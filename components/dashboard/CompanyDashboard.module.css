@@ -1,0 +1,24 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.loading {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.error {
+  font-size: 13px;
+  color: #dc2626;
+}
+
+

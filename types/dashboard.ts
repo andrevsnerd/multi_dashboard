@@ -12,6 +12,11 @@ export interface CategoryRevenue {
   totalQuantity: number;
 }
 
+export interface DateRangeInput {
+  start?: string | Date;
+  end?: string | Date;
+}
+
 export interface SalesSummary {
   totalRevenue: number;
   totalQuantity: number;

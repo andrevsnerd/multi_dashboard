@@ -2,20 +2,21 @@ import sql from 'mssql';
 
 import { resolveCompany, type CompanyModule } from '@/lib/config/company';
 import { withRequest } from '@/lib/db/connection';
-import type { CategoryRevenue, ProductRevenue, SalesSummary } from '@/types/dashboard';
+import type {
+  CategoryRevenue,
+  ProductRevenue,
+  SalesSummary,
+  DateRangeInput,
+} from '@/types/dashboard';
+import { normalizeRangeForQuery } from '@/lib/utils/date';
 
 const DEFAULT_LIMIT = 5;
 
-interface DateRange {
-  start: Date;
-  end: Date;
-}
-
-function buildCurrentMonthRange(): DateRange {
-  const now = new Date();
-  const start = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
-  const end = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1));
-  return { start, end };
+function resolveRange(range?: DateRangeInput) {
+  return normalizeRangeForQuery({
+    start: range?.start,
+    end: range?.end,
+  });
 }
 
 function buildFilialFilter(
@@ -53,23 +54,22 @@ function buildFilialFilter(
 export interface TopQueryParams {
   limit?: number;
   company?: string;
-  period?: 'current-month';
+  range?: DateRangeInput;
 }
 
 export interface SummaryQueryParams {
   company?: string;
-  period?: 'current-month';
+  range?: DateRangeInput;
 }
 
 export async function fetchTopProducts({
   limit = DEFAULT_LIMIT,
   company,
-  period = 'current-month',
+  range,
 }: TopQueryParams = {}): Promise<ProductRevenue[]> {
   return withRequest(async (request) => {
     request.input('limit', sql.Int, limit);
-    const { start, end } =
-      period === 'current-month' ? buildCurrentMonthRange() : buildCurrentMonthRange();
+    const { start, end } = resolveRange(range);
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
@@ -107,11 +107,10 @@ export async function fetchTopProducts({
 
 export async function fetchSalesSummary({
   company,
-  period = 'current-month',
+  range,
 }: SummaryQueryParams = {}): Promise<SalesSummary> {
   return withRequest(async (request) => {
-    const { start, end } =
-      period === 'current-month' ? buildCurrentMonthRange() : buildCurrentMonthRange();
+    const { start, end } = resolveRange(range);
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
@@ -163,12 +162,11 @@ export async function fetchSalesSummary({
 export async function fetchTopCategories({
   limit = DEFAULT_LIMIT,
   company,
-  period = 'current-month',
+  range,
 }: TopQueryParams = {}): Promise<CategoryRevenue[]> {
   return withRequest(async (request) => {
     request.input('limit', sql.Int, limit);
-    const { start, end } =
-      period === 'current-month' ? buildCurrentMonthRange() : buildCurrentMonthRange();
+    const { start, end } = resolveRange(range);
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 

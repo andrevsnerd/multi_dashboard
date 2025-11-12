@@ -6,14 +6,21 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const limit = Number(searchParams.get('limit') ?? '');
   const company = searchParams.get('company') ?? undefined;
-  const periodParam = searchParams.get('period');
-  const period = periodParam === 'current-month' ? 'current-month' : undefined;
+  const startParam = searchParams.get('start');
+  const endParam = searchParams.get('end');
+  const range =
+    startParam && endParam
+      ? {
+          start: startParam,
+          end: endParam,
+        }
+      : undefined;
 
   try {
     const data = await fetchTopCategories({
       limit: Number.isFinite(limit) && limit > 0 ? limit : undefined,
       company,
-      period,
+      range,
     });
 
     return NextResponse.json({ data });
