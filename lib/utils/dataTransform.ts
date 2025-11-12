@@ -15,7 +15,7 @@ export function convertDates<T extends AnyRecord>(
     return data;
   }
 
-  return data.map((item) => {
+  return data.map((item): T => {
     const next: AnyRecord = { ...item };
 
     columns.forEach((column) => {
@@ -49,18 +49,18 @@ export function dropColumns<T extends AnyRecord>(
     return data;
   }
 
-  return data.map((item) => {
-    const next = { ...item };
+  return data.map((item): T => {
+    const next: AnyRecord = { ...item };
     columns.forEach((column) => {
       if (column in next) {
         delete next[column];
       }
     });
-    return next;
+    return next as T;
   });
 }
 
-interface BarcodeRow {
+export interface BarcodeRow {
   PRODUTO: string;
   COR_PRODUTO?: string | null;
   TAMANHO?: string | null;
@@ -117,8 +117,8 @@ export function enrichWithBarcode<T extends AnyRecord>(
     }
   });
 
-  return data.map((item) => {
-    const next = { ...item };
+  return data.map((item): T => {
+    const next: AnyRecord = { ...item };
     const product = buildBarcodeKey([item.PRODUTO as string | undefined]);
     const productColor = buildBarcodeKey([
       item.PRODUTO as string | undefined,

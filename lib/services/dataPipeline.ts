@@ -8,6 +8,7 @@ import {
   enrichWithBarcode,
   convertDates,
   toNumber,
+  type BarcodeRow,
 } from '@/lib/utils/dataTransform';
 import { fetchAllRaw, type RawData } from '@/lib/repositories/rawData';
 
@@ -98,11 +99,14 @@ export async function processEstoque(
     'DATA_AJUSTE',
   ]);
 
-  const withTotals = converted.map((item) => ({
-    ...item,
-    VALOR_TOTAL_ESTOQUE:
-      toNumber(item.ESTOQUE) * toNumber(item.CUSTO_REPOSICAO1),
-  }));
+  const withTotals = converted.map((item) => {
+    const record = item as AnyRecord;
+    return {
+      ...record,
+      VALOR_TOTAL_ESTOQUE:
+        toNumber(record.ESTOQUE) * toNumber(record.CUSTO_REPOSICAO1),
+    };
+  });
 
   const trimmed = dropColumns(withTotals, INVENTORY_COLUMNS_TO_DROP);
   const enriched = enrichWithBarcode(trimmed, produtosBarra);
@@ -112,13 +116,14 @@ export async function processEstoque(
 
 export async function processVendas(
   rawData?: RawData,
-  produtosBarra?: AnyRecord[]
+  produtosBarra?: BarcodeRow[]
 ) {
   const data =
     rawData ??
     (await fetchAllRaw());
 
-  const barcodes = produtosBarra ?? data.produtosBarra;
+  const barcodes: BarcodeRow[] =
+    produtosBarra ?? (data.produtosBarra as BarcodeRow[]);
 
   const filtered = data.vendas.filter((item) => toNumber(item.QTDE) > 0);
   const converted = convertDates(filtered, ['DATA_VENDA']);
@@ -231,10 +236,11 @@ export async function processEntradas(
   ];
 
   const ordered = converted.map((item) => {
+    const record = item as AnyRecord;
     const orderedItem: AnyRecord = {};
     desiredOrder.forEach((key) => {
-      if (key in item) {
-        orderedItem[key] = item[key];
+      if (key in record) {
+        orderedItem[key] = record[key];
       }
     });
     return orderedItem;
