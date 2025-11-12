@@ -68,3 +68,52 @@ export function normalizeRangeForQuery(range?: {
   };
 }
 
+function addMonthsUtc(date: Date, months: number): Date {
+  if (months === 0) {
+    return new Date(date.getTime());
+  }
+
+  const utcYear = date.getUTCFullYear();
+  const utcMonth = date.getUTCMonth();
+  const utcDate = date.getUTCDate();
+  const utcHours = date.getUTCHours();
+  const utcMinutes = date.getUTCMinutes();
+  const utcSeconds = date.getUTCSeconds();
+  const utcMilliseconds = date.getUTCMilliseconds();
+
+  const totalMonths = utcYear * 12 + utcMonth + months;
+  const targetYear = Math.floor(totalMonths / 12);
+  const targetMonth = ((totalMonths % 12) + 12) % 12;
+  const lastDayOfTargetMonth = new Date(
+    Date.UTC(targetYear, targetMonth + 1, 0)
+  ).getUTCDate();
+  const targetDay = Math.min(utcDate, lastDayOfTargetMonth);
+
+  return new Date(
+    Date.UTC(
+      targetYear,
+      targetMonth,
+      targetDay,
+      utcHours,
+      utcMinutes,
+      utcSeconds,
+      utcMilliseconds
+    )
+  );
+}
+
+export function shiftRangeByMonths(
+  range: NormalizedRange,
+  months: number
+): NormalizedRange {
+  const duration = range.end.getTime() - range.start.getTime();
+
+  const shiftedStart = addMonthsUtc(range.start, months);
+  const shiftedEnd = new Date(shiftedStart.getTime() + duration);
+
+  return {
+    start: shiftedStart,
+    end: shiftedEnd,
+  };
+}
+

@@ -1,18 +1,24 @@
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 24px;
 }
 
 .card {
   background: #ffffff;
   border-radius: 20px;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  padding: 20px 24px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  gap: 20px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .label {
@@ -22,19 +28,84 @@
   color: #94a3b8;
 }
 
+.valueBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .value {
-  font-size: 22px;
+  font-size: 32px;
   font-weight: 700;
   color: #0f172a;
+  line-height: 1.2;
+}
+
+.valueHighlight {
+  color: #0ea5e9;
 }
 
 .description {
-  font-size: 13px;
+  margin: 0;
+  font-size: 14px;
   color: #64748b;
 }
 
-.highlight {
-  color: #0284c7;
+.divider {
+  height: 1px;
+  background: rgba(148, 163, 184, 0.24);
 }
 
+.comparison {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
 
+.previous {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.previousLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #94a3b8;
+}
+
+.previousValue {
+  font-size: 16px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.changeBadge {
+  border-radius: 9999px;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 88px;
+  text-transform: uppercase;
+}
+
+.changeBadgePositive {
+  background: rgba(22, 163, 74, 0.14);
+  color: #15803d;
+}
+
+.changeBadgeNegative {
+  background: rgba(220, 38, 38, 0.14);
+  color: #b91c1c;
+}
+
+.changeBadgeNeutral {
+  background: rgba(148, 163, 184, 0.18);
+  color: #475569;
+}

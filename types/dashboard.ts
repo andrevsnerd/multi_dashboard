@@ -17,11 +17,17 @@ export interface DateRangeInput {
   end?: string | Date;
 }
 
+export interface MetricSummary {
+  currentValue: number;
+  previousValue: number;
+  changePercentage: number | null;
+}
+
 export interface SalesSummary {
-  totalRevenue: number;
-  totalQuantity: number;
-  totalTickets: number;
-  averageTicket: number;
+  totalRevenue: MetricSummary;
+  totalQuantity: MetricSummary;
+  totalTickets: MetricSummary;
+  averageTicket: MetricSummary;
 }
 
 

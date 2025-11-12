@@ -7,7 +7,7 @@ import DateRangeFilter, {
 } from "@/components/filters/DateRangeFilter";
 import SummaryCards from "@/components/dashboard/SummaryCards";
 import CompanyRevenueLists from "@/components/dashboard/CompanyRevenueLists";
-import type { SalesSummary } from "@/types/dashboard";
+import type { MetricSummary, SalesSummary } from "@/types/dashboard";
 import { getCurrentMonthRange } from "@/lib/utils/date";
 
 import styles from "./CompanyDashboard.module.css";
@@ -17,11 +17,17 @@ interface CompanyDashboardProps {
   companyName: string;
 }
 
+const EMPTY_METRIC: MetricSummary = {
+  currentValue: 0,
+  previousValue: 0,
+  changePercentage: 0,
+};
+
 const DEFAULT_SUMMARY: SalesSummary = {
-  totalRevenue: 0,
-  totalQuantity: 0,
-  totalTickets: 0,
-  averageTicket: 0,
+  totalRevenue: { ...EMPTY_METRIC },
+  totalQuantity: { ...EMPTY_METRIC },
+  totalTickets: { ...EMPTY_METRIC },
+  averageTicket: { ...EMPTY_METRIC },
 };
 
 async function fetchSummary(company: string, range: DateRangeValue) {
