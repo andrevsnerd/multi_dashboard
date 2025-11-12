@@ -1,128 +1,84 @@
 .container {
   min-height: 100vh;
-  padding: 32px clamp(24px, 5vw, 64px);
-  background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
-  color: #f9fafb;
+  padding: 48px clamp(24px, 6vw, 80px);
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 40px;
 }
 
 .header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .label {
-  text-transform: uppercase;
-  letter-spacing: 0.24em;
   font-size: 12px;
-  color: #94a3b8;
-  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  color: #64748b;
 }
 
 .title {
-  font-size: clamp(28px, 4vw, 40px);
-  font-weight: 600;
+  font-size: clamp(32px, 5vw, 44px);
+  color: #0f172a;
+  font-weight: 700;
   margin: 0;
 }
 
-.periodo {
-  font-size: 14px;
-  color: #cbd5f5;
-  background: rgba(148, 163, 184, 0.12);
-  padding: 8px 16px;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.24);
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 24px;
-}
-
-.card {
-  background: rgba(15, 23, 42, 0.85);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 20px;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(12px);
-}
-
-.cardTitle {
-  font-size: 18px;
-  font-weight: 500;
-  margin: 0;
-  color: #e2e8f0;
-}
-
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.listItem {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-}
-
-.listItem:last-child {
-  padding-bottom: 0;
-  border-bottom: none;
-}
-
-.itemName {
-  display: block;
-  font-weight: 500;
-  color: #f8fafc;
-}
-
-.itemSubtitle {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: #94a3b8;
-}
-
-.itemMetrics {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-}
-
-.metricValue {
+.subtitle {
+  color: #475569;
   font-size: 16px;
-  font-weight: 600;
-  color: #22d3ee;
+  max-width: 520px;
 }
 
-.metricLabel {
+.actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.companyCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 28px 32px;
+  border-radius: 24px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 15px 40px rgba(15, 23, 42, 0.1);
+  text-decoration: none;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.companyCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 50px rgba(14, 165, 233, 0.2);
+  border-color: rgba(14, 165, 233, 0.25);
+}
+
+.companyLabel {
   font-size: 12px;
-  color: #94a3b8;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #0ea5e9;
 }
 
-@media (max-width: 720px) {
-  .header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
+.companyTitle {
+  font-size: 20px;
+  font-weight: 600;
+  color: #0f172a;
+}
 
-  .periodo {
-    align-self: flex-start;
+.companyHint {
+  font-size: 14px;
+  color: #64748b;
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 32px 20px;
   }
 }

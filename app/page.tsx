@@ -1,79 +1,32 @@
-import { fetchTopCategories, fetchTopProducts } from "@/lib/repositories/sales";
+import Link from "next/link";
+
 import styles from "./page.module.css";
 
-export const dynamic = "force-dynamic";
-
-export default async function Home() {
-  const [topProducts, topCategories] = await Promise.all([
-    fetchTopProducts(),
-    fetchTopCategories(),
-  ]);
-
+export default function Home() {
   return (
     <main className={styles.container}>
       <header className={styles.header}>
-        <div>
-          <p className={styles.label}>Dashboard</p>
-          <h1 className={styles.title}>Visão geral de faturamento</h1>
-        </div>
-        <p className={styles.periodo}>Últimos 90 dias</p>
+        <span className={styles.label}>Seleção de Empresa</span>
+        <h1 className={styles.title}>Escolha o ambiente de análise</h1>
+        <p className={styles.subtitle}>
+          Selecione entre as operações para acessar dashboards dedicados com filtros, métricas e
+          análises específicas.
+        </p>
       </header>
 
-      <section className={styles.grid}>
-        <article className={styles.card}>
-          <h2 className={styles.cardTitle}>Top produtos</h2>
-          <ul className={styles.list}>
-            {topProducts.map((item) => (
-              <li key={item.productId} className={styles.listItem}>
-                <div>
-                  <strong className={styles.itemName}>{item.productName}</strong>
-                  <p className={styles.itemSubtitle}>Código: {item.productId}</p>
-                </div>
-                <div className={styles.itemMetrics}>
-                  <span className={styles.metricValue}>
-                    {item.totalRevenue.toLocaleString("pt-BR", {
-                      style: "currency",
-                      currency: "BRL",
-                    })}
-                  </span>
-                  <span className={styles.metricLabel}>
-                    {item.totalQuantity} unid.
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </article>
+      <div className={styles.actions}>
+        <Link href="/nerd" className={styles.companyCard}>
+          <span className={styles.companyLabel}>NERD</span>
+          <strong className={styles.companyTitle}>Dashboard NERD</strong>
+          <span className={styles.companyHint}>Filiais, KPIs e análises personalizadas</span>
+        </Link>
 
-        <article className={styles.card}>
-          <h2 className={styles.cardTitle}>Top categorias</h2>
-          <ul className={styles.list}>
-            {topCategories.map((item) => (
-              <li key={item.categoryId} className={styles.listItem}>
-                <div>
-                  <strong className={styles.itemName}>
-                    {item.categoryName}
-                  </strong>
-                  <p className={styles.itemSubtitle}>
-                    Código: {item.categoryId}
-                  </p>
-                </div>
-                <div className={styles.itemMetrics}>
-                  <span className={styles.metricValue}>
-                    {item.totalRevenue.toLocaleString("pt-BR", {
-                      style: "currency",
-                      currency: "BRL",
-                    })}
-                  </span>
-                  <span className={styles.metricLabel}>
-                    {item.totalQuantity} unid.
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </article>
-      </section>
+        <Link href="/scarfme" className={styles.companyCard}>
+          <span className={styles.companyLabel}>SCARF ME</span>
+          <strong className={styles.companyTitle}>Dashboard Scarf Me</strong>
+          <span className={styles.companyHint}>Indicadores estratégicos por operação</span>
+        </Link>
+      </div>
     </main>
   );
 }

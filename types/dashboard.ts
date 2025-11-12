@@ -12,4 +12,11 @@ export interface CategoryRevenue {
   totalQuantity: number;
 }
 
+export interface SalesSummary {
+  totalRevenue: number;
+  totalQuantity: number;
+  totalTickets: number;
+  averageTicket: number;
+}
+
 

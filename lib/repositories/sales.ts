@@ -1,21 +1,27 @@
 import sql from 'mssql';
 
-import { resolveCompany } from '@/lib/config/company';
+import { resolveCompany, type CompanyModule } from '@/lib/config/company';
 import { withRequest } from '@/lib/db/connection';
-import type { CategoryRevenue, ProductRevenue } from '@/types/dashboard';
+import type { CategoryRevenue, ProductRevenue, SalesSummary } from '@/types/dashboard';
 
 const DEFAULT_LIMIT = 5;
-const DEFAULT_DAYS = 90;
 
-function buildSinceDate(days: number): Date {
-  const since = new Date();
-  since.setDate(since.getDate() - days);
-  return since;
+interface DateRange {
+  start: Date;
+  end: Date;
+}
+
+function buildCurrentMonthRange(): DateRange {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+  const end = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1));
+  return { start, end };
 }
 
 function buildFilialFilter(
   request: sql.Request,
-  companySlug?: string
+  companySlug: string | undefined,
+  module: CompanyModule
 ): string {
   if (!companySlug) {
     return '';
@@ -23,15 +29,21 @@ function buildFilialFilter(
 
   const company = resolveCompany(companySlug);
 
-  if (!company || company.filialCodes.length === 0) {
+  if (!company) {
     return '';
   }
 
-  company.filialCodes.forEach((filial, index) => {
+  const filiais = company.filialFilters[module] ?? [];
+
+  if (filiais.length === 0) {
+    return '';
+  }
+
+  filiais.forEach((filial, index) => {
     request.input(`filial${index}`, sql.VarChar, filial);
   });
 
-  const placeholders = company.filialCodes
+  const placeholders = filiais
     .map((_, index) => `@filial${index}`)
     .join(', ');
 
@@ -40,20 +52,28 @@ function buildFilialFilter(
 
 export interface TopQueryParams {
   limit?: number;
-  days?: number;
   company?: string;
+  period?: 'current-month';
+}
+
+export interface SummaryQueryParams {
+  company?: string;
+  period?: 'current-month';
 }
 
 export async function fetchTopProducts({
   limit = DEFAULT_LIMIT,
-  days = DEFAULT_DAYS,
   company,
+  period = 'current-month',
 }: TopQueryParams = {}): Promise<ProductRevenue[]> {
   return withRequest(async (request) => {
     request.input('limit', sql.Int, limit);
-    request.input('since', sql.DateTime, buildSinceDate(days));
+    const { start, end } =
+      period === 'current-month' ? buildCurrentMonthRange() : buildCurrentMonthRange();
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
 
-    const filialFilter = buildFilialFilter(request, company);
+    const filialFilter = buildFilialFilter(request, company, 'sales');
 
     const query = `
       SELECT TOP (@limit)
@@ -67,7 +87,8 @@ export async function fetchTopProducts({
         ) AS totalRevenue,
         SUM(vp.QTDE) AS totalQuantity
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      WHERE vp.DATA_VENDA >= @since
+      WHERE vp.DATA_VENDA >= @startDate
+        AND vp.DATA_VENDA < @endDate
         AND vp.QTDE > 0
         ${filialFilter}
       GROUP BY vp.PRODUTO
@@ -84,16 +105,74 @@ export async function fetchTopProducts({
   });
 }
 
+export async function fetchSalesSummary({
+  company,
+  period = 'current-month',
+}: SummaryQueryParams = {}): Promise<SalesSummary> {
+  return withRequest(async (request) => {
+    const { start, end } =
+      period === 'current-month' ? buildCurrentMonthRange() : buildCurrentMonthRange();
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+
+    const filialFilter = buildFilialFilter(request, company, 'sales');
+
+    const query = `
+      SELECT
+        SUM(
+          CASE
+            WHEN vp.QTDE_CANCELADA > 0 THEN 0
+            ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
+          END
+        ) AS totalRevenue,
+        SUM(vp.QTDE) AS totalQuantity,
+        COUNT(DISTINCT vp.TICKET) AS totalTickets
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      WHERE vp.DATA_VENDA >= @startDate
+        AND vp.DATA_VENDA < @endDate
+        AND vp.QTDE > 0
+        ${filialFilter};
+    `;
+
+    const result = await request.query<{
+      totalRevenue: number | null;
+      totalQuantity: number | null;
+      totalTickets: number | null;
+    }>(query);
+
+    const summary = result.recordset[0] ?? {
+      totalRevenue: 0,
+      totalQuantity: 0,
+      totalTickets: 0,
+    };
+
+    const totalRevenue = Number(summary.totalRevenue ?? 0);
+    const totalQuantity = Number(summary.totalQuantity ?? 0);
+    const totalTickets = Number(summary.totalTickets ?? 0);
+
+    return {
+      totalRevenue,
+      totalQuantity,
+      totalTickets,
+      averageTicket:
+        totalTickets > 0 ? Number((totalRevenue / totalTickets).toFixed(2)) : 0,
+    };
+  });
+}
+
 export async function fetchTopCategories({
   limit = DEFAULT_LIMIT,
-  days = DEFAULT_DAYS,
   company,
+  period = 'current-month',
 }: TopQueryParams = {}): Promise<CategoryRevenue[]> {
   return withRequest(async (request) => {
     request.input('limit', sql.Int, limit);
-    request.input('since', sql.DateTime, buildSinceDate(days));
+    const { start, end } =
+      period === 'current-month' ? buildCurrentMonthRange() : buildCurrentMonthRange();
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
 
-    const filialFilter = buildFilialFilter(request, company);
+    const filialFilter = buildFilialFilter(request, company, 'sales');
 
     const query = `
       SELECT TOP (@limit)
@@ -107,7 +186,8 @@ export async function fetchTopCategories({
         ) AS totalRevenue,
         SUM(vp.QTDE) AS totalQuantity
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      WHERE vp.DATA_VENDA >= @since
+      WHERE vp.DATA_VENDA >= @startDate
+        AND vp.DATA_VENDA < @endDate
         AND vp.QTDE > 0
         ${filialFilter}
       GROUP BY COALESCE(vp.GRUPO_PRODUTO, 'SEM GRUPO')
