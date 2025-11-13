@@ -1,7 +1,7 @@
 import sql from 'mssql';
 
 import { resolveCompany, type CompanyModule } from '@/lib/config/company';
-import { withRequest } from '@/lib/db/connection';
+import { getConnectionPool, withRequest } from '@/lib/db/connection';
 import type {
   CategoryRevenue,
   ProductRevenue,
@@ -63,6 +63,15 @@ export interface SummaryQueryParams {
   range?: DateRangeInput;
 }
 
+export interface SalesSummaryResult {
+  summary: SalesSummary;
+  currentPeriodLastSaleDate: Date | null;
+  availableRange: {
+    start: Date | null;
+    end: Date | null;
+  };
+}
+
 export async function fetchTopProducts({
   limit = DEFAULT_LIMIT,
   company,
@@ -109,7 +118,7 @@ export async function fetchTopProducts({
 export async function fetchSalesSummary({
   company,
   range,
-}: SummaryQueryParams = {}): Promise<SalesSummary> {
+}: SummaryQueryParams = {}): Promise<SalesSummaryResult> {
   return withRequest(async (request) => {
     const currentRange = resolveRange(range);
     const { start, end } = currentRange;
@@ -133,7 +142,8 @@ export async function fetchSalesSummary({
             END
           ) AS totalRevenue,
           SUM(vp.QTDE) AS totalQuantity,
-          COUNT(DISTINCT vp.TICKET) AS totalTickets
+          COUNT(DISTINCT vp.TICKET) AS totalTickets,
+          MAX(vp.DATA_VENDA) AS lastSaleDate
         FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
         WHERE vp.DATA_VENDA >= @startDate
           AND vp.DATA_VENDA < @endDate
@@ -151,7 +161,8 @@ export async function fetchSalesSummary({
             END
           ) AS totalRevenue,
           SUM(vp.QTDE) AS totalQuantity,
-          COUNT(DISTINCT vp.TICKET) AS totalTickets
+          COUNT(DISTINCT vp.TICKET) AS totalTickets,
+          MAX(vp.DATA_VENDA) AS lastSaleDate
         FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
         WHERE vp.DATA_VENDA >= @prevStartDate
           AND vp.DATA_VENDA < @prevEndDate
@@ -166,6 +177,7 @@ export async function fetchSalesSummary({
       totalRevenue: number | null;
       totalQuantity: number | null;
       totalTickets: number | null;
+      lastSaleDate: Date | null;
     }>(query);
 
     const currentRow =
@@ -173,12 +185,14 @@ export async function fetchSalesSummary({
         totalRevenue: 0,
         totalQuantity: 0,
         totalTickets: 0,
+        lastSaleDate: null,
       };
     const previousRow =
       result.recordset.find((row) => row.period === 'previous') ?? {
         totalRevenue: 0,
         totalQuantity: 0,
         totalTickets: 0,
+        lastSaleDate: null,
       };
 
     const currentRevenue = Number(currentRow.totalRevenue ?? 0);
@@ -216,11 +230,50 @@ export async function fetchSalesSummary({
       };
     };
 
-    return {
+    const summary: SalesSummary = {
       totalRevenue: buildMetric(currentRevenue, previousRevenue),
       totalQuantity: buildMetric(currentQuantity, previousQuantity),
       totalTickets: buildMetric(currentTickets, previousTickets),
       averageTicket: buildMetric(averageTicketCurrent, averageTicketPrevious),
+    };
+
+    const lastSaleDate = currentRow.lastSaleDate
+      ? new Date(currentRow.lastSaleDate)
+      : null;
+
+    const pool = await getConnectionPool();
+    const availabilityRequest = pool.request();
+    const availabilityFilter = buildFilialFilter(availabilityRequest, company, 'sales');
+    const availabilityQuery = `
+      SELECT
+        MIN(vp.DATA_VENDA) AS firstSaleDate,
+        MAX(vp.DATA_VENDA) AS lastSaleDate
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      WHERE vp.QTDE > 0
+        ${availabilityFilter}
+    `;
+
+    const availabilityResult = await availabilityRequest.query<{
+      firstSaleDate: Date | null;
+      lastSaleDate: Date | null;
+    }>(availabilityQuery);
+
+    const availabilityRow = availabilityResult.recordset[0] ?? {
+      firstSaleDate: null,
+      lastSaleDate: null,
+    };
+
+    return {
+      summary,
+      currentPeriodLastSaleDate: lastSaleDate,
+      availableRange: {
+        start: availabilityRow.firstSaleDate
+          ? new Date(availabilityRow.firstSaleDate)
+          : null,
+        end: availabilityRow.lastSaleDate
+          ? new Date(availabilityRow.lastSaleDate)
+          : null,
+      },
     };
   });
 }

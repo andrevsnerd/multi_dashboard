@@ -16,9 +16,13 @@ export function endOfCurrentMonth(): Date {
 }
 
 export function getCurrentMonthRange(): NormalizedRange {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
   return {
-    start: startOfCurrentMonth(),
-    end: endOfCurrentMonth(),
+    start,
+    end,
   };
 }
 
@@ -106,10 +110,39 @@ export function shiftRangeByMonths(
   range: NormalizedRange,
   months: number
 ): NormalizedRange {
-  const duration = range.end.getTime() - range.start.getTime();
+  if (months === 0) {
+    return {
+      start: new Date(range.start.getTime()),
+      end: new Date(range.end.getTime()),
+    };
+  }
 
-  const shiftedStart = addMonthsUtc(range.start, months);
-  const shiftedEnd = new Date(shiftedStart.getTime() + duration);
+  const desiredDuration = Math.max(0, range.end.getTime() - range.start.getTime());
+
+  const initialStart = addMonthsUtc(range.start, months);
+  const monthStart = new Date(
+    Date.UTC(initialStart.getUTCFullYear(), initialStart.getUTCMonth(), 1)
+  );
+  const nextMonthStart = new Date(
+    Date.UTC(initialStart.getUTCFullYear(), initialStart.getUTCMonth() + 1, 1)
+  );
+
+  let shiftedStart = initialStart;
+  let shiftedEndTime = initialStart.getTime() + desiredDuration;
+
+  if (shiftedEndTime > nextMonthStart.getTime()) {
+    shiftedEndTime = nextMonthStart.getTime();
+  }
+
+  let shiftedEnd = new Date(shiftedEndTime);
+  const actualDuration = shiftedEndTime - shiftedStart.getTime();
+
+  if (actualDuration < desiredDuration) {
+    const desiredStartTime = shiftedEndTime - desiredDuration;
+    const clampedStartTime = Math.max(monthStart.getTime(), desiredStartTime);
+    shiftedStart = new Date(clampedStartTime);
+    shiftedEnd = new Date(shiftedEndTime);
+  }
 
   return {
     start: shiftedStart,

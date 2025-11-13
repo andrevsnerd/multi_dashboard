@@ -16,12 +16,23 @@ export async function GET(request: Request) {
       : undefined;
 
   try {
-    const data = await fetchSalesSummary({
+    const {
+      summary,
+      currentPeriodLastSaleDate,
+      availableRange,
+    } = await fetchSalesSummary({
       company,
       range,
     });
 
-    return NextResponse.json({ data });
+    return NextResponse.json({
+      data: summary,
+      lastAvailableDate: currentPeriodLastSaleDate?.toISOString() ?? null,
+      availableRange: {
+        start: availableRange.start ? availableRange.start.toISOString() : null,
+        end: availableRange.end ? availableRange.end.toISOString() : null,
+      },
+    });
   } catch (error) {
     console.error('Erro ao carregar resumo de vendas', error);
     return NextResponse.json(
@@ -30,5 +41,6 @@ export async function GET(request: Request) {
     );
   }
 }
+
 
 

@@ -182,3 +182,4 @@ export const SALES_COLUMNS_TO_DROP = [
   'QTDE_CANCELADA',
 ];
 
+

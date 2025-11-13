@@ -30,7 +30,19 @@ const DEFAULT_SUMMARY: SalesSummary = {
   averageTicket: { ...EMPTY_METRIC },
 };
 
-async function fetchSummary(company: string, range: DateRangeValue) {
+interface SalesSummaryResponse {
+  summary: SalesSummary;
+  lastAvailableDate: Date | null;
+  availableRange: {
+    start: Date | null;
+    end: Date | null;
+  };
+}
+
+async function fetchSummary(
+  company: string,
+  range: DateRangeValue,
+): Promise<SalesSummaryResponse> {
   const searchParams = new URLSearchParams({
     company,
     start: range.startDate.toISOString(),
@@ -45,8 +57,28 @@ async function fetchSummary(company: string, range: DateRangeValue) {
     throw new Error("Erro ao carregar resumo de vendas");
   }
 
-  const json = (await response.json()) as { data: SalesSummary };
-  return json.data;
+  const json = (await response.json()) as {
+    data: SalesSummary;
+    lastAvailableDate?: string | null;
+    availableRange?: {
+      start: string | null;
+      end: string | null;
+    };
+  };
+
+  const lastAvailableDate = json.lastAvailableDate
+    ? new Date(json.lastAvailableDate)
+    : null;
+  const availableRange = {
+    start: json.availableRange?.start ? new Date(json.availableRange.start) : null,
+    end: json.availableRange?.end ? new Date(json.availableRange.end) : null,
+  };
+
+  return {
+    summary: json.data,
+    lastAvailableDate,
+    availableRange,
+  };
 }
 
 export default function CompanyDashboard({
@@ -63,6 +95,16 @@ export default function CompanyDashboard({
 
   const [range, setRange] = useState<DateRangeValue>(initialRange);
   const [summary, setSummary] = useState<SalesSummary>(DEFAULT_SUMMARY);
+  const [lastAvailableDate, setLastAvailableDate] = useState<Date | null>(
+    initialRange.endDate,
+  );
+  const [availableSalesRange, setAvailableSalesRange] = useState<{
+    start: Date | null;
+    end: Date | null;
+  }>({
+    start: null,
+    end: initialRange.endDate,
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,9 +120,15 @@ export default function CompanyDashboard({
       setLoading(true);
       setError(null);
       try {
-        const data = await fetchSummary(companyKey, range);
+        const {
+          summary: data,
+          lastAvailableDate: apiLastAvailableDate,
+          availableRange,
+        } = await fetchSummary(companyKey, range);
         if (active) {
           setSummary(data);
+          setLastAvailableDate(availableRange.end ?? apiLastAvailableDate);
+          setAvailableSalesRange(availableRange);
         }
       } catch (err) {
         if (active) {
@@ -102,10 +150,48 @@ export default function CompanyDashboard({
     };
   }, [companyKey, range, rangeKey]);
 
+  useEffect(() => {
+    if (!lastAvailableDate) {
+      return;
+    }
+
+    if (range.endDate.getTime() <= lastAvailableDate.getTime()) {
+      return;
+    }
+
+    setRange((prev) => {
+      if (prev.endDate.getTime() <= lastAvailableDate.getTime()) {
+        return prev;
+      }
+
+      const clampedEnd = new Date(lastAvailableDate.getTime());
+      const startTime = prev.startDate.getTime();
+      const clampedStart =
+        startTime > clampedEnd.getTime() ? new Date(clampedEnd.getTime()) : prev.startDate;
+
+      return {
+        startDate: clampedStart,
+        endDate: clampedEnd,
+      };
+    });
+  }, [lastAvailableDate, range.endDate]);
+
   return (
     <div className={styles.wrapper}>
       <div className={styles.controls}>
-        <DateRangeFilter value={range} onChange={setRange} />
+        <DateRangeFilter
+          value={range}
+          onChange={setRange}
+          maxSelectableDate={lastAvailableDate ?? undefined}
+          availableRange={
+            availableSalesRange.start && availableSalesRange.end
+              ? {
+                  startDate: availableSalesRange.start,
+                  endDate: availableSalesRange.end,
+                }
+              : undefined
+          }
+        />
         {loading ? <span className={styles.loading}>Atualizando métricas…</span> : null}
         {error ? <span className={styles.error}>{error}</span> : null}
       </div>
