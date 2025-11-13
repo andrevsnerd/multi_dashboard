@@ -6,6 +6,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const limit = Number(searchParams.get('limit') ?? '');
   const company = searchParams.get('company') ?? undefined;
+  const filial = searchParams.get('filial');
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
   const range =
@@ -21,6 +22,7 @@ export async function GET(request: Request) {
       limit: Number.isFinite(limit) && limit > 0 ? limit : undefined,
       company,
       range,
+      filial: filial || null,
     });
 
     return NextResponse.json({ data });

@@ -5,6 +5,7 @@ import { fetchSalesSummary } from '@/lib/repositories/sales';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const company = searchParams.get('company') ?? undefined;
+  const filial = searchParams.get('filial');
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
   const range =
@@ -23,6 +24,7 @@ export async function GET(request: Request) {
     } = await fetchSalesSummary({
       company,
       range,
+      filial: filial || null,
     });
 
     return NextResponse.json({

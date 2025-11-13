@@ -6,10 +6,11 @@ import type { CategoryRevenue, ProductRevenue } from "@/types/dashboard";
 
 import styles from "./RevenueDashboard.module.css";
 
-interface CompanyRevenueListsProps {
+export interface CompanyRevenueListsProps {
   companyKey: "nerd" | "scarfme";
   startDate: Date;
   endDate: Date;
+  filial?: string | null | undefined;
   title?: string;
   subtitle?: string;
 }
@@ -23,12 +24,17 @@ async function fetchRevenue(
   company: string,
   startDate: Date,
   endDate: Date,
+  filial: string | null,
 ): Promise<RevenueState> {
   const searchParams = new URLSearchParams({
     company,
     start: startDate.toISOString(),
     end: endDate.toISOString(),
   });
+  
+  if (filial) {
+    searchParams.set('filial', filial);
+  }
 
   const [productsResponse, categoriesResponse] = await Promise.all([
     fetch(`/api/top-products?${searchParams.toString()}`, { cache: "no-store" }),
@@ -59,6 +65,7 @@ export default function CompanyRevenueLists({
   companyKey,
   startDate,
   endDate,
+  filial = null,
   title = "Top faturamento",
   subtitle = "Produtos e categorias com maior faturamento no período selecionado.",
 }: CompanyRevenueListsProps) {
@@ -67,8 +74,8 @@ export default function CompanyRevenueLists({
   const [error, setError] = useState<string | null>(null);
 
   const rangeKey = useMemo(
-    () => `${startDate.toISOString()}::${endDate.toISOString()}`,
-    [startDate, endDate],
+    () => `${startDate.toISOString()}::${endDate.toISOString()}::${filial ?? 'all'}`,
+    [startDate, endDate, filial],
   );
 
   useEffect(() => {
@@ -79,7 +86,7 @@ export default function CompanyRevenueLists({
       setError(null);
 
       try {
-        const revenue = await fetchRevenue(companyKey, startDate, endDate);
+        const revenue = await fetchRevenue(companyKey, startDate, endDate, filial);
         if (active) {
           setState(revenue);
         }
@@ -101,7 +108,7 @@ export default function CompanyRevenueLists({
     return () => {
       active = false;
     };
-  }, [companyKey, rangeKey, startDate, endDate]);
+  }, [companyKey, rangeKey, startDate, endDate, filial]);
 
   return (
     <section className={styles.container}>

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import DateRangeFilter, {
   type DateRangeValue,
 } from "@/components/filters/DateRangeFilter";
+import FilialFilter from "@/components/filters/FilialFilter";
 import SummaryCards from "@/components/dashboard/SummaryCards";
 import CompanyRevenueLists from "@/components/dashboard/CompanyRevenueLists";
 import type { MetricSummary, SalesSummary } from "@/types/dashboard";
@@ -42,12 +43,17 @@ interface SalesSummaryResponse {
 async function fetchSummary(
   company: string,
   range: DateRangeValue,
+  filial: string | null,
 ): Promise<SalesSummaryResponse> {
   const searchParams = new URLSearchParams({
     company,
     start: range.startDate.toISOString(),
     end: range.endDate.toISOString(),
   });
+  
+  if (filial) {
+    searchParams.set('filial', filial);
+  }
 
   const response = await fetch(`/api/sales-summary?${searchParams.toString()}`, {
     cache: "no-store",
@@ -94,6 +100,7 @@ export default function CompanyDashboard({
   }, []);
 
   const [range, setRange] = useState<DateRangeValue>(initialRange);
+  const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
   const [summary, setSummary] = useState<SalesSummary>(DEFAULT_SUMMARY);
   const [lastAvailableDate, setLastAvailableDate] = useState<Date | null>(
     initialRange.endDate,
@@ -109,8 +116,8 @@ export default function CompanyDashboard({
   const [error, setError] = useState<string | null>(null);
 
   const rangeKey = useMemo(
-    () => `${range.startDate.toISOString()}::${range.endDate.toISOString()}`,
-    [range.startDate, range.endDate],
+    () => `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}`,
+    [range.startDate, range.endDate, selectedFilial],
   );
 
   useEffect(() => {
@@ -124,7 +131,7 @@ export default function CompanyDashboard({
           summary: data,
           lastAvailableDate: apiLastAvailableDate,
           availableRange,
-        } = await fetchSummary(companyKey, range);
+        } = await fetchSummary(companyKey, range, selectedFilial);
         if (active) {
           setSummary(data);
           setLastAvailableDate(availableRange.end ?? apiLastAvailableDate);
@@ -192,6 +199,11 @@ export default function CompanyDashboard({
               : undefined
           }
         />
+        <FilialFilter
+          companyKey={companyKey}
+          value={selectedFilial}
+          onChange={setSelectedFilial}
+        />
         {loading ? <span className={styles.loading}>Atualizando métricas…</span> : null}
         {error ? <span className={styles.error}>{error}</span> : null}
       </div>
@@ -202,6 +214,7 @@ export default function CompanyDashboard({
         companyKey={companyKey}
         startDate={range.startDate}
         endDate={range.endDate}
+        filial={selectedFilial}
       />
     </div>
   );

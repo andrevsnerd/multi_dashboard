@@ -23,7 +23,8 @@ function resolveRange(range?: DateRangeInput) {
 function buildFilialFilter(
   request: sql.Request,
   companySlug: string | undefined,
-  module: CompanyModule
+  module: CompanyModule,
+  specificFilial?: string | null
 ): string {
   if (!companySlug) {
     return '';
@@ -35,6 +36,13 @@ function buildFilialFilter(
     return '';
   }
 
+  // Se uma filial específica foi selecionada, usar apenas ela
+  if (specificFilial) {
+    request.input('filial', sql.VarChar, specificFilial);
+    return `AND vp.FILIAL = @filial`;
+  }
+
+  // Caso contrário, usar todas as filiais da empresa
   const filiais = company.filialFilters[module] ?? [];
 
   if (filiais.length === 0) {
@@ -56,11 +64,13 @@ export interface TopQueryParams {
   limit?: number;
   company?: string;
   range?: DateRangeInput;
+  filial?: string | null;
 }
 
 export interface SummaryQueryParams {
   company?: string;
   range?: DateRangeInput;
+  filial?: string | null;
 }
 
 export interface SalesSummaryResult {
@@ -76,6 +86,7 @@ export async function fetchTopProducts({
   limit = DEFAULT_LIMIT,
   company,
   range,
+  filial,
 }: TopQueryParams = {}): Promise<ProductRevenue[]> {
   return withRequest(async (request) => {
     request.input('limit', sql.Int, limit);
@@ -83,7 +94,7 @@ export async function fetchTopProducts({
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const filialFilter = buildFilialFilter(request, company, 'sales');
+    const filialFilter = buildFilialFilter(request, company, 'sales', filial);
 
     const query = `
       SELECT TOP (@limit)
@@ -118,6 +129,7 @@ export async function fetchTopProducts({
 export async function fetchSalesSummary({
   company,
   range,
+  filial,
 }: SummaryQueryParams = {}): Promise<SalesSummaryResult> {
   return withRequest(async (request) => {
     const currentRange = resolveRange(range);
@@ -129,7 +141,7 @@ export async function fetchSalesSummary({
     request.input('prevStartDate', sql.DateTime, previousRange.start);
     request.input('prevEndDate', sql.DateTime, previousRange.end);
 
-    const filialFilter = buildFilialFilter(request, company, 'sales');
+    const filialFilter = buildFilialFilter(request, company, 'sales', filial);
 
     const query = `
       WITH summary AS (
@@ -243,7 +255,7 @@ export async function fetchSalesSummary({
 
     const pool = await getConnectionPool();
     const availabilityRequest = pool.request();
-    const availabilityFilter = buildFilialFilter(availabilityRequest, company, 'sales');
+    const availabilityFilter = buildFilialFilter(availabilityRequest, company, 'sales', filial);
     const availabilityQuery = `
       SELECT
         MIN(vp.DATA_VENDA) AS firstSaleDate,
@@ -282,6 +294,7 @@ export async function fetchTopCategories({
   limit = DEFAULT_LIMIT,
   company,
   range,
+  filial,
 }: TopQueryParams = {}): Promise<CategoryRevenue[]> {
   return withRequest(async (request) => {
     request.input('limit', sql.Int, limit);
@@ -289,7 +302,7 @@ export async function fetchTopCategories({
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const filialFilter = buildFilialFilter(request, company, 'sales');
+    const filialFilter = buildFilialFilter(request, company, 'sales', filial);
 
     const query = `
       SELECT TOP (@limit)
