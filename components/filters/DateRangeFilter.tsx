@@ -263,7 +263,6 @@ export default function DateRangeFilter({
       >
         <span className={styles.buttonValue}>
           <span className={styles.valuePrimary}>{display.primary}</span>
-          <span className={styles.valueSecondary}>{display.secondary}</span>
         </span>
         <span>▼</span>
       </button>

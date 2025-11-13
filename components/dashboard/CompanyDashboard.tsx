@@ -202,7 +202,6 @@ export default function CompanyDashboard({
         companyKey={companyKey}
         startDate={range.startDate}
         endDate={range.endDate}
-        subtitle="Dados agregados para o intervalo selecionado."
       />
     </div>
   );

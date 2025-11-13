@@ -121,6 +121,28 @@
   letter-spacing: 0.08em;
 }
 
+.itemName {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.4;
+  display: block;
+}
+
+.itemNameContainer {
+  flex: 1;
+  min-width: 0;
+}
+
+.itemMetrics {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+  flex-shrink: 0;
+  min-width: 120px;
+}
+
 .metrics {
   display: flex;
   flex-direction: column;

@@ -105,14 +105,6 @@ export default function CompanyRevenueLists({
 
   return (
     <section className={styles.container}>
-      <header className={styles.header}>
-        <div>
-          <p className={styles.label}>{title}</p>
-          <h2 className={styles.title}>Detalhamento de faturamento</h2>
-        </div>
-        <p className={styles.periodo}>{subtitle}</p>
-      </header>
-
       {loading ? <div className={styles.loadingBar} /> : null}
       {error ? <div className={`${styles.state} ${styles.error}`}>{error}</div> : null}
 
@@ -123,9 +115,9 @@ export default function CompanyRevenueLists({
             <ul className={styles.list}>
               {state.products.map((item) => (
                 <li key={item.productId} className={styles.listItem}>
-                  <div>
+                  <div className={styles.itemNameContainer}>
                     <strong className={styles.itemName}>{item.productName}</strong>
-                    <p className={styles.itemSubtitle}>Código: {item.productId}</p>
+                    <p className={styles.itemSubtitle}>{item.productId}</p>
                   </div>
                   <div className={styles.itemMetrics}>
                     <span className={styles.metricValue}>
@@ -151,11 +143,8 @@ export default function CompanyRevenueLists({
             <ul className={styles.list}>
               {state.categories.map((item) => (
                 <li key={item.categoryId} className={styles.listItem}>
-                  <div>
+                  <div className={styles.itemNameContainer}>
                     <strong className={styles.itemName}>{item.categoryName}</strong>
-                    <p className={styles.itemSubtitle}>
-                      Código: {item.categoryId ?? "N/A"}
-                    </p>
                   </div>
                   <div className={styles.itemMetrics}>
                     <span className={styles.metricValue}>

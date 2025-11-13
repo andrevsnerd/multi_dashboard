@@ -123,7 +123,6 @@ export default function SummaryCards({
               >
                 {item.format(item.metric.currentValue)}
               </strong>
-              <p className={styles.description}>{item.description}</p>
             </div>
 
             <div className={styles.divider} aria-hidden />
