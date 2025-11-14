@@ -46,6 +46,24 @@ export default function GoalCard({
     });
   };
 
+  // Calcular status da projeção em relação à meta
+  const projectionStatus = useMemo(() => {
+    if (!projection || goal === 0) return null;
+    
+    const projectionPercentage = (projection / goal) * 100;
+    const isOnTrack = projection >= goal;
+    const difference = projection - goal;
+    // Calcular diferença percentual: (projeção - meta) / meta * 100
+    const differencePercentage = goal > 0 ? ((projection - goal) / goal) * 100 : 0;
+    
+    return {
+      isOnTrack,
+      projectionPercentage,
+      difference,
+      differencePercentage,
+    };
+  }, [projection, goal]);
+
   return (
     <div className={styles.container}>
       <div className={styles.chartWrapper}>
@@ -78,9 +96,60 @@ export default function GoalCard({
           <span className={styles.footerLabel}>Meta</span>
           <span className={styles.footerValue}>{formatCurrency(goal)}</span>
         </div>
-        {projection !== undefined && (
-          <div className={styles.footerItem}>
-            <span className={styles.footerLabel}>Projeção</span>
+        {projection !== undefined && projectionStatus && (
+          <div 
+            className={`${styles.footerItem} ${styles.projectionItem} ${
+              projectionStatus.isOnTrack ? styles.projectionOnTrack : styles.projectionOffTrack
+            }`}
+          >
+            <div className={styles.projectionHeader}>
+              <span className={styles.footerLabel}>Projeção</span>
+              {projectionStatus.isOnTrack ? (
+                <span className={styles.projectionBadge}>
+                  <svg 
+                    width="12" 
+                    height="12" 
+                    viewBox="0 0 12 12" 
+                    fill="none" 
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={styles.projectionIcon}
+                  >
+                    <path 
+                      d="M6 2L9 5.5H7V10H5V5.5H3L6 2Z" 
+                      fill="currentColor"
+                    />
+                  </svg>
+                  {(() => {
+                    const diff = projectionStatus.differencePercentage;
+                    if (diff >= 1) {
+                      return Math.round(diff);
+                    } else if (diff >= 0.1) {
+                      return diff.toFixed(1);
+                    } else if (diff > 0) {
+                      return '<0.1';
+                    }
+                    return '0';
+                  })()}%
+                </span>
+              ) : (
+                <span className={styles.projectionBadge}>
+                  <svg 
+                    width="12" 
+                    height="12" 
+                    viewBox="0 0 12 12" 
+                    fill="none" 
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={styles.projectionIcon}
+                  >
+                    <path 
+                      d="M6 10L3 6.5H5V2H7V6.5H9L6 10Z" 
+                      fill="currentColor"
+                    />
+                  </svg>
+                  {Math.round(projectionStatus.differencePercentage)}%
+                </span>
+              )}
+            </div>
             <span className={styles.footerValue}>{formatCurrency(projection)}</span>
           </div>
         )}

@@ -77,3 +77,68 @@
   color: #0f172a;
 }
 
+.projectionItem {
+  position: relative;
+  padding: 8px 12px;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.projectionOnTrack {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.projectionOffTrack {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.projectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.projectionItem .footerLabel {
+  margin-bottom: 0;
+}
+
+.projectionBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.projectionOnTrack .projectionBadge {
+  background: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
+}
+
+.projectionOffTrack .projectionBadge {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+}
+
+.projectionIcon {
+  flex-shrink: 0;
+}
+
+.projectionOnTrack .projectionIcon {
+  color: #16a34a;
+}
+
+.projectionOffTrack .projectionIcon {
+  color: #dc2626;
+}
+
