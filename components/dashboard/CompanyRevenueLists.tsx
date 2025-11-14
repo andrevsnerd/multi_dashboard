@@ -118,7 +118,13 @@ export default function CompanyRevenueLists({
       {!error ? (
         <section className={styles.grid}>
           <article className={styles.card}>
-            <h3 className={styles.cardTitle}>Top produtos</h3>
+            <div className={styles.listHeader}>
+              <h3 className={styles.cardTitle}>Top produtos</h3>
+              <div className={styles.listHeaderRight}>
+                <span className={styles.headerLabel}>Vendas</span>
+                <span className={styles.headerLabel}>Estoque</span>
+              </div>
+            </div>
             <ul className={styles.list}>
               {state.products.map((item) => (
                 <li key={item.productId} className={styles.listItem}>
@@ -127,15 +133,24 @@ export default function CompanyRevenueLists({
                     <p className={styles.itemSubtitle}>{item.productId}</p>
                   </div>
                   <div className={styles.itemMetrics}>
-                    <span className={styles.metricValue}>
-                      {item.totalRevenue.toLocaleString("pt-BR", {
-                        style: "currency",
-                        currency: "BRL",
-                      })}
-                    </span>
-                    <span className={styles.metricLabel}>
-                      {item.totalQuantity.toLocaleString("pt-BR")} unid.
-                    </span>
+                    <div className={styles.metricRow}>
+                      <div className={styles.priceColumn}>
+                        <span className={styles.metricValue}>
+                          {item.totalRevenue.toLocaleString("pt-BR", {
+                            style: "currency",
+                            currency: "BRL",
+                          })}
+                        </span>
+                        <span className={styles.metricLabel}>
+                          {item.totalQuantity.toLocaleString("pt-BR")} unid.
+                        </span>
+                      </div>
+                      <div className={styles.stockBadge}>
+                        <span className={styles.stockNumber}>
+                          {item.stock.toLocaleString("pt-BR")}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </li>
               ))}

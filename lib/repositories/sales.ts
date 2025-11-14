@@ -2,6 +2,7 @@ import sql from 'mssql';
 
 import { resolveCompany, type CompanyModule } from '@/lib/config/company';
 import { getConnectionPool, withRequest } from '@/lib/db/connection';
+import { fetchMultipleProductsStock } from '@/lib/repositories/inventory';
 import type {
   CategoryRevenue,
   ProductRevenue,
@@ -118,11 +119,28 @@ export async function fetchTopProducts({
 
     const result = await request.query<ProductRevenue>(query);
 
-    return result.recordset.map((row) => ({
+    const products = result.recordset.map((row) => ({
       ...row,
       totalRevenue: Number(row.totalRevenue ?? 0),
       totalQuantity: Number(row.totalQuantity ?? 0),
+      stock: 0, // Será preenchido abaixo
     }));
+
+    // Buscar estoque para todos os produtos de uma vez
+    if (products.length > 0) {
+      const productIds = products.map((p) => p.productId);
+      const stockMap = await fetchMultipleProductsStock(productIds, {
+        company,
+        filial,
+      });
+
+      // Adicionar estoque a cada produto
+      products.forEach((product) => {
+        product.stock = stockMap.get(product.productId) ?? 0;
+      });
+    }
+
+    return products;
   });
 }
 

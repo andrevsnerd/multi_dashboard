@@ -84,7 +84,7 @@ export default function SummaryCards({
     highlight?: boolean;
   }> = [
     {
-      label: "Faturamento Total",
+      label: "Vendas Total",
       metric: summary.totalRevenue,
       description: `${companyName} · ${periodLabel}`,
       format: formatCurrency,

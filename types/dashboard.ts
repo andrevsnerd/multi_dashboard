@@ -3,6 +3,7 @@ export interface ProductRevenue {
   productName: string;
   totalRevenue: number;
   totalQuantity: number;
+  stock: number;
 }
 
 export interface CategoryRevenue {
