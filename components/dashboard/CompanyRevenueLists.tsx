@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import type { CategoryRevenue, ProductRevenue } from "@/types/dashboard";
+import type { CategoryRevenue, ProductRevenue, FilialPerformance } from "@/types/dashboard";
 
 import styles from "./RevenueDashboard.module.css";
 
@@ -18,6 +18,7 @@ export interface CompanyRevenueListsProps {
 interface RevenueState {
   products: ProductRevenue[];
   categories: CategoryRevenue[];
+  filialPerformance: FilialPerformance[];
 }
 
 async function fetchRevenue(
@@ -36,9 +37,12 @@ async function fetchRevenue(
     searchParams.set('filial', filial);
   }
 
-  const [productsResponse, categoriesResponse] = await Promise.all([
+  const [productsResponse, categoriesResponse, filialResponse] = await Promise.all([
     fetch(`/api/top-products?${searchParams.toString()}`, { cache: "no-store" }),
     fetch(`/api/top-categories?${searchParams.toString()}`, {
+      cache: "no-store",
+    }),
+    fetch(`/api/filial-performance?${searchParams.toString()}`, {
       cache: "no-store",
     }),
   ]);
@@ -49,15 +53,22 @@ async function fetchRevenue(
   if (!categoriesResponse.ok) {
     throw new Error("Erro ao carregar top grupos");
   }
+  if (!filialResponse.ok) {
+    throw new Error("Erro ao carregar performance por filial");
+  }
 
   const productsJson = (await productsResponse.json()) as { data: ProductRevenue[] };
   const categoriesJson = (await categoriesResponse.json()) as {
     data: CategoryRevenue[];
   };
+  const filialJson = (await filialResponse.json()) as {
+    data: FilialPerformance[];
+  };
 
   return {
     products: productsJson.data,
     categories: categoriesJson.data,
+    filialPerformance: filialJson.data,
   };
 }
 
@@ -69,7 +80,7 @@ export default function CompanyRevenueLists({
   title = "Top faturamento",
   subtitle = "Produtos e categorias com maior faturamento no período selecionado.",
 }: CompanyRevenueListsProps) {
-  const [state, setState] = useState<RevenueState>({ products: [], categories: [] });
+  const [state, setState] = useState<RevenueState>({ products: [], categories: [], filialPerformance: [] });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -119,7 +130,7 @@ export default function CompanyRevenueLists({
         <section className={styles.grid}>
           <article className={styles.card}>
             <div className={styles.listHeader}>
-              <h3 className={styles.cardTitle}>Top produtos</h3>
+              <h3 className={styles.cardTitle}>TOP PRODUTOS</h3>
               <div className={styles.listHeaderRight}>
                 <span className={styles.headerLabel}>Vendas</span>
                 <span className={styles.headerLabel}>Estoque</span>
@@ -162,7 +173,7 @@ export default function CompanyRevenueLists({
 
           <article className={styles.card}>
             <div className={styles.listHeader}>
-              <h3 className={styles.cardTitle}>Top grupos</h3>
+              <h3 className={styles.cardTitle}>TOP GRUPOS</h3>
               <div className={styles.listHeaderRight}>
                 <span className={styles.headerLabel}>Vendas</span>
               </div>
@@ -201,6 +212,69 @@ export default function CompanyRevenueLists({
               })()}
               {state.categories.length === 0 ? (
                 <li className={styles.state}>Nenhum grupo encontrado.</li>
+              ) : null}
+            </ul>
+          </article>
+
+          <article className={styles.card}>
+            <div className={styles.listHeader}>
+              <h3 className={styles.cardTitle}>PERFORMANCE DETALHADA POR LOJA</h3>
+              <div className={styles.listHeaderRight}>
+                <span className={styles.headerLabel}>Vendas</span>
+                <span className={styles.headerLabel}>Var. %</span>
+              </div>
+            </div>
+            <ul className={styles.list}>
+              {state.filialPerformance.map((item) => {
+                const isPositive = item.changePercentage !== null && item.changePercentage > 0;
+                const isNegative = item.changePercentage !== null && item.changePercentage < 0;
+                const variationClass = isPositive
+                  ? styles.variationPositive
+                  : isNegative
+                    ? styles.variationNegative
+                    : styles.variationNeutral;
+
+                return (
+                  <li key={item.filial} className={styles.listItem}>
+                    <div className={styles.itemNameContainer}>
+                      <strong className={styles.itemName}>{item.filialDisplayName}</strong>
+                    </div>
+                    <div className={styles.itemMetrics}>
+                      <div className={styles.metricRow}>
+                        <div className={styles.priceColumn}>
+                          <span className={styles.metricValue}>
+                            {item.currentRevenue.toLocaleString("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            })}
+                          </span>
+                        </div>
+                        <div className={`${styles.variationBadge} ${variationClass}`}>
+                          {item.changePercentage !== null ? (
+                            <>
+                              {isPositive ? (
+                                <span className={styles.variationArrow}>↑</span>
+                              ) : isNegative ? (
+                                <span className={styles.variationArrow}>↓</span>
+                              ) : null}
+                              <span className={styles.variationValue}>
+                                {Math.abs(item.changePercentage).toLocaleString("pt-BR", {
+                                  minimumFractionDigits: 1,
+                                  maximumFractionDigits: 1,
+                                })}%
+                              </span>
+                            </>
+                          ) : (
+                            <span className={styles.variationValue}>--</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+              {state.filialPerformance.length === 0 ? (
+                <li className={styles.state}>Nenhuma filial encontrada.</li>
               ) : null}
             </ul>
           </article>

@@ -142,7 +142,7 @@ export default function RevenueDashboard() {
       {selectedCompany && !error ? (
         <section className={styles.grid}>
           <article className={styles.card}>
-            <h3 className={styles.cardTitle}>Top produtos por faturamento</h3>
+            <h3 className={styles.cardTitle}>TOP PRODUTOS POR FATURAMENTO</h3>
             <ul className={styles.list}>
               {state.products.map((item) => (
                 <li key={item.productId} className={styles.listItem}>
@@ -171,7 +171,7 @@ export default function RevenueDashboard() {
 
           <article className={styles.card}>
             <div className={styles.listHeader}>
-              <h3 className={styles.cardTitle}>Top grupos por faturamento</h3>
+              <h3 className={styles.cardTitle}>TOP GRUPOS POR FATURAMENTO</h3>
               <div className={styles.listHeaderRight}>
                 <span className={styles.headerLabel}>Vendas</span>
               </div>

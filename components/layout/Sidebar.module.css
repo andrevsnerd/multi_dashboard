@@ -7,15 +7,68 @@
   display: flex;
   flex-direction: column;
   position: fixed;
-  left: 0;
   top: 0;
-  z-index: 100;
+  z-index: 200;
+  transition: transform 0.3s ease, left 0.3s ease;
+}
+
+.sidebarOpen {
+  left: 0;
+  transform: translateX(0);
+}
+
+.sidebarClosed {
+  left: 0;
+  transform: translateX(-100%);
+}
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 150;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Desktop: sidebar sempre visível quando aberta, sem overlay */
+@media (min-width: 1025px) {
+  .sidebarClosed {
+    transform: translateX(-100%);
+  }
+}
+
+/* Mobile: sidebar com overlay e animação */
+@media (max-width: 1024px) {
+  .sidebar {
+    width: 280px;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .sidebarClosed {
+    transform: translateX(-100%);
+  }
 }
 
 .logo {
   padding: 0 24px 32px 24px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
   margin-bottom: 24px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .logoText {
@@ -23,6 +76,82 @@
   font-weight: 700;
   color: #0f172a;
   letter-spacing: -0.02em;
+  flex: 1;
+}
+
+.toggleButton {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #64748b;
+  transition: all 0.3s ease;
+  padding: 0;
+  z-index: 201;
+}
+
+.toggleButton:hover {
+  background: rgba(15, 23, 42, 0.05);
+  color: #0f172a;
+}
+
+.toggleButton:active {
+  transform: scale(0.95);
+}
+
+/* Quando sidebar está aberta, botão dentro da sidebar */
+.toggleButtonInside {
+  position: fixed;
+  top: 24px;
+  left: 216px; /* 240px (largura sidebar) - 24px (padding) */
+  transition: left 0.3s ease;
+}
+
+/* Quando sidebar está fechada, o botão "flutua" para fora */
+.toggleButtonFloating {
+  position: fixed;
+  top: 32px;
+  left: 32px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: left 0.3s ease, top 0.3s ease;
+}
+
+.toggleButtonFloating:hover {
+  background: #f8fafc;
+  border-color: rgba(15, 23, 42, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Mobile: botão sempre no topo esquerdo quando sidebar está fechada */
+@media (max-width: 1024px) {
+  .toggleButtonFloating {
+    top: 16px;
+    left: 16px;
+  }
+  
+  /* Quando sidebar está aberta no mobile, botão dentro da sidebar */
+  .toggleButtonInside {
+    top: 24px;
+    left: 24px; /* Dentro da sidebar no mobile */
+  }
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.3s ease;
+  color: currentColor;
+}
+
+.iconRotated {
+  transform: rotate(180deg);
 }
 
 .nav {

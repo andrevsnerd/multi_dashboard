@@ -33,4 +33,12 @@ export interface SalesSummary {
   totalStockValue: MetricSummary;
 }
 
+export interface FilialPerformance {
+  filial: string;
+  filialDisplayName: string;
+  currentRevenue: number;
+  previousRevenue: number;
+  changePercentage: number | null;
+}
+
 

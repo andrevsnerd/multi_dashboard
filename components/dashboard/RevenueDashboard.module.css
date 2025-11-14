@@ -74,10 +74,12 @@
 }
 
 .cardTitle {
-  font-size: 16px;
-  font-weight: 600;
-  color: #0f172a;
+  font-size: 14px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #94a3b8;
   margin: 0;
+  font-weight: 600;
 }
 
 .listHeader {
@@ -159,6 +161,48 @@
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  letter-spacing: 0.02em;
+}
+
+.variationBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  border: 1.5px solid;
+}
+
+.variationPositive {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border-color: #86efac;
+  color: #166534;
+}
+
+.variationNegative {
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.variationNeutral {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-color: #cbd5e1;
+  color: #64748b;
+}
+
+.variationArrow {
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.variationValue {
+  font-size: 13px;
+  font-weight: 600;
   letter-spacing: 0.02em;
 }
 

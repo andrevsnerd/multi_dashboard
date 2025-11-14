@@ -9,6 +9,7 @@ import type {
   SalesSummary,
   DateRangeInput,
   MetricSummary,
+  FilialPerformance,
 } from '@/types/dashboard';
 import { normalizeRangeForQuery, shiftRangeByMonths } from '@/lib/utils/date';
 
@@ -412,6 +413,111 @@ export async function fetchDailyRevenue({
       date: row.date.toISOString().split('T')[0],
       revenue: Number(row.revenue ?? 0),
     }));
+  });
+}
+
+export async function fetchFilialPerformance({
+  company,
+  range,
+}: SummaryQueryParams = {}): Promise<FilialPerformance[]> {
+  return withRequest(async (request) => {
+    const currentRange = resolveRange(range);
+    const { start, end } = currentRange;
+    const previousRange = shiftRangeByMonths(currentRange, -1);
+
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+    request.input('prevStartDate', sql.DateTime, previousRange.start);
+    request.input('prevEndDate', sql.DateTime, previousRange.end);
+
+    const companyConfig = resolveCompany(company);
+    if (!companyConfig) {
+      return [];
+    }
+
+    const filiais = companyConfig.filialFilters['sales'] ?? [];
+    if (filiais.length === 0) {
+      return [];
+    }
+
+    // Criar filtro para todas as filiais da empresa
+    filiais.forEach((filial, index) => {
+      request.input(`filial${index}`, sql.VarChar, filial);
+    });
+    const placeholders = filiais.map((_, index) => `@filial${index}`).join(', ');
+
+    const query = `
+      WITH filial_revenue AS (
+        SELECT
+          vp.FILIAL,
+          'current' AS period,
+          SUM(
+            CASE
+              WHEN vp.QTDE_CANCELADA > 0 THEN 0
+              ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
+            END
+          ) AS revenue
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        WHERE vp.DATA_VENDA >= @startDate
+          AND vp.DATA_VENDA < @endDate
+          AND vp.QTDE > 0
+          AND vp.FILIAL IN (${placeholders})
+        GROUP BY vp.FILIAL
+
+        UNION ALL
+
+        SELECT
+          vp.FILIAL,
+          'previous' AS period,
+          SUM(
+            CASE
+              WHEN vp.QTDE_CANCELADA > 0 THEN 0
+              ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
+            END
+          ) AS revenue
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        WHERE vp.DATA_VENDA >= @prevStartDate
+          AND vp.DATA_VENDA < @prevEndDate
+          AND vp.QTDE > 0
+          AND vp.FILIAL IN (${placeholders})
+        GROUP BY vp.FILIAL
+      )
+      SELECT
+        fr.FILIAL,
+        COALESCE(MAX(CASE WHEN fr.period = 'current' THEN fr.revenue END), 0) AS currentRevenue,
+        COALESCE(MAX(CASE WHEN fr.period = 'previous' THEN fr.revenue END), 0) AS previousRevenue
+      FROM filial_revenue fr
+      GROUP BY fr.FILIAL
+      ORDER BY currentRevenue DESC;
+    `;
+
+    const result = await request.query<{
+      FILIAL: string;
+      currentRevenue: number | null;
+      previousRevenue: number | null;
+    }>(query);
+
+    const displayNames = companyConfig.filialDisplayNames ?? {};
+
+    return result.recordset.map((row) => {
+      const current = Number(row.currentRevenue ?? 0);
+      const previous = Number(row.previousRevenue ?? 0);
+      
+      let changePercentage: number | null = null;
+      if (previous > 0) {
+        changePercentage = Number((((current - previous) / previous) * 100).toFixed(1));
+      } else if (current > 0) {
+        changePercentage = null; // Não há comparação possível
+      }
+
+      return {
+        filial: row.FILIAL,
+        filialDisplayName: displayNames[row.FILIAL] ?? row.FILIAL,
+        currentRevenue: current,
+        previousRevenue: previous,
+        changePercentage,
+      };
+    });
   });
 }
 
