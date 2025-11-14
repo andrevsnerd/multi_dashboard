@@ -80,8 +80,9 @@ export default function DailyRevenueChart({
   filial = null,
 }: DailyRevenueChartProps) {
   const [data, setData] = useState<DailyRevenueData[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   const rangeKey = useMemo(
     () => `${startDate.toISOString()}::${endDate.toISOString()}::${filial ?? "all"}`,
@@ -89,6 +90,12 @@ export default function DailyRevenueChart({
   );
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    
     let active = true;
 
     async function load() {
@@ -118,7 +125,7 @@ export default function DailyRevenueChart({
     return () => {
       active = false;
     };
-  }, [companyKey, rangeKey, startDate, endDate, filial]);
+  }, [companyKey, rangeKey, startDate, endDate, filial, mounted]);
 
   const totalRevenue = useMemo(() => {
     return data.reduce((sum, item) => sum + item.revenue, 0);
@@ -170,8 +177,9 @@ export default function DailyRevenueChart({
         </span>
       </div>
       <div className={styles.chartWrapper}>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+        {mounted && (
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
             <XAxis
               dataKey="date"
@@ -210,6 +218,7 @@ export default function DailyRevenueChart({
             />
           </LineChart>
         </ResponsiveContainer>
+        )}
       </div>
     </div>
   );

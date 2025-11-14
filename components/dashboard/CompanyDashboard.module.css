@@ -4,11 +4,19 @@
   gap: 32px;
 }
 
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
 .controls {
   display: flex;
   align-items: center;
   gap: 24px;
   flex-wrap: wrap;
+  flex: 1;
 }
 
 .loading {
@@ -33,6 +41,19 @@
   color: #0f172a;
   margin: 0;
   letter-spacing: -0.02em;
+}
+
+.chartsRow {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 24px;
+  align-items: stretch;
+}
+
+@media (max-width: 1024px) {
+  .chartsRow {
+    grid-template-columns: 1fr;
+  }
 }
 
 

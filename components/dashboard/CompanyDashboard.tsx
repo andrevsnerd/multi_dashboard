@@ -8,9 +8,13 @@ import DateRangeFilter, {
 import FilialFilter from "@/components/filters/FilialFilter";
 import SummaryCards from "@/components/dashboard/SummaryCards";
 import DailyRevenueChart from "@/components/dashboard/DailyRevenueChart";
+import GoalCard from "@/components/dashboard/GoalCard";
+import GoalsModal from "@/components/dashboard/GoalsModal";
+import EngineButton from "@/components/layout/EngineButton";
 import CompanyRevenueLists from "@/components/dashboard/CompanyRevenueLists";
 import type { MetricSummary, SalesSummary } from "@/types/dashboard";
 import { getCurrentMonthRange } from "@/lib/utils/date";
+import { resolveCompany } from "@/lib/config/company";
 
 import styles from "./CompanyDashboard.module.css";
 
@@ -117,11 +121,30 @@ export default function CompanyDashboard({
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
 
   const rangeKey = useMemo(
     () => `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}`,
     [range.startDate, range.endDate, selectedFilial],
   );
+
+  // Carregar metas do localStorage
+  const goals = useMemo(() => {
+    if (typeof window === "undefined") return {};
+    const stored = localStorage.getItem(`goals_${companyKey}`);
+    return stored ? JSON.parse(stored) : {};
+  }, [companyKey, isGoalsModalOpen]);
+
+  // Calcular meta atual (filial específica ou soma de todas)
+  const currentGoal = useMemo(() => {
+    if (selectedFilial) {
+      return goals[selectedFilial] || 0;
+    }
+    // Soma de todas as filiais
+    return Object.values(goals).reduce((sum, goal) => sum + (goal as number), 0);
+  }, [goals, selectedFilial]);
+
+  const currentRevenue = summary.totalRevenue.currentValue;
 
   useEffect(() => {
     let active = true;
@@ -162,34 +185,52 @@ export default function CompanyDashboard({
 
 
   return (
-    <div className={styles.wrapper}>
-      <div className={styles.controls}>
-        <DateRangeFilter
-          value={range}
-          onChange={setRange}
-          availableRange={
-            availableSalesRange.start
-              ? {
-                  startDate: availableSalesRange.start,
-                  endDate: availableSalesRange.end ?? new Date(),
-                }
-              : undefined
-          }
-        />
-        <FilialFilter
-          companyKey={companyKey}
-          value={selectedFilial}
-          onChange={setSelectedFilial}
-        />
-        {loading ? <span className={styles.loading}>Atualizando métricas…</span> : null}
-        {error ? <span className={styles.error}>{error}</span> : null}
-      </div>
+    <>
+      <div className={styles.wrapper}>
+        <div className={styles.headerRow}>
+          <div className={styles.controls}>
+            <DateRangeFilter
+              value={range}
+              onChange={setRange}
+              availableRange={
+                availableSalesRange.start
+                  ? {
+                      startDate: availableSalesRange.start,
+                      endDate: availableSalesRange.end ?? new Date(),
+                    }
+                  : undefined
+              }
+            />
+            <FilialFilter
+              companyKey={companyKey}
+              value={selectedFilial}
+              onChange={setSelectedFilial}
+            />
+            {loading ? <span className={styles.loading}>Atualizando métricas…</span> : null}
+            {error ? <span className={styles.error}>{error}</span> : null}
+          </div>
+          <EngineButton onMetasClick={() => setIsGoalsModalOpen(true)} />
+        </div>
 
-      <SummaryCards summary={summary} companyName={companyName} />
+        <SummaryCards summary={summary} companyName={companyName} />
 
-      <div className={styles.overviewSection}>
-        <h2 className={styles.overviewTitle}>VISÃO GERAL</h2>
-        <DailyRevenueChart
+        <div className={styles.overviewSection}>
+          <div className={styles.chartsRow}>
+            <GoalCard
+              currentValue={currentRevenue}
+              goal={currentGoal}
+              label={selectedFilial ? "Meta da Filial" : "Meta Geral"}
+            />
+            <DailyRevenueChart
+              companyKey={companyKey}
+              startDate={range.startDate}
+              endDate={range.endDate}
+              filial={selectedFilial}
+            />
+          </div>
+        </div>
+
+        <CompanyRevenueLists
           companyKey={companyKey}
           startDate={range.startDate}
           endDate={range.endDate}
@@ -197,13 +238,12 @@ export default function CompanyDashboard({
         />
       </div>
 
-      <CompanyRevenueLists
+      <GoalsModal
         companyKey={companyKey}
-        startDate={range.startDate}
-        endDate={range.endDate}
-        filial={selectedFilial}
+        isOpen={isGoalsModalOpen}
+        onClose={() => setIsGoalsModalOpen(false)}
       />
-    </div>
+    </>
   );
 }
 
