@@ -134,7 +134,7 @@ export default function CompanyDashboard({
         } = await fetchSummary(companyKey, range, selectedFilial);
         if (active) {
           setSummary(data);
-          setLastAvailableDate(availableRange.end ?? apiLastAvailableDate);
+          setLastAvailableDate(apiLastAvailableDate);
           setAvailableSalesRange(availableRange);
         }
       } catch (err) {
@@ -157,31 +157,6 @@ export default function CompanyDashboard({
     };
   }, [companyKey, range, rangeKey]);
 
-  useEffect(() => {
-    if (!lastAvailableDate) {
-      return;
-    }
-
-    if (range.endDate.getTime() <= lastAvailableDate.getTime()) {
-      return;
-    }
-
-    setRange((prev) => {
-      if (prev.endDate.getTime() <= lastAvailableDate.getTime()) {
-        return prev;
-      }
-
-      const clampedEnd = new Date(lastAvailableDate.getTime());
-      const startTime = prev.startDate.getTime();
-      const clampedStart =
-        startTime > clampedEnd.getTime() ? new Date(clampedEnd.getTime()) : prev.startDate;
-
-      return {
-        startDate: clampedStart,
-        endDate: clampedEnd,
-      };
-    });
-  }, [lastAvailableDate, range.endDate]);
 
   return (
     <div className={styles.wrapper}>
@@ -189,12 +164,11 @@ export default function CompanyDashboard({
         <DateRangeFilter
           value={range}
           onChange={setRange}
-          maxSelectableDate={lastAvailableDate ?? undefined}
           availableRange={
-            availableSalesRange.start && availableSalesRange.end
+            availableSalesRange.start
               ? {
                   startDate: availableSalesRange.start,
-                  endDate: availableSalesRange.end,
+                  endDate: availableSalesRange.end ?? new Date(),
                 }
               : undefined
           }

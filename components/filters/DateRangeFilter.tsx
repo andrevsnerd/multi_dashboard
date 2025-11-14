@@ -64,13 +64,9 @@ export default function DateRangeFilter({
     const base = maxSelectableDate
       ? new Date(maxSelectableDate.getTime())
       : new Date();
-    const bounded =
-      availableNormalized && availableNormalized.end.getTime() < base.getTime()
-        ? new Date(availableNormalized.end.getTime())
-        : base;
-    bounded.setHours(23, 59, 59, 999);
-    return bounded;
-  }, [maxSelectableDate, availableNormalized]);
+    base.setHours(23, 59, 59, 999);
+    return base;
+  }, [maxSelectableDate]);
 
   const clampedRange = useMemo(() => {
     const maxTime = effectiveMaxDate.getTime();
@@ -146,11 +142,9 @@ export default function DateRangeFilter({
       {
         label: "Esse mês",
         resolve: () => {
-          const pivot = availableNormalized
-            ? new Date(availableNormalized.end.getTime())
-            : clampDate(new Date());
-          let startDate = startOfMonth(pivot);
-          let endDate = endOfMonth(pivot);
+          const today = clampDate(new Date());
+          let startDate = startOfMonth(today);
+          let endDate = endOfMonth(today);
           if (availableNormalized && startDate.getTime() < availableNormalized.start.getTime()) {
             startDate = new Date(availableNormalized.start.getTime());
           }
@@ -169,11 +163,9 @@ export default function DateRangeFilter({
       {
         label: "Última semana",
         resolve: () => {
-          const reference = availableNormalized
-            ? new Date(availableNormalized.end.getTime())
-            : clampDate(new Date());
-          let startDate = subDays(startOfWeek(reference, { weekStartsOn: 1 }), 7);
-          let endDate = subDays(endOfWeek(reference, { weekStartsOn: 1 }), 7);
+          const today = clampDate(new Date());
+          let startDate = subDays(startOfWeek(today, { weekStartsOn: 1 }), 7);
+          let endDate = subDays(endOfWeek(today, { weekStartsOn: 1 }), 7);
           endDate = clampDate(endDate);
           if (availableNormalized && startDate.getTime() < availableNormalized.start.getTime()) {
             startDate = new Date(availableNormalized.start.getTime());
@@ -187,10 +179,8 @@ export default function DateRangeFilter({
       {
         label: "Último mês",
         resolve: () => {
-          const base = availableNormalized
-            ? new Date(availableNormalized.end.getTime())
-            : clampDate(new Date());
-          const lastMonth = subMonths(base, 1);
+          const today = clampDate(new Date());
+          const lastMonth = subMonths(today, 1);
           let startDate = startOfMonth(lastMonth);
           let endDate = endOfMonth(lastMonth);
           endDate = clampDate(endDate);
