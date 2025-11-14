@@ -10,50 +10,85 @@ interface GoalsModalProps {
   companyKey: CompanyKey;
   isOpen: boolean;
   onClose: () => void;
+  monthYear: { month: number; year: number };
 }
 
 interface GoalData {
   [filial: string]: number;
 }
 
-function getStorageKey(companyKey: string): string {
-  return `goals_${companyKey}`;
+async function loadGoals(companyKey: string, month: number, year: number): Promise<GoalData> {
+  try {
+    const response = await fetch(
+      `/api/goals?company=${companyKey}&month=${month}&year=${year}`,
+      { cache: "no-store" }
+    );
+    if (!response.ok) {
+      return {};
+    }
+    const json = (await response.json()) as { data: GoalData };
+    return json.data || {};
+  } catch {
+    return {};
+  }
 }
 
-function loadGoals(companyKey: string): GoalData {
-  if (typeof window === "undefined") return {};
-  const stored = localStorage.getItem(getStorageKey(companyKey));
-  return stored ? JSON.parse(stored) : {};
-}
-
-function saveGoals(companyKey: string, goals: GoalData): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(getStorageKey(companyKey), JSON.stringify(goals));
+async function saveGoals(companyKey: string, month: number, year: number, goals: GoalData): Promise<void> {
+  try {
+    await fetch("/api/goals", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        companyKey,
+        month,
+        year,
+        goals,
+      }),
+    });
+  } catch (error) {
+    console.error("Erro ao salvar metas:", error);
+  }
 }
 
 export default function GoalsModal({
   companyKey,
   isOpen,
   onClose,
+  monthYear,
 }: GoalsModalProps) {
   const company = resolveCompany(companyKey);
   const filiais = company?.filialFilters.sales ?? [];
   const displayNames = company?.filialDisplayNames ?? {};
 
-  const [goals, setGoals] = useState<GoalData>(() => loadGoals(companyKey));
+  const [goals, setGoals] = useState<GoalData>({});
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      setGoals(loadGoals(companyKey));
+      setLoading(true);
+      loadGoals(companyKey, monthYear.month, monthYear.year)
+        .then((loadedGoals) => {
+          setGoals(loadedGoals);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
     }
-  }, [isOpen, companyKey]);
+  }, [isOpen, companyKey, monthYear.month, monthYear.year]);
 
-  const handleGoalChange = (filial: string, value: string) => {
+  const handleGoalChange = async (filial: string, value: string) => {
     const numValue = value === "" ? 0 : parseFloat(value) || 0;
     const newGoals = { ...goals, [filial]: numValue };
     setGoals(newGoals);
-    saveGoals(companyKey, newGoals);
+    await saveGoals(companyKey, monthYear.month, monthYear.year, newGoals);
   };
+
+  const monthName = useMemo(() => {
+    const date = new Date(monthYear.year, monthYear.month, 1);
+    return date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  }, [monthYear.month, monthYear.year]);
 
   const totalGoal = useMemo(() => {
     return Object.values(goals).reduce((sum, goal) => sum + goal, 0);
@@ -67,7 +102,10 @@ export default function GoalsModal({
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
-          <h2 className={styles.title}>Configuração de Metas</h2>
+          <div>
+            <h2 className={styles.title}>Configuração de Metas</h2>
+            <p className={styles.monthLabel}>{monthName}</p>
+          </div>
           <button
             type="button"
             className={styles.closeButton}
@@ -79,28 +117,32 @@ export default function GoalsModal({
         </div>
 
         <div className={styles.content}>
-          <div className={styles.filialList}>
-            {filiais.map((filial) => {
-              const displayName = displayNames[filial] ?? filial;
-              return (
-                <div key={filial} className={styles.filialItem}>
-                  <label className={styles.filialLabel}>{displayName}</label>
-                  <div className={styles.inputWrapper}>
-                    <span className={styles.currency}>R$</span>
-                    <input
-                      type="number"
-                      className={styles.input}
-                      value={goals[filial] || ""}
-                      onChange={(e) => handleGoalChange(filial, e.target.value)}
-                      placeholder="0,00"
-                      min="0"
-                      step="0.01"
-                    />
+          {loading ? (
+            <div className={styles.loading}>Carregando metas...</div>
+          ) : (
+            <div className={styles.filialList}>
+              {filiais.map((filial) => {
+                const displayName = displayNames[filial] ?? filial;
+                return (
+                  <div key={filial} className={styles.filialItem}>
+                    <label className={styles.filialLabel}>{displayName}</label>
+                    <div className={styles.inputWrapper}>
+                      <span className={styles.currency}>R$</span>
+                      <input
+                        type="number"
+                        className={styles.input}
+                        value={goals[filial] || ""}
+                        onChange={(e) => handleGoalChange(filial, e.target.value)}
+                        placeholder="0,00"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
 
           <div className={styles.totalSection}>
             <span className={styles.totalLabel}>Meta Geral</span>

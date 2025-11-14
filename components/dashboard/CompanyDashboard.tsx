@@ -128,12 +128,54 @@ export default function CompanyDashboard({
     [range.startDate, range.endDate, selectedFilial],
   );
 
-  // Carregar metas do localStorage
-  const goals = useMemo(() => {
-    if (typeof window === "undefined") return {};
-    const stored = localStorage.getItem(`goals_${companyKey}`);
-    return stored ? JSON.parse(stored) : {};
-  }, [companyKey, isGoalsModalOpen]);
+  // Obter mês/ano do período selecionado
+  const monthYear = useMemo(() => {
+    const date = range.startDate;
+    return {
+      month: date.getMonth(),
+      year: date.getFullYear(),
+    };
+  }, [range.startDate]);
+
+  // Carregar metas da API para o mês específico
+  const [goals, setGoals] = useState<Record<string, number>>({});
+  const [goalsLoading, setGoalsLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadGoals() {
+      setGoalsLoading(true);
+      try {
+        const response = await fetch(
+          `/api/goals?company=${companyKey}&month=${monthYear.month}&year=${monthYear.year}`,
+          { cache: "no-store" }
+        );
+        if (active) {
+          if (response.ok) {
+            const json = (await response.json()) as { data: Record<string, number> };
+            setGoals(json.data || {});
+          } else {
+            setGoals({});
+          }
+        }
+      } catch {
+        if (active) {
+          setGoals({});
+        }
+      } finally {
+        if (active) {
+          setGoalsLoading(false);
+        }
+      }
+    }
+
+    void loadGoals();
+
+    return () => {
+      active = false;
+    };
+  }, [companyKey, monthYear.month, monthYear.year, isGoalsModalOpen]);
 
   // Calcular meta atual (filial específica ou soma de todas)
   const currentGoal = useMemo(() => {
@@ -242,6 +284,7 @@ export default function CompanyDashboard({
         companyKey={companyKey}
         isOpen={isGoalsModalOpen}
         onClose={() => setIsGoalsModalOpen(false)}
+        monthYear={monthYear}
       />
     </>
   );
