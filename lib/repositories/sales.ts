@@ -368,4 +368,51 @@ export async function fetchTopCategories({
   });
 }
 
+export interface DailyRevenue {
+  date: string;
+  revenue: number;
+}
+
+export async function fetchDailyRevenue({
+  company,
+  range,
+  filial,
+}: SummaryQueryParams = {}): Promise<DailyRevenue[]> {
+  return withRequest(async (request) => {
+    const { start, end } = resolveRange(range);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+
+    const filialFilter = buildFilialFilter(request, company, 'sales', filial);
+
+    const query = `
+      SELECT
+        CAST(vp.DATA_VENDA AS DATE) AS date,
+        SUM(
+          CASE
+            WHEN vp.QTDE_CANCELADA > 0 THEN 0
+            ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
+          END
+        ) AS revenue
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      WHERE vp.DATA_VENDA >= @startDate
+        AND vp.DATA_VENDA < @endDate
+        AND vp.QTDE > 0
+        ${filialFilter}
+      GROUP BY CAST(vp.DATA_VENDA AS DATE)
+      ORDER BY date ASC;
+    `;
+
+    const result = await request.query<{
+      date: Date;
+      revenue: number | null;
+    }>(query);
+
+    return result.recordset.map((row) => ({
+      date: row.date.toISOString().split('T')[0],
+      revenue: Number(row.revenue ?? 0),
+    }));
+  });
+}
+
 

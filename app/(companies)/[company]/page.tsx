@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import AppHeader from "@/components/layout/AppHeader";
+import Sidebar from "@/components/layout/Sidebar";
 import CompanyDashboard from "@/components/dashboard/CompanyDashboard";
 import { resolveCompany } from "@/lib/config/company";
 
@@ -22,10 +22,11 @@ export default async function CompanyDashboardPage({ params }: CompanyPageProps)
 
   return (
     <div className={styles.page}>
-      <AppHeader companyName={company.name} />
-
-      <div className={styles.content}>
-        <CompanyDashboard companyKey={company.key} companyName={company.name} />
+      <Sidebar companyName={company.name} />
+      <div className={styles.mainContent}>
+        <div className={styles.content}>
+          <CompanyDashboard companyKey={company.key} companyName={company.name} />
+        </div>
       </div>
     </div>
   );

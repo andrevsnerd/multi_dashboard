@@ -283,7 +283,7 @@ export default function DateRangeFilter({
               showMonthArrow
               showDateDisplay={false}
               locale={ptBR}
-              rangeColors={["#6366f1"]}
+              rangeColors={["#64748b"]}
               maxDate={effectiveMaxDate}
             />
           </div>

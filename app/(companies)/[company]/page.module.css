@@ -1,16 +1,24 @@
 .page {
   min-height: 100vh;
-  padding: 32px clamp(24px, 5vw, 72px);
-  background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%);
+  display: flex;
+  background: #f8fafc;
+}
+
+.mainContent {
+  flex: 1;
+  margin-left: 240px;
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  min-height: 100vh;
 }
 
 .content {
+  flex: 1;
+  padding: 32px;
   display: flex;
   flex-direction: column;
   gap: 32px;
+  padding-top: 32px;
 }
 
 .section {
@@ -32,8 +40,12 @@
   margin: 0;
 }
 
-@media (max-width: 640px) {
-  .page {
+@media (max-width: 1024px) {
+  .mainContent {
+    margin-left: 0;
+  }
+  
+  .content {
     padding: 24px 16px;
   }
 }

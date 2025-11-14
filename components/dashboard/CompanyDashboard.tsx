@@ -7,6 +7,7 @@ import DateRangeFilter, {
 } from "@/components/filters/DateRangeFilter";
 import FilialFilter from "@/components/filters/FilialFilter";
 import SummaryCards from "@/components/dashboard/SummaryCards";
+import DailyRevenueChart from "@/components/dashboard/DailyRevenueChart";
 import CompanyRevenueLists from "@/components/dashboard/CompanyRevenueLists";
 import type { MetricSummary, SalesSummary } from "@/types/dashboard";
 import { getCurrentMonthRange } from "@/lib/utils/date";
@@ -185,6 +186,16 @@ export default function CompanyDashboard({
       </div>
 
       <SummaryCards summary={summary} companyName={companyName} />
+
+      <div className={styles.overviewSection}>
+        <h2 className={styles.overviewTitle}>VISÃO GERAL</h2>
+        <DailyRevenueChart
+          companyKey={companyKey}
+          startDate={range.startDate}
+          endDate={range.endDate}
+          filial={selectedFilial}
+        />
+      </div>
 
       <CompanyRevenueLists
         companyKey={companyKey}

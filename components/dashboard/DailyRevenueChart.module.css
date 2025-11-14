@@ -1,0 +1,48 @@
+.container {
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 24px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.title {
+  font-size: 14px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin: 0;
+  font-weight: 600;
+}
+
+.total {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.chartWrapper {
+  width: 100%;
+  height: 300px;
+}
+
+.loading,
+.error,
+.empty {
+  padding: 40px;
+  text-align: center;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.error {
+  color: #dc2626;
+}
+
