@@ -92,7 +92,7 @@ export default function GoalCard({
         </div>
       </div>
       <div className={styles.footer}>
-        <div className={styles.footerItem}>
+        <div className={`${styles.footerItem} ${styles.goalItem}`}>
           <span className={styles.footerLabel}>Meta</span>
           <span className={styles.footerValue}>{formatCurrency(goal)}</span>
         </div>
@@ -102,8 +102,9 @@ export default function GoalCard({
               projectionStatus.isOnTrack ? styles.projectionOnTrack : styles.projectionOffTrack
             }`}
           >
-            <div className={styles.projectionHeader}>
-              <span className={styles.footerLabel}>Projeção</span>
+            <span className={styles.footerLabel}>Projeção</span>
+            <div className={styles.projectionValueWrapper}>
+              <span className={styles.footerValue}>{formatCurrency(projection)}</span>
               {projectionStatus.isOnTrack ? (
                 <span className={styles.projectionBadge}>
                   <svg 
@@ -150,7 +151,6 @@ export default function GoalCard({
                 </span>
               )}
             </div>
-            <span className={styles.footerValue}>{formatCurrency(projection)}</span>
           </div>
         )}
       </div>

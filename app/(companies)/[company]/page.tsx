@@ -22,7 +22,7 @@ export default async function CompanyDashboardPage({ params }: CompanyPageProps)
 
   return (
     <PageLayout companyName={company.name}>
-      <div className={styles.page}>
+    <div className={styles.page}>
         <div className={styles.content}>
           <CompanyDashboard companyKey={company.key} companyName={company.name} />
         </div>
