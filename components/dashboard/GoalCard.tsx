@@ -8,12 +8,14 @@ import styles from "./GoalCard.module.css";
 interface GoalCardProps {
   currentValue: number;
   goal: number;
+  projection?: number;
   label?: string;
 }
 
 export default function GoalCard({
   currentValue,
   goal,
+  projection,
   label = "Meta",
 }: GoalCardProps) {
   const [mounted, setMounted] = useState(false);
@@ -73,13 +75,15 @@ export default function GoalCard({
       </div>
       <div className={styles.footer}>
         <div className={styles.footerItem}>
-          <span className={styles.footerLabel}>Atual</span>
-          <span className={styles.footerValue}>{formatCurrency(currentValue)}</span>
-        </div>
-        <div className={styles.footerItem}>
           <span className={styles.footerLabel}>Meta</span>
           <span className={styles.footerValue}>{formatCurrency(goal)}</span>
         </div>
+        {projection !== undefined && (
+          <div className={styles.footerItem}>
+            <span className={styles.footerLabel}>Projeção</span>
+            <span className={styles.footerValue}>{formatCurrency(projection)}</span>
+          </div>
+        )}
       </div>
     </div>
   );

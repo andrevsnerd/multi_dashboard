@@ -188,6 +188,32 @@ export default function CompanyDashboard({
 
   const currentRevenue = summary.totalRevenue.currentValue;
 
+  // Calcular projeção do mês
+  const monthProjection = useMemo(() => {
+    if (currentRevenue === 0) return 0;
+
+    // Obter data de referência (endDate do range)
+    const referenceDate = range.endDate;
+    const monthStart = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
+    
+    // Calcular dias passados do mês (desde o início do mês até endDate, incluindo endDate)
+    const daysPassed = Math.floor((referenceDate.getTime() - monthStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    
+    // Evitar divisão por zero
+    if (daysPassed <= 0) return 0;
+    
+    // Calcular dias totais do mês
+    const lastDayOfMonth = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0);
+    const totalDaysInMonth = lastDayOfMonth.getDate();
+    
+    // Calcular média diária e projeção
+    // Projeção = (faturamento atual / dias já passados) * dias totais do mês
+    const averageDaily = currentRevenue / daysPassed;
+    const projection = averageDaily * totalDaysInMonth;
+    
+    return projection;
+  }, [currentRevenue, range.endDate]);
+
   useEffect(() => {
     let active = true;
 
@@ -261,6 +287,7 @@ export default function CompanyDashboard({
             <GoalCard
               currentValue={currentRevenue}
               goal={currentGoal}
+              projection={monthProjection}
               label={selectedFilial ? "Meta da Filial" : "Meta Geral"}
             />
             <DailyRevenueChart

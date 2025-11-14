@@ -50,10 +50,11 @@
 
 .footer {
   display: flex;
-  gap: 32px;
+  gap: 20px;
   width: 100%;
   justify-content: center;
   margin-top: auto;
+  flex-wrap: wrap;
 }
 
 .footerItem {
