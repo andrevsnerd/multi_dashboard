@@ -206,10 +206,11 @@
   align-items: center;
   gap: 2px;
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  border: 1.5px solid #475569;
+  border: 1.5px solid #47556926;
   border-radius: 8px;
   padding: 8px 12px;
   box-shadow: 0 2px 8px rgba(71, 85, 105, 0.1);
+  width: 45px;
 }
 
 .stockNumber {

@@ -127,10 +127,6 @@ export default function DailyRevenueChart({
     };
   }, [companyKey, rangeKey, startDate, endDate, filial, mounted]);
 
-  const totalRevenue = useMemo(() => {
-    return data.reduce((sum, item) => sum + item.revenue, 0);
-  }, [data]);
-
   const maxRevenue = useMemo(() => {
     if (data.length === 0) return 0;
     return Math.max(...data.map((item) => item.revenue));
@@ -172,9 +168,6 @@ export default function DailyRevenueChart({
     <div className={styles.container}>
       <div className={styles.header}>
         <h3 className={styles.title}>FATURAMENTO DIÁRIO</h3>
-        <span className={styles.total}>
-          {formatCurrency(totalRevenue)} TOTAL
-        </span>
       </div>
       <div className={styles.chartWrapper}>
         {mounted && (
