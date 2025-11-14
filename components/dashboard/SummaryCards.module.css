@@ -34,6 +34,28 @@
   gap: 8px;
 }
 
+.secondaryValue {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.secondaryLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #94a3b8;
+}
+
+.secondaryValueText {
+  font-size: 18px;
+  font-weight: 600;
+  color: #475569;
+}
+
 .value {
   font-size: 32px;
   font-weight: 700;

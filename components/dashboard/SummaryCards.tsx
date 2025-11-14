@@ -82,6 +82,11 @@ export default function SummaryCards({
     description: string;
     format: MetricFormatter;
     highlight?: boolean;
+    secondaryValue?: {
+      metric: MetricSummary;
+      format: MetricFormatter;
+      label: string;
+    };
   }> = [
     {
       label: "Vendas Total",
@@ -101,6 +106,17 @@ export default function SummaryCards({
       metric: summary.averageTicket,
       description: `${formatInteger(summary.totalTickets.currentValue)} tickets`,
       format: formatCurrency,
+    },
+    {
+      label: "Estoque Total",
+      metric: summary.totalStockQuantity,
+      description: "Quantidade total em estoque",
+      format: formatInteger,
+      secondaryValue: {
+        metric: summary.totalStockValue,
+        format: formatCurrency,
+        label: "Valor total",
+      },
     },
   ];
 
@@ -123,23 +139,36 @@ export default function SummaryCards({
               >
                 {item.format(item.metric.currentValue)}
               </strong>
+              {item.secondaryValue && (
+                <div className={styles.secondaryValue}>
+                  <span className={styles.secondaryLabel}>
+                    {item.secondaryValue.label}:
+                  </span>
+                  <strong className={styles.secondaryValueText}>
+                    {item.secondaryValue.format(item.secondaryValue.metric.currentValue)}
+                  </strong>
+                </div>
+              )}
             </div>
 
-            <div className={styles.divider} aria-hidden />
-
-            <div className={styles.comparison}>
-              <div className={styles.previous}>
-                <span className={styles.previousLabel}>Período anterior</span>
-                <strong className={styles.previousValue}>
-                  {item.format(item.metric.previousValue)}
-                </strong>
-              </div>
-              <span
-                className={`${styles.changeBadge} ${trendClassMap[badge.trend]}`}
-              >
-                {badge.label}
-              </span>
-            </div>
+            {item.metric.changePercentage !== null && (
+              <>
+                <div className={styles.divider} aria-hidden />
+                <div className={styles.comparison}>
+                  <div className={styles.previous}>
+                    <span className={styles.previousLabel}>Período anterior</span>
+                    <strong className={styles.previousValue}>
+                      {item.format(item.metric.previousValue)}
+                    </strong>
+                  </div>
+                  <span
+                    className={`${styles.changeBadge} ${trendClassMap[badge.trend]}`}
+                  >
+                    {badge.label}
+                  </span>
+                </div>
+              </>
+            )}
           </article>
         );
       })}

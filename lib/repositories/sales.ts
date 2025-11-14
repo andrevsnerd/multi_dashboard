@@ -2,7 +2,7 @@ import sql from 'mssql';
 
 import { resolveCompany, type CompanyModule } from '@/lib/config/company';
 import { getConnectionPool, withRequest } from '@/lib/db/connection';
-import { fetchMultipleProductsStock } from '@/lib/repositories/inventory';
+import { fetchMultipleProductsStock, fetchStockSummary } from '@/lib/repositories/inventory';
 import type {
   CategoryRevenue,
   ProductRevenue,
@@ -260,11 +260,27 @@ export async function fetchSalesSummary({
       };
     };
 
+    // Buscar resumo de estoque
+    const stockSummary = await fetchStockSummary({
+      company,
+      filial,
+    });
+
     const summary: SalesSummary = {
       totalRevenue: buildMetric(currentRevenue, previousRevenue),
       totalQuantity: buildMetric(currentQuantity, previousQuantity),
       totalTickets: buildMetric(currentTickets, previousTickets),
       averageTicket: buildMetric(averageTicketCurrent, averageTicketPrevious),
+      totalStockQuantity: {
+        currentValue: stockSummary.totalQuantity,
+        previousValue: stockSummary.totalQuantity, // Estoque não tem histórico temporal
+        changePercentage: null,
+      },
+      totalStockValue: {
+        currentValue: stockSummary.totalValue,
+        previousValue: stockSummary.totalValue, // Estoque não tem histórico temporal
+        changePercentage: null,
+      },
     };
 
     const lastSaleDate = currentRow.lastSaleDate

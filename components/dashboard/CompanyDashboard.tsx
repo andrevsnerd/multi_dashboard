@@ -29,6 +29,8 @@ const DEFAULT_SUMMARY: SalesSummary = {
   totalQuantity: { ...EMPTY_METRIC },
   totalTickets: { ...EMPTY_METRIC },
   averageTicket: { ...EMPTY_METRIC },
+  totalStockQuantity: { ...EMPTY_METRIC, changePercentage: null },
+  totalStockValue: { ...EMPTY_METRIC, changePercentage: null },
 };
 
 interface SalesSummaryResponse {

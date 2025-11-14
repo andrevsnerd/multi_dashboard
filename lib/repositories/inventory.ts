@@ -2,6 +2,7 @@ import sql from 'mssql';
 
 import { resolveCompany } from '@/lib/config/company';
 import { withRequest } from '@/lib/db/connection';
+import type { MetricSummary } from '@/types/dashboard';
 
 function buildFilialFilter(
   request: sql.Request,
@@ -166,6 +167,55 @@ export async function fetchMultipleProductsStock(
     });
 
     return stockMap;
+  });
+}
+
+export interface StockSummaryParams {
+  company?: string;
+  filial?: string | null;
+}
+
+export interface StockSummary {
+  totalQuantity: number;
+  totalValue: number;
+}
+
+/**
+ * Busca o resumo total de estoque (quantidade e valor)
+ * Soma apenas valores de estoque > 0
+ * O valor total é calculado como estoque * custo_reposicao1
+ */
+export async function fetchStockSummary({
+  company,
+  filial,
+}: StockSummaryParams = {}): Promise<StockSummary> {
+  return withRequest(async (request) => {
+    const filialFilter = buildFilialFilter(request, company, filial);
+
+    const query = `
+      SELECT 
+        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS totalQuantity,
+        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0) ELSE 0 END) AS totalValue
+      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+      WHERE e.ESTOQUE > 0
+        ${filialFilter}
+    `;
+
+    const result = await request.query<{
+      totalQuantity: number | null;
+      totalValue: number | null;
+    }>(query);
+
+    const row = result.recordset[0] ?? {
+      totalQuantity: 0,
+      totalValue: 0,
+    };
+
+    return {
+      totalQuantity: Number(row.totalQuantity ?? 0),
+      totalValue: Number(row.totalValue ?? 0),
+    };
   });
 }
 

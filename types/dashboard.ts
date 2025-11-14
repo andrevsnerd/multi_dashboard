@@ -29,6 +29,8 @@ export interface SalesSummary {
   totalQuantity: MetricSummary;
   totalTickets: MetricSummary;
   averageTicket: MetricSummary;
+  totalStockQuantity: MetricSummary;
+  totalStockValue: MetricSummary;
 }
 
 
