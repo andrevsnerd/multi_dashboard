@@ -47,7 +47,7 @@ async function fetchRevenue(
     throw new Error("Erro ao carregar top produtos");
   }
   if (!categoriesResponse.ok) {
-    throw new Error("Erro ao carregar top categorias");
+    throw new Error("Erro ao carregar top grupos");
   }
 
   const productsJson = (await productsResponse.json()) as { data: ProductRevenue[] };
@@ -161,28 +161,46 @@ export default function CompanyRevenueLists({
           </article>
 
           <article className={styles.card}>
-            <h3 className={styles.cardTitle}>Top categorias</h3>
+            <div className={styles.listHeader}>
+              <h3 className={styles.cardTitle}>Top grupos</h3>
+              <div className={styles.listHeaderRight}>
+                <span className={styles.headerLabel}>Vendas</span>
+              </div>
+            </div>
             <ul className={styles.list}>
-              {state.categories.map((item) => (
-                <li key={item.categoryId} className={styles.listItem}>
-                  <div className={styles.itemNameContainer}>
-                    <strong className={styles.itemName}>{item.categoryName}</strong>
-                  </div>
-                  <div className={styles.itemMetrics}>
-                    <span className={styles.metricValue}>
-                      {item.totalRevenue.toLocaleString("pt-BR", {
-                        style: "currency",
-                        currency: "BRL",
-                      })}
-                    </span>
-                    <span className={styles.metricLabel}>
-                      {item.totalQuantity.toLocaleString("pt-BR")} unid.
-                    </span>
-                  </div>
-                </li>
-              ))}
+              {(() => {
+                const totalRevenue = state.categories.reduce((sum, item) => sum + item.totalRevenue, 0);
+                return state.categories.map((item) => {
+                  const percentage = totalRevenue > 0 ? (item.totalRevenue / totalRevenue) * 100 : 0;
+                  return (
+                    <li key={item.categoryId} className={styles.listItem}>
+                      <div className={styles.itemNameContainer}>
+                        <strong className={styles.itemName}>
+                          {item.categoryName}
+                          <span className={styles.percentageBadge}>
+                            {percentage.toFixed(2)}%
+                          </span>
+                        </strong>
+                      </div>
+                      <div className={styles.itemMetrics}>
+                        <div className={styles.priceColumn}>
+                          <span className={styles.metricValue}>
+                            {item.totalRevenue.toLocaleString("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            })}
+                          </span>
+                          <span className={styles.metricLabel}>
+                            {item.totalQuantity.toLocaleString("pt-BR")} unid.
+                          </span>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                });
+              })()}
               {state.categories.length === 0 ? (
-                <li className={styles.state}>Nenhuma categoria encontrada.</li>
+                <li className={styles.state}>Nenhum grupo encontrado.</li>
               ) : null}
             </ul>
           </article>
