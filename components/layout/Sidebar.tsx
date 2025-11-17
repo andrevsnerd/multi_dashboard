@@ -27,9 +27,15 @@ export default function Sidebar({ companyName }: SidebarProps) {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
+  // Construir o link para estoque por filial baseado no pathname atual
+  const stockByFilialHref = pathname && pathname !== "/" 
+    ? `${pathname}/estoque-por-filial`
+    : "/estoque-por-filial";
+
   const navItems = [
     { label: "Home", href: "/" },
     { label: "Dashboard", href: pathname },
+    { label: "Estoque por Filial", href: stockByFilialHref },
   ];
 
   const handleLinkClick = () => {
@@ -84,7 +90,10 @@ export default function Sidebar({ companyName }: SidebarProps) {
         </div>
         <nav className={styles.nav}>
           {navItems.map((item) => {
-            const isActive = pathname === item.href || (item.href === "/" && pathname === "/");
+            const isActive = 
+              pathname === item.href || 
+              (item.href === "/" && pathname === "/") ||
+              (item.href.includes("/estoque-por-filial") && pathname?.includes("/estoque-por-filial"));
             return (
               <Link
                 key={item.href}

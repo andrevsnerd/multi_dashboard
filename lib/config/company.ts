@@ -35,6 +35,13 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
         'NERD',
       ],
     },
+    filialDisplayNames: {
+      'NERD CENTER NORTE': 'CENTER NORTE',
+      'NERD HIGIENOPOLIS': 'HIGIENOPOLIS',
+      'NERD LEBLON': 'LEBLON',
+      'NERD MORUMBI RDRRRJ': 'MORUMBI',
+      'NERD VILLA LOBOS': 'VILLA LOBOS',
+    },
   },
   scarfme: {
     key: 'scarfme',

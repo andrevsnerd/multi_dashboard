@@ -194,16 +194,20 @@ export default function CompanyDashboard({
 
     // Obter data de referência (endDate do range)
     const referenceDate = range.endDate;
-    const monthStart = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
+    // Usar o dia anterior ao endDate para evitar que o dia atual (incompleto) afete a projeção
+    const previousDate = new Date(referenceDate);
+    previousDate.setDate(previousDate.getDate() - 1);
     
-    // Calcular dias passados do mês (desde o início do mês até endDate, incluindo endDate)
-    const daysPassed = Math.floor((referenceDate.getTime() - monthStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const monthStart = new Date(previousDate.getFullYear(), previousDate.getMonth(), 1);
+    
+    // Calcular dias passados do mês (desde o início do mês até o dia anterior ao endDate)
+    const daysPassed = Math.floor((previousDate.getTime() - monthStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     
     // Evitar divisão por zero
     if (daysPassed <= 0) return 0;
     
     // Calcular dias totais do mês
-    const lastDayOfMonth = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0);
+    const lastDayOfMonth = new Date(previousDate.getFullYear(), previousDate.getMonth() + 1, 0);
     const totalDaysInMonth = lastDayOfMonth.getDate();
     
     // Calcular média diária e projeção
