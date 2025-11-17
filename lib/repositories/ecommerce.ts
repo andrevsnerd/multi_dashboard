@@ -1,15 +1,8 @@
 import sql from 'mssql';
 
-import { resolveCompany, isEcommerceFilial, type CompanyModule } from '@/lib/config/company';
+import { resolveCompany, type CompanyModule } from '@/lib/config/company';
 import { getConnectionPool, withRequest } from '@/lib/db/connection';
 import { fetchMultipleProductsStock, fetchStockSummary } from '@/lib/repositories/inventory';
-import {
-  fetchTopProductsEcommerce,
-  fetchEcommerceSummary,
-  fetchTopCategoriesEcommerce,
-  fetchDailyEcommerceRevenue,
-  fetchEcommerceFilialPerformance,
-} from '@/lib/repositories/ecommerce';
 import type {
   CategoryRevenue,
   ProductRevenue,
@@ -29,12 +22,11 @@ function resolveRange(range?: DateRangeInput) {
   });
 }
 
-function buildFilialFilter(
+function buildEcommerceFilialFilter(
   request: sql.Request,
   companySlug: string | undefined,
-  module: CompanyModule,
   specificFilial?: string | null,
-  tableAlias: string = 'vp'
+  tableAlias: string = 'f'
 ): string {
   if (!companySlug) {
     return '';
@@ -46,29 +38,25 @@ function buildFilialFilter(
     return '';
   }
 
-  // Se uma filial específica foi selecionada, usar apenas ela
+  // Se uma filial específica foi selecionada
   if (specificFilial) {
-    request.input('filial', sql.VarChar, specificFilial);
-    return `AND ${tableAlias}.FILIAL = @filial`;
+    request.input('ecommerceFilial', sql.VarChar, specificFilial);
+    return `AND ${tableAlias}.FILIAL = @ecommerceFilial`;
   }
 
-  // Caso contrário, usar todas as filiais da empresa (exceto e-commerce)
-  const filiais = company.filialFilters[module] ?? [];
+  // Caso contrário, usar todas as filiais de e-commerce da empresa
   const ecommerceFilials = company.ecommerceFilials ?? [];
   
-  // Filtrar filiais normais (remover e-commerce)
-  const normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
-
-  if (normalFiliais.length === 0) {
+  if (ecommerceFilials.length === 0) {
     return '';
   }
 
-  normalFiliais.forEach((filial, index) => {
-    request.input(`filial${index}`, sql.VarChar, filial);
+  ecommerceFilials.forEach((filial, index) => {
+    request.input(`ecommerceFilial${index}`, sql.VarChar, filial);
   });
 
-  const placeholders = normalFiliais
-    .map((_, index) => `@filial${index}`)
+  const placeholders = ecommerceFilials
+    .map((_, index) => `@ecommerceFilial${index}`)
     .join(', ');
 
   return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
@@ -96,43 +84,37 @@ export interface SalesSummaryResult {
   };
 }
 
-export async function fetchTopProducts({
+export async function fetchTopProductsEcommerce({
   limit = DEFAULT_LIMIT,
   company,
   range,
   filial,
 }: TopQueryParams = {}): Promise<ProductRevenue[]> {
-  // Se for e-commerce, usar função específica de e-commerce
-  if (isEcommerceFilial(company, filial)) {
-    return fetchTopProductsEcommerce({ limit, company, range, filial });
-  }
-
-  // Função normal para vendas de loja
   return withRequest(async (request) => {
     request.input('limit', sql.Int, limit);
     const { start, end } = resolveRange(range);
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const filialFilter = buildFilialFilter(request, company, 'sales', filial);
+    const filialFilter = buildEcommerceFilialFilter(request, company, filial);
 
     const query = `
       SELECT TOP (@limit)
-        vp.PRODUTO AS productId,
-        MAX(vp.DESC_PRODUTO) AS productName,
-        SUM(
-          CASE
-            WHEN vp.QTDE_CANCELADA > 0 THEN 0
-            ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
-          END
-        ) AS totalRevenue,
-        SUM(vp.QTDE) AS totalQuantity
-      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      WHERE vp.DATA_VENDA >= @startDate
-        AND vp.DATA_VENDA < @endDate
-        AND vp.QTDE > 0
+        fp.PRODUTO AS productId,
+        MAX(p.DESC_PRODUTO) AS productName,
+        SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue,
+        SUM(fp.QTDE) AS totalQuantity
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO
+      WHERE f.EMISSAO >= @startDate
+        AND f.EMISSAO < @endDate
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND fp.QTDE > 0
         ${filialFilter}
-      GROUP BY vp.PRODUTO
+      GROUP BY fp.PRODUTO
       ORDER BY totalRevenue DESC;
     `;
 
@@ -163,17 +145,11 @@ export async function fetchTopProducts({
   });
 }
 
-export async function fetchSalesSummary({
+export async function fetchEcommerceSummary({
   company,
   range,
   filial,
 }: SummaryQueryParams = {}): Promise<SalesSummaryResult> {
-  // Se for e-commerce, usar função específica de e-commerce
-  if (isEcommerceFilial(company, filial)) {
-    return fetchEcommerceSummary({ company, range, filial });
-  }
-
-  // Função normal para vendas de loja
   return withRequest(async (request) => {
     const currentRange = resolveRange(range);
     const { start, end } = currentRange;
@@ -184,47 +160,45 @@ export async function fetchSalesSummary({
     request.input('prevStartDate', sql.DateTime, previousRange.start);
     request.input('prevEndDate', sql.DateTime, previousRange.end);
 
-    const filialFilter = buildFilialFilter(request, company, 'sales', filial);
+    const filialFilter = buildEcommerceFilialFilter(request, company, filial);
 
     const query = `
       WITH summary AS (
         SELECT
           'current' AS period,
-          SUM(
-            CASE
-              WHEN vp.QTDE_CANCELADA > 0 THEN 0
-              ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
-            END
-          ) AS totalRevenue,
-          SUM(vp.QTDE) AS totalQuantity,
-          COUNT(DISTINCT vp.TICKET) AS totalTickets,
-          MAX(vp.DATA_VENDA) AS lastSaleDate
-        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-        WHERE vp.DATA_VENDA >= @startDate
-          AND vp.DATA_VENDA < @endDate
-          AND vp.QTDE > 0
+          SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue,
+          SUM(fp.QTDE) AS totalQuantity,
+          COUNT(DISTINCT CONCAT(f.NF_SAIDA, '-', f.SERIE_NF)) AS totalTickets,
+          MAX(f.EMISSAO) AS lastSaleDate
+        FROM FATURAMENTO f WITH (NOLOCK)
+        JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+          ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+        WHERE f.EMISSAO >= @startDate
+          AND f.EMISSAO < @endDate
+          AND f.NOTA_CANCELADA = 0
+          AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+          AND fp.QTDE > 0
           ${filialFilter}
 
         UNION ALL
 
         SELECT
           'previous' AS period,
-          SUM(
-            CASE
-              WHEN vp.QTDE_CANCELADA > 0 THEN 0
-              ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
-            END
-          ) AS totalRevenue,
-          SUM(vp.QTDE) AS totalQuantity,
-          COUNT(DISTINCT vp.TICKET) AS totalTickets,
-          MAX(vp.DATA_VENDA) AS lastSaleDate
-        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-        WHERE vp.DATA_VENDA >= @prevStartDate
-          AND vp.DATA_VENDA < @prevEndDate
-          AND vp.QTDE > 0
+          SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue,
+          SUM(fp.QTDE) AS totalQuantity,
+          COUNT(DISTINCT CONCAT(f.NF_SAIDA, '-', f.SERIE_NF)) AS totalTickets,
+          MAX(f.EMISSAO) AS lastSaleDate
+        FROM FATURAMENTO f WITH (NOLOCK)
+        JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+          ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+        WHERE f.EMISSAO >= @prevStartDate
+          AND f.EMISSAO < @prevEndDate
+          AND f.NOTA_CANCELADA = 0
+          AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+          AND fp.QTDE > 0
           ${filialFilter}
       )
-      SELECT period, totalRevenue, totalQuantity, totalTickets FROM summary;
+      SELECT period, totalRevenue, totalQuantity, totalTickets, lastSaleDate FROM summary;
     `;
 
     const result = await request.query<{
@@ -314,13 +288,17 @@ export async function fetchSalesSummary({
 
     const pool = await getConnectionPool();
     const availabilityRequest = pool.request();
-    const availabilityFilter = buildFilialFilter(availabilityRequest, company, 'sales', filial);
+    const availabilityFilter = buildEcommerceFilialFilter(availabilityRequest, company, filial);
     const availabilityQuery = `
       SELECT
-        MIN(vp.DATA_VENDA) AS firstSaleDate,
-        MAX(vp.DATA_VENDA) AS lastSaleDate
-      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      WHERE vp.QTDE > 0
+        MIN(f.EMISSAO) AS firstSaleDate,
+        MAX(f.EMISSAO) AS lastSaleDate
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND fp.QTDE > 0
         ${availabilityFilter}
     `;
 
@@ -349,43 +327,37 @@ export async function fetchSalesSummary({
   });
 }
 
-export async function fetchTopCategories({
+export async function fetchTopCategoriesEcommerce({
   limit = DEFAULT_LIMIT,
   company,
   range,
   filial,
 }: TopQueryParams = {}): Promise<CategoryRevenue[]> {
-  // Se for e-commerce, usar função específica de e-commerce
-  if (isEcommerceFilial(company, filial)) {
-    return fetchTopCategoriesEcommerce({ limit, company, range, filial });
-  }
-
-  // Função normal para vendas de loja
   return withRequest(async (request) => {
     request.input('limit', sql.Int, limit);
     const { start, end } = resolveRange(range);
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const filialFilter = buildFilialFilter(request, company, 'sales', filial);
+    const filialFilter = buildEcommerceFilialFilter(request, company, filial);
 
     const query = `
       SELECT TOP (@limit)
-        COALESCE(vp.GRUPO_PRODUTO, 'SEM GRUPO') AS categoryId,
-        COALESCE(MAX(vp.GRUPO_PRODUTO), 'SEM GRUPO') AS categoryName,
-        SUM(
-          CASE
-            WHEN vp.QTDE_CANCELADA > 0 THEN 0
-            ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
-          END
-        ) AS totalRevenue,
-        SUM(vp.QTDE) AS totalQuantity
-      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      WHERE vp.DATA_VENDA >= @startDate
-        AND vp.DATA_VENDA < @endDate
-        AND vp.QTDE > 0
+        COALESCE(p.GRUPO_PRODUTO, 'SEM GRUPO') AS categoryId,
+        COALESCE(MAX(p.GRUPO_PRODUTO), 'SEM GRUPO') AS categoryName,
+        SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue,
+        SUM(fp.QTDE) AS totalQuantity
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO
+      WHERE f.EMISSAO >= @startDate
+        AND f.EMISSAO < @endDate
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND fp.QTDE > 0
         ${filialFilter}
-      GROUP BY COALESCE(vp.GRUPO_PRODUTO, 'SEM GRUPO')
+      GROUP BY COALESCE(p.GRUPO_PRODUTO, 'SEM GRUPO')
       ORDER BY totalRevenue DESC;
     `;
 
@@ -404,39 +376,32 @@ export interface DailyRevenue {
   revenue: number;
 }
 
-export async function fetchDailyRevenue({
+export async function fetchDailyEcommerceRevenue({
   company,
   range,
   filial,
 }: SummaryQueryParams = {}): Promise<DailyRevenue[]> {
-  // Se for e-commerce, usar função específica de e-commerce
-  if (isEcommerceFilial(company, filial)) {
-    return fetchDailyEcommerceRevenue({ company, range, filial });
-  }
-
-  // Função normal para vendas de loja
   return withRequest(async (request) => {
     const { start, end } = resolveRange(range);
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const filialFilter = buildFilialFilter(request, company, 'sales', filial);
+    const filialFilter = buildEcommerceFilialFilter(request, company, filial);
 
     const query = `
       SELECT
-        CAST(vp.DATA_VENDA AS DATE) AS date,
-        SUM(
-          CASE
-            WHEN vp.QTDE_CANCELADA > 0 THEN 0
-            ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
-          END
-        ) AS revenue
-      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      WHERE vp.DATA_VENDA >= @startDate
-        AND vp.DATA_VENDA < @endDate
-        AND vp.QTDE > 0
+        CAST(f.EMISSAO AS DATE) AS date,
+        SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS revenue
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE f.EMISSAO >= @startDate
+        AND f.EMISSAO < @endDate
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND fp.QTDE > 0
         ${filialFilter}
-      GROUP BY CAST(vp.DATA_VENDA AS DATE)
+      GROUP BY CAST(f.EMISSAO AS DATE)
       ORDER BY date ASC;
     `;
 
@@ -452,17 +417,11 @@ export async function fetchDailyRevenue({
   });
 }
 
-export async function fetchFilialPerformance({
+export async function fetchEcommerceFilialPerformance({
   company,
   range,
 }: SummaryQueryParams = {}): Promise<FilialPerformance[]> {
-  const companyConfig = resolveCompany(company);
-  if (!companyConfig) {
-    return [];
-  }
-
-  // Buscar performance de filiais normais
-  const normalFiliais = withRequest(async (request) => {
+  return withRequest(async (request) => {
     const currentRange = resolveRange(range);
     const { start, end } = currentRange;
     const previousRange = shiftRangeByMonths(currentRange, -1);
@@ -472,55 +431,55 @@ export async function fetchFilialPerformance({
     request.input('prevStartDate', sql.DateTime, previousRange.start);
     request.input('prevEndDate', sql.DateTime, previousRange.end);
 
-    const filiais = companyConfig.filialFilters['sales'] ?? [];
-    const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
-    const normalFiliaisList = filiais.filter(f => !ecommerceFilials.includes(f));
-    
-    if (normalFiliaisList.length === 0) {
+    const companyConfig = resolveCompany(company);
+    if (!companyConfig) {
       return [];
     }
 
-    // Criar filtro para todas as filiais normais da empresa
-    normalFiliaisList.forEach((filial, index) => {
-      request.input(`filial${index}`, sql.VarChar, filial);
+    const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
+    if (ecommerceFilials.length === 0) {
+      return [];
+    }
+
+    // Criar filtro para todas as filiais de e-commerce da empresa
+    ecommerceFilials.forEach((filial, index) => {
+      request.input(`ecommerceFilial${index}`, sql.VarChar, filial);
     });
-    const placeholders = normalFiliaisList.map((_, index) => `@filial${index}`).join(', ');
+    const placeholders = ecommerceFilials.map((_, index) => `@ecommerceFilial${index}`).join(', ');
 
     const query = `
       WITH filial_revenue AS (
         SELECT
-          vp.FILIAL,
+          f.FILIAL,
           'current' AS period,
-          SUM(
-            CASE
-              WHEN vp.QTDE_CANCELADA > 0 THEN 0
-              ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
-            END
-          ) AS revenue
-        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-        WHERE vp.DATA_VENDA >= @startDate
-          AND vp.DATA_VENDA < @endDate
-          AND vp.QTDE > 0
-          AND vp.FILIAL IN (${placeholders})
-        GROUP BY vp.FILIAL
+          SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS revenue
+        FROM FATURAMENTO f WITH (NOLOCK)
+        JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+          ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+        WHERE f.EMISSAO >= @startDate
+          AND f.EMISSAO < @endDate
+          AND f.NOTA_CANCELADA = 0
+          AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+          AND fp.QTDE > 0
+          AND f.FILIAL IN (${placeholders})
+        GROUP BY f.FILIAL
 
         UNION ALL
 
         SELECT
-          vp.FILIAL,
+          f.FILIAL,
           'previous' AS period,
-          SUM(
-            CASE
-              WHEN vp.QTDE_CANCELADA > 0 THEN 0
-              ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
-            END
-          ) AS revenue
-        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-        WHERE vp.DATA_VENDA >= @prevStartDate
-          AND vp.DATA_VENDA < @prevEndDate
-          AND vp.QTDE > 0
-          AND vp.FILIAL IN (${placeholders})
-        GROUP BY vp.FILIAL
+          SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS revenue
+        FROM FATURAMENTO f WITH (NOLOCK)
+        JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+          ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+        WHERE f.EMISSAO >= @prevStartDate
+          AND f.EMISSAO < @prevEndDate
+          AND f.NOTA_CANCELADA = 0
+          AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+          AND fp.QTDE > 0
+          AND f.FILIAL IN (${placeholders})
+        GROUP BY f.FILIAL
       )
       SELECT
         fr.FILIAL,
@@ -537,23 +496,9 @@ export async function fetchFilialPerformance({
       previousRevenue: number | null;
     }>(query);
 
-    return result.recordset;
-  });
+    const displayNames = companyConfig.filialDisplayNames ?? {};
 
-  // Buscar performance de filiais de e-commerce
-  const ecommerceFiliais = fetchEcommerceFilialPerformance({ company, range });
-
-  // Combinar resultados
-  const [normalResults, ecommerceResults] = await Promise.all([
-    normalFiliais,
-    ecommerceFiliais,
-  ]);
-
-  const displayNames = companyConfig.filialDisplayNames ?? {};
-
-  // Combinar e ordenar por revenue atual
-  const combined = [
-    ...normalResults.map((row) => {
+    return result.recordset.map((row) => {
       const current = Number(row.currentRevenue ?? 0);
       const previous = Number(row.previousRevenue ?? 0);
       
@@ -564,7 +509,7 @@ export async function fetchFilialPerformance({
       if (previous > 0) {
         changePercentage = Number((((current - previous) / previous) * 100).toFixed(1));
       } else if (current > 0) {
-        changePercentage = null;
+        changePercentage = null; // Não há comparação possível
       }
 
       return {
@@ -574,12 +519,7 @@ export async function fetchFilialPerformance({
         previousRevenue: previous,
         changePercentage,
       };
-    }),
-    ...ecommerceResults, // Já vem com filialDisplayName correto
-  ];
-
-  // Ordenar por revenue atual (maior primeiro)
-  return combined.sort((a, b) => b.currentRevenue - a.currentRevenue);
+    });
+  });
 }
-
 
