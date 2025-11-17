@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import DateRangeFilter, {
   type DateRangeValue,
 } from "@/components/filters/DateRangeFilter";
-import FilialFilter from "@/components/filters/FilialFilter";
 import StockByFilialTable from "@/components/stock/StockByFilialTable";
 import type { StockByFilialItem } from "@/lib/repositories/stockByFilial";
 import { getCurrentMonthRange } from "@/lib/utils/date";
@@ -61,7 +60,6 @@ export default function StockByFilialPage({
   }, []);
 
   const [range, setRange] = useState<DateRangeValue>(initialRange);
-  const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
   const [data, setData] = useState<StockByFilialItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,8 +67,8 @@ export default function StockByFilialPage({
 
   const rangeKey = useMemo(
     () =>
-      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? "all"}`,
-    [range.startDate, range.endDate, selectedFilial]
+      `${range.startDate.toISOString()}::${range.endDate.toISOString()}`,
+    [range.startDate, range.endDate]
   );
 
   useEffect(() => {
@@ -83,7 +81,7 @@ export default function StockByFilialPage({
         const stockData = await fetchStockByFilial(
           companyKey,
           range,
-          selectedFilial
+          null // Sempre mostrar todas as filiais nesta página
         );
         if (active) {
           setData(stockData);
@@ -116,11 +114,6 @@ export default function StockByFilialPage({
         <h1 className={styles.title}>Estoque por Filial</h1>
         <div className={styles.controls}>
           <DateRangeFilter value={range} onChange={setRange} />
-          <FilialFilter
-            companyKey={companyKey}
-            value={selectedFilial}
-            onChange={setSelectedFilial}
-          />
           {loading ? (
             <span className={styles.loading}>Carregando dados…</span>
           ) : null}

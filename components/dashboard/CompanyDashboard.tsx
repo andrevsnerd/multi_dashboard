@@ -122,6 +122,7 @@ export default function CompanyDashboard({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
+  const [projectionRevenue, setProjectionRevenue] = useState<number>(0);
 
   const rangeKey = useMemo(
     () => `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}`,
@@ -188,9 +189,49 @@ export default function CompanyDashboard({
 
   const currentRevenue = summary.totalRevenue.currentValue;
 
+  // Buscar revenue ajustado para projeção (até o dia anterior)
+  useEffect(() => {
+    let active = true;
+
+    async function loadProjectionRevenue() {
+      try {
+        // Calcular range ajustado: até o dia anterior ao endDate
+        const adjustedEndDate = new Date(range.endDate);
+        adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+        adjustedEndDate.setHours(23, 59, 59, 999); // Fim do dia anterior
+
+        const adjustedRange = {
+          startDate: range.startDate,
+          endDate: adjustedEndDate,
+        };
+
+        const { summary: projectionSummary } = await fetchSummary(
+          companyKey,
+          adjustedRange,
+          selectedFilial,
+        );
+
+        if (active) {
+          setProjectionRevenue(projectionSummary.totalRevenue.currentValue);
+        }
+      } catch (err) {
+        // Em caso de erro, usar o revenue atual como fallback
+        if (active) {
+          setProjectionRevenue(summary.totalRevenue.currentValue);
+        }
+      }
+    }
+
+    void loadProjectionRevenue();
+
+    return () => {
+      active = false;
+    };
+  }, [companyKey, range.startDate, range.endDate, selectedFilial, summary.totalRevenue.currentValue]);
+
   // Calcular projeção do mês
   const monthProjection = useMemo(() => {
-    if (currentRevenue === 0) return 0;
+    if (projectionRevenue === 0) return 0;
 
     // Obter data de referência (endDate do range)
     const referenceDate = range.endDate;
@@ -212,11 +253,12 @@ export default function CompanyDashboard({
     
     // Calcular média diária e projeção
     // Projeção = (faturamento atual / dias já passados) * dias totais do mês
-    const averageDaily = currentRevenue / daysPassed;
+    // Usar projectionRevenue que considera vendas apenas até o dia anterior
+    const averageDaily = projectionRevenue / daysPassed;
     const projection = averageDaily * totalDaysInMonth;
     
     return projection;
-  }, [currentRevenue, range.endDate]);
+  }, [projectionRevenue, range.endDate]);
 
   useEffect(() => {
     let active = true;

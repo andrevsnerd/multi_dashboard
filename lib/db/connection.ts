@@ -29,6 +29,8 @@ const config: sql.config = {
     min: 1,
     idleTimeoutMillis: 30000,
   },
+  requestTimeout: 30000, // 30 segundos (aumentado de 15s padrão)
+  connectionTimeout: 30000, // 30 segundos para estabelecer conexão
 };
 
 let poolPromise: Promise<sql.ConnectionPool> | null = null;

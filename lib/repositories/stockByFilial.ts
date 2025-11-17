@@ -18,11 +18,13 @@ export interface FilialStockSales {
   filial: string;
   stock: number;
   sales: number;
+  salesLast30Days: number;
 }
 
 export interface StockByFilialItem {
   produto: string;
   subgrupo: string;
+  grupo: string;
   grade: string;
   descricao: string;
   cor: string;
@@ -212,8 +214,13 @@ export async function fetchStockByFilial({
       end: range?.end,
     });
 
+    // Calcular data de 30 dias atrás para verificar vendas recentes
+    const thirtyDaysAgo = new Date(end);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
+    request.input('thirtyDaysAgo', sql.DateTime, thirtyDaysAgo);
 
     const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
     const vendasFilialFilter = buildSalesFilialFilter(request, company, filial, 'vp');
@@ -238,13 +245,14 @@ export async function fetchStockByFilial({
       GROUP BY e.PRODUTO, e.COR_PRODUTO, c.DESC_COR, e.FILIAL
     `;
 
-    // Buscar dados de produto para exibição (subgrupo, grade, descrição)
+    // Buscar dados de produto para exibição (subgrupo, grupo, grade, descrição)
     // Buscar tanto de estoque quanto de vendas para garantir que todos os produtos apareçam
     const produtoInfoQuery = `
       SELECT DISTINCT
         e.PRODUTO AS produto,
         e.COR_PRODUTO AS corProduto,
         ISNULL(p.SUBGRUPO_PRODUTO, 'SEM SUBGRUPO') AS subgrupo,
+        ISNULL(p.GRUPO_PRODUTO, 'SEM GRUPO') AS grupo,
         ISNULL(p.GRADE, '') AS grade,
         ISNULL(p.DESC_PRODUTO, '') AS descricao,
         ISNULL(c.DESC_COR, '') AS corBanco
@@ -260,6 +268,7 @@ export async function fetchStockByFilial({
           vp.PRODUTO AS produto,
           vp.COR_PRODUTO AS corProduto,
           ISNULL(vp.SUBGRUPO_PRODUTO, 'SEM SUBGRUPO') AS subgrupo,
+          ISNULL(vp.GRUPO_PRODUTO, 'SEM GRUPO') AS grupo,
           ISNULL(p.GRADE, '') AS grade,
           ISNULL(vp.DESC_PRODUTO, '') AS descricao,
           ISNULL(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), '') AS corBanco
@@ -279,6 +288,7 @@ export async function fetchStockByFilial({
         vp.PRODUTO AS produto,
         vp.COR_PRODUTO AS corProduto,
         ISNULL(vp.SUBGRUPO_PRODUTO, 'SEM SUBGRUPO') AS subgrupo,
+        ISNULL(vp.GRUPO_PRODUTO, 'SEM GRUPO') AS grupo,
         ISNULL(COALESCE(vp.TAMANHO, p.GRADE), '') AS grade,
         ISNULL(vp.DESC_PRODUTO, '') AS descricao,
         ISNULL(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), '') AS corBanco,
@@ -291,10 +301,27 @@ export async function fetchStockByFilial({
         AND vp.DATA_VENDA < @endDate
         AND vp.QTDE > 0
         ${vendasFilialFilter}
-      GROUP BY vp.PRODUTO, vp.COR_PRODUTO, vp.SUBGRUPO_PRODUTO, COALESCE(vp.TAMANHO, p.GRADE), vp.DESC_PRODUTO, COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), vp.FILIAL
+      GROUP BY vp.PRODUTO, vp.COR_PRODUTO, vp.SUBGRUPO_PRODUTO, vp.GRUPO_PRODUTO, COALESCE(vp.TAMANHO, p.GRADE), vp.DESC_PRODUTO, COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), vp.FILIAL
     `;
 
-    const [estoqueResult, vendasResult, produtoInfoResult] = await Promise.all([
+    // Buscar vendas dos últimos 30 dias por produto+cor+filial (para verificar se teve venda recente)
+    const vendasLast30DaysQuery = `
+      SELECT 
+        vp.PRODUTO AS produto,
+        vp.COR_PRODUTO AS corProduto,
+        ISNULL(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), '') AS corBanco,
+        vp.FILIAL AS filial,
+        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.QTDE END) AS vendas
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
+      WHERE vp.DATA_VENDA >= @thirtyDaysAgo
+        AND vp.DATA_VENDA < @endDate
+        AND vp.QTDE > 0
+        ${vendasFilialFilter}
+      GROUP BY vp.PRODUTO, vp.COR_PRODUTO, COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), vp.FILIAL
+    `;
+
+    const [estoqueResult, vendasResult, produtoInfoResult, vendasLast30DaysResult] = await Promise.all([
       request.query<{
         produto: string;
         corProduto: string | null;
@@ -308,6 +335,7 @@ export async function fetchStockByFilial({
         produto: string;
         corProduto: string | null;
         subgrupo: string;
+        grupo: string;
         grade: string;
         descricao: string;
         corBanco: string;
@@ -318,10 +346,18 @@ export async function fetchStockByFilial({
         produto: string;
         corProduto: string | null;
         subgrupo: string;
+        grupo: string;
         grade: string;
         descricao: string;
         corBanco: string;
       }>(produtoInfoQuery),
+      request.query<{
+        produto: string;
+        corProduto: string | null;
+        corBanco: string;
+        filial: string;
+        vendas: number | null;
+      }>(vendasLast30DaysQuery),
     ]);
 
     // Função auxiliar para normalizar filial (usar em todos os lugares)
@@ -329,9 +365,10 @@ export async function fetchStockByFilial({
       return (filial || '').trim().toUpperCase();
     };
 
-    // Criar mapa de informações de produtos (subgrupo, grade, descrição) por produto+cor+grade
+    // Criar mapa de informações de produtos (subgrupo, grupo, grade, descrição) por produto+cor+grade
     const produtoInfoMap = new Map<string, {
       subgrupo: string;
+      grupo: string;
       grade: string;
       descricao: string;
     }>();
@@ -344,6 +381,7 @@ export async function fetchStockByFilial({
       const key = `${row.produto}|${corNormalizada}|${row.grade || ''}`;
       produtoInfoMap.set(key, {
         subgrupo: row.subgrupo,
+        grupo: (row.grupo && row.grupo.trim() !== '') ? row.grupo : 'SEM GRUPO',
         grade: row.grade || '',
         descricao: row.descricao,
       });
@@ -352,6 +390,22 @@ export async function fetchStockByFilial({
     // Criar um mapa para agrupar por produto+cor+grade
     const itemMap = new Map<string, StockByFilialItem>();
     const filiaisMap = new Map<string, Map<string, FilialStockSales>>();
+    
+    // Criar mapa de vendas dos últimos 30 dias por produto+cor+filial
+    const vendasLast30DaysMap = new Map<string, Map<string, number>>();
+    vendasLast30DaysResult.recordset.forEach((row) => {
+      const corNormalizada = normalizeColor(
+        getColorDescription(row.corProduto, row.corBanco)
+      );
+      const key = `${row.produto}|${corNormalizada}`;
+      const filialNormalizada = normalizeFilial(row.filial);
+      
+      if (!vendasLast30DaysMap.has(key)) {
+        vendasLast30DaysMap.set(key, new Map());
+      }
+      const filiaisVendas = vendasLast30DaysMap.get(key)!;
+      filiaisVendas.set(filialNormalizada, Number(row.vendas ?? 0));
+    });
 
     // Processar estoque por produto+cor+filial (sem grade)
     // O estoque de cada filial já está calculado na query (soma de todas as grades)
@@ -383,10 +437,14 @@ export async function fetchStockByFilial({
       const filialNormalizada = normalizeFilial(row.filial);
       
       if (!filiais.has(filialNormalizada)) {
+        // Buscar vendas dos últimos 30 dias
+        const vendasLast30Days = vendasLast30DaysMap.get(estoqueKey)?.get(filialNormalizada) ?? 0;
+        
         filiais.set(filialNormalizada, {
           filial: row.filial, // Manter o nome original para exibição
           stock: 0,
           sales: 0,
+          salesLast30Days: vendasLast30Days,
         });
       }
 
@@ -406,6 +464,7 @@ export async function fetchStockByFilial({
         // Buscar informações do produto do mapa
         const produtoInfo = produtoInfoMap.get(key) || {
           subgrupo: row.subgrupo,
+          grupo: (row.grupo && row.grupo.trim() !== '') ? row.grupo : 'SEM GRUPO',
           grade: row.grade || '',
           descricao: row.descricao,
         };
@@ -413,6 +472,7 @@ export async function fetchStockByFilial({
         itemMap.set(key, {
           produto: row.produto,
           subgrupo: produtoInfo.subgrupo,
+          grupo: produtoInfo.grupo,
           grade: produtoInfo.grade,
           descricao: produtoInfo.descricao,
           cor: corNormalizada, // Usar cor normalizada do mapeamento
@@ -439,10 +499,14 @@ export async function fetchStockByFilial({
       const filialNormalizada = normalizeFilial(row.filial);
 
       if (!filiais.has(filialNormalizada)) {
+        // Buscar vendas dos últimos 30 dias
+        const vendasLast30Days = vendasLast30DaysMap.get(estoqueKey)?.get(filialNormalizada) ?? 0;
+        
         filiais.set(filialNormalizada, {
           filial: row.filial, // Manter o nome original para exibição
           stock: 0,
           sales: 0,
+          salesLast30Days: vendasLast30Days,
         });
       }
 

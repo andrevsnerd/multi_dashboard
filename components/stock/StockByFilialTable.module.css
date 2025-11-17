@@ -100,6 +100,25 @@
   min-width: 80px;
   align-items: center;
   border: 1px solid #e5e5e5;
+  transition: background-color 0.2s ease;
+}
+
+.filialCellMatriz {
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  display: flex;
+  padding: 17px 12px;
+}
+
+.filialCellBlue {
+  background-color: #B3D9FF;
+  border-color: #7AB8FF;
+}
+
+.filialCellOrange {
+  background-color: #FFD699;
+  border-color: #FFC966;
 }
 
 .stockValue {

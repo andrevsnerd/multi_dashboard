@@ -27,14 +27,25 @@ export default function Sidebar({ companyName }: SidebarProps) {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Construir o link para estoque por filial baseado no pathname atual
-  const stockByFilialHref = pathname && pathname !== "/" 
-    ? `${pathname}/estoque-por-filial`
+  // Extrair o caminho base da empresa (remover /estoque-por-filial se estiver presente)
+  const getBasePath = () => {
+    if (!pathname || pathname === "/") {
+      return "/";
+    }
+    // Remove /estoque-por-filial do final do pathname se existir
+    return pathname.replace(/\/estoque-por-filial$/, "");
+  };
+
+  const basePath = getBasePath();
+  
+  // Construir o link para estoque por filial baseado no caminho base
+  const stockByFilialHref = basePath && basePath !== "/" 
+    ? `${basePath}/estoque-por-filial`
     : "/estoque-por-filial";
 
   const navItems = [
     { label: "Home", href: "/" },
-    { label: "Dashboard", href: pathname },
+    { label: "Dashboard", href: basePath },
     { label: "Estoque por Filial", href: stockByFilialHref },
   ];
 
@@ -90,10 +101,19 @@ export default function Sidebar({ companyName }: SidebarProps) {
         </div>
         <nav className={styles.nav}>
           {navItems.map((item) => {
-            const isActive = 
-              pathname === item.href || 
-              (item.href === "/" && pathname === "/") ||
-              (item.href.includes("/estoque-por-filial") && pathname?.includes("/estoque-por-filial"));
+            let isActive = false;
+            
+            if (item.label === "Home") {
+              // Home só está ativo na raiz
+              isActive = pathname === "/";
+            } else if (item.label === "Dashboard") {
+              // Dashboard está ativo quando está no caminho base (não em estoque-por-filial)
+              isActive = pathname === item.href && !pathname.includes("/estoque-por-filial");
+            } else if (item.label === "Estoque por Filial") {
+              // Estoque por Filial está ativo quando o pathname inclui /estoque-por-filial
+              isActive = pathname?.includes("/estoque-por-filial") || pathname === item.href;
+            }
+            
             return (
               <Link
                 key={item.href}

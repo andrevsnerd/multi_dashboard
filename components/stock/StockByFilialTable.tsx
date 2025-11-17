@@ -102,7 +102,7 @@ export default function StockByFilialTable({
     filialName: string | null
   ) => {
     if (!filialName) {
-      return { stock: 0, sales: 0 };
+      return { stock: 0, sales: 0, salesLast30Days: 0 };
     }
     // Normalizar nome da filial para comparação (trim e case-insensitive)
     // Usar a mesma normalização que foi usada no backend
@@ -112,7 +112,34 @@ export default function StockByFilialTable({
     const filialData = item.filiais.find((f) => 
       normalizeFilial(f.filial) === normalizedTarget
     );
-    return filialData || { stock: 0, sales: 0 };
+    return filialData || { stock: 0, sales: 0, salesLast30Days: 0 };
+  };
+
+  // Função para determinar a classe CSS baseada nas regras de cores
+  const getFilialCellClass = (
+    stock: number,
+    sales: number,
+    salesLast30Days: number
+  ): string => {
+    // Verificar se o produto existe no estoque da filial (stock > 0 ou stock < 0)
+    const produtoExiste = stock !== 0;
+    
+    if (!produtoExiste) {
+      return ''; // Sem cor (produto não existe no estoque)
+    }
+
+    // AZUL: Estoque ≤ 1 E teve venda no período E produto existe
+    if (stock <= 1 && sales > 0) {
+      return styles.filialCellBlue;
+    }
+
+    // LARANJA: Estoque > 1 E não teve venda no período E não teve venda nos últimos 30 dias E produto existe
+    if (stock > 1 && sales === 0 && salesLast30Days === 0) {
+      return styles.filialCellOrange;
+    }
+
+    // SEM COR: situação normal
+    return '';
   };
 
   if (loading) {
@@ -136,8 +163,8 @@ export default function StockByFilialTable({
       <table className={styles.table}>
         <thead>
           <tr>
-            <th>SUBGRUPO</th>
-            <th>GRADE</th>
+            <th>{companyKey === "nerd" ? "GRUPO" : "SUBGRUPO"}</th>
+            {companyKey !== "nerd" && <th>GRADE</th>}
             <th>DESCRIÇÃO</th>
             <th>COR</th>
             <th>VENDAS</th>
@@ -158,10 +185,12 @@ export default function StockByFilialTable({
             const productInfo = formatProductDescription(item.descricao, item.produto);
             return (
               <tr key={`${item.produto}-${item.cor}-${item.grade}-${rowIndex}`}>
-                <td className={styles.subgrupoCell}>{item.subgrupo}</td>
-                <td>
-                  <div className={styles.gradeCell}>{item.grade}</div>
-                </td>
+                <td className={styles.subgrupoCell}>{companyKey === "nerd" ? item.grupo : item.subgrupo}</td>
+                {companyKey !== "nerd" && (
+                  <td>
+                    <div className={styles.gradeCell}>{item.grade}</div>
+                  </td>
+                )}
                 <td className={styles.descricaoCell}>
                   <div className={styles.productName}>{productInfo.name}</div>
                   <div className={styles.productCode}>{productInfo.code}</div>
@@ -171,12 +200,9 @@ export default function StockByFilialTable({
                 <td className={styles.numberCell}>{item.totalEstoque}</td>
                 {matriz && (
                   <td>
-                    <div className={styles.filialCell}>
+                    <div className={`${styles.filialCell} ${styles.filialCellMatriz}`}>
                       <span className={styles.stockValue}>
                         {matrizData.stock}
-                      </span>
-                      <span className={styles.salesValue}>
-                        {matrizData.sales} vendas
                       </span>
                     </div>
                   </td>
@@ -185,7 +211,7 @@ export default function StockByFilialTable({
                   const filialData = getFilialData(item, filial);
                   return (
                     <td key={filial}>
-                      <div className={styles.filialCell}>
+                      <div className={`${styles.filialCell} ${getFilialCellClass(filialData.stock, filialData.sales, filialData.salesLast30Days)}`}>
                         <span className={styles.stockValue}>
                           {filialData.stock}
                         </span>
