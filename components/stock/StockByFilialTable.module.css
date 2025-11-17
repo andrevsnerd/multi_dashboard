@@ -121,6 +121,11 @@
   border-color: #FFC966;
 }
 
+.filialCellPurple {
+  background-color: #D8BFD8;
+  border-color: #C8A9C8;
+}
+
 .stockValue {
   font-weight: 600;
   font-size: 15px;

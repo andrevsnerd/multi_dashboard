@@ -102,7 +102,7 @@ export default function StockByFilialTable({
     filialName: string | null
   ) => {
     if (!filialName) {
-      return { stock: 0, sales: 0, salesLast30Days: 0 };
+      return { stock: 0, sales: 0, salesLast30Days: 0, hasEntry: false };
     }
     // Normalizar nome da filial para comparação (trim e case-insensitive)
     // Usar a mesma normalização que foi usada no backend
@@ -112,20 +112,27 @@ export default function StockByFilialTable({
     const filialData = item.filiais.find((f) => 
       normalizeFilial(f.filial) === normalizedTarget
     );
-    return filialData || { stock: 0, sales: 0, salesLast30Days: 0 };
+    return filialData || { stock: 0, sales: 0, salesLast30Days: 0, hasEntry: false };
   };
 
   // Função para determinar a classe CSS baseada nas regras de cores
   const getFilialCellClass = (
     stock: number,
     sales: number,
-    salesLast30Days: number
+    salesLast30Days: number,
+    hasEntry: boolean
   ): string => {
     // Verificar se o produto existe no estoque da filial (stock > 0 ou stock < 0)
     const produtoExiste = stock !== 0;
     
+    // ROXO: Produto não existe no estoque (stock === 0) E nunca teve entrada registrada nessa filial
+    // Se tem estoque, logicamente deve ter tido entrada, então não aplica roxo
+    if (!produtoExiste && !hasEntry) {
+      return styles.filialCellPurple;
+    }
+
     if (!produtoExiste) {
-      return ''; // Sem cor (produto não existe no estoque)
+      return ''; // Sem cor (produto não existe no estoque mas teve entrada em algum momento)
     }
 
     // AZUL: Estoque ≤ 1 E teve venda no período E produto existe
@@ -211,7 +218,7 @@ export default function StockByFilialTable({
                   const filialData = getFilialData(item, filial);
                   return (
                     <td key={filial}>
-                      <div className={`${styles.filialCell} ${getFilialCellClass(filialData.stock, filialData.sales, filialData.salesLast30Days)}`}>
+                      <div className={`${styles.filialCell} ${getFilialCellClass(filialData.stock, filialData.sales, filialData.salesLast30Days, filialData.hasEntry)}`}>
                         <span className={styles.stockValue}>
                           {filialData.stock}
                         </span>

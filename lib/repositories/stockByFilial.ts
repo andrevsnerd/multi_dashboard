@@ -4,6 +4,7 @@ import { resolveCompany, VAREJO_VALUE } from '@/lib/config/company';
 import { withRequest } from '@/lib/db/connection';
 import { normalizeRangeForQuery } from '@/lib/utils/date';
 import { getColorDescription, normalizeColor } from '@/lib/utils/colorMapping';
+import { buildEntriesMap } from '@/lib/repositories/entries';
 
 export interface StockByFilialParams {
   company?: string;
@@ -19,6 +20,7 @@ export interface FilialStockSales {
   stock: number;
   sales: number;
   salesLast30Days: number;
+  hasEntry: boolean;
 }
 
 export interface StockByFilialItem {
@@ -321,7 +323,10 @@ export async function fetchStockByFilial({
       GROUP BY vp.PRODUTO, vp.COR_PRODUTO, COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), vp.FILIAL
     `;
 
-    const [estoqueResult, vendasResult, produtoInfoResult, vendasLast30DaysResult] = await Promise.all([
+    // Buscar mapa de entradas - busca TODO O HISTÓRICO (sem filtro de período)
+    // Isso é usado especificamente para a regra roxa: detectar produtos que NUNCA tiveram entrada
+    // naquela filial, independente do período selecionado
+    const [estoqueResult, vendasResult, produtoInfoResult, vendasLast30DaysResult, entriesMap] = await Promise.all([
       request.query<{
         produto: string;
         corProduto: string | null;
@@ -358,6 +363,7 @@ export async function fetchStockByFilial({
         filial: string;
         vendas: number | null;
       }>(vendasLast30DaysQuery),
+      buildEntriesMap(company, filial), // Busca todo o histórico, não apenas o período selecionado
     ]);
 
     // Função auxiliar para normalizar filial (usar em todos os lugares)
@@ -374,11 +380,14 @@ export async function fetchStockByFilial({
     }>();
     
     produtoInfoResult.recordset.forEach((row) => {
+      // Normalizar código do produto para garantir consistência
+      const produtoNormalizado = (row.produto || '').trim().toUpperCase();
+      
       // Usar mapeamento de cores (prioridade) ou fallback para cor do banco
       const corNormalizada = normalizeColor(
         getColorDescription(row.corProduto, row.corBanco)
       );
-      const key = `${row.produto}|${corNormalizada}|${row.grade || ''}`;
+      const key = `${produtoNormalizado}|${corNormalizada}|${row.grade || ''}`;
       produtoInfoMap.set(key, {
         subgrupo: row.subgrupo,
         grupo: (row.grupo && row.grupo.trim() !== '') ? row.grupo : 'SEM GRUPO',
@@ -394,10 +403,13 @@ export async function fetchStockByFilial({
     // Criar mapa de vendas dos últimos 30 dias por produto+cor+filial
     const vendasLast30DaysMap = new Map<string, Map<string, number>>();
     vendasLast30DaysResult.recordset.forEach((row) => {
+      // Normalizar código do produto para garantir consistência
+      const produtoNormalizado = (row.produto || '').trim().toUpperCase();
+      
       const corNormalizada = normalizeColor(
         getColorDescription(row.corProduto, row.corBanco)
       );
-      const key = `${row.produto}|${corNormalizada}`;
+      const key = `${produtoNormalizado}|${corNormalizada}`;
       const filialNormalizada = normalizeFilial(row.filial);
       
       if (!vendasLast30DaysMap.has(key)) {
@@ -419,13 +431,16 @@ export async function fetchStockByFilial({
       // Caso contrário, usar a soma dos positivos + negativos
       const estoqueFilial = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
       
+      // Normalizar código do produto para garantir consistência
+      const produtoNormalizado = (row.produto || '').trim().toUpperCase();
+      
       // Usar mapeamento de cores (prioridade) ou fallback para cor do banco
       const corNormalizada = normalizeColor(
         getColorDescription(row.corProduto, row.corBanco)
       );
       
       // Chave para estoque por filial: produto|cor (normalizada)
-      const estoqueKey = `${row.produto}|${corNormalizada}`;
+      const estoqueKey = `${produtoNormalizado}|${corNormalizada}`;
       
       if (!filiaisMap.has(estoqueKey)) {
         filiaisMap.set(estoqueKey, new Map());
@@ -440,25 +455,45 @@ export async function fetchStockByFilial({
         // Buscar vendas dos últimos 30 dias
         const vendasLast30Days = vendasLast30DaysMap.get(estoqueKey)?.get(filialNormalizada) ?? 0;
         
+        // Verificar se houve entrada para este produto+cor+filial (usar produto normalizado)
+        const entryKey = `${produtoNormalizado}|${corNormalizada}|${filialNormalizada}`;
+        let hasEntry = entriesMap.get(entryKey) ?? false;
+        
+        // Se tem estoque, logicamente deve ter tido entrada (mesmo que a busca não encontrou)
+        // Isso pode acontecer se a entrada foi feita de outra forma (transferência, ajuste, etc)
+        if (estoqueFilial !== 0) {
+          hasEntry = true;
+        }
+        
         filiais.set(filialNormalizada, {
           filial: row.filial, // Manter o nome original para exibição
           stock: 0,
           sales: 0,
           salesLast30Days: vendasLast30Days,
+          hasEntry,
         });
       }
 
       // Atribuir estoque da filial (já calculado na query com soma de todas as grades)
-      filiais.get(filialNormalizada)!.stock = estoqueFilial;
+      const filialData = filiais.get(filialNormalizada)!;
+      filialData.stock = estoqueFilial;
+      
+      // Se tem estoque, garantir que hasEntry seja true
+      if (estoqueFilial !== 0 && !filialData.hasEntry) {
+        filialData.hasEntry = true;
+      }
     });
 
     // Processar vendas (agrupadas por produto+cor+grade+filial)
     vendasResult.recordset.forEach((row) => {
+      // Normalizar código do produto para garantir consistência
+      const produtoNormalizado = (row.produto || '').trim().toUpperCase();
+      
       // Usar mapeamento de cores (prioridade) ou fallback para cor do banco
       const corNormalizada = normalizeColor(
         getColorDescription(row.corProduto, row.corBanco)
       );
-      const key = `${row.produto}|${corNormalizada}|${row.grade || ''}`;
+      const key = `${produtoNormalizado}|${corNormalizada}|${row.grade || ''}`;
       
       if (!itemMap.has(key)) {
         // Buscar informações do produto do mapa
@@ -487,7 +522,7 @@ export async function fetchStockByFilial({
       item.totalVendas += vendas;
 
       // Chave para estoque por filial: produto|cor (normalizada, mesma usada no estoque)
-      const estoqueKey = `${row.produto}|${corNormalizada}`;
+      const estoqueKey = `${produtoNormalizado}|${corNormalizada}`;
       
       if (!filiaisMap.has(estoqueKey)) {
         filiaisMap.set(estoqueKey, new Map());
@@ -502,16 +537,32 @@ export async function fetchStockByFilial({
         // Buscar vendas dos últimos 30 dias
         const vendasLast30Days = vendasLast30DaysMap.get(estoqueKey)?.get(filialNormalizada) ?? 0;
         
+        // Verificar se houve entrada para este produto+cor+filial (usar produto normalizado)
+        const entryKey = `${produtoNormalizado}|${corNormalizada}|${filialNormalizada}`;
+        let hasEntry = entriesMap.get(entryKey) ?? false;
+        
+        // Se tem vendas, logicamente deve ter tido entrada (mesmo que a busca não encontrou)
+        if (vendas > 0) {
+          hasEntry = true;
+        }
+        
         filiais.set(filialNormalizada, {
           filial: row.filial, // Manter o nome original para exibição
           stock: 0,
           sales: 0,
           salesLast30Days: vendasLast30Days,
+          hasEntry,
         });
       }
 
       // Acumular vendas da filial
-      filiais.get(filialNormalizada)!.sales += vendas;
+      const filialData = filiais.get(filialNormalizada)!;
+      filialData.sales += vendas;
+      
+      // Se tem vendas, garantir que hasEntry seja true
+      if (vendas > 0 && !filialData.hasEntry) {
+        filialData.hasEntry = true;
+      }
     });
 
     // Buscar estoque total por produto + cor (agrupado por combinação, sem grade)
@@ -545,6 +596,9 @@ export async function fetchStockByFilial({
     // Usar mapeamento de cores para garantir consistência
     const stockTotalMap = new Map<string, number>();
     estoqueTotalResult.recordset.forEach((row) => {
+      // Normalizar código do produto para garantir consistência
+      const produtoNormalizado = (row.produto || '').trim().toUpperCase();
+      
       const positiveStock = Number(row.positiveStock ?? 0);
       const negativeStock = Number(row.negativeStock ?? 0);
       const positiveCount = Number(row.positiveCount ?? 0);
@@ -558,21 +612,23 @@ export async function fetchStockByFilial({
       );
       
       // Chave: produto|cor (sem grade, normalizada)
-      const key = `${row.produto}|${corNormalizada}`;
+      const key = `${produtoNormalizado}|${corNormalizada}`;
       stockTotalMap.set(key, finalStock);
     });
 
     // Converter para array e adicionar filiais e estoque total
     const items: StockByFilialItem[] = Array.from(itemMap.values()).map((item) => {
       // Chave para estoque por filial: produto|cor (sem grade)
+      // Normalizar produto para garantir consistência
+      const produtoNormalizado = (item.produto || '').trim().toUpperCase();
       // A cor já está normalizada no item (vem do mapeamento)
       const corNormalizada = normalizeColor(item.cor);
-      const estoqueKey = `${item.produto}|${corNormalizada}`;
+      const estoqueKey = `${produtoNormalizado}|${corNormalizada}`;
       const filiais = filiaisMap.get(estoqueKey) ?? new Map();
       item.filiais = Array.from(filiais.values());
       
       // Buscar estoque total (usar mesma normalização)
-      const stockKey = `${item.produto}|${corNormalizada}`;
+      const stockKey = `${produtoNormalizado}|${corNormalizada}`;
       item.totalEstoque = stockTotalMap.get(stockKey) ?? 0;
       
       return item;
