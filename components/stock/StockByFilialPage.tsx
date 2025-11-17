@@ -117,7 +117,9 @@ export default function StockByFilialPage({
   }, [companyKey, range, rangeKey]);
 
   // Extrair opções de filtro dinamicamente dos dados carregados
-  // Considerando o checkbox "mostrar itens sem vendas"
+  // Os filtros reagem ao checkbox "mostrar itens sem vendas"
+  // Se desmarcado: mostra apenas opções dos itens com vendas no período
+  // Se marcado: mostra opções de todos os itens (com vendas + sem vendas das filiais mapeadas)
   const availableFilterOptions = useMemo(() => {
     if (companyKey !== "scarfme") {
       return { linhas: [], subgrupos: [], grades: [], colecoes: [] };

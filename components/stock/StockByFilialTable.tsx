@@ -30,35 +30,41 @@ function organizeFiliais(
   items: StockByFilialItem[]
 ): {
   matriz: string | null;
+  ecommerce: string | null;
   filiais: string[];
 } {
   const company = resolveCompany(companyKey);
   if (!company) {
-    return { matriz: null, filiais: [] };
+    return { matriz: null, ecommerce: null, filiais: [] };
   }
 
   // Definir matriz baseado na empresa
   let matriz: string | null = null;
+  let ecommerce: string | null = null;
   if (companyKey === "nerd") {
     matriz = "NERD";
   } else if (companyKey === "scarfme") {
-    matriz = "SCARFME MATRIZ CMS";
+    // Para scarfme, a matriz é "SCARF ME - MATRIZ" e o e-commerce é "SCARFME MATRIZ CMS"
+    matriz = "SCARF ME - MATRIZ";
+    ecommerce = "SCARFME MATRIZ CMS";
   }
 
   // Obter todas as filiais da configuração de inventory
   const allFiliais = company.filialFilters['inventory'] ?? [];
   
   // Filtrar ecommerce filiais se necessário (para ScarfMe)
+  // Excluir tanto a matriz quanto o ecommerce da lista de outras filiais
   const ecommerceFilials = company.ecommerceFilials ?? [];
-  const normalFiliais = allFiliais.filter(f => !ecommerceFilials.includes(f) || f === matriz);
+  const normalFiliais = allFiliais.filter(f => 
+    !ecommerceFilials.includes(f) && f !== matriz
+  );
 
-  // Separar matriz das outras filiais
-  const otherFiliais = normalFiliais
-    .filter(f => f !== matriz)
-    .sort();
+  // Separar matriz e ecommerce das outras filiais
+  const otherFiliais = normalFiliais.sort();
 
   return {
     matriz,
+    ecommerce,
     filiais: otherFiliais, // Todas as filiais, sem limite
   };
 }
@@ -193,7 +199,7 @@ export default function StockByFilialTable({
   dateRange,
 }: StockByFilialTableProps) {
   const company = resolveCompany(companyKey);
-  const { matriz, filiais } = useMemo(
+  const { matriz, ecommerce, filiais } = useMemo(
     () => organizeFiliais(companyKey, data),
     [companyKey, data]
   );
@@ -288,6 +294,9 @@ export default function StockByFilialTable({
             <th>VENDAS</th>
             <th>ESTOQUE</th>
             {matriz && <th>MATRIZ</th>}
+            {ecommerce && companyKey === "scarfme" && (
+              <th>{company?.filialDisplayNames?.[ecommerce] || ecommerce}</th>
+            )}
             {filiais.map((filial) => {
               const displayName = company?.filialDisplayNames?.[filial] || filial;
               return (
@@ -300,6 +309,7 @@ export default function StockByFilialTable({
         <tbody>
           {filteredData.map((item, rowIndex) => {
             const matrizData = getFilialData(item, matriz);
+            const ecommerceData = ecommerce ? getFilialData(item, ecommerce) : { stock: 0, sales: 0, salesLast30Days: 0, hasEntry: false };
             const productInfo = formatProductDescription(item.descricao, item.produto);
             return (
               <tr key={`${item.produto}-${item.cor}-${item.grade}-${rowIndex}`}>
@@ -321,6 +331,18 @@ export default function StockByFilialTable({
                     <div className={`${styles.filialCell} ${styles.filialCellMatriz}`}>
                       <span className={styles.stockValue}>
                         {matrizData.stock}
+                      </span>
+                    </div>
+                  </td>
+                )}
+                {ecommerce && companyKey === "scarfme" && (
+                  <td>
+                    <div className={`${styles.filialCell} ${getFilialCellClass(ecommerceData.stock, ecommerceData.sales, ecommerceData.salesLast30Days, ecommerceData.hasEntry)}`}>
+                      <span className={styles.stockValue}>
+                        {ecommerceData.stock}
+                      </span>
+                      <span className={styles.salesValue}>
+                        {ecommerceData.sales} vendas
                       </span>
                     </div>
                   </td>
