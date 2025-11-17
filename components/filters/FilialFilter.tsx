@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { resolveCompany, type CompanyKey } from "@/lib/config/company";
+import { resolveCompany, type CompanyKey, VAREJO_VALUE, isEcommerceFilial } from "@/lib/config/company";
 
 import styles from "./FilialFilter.module.css";
 
@@ -24,8 +24,21 @@ export default function FilialFilter({
   const company = resolveCompany(companyKey);
   const filiais = company?.filialFilters.sales ?? [];
   const displayNames = company?.filialDisplayNames ?? {};
+  const isScarfme = companyKey === 'scarfme';
+  const ecommerceFilials = company?.ecommerceFilials ?? [];
+  
+  // Filtrar filiais normais (sem ecommerce) para mostrar na lista
+  const normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
 
-  const displayValue = value
+  // Obter a primeira filial de ecommerce (se houver)
+  const ecommerceFilial = ecommerceFilials.length > 0 ? ecommerceFilials[0] : null;
+  const ecommerceDisplayName = ecommerceFilial ? (displayNames[ecommerceFilial] ?? ecommerceFilial) : null;
+
+  const displayValue = value === VAREJO_VALUE
+    ? "VAREJO"
+    : isEcommerceFilial(companyKey, value)
+    ? ecommerceDisplayName ?? "E-COMMERCE"
+    : value
     ? displayNames[value] ?? value
     : "Todas as filiais";
 
@@ -57,7 +70,31 @@ export default function FilialFilter({
             >
               Todas as filiais
             </button>
-            {filiais.map((filial) => {
+            {isScarfme && (
+              <button
+                type="button"
+                className={`${styles.option} ${value === VAREJO_VALUE ? styles.optionActive : ""}`}
+                onClick={() => {
+                  onChange(VAREJO_VALUE);
+                  setIsOpen(false);
+                }}
+              >
+                VAREJO
+              </button>
+            )}
+            {isScarfme && ecommerceFilial && (
+              <button
+                type="button"
+                className={`${styles.option} ${value === ecommerceFilial ? styles.optionActive : ""}`}
+                onClick={() => {
+                  onChange(ecommerceFilial);
+                  setIsOpen(false);
+                }}
+              >
+                {ecommerceDisplayName}
+              </button>
+            )}
+            {normalFiliais.map((filial) => {
               const displayName = displayNames[filial] ?? filial;
               return (
                 <button

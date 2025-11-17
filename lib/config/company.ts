@@ -2,6 +2,10 @@ export type CompanyKey = 'nerd' | 'scarfme';
 
 export type CompanyModule = 'sales' | 'inventory';
 
+// Valor especial para representar "VAREJO" (apenas filiais normais, sem ecommerce)
+// Usado apenas para scarfme
+export const VAREJO_VALUE = "__VAREJO__";
+
 export interface CompanyConfig {
   key: CompanyKey;
   name: string;

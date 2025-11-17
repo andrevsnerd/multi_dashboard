@@ -1,6 +1,6 @@
 import sql from 'mssql';
 
-import { resolveCompany } from '@/lib/config/company';
+import { resolveCompany, VAREJO_VALUE } from '@/lib/config/company';
 import { withRequest } from '@/lib/db/connection';
 import type { MetricSummary } from '@/types/dashboard';
 
@@ -20,25 +20,69 @@ function buildFilialFilter(
     return '';
   }
 
+  const isScarfme = companySlug === 'scarfme';
+  const filiais = company.filialFilters['inventory'] ?? [];
+  const ecommerceFilials = company.ecommerceFilials ?? [];
+
   // Se uma filial específica foi selecionada, usar apenas ela
-  if (specificFilial) {
+  if (specificFilial && specificFilial !== VAREJO_VALUE) {
     const filialParam = `estoqueFilial`;
     request.input(filialParam, sql.VarChar, specificFilial);
     return `AND ${prefix}.FILIAL = @${filialParam}`;
   }
 
-  // Caso contrário, usar todas as filiais da empresa (módulo inventory)
-  const filiais = company.filialFilters['inventory'] ?? [];
+  // Para scarfme: se for "VAREJO", mostrar apenas filiais normais (sem ecommerce)
+  if (isScarfme && specificFilial === VAREJO_VALUE) {
+    const normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
+    
+    if (normalFiliais.length === 0) {
+      return '';
+    }
 
-  if (filiais.length === 0) {
+    normalFiliais.forEach((filial, index) => {
+      request.input(`estoqueFilial${index}`, sql.VarChar, filial);
+    });
+
+    const placeholders = normalFiliais
+      .map((_, index) => `@estoqueFilial${index}`)
+      .join(', ');
+
+    return `AND ${prefix}.FILIAL IN (${placeholders})`;
+  }
+
+  // Para scarfme: se for "Todas as filiais" (null), incluir também ecommerce
+  // Para outras empresas: usar apenas filiais normais (sem ecommerce)
+  if (isScarfme && specificFilial === null) {
+    // Incluir todas as filiais (normais + ecommerce)
+    const allFiliais = filiais; // Já inclui todas as filiais da lista
+    
+    if (allFiliais.length === 0) {
+      return '';
+    }
+
+    allFiliais.forEach((filial, index) => {
+      request.input(`estoqueFilial${index}`, sql.VarChar, filial);
+    });
+
+    const placeholders = allFiliais
+      .map((_, index) => `@estoqueFilial${index}`)
+      .join(', ');
+
+    return `AND ${prefix}.FILIAL IN (${placeholders})`;
+  }
+
+  // Para outras empresas (ou comportamento padrão): usar apenas filiais normais (sem ecommerce)
+  const normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
+
+  if (normalFiliais.length === 0) {
     return '';
   }
 
-  filiais.forEach((filial, index) => {
+  normalFiliais.forEach((filial, index) => {
     request.input(`estoqueFilial${index}`, sql.VarChar, filial);
   });
 
-  const placeholders = filiais
+  const placeholders = normalFiliais
     .map((_, index) => `@estoqueFilial${index}`)
     .join(', ');
 

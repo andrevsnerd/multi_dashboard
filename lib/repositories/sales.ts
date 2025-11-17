@@ -1,15 +1,15 @@
 import sql from 'mssql';
 
-import { resolveCompany, isEcommerceFilial, type CompanyModule } from '@/lib/config/company';
-import { getConnectionPool, withRequest } from '@/lib/db/connection';
-import { fetchMultipleProductsStock, fetchStockSummary } from '@/lib/repositories/inventory';
+import { resolveCompany, isEcommerceFilial, type CompanyModule, VAREJO_VALUE } from '@/lib/config/company';
 import {
-  fetchTopProductsEcommerce,
   fetchEcommerceSummary,
+  fetchTopProductsEcommerce,
   fetchTopCategoriesEcommerce,
   fetchDailyEcommerceRevenue,
   fetchEcommerceFilialPerformance,
 } from '@/lib/repositories/ecommerce';
+import { getConnectionPool, withRequest } from '@/lib/db/connection';
+import { fetchMultipleProductsStock, fetchStockSummary } from '@/lib/repositories/inventory';
 import type {
   CategoryRevenue,
   ProductRevenue,
@@ -29,6 +29,24 @@ function resolveRange(range?: DateRangeInput) {
   });
 }
 
+/**
+ * Verifica se deve agregar dados de ecommerce para scarfme
+ */
+function shouldAggregateEcommerce(
+  company: string | undefined,
+  filial: string | null | undefined
+): boolean {
+  if (!company || filial !== null) {
+    return false;
+  }
+  
+  const companyConfig = resolveCompany(company);
+  const isScarfme = company === 'scarfme';
+  const hasEcommerce = (companyConfig?.ecommerceFilials?.length ?? 0) > 0;
+  
+  return isScarfme && hasEcommerce;
+}
+
 function buildFilialFilter(
   request: sql.Request,
   companySlug: string | undefined,
@@ -46,17 +64,57 @@ function buildFilialFilter(
     return '';
   }
 
+  const isScarfme = companySlug === 'scarfme';
+  const filiais = company.filialFilters[module] ?? [];
+  const ecommerceFilials = company.ecommerceFilials ?? [];
+
   // Se uma filial específica foi selecionada, usar apenas ela
-  if (specificFilial) {
+  if (specificFilial && specificFilial !== VAREJO_VALUE) {
     request.input('filial', sql.VarChar, specificFilial);
     return `AND ${tableAlias}.FILIAL = @filial`;
   }
 
-  // Caso contrário, usar todas as filiais da empresa (exceto e-commerce)
-  const filiais = company.filialFilters[module] ?? [];
-  const ecommerceFilials = company.ecommerceFilials ?? [];
-  
-  // Filtrar filiais normais (remover e-commerce)
+  // Para scarfme: se for "VAREJO", mostrar apenas filiais normais (sem ecommerce)
+  if (isScarfme && specificFilial === VAREJO_VALUE) {
+    const normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
+    
+    if (normalFiliais.length === 0) {
+      return '';
+    }
+
+    normalFiliais.forEach((filial, index) => {
+      request.input(`filial${index}`, sql.VarChar, filial);
+    });
+
+    const placeholders = normalFiliais
+      .map((_, index) => `@filial${index}`)
+      .join(', ');
+
+    return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
+  }
+
+  // Para scarfme: se for "Todas as filiais" (null), incluir também ecommerce
+  // Para outras empresas: usar apenas filiais normais (sem ecommerce)
+  if (isScarfme && specificFilial === null) {
+    // Incluir todas as filiais (normais + ecommerce)
+    const allFiliais = filiais; // Já inclui todas as filiais da lista
+    
+    if (allFiliais.length === 0) {
+      return '';
+    }
+
+    allFiliais.forEach((filial, index) => {
+      request.input(`filial${index}`, sql.VarChar, filial);
+    });
+
+    const placeholders = allFiliais
+      .map((_, index) => `@filial${index}`)
+      .join(', ');
+
+    return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
+  }
+
+  // Para outras empresas (ou comportamento padrão): usar apenas filiais normais (sem ecommerce)
   const normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
 
   if (normalFiliais.length === 0) {
@@ -105,6 +163,42 @@ export async function fetchTopProducts({
   // Se for e-commerce, usar função específica de e-commerce
   if (isEcommerceFilial(company, filial)) {
     return fetchTopProductsEcommerce({ limit, company, range, filial });
+  }
+
+  // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
+  if (shouldAggregateEcommerce(company, filial)) {
+    // Buscar produtos de vendas normais e ecommerce em paralelo
+    const [salesProducts, ecommerceProducts] = await Promise.all([
+      fetchTopProducts({ limit: limit * 2, company, range, filial: VAREJO_VALUE }),
+      fetchTopProductsEcommerce({ limit: limit * 2, company, range, filial: null }),
+    ]);
+
+    // Agregar produtos por productId
+    const productMap = new Map<string, ProductRevenue>();
+
+    // Adicionar produtos de vendas normais
+    salesProducts.forEach((product) => {
+      productMap.set(product.productId, { ...product });
+    });
+
+    // Agregar produtos de ecommerce
+    ecommerceProducts.forEach((product) => {
+      const existing = productMap.get(product.productId);
+      if (existing) {
+        existing.totalRevenue += product.totalRevenue;
+        existing.totalQuantity += product.totalQuantity;
+        // Manter o estoque da venda normal (já foi buscado)
+      } else {
+        productMap.set(product.productId, { ...product });
+      }
+    });
+
+    // Converter para array, ordenar por revenue e pegar os top N
+    const aggregated = Array.from(productMap.values())
+      .sort((a, b) => b.totalRevenue - a.totalRevenue)
+      .slice(0, limit);
+
+    return aggregated;
   }
 
   // Função normal para vendas de loja
@@ -171,6 +265,145 @@ export async function fetchSalesSummary({
   // Se for e-commerce, usar função específica de e-commerce
   if (isEcommerceFilial(company, filial)) {
     return fetchEcommerceSummary({ company, range, filial });
+  }
+
+  // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
+  if (shouldAggregateEcommerce(company, filial)) {
+    // Buscar vendas normais (varejo) e ecommerce em paralelo
+    const [salesResult, ecommerceResult] = await Promise.all([
+      fetchSalesSummary({ company, range, filial: VAREJO_VALUE }),
+      fetchEcommerceSummary({ company, range, filial: null }),
+    ]);
+
+    // Agregar os resultados
+    const aggregateMetric = (
+      sales: MetricSummary,
+      ecommerce: MetricSummary
+    ): MetricSummary => {
+      const current = sales.currentValue + ecommerce.currentValue;
+      const previous = sales.previousValue + ecommerce.previousValue;
+      
+      if (previous === 0 && current === 0) {
+        return {
+          currentValue: current,
+          previousValue: previous,
+          changePercentage: 0,
+        };
+      }
+
+      const changePercentage =
+        previous === 0
+          ? null
+          : Number((((current - previous) / previous) * 100).toFixed(1));
+
+      return {
+        currentValue: current,
+        previousValue: previous,
+        changePercentage,
+      };
+    };
+
+    const summary: SalesSummary = {
+      totalRevenue: aggregateMetric(
+        salesResult.summary.totalRevenue,
+        ecommerceResult.summary.totalRevenue
+      ),
+      totalQuantity: aggregateMetric(
+        salesResult.summary.totalQuantity,
+        ecommerceResult.summary.totalQuantity
+      ),
+      totalTickets: aggregateMetric(
+        salesResult.summary.totalTickets,
+        ecommerceResult.summary.totalTickets
+      ),
+      averageTicket: {
+        currentValue:
+          (salesResult.summary.totalTickets.currentValue +
+            ecommerceResult.summary.totalTickets.currentValue) > 0
+            ? Number(
+                (
+                  (salesResult.summary.totalRevenue.currentValue +
+                    ecommerceResult.summary.totalRevenue.currentValue) /
+                  (salesResult.summary.totalTickets.currentValue +
+                    ecommerceResult.summary.totalTickets.currentValue)
+                ).toFixed(2)
+              )
+            : 0,
+        previousValue:
+          (salesResult.summary.totalTickets.previousValue +
+            ecommerceResult.summary.totalTickets.previousValue) > 0
+            ? Number(
+                (
+                  (salesResult.summary.totalRevenue.previousValue +
+                    ecommerceResult.summary.totalRevenue.previousValue) /
+                  (salesResult.summary.totalTickets.previousValue +
+                    ecommerceResult.summary.totalTickets.previousValue)
+                ).toFixed(2)
+              )
+            : 0,
+        changePercentage: null, // Será calculado abaixo
+      },
+      totalStockQuantity: salesResult.summary.totalStockQuantity,
+      totalStockValue: salesResult.summary.totalStockValue,
+    };
+
+    // Calcular changePercentage do averageTicket
+    if (summary.averageTicket.previousValue > 0) {
+      summary.averageTicket.changePercentage = Number(
+        (
+          ((summary.averageTicket.currentValue -
+            summary.averageTicket.previousValue) /
+            summary.averageTicket.previousValue) *
+          100
+        ).toFixed(1)
+      );
+    } else if (summary.averageTicket.currentValue > 0) {
+      summary.averageTicket.changePercentage = null;
+    } else {
+      summary.averageTicket.changePercentage = 0;
+    }
+
+    // Usar a última data de venda mais recente
+    const lastSaleDate =
+      salesResult.currentPeriodLastSaleDate &&
+      ecommerceResult.currentPeriodLastSaleDate
+        ? new Date(
+            Math.max(
+              salesResult.currentPeriodLastSaleDate.getTime(),
+              ecommerceResult.currentPeriodLastSaleDate.getTime()
+            )
+          )
+        : salesResult.currentPeriodLastSaleDate ||
+          ecommerceResult.currentPeriodLastSaleDate;
+
+    // Usar o range disponível mais amplo
+    const availableRange = {
+      start:
+        salesResult.availableRange.start && ecommerceResult.availableRange.start
+          ? new Date(
+              Math.min(
+                salesResult.availableRange.start.getTime(),
+                ecommerceResult.availableRange.start.getTime()
+              )
+            )
+          : salesResult.availableRange.start ||
+            ecommerceResult.availableRange.start,
+      end:
+        salesResult.availableRange.end && ecommerceResult.availableRange.end
+          ? new Date(
+              Math.max(
+                salesResult.availableRange.end.getTime(),
+                ecommerceResult.availableRange.end.getTime()
+              )
+            )
+          : salesResult.availableRange.end || ecommerceResult.availableRange.end,
+    };
+
+    return {
+      summary,
+      currentPeriodLastSaleDate: lastSaleDate,
+      availableRange,
+    };
   }
 
   // Função normal para vendas de loja
@@ -360,6 +593,41 @@ export async function fetchTopCategories({
     return fetchTopCategoriesEcommerce({ limit, company, range, filial });
   }
 
+  // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
+  if (shouldAggregateEcommerce(company, filial)) {
+    // Buscar categorias de vendas normais e ecommerce em paralelo
+    const [salesCategories, ecommerceCategories] = await Promise.all([
+      fetchTopCategories({ limit: limit * 2, company, range, filial: VAREJO_VALUE }),
+      fetchTopCategoriesEcommerce({ limit: limit * 2, company, range, filial: null }),
+    ]);
+
+    // Agregar categorias por categoryId
+    const categoryMap = new Map<string, CategoryRevenue>();
+
+    // Adicionar categorias de vendas normais
+    salesCategories.forEach((category) => {
+      categoryMap.set(category.categoryId, { ...category });
+    });
+
+    // Agregar categorias de ecommerce
+    ecommerceCategories.forEach((category) => {
+      const existing = categoryMap.get(category.categoryId);
+      if (existing) {
+        existing.totalRevenue += category.totalRevenue;
+        existing.totalQuantity += category.totalQuantity;
+      } else {
+        categoryMap.set(category.categoryId, { ...category });
+      }
+    });
+
+    // Converter para array, ordenar por revenue e pegar os top N
+    const aggregated = Array.from(categoryMap.values())
+      .sort((a, b) => b.totalRevenue - a.totalRevenue)
+      .slice(0, limit);
+
+    return aggregated;
+  }
+
   // Função normal para vendas de loja
   return withRequest(async (request) => {
     request.input('limit', sql.Int, limit);
@@ -412,6 +680,38 @@ export async function fetchDailyRevenue({
   // Se for e-commerce, usar função específica de e-commerce
   if (isEcommerceFilial(company, filial)) {
     return fetchDailyEcommerceRevenue({ company, range, filial });
+  }
+
+  // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
+  if (shouldAggregateEcommerce(company, filial)) {
+    // Buscar receita diária de vendas normais e ecommerce em paralelo
+    const [salesDaily, ecommerceDaily] = await Promise.all([
+      fetchDailyRevenue({ company, range, filial: VAREJO_VALUE }),
+      fetchDailyEcommerceRevenue({ company, range, filial: null }),
+    ]);
+
+    // Agregar por data
+    const dateMap = new Map<string, DailyRevenue>();
+
+    // Adicionar receita de vendas normais
+    salesDaily.forEach((day) => {
+      dateMap.set(day.date, { ...day });
+    });
+
+    // Agregar receita de ecommerce
+    ecommerceDaily.forEach((day) => {
+      const existing = dateMap.get(day.date);
+      if (existing) {
+        existing.revenue += day.revenue;
+      } else {
+        dateMap.set(day.date, { ...day });
+      }
+    });
+
+    // Converter para array e ordenar por data
+    return Array.from(dateMap.values()).sort((a, b) => 
+      a.date.localeCompare(b.date)
+    );
   }
 
   // Função normal para vendas de loja
