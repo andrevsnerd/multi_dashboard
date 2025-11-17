@@ -151,6 +151,8 @@
   transition: all 0.2s;
   white-space: nowrap;
   font-family: inherit;
+  width: 100%;
+  min-width: 140px;
 }
 
 .actionButton:hover {
@@ -164,6 +166,59 @@
 
 .actionButton.dark:hover {
   background-color: #111827;
+}
+
+/* Estilos para diferentes tipos de ação */
+.actionSEM_VENDAS_AGUARDAR {
+  background-color: #f9fafb;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+}
+
+.actionSEM_VENDAS_AGUARDAR:hover {
+  background-color: #f3f4f6;
+}
+
+.actionTRANSFERIR {
+  background-color: #1f2937;
+  color: #ffffff;
+  border: 1px solid #1f2937;
+  font-weight: 600;
+}
+
+.actionTRANSFERIR:hover {
+  background-color: #111827;
+}
+
+.actionCOMPRAR {
+  background-color: #1f2937;
+  color: #ffffff;
+  border: 1px solid #1f2937;
+  font-weight: 600;
+}
+
+.actionCOMPRAR:hover {
+  background-color: #111827;
+}
+
+.actionMONITORAR {
+  background-color: #f9fafb;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+}
+
+.actionMONITORAR:hover {
+  background-color: #f3f4f6;
+}
+
+.actionESTOQUE_NORMAL {
+  background-color: #f9fafb;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+}
+
+.actionESTOQUE_NORMAL:hover {
+  background-color: #f3f4f6;
 }
 
 .loading,

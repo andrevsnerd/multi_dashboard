@@ -4,6 +4,7 @@ import { useMemo } from "react";
 
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 import type { StockByFilialItem } from "@/lib/repositories/stockByFilial";
+import type { DateRangeValue } from "@/components/filters/DateRangeFilter";
 
 import styles from "./StockByFilialTable.module.css";
 
@@ -12,6 +13,13 @@ interface StockByFilialTableProps {
   data: StockByFilialItem[];
   loading?: boolean;
   showItemsWithoutSales?: boolean;
+  dateRange?: DateRangeValue;
+}
+
+interface ActionRecommendation {
+  type: "SEM_VENDAS_AGUARDAR" | "TRANSFERIR" | "COMPRAR" | "MONITORAR" | "ESTOQUE_NORMAL";
+  quantity?: number;
+  message: string;
 }
 
 /**
@@ -77,17 +85,120 @@ function formatProductDescription(descricao: string, produto: string): {
   };
 }
 
+/**
+ * Calcula a projeção de venda do mês baseado no período selecionado
+ */
+function calculateMonthlyProjection(
+  totalVendas: number,
+  dateRange?: DateRangeValue
+): number {
+  if (!dateRange) {
+    // Se não houver período, assumir 30 dias
+    return totalVendas;
+  }
+
+  const start = new Date(dateRange.startDate);
+  const end = new Date(dateRange.endDate);
+  
+  // Calcular dias do período
+  const daysInPeriod = Math.max(
+    1,
+    Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+  );
+
+  // Projetar para 30 dias
+  const vendaDiaria = totalVendas / daysInPeriod;
+  return vendaDiaria * 30;
+}
+
+/**
+ * Calcula a recomendação de ação para um produto
+ */
+function calculateActionRecommendation(
+  item: StockByFilialItem,
+  dateRange: DateRangeValue | undefined,
+  filiaisCount: number,
+  matriz: string | null
+): ActionRecommendation {
+  const totalEstoque = item.totalEstoque;
+  const totalVendas = item.totalVendas;
+  
+  // Calcular projeção de venda do mês
+  const projecaoVendaMes = calculateMonthlyProjection(totalVendas, dateRange);
+  
+  // Final EST Mês = Estoque - Projeção venda MÊS
+  const finalEstoqueMes = totalEstoque - projecaoVendaMes;
+  
+  // REGRA 1: SEM VENDAS - AGUARDAR
+  // Se Qtd_Vendida == 0 ou Projeção venda MÊS == 0
+  if (totalVendas === 0 || projecaoVendaMes === 0) {
+    return {
+      type: "SEM_VENDAS_AGUARDAR",
+      message: "SEM VENDAS - AGUARDAR",
+    };
+  }
+  
+  // Calcular número de filiais sem matriz (já calculado em filiaisCount)
+  // Verificar se alguma filial com vendas tem estoque < 1
+  const filiaisComVendas = item.filiais.filter(f => f.sales > 0);
+  const algumaFilialComEstoqueBaixo = filiaisComVendas.some(f => f.stock < 1);
+  
+  // REGRA 2: TRANSFERIR
+  // Se estoque total >= (número de filiais sem matriz) × 2 E alguma filial com vendas tem estoque < 1
+  if (totalEstoque >= (filiaisCount * 2) && algumaFilialComEstoqueBaixo) {
+    return {
+      type: "TRANSFERIR",
+      message: "TRANSFERIR",
+    };
+  }
+  
+  // Calcular venda diária e estoques
+  const vendaDiaria = projecaoVendaMes / 30;
+  const estoqueMinimo = Math.max(15, vendaDiaria * 15);
+  const estoqueIdeal = Math.max(20, vendaDiaria * 25);
+  
+  // REGRA 3: COMPRAR X UN
+  // Se Final EST MÊS < estoque_minimo
+  if (finalEstoqueMes < estoqueMinimo) {
+    const quantidade = estoqueIdeal - finalEstoqueMes;
+    return {
+      type: "COMPRAR",
+      quantity: Math.ceil(quantidade),
+      message: `COMPRAR ${Math.ceil(quantidade)} UN`,
+    };
+  }
+  
+  // REGRA 4: MONITORAR
+  // Se Final EST MÊS entre mínimo e ideal
+  if (finalEstoqueMes >= estoqueMinimo && finalEstoqueMes < estoqueIdeal) {
+    return {
+      type: "MONITORAR",
+      message: "MONITORAR",
+    };
+  }
+  
+  // REGRA 5: ESTOQUE NORMAL
+  // Se Final EST MÊS >= estoque_ideal
+  return {
+    type: "ESTOQUE_NORMAL",
+    message: "ESTOQUE NORMAL",
+  };
+}
+
 export default function StockByFilialTable({
   companyKey,
   data,
   loading,
   showItemsWithoutSales = false,
+  dateRange,
 }: StockByFilialTableProps) {
   const company = resolveCompany(companyKey);
   const { matriz, filiais } = useMemo(
     () => organizeFiliais(companyKey, data),
     [companyKey, data]
   );
+  
+  const filiaisCount = filiais.length;
 
   // Filtrar dados baseado no checkbox
   const filteredData = useMemo(() => {
@@ -230,9 +341,20 @@ export default function StockByFilialTable({
                   );
                 })}
                 <td>
-                  <button className={styles.actionButton} type="button">
-                    Estoque Normal
-                  </button>
+                  {(() => {
+                    const recommendation = calculateActionRecommendation(
+                      item,
+                      dateRange,
+                      filiaisCount,
+                      matriz
+                    );
+                    const actionClass = styles[`action${recommendation.type}`] || styles.actionButton;
+                    return (
+                      <button className={`${styles.actionButton} ${actionClass}`} type="button">
+                        {recommendation.message}
+                      </button>
+                    );
+                  })()}
                 </td>
               </tr>
             );

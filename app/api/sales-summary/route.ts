@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { fetchSalesSummary } from '@/lib/repositories/sales';
 
 // Aumentar timeout para queries que podem demorar mais
-export const maxDuration = 30; // 30 segundos (padrão Next.js é 10s)
+export const maxDuration = 60; // 60 segundos (padrão Next.js é 10s)
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

@@ -13,6 +13,10 @@ export interface StockByFilialParams {
     start?: string | Date;
     end?: string | Date;
   };
+  linha?: string | null;
+  subgrupo?: string | null;
+  grade?: string | null;
+  colecao?: string | null;
 }
 
 export interface FilialStockSales {
@@ -33,6 +37,8 @@ export interface StockByFilialItem {
   totalVendas: number;
   totalEstoque: number;
   filiais: FilialStockSales[];
+  linha?: string;
+  colecao?: string;
 }
 
 function buildFilialFilter(
@@ -118,6 +124,176 @@ function buildFilialFilter(
     .join(', ');
 
   return `AND ${prefix}.FILIAL IN (${placeholders})`;
+}
+
+/**
+ * Cria filtro de linha/grupo para NERD (apenas ELETRONICOS)
+ * Verifica tanto LINHA quanto GRUPO_PRODUTO para garantir que funcione
+ */
+function buildGrupoFilter(
+  companySlug: string | undefined,
+  prefix: string = 'p'
+): string {
+  if (companySlug === 'nerd') {
+    // Verificar tanto LINHA quanto GRUPO_PRODUTO, normalizando com UPPER e TRIM
+    return `AND (
+      UPPER(LTRIM(RTRIM(ISNULL(${prefix}.LINHA, '')))) = 'ELETRONICOS'
+      OR UPPER(LTRIM(RTRIM(ISNULL(${prefix}.GRUPO_PRODUTO, '')))) = 'ELETRONICOS'
+    )`;
+  }
+  return '';
+}
+
+/**
+ * Cria filtro de linha para ScarfMe
+ */
+function buildLinhaFilter(
+  request: sql.Request,
+  companySlug: string | undefined,
+  linha: string | null | undefined,
+  prefix: string = 'p'
+): string {
+  if (companySlug !== 'scarfme' || !linha) {
+    return '';
+  }
+  request.input('linha', sql.VarChar, linha);
+  return `AND UPPER(LTRIM(RTRIM(ISNULL(${prefix}.LINHA, '')))) = UPPER(LTRIM(RTRIM(@linha)))`;
+}
+
+/**
+ * Cria filtro de subgrupo para ScarfMe
+ */
+function buildSubgrupoFilter(
+  request: sql.Request,
+  companySlug: string | undefined,
+  subgrupo: string | null | undefined,
+  prefix: string = 'p'
+): string {
+  if (companySlug !== 'scarfme' || !subgrupo) {
+    return '';
+  }
+  request.input('subgrupo', sql.VarChar, subgrupo);
+  return `AND UPPER(LTRIM(RTRIM(ISNULL(${prefix}.SUBGRUPO_PRODUTO, '')))) = UPPER(LTRIM(RTRIM(@subgrupo)))`;
+}
+
+/**
+ * Cria filtro de grade para ScarfMe
+ */
+function buildGradeFilter(
+  request: sql.Request,
+  companySlug: string | undefined,
+  grade: string | null | undefined,
+  prefix: string = 'p'
+): string {
+  if (companySlug !== 'scarfme' || !grade) {
+    return '';
+  }
+  request.input('grade', sql.VarChar, grade);
+  return `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, ${prefix}.GRADE), '')))) = UPPER(LTRIM(RTRIM(@grade)))`;
+}
+
+/**
+ * Cria filtro de linha para vendas (ScarfMe)
+ */
+function buildLinhaFilterForSales(
+  request: sql.Request,
+  companySlug: string | undefined,
+  linha: string | null | undefined
+): string {
+  if (companySlug !== 'scarfme' || !linha) {
+    return '';
+  }
+  request.input('linhaVendas', sql.VarChar, linha);
+  return `AND (
+    UPPER(LTRIM(RTRIM(ISNULL(vp.LINHA, '')))) = UPPER(LTRIM(RTRIM(@linhaVendas)))
+    OR UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = UPPER(LTRIM(RTRIM(@linhaVendas)))
+  )`;
+}
+
+/**
+ * Cria filtro de subgrupo para vendas (ScarfMe)
+ */
+function buildSubgrupoFilterForSales(
+  request: sql.Request,
+  companySlug: string | undefined,
+  subgrupo: string | null | undefined
+): string {
+  if (companySlug !== 'scarfme' || !subgrupo) {
+    return '';
+  }
+  request.input('subgrupoVendas', sql.VarChar, subgrupo);
+  return `AND (
+    UPPER(LTRIM(RTRIM(ISNULL(vp.SUBGRUPO_PRODUTO, '')))) = UPPER(LTRIM(RTRIM(@subgrupoVendas)))
+    OR UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = UPPER(LTRIM(RTRIM(@subgrupoVendas)))
+  )`;
+}
+
+/**
+ * Cria filtro de grade para vendas (ScarfMe)
+ */
+function buildGradeFilterForSales(
+  request: sql.Request,
+  companySlug: string | undefined,
+  grade: string | null | undefined
+): string {
+  if (companySlug !== 'scarfme' || !grade) {
+    return '';
+  }
+  request.input('gradeVendas', sql.VarChar, grade);
+  return `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) = UPPER(LTRIM(RTRIM(@gradeVendas)))`;
+}
+
+/**
+ * Cria filtro de coleção para ScarfMe
+ */
+function buildColecaoFilter(
+  request: sql.Request,
+  companySlug: string | undefined,
+  colecao: string | null | undefined,
+  prefix: string = 'p'
+): string {
+  if (companySlug !== 'scarfme' || !colecao) {
+    return '';
+  }
+  request.input('colecao', sql.VarChar, colecao);
+  return `AND UPPER(LTRIM(RTRIM(ISNULL(${prefix}.COLECAO, '')))) = UPPER(LTRIM(RTRIM(@colecao)))`;
+}
+
+/**
+ * Cria filtro de coleção para vendas (ScarfMe)
+ */
+function buildColecaoFilterForSales(
+  request: sql.Request,
+  companySlug: string | undefined,
+  colecao: string | null | undefined
+): string {
+  if (companySlug !== 'scarfme' || !colecao) {
+    return '';
+  }
+  request.input('colecaoVendas', sql.VarChar, colecao);
+  return `AND (
+    UPPER(LTRIM(RTRIM(ISNULL(vp.COLECAO, '')))) = UPPER(LTRIM(RTRIM(@colecaoVendas)))
+    OR UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = UPPER(LTRIM(RTRIM(@colecaoVendas)))
+  )`;
+}
+
+/**
+ * Cria filtro de linha/grupo para NERD nas queries de vendas
+ * Verifica tanto na tabela de vendas (vp) quanto na tabela de produtos (p)
+ */
+function buildGrupoFilterForSales(
+  companySlug: string | undefined
+): string {
+  if (companySlug === 'nerd') {
+    // Verificar tanto LINHA quanto GRUPO_PRODUTO em ambas as tabelas
+    return `AND (
+      UPPER(LTRIM(RTRIM(ISNULL(vp.LINHA, '')))) = 'ELETRONICOS'
+      OR UPPER(LTRIM(RTRIM(ISNULL(vp.GRUPO_PRODUTO, '')))) = 'ELETRONICOS'
+      OR UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = 'ELETRONICOS'
+      OR UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = 'ELETRONICOS'
+    )`;
+  }
+  return '';
 }
 
 function buildSalesFilialFilter(
@@ -209,6 +385,10 @@ export async function fetchStockByFilial({
   company,
   filial,
   range,
+  linha,
+  subgrupo,
+  grade,
+  colecao,
 }: StockByFilialParams = {}): Promise<StockByFilialItem[]> {
   return withRequest(async (request) => {
     const { start, end } = normalizeRangeForQuery({
@@ -226,6 +406,19 @@ export async function fetchStockByFilial({
 
     const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
     const vendasFilialFilter = buildSalesFilialFilter(request, company, filial, 'vp');
+    const grupoFilter = buildGrupoFilter(company, 'p');
+    // Para vendas, verificar tanto vp quanto p (produtos) para LINHA e GRUPO_PRODUTO
+    const grupoFilterVendas = buildGrupoFilterForSales(company);
+    
+    // Filtros específicos para ScarfMe
+    const linhaFilter = buildLinhaFilter(request, company, linha, 'p');
+    const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupo, 'p');
+    const gradeFilter = buildGradeFilter(request, company, grade, 'p');
+    const colecaoFilter = buildColecaoFilter(request, company, colecao, 'p');
+    const linhaFilterVendas = buildLinhaFilterForSales(request, company, linha);
+    const subgrupoFilterVendas = buildSubgrupoFilterForSales(request, company, subgrupo);
+    const gradeFilterVendas = buildGradeFilterForSales(request, company, grade);
+    const colecaoFilterVendas = buildColecaoFilterForSales(request, company, colecao);
 
     // Buscar estoque agrupado por produto, cor e filial (sem grade)
     // Usando a mesma lógica do top produtos: separar positivos e negativos
@@ -244,10 +437,15 @@ export async function fetchStockByFilial({
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
       WHERE 1=1
         ${estoqueFilialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        ${colecaoFilter}
       GROUP BY e.PRODUTO, e.COR_PRODUTO, c.DESC_COR, e.FILIAL
     `;
 
-    // Buscar dados de produto para exibição (subgrupo, grupo, grade, descrição)
+    // Buscar dados de produto para exibição (subgrupo, grupo, grade, descrição, linha, coleção)
     // Buscar tanto de estoque quanto de vendas para garantir que todos os produtos apareçam
     const produtoInfoQuery = `
       SELECT DISTINCT
@@ -255,14 +453,21 @@ export async function fetchStockByFilial({
         e.COR_PRODUTO AS corProduto,
         ISNULL(p.SUBGRUPO_PRODUTO, 'SEM SUBGRUPO') AS subgrupo,
         ISNULL(p.GRUPO_PRODUTO, 'SEM GRUPO') AS grupo,
-        ISNULL(p.GRADE, '') AS grade,
+        ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
         ISNULL(p.DESC_PRODUTO, '') AS descricao,
-        ISNULL(c.DESC_COR, '') AS corBanco
+        ISNULL(c.DESC_COR, '') AS corBanco,
+        ISNULL(p.LINHA, '') AS linha,
+        ISNULL(p.COLECAO, '') AS colecao
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
       WHERE 1=1
         ${estoqueFilialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        ${colecaoFilter}
       
       UNION
       
@@ -271,9 +476,11 @@ export async function fetchStockByFilial({
           vp.COR_PRODUTO AS corProduto,
           ISNULL(vp.SUBGRUPO_PRODUTO, 'SEM SUBGRUPO') AS subgrupo,
           ISNULL(vp.GRUPO_PRODUTO, 'SEM GRUPO') AS grupo,
-          ISNULL(p.GRADE, '') AS grade,
+          ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
           ISNULL(vp.DESC_PRODUTO, '') AS descricao,
-          ISNULL(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), '') AS corBanco
+          ISNULL(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), '') AS corBanco,
+          ISNULL(COALESCE(vp.LINHA, p.LINHA), '') AS linha,
+          ISNULL(COALESCE(vp.COLECAO, p.COLECAO), '') AS colecao
         FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
         LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
         LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
@@ -281,17 +488,23 @@ export async function fetchStockByFilial({
           AND vp.DATA_VENDA < @endDate
           AND vp.QTDE > 0
           ${vendasFilialFilter}
+          ${grupoFilterVendas}
+          ${linhaFilterVendas}
+          ${subgrupoFilterVendas}
+          ${gradeFilterVendas}
+          ${colecaoFilterVendas}
     `;
 
-    // Buscar vendas agrupadas por produto, cor, tamanho e filial
+    // Buscar vendas agrupadas por produto, cor, grade e filial
     // Usar join com CORES_BASICAS para garantir consistência com a query de estoque
+    // GRADE vem da tabela PRODUTOS (p.GRADE), não de vp.TAMANHO
     const vendasQuery = `
       SELECT 
         vp.PRODUTO AS produto,
         vp.COR_PRODUTO AS corProduto,
         ISNULL(vp.SUBGRUPO_PRODUTO, 'SEM SUBGRUPO') AS subgrupo,
         ISNULL(vp.GRUPO_PRODUTO, 'SEM GRUPO') AS grupo,
-        ISNULL(COALESCE(vp.TAMANHO, p.GRADE), '') AS grade,
+        ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
         ISNULL(vp.DESC_PRODUTO, '') AS descricao,
         ISNULL(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), '') AS corBanco,
         vp.FILIAL AS filial,
@@ -303,10 +516,16 @@ export async function fetchStockByFilial({
         AND vp.DATA_VENDA < @endDate
         AND vp.QTDE > 0
         ${vendasFilialFilter}
-      GROUP BY vp.PRODUTO, vp.COR_PRODUTO, vp.SUBGRUPO_PRODUTO, vp.GRUPO_PRODUTO, COALESCE(vp.TAMANHO, p.GRADE), vp.DESC_PRODUTO, COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), vp.FILIAL
+        ${grupoFilterVendas}
+        ${linhaFilterVendas}
+        ${subgrupoFilterVendas}
+        ${gradeFilterVendas}
+        ${colecaoFilterVendas}
+      GROUP BY vp.PRODUTO, vp.COR_PRODUTO, vp.SUBGRUPO_PRODUTO, vp.GRUPO_PRODUTO, p.GRADE, vp.DESC_PRODUTO, COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), vp.FILIAL
     `;
 
     // Buscar vendas dos últimos 30 dias por produto+cor+filial (para verificar se teve venda recente)
+    // Para esta query, precisamos adicionar JOIN com PRODUTOS se for NERD ou ScarfMe para aplicar os filtros
     const vendasLast30DaysQuery = `
       SELECT 
         vp.PRODUTO AS produto,
@@ -316,10 +535,16 @@ export async function fetchStockByFilial({
         SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.QTDE END) AS vendas
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
+      ${company === 'nerd' || company === 'scarfme' ? 'LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO' : ''}
       WHERE vp.DATA_VENDA >= @thirtyDaysAgo
         AND vp.DATA_VENDA < @endDate
         AND vp.QTDE > 0
         ${vendasFilialFilter}
+        ${grupoFilterVendas}
+        ${linhaFilterVendas}
+        ${subgrupoFilterVendas}
+        ${gradeFilterVendas}
+        ${colecaoFilterVendas}
       GROUP BY vp.PRODUTO, vp.COR_PRODUTO, COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), vp.FILIAL
     `;
 
@@ -355,6 +580,8 @@ export async function fetchStockByFilial({
         grade: string;
         descricao: string;
         corBanco: string;
+        linha: string;
+        colecao: string;
       }>(produtoInfoQuery),
       request.query<{
         produto: string;
@@ -371,12 +598,14 @@ export async function fetchStockByFilial({
       return (filial || '').trim().toUpperCase();
     };
 
-    // Criar mapa de informações de produtos (subgrupo, grupo, grade, descrição) por produto+cor+grade
+    // Criar mapa de informações de produtos (subgrupo, grupo, grade, descrição, linha, coleção) por produto+cor+grade
     const produtoInfoMap = new Map<string, {
       subgrupo: string;
       grupo: string;
       grade: string;
       descricao: string;
+      linha: string;
+      colecao: string;
     }>();
     
     produtoInfoResult.recordset.forEach((row) => {
@@ -387,12 +616,24 @@ export async function fetchStockByFilial({
       const corNormalizada = normalizeColor(
         getColorDescription(row.corProduto, row.corBanco)
       );
-      const key = `${produtoNormalizado}|${corNormalizada}|${row.grade || ''}`;
+      
+      // Normalizar grade - garantir que seja string e tratar valores nulos/vazios
+      // A grade vem da query como CONVERT(VARCHAR, p.GRADE) tanto para estoque quanto para vendas
+      let gradeNormalizada = '';
+      if (row.grade != null) {
+        const gradeStr = String(row.grade).trim();
+        // Remover espaços extras e garantir que não seja apenas espaços
+        gradeNormalizada = gradeStr || '';
+      }
+      
+      const key = `${produtoNormalizado}|${corNormalizada}|${gradeNormalizada}`;
       produtoInfoMap.set(key, {
         subgrupo: row.subgrupo,
         grupo: (row.grupo && row.grupo.trim() !== '') ? row.grupo : 'SEM GRUPO',
-        grade: row.grade || '',
+        grade: gradeNormalizada, // Armazenar a grade normalizada
         descricao: row.descricao,
+        linha: (row.linha || '').trim().toUpperCase(),
+        colecao: (row.colecao || '').trim().toUpperCase(),
       });
     });
 
@@ -421,6 +662,7 @@ export async function fetchStockByFilial({
 
     // Processar estoque por produto+cor+filial (sem grade)
     // O estoque de cada filial já está calculado na query (soma de todas as grades)
+    // Também precisamos criar itens no itemMap para produtos que têm estoque mas não têm vendas
     estoqueResult.recordset.forEach((row) => {
       // Aplicar a mesma lógica do top produtos
       const positiveStock = Number(row.positiveStock ?? 0);
@@ -441,6 +683,51 @@ export async function fetchStockByFilial({
       
       // Chave para estoque por filial: produto|cor (normalizada)
       const estoqueKey = `${produtoNormalizado}|${corNormalizada}`;
+      
+      // Buscar informações do produto do produtoInfoMap para criar itens sem vendas
+      // Como o estoque não tem grade, vamos buscar todas as grades possíveis para este produto+cor
+      // e criar itens para cada uma que tenha informações no produtoInfoMap
+      const produtoInfoKeys = Array.from(produtoInfoMap.keys()).filter(key => 
+        key.startsWith(`${produtoNormalizado}|${corNormalizada}|`)
+      );
+      
+      // Se não encontrou nenhuma informação no produtoInfoMap, criar um item com grade vazia
+      if (produtoInfoKeys.length === 0) {
+        const keySemGrade = `${produtoNormalizado}|${corNormalizada}|`;
+        if (!itemMap.has(keySemGrade)) {
+          itemMap.set(keySemGrade, {
+            produto: row.produto,
+            subgrupo: 'SEM SUBGRUPO',
+            grupo: 'SEM GRUPO',
+            grade: '',
+            descricao: '',
+            cor: corNormalizada,
+            totalVendas: 0,
+            totalEstoque: 0,
+            filiais: [],
+          });
+        }
+      } else {
+        // Criar itens para cada grade encontrada no produtoInfoMap
+        produtoInfoKeys.forEach(infoKey => {
+          if (!itemMap.has(infoKey)) {
+            const produtoInfo = produtoInfoMap.get(infoKey)!;
+            itemMap.set(infoKey, {
+              produto: row.produto,
+              subgrupo: produtoInfo.subgrupo,
+              grupo: produtoInfo.grupo,
+              grade: produtoInfo.grade,
+              descricao: produtoInfo.descricao,
+              cor: corNormalizada,
+              totalVendas: 0,
+              totalEstoque: 0,
+              filiais: [],
+              linha: produtoInfo.linha && produtoInfo.linha !== '' ? produtoInfo.linha : undefined,
+              colecao: produtoInfo.colecao && produtoInfo.colecao !== '' ? produtoInfo.colecao : undefined,
+            });
+          }
+        });
+      }
       
       if (!filiaisMap.has(estoqueKey)) {
         filiaisMap.set(estoqueKey, new Map());
@@ -493,27 +780,41 @@ export async function fetchStockByFilial({
       const corNormalizada = normalizeColor(
         getColorDescription(row.corProduto, row.corBanco)
       );
-      const key = `${produtoNormalizado}|${corNormalizada}|${row.grade || ''}`;
+      
+      // Normalizar grade - garantir que seja string e tratar valores nulos/vazios
+      // A grade vem da query como CONVERT(VARCHAR, p.GRADE) da tabela PRODUTOS
+      let gradeNormalizada = '';
+      if (row.grade != null) {
+        const gradeStr = String(row.grade).trim();
+        // Se a grade for apenas espaços ou vazia após trim, usar string vazia
+        gradeNormalizada = gradeStr || '';
+      }
+      
+      const key = `${produtoNormalizado}|${corNormalizada}|${gradeNormalizada}`;
       
       if (!itemMap.has(key)) {
-        // Buscar informações do produto do mapa
+        // Buscar informações do produto do mapa (pode ter grade diferente, então usar a grade da venda)
         const produtoInfo = produtoInfoMap.get(key) || {
           subgrupo: row.subgrupo,
           grupo: (row.grupo && row.grupo.trim() !== '') ? row.grupo : 'SEM GRUPO',
-          grade: row.grade || '',
+          grade: gradeNormalizada,
           descricao: row.descricao,
+          linha: '',
+          colecao: '',
         };
         
         itemMap.set(key, {
           produto: row.produto,
           subgrupo: produtoInfo.subgrupo,
           grupo: produtoInfo.grupo,
-          grade: produtoInfo.grade,
+          grade: gradeNormalizada, // Sempre usar a grade da venda atual (row.grade normalizada)
           descricao: produtoInfo.descricao,
           cor: corNormalizada, // Usar cor normalizada do mapeamento
           totalVendas: 0,
           totalEstoque: 0,
           filiais: [],
+          linha: produtoInfo.linha && produtoInfo.linha !== '' ? produtoInfo.linha : undefined,
+          colecao: produtoInfo.colecao && produtoInfo.colecao !== '' ? produtoInfo.colecao : undefined,
         });
       }
 
@@ -580,6 +881,11 @@ export async function fetchStockByFilial({
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
       WHERE 1=1
         ${estoqueFilialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        ${colecaoFilter}
       GROUP BY e.PRODUTO, e.COR_PRODUTO, c.DESC_COR
     `;
 
@@ -631,6 +937,19 @@ export async function fetchStockByFilial({
       const stockKey = `${produtoNormalizado}|${corNormalizada}`;
       item.totalEstoque = stockTotalMap.get(stockKey) ?? 0;
       
+      // Garantir que grade seja sempre string
+      if (typeof item.grade !== 'string') {
+        item.grade = '';
+      }
+      
+      // Garantir que linha e colecao sejam strings ou undefined
+      if (item.linha && typeof item.linha !== 'string') {
+        item.linha = undefined;
+      }
+      if (item.colecao && typeof item.colecao !== 'string') {
+        item.colecao = undefined;
+      }
+      
       return item;
     });
 
@@ -638,6 +957,66 @@ export async function fetchStockByFilial({
     items.sort((a, b) => b.totalVendas - a.totalVendas);
 
     return items;
+  });
+}
+
+/**
+ * Busca valores únicos de linha, subgrupo, grade e coleção para ScarfMe
+ */
+export async function fetchFilterOptions(
+  company?: string
+): Promise<{
+  linhas: string[];
+  subgrupos: string[];
+  grades: string[];
+  colecoes: string[];
+}> {
+  if (company !== 'scarfme') {
+    return { linhas: [], subgrupos: [], grades: [], colecoes: [] };
+  }
+
+  return withRequest(async (request) => {
+    const linhasQuery = `
+      SELECT DISTINCT UPPER(LTRIM(RTRIM(ISNULL(LINHA, '')))) AS linha
+      FROM PRODUTOS WITH (NOLOCK)
+      WHERE LINHA IS NOT NULL AND LTRIM(RTRIM(LINHA)) <> ''
+      ORDER BY linha
+    `;
+
+    const subgruposQuery = `
+      SELECT DISTINCT UPPER(LTRIM(RTRIM(ISNULL(SUBGRUPO_PRODUTO, '')))) AS subgrupo
+      FROM PRODUTOS WITH (NOLOCK)
+      WHERE SUBGRUPO_PRODUTO IS NOT NULL AND LTRIM(RTRIM(SUBGRUPO_PRODUTO)) <> ''
+      ORDER BY subgrupo
+    `;
+
+    const gradesQuery = `
+      SELECT DISTINCT UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, GRADE), '')))) AS grade
+      FROM PRODUTOS WITH (NOLOCK)
+      WHERE GRADE IS NOT NULL
+      ORDER BY grade
+    `;
+
+    const colecoesQuery = `
+      SELECT DISTINCT UPPER(LTRIM(RTRIM(ISNULL(COLECAO, '')))) AS colecao
+      FROM PRODUTOS WITH (NOLOCK)
+      WHERE COLECAO IS NOT NULL AND LTRIM(RTRIM(COLECAO)) <> ''
+      ORDER BY colecao
+    `;
+
+    const [linhasResult, subgruposResult, gradesResult, colecoesResult] = await Promise.all([
+      request.query<{ linha: string }>(linhasQuery),
+      request.query<{ subgrupo: string }>(subgruposQuery),
+      request.query<{ grade: string }>(gradesQuery),
+      request.query<{ colecao: string }>(colecoesQuery),
+    ]);
+
+    return {
+      linhas: linhasResult.recordset.map((r) => r.linha).filter(Boolean),
+      subgrupos: subgruposResult.recordset.map((r) => r.subgrupo).filter(Boolean),
+      grades: gradesResult.recordset.map((r) => r.grade).filter(Boolean),
+      colecoes: colecoesResult.recordset.map((r) => r.colecao).filter(Boolean),
+    };
   });
 }
 

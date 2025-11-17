@@ -419,83 +419,103 @@ export async function fetchSalesSummary({
 
     const filialFilter = buildFilialFilter(request, company, 'sales', filial);
 
+    // Otimizar query usando uma única passada pela tabela com CASE para separar períodos
+    // Isso é mais eficiente que UNION ALL com duas queries separadas
     const query = `
-      WITH summary AS (
-        SELECT
-          'current' AS period,
-          SUM(
-            CASE
-              WHEN vp.QTDE_CANCELADA > 0 THEN 0
-              ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
-            END
-          ) AS totalRevenue,
-          SUM(vp.QTDE) AS totalQuantity,
-          COUNT(DISTINCT vp.TICKET) AS totalTickets,
-          MAX(vp.DATA_VENDA) AS lastSaleDate
-        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-        WHERE vp.DATA_VENDA >= @startDate
-          AND vp.DATA_VENDA < @endDate
-          AND vp.QTDE > 0
-          ${filialFilter}
-
-        UNION ALL
-
-        SELECT
-          'previous' AS period,
-          SUM(
-            CASE
-              WHEN vp.QTDE_CANCELADA > 0 THEN 0
-              ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
-            END
-          ) AS totalRevenue,
-          SUM(vp.QTDE) AS totalQuantity,
-          COUNT(DISTINCT vp.TICKET) AS totalTickets,
-          MAX(vp.DATA_VENDA) AS lastSaleDate
-        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-        WHERE vp.DATA_VENDA >= @prevStartDate
-          AND vp.DATA_VENDA < @prevEndDate
-          AND vp.QTDE > 0
-          ${filialFilter}
-      )
-      SELECT period, totalRevenue, totalQuantity, totalTickets FROM summary;
+      SELECT
+        SUM(
+          CASE
+            WHEN vp.DATA_VENDA >= @startDate AND vp.DATA_VENDA < @endDate
+              AND vp.QTDE_CANCELADA = 0
+            THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
+            ELSE 0
+          END
+        ) AS currentRevenue,
+        SUM(
+          CASE
+            WHEN vp.DATA_VENDA >= @prevStartDate AND vp.DATA_VENDA < @prevEndDate
+              AND vp.QTDE_CANCELADA = 0
+            THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
+            ELSE 0
+          END
+        ) AS previousRevenue,
+        SUM(
+          CASE
+            WHEN vp.DATA_VENDA >= @startDate AND vp.DATA_VENDA < @endDate
+              AND vp.QTDE > 0
+            THEN vp.QTDE
+            ELSE 0
+          END
+        ) AS currentQuantity,
+        SUM(
+          CASE
+            WHEN vp.DATA_VENDA >= @prevStartDate AND vp.DATA_VENDA < @prevEndDate
+              AND vp.QTDE > 0
+            THEN vp.QTDE
+            ELSE 0
+          END
+        ) AS previousQuantity,
+        COUNT(DISTINCT CASE
+          WHEN vp.DATA_VENDA >= @startDate AND vp.DATA_VENDA < @endDate
+            AND vp.QTDE > 0
+          THEN vp.TICKET
+          ELSE NULL
+        END) AS currentTickets,
+        COUNT(DISTINCT CASE
+          WHEN vp.DATA_VENDA >= @prevStartDate AND vp.DATA_VENDA < @prevEndDate
+            AND vp.QTDE > 0
+          THEN vp.TICKET
+          ELSE NULL
+        END) AS previousTickets,
+        MAX(CASE
+          WHEN vp.DATA_VENDA >= @startDate AND vp.DATA_VENDA < @endDate
+          THEN vp.DATA_VENDA
+          ELSE NULL
+        END) AS currentLastSaleDate
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      WHERE (
+          (vp.DATA_VENDA >= @startDate AND vp.DATA_VENDA < @endDate)
+          OR (vp.DATA_VENDA >= @prevStartDate AND vp.DATA_VENDA < @prevEndDate)
+        )
+        AND vp.QTDE > 0
+        ${filialFilter}
     `;
 
     const result = await request.query<{
-      period: 'current' | 'previous';
-      totalRevenue: number | null;
-      totalQuantity: number | null;
-      totalTickets: number | null;
-      lastSaleDate: Date | null;
+      currentRevenue: number | null;
+      previousRevenue: number | null;
+      currentQuantity: number | null;
+      previousQuantity: number | null;
+      currentTickets: number | null;
+      previousTickets: number | null;
+      currentLastSaleDate: Date | null;
     }>(query);
 
-    const currentRow =
-      result.recordset.find((row) => row.period === 'current') ?? {
-        totalRevenue: 0,
-        totalQuantity: 0,
-        totalTickets: 0,
-        lastSaleDate: null,
-      };
-    const previousRow =
-      result.recordset.find((row) => row.period === 'previous') ?? {
-        totalRevenue: 0,
-        totalQuantity: 0,
-        totalTickets: 0,
-        lastSaleDate: null,
-      };
+    const row = result.recordset[0] ?? {
+      currentRevenue: 0,
+      previousRevenue: 0,
+      currentQuantity: 0,
+      previousQuantity: 0,
+      currentTickets: 0,
+      previousTickets: 0,
+      currentLastSaleDate: null,
+    };
 
-    const currentRevenue = Number(currentRow.totalRevenue ?? 0);
-    const previousRevenue = Number(previousRow.totalRevenue ?? 0);
+    const currentRevenue = Number(row.currentRevenue ?? 0);
+    const previousRevenue = Number(row.previousRevenue ?? 0);
 
-    const currentQuantity = Number(currentRow.totalQuantity ?? 0);
-    const previousQuantity = Number(previousRow.totalQuantity ?? 0);
+    const currentQuantity = Number(row.currentQuantity ?? 0);
+    const previousQuantity = Number(row.previousQuantity ?? 0);
 
-    const currentTickets = Number(currentRow.totalTickets ?? 0);
-    const previousTickets = Number(previousRow.totalTickets ?? 0);
+    const currentTickets = Number(row.currentTickets ?? 0);
+    const previousTickets = Number(row.previousTickets ?? 0);
 
     const averageTicketCurrent =
       currentTickets > 0 ? Number((currentRevenue / currentTickets).toFixed(2)) : 0;
     const averageTicketPrevious =
       previousTickets > 0 ? Number((previousRevenue / previousTickets).toFixed(2)) : 0;
+
+    const currentLastSaleDate = row.currentLastSaleDate;
 
     const buildMetric = (current: number, previous: number): MetricSummary => {
       if (previous === 0 && current === 0) {
@@ -541,8 +561,8 @@ export async function fetchSalesSummary({
       },
     };
 
-    const lastSaleDate = currentRow.lastSaleDate
-      ? new Date(currentRow.lastSaleDate)
+    const lastSaleDate = currentLastSaleDate
+      ? new Date(currentLastSaleDate)
       : null;
 
     const pool = await getConnectionPool();
