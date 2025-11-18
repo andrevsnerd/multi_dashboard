@@ -15,7 +15,8 @@
     "react": "19.2.0",
     "react-date-range": "^2.0.1",
     "react-dom": "19.2.0",
-    "recharts": "^3.4.1"
+    "recharts": "^3.4.1",
+    "typescript": "^5"
   },
   "devDependencies": {
     "@types/mssql": "^9.1.8",
@@ -24,7 +25,6 @@
     "@types/react-date-range": "^1.4.10",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.0.2",
-    "typescript": "^5"
+    "eslint-config-next": "16.0.2"
   }
 }
