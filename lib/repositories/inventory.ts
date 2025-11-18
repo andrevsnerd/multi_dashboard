@@ -2,10 +2,11 @@ import sql from 'mssql';
 
 import { resolveCompany, VAREJO_VALUE } from '@/lib/config/company';
 import { withRequest } from '@/lib/db/connection';
+import { RequestLike } from '@/lib/db/proxy';
 import type { MetricSummary } from '@/types/dashboard';
 
 function buildFilialFilter(
-  request: sql.Request,
+  request: sql.Request | RequestLike,
   companySlug: string | undefined,
   specificFilial?: string | null,
   prefix: string = 'e'

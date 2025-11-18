@@ -2,6 +2,7 @@ import sql from 'mssql';
 
 import { resolveCompany, type CompanyModule } from '@/lib/config/company';
 import { getConnectionPool, withRequest } from '@/lib/db/connection';
+import { RequestLike } from '@/lib/db/proxy';
 import { fetchMultipleProductsStock, fetchStockSummary } from '@/lib/repositories/inventory';
 import type {
   CategoryRevenue,
@@ -23,7 +24,7 @@ function resolveRange(range?: DateRangeInput) {
 }
 
 function buildEcommerceFilialFilter(
-  request: sql.Request,
+  request: sql.Request | RequestLike,
   companySlug: string | undefined,
   specificFilial?: string | null,
   tableAlias: string = 'f'

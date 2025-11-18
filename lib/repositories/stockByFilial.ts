@@ -2,6 +2,7 @@ import sql from 'mssql';
 
 import { resolveCompany, VAREJO_VALUE } from '@/lib/config/company';
 import { withRequest } from '@/lib/db/connection';
+import { RequestLike } from '@/lib/db/proxy';
 import { normalizeRangeForQuery } from '@/lib/utils/date';
 import { getColorDescription, normalizeColor } from '@/lib/utils/colorMapping';
 import { buildEntriesMap } from '@/lib/repositories/entries';
@@ -42,7 +43,7 @@ export interface StockByFilialItem {
 }
 
 function buildFilialFilter(
-  request: sql.Request,
+  request: sql.Request | RequestLike,
   companySlug: string | undefined,
   specificFilial?: string | null,
   prefix: string = 'e'
@@ -148,7 +149,7 @@ function buildGrupoFilter(
  * Cria filtro de linha para ScarfMe
  */
 function buildLinhaFilter(
-  request: sql.Request,
+  request: sql.Request | RequestLike,
   companySlug: string | undefined,
   linha: string | null | undefined,
   prefix: string = 'p'
@@ -164,7 +165,7 @@ function buildLinhaFilter(
  * Cria filtro de subgrupo para ScarfMe
  */
 function buildSubgrupoFilter(
-  request: sql.Request,
+  request: sql.Request | RequestLike,
   companySlug: string | undefined,
   subgrupo: string | null | undefined,
   prefix: string = 'p'
@@ -180,7 +181,7 @@ function buildSubgrupoFilter(
  * Cria filtro de grade para ScarfMe
  */
 function buildGradeFilter(
-  request: sql.Request,
+  request: sql.Request | RequestLike,
   companySlug: string | undefined,
   grade: string | null | undefined,
   prefix: string = 'p'
@@ -196,7 +197,7 @@ function buildGradeFilter(
  * Cria filtro de linha para vendas (ScarfMe)
  */
 function buildLinhaFilterForSales(
-  request: sql.Request,
+  request: sql.Request | RequestLike,
   companySlug: string | undefined,
   linha: string | null | undefined
 ): string {
@@ -214,7 +215,7 @@ function buildLinhaFilterForSales(
  * Cria filtro de subgrupo para vendas (ScarfMe)
  */
 function buildSubgrupoFilterForSales(
-  request: sql.Request,
+  request: sql.Request | RequestLike,
   companySlug: string | undefined,
   subgrupo: string | null | undefined
 ): string {
@@ -232,7 +233,7 @@ function buildSubgrupoFilterForSales(
  * Cria filtro de grade para vendas (ScarfMe)
  */
 function buildGradeFilterForSales(
-  request: sql.Request,
+  request: sql.Request | RequestLike,
   companySlug: string | undefined,
   grade: string | null | undefined
 ): string {
@@ -247,7 +248,7 @@ function buildGradeFilterForSales(
  * Cria filtro de coleção para ScarfMe
  */
 function buildColecaoFilter(
-  request: sql.Request,
+  request: sql.Request | RequestLike,
   companySlug: string | undefined,
   colecao: string | null | undefined,
   prefix: string = 'p'
@@ -263,7 +264,7 @@ function buildColecaoFilter(
  * Cria filtro de coleção para vendas (ScarfMe)
  */
 function buildColecaoFilterForSales(
-  request: sql.Request,
+  request: sql.Request | RequestLike,
   companySlug: string | undefined,
   colecao: string | null | undefined
 ): string {
@@ -297,7 +298,7 @@ function buildGrupoFilterForSales(
 }
 
 function buildSalesFilialFilter(
-  request: sql.Request,
+  request: sql.Request | RequestLike,
   companySlug: string | undefined,
   specificFilial?: string | null,
   prefix: string = 'vp'

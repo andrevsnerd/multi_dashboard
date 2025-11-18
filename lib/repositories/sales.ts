@@ -9,6 +9,7 @@ import {
   fetchEcommerceFilialPerformance,
 } from '@/lib/repositories/ecommerce';
 import { getConnectionPool, withRequest } from '@/lib/db/connection';
+import { RequestLike } from '@/lib/db/proxy';
 import { fetchMultipleProductsStock, fetchStockSummary } from '@/lib/repositories/inventory';
 import type {
   CategoryRevenue,
@@ -48,7 +49,7 @@ function shouldAggregateEcommerce(
 }
 
 function buildFilialFilter(
-  request: sql.Request,
+  request: sql.Request | RequestLike,
   companySlug: string | undefined,
   module: CompanyModule,
   specificFilial?: string | null,

@@ -1,0 +1,35 @@
+========================================
+VALORES PARA COPIAR E COLAR NO VERCEL
+========================================
+
+VARIÁVEL 1:
+-----------
+Key: PROXY_URL
+Value: https://gasometrical-itchingly-shiela.ngrok-free.dev
+Environments: ✅ Production, ✅ Preview, ✅ Development
+
+VARIÁVEL 2:
+-----------
+Key: PROXY_SECRET
+Value: proxy-nerd-2024-1591
+Environments: ✅ Production, ✅ Preview, ✅ Development
+
+VARIÁVEL 3:
+-----------
+Key: NODE_ENV
+Value: production
+Environments: ✅ Production, ✅ Preview, ✅ Development
+
+========================================
+INSTRUÇÕES RÁPIDAS:
+========================================
+
+1. Acesse: https://vercel.com
+2. Selecione projeto: multi_dashboard
+3. Vá em: Settings → Environment Variables
+4. Adicione as 3 variáveis acima
+5. Faça redeploy
+6. Teste o app!
+
+========================================
+

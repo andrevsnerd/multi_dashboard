@@ -1,5 +1,5 @@
 import sql from 'mssql';
-import { shouldUseProxy, queryViaProxy, ProxyRequest } from './proxy';
+import { shouldUseProxy, queryViaProxy, ProxyRequest, RequestLike } from './proxy';
 
 const {
   DB_SERVER,
@@ -61,12 +61,12 @@ export async function getConnectionPool(): Promise<sql.ConnectionPool> {
 }
 
 export async function withRequest<T>(
-  handler: (request: sql.Request | any) => Promise<T>
+  handler: (request: sql.Request | RequestLike) => Promise<T>
 ): Promise<T> {
   // Se estiver usando proxy, usa ProxyRequest
   if (shouldUseProxy()) {
     const proxyRequest = new ProxyRequest();
-    return handler(proxyRequest as any);
+    return handler(proxyRequest as unknown as sql.Request);
   }
 
   // Caso contrário, usa conexão direta
@@ -82,8 +82,9 @@ export async function query<T>(queryText: string): Promise<T[]> {
   }
 
   // Caso contrário, usa conexão direta
-  return withRequest(async (request) => {
-    const result = await request.query<T>(queryText);
+  return withRequest(async (request: sql.Request | RequestLike) => {
+    const sqlRequest = request as sql.Request;
+    const result = await sqlRequest.query<T>(queryText);
     return result.recordset as T[];
   });
 }

@@ -64,17 +64,25 @@ export async function queryViaProxy<T>(
 }
 
 /**
+ * Interface comum para request (compatível com sql.Request e ProxyRequest)
+ */
+export interface RequestLike {
+  input(name: string, type: any, value: any): any;
+  query<T = any>(queryText: string): Promise<{ recordset: T[] }>;
+}
+
+/**
  * Simula um sql.Request para uso com withRequest via proxy
  */
-export class ProxyRequest {
+export class ProxyRequest implements RequestLike {
   private params: Record<string, any> = {};
 
-  input(name: string, type: any, value: any): this {
+  input(name: string, type: any, value: any): ProxyRequest {
     this.params[name] = value;
     return this;
   }
 
-  async query<T>(queryText: string): Promise<{ recordset: T[] }> {
+  async query<T = any>(queryText: string): Promise<{ recordset: T[] }> {
     const data = await queryViaProxy<T>(queryText, this.params);
     return { recordset: data };
   }
