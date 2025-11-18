@@ -72,6 +72,22 @@ function authenticate(req, res, next) {
   next();
 }
 
+// Rota raiz - informações do proxy
+app.get('/', (req, res) => {
+  res.json({
+    service: 'Multi-Dashboard Proxy Server',
+    status: 'running',
+    version: '1.0.0',
+    endpoints: {
+      health: 'GET /health',
+      query: 'POST /query',
+      'with-request': 'POST /with-request',
+      'sales-summary': 'GET /api/sales-summary'
+    },
+    authentication: 'Required header: X-Proxy-Token'
+  });
+});
+
 // Endpoint de health check
 app.get('/health', async (req, res) => {
   try {
