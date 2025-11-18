@@ -303,7 +303,26 @@ async function fetchProductsWithDetailsSales({
       GROUP BY ${groupByFields}
     `;
 
-    const [currentResult, previousResult] = await Promise.all([
+    // Query para verificar se o produto já teve vendas em algum momento antes do período atual
+    const hasEverSoldColorSelectFields = groupByColor
+      ? 'vp.COR_PRODUTO AS corProduto,'
+      : '';
+
+    const hasEverSoldQuery = `
+      SELECT 
+        vp.PRODUTO AS productId,
+        ${hasEverSoldColorSelectFields}
+        COUNT(*) AS saleCount
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      WHERE vp.DATA_VENDA < @startDate
+        AND vp.QTDE > 0
+        ${filialFilter}
+        ${grupoFilter}
+      GROUP BY ${groupByFields}
+    `;
+
+    const [currentResult, previousResult, hasEverSoldResult] = await Promise.all([
       request.query<{
         productId: string;
         productName: string;
@@ -320,6 +339,11 @@ async function fetchProductsWithDetailsSales({
         previousRevenue: number | null;
         previousQuantity: number | null;
       }>(previousQuery),
+      request.query<{
+        productId: string;
+        corProduto?: string | null;
+        saleCount: number;
+      }>(hasEverSoldQuery),
     ]);
 
     // Criar mapa do período anterior (chave inclui cor se groupByColor estiver ativo)
@@ -332,6 +356,15 @@ async function fetchProductsWithDetailsSales({
         revenue: Number(row.previousRevenue ?? 0),
         quantity: Number(row.previousQuantity ?? 0),
       });
+    });
+
+    // Criar mapa de produtos que já tiveram vendas antes do período atual
+    const hasEverSoldMap = new Map<string, boolean>();
+    hasEverSoldResult.recordset.forEach((row) => {
+      const key = groupByColor && row.corProduto
+        ? `${row.productId}-${row.corProduto}`
+        : row.productId;
+      hasEverSoldMap.set(key, true);
     });
 
     const products = currentResult.recordset.map((row) => {
@@ -348,20 +381,26 @@ async function fetchProductsWithDetailsSales({
       const previousRevenue = previous.revenue;
       const previousQuantity = previous.quantity;
       
+      // Verificar se o produto já teve vendas em algum momento antes do período atual
+      const hasEverSold = hasEverSoldMap.has(previousKey);
+      
       const averagePrice = quantity > 0 ? revenue / quantity : 0;
       const markup = cost > 0 ? averagePrice / cost : 0;
       
       // Calcular variações
-      const isNew = previousRevenue === 0 && previousQuantity === 0;
+      // isNew só é true se não teve vendas no período anterior E nunca teve vendas antes
+      const isNew = previousRevenue === 0 && previousQuantity === 0 && !hasEverSold;
+      
+      // Se não teve vendas no período anterior mas já teve antes, mostrar 0% em vez de null
       const revenueVariance = isNew
         ? null
         : previousRevenue === 0
-          ? null
+          ? (hasEverSold ? 0 : null) // Se já teve vendas antes, mostrar 0%, senão null
           : Number((((revenue - previousRevenue) / previousRevenue) * 100).toFixed(1));
       const quantityVariance = isNew
         ? null
         : previousQuantity === 0
-          ? null
+          ? (hasEverSold ? 0 : null) // Se já teve vendas antes, mostrar 0%, senão null
           : Number((((quantity - previousQuantity) / previousQuantity) * 100).toFixed(1));
 
       // Processar informações de cor
@@ -499,7 +538,28 @@ async function fetchProductsWithDetailsEcommerce({
       GROUP BY ${ecommerceGroupByFields}
     `;
 
-    const [currentResult, previousResult] = await Promise.all([
+    // Query para verificar se o produto já teve vendas em algum momento antes do período atual (e-commerce)
+    const hasEverSoldEcommerceColorSelectFields = groupByColor
+      ? 'fp.COR_PRODUTO AS corProduto,'
+      : '';
+
+    const hasEverSoldEcommerceQuery = `
+      SELECT 
+        fp.PRODUTO AS productId,
+        ${hasEverSoldEcommerceColorSelectFields}
+        COUNT(*) AS saleCount
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE f.EMISSAO < @startDate
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND fp.QTDE > 0
+        ${filialFilter}
+      GROUP BY ${ecommerceGroupByFields}
+    `;
+
+    const [currentResult, previousResult, hasEverSoldResult] = await Promise.all([
       request.query<{
         productId: string;
         productName: string;
@@ -514,6 +574,11 @@ async function fetchProductsWithDetailsEcommerce({
         previousRevenue: number | null;
         previousQuantity: number | null;
       }>(previousQuery),
+      request.query<{
+        productId: string;
+        corProduto?: string | null;
+        saleCount: number;
+      }>(hasEverSoldEcommerceQuery),
     ]);
 
     // Criar mapa do período anterior (chave inclui cor se groupByColor estiver ativo)
@@ -526,6 +591,15 @@ async function fetchProductsWithDetailsEcommerce({
         revenue: Number(row.previousRevenue ?? 0),
         quantity: Number(row.previousQuantity ?? 0),
       });
+    });
+
+    // Criar mapa de produtos que já tiveram vendas antes do período atual (e-commerce)
+    const hasEverSoldMap = new Map<string, boolean>();
+    hasEverSoldResult.recordset.forEach((row) => {
+      const key = groupByColor && row.corProduto
+        ? `${row.productId}-${row.corProduto}`
+        : row.productId;
+      hasEverSoldMap.set(key, true);
     });
 
     const products = currentResult.recordset.map((row) => {
@@ -541,20 +615,26 @@ async function fetchProductsWithDetailsEcommerce({
       const previousRevenue = previous.revenue;
       const previousQuantity = previous.quantity;
       
+      // Verificar se o produto já teve vendas em algum momento antes do período atual
+      const hasEverSold = hasEverSoldMap.has(previousKey);
+      
       const averagePrice = quantity > 0 ? revenue / quantity : 0;
       const markup = cost > 0 ? averagePrice / cost : 0;
       
       // Calcular variações
-      const isNew = previousRevenue === 0 && previousQuantity === 0;
+      // isNew só é true se não teve vendas no período anterior E nunca teve vendas antes
+      const isNew = previousRevenue === 0 && previousQuantity === 0 && !hasEverSold;
+      
+      // Se não teve vendas no período anterior mas já teve antes, mostrar 0% em vez de null
       const revenueVariance = isNew
         ? null
         : previousRevenue === 0
-          ? null
+          ? (hasEverSold ? 0 : null) // Se já teve vendas antes, mostrar 0%, senão null
           : Number((((revenue - previousRevenue) / previousRevenue) * 100).toFixed(1));
       const quantityVariance = isNew
         ? null
         : previousQuantity === 0
-          ? null
+          ? (hasEverSold ? 0 : null) // Se já teve vendas antes, mostrar 0%, senão null
           : Number((((quantity - previousQuantity) / previousQuantity) * 100).toFixed(1));
 
       // Processar informações de cor
