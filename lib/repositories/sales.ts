@@ -8,7 +8,7 @@ import {
   fetchDailyEcommerceRevenue,
   fetchEcommerceFilialPerformance,
 } from '@/lib/repositories/ecommerce';
-import { getConnectionPool, withRequest } from '@/lib/db/connection';
+import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import { fetchMultipleProductsStock, fetchStockSummary } from '@/lib/repositories/inventory';
 import type {
@@ -571,27 +571,28 @@ export async function fetchSalesSummary({
       ? new Date(currentLastSaleDate)
       : null;
 
-    const pool = await getConnectionPool();
-    const availabilityRequest = pool.request();
-    const availabilityFilter = buildFilialFilter(availabilityRequest, company, 'sales', filial);
-    const availabilityQuery = `
-      SELECT
-        MIN(vp.DATA_VENDA) AS firstSaleDate,
-        MAX(vp.DATA_VENDA) AS lastSaleDate
-      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      WHERE vp.QTDE > 0
-        ${availabilityFilter}
-    `;
+    // Buscar disponibilidade de datas usando withRequest para suportar proxy
+    const availabilityRow = await withRequest(async (availabilityRequest) => {
+      const availabilityFilter = buildFilialFilter(availabilityRequest, company, 'sales', filial);
+      const availabilityQuery = `
+        SELECT
+          MIN(vp.DATA_VENDA) AS firstSaleDate,
+          MAX(vp.DATA_VENDA) AS lastSaleDate
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        WHERE vp.QTDE > 0
+          ${availabilityFilter}
+      `;
 
-    const availabilityResult = await availabilityRequest.query<{
-      firstSaleDate: Date | null;
-      lastSaleDate: Date | null;
-    }>(availabilityQuery);
+      const availabilityResult = await availabilityRequest.query<{
+        firstSaleDate: Date | null;
+        lastSaleDate: Date | null;
+      }>(availabilityQuery);
 
-    const availabilityRow = availabilityResult.recordset[0] ?? {
-      firstSaleDate: null,
-      lastSaleDate: null,
-    };
+      return availabilityResult.recordset[0] ?? {
+        firstSaleDate: null,
+        lastSaleDate: null,
+      };
+    });
 
     return {
       summary,
@@ -771,10 +772,14 @@ export async function fetchDailyRevenue({
       revenue: number | null;
     }>(query);
 
-    return result.recordset.map((row) => ({
-      date: row.date.toISOString().split('T')[0],
-      revenue: Number(row.revenue ?? 0),
-    }));
+    return result.recordset.map((row) => {
+      // Converter para Date se for string (vindo do proxy)
+      const date = row.date instanceof Date ? row.date : new Date(row.date);
+      return {
+        date: date.toISOString().split('T')[0],
+        revenue: Number(row.revenue ?? 0),
+      };
+    });
   });
 }
 

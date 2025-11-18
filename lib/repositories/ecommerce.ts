@@ -1,7 +1,7 @@
 import sql from 'mssql';
 
 import { resolveCompany, type CompanyModule } from '@/lib/config/company';
-import { getConnectionPool, withRequest } from '@/lib/db/connection';
+import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import { fetchMultipleProductsStock, fetchStockSummary } from '@/lib/repositories/inventory';
 import type {
@@ -292,31 +292,32 @@ export async function fetchEcommerceSummary({
       ? new Date(currentRow.lastSaleDate)
       : null;
 
-    const pool = await getConnectionPool();
-    const availabilityRequest = pool.request();
-    const availabilityFilter = buildEcommerceFilialFilter(availabilityRequest, company, filial);
-    const availabilityQuery = `
-      SELECT
-        MIN(f.EMISSAO) AS firstSaleDate,
-        MAX(f.EMISSAO) AS lastSaleDate
-      FROM FATURAMENTO f WITH (NOLOCK)
-      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
-        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
-      WHERE f.NOTA_CANCELADA = 0
-        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-        AND fp.QTDE > 0
-        ${availabilityFilter}
-    `;
+    // Buscar disponibilidade de datas usando withRequest para suportar proxy
+    const availabilityRow = await withRequest(async (availabilityRequest) => {
+      const availabilityFilter = buildEcommerceFilialFilter(availabilityRequest, company, filial);
+      const availabilityQuery = `
+        SELECT
+          MIN(f.EMISSAO) AS firstSaleDate,
+          MAX(f.EMISSAO) AS lastSaleDate
+        FROM FATURAMENTO f WITH (NOLOCK)
+        JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+          ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+        WHERE f.NOTA_CANCELADA = 0
+          AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+          AND fp.QTDE > 0
+          ${availabilityFilter}
+      `;
 
-    const availabilityResult = await availabilityRequest.query<{
-      firstSaleDate: Date | null;
-      lastSaleDate: Date | null;
-    }>(availabilityQuery);
+      const availabilityResult = await availabilityRequest.query<{
+        firstSaleDate: Date | null;
+        lastSaleDate: Date | null;
+      }>(availabilityQuery);
 
-    const availabilityRow = availabilityResult.recordset[0] ?? {
-      firstSaleDate: null,
-      lastSaleDate: null,
-    };
+      return availabilityResult.recordset[0] ?? {
+        firstSaleDate: null,
+        lastSaleDate: null,
+      };
+    });
 
     return {
       summary,
@@ -416,10 +417,14 @@ export async function fetchDailyEcommerceRevenue({
       revenue: number | null;
     }>(query);
 
-    return result.recordset.map((row) => ({
-      date: row.date.toISOString().split('T')[0],
-      revenue: Number(row.revenue ?? 0),
-    }));
+    return result.recordset.map((row) => {
+      // Converter para Date se for string (vindo do proxy)
+      const date = row.date instanceof Date ? row.date : new Date(row.date);
+      return {
+        date: date.toISOString().split('T')[0],
+        revenue: Number(row.revenue ?? 0),
+      };
+    });
   });
 }
 
