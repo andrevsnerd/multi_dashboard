@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import DateRangeFilter, {
   type DateRangeValue,
@@ -10,7 +10,6 @@ import StockByFilialTable from "@/components/stock/StockByFilialTable";
 import type { StockByFilialItem } from "@/lib/repositories/stockByFilial";
 import { getCurrentMonthRange } from "@/lib/utils/date";
 import type { CompanyKey } from "@/lib/config/company";
-import { exportElementToHtml } from "@/lib/utils/exportHtml";
 
 import styles from "./StockByFilialPage.module.css";
 
@@ -72,9 +71,6 @@ export default function StockByFilialPage({
   const [subgrupo, setSubgrupo] = useState<string | null>(null);
   const [grade, setGrade] = useState<string | null>(null);
   const [colecao, setColecao] = useState<string | null>(null);
-
-  // Ref para o wrapper da página para exportação HTML
-  const wrapperRef = useRef<HTMLDivElement>(null);
 
   const rangeKey = useMemo(
     () =>
@@ -198,23 +194,8 @@ export default function StockByFilialPage({
     return result;
   }, [data, showItemsWithoutSales, companyKey, linha, subgrupo, grade, colecao]);
 
-  const handleExportHtml = () => {
-    if (!wrapperRef.current) return;
-    
-    // Esperar um pouco para garantir que tudo está renderizado
-    setTimeout(() => {
-      if (wrapperRef.current) {
-        const dateStr = range.startDate.toLocaleDateString('pt-BR').replace(/\//g, '-');
-        exportElementToHtml(wrapperRef.current, {
-          filename: `estoque-por-filial-${companyKey}-${dateStr}.html`,
-          title: `Estoque por Filial - ${companyName}`,
-        });
-      }
-    }, 100);
-  };
-
   return (
-    <div className={styles.wrapper} ref={wrapperRef}>
+    <div className={styles.wrapper}>
       <div className={styles.header}>
         <h1 className={styles.title}>Estoque por Filial</h1>
         <div className={styles.controls}>
@@ -251,30 +232,6 @@ export default function StockByFilialPage({
             <span className={styles.loading}>Carregando dados…</span>
           ) : null}
           {error ? <span className={styles.error}>{error}</span> : null}
-          <button
-            type="button"
-            onClick={handleExportHtml}
-            className={styles.exportButton}
-            disabled={loading || filteredData.length === 0}
-            title={loading ? "Carregando dados..." : filteredData.length === 0 ? "Nenhum dado para exportar" : "Exportar dashboard em HTML"}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M8 11L8 1M8 11L5 8M8 11L11 8M3 11L3 13C3 13.5523 3.44772 14 4 14L12 14C12.5523 14 13 13.5523 13 13L13 11"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Exportar HTML
-          </button>
         </div>
       </div>
 
