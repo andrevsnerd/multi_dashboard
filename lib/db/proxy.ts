@@ -64,6 +64,23 @@ export async function queryViaProxy<T>(
 }
 
 /**
+ * Simula um sql.Request para uso com withRequest via proxy
+ */
+export class ProxyRequest {
+  private params: Record<string, any> = {};
+
+  input(name: string, type: any, value: any): this {
+    this.params[name] = value;
+    return this;
+  }
+
+  async query<T>(queryText: string): Promise<{ recordset: T[] }> {
+    const data = await queryViaProxy<T>(queryText, this.params);
+    return { recordset: data };
+  }
+}
+
+/**
  * Testa a conexão com o proxy
  */
 export async function testProxyConnection(): Promise<boolean> {

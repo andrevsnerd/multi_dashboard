@@ -1,5 +1,5 @@
 import sql from 'mssql';
-import { shouldUseProxy, queryViaProxy } from './proxy';
+import { shouldUseProxy, queryViaProxy, ProxyRequest } from './proxy';
 
 const {
   DB_SERVER,
@@ -61,15 +61,15 @@ export async function getConnectionPool(): Promise<sql.ConnectionPool> {
 }
 
 export async function withRequest<T>(
-  handler: (request: sql.Request) => Promise<T>
+  handler: (request: sql.Request | any) => Promise<T>
 ): Promise<T> {
-  // Se estiver usando proxy, não pode usar withRequest
+  // Se estiver usando proxy, usa ProxyRequest
   if (shouldUseProxy()) {
-    throw new Error(
-      'withRequest não disponível com proxy. Use query() para queries simples.'
-    );
+    const proxyRequest = new ProxyRequest();
+    return handler(proxyRequest as any);
   }
 
+  // Caso contrário, usa conexão direta
   const pool = await getConnectionPool();
   const request = pool.request();
   return handler(request);
