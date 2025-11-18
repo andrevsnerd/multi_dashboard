@@ -17,10 +17,10 @@
     "react-dom": "19.2.0",
     "recharts": "^3.4.1",
     "typescript": "^5",
-    "@types/react-date-range": "^1.4.10"
+    "@types/react-date-range": "^1.4.10",
+    "@types/mssql": "^9.1.8"
   },
   "devDependencies": {
-    "@types/mssql": "^9.1.8",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
