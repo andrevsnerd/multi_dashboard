@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
 
-import { fetchProductsWithDetails, type ProductDetail } from '@/lib/repositories/products';
+import { fetchAvailableGrupos } from '@/lib/repositories/products';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const company = searchParams.get('company') ?? undefined;
   const filial = searchParams.get('filial');
-  const grupo = searchParams.get('grupo');
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
 
@@ -23,18 +22,17 @@ export async function GET(request: Request) {
   };
 
   try {
-    const data = await fetchProductsWithDetails({
+    const data = await fetchAvailableGrupos({
       company,
       range,
       filial: filial || null,
-      grupo: grupo || null,
     });
 
     return NextResponse.json({ data });
   } catch (error) {
-    console.error('Erro ao carregar produtos', error);
+    console.error('Erro ao carregar grupos', error);
     return NextResponse.json(
-      { error: 'Erro ao carregar produtos' },
+      { error: 'Erro ao carregar grupos' },
       { status: 500 }
     );
   }

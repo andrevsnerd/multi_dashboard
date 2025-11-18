@@ -30,6 +30,7 @@ export interface ProductsQueryParams {
     end?: string | Date;
   };
   filial?: string | null;
+  grupo?: string | null;
 }
 
 function resolveRange(range?: { start?: string | Date; end?: string | Date }) {
@@ -125,6 +126,28 @@ function buildFilialFilter(
 }
 
 /**
+ * Cria filtro de grupo para NERD
+ */
+function buildGrupoFilterForProducts(
+  request: sql.Request | RequestLike,
+  companySlug: string | undefined,
+  grupo: string | null | undefined
+): string {
+  if (companySlug !== 'nerd' || !grupo) {
+    return '';
+  }
+  
+  // Normalizar o grupo para comparação (mesmo formato usado na busca)
+  const grupoNormalizado = grupo.trim().toUpperCase();
+  request.input('grupo', sql.VarChar, grupoNormalizado);
+  
+  return `AND (
+    UPPER(LTRIM(RTRIM(ISNULL(vp.GRUPO_PRODUTO, '')))) = @grupo
+    OR UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupo
+  )`;
+}
+
+/**
  * Busca produtos com todas as informações necessárias para a página de produtos
  * Inclui faturamento, quantidade, preço médio, custo, markup, estoque e variações
  */
@@ -132,17 +155,18 @@ export async function fetchProductsWithDetails({
   company,
   range,
   filial,
+  grupo,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   // Se for e-commerce, usar função específica de e-commerce
   if (isEcommerceFilial(company, filial)) {
-    return fetchProductsWithDetailsEcommerce({ company, range, filial });
+    return fetchProductsWithDetailsEcommerce({ company, range, filial, grupo });
   }
 
   // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
   if (company === 'scarfme' && filial === null) {
     const [salesProducts, ecommerceProducts] = await Promise.all([
-      fetchProductsWithDetailsSales({ company, range, filial: VAREJO_VALUE }),
-      fetchProductsWithDetailsEcommerce({ company, range, filial: null }),
+      fetchProductsWithDetailsSales({ company, range, filial: VAREJO_VALUE, grupo }),
+      fetchProductsWithDetailsEcommerce({ company, range, filial: null, grupo }),
     ]);
 
     // Agregar produtos por productId
@@ -175,7 +199,7 @@ export async function fetchProductsWithDetails({
   }
 
   // Função normal para vendas de loja
-  return fetchProductsWithDetailsSales({ company, range, filial });
+  return fetchProductsWithDetailsSales({ company, range, filial, grupo });
 }
 
 /**
@@ -185,6 +209,7 @@ async function fetchProductsWithDetailsSales({
   company,
   range,
   filial,
+  grupo,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   return withRequest(async (request) => {
     const { start, end } = resolveRange(range);
@@ -197,12 +222,14 @@ async function fetchProductsWithDetailsSales({
     request.input('previousEndDate', sql.DateTime, previousRange.end);
 
     const filialFilter = buildFilialFilter(request, company, 'sales', filial);
+    const grupoFilter = buildGrupoFilterForProducts(request, company, grupo);
 
     // Query para período atual
     const currentQuery = `
       SELECT 
         vp.PRODUTO AS productId,
         MAX(vp.DESC_PRODUTO) AS productName,
+        MAX(COALESCE(vp.GRUPO_PRODUTO, p.GRUPO_PRODUTO, '')) AS grupo,
         SUM(
           CASE
             WHEN vp.QTDE_CANCELADA > 0 THEN 0
@@ -217,10 +244,12 @@ async function fetchProductsWithDetailsSales({
           END
         ) AS cost
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       WHERE vp.DATA_VENDA >= @startDate
         AND vp.DATA_VENDA < @endDate
         AND vp.QTDE > 0
         ${filialFilter}
+        ${grupoFilter}
       GROUP BY vp.PRODUTO
     `;
 
@@ -236,10 +265,12 @@ async function fetchProductsWithDetailsSales({
         ) AS previousRevenue,
         SUM(vp.QTDE) AS previousQuantity
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       WHERE vp.DATA_VENDA >= @previousStartDate
         AND vp.DATA_VENDA < @previousEndDate
         AND vp.QTDE > 0
         ${filialFilter}
+        ${grupoFilter}
       GROUP BY vp.PRODUTO
     `;
 
@@ -247,6 +278,7 @@ async function fetchProductsWithDetailsSales({
       request.query<{
         productId: string;
         productName: string;
+        grupo: string | null;
         totalRevenue: number | null;
         totalQuantity: number | null;
         cost: number | null;
@@ -271,6 +303,7 @@ async function fetchProductsWithDetailsSales({
       const revenue = Number(row.totalRevenue ?? 0);
       const quantity = Number(row.totalQuantity ?? 0);
       const cost = Number(row.cost ?? 0);
+      const grupo = (row.grupo && row.grupo.trim() !== '') ? row.grupo.trim() : null;
       const previous = previousMap.get(row.productId) ?? { revenue: 0, quantity: 0 };
       const previousRevenue = previous.revenue;
       const previousQuantity = previous.quantity;
@@ -331,6 +364,7 @@ async function fetchProductsWithDetailsEcommerce({
   company,
   range,
   filial,
+  grupo,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   return withRequest(async (request) => {
     const { start, end } = resolveRange(range);
@@ -482,3 +516,55 @@ async function fetchProductsWithDetailsEcommerce({
   });
 }
 
+/**
+ * Busca grupos disponíveis para NERD
+ * Busca apenas grupos de produtos que tiveram vendas no período e filial selecionados
+ */
+export async function fetchAvailableGrupos({
+  company,
+  range,
+  filial,
+}: Omit<ProductsQueryParams, 'grupo'> = {}): Promise<string[]> {
+  if (company !== 'nerd') {
+    return [];
+  }
+
+  return withRequest(async (request) => {
+    const { start, end } = resolveRange(range);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+
+    const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+
+    const query = `
+      SELECT DISTINCT 
+        COALESCE(vp.GRUPO_PRODUTO, p.GRUPO_PRODUTO, '') AS grupo
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      WHERE vp.DATA_VENDA >= @startDate
+        AND vp.DATA_VENDA < @endDate
+        AND vp.QTDE > 0
+        AND COALESCE(vp.GRUPO_PRODUTO, p.GRUPO_PRODUTO, '') <> ''
+        ${filialFilter}
+      ORDER BY grupo
+    `;
+
+    try {
+      const result = await request.query<{ grupo: string }>(query);
+      const grupos = result.recordset
+        .map((row) => {
+          const grupo = row.grupo?.trim() || '';
+          return grupo.toUpperCase();
+        })
+        .filter((grupo) => grupo !== '');
+      
+      // Remover duplicatas após normalização
+      const gruposUnicos = [...new Set(grupos)].sort();
+      
+      return gruposUnicos;
+    } catch (error) {
+      console.error('Erro ao buscar grupos:', error);
+      return [];
+    }
+  });
+}

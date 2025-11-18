@@ -6,6 +6,7 @@ import DateRangeFilter, {
   type DateRangeValue,
 } from "@/components/filters/DateRangeFilter";
 import FilialFilter from "@/components/filters/FilialFilter";
+import SelectFilter from "@/components/filters/SelectFilter";
 import SummaryCards from "@/components/dashboard/SummaryCards";
 import ProductsTable from "@/components/products/ProductsTable";
 import type { ProductDetail } from "@/lib/repositories/products";
@@ -32,7 +33,8 @@ const EMPTY_SUMMARY: SalesSummary = {
 async function fetchProducts(
   company: string,
   range: DateRangeValue,
-  filial: string | null
+  filial: string | null,
+  grupo: string | null
 ): Promise<ProductDetail[]> {
   const searchParams = new URLSearchParams({
     company,
@@ -42,6 +44,10 @@ async function fetchProducts(
 
   if (filial) {
     searchParams.set("filial", filial);
+  }
+
+  if (grupo) {
+    searchParams.set("grupo", grupo);
   }
 
   const response = await fetch(`/api/products?${searchParams.toString()}`, {
@@ -62,7 +68,8 @@ async function fetchProducts(
 async function fetchSummary(
   company: string,
   range: DateRangeValue,
-  filial: string | null
+  filial: string | null,
+  grupo: string | null
 ): Promise<SalesSummary> {
   const searchParams = new URLSearchParams({
     company,
@@ -72,6 +79,10 @@ async function fetchSummary(
 
   if (filial) {
     searchParams.set("filial", filial);
+  }
+
+  if (grupo) {
+    searchParams.set("grupo", grupo);
   }
 
   const response = await fetch(`/api/sales-summary?${searchParams.toString()}`, {
@@ -103,15 +114,66 @@ export default function ProductsPage({
 
   const [range, setRange] = useState<DateRangeValue>(initialRange);
   const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
+  const [selectedGrupo, setSelectedGrupo] = useState<string | null>(null);
   const [data, setData] = useState<ProductDetail[]>([]);
   const [summary, setSummary] = useState<SalesSummary>(EMPTY_SUMMARY);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [availableGrupos, setAvailableGrupos] = useState<string[]>([]);
+
+  // Buscar grupos disponíveis para NERD
+  useEffect(() => {
+    if (companyKey !== "nerd") {
+      setAvailableGrupos([]);
+      return;
+    }
+
+    let active = true;
+
+    async function loadGrupos() {
+      try {
+        const searchParams = new URLSearchParams({
+          company: companyKey,
+          start: range.startDate.toISOString(),
+          end: range.endDate.toISOString(),
+        });
+
+        if (selectedFilial) {
+          searchParams.set("filial", selectedFilial);
+        }
+
+        const response = await fetch(`/api/products/grupos?${searchParams.toString()}`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const json = (await response.json()) as {
+          data: string[];
+        };
+
+        if (active) {
+          setAvailableGrupos(json.data || []);
+        }
+      } catch (err) {
+        // Silenciosamente falhar
+      }
+    }
+
+    void loadGrupos();
+
+    return () => {
+      active = false;
+    };
+  }, [companyKey, range.startDate, range.endDate, selectedFilial]);
+
   const rangeKey = useMemo(
     () =>
-      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}`,
-    [range.startDate, range.endDate, selectedFilial]
+      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}::${selectedGrupo ?? 'all'}`,
+    [range.startDate, range.endDate, selectedFilial, selectedGrupo]
   );
 
   useEffect(() => {
@@ -122,8 +184,8 @@ export default function ProductsPage({
       setError(null);
       try {
         const [productsData, summaryData] = await Promise.all([
-          fetchProducts(companyKey, range, selectedFilial),
-          fetchSummary(companyKey, range, selectedFilial),
+          fetchProducts(companyKey, range, selectedFilial, selectedGrupo),
+          fetchSummary(companyKey, range, selectedFilial, selectedGrupo),
         ]);
         if (active) {
           setData(productsData);
@@ -149,7 +211,7 @@ export default function ProductsPage({
     return () => {
       active = false;
     };
-  }, [companyKey, range, rangeKey, selectedFilial]);
+  }, [companyKey, range, rangeKey, selectedFilial, selectedGrupo]);
 
   return (
     <div className={styles.wrapper}>
@@ -162,6 +224,14 @@ export default function ProductsPage({
             value={selectedFilial}
             onChange={setSelectedFilial}
           />
+          {companyKey === "nerd" && (
+            <SelectFilter
+              label="Grupo"
+              value={selectedGrupo}
+              options={availableGrupos}
+              onChange={setSelectedGrupo}
+            />
+          )}
           {loading ? (
             <span className={styles.loading}>Carregando dados…</span>
           ) : null}

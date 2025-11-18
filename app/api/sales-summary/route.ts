@@ -9,6 +9,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const company = searchParams.get('company') ?? undefined;
   const filial = searchParams.get('filial');
+  const grupo = searchParams.get('grupo');
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
   const range =
@@ -28,6 +29,7 @@ export async function GET(request: Request) {
       company,
       range,
       filial: filial || null,
+      grupo: grupo || null,
     });
 
     return NextResponse.json({

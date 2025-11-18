@@ -74,6 +74,7 @@ export interface SummaryQueryParams {
   company?: string;
   range?: DateRangeInput;
   filial?: string | null;
+  grupo?: string | null;
 }
 
 export interface SalesSummaryResult {
@@ -150,6 +151,7 @@ export async function fetchEcommerceSummary({
   company,
   range,
   filial,
+  grupo,
 }: SummaryQueryParams = {}): Promise<SalesSummaryResult> {
   return withRequest(async (request) => {
     const currentRange = resolveRange(range);
@@ -269,6 +271,7 @@ export async function fetchEcommerceSummary({
     const stockSummary = await fetchStockSummary({
       company,
       filial,
+      grupo,
     });
 
     const summary: SalesSummary = {

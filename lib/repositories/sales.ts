@@ -144,6 +144,7 @@ export interface SummaryQueryParams {
   company?: string;
   range?: DateRangeInput;
   filial?: string | null;
+  grupo?: string | null;
 }
 
 export interface SalesSummaryResult {
@@ -262,18 +263,19 @@ export async function fetchSalesSummary({
   company,
   range,
   filial,
+  grupo,
 }: SummaryQueryParams = {}): Promise<SalesSummaryResult> {
   // Se for e-commerce, usar função específica de e-commerce
   if (isEcommerceFilial(company, filial)) {
-    return fetchEcommerceSummary({ company, range, filial });
+    return fetchEcommerceSummary({ company, range, filial, grupo });
   }
 
   // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
   if (shouldAggregateEcommerce(company, filial)) {
     // Buscar vendas normais (varejo) e ecommerce em paralelo
     const [salesResult, ecommerceResult] = await Promise.all([
-      fetchSalesSummary({ company, range, filial: VAREJO_VALUE }),
-      fetchEcommerceSummary({ company, range, filial: null }),
+      fetchSalesSummary({ company, range, filial: VAREJO_VALUE, grupo }),
+      fetchEcommerceSummary({ company, range, filial: null, grupo }),
     ]);
 
     // Agregar os resultados
@@ -424,6 +426,19 @@ export async function fetchSalesSummary({
     request.input('prevEndDate', sql.DateTime, adjustedPreviousEnd);
 
     const filialFilter = buildFilialFilter(request, company, 'sales', filial);
+    
+    // Criar filtro de grupo para NERD
+    let grupoFilter = '';
+    let grupoJoin = '';
+    if (company === 'nerd' && grupo) {
+      const grupoNormalizado = grupo.trim().toUpperCase();
+      request.input('grupo', sql.VarChar, grupoNormalizado);
+      grupoJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
+      grupoFilter = `AND (
+        UPPER(LTRIM(RTRIM(ISNULL(vp.GRUPO_PRODUTO, '')))) = @grupo
+        OR UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupo
+      )`;
+    }
 
     // Otimizar query usando uma única passada pela tabela com CASE para separar períodos
     // Isso é mais eficiente que UNION ALL com duas queries separadas
@@ -479,12 +494,14 @@ export async function fetchSalesSummary({
           ELSE NULL
         END) AS currentLastSaleDate
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      ${grupoJoin}
       WHERE (
           (vp.DATA_VENDA >= @startDate AND vp.DATA_VENDA < @endDate)
           OR (vp.DATA_VENDA >= @prevStartDate AND vp.DATA_VENDA < @prevEndDate)
         )
         AND vp.QTDE > 0
         ${filialFilter}
+        ${grupoFilter}
     `;
 
     const result = await request.query<{
@@ -548,6 +565,7 @@ export async function fetchSalesSummary({
     const stockSummary = await fetchStockSummary({
       company,
       filial,
+      grupo,
     });
 
     const summary: SalesSummary = {

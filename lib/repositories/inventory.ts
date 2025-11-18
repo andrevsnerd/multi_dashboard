@@ -218,6 +218,7 @@ export async function fetchMultipleProductsStock(
 export interface StockSummaryParams {
   company?: string;
   filial?: string | null;
+  grupo?: string | null;
 }
 
 export interface StockSummary {
@@ -233,33 +234,69 @@ export interface StockSummary {
 export async function fetchStockSummary({
   company,
   filial,
+  grupo,
 }: StockSummaryParams = {}): Promise<StockSummary> {
   return withRequest(async (request) => {
     const filialFilter = buildFilialFilter(request, company, filial);
+    
+    // Criar filtro de grupo para NERD
+    let grupoFilter = '';
+    if (company === 'nerd' && grupo) {
+      const grupoNormalizado = grupo.trim().toUpperCase();
+      request.input('grupo', sql.VarChar, grupoNormalizado);
+      grupoFilter = `AND (
+        UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupo
+      )`;
+    }
 
     const query = `
       SELECT 
-        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS totalQuantity,
-        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0) ELSE 0 END) AS totalValue
+        e.PRODUTO AS productId,
+        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS positiveStock,
+        SUM(CASE WHEN e.ESTOQUE < 0 THEN e.ESTOQUE ELSE 0 END) AS negativeStock,
+        COUNT(CASE WHEN e.ESTOQUE > 0 THEN 1 END) AS positiveCount,
+        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0) ELSE 0 END) AS positiveValue,
+        SUM(CASE WHEN e.ESTOQUE < 0 THEN e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0) ELSE 0 END) AS negativeValue
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
-      WHERE e.ESTOQUE > 0
+      WHERE 1=1
         ${filialFilter}
+        ${grupoFilter}
+      GROUP BY e.PRODUTO
     `;
 
     const result = await request.query<{
-      totalQuantity: number | null;
-      totalValue: number | null;
+      productId: string;
+      positiveStock: number | null;
+      negativeStock: number | null;
+      positiveCount: number | null;
+      positiveValue: number | null;
+      negativeValue: number | null;
     }>(query);
 
-    const row = result.recordset[0] ?? {
-      totalQuantity: 0,
-      totalValue: 0,
-    };
+    // Aplicar a mesma lógica usada em fetchMultipleProductsStock
+    let totalQuantity = 0;
+    let totalValue = 0;
+
+    result.recordset.forEach((row) => {
+      const positiveStock = Number(row.positiveStock ?? 0);
+      const negativeStock = Number(row.negativeStock ?? 0);
+      const positiveCount = Number(row.positiveCount ?? 0);
+      const positiveValue = Number(row.positiveValue ?? 0);
+      const negativeValue = Number(row.negativeValue ?? 0);
+      
+      // Se houver estoque positivo, usar apenas a soma dos positivos
+      // Caso contrário, usar a soma dos positivos + negativos
+      const finalStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
+      const finalValue = positiveCount > 0 ? positiveValue : (positiveValue + negativeValue);
+      
+      totalQuantity += finalStock;
+      totalValue += finalValue;
+    });
 
     return {
-      totalQuantity: Number(row.totalQuantity ?? 0),
-      totalValue: Number(row.totalValue ?? 0),
+      totalQuantity,
+      totalValue,
     };
   });
 }
