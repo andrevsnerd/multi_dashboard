@@ -7,6 +7,7 @@ export async function GET(request: Request) {
   const company = searchParams.get('company') ?? undefined;
   const filial = searchParams.get('filial');
   const grupo = searchParams.get('grupo');
+  const groupByColorParam = searchParams.get('groupByColor');
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
 
@@ -22,12 +23,15 @@ export async function GET(request: Request) {
     end: endParam,
   };
 
+  const groupByColor = groupByColorParam === 'true';
+
   try {
     const data = await fetchProductsWithDetails({
       company,
       range,
       filial: filial || null,
       grupo: grupo || null,
+      groupByColor,
     });
 
     return NextResponse.json({ data });

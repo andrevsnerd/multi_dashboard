@@ -8,6 +8,7 @@ import { fetchMultipleProductsStock } from '@/lib/repositories/inventory';
 import {
   fetchTopProductsEcommerce,
 } from '@/lib/repositories/ecommerce';
+import { getColorDescription } from '@/lib/utils/colorMapping';
 
 export interface ProductDetail {
   productId: string;
@@ -21,6 +22,8 @@ export interface ProductDetail {
   revenueVariance: number | null; // null se for novo produto
   quantityVariance: number | null; // null se for novo produto
   isNew: boolean; // true se não teve vendas no período anterior
+  corProduto?: string | null; // Código da cor do produto
+  descCorProduto?: string | null; // Descrição da cor do produto
 }
 
 export interface ProductsQueryParams {
@@ -31,6 +34,7 @@ export interface ProductsQueryParams {
   };
   filial?: string | null;
   grupo?: string | null;
+  groupByColor?: boolean; // Se true, agrupa produtos por cor
 }
 
 function resolveRange(range?: { start?: string | Date; end?: string | Date }) {
@@ -156,30 +160,37 @@ export async function fetchProductsWithDetails({
   range,
   filial,
   grupo,
+  groupByColor = false,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   // Se for e-commerce, usar função específica de e-commerce
   if (isEcommerceFilial(company, filial)) {
-    return fetchProductsWithDetailsEcommerce({ company, range, filial, grupo });
+    return fetchProductsWithDetailsEcommerce({ company, range, filial, grupo, groupByColor });
   }
 
   // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
   if (company === 'scarfme' && filial === null) {
     const [salesProducts, ecommerceProducts] = await Promise.all([
-      fetchProductsWithDetailsSales({ company, range, filial: VAREJO_VALUE, grupo }),
-      fetchProductsWithDetailsEcommerce({ company, range, filial: null, grupo }),
+      fetchProductsWithDetailsSales({ company, range, filial: VAREJO_VALUE, grupo, groupByColor }),
+      fetchProductsWithDetailsEcommerce({ company, range, filial: null, grupo, groupByColor }),
     ]);
 
-    // Agregar produtos por productId
+    // Agregar produtos por productId (e cor se groupByColor estiver ativo)
     const productMap = new Map<string, ProductDetail>();
+    const getKey = (product: ProductDetail) => 
+      groupByColor && product.corProduto 
+        ? `${product.productId}-${product.corProduto}` 
+        : product.productId;
 
     // Adicionar produtos de vendas normais
     salesProducts.forEach((product) => {
-      productMap.set(product.productId, { ...product });
+      const key = getKey(product);
+      productMap.set(key, { ...product });
     });
 
     // Agregar produtos de ecommerce
     ecommerceProducts.forEach((product) => {
-      const existing = productMap.get(product.productId);
+      const key = getKey(product);
+      const existing = productMap.get(key);
       if (existing) {
         existing.totalRevenue += product.totalRevenue;
         existing.totalQuantity += product.totalQuantity;
@@ -189,7 +200,7 @@ export async function fetchProductsWithDetails({
           existing.markup = existing.averagePrice / existing.cost;
         }
       } else {
-        productMap.set(product.productId, { ...product });
+        productMap.set(key, { ...product });
       }
     });
 
@@ -199,7 +210,7 @@ export async function fetchProductsWithDetails({
   }
 
   // Função normal para vendas de loja
-  return fetchProductsWithDetailsSales({ company, range, filial, grupo });
+  return fetchProductsWithDetailsSales({ company, range, filial, grupo, groupByColor });
 }
 
 /**
@@ -210,6 +221,7 @@ async function fetchProductsWithDetailsSales({
   range,
   filial,
   grupo,
+  groupByColor = false,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   return withRequest(async (request) => {
     const { start, end } = resolveRange(range);
@@ -224,12 +236,23 @@ async function fetchProductsWithDetailsSales({
     const filialFilter = buildFilialFilter(request, company, 'sales', filial);
     const grupoFilter = buildGrupoFilterForProducts(request, company, grupo);
 
+    // Definir campos de agrupamento e seleção baseado em groupByColor
+    const groupByFields = groupByColor 
+      ? 'vp.PRODUTO, vp.COR_PRODUTO'
+      : 'vp.PRODUTO';
+    
+    const colorSelectFields = groupByColor
+      ? `vp.COR_PRODUTO AS corProduto,
+         MAX(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO, '')) AS descCorProduto,`
+      : '';
+
     // Query para período atual
     const currentQuery = `
       SELECT 
         vp.PRODUTO AS productId,
         MAX(vp.DESC_PRODUTO) AS productName,
         MAX(COALESCE(vp.GRUPO_PRODUTO, p.GRUPO_PRODUTO, '')) AS grupo,
+        ${colorSelectFields}
         SUM(
           CASE
             WHEN vp.QTDE_CANCELADA > 0 THEN 0
@@ -245,18 +268,24 @@ async function fetchProductsWithDetailsSales({
         ) AS cost
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      ${groupByColor ? 'LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR' : ''}
       WHERE vp.DATA_VENDA >= @startDate
         AND vp.DATA_VENDA < @endDate
         AND vp.QTDE > 0
         ${filialFilter}
         ${grupoFilter}
-      GROUP BY vp.PRODUTO
+      GROUP BY ${groupByFields}
     `;
 
     // Query para período anterior
+    const previousColorSelectFields = groupByColor
+      ? 'vp.COR_PRODUTO AS corProduto,'
+      : '';
+
     const previousQuery = `
       SELECT 
         vp.PRODUTO AS productId,
+        ${previousColorSelectFields}
         SUM(
           CASE
             WHEN vp.QTDE_CANCELADA > 0 THEN 0
@@ -271,7 +300,7 @@ async function fetchProductsWithDetailsSales({
         AND vp.QTDE > 0
         ${filialFilter}
         ${grupoFilter}
-      GROUP BY vp.PRODUTO
+      GROUP BY ${groupByFields}
     `;
 
     const [currentResult, previousResult] = await Promise.all([
@@ -279,21 +308,27 @@ async function fetchProductsWithDetailsSales({
         productId: string;
         productName: string;
         grupo: string | null;
+        corProduto?: string | null;
+        descCorProduto?: string | null;
         totalRevenue: number | null;
         totalQuantity: number | null;
         cost: number | null;
       }>(currentQuery),
       request.query<{
         productId: string;
+        corProduto?: string | null;
         previousRevenue: number | null;
         previousQuantity: number | null;
       }>(previousQuery),
     ]);
 
-    // Criar mapa do período anterior
+    // Criar mapa do período anterior (chave inclui cor se groupByColor estiver ativo)
     const previousMap = new Map<string, { revenue: number; quantity: number }>();
     previousResult.recordset.forEach((row) => {
-      previousMap.set(row.productId, {
+      const key = groupByColor && row.corProduto
+        ? `${row.productId}-${row.corProduto}`
+        : row.productId;
+      previousMap.set(key, {
         revenue: Number(row.previousRevenue ?? 0),
         quantity: Number(row.previousQuantity ?? 0),
       });
@@ -304,7 +339,12 @@ async function fetchProductsWithDetailsSales({
       const quantity = Number(row.totalQuantity ?? 0);
       const cost = Number(row.cost ?? 0);
       const grupo = (row.grupo && row.grupo.trim() !== '') ? row.grupo.trim() : null;
-      const previous = previousMap.get(row.productId) ?? { revenue: 0, quantity: 0 };
+      
+      // Obter chave para buscar dados do período anterior (inclui cor se groupByColor estiver ativo)
+      const previousKey = groupByColor && row.corProduto
+        ? `${row.productId}-${row.corProduto}`
+        : row.productId;
+      const previous = previousMap.get(previousKey) ?? { revenue: 0, quantity: 0 };
       const previousRevenue = previous.revenue;
       const previousQuantity = previous.quantity;
       
@@ -324,6 +364,12 @@ async function fetchProductsWithDetailsSales({
           ? null
           : Number((((quantity - previousQuantity) / previousQuantity) * 100).toFixed(1));
 
+      // Processar informações de cor
+      const corProduto = groupByColor ? (row.corProduto || null) : null;
+      const descCorProduto = groupByColor 
+        ? getColorDescription(row.corProduto, row.descCorProduto)
+        : null;
+
       return {
         productId: row.productId,
         productName: row.productName || 'Sem descrição',
@@ -336,6 +382,8 @@ async function fetchProductsWithDetailsSales({
         revenueVariance,
         quantityVariance,
         isNew,
+        corProduto,
+        descCorProduto,
       };
     });
 
@@ -365,6 +413,7 @@ async function fetchProductsWithDetailsEcommerce({
   range,
   filial,
   grupo,
+  groupByColor = false,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   return withRequest(async (request) => {
     const { start, end } = resolveRange(range);
@@ -396,11 +445,21 @@ async function fetchProductsWithDetailsEcommerce({
       }
     }
 
+    // Definir campos de agrupamento e seleção baseado em groupByColor
+    const ecommerceGroupByFields = groupByColor 
+      ? 'fp.PRODUTO, fp.COR_PRODUTO'
+      : 'fp.PRODUTO';
+    
+    const ecommerceColorSelectFields = groupByColor
+      ? `fp.COR_PRODUTO AS corProduto,`
+      : '';
+
     // Query para período atual
     const currentQuery = `
       SELECT 
         fp.PRODUTO AS productId,
         MAX(p.DESC_PRODUTO) AS productName,
+        ${ecommerceColorSelectFields}
         SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue,
         SUM(fp.QTDE) AS totalQuantity,
         AVG(ISNULL(fp.CUSTO_NA_DATA, 0)) AS cost
@@ -414,13 +473,18 @@ async function fetchProductsWithDetailsEcommerce({
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         AND fp.QTDE > 0
         ${filialFilter}
-      GROUP BY fp.PRODUTO
+      GROUP BY ${ecommerceGroupByFields}
     `;
 
     // Query para período anterior
+    const previousEcommerceColorSelectFields = groupByColor
+      ? 'fp.COR_PRODUTO AS corProduto,'
+      : '';
+
     const previousQuery = `
       SELECT 
         fp.PRODUTO AS productId,
+        ${previousEcommerceColorSelectFields}
         SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS previousRevenue,
         SUM(fp.QTDE) AS previousQuantity
       FROM FATURAMENTO f WITH (NOLOCK)
@@ -432,28 +496,33 @@ async function fetchProductsWithDetailsEcommerce({
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         AND fp.QTDE > 0
         ${filialFilter}
-      GROUP BY fp.PRODUTO
+      GROUP BY ${ecommerceGroupByFields}
     `;
 
     const [currentResult, previousResult] = await Promise.all([
       request.query<{
         productId: string;
         productName: string;
+        corProduto?: string | null;
         totalRevenue: number | null;
         totalQuantity: number | null;
         cost: number | null;
       }>(currentQuery),
       request.query<{
         productId: string;
+        corProduto?: string | null;
         previousRevenue: number | null;
         previousQuantity: number | null;
       }>(previousQuery),
     ]);
 
-    // Criar mapa do período anterior
+    // Criar mapa do período anterior (chave inclui cor se groupByColor estiver ativo)
     const previousMap = new Map<string, { revenue: number; quantity: number }>();
     previousResult.recordset.forEach((row) => {
-      previousMap.set(row.productId, {
+      const key = groupByColor && row.corProduto
+        ? `${row.productId}-${row.corProduto}`
+        : row.productId;
+      previousMap.set(key, {
         revenue: Number(row.previousRevenue ?? 0),
         quantity: Number(row.previousQuantity ?? 0),
       });
@@ -463,7 +532,12 @@ async function fetchProductsWithDetailsEcommerce({
       const revenue = Number(row.totalRevenue ?? 0);
       const quantity = Number(row.totalQuantity ?? 0);
       const cost = Number(row.cost ?? 0);
-      const previous = previousMap.get(row.productId) ?? { revenue: 0, quantity: 0 };
+      
+      // Obter chave para buscar dados do período anterior (inclui cor se groupByColor estiver ativo)
+      const previousKey = groupByColor && row.corProduto
+        ? `${row.productId}-${row.corProduto}`
+        : row.productId;
+      const previous = previousMap.get(previousKey) ?? { revenue: 0, quantity: 0 };
       const previousRevenue = previous.revenue;
       const previousQuantity = previous.quantity;
       
@@ -483,6 +557,12 @@ async function fetchProductsWithDetailsEcommerce({
           ? null
           : Number((((quantity - previousQuantity) / previousQuantity) * 100).toFixed(1));
 
+      // Processar informações de cor
+      const corProduto = groupByColor ? (row.corProduto || null) : null;
+      const descCorProduto = groupByColor 
+        ? getColorDescription(row.corProduto, null)
+        : null;
+
       return {
         productId: row.productId,
         productName: row.productName || 'Sem descrição',
@@ -495,6 +575,8 @@ async function fetchProductsWithDetailsEcommerce({
         revenueVariance,
         quantityVariance,
         isNew,
+        corProduto,
+        descCorProduto,
       };
     });
 

@@ -34,7 +34,8 @@ async function fetchProducts(
   company: string,
   range: DateRangeValue,
   filial: string | null,
-  grupo: string | null
+  grupo: string | null,
+  groupByColor: boolean
 ): Promise<ProductDetail[]> {
   const searchParams = new URLSearchParams({
     company,
@@ -48,6 +49,10 @@ async function fetchProducts(
 
   if (grupo) {
     searchParams.set("grupo", grupo);
+  }
+
+  if (groupByColor) {
+    searchParams.set("groupByColor", "true");
   }
 
   const response = await fetch(`/api/products?${searchParams.toString()}`, {
@@ -115,6 +120,7 @@ export default function ProductsPage({
   const [range, setRange] = useState<DateRangeValue>(initialRange);
   const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
   const [selectedGrupo, setSelectedGrupo] = useState<string | null>(null);
+  const [groupByColor, setGroupByColor] = useState(false);
   const [data, setData] = useState<ProductDetail[]>([]);
   const [summary, setSummary] = useState<SalesSummary>(EMPTY_SUMMARY);
   const [loading, setLoading] = useState(false);
@@ -172,8 +178,8 @@ export default function ProductsPage({
 
   const rangeKey = useMemo(
     () =>
-      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}::${selectedGrupo ?? 'all'}`,
-    [range.startDate, range.endDate, selectedFilial, selectedGrupo]
+      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}::${selectedGrupo ?? 'all'}::${groupByColor}`,
+    [range.startDate, range.endDate, selectedFilial, selectedGrupo, groupByColor]
   );
 
   useEffect(() => {
@@ -184,7 +190,7 @@ export default function ProductsPage({
       setError(null);
       try {
         const [productsData, summaryData] = await Promise.all([
-          fetchProducts(companyKey, range, selectedFilial, selectedGrupo),
+          fetchProducts(companyKey, range, selectedFilial, selectedGrupo, groupByColor),
           fetchSummary(companyKey, range, selectedFilial, selectedGrupo),
         ]);
         if (active) {
@@ -245,7 +251,19 @@ export default function ProductsPage({
         dateRange={range}
       />
 
-      <ProductsTable data={data} loading={loading} />
+      <div className={styles.tableControls}>
+        <label className={styles.switchLabel}>
+          <input
+            type="checkbox"
+            className={styles.switch}
+            checked={groupByColor}
+            onChange={(e) => setGroupByColor(e.target.checked)}
+          />
+          <span className={styles.switchText}>Por cor</span>
+        </label>
+      </div>
+
+      <ProductsTable data={data} loading={loading} groupByColor={groupByColor} />
     </div>
   );
 }

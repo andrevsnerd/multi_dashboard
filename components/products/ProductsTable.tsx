@@ -8,11 +8,13 @@ import styles from "./ProductsTable.module.css";
 interface ProductsTableProps {
   data: ProductDetail[];
   loading?: boolean;
+  groupByColor?: boolean;
 }
 
 export default function ProductsTable({
   data,
   loading,
+  groupByColor = false,
 }: ProductsTableProps) {
   const [sortColumn, setSortColumn] = useState<keyof ProductDetail>("totalRevenue");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -103,6 +105,11 @@ export default function ProductsTable({
                   </span>
                 )}
               </th>
+              {groupByColor && (
+                <th className={styles.descriptionHeader}>
+                  COR
+                </th>
+              )}
               <th
                 className={`${styles.sortable} ${styles.currencyHeader}`}
                 onClick={() => handleSort("totalRevenue")}
@@ -189,11 +196,16 @@ export default function ProductsTable({
               const isRevenueNegative = product.revenueVariance !== null && product.revenueVariance < 0;
 
               return (
-                <tr key={`${product.productId}-${index}`}>
+                <tr key={`${product.productId}-${product.corProduto || ''}-${index}`}>
                   <td className={styles.descriptionCell}>
                     <div className={styles.productName}>{product.productName}</div>
                     <div className={styles.productCode}>{product.productId}</div>
                   </td>
+                  {groupByColor && (
+                    <td className={styles.descriptionCell}>
+                      {product.descCorProduto || '--'}
+                    </td>
+                  )}
                   <td className={styles.currencyCell}>{formatCurrency(product.totalRevenue)}</td>
                   <td className={styles.varianceCell}>
                     {product.isNew ? (
