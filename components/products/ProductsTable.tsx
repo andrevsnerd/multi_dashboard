@@ -93,18 +93,7 @@ export default function ProductsTable({
           <thead>
             <tr>
               <th
-                className={styles.sortable}
-                onClick={() => handleSort("productId")}
-              >
-                CÓDIGO
-                {sortColumn === "productId" && (
-                  <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "↑" : "↓"}
-                  </span>
-                )}
-              </th>
-              <th
-                className={styles.sortable}
+                className={`${styles.sortable} ${styles.descriptionHeader}`}
                 onClick={() => handleSort("productName")}
               >
                 DESCRIÇÃO
@@ -115,7 +104,7 @@ export default function ProductsTable({
                 )}
               </th>
               <th
-                className={styles.sortable}
+                className={`${styles.sortable} ${styles.currencyHeader}`}
                 onClick={() => handleSort("totalRevenue")}
               >
                 FATURAMENTO
@@ -126,7 +115,7 @@ export default function ProductsTable({
                 )}
               </th>
               <th
-                className={styles.sortable}
+                className={`${styles.sortable} ${styles.varianceHeader}`}
                 onClick={() => handleSort("revenueVariance")}
               >
                 VAR. %
@@ -137,7 +126,7 @@ export default function ProductsTable({
                 )}
               </th>
               <th
-                className={styles.sortable}
+                className={`${styles.sortable} ${styles.numberHeader}`}
                 onClick={() => handleSort("totalQuantity")}
               >
                 QTD
@@ -148,18 +137,7 @@ export default function ProductsTable({
                 )}
               </th>
               <th
-                className={styles.sortable}
-                onClick={() => handleSort("quantityVariance")}
-              >
-                VAR. %
-                {sortColumn === "quantityVariance" && (
-                  <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "↑" : "↓"}
-                  </span>
-                )}
-              </th>
-              <th
-                className={styles.sortable}
+                className={`${styles.sortable} ${styles.currencyHeader}`}
                 onClick={() => handleSort("averagePrice")}
               >
                 PREÇO MÉDIO
@@ -170,7 +148,7 @@ export default function ProductsTable({
                 )}
               </th>
               <th
-                className={styles.sortable}
+                className={`${styles.sortable} ${styles.currencyHeader}`}
                 onClick={() => handleSort("cost")}
               >
                 CUSTO
@@ -181,7 +159,7 @@ export default function ProductsTable({
                 )}
               </th>
               <th
-                className={styles.sortable}
+                className={`${styles.sortable} ${styles.markupHeader}`}
                 onClick={() => handleSort("markup")}
               >
                 MARKUP
@@ -192,7 +170,7 @@ export default function ProductsTable({
                 )}
               </th>
               <th
-                className={styles.sortable}
+                className={`${styles.sortable} ${styles.numberHeader}`}
                 onClick={() => handleSort("stock")}
               >
                 ESTOQUE
@@ -207,16 +185,15 @@ export default function ProductsTable({
           <tbody>
             {sortedData.map((product, index) => {
               const revenueVariance = formatPercentage(product.revenueVariance);
-              const quantityVariance = formatPercentage(product.quantityVariance);
               const isRevenuePositive = product.revenueVariance !== null && product.revenueVariance > 0;
               const isRevenueNegative = product.revenueVariance !== null && product.revenueVariance < 0;
-              const isQuantityPositive = product.quantityVariance !== null && product.quantityVariance > 0;
-              const isQuantityNegative = product.quantityVariance !== null && product.quantityVariance < 0;
 
               return (
                 <tr key={`${product.productId}-${index}`}>
-                  <td className={styles.codeCell}>{product.productId}</td>
-                  <td className={styles.descriptionCell}>{product.productName}</td>
+                  <td className={styles.descriptionCell}>
+                    <div className={styles.productName}>{product.productName}</div>
+                    <div className={styles.productCode}>{product.productId}</div>
+                  </td>
                   <td className={styles.currencyCell}>{formatCurrency(product.totalRevenue)}</td>
                   <td className={styles.varianceCell}>
                     {product.isNew ? (
@@ -240,27 +217,6 @@ export default function ProductsTable({
                     )}
                   </td>
                   <td className={styles.numberCell}>{formatNumber(product.totalQuantity)}</td>
-                  <td className={styles.varianceCell}>
-                    {product.isNew ? (
-                      <span className={styles.newBadge}>NOVO</span>
-                    ) : quantityVariance ? (
-                      <span
-                        className={`${styles.varianceValue} ${
-                          isQuantityPositive
-                            ? styles.variancePositive
-                            : isQuantityNegative
-                              ? styles.varianceNegative
-                              : ""
-                        }`}
-                      >
-                        {isQuantityPositive && "↑"}
-                        {isQuantityNegative && "↓"}
-                        {quantityVariance}
-                      </span>
-                    ) : (
-                      "--"
-                    )}
-                  </td>
                   <td className={styles.currencyCell}>{formatCurrency(product.averagePrice)}</td>
                   <td className={styles.currencyCell}>{formatCurrency(product.cost)}</td>
                   <td className={styles.markupCell}>

@@ -63,6 +63,26 @@
   min-width: fit-content;
 }
 
+.descriptionHeader {
+  text-align: left !important;
+}
+
+.currencyHeader {
+  text-align: right !important;
+}
+
+.numberHeader {
+  text-align: right !important;
+}
+
+.varianceHeader {
+  text-align: center !important;
+}
+
+.markupHeader {
+  text-align: center !important;
+}
+
 .table td {
   padding: 12px 10px;
   border-bottom: 1px solid #e5e7eb;
@@ -71,6 +91,36 @@
   vertical-align: middle;
   white-space: nowrap;
   text-align: center;
+}
+
+.table th.descriptionHeader,
+.table td.descriptionCell {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.table th.currencyHeader,
+.table td.currencyCell {
+  padding-left: 12px;
+  padding-right: 16px;
+}
+
+.table th.numberHeader,
+.table td.numberCell {
+  padding-left: 12px;
+  padding-right: 16px;
+}
+
+.table th.varianceHeader,
+.table td.varianceCell {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.table th.markupHeader,
+.table td.markupCell {
+  padding-left: 12px;
+  padding-right: 12px;
 }
 
 .table tbody tr:hover {
@@ -113,6 +163,19 @@
   max-width: 250px;
   min-width: 200px;
   word-wrap: break-word;
+}
+
+.productName {
+  font-weight: 500;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.productCode {
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+  color: #6b7280;
+  font-weight: 400;
 }
 
 .currencyCell {
@@ -205,14 +268,13 @@
     font-size: 12px;
   }
 
-  .codeCell {
-    font-size: 11px;
-    min-width: 90px;
-  }
-
   .descriptionCell {
     max-width: 180px;
     min-width: 150px;
+  }
+
+  .productCode {
+    font-size: 10px;
   }
 
   .currencyCell {
@@ -264,14 +326,13 @@
     font-size: 11px;
   }
 
-  .codeCell {
-    font-size: 10px;
-    min-width: 80px;
-  }
-
   .descriptionCell {
     max-width: 150px;
     min-width: 120px;
+  }
+
+  .productCode {
+    font-size: 9px;
   }
 
   .currencyCell {
