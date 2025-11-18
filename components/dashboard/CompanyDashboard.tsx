@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 
 import DateRangeFilter, {
   type DateRangeValue,
@@ -15,6 +15,7 @@ import CompanyRevenueLists from "@/components/dashboard/CompanyRevenueLists";
 import type { MetricSummary, SalesSummary } from "@/types/dashboard";
 import { getCurrentMonthRange } from "@/lib/utils/date";
 import { resolveCompany } from "@/lib/config/company";
+import { exportElementToHtml } from "@/lib/utils/exportHtml";
 
 import styles from "./CompanyDashboard.module.css";
 
@@ -123,6 +124,9 @@ export default function CompanyDashboard({
   const [error, setError] = useState<string | null>(null);
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
   const [projectionRevenue, setProjectionRevenue] = useState<number>(0);
+  
+  // Ref para o wrapper da dashboard para exportação HTML
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   const rangeKey = useMemo(
     () => `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}`,
@@ -297,10 +301,24 @@ export default function CompanyDashboard({
     };
   }, [companyKey, range, rangeKey]);
 
+  const handleExportHtml = () => {
+    if (!wrapperRef.current) return;
+    
+    // Esperar um pouco para garantir que tudo está renderizado
+    setTimeout(() => {
+      if (wrapperRef.current) {
+        const dateStr = range.startDate.toLocaleDateString('pt-BR').replace(/\//g, '-');
+        exportElementToHtml(wrapperRef.current, {
+          filename: `dashboard-${companyKey}-${dateStr}.html`,
+          title: `Dashboard - ${companyName}`,
+        });
+      }
+    }, 100);
+  };
 
   return (
     <>
-      <div className={styles.wrapper}>
+      <div className={styles.wrapper} ref={wrapperRef}>
         <div className={styles.headerRow}>
           <div className={styles.controls}>
             <DateRangeFilter
@@ -322,11 +340,35 @@ export default function CompanyDashboard({
             />
             {loading ? <span className={styles.loading}>Atualizando métricas…</span> : null}
             {error ? <span className={styles.error}>{error}</span> : null}
+            <button
+              type="button"
+              onClick={handleExportHtml}
+              className={styles.exportButton}
+              disabled={loading}
+              title={loading ? "Carregando dados..." : "Exportar dashboard em HTML"}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M8 11L8 1M8 11L5 8M8 11L11 8M3 11L3 13C3 13.5523 3.44772 14 4 14L12 14C12.5523 14 13 13.5523 13 13L13 11"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Exportar HTML
+            </button>
           </div>
           <EngineButton onMetasClick={() => setIsGoalsModalOpen(true)} />
         </div>
 
-        <SummaryCards summary={summary} companyName={companyName} />
+        <SummaryCards summary={summary} companyName={companyName} dateRange={range} />
 
         <div className={styles.overviewSection}>
           <div className={styles.chartsRow}>

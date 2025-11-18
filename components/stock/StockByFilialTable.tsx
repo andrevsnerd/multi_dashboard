@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef, useEffect } from "react";
 
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 import type { StockByFilialItem } from "@/lib/repositories/stockByFilial";
@@ -206,6 +206,10 @@ export default function StockByFilialTable({
   
   const filiaisCount = filiais.length;
 
+  // Refs para sincronizar scroll
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+
   // Filtrar dados baseado no checkbox
   const filteredData = useMemo(() => {
     if (showItemsWithoutSales) {
@@ -213,6 +217,89 @@ export default function StockByFilialTable({
     }
     return data.filter((item) => item.totalVendas > 0);
   }, [data, showItemsWithoutSales]);
+
+  // Sincronizar largura do scroll superior com a tabela
+  useEffect(() => {
+    if (!topScrollRef.current || !tableScrollRef.current) return;
+
+    const updateScrollWidth = () => {
+      const tableScroll = tableScrollRef.current;
+      const topScroll = topScrollRef.current;
+      if (!tableScroll || !topScroll) return;
+
+      const table = tableScroll.querySelector('table');
+      if (!table) return;
+
+      // Aguardar um frame para garantir que a tabela foi renderizada
+      requestAnimationFrame(() => {
+        const innerDiv = topScroll.querySelector('div');
+        if (innerDiv) {
+          innerDiv.style.width = `${table.scrollWidth}px`;
+        }
+      });
+    };
+
+    // Atualizar largura inicialmente com um pequeno delay
+    const timeoutId = setTimeout(updateScrollWidth, 100);
+    
+    // Atualizar quando a janela for redimensionada
+    window.addEventListener('resize', updateScrollWidth);
+
+    // Observar mudanças no DOM
+    const observer = new MutationObserver(() => {
+      setTimeout(updateScrollWidth, 50);
+    });
+    if (tableScrollRef.current) {
+      observer.observe(tableScrollRef.current, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'class'],
+      });
+    }
+
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', updateScrollWidth);
+      observer.disconnect();
+    };
+  }, [filteredData, filiais]);
+
+  // Sincronizar scroll entre os dois elementos
+  useEffect(() => {
+    const topScroll = topScrollRef.current;
+    const tableScroll = tableScrollRef.current;
+
+    if (!topScroll || !tableScroll) return;
+
+    let isScrolling = false;
+
+    const syncTopToTable = () => {
+      if (isScrolling) return;
+      isScrolling = true;
+      tableScroll.scrollLeft = topScroll.scrollLeft;
+      requestAnimationFrame(() => {
+        isScrolling = false;
+      });
+    };
+
+    const syncTableToTop = () => {
+      if (isScrolling) return;
+      isScrolling = true;
+      topScroll.scrollLeft = tableScroll.scrollLeft;
+      requestAnimationFrame(() => {
+        isScrolling = false;
+      });
+    };
+
+    topScroll.addEventListener('scroll', syncTopToTable, { passive: true });
+    tableScroll.addEventListener('scroll', syncTableToTop, { passive: true });
+
+    return () => {
+      topScroll.removeEventListener('scroll', syncTopToTable);
+      tableScroll.removeEventListener('scroll', syncTableToTop);
+    };
+  }, []);
 
   const getFilialData = (
     item: StockByFilialItem,
@@ -268,122 +355,130 @@ export default function StockByFilialTable({
 
   if (loading) {
     return (
-      <div className={styles.container}>
-        <div className={styles.loading}>Carregando dados...</div>
+      <div className={styles.wrapper}>
+        <div className={styles.container}>
+          <div className={styles.loading}>Carregando dados...</div>
+        </div>
       </div>
     );
   }
 
   if (filteredData.length === 0) {
     return (
-      <div className={styles.container}>
-        <div className={styles.empty}>Nenhum dado disponível</div>
+      <div className={styles.wrapper}>
+        <div className={styles.container}>
+          <div className={styles.empty}>Nenhum dado disponível</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className={styles.container}>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th>{companyKey === "nerd" ? "GRUPO" : "SUBGRUPO"}</th>
-            {companyKey !== "nerd" && <th>GRADE</th>}
-            <th>DESCRIÇÃO</th>
-            <th>COR</th>
-            <th>VENDAS</th>
-            <th>ESTOQUE</th>
-            {matriz && <th>MATRIZ</th>}
-            {ecommerce && companyKey === "scarfme" && (
-              <th>{company?.filialDisplayNames?.[ecommerce] || ecommerce}</th>
-            )}
-            {filiais.map((filial) => {
-              const displayName = company?.filialDisplayNames?.[filial] || filial;
+    <div className={styles.wrapper}>
+      <div className={styles.scrollBarTop} ref={topScrollRef}>
+        <div className={styles.scrollBarTopInner}></div>
+      </div>
+      <div className={styles.container} ref={tableScrollRef}>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>{companyKey === "nerd" ? "GRUPO" : "SUBGRUPO"}</th>
+              {companyKey !== "nerd" && <th>GRADE</th>}
+              <th>DESCRIÇÃO</th>
+              <th>COR</th>
+              <th>VENDAS</th>
+              <th>ESTOQUE</th>
+              {matriz && <th>MATRIZ</th>}
+              {ecommerce && companyKey === "scarfme" && (
+                <th>{company?.filialDisplayNames?.[ecommerce] || ecommerce}</th>
+              )}
+              {filiais.map((filial) => {
+                const displayName = company?.filialDisplayNames?.[filial] || filial;
+                return (
+                  <th key={filial}>{displayName}</th>
+                );
+              })}
+              <th>AÇÃO</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredData.map((item, rowIndex) => {
+              const matrizData = getFilialData(item, matriz);
+              const ecommerceData = ecommerce ? getFilialData(item, ecommerce) : { stock: 0, sales: 0, salesLast30Days: 0, hasEntry: false };
+              const productInfo = formatProductDescription(item.descricao, item.produto);
               return (
-                <th key={filial}>{displayName}</th>
-              );
-            })}
-            <th>AÇÃO</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredData.map((item, rowIndex) => {
-            const matrizData = getFilialData(item, matriz);
-            const ecommerceData = ecommerce ? getFilialData(item, ecommerce) : { stock: 0, sales: 0, salesLast30Days: 0, hasEntry: false };
-            const productInfo = formatProductDescription(item.descricao, item.produto);
-            return (
-              <tr key={`${item.produto}-${item.cor}-${item.grade}-${rowIndex}`}>
-                <td className={styles.subgrupoCell}>{companyKey === "nerd" ? item.grupo : item.subgrupo}</td>
-                {companyKey !== "nerd" && (
-                  <td>
-                    <div className={styles.gradeCell}>{item.grade}</div>
+                <tr key={`${item.produto}-${item.cor}-${item.grade}-${rowIndex}`}>
+                  <td className={styles.subgrupoCell}>{companyKey === "nerd" ? item.grupo : item.subgrupo}</td>
+                  {companyKey !== "nerd" && (
+                    <td>
+                      <div className={styles.gradeCell}>{item.grade}</div>
+                    </td>
+                  )}
+                  <td className={styles.descricaoCell}>
+                    <div className={styles.productName}>{productInfo.name}</div>
+                    <div className={styles.productCode}>{productInfo.code}</div>
                   </td>
-                )}
-                <td className={styles.descricaoCell}>
-                  <div className={styles.productName}>{productInfo.name}</div>
-                  <div className={styles.productCode}>{productInfo.code}</div>
-                </td>
-                <td>{item.cor}</td>
-                <td className={styles.numberCell}>{item.totalVendas}</td>
-                <td className={styles.numberCell}>{item.totalEstoque}</td>
-                {matriz && (
-                  <td>
-                    <div className={`${styles.filialCell} ${styles.filialCellMatriz}`}>
-                      <span className={styles.stockValue}>
-                        {matrizData.stock}
-                      </span>
-                    </div>
-                  </td>
-                )}
-                {ecommerce && companyKey === "scarfme" && (
-                  <td>
-                    <div className={`${styles.filialCell} ${getFilialCellClass(ecommerceData.stock, ecommerceData.sales, ecommerceData.salesLast30Days, ecommerceData.hasEntry)}`}>
-                      <span className={styles.stockValue}>
-                        {ecommerceData.stock}
-                      </span>
-                      <span className={styles.salesValue}>
-                        {ecommerceData.sales} vendas
-                      </span>
-                    </div>
-                  </td>
-                )}
-                {filiais.map((filial) => {
-                  const filialData = getFilialData(item, filial);
-                  return (
-                    <td key={filial}>
-                      <div className={`${styles.filialCell} ${getFilialCellClass(filialData.stock, filialData.sales, filialData.salesLast30Days, filialData.hasEntry)}`}>
+                  <td>{item.cor}</td>
+                  <td className={styles.numberCell}>{item.totalVendas}</td>
+                  <td className={styles.numberCell}>{item.totalEstoque}</td>
+                  {matriz && (
+                    <td>
+                      <div className={`${styles.filialCell} ${styles.filialCellMatriz}`}>
                         <span className={styles.stockValue}>
-                          {filialData.stock}
-                        </span>
-                        <span className={styles.salesValue}>
-                          {filialData.sales} vendas
+                          {matrizData.stock}
                         </span>
                       </div>
                     </td>
-                  );
-                })}
-                <td>
-                  {(() => {
-                    const recommendation = calculateActionRecommendation(
-                      item,
-                      dateRange,
-                      filiaisCount,
-                      matriz
-                    );
-                    const actionClass = styles[`action${recommendation.type}`] || styles.actionButton;
+                  )}
+                  {ecommerce && companyKey === "scarfme" && (
+                    <td>
+                      <div className={`${styles.filialCell} ${getFilialCellClass(ecommerceData.stock, ecommerceData.sales, ecommerceData.salesLast30Days, ecommerceData.hasEntry)}`}>
+                        <span className={styles.stockValue}>
+                          {ecommerceData.stock}
+                        </span>
+                        <span className={styles.salesValue}>
+                          {ecommerceData.sales} vendas
+                        </span>
+                      </div>
+                    </td>
+                  )}
+                  {filiais.map((filial) => {
+                    const filialData = getFilialData(item, filial);
                     return (
-                      <button className={`${styles.actionButton} ${actionClass}`} type="button">
-                        {recommendation.message}
-                      </button>
+                      <td key={filial}>
+                        <div className={`${styles.filialCell} ${getFilialCellClass(filialData.stock, filialData.sales, filialData.salesLast30Days, filialData.hasEntry)}`}>
+                          <span className={styles.stockValue}>
+                            {filialData.stock}
+                          </span>
+                          <span className={styles.salesValue}>
+                            {filialData.sales} vendas
+                          </span>
+                        </div>
+                      </td>
                     );
-                  })()}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                  })}
+                  <td>
+                    {(() => {
+                      const recommendation = calculateActionRecommendation(
+                        item,
+                        dateRange,
+                        filiaisCount,
+                        matriz
+                      );
+                      const actionClass = styles[`action${recommendation.type}`] || styles.actionButton;
+                      return (
+                        <button className={`${styles.actionButton} ${actionClass}`} type="button">
+                          {recommendation.message}
+                        </button>
+                      );
+                    })()}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
-

@@ -117,36 +117,37 @@ export function shiftRangeByMonths(
     };
   }
 
-  const desiredDuration = Math.max(0, range.end.getTime() - range.start.getTime());
-
-  const initialStart = addMonthsUtc(range.start, months);
-  const monthStart = new Date(
-    Date.UTC(initialStart.getUTCFullYear(), initialStart.getUTCMonth(), 1)
-  );
-  const nextMonthStart = new Date(
-    Date.UTC(initialStart.getUTCFullYear(), initialStart.getUTCMonth() + 1, 1)
-  );
-
-  let shiftedStart = initialStart;
-  let shiftedEndTime = initialStart.getTime() + desiredDuration;
-
-  if (shiftedEndTime > nextMonthStart.getTime()) {
-    shiftedEndTime = nextMonthStart.getTime();
-  }
-
-  let shiftedEnd = new Date(shiftedEndTime);
-  const actualDuration = shiftedEndTime - shiftedStart.getTime();
-
-  if (actualDuration < desiredDuration) {
-    const desiredStartTime = shiftedEndTime - desiredDuration;
-    const clampedStartTime = Math.max(monthStart.getTime(), desiredStartTime);
-    shiftedStart = new Date(clampedStartTime);
-    shiftedEnd = new Date(shiftedEndTime);
+  // Calcular o período anterior mantendo a mesma duração
+  // O endDate é exclusivo (início do próximo dia), então precisamos calcular corretamente
+  const startDate = range.start;
+  const endDate = range.end;
+  
+  // Calcular a duração em milissegundos (endDate é exclusivo, então já está correto)
+  const duration = endDate.getTime() - startDate.getTime();
+  
+  // Calcular a data de início do período anterior
+  const previousStart = addMonthsUtc(startDate, months);
+  
+  // Calcular a data de fim do período anterior mantendo a mesma duração
+  const previousEnd = new Date(previousStart.getTime() + duration);
+  
+  // Verificar se o período anterior ultrapassa o mês anterior
+  const previousMonth = previousStart.getUTCMonth();
+  const previousYear = previousStart.getUTCFullYear();
+  const nextMonthStart = new Date(Date.UTC(previousYear, previousMonth + 1, 1));
+  
+  // Se o período anterior ultrapassar o mês, ajustar para terminar no último dia do mês
+  if (previousEnd.getTime() > nextMonthStart.getTime()) {
+    // Ajustar para o último dia do mês anterior (início do próximo mês, que é exclusivo)
+    return {
+      start: previousStart,
+      end: nextMonthStart,
+    };
   }
 
   return {
-    start: shiftedStart,
-    end: shiftedEnd,
+    start: previousStart,
+    end: previousEnd,
   };
 }
 

@@ -39,14 +39,16 @@ export default function Sidebar({ companyName }: SidebarProps) {
   const basePath = getBasePath();
   
   // Construir o link para estoque por filial baseado no caminho base
-  const stockByFilialHref = basePath && basePath !== "/" 
-    ? `${basePath}/estoque-por-filial`
-    : "/estoque-por-filial";
+  // TODO: Descomentar quando estoque por filial estiver pronto
+  // const stockByFilialHref = basePath && basePath !== "/" 
+  //   ? `${basePath}/estoque-por-filial`
+  //   : "/estoque-por-filial";
 
   const navItems = [
     { label: "Home", href: "/" },
     { label: "Dashboard", href: basePath },
-    { label: "Estoque por Filial", href: stockByFilialHref },
+    // TODO: Descomentar quando estoque por filial estiver pronto
+    // { label: "Estoque por Filial", href: stockByFilialHref },
   ];
 
   const handleLinkClick = () => {
@@ -109,10 +111,12 @@ export default function Sidebar({ companyName }: SidebarProps) {
             } else if (item.label === "Dashboard") {
               // Dashboard está ativo quando está no caminho base (não em estoque-por-filial)
               isActive = pathname === item.href && !pathname.includes("/estoque-por-filial");
-            } else if (item.label === "Estoque por Filial") {
-              // Estoque por Filial está ativo quando o pathname inclui /estoque-por-filial
-              isActive = pathname?.includes("/estoque-por-filial") || pathname === item.href;
             }
+            // TODO: Descomentar quando estoque por filial estiver pronto
+            // else if (item.label === "Estoque por Filial") {
+            //   // Estoque por Filial está ativo quando o pathname inclui /estoque-por-filial
+            //   isActive = pathname?.includes("/estoque-por-filial") || pathname === item.href;
+            // }
             
             return (
               <Link

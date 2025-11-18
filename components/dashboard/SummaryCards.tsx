@@ -1,4 +1,6 @@
 import type { MetricSummary, SalesSummary } from "@/types/dashboard";
+import type { DateRangeValue } from "@/components/filters/DateRangeFilter";
+import { shiftRangeByMonths } from "@/lib/utils/date";
 
 import styles from "./SummaryCards.module.css";
 
@@ -6,6 +8,7 @@ interface SummaryCardsProps {
   summary: SalesSummary;
   companyName: string;
   periodLabel?: string;
+  dateRange?: DateRangeValue;
 }
 
 type MetricFormatter = (value: number) => string;
@@ -66,6 +69,7 @@ export default function SummaryCards({
   summary,
   companyName,
   periodLabel = "Mês atual",
+  dateRange,
 }: SummaryCardsProps) {
   const trendClassMap: Record<
     ReturnType<typeof resolveChangeBadge>["trend"],
@@ -75,6 +79,27 @@ export default function SummaryCards({
     negative: styles.changeBadgeNegative,
     neutral: styles.changeBadgeNeutral,
   };
+
+  // Calcular o período anterior e os dias analisados
+  const previousPeriodLabel = (() => {
+    if (!dateRange) {
+      return "MÊS ANTERIOR";
+    }
+
+    const currentRange = {
+      start: dateRange.startDate,
+      end: dateRange.endDate,
+    };
+    const previousRange = shiftRangeByMonths(currentRange, -1);
+    
+    const startDay = previousRange.start.getDate();
+    // O end pode ser exclusivo (início do próximo dia), então subtrair 1 dia para obter o último dia do período
+    const endDate = new Date(previousRange.end);
+    endDate.setDate(endDate.getDate() - 1);
+    const endDay = endDate.getDate();
+    
+    return `MÊS ANTERIOR (${startDay}-${endDay})`;
+  })();
 
   const items: Array<{
     label: string;
@@ -156,7 +181,7 @@ export default function SummaryCards({
                 <div className={styles.divider} aria-hidden />
                 <div className={styles.comparison}>
                   <div className={styles.previous}>
-                    <span className={styles.previousLabel}>Período anterior</span>
+                    <span className={styles.previousLabel}>{previousPeriodLabel}</span>
                     <strong className={styles.previousValue}>
                       {item.format(item.metric.previousValue)}
                     </strong>
