@@ -1,0 +1,304 @@
+.wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  position: relative;
+  -webkit-overflow-scrolling: touch;
+}
+
+.container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+.table {
+  width: auto;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  table-layout: auto;
+}
+
+.table thead {
+  background-color: #f8f9fa;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.table th {
+  padding: 12px 10px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 11px;
+  color: #1f2937;
+  border-bottom: 2px solid #e5e7eb;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  min-width: fit-content;
+}
+
+.table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #374151;
+  font-size: 13px;
+  vertical-align: middle;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.sortable {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  transition: background-color 0.2s;
+}
+
+.sortable:hover {
+  background-color: #f1f5f9;
+}
+
+.sortIndicator {
+  margin-left: 4px;
+  font-size: 10px;
+  color: #6366f1;
+}
+
+.codeCell {
+  font-weight: 500;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: #4b5563;
+  text-align: left !important;
+  min-width: 100px;
+}
+
+.descriptionCell {
+  text-align: left !important;
+  white-space: normal;
+  max-width: 250px;
+  min-width: 200px;
+  word-wrap: break-word;
+}
+
+.currencyCell {
+  text-align: right !important;
+  font-weight: 500;
+  color: #1f2937;
+  min-width: 110px;
+}
+
+.numberCell {
+  text-align: right !important;
+  font-weight: 500;
+  color: #1f2937;
+  min-width: 80px;
+}
+
+.varianceCell {
+  text-align: center !important;
+  min-width: 90px;
+}
+
+.varianceValue {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.variancePositive {
+  color: #059669;
+  background-color: #d1fae5;
+}
+
+.varianceNegative {
+  color: #dc2626;
+  background-color: #fee2e2;
+}
+
+.newBadge {
+  display: inline-block;
+  background-color: #3b82f6;
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.markupCell {
+  text-align: center !important;
+  min-width: 80px;
+}
+
+.markupValue {
+  display: inline-block;
+  background-color: #d1fae5;
+  color: #059669;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.loading,
+.empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .table {
+    font-size: 12px;
+  }
+
+  .table th {
+    padding: 10px 8px;
+    font-size: 10px;
+  }
+
+  .table td {
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+
+  .codeCell {
+    font-size: 11px;
+    min-width: 90px;
+  }
+
+  .descriptionCell {
+    max-width: 180px;
+    min-width: 150px;
+  }
+
+  .currencyCell {
+    min-width: 100px;
+    font-size: 11px;
+  }
+
+  .numberCell {
+    min-width: 70px;
+    font-size: 11px;
+  }
+
+  .varianceCell {
+    min-width: 80px;
+  }
+
+  .varianceValue {
+    font-size: 11px;
+    padding: 2px 4px;
+  }
+
+  .markupCell {
+    min-width: 70px;
+  }
+
+  .markupValue {
+    font-size: 11px;
+    padding: 3px 6px;
+  }
+
+  .newBadge {
+    font-size: 9px;
+    padding: 3px 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .table {
+    font-size: 11px;
+  }
+
+  .table th {
+    padding: 8px 6px;
+    font-size: 9px;
+  }
+
+  .table td {
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+
+  .codeCell {
+    font-size: 10px;
+    min-width: 80px;
+  }
+
+  .descriptionCell {
+    max-width: 150px;
+    min-width: 120px;
+  }
+
+  .currencyCell {
+    min-width: 90px;
+    font-size: 10px;
+  }
+
+  .numberCell {
+    min-width: 60px;
+    font-size: 10px;
+  }
+
+  .varianceCell {
+    min-width: 70px;
+  }
+
+  .varianceValue {
+    font-size: 10px;
+  }
+
+  .markupCell {
+    min-width: 60px;
+  }
+
+  .markupValue {
+    font-size: 10px;
+    padding: 2px 4px;
+  }
+}
+
