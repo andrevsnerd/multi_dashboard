@@ -7,7 +7,8 @@
  * Use um túnel (ngrok/Cloudflare) para expor este servidor na internet.
  */
 
-require('dotenv').config({ path: '.env.local' });
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
 const express = require('express');
 const cors = require('cors');
 const sql = require('mssql');
@@ -18,6 +19,14 @@ const PORT = process.env.PROXY_PORT || 3001;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Validar variáveis de ambiente
+if (!process.env.DB_USERNAME || !process.env.DB_PASSWORD || !process.env.DB_SERVER || !process.env.DB_DATABASE) {
+  console.error('❌ Erro: Variáveis de ambiente não encontradas!');
+  console.error('   Verifique se o arquivo .env.local existe na raiz do projeto.');
+  console.error('   Variáveis necessárias: DB_USERNAME, DB_PASSWORD, DB_SERVER, DB_DATABASE');
+  process.exit(1);
+}
 
 // Configuração do SQL Server (usa as mesmas variáveis de ambiente)
 const dbConfig = {
