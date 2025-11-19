@@ -326,16 +326,24 @@ export async function fetchStockSummary({
       negativeValue: number | null;
     }>(query);
 
-    // DEBUG: Log para entender o que está sendo retornado
-    if (colecao) {
-      console.log(`[fetchStockSummary] Coleção: ${colecao}, Filial: ${filial || 'null'}, Total de produtos retornados: ${result.recordset.length}`);
+    // DEBUG: Log para entender o que está sendo retornado (sempre, não apenas com coleção)
+    const hasProductFilters = !!(colecao || linha || subgrupo || grade || grupo);
+    if (hasProductFilters || company === 'scarfme') {
+      const filterInfo = [
+        colecao && `colecao=${colecao}`,
+        linha && `linha=${linha}`,
+        subgrupo && `subgrupo=${subgrupo}`,
+        grade && `grade=${grade}`,
+        grupo && `grupo=${grupo}`
+      ].filter(Boolean).join(', ') || 'sem filtros de produto';
+      
+      console.log(`[fetchStockSummary] ${filterInfo}, Filial: ${filial || 'null'}, Total de produtos retornados: ${result.recordset.length}`);
       let debugTotalPositive = 0;
       let debugTotalNegative = 0;
       let debugProductsWithPositive = 0;
       let debugProductsWithOnlyNegative = 0;
       let debugExcluded = 0;
       let debugFinalFromPositive = 0;
-      let debugFinalFromNegative = 0;
       
       result.recordset.forEach((row) => {
         const pos = Number(row.positiveStock ?? 0);
@@ -348,7 +356,6 @@ export async function fetchStockSummary({
           debugFinalFromPositive += pos;
         } else if (neg < 0) {
           debugProductsWithOnlyNegative++;
-          debugFinalFromNegative += (pos + neg);
         } else {
           debugExcluded++;
         }
@@ -356,7 +363,7 @@ export async function fetchStockSummary({
       
       console.log(`[fetchStockSummary] DEBUG - Positivo total: ${debugTotalPositive}, Negativo total: ${debugTotalNegative}`);
       console.log(`[fetchStockSummary] DEBUG - Produtos com positivo: ${debugProductsWithPositive}, Apenas negativo: ${debugProductsWithOnlyNegative}, Excluídos: ${debugExcluded}`);
-      console.log(`[fetchStockSummary] DEBUG - Final de produtos com positivo: ${debugFinalFromPositive}, Final de produtos só negativo: ${debugFinalFromNegative}`);
+      console.log(`[fetchStockSummary] DEBUG - Final calculado (apenas positivos): ${debugFinalFromPositive}`);
     }
 
     // Aplicar a mesma lógica usada em fetchMultipleProductsStock
@@ -390,8 +397,16 @@ export async function fetchStockSummary({
     });
     
     // DEBUG: Log do resultado final
-    if (colecao) {
-      console.log(`[fetchStockSummary] Coleção: ${colecao}, Total final calculado: ${totalQuantity}`);
+    if (hasProductFilters || company === 'scarfme') {
+      const filterInfo = [
+        colecao && `colecao=${colecao}`,
+        linha && `linha=${linha}`,
+        subgrupo && `subgrupo=${subgrupo}`,
+        grade && `grade=${grade}`,
+        grupo && `grupo=${grupo}`
+      ].filter(Boolean).join(', ') || 'sem filtros de produto';
+      
+      console.log(`[fetchStockSummary] ${filterInfo}, Filial: ${filial || 'null'}, Total final calculado: ${totalQuantity}`);
     }
 
     return {
