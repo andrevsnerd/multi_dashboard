@@ -45,7 +45,7 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
   },
   scarfme: {
     key: 'scarfme',
-    name: 'Scarf Me',
+    name: 'SCARF ME',
     filialFilters: {
       sales: [
         'GUARULHOS - RSR',

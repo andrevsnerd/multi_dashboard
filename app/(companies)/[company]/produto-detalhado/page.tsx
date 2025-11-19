@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import PageLayout from "@/components/layout/PageLayout";
@@ -10,6 +11,21 @@ interface ProductDetailPageRouteProps {
   params: Promise<{
     company: string;
   }>;
+}
+
+export async function generateMetadata({ params }: ProductDetailPageRouteProps): Promise<Metadata> {
+  const { company: companySlug } = await params;
+  const company = resolveCompany(companySlug);
+
+  if (!company) {
+    return {
+      title: "Produto Detalhado",
+    };
+  }
+
+  return {
+    title: `Produto Detalhado | ${company.name}`,
+  };
 }
 
 export default async function ProductDetailPageRoute({

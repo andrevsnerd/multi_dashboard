@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import PageLayout from "@/components/layout/PageLayout";
@@ -10,6 +11,21 @@ interface CompanyPageProps {
   params: Promise<{
     company: string;
   }>;
+}
+
+export async function generateMetadata({ params }: CompanyPageProps): Promise<Metadata> {
+  const { company: companySlug } = await params;
+  const company = resolveCompany(companySlug);
+
+  if (!company) {
+    return {
+      title: "Dashboard",
+    };
+  }
+
+  return {
+    title: `Dashboard | ${company.name}`,
+  };
 }
 
 export default async function CompanyDashboardPage({ params }: CompanyPageProps) {
