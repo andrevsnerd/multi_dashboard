@@ -171,6 +171,10 @@ export default function ProductDetailPage({
       setLoading(true);
       setError(null);
       try {
+        // Verificação adicional para garantir que selectedProductId não é null
+        if (!selectedProductId) {
+          return;
+        }
         const productData = await fetchProductDetail(selectedProductId, companyKey, range);
         if (active) {
           // Converter datas de strings para Date objects se necessário
