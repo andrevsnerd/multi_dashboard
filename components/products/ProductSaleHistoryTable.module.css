@@ -1,0 +1,166 @@
+.wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.container {
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.table thead {
+  background-color: #f8fafc;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+  vertical-align: middle;
+}
+
+.table th.dateHeader {
+  text-align: left;
+  padding: 12px 16px;
+}
+
+.table th.filialHeader {
+  text-align: left;
+  padding: 12px 16px;
+}
+
+.table th.numberHeader {
+  text-align: right;
+  padding: 12px 16px;
+}
+
+.table th.currencyHeader {
+  text-align: right;
+  padding: 12px 16px;
+}
+
+.table th.colorHeader {
+  text-align: left;
+  padding: 12px 16px;
+}
+
+.table tbody tr {
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  transition: background-color 0.2s;
+}
+
+.table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.table td {
+  padding: 12px 16px;
+  font-size: 14px;
+  color: #1f2937;
+  vertical-align: middle;
+}
+
+.table td.dateCell {
+  color: #475569;
+  text-align: left;
+  padding: 12px 16px;
+}
+
+.table td.filialCell {
+  font-weight: 500;
+  color: #0f172a;
+  text-align: left;
+  padding: 12px 16px;
+}
+
+.table td.numberCell {
+  text-align: right;
+  color: #475569;
+  padding: 12px 16px;
+}
+
+.table td.currencyCell {
+  text-align: right;
+  font-weight: 600;
+  color: #0f172a;
+  padding: 12px 16px;
+}
+
+.table td.colorCell {
+  color: #64748b;
+  text-align: left;
+  padding: 12px 16px;
+}
+
+.footer {
+  padding: 16px 24px;
+  background: #f8fafc;
+  border-radius: 0 0 20px 20px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  text-align: right;
+}
+
+.totalLabel {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.loading,
+.empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: #64748b;
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .table {
+    font-size: 12px;
+  }
+
+  .table th,
+  .table td {
+    padding: 12px 8px;
+  }
+
+  .title {
+    font-size: 18px;
+  }
+
+  .footer {
+    padding: 12px 16px;
+  }
+
+  .totalLabel {
+    font-size: 14px;
+  }
+}
+

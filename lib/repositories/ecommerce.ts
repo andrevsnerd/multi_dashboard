@@ -75,6 +75,10 @@ export interface SummaryQueryParams {
   range?: DateRangeInput;
   filial?: string | null;
   grupo?: string | null;
+  linha?: string | null;
+  colecao?: string | null;
+  subgrupo?: string | null;
+  grade?: string | null;
 }
 
 export interface SalesSummaryResult {
@@ -152,6 +156,10 @@ export async function fetchEcommerceSummary({
   range,
   filial,
   grupo,
+  linha,
+  colecao,
+  subgrupo,
+  grade,
 }: SummaryQueryParams = {}): Promise<SalesSummaryResult> {
   return withRequest(async (request) => {
     const currentRange = resolveRange(range);
@@ -170,6 +178,41 @@ export async function fetchEcommerceSummary({
 
     const filialFilter = buildEcommerceFilialFilter(request, company, filial);
 
+    // Criar filtros para ScarfMe (e-commerce usa apenas p, não vp)
+    let linhaFilter = '';
+    let colecaoFilter = '';
+    let subgrupoFilter = '';
+    let gradeFilter = '';
+    let produtoJoin = '';
+    
+    if (company === 'scarfme' && (linha || colecao || subgrupo || grade)) {
+      produtoJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO`;
+      
+      if (linha) {
+        const linhaNormalizada = linha.trim().toUpperCase();
+        request.input('linha', sql.VarChar, linhaNormalizada);
+        linhaFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linha`;
+      }
+      
+      if (colecao) {
+        const colecaoNormalizada = colecao.trim().toUpperCase();
+        request.input('colecao', sql.VarChar, colecaoNormalizada);
+        colecaoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao`;
+      }
+      
+      if (subgrupo) {
+        const subgrupoNormalizado = subgrupo.trim().toUpperCase();
+        request.input('subgrupo', sql.VarChar, subgrupoNormalizado);
+        subgrupoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupo`;
+      }
+      
+      if (grade) {
+        const gradeNormalizada = grade.trim().toUpperCase();
+        request.input('grade', sql.VarChar, gradeNormalizada);
+        gradeFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) = @grade`;
+      }
+    }
+
     const query = `
       WITH summary AS (
         SELECT
@@ -181,12 +224,17 @@ export async function fetchEcommerceSummary({
         FROM FATURAMENTO f WITH (NOLOCK)
         JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
           ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+        ${produtoJoin}
         WHERE f.EMISSAO >= @startDate
           AND f.EMISSAO < @endDate
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
           AND fp.QTDE > 0
           ${filialFilter}
+          ${linhaFilter}
+          ${colecaoFilter}
+          ${subgrupoFilter}
+          ${gradeFilter}
 
         UNION ALL
 
@@ -199,12 +247,17 @@ export async function fetchEcommerceSummary({
         FROM FATURAMENTO f WITH (NOLOCK)
         JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
           ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+        ${produtoJoin}
         WHERE f.EMISSAO >= @prevStartDate
           AND f.EMISSAO < @prevEndDate
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
           AND fp.QTDE > 0
           ${filialFilter}
+          ${linhaFilter}
+          ${colecaoFilter}
+          ${subgrupoFilter}
+          ${gradeFilter}
       )
       SELECT period, totalRevenue, totalQuantity, totalTickets, lastSaleDate FROM summary;
     `;
@@ -272,6 +325,10 @@ export async function fetchEcommerceSummary({
       company,
       filial,
       grupo,
+      linha,
+      colecao,
+      subgrupo,
+      grade,
     });
 
     const summary: SalesSummary = {

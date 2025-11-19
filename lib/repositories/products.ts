@@ -34,6 +34,10 @@ export interface ProductsQueryParams {
   };
   filial?: string | null;
   grupo?: string | null;
+  linha?: string | null;
+  colecao?: string | null;
+  subgrupo?: string | null;
+  grade?: string | null;
   groupByColor?: boolean; // Se true, agrupa produtos por cor
 }
 
@@ -152,6 +156,87 @@ function buildGrupoFilterForProducts(
 }
 
 /**
+ * Cria filtro de linha para ScarfMe
+ */
+function buildLinhaFilterForProducts(
+  request: sql.Request | RequestLike,
+  companySlug: string | undefined,
+  linha: string | null | undefined
+): string {
+  if (companySlug !== 'scarfme' || !linha) {
+    return '';
+  }
+  
+  const linhaNormalizada = linha.trim().toUpperCase();
+  request.input('linha', sql.VarChar, linhaNormalizada);
+  
+  return `AND (
+    UPPER(LTRIM(RTRIM(ISNULL(vp.LINHA, '')))) = @linha
+    OR UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linha
+  )`;
+}
+
+/**
+ * Cria filtro de coleção para ScarfMe
+ */
+function buildColecaoFilterForProducts(
+  request: sql.Request | RequestLike,
+  companySlug: string | undefined,
+  colecao: string | null | undefined
+): string {
+  if (companySlug !== 'scarfme' || !colecao) {
+    return '';
+  }
+  
+  const colecaoNormalizada = colecao.trim().toUpperCase();
+  request.input('colecao', sql.VarChar, colecaoNormalizada);
+  
+  return `AND (
+    UPPER(LTRIM(RTRIM(ISNULL(vp.COLECAO, '')))) = @colecao
+    OR UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao
+  )`;
+}
+
+/**
+ * Cria filtro de subgrupo para ScarfMe
+ */
+function buildSubgrupoFilterForProducts(
+  request: sql.Request | RequestLike,
+  companySlug: string | undefined,
+  subgrupo: string | null | undefined
+): string {
+  if (companySlug !== 'scarfme' || !subgrupo) {
+    return '';
+  }
+  
+  const subgrupoNormalizado = subgrupo.trim().toUpperCase();
+  request.input('subgrupo', sql.VarChar, subgrupoNormalizado);
+  
+  return `AND (
+    UPPER(LTRIM(RTRIM(ISNULL(vp.SUBGRUPO_PRODUTO, '')))) = @subgrupo
+    OR UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupo
+  )`;
+}
+
+/**
+ * Cria filtro de grade para ScarfMe
+ */
+function buildGradeFilterForProducts(
+  request: sql.Request | RequestLike,
+  companySlug: string | undefined,
+  grade: string | null | undefined
+): string {
+  if (companySlug !== 'scarfme' || !grade) {
+    return '';
+  }
+  
+  const gradeNormalizada = grade.trim().toUpperCase();
+  request.input('grade', sql.VarChar, gradeNormalizada);
+  
+  return `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) = @grade`;
+}
+
+/**
  * Busca produtos com todas as informações necessárias para a página de produtos
  * Inclui faturamento, quantidade, preço médio, custo, markup, estoque e variações
  */
@@ -160,18 +245,22 @@ export async function fetchProductsWithDetails({
   range,
   filial,
   grupo,
+  linha,
+  colecao,
+  subgrupo,
+  grade,
   groupByColor = false,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   // Se for e-commerce, usar função específica de e-commerce
   if (isEcommerceFilial(company, filial)) {
-    return fetchProductsWithDetailsEcommerce({ company, range, filial, grupo, groupByColor });
+    return fetchProductsWithDetailsEcommerce({ company, range, filial, grupo, linha, colecao, subgrupo, grade, groupByColor });
   }
 
   // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
   if (company === 'scarfme' && filial === null) {
     const [salesProducts, ecommerceProducts] = await Promise.all([
-      fetchProductsWithDetailsSales({ company, range, filial: VAREJO_VALUE, grupo, groupByColor }),
-      fetchProductsWithDetailsEcommerce({ company, range, filial: null, grupo, groupByColor }),
+      fetchProductsWithDetailsSales({ company, range, filial: VAREJO_VALUE, grupo, linha, colecao, subgrupo, grade, groupByColor }),
+      fetchProductsWithDetailsEcommerce({ company, range, filial: null, grupo, linha, colecao, subgrupo, grade, groupByColor }),
     ]);
 
     // Agregar produtos por productId (e cor se groupByColor estiver ativo)
@@ -210,7 +299,7 @@ export async function fetchProductsWithDetails({
   }
 
   // Função normal para vendas de loja
-  return fetchProductsWithDetailsSales({ company, range, filial, grupo, groupByColor });
+  return fetchProductsWithDetailsSales({ company, range, filial, grupo, linha, colecao, subgrupo, grade, groupByColor });
 }
 
 /**
@@ -221,6 +310,10 @@ async function fetchProductsWithDetailsSales({
   range,
   filial,
   grupo,
+  linha,
+  colecao,
+  subgrupo,
+  grade,
   groupByColor = false,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   return withRequest(async (request) => {
@@ -235,6 +328,10 @@ async function fetchProductsWithDetailsSales({
 
     const filialFilter = buildFilialFilter(request, company, 'sales', filial);
     const grupoFilter = buildGrupoFilterForProducts(request, company, grupo);
+    const linhaFilter = buildLinhaFilterForProducts(request, company, linha);
+    const colecaoFilter = buildColecaoFilterForProducts(request, company, colecao);
+    const subgrupoFilter = buildSubgrupoFilterForProducts(request, company, subgrupo);
+    const gradeFilter = buildGradeFilterForProducts(request, company, grade);
 
     // Definir campos de agrupamento e seleção baseado em groupByColor
     const groupByFields = groupByColor 
@@ -274,6 +371,10 @@ async function fetchProductsWithDetailsSales({
         AND vp.QTDE > 0
         ${filialFilter}
         ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
       GROUP BY ${groupByFields}
     `;
 
@@ -300,6 +401,10 @@ async function fetchProductsWithDetailsSales({
         AND vp.QTDE > 0
         ${filialFilter}
         ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
       GROUP BY ${groupByFields}
     `;
 
@@ -319,6 +424,10 @@ async function fetchProductsWithDetailsSales({
         AND vp.QTDE > 0
         ${filialFilter}
         ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
       GROUP BY ${groupByFields}
     `;
 
@@ -452,6 +561,10 @@ async function fetchProductsWithDetailsEcommerce({
   range,
   filial,
   grupo,
+  linha,
+  colecao,
+  subgrupo,
+  grade,
   groupByColor = false,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   return withRequest(async (request) => {
@@ -484,6 +597,30 @@ async function fetchProductsWithDetailsEcommerce({
       }
     }
 
+    // Para e-commerce, usar apenas p (não temos vp)
+    let linhaFilter = '';
+    if (company === 'scarfme' && linha) {
+      const linhaNormalizada = linha.trim().toUpperCase();
+      request.input('linha', sql.VarChar, linhaNormalizada);
+      linhaFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linha`;
+    }
+    
+    let colecaoFilter = '';
+    if (company === 'scarfme' && colecao) {
+      const colecaoNormalizada = colecao.trim().toUpperCase();
+      request.input('colecao', sql.VarChar, colecaoNormalizada);
+      colecaoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao`;
+    }
+    
+    let subgrupoFilter = '';
+    if (company === 'scarfme' && subgrupo) {
+      const subgrupoNormalizado = subgrupo.trim().toUpperCase();
+      request.input('subgrupo', sql.VarChar, subgrupoNormalizado);
+      subgrupoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupo`;
+    }
+    
+    const gradeFilter = buildGradeFilterForProducts(request, company, grade);
+
     // Definir campos de agrupamento e seleção baseado em groupByColor
     const ecommerceGroupByFields = groupByColor 
       ? 'fp.PRODUTO, fp.COR_PRODUTO'
@@ -512,6 +649,10 @@ async function fetchProductsWithDetailsEcommerce({
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         AND fp.QTDE > 0
         ${filialFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
       GROUP BY ${ecommerceGroupByFields}
     `;
 
@@ -529,12 +670,17 @@ async function fetchProductsWithDetailsEcommerce({
       FROM FATURAMENTO f WITH (NOLOCK)
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO
       WHERE f.EMISSAO >= @previousStartDate
         AND f.EMISSAO < @previousEndDate
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         AND fp.QTDE > 0
         ${filialFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
       GROUP BY ${ecommerceGroupByFields}
     `;
 
@@ -551,11 +697,16 @@ async function fetchProductsWithDetailsEcommerce({
       FROM FATURAMENTO f WITH (NOLOCK)
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO
       WHERE f.EMISSAO < @startDate
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         AND fp.QTDE > 0
         ${filialFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
       GROUP BY ${ecommerceGroupByFields}
     `;
 
@@ -726,6 +877,214 @@ export async function fetchAvailableGrupos({
       return gruposUnicos;
     } catch (error) {
       console.error('Erro ao buscar grupos:', error);
+      return [];
+    }
+  });
+}
+
+/**
+ * Busca linhas disponíveis para ScarfMe
+ * Busca apenas linhas de produtos que tiveram vendas no período e filial selecionados
+ */
+export async function fetchAvailableLinhas({
+  company,
+  range,
+  filial,
+}: Omit<ProductsQueryParams, 'linha'> = {}): Promise<string[]> {
+  if (company !== 'scarfme') {
+    return [];
+  }
+
+  return withRequest(async (request) => {
+    const { start, end } = resolveRange(range);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+
+    const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+
+    const query = `
+      SELECT DISTINCT 
+        COALESCE(vp.LINHA, p.LINHA, '') AS linha
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      WHERE vp.DATA_VENDA >= @startDate
+        AND vp.DATA_VENDA < @endDate
+        AND vp.QTDE > 0
+        AND COALESCE(vp.LINHA, p.LINHA, '') <> ''
+        ${filialFilter}
+      ORDER BY linha
+    `;
+
+    try {
+      const result = await request.query<{ linha: string }>(query);
+      const linhas = result.recordset
+        .map((row) => {
+          const linha = row.linha?.trim() || '';
+          return linha.toUpperCase();
+        })
+        .filter((linha) => linha !== '');
+      
+      const linhasUnicas = [...new Set(linhas)].sort();
+      
+      return linhasUnicas;
+    } catch (error) {
+      console.error('Erro ao buscar linhas:', error);
+      return [];
+    }
+  });
+}
+
+/**
+ * Busca coleções disponíveis para ScarfMe
+ * Busca apenas coleções de produtos que tiveram vendas no período e filial selecionados
+ */
+export async function fetchAvailableColecoes({
+  company,
+  range,
+  filial,
+}: Omit<ProductsQueryParams, 'colecao'> = {}): Promise<string[]> {
+  if (company !== 'scarfme') {
+    return [];
+  }
+
+  return withRequest(async (request) => {
+    const { start, end } = resolveRange(range);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+
+    const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+
+    const query = `
+      SELECT DISTINCT 
+        COALESCE(vp.COLECAO, p.COLECAO, '') AS colecao
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      WHERE vp.DATA_VENDA >= @startDate
+        AND vp.DATA_VENDA < @endDate
+        AND vp.QTDE > 0
+        AND COALESCE(vp.COLECAO, p.COLECAO, '') <> ''
+        ${filialFilter}
+      ORDER BY colecao
+    `;
+
+    try {
+      const result = await request.query<{ colecao: string }>(query);
+      const colecoes = result.recordset
+        .map((row) => {
+          const colecao = row.colecao?.trim() || '';
+          return colecao.toUpperCase();
+        })
+        .filter((colecao) => colecao !== '');
+      
+      const colecoesUnicas = [...new Set(colecoes)].sort();
+      
+      return colecoesUnicas;
+    } catch (error) {
+      console.error('Erro ao buscar coleções:', error);
+      return [];
+    }
+  });
+}
+
+/**
+ * Busca subgrupos disponíveis para ScarfMe
+ * Busca apenas subgrupos de produtos que tiveram vendas no período e filial selecionados
+ */
+export async function fetchAvailableSubgrupos({
+  company,
+  range,
+  filial,
+}: Omit<ProductsQueryParams, 'subgrupo'> = {}): Promise<string[]> {
+  if (company !== 'scarfme') {
+    return [];
+  }
+
+  return withRequest(async (request) => {
+    const { start, end } = resolveRange(range);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+
+    const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+
+    const query = `
+      SELECT DISTINCT 
+        COALESCE(vp.SUBGRUPO_PRODUTO, p.SUBGRUPO_PRODUTO, '') AS subgrupo
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      WHERE vp.DATA_VENDA >= @startDate
+        AND vp.DATA_VENDA < @endDate
+        AND vp.QTDE > 0
+        AND COALESCE(vp.SUBGRUPO_PRODUTO, p.SUBGRUPO_PRODUTO, '') <> ''
+        ${filialFilter}
+      ORDER BY subgrupo
+    `;
+
+    try {
+      const result = await request.query<{ subgrupo: string }>(query);
+      const subgrupos = result.recordset
+        .map((row) => {
+          const subgrupo = row.subgrupo?.trim() || '';
+          return subgrupo.toUpperCase();
+        })
+        .filter((subgrupo) => subgrupo !== '');
+      
+      const subgruposUnicos = [...new Set(subgrupos)].sort();
+      
+      return subgruposUnicos;
+    } catch (error) {
+      console.error('Erro ao buscar subgrupos:', error);
+      return [];
+    }
+  });
+}
+
+/**
+ * Busca grades disponíveis para ScarfMe
+ * Busca apenas grades de produtos que tiveram vendas no período e filial selecionados
+ */
+export async function fetchAvailableGrades({
+  company,
+  range,
+  filial,
+}: Omit<ProductsQueryParams, 'grade'> = {}): Promise<string[]> {
+  if (company !== 'scarfme') {
+    return [];
+  }
+
+  return withRequest(async (request) => {
+    const { start, end } = resolveRange(range);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+
+    const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+
+    const query = `
+      SELECT DISTINCT 
+        UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) AS grade
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      WHERE vp.DATA_VENDA >= @startDate
+        AND vp.DATA_VENDA < @endDate
+        AND vp.QTDE > 0
+        AND p.GRADE IS NOT NULL
+        ${filialFilter}
+      ORDER BY grade
+    `;
+
+    try {
+      const result = await request.query<{ grade: string }>(query);
+      const grades = result.recordset
+        .map((row) => {
+          const grade = row.grade?.trim() || '';
+          return grade.toUpperCase();
+        })
+        .filter((grade) => grade !== '');
+      
+      const gradesUnicas = [...new Set(grades)].sort();
+      
+      return gradesUnicas;
+    } catch (error) {
+      console.error('Erro ao buscar grades:', error);
       return [];
     }
   });

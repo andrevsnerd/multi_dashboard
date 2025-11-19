@@ -77,10 +77,26 @@
   letter-spacing: 0.3px;
   text-transform: uppercase;
   min-width: fit-content;
+  vertical-align: middle;
+}
+
+.textLeftHeader {
+  text-align: left;
+  padding: 14px 16px;
+}
+
+.textRightHeader {
+  text-align: right;
+  padding: 14px 16px;
+}
+
+.textCenterHeader {
+  text-align: center;
+  padding: 14px 16px;
 }
 
 .table td {
-  padding: 14px 16px;
+  padding: 0;
   border-bottom: 1px solid #e5e7eb;
   color: #374151;
   font-size: 13px;
@@ -103,6 +119,8 @@
 .subgrupoCell {
   font-weight: 500;
   color: #1f2937;
+  text-align: left;
+  padding: 14px 16px;
 }
 
 .gradeCell {
@@ -120,6 +138,8 @@
 .descricaoCell {
   min-width: 200px;
   max-width: 250px;
+  text-align: left;
+  padding: 14px 16px;
 }
 
 .productName {
@@ -141,6 +161,37 @@
   font-size: 14px;
   color: #1f2937;
   text-align: right;
+  padding: 14px 16px;
+}
+
+.colorCell {
+  text-align: left;
+  padding: 14px 16px;
+}
+
+.textCenterCell {
+  text-align: center;
+  padding: 14px 16px;
+}
+
+.filialHeader {
+  text-align: center;
+  padding: 14px 16px;
+}
+
+.filialCellContainer {
+  text-align: center;
+  padding: 14px 16px;
+}
+
+.actionHeader {
+  text-align: center;
+  padding: 14px 16px;
+}
+
+.actionCell {
+  text-align: center;
+  padding: 14px 16px;
 }
 
 .filialCell {

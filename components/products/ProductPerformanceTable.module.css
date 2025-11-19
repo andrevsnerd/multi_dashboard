@@ -1,0 +1,153 @@
+.wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.container {
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.table thead {
+  background-color: #f8fafc;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+  vertical-align: middle;
+}
+
+.table th.filialHeader {
+  text-align: left;
+  padding: 12px 16px;
+}
+
+.table th.currencyHeader {
+  text-align: right;
+  padding: 12px 16px;
+}
+
+.table th.numberHeader {
+  text-align: right;
+  padding: 12px 16px;
+}
+
+.table th.varianceHeader {
+  text-align: right;
+  padding: 12px 16px;
+}
+
+.table tbody tr {
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  transition: background-color 0.2s;
+}
+
+.table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.table td {
+  padding: 12px 16px;
+  font-size: 14px;
+  color: #1f2937;
+  vertical-align: middle;
+}
+
+.table td.filialCell {
+  font-weight: 500;
+  color: #0f172a;
+  text-align: left;
+  padding: 12px 16px;
+}
+
+.table td.currencyCell {
+  text-align: right;
+  font-weight: 600;
+  color: #0f172a;
+  padding: 12px 16px;
+}
+
+.table td.numberCell {
+  text-align: right;
+  color: #475569;
+  padding: 12px 16px;
+}
+
+.table td.varianceCell {
+  text-align: right;
+  padding: 12px 16px;
+}
+
+.varianceValue {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.variancePositive {
+  background: rgba(22, 163, 74, 0.14);
+  color: #15803d;
+}
+
+.varianceNegative {
+  background: rgba(220, 38, 38, 0.14);
+  color: #b91c1c;
+}
+
+.loading,
+.empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: #64748b;
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .table {
+    font-size: 12px;
+  }
+
+  .table th,
+  .table td {
+    padding: 12px 8px;
+  }
+
+  .title {
+    font-size: 18px;
+  }
+}
+

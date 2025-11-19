@@ -10,6 +10,10 @@ export async function GET(request: Request) {
   const company = searchParams.get('company') ?? undefined;
   const filial = searchParams.get('filial');
   const grupo = searchParams.get('grupo');
+  const linha = searchParams.get('linha');
+  const colecao = searchParams.get('colecao');
+  const subgrupo = searchParams.get('subgrupo');
+  const grade = searchParams.get('grade');
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
   const range =
@@ -30,6 +34,10 @@ export async function GET(request: Request) {
       range,
       filial: filial || null,
       grupo: grupo || null,
+      linha: linha || null,
+      colecao: colecao || null,
+      subgrupo: subgrupo || null,
+      grade: grade || null,
     });
 
     return NextResponse.json({

@@ -35,6 +35,10 @@ async function fetchProducts(
   range: DateRangeValue,
   filial: string | null,
   grupo: string | null,
+  linha: string | null,
+  colecao: string | null,
+  subgrupo: string | null,
+  grade: string | null,
   groupByColor: boolean
 ): Promise<ProductDetail[]> {
   const searchParams = new URLSearchParams({
@@ -49,6 +53,22 @@ async function fetchProducts(
 
   if (grupo) {
     searchParams.set("grupo", grupo);
+  }
+
+  if (linha) {
+    searchParams.set("linha", linha);
+  }
+
+  if (colecao) {
+    searchParams.set("colecao", colecao);
+  }
+
+  if (subgrupo) {
+    searchParams.set("subgrupo", subgrupo);
+  }
+
+  if (grade) {
+    searchParams.set("grade", grade);
   }
 
   if (groupByColor) {
@@ -74,7 +94,11 @@ async function fetchSummary(
   company: string,
   range: DateRangeValue,
   filial: string | null,
-  grupo: string | null
+  grupo: string | null,
+  linha: string | null,
+  colecao: string | null,
+  subgrupo: string | null,
+  grade: string | null
 ): Promise<SalesSummary> {
   const searchParams = new URLSearchParams({
     company,
@@ -88,6 +112,22 @@ async function fetchSummary(
 
   if (grupo) {
     searchParams.set("grupo", grupo);
+  }
+
+  if (linha) {
+    searchParams.set("linha", linha);
+  }
+
+  if (colecao) {
+    searchParams.set("colecao", colecao);
+  }
+
+  if (subgrupo) {
+    searchParams.set("subgrupo", subgrupo);
+  }
+
+  if (grade) {
+    searchParams.set("grade", grade);
   }
 
   const response = await fetch(`/api/sales-summary?${searchParams.toString()}`, {
@@ -120,6 +160,10 @@ export default function ProductsPage({
   const [range, setRange] = useState<DateRangeValue>(initialRange);
   const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
   const [selectedGrupo, setSelectedGrupo] = useState<string | null>(null);
+  const [selectedLinha, setSelectedLinha] = useState<string | null>(null);
+  const [selectedColecao, setSelectedColecao] = useState<string | null>(null);
+  const [selectedSubgrupo, setSelectedSubgrupo] = useState<string | null>(null);
+  const [selectedGrade, setSelectedGrade] = useState<string | null>(null);
   const [groupByColor, setGroupByColor] = useState(false);
   const [data, setData] = useState<ProductDetail[]>([]);
   const [summary, setSummary] = useState<SalesSummary>(EMPTY_SUMMARY);
@@ -127,6 +171,10 @@ export default function ProductsPage({
   const [error, setError] = useState<string | null>(null);
 
   const [availableGrupos, setAvailableGrupos] = useState<string[]>([]);
+  const [availableLinhas, setAvailableLinhas] = useState<string[]>([]);
+  const [availableColecoes, setAvailableColecoes] = useState<string[]>([]);
+  const [availableSubgrupos, setAvailableSubgrupos] = useState<string[]>([]);
+  const [availableGrades, setAvailableGrades] = useState<string[]>([]);
 
   // Buscar grupos disponíveis para NERD
   useEffect(() => {
@@ -176,10 +224,202 @@ export default function ProductsPage({
     };
   }, [companyKey, range.startDate, range.endDate, selectedFilial]);
 
+  // Buscar linhas disponíveis para ScarfMe
+  useEffect(() => {
+    if (companyKey !== "scarfme") {
+      setAvailableLinhas([]);
+      return;
+    }
+
+    let active = true;
+
+    async function loadLinhas() {
+      try {
+        const searchParams = new URLSearchParams({
+          company: companyKey,
+          start: range.startDate.toISOString(),
+          end: range.endDate.toISOString(),
+        });
+
+        if (selectedFilial) {
+          searchParams.set("filial", selectedFilial);
+        }
+
+        const response = await fetch(`/api/products/linhas?${searchParams.toString()}`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const json = (await response.json()) as {
+          data: string[];
+        };
+
+        if (active) {
+          setAvailableLinhas(json.data || []);
+        }
+      } catch (err) {
+        // Silenciosamente falhar
+      }
+    }
+
+    void loadLinhas();
+
+    return () => {
+      active = false;
+    };
+  }, [companyKey, range.startDate, range.endDate, selectedFilial]);
+
+  // Buscar coleções disponíveis para ScarfMe
+  useEffect(() => {
+    if (companyKey !== "scarfme") {
+      setAvailableColecoes([]);
+      return;
+    }
+
+    let active = true;
+
+    async function loadColecoes() {
+      try {
+        const searchParams = new URLSearchParams({
+          company: companyKey,
+          start: range.startDate.toISOString(),
+          end: range.endDate.toISOString(),
+        });
+
+        if (selectedFilial) {
+          searchParams.set("filial", selectedFilial);
+        }
+
+        const response = await fetch(`/api/products/colecoes?${searchParams.toString()}`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const json = (await response.json()) as {
+          data: string[];
+        };
+
+        if (active) {
+          setAvailableColecoes(json.data || []);
+        }
+      } catch (err) {
+        // Silenciosamente falhar
+      }
+    }
+
+    void loadColecoes();
+
+    return () => {
+      active = false;
+    };
+  }, [companyKey, range.startDate, range.endDate, selectedFilial]);
+
+  // Buscar subgrupos disponíveis para ScarfMe
+  useEffect(() => {
+    if (companyKey !== "scarfme") {
+      setAvailableSubgrupos([]);
+      return;
+    }
+
+    let active = true;
+
+    async function loadSubgrupos() {
+      try {
+        const searchParams = new URLSearchParams({
+          company: companyKey,
+          start: range.startDate.toISOString(),
+          end: range.endDate.toISOString(),
+        });
+
+        if (selectedFilial) {
+          searchParams.set("filial", selectedFilial);
+        }
+
+        const response = await fetch(`/api/products/subgrupos?${searchParams.toString()}`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const json = (await response.json()) as {
+          data: string[];
+        };
+
+        if (active) {
+          setAvailableSubgrupos(json.data || []);
+        }
+      } catch (err) {
+        // Silenciosamente falhar
+      }
+    }
+
+    void loadSubgrupos();
+
+    return () => {
+      active = false;
+    };
+  }, [companyKey, range.startDate, range.endDate, selectedFilial]);
+
+  // Buscar grades disponíveis para ScarfMe
+  useEffect(() => {
+    if (companyKey !== "scarfme") {
+      setAvailableGrades([]);
+      return;
+    }
+
+    let active = true;
+
+    async function loadGrades() {
+      try {
+        const searchParams = new URLSearchParams({
+          company: companyKey,
+          start: range.startDate.toISOString(),
+          end: range.endDate.toISOString(),
+        });
+
+        if (selectedFilial) {
+          searchParams.set("filial", selectedFilial);
+        }
+
+        const response = await fetch(`/api/products/grades?${searchParams.toString()}`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const json = (await response.json()) as {
+          data: string[];
+        };
+
+        if (active) {
+          setAvailableGrades(json.data || []);
+        }
+      } catch (err) {
+        // Silenciosamente falhar
+      }
+    }
+
+    void loadGrades();
+
+    return () => {
+      active = false;
+    };
+  }, [companyKey, range.startDate, range.endDate, selectedFilial]);
+
   const rangeKey = useMemo(
     () =>
-      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}::${selectedGrupo ?? 'all'}::${groupByColor}`,
-    [range.startDate, range.endDate, selectedFilial, selectedGrupo, groupByColor]
+      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}::${selectedGrupo ?? 'all'}::${selectedLinha ?? 'all'}::${selectedColecao ?? 'all'}::${selectedSubgrupo ?? 'all'}::${selectedGrade ?? 'all'}::${groupByColor}`,
+    [range.startDate, range.endDate, selectedFilial, selectedGrupo, selectedLinha, selectedColecao, selectedSubgrupo, selectedGrade, groupByColor]
   );
 
   useEffect(() => {
@@ -190,8 +430,8 @@ export default function ProductsPage({
       setError(null);
       try {
         const [productsData, summaryData] = await Promise.all([
-          fetchProducts(companyKey, range, selectedFilial, selectedGrupo, groupByColor),
-          fetchSummary(companyKey, range, selectedFilial, selectedGrupo),
+          fetchProducts(companyKey, range, selectedFilial, selectedGrupo, selectedLinha, selectedColecao, selectedSubgrupo, selectedGrade, groupByColor),
+          fetchSummary(companyKey, range, selectedFilial, selectedGrupo, selectedLinha, selectedColecao, selectedSubgrupo, selectedGrade),
         ]);
         if (active) {
           setData(productsData);
@@ -217,7 +457,7 @@ export default function ProductsPage({
     return () => {
       active = false;
     };
-  }, [companyKey, range, rangeKey, selectedFilial, selectedGrupo]);
+  }, [companyKey, range, rangeKey, selectedFilial, selectedGrupo, selectedLinha, selectedColecao, selectedSubgrupo, selectedGrade]);
 
   return (
     <div className={styles.wrapper}>
@@ -237,6 +477,34 @@ export default function ProductsPage({
               options={availableGrupos}
               onChange={setSelectedGrupo}
             />
+          )}
+          {companyKey === "scarfme" && (
+            <>
+              <SelectFilter
+                label="Linha"
+                value={selectedLinha}
+                options={availableLinhas}
+                onChange={setSelectedLinha}
+              />
+              <SelectFilter
+                label="Coleção"
+                value={selectedColecao}
+                options={availableColecoes}
+                onChange={setSelectedColecao}
+              />
+              <SelectFilter
+                label="Subgrupo"
+                value={selectedSubgrupo}
+                options={availableSubgrupos}
+                onChange={setSelectedSubgrupo}
+              />
+              <SelectFilter
+                label="Grade"
+                value={selectedGrade}
+                options={availableGrades}
+                onChange={setSelectedGrade}
+              />
+            </>
           )}
           {loading ? (
             <span className={styles.loading}>Carregando dados…</span>

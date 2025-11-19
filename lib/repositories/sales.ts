@@ -145,6 +145,10 @@ export interface SummaryQueryParams {
   range?: DateRangeInput;
   filial?: string | null;
   grupo?: string | null;
+  linha?: string | null;
+  colecao?: string | null;
+  subgrupo?: string | null;
+  grade?: string | null;
 }
 
 export interface SalesSummaryResult {
@@ -264,18 +268,22 @@ export async function fetchSalesSummary({
   range,
   filial,
   grupo,
+  linha,
+  colecao,
+  subgrupo,
+  grade,
 }: SummaryQueryParams = {}): Promise<SalesSummaryResult> {
   // Se for e-commerce, usar função específica de e-commerce
   if (isEcommerceFilial(company, filial)) {
-    return fetchEcommerceSummary({ company, range, filial, grupo });
+    return fetchEcommerceSummary({ company, range, filial, grupo, linha, colecao, subgrupo, grade });
   }
 
   // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
   if (shouldAggregateEcommerce(company, filial)) {
     // Buscar vendas normais (varejo) e ecommerce em paralelo
     const [salesResult, ecommerceResult] = await Promise.all([
-      fetchSalesSummary({ company, range, filial: VAREJO_VALUE, grupo }),
-      fetchEcommerceSummary({ company, range, filial: null, grupo }),
+      fetchSalesSummary({ company, range, filial: VAREJO_VALUE, grupo, linha, colecao, subgrupo, grade }),
+      fetchEcommerceSummary({ company, range, filial: null, grupo, linha, colecao, subgrupo, grade }),
     ]);
 
     // Agregar os resultados
@@ -305,6 +313,19 @@ export async function fetchSalesSummary({
         changePercentage,
       };
     };
+
+    // IMPORTANTE: O estoque deve ser calculado para TODAS as filiais (varejo + ecommerce)
+    // Não podemos usar apenas o estoque do varejo, pois isso excluiria o estoque do e-commerce
+    // Por isso, buscamos o estoque separadamente com filial=null para incluir todas as filiais
+    const stockSummaryForAll = await fetchStockSummary({
+      company,
+      filial: null, // Todas as filiais (varejo + ecommerce)
+      grupo,
+      linha,
+      colecao,
+      subgrupo,
+      grade,
+    });
 
     const summary: SalesSummary = {
       totalRevenue: aggregateMetric(
@@ -346,8 +367,16 @@ export async function fetchSalesSummary({
             : 0,
         changePercentage: null, // Será calculado abaixo
       },
-      totalStockQuantity: salesResult.summary.totalStockQuantity,
-      totalStockValue: salesResult.summary.totalStockValue,
+      totalStockQuantity: {
+        currentValue: stockSummaryForAll.totalQuantity,
+        previousValue: stockSummaryForAll.totalQuantity, // Estoque não tem histórico temporal
+        changePercentage: null,
+      },
+      totalStockValue: {
+        currentValue: stockSummaryForAll.totalValue,
+        previousValue: stockSummaryForAll.totalValue, // Estoque não tem histórico temporal
+        changePercentage: null,
+      },
     };
 
     // Calcular changePercentage do averageTicket
@@ -440,6 +469,53 @@ export async function fetchSalesSummary({
       )`;
     }
 
+    // Criar filtros para ScarfMe
+    let linhaFilter = '';
+    let colecaoFilter = '';
+    let subgrupoFilter = '';
+    let gradeFilter = '';
+    let scarfmeJoin = '';
+    
+    if (company === 'scarfme') {
+      // Garantir que temos o JOIN com PRODUTOS se não tiver sido adicionado pelo grupo
+      if (!grupoJoin) {
+        scarfmeJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
+      }
+      
+      if (linha) {
+        const linhaNormalizada = linha.trim().toUpperCase();
+        request.input('linha', sql.VarChar, linhaNormalizada);
+        linhaFilter = `AND (
+          UPPER(LTRIM(RTRIM(ISNULL(vp.LINHA, '')))) = @linha
+          OR UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linha
+        )`;
+      }
+      
+      if (colecao) {
+        const colecaoNormalizada = colecao.trim().toUpperCase();
+        request.input('colecao', sql.VarChar, colecaoNormalizada);
+        colecaoFilter = `AND (
+          UPPER(LTRIM(RTRIM(ISNULL(vp.COLECAO, '')))) = @colecao
+          OR UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao
+        )`;
+      }
+      
+      if (subgrupo) {
+        const subgrupoNormalizado = subgrupo.trim().toUpperCase();
+        request.input('subgrupo', sql.VarChar, subgrupoNormalizado);
+        subgrupoFilter = `AND (
+          UPPER(LTRIM(RTRIM(ISNULL(vp.SUBGRUPO_PRODUTO, '')))) = @subgrupo
+          OR UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupo
+        )`;
+      }
+      
+      if (grade) {
+        const gradeNormalizada = grade.trim().toUpperCase();
+        request.input('grade', sql.VarChar, gradeNormalizada);
+        gradeFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) = @grade`;
+      }
+    }
+
     // Otimizar query usando uma única passada pela tabela com CASE para separar períodos
     // Isso é mais eficiente que UNION ALL com duas queries separadas
     const query = `
@@ -494,7 +570,7 @@ export async function fetchSalesSummary({
           ELSE NULL
         END) AS currentLastSaleDate
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      ${grupoJoin}
+      ${grupoJoin || scarfmeJoin}
       WHERE (
           (vp.DATA_VENDA >= @startDate AND vp.DATA_VENDA < @endDate)
           OR (vp.DATA_VENDA >= @prevStartDate AND vp.DATA_VENDA < @prevEndDate)
@@ -502,6 +578,10 @@ export async function fetchSalesSummary({
         AND vp.QTDE > 0
         ${filialFilter}
         ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
     `;
 
     const result = await request.query<{
@@ -566,6 +646,10 @@ export async function fetchSalesSummary({
       company,
       filial,
       grupo,
+      linha,
+      colecao,
+      subgrupo,
+      grade,
     });
 
     const summary: SalesSummary = {

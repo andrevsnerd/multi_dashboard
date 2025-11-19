@@ -382,23 +382,23 @@ export default function StockByFilialTable({
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>{companyKey === "nerd" ? "GRUPO" : "SUBGRUPO"}</th>
-              {companyKey !== "nerd" && <th>GRADE</th>}
-              <th>DESCRIÇÃO</th>
-              <th>COR</th>
-              <th>VENDAS</th>
-              <th>ESTOQUE</th>
-              {matriz && <th>MATRIZ</th>}
+              <th className={styles.textLeftHeader}>{companyKey === "nerd" ? "GRUPO" : "SUBGRUPO"}</th>
+              {companyKey !== "nerd" && <th className={styles.textCenterHeader}>GRADE</th>}
+              <th className={styles.textLeftHeader}>DESCRIÇÃO</th>
+              <th className={styles.textLeftHeader}>COR</th>
+              <th className={styles.textRightHeader}>VENDAS</th>
+              <th className={styles.textRightHeader}>ESTOQUE</th>
+              {matriz && <th className={styles.filialHeader}>MATRIZ</th>}
               {ecommerce && companyKey === "scarfme" && (
-                <th>{company?.filialDisplayNames?.[ecommerce] || ecommerce}</th>
+                <th className={styles.filialHeader}>{company?.filialDisplayNames?.[ecommerce] || ecommerce}</th>
               )}
               {filiais.map((filial) => {
                 const displayName = company?.filialDisplayNames?.[filial] || filial;
                 return (
-                  <th key={filial}>{displayName}</th>
+                  <th key={filial} className={styles.filialHeader}>{displayName}</th>
                 );
               })}
-              <th>AÇÃO</th>
+              <th className={styles.actionHeader}>AÇÃO</th>
             </tr>
           </thead>
           <tbody>
@@ -410,7 +410,7 @@ export default function StockByFilialTable({
                 <tr key={`${item.produto}-${item.cor}-${item.grade}-${rowIndex}`}>
                   <td className={styles.subgrupoCell}>{companyKey === "nerd" ? item.grupo : item.subgrupo}</td>
                   {companyKey !== "nerd" && (
-                    <td>
+                    <td className={styles.textCenterCell}>
                       <div className={styles.gradeCell}>{item.grade}</div>
                     </td>
                   )}
@@ -418,11 +418,11 @@ export default function StockByFilialTable({
                     <div className={styles.productName}>{productInfo.name}</div>
                     <div className={styles.productCode}>{productInfo.code}</div>
                   </td>
-                  <td>{item.cor}</td>
+                  <td className={styles.colorCell}>{item.cor}</td>
                   <td className={styles.numberCell}>{item.totalVendas}</td>
                   <td className={styles.numberCell}>{item.totalEstoque}</td>
                   {matriz && (
-                    <td>
+                    <td className={styles.filialCellContainer}>
                       <div className={`${styles.filialCell} ${styles.filialCellMatriz}`}>
                         <span className={styles.stockValue}>
                           {matrizData.stock}
@@ -431,7 +431,7 @@ export default function StockByFilialTable({
                     </td>
                   )}
                   {ecommerce && companyKey === "scarfme" && (
-                    <td>
+                    <td className={styles.filialCellContainer}>
                       <div className={`${styles.filialCell} ${getFilialCellClass(ecommerceData.stock, ecommerceData.sales, ecommerceData.salesLast30Days, ecommerceData.hasEntry)}`}>
                         <span className={styles.stockValue}>
                           {ecommerceData.stock}
@@ -445,7 +445,7 @@ export default function StockByFilialTable({
                   {filiais.map((filial) => {
                     const filialData = getFilialData(item, filial);
                     return (
-                      <td key={filial}>
+                      <td key={filial} className={styles.filialCellContainer}>
                         <div className={`${styles.filialCell} ${getFilialCellClass(filialData.stock, filialData.sales, filialData.salesLast30Days, filialData.hasEntry)}`}>
                           <span className={styles.stockValue}>
                             {filialData.stock}
@@ -457,7 +457,7 @@ export default function StockByFilialTable({
                       </td>
                     );
                   })}
-                  <td>
+                  <td className={styles.actionCell}>
                     {(() => {
                       const recommendation = calculateActionRecommendation(
                         item,

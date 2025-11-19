@@ -219,6 +219,10 @@ export interface StockSummaryParams {
   company?: string;
   filial?: string | null;
   grupo?: string | null;
+  linha?: string | null;
+  colecao?: string | null;
+  subgrupo?: string | null;
+  grade?: string | null;
 }
 
 export interface StockSummary {
@@ -235,10 +239,12 @@ export async function fetchStockSummary({
   company,
   filial,
   grupo,
+  linha,
+  colecao,
+  subgrupo,
+  grade,
 }: StockSummaryParams = {}): Promise<StockSummary> {
   return withRequest(async (request) => {
-    const filialFilter = buildFilialFilter(request, company, filial);
-    
     // Criar filtro de grupo para NERD
     let grupoFilter = '';
     if (company === 'nerd' && grupo) {
@@ -249,6 +255,48 @@ export async function fetchStockSummary({
       )`;
     }
 
+    // Criar filtros para ScarfMe
+    let linhaFilter = '';
+    let colecaoFilter = '';
+    let subgrupoFilter = '';
+    let gradeFilter = '';
+    
+    if (company === 'scarfme') {
+      if (linha) {
+        const linhaNormalizada = linha.trim().toUpperCase();
+        request.input('linha', sql.VarChar, linhaNormalizada);
+        linhaFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linha`;
+      }
+      
+      if (colecao) {
+        const colecaoNormalizada = colecao.trim().toUpperCase();
+        request.input('colecao', sql.VarChar, colecaoNormalizada);
+        // Como a query começa de ESTOQUE_PRODUTOS, precisamos verificar a coleção na tabela PRODUTOS
+        // Mas como é LEFT JOIN, se o produto não existir em PRODUTOS, será NULL
+        // Por segurança, verificamos apenas p.COLECAO já que ESTOQUE_PRODUTOS não tem esse campo
+        colecaoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao`;
+      }
+      
+      if (subgrupo) {
+        const subgrupoNormalizado = subgrupo.trim().toUpperCase();
+        request.input('subgrupo', sql.VarChar, subgrupoNormalizado);
+        subgrupoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupo`;
+      }
+      
+      if (grade) {
+        const gradeNormalizada = grade.trim().toUpperCase();
+        request.input('grade', sql.VarChar, gradeNormalizada);
+        gradeFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) = @grade`;
+      }
+    }
+
+    // IMPORTANTE: A query deve começar de ESTOQUE_PRODUTOS para garantir que todas as linhas de estoque
+    // sejam consideradas, e depois fazer JOIN com PRODUTOS para aplicar os filtros de produto
+    // Isso garante que não perdemos nenhuma linha de estoque que corresponda aos filtros
+    // Para scarfme, quando não há filial específica (null), considerar TODAS as filiais de inventory
+    // (incluindo MATRIZ e MATRIZ CMS - todas as 10 filiais: varejo + ecommerce + matriz)
+    const estoqueFilialFilterForWhere = buildFilialFilter(request, company, filial, 'e');
+    
     const query = `
       SELECT 
         e.PRODUTO AS productId,
@@ -260,8 +308,12 @@ export async function fetchStockSummary({
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
       WHERE 1=1
-        ${filialFilter}
+        ${estoqueFilialFilterForWhere}
         ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
       GROUP BY e.PRODUTO
     `;
 
@@ -274,6 +326,39 @@ export async function fetchStockSummary({
       negativeValue: number | null;
     }>(query);
 
+    // DEBUG: Log para entender o que está sendo retornado
+    if (colecao) {
+      console.log(`[fetchStockSummary] Coleção: ${colecao}, Filial: ${filial || 'null'}, Total de produtos retornados: ${result.recordset.length}`);
+      let debugTotalPositive = 0;
+      let debugTotalNegative = 0;
+      let debugProductsWithPositive = 0;
+      let debugProductsWithOnlyNegative = 0;
+      let debugExcluded = 0;
+      let debugFinalFromPositive = 0;
+      let debugFinalFromNegative = 0;
+      
+      result.recordset.forEach((row) => {
+        const pos = Number(row.positiveStock ?? 0);
+        const neg = Number(row.negativeStock ?? 0);
+        const count = Number(row.positiveCount ?? 0);
+        debugTotalPositive += pos;
+        debugTotalNegative += neg;
+        if (count > 0) {
+          debugProductsWithPositive++;
+          debugFinalFromPositive += pos;
+        } else if (neg < 0) {
+          debugProductsWithOnlyNegative++;
+          debugFinalFromNegative += (pos + neg);
+        } else {
+          debugExcluded++;
+        }
+      });
+      
+      console.log(`[fetchStockSummary] DEBUG - Positivo total: ${debugTotalPositive}, Negativo total: ${debugTotalNegative}`);
+      console.log(`[fetchStockSummary] DEBUG - Produtos com positivo: ${debugProductsWithPositive}, Apenas negativo: ${debugProductsWithOnlyNegative}, Excluídos: ${debugExcluded}`);
+      console.log(`[fetchStockSummary] DEBUG - Final de produtos com positivo: ${debugFinalFromPositive}, Final de produtos só negativo: ${debugFinalFromNegative}`);
+    }
+
     // Aplicar a mesma lógica usada em fetchMultipleProductsStock
     let totalQuantity = 0;
     let totalValue = 0;
@@ -285,14 +370,29 @@ export async function fetchStockSummary({
       const positiveValue = Number(row.positiveValue ?? 0);
       const negativeValue = Number(row.negativeValue ?? 0);
       
-      // Se houver estoque positivo, usar apenas a soma dos positivos
-      // Caso contrário, usar a soma dos positivos + negativos
-      const finalStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
-      const finalValue = positiveCount > 0 ? positiveValue : (positiveValue + negativeValue);
+      // REGRA: APENAS produtos com estoque POSITIVO devem ser considerados
+      // Negativos são IGNORADOS completamente, mesmo que o produto tenha apenas negativo
+      // Isso evita valores falsos na soma
+      
+      // Se o produto não tem estoque positivo em nenhuma filial, IGNORAR completamente
+      // (não incluir produtos que só têm negativo)
+      if (positiveCount === 0) {
+        return; // Ignorar produtos sem estoque positivo
+      }
+      
+      // Se tem positivo em qualquer filial, usar APENAS a soma dos positivos
+      // NEGATIVOS são completamente ignorados
+      const finalStock = positiveStock;  // Apenas positivos, ignorar negativos
+      const finalValue = positiveValue;  // Apenas positivos, ignorar negativos
       
       totalQuantity += finalStock;
       totalValue += finalValue;
     });
+    
+    // DEBUG: Log do resultado final
+    if (colecao) {
+      console.log(`[fetchStockSummary] Coleção: ${colecao}, Total final calculado: ${totalQuantity}`);
+    }
 
     return {
       totalQuantity,

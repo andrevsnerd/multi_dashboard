@@ -1,17 +1,11 @@
 import { NextResponse } from 'next/server';
 
-import { fetchProductsWithDetails, type ProductDetail } from '@/lib/repositories/products';
+import { fetchAvailableGrades } from '@/lib/repositories/products';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const company = searchParams.get('company') ?? undefined;
   const filial = searchParams.get('filial');
-  const grupo = searchParams.get('grupo');
-  const linha = searchParams.get('linha');
-  const colecao = searchParams.get('colecao');
-  const subgrupo = searchParams.get('subgrupo');
-  const grade = searchParams.get('grade');
-  const groupByColorParam = searchParams.get('groupByColor');
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
 
@@ -27,26 +21,18 @@ export async function GET(request: Request) {
     end: endParam,
   };
 
-  const groupByColor = groupByColorParam === 'true';
-
   try {
-    const data = await fetchProductsWithDetails({
+    const data = await fetchAvailableGrades({
       company,
       range,
       filial: filial || null,
-      grupo: grupo || null,
-      linha: linha || null,
-      colecao: colecao || null,
-      subgrupo: subgrupo || null,
-      grade: grade || null,
-      groupByColor,
     });
 
     return NextResponse.json({ data });
   } catch (error) {
-    console.error('Erro ao carregar produtos', error);
+    console.error('Erro ao carregar grades', error);
     return NextResponse.json(
-      { error: 'Erro ao carregar produtos' },
+      { error: 'Erro ao carregar grades' },
       { status: 500 }
     );
   }
