@@ -6,11 +6,14 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const company = searchParams.get('company') ?? undefined;
   const filial = searchParams.get('filial');
-  const grupo = searchParams.get('grupo');
-  const linha = searchParams.get('linha');
-  const colecao = searchParams.get('colecao');
-  const subgrupo = searchParams.get('subgrupo');
-  const grade = searchParams.get('grade');
+  
+  // Obter todos os valores para cada filtro (suporta múltiplos)
+  const grupos = searchParams.getAll('grupo');
+  const linhas = searchParams.getAll('linha');
+  const colecoes = searchParams.getAll('colecao');
+  const subgrupos = searchParams.getAll('subgrupo');
+  const grades = searchParams.getAll('grade');
+  
   const groupByColorParam = searchParams.get('groupByColor');
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
@@ -34,11 +37,11 @@ export async function GET(request: Request) {
       company,
       range,
       filial: filial || null,
-      grupo: grupo || null,
-      linha: linha || null,
-      colecao: colecao || null,
-      subgrupo: subgrupo || null,
-      grade: grade || null,
+      grupos: grupos.length > 0 ? grupos : null,
+      linhas: linhas.length > 0 ? linhas : null,
+      colecoes: colecoes.length > 0 ? colecoes : null,
+      subgrupos: subgrupos.length > 0 ? subgrupos : null,
+      grades: grades.length > 0 ? grades : null,
       groupByColor,
     });
 

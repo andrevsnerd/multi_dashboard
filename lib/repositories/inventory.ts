@@ -219,10 +219,15 @@ export interface StockSummaryParams {
   company?: string;
   filial?: string | null;
   grupo?: string | null;
+  grupos?: string[] | null;
   linha?: string | null;
+  linhas?: string[] | null;
   colecao?: string | null;
+  colecoes?: string[] | null;
   subgrupo?: string | null;
+  subgrupos?: string[] | null;
   grade?: string | null;
+  grades?: string[] | null;
 }
 
 export interface StockSummary {
@@ -239,54 +244,103 @@ export async function fetchStockSummary({
   company,
   filial,
   grupo,
+  grupos,
   linha,
+  linhas,
   colecao,
+  colecoes,
   subgrupo,
+  subgrupos,
   grade,
+  grades,
 }: StockSummaryParams = {}): Promise<StockSummary> {
   return withRequest(async (request) => {
-    // Criar filtro de grupo para NERD
+    // Criar filtro de grupo para NERD (suporta múltiplos)
     let grupoFilter = '';
-    if (company === 'nerd' && grupo) {
-      const grupoNormalizado = grupo.trim().toUpperCase();
-      request.input('grupo', sql.VarChar, grupoNormalizado);
-      grupoFilter = `AND (
-        UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupo
-      )`;
+    const gruposList = grupos && grupos.length > 0 ? grupos : grupo ? [grupo] : [];
+    if (company === 'nerd' && gruposList.length > 0) {
+      const gruposNormalizados = gruposList.map(g => g.trim().toUpperCase());
+      if (gruposNormalizados.length === 1) {
+        request.input('grupo', sql.VarChar, gruposNormalizados[0]);
+        grupoFilter = `AND (
+          UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupo
+        )`;
+      } else {
+        gruposNormalizados.forEach((g, index) => {
+          request.input(`grupo${index}`, sql.VarChar, g);
+        });
+        const placeholders = gruposNormalizados.map((_, index) => `@grupo${index}`).join(', ');
+        grupoFilter = `AND (
+          UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) IN (${placeholders})
+        )`;
+      }
     }
 
-    // Criar filtros para ScarfMe
+    // Criar filtros para ScarfMe (suporta múltiplos)
     let linhaFilter = '';
     let colecaoFilter = '';
     let subgrupoFilter = '';
     let gradeFilter = '';
     
     if (company === 'scarfme') {
-      if (linha) {
-        const linhaNormalizada = linha.trim().toUpperCase();
-        request.input('linha', sql.VarChar, linhaNormalizada);
-        linhaFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linha`;
+      const linhasList = linhas && linhas.length > 0 ? linhas : linha ? [linha] : [];
+      if (linhasList.length > 0) {
+        const linhasNormalizadas = linhasList.map(l => l.trim().toUpperCase());
+        if (linhasNormalizadas.length === 1) {
+          request.input('linha', sql.VarChar, linhasNormalizadas[0]);
+          linhaFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linha`;
+        } else {
+          linhasNormalizadas.forEach((l, index) => {
+            request.input(`linha${index}`, sql.VarChar, l);
+          });
+          const placeholders = linhasNormalizadas.map((_, index) => `@linha${index}`).join(', ');
+          linhaFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) IN (${placeholders})`;
+        }
       }
       
-      if (colecao) {
-        const colecaoNormalizada = colecao.trim().toUpperCase();
-        request.input('colecao', sql.VarChar, colecaoNormalizada);
-        // Como a query começa de ESTOQUE_PRODUTOS, precisamos verificar a coleção na tabela PRODUTOS
-        // Mas como é LEFT JOIN, se o produto não existir em PRODUTOS, será NULL
-        // Por segurança, verificamos apenas p.COLECAO já que ESTOQUE_PRODUTOS não tem esse campo
-        colecaoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao`;
+      const colecoesList = colecoes && colecoes.length > 0 ? colecoes : colecao ? [colecao] : [];
+      if (colecoesList.length > 0) {
+        const colecoesNormalizadas = colecoesList.map(c => c.trim().toUpperCase());
+        if (colecoesNormalizadas.length === 1) {
+          request.input('colecao', sql.VarChar, colecoesNormalizadas[0]);
+          colecaoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao`;
+        } else {
+          colecoesNormalizadas.forEach((c, index) => {
+            request.input(`colecao${index}`, sql.VarChar, c);
+          });
+          const placeholders = colecoesNormalizadas.map((_, index) => `@colecao${index}`).join(', ');
+          colecaoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) IN (${placeholders})`;
+        }
       }
       
-      if (subgrupo) {
-        const subgrupoNormalizado = subgrupo.trim().toUpperCase();
-        request.input('subgrupo', sql.VarChar, subgrupoNormalizado);
-        subgrupoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupo`;
+      const subgruposList = subgrupos && subgrupos.length > 0 ? subgrupos : subgrupo ? [subgrupo] : [];
+      if (subgruposList.length > 0) {
+        const subgruposNormalizados = subgruposList.map(s => s.trim().toUpperCase());
+        if (subgruposNormalizados.length === 1) {
+          request.input('subgrupo', sql.VarChar, subgruposNormalizados[0]);
+          subgrupoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupo`;
+        } else {
+          subgruposNormalizados.forEach((s, index) => {
+            request.input(`subgrupo${index}`, sql.VarChar, s);
+          });
+          const placeholders = subgruposNormalizados.map((_, index) => `@subgrupo${index}`).join(', ');
+          subgrupoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) IN (${placeholders})`;
+        }
       }
       
-      if (grade) {
-        const gradeNormalizada = grade.trim().toUpperCase();
-        request.input('grade', sql.VarChar, gradeNormalizada);
-        gradeFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) = @grade`;
+      const gradesList = grades && grades.length > 0 ? grades : grade ? [grade] : [];
+      if (gradesList.length > 0) {
+        const gradesNormalizadas = gradesList.map(g => g.trim().toUpperCase());
+        if (gradesNormalizadas.length === 1) {
+          request.input('grade', sql.VarChar, gradesNormalizadas[0]);
+          gradeFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) = @grade`;
+        } else {
+          gradesNormalizadas.forEach((g, index) => {
+            request.input(`grade${index}`, sql.VarChar, g);
+          });
+          const placeholders = gradesNormalizadas.map((_, index) => `@grade${index}`).join(', ');
+          gradeFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) IN (${placeholders})`;
+        }
       }
     }
 

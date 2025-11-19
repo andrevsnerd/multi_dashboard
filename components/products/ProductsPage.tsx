@@ -6,7 +6,7 @@ import DateRangeFilter, {
   type DateRangeValue,
 } from "@/components/filters/DateRangeFilter";
 import FilialFilter from "@/components/filters/FilialFilter";
-import SelectFilter from "@/components/filters/SelectFilter";
+import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
 import SummaryCards from "@/components/dashboard/SummaryCards";
 import ProductsTable from "@/components/products/ProductsTable";
 import type { ProductDetail } from "@/lib/repositories/products";
@@ -34,11 +34,11 @@ async function fetchProducts(
   company: string,
   range: DateRangeValue,
   filial: string | null,
-  grupo: string | null,
-  linha: string | null,
-  colecao: string | null,
-  subgrupo: string | null,
-  grade: string | null,
+  grupos: string[],
+  linhas: string[],
+  colecoes: string[],
+  subgrupos: string[],
+  grades: string[],
   groupByColor: boolean
 ): Promise<ProductDetail[]> {
   const searchParams = new URLSearchParams({
@@ -51,25 +51,25 @@ async function fetchProducts(
     searchParams.set("filial", filial);
   }
 
-  if (grupo) {
-    searchParams.set("grupo", grupo);
-  }
+  grupos.forEach((grupo) => {
+    searchParams.append("grupo", grupo);
+  });
 
-  if (linha) {
-    searchParams.set("linha", linha);
-  }
+  linhas.forEach((linha) => {
+    searchParams.append("linha", linha);
+  });
 
-  if (colecao) {
-    searchParams.set("colecao", colecao);
-  }
+  colecoes.forEach((colecao) => {
+    searchParams.append("colecao", colecao);
+  });
 
-  if (subgrupo) {
-    searchParams.set("subgrupo", subgrupo);
-  }
+  subgrupos.forEach((subgrupo) => {
+    searchParams.append("subgrupo", subgrupo);
+  });
 
-  if (grade) {
-    searchParams.set("grade", grade);
-  }
+  grades.forEach((grade) => {
+    searchParams.append("grade", grade);
+  });
 
   if (groupByColor) {
     searchParams.set("groupByColor", "true");
@@ -94,11 +94,11 @@ async function fetchSummary(
   company: string,
   range: DateRangeValue,
   filial: string | null,
-  grupo: string | null,
-  linha: string | null,
-  colecao: string | null,
-  subgrupo: string | null,
-  grade: string | null
+  grupos: string[],
+  linhas: string[],
+  colecoes: string[],
+  subgrupos: string[],
+  grades: string[]
 ): Promise<SalesSummary> {
   const searchParams = new URLSearchParams({
     company,
@@ -110,25 +110,25 @@ async function fetchSummary(
     searchParams.set("filial", filial);
   }
 
-  if (grupo) {
-    searchParams.set("grupo", grupo);
-  }
+  grupos.forEach((grupo) => {
+    searchParams.append("grupo", grupo);
+  });
 
-  if (linha) {
-    searchParams.set("linha", linha);
-  }
+  linhas.forEach((linha) => {
+    searchParams.append("linha", linha);
+  });
 
-  if (colecao) {
-    searchParams.set("colecao", colecao);
-  }
+  colecoes.forEach((colecao) => {
+    searchParams.append("colecao", colecao);
+  });
 
-  if (subgrupo) {
-    searchParams.set("subgrupo", subgrupo);
-  }
+  subgrupos.forEach((subgrupo) => {
+    searchParams.append("subgrupo", subgrupo);
+  });
 
-  if (grade) {
-    searchParams.set("grade", grade);
-  }
+  grades.forEach((grade) => {
+    searchParams.append("grade", grade);
+  });
 
   const response = await fetch(`/api/sales-summary?${searchParams.toString()}`, {
     cache: "no-store",
@@ -159,11 +159,11 @@ export default function ProductsPage({
 
   const [range, setRange] = useState<DateRangeValue>(initialRange);
   const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
-  const [selectedGrupo, setSelectedGrupo] = useState<string | null>(null);
-  const [selectedLinha, setSelectedLinha] = useState<string | null>(null);
-  const [selectedColecao, setSelectedColecao] = useState<string | null>(null);
-  const [selectedSubgrupo, setSelectedSubgrupo] = useState<string | null>(null);
-  const [selectedGrade, setSelectedGrade] = useState<string | null>(null);
+  const [selectedGrupos, setSelectedGrupos] = useState<string[]>([]);
+  const [selectedLinhas, setSelectedLinhas] = useState<string[]>([]);
+  const [selectedColecoes, setSelectedColecoes] = useState<string[]>([]);
+  const [selectedSubgrupos, setSelectedSubgrupos] = useState<string[]>([]);
+  const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
   const [groupByColor, setGroupByColor] = useState(false);
   const [data, setData] = useState<ProductDetail[]>([]);
   const [summary, setSummary] = useState<SalesSummary>(EMPTY_SUMMARY);
@@ -418,8 +418,8 @@ export default function ProductsPage({
 
   const rangeKey = useMemo(
     () =>
-      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}::${selectedGrupo ?? 'all'}::${selectedLinha ?? 'all'}::${selectedColecao ?? 'all'}::${selectedSubgrupo ?? 'all'}::${selectedGrade ?? 'all'}::${groupByColor}`,
-    [range.startDate, range.endDate, selectedFilial, selectedGrupo, selectedLinha, selectedColecao, selectedSubgrupo, selectedGrade, groupByColor]
+      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}::${selectedGrupos.join(',')}::${selectedLinhas.join(',')}::${selectedColecoes.join(',')}::${selectedSubgrupos.join(',')}::${selectedGrades.join(',')}::${groupByColor}`,
+    [range.startDate, range.endDate, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, groupByColor]
   );
 
   useEffect(() => {
@@ -430,8 +430,8 @@ export default function ProductsPage({
       setError(null);
       try {
         const [productsData, summaryData] = await Promise.all([
-          fetchProducts(companyKey, range, selectedFilial, selectedGrupo, selectedLinha, selectedColecao, selectedSubgrupo, selectedGrade, groupByColor),
-          fetchSummary(companyKey, range, selectedFilial, selectedGrupo, selectedLinha, selectedColecao, selectedSubgrupo, selectedGrade),
+          fetchProducts(companyKey, range, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, groupByColor),
+          fetchSummary(companyKey, range, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades),
         ]);
         if (active) {
           setData(productsData);
@@ -457,7 +457,7 @@ export default function ProductsPage({
     return () => {
       active = false;
     };
-  }, [companyKey, range, rangeKey, selectedFilial, selectedGrupo, selectedLinha, selectedColecao, selectedSubgrupo, selectedGrade]);
+  }, [companyKey, range, rangeKey, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades]);
 
   return (
     <div className={styles.wrapper}>
@@ -471,38 +471,38 @@ export default function ProductsPage({
             onChange={setSelectedFilial}
           />
           {companyKey === "nerd" && (
-            <SelectFilter
+            <MultiSelectFilter
               label="Grupo"
-              value={selectedGrupo}
+              value={selectedGrupos}
               options={availableGrupos}
-              onChange={setSelectedGrupo}
+              onChange={setSelectedGrupos}
             />
           )}
           {companyKey === "scarfme" && (
             <>
-              <SelectFilter
+              <MultiSelectFilter
                 label="Linha"
-                value={selectedLinha}
+                value={selectedLinhas}
                 options={availableLinhas}
-                onChange={setSelectedLinha}
+                onChange={setSelectedLinhas}
               />
-              <SelectFilter
+              <MultiSelectFilter
                 label="Coleção"
-                value={selectedColecao}
+                value={selectedColecoes}
                 options={availableColecoes}
-                onChange={setSelectedColecao}
+                onChange={setSelectedColecoes}
               />
-              <SelectFilter
+              <MultiSelectFilter
                 label="Subgrupo"
-                value={selectedSubgrupo}
+                value={selectedSubgrupos}
                 options={availableSubgrupos}
-                onChange={setSelectedSubgrupo}
+                onChange={setSelectedSubgrupos}
               />
-              <SelectFilter
+              <MultiSelectFilter
                 label="Grade"
-                value={selectedGrade}
+                value={selectedGrades}
                 options={availableGrades}
-                onChange={setSelectedGrade}
+                onChange={setSelectedGrades}
               />
             </>
           )}

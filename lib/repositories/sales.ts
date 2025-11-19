@@ -145,10 +145,15 @@ export interface SummaryQueryParams {
   range?: DateRangeInput;
   filial?: string | null;
   grupo?: string | null;
+  grupos?: string[] | null;
   linha?: string | null;
+  linhas?: string[] | null;
   colecao?: string | null;
+  colecoes?: string[] | null;
   subgrupo?: string | null;
+  subgrupos?: string[] | null;
   grade?: string | null;
+  grades?: string[] | null;
 }
 
 export interface SalesSummaryResult {
@@ -268,22 +273,27 @@ export async function fetchSalesSummary({
   range,
   filial,
   grupo,
+  grupos,
   linha,
+  linhas,
   colecao,
+  colecoes,
   subgrupo,
+  subgrupos,
   grade,
+  grades,
 }: SummaryQueryParams = {}): Promise<SalesSummaryResult> {
   // Se for e-commerce, usar função específica de e-commerce
   if (isEcommerceFilial(company, filial)) {
-    return fetchEcommerceSummary({ company, range, filial, grupo, linha, colecao, subgrupo, grade });
+    return fetchEcommerceSummary({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades });
   }
 
   // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
   if (shouldAggregateEcommerce(company, filial)) {
     // Buscar vendas normais (varejo) e ecommerce em paralelo
     const [salesResult, ecommerceResult] = await Promise.all([
-      fetchSalesSummary({ company, range, filial: VAREJO_VALUE, grupo, linha, colecao, subgrupo, grade }),
-      fetchEcommerceSummary({ company, range, filial: null, grupo, linha, colecao, subgrupo, grade }),
+      fetchSalesSummary({ company, range, filial: VAREJO_VALUE, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades }),
+      fetchEcommerceSummary({ company, range, filial: null, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades }),
     ]);
 
     // Agregar os resultados
@@ -321,10 +331,15 @@ export async function fetchSalesSummary({
       company,
       filial: null, // Todas as filiais (varejo + ecommerce)
       grupo,
+      grupos,
       linha,
+      linhas,
       colecao,
+      colecoes,
       subgrupo,
+      subgrupos,
       grade,
+      grades,
     });
 
     const summary: SalesSummary = {
@@ -456,20 +471,33 @@ export async function fetchSalesSummary({
 
     const filialFilter = buildFilialFilter(request, company, 'sales', filial);
     
-    // Criar filtro de grupo para NERD
+    // Criar filtro de grupo para NERD (suporta múltiplos)
     let grupoFilter = '';
     let grupoJoin = '';
-    if (company === 'nerd' && grupo) {
-      const grupoNormalizado = grupo.trim().toUpperCase();
-      request.input('grupo', sql.VarChar, grupoNormalizado);
+    const gruposList = grupos && grupos.length > 0 ? grupos : grupo ? [grupo] : [];
+    if (company === 'nerd' && gruposList.length > 0) {
+      const gruposNormalizados = gruposList.map(g => g.trim().toUpperCase());
       grupoJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
-      grupoFilter = `AND (
-        UPPER(LTRIM(RTRIM(ISNULL(vp.GRUPO_PRODUTO, '')))) = @grupo
-        OR UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupo
-      )`;
+      
+      if (gruposNormalizados.length === 1) {
+        request.input('grupo', sql.VarChar, gruposNormalizados[0]);
+        grupoFilter = `AND (
+          UPPER(LTRIM(RTRIM(ISNULL(vp.GRUPO_PRODUTO, '')))) = @grupo
+          OR UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupo
+        )`;
+      } else {
+        gruposNormalizados.forEach((g, index) => {
+          request.input(`grupo${index}`, sql.VarChar, g);
+        });
+        const placeholders = gruposNormalizados.map((_, index) => `@grupo${index}`).join(', ');
+        grupoFilter = `AND (
+          UPPER(LTRIM(RTRIM(ISNULL(vp.GRUPO_PRODUTO, '')))) IN (${placeholders})
+          OR UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) IN (${placeholders})
+        )`;
+      }
     }
 
-    // Criar filtros para ScarfMe
+    // Criar filtros para ScarfMe (suporta múltiplos)
     let linhaFilter = '';
     let colecaoFilter = '';
     let subgrupoFilter = '';
@@ -482,37 +510,82 @@ export async function fetchSalesSummary({
         scarfmeJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
       }
       
-      if (linha) {
-        const linhaNormalizada = linha.trim().toUpperCase();
-        request.input('linha', sql.VarChar, linhaNormalizada);
-        linhaFilter = `AND (
-          UPPER(LTRIM(RTRIM(ISNULL(vp.LINHA, '')))) = @linha
-          OR UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linha
-        )`;
+      const linhasList = linhas && linhas.length > 0 ? linhas : linha ? [linha] : [];
+      if (linhasList.length > 0) {
+        const linhasNormalizadas = linhasList.map(l => l.trim().toUpperCase());
+        if (linhasNormalizadas.length === 1) {
+          request.input('linha', sql.VarChar, linhasNormalizadas[0]);
+          linhaFilter = `AND (
+            UPPER(LTRIM(RTRIM(ISNULL(vp.LINHA, '')))) = @linha
+            OR UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linha
+          )`;
+        } else {
+          linhasNormalizadas.forEach((l, index) => {
+            request.input(`linha${index}`, sql.VarChar, l);
+          });
+          const placeholders = linhasNormalizadas.map((_, index) => `@linha${index}`).join(', ');
+          linhaFilter = `AND (
+            UPPER(LTRIM(RTRIM(ISNULL(vp.LINHA, '')))) IN (${placeholders})
+            OR UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) IN (${placeholders})
+          )`;
+        }
       }
       
-      if (colecao) {
-        const colecaoNormalizada = colecao.trim().toUpperCase();
-        request.input('colecao', sql.VarChar, colecaoNormalizada);
-        colecaoFilter = `AND (
-          UPPER(LTRIM(RTRIM(ISNULL(vp.COLECAO, '')))) = @colecao
-          OR UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao
-        )`;
+      const colecoesList = colecoes && colecoes.length > 0 ? colecoes : colecao ? [colecao] : [];
+      if (colecoesList.length > 0) {
+        const colecoesNormalizadas = colecoesList.map(c => c.trim().toUpperCase());
+        if (colecoesNormalizadas.length === 1) {
+          request.input('colecao', sql.VarChar, colecoesNormalizadas[0]);
+          colecaoFilter = `AND (
+            UPPER(LTRIM(RTRIM(ISNULL(vp.COLECAO, '')))) = @colecao
+            OR UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao
+          )`;
+        } else {
+          colecoesNormalizadas.forEach((c, index) => {
+            request.input(`colecao${index}`, sql.VarChar, c);
+          });
+          const placeholders = colecoesNormalizadas.map((_, index) => `@colecao${index}`).join(', ');
+          colecaoFilter = `AND (
+            UPPER(LTRIM(RTRIM(ISNULL(vp.COLECAO, '')))) IN (${placeholders})
+            OR UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) IN (${placeholders})
+          )`;
+        }
       }
       
-      if (subgrupo) {
-        const subgrupoNormalizado = subgrupo.trim().toUpperCase();
-        request.input('subgrupo', sql.VarChar, subgrupoNormalizado);
-        subgrupoFilter = `AND (
-          UPPER(LTRIM(RTRIM(ISNULL(vp.SUBGRUPO_PRODUTO, '')))) = @subgrupo
-          OR UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupo
-        )`;
+      const subgruposList = subgrupos && subgrupos.length > 0 ? subgrupos : subgrupo ? [subgrupo] : [];
+      if (subgruposList.length > 0) {
+        const subgruposNormalizados = subgruposList.map(s => s.trim().toUpperCase());
+        if (subgruposNormalizados.length === 1) {
+          request.input('subgrupo', sql.VarChar, subgruposNormalizados[0]);
+          subgrupoFilter = `AND (
+            UPPER(LTRIM(RTRIM(ISNULL(vp.SUBGRUPO_PRODUTO, '')))) = @subgrupo
+            OR UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupo
+          )`;
+        } else {
+          subgruposNormalizados.forEach((s, index) => {
+            request.input(`subgrupo${index}`, sql.VarChar, s);
+          });
+          const placeholders = subgruposNormalizados.map((_, index) => `@subgrupo${index}`).join(', ');
+          subgrupoFilter = `AND (
+            UPPER(LTRIM(RTRIM(ISNULL(vp.SUBGRUPO_PRODUTO, '')))) IN (${placeholders})
+            OR UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) IN (${placeholders})
+          )`;
+        }
       }
       
-      if (grade) {
-        const gradeNormalizada = grade.trim().toUpperCase();
-        request.input('grade', sql.VarChar, gradeNormalizada);
-        gradeFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) = @grade`;
+      const gradesList = grades && grades.length > 0 ? grades : grade ? [grade] : [];
+      if (gradesList.length > 0) {
+        const gradesNormalizadas = gradesList.map(g => g.trim().toUpperCase());
+        if (gradesNormalizadas.length === 1) {
+          request.input('grade', sql.VarChar, gradesNormalizadas[0]);
+          gradeFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) = @grade`;
+        } else {
+          gradesNormalizadas.forEach((g, index) => {
+            request.input(`grade${index}`, sql.VarChar, g);
+          });
+          const placeholders = gradesNormalizadas.map((_, index) => `@grade${index}`).join(', ');
+          gradeFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) IN (${placeholders})`;
+        }
       }
     }
 

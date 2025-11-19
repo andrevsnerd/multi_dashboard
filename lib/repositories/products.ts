@@ -34,10 +34,15 @@ export interface ProductsQueryParams {
   };
   filial?: string | null;
   grupo?: string | null;
+  grupos?: string[] | null;
   linha?: string | null;
+  linhas?: string[] | null;
   colecao?: string | null;
+  colecoes?: string[] | null;
   subgrupo?: string | null;
+  subgrupos?: string[] | null;
   grade?: string | null;
+  grades?: string[] | null;
   groupByColor?: boolean; // Se true, agrupa produtos por cor
 }
 
@@ -134,106 +139,235 @@ function buildFilialFilter(
 }
 
 /**
- * Cria filtro de grupo para NERD
+ * Cria filtro de grupo para NERD (suporta múltiplos valores)
  */
 function buildGrupoFilterForProducts(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
-  grupo: string | null | undefined
+  grupo: string | null | undefined,
+  grupos: string[] | null | undefined
 ): string {
-  if (companySlug !== 'nerd' || !grupo) {
+  if (companySlug !== 'nerd') {
     return '';
   }
   
-  // Normalizar o grupo para comparação (mesmo formato usado na busca)
-  const grupoNormalizado = grupo.trim().toUpperCase();
-  request.input('grupo', sql.VarChar, grupoNormalizado);
+  // Usar array se fornecido, senão usar valor único (compatibilidade)
+  const gruposList = grupos && grupos.length > 0 
+    ? grupos 
+    : grupo 
+      ? [grupo] 
+      : [];
+  
+  if (gruposList.length === 0) {
+    return '';
+  }
+  
+  // Normalizar grupos
+  const gruposNormalizados = gruposList.map(g => g.trim().toUpperCase());
+  
+  if (gruposNormalizados.length === 1) {
+    request.input('grupo', sql.VarChar, gruposNormalizados[0]);
+    return `AND (
+      UPPER(LTRIM(RTRIM(ISNULL(vp.GRUPO_PRODUTO, '')))) = @grupo
+      OR UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupo
+    )`;
+  }
+  
+  // Múltiplos grupos - usar IN
+  gruposNormalizados.forEach((g, index) => {
+    request.input(`grupo${index}`, sql.VarChar, g);
+  });
+  
+  const placeholders = gruposNormalizados
+    .map((_, index) => `@grupo${index}`)
+    .join(', ');
   
   return `AND (
-    UPPER(LTRIM(RTRIM(ISNULL(vp.GRUPO_PRODUTO, '')))) = @grupo
-    OR UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupo
+    UPPER(LTRIM(RTRIM(ISNULL(vp.GRUPO_PRODUTO, '')))) IN (${placeholders})
+    OR UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) IN (${placeholders})
   )`;
 }
 
 /**
- * Cria filtro de linha para ScarfMe
+ * Cria filtro de linha para ScarfMe (suporta múltiplos valores)
  */
 function buildLinhaFilterForProducts(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
-  linha: string | null | undefined
+  linha: string | null | undefined,
+  linhas: string[] | null | undefined
 ): string {
-  if (companySlug !== 'scarfme' || !linha) {
+  if (companySlug !== 'scarfme') {
     return '';
   }
   
-  const linhaNormalizada = linha.trim().toUpperCase();
-  request.input('linha', sql.VarChar, linhaNormalizada);
+  const linhasList = linhas && linhas.length > 0 
+    ? linhas 
+    : linha 
+      ? [linha] 
+      : [];
+  
+  if (linhasList.length === 0) {
+    return '';
+  }
+  
+  const linhasNormalizadas = linhasList.map(l => l.trim().toUpperCase());
+  
+  if (linhasNormalizadas.length === 1) {
+    request.input('linha', sql.VarChar, linhasNormalizadas[0]);
+    return `AND (
+      UPPER(LTRIM(RTRIM(ISNULL(vp.LINHA, '')))) = @linha
+      OR UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linha
+    )`;
+  }
+  
+  linhasNormalizadas.forEach((l, index) => {
+    request.input(`linha${index}`, sql.VarChar, l);
+  });
+  
+  const placeholders = linhasNormalizadas
+    .map((_, index) => `@linha${index}`)
+    .join(', ');
   
   return `AND (
-    UPPER(LTRIM(RTRIM(ISNULL(vp.LINHA, '')))) = @linha
-    OR UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linha
+    UPPER(LTRIM(RTRIM(ISNULL(vp.LINHA, '')))) IN (${placeholders})
+    OR UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) IN (${placeholders})
   )`;
 }
 
 /**
- * Cria filtro de coleção para ScarfMe
+ * Cria filtro de coleção para ScarfMe (suporta múltiplos valores)
  */
 function buildColecaoFilterForProducts(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
-  colecao: string | null | undefined
+  colecao: string | null | undefined,
+  colecoes: string[] | null | undefined
 ): string {
-  if (companySlug !== 'scarfme' || !colecao) {
+  if (companySlug !== 'scarfme') {
     return '';
   }
   
-  const colecaoNormalizada = colecao.trim().toUpperCase();
-  request.input('colecao', sql.VarChar, colecaoNormalizada);
+  const colecoesList = colecoes && colecoes.length > 0 
+    ? colecoes 
+    : colecao 
+      ? [colecao] 
+      : [];
+  
+  if (colecoesList.length === 0) {
+    return '';
+  }
+  
+  const colecoesNormalizadas = colecoesList.map(c => c.trim().toUpperCase());
+  
+  if (colecoesNormalizadas.length === 1) {
+    request.input('colecao', sql.VarChar, colecoesNormalizadas[0]);
+    return `AND (
+      UPPER(LTRIM(RTRIM(ISNULL(vp.COLECAO, '')))) = @colecao
+      OR UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao
+    )`;
+  }
+  
+  colecoesNormalizadas.forEach((c, index) => {
+    request.input(`colecao${index}`, sql.VarChar, c);
+  });
+  
+  const placeholders = colecoesNormalizadas
+    .map((_, index) => `@colecao${index}`)
+    .join(', ');
   
   return `AND (
-    UPPER(LTRIM(RTRIM(ISNULL(vp.COLECAO, '')))) = @colecao
-    OR UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao
+    UPPER(LTRIM(RTRIM(ISNULL(vp.COLECAO, '')))) IN (${placeholders})
+    OR UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) IN (${placeholders})
   )`;
 }
 
 /**
- * Cria filtro de subgrupo para ScarfMe
+ * Cria filtro de subgrupo para ScarfMe (suporta múltiplos valores)
  */
 function buildSubgrupoFilterForProducts(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
-  subgrupo: string | null | undefined
+  subgrupo: string | null | undefined,
+  subgrupos: string[] | null | undefined
 ): string {
-  if (companySlug !== 'scarfme' || !subgrupo) {
+  if (companySlug !== 'scarfme') {
     return '';
   }
   
-  const subgrupoNormalizado = subgrupo.trim().toUpperCase();
-  request.input('subgrupo', sql.VarChar, subgrupoNormalizado);
+  const subgruposList = subgrupos && subgrupos.length > 0 
+    ? subgrupos 
+    : subgrupo 
+      ? [subgrupo] 
+      : [];
+  
+  if (subgruposList.length === 0) {
+    return '';
+  }
+  
+  const subgruposNormalizados = subgruposList.map(s => s.trim().toUpperCase());
+  
+  if (subgruposNormalizados.length === 1) {
+    request.input('subgrupo', sql.VarChar, subgruposNormalizados[0]);
+    return `AND (
+      UPPER(LTRIM(RTRIM(ISNULL(vp.SUBGRUPO_PRODUTO, '')))) = @subgrupo
+      OR UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupo
+    )`;
+  }
+  
+  subgruposNormalizados.forEach((s, index) => {
+    request.input(`subgrupo${index}`, sql.VarChar, s);
+  });
+  
+  const placeholders = subgruposNormalizados
+    .map((_, index) => `@subgrupo${index}`)
+    .join(', ');
   
   return `AND (
-    UPPER(LTRIM(RTRIM(ISNULL(vp.SUBGRUPO_PRODUTO, '')))) = @subgrupo
-    OR UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupo
+    UPPER(LTRIM(RTRIM(ISNULL(vp.SUBGRUPO_PRODUTO, '')))) IN (${placeholders})
+    OR UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) IN (${placeholders})
   )`;
 }
 
 /**
- * Cria filtro de grade para ScarfMe
+ * Cria filtro de grade para ScarfMe (suporta múltiplos valores)
  */
 function buildGradeFilterForProducts(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
-  grade: string | null | undefined
+  grade: string | null | undefined,
+  grades: string[] | null | undefined
 ): string {
-  if (companySlug !== 'scarfme' || !grade) {
+  if (companySlug !== 'scarfme') {
     return '';
   }
   
-  const gradeNormalizada = grade.trim().toUpperCase();
-  request.input('grade', sql.VarChar, gradeNormalizada);
+  const gradesList = grades && grades.length > 0 
+    ? grades 
+    : grade 
+      ? [grade] 
+      : [];
   
-  return `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) = @grade`;
+  if (gradesList.length === 0) {
+    return '';
+  }
+  
+  const gradesNormalizadas = gradesList.map(g => g.trim().toUpperCase());
+  
+  if (gradesNormalizadas.length === 1) {
+    request.input('grade', sql.VarChar, gradesNormalizadas[0]);
+    return `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) = @grade`;
+  }
+  
+  gradesNormalizadas.forEach((g, index) => {
+    request.input(`grade${index}`, sql.VarChar, g);
+  });
+  
+  const placeholders = gradesNormalizadas
+    .map((_, index) => `@grade${index}`)
+    .join(', ');
+  
+  return `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) IN (${placeholders})`;
 }
 
 /**
@@ -245,22 +379,27 @@ export async function fetchProductsWithDetails({
   range,
   filial,
   grupo,
+  grupos,
   linha,
+  linhas,
   colecao,
+  colecoes,
   subgrupo,
+  subgrupos,
   grade,
+  grades,
   groupByColor = false,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   // Se for e-commerce, usar função específica de e-commerce
   if (isEcommerceFilial(company, filial)) {
-    return fetchProductsWithDetailsEcommerce({ company, range, filial, grupo, linha, colecao, subgrupo, grade, groupByColor });
+    return fetchProductsWithDetailsEcommerce({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor });
   }
 
   // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
   if (company === 'scarfme' && filial === null) {
     const [salesProducts, ecommerceProducts] = await Promise.all([
-      fetchProductsWithDetailsSales({ company, range, filial: VAREJO_VALUE, grupo, linha, colecao, subgrupo, grade, groupByColor }),
-      fetchProductsWithDetailsEcommerce({ company, range, filial: null, grupo, linha, colecao, subgrupo, grade, groupByColor }),
+      fetchProductsWithDetailsSales({ company, range, filial: VAREJO_VALUE, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor }),
+      fetchProductsWithDetailsEcommerce({ company, range, filial: null, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor }),
     ]);
 
     // Agregar produtos por productId (e cor se groupByColor estiver ativo)
@@ -299,7 +438,7 @@ export async function fetchProductsWithDetails({
   }
 
   // Função normal para vendas de loja
-  return fetchProductsWithDetailsSales({ company, range, filial, grupo, linha, colecao, subgrupo, grade, groupByColor });
+  return fetchProductsWithDetailsSales({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor });
 }
 
 /**
@@ -310,10 +449,15 @@ async function fetchProductsWithDetailsSales({
   range,
   filial,
   grupo,
+  grupos,
   linha,
+  linhas,
   colecao,
+  colecoes,
   subgrupo,
+  subgrupos,
   grade,
+  grades,
   groupByColor = false,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   return withRequest(async (request) => {
@@ -327,11 +471,11 @@ async function fetchProductsWithDetailsSales({
     request.input('previousEndDate', sql.DateTime, previousRange.end);
 
     const filialFilter = buildFilialFilter(request, company, 'sales', filial);
-    const grupoFilter = buildGrupoFilterForProducts(request, company, grupo);
-    const linhaFilter = buildLinhaFilterForProducts(request, company, linha);
-    const colecaoFilter = buildColecaoFilterForProducts(request, company, colecao);
-    const subgrupoFilter = buildSubgrupoFilterForProducts(request, company, subgrupo);
-    const gradeFilter = buildGradeFilterForProducts(request, company, grade);
+    const grupoFilter = buildGrupoFilterForProducts(request, company, grupo, grupos);
+    const linhaFilter = buildLinhaFilterForProducts(request, company, linha, linhas);
+    const colecaoFilter = buildColecaoFilterForProducts(request, company, colecao, colecoes);
+    const subgrupoFilter = buildSubgrupoFilterForProducts(request, company, subgrupo, subgrupos);
+    const gradeFilter = buildGradeFilterForProducts(request, company, grade, grades);
 
     // Definir campos de agrupamento e seleção baseado em groupByColor
     const groupByFields = groupByColor 
@@ -561,10 +705,15 @@ async function fetchProductsWithDetailsEcommerce({
   range,
   filial,
   grupo,
+  grupos,
   linha,
+  linhas,
   colecao,
+  colecoes,
   subgrupo,
+  subgrupos,
   grade,
+  grades,
   groupByColor = false,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   return withRequest(async (request) => {
@@ -598,28 +747,10 @@ async function fetchProductsWithDetailsEcommerce({
     }
 
     // Para e-commerce, usar apenas p (não temos vp)
-    let linhaFilter = '';
-    if (company === 'scarfme' && linha) {
-      const linhaNormalizada = linha.trim().toUpperCase();
-      request.input('linha', sql.VarChar, linhaNormalizada);
-      linhaFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linha`;
-    }
-    
-    let colecaoFilter = '';
-    if (company === 'scarfme' && colecao) {
-      const colecaoNormalizada = colecao.trim().toUpperCase();
-      request.input('colecao', sql.VarChar, colecaoNormalizada);
-      colecaoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao`;
-    }
-    
-    let subgrupoFilter = '';
-    if (company === 'scarfme' && subgrupo) {
-      const subgrupoNormalizado = subgrupo.trim().toUpperCase();
-      request.input('subgrupo', sql.VarChar, subgrupoNormalizado);
-      subgrupoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupo`;
-    }
-    
-    const gradeFilter = buildGradeFilterForProducts(request, company, grade);
+    const linhaFilter = buildLinhaFilterForProducts(request, company, linha, linhas).replace(/vp\./g, 'p.').replace(/OR UPPER\(LTRIM\(RTRIM\(ISNULL\(vp\./g, 'OR UPPER(LTRIM(RTRIM(ISNULL(p.');
+    const colecaoFilter = buildColecaoFilterForProducts(request, company, colecao, colecoes).replace(/vp\./g, 'p.').replace(/OR UPPER\(LTRIM\(RTRIM\(ISNULL\(vp\./g, 'OR UPPER(LTRIM(RTRIM(ISNULL(p.');
+    const subgrupoFilter = buildSubgrupoFilterForProducts(request, company, subgrupo, subgrupos).replace(/vp\./g, 'p.').replace(/OR UPPER\(LTRIM\(RTRIM\(ISNULL\(vp\./g, 'OR UPPER(LTRIM(RTRIM(ISNULL(p.');
+    const gradeFilter = buildGradeFilterForProducts(request, company, grade, grades);
 
     // Definir campos de agrupamento e seleção baseado em groupByColor
     const ecommerceGroupByFields = groupByColor 
