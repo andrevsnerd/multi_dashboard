@@ -734,6 +734,95 @@ export async function fetchStockSummary({
     });
     
     // DEBUG: Log do resultado final
+    // DIAGNÓSTICO ESPECIAL PARA NERD: Verificar diferença entre planilha e sistema
+    if (company === 'nerd' && !filial) {
+      // Query para verificar estoque total sem agrupamento (como na planilha)
+      const queryTotalSemAgrupamento = `
+        SELECT 
+          SUM(e.ESTOQUE) AS estoque_total_bruto,
+          SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoque_positivo_total,
+          SUM(CASE WHEN e.ESTOQUE < 0 THEN e.ESTOQUE ELSE 0 END) AS estoque_negativo_total,
+          COUNT(DISTINCT e.PRODUTO) AS total_produtos,
+          COUNT(*) AS total_linhas_estoque
+        FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+        ${joinType} JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+        WHERE 1=1
+          ${estoqueFilialFilterForWhere}
+          ${grupoFilter}
+          ${linhaFilter}
+          ${colecaoFilter}
+          ${subgrupoFilter}
+          ${gradeFilter}
+      `;
+      
+      const resultTotal = await request.query<{
+        estoque_total_bruto: number | null;
+        estoque_positivo_total: number | null;
+        estoque_negativo_total: number | null;
+        total_produtos: number | null;
+        total_linhas_estoque: number | null;
+      }>(queryTotalSemAgrupamento);
+      
+      // Query para verificar produtos que só têm estoque negativo (sendo ignorados)
+      // Primeiro, vamos construir o filtro de filial para a subquery
+      let estoqueFilialFilterForSubquery = estoqueFilialFilterForWhere;
+      if (estoqueFilialFilterForSubquery) {
+        // Substituir referências de 'e.' por 'e2.' na subquery
+        estoqueFilialFilterForSubquery = estoqueFilialFilterForSubquery.replace(/e\.FILIAL/g, 'e2.FILIAL');
+      }
+      
+      const queryApenasNegativo = `
+        SELECT 
+          COUNT(DISTINCT e.PRODUTO) AS produtos_apenas_negativo,
+          SUM(e.ESTOQUE) AS estoque_apenas_negativo_total
+        FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+        ${joinType} JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+        WHERE 1=1
+          ${estoqueFilialFilterForWhere}
+          ${grupoFilter}
+          ${linhaFilter}
+          ${colecaoFilter}
+          ${subgrupoFilter}
+          ${gradeFilter}
+          AND e.PRODUTO NOT IN (
+            SELECT DISTINCT e2.PRODUTO
+            FROM ESTOQUE_PRODUTOS e2 WITH (NOLOCK)
+            WHERE e2.ESTOQUE > 0
+              ${estoqueFilialFilterForSubquery}
+          )
+          AND e.ESTOQUE < 0
+      `;
+      
+      const resultApenasNegativo = await request.query<{
+        produtos_apenas_negativo: number | null;
+        estoque_apenas_negativo_total: number | null;
+      }>(queryApenasNegativo);
+      
+      if (resultTotal.recordset.length > 0 && resultApenasNegativo.recordset.length > 0) {
+        const total = resultTotal.recordset[0];
+        const apenasNegativo = resultApenasNegativo.recordset[0];
+        
+        const estoqueTotalBruto = Number(total.estoque_total_bruto ?? 0);
+        const estoquePositivoTotal = Number(total.estoque_positivo_total ?? 0);
+        const estoqueNegativoTotal = Number(total.estoque_negativo_total ?? 0);
+        const produtosApenasNegativo = Number(apenasNegativo.produtos_apenas_negativo ?? 0);
+        const estoqueApenasNegativo = Number(apenasNegativo.estoque_apenas_negativo_total ?? 0);
+        
+        console.log(`[fetchStockSummary] DIAGNÓSTICO NERD - Análise de estoque:`, {
+          estoque_sistema_atual: totalQuantity,
+          estoque_total_bruto: estoqueTotalBruto,
+          estoque_positivo_total: estoquePositivoTotal,
+          estoque_negativo_total: estoqueNegativoTotal,
+          produtos_apenas_negativo: produtosApenasNegativo,
+          estoque_apenas_negativo: estoqueApenasNegativo,
+          diferenca_bruto_vs_sistema: estoqueTotalBruto - totalQuantity,
+          diferenca_positivo_vs_sistema: estoquePositivoTotal - totalQuantity,
+          total_produtos: total.total_produtos || 0,
+          total_linhas_estoque: total.total_linhas_estoque || 0,
+        });
+      }
+    }
+    
     if (hasProductFilters || company === 'scarfme' || filial === VAREJO_VALUE) {
       const filterInfo = [
         colecao && `colecao=${colecao}`,
