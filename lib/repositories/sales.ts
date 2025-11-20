@@ -715,14 +715,20 @@ export async function fetchSalesSummary({
     };
 
     // Buscar resumo de estoque
+    // IMPORTANTE: Passar TODOS os filtros (valores únicos E arrays) para garantir que o estoque seja filtrado corretamente
     const stockSummary = await fetchStockSummary({
       company,
       filial,
       grupo,
+      grupos,
       linha,
+      linhas,
       colecao,
+      colecoes,
       subgrupo,
+      subgrupos,
       grade,
+      grades,
     });
 
     const summary: SalesSummary = {

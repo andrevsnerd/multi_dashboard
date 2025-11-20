@@ -65,6 +65,16 @@
   color: #64748b;
 }
 
+.markup {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.colorCodeInline {
+  font-family: 'Courier New', monospace;
+  color: #64748b;
+}
+
 @media (max-width: 768px) {
   .grid {
     grid-template-columns: 1fr;

@@ -93,6 +93,7 @@ function buildFilialFilter(
 export interface ProductStockParams {
   company?: string;
   filial?: string | null;
+  ecommerceOnly?: boolean; // Se true e filial é null, buscar apenas filiais de e-commerce
 }
 
 export interface ProductStock {
@@ -107,12 +108,28 @@ export interface ProductStock {
  */
 export async function fetchProductStock(
   productId: string,
-  { company, filial }: ProductStockParams = {}
+  { company, filial, ecommerceOnly = false }: ProductStockParams = {}
 ): Promise<number> {
   return withRequest(async (request) => {
     request.input('productId', sql.VarChar, productId);
 
-    const filialFilter = buildFilialFilter(request, company, filial);
+    let filialFilter = '';
+    if (ecommerceOnly && !filial && company) {
+      // Buscar apenas filiais de e-commerce
+      const companyConfig = resolveCompany(company);
+      const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
+      if (ecommerceFilials.length > 0) {
+        ecommerceFilials.forEach((filial, index) => {
+          request.input(`estoqueEcommerceFilial${index}`, sql.VarChar, filial);
+        });
+        const placeholders = ecommerceFilials
+          .map((_, index) => `@estoqueEcommerceFilial${index}`)
+          .join(', ');
+        filialFilter = `AND e.FILIAL IN (${placeholders})`;
+      }
+    } else {
+      filialFilter = buildFilialFilter(request, company, filial);
+    }
 
     const query = `
       SELECT 
@@ -154,14 +171,30 @@ export async function fetchProductStock(
  */
 export async function fetchMultipleProductsStock(
   productIds: string[],
-  { company, filial }: ProductStockParams = {}
+  { company, filial, ecommerceOnly = false }: ProductStockParams = {}
 ): Promise<Map<string, number>> {
   if (productIds.length === 0) {
     return new Map();
   }
 
   return withRequest(async (request) => {
-    const filialFilter = buildFilialFilter(request, company, filial);
+    let filialFilter = '';
+    if (ecommerceOnly && !filial && company) {
+      // Buscar apenas filiais de e-commerce
+      const companyConfig = resolveCompany(company);
+      const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
+      if (ecommerceFilials.length > 0) {
+        ecommerceFilials.forEach((filial, index) => {
+          request.input(`estoqueEcommerceFilial${index}`, sql.VarChar, filial);
+        });
+        const placeholders = ecommerceFilials
+          .map((_, index) => `@estoqueEcommerceFilial${index}`)
+          .join(', ');
+        filialFilter = `AND e.FILIAL IN (${placeholders})`;
+      }
+    } else {
+      filialFilter = buildFilialFilter(request, company, filial);
+    }
 
     // Criar placeholders para os IDs dos produtos
     const productPlaceholders = productIds
@@ -228,6 +261,7 @@ export interface StockSummaryParams {
   subgrupos?: string[] | null;
   grade?: string | null;
   grades?: string[] | null;
+  ecommerceOnly?: boolean; // Se true e filial é null, buscar apenas filiais de e-commerce
 }
 
 export interface StockSummary {
@@ -253,6 +287,7 @@ export async function fetchStockSummary({
   subgrupos,
   grade,
   grades,
+  ecommerceOnly = false,
 }: StockSummaryParams = {}): Promise<StockSummary> {
   return withRequest(async (request) => {
     // Criar filtro de grupo para NERD (suporta múltiplos)
@@ -349,7 +384,63 @@ export async function fetchStockSummary({
     // Isso garante que não perdemos nenhuma linha de estoque que corresponda aos filtros
     // Para scarfme, quando não há filial específica (null), considerar TODAS as filiais de inventory
     // (incluindo MATRIZ e MATRIZ CMS - todas as 10 filiais: varejo + ecommerce + matriz)
-    const estoqueFilialFilterForWhere = buildFilialFilter(request, company, filial, 'e');
+    // Se ecommerceOnly é true e filial é null, buscar apenas filiais de e-commerce
+    let estoqueFilialFilterForWhere = '';
+    if (ecommerceOnly && !filial && company) {
+      // Buscar apenas filiais de e-commerce
+      const companyConfig = resolveCompany(company);
+      const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
+      if (ecommerceFilials.length > 0) {
+        ecommerceFilials.forEach((filial, index) => {
+          request.input(`estoqueEcommerceFilial${index}`, sql.VarChar, filial);
+        });
+        const placeholders = ecommerceFilials
+          .map((_, index) => `@estoqueEcommerceFilial${index}`)
+          .join(', ');
+        estoqueFilialFilterForWhere = `AND e.FILIAL IN (${placeholders})`;
+      }
+    } else {
+      estoqueFilialFilterForWhere = buildFilialFilter(request, company, filial, 'e');
+    }
+    
+    // CORREÇÃO: Quando há QUALQUER filtro de produto (coleção, linha, subgrupo, grade), usar INNER JOIN
+    // para garantir que apenas produtos que existem em PRODUTOS e atendem aos filtros sejam incluídos
+    // Isso evita incluir produtos sem os atributos filtrados ou produtos que não existem em PRODUTOS
+    const hasProductFilter = !!(colecao || (colecoes && colecoes.length > 0) || 
+                                 linha || (linhas && linhas.length > 0) || 
+                                 subgrupo || (subgrupos && subgrupos.length > 0) || 
+                                 grade || (grades && grades.length > 0) ||
+                                 (company === 'nerd' && (grupo || (grupos && grupos.length > 0))));
+    const joinType = hasProductFilter ? 'INNER' : 'LEFT';
+    
+    // DEBUG: Log quando filial é VAREJO ou quando há filtros de produto
+    if (filial === VAREJO_VALUE || hasProductFilter) {
+      console.log(`[fetchStockSummary] DEBUG - Filtros aplicados:`, {
+        filial: filial || 'null',
+        filialType: filial === VAREJO_VALUE ? 'VAREJO' : (filial ? 'ESPECIFICA' : 'TODAS'),
+        ecommerceOnly,
+        hasProductFilter,
+        joinType,
+        colecao,
+        colecoes,
+        linha,
+        linhas,
+        subgrupo,
+        subgrupos,
+        grade,
+        grades,
+        grupo,
+        grupos,
+        estoqueFilialFilterForWhere: estoqueFilialFilterForWhere.length > 100 
+          ? estoqueFilialFilterForWhere.substring(0, 100) + '...' 
+          : estoqueFilialFilterForWhere,
+        grupoFilter: grupoFilter ? grupoFilter.substring(0, 50) + '...' : '',
+        linhaFilter: linhaFilter ? linhaFilter.substring(0, 50) + '...' : '',
+        colecaoFilter: colecaoFilter ? colecaoFilter.substring(0, 50) + '...' : '',
+        subgrupoFilter: subgrupoFilter ? subgrupoFilter.substring(0, 50) + '...' : '',
+        gradeFilter: gradeFilter ? gradeFilter.substring(0, 50) + '...' : '',
+      });
+    }
     
     const query = `
       SELECT 
@@ -360,7 +451,7 @@ export async function fetchStockSummary({
         SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0) ELSE 0 END) AS positiveValue,
         SUM(CASE WHEN e.ESTOQUE < 0 THEN e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0) ELSE 0 END) AS negativeValue
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
-      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+      ${joinType} JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
       WHERE 1=1
         ${estoqueFilialFilterForWhere}
         ${grupoFilter}
@@ -382,6 +473,198 @@ export async function fetchStockSummary({
 
     // DEBUG: Log para entender o que está sendo retornado (sempre, não apenas com coleção)
     const hasProductFilters = !!(colecao || linha || subgrupo || grade || grupo);
+    
+    // DEBUG ESPECÍFICO PARA FILTROS DE PRODUTO
+    if (hasProductFilters) {
+      console.log(`[fetchStockSummary] DEBUG FILTROS - Filtros aplicados:`, {
+        colecao,
+        colecoes,
+        linha,
+        linhas,
+        subgrupo,
+        subgrupos,
+        grade,
+        grades,
+        grupo,
+        grupos,
+        joinType,
+        ecommerceOnly,
+        filial: filial || 'null',
+        totalRows: result.recordset.length,
+      });
+      
+      // Verificar se há produtos sem JOIN com PRODUTOS
+      const querySemJoin = `
+        SELECT 
+          COUNT(*) AS total_sem_join,
+          SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoque_sem_join
+        FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+        WHERE 1=1
+          ${estoqueFilialFilterForWhere}
+          AND p.PRODUTO IS NULL
+      `;
+      
+      const resultSemJoin = await request.query<{
+        total_sem_join: number | null;
+        estoque_sem_join: number | null;
+      }>(querySemJoin);
+      
+      if (resultSemJoin.recordset.length > 0) {
+        const semJoin = resultSemJoin.recordset[0];
+        console.log(`[fetchStockSummary] DEBUG FILTROS - Produtos sem JOIN com PRODUTOS:`, {
+          total: semJoin.total_sem_join || 0,
+          estoque: semJoin.estoque_sem_join || 0,
+        });
+      }
+      
+      // Verificar produtos com valores NULL nos campos filtrados
+      if (colecao || (colecoes && colecoes.length > 0)) {
+        const queryColecaoNull = `
+          SELECT 
+            COUNT(DISTINCT e.PRODUTO) AS total_produtos,
+            SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoque_positivo
+          FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+          ${joinType} JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+          WHERE 1=1
+            ${estoqueFilialFilterForWhere}
+            AND (p.COLECAO IS NULL OR UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = '')
+            AND e.ESTOQUE > 0
+        `;
+        
+        const resultColecaoNull = await request.query<{
+          total_produtos: number | null;
+          estoque_positivo: number | null;
+        }>(queryColecaoNull);
+        
+        if (resultColecaoNull.recordset.length > 0) {
+          const colecaoNull = resultColecaoNull.recordset[0];
+          console.log(`[fetchStockSummary] DEBUG FILTROS - Produtos com COLECAO NULL ou vazia:`, {
+            total: colecaoNull.total_produtos || 0,
+            estoque: colecaoNull.estoque_positivo || 0,
+          });
+        }
+      }
+      
+      // Verificar se o filtro está sendo aplicado corretamente
+      const queryComFiltro = `
+        SELECT 
+          COUNT(DISTINCT e.PRODUTO) AS total_produtos,
+          SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoque_positivo
+        FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+        ${joinType} JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+        WHERE 1=1
+          ${estoqueFilialFilterForWhere}
+          ${colecaoFilter}
+          ${linhaFilter}
+          ${subgrupoFilter}
+          ${gradeFilter}
+          ${grupoFilter}
+          AND e.ESTOQUE > 0
+      `;
+      
+      const resultComFiltro = await request.query<{
+        total_produtos: number | null;
+        estoque_positivo: number | null;
+      }>(queryComFiltro);
+      
+      if (resultComFiltro.recordset.length > 0) {
+        const comFiltro = resultComFiltro.recordset[0];
+        console.log(`[fetchStockSummary] DEBUG FILTROS - Com filtros aplicados:`, {
+          total: comFiltro.total_produtos || 0,
+          estoque: comFiltro.estoque_positivo || 0,
+        });
+      }
+    }
+    
+    // DEBUG ESPECÍFICO PARA GRADE (mantido para compatibilidade)
+    if (grade || (grades && grades.length > 0)) {
+      console.log(`[fetchStockSummary] DEBUG GRADE - Filtro aplicado:`, {
+        grade,
+        grades,
+        gradeFilter,
+        ecommerceOnly,
+        filial: filial || 'null',
+        totalRows: result.recordset.length,
+      });
+      
+      // Verificar se há produtos sem JOIN com PRODUTOS
+      const querySemJoin = `
+        SELECT 
+          COUNT(*) AS total_sem_join,
+          SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoque_sem_join
+        FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+        WHERE 1=1
+          ${estoqueFilialFilterForWhere}
+          AND p.PRODUTO IS NULL
+      `;
+      
+      const resultSemJoin = await request.query<{
+        total_sem_join: number | null;
+        estoque_sem_join: number | null;
+      }>(querySemJoin);
+      
+      if (resultSemJoin.recordset.length > 0) {
+        const semJoin = resultSemJoin.recordset[0];
+        console.log(`[fetchStockSummary] DEBUG GRADE - Produtos sem JOIN com PRODUTOS:`, {
+          total: semJoin.total_sem_join || 0,
+          estoque: semJoin.estoque_sem_join || 0,
+        });
+      }
+      
+      // Verificar produtos com grade NULL que estão sendo incluídos
+      const queryGradeNull = `
+        SELECT 
+          COUNT(DISTINCT e.PRODUTO) AS total_produtos,
+          SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoque_positivo
+        FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+        WHERE 1=1
+          ${estoqueFilialFilterForWhere}
+          AND (p.GRADE IS NULL OR CONVERT(VARCHAR, p.GRADE) = '')
+          AND e.ESTOQUE > 0
+      `;
+      
+      const resultGradeNull = await request.query<{
+        total_produtos: number | null;
+        estoque_positivo: number | null;
+      }>(queryGradeNull);
+      
+      if (resultGradeNull.recordset.length > 0) {
+        const gradeNull = resultGradeNull.recordset[0];
+        console.log(`[fetchStockSummary] DEBUG GRADE - Produtos com GRADE NULL:`, {
+          total: gradeNull.total_produtos || 0,
+          estoque: gradeNull.estoque_positivo || 0,
+        });
+      }
+      
+      // Verificar se o filtro está sendo aplicado corretamente
+      const queryComFiltro = `
+        SELECT 
+          COUNT(DISTINCT e.PRODUTO) AS total_produtos,
+          SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoque_positivo
+        FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+        WHERE 1=1
+          ${estoqueFilialFilterForWhere}
+          ${gradeFilter}
+          AND e.ESTOQUE > 0
+      `;
+      
+      const resultComFiltro = await request.query<{
+        total_produtos: number | null;
+        estoque_positivo: number | null;
+      }>(queryComFiltro);
+      
+      if (resultComFiltro.recordset.length > 0) {
+        const comFiltro = resultComFiltro.recordset[0];
+        console.log(`[fetchStockSummary] DEBUG GRADE - Com filtro aplicado:`, {
+          total: comFiltro.total_produtos || 0,
+          estoque: comFiltro.estoque_positivo || 0,
+        });
+      }
+    }
     if (hasProductFilters || company === 'scarfme') {
       const filterInfo = [
         colecao && `colecao=${colecao}`,
@@ -451,7 +734,7 @@ export async function fetchStockSummary({
     });
     
     // DEBUG: Log do resultado final
-    if (hasProductFilters || company === 'scarfme') {
+    if (hasProductFilters || company === 'scarfme' || filial === VAREJO_VALUE) {
       const filterInfo = [
         colecao && `colecao=${colecao}`,
         linha && `linha=${linha}`,
@@ -460,7 +743,45 @@ export async function fetchStockSummary({
         grupo && `grupo=${grupo}`
       ].filter(Boolean).join(', ') || 'sem filtros de produto';
       
-      console.log(`[fetchStockSummary] ${filterInfo}, Filial: ${filial || 'null'}, Total final calculado: ${totalQuantity}`);
+      console.log(`[fetchStockSummary] ${filterInfo}, Filial: ${filial || 'null'}, Total de linhas retornadas: ${result.recordset.length}, Total final calculado: ${totalQuantity}`);
+      
+      // DEBUG ESPECÍFICO PARA VAREJO: Verificar se há produtos duplicados ou problemas de agregação
+      if (filial === VAREJO_VALUE) {
+        // Verificar se há produtos que aparecem em múltiplas filiais
+        const queryVerificarDuplicados = `
+          SELECT 
+            COUNT(DISTINCT e.PRODUTO) AS produtos_distintos,
+            COUNT(*) AS total_linhas_estoque,
+            SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoque_total_sem_group
+          FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+          ${joinType} JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+          WHERE 1=1
+            ${estoqueFilialFilterForWhere}
+            ${grupoFilter}
+            ${linhaFilter}
+            ${colecaoFilter}
+            ${subgrupoFilter}
+            ${gradeFilter}
+            AND e.ESTOQUE > 0
+        `;
+        
+        const resultVerificar = await request.query<{
+          produtos_distintos: number | null;
+          total_linhas_estoque: number | null;
+          estoque_total_sem_group: number | null;
+        }>(queryVerificarDuplicados);
+        
+        if (resultVerificar.recordset.length > 0) {
+          const verificar = resultVerificar.recordset[0];
+          console.log(`[fetchStockSummary] DEBUG VAREJO - Verificacao de agregacao:`, {
+            produtos_distintos: verificar.produtos_distintos || 0,
+            total_linhas_estoque: verificar.total_linhas_estoque || 0,
+            estoque_total_sem_group: verificar.estoque_total_sem_group || 0,
+            estoque_total_com_group: totalQuantity,
+            diferenca: (verificar.estoque_total_sem_group || 0) - totalQuantity,
+          });
+        }
+      }
     }
 
     return {

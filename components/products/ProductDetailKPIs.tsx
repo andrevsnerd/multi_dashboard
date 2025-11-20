@@ -27,16 +27,32 @@ function formatMarkup(value: number): string {
   return `${value.toFixed(2)}x`;
 }
 
+interface KPIItem {
+  label: string;
+  value: string;
+  description: string;
+  highlight?: boolean;
+  markup?: string | null;
+  valueExtra?: string | null;
+  colorCode?: string | null;
+}
+
 export default function ProductDetailKPIs({
   detail,
   companyName,
 }: ProductDetailKPIsProps) {
-  const items = [
+  const items: KPIItem[] = [
     {
       label: "Vendas Total",
       value: formatCurrency(detail.totalRevenue),
-      description: `${detail.totalQuantity} unidades vendidas`,
+      description: `${detail.totalQuantity} unidades`,
+      markup: detail.totalMarkup && detail.totalMarkup > 0 ? formatMarkup(detail.totalMarkup) : null,
       highlight: true,
+    },
+    {
+      label: "Preço Médio",
+      value: formatCurrency(detail.averagePrice),
+      description: `Custo: ${formatCurrency(detail.averageCost)}`,
     },
     {
       label: "Estoque Total",
@@ -47,17 +63,20 @@ export default function ProductDetailKPIs({
       label: "Melhor Loja",
       value: detail.topFilialDisplayName || detail.topFilial || "--",
       description: detail.topFilial
-        ? `Melhor performance - ${formatCurrency(detail.topFilialRevenue)}`
+        ? formatCurrency(detail.topFilialRevenue)
         : "Nenhuma venda registrada",
     },
     {
       label: "Cor Mais Vendida",
       value: detail.topColorDisplayName || detail.topColor || "--",
-      valueExtra: detail.topColorCode || null,
+      valueExtra: null,
       description:
         detail.topColor && detail.topColorQuantity > 0
-          ? `${detail.topColorQuantity} unidades · Markup: ${formatMarkup(detail.topColorMarkup)}`
+          ? detail.topColorCode
+            ? `${detail.topColorCode} · ${detail.topColorQuantity} unidades`
+            : `${detail.topColorQuantity} unidades`
           : "Nenhuma cor registrada",
+      colorCode: null,
     },
   ];
 
@@ -80,7 +99,15 @@ export default function ProductDetailKPIs({
                 <span className={styles.colorCode}>{item.valueExtra}</span>
               )}
             </div>
-            <p className={styles.description}>{item.description}</p>
+            <p className={styles.description}>
+              {item.description}
+              {item.colorCode && (
+                <span className={styles.colorCodeInline}> · {item.colorCode}</span>
+              )}
+              {item.markup && (
+                <span className={styles.markup}> · Markup: {item.markup}</span>
+              )}
+            </p>
           </div>
         </article>
       ))}

@@ -287,7 +287,7 @@ export default function ProductDetailPage({
             <div>
               <h2 className={styles.productName}>{data.detail.productName}</h2>
               <div className={styles.productInfo}>
-                <span className={styles.productId}>Código: {data.detail.productId}</span>
+                <span className={styles.productId}>{data.detail.productId}</span>
                 {data.detail.lastEntryDate && data.detail.lastEntryFilial && (
                   <span className={styles.lastEntry}>
                     Última entrada:{" "}

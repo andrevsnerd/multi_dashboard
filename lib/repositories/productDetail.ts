@@ -99,6 +99,9 @@ export interface ProductDetailInfo {
   totalRevenue: number;
   totalQuantity: number;
   totalStock: number;
+  totalMarkup: number;
+  averagePrice: number;
+  averageCost: number;
   topFilial: string | null;
   topFilialDisplayName: string | null;
   topFilialRevenue: number;
@@ -295,6 +298,7 @@ export async function fetchProductDetail({
     let totalRevenue = 0;
     let totalQuantity = 0;
     let previousRevenue = 0;
+    let totalCostWeighted = 0; // Custo total ponderado por quantidade
 
     const revenueByFilial = new Map<string, number>();
     const quantityByFilial = new Map<string, number>();
@@ -319,7 +323,9 @@ export async function fetchProductDetail({
       revenueByColor.set(cor, (revenueByColor.get(cor) ?? 0) + revenue);
       
       if (row.cost) {
-        costByColor.set(cor, Number(row.cost));
+        const cost = Number(row.cost);
+        costByColor.set(cor, cost);
+        totalCostWeighted += cost * quantity; // Acumular custo ponderado
       }
 
       // Armazenar código e descrição da cor
@@ -381,6 +387,11 @@ export async function fetchProductDetail({
         ? (totalRevenue > 0 ? null : 0)
         : Number((((totalRevenue - previousRevenue) / previousRevenue) * 100).toFixed(1));
 
+    // Calcular markup total
+    const averageCost = totalQuantity > 0 ? totalCostWeighted / totalQuantity : 0;
+    const averagePrice = totalQuantity > 0 ? totalRevenue / totalQuantity : 0;
+    const totalMarkup = averageCost > 0 ? averagePrice / averageCost : 0;
+
     // Converter lastEntryDate para Date se existir
     let lastEntryDate: Date | null = null;
     if (productRow.lastEntryDate) {
@@ -397,6 +408,9 @@ export async function fetchProductDetail({
       totalRevenue,
       totalQuantity,
       totalStock,
+      totalMarkup,
+      averagePrice,
+      averageCost,
       topFilial,
       topFilialDisplayName,
       topFilialRevenue,

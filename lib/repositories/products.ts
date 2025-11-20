@@ -746,11 +746,76 @@ async function fetchProductsWithDetailsEcommerce({
       }
     }
 
-    // Para e-commerce, usar apenas p (não temos vp)
-    const linhaFilter = buildLinhaFilterForProducts(request, company, linha, linhas).replace(/vp\./g, 'p.').replace(/OR UPPER\(LTRIM\(RTRIM\(ISNULL\(vp\./g, 'OR UPPER(LTRIM(RTRIM(ISNULL(p.');
-    const colecaoFilter = buildColecaoFilterForProducts(request, company, colecao, colecoes).replace(/vp\./g, 'p.').replace(/OR UPPER\(LTRIM\(RTRIM\(ISNULL\(vp\./g, 'OR UPPER(LTRIM(RTRIM(ISNULL(p.');
-    const subgrupoFilter = buildSubgrupoFilterForProducts(request, company, subgrupo, subgrupos).replace(/vp\./g, 'p.').replace(/OR UPPER\(LTRIM\(RTRIM\(ISNULL\(vp\./g, 'OR UPPER(LTRIM(RTRIM(ISNULL(p.');
-    const gradeFilter = buildGradeFilterForProducts(request, company, grade, grades);
+    // Para e-commerce, construir filtros usando apenas p (não temos vp)
+    // Criar filtros específicos para e-commerce para evitar problemas com substituição de strings
+    let linhaFilter = '';
+    let colecaoFilter = '';
+    let subgrupoFilter = '';
+    let gradeFilter = '';
+    
+    // Filtro de linha para e-commerce
+    const linhasList = linhas && linhas.length > 0 ? linhas : linha ? [linha] : [];
+    if (company === 'scarfme' && linhasList.length > 0) {
+      const linhasNormalizadas = linhasList.map(l => l.trim().toUpperCase());
+      if (linhasNormalizadas.length === 1) {
+        request.input('linhaEcommerce', sql.VarChar, linhasNormalizadas[0]);
+        linhaFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linhaEcommerce`;
+      } else {
+        linhasNormalizadas.forEach((l, index) => {
+          request.input(`linhaEcommerce${index}`, sql.VarChar, l);
+        });
+        const placeholders = linhasNormalizadas.map((_, index) => `@linhaEcommerce${index}`).join(', ');
+        linhaFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) IN (${placeholders})`;
+      }
+    }
+    
+    // Filtro de coleção para e-commerce
+    const colecoesList = colecoes && colecoes.length > 0 ? colecoes : colecao ? [colecao] : [];
+    if (company === 'scarfme' && colecoesList.length > 0) {
+      const colecoesNormalizadas = colecoesList.map(c => c.trim().toUpperCase());
+      if (colecoesNormalizadas.length === 1) {
+        request.input('colecaoEcommerce', sql.VarChar, colecoesNormalizadas[0]);
+        colecaoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecaoEcommerce`;
+      } else {
+        colecoesNormalizadas.forEach((c, index) => {
+          request.input(`colecaoEcommerce${index}`, sql.VarChar, c);
+        });
+        const placeholders = colecoesNormalizadas.map((_, index) => `@colecaoEcommerce${index}`).join(', ');
+        colecaoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) IN (${placeholders})`;
+      }
+    }
+    
+    // Filtro de subgrupo para e-commerce
+    const subgruposList = subgrupos && subgrupos.length > 0 ? subgrupos : subgrupo ? [subgrupo] : [];
+    if (company === 'scarfme' && subgruposList.length > 0) {
+      const subgruposNormalizados = subgruposList.map(s => s.trim().toUpperCase());
+      if (subgruposNormalizados.length === 1) {
+        request.input('subgrupoEcommerce', sql.VarChar, subgruposNormalizados[0]);
+        subgrupoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupoEcommerce`;
+      } else {
+        subgruposNormalizados.forEach((s, index) => {
+          request.input(`subgrupoEcommerce${index}`, sql.VarChar, s);
+        });
+        const placeholders = subgruposNormalizados.map((_, index) => `@subgrupoEcommerce${index}`).join(', ');
+        subgrupoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) IN (${placeholders})`;
+      }
+    }
+    
+    // Filtro de grade para e-commerce
+    const gradesList = grades && grades.length > 0 ? grades : grade ? [grade] : [];
+    if (company === 'scarfme' && gradesList.length > 0) {
+      const gradesNormalizadas = gradesList.map(g => g.trim().toUpperCase());
+      if (gradesNormalizadas.length === 1) {
+        request.input('gradeEcommerce', sql.VarChar, gradesNormalizadas[0]);
+        gradeFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) = @gradeEcommerce`;
+      } else {
+        gradesNormalizadas.forEach((g, index) => {
+          request.input(`gradeEcommerce${index}`, sql.VarChar, g);
+        });
+        const placeholders = gradesNormalizadas.map((_, index) => `@gradeEcommerce${index}`).join(', ');
+        gradeFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) IN (${placeholders})`;
+      }
+    }
 
     // Definir campos de agrupamento e seleção baseado em groupByColor
     const ecommerceGroupByFields = groupByColor 
@@ -778,7 +843,6 @@ async function fetchProductsWithDetailsEcommerce({
         AND f.EMISSAO < @endDate
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-        AND fp.QTDE > 0
         ${filialFilter}
         ${linhaFilter}
         ${colecaoFilter}
@@ -806,7 +870,6 @@ async function fetchProductsWithDetailsEcommerce({
         AND f.EMISSAO < @previousEndDate
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-        AND fp.QTDE > 0
         ${filialFilter}
         ${linhaFilter}
         ${colecaoFilter}
@@ -832,7 +895,6 @@ async function fetchProductsWithDetailsEcommerce({
       WHERE f.EMISSAO < @startDate
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-        AND fp.QTDE > 0
         ${filialFilter}
         ${linhaFilter}
         ${colecaoFilter}
@@ -943,11 +1005,13 @@ async function fetchProductsWithDetailsEcommerce({
     });
 
     // Buscar estoque para todos os produtos de uma vez
+    // IMPORTANTE: Para e-commerce, quando filial é null, buscar estoque apenas das filiais de e-commerce
     if (products.length > 0) {
       const productIds = products.map((p) => p.productId);
       const stockMap = await fetchMultipleProductsStock(productIds, {
         company,
         filial,
+        ecommerceOnly: !filial, // Se filial é null, buscar apenas filiais de e-commerce
       });
 
       // Adicionar estoque a cada produto

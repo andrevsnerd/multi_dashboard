@@ -30,25 +30,32 @@ function buildEcommerceFilialFilter(
   tableAlias: string = 'f'
 ): string {
   if (!companySlug) {
+    console.log('[buildEcommerceFilialFilter] DEBUG - Sem companySlug');
     return '';
   }
 
   const company = resolveCompany(companySlug);
 
   if (!company) {
+    console.log('[buildEcommerceFilialFilter] DEBUG - Empresa não encontrada:', companySlug);
     return '';
   }
 
   // Se uma filial específica foi selecionada
   if (specificFilial) {
     request.input('ecommerceFilial', sql.VarChar, specificFilial);
-    return `AND ${tableAlias}.FILIAL = @ecommerceFilial`;
+    const filter = `AND ${tableAlias}.FILIAL = @ecommerceFilial`;
+    console.log('[buildEcommerceFilialFilter] DEBUG - Filial específica:', specificFilial, 'Filter:', filter);
+    return filter;
   }
 
   // Caso contrário, usar todas as filiais de e-commerce da empresa
   const ecommerceFilials = company.ecommerceFilials ?? [];
   
+  console.log('[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce:', ecommerceFilials);
+  
   if (ecommerceFilials.length === 0) {
+    console.log('[buildEcommerceFilialFilter] DEBUG - Nenhuma filial de e-commerce encontrada');
     return '';
   }
 
@@ -60,7 +67,9 @@ function buildEcommerceFilialFilter(
     .map((_, index) => `@ecommerceFilial${index}`)
     .join(', ');
 
-  return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
+  const filter = `AND ${tableAlias}.FILIAL IN (${placeholders})`;
+  console.log('[buildEcommerceFilialFilter] DEBUG - Filtro gerado:', filter);
+  return filter;
 }
 
 export interface TopQueryParams {
@@ -119,11 +128,10 @@ export async function fetchTopProductsEcommerce({
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO
-      WHERE f.EMISSAO >= @startDate
-        AND f.EMISSAO < @endDate
+      WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-        AND fp.QTDE > 0
         ${filialFilter}
       GROUP BY fp.PRODUTO
       ORDER BY totalRevenue DESC;
@@ -139,11 +147,13 @@ export async function fetchTopProductsEcommerce({
     }));
 
     // Buscar estoque para todos os produtos de uma vez
+    // IMPORTANTE: Para e-commerce, quando filial é null, buscar estoque apenas das filiais de e-commerce
     if (products.length > 0) {
       const productIds = products.map((p) => p.productId);
       const stockMap = await fetchMultipleProductsStock(productIds, {
         company,
         filial,
+        ecommerceOnly: !filial, // Se filial é null, buscar apenas filiais de e-commerce
       });
 
       // Adicionar estoque a cada produto
@@ -260,6 +270,30 @@ export async function fetchEcommerceSummary({
       }
     }
 
+    // DEBUG: Log dos parâmetros e filtros
+    console.log('[fetchEcommerceSummary] DEBUG - Parâmetros:', {
+      company,
+      filial,
+      startDate: start.toISOString(),
+      endDate: end.toISOString(),
+      linha,
+      linhas,
+      colecao,
+      colecoes,
+      subgrupo,
+      subgrupos,
+      grade,
+      grades,
+    });
+    console.log('[fetchEcommerceSummary] DEBUG - Filtros SQL:', {
+      filialFilter,
+      linhaFilter,
+      colecaoFilter,
+      subgrupoFilter,
+      gradeFilter,
+      produtoJoin,
+    });
+
     const query = `
       WITH summary AS (
         SELECT
@@ -267,16 +301,16 @@ export async function fetchEcommerceSummary({
           SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue,
           SUM(fp.QTDE) AS totalQuantity,
           COUNT(DISTINCT CONCAT(f.NF_SAIDA, '-', f.SERIE_NF)) AS totalTickets,
-          MAX(f.EMISSAO) AS lastSaleDate
+          MAX(f.EMISSAO) AS lastSaleDate,
+          COUNT(*) AS totalRows
         FROM FATURAMENTO f WITH (NOLOCK)
         JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
           ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
         ${produtoJoin}
-        WHERE f.EMISSAO >= @startDate
-          AND f.EMISSAO < @endDate
+        WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+          AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-          AND fp.QTDE > 0
           ${filialFilter}
           ${linhaFilter}
           ${colecaoFilter}
@@ -290,23 +324,23 @@ export async function fetchEcommerceSummary({
           SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue,
           SUM(fp.QTDE) AS totalQuantity,
           COUNT(DISTINCT CONCAT(f.NF_SAIDA, '-', f.SERIE_NF)) AS totalTickets,
-          MAX(f.EMISSAO) AS lastSaleDate
+          MAX(f.EMISSAO) AS lastSaleDate,
+          COUNT(*) AS totalRows
         FROM FATURAMENTO f WITH (NOLOCK)
         JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
           ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
         ${produtoJoin}
-        WHERE f.EMISSAO >= @prevStartDate
-          AND f.EMISSAO < @prevEndDate
+        WHERE CAST(f.EMISSAO AS DATE) >= CAST(@prevStartDate AS DATE)
+          AND CAST(f.EMISSAO AS DATE) <= CAST(@prevEndDate AS DATE)
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-          AND fp.QTDE > 0
           ${filialFilter}
           ${linhaFilter}
           ${colecaoFilter}
           ${subgrupoFilter}
           ${gradeFilter}
       )
-      SELECT period, totalRevenue, totalQuantity, totalTickets, lastSaleDate FROM summary;
+      SELECT period, totalRevenue, totalQuantity, totalTickets, lastSaleDate, totalRows FROM summary;
     `;
 
     const result = await request.query<{
@@ -315,7 +349,15 @@ export async function fetchEcommerceSummary({
       totalQuantity: number | null;
       totalTickets: number | null;
       lastSaleDate: Date | null;
+      totalRows: number | null;
     }>(query);
+
+    // DEBUG: Log do resultado da query
+    console.log('[fetchEcommerceSummary] DEBUG - Resultado da query:', {
+      current: result.recordset.find(r => r.period === 'current'),
+      previous: result.recordset.find(r => r.period === 'previous'),
+      allRows: result.recordset,
+    });
 
     const currentRow =
       result.recordset.find((row) => row.period === 'current') ?? {
@@ -323,6 +365,7 @@ export async function fetchEcommerceSummary({
         totalQuantity: 0,
         totalTickets: 0,
         lastSaleDate: null,
+        totalRows: 0,
       };
     const previousRow =
       result.recordset.find((row) => row.period === 'previous') ?? {
@@ -330,7 +373,532 @@ export async function fetchEcommerceSummary({
         totalQuantity: 0,
         totalTickets: 0,
         lastSaleDate: null,
+        totalRows: 0,
       };
+
+    // DEBUG: Log dos valores calculados
+    console.log('[fetchEcommerceSummary] DEBUG - Valores calculados:', {
+      currentRevenue: Number(currentRow.totalRevenue ?? 0),
+      currentQuantity: Number(currentRow.totalQuantity ?? 0),
+      currentTickets: Number(currentRow.totalTickets ?? 0),
+      currentRows: Number(currentRow.totalRows ?? 0),
+      previousRevenue: Number(previousRow.totalRevenue ?? 0),
+      previousQuantity: Number(previousRow.totalQuantity ?? 0),
+      previousTickets: Number(previousRow.totalTickets ?? 0),
+      previousRows: Number(previousRow.totalRows ?? 0),
+    });
+
+    // DEBUG: Query de teste para comparar com a planilha (sem filtros de produto)
+    const testQuery = `
+      SELECT 
+        SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue,
+        COUNT(*) AS totalRows,
+        COUNT(DISTINCT f.NF_SAIDA + '-' + f.SERIE_NF) AS totalNotas
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        ${filialFilter}
+    `;
+    
+    try {
+      const testResult = await request.query<{
+        totalRevenue: number | null;
+        totalRows: number | null;
+        totalNotas: number | null;
+      }>(testQuery);
+      
+      console.log('[fetchEcommerceSummary] DEBUG - Query de teste (sem filtros de produto):', {
+        totalRevenue: Number(testResult.recordset[0]?.totalRevenue ?? 0),
+        totalRows: Number(testResult.recordset[0]?.totalRows ?? 0),
+        totalNotas: Number(testResult.recordset[0]?.totalNotas ?? 0),
+      });
+    } catch (error) {
+      console.error('[fetchEcommerceSummary] DEBUG - Erro na query de teste:', error);
+    }
+
+    // DEBUG: Query de teste sem nenhum filtro (para comparar com a planilha completa)
+    const testQueryNoFilters = `
+      SELECT 
+        SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue,
+        COUNT(*) AS totalRows,
+        COUNT(DISTINCT f.NF_SAIDA + '-' + f.SERIE_NF) AS totalNotas,
+        MIN(f.EMISSAO) AS primeiraData,
+        MAX(f.EMISSAO) AS ultimaData
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+    `;
+    
+    try {
+      const testResultNoFilters = await request.query<{
+        totalRevenue: number | null;
+        totalRows: number | null;
+        totalNotas: number | null;
+        primeiraData: Date | null;
+        ultimaData: Date | null;
+      }>(testQueryNoFilters);
+      
+      console.log('[fetchEcommerceSummary] DEBUG - Query de teste (SEM NENHUM FILTRO - deve ser igual à planilha):', {
+        totalRevenue: Number(testResultNoFilters.recordset[0]?.totalRevenue ?? 0),
+        totalRows: Number(testResultNoFilters.recordset[0]?.totalRows ?? 0),
+        totalNotas: Number(testResultNoFilters.recordset[0]?.totalNotas ?? 0),
+        primeiraData: testResultNoFilters.recordset[0]?.primeiraData,
+        ultimaData: testResultNoFilters.recordset[0]?.ultimaData,
+      });
+    } catch (error) {
+      console.error('[fetchEcommerceSummary] DEBUG - Erro na query de teste sem filtros:', error);
+    }
+
+    // DEBUG: Query EXATA da planilha - FILIAL específica, EMISSAO em novembro até dia 20, soma VALOR_LIQUIDO e QTDE
+    // Esta query deve retornar exatamente 400.056,09 e 1845
+    // IMPORTANTE: A planilha pode estar usando LEFT JOIN em vez de INNER JOIN
+    const testQueryExataPlanilha = `
+      SELECT 
+        SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue,
+        SUM(ISNULL(fp.QTDE, 0)) AS totalQuantity,
+        COUNT(*) AS totalRows,
+        COUNT(DISTINCT f.NF_SAIDA + '-' + f.SERIE_NF) AS totalNotas,
+        MIN(f.EMISSAO) AS primeiraData,
+        MAX(f.EMISSAO) AS ultimaData,
+        COUNT(CASE WHEN fp.VALOR_LIQUIDO IS NULL THEN 1 END) AS rowsValorLiquidoNull,
+        COUNT(CASE WHEN fp.VALOR_LIQUIDO = 0 THEN 1 END) AS rowsValorLiquidoZero,
+        COUNT(CASE WHEN fp.QTDE IS NULL THEN 1 END) AS rowsQtdeNull,
+        COUNT(CASE WHEN fp.QTDE = 0 THEN 1 END) AS rowsQtdeZero,
+        COUNT(CASE WHEN fp.QTDE < 0 THEN 1 END) AS rowsQtdeNegativo
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        ${filialFilter}
+    `;
+
+    // DEBUG: Query com LEFT JOIN (como na planilha) para verificar se há diferença
+    const testQueryLeftJoin = `
+      SELECT 
+        SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue,
+        SUM(ISNULL(fp.QTDE, 0)) AS totalQuantity,
+        COUNT(*) AS totalRows,
+        COUNT(DISTINCT f.NF_SAIDA + '-' + f.SERIE_NF) AS totalNotas,
+        COUNT(CASE WHEN fp.PRODUTO IS NULL THEN 1 END) AS rowsSemProduto
+      FROM FATURAMENTO f WITH (NOLOCK)
+      LEFT JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        ${filialFilter}
+    `;
+
+    // DEBUG: Verificar se há problema com espaços em branco no nome da filial
+    const testQueryFilialTrim = `
+      SELECT 
+        SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue,
+        SUM(ISNULL(fp.QTDE, 0)) AS totalQuantity,
+        COUNT(*) AS totalRows,
+        COUNT(DISTINCT LTRIM(RTRIM(f.FILIAL))) AS filiaisDistintas,
+        COUNT(DISTINCT LTRIM(RTRIM(fp.FILIAL))) AS filiaisProdutosDistintas
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON LTRIM(RTRIM(f.FILIAL)) = LTRIM(RTRIM(fp.FILIAL)) 
+        AND f.NF_SAIDA = fp.NF_SAIDA 
+        AND f.SERIE_NF = fp.SERIE_NF
+      WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND LTRIM(RTRIM(f.FILIAL)) = LTRIM(RTRIM(@ecommerceFilial))
+    `;
+    
+    try {
+      const testResultExata = await request.query<{
+        totalRevenue: number | null;
+        totalQuantity: number | null;
+        totalRows: number | null;
+        totalNotas: number | null;
+        primeiraData: Date | null;
+        ultimaData: Date | null;
+        rowsValorLiquidoNull: number | null;
+        rowsValorLiquidoZero: number | null;
+        rowsQtdeNull: number | null;
+        rowsQtdeZero: number | null;
+        rowsQtdeNegativo: number | null;
+      }>(testQueryExataPlanilha);
+      
+      const row = testResultExata.recordset[0];
+      console.log('[fetchEcommerceSummary] DEBUG - Query EXATA da planilha (FILIAL + EMISSAO novembro até dia 20) - INNER JOIN:', {
+        totalRevenue: Number(row?.totalRevenue ?? 0),
+        totalQuantity: Number(row?.totalQuantity ?? 0),
+        totalRows: Number(row?.totalRows ?? 0),
+        totalNotas: Number(row?.totalNotas ?? 0),
+        primeiraData: row?.primeiraData,
+        ultimaData: row?.ultimaData,
+        rowsValorLiquidoNull: Number(row?.rowsValorLiquidoNull ?? 0),
+        rowsValorLiquidoZero: Number(row?.rowsValorLiquidoZero ?? 0),
+        rowsQtdeNull: Number(row?.rowsQtdeNull ?? 0),
+        rowsQtdeZero: Number(row?.rowsQtdeZero ?? 0),
+        rowsQtdeNegativo: Number(row?.rowsQtdeNegativo ?? 0),
+        esperadoNaPlanilha: {
+          totalRevenue: 400056.09,
+          totalQuantity: 1845,
+        },
+        diferenca: {
+          totalRevenue: Number(row?.totalRevenue ?? 0) - 400056.09,
+          totalQuantity: Number(row?.totalQuantity ?? 0) - 1845,
+        },
+      });
+    } catch (error) {
+      console.error('[fetchEcommerceSummary] DEBUG - Erro na query exata da planilha:', error);
+    }
+
+    // Testar com LEFT JOIN
+    try {
+      const testResultLeftJoin = await request.query<{
+        totalRevenue: number | null;
+        totalQuantity: number | null;
+        totalRows: number | null;
+        totalNotas: number | null;
+        rowsSemProduto: number | null;
+      }>(testQueryLeftJoin);
+      
+      const rowLeft = testResultLeftJoin.recordset[0];
+      console.log('[fetchEcommerceSummary] DEBUG - Query com LEFT JOIN (como na planilha):', {
+        totalRevenue: Number(rowLeft?.totalRevenue ?? 0),
+        totalQuantity: Number(rowLeft?.totalQuantity ?? 0),
+        totalRows: Number(rowLeft?.totalRows ?? 0),
+        totalNotas: Number(rowLeft?.totalNotas ?? 0),
+        rowsSemProduto: Number(rowLeft?.rowsSemProduto ?? 0),
+        esperadoNaPlanilha: {
+          totalRevenue: 400056.09,
+          totalQuantity: 1845,
+        },
+        diferenca: {
+          totalRevenue: Number(rowLeft?.totalRevenue ?? 0) - 400056.09,
+          totalQuantity: Number(rowLeft?.totalQuantity ?? 0) - 1845,
+        },
+      });
+    } catch (error) {
+      console.error('[fetchEcommerceSummary] DEBUG - Erro na query com LEFT JOIN:', error);
+    }
+
+    // Testar com TRIM no filtro de filial (pode haver espaços em branco)
+    if (filial) {
+      try {
+        request.input('ecommerceFilialTrim', sql.VarChar, filial.trim());
+        const testResultTrim = await request.query<{
+          totalRevenue: number | null;
+          totalQuantity: number | null;
+          totalRows: number | null;
+          filiaisDistintas: number | null;
+          filiaisProdutosDistintas: number | null;
+        }>(testQueryFilialTrim);
+        
+        const rowTrim = testResultTrim.recordset[0];
+        console.log('[fetchEcommerceSummary] DEBUG - Query com TRIM no filtro de filial:', {
+          totalRevenue: Number(rowTrim?.totalRevenue ?? 0),
+          totalQuantity: Number(rowTrim?.totalQuantity ?? 0),
+          totalRows: Number(rowTrim?.totalRows ?? 0),
+          filiaisDistintas: Number(rowTrim?.filiaisDistintas ?? 0),
+          filiaisProdutosDistintas: Number(rowTrim?.filiaisProdutosDistintas ?? 0),
+          esperadoNaPlanilha: {
+            totalRevenue: 400056.09,
+            totalQuantity: 1845,
+          },
+          diferenca: {
+            totalRevenue: Number(rowTrim?.totalRevenue ?? 0) - 400056.09,
+            totalQuantity: Number(rowTrim?.totalQuantity ?? 0) - 1845,
+          },
+        });
+      } catch (error) {
+        console.error('[fetchEcommerceSummary] DEBUG - Erro na query com TRIM:', error);
+      }
+    }
+
+    // DEBUG: Query com filtro de data incluindo o dia 20 completo (usando <= em vez de <)
+    // A planilha pode estar incluindo o dia 20 completo, enquanto nossa query usa < @endDate
+    const testQueryDataInclusiva = `
+      SELECT 
+        SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue,
+        SUM(ISNULL(fp.QTDE, 0)) AS totalQuantity,
+        COUNT(*) AS totalRows,
+        COUNT(DISTINCT f.NF_SAIDA + '-' + f.SERIE_NF) AS totalNotas,
+        MIN(f.EMISSAO) AS primeiraData,
+        MAX(f.EMISSAO) AS ultimaData,
+        COUNT(CASE WHEN CAST(f.EMISSAO AS DATE) = CAST(@endDate AS DATE) THEN 1 END) AS rowsNoDia20
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        ${filialFilter}
+    `;
+    
+    try {
+      const testResultDataInclusiva = await request.query<{
+        totalRevenue: number | null;
+        totalQuantity: number | null;
+        totalRows: number | null;
+        totalNotas: number | null;
+        primeiraData: Date | null;
+        ultimaData: Date | null;
+        rowsNoDia20: number | null;
+      }>(testQueryDataInclusiva);
+      
+      const rowData = testResultDataInclusiva.recordset[0];
+      console.log('[fetchEcommerceSummary] DEBUG - Query com data INCLUSIVA (incluindo dia 20 completo):', {
+        totalRevenue: Number(rowData?.totalRevenue ?? 0),
+        totalQuantity: Number(rowData?.totalQuantity ?? 0),
+        totalRows: Number(rowData?.totalRows ?? 0),
+        totalNotas: Number(rowData?.totalNotas ?? 0),
+        primeiraData: rowData?.primeiraData,
+        ultimaData: rowData?.ultimaData,
+        rowsNoDia20: Number(rowData?.rowsNoDia20 ?? 0),
+        esperadoNaPlanilha: {
+          totalRevenue: 400056.09,
+          totalQuantity: 1845,
+        },
+        diferenca: {
+          totalRevenue: Number(rowData?.totalRevenue ?? 0) - 400056.09,
+          totalQuantity: Number(rowData?.totalQuantity ?? 0) - 1845,
+        },
+      });
+    } catch (error) {
+      console.error('[fetchEcommerceSummary] DEBUG - Erro na query com data inclusiva:', error);
+    }
+
+    // DEBUG: Query de teste para verificar se há registros com QTDE <= 0 que têm VALOR_LIQUIDO
+    const testQueryComQTDE = `
+      SELECT 
+        SUM(CASE WHEN fp.QTDE > 0 THEN ISNULL(fp.VALOR_LIQUIDO, 0) ELSE 0 END) AS totalRevenueComQTDE,
+        SUM(CASE WHEN fp.QTDE <= 0 THEN ISNULL(fp.VALOR_LIQUIDO, 0) ELSE 0 END) AS totalRevenueSemQTDE,
+        COUNT(CASE WHEN fp.QTDE > 0 THEN 1 END) AS rowsComQTDE,
+        COUNT(CASE WHEN fp.QTDE <= 0 THEN 1 END) AS rowsSemQTDE,
+        SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenueTodos,
+        COUNT(*) AS totalRowsTodos
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        ${filialFilter}
+    `;
+    
+    try {
+      const testResultQTDE = await request.query<{
+        totalRevenueComQTDE: number | null;
+        totalRevenueSemQTDE: number | null;
+        rowsComQTDE: number | null;
+        rowsSemQTDE: number | null;
+        totalRevenueTodos: number | null;
+        totalRowsTodos: number | null;
+      }>(testQueryComQTDE);
+      
+      console.log('[fetchEcommerceSummary] DEBUG - Análise por QTDE:', {
+        totalRevenueComQTDE: Number(testResultQTDE.recordset[0]?.totalRevenueComQTDE ?? 0),
+        totalRevenueSemQTDE: Number(testResultQTDE.recordset[0]?.totalRevenueSemQTDE ?? 0),
+        rowsComQTDE: Number(testResultQTDE.recordset[0]?.rowsComQTDE ?? 0),
+        rowsSemQTDE: Number(testResultQTDE.recordset[0]?.rowsSemQTDE ?? 0),
+        totalRevenueTodos: Number(testResultQTDE.recordset[0]?.totalRevenueTodos ?? 0),
+        totalRowsTodos: Number(testResultQTDE.recordset[0]?.totalRowsTodos ?? 0),
+        esperadoNaPlanilha: 400056.09,
+        diferenca: Number(testResultQTDE.recordset[0]?.totalRevenueTodos ?? 0) - 400056.09,
+      });
+    } catch (error) {
+      console.error('[fetchEcommerceSummary] DEBUG - Erro na query de análise por QTDE:', error);
+    }
+
+    // DEBUG: Query para verificar se há registros excluídos por algum motivo
+    const testQueryDetalhada = `
+      SELECT 
+        f.NF_SAIDA,
+        f.SERIE_NF,
+        f.EMISSAO,
+        fp.PRODUTO,
+        fp.QTDE,
+        fp.VALOR_LIQUIDO,
+        f.NOTA_CANCELADA,
+        f.NATUREZA_SAIDA,
+        f.FILIAL
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        ${filialFilter}
+      ORDER BY f.EMISSAO DESC, fp.VALOR_LIQUIDO DESC
+    `;
+    
+    try {
+      const testResultDetalhada = await request.query<{
+        NF_SAIDA: string;
+        SERIE_NF: string;
+        EMISSAO: Date;
+        PRODUTO: string;
+        QTDE: number;
+        VALOR_LIQUIDO: number;
+        NOTA_CANCELADA: number;
+        NATUREZA_SAIDA: string;
+        FILIAL: string;
+      }>(testQueryDetalhada);
+      
+      const totalDetalhado = testResultDetalhada.recordset.reduce((sum, row) => {
+        return sum + Number(row.VALOR_LIQUIDO ?? 0);
+      }, 0);
+      
+      console.log('[fetchEcommerceSummary] DEBUG - Query detalhada (primeiros 10 registros):', {
+        totalRegistros: testResultDetalhada.recordset.length,
+        totalDetalhado: totalDetalhado,
+        primeiros10: testResultDetalhada.recordset.slice(0, 10).map(r => ({
+          NF: `${r.NF_SAIDA}-${r.SERIE_NF}`,
+          EMISSAO: r.EMISSAO,
+          PRODUTO: r.PRODUTO,
+          QTDE: r.QTDE,
+          VALOR_LIQUIDO: r.VALOR_LIQUIDO,
+          FILIAL: r.FILIAL,
+        })),
+        esperadoNaPlanilha: 400056.09,
+        diferenca: totalDetalhado - 400056.09,
+      });
+    } catch (error) {
+      console.error('[fetchEcommerceSummary] DEBUG - Erro na query detalhada:', error);
+    }
+
+    // DEBUG: Verificar se há registros em FATURAMENTO que não fazem JOIN com W_FATURAMENTO_PROD_02
+    const testQuerySemJoin = `
+      SELECT 
+        COUNT(*) AS totalFaturas,
+        SUM(ISNULL(f.VALOR_TOTAL, 0)) AS valorTotalFaturas
+      FROM FATURAMENTO f WITH (NOLOCK)
+      WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        ${filialFilter}
+        AND NOT EXISTS (
+          SELECT 1 
+          FROM W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+          WHERE fp.FILIAL = f.FILIAL 
+            AND fp.NF_SAIDA = f.NF_SAIDA 
+            AND fp.SERIE_NF = f.SERIE_NF
+        )
+    `;
+    
+    try {
+      const testResultSemJoin = await request.query<{
+        totalFaturas: number | null;
+        valorTotalFaturas: number | null;
+      }>(testQuerySemJoin);
+      
+      console.log('[fetchEcommerceSummary] DEBUG - Faturas sem produtos (não fazem JOIN):', {
+        totalFaturas: Number(testResultSemJoin.recordset[0]?.totalFaturas ?? 0),
+        valorTotalFaturas: Number(testResultSemJoin.recordset[0]?.valorTotalFaturas ?? 0),
+      });
+    } catch (error) {
+      console.error('[fetchEcommerceSummary] DEBUG - Erro na query de faturas sem JOIN:', error);
+    }
+
+    // DEBUG: Verificar se a planilha pode estar usando outra coluna ou cálculo
+    const testQueryTodasColunas = `
+      SELECT 
+        SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalValorLiquido,
+        SUM(ISNULL(fp.VALOR, 0)) AS totalValor,
+        SUM(ISNULL(fp.VALOR_PRODUCAO, 0)) AS totalValorProducao,
+        SUM(ISNULL(fp.PRECO * fp.QTDE, 0)) AS totalPrecoQtde,
+        SUM(ISNULL(fp.VALOR_LIQUIDO + fp.DIF_PRODUCAO_LIQUIDO, 0)) AS totalValorLiquidoComDiferenca,
+        SUM(ISNULL(fp.VALOR + fp.DIF_PRODUCAO, 0)) AS totalValorComDiferenca,
+        COUNT(*) AS totalRows
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        ${filialFilter}
+    `;
+    
+    try {
+      const testResultTodasColunas = await request.query<{
+        totalValorLiquido: number | null;
+        totalValor: number | null;
+        totalValorProducao: number | null;
+        totalPrecoQtde: number | null;
+        totalValorLiquidoComDiferenca: number | null;
+        totalValorComDiferenca: number | null;
+        totalRows: number | null;
+      }>(testQueryTodasColunas);
+      
+      const row = testResultTodasColunas.recordset[0];
+      console.log('[fetchEcommerceSummary] DEBUG - Comparação de colunas diferentes:', {
+        totalValorLiquido: Number(row?.totalValorLiquido ?? 0),
+        totalValor: Number(row?.totalValor ?? 0),
+        totalValorProducao: Number(row?.totalValorProducao ?? 0),
+        totalPrecoQtde: Number(row?.totalPrecoQtde ?? 0),
+        totalValorLiquidoComDiferenca: Number(row?.totalValorLiquidoComDiferenca ?? 0),
+        totalValorComDiferenca: Number(row?.totalValorComDiferenca ?? 0),
+        totalRows: Number(row?.totalRows ?? 0),
+        esperadoNaPlanilha: 400056.09,
+        diferencaValorLiquido: Number(row?.totalValorLiquido ?? 0) - 400056.09,
+        diferencaValor: Number(row?.totalValor ?? 0) - 400056.09,
+        diferencaValorLiquidoComDiferenca: Number(row?.totalValorLiquidoComDiferenca ?? 0) - 400056.09,
+        diferencaValorComDiferenca: Number(row?.totalValorComDiferenca ?? 0) - 400056.09,
+      });
+    } catch (error) {
+      console.error('[fetchEcommerceSummary] DEBUG - Erro na query de comparação de colunas:', error);
+    }
+
+    // DEBUG: Verificar se há registros com valores NULL ou zero que podem estar sendo incluídos na planilha
+    const testQueryNulls = `
+      SELECT 
+        COUNT(*) AS totalRows,
+        COUNT(CASE WHEN fp.VALOR_LIQUIDO IS NULL THEN 1 END) AS rowsValorLiquidoNull,
+        COUNT(CASE WHEN fp.VALOR_LIQUIDO = 0 THEN 1 END) AS rowsValorLiquidoZero,
+        COUNT(CASE WHEN fp.VALOR IS NULL THEN 1 END) AS rowsValorNull,
+        COUNT(CASE WHEN fp.VALOR = 0 THEN 1 END) AS rowsValorZero,
+        SUM(CASE WHEN fp.VALOR_LIQUIDO IS NULL THEN ISNULL(fp.VALOR, 0) ELSE 0 END) AS somaValorQuandoLiquidoNull,
+        SUM(CASE WHEN fp.VALOR_LIQUIDO = 0 AND fp.VALOR <> 0 THEN ISNULL(fp.VALOR, 0) ELSE 0 END) AS somaValorQuandoLiquidoZero
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        ${filialFilter}
+    `;
+    
+    try {
+      const testResultNulls = await request.query<{
+        totalRows: number | null;
+        rowsValorLiquidoNull: number | null;
+        rowsValorLiquidoZero: number | null;
+        rowsValorNull: number | null;
+        rowsValorZero: number | null;
+        somaValorQuandoLiquidoNull: number | null;
+        somaValorQuandoLiquidoZero: number | null;
+      }>(testQueryNulls);
+      
+      console.log('[fetchEcommerceSummary] DEBUG - Análise de valores NULL e zero:', testResultNulls.recordset[0]);
+    } catch (error) {
+      console.error('[fetchEcommerceSummary] DEBUG - Erro na query de análise de NULLs:', error);
+    }
 
     const currentRevenue = Number(currentRow.totalRevenue ?? 0);
     const previousRevenue = Number(previousRow.totalRevenue ?? 0);
@@ -368,14 +936,25 @@ export async function fetchEcommerceSummary({
     };
 
     // Buscar resumo de estoque
+    // IMPORTANTE: Passar todos os filtros (valores únicos e arrays) para garantir que o estoque seja filtrado corretamente
+    // IMPORTANTE: Para e-commerce, quando filial é null, significa "todas as filiais de e-commerce"
+    // Mas fetchStockSummary com filial=null busca todas as filiais (varejo + ecommerce)
+    // Solução: quando filial é null em contexto de e-commerce, devemos buscar estoque apenas das filiais de e-commerce
+    // Vamos modificar fetchStockSummary para aceitar um parâmetro adicional "ecommerceOnly"
     const stockSummary = await fetchStockSummary({
       company,
-      filial,
+      filial, // Se for null, buscará todas as filiais (mas precisamos ajustar para buscar apenas e-commerce)
       grupo,
+      grupos,
       linha,
+      linhas,
       colecao,
+      colecoes,
       subgrupo,
+      subgrupos,
       grade,
+      grades,
+      ecommerceOnly: !filial, // Se filial é null, buscar apenas filiais de e-commerce
     });
 
     const summary: SalesSummary = {
@@ -411,7 +990,6 @@ export async function fetchEcommerceSummary({
           ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
         WHERE f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-          AND fp.QTDE > 0
           ${availabilityFilter}
       `;
 
@@ -465,11 +1043,10 @@ export async function fetchTopCategoriesEcommerce({
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO
-      WHERE f.EMISSAO >= @startDate
-        AND f.EMISSAO < @endDate
+      WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-        AND fp.QTDE > 0
         ${filialFilter}
       GROUP BY COALESCE(p.GRUPO_PRODUTO, 'SEM GRUPO')
       ORDER BY totalRevenue DESC;
@@ -509,11 +1086,10 @@ export async function fetchDailyEcommerceRevenue({
       FROM FATURAMENTO f WITH (NOLOCK)
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
-      WHERE f.EMISSAO >= @startDate
-        AND f.EMISSAO < @endDate
+      WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-        AND fp.QTDE > 0
         ${filialFilter}
       GROUP BY CAST(f.EMISSAO AS DATE)
       ORDER BY date ASC;
@@ -578,11 +1154,10 @@ export async function fetchEcommerceFilialPerformance({
         FROM FATURAMENTO f WITH (NOLOCK)
         JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
           ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
-        WHERE f.EMISSAO >= @startDate
-          AND f.EMISSAO < @endDate
+        WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+          AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-          AND fp.QTDE > 0
           AND f.FILIAL IN (${placeholders})
         GROUP BY f.FILIAL
 
@@ -595,11 +1170,10 @@ export async function fetchEcommerceFilialPerformance({
         FROM FATURAMENTO f WITH (NOLOCK)
         JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
           ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
-        WHERE f.EMISSAO >= @prevStartDate
-          AND f.EMISSAO < @prevEndDate
+      WHERE CAST(f.EMISSAO AS DATE) >= CAST(@prevStartDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@prevEndDate AS DATE)
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-          AND fp.QTDE > 0
           AND f.FILIAL IN (${placeholders})
         GROUP BY f.FILIAL
       )
