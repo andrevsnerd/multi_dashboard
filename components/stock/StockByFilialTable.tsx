@@ -383,8 +383,8 @@ export default function StockByFilialTable({
           <thead>
             <tr>
               <th className={`${styles.textLeftHeader} ${styles.subgrupoHeader}`}>{companyKey === "nerd" ? "GRUPO" : "SUBGRUPO"}</th>
-              {companyKey !== "nerd" && <th className={styles.textCenterHeader}>GRADE</th>}
-              <th className={styles.textLeftHeader}>DESCRIÇÃO</th>
+              {companyKey !== "nerd" && <th className={`${styles.textCenterHeader} ${styles.gradeHeader}`}>GRADE</th>}
+              <th className={`${styles.textLeftHeader} ${styles.descricaoHeader}`}>DESCRIÇÃO</th>
               <th className={`${styles.textLeftHeader} ${styles.colorHeader}`}>COR</th>
               <th className={`${styles.textCenterHeader} ${styles.vendasHeader}`}>VENDAS</th>
               <th className={`${styles.textCenterHeader} ${styles.estoqueHeader}`}>ESTOQUE</th>
