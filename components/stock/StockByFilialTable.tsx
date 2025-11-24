@@ -382,11 +382,11 @@ export default function StockByFilialTable({
         <table className={styles.table}>
           <thead>
             <tr>
-              <th className={styles.textLeftHeader}>{companyKey === "nerd" ? "GRUPO" : "SUBGRUPO"}</th>
+              <th className={`${styles.textLeftHeader} ${styles.subgrupoHeader}`}>{companyKey === "nerd" ? "GRUPO" : "SUBGRUPO"}</th>
               {companyKey !== "nerd" && <th className={styles.textCenterHeader}>GRADE</th>}
               <th className={styles.textLeftHeader}>DESCRIÇÃO</th>
-              <th className={styles.textLeftHeader}>COR</th>
-              <th className={styles.textCenterHeader}>VENDAS</th>
+              <th className={`${styles.textLeftHeader} ${styles.colorHeader}`}>COR</th>
+              <th className={`${styles.textCenterHeader} ${styles.vendasHeader}`}>VENDAS</th>
               <th className={`${styles.textCenterHeader} ${styles.estoqueHeader}`}>ESTOQUE</th>
               {matriz && <th className={styles.filialHeader}>MATRIZ</th>}
               {ecommerce && companyKey === "scarfme" && (
@@ -419,7 +419,7 @@ export default function StockByFilialTable({
                     <div className={styles.productCode}>{productInfo.code}</div>
                   </td>
                   <td className={styles.colorCell}>{item.cor}</td>
-                  <td className={styles.numberCellCenter}>{item.totalVendas}</td>
+                  <td className={`${styles.numberCellCenter} ${styles.vendasCell}`}>{item.totalVendas}</td>
                   <td className={`${styles.numberCellCenter} ${styles.estoqueCell}`}>{item.totalEstoque}</td>
                   {matriz && (
                     <td className={styles.filialCellContainer}>

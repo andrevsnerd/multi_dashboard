@@ -76,7 +76,7 @@
 }
 
 .table th {
-  padding: 6px 4px;
+  padding: 6px 6px;
   text-align: center;
   font-weight: 600;
   font-size: 10px;
@@ -91,17 +91,17 @@
 
 .textLeftHeader {
   text-align: left;
-  padding: 6px 4px;
+  padding: 6px 6px;
 }
 
 .textRightHeader {
   text-align: right;
-  padding: 6px 4px;
+  padding: 6px 6px;
 }
 
 .textCenterHeader {
   text-align: center;
-  padding: 6px 4px;
+  padding: 6px 6px;
 }
 
 .table td {
@@ -129,8 +129,16 @@
   font-weight: 500;
   color: #1f2937;
   text-align: left;
-  padding: 6px 4px;
+  padding: 6px 2px;
   font-size: 11px;
+  max-width: 100px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.subgrupoHeader {
+  padding: 6px 2px;
 }
 
 .gradeCell {
@@ -149,7 +157,7 @@
   min-width: 150px;
   max-width: 180px;
   text-align: left;
-  padding: 6px 4px;
+  padding: 6px 6px;
 }
 
 .productName {
@@ -175,7 +183,7 @@
   font-size: 11px;
   color: #1f2937;
   text-align: right;
-  padding: 6px 4px;
+  padding: 6px 6px;
 }
 
 .numberCellCenter {
@@ -183,31 +191,47 @@
   font-size: 11px;
   color: #1f2937;
   text-align: center;
-  padding: 6px 4px;
+  padding: 6px 6px;
+}
+
+.vendasHeader {
+  padding-left: 4px;
+}
+
+.vendasCell {
+  padding-left: 4px;
 }
 
 .estoqueCell {
-  padding-right: 16px;
+  padding-right: 12px;
 }
 
 .estoqueHeader {
-  padding-right: 16px;
+  padding-right: 12px;
 }
 
 .colorCell {
   text-align: left;
-  padding: 6px 4px;
+  padding: 6px 2px;
   font-size: 11px;
+  max-width: 60px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.colorHeader {
+  padding: 6px 2px;
 }
 
 .textCenterCell {
   text-align: center;
-  padding: 6px 4px;
+  padding: 6px 6px;
 }
 
 .filialHeader {
   text-align: center;
-  padding: 6px 2px;
+  padding: 6px 4px;
   font-size: 9px;
   max-width: 80px;
   word-wrap: break-word;
@@ -216,17 +240,17 @@
 
 .filialCellContainer {
   text-align: center;
-  padding: 6px 2px;
+  padding: 6px 4px;
 }
 
 .actionHeader {
   text-align: center;
-  padding: 6px 4px;
+  padding: 6px 6px;
 }
 
 .actionCell {
   text-align: center;
-  padding: 6px 4px;
+  padding: 6px 6px;
 }
 
 .filialCell {
@@ -423,7 +447,7 @@
   }
 
   .table th {
-    padding: 6px 4px;
+    padding: 6px 6px;
     font-size: 10px;
   }
 
@@ -439,11 +463,19 @@
   .textCenterCell,
   .filialCellContainer,
   .actionCell {
+    padding: 6px 6px;
+  }
+
+  .filialCellContainer {
     padding: 6px 4px;
   }
 
-  .numberCellCenter {
-    padding: 6px 8px;
+  .estoqueCell {
+    padding-right: 12px;
+  }
+
+  .estoqueHeader {
+    padding-right: 12px;
   }
 
   .filialCell {
