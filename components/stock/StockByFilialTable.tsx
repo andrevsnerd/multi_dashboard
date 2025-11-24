@@ -436,8 +436,8 @@ export default function StockByFilialTable({
                         <span className={styles.stockValue}>
                           {ecommerceData.stock}
                         </span>
-                        <span className={styles.salesValue}>
-                          {ecommerceData.sales} vendas
+                        <span className={styles.salesBadge}>
+                          {ecommerceData.sales}
                         </span>
                       </div>
                     </td>
@@ -450,8 +450,8 @@ export default function StockByFilialTable({
                           <span className={styles.stockValue}>
                             {filialData.stock}
                           </span>
-                          <span className={styles.salesValue}>
-                            {filialData.sales} vendas
+                          <span className={styles.salesBadge}>
+                            {filialData.sales}
                           </span>
                         </div>
                       </td>
