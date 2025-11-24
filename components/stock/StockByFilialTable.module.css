@@ -76,7 +76,7 @@
 }
 
 .table th {
-  padding: 8px 10px;
+  padding: 6px 4px;
   text-align: center;
   font-weight: 600;
   font-size: 10px;
@@ -91,17 +91,17 @@
 
 .textLeftHeader {
   text-align: left;
-  padding: 8px 10px;
+  padding: 6px 4px;
 }
 
 .textRightHeader {
   text-align: right;
-  padding: 8px 10px;
+  padding: 6px 4px;
 }
 
 .textCenterHeader {
   text-align: center;
-  padding: 8px 10px;
+  padding: 6px 4px;
 }
 
 .table td {
@@ -129,7 +129,7 @@
   font-weight: 500;
   color: #1f2937;
   text-align: left;
-  padding: 8px 10px;
+  padding: 6px 4px;
   font-size: 11px;
 }
 
@@ -149,7 +149,7 @@
   min-width: 150px;
   max-width: 180px;
   text-align: left;
-  padding: 8px 10px;
+  padding: 6px 4px;
 }
 
 .productName {
@@ -175,23 +175,39 @@
   font-size: 11px;
   color: #1f2937;
   text-align: right;
-  padding: 8px 10px;
+  padding: 6px 4px;
+}
+
+.numberCellCenter {
+  font-weight: 600;
+  font-size: 11px;
+  color: #1f2937;
+  text-align: center;
+  padding: 6px 4px;
+}
+
+.estoqueCell {
+  padding-right: 16px;
+}
+
+.estoqueHeader {
+  padding-right: 16px;
 }
 
 .colorCell {
   text-align: left;
-  padding: 8px 10px;
+  padding: 6px 4px;
   font-size: 11px;
 }
 
 .textCenterCell {
   text-align: center;
-  padding: 8px 10px;
+  padding: 6px 4px;
 }
 
 .filialHeader {
   text-align: center;
-  padding: 8px 6px;
+  padding: 6px 2px;
   font-size: 9px;
   max-width: 80px;
   word-wrap: break-word;
@@ -200,17 +216,17 @@
 
 .filialCellContainer {
   text-align: center;
-  padding: 6px 4px;
+  padding: 6px 2px;
 }
 
 .actionHeader {
   text-align: center;
-  padding: 8px 10px;
+  padding: 6px 4px;
 }
 
 .actionCell {
   text-align: center;
-  padding: 6px 8px;
+  padding: 6px 4px;
 }
 
 .filialCell {
@@ -218,7 +234,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 6px;
+  padding: 6px 4px;
   background-color: #f8f9fa;
   border-radius: 0;
   min-width: 70px;
@@ -233,7 +249,7 @@
   align-items: center;
   height: 100%;
   display: flex;
-  padding: 8px 6px;
+  padding: 6px 4px;
   border-radius: 0;
 }
 
@@ -407,7 +423,7 @@
   }
 
   .table th {
-    padding: 8px 8px;
+    padding: 6px 4px;
     font-size: 10px;
   }
 
@@ -419,16 +435,21 @@
   .descricaoCell,
   .colorCell,
   .numberCell,
+  .numberCellCenter,
   .textCenterCell,
   .filialCellContainer,
   .actionCell {
-    padding: 8px 8px;
+    padding: 6px 4px;
+  }
+
+  .numberCellCenter {
+    padding: 6px 8px;
   }
 
   .filialCell {
     min-width: 65px;
     max-width: 75px;
-    padding: 6px 5px;
+    padding: 6px 3px;
     min-height: 45px;
   }
 
@@ -461,7 +482,7 @@
   }
 
   .filialHeader {
-    padding: 8px 5px;
+    padding: 6px 2px;
     font-size: 9px;
     max-width: 75px;
   }
@@ -474,7 +495,7 @@
   }
 
   .table th {
-    padding: 6px 8px;
+    padding: 6px 4px;
     font-size: 9px;
   }
 
@@ -482,9 +503,14 @@
   .descricaoCell,
   .colorCell,
   .numberCell,
+  .numberCellCenter,
   .textCenterCell,
   .filialCellContainer,
   .actionCell {
+    padding: 6px 4px;
+  }
+
+  .numberCellCenter {
     padding: 6px 8px;
   }
 
@@ -504,7 +530,7 @@
   .filialCell {
     min-width: 60px;
     max-width: 70px;
-    padding: 6px 4px;
+    padding: 6px 3px;
     min-height: 40px;
   }
 
@@ -582,7 +608,7 @@
   }
 
   .table th {
-    padding: 6px 6px;
+    padding: 6px 3px;
     font-size: 8px;
     letter-spacing: 0.1px;
   }
@@ -594,7 +620,7 @@
   .textCenterCell,
   .filialCellContainer,
   .actionCell {
-    padding: 6px 6px;
+    padding: 6px 3px;
   }
 
   .descricaoCell {
@@ -627,7 +653,7 @@
   .filialCell {
     min-width: 55px;
     max-width: 65px;
-    padding: 5px 3px;
+    padding: 6px 2px;
     min-height: 35px;
   }
 
@@ -701,7 +727,7 @@
   }
 
   .table th {
-    padding: 5px 4px;
+    padding: 5px 3px;
     font-size: 7px;
   }
 
@@ -712,7 +738,7 @@
   .textCenterCell,
   .filialCellContainer,
   .actionCell {
-    padding: 5px 4px;
+    padding: 5px 3px;
   }
 
   .descricaoCell {
@@ -723,7 +749,7 @@
   .filialCell {
     min-width: 50px;
     max-width: 60px;
-    padding: 4px 3px;
+    padding: 5px 2px;
     min-height: 30px;
   }
 

@@ -386,8 +386,8 @@ export default function StockByFilialTable({
               {companyKey !== "nerd" && <th className={styles.textCenterHeader}>GRADE</th>}
               <th className={styles.textLeftHeader}>DESCRIÇÃO</th>
               <th className={styles.textLeftHeader}>COR</th>
-              <th className={styles.textRightHeader}>VENDAS</th>
-              <th className={styles.textRightHeader}>ESTOQUE</th>
+              <th className={styles.textCenterHeader}>VENDAS</th>
+              <th className={`${styles.textCenterHeader} ${styles.estoqueHeader}`}>ESTOQUE</th>
               {matriz && <th className={styles.filialHeader}>MATRIZ</th>}
               {ecommerce && companyKey === "scarfme" && (
                 <th className={styles.filialHeader}>{company?.filialDisplayNames?.[ecommerce] || ecommerce}</th>
@@ -419,8 +419,8 @@ export default function StockByFilialTable({
                     <div className={styles.productCode}>{productInfo.code}</div>
                   </td>
                   <td className={styles.colorCell}>{item.cor}</td>
-                  <td className={styles.numberCell}>{item.totalVendas}</td>
-                  <td className={styles.numberCell}>{item.totalEstoque}</td>
+                  <td className={styles.numberCellCenter}>{item.totalVendas}</td>
+                  <td className={`${styles.numberCellCenter} ${styles.estoqueCell}`}>{item.totalEstoque}</td>
                   {matriz && (
                     <td className={styles.filialCellContainer}>
                       <div className={`${styles.filialCell} ${styles.filialCellMatriz}`}>
