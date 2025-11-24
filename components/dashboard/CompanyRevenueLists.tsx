@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import type { CategoryRevenue, ProductRevenue, FilialPerformance } from "@/types/dashboard";
+import { isEcommerceFilial, VAREJO_VALUE } from "@/lib/config/company";
 
 import styles from "./RevenueDashboard.module.css";
 
@@ -121,6 +122,53 @@ export default function CompanyRevenueLists({
     };
   }, [companyKey, rangeKey, startDate, endDate, filial]);
 
+  // Adicionar "VAREJO" como primeiro item apenas para SCARFME
+  const filialPerformanceWithVarejo = useMemo(() => {
+    if (companyKey !== "scarfme") {
+      return state.filialPerformance;
+    }
+
+    // Filtrar apenas filiais normais (não e-commerce)
+    const varejoFiliais = state.filialPerformance.filter(
+      (item) => !isEcommerceFilial(companyKey, item.filial)
+    );
+
+    // Se não houver filiais de varejo, retornar a lista original
+    if (varejoFiliais.length === 0) {
+      return state.filialPerformance;
+    }
+
+    // Calcular agregação de VAREJO
+    const varejoCurrentRevenue = varejoFiliais.reduce(
+      (sum, item) => sum + item.currentRevenue,
+      0
+    );
+    const varejoPreviousRevenue = varejoFiliais.reduce(
+      (sum, item) => sum + item.previousRevenue,
+      0
+    );
+
+    let varejoChangePercentage: number | null = null;
+    if (varejoPreviousRevenue > 0) {
+      varejoChangePercentage = Number(
+        (((varejoCurrentRevenue - varejoPreviousRevenue) / varejoPreviousRevenue) * 100).toFixed(1)
+      );
+    } else if (varejoCurrentRevenue > 0) {
+      varejoChangePercentage = null;
+    }
+
+    const varejoItem: FilialPerformance = {
+      filial: VAREJO_VALUE,
+      filialDisplayName: "VAREJO",
+      currentRevenue: varejoCurrentRevenue,
+      previousRevenue: varejoPreviousRevenue,
+      changePercentage: varejoChangePercentage,
+    };
+
+    // Retornar VAREJO primeiro, depois as outras filiais
+    return [varejoItem, ...state.filialPerformance];
+  }, [state.filialPerformance, companyKey]);
+
   return (
     <section className={styles.container}>
       {loading ? <div className={styles.loadingBar} /> : null}
@@ -225,7 +273,7 @@ export default function CompanyRevenueLists({
               </div>
             </div>
             <ul className={styles.list}>
-              {state.filialPerformance.map((item) => {
+              {filialPerformanceWithVarejo.map((item) => {
                 const isPositive = item.changePercentage !== null && item.changePercentage > 0;
                 const isNegative = item.changePercentage !== null && item.changePercentage < 0;
                 const variationClass = isPositive
@@ -273,7 +321,7 @@ export default function CompanyRevenueLists({
                   </li>
                 );
               })}
-              {state.filialPerformance.length === 0 ? (
+              {filialPerformanceWithVarejo.length === 0 ? (
                 <li className={styles.state}>Nenhuma filial encontrada.</li>
               ) : null}
             </ul>
