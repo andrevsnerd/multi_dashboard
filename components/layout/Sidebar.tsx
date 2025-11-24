@@ -27,13 +27,16 @@ export default function Sidebar({ companyName }: SidebarProps) {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Extrair o caminho base da empresa (remover /estoque-por-filial e /produtos se estiver presente)
+  // Extrair o caminho base da empresa (remover /estoque-por-filial, /produtos e /produto-detalhado se estiver presente)
   const getBasePath = () => {
     if (!pathname || pathname === "/") {
       return "/";
     }
-    // Remove /estoque-por-filial e /produtos do final do pathname se existir
-    return pathname.replace(/\/estoque-por-filial$/, "").replace(/\/produtos$/, "");
+    // Remove /estoque-por-filial, /produtos e /produto-detalhado do final do pathname se existir
+    return pathname
+      .replace(/\/estoque-por-filial$/, "")
+      .replace(/\/produto-detalhado$/, "")
+      .replace(/\/produtos$/, "");
   };
 
   const basePath = getBasePath();
@@ -49,10 +52,16 @@ export default function Sidebar({ companyName }: SidebarProps) {
     ? `${basePath}/produtos`
     : "/produtos";
 
+  // Construir o link para produto detalhado baseado no caminho base
+  const produtoDetalhadoHref = basePath && basePath !== "/" 
+    ? `${basePath}/produto-detalhado`
+    : "/produto-detalhado";
+
   const navItems = [
     { label: "Home", href: "/" },
     { label: "Dashboard", href: basePath },
     { label: "Produtos", href: produtosHref },
+    { label: "Produto Detalhado", href: produtoDetalhadoHref },
     // TODO: Descomentar quando estoque por filial estiver pronto
     // { label: "Estoque por Filial", href: stockByFilialHref },
   ];
@@ -115,11 +124,18 @@ export default function Sidebar({ companyName }: SidebarProps) {
               // Home só está ativo na raiz
               isActive = pathname === "/";
             } else if (item.label === "Dashboard") {
-              // Dashboard está ativo quando está no caminho base (não em estoque-por-filial ou produtos)
-              isActive = pathname === item.href && !pathname.includes("/estoque-por-filial") && !pathname.includes("/produtos");
+              // Dashboard está ativo quando está no caminho base (não em estoque-por-filial, produtos ou produto-detalhado)
+              isActive = pathname === item.href && 
+                !pathname.includes("/estoque-por-filial") && 
+                !pathname.includes("/produtos") &&
+                !pathname.includes("/produto-detalhado");
             } else if (item.label === "Produtos") {
-              // Produtos está ativo quando o pathname inclui /produtos
-              isActive = pathname?.includes("/produtos") || pathname === item.href;
+              // Produtos está ativo quando o pathname inclui /produtos mas não /produto-detalhado
+              isActive = (pathname?.includes("/produtos") || pathname === item.href) && 
+                !pathname?.includes("/produto-detalhado");
+            } else if (item.label === "Produto Detalhado") {
+              // Produto Detalhado está ativo quando o pathname inclui /produto-detalhado
+              isActive = pathname?.includes("/produto-detalhado") || pathname === item.href;
             }
             // TODO: Descomentar quando estoque por filial estiver pronto
             // else if (item.label === "Estoque por Filial") {

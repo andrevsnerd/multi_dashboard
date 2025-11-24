@@ -6,6 +6,64 @@ import { RequestLike } from '@/lib/db/proxy';
 import { normalizeRangeForQuery, shiftRangeByMonths } from '@/lib/utils/date';
 import { getColorDescription } from '@/lib/utils/colorMapping';
 
+/**
+ * Verifica se deve agregar dados de ecommerce para scarfme
+ */
+function shouldAggregateEcommerce(
+  company: string | undefined,
+  filial: string | null | undefined
+): boolean {
+  if (!company || filial !== null) {
+    return false;
+  }
+  
+  const companyConfig = resolveCompany(company);
+  const isScarfme = company === 'scarfme';
+  const hasEcommerce = (companyConfig?.ecommerceFilials?.length ?? 0) > 0;
+  
+  return isScarfme && hasEcommerce;
+}
+
+function buildEcommerceFilialFilter(
+  request: sql.Request | RequestLike,
+  companySlug: string | undefined,
+  specificFilial?: string | null,
+  tableAlias: string = 'f'
+): string {
+  if (!companySlug) {
+    return '';
+  }
+
+  const company = resolveCompany(companySlug);
+
+  if (!company) {
+    return '';
+  }
+
+  // Se uma filial específica foi selecionada
+  if (specificFilial) {
+    request.input('ecommerceFilial', sql.VarChar, specificFilial);
+    return `AND ${tableAlias}.FILIAL = @ecommerceFilial`;
+  }
+
+  // Caso contrário, usar todas as filiais de e-commerce da empresa
+  const ecommerceFilials = company.ecommerceFilials ?? [];
+  
+  if (ecommerceFilials.length === 0) {
+    return '';
+  }
+
+  ecommerceFilials.forEach((filial, index) => {
+    request.input(`ecommerceFilial${index}`, sql.VarChar, filial);
+  });
+
+  const placeholders = ecommerceFilials
+    .map((_, index) => `@ecommerceFilial${index}`)
+    .join(', ');
+
+  return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
+}
+
 function buildFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
@@ -150,6 +208,124 @@ function resolveRange(range?: { start?: string | Date; end?: string | Date }) {
 }
 
 /**
+ * Busca dados de ecommerce de um produto específico
+ */
+async function fetchProductDetailEcommerce({
+  productId,
+  company,
+  range,
+  filial,
+}: ProductDetailParams): Promise<{
+  totalRevenue: number;
+  totalQuantity: number;
+  previousRevenue: number;
+  revenueByFilial: Map<string, number>;
+  quantityByFilial: Map<string, number>;
+  quantityByColor: Map<string, number>;
+  revenueByColor: Map<string, number>;
+}> {
+  const { start, end } = resolveRange(range);
+  const previousRange = shiftRangeByMonths({ start, end }, -1);
+
+  return withRequest(async (request) => {
+    request.input('productId', sql.VarChar, productId);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+    request.input('previousStartDate', sql.DateTime, previousRange.start);
+    request.input('previousEndDate', sql.DateTime, previousRange.end);
+
+    const filialFilter = buildEcommerceFilialFilter(request, company, filial, 'f');
+
+    // Buscar vendas do período atual
+    const currentSalesQuery = `
+      SELECT 
+        SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue,
+        SUM(fp.QTDE) AS totalQuantity,
+        f.FILIAL,
+        fp.COR_PRODUTO
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE fp.PRODUTO = @productId
+        AND CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND fp.QTDE > 0
+        ${filialFilter}
+      GROUP BY f.FILIAL, fp.COR_PRODUTO
+    `;
+
+    // Buscar vendas do período anterior
+    const previousSalesQuery = `
+      SELECT 
+        SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE fp.PRODUTO = @productId
+        AND CAST(f.EMISSAO AS DATE) >= CAST(@previousStartDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@previousEndDate AS DATE)
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND fp.QTDE > 0
+        ${filialFilter}
+      GROUP BY f.FILIAL
+    `;
+
+    const [currentSalesResult, previousSalesResult] = await Promise.all([
+      request.query<{
+        totalRevenue: number | null;
+        totalQuantity: number | null;
+        FILIAL: string;
+        COR_PRODUTO: string | null;
+      }>(currentSalesQuery),
+      request.query<{
+        totalRevenue: number | null;
+        FILIAL: string;
+      }>(previousSalesQuery),
+    ]);
+
+    let totalRevenue = 0;
+    let totalQuantity = 0;
+    let previousRevenue = 0;
+    const revenueByFilial = new Map<string, number>();
+    const quantityByFilial = new Map<string, number>();
+    const quantityByColor = new Map<string, number>();
+    const revenueByColor = new Map<string, number>();
+
+    currentSalesResult.recordset.forEach((row) => {
+      const revenue = Number(row.totalRevenue ?? 0);
+      const quantity = Number(row.totalQuantity ?? 0);
+      const filial = (row.FILIAL || '').trim();
+      const cor = row.COR_PRODUTO || 'SEM COR';
+
+      totalRevenue += revenue;
+      totalQuantity += quantity;
+
+      revenueByFilial.set(filial, (revenueByFilial.get(filial) ?? 0) + revenue);
+      quantityByFilial.set(filial, (quantityByFilial.get(filial) ?? 0) + quantity);
+      quantityByColor.set(cor, (quantityByColor.get(cor) ?? 0) + quantity);
+      revenueByColor.set(cor, (revenueByColor.get(cor) ?? 0) + revenue);
+    });
+
+    previousSalesResult.recordset.forEach((row) => {
+      previousRevenue += Number(row.totalRevenue ?? 0);
+    });
+
+    return {
+      totalRevenue,
+      totalQuantity,
+      previousRevenue,
+      revenueByFilial,
+      quantityByFilial,
+      quantityByColor,
+      revenueByColor,
+    };
+  });
+}
+
+/**
  * Busca dados detalhados de um produto específico
  */
 export async function fetchProductDetail({
@@ -158,6 +334,73 @@ export async function fetchProductDetail({
   range,
   filial,
 }: ProductDetailParams): Promise<ProductDetailInfo> {
+  // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
+  if (shouldAggregateEcommerce(company, filial)) {
+    const [salesResult, ecommerceResult] = await Promise.all([
+      fetchProductDetail({ productId, company, range, filial: VAREJO_VALUE }),
+      fetchProductDetailEcommerce({ productId, company, range, filial: null }),
+    ]);
+
+    // Calcular previousRevenue do salesResult
+    const salesPreviousRevenue = salesResult.revenueVariance !== null && salesResult.totalRevenue > 0
+      ? salesResult.totalRevenue / (1 + salesResult.revenueVariance / 100)
+      : 0;
+
+    // Agregar dados
+    const totalRevenue = salesResult.totalRevenue + ecommerceResult.totalRevenue;
+    const totalQuantity = salesResult.totalQuantity + ecommerceResult.totalQuantity;
+    const previousRevenue = salesPreviousRevenue + ecommerceResult.previousRevenue;
+
+    // Agregar revenue por filial para encontrar topFilial
+    const allRevenueByFilial = new Map(salesResult.topFilial ? [[salesResult.topFilial, salesResult.topFilialRevenue]] : []);
+    ecommerceResult.revenueByFilial.forEach((revenue, filialName) => {
+      allRevenueByFilial.set(filialName, (allRevenueByFilial.get(filialName) ?? 0) + revenue);
+    });
+
+    // Encontrar topFilial
+    let topFilial: string | null = null;
+    let topFilialDisplayName: string | null = null;
+    let topFilialRevenue = 0;
+    const companyConfig = resolveCompany(company);
+    const displayNames = companyConfig?.filialDisplayNames ?? {};
+    allRevenueByFilial.forEach((revenue, filialName) => {
+      if (revenue > topFilialRevenue) {
+        topFilialRevenue = revenue;
+        topFilial = filialName;
+        // Normalizar o nome da filial (trim) e aplicar mapeamento
+        const normalizedFilial = filialName.trim();
+        topFilialDisplayName = displayNames[normalizedFilial] ?? displayNames[filialName] ?? filialName;
+      }
+    });
+
+    // Agregar quantity por cor
+    const allQuantityByColor = new Map<string, number>();
+    // Adicionar cores do salesResult (precisamos buscar isso de outra forma ou usar uma aproximação)
+    // Por enquanto, vamos manter o topColor do salesResult, mas podemos melhorar isso depois
+
+    const revenueVariance =
+      previousRevenue === 0
+        ? (totalRevenue > 0 ? null : 0)
+        : Number((((totalRevenue - previousRevenue) / previousRevenue) * 100).toFixed(1));
+
+    // Recalcular média e markup
+    const averageCost = salesResult.averageCost; // Usar o mesmo custo (ecommerce não tem custo detalhado)
+    const averagePrice = totalQuantity > 0 ? totalRevenue / totalQuantity : 0;
+    const totalMarkup = averageCost > 0 ? averagePrice / averageCost : 0;
+
+    return {
+      ...salesResult,
+      totalRevenue,
+      totalQuantity,
+      totalMarkup,
+      averagePrice,
+      topFilial,
+      topFilialDisplayName,
+      topFilialRevenue,
+      revenueVariance,
+    };
+  }
+
   const { start, end } = resolveRange(range);
   const previousRange = shiftRangeByMonths({ start, end }, -1);
 
@@ -348,7 +591,9 @@ export async function fetchProductDetail({
       if (revenue > topFilialRevenue) {
         topFilialRevenue = revenue;
         topFilial = filial;
-        topFilialDisplayName = displayNames[filial] ?? filial;
+        // Normalizar o nome da filial (trim) e aplicar mapeamento
+        const normalizedFilial = filial.trim();
+        topFilialDisplayName = displayNames[normalizedFilial] ?? displayNames[filial] ?? filial;
       }
     });
 
@@ -400,11 +645,16 @@ export async function fetchProductDetail({
         : new Date(productRow.lastEntryDate);
     }
 
+    // Aplicar mapeamento para lastEntryFilial
+    const lastEntryFilialDisplayName = productRow.lastEntryFilial
+      ? (displayNames[productRow.lastEntryFilial] ?? productRow.lastEntryFilial)
+      : null;
+
     return {
       productId: productRow.productId,
       productName: productRow.productName || 'Produto não encontrado',
       lastEntryDate,
-      lastEntryFilial: productRow.lastEntryFilial,
+      lastEntryFilial: lastEntryFilialDisplayName,
       totalRevenue,
       totalQuantity,
       totalStock,
@@ -425,6 +675,178 @@ export async function fetchProductDetail({
 }
 
 /**
+ * Busca estoque e vendas por filial de um produto (apenas ecommerce)
+ */
+async function fetchProductStockByFilialEcommerce({
+  productId,
+  company,
+  range,
+  filial,
+}: ProductDetailParams): Promise<ProductStockByFilial[]> {
+  const { start, end } = resolveRange(range);
+  const previousRange = shiftRangeByMonths({ start, end }, -1);
+
+  return withRequest(async (request) => {
+    request.input('productId', sql.VarChar, productId);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+    request.input('previousStartDate', sql.DateTime, previousRange.start);
+    request.input('previousEndDate', sql.DateTime, previousRange.end);
+
+    const companyConfig = resolveCompany(company);
+    if (!companyConfig) {
+      return [];
+    }
+
+    // Construir o filtro de filiais de ecommerce uma vez e reutilizar
+    const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
+    let estoqueFilialFilter = '';
+    let vendasFilialFilter = '';
+    
+    if (filial) {
+      request.input('ecommerceFilial', sql.VarChar, filial);
+      estoqueFilialFilter = `AND e.FILIAL = @ecommerceFilial`;
+      vendasFilialFilter = `AND f.FILIAL = @ecommerceFilial`;
+    } else if (ecommerceFilials.length > 0) {
+      // Criar parâmetros uma única vez
+      ecommerceFilials.forEach((filialName, index) => {
+        request.input(`ecommerceFilial${index}`, sql.VarChar, filialName);
+      });
+      const placeholders = ecommerceFilials
+        .map((_, index) => `@ecommerceFilial${index}`)
+        .join(', ');
+      estoqueFilialFilter = `AND e.FILIAL IN (${placeholders})`;
+      vendasFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+    }
+
+    // Buscar estoque por filial
+    const stockQuery = `
+      SELECT 
+        e.FILIAL,
+        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS positiveStock,
+        SUM(CASE WHEN e.ESTOQUE < 0 THEN e.ESTOQUE ELSE 0 END) AS negativeStock,
+        COUNT(CASE WHEN e.ESTOQUE > 0 THEN 1 END) AS positiveCount
+      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      WHERE e.PRODUTO = @productId
+        ${estoqueFilialFilter}
+      GROUP BY e.FILIAL
+    `;
+
+    // Buscar vendas por filial - período atual
+    const currentSalesQuery = `
+      SELECT 
+        f.FILIAL,
+        SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue,
+        SUM(fp.QTDE) AS totalQuantity
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE fp.PRODUTO = @productId
+        AND CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND fp.QTDE > 0
+        ${vendasFilialFilter}
+      GROUP BY f.FILIAL
+    `;
+
+    // Buscar vendas por filial - período anterior
+    const previousSalesQuery = `
+      SELECT 
+        f.FILIAL,
+        SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE fp.PRODUTO = @productId
+        AND CAST(f.EMISSAO AS DATE) >= CAST(@previousStartDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@previousEndDate AS DATE)
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND fp.QTDE > 0
+        ${vendasFilialFilter}
+      GROUP BY f.FILIAL
+    `;
+
+    const [stockResult, currentSalesResult, previousSalesResult] = await Promise.all([
+      request.query<{
+        FILIAL: string;
+        positiveStock: number | null;
+        negativeStock: number | null;
+        positiveCount: number | null;
+      }>(stockQuery),
+      request.query<{
+        FILIAL: string;
+        totalRevenue: number | null;
+        totalQuantity: number | null;
+      }>(currentSalesQuery),
+      request.query<{
+        FILIAL: string;
+        totalRevenue: number | null;
+      }>(previousSalesQuery),
+    ]);
+
+    // Criar mapas
+    const stockMap = new Map<string, number>();
+    stockResult.recordset.forEach((row) => {
+      const positiveStock = Number(row.positiveStock ?? 0);
+      const negativeStock = Number(row.negativeStock ?? 0);
+      const positiveCount = Number(row.positiveCount ?? 0);
+      const finalStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
+      stockMap.set(row.FILIAL, finalStock);
+    });
+
+    const currentRevenueMap = new Map<string, number>();
+    const currentQuantityMap = new Map<string, number>();
+    currentSalesResult.recordset.forEach((row) => {
+      currentRevenueMap.set(row.FILIAL, Number(row.totalRevenue ?? 0));
+      currentQuantityMap.set(row.FILIAL, Number(row.totalQuantity ?? 0));
+    });
+
+    const previousRevenueMap = new Map<string, number>();
+    previousSalesResult.recordset.forEach((row) => {
+      previousRevenueMap.set(row.FILIAL, Number(row.totalRevenue ?? 0));
+    });
+
+    // Obter todas as filiais únicas
+    const allFiliais = new Set<string>();
+    stockMap.forEach((_, filial) => allFiliais.add(filial));
+    currentRevenueMap.forEach((_, filial) => allFiliais.add(filial));
+
+    const displayNames = companyConfig.filialDisplayNames ?? {};
+    const result: ProductStockByFilial[] = [];
+
+    allFiliais.forEach((filial) => {
+      const stock = stockMap.get(filial) ?? 0;
+      const revenue = currentRevenueMap.get(filial) ?? 0;
+      const quantity = currentQuantityMap.get(filial) ?? 0;
+      const previousRevenue = previousRevenueMap.get(filial) ?? 0;
+
+      const revenueVariance =
+        previousRevenue === 0
+          ? (revenue > 0 ? null : 0)
+          : Number((((revenue - previousRevenue) / previousRevenue) * 100).toFixed(1));
+
+      // Normalizar o nome da filial (trim) e aplicar mapeamento
+      const normalizedFilial = filial.trim();
+      const filialDisplayName = displayNames[normalizedFilial] ?? displayNames[filial] ?? filial;
+
+      result.push({
+        filial,
+        filialDisplayName,
+        stock,
+        revenue,
+        quantity,
+        revenueVariance,
+      });
+    });
+
+    return result.sort((a, b) => b.revenue - a.revenue);
+  });
+}
+
+/**
  * Busca estoque e vendas por filial de um produto
  */
 export async function fetchProductStockByFilial({
@@ -433,6 +855,49 @@ export async function fetchProductStockByFilial({
   range,
   filial,
 }: ProductDetailParams): Promise<ProductStockByFilial[]> {
+  // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
+  if (shouldAggregateEcommerce(company, filial)) {
+    const [salesResult, ecommerceResult] = await Promise.all([
+      fetchProductStockByFilial({ productId, company, range, filial: VAREJO_VALUE }),
+      fetchProductStockByFilialEcommerce({ productId, company, range, filial: null }),
+    ]);
+
+    // Agregar por filial
+    const filialMap = new Map<string, ProductStockByFilial>();
+    
+    salesResult.forEach((item) => {
+      filialMap.set(item.filial, { ...item });
+    });
+
+    ecommerceResult.forEach((item) => {
+      const existing = filialMap.get(item.filial);
+      if (existing) {
+        existing.revenue += item.revenue;
+        existing.quantity += item.quantity;
+        // Adicionar estoque do ecommerce ao estoque existente
+        existing.stock += item.stock;
+        // Garantir que o filialDisplayName está mapeado corretamente
+        existing.filialDisplayName = item.filialDisplayName;
+        // Recalcular revenueVariance
+        const previousRevenue = existing.revenueVariance !== null && existing.revenue > 0
+          ? existing.revenue / (1 + existing.revenueVariance / 100)
+          : 0;
+        const itemPreviousRevenue = item.revenueVariance !== null && item.revenue > 0
+          ? item.revenue / (1 + item.revenueVariance / 100)
+          : 0;
+        const totalPreviousRevenue = previousRevenue + itemPreviousRevenue;
+        existing.revenueVariance =
+          totalPreviousRevenue === 0
+            ? (existing.revenue > 0 ? null : 0)
+            : Number((((existing.revenue - totalPreviousRevenue) / totalPreviousRevenue) * 100).toFixed(1));
+      } else {
+        filialMap.set(item.filial, { ...item });
+      }
+    });
+
+    return Array.from(filialMap.values()).sort((a, b) => b.revenue - a.revenue);
+  }
+
   const { start, end } = resolveRange(range);
   const previousRange = shiftRangeByMonths({ start, end }, -1);
 
@@ -567,9 +1032,13 @@ export async function fetchProductStockByFilial({
           ? (revenue > 0 ? null : 0)
           : Number((((revenue - previousRevenue) / previousRevenue) * 100).toFixed(1));
 
+      // Normalizar o nome da filial (trim) e aplicar mapeamento
+      const normalizedFilial = filial.trim();
+      const filialDisplayName = displayNames[normalizedFilial] ?? displayNames[filial] ?? filial;
+
       result.push({
         filial,
-        filialDisplayName: displayNames[filial] ?? filial,
+        filialDisplayName,
         stock,
         revenue,
         quantity,
@@ -583,6 +1052,84 @@ export async function fetchProductStockByFilial({
 }
 
 /**
+ * Busca histórico de vendas de um produto (apenas ecommerce)
+ */
+async function fetchProductSaleHistoryEcommerce({
+  productId,
+  company,
+  range,
+  filial,
+}: ProductDetailParams): Promise<ProductSaleHistory[]> {
+  const { start, end } = resolveRange(range);
+
+  return withRequest(async (request) => {
+    request.input('productId', sql.VarChar, productId);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+
+    const companyConfig = resolveCompany(company);
+    if (!companyConfig) {
+      return [];
+    }
+
+    const filialFilter = buildEcommerceFilialFilter(request, company, filial, 'f');
+
+    const query = `
+      SELECT 
+        f.EMISSAO AS date,
+        f.FILIAL,
+        fp.QTDE AS quantity,
+        ISNULL(fp.VALOR_LIQUIDO, 0) AS revenue,
+        fp.COR_PRODUTO AS color,
+        ISNULL(c.DESC_COR, '') AS corBanco
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON fp.COR_PRODUTO = c.COR
+      WHERE fp.PRODUTO = @productId
+        AND CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND fp.QTDE > 0
+        ${filialFilter}
+      ORDER BY f.EMISSAO DESC, f.FILIAL
+    `;
+
+    const result = await request.query<{
+      date: Date;
+      FILIAL: string;
+      quantity: number;
+      revenue: number;
+      color: string | null;
+      corBanco: string;
+    }>(query);
+
+    const displayNames = companyConfig.filialDisplayNames ?? {};
+
+    return result.recordset.map((row) => {
+      const date = row.date instanceof Date ? row.date : new Date(row.date);
+      const colorDisplayName = row.color
+        ? getColorDescription(row.color, row.corBanco)
+        : null;
+
+      return {
+        date,
+        filial: row.FILIAL,
+        filialDisplayName: (() => {
+          const normalizedFilial = (row.FILIAL || '').trim();
+          return displayNames[normalizedFilial] ?? displayNames[row.FILIAL] ?? row.FILIAL;
+        })(),
+        quantity: Number(row.quantity ?? 0),
+        revenue: Number(row.revenue ?? 0),
+        color: row.color,
+        colorDisplayName,
+      };
+    });
+  });
+}
+
+/**
  * Busca histórico de vendas de um produto
  */
 export async function fetchProductSaleHistory({
@@ -591,6 +1138,18 @@ export async function fetchProductSaleHistory({
   range,
   filial,
 }: ProductDetailParams): Promise<ProductSaleHistory[]> {
+  // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
+  if (shouldAggregateEcommerce(company, filial)) {
+    const [salesResult, ecommerceResult] = await Promise.all([
+      fetchProductSaleHistory({ productId, company, range, filial: VAREJO_VALUE }),
+      fetchProductSaleHistoryEcommerce({ productId, company, range, filial: null }),
+    ]);
+
+    // Combinar e ordenar por data
+    const combined = [...salesResult, ...ecommerceResult];
+    return combined.sort((a, b) => b.date.getTime() - a.date.getTime());
+  }
+
   const { start, end } = resolveRange(range);
 
   return withRequest(async (request) => {
@@ -648,7 +1207,10 @@ export async function fetchProductSaleHistory({
       return {
         date,
         filial: row.FILIAL,
-        filialDisplayName: displayNames[row.FILIAL] ?? row.FILIAL,
+        filialDisplayName: (() => {
+          const normalizedFilial = (row.FILIAL || '').trim();
+          return displayNames[normalizedFilial] ?? displayNames[row.FILIAL] ?? row.FILIAL;
+        })(),
         quantity: Number(row.quantity ?? 0),
         revenue: Number(row.revenue ?? 0),
         color: row.color,
