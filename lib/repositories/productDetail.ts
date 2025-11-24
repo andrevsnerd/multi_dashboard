@@ -69,7 +69,8 @@ function buildFilialFilter(
   companySlug: string | undefined,
   module: CompanyModule,
   specificFilial?: string | null,
-  tableAlias: string = 'vp'
+  tableAlias: string = 'vp',
+  paramPrefix: string = 'filial'
 ): string {
   if (!companySlug) {
     return '';
@@ -87,8 +88,8 @@ function buildFilialFilter(
 
   // Se uma filial específica foi selecionada, usar apenas ela
   if (specificFilial && specificFilial !== VAREJO_VALUE) {
-    request.input('filial', sql.VarChar, specificFilial);
-    return `AND ${tableAlias}.FILIAL = @filial`;
+    request.input(paramPrefix, sql.VarChar, specificFilial);
+    return `AND ${tableAlias}.FILIAL = @${paramPrefix}`;
   }
 
   // Para scarfme: se for "VAREJO", mostrar apenas filiais normais (sem ecommerce)
@@ -100,11 +101,11 @@ function buildFilialFilter(
     }
 
     normalFiliais.forEach((filial, index) => {
-      request.input(`filial${index}`, sql.VarChar, filial);
+      request.input(`${paramPrefix}${index}`, sql.VarChar, filial);
     });
 
     const placeholders = normalFiliais
-      .map((_, index) => `@filial${index}`)
+      .map((_, index) => `@${paramPrefix}${index}`)
       .join(', ');
 
     return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
@@ -121,11 +122,11 @@ function buildFilialFilter(
     }
 
     allFiliais.forEach((filial, index) => {
-      request.input(`filial${index}`, sql.VarChar, filial);
+      request.input(`${paramPrefix}${index}`, sql.VarChar, filial);
     });
 
     const placeholders = allFiliais
-      .map((_, index) => `@filial${index}`)
+      .map((_, index) => `@${paramPrefix}${index}`)
       .join(', ');
 
     return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
@@ -139,11 +140,11 @@ function buildFilialFilter(
   }
 
   normalFiliais.forEach((filial, index) => {
-    request.input(`filial${index}`, sql.VarChar, filial);
+    request.input(`${paramPrefix}${index}`, sql.VarChar, filial);
   });
 
   const placeholders = normalFiliais
-    .map((_, index) => `@filial${index}`)
+    .map((_, index) => `@${paramPrefix}${index}`)
     .join(', ');
 
   return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
@@ -913,7 +914,8 @@ export async function fetchProductStockByFilial({
       return [];
     }
 
-    // Buscar estoque por filial
+    // Buscar estoque por filial - buscar de todas as filiais e filtrar depois
+    // Isso garante que encontramos estoque mesmo se o nome da filial no banco não corresponder exatamente
     const stockQuery = `
       SELECT 
         e.FILIAL,
@@ -926,7 +928,7 @@ export async function fetchProductStockByFilial({
     `;
 
     // Buscar vendas por filial - período atual
-    const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+    const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp', 'vendasFilial');
     const currentSalesQuery = `
       SELECT 
         vp.FILIAL,
@@ -983,26 +985,29 @@ export async function fetchProductStockByFilial({
       }>(previousSalesQuery),
     ]);
 
-    // Criar mapas
+    // Criar mapas - normalizar nomes das filiais (trim) para garantir correspondência
     const stockMap = new Map<string, number>();
     stockResult.recordset.forEach((row) => {
       const positiveStock = Number(row.positiveStock ?? 0);
       const negativeStock = Number(row.negativeStock ?? 0);
       const positiveCount = Number(row.positiveCount ?? 0);
       const finalStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
-      stockMap.set(row.FILIAL, finalStock);
+      const normalizedFilial = (row.FILIAL || '').trim();
+      stockMap.set(normalizedFilial, finalStock);
     });
 
     const currentRevenueMap = new Map<string, number>();
     const currentQuantityMap = new Map<string, number>();
     currentSalesResult.recordset.forEach((row) => {
-      currentRevenueMap.set(row.FILIAL, Number(row.totalRevenue ?? 0));
-      currentQuantityMap.set(row.FILIAL, Number(row.totalQuantity ?? 0));
+      const normalizedFilial = (row.FILIAL || '').trim();
+      currentRevenueMap.set(normalizedFilial, Number(row.totalRevenue ?? 0));
+      currentQuantityMap.set(normalizedFilial, Number(row.totalQuantity ?? 0));
     });
 
     const previousRevenueMap = new Map<string, number>();
     previousSalesResult.recordset.forEach((row) => {
-      previousRevenueMap.set(row.FILIAL, Number(row.totalRevenue ?? 0));
+      const normalizedFilial = (row.FILIAL || '').trim();
+      previousRevenueMap.set(normalizedFilial, Number(row.totalRevenue ?? 0));
     });
 
     // Obter todas as filiais únicas
@@ -1011,14 +1016,18 @@ export async function fetchProductStockByFilial({
     currentRevenueMap.forEach((_, filial) => allFiliais.add(filial));
 
     const displayNames = companyConfig.filialDisplayNames ?? {};
-    const filiais = companyConfig.filialFilters['sales'] ?? [];
+    // Usar filiais de inventory para incluir todas as filiais da empresa (incluindo matriz)
+    const filiais = companyConfig.filialFilters['inventory'] ?? [];
+    // Normalizar também as filiais da configuração para comparação
+    const normalizedFiliais = filiais.map(f => f.trim());
 
     // Criar resultado
     const result: ProductStockByFilial[] = [];
 
     allFiliais.forEach((filial) => {
-      // Apenas incluir filiais da empresa
-      if (!filiais.includes(filial)) {
+      // Apenas incluir filiais da empresa (usando inventory para incluir todas as filiais)
+      // Comparar com nomes normalizados
+      if (!normalizedFiliais.includes(filial)) {
         return;
       }
 
@@ -1032,9 +1041,8 @@ export async function fetchProductStockByFilial({
           ? (revenue > 0 ? null : 0)
           : Number((((revenue - previousRevenue) / previousRevenue) * 100).toFixed(1));
 
-      // Normalizar o nome da filial (trim) e aplicar mapeamento
-      const normalizedFilial = filial.trim();
-      const filialDisplayName = displayNames[normalizedFilial] ?? displayNames[filial] ?? filial;
+      // Aplicar mapeamento (filial já está normalizada)
+      const filialDisplayName = displayNames[filial] ?? filial;
 
       result.push({
         filial,
