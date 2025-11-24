@@ -3,6 +3,7 @@
 """
 Exportador de Relatórios Scarfme v5.0 - Otimizado
 Gera relatórios: Produtos, Estoque, Vendas, E-commerce, Entradas
+Também executa análise NERD Geral no modo default do mês recente
 """
 
 import os
@@ -13,6 +14,21 @@ import numpy as np
 import pyodbc
 import shutil
 from datetime import datetime
+import warnings
+
+# Importar função principal do nerd_geral.py
+try:
+    # Adicionar o diretório atual ao path para importar nerd_geral
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    if script_dir not in sys.path:
+        sys.path.insert(0, script_dir)
+    
+    from nerd_geral import analisar_produtos_tarcila_outubro
+    NERD_GERAL_DISPONIVEL = True
+except ImportError as e:
+    print(f"⚠️ Aviso: Não foi possível importar nerd_geral.py: {e}")
+    print("   Continuando sem executar análise NERD Geral...")
+    NERD_GERAL_DISPONIVEL = False
 
 # Config conexão
 DB_CONFIG = {
@@ -31,32 +47,30 @@ COLS_REMOVER = {
 
 def enriquecer_com_codigo_barra(df_base, df_codigos_barra, prioridade_tamanho=True):
     """
-    Adiciona a coluna CODIGO_BARRA ao DataFrame base usando as colunas disponíveis.
-    A tentativa de match respeita a sequência: PRODUTO+COR+TAMANHO (se existir),
-    PRODUTO+COR e por fim apenas PRODUTO.
+    Adiciona coluna CODIGO_BARRA ao DataFrame base usando correspondências
+    progressivas: PRODUTO+COR+TAMANHO, PRODUTO+COR e, por fim, apenas PRODUTO.
     """
     if 'PRODUTO' not in df_base.columns:
         return df_base
-    
+
     df_resultado = df_base.copy()
     codigos = df_codigos_barra[['PRODUTO', 'COR_PRODUTO', 'TAMANHO', 'CODIGO_BARRA']].copy()
     codigos.drop_duplicates(subset=['PRODUTO', 'COR_PRODUTO', 'TAMANHO'], inplace=True)
-    
+
     chaves_opcoes = []
     if prioridade_tamanho and all(col in df_resultado.columns for col in ['PRODUTO', 'COR_PRODUTO', 'TAMANHO']):
         chaves_opcoes.append(['PRODUTO', 'COR_PRODUTO', 'TAMANHO'])
     if all(col in df_resultado.columns for col in ['PRODUTO', 'COR_PRODUTO']):
         chaves_opcoes.append(['PRODUTO', 'COR_PRODUTO'])
     chaves_opcoes.append(['PRODUTO'])
-    
+
     for chaves in chaves_opcoes:
         codigos_merge = codigos[chaves + ['CODIGO_BARRA']].drop_duplicates(subset=chaves)
         df_resultado = df_resultado.merge(codigos_merge, how='left', on=chaves, suffixes=('', '_MERGE'))
         if df_resultado['CODIGO_BARRA'].notna().any():
             break
-        else:
-            df_resultado.drop(columns=['CODIGO_BARRA'], inplace=True)
-    
+        df_resultado.drop(columns=['CODIGO_BARRA'], inplace=True)
+
     return df_resultado
 
 def conectar_banco():
@@ -148,13 +162,9 @@ def processar_vendas(df, df_codigos_barra):
     df = converter_datas(df, ['DATA_VENDA'])
     df = df[df['QTDE'] > 0].copy()
 
-    # Enriquecimento com códigos de barra (produto + cor + tamanho)
     colunas_chave = ['PRODUTO', 'COR_PRODUTO', 'TAMANHO']
     colunas_barra = colunas_chave + ['CODIGO_BARRA']
-    df_codigos = (
-        df_codigos_barra[colunas_barra]
-        .drop_duplicates(subset=colunas_chave)
-    )
+    df_codigos = df_codigos_barra[colunas_barra].drop_duplicates(subset=colunas_chave)
     df = df.merge(df_codigos, how='left', on=colunas_chave)
     
     # Calcula valor líquido
@@ -376,9 +386,50 @@ def main():
     # Cópia
     copiar_arquivos()
     
+    # Executar análise NERD Geral (modo default do mês recente)
+    if NERD_GERAL_DISPONIVEL:
+        print("\n" + "="*60)
+        print("[ANÁLISE NERD GERAL]")
+        print("="*60)
+        t_nerd = time.time()
+        
+        try:
+            # Suprimir warnings do pandas durante execução do nerd_geral
+            warnings.filterwarnings("ignore", category=UserWarning, module='pandas')
+            
+            # Executar nerd_geral (o popup final dele aparecerá normalmente)
+            analisar_produtos_tarcila_outubro()
+            
+            print(f"\n✓ Análise NERD Geral concluída em {time.time()-t_nerd:.2f}s")
+        except Exception as e:
+            print(f"\n✗ Erro ao executar análise NERD Geral: {e}")
+            import traceback
+            print(traceback.format_exc())
+    else:
+        print("\n⚠️ Análise NERD Geral não foi executada (módulo não disponível)")
+    
+    # Aviso final de conclusão de tudo
+    tempo_total_final = time.time() - t_total
     print("\n" + "="*60)
-    print(f"CONCLUÍDO! Tempo total: {time.time()-t_total:.2f}s")
+    print("🎉 EXPORTAÇÃO COMPLETA CONCLUÍDA!")
     print("="*60)
+    print(f"⏱️ Tempo total: {tempo_total_final:.2f}s")
+    print("\n✅ Relatórios exportados:")
+    print("   • Produtos tratados")
+    print("   • Estoque tratado")
+    print("   • Vendas tratadas")
+    print("   • E-commerce")
+    print("   • Entradas")
+    if NERD_GERAL_DISPONIVEL:
+        print("   • Análise NERD Geral (mês recente)")
+    print("\n📁 Arquivos salvos na pasta 'data' e copiados para os destinos configurados")
+    print("="*60)
+    print("\n✅ Script executado com sucesso! Todos os processos foram concluídos automaticamente.")
+    print("   Você pode fechar esta janela quando quiser.")
+    print("="*60)
+    
+    # NOTA: Popups removidos para execução totalmente automática
+    # Todas as informações estão no console acima
 
 if __name__ == '__main__':
     main()
