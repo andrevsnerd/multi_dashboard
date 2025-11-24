@@ -283,40 +283,81 @@ export default function ProductDetailPage({
 
       {data ? (
         <>
-          <div className={styles.productHeader}>
-            <div>
-              <h2 className={styles.productName}>{data.detail.productName}</h2>
-              <div className={styles.productInfo}>
-                <span className={styles.productId}>{data.detail.productId}</span>
+          <div className={styles.productHeaderContainer}>
+            <div className={styles.productHeader}>
+              <div>
+                <h2 className={styles.productName}>{data.detail.productName}</h2>
+                <div className={styles.productInfo}>
+                  <span className={styles.productId}>{data.detail.productId}</span>
+                </div>
                 {data.detail.lastEntryDate && data.detail.lastEntryFilial && (
-                  <span className={styles.lastEntry}>
-                    Última entrada:{" "}
-                    {(data.detail.lastEntryDate instanceof Date
-                      ? data.detail.lastEntryDate
-                      : new Date(data.detail.lastEntryDate)
-                    ).toLocaleDateString("pt-BR")}{" "}
-                    em {data.detail.lastEntryFilial}
-                  </span>
+                  <div className={styles.lastEntryContainer}>
+                    <span className={styles.lastEntry}>
+                      Última entrada:{" "}
+                      {(data.detail.lastEntryDate instanceof Date
+                        ? data.detail.lastEntryDate
+                        : new Date(data.detail.lastEntryDate)
+                      ).toLocaleDateString("pt-BR")}{" "}
+                      em {data.detail.lastEntryFilial}
+                    </span>
+                  </div>
                 )}
-                {data.detail.revenueVariance !== null && (
-                  <span
-                    className={`${styles.variance} ${
-                      data.detail.revenueVariance > 0
-                        ? styles.variancePositive
-                        : data.detail.revenueVariance < 0
-                          ? styles.varianceNegative
-                          : ""
-                    }`}
-                  >
-                    {data.detail.revenueVariance > 0 ? "↑" : data.detail.revenueVariance < 0 ? "↓" : ""}
-                    {Math.abs(data.detail.revenueVariance).toFixed(1)}%
+              </div>
+            </div>
+
+            <div className={styles.projectionCard}>
+              <div className={styles.projectionContent}>
+                <div className={styles.projectionItem}>
+                  <span className={styles.projectionLabel}>Markup</span>
+                  <span className={styles.projectionValue}>
+                    {data.detail.totalMarkup > 0 ? `${data.detail.totalMarkup.toFixed(2)}x` : "--"}
                   </span>
-                )}
+                </div>
+                <div className={styles.projectionItem}>
+                  <span className={styles.projectionLabel}>Projeção do Mês</span>
+                  <span className={styles.projectionValue}>
+                    {(() => {
+                      // Calcular projeção do mês atual
+                      const start = new Date(range.startDate);
+                      const end = new Date(range.endDate);
+                      const daysInPeriod = Math.max(
+                        1,
+                        Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+                      );
+                      
+                      // Obter o mês atual
+                      const currentMonth = new Date(start.getFullYear(), start.getMonth(), 1);
+                      const lastDayOfMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+                      const totalDaysInMonth = lastDayOfMonth.getDate();
+                      
+                      // Calcular dias já passados no mês (até o endDate)
+                      const daysPassed = Math.min(
+                        Math.ceil((end.getTime() - currentMonth.getTime()) / (1000 * 60 * 60 * 24)),
+                        totalDaysInMonth
+                      );
+                      
+                      if (daysPassed <= 0 || data.detail.totalRevenue === 0) {
+                        return "R$ 0,00";
+                      }
+                      
+                      // Calcular média diária e projeção
+                      const averageDaily = data.detail.totalRevenue / daysPassed;
+                      const projection = averageDaily * totalDaysInMonth;
+                      
+                      return projection.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      });
+                    })()}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
-          <ProductDetailKPIs detail={data.detail} companyName={companyName} />
+          <ProductDetailKPIs detail={data.detail} companyName={companyName} range={range} />
 
           <ProductPerformanceTable
             data={data.stockByFilial}

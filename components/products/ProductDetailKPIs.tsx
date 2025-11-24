@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { ProductDetailInfo } from "@/lib/repositories/productDetail";
 
 import styles from "./ProductDetailKPIs.module.css";
@@ -7,6 +8,10 @@ import styles from "./ProductDetailKPIs.module.css";
 interface ProductDetailKPIsProps {
   detail: ProductDetailInfo;
   companyName: string;
+  range: {
+    startDate: Date;
+    endDate: Date;
+  };
 }
 
 function formatCurrency(value: number): string {
@@ -33,21 +38,71 @@ interface KPIItem {
   description: string;
   highlight?: boolean;
   markup?: string | null;
-  valueExtra?: string | null;
+  valueExtra?: ReactNode | null;
   colorCode?: string | null;
 }
 
 export default function ProductDetailKPIs({
   detail,
   companyName,
+  range,
 }: ProductDetailKPIsProps) {
+  // Calcular projeção de estoque no fim do mês
+  const calculateStockProjection = (): number => {
+    const start = new Date(range.startDate);
+    const end = new Date(range.endDate);
+    const daysInPeriod = Math.max(
+      1,
+      Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+    );
+    
+    // Obter o mês atual
+    const currentMonth = new Date(start.getFullYear(), start.getMonth(), 1);
+    const lastDayOfMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+    const totalDaysInMonth = lastDayOfMonth.getDate();
+    
+    // Calcular dias já passados no mês (até o endDate)
+    const daysPassed = Math.min(
+      Math.ceil((end.getTime() - currentMonth.getTime()) / (1000 * 60 * 60 * 24)),
+      totalDaysInMonth
+    );
+    
+    if (daysPassed <= 0 || detail.totalQuantity === 0) {
+      return detail.totalStock;
+    }
+    
+    // Calcular média diária de vendas e projeção do mês
+    const averageDailyQuantity = detail.totalQuantity / daysPassed;
+    const monthlyProjectionQuantity = averageDailyQuantity * totalDaysInMonth;
+    
+    // Projeção de estoque = estoque atual - projeção de vendas do mês
+    const stockProjection = detail.totalStock - monthlyProjectionQuantity;
+    
+    return Math.max(0, stockProjection);
+  };
+
+  const stockProjection = calculateStockProjection();
+
   const items: KPIItem[] = [
     {
       label: "Vendas Total",
       value: formatCurrency(detail.totalRevenue),
       description: `${detail.totalQuantity} unidades`,
-      markup: detail.totalMarkup && detail.totalMarkup > 0 ? formatMarkup(detail.totalMarkup) : null,
       highlight: true,
+      valueExtra: detail.revenueVariance !== null ? (
+        <span
+          className={`${styles.variance} ${
+            detail.revenueVariance > 0
+              ? styles.variancePositive
+              : detail.revenueVariance < 0
+                ? styles.varianceNegative
+                : ""
+          }`}
+        >
+          {detail.revenueVariance > 0 ? "↑" : detail.revenueVariance < 0 ? "↓" : ""}
+          {Math.abs(detail.revenueVariance).toFixed(1)}%
+        </span>
+      ) : null,
     },
     {
       label: "Preço Médio",
@@ -57,7 +112,7 @@ export default function ProductDetailKPIs({
     {
       label: "Estoque Total",
       value: formatInteger(detail.totalStock),
-      description: "Unidades disponíveis",
+      description: `Projeção do Mês: ${formatInteger(stockProjection)} unidades`,
     },
     {
       label: "Melhor Loja",
@@ -72,9 +127,7 @@ export default function ProductDetailKPIs({
       valueExtra: null,
       description:
         detail.topColor && detail.topColorQuantity > 0
-          ? detail.topColorCode
-            ? `${detail.topColorCode} · ${detail.topColorQuantity} unidades`
-            : `${detail.topColorQuantity} unidades`
+          ? `${detail.topColorQuantity} unidades`
           : "Nenhuma cor registrada",
       colorCode: null,
     },
@@ -95,9 +148,7 @@ export default function ProductDetailKPIs({
               >
                 {item.value}
               </strong>
-              {item.valueExtra && (
-                <span className={styles.colorCode}>{item.valueExtra}</span>
-              )}
+              {item.valueExtra}
             </div>
             <p className={styles.description}>
               {item.description}

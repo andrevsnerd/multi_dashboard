@@ -36,8 +36,10 @@
 
 .valueContainer {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: nowrap;
 }
 
 .value {
@@ -73,6 +75,24 @@
 .colorCodeInline {
   font-family: 'Courier New', monospace;
   color: #64748b;
+}
+
+.variance {
+  font-size: 16px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.variancePositive {
+  color: #059669;
+  background-color: #d1fae5;
+}
+
+.varianceNegative {
+  color: #dc2626;
+  background-color: #fee2e2;
 }
 
 @media (max-width: 768px) {
