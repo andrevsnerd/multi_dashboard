@@ -189,25 +189,16 @@ export default function CompanyDashboard({
 
   const currentRevenue = summary.totalRevenue.currentValue;
 
-  // Buscar revenue ajustado para projeção (até o dia anterior)
+  // Buscar revenue para projeção (até o dia atual)
   useEffect(() => {
     let active = true;
 
     async function loadProjectionRevenue() {
       try {
-        // Calcular range ajustado: até o dia anterior ao endDate
-        const adjustedEndDate = new Date(range.endDate);
-        adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
-        adjustedEndDate.setHours(23, 59, 59, 999); // Fim do dia anterior
-
-        const adjustedRange = {
-          startDate: range.startDate,
-          endDate: adjustedEndDate,
-        };
-
+        // Usar o range atual (até o dia atual)
         const { summary: projectionSummary } = await fetchSummary(
           companyKey,
-          adjustedRange,
+          range,
           selectedFilial,
         );
 
@@ -233,27 +224,23 @@ export default function CompanyDashboard({
   const monthProjection = useMemo(() => {
     if (projectionRevenue === 0) return 0;
 
-    // Obter data de referência (endDate do range)
+    // Obter data de referência (endDate do range - dia atual)
     const referenceDate = range.endDate;
-    // Usar o dia anterior ao endDate para evitar que o dia atual (incompleto) afete a projeção
-    const previousDate = new Date(referenceDate);
-    previousDate.setDate(previousDate.getDate() - 1);
     
-    const monthStart = new Date(previousDate.getFullYear(), previousDate.getMonth(), 1);
+    const monthStart = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
     
-    // Calcular dias passados do mês (desde o início do mês até o dia anterior ao endDate)
-    const daysPassed = Math.floor((previousDate.getTime() - monthStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    // Calcular dias passados do mês (desde o início do mês até o dia atual)
+    const daysPassed = Math.floor((referenceDate.getTime() - monthStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     
     // Evitar divisão por zero
     if (daysPassed <= 0) return 0;
     
     // Calcular dias totais do mês
-    const lastDayOfMonth = new Date(previousDate.getFullYear(), previousDate.getMonth() + 1, 0);
+    const lastDayOfMonth = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0);
     const totalDaysInMonth = lastDayOfMonth.getDate();
     
     // Calcular média diária e projeção
     // Projeção = (faturamento atual / dias já passados) * dias totais do mês
-    // Usar projectionRevenue que considera vendas apenas até o dia anterior
     const averageDaily = projectionRevenue / daysPassed;
     const projection = averageDaily * totalDaysInMonth;
     
