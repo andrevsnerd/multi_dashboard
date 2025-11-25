@@ -97,6 +97,7 @@ export default function ProductDetailPage({
   const [range, setRange] = useState<DateRangeValue>(initialRange);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [selectedProductName, setSelectedProductName] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<
     Array<{ productId: string; productName: string }>
   >([]);
@@ -130,10 +131,14 @@ export default function ProductDetailPage({
       return;
     }
 
-    // Se já tem um produto selecionado e o termo mudou, não mostrar resultados
-    if (selectedProductId && searchTerm) {
-      setShowSearchResults(false);
-      return;
+    // Se há produto selecionado, verificar se o texto mudou
+    if (selectedProductId && selectedProductName) {
+      // Se o texto é igual ao nome do produto selecionado, não buscar
+      if (searchTerm.trim() === selectedProductName.trim()) {
+        setShowSearchResults(false);
+        return;
+      }
+      // Se mudou, já limpamos o selectedProductId no onChange, então continuar com a busca
     }
 
     let active = true;
@@ -141,7 +146,7 @@ export default function ProductDetailPage({
     async function performSearch() {
       try {
         const results = await searchProducts(companyKey, searchTerm);
-        if (active && !selectedProductId) {
+        if (active) {
           setSearchResults(results);
           setShowSearchResults(results.length > 0);
         }
@@ -156,7 +161,7 @@ export default function ProductDetailPage({
       active = false;
       clearTimeout(timeoutId);
     };
-  }, [searchTerm, companyKey, selectedProductId]);
+  }, [searchTerm, companyKey, selectedProductId, selectedProductName]);
 
   // Carregar detalhes do produto quando selecionado ou período mudar
   useEffect(() => {
@@ -222,8 +227,10 @@ export default function ProductDetailPage({
   }, [selectedProductId, companyKey, range]);
 
   const handleProductSelect = useCallback((productId: string, productName: string) => {
+    const trimmedName = productName.trim();
     setSelectedProductId(productId);
-    setSearchTerm(productName);
+    setSelectedProductName(trimmedName);
+    setSearchTerm(trimmedName);
     setShowSearchResults(false);
     setSearchResults([]);
   }, []);
@@ -234,30 +241,86 @@ export default function ProductDetailPage({
         <h1 className={styles.title}>Produto Detalhado</h1>
         <div className={styles.controls}>
           <div className={styles.searchContainer} ref={searchContainerRef}>
-            <input
-              type="text"
-              className={styles.searchInput}
-              placeholder="Pesquisar produto por nome ou código..."
-              value={searchTerm}
-              onChange={(e) => {
-                const value = e.target.value;
-                setSearchTerm(value);
-                if (!value) {
-                  setSelectedProductId(null);
-                  setData(null);
-                  setShowSearchResults(false);
-                } else if (!selectedProductId) {
-                  // Apenas mostrar resultados se não tiver produto selecionado
-                  setShowSearchResults(true);
-                }
-              }}
-              onFocus={() => {
-                if (searchResults.length > 0 && !selectedProductId) {
-                  setShowSearchResults(true);
-                }
-              }}
-            />
-            {showSearchResults && searchResults.length > 0 && !selectedProductId && (
+            <div className={styles.searchInputWrapper}>
+              <input
+                type="text"
+                className={styles.searchInput}
+                placeholder="Pesquisar produto por nome ou código..."
+                value={searchTerm}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setSearchTerm(value);
+                  
+                  // Se o usuário está editando e o texto mudou do produto selecionado, limpar seleção
+                  if (selectedProductId && selectedProductName) {
+                    if (value.trim() !== selectedProductName.trim()) {
+                      // Usuário está editando, limpar seleção para permitir nova busca
+                      setSelectedProductId(null);
+                      setSelectedProductName(null);
+                      setData(null);
+                    }
+                  }
+                  
+                  if (!value) {
+                    setSelectedProductId(null);
+                    setSelectedProductName(null);
+                    setData(null);
+                    setShowSearchResults(false);
+                  } else {
+                    // Sempre permitir mostrar resultados quando há texto
+                    if (value.trim().length >= 2) {
+                      setShowSearchResults(true);
+                    } else {
+                      setShowSearchResults(false);
+                    }
+                  }
+                }}
+                onFocus={() => {
+                  // Se há texto e não há produto selecionado, mostrar resultados
+                  if (searchTerm.trim().length >= 2 && !selectedProductId) {
+                    setShowSearchResults(true);
+                  }
+                  // Se o usuário está editando (texto diferente do produto selecionado), permitir busca
+                  if (selectedProductId && selectedProductName && searchTerm.trim().length >= 2) {
+                    if (searchTerm.trim() !== selectedProductName.trim()) {
+                      setShowSearchResults(true);
+                    }
+                  }
+                }}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  className={styles.clearButton}
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSelectedProductId(null);
+                    setSelectedProductName(null);
+                    setData(null);
+                    setShowSearchResults(false);
+                    setSearchResults([]);
+                  }}
+                  aria-label="Limpar busca"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M12 4L4 12M4 4L12 12"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+            {showSearchResults && searchResults.length > 0 && (
               <div className={styles.searchResults}>
                 {searchResults.slice(0, 10).map((product) => (
                   <button
