@@ -305,6 +305,41 @@ export default function ProductDetailPage({
               </div>
             </div>
 
+            {/* Card Vendas Total no mobile - aparece logo após o nome */}
+            <div className={styles.mobileVendasTotalCard}>
+              <div className={styles.mobileVendasTotalContent}>
+                <span className={styles.mobileVendasTotalLabel}>Vendas Total</span>
+                <div className={styles.mobileVendasTotalValue}>
+                  <strong className={styles.mobileVendasTotalAmount}>
+                    {data.detail.totalRevenue.toLocaleString("pt-BR", {
+                      style: "currency",
+                      currency: "BRL",
+                      maximumFractionDigits: 2,
+                    })}
+                  </strong>
+                  {data.detail.revenueVariance !== null && (
+                    <span
+                      className={`${styles.mobileVendasTotalVariance} ${
+                        data.detail.revenueVariance > 0
+                          ? styles.variancePositive
+                          : data.detail.revenueVariance < 0
+                            ? styles.varianceNegative
+                            : ""
+                      }`}
+                    >
+                      {data.detail.revenueVariance > 0 ? "↑" : data.detail.revenueVariance < 0 ? "↓" : ""}
+                      {Math.abs(data.detail.revenueVariance).toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+                <p className={styles.mobileVendasTotalDescription}>
+                  {data.detail.totalQuantity.toLocaleString("pt-BR", {
+                    maximumFractionDigits: 0,
+                  })} unidades
+                </p>
+              </div>
+            </div>
+
             <div className={styles.projectionCard}>
               <div className={styles.projectionContent}>
                 <div className={styles.projectionItem}>

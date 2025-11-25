@@ -12,22 +12,23 @@ interface SidebarContextType {
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
-  // Estado inicial: aberta no desktop, fechada no mobile
-  const [isOpen, setIsOpen] = useState(() => {
-    if (typeof window !== "undefined") {
-      return window.innerWidth > 1024;
-    }
-    return true; // Default para SSR
-  });
+  // Estado inicial: sempre false para evitar erro de hidratação
+  // Será sincronizado no useEffect após a hidratação
+  const [isOpen, setIsOpen] = useState(false);
+  const [wasDesktop, setWasDesktop] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
-  const [wasDesktop, setWasDesktop] = useState(() => {
-    if (typeof window !== "undefined") {
-      return window.innerWidth > 1024;
-    }
-    return true;
-  });
+  // Sincronizar estado após hidratação
+  useEffect(() => {
+    setIsMounted(true);
+    const isDesktop = window.innerWidth > 1024;
+    setIsOpen(isDesktop);
+    setWasDesktop(isDesktop);
+  }, []);
 
   useEffect(() => {
+    if (!isMounted) return;
+
     const handleResize = () => {
       const isDesktop = window.innerWidth > 1024;
       
@@ -40,7 +41,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [wasDesktop]);
+  }, [wasDesktop, isMounted]);
 
   const toggle = () => setIsOpen((prev) => !prev);
   const close = () => setIsOpen(false);

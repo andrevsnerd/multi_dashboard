@@ -136,7 +136,10 @@ export default function ProductDetailKPIs({
   return (
     <div className={styles.grid}>
       {items.map((item) => (
-        <article key={item.label} className={styles.card}>
+        <article 
+          key={item.label} 
+          className={`${styles.card} ${item.label === "Vendas Total" ? styles.vendasTotalCard : ""}`}
+        >
           <header className={styles.cardHeader}>
             <span className={styles.label}>{item.label}</span>
           </header>

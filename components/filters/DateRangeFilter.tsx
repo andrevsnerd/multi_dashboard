@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { DateRange, RangeKeyDict } from "react-date-range";
 import { endOfMonth, endOfWeek, startOfMonth, startOfWeek, startOfYear, subDays, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -48,6 +48,11 @@ export default function DateRangeFilter({
   availableRange,
 }: DateRangeFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const [isMobile, setIsMobile] = useState(false);
+  
   const normalized = useMemo(
     () => normalizeRange(value.startDate, value.endDate),
     [value.startDate, value.endDate],
@@ -249,6 +254,74 @@ export default function DateRangeFilter({
     ];
   }, [effectiveMaxDate, availableNormalized]);
 
+  // Detectar mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Calcular posição do dropdown quando abrir
+  useEffect(() => {
+    if (!isOpen || !containerRef.current) {
+      setDropdownStyle({});
+      return;
+    }
+    
+    // No mobile, o CSS já define posição fixa, não precisa calcular
+    if (isMobile) {
+      setDropdownStyle({});
+      return;
+    }
+
+    const updatePosition = () => {
+      if (!containerRef.current) return;
+
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const dropdownWidth = 600; // min-width do dropdown
+
+      let left: number | undefined = 0;
+      let right: number | undefined = undefined;
+
+      // Verificar se há espaço à direita
+      const spaceOnRight = viewportWidth - containerRect.left;
+      const spaceOnLeft = containerRect.left;
+
+      // Se não há espaço suficiente à direita, alinhar à direita do container
+      if (spaceOnRight < dropdownWidth && spaceOnLeft >= dropdownWidth) {
+        right = 0;
+        left = undefined;
+      } else if (spaceOnRight < dropdownWidth) {
+        // Se não há espaço em nenhum lado, ajustar para caber na viewport
+        left = Math.max(8, viewportWidth - dropdownWidth - containerRect.left - 8);
+      }
+
+      setDropdownStyle({
+        left: left !== undefined ? `${left}px` : undefined,
+        right: right !== undefined ? `${right}px` : undefined,
+      });
+    };
+
+    // Usar requestAnimationFrame para garantir que o DOM foi atualizado
+    const rafId = requestAnimationFrame(() => {
+      updatePosition();
+    });
+    
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isOpen, isMobile]);
+
   const display = formatDisplay({
     startDate: clampedRange.start,
     endDate: clampedRange.end,
@@ -294,7 +367,7 @@ export default function DateRangeFilter({
   };
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} ref={containerRef}>
       <span className={styles.label}>{label}</span>
       <button
         type="button"
@@ -310,7 +383,11 @@ export default function DateRangeFilter({
       {isOpen ? (
         <>
           <div className={styles.backdrop} onClick={() => setIsOpen(false)} />
-          <div className={styles.dropdown}>
+          <div 
+            className={styles.dropdown} 
+            ref={dropdownRef} 
+            style={isMobile ? {} : dropdownStyle}
+          >
             <div className={styles.presets}>
               {presets.map((preset) => (
                 <button

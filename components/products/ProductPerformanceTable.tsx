@@ -25,10 +25,67 @@ function formatNumber(value: number): string {
   });
 }
 
-function formatPercentage(value: number | null): string | null {
-  if (value === null) return null;
-  const sign = value >= 0 ? "+" : "";
-  return `${sign}${value.toFixed(1)}%`;
+function formatVariance(value: number | null, currentRevenue: number): {
+  text: string;
+  isPositive: boolean;
+  isNegative: boolean;
+  isNeutral: boolean;
+  explanation: string;
+} {
+  if (value === null) {
+    // null significa que não havia vendas no período anterior, mas há agora
+    if (currentRevenue > 0) {
+      return {
+        text: "Novo",
+        isPositive: true,
+        isNegative: false,
+        isNeutral: false,
+        explanation: "Primeira venda no período"
+      };
+    } else {
+      return {
+        text: "--",
+        isPositive: false,
+        isNegative: false,
+        isNeutral: true,
+        explanation: "Sem vendas"
+      };
+    }
+  }
+
+  if (value === 0) {
+    return {
+      text: "0%",
+      isPositive: false,
+      isNegative: false,
+      isNeutral: true,
+      explanation: "Sem mudança"
+    };
+  }
+
+  const isPositive = value > 0;
+  const isNegative = value < 0;
+  
+  // Para -100%, mostrar texto mais claro
+  if (value === -100) {
+    return {
+      text: "Parou",
+      isPositive: false,
+      isNegative: true,
+      isNeutral: false,
+      explanation: "Não vendeu neste período"
+    };
+  }
+
+  return {
+    text: `${isPositive ? "+" : ""}${value.toFixed(1)}%`,
+    isPositive,
+    isNegative,
+    isNeutral: false,
+    explanation: isPositive 
+      ? `Aumentou ${Math.abs(value).toFixed(1)}% em relação ao período anterior`
+      : `Diminuiu ${Math.abs(value).toFixed(1)}% em relação ao período anterior`
+  };
 }
 
 export default function ProductPerformanceTable({
@@ -53,8 +110,9 @@ export default function ProductPerformanceTable({
 
   return (
     <div className={styles.wrapper}>
-      <h3 className={styles.title}>Vendas e estoque em cada filial</h3>
+      <h3 className={styles.title}>Performance por Filial</h3>
       <div className={styles.container}>
+        {/* Desktop: Tabela tradicional */}
         <table className={styles.table}>
           <thead>
             <tr>
@@ -67,9 +125,7 @@ export default function ProductPerformanceTable({
           </thead>
           <tbody>
             {data.map((row) => {
-              const variance = formatPercentage(row.revenueVariance);
-              const isPositive = row.revenueVariance !== null && row.revenueVariance > 0;
-              const isNegative = row.revenueVariance !== null && row.revenueVariance < 0;
+              const variance = formatVariance(row.revenueVariance, row.revenue);
 
               return (
                 <tr key={row.filial}>
@@ -78,29 +134,66 @@ export default function ProductPerformanceTable({
                   <td className={styles.numberCell}>{formatNumber(row.quantity)}</td>
                   <td className={styles.numberCell}>{formatNumber(row.stock)}</td>
                   <td className={styles.varianceCell}>
-                    {variance ? (
-                      <span
-                        className={`${styles.varianceValue} ${
-                          isPositive
-                            ? styles.variancePositive
-                            : isNegative
-                              ? styles.varianceNegative
-                              : ""
-                        }`}
-                      >
-                        {isPositive && "↑"}
-                        {isNegative && "↓"}
-                        {variance}
-                      </span>
-                    ) : (
-                      "--"
-                    )}
+                    <span
+                      className={`${styles.varianceValue} ${
+                        variance.isPositive
+                          ? styles.variancePositive
+                          : variance.isNegative
+                            ? styles.varianceNegative
+                            : styles.varianceNeutral
+                      }`}
+                      title={variance.explanation}
+                    >
+                      {variance.isPositive && "↑"}
+                      {variance.isNegative && "↓"}
+                      {variance.text}
+                    </span>
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+
+        {/* Mobile: Cards */}
+        <div className={styles.mobileCards}>
+          {data.map((row) => {
+            const variance = formatVariance(row.revenueVariance, row.revenue);
+
+            return (
+              <div key={row.filial} className={styles.card}>
+                <div className={styles.cardMain}>
+                  <div className={styles.cardHeader}>
+                    <div className={styles.cardFilialContainer}>
+                      <h4 className={styles.cardFilial}>{row.filialDisplayName}</h4>
+                      <span
+                        className={`${styles.cardVariance} ${
+                          variance.isPositive
+                            ? styles.variancePositive
+                            : variance.isNegative
+                              ? styles.varianceNegative
+                              : styles.varianceNeutral
+                        }`}
+                        title={variance.explanation}
+                      >
+                        {variance.isPositive && "↑"}
+                        {variance.isNegative && "↓"}
+                        {variance.text}
+                      </span>
+                    </div>
+                    <span className={styles.cardStock}>
+                      {formatNumber(row.stock)} estoque
+                    </span>
+                  </div>
+                  <div className={styles.cardRevenue}>
+                    <span className={styles.cardRevenueValue}>{formatCurrency(row.revenue)}</span>
+                    <span className={styles.cardQuantity}>{formatNumber(row.quantity)} unidades</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

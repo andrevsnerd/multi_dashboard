@@ -4,12 +4,14 @@
   flex-direction: column;
   gap: 24px;
   padding: 0;
+  overflow: visible;
 }
 
 .header {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  overflow: visible;
 }
 
 .title {
@@ -24,6 +26,7 @@
   flex-wrap: wrap;
   gap: 12px;
   align-items: flex-end;
+  position: relative;
 }
 
 .searchContainer {
@@ -51,6 +54,8 @@
 /* Ajustar alinhamento do DateRangeFilter para ficar alinhado com o input */
 .controls :global([class*="DateRangeFilter"]) {
   margin-bottom: 0;
+  position: relative;
+  z-index: 100;
 }
 
 .searchInput:focus {
@@ -235,29 +240,75 @@
 
 @media (max-width: 768px) {
   .wrapper {
-    gap: 20px;
+    gap: 16px;
   }
 
   .title {
-    font-size: 24px;
+    font-size: 22px;
+  }
+
+  .header {
+    gap: 12px;
   }
 
   .controls {
-    gap: 10px;
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
   }
 
   .searchContainer {
     min-width: 100%;
+    width: 100%;
+    order: 1;
+  }
+
+  /* DateRangeFilter no mobile deve vir depois do input */
+  .controls :global([class*="DateRangeFilter"]) {
+    order: 2;
+    width: 100%;
+    z-index: 50;
+  }
+
+  /* Garantir que o dropdown do filtro não interfira com o input de busca */
+  .controls :global([class*="DateRangeFilter"]) {
+    z-index: 50;
+  }
+  
+  /* Quando o input está focado, o dropdown do filtro deve ter z-index menor */
+  .searchContainer:has(.searchInput:focus) ~ :global([class*="DateRangeFilter"]) {
+    z-index: 1;
+  }
+  
+  /* Fallback para navegadores que não suportam :has() */
+  @supports not selector(:has(*)) {
+    .controls :global([class*="DateRangeFilter"]) {
+      z-index: 50;
+    }
+  }
+
+  .searchResults {
+    z-index: 100;
+    max-height: 250px;
   }
 
   .loading,
   .error {
     font-size: 12px;
     padding: 6px 10px;
+    order: 3;
+    width: 100%;
+    text-align: center;
   }
 
   .productHeaderContainer {
     grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .productHeader,
+  .projectionCard {
+    padding: 16px;
   }
 
   .productName {
@@ -272,6 +323,63 @@
 
   .projectionValue {
     font-size: 20px;
+  }
+
+  .mobileVendasTotalCard {
+    display: block;
+    background: #ffffff;
+    border-radius: 20px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    padding: 20px;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+    order: 2;
+  }
+
+  .mobileVendasTotalContent {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .mobileVendasTotalLabel {
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #94a3b8;
+  }
+
+  .mobileVendasTotalValue {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .mobileVendasTotalAmount {
+    font-size: 28px;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.2;
+  }
+
+  .mobileVendasTotalVariance {
+    font-size: 16px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+
+  .mobileVendasTotalDescription {
+    margin: 0;
+    font-size: 14px;
+    color: #64748b;
+  }
+}
+
+@media (min-width: 769px) {
+  .mobileVendasTotalCard {
+    display: none;
   }
 }
 

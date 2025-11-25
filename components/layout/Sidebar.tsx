@@ -15,8 +15,10 @@ export default function Sidebar({ companyName }: SidebarProps) {
   const pathname = usePathname();
   const { isOpen, toggle, close } = useSidebar();
   const [isMobile, setIsMobile] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 1024);
     };
@@ -76,7 +78,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
   return (
     <>
       {/* Overlay para mobile - só aparece quando sidebar está aberta no mobile */}
-      {isOpen && isMobile && (
+      {isMounted && isOpen && isMobile && (
         <div 
           className={styles.overlay} 
           onClick={close} 

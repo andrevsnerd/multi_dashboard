@@ -54,8 +54,9 @@ export default function ProductSaleHistoryTable({
 
   return (
     <div className={styles.wrapper}>
-      <h3 className={styles.title}>Vendas detalhadas em ordem cronológica</h3>
+      <h3 className={styles.title}>Histórico de Vendas</h3>
       <div className={styles.container}>
+        {/* Desktop: Tabela tradicional */}
         <table className={styles.table}>
           <thead>
             <tr>
@@ -81,11 +82,34 @@ export default function ProductSaleHistoryTable({
             })}
           </tbody>
         </table>
-      </div>
-      <div className={styles.footer}>
-        <strong className={styles.totalLabel}>
-          Total de vendas no período: {formatCurrency(totalRevenue)}
-        </strong>
+
+        {/* Mobile: Cards */}
+        <div className={styles.mobileCards}>
+          {data.map((row, index) => {
+            const dateObj = row.date instanceof Date ? row.date : new Date(row.date);
+            return (
+              <div key={`${dateObj.getTime()}-${row.filial}-${index}`} className={styles.card}>
+                <div className={styles.cardMain}>
+                  <div className={styles.cardLeft}>
+                    <div className={styles.cardHeader}>
+                      <span className={styles.cardDate}>{formatDate(dateObj)}</span>
+                      {row.colorDisplayName && (
+                        <span className={styles.cardColor}>{row.colorDisplayName}</span>
+                      )}
+                    </div>
+                    <div className={styles.cardRevenue}>
+                      <span className={styles.cardRevenueValue}>{formatCurrency(row.revenue)}</span>
+                      <span className={styles.cardQuantity}>{formatNumber(row.quantity)} unidades</span>
+                    </div>
+                  </div>
+                  <div className={styles.cardRight}>
+                    <span className={styles.cardFilial}>{row.filialDisplayName}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

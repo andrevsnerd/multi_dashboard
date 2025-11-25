@@ -108,5 +108,9 @@
   .value {
     font-size: 28px;
   }
+
+  .vendasTotalCard {
+    display: none;
+  }
 }
 
