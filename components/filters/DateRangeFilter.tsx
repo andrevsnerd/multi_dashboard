@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { DateRange, RangeKeyDict } from "react-date-range";
-import { endOfMonth, endOfWeek, startOfMonth, startOfWeek, subDays, subMonths } from "date-fns";
+import { endOfMonth, endOfWeek, startOfMonth, startOfWeek, startOfYear, subDays, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 import { formatDateForQuery, normalizeRange } from "@/lib/utils/date";
@@ -161,7 +161,7 @@ export default function DateRangeFilter({
         },
       },
       {
-        label: "Última semana",
+        label: "Semana passada",
         resolve: () => {
           const today = clampDate(new Date());
           let startDate = subDays(startOfWeek(today, { weekStartsOn: 1 }), 7);
@@ -177,7 +177,7 @@ export default function DateRangeFilter({
         },
       },
       {
-        label: "Último mês",
+        label: "Mês passado",
         resolve: () => {
           const today = clampDate(new Date());
           const lastMonth = subMonths(today, 1);
@@ -190,6 +190,56 @@ export default function DateRangeFilter({
           if (startDate.getTime() > endDate.getTime()) {
             startDate = new Date(endDate.getTime());
           }
+          return {
+            startDate,
+            endDate,
+          };
+        },
+      },
+      {
+        label: "4 meses",
+        resolve: () => {
+          const today = clampDate(new Date());
+          // Começar no início do mês de 3 meses atrás
+          // Ex: se estamos em novembro, começa em agosto (3 meses atrás)
+          const threeMonthsAgo = subMonths(today, 3);
+          let startDate = startOfMonth(threeMonthsAgo);
+          // Terminar no dia atual (ou no maxSelectableDate se for menor)
+          let endDate = clampDate(new Date());
+          
+          // Respeitar o availableRange se existir
+          if (availableNormalized && startDate.getTime() < availableNormalized.start.getTime()) {
+            startDate = new Date(availableNormalized.start.getTime());
+          }
+          
+          if (startDate.getTime() > endDate.getTime()) {
+            startDate = new Date(endDate.getTime());
+          }
+          
+          return {
+            startDate,
+            endDate,
+          };
+        },
+      },
+      {
+        label: "Esse Ano",
+        resolve: () => {
+          const today = clampDate(new Date());
+          // Começar no primeiro dia do ano atual
+          let startDate = startOfYear(today);
+          // Terminar no dia atual (ou no maxSelectableDate se for menor)
+          let endDate = clampDate(new Date());
+          
+          // Respeitar o availableRange se existir
+          if (availableNormalized && startDate.getTime() < availableNormalized.start.getTime()) {
+            startDate = new Date(availableNormalized.start.getTime());
+          }
+          
+          if (startDate.getTime() > endDate.getTime()) {
+            startDate = new Date(endDate.getTime());
+          }
+          
           return {
             startDate,
             endDate,

@@ -108,7 +108,7 @@ export default function ProductsTable({
                 )}
               </th>
               {companyKey === "scarfme" && (
-                <th className={styles.descriptionHeader}>
+                <th className={styles.gradeHeader}>
                   GRADE
                 </th>
               )}
@@ -222,7 +222,7 @@ export default function ProductsTable({
                     <div className={styles.productCode}>{product.productId}</div>
                   </td>
                   {companyKey === "scarfme" && (
-                    <td className={styles.descriptionCell}>
+                    <td className={styles.gradeCell}>
                       {product.grade || '--'}
                     </td>
                   )}

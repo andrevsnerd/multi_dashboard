@@ -67,6 +67,13 @@
   text-align: left !important;
 }
 
+.gradeHeader {
+  text-align: center !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  min-width: 80px;
+}
+
 .currencyHeader {
   text-align: right !important;
 }
@@ -163,6 +170,14 @@
   max-width: 250px;
   min-width: 200px;
   word-wrap: break-word;
+}
+
+.gradeCell {
+  text-align: center !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  min-width: 80px;
+  white-space: nowrap;
 }
 
 .productName {
