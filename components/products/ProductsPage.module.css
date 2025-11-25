@@ -106,21 +106,29 @@
 
 @media (max-width: 768px) {
   .wrapper {
-    gap: 20px;
+    gap: 16px;
   }
 
   .title {
-    font-size: 24px;
+    font-size: 22px;
+  }
+
+  .header {
+    gap: 12px;
   }
 
   .controls {
-    gap: 10px;
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
   }
 
   .loading,
   .error {
     font-size: 12px;
     padding: 6px 10px;
+    width: 100%;
+    text-align: center;
   }
 }
 

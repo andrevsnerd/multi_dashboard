@@ -64,10 +64,57 @@ export default function ProductsTable({
     });
   };
 
-  const formatPercentage = (value: number | null) => {
-    if (value === null) return null;
-    const sign = value >= 0 ? "+" : "";
-    return `${sign}${value.toFixed(1)}%`;
+  const formatVariance = (value: number | null, currentRevenue: number): {
+    text: string;
+    isPositive: boolean;
+    isNegative: boolean;
+    isNeutral: boolean;
+  } => {
+    if (value === null) {
+      if (currentRevenue > 0) {
+        return {
+          text: "Novo",
+          isPositive: true,
+          isNegative: false,
+          isNeutral: false,
+        };
+      } else {
+        return {
+          text: "--",
+          isPositive: false,
+          isNegative: false,
+          isNeutral: true,
+        };
+      }
+    }
+
+    if (value === 0) {
+      return {
+        text: "0%",
+        isPositive: false,
+        isNegative: false,
+        isNeutral: true,
+      };
+    }
+
+    const isPositive = value > 0;
+    const isNegative = value < 0;
+    
+    if (value === -100) {
+      return {
+        text: "Parou",
+        isPositive: false,
+        isNegative: true,
+        isNeutral: false,
+      };
+    }
+
+    return {
+      text: `${isPositive ? "+" : ""}${value.toFixed(1)}%`,
+      isPositive,
+      isNegative,
+      isNeutral: false,
+    };
   };
 
   const formatMarkup = (value: number) => {
@@ -93,6 +140,7 @@ export default function ProductsTable({
   return (
     <div className={styles.wrapper}>
       <div className={styles.container}>
+        {/* Desktop: Tabela tradicional */}
         <table className={styles.table}>
           <thead>
             <tr>
@@ -211,10 +259,6 @@ export default function ProductsTable({
           </thead>
           <tbody>
             {sortedData.map((product, index) => {
-              const revenueVariance = formatPercentage(product.revenueVariance);
-              const isRevenuePositive = product.revenueVariance !== null && product.revenueVariance > 0;
-              const isRevenueNegative = product.revenueVariance !== null && product.revenueVariance < 0;
-
               return (
                 <tr key={`${product.productId}-${product.corProduto || ''}-${index}`}>
                   <td className={styles.descriptionCell}>
@@ -235,23 +279,26 @@ export default function ProductsTable({
                   <td className={styles.varianceCell}>
                     {product.isNew ? (
                       <span className={styles.newBadge}>NOVO</span>
-                    ) : revenueVariance ? (
-                      <span
-                        className={`${styles.varianceValue} ${
-                          isRevenuePositive
-                            ? styles.variancePositive
-                            : isRevenueNegative
-                              ? styles.varianceNegative
-                              : ""
-                        }`}
-                      >
-                        {isRevenuePositive && "↑"}
-                        {isRevenueNegative && "↓"}
-                        {revenueVariance}
-                      </span>
-                    ) : (
-                      "--"
-                    )}
+                    ) : (() => {
+                      const variance = formatVariance(product.revenueVariance, product.totalRevenue);
+                      return variance.text !== "--" ? (
+                        <span
+                          className={`${styles.varianceValue} ${
+                            variance.isPositive
+                              ? styles.variancePositive
+                              : variance.isNegative
+                                ? styles.varianceNegative
+                                : styles.varianceNeutral
+                          }`}
+                        >
+                          {variance.isPositive && "↑"}
+                          {variance.isNegative && "↓"}
+                          {variance.text}
+                        </span>
+                      ) : (
+                        "--"
+                      );
+                    })()}
                   </td>
                   <td className={styles.numberCell}>{formatNumber(product.totalQuantity)}</td>
                   <td className={styles.currencyCell}>{formatCurrency(product.averagePrice)}</td>
@@ -270,6 +317,80 @@ export default function ProductsTable({
             })}
           </tbody>
         </table>
+
+        {/* Mobile: Cards */}
+        <div className={styles.mobileCards}>
+          {sortedData.map((product, index) => {
+            const variance = formatVariance(product.revenueVariance, product.totalRevenue);
+
+            return (
+              <div key={`${product.productId}-${product.corProduto || ''}-${index}`} className={styles.card}>
+                <div className={styles.cardMain}>
+                  <div className={styles.cardHeader}>
+                    <div className={styles.cardLeft}>
+                      <div className={styles.cardProductInfo}>
+                        <h4 className={styles.cardProductName}>
+                          {product.productName}
+                          {!product.isNew && (
+                            <span
+                              className={`${styles.cardVariance} ${
+                                variance.isPositive
+                                  ? styles.variancePositive
+                                  : variance.isNegative
+                                    ? styles.varianceNegative
+                                    : styles.varianceNeutral
+                              }`}
+                            >
+                              {variance.isPositive && "↑"}
+                              {variance.isNegative && "↓"}
+                              {variance.text}
+                            </span>
+                          )}
+                        </h4>
+                        <div className={styles.cardProductMeta}>
+                          <span className={styles.cardProductCode}>{product.productId}</span>
+                          {companyKey === "scarfme" && product.grade && (
+                            <span className={styles.cardGrade}>{product.grade}</span>
+                          )}
+                          {groupByColor && product.descCorProduto && (
+                            <span className={styles.cardColor}>{product.descCorProduto}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className={styles.cardRevenue}>
+                        <span className={styles.cardRevenueValue}>{formatCurrency(product.totalRevenue)}</span>
+                        <span className={styles.cardQuantity}>{formatNumber(product.totalQuantity)} unidades</span>
+                      </div>
+                    </div>
+                    <div className={styles.cardRight}>
+                      {product.isNew && (
+                        <span className={styles.cardNewBadge}>NOVO</span>
+                      )}
+                      <div className={styles.cardStockBadges}>
+                        <span className={styles.cardStock}>
+                          {formatNumber(product.stock)} estoque
+                        </span>
+                        {companyKey === "scarfme" && product.estoqueRede !== undefined && (
+                          <span className={styles.cardStockRede}>
+                            {formatNumber(product.estoqueRede)} rede
+                          </span>
+                        )}
+                      </div>
+                      <div className={styles.cardPriceInfo}>
+                        <span className={styles.cardPriceItem}>
+                          <span className={styles.cardPriceLabel}>Preço:</span> {formatCurrency(product.averagePrice)}
+                        </span>
+                        <span className={styles.cardPriceItem}>
+                          <span className={styles.cardPriceLabel}>Custo:</span> {formatCurrency(product.cost)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
