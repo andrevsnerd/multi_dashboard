@@ -863,15 +863,25 @@ export async function fetchProductStockByFilial({
       fetchProductStockByFilialEcommerce({ productId, company, range, filial: null }),
     ]);
 
-    // Agregar por filial
+    const companyConfig = resolveCompany(company);
+    const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
+    
+    // Agregar por filial - usar nome normalizado (trim) como chave para evitar duplicatas
     const filialMap = new Map<string, ProductStockByFilial>();
     
+    // Adicionar resultados de vendas normais, excluindo filiais de e-commerce
     salesResult.forEach((item) => {
-      filialMap.set(item.filial, { ...item });
+      const normalizedFilial = (item.filial || '').trim();
+      // Excluir filiais de e-commerce do resultado de vendas normais
+      if (!ecommerceFilials.includes(normalizedFilial) && !ecommerceFilials.includes(item.filial)) {
+        filialMap.set(normalizedFilial, { ...item, filial: normalizedFilial });
+      }
     });
 
+    // Adicionar resultados de e-commerce
     ecommerceResult.forEach((item) => {
-      const existing = filialMap.get(item.filial);
+      const normalizedFilial = (item.filial || '').trim();
+      const existing = filialMap.get(normalizedFilial);
       if (existing) {
         existing.revenue += item.revenue;
         existing.quantity += item.quantity;
@@ -892,7 +902,7 @@ export async function fetchProductStockByFilial({
             ? (existing.revenue > 0 ? null : 0)
             : Number((((existing.revenue - totalPreviousRevenue) / totalPreviousRevenue) * 100).toFixed(1));
       } else {
-        filialMap.set(item.filial, { ...item });
+        filialMap.set(normalizedFilial, { ...item, filial: normalizedFilial });
       }
     });
 
@@ -1020,21 +1030,29 @@ export async function fetchProductStockByFilial({
     const filiais = companyConfig.filialFilters['inventory'] ?? [];
     // Normalizar também as filiais da configuração para comparação
     const normalizedFiliais = filiais.map(f => f.trim());
+    // Obter filiais de e-commerce normalizadas
+    const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
+    const normalizedEcommerceFilials = ecommerceFilials.map(f => f.trim());
 
     // Criar resultado
     const result: ProductStockByFilial[] = [];
 
-    allFiliais.forEach((filial) => {
+    allFiliais.forEach((filialName) => {
       // Apenas incluir filiais da empresa (usando inventory para incluir todas as filiais)
       // Comparar com nomes normalizados
-      if (!normalizedFiliais.includes(filial)) {
+      if (!normalizedFiliais.includes(filialName)) {
         return;
       }
 
-      const stock = stockMap.get(filial) ?? 0;
-      const revenue = currentRevenueMap.get(filial) ?? 0;
-      const quantity = currentQuantityMap.get(filial) ?? 0;
-      const previousRevenue = previousRevenueMap.get(filial) ?? 0;
+      // Se estamos buscando apenas VAREJO, excluir filiais de e-commerce
+      if (filial === VAREJO_VALUE && normalizedEcommerceFilials.includes(filialName)) {
+        return;
+      }
+
+      const stock = stockMap.get(filialName) ?? 0;
+      const revenue = currentRevenueMap.get(filialName) ?? 0;
+      const quantity = currentQuantityMap.get(filialName) ?? 0;
+      const previousRevenue = previousRevenueMap.get(filialName) ?? 0;
 
       const revenueVariance =
         previousRevenue === 0
@@ -1042,10 +1060,10 @@ export async function fetchProductStockByFilial({
           : Number((((revenue - previousRevenue) / previousRevenue) * 100).toFixed(1));
 
       // Aplicar mapeamento (filial já está normalizada)
-      const filialDisplayName = displayNames[filial] ?? filial;
+      const filialDisplayName = displayNames[filialName] ?? filialName;
 
       result.push({
-        filial,
+        filial: filialName,
         filialDisplayName,
         stock,
         revenue,
