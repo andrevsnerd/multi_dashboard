@@ -19,9 +19,68 @@
   flex: 1;
 }
 
-.loading {
-  font-size: 13px;
-  color: #0f172a;
+.loadingBanner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 24px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.08) 100%);
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.loadingText {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2563eb;
+  letter-spacing: 0.02em;
+}
+
+.loadingSpinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(59, 130, 246, 0.2);
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  }
+  50% {
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.25);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.contentLoading {
+  opacity: 0.5;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  position: relative;
+}
+
+.contentLoading::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 20px;
+  z-index: 1;
+  pointer-events: none;
 }
 
 .error {

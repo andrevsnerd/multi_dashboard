@@ -506,32 +506,38 @@ export default function ProductsPage({
               />
             </>
           )}
-          {loading ? (
-            <span className={styles.loading}>Carregando dados…</span>
-          ) : null}
           {error ? <span className={styles.error}>{error}</span> : null}
         </div>
       </div>
 
-      <SummaryCards
-        summary={summary}
-        companyName={companyName}
-        dateRange={range}
-      />
+      {loading && (
+        <div className={styles.loadingBanner}>
+          <span className={styles.loadingSpinner}></span>
+          <span className={styles.loadingText}>Carregando dados…</span>
+        </div>
+      )}
 
-      <div className={styles.tableControls}>
-        <label className={styles.switchLabel}>
-          <input
-            type="checkbox"
-            className={styles.switch}
-            checked={groupByColor}
-            onChange={(e) => setGroupByColor(e.target.checked)}
-          />
-          <span className={styles.switchText}>Por cor</span>
-        </label>
+      <div className={loading ? styles.contentLoading : undefined}>
+        <SummaryCards
+          summary={loading ? EMPTY_SUMMARY : summary}
+          companyName={companyName}
+          dateRange={range}
+        />
+
+        <div className={styles.tableControls}>
+          <label className={styles.switchLabel}>
+            <input
+              type="checkbox"
+              className={styles.switch}
+              checked={groupByColor}
+              onChange={(e) => setGroupByColor(e.target.checked)}
+            />
+            <span className={styles.switchText}>Por cor</span>
+          </label>
+        </div>
+
+        <ProductsTable data={data} loading={loading} groupByColor={groupByColor} companyKey={companyKey} />
       </div>
-
-      <ProductsTable data={data} loading={loading} groupByColor={groupByColor} companyKey={companyKey} />
     </div>
   );
 }

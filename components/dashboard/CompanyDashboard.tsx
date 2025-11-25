@@ -306,37 +306,47 @@ export default function CompanyDashboard({
               value={selectedFilial}
               onChange={setSelectedFilial}
             />
-            {loading ? <span className={styles.loading}>Atualizando métricas…</span> : null}
             {error ? <span className={styles.error}>{error}</span> : null}
           </div>
           <EngineButton onMetasClick={() => setIsGoalsModalOpen(true)} />
         </div>
 
-        <SummaryCards summary={summary} companyName={companyName} dateRange={range} />
-
-        <div className={styles.overviewSection}>
-          <div className={styles.chartsRow}>
-            <GoalCard
-              currentValue={currentRevenue}
-              goal={currentGoal}
-              projection={monthProjection}
-              label={selectedFilial ? "Meta da Filial" : "Meta Geral"}
-            />
-            <DailyRevenueChart
-              companyKey={companyKey}
-              startDate={range.startDate}
-              endDate={range.endDate}
-              filial={selectedFilial}
-            />
+        {loading && (
+          <div className={styles.loadingBanner}>
+            <span className={styles.loadingSpinner}></span>
+            <span className={styles.loadingText}>Atualizando métricas…</span>
           </div>
+        )}
+
+        <div className={loading ? styles.contentLoading : undefined}>
+          <SummaryCards summary={loading ? DEFAULT_SUMMARY : summary} companyName={companyName} dateRange={range} />
         </div>
 
-        <CompanyRevenueLists
-          companyKey={companyKey}
-          startDate={range.startDate}
-          endDate={range.endDate}
-          filial={selectedFilial}
-        />
+        <div className={loading ? styles.contentLoading : undefined}>
+          <div className={styles.overviewSection}>
+            <div className={styles.chartsRow}>
+              <GoalCard
+                currentValue={loading ? 0 : currentRevenue}
+                goal={currentGoal}
+                projection={loading ? 0 : monthProjection}
+                label={selectedFilial ? "Meta da Filial" : "Meta Geral"}
+              />
+              <DailyRevenueChart
+                companyKey={companyKey}
+                startDate={range.startDate}
+                endDate={range.endDate}
+                filial={selectedFilial}
+              />
+            </div>
+          </div>
+
+          <CompanyRevenueLists
+            companyKey={companyKey}
+            startDate={range.startDate}
+            endDate={range.endDate}
+            filial={selectedFilial}
+          />
+        </div>
       </div>
 
       <GoalsModal
