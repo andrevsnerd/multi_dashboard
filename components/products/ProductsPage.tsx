@@ -531,7 +531,7 @@ export default function ProductsPage({
         </label>
       </div>
 
-      <ProductsTable data={data} loading={loading} groupByColor={groupByColor} />
+      <ProductsTable data={data} loading={loading} groupByColor={groupByColor} companyKey={companyKey} />
     </div>
   );
 }

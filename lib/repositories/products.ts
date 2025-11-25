@@ -24,6 +24,8 @@ export interface ProductDetail {
   isNew: boolean; // true se não teve vendas no período anterior
   corProduto?: string | null; // Código da cor do produto
   descCorProduto?: string | null; // Descrição da cor do produto
+  grade?: string | null; // Grade do produto (apenas para scarfme)
+  estoqueRede?: number; // Estoque total em todas as filiais (apenas para scarfme)
 }
 
 export interface ProductsQueryParams {
@@ -427,14 +429,42 @@ export async function fetchProductsWithDetails({
         if (existing.cost > 0) {
           existing.markup = existing.averagePrice / existing.cost;
         }
+        // Preservar grade se não existir no produto existente
+        if (!existing.grade && product.grade) {
+          existing.grade = product.grade;
+        }
       } else {
         productMap.set(key, { ...product });
       }
     });
 
-    // Converter para array e ordenar por revenue
-    return Array.from(productMap.values())
-      .sort((a, b) => b.totalRevenue - a.totalRevenue);
+    // Converter para array
+    const aggregatedProducts = Array.from(productMap.values());
+
+    // Quando filial é null (sem filtros), recalcular estoque de todas as filiais
+    // porque o estoque normal veio apenas de VAREJO (sem e-commerce) ou apenas de e-commerce
+    // O estoque rede sempre deve ser o estoque de todas as filiais (correto)
+    if (aggregatedProducts.length > 0) {
+      const productIds = aggregatedProducts.map((p) => p.productId);
+      
+      // Buscar estoque de todas as filiais para o estoque rede (este é o correto)
+      const stockMapAllFiliais = await fetchMultipleProductsStock(productIds, {
+        company,
+        filial: null, // Todas as filiais
+      });
+
+      // Atualizar estoque normal e estoque rede com o valor correto (todas as filiais)
+      aggregatedProducts.forEach((product) => {
+        const stockAllFiliais = stockMapAllFiliais.get(product.productId) ?? 0;
+        // Estoque normal = estoque de todas as filiais quando não há filtros
+        product.stock = stockAllFiliais;
+        // Estoque rede = sempre estoque de todas as filiais (correto)
+        product.estoqueRede = stockAllFiliais;
+      });
+    }
+
+    // Ordenar por revenue
+    return aggregatedProducts.sort((a, b) => b.totalRevenue - a.totalRevenue);
   }
 
   // Função normal para vendas de loja
@@ -487,12 +517,18 @@ async function fetchProductsWithDetailsSales({
          MAX(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO, '')) AS descCorProduto,`
       : '';
 
+    // Adicionar campo grade apenas para scarfme
+    const gradeSelectField = company === 'scarfme'
+      ? 'MAX(CONVERT(VARCHAR, p.GRADE)) AS grade,'
+      : '';
+
     // Query para período atual
     const currentQuery = `
       SELECT 
         vp.PRODUTO AS productId,
         MAX(vp.DESC_PRODUTO) AS productName,
         MAX(COALESCE(vp.GRUPO_PRODUTO, p.GRUPO_PRODUTO, '')) AS grupo,
+        ${gradeSelectField}
         ${colorSelectFields}
         SUM(
           CASE
@@ -580,6 +616,7 @@ async function fetchProductsWithDetailsSales({
         productId: string;
         productName: string;
         grupo: string | null;
+        grade?: string | null;
         corProduto?: string | null;
         descCorProduto?: string | null;
         totalRevenue: number | null;
@@ -662,6 +699,11 @@ async function fetchProductsWithDetailsSales({
         ? getColorDescription(row.corProduto, row.descCorProduto)
         : null;
 
+      // Processar grade apenas para scarfme
+      const grade = company === 'scarfme' 
+        ? (row.grade && row.grade.trim() !== '' ? row.grade.trim() : null)
+        : undefined;
+
       return {
         productId: row.productId,
         productName: row.productName || 'Sem descrição',
@@ -676,6 +718,7 @@ async function fetchProductsWithDetailsSales({
         isNew,
         corProduto,
         descCorProduto,
+        grade,
       };
     });
 
@@ -691,6 +734,28 @@ async function fetchProductsWithDetailsSales({
       products.forEach((product) => {
         product.stock = stockMap.get(product.productId) ?? 0;
       });
+
+      // Para scarfme, sempre buscar estoque rede (de todas as filiais)
+      // O estoque rede sempre deve ser o estoque de todas as filiais (correto)
+      if (company === 'scarfme') {
+        const stockRedeMap = await fetchMultipleProductsStock(productIds, {
+          company,
+          filial: null, // null = todas as filiais (correto)
+        });
+
+        // Adicionar estoque rede a cada produto (sempre de todas as filiais)
+        products.forEach((product) => {
+          product.estoqueRede = stockRedeMap.get(product.productId) ?? 0;
+        });
+
+        // Se não houver filtro de filial (filial === null), o estoque normal também deve ser de todas as filiais
+        // (igual ao estoque rede, que está correto)
+        if (filial === null) {
+          products.forEach((product) => {
+            product.stock = product.estoqueRede; // Estoque normal = estoque rede quando não há filtros
+          });
+        }
+      }
     }
 
     return products.sort((a, b) => b.totalRevenue - a.totalRevenue);
@@ -826,11 +891,17 @@ async function fetchProductsWithDetailsEcommerce({
       ? `fp.COR_PRODUTO AS corProduto,`
       : '';
 
+    // Adicionar campo grade apenas para scarfme
+    const ecommerceGradeSelectField = company === 'scarfme'
+      ? 'MAX(CONVERT(VARCHAR, p.GRADE)) AS grade,'
+      : '';
+
     // Query para período atual
     const currentQuery = `
       SELECT 
         fp.PRODUTO AS productId,
         MAX(p.DESC_PRODUTO) AS productName,
+        ${ecommerceGradeSelectField}
         ${ecommerceColorSelectFields}
         SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue,
         SUM(fp.QTDE) AS totalQuantity,
@@ -907,6 +978,7 @@ async function fetchProductsWithDetailsEcommerce({
       request.query<{
         productId: string;
         productName: string;
+        grade?: string | null;
         corProduto?: string | null;
         totalRevenue: number | null;
         totalQuantity: number | null;
@@ -987,6 +1059,11 @@ async function fetchProductsWithDetailsEcommerce({
         ? getColorDescription(row.corProduto, null)
         : null;
 
+      // Processar grade apenas para scarfme
+      const grade = company === 'scarfme' 
+        ? (row.grade && row.grade.trim() !== '' ? row.grade.trim() : null)
+        : undefined;
+
       return {
         productId: row.productId,
         productName: row.productName || 'Sem descrição',
@@ -1001,6 +1078,7 @@ async function fetchProductsWithDetailsEcommerce({
         isNew,
         corProduto,
         descCorProduto,
+        grade,
       };
     });
 
@@ -1018,6 +1096,28 @@ async function fetchProductsWithDetailsEcommerce({
       products.forEach((product) => {
         product.stock = stockMap.get(product.productId) ?? 0;
       });
+
+      // Para scarfme, sempre buscar estoque rede (de todas as filiais)
+      // O estoque rede sempre deve ser o estoque de todas as filiais (correto)
+      if (company === 'scarfme') {
+        const stockRedeMap = await fetchMultipleProductsStock(productIds, {
+          company,
+          filial: null, // null = todas as filiais (correto)
+        });
+
+        // Adicionar estoque rede a cada produto (sempre de todas as filiais)
+        products.forEach((product) => {
+          product.estoqueRede = stockRedeMap.get(product.productId) ?? 0;
+        });
+
+        // Se não houver filtro de filial (filial === null), o estoque normal também deve ser de todas as filiais
+        // (igual ao estoque rede, que está correto)
+        if (filial === null) {
+          products.forEach((product) => {
+            product.stock = product.estoqueRede; // Estoque normal = estoque rede quando não há filtros
+          });
+        }
+      }
     }
 
     return products.sort((a, b) => b.totalRevenue - a.totalRevenue);

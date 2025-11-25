@@ -9,12 +9,14 @@ interface ProductsTableProps {
   data: ProductDetail[];
   loading?: boolean;
   groupByColor?: boolean;
+  companyKey?: string;
 }
 
 export default function ProductsTable({
   data,
   loading,
   groupByColor = false,
+  companyKey,
 }: ProductsTableProps) {
   const [sortColumn, setSortColumn] = useState<keyof ProductDetail>("totalRevenue");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -105,6 +107,11 @@ export default function ProductsTable({
                   </span>
                 )}
               </th>
+              {companyKey === "scarfme" && (
+                <th className={styles.descriptionHeader}>
+                  GRADE
+                </th>
+              )}
               {groupByColor && (
                 <th className={styles.descriptionHeader}>
                   COR
@@ -187,6 +194,19 @@ export default function ProductsTable({
                   </span>
                 )}
               </th>
+              {companyKey === "scarfme" && (
+                <th
+                  className={`${styles.sortable} ${styles.numberHeader}`}
+                  onClick={() => handleSort("estoqueRede")}
+                >
+                  ESTOQUE REDE
+                  {sortColumn === "estoqueRede" && (
+                    <span className={styles.sortIndicator}>
+                      {sortDirection === "asc" ? "↑" : "↓"}
+                    </span>
+                  )}
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -201,6 +221,11 @@ export default function ProductsTable({
                     <div className={styles.productName}>{product.productName}</div>
                     <div className={styles.productCode}>{product.productId}</div>
                   </td>
+                  {companyKey === "scarfme" && (
+                    <td className={styles.descriptionCell}>
+                      {product.grade || '--'}
+                    </td>
+                  )}
                   {groupByColor && (
                     <td className={styles.descriptionCell}>
                       {product.descCorProduto || '--'}
@@ -235,6 +260,11 @@ export default function ProductsTable({
                     <span className={styles.markupValue}>{formatMarkup(product.markup)}</span>
                   </td>
                   <td className={styles.numberCell}>{formatNumber(product.stock)}</td>
+                  {companyKey === "scarfme" && (
+                    <td className={styles.numberCell}>
+                      {product.estoqueRede !== undefined ? formatNumber(product.estoqueRede) : '--'}
+                    </td>
+                  )}
                 </tr>
               );
             })}
