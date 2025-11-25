@@ -719,6 +719,7 @@ async function fetchProductsWithDetailsSales({
         corProduto,
         descCorProduto,
         grade,
+        estoqueRede: 0, // Será preenchido abaixo para scarfme
       };
     });
 
@@ -1079,6 +1080,7 @@ async function fetchProductsWithDetailsEcommerce({
         corProduto,
         descCorProduto,
         grade,
+        estoqueRede: 0, // Será preenchido abaixo para scarfme
       };
     });
 
