@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import type { VendedorItem, VendedorProdutoItem } from "@/lib/repositories/vendedores";
 import type { DateRangeValue } from "@/components/filters/DateRangeFilter";
 import { resolveCompany } from "@/lib/config/company";
@@ -267,9 +267,8 @@ export default function VendedoresTable({
                 : vendedor.grupoMaisVendido;
 
               return (
-                <>
+                <React.Fragment key={`${vendedor.vendedor}-${vendedor.filial}-${index}`}>
                   <tr 
-                    key={`${vendedor.vendedor}-${vendedor.filial}-${index}`}
                     className={styles.vendedorRow}
                     onClick={() => toggleExpand(vendedor.vendedor, vendedor.filial)}
                   >
@@ -346,7 +345,7 @@ export default function VendedoresTable({
                       </td>
                     </tr>
                   )}
-                </>
+                </React.Fragment>
               );
             })}
           </tbody>

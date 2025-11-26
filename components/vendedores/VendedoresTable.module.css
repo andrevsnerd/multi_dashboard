@@ -427,37 +427,45 @@
 }
 
 .cardExpanded {
-  background-color: #f8f9fa;
-  border-top: 1px solid rgba(15, 23, 42, 0.08);
-  padding: 12px 16px;
+  background-color: #fafafa;
+  border-top: 1px solid #e5e7eb;
+  padding: 16px;
 }
 
 .cardProdutosList {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .cardProdutoItem {
   background: white;
-  padding: 12px;
+  padding: 14px 16px;
   border-radius: 8px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid #e5e7eb;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cardProdutoItem:active {
+  border-color: #d1d5db;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .cardProdutoGrupo {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
-  color: #64748b;
+  color: #9ca3af;
   text-transform: uppercase;
-  margin-bottom: 4px;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
 }
 
 .cardProdutoDescricao {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 400;
   color: #1f2937;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  line-height: 1.4;
 }
 
 .cardProdutoValues {
@@ -465,17 +473,19 @@
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #f3f4f6;
 }
 
 .cardProdutoFaturamento {
-  font-size: 14px;
-  font-weight: 700;
-  color: #0f172a;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
 }
 
 .cardProdutoQuantidade {
-  font-size: 12px;
-  color: #64748b;
+  font-size: 13px;
+  color: #6b7280;
   font-weight: 500;
 }
 
@@ -543,66 +553,77 @@
 
 /* Expanded row styles */
 .expandedRow {
-  background-color: #f8f9fa;
+  background-color: #fafafa;
 }
 
 .expandedCell {
-  padding: 0 !important;
-  background-color: #f8f9fa;
+  padding: 20px 16px !important;
+  background-color: #fafafa;
 }
 
 .produtosContainer {
-  padding: 16px;
+  width: 100%;
   background-color: #ffffff;
-  margin: 8px;
   border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
 }
 
 .produtosTable {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .produtosTable thead {
-  background-color: #f1f5f9;
+  background-color: transparent;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .produtosTable th {
-  padding: 8px 12px;
-  text-align: left;
+  padding: 12px 16px;
   font-weight: 600;
   font-size: 11px;
-  color: #1f2937;
-  border-bottom: 2px solid #e5e7eb;
+  color: #6b7280;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .produtoGrupoHeader {
   min-width: 150px;
+  width: 15%;
+  text-align: left;
 }
 
 .produtoDescricaoHeader {
   min-width: 300px;
+  width: 50%;
+  text-align: left;
 }
 
 .produtoFaturamentoHeader {
-  text-align: right !important;
+  text-align: right;
   min-width: 120px;
+  width: 20%;
 }
 
 .produtoQuantidadeHeader {
-  text-align: right !important;
+  text-align: right;
   min-width: 100px;
+  width: 15%;
 }
 
 .produtosTable td {
-  padding: 10px 12px;
-  border-bottom: 1px solid #e5e7eb;
+  padding: 14px 16px;
+  border-bottom: 1px solid #f3f4f6;
   color: #374151;
-  font-size: 12px;
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.produtosTable tbody tr {
+  transition: background-color 0.15s ease;
 }
 
 .produtosTable tbody tr:hover {
@@ -615,30 +636,37 @@
 
 .produtoGrupoCell {
   font-weight: 500;
-  color: #4b5563;
+  color: #6b7280;
+  font-size: 12px;
+  text-align: left;
 }
 
 .produtoDescricaoCell {
   color: #1f2937;
+  font-weight: 400;
+  text-align: left;
 }
 
 .produtoFaturamentoCell {
-  text-align: right !important;
-  font-weight: 500;
+  text-align: right;
+  font-weight: 600;
   color: #1f2937;
+  font-size: 13px;
 }
 
 .produtoQuantidadeCell {
-  text-align: right !important;
+  text-align: right;
   font-weight: 500;
-  color: #1f2937;
+  color: #6b7280;
+  font-size: 13px;
 }
 
 .loadingProdutos,
 .emptyProdutos {
-  padding: 20px;
+  padding: 40px 20px;
   text-align: center;
-  color: #6b7280;
+  color: #9ca3af;
   font-size: 13px;
+  font-weight: 500;
 }
 
