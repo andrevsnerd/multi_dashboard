@@ -164,7 +164,7 @@ export default function ProductsPage({
   const [selectedColecoes, setSelectedColecoes] = useState<string[]>([]);
   const [selectedSubgrupos, setSelectedSubgrupos] = useState<string[]>([]);
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
-  const [groupByColor, setGroupByColor] = useState(false);
+  const [groupByColor, setGroupByColor] = useState(true);
   const [data, setData] = useState<ProductDetail[]>([]);
   const [summary, setSummary] = useState<SalesSummary>(EMPTY_SUMMARY);
   const [loading, setLoading] = useState(false);

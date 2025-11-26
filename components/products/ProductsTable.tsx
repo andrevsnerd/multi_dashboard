@@ -331,6 +331,15 @@ export default function ProductsTable({
                       <div className={styles.cardProductInfo}>
                         <h4 className={styles.cardProductName}>
                           {product.productName}
+                        </h4>
+                        <div className={styles.cardProductMeta}>
+                          <span className={styles.cardProductCode}>{product.productId}</span>
+                          {companyKey === "scarfme" && product.grade && (
+                            <span className={styles.cardGrade}>{product.grade}</span>
+                          )}
+                          {groupByColor && product.descCorProduto && (
+                            <span className={styles.cardColor}>{product.descCorProduto}</span>
+                          )}
                           {!product.isNew && (
                             <span
                               className={`${styles.cardVariance} ${
@@ -341,25 +350,16 @@ export default function ProductsTable({
                                     : styles.varianceNeutral
                               }`}
                             >
-                              {variance.isPositive && "↑"}
-                              {variance.isNegative && "↓"}
                               {variance.text}
                             </span>
-                          )}
-                        </h4>
-                        <div className={styles.cardProductMeta}>
-                          <span className={styles.cardProductCode}>{product.productId}</span>
-                          {companyKey === "scarfme" && product.grade && (
-                            <span className={styles.cardGrade}>{product.grade}</span>
-                          )}
-                          {groupByColor && product.descCorProduto && (
-                            <span className={styles.cardColor}>{product.descCorProduto}</span>
                           )}
                         </div>
                       </div>
                       <div className={styles.cardRevenue}>
-                        <span className={styles.cardRevenueValue}>{formatCurrency(product.totalRevenue)}</span>
-                        <span className={styles.cardQuantity}>{formatNumber(product.totalQuantity)} unidades</span>
+                        <span className={styles.cardRevenueValue}>
+                          {formatCurrency(product.totalRevenue)}
+                          <span className={styles.cardQuantity}> {formatNumber(product.totalQuantity)} unidades</span>
+                        </span>
                       </div>
                     </div>
                     <div className={styles.cardRight}>
