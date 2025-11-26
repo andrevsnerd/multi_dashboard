@@ -438,6 +438,8 @@ export interface VendedorProdutosQueryParams {
   colecoes?: string[];
   subgrupos?: string[];
   grades?: string[];
+  produtoId?: string;
+  produtoSearchTerm?: string;
 }
 
 export async function fetchVendedorProdutos({
