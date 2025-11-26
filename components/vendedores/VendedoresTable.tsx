@@ -18,6 +18,7 @@ interface VendedoresTableProps {
   selectedColecoes: string[];
   selectedSubgrupos: string[];
   selectedGrades: string[];
+  selectedProductId?: string | null;
 }
 
 export default function VendedoresTable({
@@ -31,6 +32,7 @@ export default function VendedoresTable({
   selectedColecoes,
   selectedSubgrupos,
   selectedGrades,
+  selectedProductId,
 }: VendedoresTableProps) {
   const [sortColumn, setSortColumn] = useState<keyof VendedorItem>("faturamento");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -104,6 +106,22 @@ export default function VendedoresTable({
     return company?.filialDisplayNames?.[filial] ?? filial;
   };
 
+  const formatVendedorName = (fullName: string): string => {
+    const parts = fullName.trim().split(/\s+/);
+    if (parts.length <= 1) return fullName;
+    
+    // Se o segundo nome tem 3 letras ou menos (DA, DOS, DO, etc), pegar o terceiro também
+    if (parts.length >= 2 && parts[1].length <= 3) {
+      if (parts.length >= 3) {
+        return `${parts[0]} ${parts[1]} ${parts[2]}`;
+      }
+      return `${parts[0]} ${parts[1]}`;
+    }
+    
+    // Se o segundo nome tem mais de 3 letras, parar no segundo
+    return `${parts[0]} ${parts[1]}`;
+  };
+
   const getVendedorKey = (vendedor: string, filial: string): string => {
     return `${vendedor}::${filial}`;
   };
@@ -154,6 +172,10 @@ export default function VendedoresTable({
           selectedGrades.forEach((grade) => {
             searchParams.append("grade", grade);
           });
+
+          if (selectedProductId) {
+            searchParams.set("produtoId", selectedProductId);
+          }
 
           const vendedorEncoded = encodeURIComponent(vendedor);
           const response = await fetch(
@@ -339,7 +361,7 @@ export default function VendedoresTable({
                   </tr>
                   {isExpanded && (
                     <tr key={`${key}-expanded`} className={styles.expandedRow}>
-                      <td colSpan={companyKey === 'scarfme' ? 7 : 7} className={styles.expandedCell}>
+                      <td colSpan={7} className={styles.expandedCell}>
                         {isLoadingProdutos ? (
                           <div className={styles.loadingProdutos}>Carregando produtos...</div>
                         ) : produtos.length === 0 ? (
@@ -349,39 +371,57 @@ export default function VendedoresTable({
                             <table className={styles.produtosTable}>
                               <thead>
                                 <tr>
-                                  {companyKey === 'nerd' ? (
+                                  {companyKey === 'scarfme' ? (
                                     <>
-                                      <th className={styles.produtoGrupoHeader}>GRUPO</th>
+                                      <th className={styles.produtoLinhaHeader}>LINHA</th>
                                       <th className={styles.produtoDescricaoHeader}>DESCRIÇÃO</th>
+                                      <th className={styles.produtoCorHeader}>COR</th>
+                                      <th className={styles.produtoGradeHeader}>GRADE</th>
+                                      <th className={styles.produtoSubgrupoHeader}>SUBGRUPO</th>
+                                      <th className={styles.produtoColecaoHeader}>COLEÇÃO</th>
                                     </>
                                   ) : (
                                     <>
-                                      <th className={styles.produtoLinhaHeader}>LINHA</th>
-                                      <th className={styles.produtoColecaoHeader}>COLEÇÃO</th>
-                                      <th className={styles.produtoSubgrupoHeader}>SUBGRUPO</th>
-                                      <th className={styles.produtoGradeHeader}>GRADE</th>
+                                      <th className={styles.produtoGrupoHeader}>GRUPO</th>
                                       <th className={styles.produtoDescricaoHeader}>DESCRIÇÃO</th>
+                                      <th className={styles.produtoCorHeader}>COR</th>
                                     </>
                                   )}
                                   <th className={styles.produtoFaturamentoHeader}>FATURAMENTO</th>
-                                  <th className={styles.produtoQuantidadeHeader}>QUANTIDADE</th>
+                                  <th className={styles.produtoQuantidadeHeader}>QTD</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {produtos.map((produto, produtoIndex) => (
                                   <tr key={`${key}-produto-${produtoIndex}`}>
-                                    {companyKey === 'nerd' ? (
+                                    {companyKey === 'scarfme' ? (
                                       <>
-                                        <td className={styles.produtoGrupoCell}>{produto.grupo || '--'}</td>
-                                        <td className={styles.produtoDescricaoCell}>{produto.descricao}</td>
+                                        <td className={styles.produtoLinhaCell}>{produto.linha || '--'}</td>
+                                        <td className={styles.produtoDescricaoCell}>
+                                          <div className={styles.produtoDescricaoWrapper}>
+                                            <div className={styles.produtoDescricaoText}>{produto.descricao}</div>
+                                            {produto.codigo && (
+                                              <div className={styles.produtoCodigo}>{produto.codigo}</div>
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td className={styles.produtoCorCell}>{produto.cor || '--'}</td>
+                                        <td className={styles.produtoGradeCell}>{produto.grade || '--'}</td>
+                                        <td className={styles.produtoSubgrupoCell}>{produto.subgrupo || '--'}</td>
+                                        <td className={styles.produtoColecaoCell}>{produto.colecao || '--'}</td>
                                       </>
                                     ) : (
                                       <>
-                                        <td className={styles.produtoLinhaCell}>{produto.linha || '--'}</td>
-                                        <td className={styles.produtoColecaoCell}>{produto.colecao || '--'}</td>
-                                        <td className={styles.produtoSubgrupoCell}>{produto.subgrupo || '--'}</td>
-                                        <td className={styles.produtoGradeCell}>{produto.grade || '--'}</td>
-                                        <td className={styles.produtoDescricaoCell}>{produto.descricao}</td>
+                                        <td className={styles.produtoGrupoCell}>{produto.grupo || '--'}</td>
+                                        <td className={styles.produtoDescricaoCell}>
+                                          <div className={styles.produtoDescricaoWrapper}>
+                                            <div className={styles.produtoDescricaoText}>{produto.descricao}</div>
+                                            {produto.codigo && (
+                                              <div className={styles.produtoCodigo}>{produto.codigo}</div>
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td className={styles.produtoCorCell}>{produto.cor || '--'}</td>
                                       </>
                                     )}
                                     <td className={styles.produtoFaturamentoCell}>
@@ -419,70 +459,55 @@ export default function VendedoresTable({
 
             return (
               <div key={`${vendedor.vendedor}-${vendedor.filial}-${index}`}>
-                <div 
-                  className={styles.card}
-                  onClick={() => toggleExpand(vendedor.vendedor, vendedor.filial)}
-                >
-                  <div className={styles.cardMain}>
-                    <div className={styles.cardHeader}>
-                      <div className={styles.cardLeft}>
-                        <div className={styles.cardVendedorInfo}>
-                          <div className={styles.cardRankingNumber}>#{ranking}</div>
-                          <div>
-                            <div className={styles.cardVendedorNameRow}>
-                              <h4 className={styles.cardVendedorName}>
-                                {vendedor.vendedor}
-                              </h4>
-                              {badgeText && (
-                                <span className={styles.cardGrupoBadge}>{badgeText}</span>
-                              )}
-                            </div>
-                            <div className={styles.cardVendedorFilial}>
-                              {getFilialDisplayName(vendedor.filial)}
-                            </div>
-                          </div>
-                        </div>
-                        <div className={styles.cardRevenue}>
-                          <span className={styles.cardRevenueValue}>
-                            {formatCurrency(vendedor.faturamento)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className={styles.cardBody}>
-                      <div className={styles.cardRow}>
-                        <span className={styles.cardLabel}>Quantidade Vendida:</span>
-                        <span className={styles.cardValue}>
-                          {formatNumber(vendedor.quantidadeVendida)}
-                        </span>
-                      </div>
-                      <div className={styles.cardRow}>
-                        <span className={styles.cardLabel}>Tickets:</span>
-                        <span className={styles.cardValue}>
-                          {formatNumber(vendedor.tickets)}
-                        </span>
-                      </div>
-                      <div className={styles.cardRow}>
-                        <span className={styles.cardLabel}>Ticket Médio:</span>
-                        <span className={styles.cardValue}>
-                          {formatCurrency(vendedor.ticketMedio)}
-                        </span>
-                      </div>
-                      <div className={styles.cardRow}>
-                        <span className={styles.cardLabel}>Qtde. por Ticket:</span>
-                        <span className={styles.cardValue}>
-                          {formatDecimal(vendedor.quantidadePorTicket, 2)}
-                        </span>
-                      </div>
-                      <div className={styles.cardRow}>
-                        <span className={styles.cardLabel}>Participação Filial:</span>
-                        <span className={styles.cardValue}>
-                          {formatPercentage(vendedor.participacaoFilial)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                 <div 
+                   className={styles.card}
+                   onClick={() => toggleExpand(vendedor.vendedor, vendedor.filial)}
+                 >
+                   <div className={styles.cardContent}>
+                     <div className={styles.cardLeft}>
+                       <div className={styles.cardRankingNumber}>#{ranking}</div>
+                       <div className={styles.cardVendedorText}>
+                         <div className={styles.cardVendedorNameRow}>
+                           <h4 className={styles.cardVendedorName}>
+                             {formatVendedorName(vendedor.vendedor)}
+                           </h4>
+                           {badgeText && (
+                             <span className={styles.cardGrupoBadge}>{badgeText}</span>
+                           )}
+                         </div>
+                         <div className={styles.cardVendedorFilial}>
+                           {getFilialDisplayName(vendedor.filial)}
+                         </div>
+                       </div>
+                     </div>
+                     <div className={styles.cardMetricsRow}>
+                       <div className={styles.cardMetric}>
+                         <span className={styles.cardMetricLabel}>FAT</span>
+                         <span className={styles.cardMetricValueHighlight}>
+                           {formatCurrency(vendedor.faturamento)}
+                         </span>
+                       </div>
+                       <div className={styles.cardMetric}>
+                         <span className={styles.cardMetricLabel}>QTD</span>
+                         <span className={styles.cardMetricValue}>
+                           {formatNumber(vendedor.quantidadeVendida)}
+                         </span>
+                       </div>
+                       <div className={styles.cardMetric}>
+                         <span className={styles.cardMetricLabel}>TKT</span>
+                         <span className={styles.cardMetricValue}>
+                           {formatNumber(vendedor.tickets)}
+                         </span>
+                       </div>
+                       <div className={styles.cardMetric}>
+                         <span className={styles.cardMetricLabel}>PART</span>
+                         <span className={styles.cardMetricValue}>
+                           {formatPercentage(vendedor.participacaoFilial)}
+                         </span>
+                       </div>
+                     </div>
+                   </div>
+                 </div>
                 {isExpanded && (
                   <div className={styles.cardExpanded}>
                     {isLoadingProdutos ? (
@@ -493,31 +518,47 @@ export default function VendedoresTable({
                       <div className={styles.cardProdutosList}>
                         {produtos.map((produto, produtoIndex) => (
                           <div key={`${key}-produto-${produtoIndex}`} className={styles.cardProdutoItem}>
-                            {companyKey === 'nerd' ? (
-                              <div className={styles.cardProdutoGrupo}>{produto.grupo || '--'}</div>
-                            ) : (
-                              <div className={styles.cardProdutoMeta}>
-                                {produto.linha && (
-                                  <span className={styles.cardProdutoTag}>{produto.linha}</span>
-                                )}
-                                {produto.colecao && (
-                                  <span className={styles.cardProdutoTag}>{produto.colecao}</span>
-                                )}
-                                {produto.subgrupo && (
-                                  <span className={styles.cardProdutoTag}>{produto.subgrupo}</span>
-                                )}
-                                {produto.grade && (
-                                  <span className={styles.cardProdutoTag}>{produto.grade}</span>
+                            <div className={styles.cardProdutoLeft}>
+                              {companyKey === 'nerd' ? (
+                                <div className={styles.cardProdutoGrupo}>{produto.grupo || '--'}</div>
+                              ) : (
+                                <div className={styles.cardProdutoMeta}>
+                                  {produto.linha && (
+                                    <span className={styles.cardProdutoTag}>{produto.linha}</span>
+                                  )}
+                                  {produto.colecao && (
+                                    <span className={styles.cardProdutoTag}>{produto.colecao}</span>
+                                  )}
+                                  {produto.subgrupo && (
+                                    <span className={styles.cardProdutoTag}>{produto.subgrupo}</span>
+                                  )}
+                                  {produto.grade && (
+                                    <span className={styles.cardProdutoTag}>{produto.grade}</span>
+                                  )}
+                                  {produto.cor && (
+                                    <span className={styles.cardProdutoTag}>{produto.cor}</span>
+                                  )}
+                                </div>
+                              )}
+                              <div className={styles.cardProdutoDescricaoWrapper}>
+                                <div className={styles.cardProdutoDescricao}>{produto.descricao}</div>
+                                {produto.codigo && (
+                                  <div className={styles.cardProdutoCodigo}>{produto.codigo}</div>
                                 )}
                               </div>
-                            )}
-                            <div className={styles.cardProdutoDescricao}>{produto.descricao}</div>
-                            <div className={styles.cardProdutoValues}>
-                              <div className={styles.cardProdutoFaturamento}>
-                                {formatCurrency(produto.faturamento)}
+                            </div>
+                            <div className={styles.cardProdutoMetrics}>
+                              <div className={styles.cardProdutoMetric}>
+                                <span className={styles.cardProdutoMetricLabel}>FAT</span>
+                                <span className={styles.cardProdutoMetricValue}>
+                                  {formatCurrency(produto.faturamento)}
+                                </span>
                               </div>
-                              <div className={styles.cardProdutoQuantidade}>
-                                {formatNumber(produto.quantidade)} un.
+                              <div className={styles.cardProdutoMetric}>
+                                <span className={styles.cardProdutoMetricLabel}>QTD</span>
+                                <span className={styles.cardProdutoMetricValue}>
+                                  {formatNumber(produto.quantidade)}
+                                </span>
                               </div>
                             </div>
                           </div>

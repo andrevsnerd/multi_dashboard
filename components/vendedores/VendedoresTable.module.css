@@ -265,7 +265,7 @@
 }
 
 .card {
-  padding: 12px 16px;
+  padding: 8px 12px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
   background: #ffffff;
   transition: background-color 0.2s;
@@ -279,103 +279,87 @@
   background-color: #f8fafc;
 }
 
-.cardMain {
+.cardContent {
   display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.cardHeader {
-  display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: flex-start;
   gap: 16px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
-  margin-bottom: 12px;
+  width: 100%;
 }
 
 .cardLeft {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
   flex: 1;
   min-width: 0;
 }
 
-.cardVendedorInfo {
+.cardVendedorText {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.cardVendedorIcon {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background-color: #3b82f6;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 16px;
-  flex-shrink: 0;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
 .cardVendedorName {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: #0f172a;
-  margin: 0 0 4px 0;
+  margin: 0;
   line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cardVendedorFilial {
   font-size: 11px;
   color: #64748b;
   font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.cardRevenue {
+.cardMetricsRow {
   display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.cardRevenueValue {
-  font-size: 16px;
-  font-weight: 700;
-  color: #0f172a;
-  line-height: 1.2;
-}
-
-.cardBody {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.cardRow {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 12px;
-}
-
-.cardLabel {
-  font-size: 13px;
-  color: #64748b;
-  font-weight: 500;
+  justify-content: flex-end;
+  gap: 16px;
   flex-shrink: 0;
 }
 
-.cardValue {
-  font-size: 14px;
-  color: #0f172a;
-  font-weight: 600;
-  text-align: right;
-  flex: 1;
+.cardMetric {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: flex-end;
   min-width: 0;
-  word-break: break-word;
+}
+
+.cardMetricLabel {
+  font-size: 9px;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.cardMetricValue {
+  font-size: 11px;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.cardMetricValueHighlight {
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
 }
 
 .cardExpandButton {
@@ -397,20 +381,21 @@
 }
 
 .cardRankingNumber {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: #64748b;
-  min-width: 28px;
+  min-width: 24px;
   text-align: left;
   padding-top: 2px;
+  flex-shrink: 0;
 }
 
 .cardVendedorNameRow {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .cardGrupoBadge {
@@ -429,20 +414,30 @@
 .cardExpanded {
   background-color: #fafafa;
   border-top: 1px solid #e5e7eb;
-  padding: 16px;
+  padding: 10px 12px;
+}
+
+.cardProdutosExpandedWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .cardProdutosList {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .cardProdutoItem {
   background: white;
-  padding: 14px 16px;
-  border-radius: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
   border: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -451,61 +446,91 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
+.cardProdutoLeft {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .cardProdutoGrupo {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
   color: #9ca3af;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 6px;
+  letter-spacing: 0.4px;
 }
 
 .cardProdutoMeta {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 6px;
+  gap: 4px;
 }
 
 .cardProdutoTag {
   display: inline-block;
-  padding: 3px 8px;
+  padding: 2px 6px;
   background-color: #f3f4f6;
   color: #6b7280;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+}
+
+.cardProdutoDescricaoWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cardProdutoDescricao {
+  font-size: 12px;
+  font-weight: 400;
+  color: #1f2937;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardProdutoCodigo {
+  font-size: 10px;
+  font-weight: 500;
+  color: #6b7280;
+  line-height: 1.2;
+}
+
+.cardProdutoMetrics {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.cardProdutoMetric {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.cardProdutoMetricLabel {
+  font-size: 9px;
+  font-weight: 600;
+  color: #9ca3af;
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
 
-.cardProdutoDescricao {
-  font-size: 14px;
-  font-weight: 400;
-  color: #1f2937;
-  margin-bottom: 10px;
-  line-height: 1.4;
-}
-
-.cardProdutoValues {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding-top: 8px;
-  border-top: 1px solid #f3f4f6;
-}
-
-.cardProdutoFaturamento {
-  font-size: 15px;
+.cardProdutoMetricValue {
+  font-size: 11px;
   font-weight: 600;
   color: #1f2937;
-}
-
-.cardProdutoQuantidade {
-  font-size: 13px;
-  color: #6b7280;
-  font-weight: 500;
+  white-space: nowrap;
 }
 
 /* Mobile optimizations */
@@ -580,6 +605,37 @@
   background-color: #fafafa;
 }
 
+.produtosExpandedWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.produtosSearchContainer {
+  width: 100%;
+}
+
+.produtosSearchInput {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #1f2937;
+  background-color: #ffffff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.produtosSearchInput:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.produtosSearchInput::placeholder {
+  color: #9ca3af;
+}
+
 .produtosContainer {
   width: 100%;
   background-color: #ffffff;
@@ -639,22 +695,51 @@
   text-align: left;
 }
 
-.produtoDescricaoHeader {
-  min-width: 200px;
+.produtoLinhaHeader {
+  min-width: 100px;
+  width: 10%;
   text-align: left;
-  /* Width será calculado automaticamente baseado nas outras colunas */
+}
+
+.produtoSubgrupoHeader {
+  min-width: 100px;
+  width: 10%;
+  text-align: left;
+}
+
+.produtoGradeHeader {
+  min-width: 100px;
+  width: 10%;
+  text-align: left;
+}
+
+.produtoColecaoHeader {
+  min-width: 100px;
+  width: 10%;
+  text-align: left;
+}
+
+.produtoDescricaoHeader {
+  min-width: 250px;
+  text-align: left;
+}
+
+.produtoCorHeader {
+  min-width: 120px;
+  width: 10%;
+  text-align: left;
 }
 
 .produtoFaturamentoHeader {
   text-align: right;
   min-width: 120px;
-  width: 17%;
+  width: 12%;
 }
 
 .produtoQuantidadeHeader {
   text-align: right;
-  min-width: 100px;
-  width: 17%;
+  min-width: 80px;
+  width: 13%;
 }
 
 .produtosTable td {
@@ -693,6 +778,31 @@
   text-align: left;
 }
 
+.produtoDescricaoCell {
+  color: #1f2937;
+  font-weight: 400;
+  text-align: left;
+}
+
+.produtoDescricaoWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.produtoDescricaoText {
+  font-weight: 400;
+  color: #1f2937;
+  line-height: 1.4;
+}
+
+.produtoCodigo {
+  font-size: 11px;
+  font-weight: 500;
+  color: #6b7280;
+  line-height: 1.3;
+}
+
 .produtoGradeCell {
   font-weight: 500;
   color: #6b7280;
@@ -700,9 +810,10 @@
   text-align: left;
 }
 
-.produtoDescricaoCell {
-  color: #1f2937;
-  font-weight: 400;
+.produtoCorCell {
+  font-weight: 500;
+  color: #6b7280;
+  font-size: 12px;
   text-align: left;
 }
 

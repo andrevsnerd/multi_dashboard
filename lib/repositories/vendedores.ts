@@ -19,11 +19,13 @@ export interface VendedorItem {
 }
 
 export interface VendedorProdutoItem {
+  codigo?: string;
   grupo?: string;
   linha?: string;
   colecao?: string;
   subgrupo?: string;
   grade?: string;
+  cor?: string;
   descricao: string;
   faturamento: number;
   quantidade: number;
@@ -41,6 +43,7 @@ export interface VendedoresQueryParams {
   colecoes?: string[];
   subgrupos?: string[];
   grades?: string[];
+  produtoId?: string;
 }
 
 function buildFilialFilter(
@@ -135,6 +138,7 @@ export async function fetchVendedores({
   colecoes,
   subgrupos,
   grades,
+  produtoId,
 }: VendedoresQueryParams = {}): Promise<VendedorItem[]> {
   return withRequest(async (request) => {
     const { start, end } = normalizeRangeForQuery(range);
@@ -206,6 +210,11 @@ export async function fetchVendedores({
       'grade'
     );
 
+    const produtoFilter = produtoId ? `AND vp.PRODUTO = @produtoId` : '';
+    if (produtoId) {
+      request.input('produtoId', sql.VarChar, produtoId);
+    }
+
     // Query para buscar dados dos vendedores
     // Primeiro, buscar faturamento total por filial para calcular participação
     const filialTotalQuery = `
@@ -228,6 +237,7 @@ export async function fetchVendedores({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${produtoFilter}
       GROUP BY vp.FILIAL
     `;
 
@@ -269,6 +279,7 @@ export async function fetchVendedores({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${produtoFilter}
       GROUP BY vp.VENDEDOR, vp.FILIAL
       HAVING SUM(
         CASE
@@ -318,6 +329,7 @@ export async function fetchVendedores({
           ${colecaoFilter}
           ${subgrupoFilter}
           ${gradeFilter}
+          ${produtoFilter}
         GROUP BY ISNULL(v.VENDEDOR_APELIDO, vp.VENDEDOR), vp.VENDEDOR, vp.FILIAL, vp.GRUPO_PRODUTO, vp.SUBGRUPO_PRODUTO
         HAVING SUM(
           CASE
@@ -431,6 +443,7 @@ export async function fetchVendedorProdutos({
   colecoes,
   subgrupos,
   grades,
+  produtoId,
 }: VendedorProdutosQueryParams): Promise<VendedorProdutoItem[]> {
   return withRequest(async (request) => {
     const { start, end } = normalizeRangeForQuery(range);
@@ -496,16 +509,23 @@ export async function fetchVendedorProdutos({
       'grade'
     );
 
+    const produtoFilter = produtoId ? `AND vp.PRODUTO = @produtoId` : '';
+    if (produtoId) {
+      request.input('produtoId', sql.VarChar, produtoId);
+    }
+
     // Query para buscar produtos vendidos pelo vendedor
     // Usar VENDEDOR_APELIDO para fazer o match
     // Não usar buildFilialFilter aqui pois já estamos filtrando diretamente por filial
     const produtosQuery = `
       SELECT 
+        MAX(vp.PRODUTO) AS codigo,
         ISNULL(MAX(vp.GRUPO_PRODUTO), 'SEM GRUPO') AS grupo,
         ISNULL(MAX(COALESCE(vp.LINHA, p.LINHA, '')), '') AS linha,
         ISNULL(MAX(COALESCE(vp.COLECAO, p.COLECAO, '')), '') AS colecao,
         ISNULL(MAX(COALESCE(vp.SUBGRUPO_PRODUTO, p.SUBGRUPO_PRODUTO, '')), '') AS subgrupo,
         ISNULL(MAX(CONVERT(VARCHAR, p.GRADE)), '') AS grade,
+        ISNULL(MAX(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO, '')), '') AS cor,
         ISNULL(MAX(vp.DESC_PRODUTO), 'SEM DESCRIÇÃO') AS descricao,
         SUM(
           CASE
@@ -525,6 +545,7 @@ export async function fetchVendedorProdutos({
         AND v.PEDIDO = vp.PEDIDO 
         AND v.TICKET = vp.TICKET
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
       WHERE vp.DATA_VENDA >= @startDate
         AND vp.DATA_VENDA < @endDate
         AND vp.QTDE > 0
@@ -538,6 +559,7 @@ export async function fetchVendedorProdutos({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${produtoFilter}
       GROUP BY vp.PRODUTO, vp.DESC_PRODUTO
       HAVING SUM(
         CASE
@@ -549,22 +571,26 @@ export async function fetchVendedorProdutos({
     `;
 
     const produtosResult = await request.query<{
+      codigo: string;
       grupo: string;
       linha: string;
       colecao: string;
       subgrupo: string;
       grade: string;
+      cor: string;
       descricao: string;
       faturamento: number;
       quantidade: number;
     }>(produtosQuery);
 
     return produtosResult.recordset.map((row) => ({
+      codigo: row.codigo || undefined,
       grupo: row.grupo && row.grupo !== 'SEM GRUPO' ? row.grupo : undefined,
       linha: row.linha && row.linha !== '' ? row.linha : undefined,
       colecao: row.colecao && row.colecao !== '' ? row.colecao : undefined,
       subgrupo: row.subgrupo && row.subgrupo !== '' ? row.subgrupo : undefined,
       grade: row.grade && row.grade !== '' ? row.grade : undefined,
+      cor: row.cor && row.cor !== '' ? row.cor : undefined,
       descricao: row.descricao || 'SEM DESCRIÇÃO',
       faturamento: row.faturamento || 0,
       quantidade: row.quantidade || 0,
