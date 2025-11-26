@@ -13,6 +13,11 @@ interface VendedoresTableProps {
   companyKey?: string;
   range: DateRangeValue;
   selectedFilial: string | null;
+  selectedGrupos: string[];
+  selectedLinhas: string[];
+  selectedColecoes: string[];
+  selectedSubgrupos: string[];
+  selectedGrades: string[];
 }
 
 export default function VendedoresTable({
@@ -21,6 +26,11 @@ export default function VendedoresTable({
   companyKey,
   range,
   selectedFilial,
+  selectedGrupos,
+  selectedLinhas,
+  selectedColecoes,
+  selectedSubgrupos,
+  selectedGrades,
 }: VendedoresTableProps) {
   const [sortColumn, setSortColumn] = useState<keyof VendedorItem>("faturamento");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -123,6 +133,26 @@ export default function VendedoresTable({
             filial: filial,
             start: range.startDate.toISOString(),
             end: range.endDate.toISOString(),
+          });
+
+          selectedGrupos.forEach((grupo) => {
+            searchParams.append("grupo", grupo);
+          });
+
+          selectedLinhas.forEach((linha) => {
+            searchParams.append("linha", linha);
+          });
+
+          selectedColecoes.forEach((colecao) => {
+            searchParams.append("colecao", colecao);
+          });
+
+          selectedSubgrupos.forEach((subgrupo) => {
+            searchParams.append("subgrupo", subgrupo);
+          });
+
+          selectedGrades.forEach((grade) => {
+            searchParams.append("grade", grade);
           });
 
           const vendedorEncoded = encodeURIComponent(vendedor);
@@ -309,7 +339,7 @@ export default function VendedoresTable({
                   </tr>
                   {isExpanded && (
                     <tr key={`${key}-expanded`} className={styles.expandedRow}>
-                      <td colSpan={7} className={styles.expandedCell}>
+                      <td colSpan={companyKey === 'scarfme' ? 7 : 7} className={styles.expandedCell}>
                         {isLoadingProdutos ? (
                           <div className={styles.loadingProdutos}>Carregando produtos...</div>
                         ) : produtos.length === 0 ? (
@@ -319,8 +349,20 @@ export default function VendedoresTable({
                             <table className={styles.produtosTable}>
                               <thead>
                                 <tr>
-                                  <th className={styles.produtoGrupoHeader}>GRUPO</th>
-                                  <th className={styles.produtoDescricaoHeader}>DESCRIÇÃO</th>
+                                  {companyKey === 'nerd' ? (
+                                    <>
+                                      <th className={styles.produtoGrupoHeader}>GRUPO</th>
+                                      <th className={styles.produtoDescricaoHeader}>DESCRIÇÃO</th>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <th className={styles.produtoLinhaHeader}>LINHA</th>
+                                      <th className={styles.produtoColecaoHeader}>COLEÇÃO</th>
+                                      <th className={styles.produtoSubgrupoHeader}>SUBGRUPO</th>
+                                      <th className={styles.produtoGradeHeader}>GRADE</th>
+                                      <th className={styles.produtoDescricaoHeader}>DESCRIÇÃO</th>
+                                    </>
+                                  )}
                                   <th className={styles.produtoFaturamentoHeader}>FATURAMENTO</th>
                                   <th className={styles.produtoQuantidadeHeader}>QUANTIDADE</th>
                                 </tr>
@@ -328,8 +370,20 @@ export default function VendedoresTable({
                               <tbody>
                                 {produtos.map((produto, produtoIndex) => (
                                   <tr key={`${key}-produto-${produtoIndex}`}>
-                                    <td className={styles.produtoGrupoCell}>{produto.grupo}</td>
-                                    <td className={styles.produtoDescricaoCell}>{produto.descricao}</td>
+                                    {companyKey === 'nerd' ? (
+                                      <>
+                                        <td className={styles.produtoGrupoCell}>{produto.grupo || '--'}</td>
+                                        <td className={styles.produtoDescricaoCell}>{produto.descricao}</td>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <td className={styles.produtoLinhaCell}>{produto.linha || '--'}</td>
+                                        <td className={styles.produtoColecaoCell}>{produto.colecao || '--'}</td>
+                                        <td className={styles.produtoSubgrupoCell}>{produto.subgrupo || '--'}</td>
+                                        <td className={styles.produtoGradeCell}>{produto.grade || '--'}</td>
+                                        <td className={styles.produtoDescricaoCell}>{produto.descricao}</td>
+                                      </>
+                                    )}
                                     <td className={styles.produtoFaturamentoCell}>
                                       {formatCurrency(produto.faturamento)}
                                     </td>
@@ -439,7 +493,24 @@ export default function VendedoresTable({
                       <div className={styles.cardProdutosList}>
                         {produtos.map((produto, produtoIndex) => (
                           <div key={`${key}-produto-${produtoIndex}`} className={styles.cardProdutoItem}>
-                            <div className={styles.cardProdutoGrupo}>{produto.grupo}</div>
+                            {companyKey === 'nerd' ? (
+                              <div className={styles.cardProdutoGrupo}>{produto.grupo || '--'}</div>
+                            ) : (
+                              <div className={styles.cardProdutoMeta}>
+                                {produto.linha && (
+                                  <span className={styles.cardProdutoTag}>{produto.linha}</span>
+                                )}
+                                {produto.colecao && (
+                                  <span className={styles.cardProdutoTag}>{produto.colecao}</span>
+                                )}
+                                {produto.subgrupo && (
+                                  <span className={styles.cardProdutoTag}>{produto.subgrupo}</span>
+                                )}
+                                {produto.grade && (
+                                  <span className={styles.cardProdutoTag}>{produto.grade}</span>
+                                )}
+                              </div>
+                            )}
                             <div className={styles.cardProdutoDescricao}>{produto.descricao}</div>
                             <div className={styles.cardProdutoValues}>
                               <div className={styles.cardProdutoFaturamento}>

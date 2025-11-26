@@ -13,6 +13,11 @@ export async function GET(
   const filial = searchParams.get('filial');
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
+  const grupos = searchParams.getAll('grupo');
+  const linhas = searchParams.getAll('linha');
+  const colecoes = searchParams.getAll('colecao');
+  const subgrupos = searchParams.getAll('subgrupo');
+  const grades = searchParams.getAll('grade');
 
   const { vendedor: vendedorEncoded } = await params;
   const vendedor = decodeURIComponent(vendedorEncoded);
@@ -38,6 +43,11 @@ export async function GET(
       vendedor,
       filial,
       range,
+      grupos,
+      linhas,
+      colecoes,
+      subgrupos,
+      grades,
     });
 
     return NextResponse.json({ data });

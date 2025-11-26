@@ -460,6 +460,25 @@
   margin-bottom: 6px;
 }
 
+.cardProdutoMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.cardProdutoTag {
+  display: inline-block;
+  padding: 3px 8px;
+  background-color: #f3f4f6;
+  color: #6b7280;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
 .cardProdutoDescricao {
   font-size: 14px;
   font-weight: 400;
@@ -592,26 +611,50 @@
 
 .produtoGrupoHeader {
   min-width: 150px;
-  width: 15%;
+  width: 18%;
+  text-align: left;
+}
+
+.produtoLinhaHeader {
+  min-width: 100px;
+  width: 10%;
+  text-align: left;
+}
+
+.produtoColecaoHeader {
+  min-width: 100px;
+  width: 10%;
+  text-align: left;
+}
+
+.produtoSubgrupoHeader {
+  min-width: 100px;
+  width: 10%;
+  text-align: left;
+}
+
+.produtoGradeHeader {
+  min-width: 70px;
+  width: 6%;
   text-align: left;
 }
 
 .produtoDescricaoHeader {
-  min-width: 300px;
-  width: 50%;
+  min-width: 200px;
   text-align: left;
+  /* Width será calculado automaticamente baseado nas outras colunas */
 }
 
 .produtoFaturamentoHeader {
   text-align: right;
   min-width: 120px;
-  width: 20%;
+  width: 17%;
 }
 
 .produtoQuantidadeHeader {
   text-align: right;
   min-width: 100px;
-  width: 15%;
+  width: 17%;
 }
 
 .produtosTable td {
@@ -635,6 +678,22 @@
 }
 
 .produtoGrupoCell {
+  font-weight: 500;
+  color: #6b7280;
+  font-size: 12px;
+  text-align: left;
+}
+
+.produtoLinhaCell,
+.produtoColecaoCell,
+.produtoSubgrupoCell {
+  font-weight: 500;
+  color: #6b7280;
+  font-size: 12px;
+  text-align: left;
+}
+
+.produtoGradeCell {
   font-weight: 500;
   color: #6b7280;
   font-size: 12px;

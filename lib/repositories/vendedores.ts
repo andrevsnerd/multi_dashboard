@@ -19,7 +19,11 @@ export interface VendedorItem {
 }
 
 export interface VendedorProdutoItem {
-  grupo: string;
+  grupo?: string;
+  linha?: string;
+  colecao?: string;
+  subgrupo?: string;
+  grade?: string;
   descricao: string;
   faturamento: number;
   quantidade: number;
@@ -32,6 +36,11 @@ export interface VendedoresQueryParams {
     start?: Date | string;
     end?: Date | string;
   };
+  grupos?: string[];
+  linhas?: string[];
+  colecoes?: string[];
+  subgrupos?: string[];
+  grades?: string[];
 }
 
 function buildFilialFilter(
@@ -121,6 +130,11 @@ export async function fetchVendedores({
   company,
   filial,
   range,
+  grupos,
+  linhas,
+  colecoes,
+  subgrupos,
+  grades,
 }: VendedoresQueryParams = {}): Promise<VendedorItem[]> {
   return withRequest(async (request) => {
     const { start, end } = normalizeRangeForQuery(range);
@@ -136,6 +150,62 @@ export async function fetchVendedores({
       'vp'
     );
 
+    // Filtros adicionais por grupo/linha/coleção/subgrupo/grade
+    const buildListFilter = (
+      fieldExpression: string,
+      values: string[] | undefined,
+      paramBase: string
+    ): string => {
+      if (!values || values.length === 0) {
+        return '';
+      }
+
+      const nonEmpty = values.map((v) => v.trim()).filter((v) => v !== '');
+      if (nonEmpty.length === 0) {
+        return '';
+      }
+
+      nonEmpty.forEach((value, index) => {
+        request.input(`${paramBase}${index}`, sql.VarChar, value);
+      });
+
+      const placeholders = nonEmpty
+        .map((_, index) => `@${paramBase}${index}`)
+        .join(', ');
+
+      return `AND ${fieldExpression} IN (${placeholders})`;
+    };
+
+    const grupoFilter = buildListFilter(
+      "COALESCE(vp.GRUPO_PRODUTO, p.GRUPO_PRODUTO, '')",
+      grupos,
+      'grupo'
+    );
+
+    const linhaFilter = buildListFilter(
+      "COALESCE(vp.LINHA, p.LINHA, '')",
+      linhas,
+      'linha'
+    );
+
+    const colecaoFilter = buildListFilter(
+      "COALESCE(vp.COLECAO, p.COLECAO, '')",
+      colecoes,
+      'colecao'
+    );
+
+    const subgrupoFilter = buildListFilter(
+      "COALESCE(vp.SUBGRUPO_PRODUTO, p.SUBGRUPO_PRODUTO, '')",
+      subgrupos,
+      'subgrupo'
+    );
+
+    const gradeFilter = buildListFilter(
+      "CONVERT(VARCHAR, p.GRADE)",
+      grades,
+      'grade'
+    );
+
     // Query para buscar dados dos vendedores
     // Primeiro, buscar faturamento total por filial para calcular participação
     const filialTotalQuery = `
@@ -148,10 +218,16 @@ export async function fetchVendedores({
           END
         ) AS totalFaturamentoFilial
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       WHERE vp.DATA_VENDA >= @startDate
         AND vp.DATA_VENDA < @endDate
         AND vp.QTDE > 0
         ${filialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
       GROUP BY vp.FILIAL
     `;
 
@@ -179,6 +255,7 @@ export async function fetchVendedores({
           ELSE NULL
         END) AS tickets
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       LEFT JOIN W_CTB_LOJA_VENDA_PEDIDO v WITH (NOLOCK)
         ON v.FILIAL = vp.FILIAL 
         AND v.PEDIDO = vp.PEDIDO 
@@ -187,6 +264,11 @@ export async function fetchVendedores({
         AND vp.DATA_VENDA < @endDate
         AND vp.QTDE > 0
         ${filialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
       GROUP BY vp.VENDEDOR, vp.FILIAL
       HAVING SUM(
         CASE
@@ -222,6 +304,7 @@ export async function fetchVendedores({
             ) DESC
           ) AS rn
         FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
         LEFT JOIN W_CTB_LOJA_VENDA_PEDIDO v WITH (NOLOCK)
           ON v.FILIAL = vp.FILIAL 
           AND v.PEDIDO = vp.PEDIDO 
@@ -230,6 +313,11 @@ export async function fetchVendedores({
           AND vp.DATA_VENDA < @endDate
           AND vp.QTDE > 0
           ${filialFilter}
+          ${grupoFilter}
+          ${linhaFilter}
+          ${colecaoFilter}
+          ${subgrupoFilter}
+          ${gradeFilter}
         GROUP BY ISNULL(v.VENDEDOR_APELIDO, vp.VENDEDOR), vp.VENDEDOR, vp.FILIAL, vp.GRUPO_PRODUTO, vp.SUBGRUPO_PRODUTO
         HAVING SUM(
           CASE
@@ -326,6 +414,11 @@ export interface VendedorProdutosQueryParams {
     start?: Date | string;
     end?: Date | string;
   };
+  grupos?: string[];
+  linhas?: string[];
+  colecoes?: string[];
+  subgrupos?: string[];
+  grades?: string[];
 }
 
 export async function fetchVendedorProdutos({
@@ -333,6 +426,11 @@ export async function fetchVendedorProdutos({
   vendedor,
   filial,
   range,
+  grupos,
+  linhas,
+  colecoes,
+  subgrupos,
+  grades,
 }: VendedorProdutosQueryParams): Promise<VendedorProdutoItem[]> {
   return withRequest(async (request) => {
     const { start, end } = normalizeRangeForQuery(range);
@@ -342,12 +440,72 @@ export async function fetchVendedorProdutos({
     request.input('vendedor', sql.VarChar, vendedor);
     request.input('filial', sql.VarChar, filial);
 
+    // Filtros adicionais por grupo/linha/coleção/subgrupo/grade
+    const buildListFilter = (
+      fieldExpression: string,
+      values: string[] | undefined,
+      paramBase: string
+    ): string => {
+      if (!values || values.length === 0) {
+        return '';
+      }
+
+      const nonEmpty = values.map((v) => v.trim()).filter((v) => v !== '');
+      if (nonEmpty.length === 0) {
+        return '';
+      }
+
+      nonEmpty.forEach((value, index) => {
+        request.input(`${paramBase}${index}`, sql.VarChar, value);
+      });
+
+      const placeholders = nonEmpty
+        .map((_, index) => `@${paramBase}${index}`)
+        .join(', ');
+
+      return `AND ${fieldExpression} IN (${placeholders})`;
+    };
+
+    const grupoFilter = buildListFilter(
+      "COALESCE(vp.GRUPO_PRODUTO, p.GRUPO_PRODUTO, '')",
+      grupos,
+      'grupo'
+    );
+
+    const linhaFilter = buildListFilter(
+      "COALESCE(vp.LINHA, p.LINHA, '')",
+      linhas,
+      'linha'
+    );
+
+    const colecaoFilter = buildListFilter(
+      "COALESCE(vp.COLECAO, p.COLECAO, '')",
+      colecoes,
+      'colecao'
+    );
+
+    const subgrupoFilter = buildListFilter(
+      "COALESCE(vp.SUBGRUPO_PRODUTO, p.SUBGRUPO_PRODUTO, '')",
+      subgrupos,
+      'subgrupo'
+    );
+
+    const gradeFilter = buildListFilter(
+      "CONVERT(VARCHAR, p.GRADE)",
+      grades,
+      'grade'
+    );
+
     // Query para buscar produtos vendidos pelo vendedor
     // Usar VENDEDOR_APELIDO para fazer o match
     // Não usar buildFilialFilter aqui pois já estamos filtrando diretamente por filial
     const produtosQuery = `
       SELECT 
         ISNULL(MAX(vp.GRUPO_PRODUTO), 'SEM GRUPO') AS grupo,
+        ISNULL(MAX(COALESCE(vp.LINHA, p.LINHA, '')), '') AS linha,
+        ISNULL(MAX(COALESCE(vp.COLECAO, p.COLECAO, '')), '') AS colecao,
+        ISNULL(MAX(COALESCE(vp.SUBGRUPO_PRODUTO, p.SUBGRUPO_PRODUTO, '')), '') AS subgrupo,
+        ISNULL(MAX(CONVERT(VARCHAR, p.GRADE)), '') AS grade,
         ISNULL(MAX(vp.DESC_PRODUTO), 'SEM DESCRIÇÃO') AS descricao,
         SUM(
           CASE
@@ -366,6 +524,7 @@ export async function fetchVendedorProdutos({
         ON v.FILIAL = vp.FILIAL 
         AND v.PEDIDO = vp.PEDIDO 
         AND v.TICKET = vp.TICKET
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       WHERE vp.DATA_VENDA >= @startDate
         AND vp.DATA_VENDA < @endDate
         AND vp.QTDE > 0
@@ -374,6 +533,11 @@ export async function fetchVendedorProdutos({
           ISNULL(v.VENDEDOR_APELIDO, vp.VENDEDOR) = @vendedor
           OR vp.VENDEDOR = @vendedor
         )
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
       GROUP BY vp.PRODUTO, vp.DESC_PRODUTO
       HAVING SUM(
         CASE
@@ -386,13 +550,21 @@ export async function fetchVendedorProdutos({
 
     const produtosResult = await request.query<{
       grupo: string;
+      linha: string;
+      colecao: string;
+      subgrupo: string;
+      grade: string;
       descricao: string;
       faturamento: number;
       quantidade: number;
     }>(produtosQuery);
 
     return produtosResult.recordset.map((row) => ({
-      grupo: row.grupo || 'SEM GRUPO',
+      grupo: row.grupo && row.grupo !== 'SEM GRUPO' ? row.grupo : undefined,
+      linha: row.linha && row.linha !== '' ? row.linha : undefined,
+      colecao: row.colecao && row.colecao !== '' ? row.colecao : undefined,
+      subgrupo: row.subgrupo && row.subgrupo !== '' ? row.subgrupo : undefined,
+      grade: row.grade && row.grade !== '' ? row.grade : undefined,
       descricao: row.descricao || 'SEM DESCRIÇÃO',
       faturamento: row.faturamento || 0,
       quantidade: row.quantidade || 0,
