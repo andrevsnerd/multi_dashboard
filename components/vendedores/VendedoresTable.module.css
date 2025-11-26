@@ -1,0 +1,403 @@
+.wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  position: relative;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+  .container {
+    border-radius: 20px;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+  }
+}
+
+.container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+.table {
+  width: auto;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  table-layout: auto;
+}
+
+.table thead {
+  background-color: #f8f9fa;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.table th {
+  padding: 12px 10px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 11px;
+  color: #1f2937;
+  border-bottom: 2px solid #e5e7eb;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  min-width: fit-content;
+}
+
+.vendedorHeader {
+  text-align: left !important;
+  min-width: 250px;
+}
+
+.currencyHeader {
+  text-align: right !important;
+}
+
+.numberHeader {
+  text-align: right !important;
+}
+
+.percentageHeader {
+  text-align: center !important;
+}
+
+.table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #374151;
+  font-size: 13px;
+  vertical-align: middle;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.table th.vendedorHeader,
+.table td.vendedorCell {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.table th.currencyHeader,
+.table td.currencyCell {
+  padding-left: 12px;
+  padding-right: 16px;
+}
+
+.table th.numberHeader,
+.table td.numberCell {
+  padding-left: 12px;
+  padding-right: 16px;
+}
+
+.table th.percentageHeader,
+.table td.percentageCell {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.sortable {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  transition: background-color 0.2s;
+}
+
+.sortable:hover {
+  background-color: #f1f5f9;
+}
+
+.sortIndicator {
+  margin-left: 4px;
+  font-size: 10px;
+  color: #6366f1;
+}
+
+.vendedorCell {
+  text-align: left !important;
+}
+
+.vendedorInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vendedorIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #3b82f6;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.vendedorDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.vendedorName {
+  font-weight: 500;
+  color: #1f2937;
+  font-size: 13px;
+}
+
+.vendedorFilial {
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 400;
+}
+
+.currencyCell {
+  text-align: right !important;
+  font-weight: 500;
+  color: #1f2937;
+  min-width: 110px;
+}
+
+.numberCell {
+  text-align: right !important;
+  font-weight: 500;
+  color: #1f2937;
+  min-width: 80px;
+}
+
+.percentageCell {
+  text-align: center !important;
+  font-weight: 500;
+  color: #1f2937;
+  min-width: 120px;
+}
+
+.loading,
+.empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+/* Mobile Cards */
+.mobileCards {
+  display: none;
+}
+
+.card {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+  transition: background-color 0.2s;
+}
+
+.card:last-child {
+  border-bottom: none;
+}
+
+.card:active {
+  background-color: #f8fafc;
+}
+
+.cardMain {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  margin-bottom: 12px;
+}
+
+.cardLeft {
+  flex: 1;
+  min-width: 0;
+}
+
+.cardVendedorInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.cardVendedorIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #3b82f6;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.cardVendedorName {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 4px 0;
+  line-height: 1.3;
+}
+
+.cardVendedorFilial {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 400;
+}
+
+.cardRevenue {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.cardRevenueValue {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cardRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.cardLabel {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.cardValue {
+  font-size: 14px;
+  color: #0f172a;
+  font-weight: 600;
+  text-align: right;
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .table {
+    display: none;
+  }
+
+  .mobileCards {
+    display: block;
+  }
+
+  .container {
+    padding: 0;
+    overflow: hidden;
+    border-radius: 20px;
+  }
+
+  .card:first-child {
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+  }
+
+  .card:last-child {
+    border-bottom-left-radius: 20px;
+    border-bottom-right-radius: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .table {
+    font-size: 11px;
+  }
+
+  .table th {
+    padding: 8px 6px;
+    font-size: 9px;
+  }
+
+  .table td {
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+
+  .vendedorCell {
+    min-width: 200px;
+  }
+
+  .currencyCell {
+    min-width: 90px;
+    font-size: 10px;
+  }
+
+  .numberCell {
+    min-width: 60px;
+    font-size: 10px;
+  }
+
+  .percentageCell {
+    min-width: 100px;
+    font-size: 10px;
+  }
+}
+
