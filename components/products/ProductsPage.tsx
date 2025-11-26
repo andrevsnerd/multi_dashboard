@@ -161,6 +161,32 @@ async function fetchSummary(
   return json.data;
 }
 
+async function searchProducts(
+  company: string,
+  searchTerm: string
+): Promise<Array<{ productId: string; productName: string }>> {
+  if (!searchTerm || searchTerm.trim().length < 2) {
+    return [];
+  }
+
+  const response = await fetch(
+    `/api/products/search?company=${encodeURIComponent(company)}&q=${encodeURIComponent(searchTerm)}`,
+    {
+      cache: "no-store",
+    }
+  );
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const json = (await response.json()) as {
+    data: Array<{ productId: string; productName: string }>;
+  };
+
+  return json.data || [];
+}
+
 export default function ProductsPage({
   companyKey,
   companyName,
@@ -439,6 +465,77 @@ export default function ProductsPage({
       active = false;
     };
   }, [companyKey, range.startDate, range.endDate, selectedFilial]);
+
+  // Buscar produtos ao digitar
+  useEffect(() => {
+    if (!searchTerm || searchTerm.trim().length < 2) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    // Se há produto selecionado, verificar se o texto mudou
+    if (selectedProductId && selectedProductName) {
+      // Se o texto é igual ao nome do produto selecionado, não buscar
+      if (searchTerm.trim() === selectedProductName.trim()) {
+        setShowSearchResults(false);
+        return;
+      }
+      // Se mudou, já limpamos o selectedProductId no onChange, então continuar com a busca
+    }
+
+    // Sempre mostrar o dropdown quando há texto (mesmo que não tenha resultados ainda)
+    setShowSearchResults(true);
+
+    let active = true;
+
+    async function performSearch() {
+      try {
+        const results = await searchProducts(companyKey, searchTerm);
+        if (active) {
+          setSearchResults(results);
+        }
+      } catch (err) {
+        // Silenciosamente falhar
+        if (active) {
+          setSearchResults([]);
+        }
+      }
+    }
+
+    const timeoutId = setTimeout(performSearch, 300);
+
+    return () => {
+      active = false;
+      clearTimeout(timeoutId);
+    };
+  }, [searchTerm, companyKey, selectedProductId, selectedProductName]);
+
+  const handleProductSelect = useCallback((productId: string, productName: string) => {
+    const trimmedName = productName.trim();
+    setSelectedProductId(productId);
+    setSelectedProductName(trimmedName);
+    setSearchTerm(trimmedName);
+    setShowSearchResults(false);
+    setSearchResults([]);
+  }, []);
+
+  // Fechar dropdown ao clicar fora
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(event.target as Node)
+      ) {
+        setShowSearchResults(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const rangeKey = useMemo(
     () =>
