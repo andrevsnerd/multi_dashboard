@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 
 import DateRangeFilter, {
   type DateRangeValue,
@@ -39,7 +39,9 @@ async function fetchProducts(
   colecoes: string[],
   subgrupos: string[],
   grades: string[],
-  groupByColor: boolean
+  groupByColor: boolean,
+  produtoId?: string | null,
+  produtoSearchTerm?: string | null,
 ): Promise<ProductDetail[]> {
   const searchParams = new URLSearchParams({
     company,
@@ -75,6 +77,12 @@ async function fetchProducts(
     searchParams.set("groupByColor", "true");
   }
 
+  if (produtoId) {
+    searchParams.set("produtoId", produtoId);
+  } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
+    searchParams.set("produtoSearchTerm", produtoSearchTerm.trim());
+  }
+
   const response = await fetch(`/api/products?${searchParams.toString()}`, {
     cache: "no-store",
   });
@@ -98,7 +106,9 @@ async function fetchSummary(
   linhas: string[],
   colecoes: string[],
   subgrupos: string[],
-  grades: string[]
+  grades: string[],
+  produtoId?: string | null,
+  produtoSearchTerm?: string | null,
 ): Promise<SalesSummary> {
   const searchParams = new URLSearchParams({
     company,
@@ -129,6 +139,12 @@ async function fetchSummary(
   grades.forEach((grade) => {
     searchParams.append("grade", grade);
   });
+
+  if (produtoId) {
+    searchParams.set("produtoId", produtoId);
+  } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
+    searchParams.set("produtoSearchTerm", produtoSearchTerm.trim());
+  }
 
   const response = await fetch(`/api/sales-summary?${searchParams.toString()}`, {
     cache: "no-store",
@@ -165,6 +181,14 @@ export default function ProductsPage({
   const [selectedSubgrupos, setSelectedSubgrupos] = useState<string[]>([]);
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
   const [groupByColor, setGroupByColor] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [selectedProductName, setSelectedProductName] = useState<string | null>(null);
+  const [searchResults, setSearchResults] = useState<
+    Array<{ productId: string; productName: string }>
+  >([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<ProductDetail[]>([]);
   const [summary, setSummary] = useState<SalesSummary>(EMPTY_SUMMARY);
   const [loading, setLoading] = useState(false);
@@ -418,8 +442,8 @@ export default function ProductsPage({
 
   const rangeKey = useMemo(
     () =>
-      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}::${selectedGrupos.join(',')}::${selectedLinhas.join(',')}::${selectedColecoes.join(',')}::${selectedSubgrupos.join(',')}::${selectedGrades.join(',')}::${groupByColor}`,
-    [range.startDate, range.endDate, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, groupByColor]
+      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}::${selectedGrupos.join(',')}::${selectedLinhas.join(',')}::${selectedColecoes.join(',')}::${selectedSubgrupos.join(',')}::${selectedGrades.join(',')}::${groupByColor}::${selectedProductId ?? 'all'}::${searchTerm.trim()}`,
+    [range.startDate, range.endDate, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, groupByColor, selectedProductId, searchTerm]
   );
 
   useEffect(() => {
@@ -430,8 +454,8 @@ export default function ProductsPage({
       setError(null);
       try {
         const [productsData, summaryData] = await Promise.all([
-          fetchProducts(companyKey, range, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, groupByColor),
-          fetchSummary(companyKey, range, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades),
+          fetchProducts(companyKey, range, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, groupByColor, selectedProductId, selectedProductId ? null : (searchTerm && searchTerm.trim().length >= 2 ? searchTerm.trim() : null)),
+          fetchSummary(companyKey, range, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, selectedProductId, selectedProductId ? null : (searchTerm && searchTerm.trim().length >= 2 ? searchTerm.trim() : null)),
         ]);
         if (active) {
           setData(productsData);
@@ -506,6 +530,125 @@ export default function ProductsPage({
               />
             </>
           )}
+          <div className={styles.searchContainer} ref={searchContainerRef}>
+            <div className={styles.searchLabel}>Produto</div>
+            <div className={styles.searchInputWrapper}>
+              <input
+                type="text"
+                className={styles.searchInput}
+                placeholder="Digite o nome ou código do produto..."
+                value={searchTerm}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setSearchTerm(value);
+                  
+                  // Se o usuário está editando e o texto mudou do produto selecionado, limpar seleção
+                  if (selectedProductId && selectedProductName) {
+                    if (value.trim() !== selectedProductName.trim()) {
+                      // Usuário está editando, limpar seleção para permitir nova busca
+                      setSelectedProductId(null);
+                      setSelectedProductName(null);
+                    }
+                  }
+                  
+                  if (!value) {
+                    setSelectedProductId(null);
+                    setSelectedProductName(null);
+                    setShowSearchResults(false);
+                    setSearchResults([]);
+                  } else {
+                    // Sempre permitir mostrar resultados quando há texto
+                    if (value.trim().length >= 2) {
+                      setShowSearchResults(true);
+                    } else {
+                      setShowSearchResults(false);
+                      setSearchResults([]);
+                    }
+                  }
+                }}
+                onFocus={() => {
+                  if (searchTerm.trim().length >= 2 && !selectedProductId) {
+                    setShowSearchResults(true);
+                  }
+                  if (selectedProductId && selectedProductName && searchTerm.trim().length >= 2) {
+                    if (searchTerm.trim() !== selectedProductName.trim()) {
+                      setShowSearchResults(true);
+                    }
+                  }
+                }}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  className={styles.clearButton}
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSelectedProductId(null);
+                    setSelectedProductName(null);
+                    setData([]);
+                    setShowSearchResults(false);
+                    setSearchResults([]);
+                  }}
+                  aria-label="Limpar busca"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M12 4L4 12M4 4L12 12"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+            {showSearchResults && (
+              <div className={styles.searchResults}>
+                {searchTerm.trim().length >= 2 && (
+                  <button
+                    type="button"
+                    className={styles.searchResultItem}
+                    onClick={() => {
+                      setSelectedProductId(null);
+                      setSelectedProductName(null);
+                      setShowSearchResults(false);
+                      setSearchResults([]);
+                    }}
+                  >
+                    <div className={styles.searchResultName}>
+                      <strong>Buscar por: "{searchTerm}"</strong>
+                    </div>
+                    <div className={styles.searchResultId}>Mostrar todos os produtos que contêm este texto</div>
+                  </button>
+                )}
+                {searchResults.length > 0 && (
+                  <>
+                    {searchTerm.trim().length >= 2 && (
+                      <div className={styles.searchResultSeparator}></div>
+                    )}
+                    {searchResults.map((result) => (
+                      <button
+                        key={result.productId}
+                        type="button"
+                        className={styles.searchResultItem}
+                        onClick={() => handleProductSelect(result.productId, result.productName)}
+                      >
+                        <div className={styles.searchResultName}>{result.productName}</div>
+                        <div className={styles.searchResultId}>{result.productId}</div>
+                      </button>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
           {error ? <span className={styles.error}>{error}</span> : null}
         </div>
       </div>

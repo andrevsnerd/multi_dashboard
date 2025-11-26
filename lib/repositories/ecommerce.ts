@@ -93,6 +93,8 @@ export interface SummaryQueryParams {
   subgrupos?: string[] | null;
   grade?: string | null;
   grades?: string[] | null;
+  produtoId?: string;
+  produtoSearchTerm?: string;
 }
 
 export interface SalesSummaryResult {
@@ -180,6 +182,8 @@ export async function fetchEcommerceSummary({
   subgrupos,
   grade,
   grades,
+  produtoId,
+  produtoSearchTerm,
 }: SummaryQueryParams = {}): Promise<SalesSummaryResult> {
   return withRequest(async (request) => {
     const currentRange = resolveRange(range);
@@ -270,6 +274,20 @@ export async function fetchEcommerceSummary({
       }
     }
 
+    // Filtro de produto
+    let produtoFilter = '';
+    if (produtoId) {
+      request.input('produtoIdEcommerce', sql.VarChar, produtoId);
+      produtoFilter = `AND fp.PRODUTO = @produtoIdEcommerce`;
+    } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
+      const searchPattern = `%${produtoSearchTerm.trim()}%`;
+      request.input('produtoSearchTermEcommerce', sql.VarChar, searchPattern);
+      if (!produtoJoin) {
+        produtoJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO`;
+      }
+      produtoFilter = `AND p.DESC_PRODUTO LIKE @produtoSearchTermEcommerce`;
+    }
+
     // DEBUG: Log dos parâmetros e filtros
     console.log('[fetchEcommerceSummary] DEBUG - Parâmetros:', {
       company,
@@ -316,6 +334,7 @@ export async function fetchEcommerceSummary({
           ${colecaoFilter}
           ${subgrupoFilter}
           ${gradeFilter}
+          ${produtoFilter}
 
         UNION ALL
 
@@ -339,6 +358,7 @@ export async function fetchEcommerceSummary({
           ${colecaoFilter}
           ${subgrupoFilter}
           ${gradeFilter}
+          ${produtoFilter}
       )
       SELECT period, totalRevenue, totalQuantity, totalTickets, lastSaleDate, totalRows FROM summary;
     `;

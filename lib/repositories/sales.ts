@@ -154,6 +154,8 @@ export interface SummaryQueryParams {
   subgrupos?: string[] | null;
   grade?: string | null;
   grades?: string[] | null;
+  produtoId?: string;
+  produtoSearchTerm?: string;
 }
 
 export interface SalesSummaryResult {
@@ -282,18 +284,20 @@ export async function fetchSalesSummary({
   subgrupos,
   grade,
   grades,
+  produtoId,
+  produtoSearchTerm,
 }: SummaryQueryParams = {}): Promise<SalesSummaryResult> {
   // Se for e-commerce, usar função específica de e-commerce
   if (isEcommerceFilial(company, filial)) {
-    return fetchEcommerceSummary({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades });
+    return fetchEcommerceSummary({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, produtoId, produtoSearchTerm });
   }
 
   // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
   if (shouldAggregateEcommerce(company, filial)) {
     // Buscar vendas normais (varejo) e ecommerce em paralelo
     const [salesResult, ecommerceResult] = await Promise.all([
-      fetchSalesSummary({ company, range, filial: VAREJO_VALUE, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades }),
-      fetchEcommerceSummary({ company, range, filial: null, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades }),
+      fetchSalesSummary({ company, range, filial: VAREJO_VALUE, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, produtoId, produtoSearchTerm }),
+      fetchEcommerceSummary({ company, range, filial: null, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, produtoId, produtoSearchTerm }),
     ]);
 
     // Agregar os resultados
@@ -340,6 +344,8 @@ export async function fetchSalesSummary({
       subgrupos,
       grade,
       grades,
+      produtoId,
+      produtoSearchTerm,
     });
 
     const summary: SalesSummary = {
@@ -589,6 +595,17 @@ export async function fetchSalesSummary({
       }
     }
 
+    // Filtro de produto
+    let produtoFilter = '';
+    if (produtoId) {
+      request.input('produtoId', sql.VarChar, produtoId);
+      produtoFilter = `AND vp.PRODUTO = @produtoId`;
+    } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
+      const searchPattern = `%${produtoSearchTerm.trim()}%`;
+      request.input('produtoSearchTerm', sql.VarChar, searchPattern);
+      produtoFilter = `AND vp.DESC_PRODUTO LIKE @produtoSearchTerm`;
+    }
+
     // Otimizar query usando uma única passada pela tabela com CASE para separar períodos
     // Isso é mais eficiente que UNION ALL com duas queries separadas
     const query = `
@@ -655,6 +672,7 @@ export async function fetchSalesSummary({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${produtoFilter}
     `;
 
     const result = await request.query<{
@@ -729,6 +747,8 @@ export async function fetchSalesSummary({
       subgrupos,
       grade,
       grades,
+      produtoId,
+      produtoSearchTerm,
     });
 
     const summary: SalesSummary = {

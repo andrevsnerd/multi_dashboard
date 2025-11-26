@@ -13,6 +13,8 @@ export async function GET(request: Request) {
   const colecoes = searchParams.getAll('colecao');
   const subgrupos = searchParams.getAll('subgrupo');
   const grades = searchParams.getAll('grade');
+  const produtoId = searchParams.get('produtoId');
+  const produtoSearchTerm = searchParams.get('produtoSearchTerm');
   
   const groupByColorParam = searchParams.get('groupByColor');
   const startParam = searchParams.get('start');
@@ -43,6 +45,8 @@ export async function GET(request: Request) {
       subgrupos: subgrupos.length > 0 ? subgrupos : null,
       grades: grades.length > 0 ? grades : null,
       groupByColor,
+      produtoId: produtoId || undefined,
+      produtoSearchTerm: produtoSearchTerm || undefined,
     });
 
     return NextResponse.json({ data });

@@ -46,6 +46,8 @@ export interface ProductsQueryParams {
   grade?: string | null;
   grades?: string[] | null;
   groupByColor?: boolean; // Se true, agrupa produtos por cor
+  produtoId?: string;
+  produtoSearchTerm?: string;
 }
 
 function resolveRange(range?: { start?: string | Date; end?: string | Date }) {
@@ -391,17 +393,19 @@ export async function fetchProductsWithDetails({
   grade,
   grades,
   groupByColor = false,
+  produtoId,
+  produtoSearchTerm,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   // Se for e-commerce, usar função específica de e-commerce
   if (isEcommerceFilial(company, filial)) {
-    return fetchProductsWithDetailsEcommerce({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor });
+    return fetchProductsWithDetailsEcommerce({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm });
   }
 
   // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
   if (company === 'scarfme' && filial === null) {
     const [salesProducts, ecommerceProducts] = await Promise.all([
-      fetchProductsWithDetailsSales({ company, range, filial: VAREJO_VALUE, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor }),
-      fetchProductsWithDetailsEcommerce({ company, range, filial: null, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor }),
+      fetchProductsWithDetailsSales({ company, range, filial: VAREJO_VALUE, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm }),
+      fetchProductsWithDetailsEcommerce({ company, range, filial: null, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm }),
     ]);
 
     // Agregar produtos por productId (e cor se groupByColor estiver ativo)
@@ -468,7 +472,7 @@ export async function fetchProductsWithDetails({
   }
 
   // Função normal para vendas de loja
-  return fetchProductsWithDetailsSales({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor });
+  return fetchProductsWithDetailsSales({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm });
 }
 
 /**
@@ -489,6 +493,8 @@ async function fetchProductsWithDetailsSales({
   grade,
   grades,
   groupByColor = false,
+  produtoId,
+  produtoSearchTerm,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   return withRequest(async (request) => {
     const { start, end } = resolveRange(range);
@@ -506,6 +512,16 @@ async function fetchProductsWithDetailsSales({
     const colecaoFilter = buildColecaoFilterForProducts(request, company, colecao, colecoes);
     const subgrupoFilter = buildSubgrupoFilterForProducts(request, company, subgrupo, subgrupos);
     const gradeFilter = buildGradeFilterForProducts(request, company, grade, grades);
+
+    let produtoFilter = '';
+    if (produtoId) {
+      request.input('produtoId', sql.VarChar, produtoId);
+      produtoFilter = `AND vp.PRODUTO = @produtoId`;
+    } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
+      const searchPattern = `%${produtoSearchTerm.trim()}%`;
+      request.input('produtoSearchTerm', sql.VarChar, searchPattern);
+      produtoFilter = `AND vp.DESC_PRODUTO LIKE @produtoSearchTerm`;
+    }
 
     // Definir campos de agrupamento e seleção baseado em groupByColor
     const groupByFields = groupByColor 
@@ -555,6 +571,7 @@ async function fetchProductsWithDetailsSales({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${produtoFilter}
       GROUP BY ${groupByFields}
     `;
 
@@ -608,6 +625,7 @@ async function fetchProductsWithDetailsSales({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${produtoFilter}
       GROUP BY ${groupByFields}
     `;
 
@@ -781,6 +799,8 @@ async function fetchProductsWithDetailsEcommerce({
   grade,
   grades,
   groupByColor = false,
+  produtoId,
+  produtoSearchTerm,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   return withRequest(async (request) => {
     const { start, end } = resolveRange(range);
@@ -818,6 +838,16 @@ async function fetchProductsWithDetailsEcommerce({
     let colecaoFilter = '';
     let subgrupoFilter = '';
     let gradeFilter = '';
+    
+    let produtoFilter = '';
+    if (produtoId) {
+      request.input('produtoIdEcommerce', sql.VarChar, produtoId);
+      produtoFilter = `AND fp.PRODUTO = @produtoIdEcommerce`;
+    } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
+      const searchPattern = `%${produtoSearchTerm.trim()}%`;
+      request.input('produtoSearchTermEcommerce', sql.VarChar, searchPattern);
+      produtoFilter = `AND p.DESC_PRODUTO LIKE @produtoSearchTermEcommerce`;
+    }
     
     // Filtro de linha para e-commerce
     const linhasList = linhas && linhas.length > 0 ? linhas : linha ? [linha] : [];
@@ -920,6 +950,7 @@ async function fetchProductsWithDetailsEcommerce({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${produtoFilter}
       GROUP BY ${ecommerceGroupByFields}
     `;
 
@@ -947,6 +978,7 @@ async function fetchProductsWithDetailsEcommerce({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${produtoFilter}
       GROUP BY ${ecommerceGroupByFields}
     `;
 

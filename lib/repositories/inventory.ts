@@ -262,6 +262,8 @@ export interface StockSummaryParams {
   grade?: string | null;
   grades?: string[] | null;
   ecommerceOnly?: boolean; // Se true e filial é null, buscar apenas filiais de e-commerce
+  produtoId?: string;
+  produtoSearchTerm?: string;
 }
 
 export interface StockSummary {
@@ -288,6 +290,8 @@ export async function fetchStockSummary({
   grade,
   grades,
   ecommerceOnly = false,
+  produtoId,
+  produtoSearchTerm,
 }: StockSummaryParams = {}): Promise<StockSummary> {
   return withRequest(async (request) => {
     // Criar filtro de grupo para NERD (suporta múltiplos)
@@ -403,14 +407,26 @@ export async function fetchStockSummary({
       estoqueFilialFilterForWhere = buildFilialFilter(request, company, filial, 'e');
     }
     
-    // CORREÇÃO: Quando há QUALQUER filtro de produto (coleção, linha, subgrupo, grade), usar INNER JOIN
+    // Filtro de produto
+    let produtoFilter = '';
+    if (produtoId) {
+      request.input('produtoIdEstoque', sql.VarChar, produtoId);
+      produtoFilter = `AND e.PRODUTO = @produtoIdEstoque`;
+    } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
+      const searchPattern = `%${produtoSearchTerm.trim()}%`;
+      request.input('produtoSearchTermEstoque', sql.VarChar, searchPattern);
+      produtoFilter = `AND p.DESC_PRODUTO LIKE @produtoSearchTermEstoque`;
+    }
+
+    // CORREÇÃO: Quando há QUALQUER filtro de produto (coleção, linha, subgrupo, grade, produtoSearchTerm), usar INNER JOIN
     // para garantir que apenas produtos que existem em PRODUTOS e atendem aos filtros sejam incluídos
     // Isso evita incluir produtos sem os atributos filtrados ou produtos que não existem em PRODUTOS
     const hasProductFilter = !!(colecao || (colecoes && colecoes.length > 0) || 
                                  linha || (linhas && linhas.length > 0) || 
                                  subgrupo || (subgrupos && subgrupos.length > 0) || 
                                  grade || (grades && grades.length > 0) ||
-                                 (company === 'nerd' && (grupo || (grupos && grupos.length > 0))));
+                                 (company === 'nerd' && (grupo || (grupos && grupos.length > 0))) ||
+                                 (produtoSearchTerm && produtoSearchTerm.trim().length >= 2));
     const joinType = hasProductFilter ? 'INNER' : 'LEFT';
     
     // DEBUG: Log quando filial é VAREJO ou quando há filtros de produto
@@ -459,6 +475,7 @@ export async function fetchStockSummary({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${produtoFilter}
       GROUP BY e.PRODUTO
     `;
 
@@ -560,6 +577,7 @@ export async function fetchStockSummary({
           ${subgrupoFilter}
           ${gradeFilter}
           ${grupoFilter}
+          ${produtoFilter}
           AND e.ESTOQUE > 0
       `;
       
@@ -753,6 +771,7 @@ export async function fetchStockSummary({
           ${colecaoFilter}
           ${subgrupoFilter}
           ${gradeFilter}
+          ${produtoFilter}
       `;
       
       const resultTotal = await request.query<{
@@ -784,6 +803,7 @@ export async function fetchStockSummary({
           ${colecaoFilter}
           ${subgrupoFilter}
           ${gradeFilter}
+          ${produtoFilter}
           AND e.PRODUTO NOT IN (
             SELECT DISTINCT e2.PRODUTO
             FROM ESTOQUE_PRODUTOS e2 WITH (NOLOCK)
@@ -851,6 +871,7 @@ export async function fetchStockSummary({
             ${colecaoFilter}
             ${subgrupoFilter}
             ${gradeFilter}
+            ${produtoFilter}
             AND e.ESTOQUE > 0
         `;
         
