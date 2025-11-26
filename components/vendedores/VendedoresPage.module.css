@@ -117,6 +117,12 @@
   z-index: 1000;
 }
 
+.searchResultSeparator {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 4px 0;
+}
+
 .searchResultItem {
   width: 100%;
   padding: 12px 16px;

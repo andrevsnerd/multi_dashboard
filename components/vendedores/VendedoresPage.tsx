@@ -55,6 +55,7 @@ async function fetchVendedores(
   subgrupos: string[],
   grades: string[],
   produtoId?: string | null,
+  produtoSearchTerm?: string | null,
 ): Promise<VendedorItem[]> {
   const searchParams = new URLSearchParams({
     company,
@@ -88,6 +89,8 @@ async function fetchVendedores(
 
   if (produtoId) {
     searchParams.set("produtoId", produtoId);
+  } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
+    searchParams.set("produtoSearchTerm", produtoSearchTerm.trim());
   }
 
   const response = await fetch(`/api/vendedores?${searchParams.toString()}`, {
@@ -144,8 +147,8 @@ export default function VendedoresPage({
 
   const rangeKey = useMemo(
     () =>
-      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}::${selectedGrupos.join(',')}::${selectedLinhas.join(',')}::${selectedColecoes.join(',')}::${selectedSubgrupos.join(',')}::${selectedGrades.join(',')}::${selectedProductId ?? 'all'}`,
-    [range.startDate, range.endDate, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, selectedProductId]
+      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}::${selectedGrupos.join(',')}::${selectedLinhas.join(',')}::${selectedColecoes.join(',')}::${selectedSubgrupos.join(',')}::${selectedGrades.join(',')}::${selectedProductId ?? 'all'}::${searchTerm.trim()}`,
+    [range.startDate, range.endDate, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, selectedProductId, searchTerm]
   );
 
   // Fechar dropdown ao clicar fora
@@ -185,15 +188,20 @@ export default function VendedoresPage({
 
     let active = true;
 
+    // Sempre mostrar o dropdown quando há texto (mesmo que não tenha resultados ainda)
+    setShowSearchResults(true);
+
     async function performSearch() {
       try {
         const results = await searchProducts(companyKey, searchTerm);
         if (active) {
           setSearchResults(results);
-          setShowSearchResults(results.length > 0);
         }
       } catch (err) {
         // Silenciosamente falhar
+        if (active) {
+          setSearchResults([]);
+        }
       }
     }
 
@@ -332,7 +340,8 @@ export default function VendedoresPage({
           selectedColecoes,
           selectedSubgrupos,
           selectedGrades,
-          selectedProductId
+          selectedProductId,
+          selectedProductId ? null : (searchTerm && searchTerm.trim().length >= 2 ? searchTerm.trim() : null)
         );
         if (active) {
           setData(vendedoresData);
@@ -431,12 +440,14 @@ export default function VendedoresPage({
                     setSelectedProductId(null);
                     setSelectedProductName(null);
                     setShowSearchResults(false);
+                    setSearchResults([]);
                   } else {
                     // Sempre permitir mostrar resultados quando há texto
                     if (value.trim().length >= 2) {
                       setShowSearchResults(true);
                     } else {
                       setShowSearchResults(false);
+                      setSearchResults([]);
                     }
                   }
                 }}
@@ -483,19 +494,43 @@ export default function VendedoresPage({
                 </button>
               )}
             </div>
-            {showSearchResults && searchResults.length > 0 && (
+            {showSearchResults && (
               <div className={styles.searchResults}>
-                {searchResults.map((result) => (
+                {searchTerm.trim().length >= 2 && (
                   <button
-                    key={result.productId}
                     type="button"
                     className={styles.searchResultItem}
-                    onClick={() => handleProductSelect(result.productId, result.productName)}
+                    onClick={() => {
+                      setSelectedProductId(null);
+                      setSelectedProductName(null);
+                      setShowSearchResults(false);
+                      setSearchResults([]);
+                    }}
                   >
-                    <div className={styles.searchResultName}>{result.productName}</div>
-                    <div className={styles.searchResultId}>{result.productId}</div>
+                    <div className={styles.searchResultName}>
+                      <strong>Buscar por: "{searchTerm}"</strong>
+                    </div>
+                    <div className={styles.searchResultId}>Mostrar todos os produtos que contêm este texto</div>
                   </button>
-                ))}
+                )}
+                {searchResults.length > 0 && (
+                  <>
+                    {searchTerm.trim().length >= 2 && (
+                      <div className={styles.searchResultSeparator}></div>
+                    )}
+                    {searchResults.map((result) => (
+                      <button
+                        key={result.productId}
+                        type="button"
+                        className={styles.searchResultItem}
+                        onClick={() => handleProductSelect(result.productId, result.productName)}
+                      >
+                        <div className={styles.searchResultName}>{result.productName}</div>
+                        <div className={styles.searchResultId}>{result.productId}</div>
+                      </button>
+                    ))}
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -523,6 +558,7 @@ export default function VendedoresPage({
           selectedSubgrupos={selectedSubgrupos}
           selectedGrades={selectedGrades}
           selectedProductId={selectedProductId}
+          produtoSearchTerm={selectedProductId ? null : (searchTerm && searchTerm.trim().length >= 2 ? searchTerm.trim() : null)}
         />
       </div>
     </div>

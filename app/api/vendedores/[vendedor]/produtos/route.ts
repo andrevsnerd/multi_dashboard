@@ -19,6 +19,7 @@ export async function GET(
   const subgrupos = searchParams.getAll('subgrupo');
   const grades = searchParams.getAll('grade');
   const produtoId = searchParams.get('produtoId');
+  const produtoSearchTerm = searchParams.get('produtoSearchTerm');
 
   const { vendedor: vendedorEncoded } = await params;
   const vendedor = decodeURIComponent(vendedorEncoded);
@@ -50,6 +51,7 @@ export async function GET(
       subgrupos,
       grades,
       produtoId: produtoId || undefined,
+      produtoSearchTerm: produtoSearchTerm || undefined,
     });
 
     return NextResponse.json({ data });

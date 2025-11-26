@@ -44,6 +44,7 @@ export interface VendedoresQueryParams {
   subgrupos?: string[];
   grades?: string[];
   produtoId?: string;
+  produtoSearchTerm?: string;
 }
 
 function buildFilialFilter(
@@ -139,6 +140,7 @@ export async function fetchVendedores({
   subgrupos,
   grades,
   produtoId,
+  produtoSearchTerm,
 }: VendedoresQueryParams = {}): Promise<VendedorItem[]> {
   return withRequest(async (request) => {
     const { start, end } = normalizeRangeForQuery(range);
@@ -210,9 +212,14 @@ export async function fetchVendedores({
       'grade'
     );
 
-    const produtoFilter = produtoId ? `AND vp.PRODUTO = @produtoId` : '';
+    let produtoFilter = '';
     if (produtoId) {
       request.input('produtoId', sql.VarChar, produtoId);
+      produtoFilter = `AND vp.PRODUTO = @produtoId`;
+    } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
+      const searchPattern = `%${produtoSearchTerm.trim()}%`;
+      request.input('produtoSearchTerm', sql.VarChar, searchPattern);
+      produtoFilter = `AND vp.DESC_PRODUTO LIKE @produtoSearchTerm`;
     }
 
     // Query para buscar dados dos vendedores
@@ -444,6 +451,7 @@ export async function fetchVendedorProdutos({
   subgrupos,
   grades,
   produtoId,
+  produtoSearchTerm,
 }: VendedorProdutosQueryParams): Promise<VendedorProdutoItem[]> {
   return withRequest(async (request) => {
     const { start, end } = normalizeRangeForQuery(range);
@@ -509,9 +517,14 @@ export async function fetchVendedorProdutos({
       'grade'
     );
 
-    const produtoFilter = produtoId ? `AND vp.PRODUTO = @produtoId` : '';
+    let produtoFilter = '';
     if (produtoId) {
       request.input('produtoId', sql.VarChar, produtoId);
+      produtoFilter = `AND vp.PRODUTO = @produtoId`;
+    } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
+      const searchPattern = `%${produtoSearchTerm.trim()}%`;
+      request.input('produtoSearchTerm', sql.VarChar, searchPattern);
+      produtoFilter = `AND vp.DESC_PRODUTO LIKE @produtoSearchTerm`;
     }
 
     // Query para buscar produtos vendidos pelo vendedor

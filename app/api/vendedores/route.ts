@@ -16,6 +16,7 @@ export async function GET(request: Request) {
   const subgrupos = searchParams.getAll('subgrupo');
   const grades = searchParams.getAll('grade');
   const produtoId = searchParams.get('produtoId');
+  const produtoSearchTerm = searchParams.get('produtoSearchTerm');
 
   const range =
     startParam && endParam
@@ -36,6 +37,7 @@ export async function GET(request: Request) {
       subgrupos,
       grades,
       produtoId: produtoId || undefined,
+      produtoSearchTerm: produtoSearchTerm || undefined,
     });
 
     return NextResponse.json({ data });

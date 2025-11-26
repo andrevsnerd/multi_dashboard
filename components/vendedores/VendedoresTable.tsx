@@ -19,6 +19,7 @@ interface VendedoresTableProps {
   selectedSubgrupos: string[];
   selectedGrades: string[];
   selectedProductId?: string | null;
+  produtoSearchTerm?: string | null;
 }
 
 export default function VendedoresTable({
@@ -33,6 +34,7 @@ export default function VendedoresTable({
   selectedSubgrupos,
   selectedGrades,
   selectedProductId,
+  produtoSearchTerm,
 }: VendedoresTableProps) {
   const [sortColumn, setSortColumn] = useState<keyof VendedorItem>("faturamento");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -175,6 +177,8 @@ export default function VendedoresTable({
 
           if (selectedProductId) {
             searchParams.set("produtoId", selectedProductId);
+          } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
+            searchParams.set("produtoSearchTerm", produtoSearchTerm.trim());
           }
 
           const vendedorEncoded = encodeURIComponent(vendedor);
