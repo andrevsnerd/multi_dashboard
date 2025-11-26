@@ -14,6 +14,15 @@ export interface VendedorItem {
   ticketMedio: number;
   quantidadePorTicket: number;
   participacaoFilial: number;
+  grupoMaisVendido?: string;
+  subgrupoMaisVendido?: string;
+}
+
+export interface VendedorProdutoItem {
+  grupo: string;
+  descricao: string;
+  faturamento: number;
+  quantidade: number;
 }
 
 export interface VendedoresQueryParams {
@@ -187,7 +196,58 @@ export async function fetchVendedores({
       ) > 0
     `;
 
-    const [filialTotalResult, vendedoresResult] = await Promise.all([
+    // Query para buscar grupo/subgrupo mais vendido por vendedor
+    // Usar ROW_NUMBER para pegar o grupo/subgrupo com maior faturamento
+    const grupoMaisVendidoQuery = `
+      WITH GrupoVendas AS (
+        SELECT 
+          ISNULL(v.VENDEDOR_APELIDO, vp.VENDEDOR) AS vendedor,
+          vp.VENDEDOR AS vendedorCodigo,
+          vp.FILIAL AS filial,
+          ISNULL(vp.GRUPO_PRODUTO, 'SEM GRUPO') AS grupo,
+          ISNULL(vp.SUBGRUPO_PRODUTO, 'SEM SUBGRUPO') AS subgrupo,
+          SUM(
+            CASE
+              WHEN vp.QTDE_CANCELADA > 0 THEN 0
+              ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
+            END
+          ) AS faturamentoGrupo,
+          ROW_NUMBER() OVER (
+            PARTITION BY ISNULL(v.VENDEDOR_APELIDO, vp.VENDEDOR), vp.FILIAL 
+            ORDER BY SUM(
+              CASE
+                WHEN vp.QTDE_CANCELADA > 0 THEN 0
+                ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
+              END
+            ) DESC
+          ) AS rn
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        LEFT JOIN W_CTB_LOJA_VENDA_PEDIDO v WITH (NOLOCK)
+          ON v.FILIAL = vp.FILIAL 
+          AND v.PEDIDO = vp.PEDIDO 
+          AND v.TICKET = vp.TICKET
+        WHERE vp.DATA_VENDA >= @startDate
+          AND vp.DATA_VENDA < @endDate
+          AND vp.QTDE > 0
+          ${filialFilter}
+        GROUP BY ISNULL(v.VENDEDOR_APELIDO, vp.VENDEDOR), vp.VENDEDOR, vp.FILIAL, vp.GRUPO_PRODUTO, vp.SUBGRUPO_PRODUTO
+        HAVING SUM(
+          CASE
+            WHEN vp.QTDE_CANCELADA > 0 THEN 0
+            ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
+          END
+        ) > 0
+      )
+      SELECT 
+        vendedor,
+        filial,
+        grupo,
+        subgrupo
+      FROM GrupoVendas
+      WHERE rn = 1
+    `;
+
+    const [filialTotalResult, vendedoresResult, grupoMaisVendidoResult] = await Promise.all([
       request.query<{ FILIAL: string; totalFaturamentoFilial: number }>(filialTotalQuery),
       request.query<{
         vendedor: string;
@@ -196,12 +256,31 @@ export async function fetchVendedores({
         quantidadeVendida: number;
         tickets: number;
       }>(vendedoresQuery),
+      request.query<{
+        vendedor: string;
+        filial: string;
+        grupo: string;
+        subgrupo: string;
+        faturamentoGrupo: number;
+      }>(grupoMaisVendidoQuery),
     ]);
 
     // Criar mapa de faturamento total por filial
     const filialTotalMap = new Map<string, number>();
     filialTotalResult.recordset.forEach((row) => {
       filialTotalMap.set(row.FILIAL, row.totalFaturamentoFilial || 0);
+    });
+
+    // Criar mapa de grupo/subgrupo mais vendido por vendedor
+    const grupoMaisVendidoMap = new Map<string, { grupo?: string; subgrupo?: string }>();
+    const isScarfme = company === 'scarfme';
+    
+    grupoMaisVendidoResult.recordset.forEach((row) => {
+      const key = `${row.vendedor}::${row.filial}`;
+      grupoMaisVendidoMap.set(key, {
+        grupo: row.grupo && row.grupo !== 'SEM GRUPO' ? row.grupo : undefined,
+        subgrupo: row.subgrupo && row.subgrupo !== 'SEM SUBGRUPO' ? row.subgrupo : undefined,
+      });
     });
 
     // Processar resultados e calcular métricas
@@ -217,6 +296,9 @@ export async function fetchVendedores({
         ? (faturamento / totalFaturamentoFilial) * 100 
         : 0;
 
+      const key = `${row.vendedor}::${row.filial}`;
+      const grupoMaisVendido = grupoMaisVendidoMap.get(key);
+
       return {
         vendedor: row.vendedor || 'SEM VENDEDOR',
         filial: row.filial,
@@ -226,11 +308,95 @@ export async function fetchVendedores({
         ticketMedio,
         quantidadePorTicket,
         participacaoFilial,
+        grupoMaisVendido: isScarfme ? undefined : grupoMaisVendido?.grupo,
+        subgrupoMaisVendido: isScarfme ? grupoMaisVendido?.subgrupo : undefined,
       };
     });
 
     // Ordenar por faturamento (decrescente)
     return vendedores.sort((a, b) => b.faturamento - a.faturamento);
+  });
+}
+
+export interface VendedorProdutosQueryParams {
+  company?: string;
+  vendedor: string;
+  filial: string;
+  range?: {
+    start?: Date | string;
+    end?: Date | string;
+  };
+}
+
+export async function fetchVendedorProdutos({
+  company,
+  vendedor,
+  filial,
+  range,
+}: VendedorProdutosQueryParams): Promise<VendedorProdutoItem[]> {
+  return withRequest(async (request) => {
+    const { start, end } = normalizeRangeForQuery(range);
+    
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+    request.input('vendedor', sql.VarChar, vendedor);
+    request.input('filial', sql.VarChar, filial);
+
+    // Query para buscar produtos vendidos pelo vendedor
+    // Usar VENDEDOR_APELIDO para fazer o match
+    // Não usar buildFilialFilter aqui pois já estamos filtrando diretamente por filial
+    const produtosQuery = `
+      SELECT 
+        ISNULL(MAX(vp.GRUPO_PRODUTO), 'SEM GRUPO') AS grupo,
+        ISNULL(MAX(vp.DESC_PRODUTO), 'SEM DESCRIÇÃO') AS descricao,
+        SUM(
+          CASE
+            WHEN vp.QTDE_CANCELADA > 0 THEN 0
+            ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
+          END
+        ) AS faturamento,
+        SUM(
+          CASE
+            WHEN vp.QTDE_CANCELADA > 0 THEN 0
+            ELSE vp.QTDE
+          END
+        ) AS quantidade
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN W_CTB_LOJA_VENDA_PEDIDO v WITH (NOLOCK)
+        ON v.FILIAL = vp.FILIAL 
+        AND v.PEDIDO = vp.PEDIDO 
+        AND v.TICKET = vp.TICKET
+      WHERE vp.DATA_VENDA >= @startDate
+        AND vp.DATA_VENDA < @endDate
+        AND vp.QTDE > 0
+        AND vp.FILIAL = @filial
+        AND (
+          ISNULL(v.VENDEDOR_APELIDO, vp.VENDEDOR) = @vendedor
+          OR vp.VENDEDOR = @vendedor
+        )
+      GROUP BY vp.PRODUTO, vp.DESC_PRODUTO
+      HAVING SUM(
+        CASE
+          WHEN vp.QTDE_CANCELADA > 0 THEN 0
+          ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
+        END
+      ) > 0
+      ORDER BY faturamento DESC
+    `;
+
+    const produtosResult = await request.query<{
+      grupo: string;
+      descricao: string;
+      faturamento: number;
+      quantidade: number;
+    }>(produtosQuery);
+
+    return produtosResult.recordset.map((row) => ({
+      grupo: row.grupo || 'SEM GRUPO',
+      descricao: row.descricao || 'SEM DESCRIÇÃO',
+      faturamento: row.faturamento || 0,
+      quantidade: row.quantidade || 0,
+    }));
   });
 }
 

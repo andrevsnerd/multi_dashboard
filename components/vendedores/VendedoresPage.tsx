@@ -132,7 +132,13 @@ export default function VendedoresPage({
       )}
 
       <div className={loading ? styles.contentLoading : undefined}>
-        <VendedoresTable data={data} loading={loading} companyKey={companyKey} />
+        <VendedoresTable 
+          data={data} 
+          loading={loading} 
+          companyKey={companyKey}
+          range={range}
+          selectedFilial={selectedFilial}
+        />
       </div>
     </div>
   );

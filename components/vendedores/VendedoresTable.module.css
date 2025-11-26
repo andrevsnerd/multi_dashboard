@@ -152,10 +152,55 @@
   text-align: left !important;
 }
 
+.vendedorRow {
+  cursor: pointer;
+}
+
+.vendedorRow:hover {
+  background-color: #f1f5f9 !important;
+}
+
 .vendedorInfo {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
+}
+
+.rankingNumber {
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+  min-width: 32px;
+  text-align: left;
+  padding-top: 2px;
+}
+
+.vendedorDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.vendedorNameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.grupoBadge {
+  display: inline-block;
+  padding: 4px 10px;
+  background-color: #e5e7eb;
+  color: #374151;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
 }
 
 .vendedorIcon {
@@ -172,12 +217,6 @@
   flex-shrink: 0;
 }
 
-.vendedorDetails {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
 
 .vendedorName {
   font-weight: 500;
@@ -263,7 +302,7 @@
 
 .cardVendedorInfo {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   margin-bottom: 8px;
 }
@@ -339,6 +378,107 @@
   word-break: break-word;
 }
 
+.cardExpandButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: #64748b;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  transition: color 0.2s;
+}
+
+.cardExpandButton:hover {
+  color: #1f2937;
+}
+
+.cardRankingNumber {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  min-width: 28px;
+  text-align: left;
+  padding-top: 2px;
+}
+
+.cardVendedorNameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.cardGrupoBadge {
+  display: inline-block;
+  padding: 3px 8px;
+  background-color: #e5e7eb;
+  color: #374151;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.cardExpanded {
+  background-color: #f8f9fa;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 12px 16px;
+}
+
+.cardProdutosList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cardProdutoItem {
+  background: white;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.cardProdutoGrupo {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.cardProdutoDescricao {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f2937;
+  margin-bottom: 8px;
+}
+
+.cardProdutoValues {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.cardProdutoFaturamento {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.cardProdutoQuantidade {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+
 /* Mobile optimizations */
 @media (max-width: 768px) {
   .table {
@@ -399,5 +539,106 @@
     min-width: 100px;
     font-size: 10px;
   }
+}
+
+/* Expanded row styles */
+.expandedRow {
+  background-color: #f8f9fa;
+}
+
+.expandedCell {
+  padding: 0 !important;
+  background-color: #f8f9fa;
+}
+
+.produtosContainer {
+  padding: 16px;
+  background-color: #ffffff;
+  margin: 8px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.produtosTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.produtosTable thead {
+  background-color: #f1f5f9;
+}
+
+.produtosTable th {
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  color: #1f2937;
+  border-bottom: 2px solid #e5e7eb;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.produtoGrupoHeader {
+  min-width: 150px;
+}
+
+.produtoDescricaoHeader {
+  min-width: 300px;
+}
+
+.produtoFaturamentoHeader {
+  text-align: right !important;
+  min-width: 120px;
+}
+
+.produtoQuantidadeHeader {
+  text-align: right !important;
+  min-width: 100px;
+}
+
+.produtosTable td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #374151;
+  font-size: 12px;
+}
+
+.produtosTable tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.produtosTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.produtoGrupoCell {
+  font-weight: 500;
+  color: #4b5563;
+}
+
+.produtoDescricaoCell {
+  color: #1f2937;
+}
+
+.produtoFaturamentoCell {
+  text-align: right !important;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.produtoQuantidadeCell {
+  text-align: right !important;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.loadingProdutos,
+.emptyProdutos {
+  padding: 20px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 13px;
 }
 
