@@ -26,7 +26,26 @@ async function fetchClientes(
   vendedor: string | null,
   searchTerm?: string | null,
   last7DaysRange?: DateRangeValue,
-): Promise<{ data: ClienteItem[]; count: number; countWeek: number; countWeekPrevious: number; countMonth: number }> {
+): Promise<{ 
+  data: ClienteItem[]; 
+  count: number; 
+  countWeek: number; 
+  countWeekPrevious: number; 
+  countMonth: number;
+  topFilial: { filial: string; count: number } | null;
+  filialPerformance: Array<{
+    filial: string;
+    filialDisplayName: string;
+    currentCount: number;
+    previousCount: number;
+    changePercentage: number | null;
+  }>;
+  topVendedores: Array<{
+    vendedor: string;
+    filial: string;
+    count: number;
+  }>;
+}> {
   const searchParams = new URLSearchParams({
     company,
     start: range.startDate.toISOString(),
@@ -66,6 +85,18 @@ async function fetchClientes(
     countWeekPrevious: number;
     countMonth: number;
     topFilial: { filial: string; count: number } | null;
+    filialPerformance: Array<{
+      filial: string;
+      filialDisplayName: string;
+      currentCount: number;
+      previousCount: number;
+      changePercentage: number | null;
+    }>;
+    topVendedores: Array<{
+      vendedor: string;
+      filial: string;
+      count: number;
+    }>;
   };
 
   return json;
@@ -93,6 +124,18 @@ export default function ClientesPage({
   const [countWeekPrevious, setCountWeekPrevious] = useState<number>(0); // 7 dias anteriores
   const [countMonth, setCountMonth] = useState<number>(0);
   const [topFilial, setTopFilial] = useState<{ filial: string; count: number } | null>(null);
+  const [filialPerformance, setFilialPerformance] = useState<Array<{
+    filial: string;
+    filialDisplayName: string;
+    currentCount: number;
+    previousCount: number;
+    changePercentage: number | null;
+  }>>([]);
+  const [topVendedores, setTopVendedores] = useState<Array<{
+    vendedor: string;
+    filial: string;
+    count: number;
+  }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -178,6 +221,8 @@ export default function ClientesPage({
           setCountWeekPrevious(result.countWeekPrevious);
           setCountMonth(result.countMonth);
           setTopFilial(result.topFilial);
+          setFilialPerformance(result.filialPerformance || []);
+          setTopVendedores(result.topVendedores || []);
         }
       } catch (err) {
         if (active) {
@@ -359,6 +404,102 @@ export default function ClientesPage({
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Cards de Performance por Filial e Top Vendedores */}
+      <div className={styles.performanceGrid}>
+        <div className={styles.performanceCard}>
+          <div className={styles.performanceCardHeader}>
+            <h3 className={styles.performanceCardTitle}>CADASTROS POR FILIAL</h3>
+            <div className={styles.performanceCardHeaderRight}>
+              <span className={styles.performanceHeaderLabel}>Cadastros</span>
+              <span className={styles.performanceHeaderLabel}>Var. %</span>
+            </div>
+          </div>
+          <ul className={styles.performanceList}>
+            {filialPerformance.length === 0 ? (
+              <li className={styles.performanceState}>Nenhuma filial encontrada.</li>
+            ) : (
+              filialPerformance.map((item) => {
+                const isPositive = item.changePercentage !== null && item.changePercentage > 0;
+                const isNegative = item.changePercentage !== null && item.changePercentage < 0;
+                const variationClass = isPositive
+                  ? styles.performanceVariationPositive
+                  : isNegative
+                    ? styles.performanceVariationNegative
+                    : styles.performanceVariationNeutral;
+
+                return (
+                  <li key={item.filial} className={styles.performanceListItem}>
+                    <div className={styles.performanceItemNameContainer}>
+                      <strong className={styles.performanceItemName}>{item.filialDisplayName}</strong>
+                    </div>
+                    <div className={styles.performanceItemMetrics}>
+                      <div className={styles.performanceMetricRow}>
+                        <div className={styles.performancePriceColumn}>
+                          <span className={styles.performanceMetricValue}>
+                            {item.currentCount.toLocaleString("pt-BR")}
+                          </span>
+                        </div>
+                        <div className={`${styles.performanceVariationBadge} ${variationClass}`}>
+                          {item.changePercentage !== null ? (
+                            <>
+                              {isPositive ? (
+                                <span className={styles.performanceVariationArrow}>↑</span>
+                              ) : isNegative ? (
+                                <span className={styles.performanceVariationArrow}>↓</span>
+                              ) : null}
+                              <span className={styles.performanceVariationValue}>
+                                {Math.abs(item.changePercentage).toLocaleString("pt-BR", {
+                                  minimumFractionDigits: 1,
+                                  maximumFractionDigits: 1,
+                                })}%
+                              </span>
+                            </>
+                          ) : (
+                            <span className={styles.performanceVariationValue}>--</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        </div>
+
+        <div className={styles.performanceCard}>
+          <div className={styles.performanceCardHeader}>
+            <h3 className={styles.performanceCardTitle}>TOP 5 VENDEDORES</h3>
+            <div className={styles.performanceCardHeaderRight}>
+              <span className={styles.performanceHeaderLabel}>Cadastros</span>
+            </div>
+          </div>
+          <ul className={styles.performanceList}>
+            {topVendedores.length === 0 ? (
+              <li className={styles.performanceState}>Nenhum vendedor encontrado.</li>
+            ) : (
+              topVendedores.map((item, index) => (
+                <li key={`${item.vendedor}-${item.filial}-${index}`} className={styles.performanceListItem}>
+                  <div className={styles.performanceItemNameContainer}>
+                    <strong className={styles.performanceItemName}>{item.vendedor}</strong>
+                    <span className={styles.performanceItemSubtitle}>{item.filial}</span>
+                  </div>
+                  <div className={styles.performanceItemMetrics}>
+                    <div className={styles.performanceMetricRow}>
+                      <div className={styles.performancePriceColumn}>
+                        <span className={styles.performanceMetricValue}>
+                          {item.count.toLocaleString("pt-BR")}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              ))
+            )}
+          </ul>
         </div>
       </div>
 

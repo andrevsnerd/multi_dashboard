@@ -400,6 +400,212 @@
   }
 }
 
+/* Performance Cards */
+.performanceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 24px;
+}
+
+.performanceCard {
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+}
+
+.performanceCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 0 8px 0;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 8px;
+}
+
+.performanceCardTitle {
+  font-size: 14px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin: 0;
+  font-weight: 600;
+}
+
+.performanceCardHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+  min-width: 200px;
+  justify-content: flex-end;
+}
+
+.performanceHeaderLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.performanceList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.performanceListItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.performanceListItem:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.performanceItemNameContainer {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.performanceItemName {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.4;
+  display: block;
+}
+
+.performanceItemSubtitle {
+  font-size: 12px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.performanceItemMetrics {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+  flex-shrink: 0;
+  min-width: 200px;
+}
+
+.performanceMetricRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.performancePriceColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+}
+
+.performanceMetricValue {
+  font-size: 16px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.performanceVariationBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  border: 1.5px solid;
+}
+
+.performanceVariationPositive {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border-color: #86efac;
+  color: #166534;
+}
+
+.performanceVariationNegative {
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.performanceVariationNeutral {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-color: #cbd5e1;
+  color: #64748b;
+}
+
+.performanceVariationArrow {
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.performanceVariationValue {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.performanceState {
+  background: #f8fafc;
+  border-radius: 16px;
+  border: 1px dashed #cbd5f5;
+  padding: 32px;
+  text-align: center;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.kpiTopFilialRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.kpiTopFilialCountSmall {
+  font-size: 12px;
+  font-weight: 500;
+  color: #94a3b8;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .performanceGrid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .performanceCard {
+    padding: 20px;
+  }
+}
+
 @media (max-width: 480px) {
   .wrapper {
     gap: 16px;
@@ -417,6 +623,18 @@
   .searchContainer {
     min-width: 100%;
     max-width: 100%;
+  }
+
+  .performanceGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .performanceCardHeaderRight {
+    min-width: auto;
+  }
+
+  .performanceItemMetrics {
+    min-width: auto;
   }
 }
 

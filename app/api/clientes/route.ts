@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { fetchClientes, fetchClientesCount, fetchClientesCountPreviousPeriod, fetchTopFilialByClientes } from '@/lib/repositories/clientes';
+import { fetchClientes, fetchClientesCount, fetchClientesCountPreviousPeriod, fetchTopFilialByClientes, fetchFilialClientesPerformance, fetchTopVendedoresClientes } from '@/lib/repositories/clientes';
 
 export const maxDuration = 60; // 60 segundos
 
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
         })
       : Promise.resolve(0);
 
-    const [data, count, last7DaysCount, countWeekPrevious, countMonth, topFilial] = await Promise.all([
+    const [data, count, last7DaysCount, countWeekPrevious, countMonth, topFilial, filialPerformance, topVendedores] = await Promise.all([
       fetchClientes({
         company,
         filial: filial || null,
@@ -82,6 +82,20 @@ export async function GET(request: Request) {
         range,
         searchTerm: searchTerm || undefined,
       }),
+      fetchFilialClientesPerformance({
+        company,
+        filial: null, // Sempre buscar todas as filiais
+        vendedor: vendedor || null,
+        range,
+        searchTerm: searchTerm || undefined,
+      }),
+      fetchTopVendedoresClientes({
+        company,
+        filial: filial || null,
+        range,
+        searchTerm: searchTerm || undefined,
+        limit: 5,
+      }),
     ]);
 
     return NextResponse.json({ 
@@ -91,6 +105,8 @@ export async function GET(request: Request) {
       countWeekPrevious: countWeekPrevious, // 7 dias anteriores
       countMonth,
       topFilial,
+      filialPerformance,
+      topVendedores,
     });
   } catch (error) {
     console.error('Erro ao carregar clientes', error);

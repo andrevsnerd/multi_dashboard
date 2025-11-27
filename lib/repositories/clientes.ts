@@ -773,6 +773,294 @@ export async function fetchClientesCountPreviousPeriod({
   });
 }
 
+// Interface para performance de filiais por cadastros
+export interface FilialClientesPerformance {
+  filial: string;
+  filialDisplayName: string;
+  currentCount: number;
+  previousCount: number;
+  changePercentage: number | null;
+}
+
+// Função para buscar cadastros por filial com comparação ao mês anterior
+export async function fetchFilialClientesPerformance({
+  company,
+  range,
+  vendedor,
+  searchTerm,
+}: ClientesQueryParams = {}): Promise<FilialClientesPerformance[]> {
+  return withRequest(async (request) => {
+    const companyConfig = resolveCompany(company);
+    if (!companyConfig) {
+      return [];
+    }
+
+    const parseDateToString = (dateStr: string | Date): string => {
+      if (dateStr instanceof Date) {
+        const year = dateStr.getFullYear();
+        const month = String(dateStr.getMonth() + 1).padStart(2, '0');
+        const day = String(dateStr.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+      
+      const d = new Date(dateStr);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
+    let startDateStr: string;
+    let endDateStr: string;
+    
+    if (range?.start && range?.end) {
+      const startDate = range.start instanceof Date ? range.start : new Date(range.start);
+      startDateStr = parseDateToString(startDate);
+      
+      const endDate = range.end instanceof Date ? range.end : new Date(range.end);
+      const endDatePlusOne = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() + 1);
+      endDateStr = parseDateToString(endDatePlusOne);
+    } else {
+      const defaultRange = getCurrentMonthRange();
+      startDateStr = parseDateToString(defaultRange.start);
+      const endDatePlusOne = new Date(defaultRange.end.getFullYear(), defaultRange.end.getMonth(), defaultRange.end.getDate() + 1);
+      endDateStr = parseDateToString(endDatePlusOne);
+    }
+
+    // Calcular período anterior proporcional
+    const startDate = range?.start instanceof Date ? range.start : (range?.start ? new Date(range.start) : getCurrentMonthRange().start);
+    const endDate = range?.end instanceof Date ? range.end : (range?.end ? new Date(range.end) : getCurrentMonthRange().end);
+    const currentMonthStart = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const daysInCurrentMonth = Math.ceil((endDate.getTime() - currentMonthStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    
+    const previousMonthEnd = new Date(startDate);
+    previousMonthEnd.setDate(previousMonthEnd.getDate() - 1);
+    const previousMonthStart = new Date(previousMonthEnd);
+    previousMonthStart.setDate(1);
+    const previousMonthEndAdjusted = new Date(previousMonthStart);
+    previousMonthEndAdjusted.setDate(Math.min(daysInCurrentMonth, previousMonthEnd.getDate()));
+    
+    const prevStartDateStr = parseDateToString(previousMonthStart);
+    const prevEndDatePlusOne = new Date(previousMonthEndAdjusted.getFullYear(), previousMonthEndAdjusted.getMonth(), previousMonthEndAdjusted.getDate() + 1);
+    const prevEndDateStr = parseDateToString(prevEndDatePlusOne);
+    
+    request.input('startDate', sql.Date, startDateStr);
+    request.input('endDate', sql.Date, endDateStr);
+    request.input('prevStartDate', sql.Date, prevStartDateStr);
+    request.input('prevEndDate', sql.Date, prevEndDateStr);
+
+    const filiais = companyConfig.filialFilters['sales'] ?? [];
+    const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
+    const normalFiliaisList = filiais.filter(f => !ecommerceFilials.includes(f));
+    
+    if (normalFiliaisList.length === 0) {
+      return [];
+    }
+
+    // Criar filtro para todas as filiais normais da empresa
+    normalFiliaisList.forEach((filial, index) => {
+      request.input(`filial${index}`, sql.VarChar, filial);
+    });
+    const placeholders = normalFiliaisList.map((_, index) => `@filial${index}`).join(', ');
+
+    let vendedorFilter = '';
+    if (vendedor && vendedor.trim() !== '') {
+      const vendedorPattern = vendedor.trim();
+      request.input('vendedorFilter', sql.VarChar, vendedorPattern);
+      vendedorFilter = `AND (
+        LTRIM(RTRIM(CAST(cv.VENDEDOR AS VARCHAR))) = @vendedorFilter
+        OR LTRIM(RTRIM(ISNULL(lv.VENDEDOR_APELIDO, ISNULL(lv.NOME_VENDEDOR, '')))) = @vendedorFilter
+      )`;
+    }
+
+    let searchFilter = '';
+    if (searchTerm && searchTerm.trim().length >= 2) {
+      const searchPattern = `%${searchTerm.trim()}%`;
+      request.input('searchTerm', sql.VarChar, searchPattern);
+      searchFilter = `AND (
+        cv.CLIENTE_VAREJO LIKE @searchTerm 
+        OR ISNULL(lv.VENDEDOR_APELIDO, ISNULL(lv.NOME_VENDEDOR, cv.VENDEDOR)) LIKE @searchTerm
+      )`;
+    }
+
+    const query = `
+      WITH filial_clientes AS (
+        SELECT
+          cv.FILIAL,
+          'current' AS period,
+          COUNT(*) AS clientCount
+        FROM CLIENTES_VAREJO cv WITH (NOLOCK)
+        LEFT JOIN LOJA_VENDEDORES lv WITH (NOLOCK)
+          ON LTRIM(RTRIM(CAST(cv.VENDEDOR AS VARCHAR))) = LTRIM(RTRIM(CAST(lv.VENDEDOR AS VARCHAR)))
+        WHERE CAST(cv.CADASTRAMENTO AS DATE) >= CAST(@startDate AS DATE)
+          AND CAST(cv.CADASTRAMENTO AS DATE) < CAST(@endDate AS DATE)
+          AND LTRIM(RTRIM(CAST(cv.FILIAL AS VARCHAR))) IN (${placeholders})
+          ${vendedorFilter}
+          ${searchFilter}
+        GROUP BY cv.FILIAL
+
+        UNION ALL
+
+        SELECT
+          cv.FILIAL,
+          'previous' AS period,
+          COUNT(*) AS clientCount
+        FROM CLIENTES_VAREJO cv WITH (NOLOCK)
+        LEFT JOIN LOJA_VENDEDORES lv WITH (NOLOCK)
+          ON LTRIM(RTRIM(CAST(cv.VENDEDOR AS VARCHAR))) = LTRIM(RTRIM(CAST(lv.VENDEDOR AS VARCHAR)))
+        WHERE CAST(cv.CADASTRAMENTO AS DATE) >= CAST(@prevStartDate AS DATE)
+          AND CAST(cv.CADASTRAMENTO AS DATE) < CAST(@prevEndDate AS DATE)
+          AND LTRIM(RTRIM(CAST(cv.FILIAL AS VARCHAR))) IN (${placeholders})
+          ${vendedorFilter}
+          ${searchFilter}
+        GROUP BY cv.FILIAL
+      )
+      SELECT
+        f.FILIAL,
+        SUM(CASE WHEN f.period = 'current' THEN f.clientCount ELSE 0 END) AS currentCount,
+        SUM(CASE WHEN f.period = 'previous' THEN f.clientCount ELSE 0 END) AS previousCount
+      FROM filial_clientes f
+      GROUP BY f.FILIAL
+      ORDER BY currentCount DESC
+    `;
+
+    try {
+      const result = await request.query<{
+        FILIAL: string;
+        currentCount: number;
+        previousCount: number;
+      }>(query);
+
+      const displayNames = companyConfig.filialDisplayNames ?? {};
+
+      return result.recordset.map((row) => {
+        const currentCount = row.currentCount || 0;
+        const previousCount = row.previousCount || 0;
+        const changePercentage = previousCount > 0 
+          ? ((currentCount - previousCount) / previousCount) * 100 
+          : (currentCount > 0 ? null : 0);
+
+        return {
+          filial: row.FILIAL || '',
+          filialDisplayName: displayNames[row.FILIAL] || row.FILIAL || '',
+          currentCount,
+          previousCount,
+          changePercentage,
+        };
+      });
+    } catch (error) {
+      console.error('Erro ao buscar performance de filiais por clientes:', error);
+      return [];
+    }
+  });
+}
+
+// Interface para top vendedores
+export interface TopVendedorClientes {
+  vendedor: string;
+  filial: string;
+  count: number;
+}
+
+// Função para buscar top 5 vendedores por cadastros
+export async function fetchTopVendedoresClientes({
+  company,
+  filial,
+  range,
+  searchTerm,
+  limit = 5,
+}: ClientesQueryParams & { limit?: number }): Promise<TopVendedorClientes[]> {
+  return withRequest(async (request) => {
+    const parseDateToString = (dateStr: string | Date): string => {
+      if (dateStr instanceof Date) {
+        const year = dateStr.getFullYear();
+        const month = String(dateStr.getMonth() + 1).padStart(2, '0');
+        const day = String(dateStr.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+      
+      const d = new Date(dateStr);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
+    let startDateStr: string;
+    let endDateStr: string;
+    
+    if (range?.start && range?.end) {
+      const startDate = range.start instanceof Date ? range.start : new Date(range.start);
+      startDateStr = parseDateToString(startDate);
+      
+      const endDate = range.end instanceof Date ? range.end : new Date(range.end);
+      const endDatePlusOne = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() + 1);
+      endDateStr = parseDateToString(endDatePlusOne);
+    } else {
+      const defaultRange = getCurrentMonthRange();
+      startDateStr = parseDateToString(defaultRange.start);
+      const endDatePlusOne = new Date(defaultRange.end.getFullYear(), defaultRange.end.getMonth(), defaultRange.end.getDate() + 1);
+      endDateStr = parseDateToString(endDatePlusOne);
+    }
+    
+    request.input('startDate', sql.Date, startDateStr);
+    request.input('endDate', sql.Date, endDateStr);
+
+    const filialFilter = buildFilialFilter(
+      request,
+      company,
+      'sales',
+      filial,
+      'cv'
+    );
+
+    let searchFilter = '';
+    if (searchTerm && searchTerm.trim().length >= 2) {
+      const searchPattern = `%${searchTerm.trim()}%`;
+      request.input('searchTerm', sql.VarChar, searchPattern);
+      searchFilter = `AND (
+        cv.CLIENTE_VAREJO LIKE @searchTerm 
+        OR ISNULL(lv.VENDEDOR_APELIDO, ISNULL(lv.NOME_VENDEDOR, cv.VENDEDOR)) LIKE @searchTerm
+      )`;
+    }
+
+    const topVendedoresQuery = `
+      SELECT TOP ${limit}
+        LTRIM(RTRIM(ISNULL(lv.VENDEDOR_APELIDO, ISNULL(lv.NOME_VENDEDOR, cv.VENDEDOR)))) AS vendedor,
+        LTRIM(RTRIM(cv.FILIAL)) AS filial,
+        COUNT(*) AS total
+      FROM CLIENTES_VAREJO cv WITH (NOLOCK)
+      LEFT JOIN LOJA_VENDEDORES lv WITH (NOLOCK)
+        ON LTRIM(RTRIM(CAST(cv.VENDEDOR AS VARCHAR))) = LTRIM(RTRIM(CAST(lv.VENDEDOR AS VARCHAR)))
+      WHERE CAST(cv.CADASTRAMENTO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(cv.CADASTRAMENTO AS DATE) < CAST(@endDate AS DATE)
+        ${filialFilter}
+        ${searchFilter}
+        AND LTRIM(RTRIM(CAST(cv.VENDEDOR AS VARCHAR))) IS NOT NULL
+        AND LTRIM(RTRIM(CAST(cv.VENDEDOR AS VARCHAR))) <> ''
+      GROUP BY LTRIM(RTRIM(ISNULL(lv.VENDEDOR_APELIDO, ISNULL(lv.NOME_VENDEDOR, cv.VENDEDOR)))), cv.FILIAL
+      ORDER BY COUNT(*) DESC
+    `;
+
+    try {
+      const result = await request.query<{
+        vendedor: string;
+        filial: string;
+        total: number;
+      }>(topVendedoresQuery);
+
+      return result.recordset.map((row) => ({
+        vendedor: row.vendedor || 'SEM VENDEDOR',
+        filial: row.filial || '',
+        count: row.total || 0,
+      }));
+    } catch (error) {
+      console.error('Erro ao buscar top vendedores por clientes:', error);
+      return [];
+    }
+  });
+}
+
 // Função para buscar lista de vendedores únicos que cadastraram clientes no período
 export async function fetchVendedoresList({
   company,
