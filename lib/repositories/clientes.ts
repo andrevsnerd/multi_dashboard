@@ -21,6 +21,7 @@ export interface ClienteItem {
 export interface ClientesQueryParams {
   company?: string;
   filial?: string | null;
+  vendedor?: string | null;
   range?: {
     start?: Date | string;
     end?: Date | string;
@@ -115,6 +116,7 @@ function buildFilialFilter(
 export async function fetchClientes({
   company,
   filial,
+  vendedor,
   range,
   searchTerm,
 }: ClientesQueryParams = {}): Promise<ClienteItem[]> {
@@ -182,9 +184,23 @@ export async function fetchClientes({
     console.log('[fetchClientes] Filtros:', {
       company,
       filial,
+      vendedor,
       searchTerm,
       filialFilter: filialFilter.substring(0, 200), // Primeiros 200 chars
     });
+
+    // Filtro de vendedor
+    let vendedorFilter = '';
+    if (vendedor && vendedor.trim() !== '') {
+      // Filtrar por código do vendedor ou nome do vendedor
+      // Pode ser código (ex: "7433") ou nome (ex: "ANA")
+      const vendedorPattern = vendedor.trim();
+      request.input('vendedorFilter', sql.VarChar, vendedorPattern);
+      vendedorFilter = `AND (
+        LTRIM(RTRIM(CAST(cv.VENDEDOR AS VARCHAR))) = @vendedorFilter
+        OR LTRIM(RTRIM(ISNULL(lv.VENDEDOR_APELIDO, ISNULL(lv.NOME_VENDEDOR, '')))) = @vendedorFilter
+      )`;
+    }
 
     // Filtro de pesquisa por nome do cliente ou vendedor
     let searchFilter = '';
@@ -223,6 +239,7 @@ export async function fetchClientes({
       WHERE CAST(cv.CADASTRAMENTO AS DATE) >= CAST(@startDate AS DATE)
         AND CAST(cv.CADASTRAMENTO AS DATE) < CAST(@endDate AS DATE)
         ${filialFilter}
+        ${vendedorFilter}
         ${searchFilter}
       ORDER BY cv.CADASTRAMENTO ASC, cv.CLIENTE_VAREJO
     `;
@@ -422,6 +439,7 @@ export async function fetchClientes({
 export async function fetchClientesCount({
   company,
   filial,
+  vendedor,
   range,
   searchTerm,
 }: ClientesQueryParams = {}): Promise<number> {
@@ -478,6 +496,17 @@ export async function fetchClientesCount({
       'cv'
     );
 
+    // Filtro de vendedor
+    let vendedorFilter = '';
+    if (vendedor && vendedor.trim() !== '') {
+      const vendedorPattern = vendedor.trim();
+      request.input('vendedorFilter', sql.VarChar, vendedorPattern);
+      vendedorFilter = `AND (
+        LTRIM(RTRIM(CAST(cv.VENDEDOR AS VARCHAR))) = @vendedorFilter
+        OR LTRIM(RTRIM(ISNULL(lv.VENDEDOR_APELIDO, ISNULL(lv.NOME_VENDEDOR, '')))) = @vendedorFilter
+      )`;
+    }
+
     let searchFilter = '';
     if (searchTerm && searchTerm.trim().length >= 2) {
       const searchPattern = `%${searchTerm.trim()}%`;
@@ -498,6 +527,7 @@ export async function fetchClientesCount({
       WHERE CAST(cv.CADASTRAMENTO AS DATE) >= CAST(@startDate AS DATE)
         AND CAST(cv.CADASTRAMENTO AS DATE) < CAST(@endDate AS DATE)
         ${filialFilter}
+        ${vendedorFilter}
         ${searchFilter}
     `;
     
@@ -508,3 +538,93 @@ export async function fetchClientesCount({
   });
 }
 
+// Função para buscar lista de vendedores únicos que cadastraram clientes no período
+export async function fetchVendedoresList({
+  company,
+  filial,
+  range,
+}: {
+  company?: string;
+  filial?: string | null;
+  range?: {
+    start?: Date | string;
+    end?: Date | string;
+  };
+}): Promise<Array<{ codigo: string; nome: string }>> {
+  return withRequest(async (request) => {
+    // Processar datas da mesma forma que fetchClientes
+    const parseDateToString = (dateStr: string | Date): string => {
+      if (dateStr instanceof Date) {
+        const year = dateStr.getFullYear();
+        const month = String(dateStr.getMonth() + 1).padStart(2, '0');
+        const day = String(dateStr.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+      
+      const d = new Date(dateStr);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
+    let startDateStr: string;
+    let endDateStr: string;
+    
+    if (range?.start && range?.end) {
+      const startDate = range.start instanceof Date ? range.start : new Date(range.start);
+      startDateStr = parseDateToString(startDate);
+      
+      const endDate = range.end instanceof Date ? range.end : new Date(range.end);
+      const endDatePlusOne = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() + 1);
+      endDateStr = parseDateToString(endDatePlusOne);
+    } else {
+      const defaultRange = getCurrentMonthRange();
+      startDateStr = parseDateToString(defaultRange.start);
+      const endDatePlusOne = new Date(defaultRange.end.getFullYear(), defaultRange.end.getMonth(), defaultRange.end.getDate() + 1);
+      endDateStr = parseDateToString(endDatePlusOne);
+    }
+    
+    request.input('startDate', sql.Date, startDateStr);
+    request.input('endDate', sql.Date, endDateStr);
+
+    const filialFilter = buildFilialFilter(
+      request,
+      company,
+      'sales',
+      filial,
+      'cv'
+    );
+
+    // Query para buscar vendedores únicos que cadastraram clientes no período
+    const vendedoresQuery = `
+      SELECT DISTINCT
+        LTRIM(RTRIM(CAST(cv.VENDEDOR AS VARCHAR))) AS codigo,
+        LTRIM(RTRIM(ISNULL(lv.VENDEDOR_APELIDO, ISNULL(lv.NOME_VENDEDOR, cv.VENDEDOR)))) AS nome
+      FROM CLIENTES_VAREJO cv WITH (NOLOCK)
+      LEFT JOIN LOJA_VENDEDORES lv WITH (NOLOCK)
+        ON LTRIM(RTRIM(CAST(cv.VENDEDOR AS VARCHAR))) = LTRIM(RTRIM(CAST(lv.VENDEDOR AS VARCHAR)))
+      WHERE CAST(cv.CADASTRAMENTO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(cv.CADASTRAMENTO AS DATE) < CAST(@endDate AS DATE)
+        ${filialFilter}
+        AND LTRIM(RTRIM(CAST(cv.VENDEDOR AS VARCHAR))) IS NOT NULL
+        AND LTRIM(RTRIM(CAST(cv.VENDEDOR AS VARCHAR))) <> ''
+      ORDER BY nome
+    `;
+
+    try {
+      const result = await request.query<{
+        codigo: string;
+        nome: string;
+      }>(vendedoresQuery);
+
+      return result.recordset.map((row) => ({
+        codigo: row.codigo || '',
+        nome: row.nome || row.codigo || 'SEM VENDEDOR',
+      }));
+    } catch (error) {
+      console.error('Erro ao buscar lista de vendedores:', error);
+      throw error;
+    }
+  });
+}

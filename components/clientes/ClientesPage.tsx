@@ -6,6 +6,7 @@ import DateRangeFilter, {
   type DateRangeValue,
 } from "@/components/filters/DateRangeFilter";
 import FilialFilter from "@/components/filters/FilialFilter";
+import VendedorFilter from "@/components/filters/VendedorFilter";
 import ClientesTable from "@/components/clientes/ClientesTable";
 import type { ClienteItem } from "@/lib/repositories/clientes";
 import { getCurrentMonthRange } from "@/lib/utils/date";
@@ -22,6 +23,7 @@ async function fetchClientes(
   company: string,
   range: DateRangeValue,
   filial: string | null,
+  vendedor: string | null,
   searchTerm?: string | null,
 ): Promise<{ data: ClienteItem[]; count: number }> {
   const searchParams = new URLSearchParams({
@@ -32,6 +34,10 @@ async function fetchClientes(
 
   if (filial) {
     searchParams.set("filial", filial);
+  }
+
+  if (vendedor) {
+    searchParams.set("vendedor", vendedor);
   }
 
   if (searchTerm && searchTerm.trim().length >= 2) {
@@ -68,6 +74,7 @@ export default function ClientesPage({
 
   const [range, setRange] = useState<DateRangeValue>(initialRange);
   const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
+  const [selectedVendedor, setSelectedVendedor] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [data, setData] = useState<ClienteItem[]>([]);
   const [count, setCount] = useState<number>(0);
@@ -76,8 +83,8 @@ export default function ClientesPage({
 
   const rangeKey = useMemo(
     () =>
-      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}::${searchTerm.trim()}`,
-    [range.startDate, range.endDate, selectedFilial, searchTerm]
+      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}::${selectedVendedor ?? 'all'}::${searchTerm.trim()}`,
+    [range.startDate, range.endDate, selectedFilial, selectedVendedor, searchTerm]
   );
 
   useEffect(() => {
@@ -91,6 +98,7 @@ export default function ClientesPage({
           companyKey,
           range,
           selectedFilial,
+          selectedVendedor,
           searchTerm.trim().length >= 2 ? searchTerm.trim() : null
         );
         if (active) {
@@ -117,7 +125,7 @@ export default function ClientesPage({
     return () => {
       active = false;
     };
-  }, [companyKey, range, rangeKey, selectedFilial, searchTerm]);
+  }, [companyKey, range, rangeKey, selectedFilial, selectedVendedor, searchTerm]);
 
   return (
     <div className={styles.wrapper}>
@@ -129,6 +137,13 @@ export default function ClientesPage({
             companyKey={companyKey}
             value={selectedFilial}
             onChange={setSelectedFilial}
+          />
+          <VendedorFilter
+            companyKey={companyKey}
+            value={selectedVendedor}
+            onChange={setSelectedVendedor}
+            range={range}
+            filial={selectedFilial}
           />
           <div className={styles.searchContainer}>
             <div className={styles.searchLabel}>Pesquisa</div>

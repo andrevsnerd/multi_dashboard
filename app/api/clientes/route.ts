@@ -8,6 +8,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const company = searchParams.get('company') ?? undefined;
   const filial = searchParams.get('filial');
+  const vendedor = searchParams.get('vendedor');
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
   const searchTerm = searchParams.get('searchTerm');
@@ -25,12 +26,14 @@ export async function GET(request: Request) {
       fetchClientes({
         company,
         filial: filial || null,
+        vendedor: vendedor || null,
         range,
         searchTerm: searchTerm || undefined,
       }),
       fetchClientesCount({
         company,
         filial: filial || null,
+        vendedor: vendedor || null,
         range,
         searchTerm: searchTerm || undefined,
       }),
