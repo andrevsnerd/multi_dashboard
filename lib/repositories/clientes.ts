@@ -538,6 +538,241 @@ export async function fetchClientesCount({
   });
 }
 
+// Função para buscar a filial com mais cadastros no período
+export async function fetchTopFilialByClientes({
+  company,
+  filial,
+  vendedor,
+  range,
+  searchTerm,
+}: ClientesQueryParams = {}): Promise<{ filial: string; count: number } | null> {
+  return withRequest(async (request) => {
+    const parseDateToString = (dateStr: string | Date): string => {
+      if (dateStr instanceof Date) {
+        const year = dateStr.getFullYear();
+        const month = String(dateStr.getMonth() + 1).padStart(2, '0');
+        const day = String(dateStr.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+      
+      const d = new Date(dateStr);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
+    let startDateStr: string;
+    let endDateStr: string;
+    
+    if (range?.start && range?.end) {
+      const startDate = range.start instanceof Date ? range.start : new Date(range.start);
+      startDateStr = parseDateToString(startDate);
+      
+      const endDate = range.end instanceof Date ? range.end : new Date(range.end);
+      const endDatePlusOne = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() + 1);
+      endDateStr = parseDateToString(endDatePlusOne);
+    } else {
+      const defaultRange = getCurrentMonthRange();
+      startDateStr = parseDateToString(defaultRange.start);
+      const endDatePlusOne = new Date(defaultRange.end.getFullYear(), defaultRange.end.getMonth(), defaultRange.end.getDate() + 1);
+      endDateStr = parseDateToString(endDatePlusOne);
+    }
+    
+    request.input('startDate', sql.Date, startDateStr);
+    request.input('endDate', sql.Date, endDateStr);
+
+    const filialFilter = buildFilialFilter(
+      request,
+      company,
+      'sales',
+      filial,
+      'cv'
+    );
+
+    let vendedorFilter = '';
+    if (vendedor && vendedor.trim() !== '') {
+      const vendedorPattern = vendedor.trim();
+      request.input('vendedorFilter', sql.VarChar, vendedorPattern);
+      vendedorFilter = `AND (
+        LTRIM(RTRIM(CAST(cv.VENDEDOR AS VARCHAR))) = @vendedorFilter
+        OR LTRIM(RTRIM(ISNULL(lv.VENDEDOR_APELIDO, ISNULL(lv.NOME_VENDEDOR, '')))) = @vendedorFilter
+      )`;
+    }
+
+    let searchFilter = '';
+    if (searchTerm && searchTerm.trim().length >= 2) {
+      const searchPattern = `%${searchTerm.trim()}%`;
+      request.input('searchTerm', sql.VarChar, searchPattern);
+      searchFilter = `AND (
+        cv.CLIENTE_VAREJO LIKE @searchTerm 
+        OR ISNULL(lv.VENDEDOR_APELIDO, ISNULL(lv.NOME_VENDEDOR, cv.VENDEDOR)) LIKE @searchTerm
+      )`;
+    }
+
+    const topFilialQuery = `
+      SELECT TOP 1
+        LTRIM(RTRIM(cv.FILIAL)) AS filial,
+        COUNT(*) AS total
+      FROM CLIENTES_VAREJO cv WITH (NOLOCK)
+      LEFT JOIN LOJA_VENDEDORES lv WITH (NOLOCK)
+        ON LTRIM(RTRIM(CAST(cv.VENDEDOR AS VARCHAR))) = LTRIM(RTRIM(CAST(lv.VENDEDOR AS VARCHAR)))
+      WHERE CAST(cv.CADASTRAMENTO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(cv.CADASTRAMENTO AS DATE) < CAST(@endDate AS DATE)
+        ${filialFilter}
+        ${vendedorFilter}
+        ${searchFilter}
+      GROUP BY cv.FILIAL
+      ORDER BY COUNT(*) DESC
+    `;
+
+    try {
+      const result = await request.query<{
+        filial: string;
+        total: number;
+      }>(topFilialQuery);
+
+      if (result.recordset.length === 0) {
+        return null;
+      }
+
+      return {
+        filial: result.recordset[0].filial || '',
+        count: result.recordset[0].total || 0,
+      };
+    } catch (error) {
+      console.error('Erro ao buscar filial com mais cadastros:', error);
+      return null;
+    }
+  });
+}
+
+// Função para buscar contagem de clientes em período anterior (semana ou mês)
+export async function fetchClientesCountPreviousPeriod({
+  company,
+  filial,
+  vendedor,
+  range,
+  searchTerm,
+  periodType, // 'week' ou 'month'
+}: ClientesQueryParams & { periodType: 'week' | 'month' }): Promise<number> {
+  return withRequest(async (request) => {
+    const parseDateToString = (dateStr: string | Date): string => {
+      if (dateStr instanceof Date) {
+        const year = dateStr.getFullYear();
+        const month = String(dateStr.getMonth() + 1).padStart(2, '0');
+        const day = String(dateStr.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+      
+      const d = new Date(dateStr);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
+    // Calcular período anterior baseado no período atual
+    let startDate: Date;
+    let endDate: Date;
+    
+    if (range?.start && range?.end) {
+      startDate = range.start instanceof Date ? range.start : new Date(range.start);
+      endDate = range.end instanceof Date ? range.end : new Date(range.end);
+    } else {
+      const defaultRange = getCurrentMonthRange();
+      startDate = defaultRange.start;
+      endDate = defaultRange.end;
+    }
+    
+    // Calcular duração do período atual em dias
+    const periodDurationDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Calcular período anterior
+    let previousStartDate: Date;
+    let previousEndDate: Date;
+    
+    if (periodType === 'week') {
+      // Últimos 7 dias: do dia final do período até 7 dias atrás
+      const last7DaysEnd = new Date(endDate);
+      const last7DaysStart = new Date(endDate);
+      last7DaysStart.setDate(last7DaysStart.getDate() - 6); // 7 dias incluindo o dia final
+      
+      // Semana anterior: os 7 dias antes dos últimos 7 dias
+      previousEndDate = new Date(last7DaysStart);
+      previousEndDate.setDate(previousEndDate.getDate() - 1); // Um dia antes do início dos últimos 7 dias
+      previousStartDate = new Date(previousEndDate);
+      previousStartDate.setDate(previousStartDate.getDate() - 6); // 7 dias antes
+    } else {
+      // Mês anterior: proporcional ao número de dias corridos do mês atual
+      // Calcular quantos dias já se passaram no mês atual
+      const currentMonthStart = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+      const daysInCurrentMonth = Math.ceil((endDate.getTime() - currentMonthStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      
+      // Calcular o mês anterior proporcional
+      previousEndDate = new Date(startDate);
+      previousEndDate.setDate(previousEndDate.getDate() - 1); // Um dia antes do início atual
+      previousStartDate = new Date(previousEndDate);
+      previousStartDate.setDate(1); // Primeiro dia do mês anterior
+      
+      // Ajustar para ter o mesmo número de dias do mês atual
+      const previousMonthEndAdjusted = new Date(previousStartDate);
+      previousMonthEndAdjusted.setDate(Math.min(daysInCurrentMonth, previousEndDate.getDate()));
+      previousEndDate = previousMonthEndAdjusted;
+    }
+    
+    const startDateStr = parseDateToString(previousStartDate);
+    const endDatePlusOne = new Date(previousEndDate.getFullYear(), previousEndDate.getMonth(), previousEndDate.getDate() + 1);
+    const endDateStr = parseDateToString(endDatePlusOne);
+    
+    request.input('startDate', sql.Date, startDateStr);
+    request.input('endDate', sql.Date, endDateStr);
+
+    const filialFilter = buildFilialFilter(
+      request,
+      company,
+      'sales',
+      filial,
+      'cv'
+    );
+
+    let vendedorFilter = '';
+    if (vendedor && vendedor.trim() !== '') {
+      const vendedorPattern = vendedor.trim();
+      request.input('vendedorFilter', sql.VarChar, vendedorPattern);
+      vendedorFilter = `AND (
+        LTRIM(RTRIM(CAST(cv.VENDEDOR AS VARCHAR))) = @vendedorFilter
+        OR LTRIM(RTRIM(ISNULL(lv.VENDEDOR_APELIDO, ISNULL(lv.NOME_VENDEDOR, '')))) = @vendedorFilter
+      )`;
+    }
+
+    let searchFilter = '';
+    if (searchTerm && searchTerm.trim().length >= 2) {
+      const searchPattern = `%${searchTerm.trim()}%`;
+      request.input('searchTerm', sql.VarChar, searchPattern);
+      searchFilter = `AND (
+        cv.CLIENTE_VAREJO LIKE @searchTerm 
+        OR ISNULL(lv.VENDEDOR_APELIDO, ISNULL(lv.NOME_VENDEDOR, cv.VENDEDOR)) LIKE @searchTerm
+      )`;
+    }
+
+    const countQuery = `
+      SELECT COUNT(*) AS total
+      FROM CLIENTES_VAREJO cv WITH (NOLOCK)
+      LEFT JOIN LOJA_VENDEDORES lv WITH (NOLOCK)
+        ON LTRIM(RTRIM(CAST(cv.VENDEDOR AS VARCHAR))) = LTRIM(RTRIM(CAST(lv.VENDEDOR AS VARCHAR)))
+      WHERE CAST(cv.CADASTRAMENTO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(cv.CADASTRAMENTO AS DATE) < CAST(@endDate AS DATE)
+        ${filialFilter}
+        ${vendedorFilter}
+        ${searchFilter}
+    `;
+
+    const result = await request.query<{ total: number }>(countQuery);
+    return result.recordset[0]?.total || 0;
+  });
+}
+
 // Função para buscar lista de vendedores únicos que cadastraram clientes no período
 export async function fetchVendedoresList({
   company,
