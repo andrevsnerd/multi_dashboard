@@ -252,7 +252,12 @@ export default function ClientesTable({
           {sortedData.map((cliente, index) => (
             <div key={`${cliente.nomeCliente}-${cliente.filial}-${index}`} className={styles.card}>
               <div className={styles.cardHeader}>
-                <div className={styles.cardTitle}>{cliente.nomeCliente}</div>
+                <div className={styles.cardTitleRow}>
+                  <div className={styles.cardTitle}>{cliente.nomeCliente}</div>
+                  {cliente.cpf && (
+                    <span className={styles.cardCpfInline}>({formatCPF(cliente.cpf)})</span>
+                  )}
+                </div>
                 <div className={styles.cardDate}>{formatDate(cliente.data)}</div>
               </div>
               <div className={styles.cardContent}>
@@ -261,25 +266,19 @@ export default function ClientesTable({
                   <span className={styles.cardValue}>{formatTelefone(cliente.telefone) || '--'}</span>
                 </div>
                 <div className={styles.cardRow}>
-                  <span className={styles.cardLabel}>CPF:</span>
-                  <span className={styles.cardValue}>{formatCPF(cliente.cpf) || '--'}</span>
-                </div>
-                <div className={styles.cardRow}>
                   <span className={styles.cardLabel}>Endereço:</span>
-                  <span className={styles.cardValue}>{formatEndereco(cliente) || '--'}</span>
-                </div>
-                <div className={styles.cardRow}>
-                  <span className={styles.cardLabel}>Cidade:</span>
-                  <span className={styles.cardValue}>{cliente.cidade || '--'}</span>
+                  <span className={styles.cardValue}>
+                    {formatEndereco(cliente) || '--'}
+                    {cliente.cidade && (
+                      <span className={styles.cardCityInline}> ({cliente.cidade})</span>
+                    )}
+                  </span>
                 </div>
                 <div className={styles.cardRow}>
                   <span className={styles.cardLabel}>Vendedor:</span>
-                  <span className={styles.cardValue}>{cliente.vendedor}</span>
-                </div>
-                <div className={styles.cardRow}>
-                  <span className={styles.cardLabel}>Filial:</span>
                   <span className={styles.cardValue}>
-                    {getFilialDisplayName(cliente.filial)}
+                    {cliente.vendedor}
+                    <span className={styles.cardFilialInline}> {getFilialDisplayName(cliente.filial)}</span>
                   </span>
                 </div>
               </div>

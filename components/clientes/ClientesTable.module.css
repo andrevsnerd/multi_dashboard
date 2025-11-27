@@ -155,7 +155,7 @@
 }
 
 .card {
-  padding: 16px;
+  padding: 12px 16px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
   background: #ffffff;
   transition: background-color 0.2s;
@@ -173,16 +173,17 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   gap: 12px;
 }
 
-.cardTitle {
-  font-size: 15px;
-  font-weight: 600;
-  color: #0f172a;
-  line-height: 1.3;
+.cardTitleRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
   flex: 1;
+  min-width: 0;
 }
 
 .cardDate {
@@ -190,12 +191,26 @@
   color: #64748b;
   font-weight: 500;
   white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cardTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.cardCpfInline {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 400;
 }
 
 .cardContent {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .cardRow {
@@ -203,19 +218,34 @@
   align-items: flex-start;
   gap: 8px;
   font-size: 13px;
+  line-height: 1.4;
 }
 
 .cardLabel {
   font-weight: 600;
   color: #6b7280;
-  min-width: 80px;
+  min-width: 75px;
   flex-shrink: 0;
+  font-size: 12px;
 }
 
 .cardValue {
   color: #1f2937;
   flex: 1;
   word-break: break-word;
+  font-size: 13px;
+}
+
+.cardCityInline {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.cardFilialInline {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 400;
+  margin-left: 4px;
 }
 
 /* Mobile optimizations */
@@ -270,20 +300,37 @@
   }
 
   .card {
-    padding: 12px;
+    padding: 10px 14px;
   }
 
   .cardTitle {
     font-size: 14px;
   }
 
+  .cardCpfInline {
+    font-size: 10px;
+  }
+
   .cardRow {
     font-size: 12px;
+    gap: 6px;
   }
 
   .cardLabel {
     min-width: 70px;
+    font-size: 11px;
+  }
+
+  .cardValue {
     font-size: 12px;
+  }
+
+  .cardCityInline {
+    font-size: 11px;
+  }
+
+  .cardFilialInline {
+    font-size: 10px;
   }
 }
 
