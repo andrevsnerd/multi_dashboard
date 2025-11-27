@@ -134,20 +134,17 @@ export default function GoalCard({
                 </span>
               ) : (
                 <span className={styles.projectionBadge}>
-                  <svg 
-                    width="12" 
-                    height="12" 
-                    viewBox="0 0 12 12" 
-                    fill="none" 
-                    xmlns="http://www.w3.org/2000/svg"
-                    className={styles.projectionIcon}
-                  >
-                    <path 
-                      d="M6 10L3 6.5H5V2H7V6.5H9L6 10Z" 
-                      fill="currentColor"
-                    />
-                  </svg>
-                  {Math.round(projectionStatus.differencePercentage)}%
+                  {(() => {
+                    const percent = projectionStatus.projectionPercentage;
+                    if (percent >= 1) {
+                      return Math.round(percent);
+                    } else if (percent >= 0.1) {
+                      return percent.toFixed(1);
+                    } else if (percent > 0) {
+                      return '<0.1';
+                    }
+                    return '0';
+                  })()}%
                 </span>
               )}
             </div>
