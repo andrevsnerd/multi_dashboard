@@ -29,17 +29,18 @@ export default function Sidebar({ companyName }: SidebarProps) {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Extrair o caminho base da empresa (remover /estoque-por-filial, /produtos, /produto-detalhado e /vendedores se estiver presente)
+  // Extrair o caminho base da empresa (remover /estoque-por-filial, /produtos, /produto-detalhado, /vendedores e /clientes se estiver presente)
   const getBasePath = () => {
     if (!pathname || pathname === "/") {
       return "/";
     }
-    // Remove /estoque-por-filial, /produtos, /produto-detalhado e /vendedores do final do pathname se existir
+    // Remove /estoque-por-filial, /produtos, /produto-detalhado, /vendedores e /clientes do final do pathname se existir
     return pathname
       .replace(/\/estoque-por-filial$/, "")
       .replace(/\/produto-detalhado$/, "")
       .replace(/\/produtos$/, "")
-      .replace(/\/vendedores$/, "");
+      .replace(/\/vendedores$/, "")
+      .replace(/\/clientes$/, "");
   };
 
   const basePath = getBasePath();
@@ -65,12 +66,18 @@ export default function Sidebar({ companyName }: SidebarProps) {
     ? `${basePath}/vendedores`
     : "/vendedores";
 
+  // Construir o link para clientes baseado no caminho base
+  const clientesHref = basePath && basePath !== "/" 
+    ? `${basePath}/clientes`
+    : "/clientes";
+
   const navItems = [
     { label: "Home", href: "/" },
     { label: "Dashboard", href: basePath },
     { label: "Produtos", href: produtosHref },
     { label: "Produto Detalhado", href: produtoDetalhadoHref },
     { label: "Vendedores", href: vendedoresHref },
+    { label: "Clientes", href: clientesHref },
     // TODO: Descomentar quando estoque por filial estiver pronto
     // { label: "Estoque por Filial", href: stockByFilialHref },
   ];
@@ -133,12 +140,13 @@ export default function Sidebar({ companyName }: SidebarProps) {
               // Home só está ativo na raiz
               isActive = pathname === "/";
             } else if (item.label === "Dashboard") {
-              // Dashboard está ativo quando está no caminho base (não em estoque-por-filial, produtos, produto-detalhado ou vendedores)
+              // Dashboard está ativo quando está no caminho base (não em estoque-por-filial, produtos, produto-detalhado, vendedores ou clientes)
               isActive = pathname === item.href && 
                 !pathname.includes("/estoque-por-filial") && 
                 !pathname.includes("/produtos") &&
                 !pathname.includes("/produto-detalhado") &&
-                !pathname.includes("/vendedores");
+                !pathname.includes("/vendedores") &&
+                !pathname.includes("/clientes");
             } else if (item.label === "Produtos") {
               // Produtos está ativo quando o pathname inclui /produtos mas não /produto-detalhado
               isActive = (pathname?.includes("/produtos") || pathname === item.href) && 
@@ -149,6 +157,9 @@ export default function Sidebar({ companyName }: SidebarProps) {
             } else if (item.label === "Vendedores") {
               // Vendedores está ativo quando o pathname inclui /vendedores
               isActive = pathname?.includes("/vendedores") || pathname === item.href;
+            } else if (item.label === "Clientes") {
+              // Clientes está ativo quando o pathname inclui /clientes
+              isActive = pathname?.includes("/clientes") || pathname === item.href;
             }
             // TODO: Descomentar quando estoque por filial estiver pronto
             // else if (item.label === "Estoque por Filial") {

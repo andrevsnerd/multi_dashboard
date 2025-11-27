@@ -1,0 +1,289 @@
+.wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  position: relative;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+  .container {
+    border-radius: 20px;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+  }
+}
+
+.container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+.table {
+  width: auto;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  table-layout: auto;
+}
+
+.table thead {
+  background-color: #f8f9fa;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.table th {
+  padding: 12px 10px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 11px;
+  color: #1f2937;
+  border-bottom: 2px solid #e5e7eb;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  min-width: fit-content;
+}
+
+.textHeader {
+  text-align: left !important;
+  min-width: 150px;
+}
+
+.dateHeader {
+  text-align: center !important;
+  min-width: 100px;
+}
+
+.table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #374151;
+  font-size: 13px;
+  vertical-align: middle;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.table th.textHeader,
+.table td.textCell {
+  padding-left: 16px;
+  padding-right: 16px;
+  text-align: left !important;
+}
+
+.table th.dateHeader,
+.table td.dateCell {
+  padding-left: 12px;
+  padding-right: 12px;
+  text-align: center !important;
+}
+
+.table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.sortable {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  transition: background-color 0.2s;
+}
+
+.sortable:hover {
+  background-color: #f1f5f9;
+}
+
+.sortIndicator {
+  margin-left: 4px;
+  font-size: 10px;
+  color: #6366f1;
+}
+
+.textCell {
+  text-align: left !important;
+}
+
+.dateCell {
+  text-align: center !important;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.loading,
+.empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+/* Mobile Cards */
+.mobileCards {
+  display: none;
+}
+
+.card {
+  padding: 16px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+  transition: background-color 0.2s;
+}
+
+.card:last-child {
+  border-bottom: none;
+}
+
+.card:active {
+  background-color: #f8fafc;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.cardTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.3;
+  flex: 1;
+}
+
+.cardDate {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.cardContent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cardRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.cardLabel {
+  font-weight: 600;
+  color: #6b7280;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.cardValue {
+  color: #1f2937;
+  flex: 1;
+  word-break: break-word;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .table {
+    display: none;
+  }
+
+  .mobileCards {
+    display: block;
+  }
+
+  .container {
+    padding: 0;
+    overflow: hidden;
+    border-radius: 20px;
+  }
+
+  .card:first-child {
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+  }
+
+  .card:last-child {
+    border-bottom-left-radius: 20px;
+    border-bottom-right-radius: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .table {
+    font-size: 11px;
+  }
+
+  .table th {
+    padding: 8px 6px;
+    font-size: 9px;
+  }
+
+  .table td {
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+
+  .textCell {
+    min-width: 120px;
+  }
+
+  .dateCell {
+    min-width: 80px;
+    font-size: 10px;
+  }
+
+  .card {
+    padding: 12px;
+  }
+
+  .cardTitle {
+    font-size: 14px;
+  }
+
+  .cardRow {
+    font-size: 12px;
+  }
+
+  .cardLabel {
+    min-width: 70px;
+    font-size: 12px;
+  }
+}
+
