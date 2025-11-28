@@ -156,6 +156,7 @@ export interface SummaryQueryParams {
   grades?: string[] | null;
   produtoId?: string;
   produtoSearchTerm?: string;
+  acimaDoTicket?: boolean; // Se true, filtra apenas vendas acima do preço sugerido
 }
 
 export interface SalesSummaryResult {
@@ -286,18 +287,19 @@ export async function fetchSalesSummary({
   grades,
   produtoId,
   produtoSearchTerm,
+  acimaDoTicket = false,
 }: SummaryQueryParams = {}): Promise<SalesSummaryResult> {
   // Se for e-commerce, usar função específica de e-commerce
   if (isEcommerceFilial(company, filial)) {
-    return fetchEcommerceSummary({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, produtoId, produtoSearchTerm });
+    return fetchEcommerceSummary({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, produtoId, produtoSearchTerm, acimaDoTicket });
   }
 
   // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
   if (shouldAggregateEcommerce(company, filial)) {
     // Buscar vendas normais (varejo) e ecommerce em paralelo
     const [salesResult, ecommerceResult] = await Promise.all([
-      fetchSalesSummary({ company, range, filial: VAREJO_VALUE, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, produtoId, produtoSearchTerm }),
-      fetchEcommerceSummary({ company, range, filial: null, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, produtoId, produtoSearchTerm }),
+      fetchSalesSummary({ company, range, filial: VAREJO_VALUE, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, produtoId, produtoSearchTerm, acimaDoTicket }),
+      fetchEcommerceSummary({ company, range, filial: null, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, produtoId, produtoSearchTerm, acimaDoTicket }),
     ]);
 
     // Agregar os resultados
@@ -480,10 +482,16 @@ export async function fetchSalesSummary({
     // Criar filtro de grupo para NERD (suporta múltiplos)
     let grupoFilter = '';
     let grupoJoin = '';
+    // Se acimaDoTicket estiver ativo, precisamos do JOIN com PRODUTOS mesmo sem filtro de grupo
+    if (acimaDoTicket && company !== 'scarfme') {
+      grupoJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
+    }
     const gruposList = grupos && grupos.length > 0 ? grupos : grupo ? [grupo] : [];
     if (company === 'nerd' && gruposList.length > 0) {
       const gruposNormalizados = gruposList.map(g => g.trim().toUpperCase());
-      grupoJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
+      if (!grupoJoin) {
+        grupoJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
+      }
       
       if (gruposNormalizados.length === 1) {
         request.input('grupo', sql.VarChar, gruposNormalizados[0]);
@@ -511,9 +519,11 @@ export async function fetchSalesSummary({
     let scarfmeJoin = '';
     
     if (company === 'scarfme') {
-      // Garantir que temos o JOIN com PRODUTOS se não tiver sido adicionado pelo grupo
-      if (!grupoJoin) {
+      // Garantir que temos o JOIN com PRODUTOS se não tiver sido adicionado pelo grupo ou acimaDoTicket
+      if (!grupoJoin && !acimaDoTicket) {
         scarfmeJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
+      } else if (acimaDoTicket && !grupoJoin) {
+        grupoJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
       }
       
       const linhasList = linhas && linhas.length > 0 ? linhas : linha ? [linha] : [];
@@ -606,6 +616,21 @@ export async function fetchSalesSummary({
       produtoFilter = `AND vp.DESC_PRODUTO LIKE @produtoSearchTerm`;
     }
 
+    // Se acimaDoTicket estiver ativo, filtrar apenas vendas onde PRECO_LIQUIDO > preço sugerido
+    let acimaDoTicketFilter = '';
+    if (acimaDoTicket) {
+      acimaDoTicketFilter = `AND p.PRECO_REPOSICAO_1 IS NOT NULL 
+         AND p.PRECO_REPOSICAO_1 > 0 
+         AND vp.PRECO_LIQUIDO > CAST(p.PRECO_REPOSICAO_1 AS DECIMAL(18, 2))`;
+      
+      // Para NERD, remover linha ASSISTENCIA nesta visão
+      if (company === 'nerd') {
+        acimaDoTicketFilter += `
+         AND UPPER(LTRIM(RTRIM(ISNULL(vp.LINHA, '')))) <> 'ASSISTENCIA'
+         AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) <> 'ASSISTENCIA'`;
+      }
+    }
+
     // Otimizar query usando uma única passada pela tabela com CASE para separar períodos
     // Isso é mais eficiente que UNION ALL com duas queries separadas
     const query = `
@@ -673,6 +698,7 @@ export async function fetchSalesSummary({
         ${subgrupoFilter}
         ${gradeFilter}
         ${produtoFilter}
+        ${acimaDoTicketFilter}
     `;
 
     const result = await request.query<{

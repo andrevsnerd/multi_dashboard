@@ -40,6 +40,7 @@ async function fetchProducts(
   subgrupos: string[],
   grades: string[],
   groupByColor: boolean,
+  acimaDoTicket: boolean,
   produtoId?: string | null,
   produtoSearchTerm?: string | null,
 ): Promise<ProductDetail[]> {
@@ -77,6 +78,10 @@ async function fetchProducts(
     searchParams.set("groupByColor", "true");
   }
 
+  if (acimaDoTicket) {
+    searchParams.set("acimaDoTicket", "true");
+  }
+
   if (produtoId) {
     searchParams.set("produtoId", produtoId);
   } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
@@ -107,6 +112,7 @@ async function fetchSummary(
   colecoes: string[],
   subgrupos: string[],
   grades: string[],
+  acimaDoTicket: boolean,
   produtoId?: string | null,
   produtoSearchTerm?: string | null,
 ): Promise<SalesSummary> {
@@ -139,6 +145,10 @@ async function fetchSummary(
   grades.forEach((grade) => {
     searchParams.append("grade", grade);
   });
+
+  if (acimaDoTicket) {
+    searchParams.set("acimaDoTicket", "true");
+  }
 
   if (produtoId) {
     searchParams.set("produtoId", produtoId);
@@ -207,6 +217,7 @@ export default function ProductsPage({
   const [selectedSubgrupos, setSelectedSubgrupos] = useState<string[]>([]);
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
   const [groupByColor, setGroupByColor] = useState(true);
+  const [acimaDoTicket, setAcimaDoTicket] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [selectedProductName, setSelectedProductName] = useState<string | null>(null);
@@ -539,8 +550,8 @@ export default function ProductsPage({
 
   const rangeKey = useMemo(
     () =>
-      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}::${selectedGrupos.join(',')}::${selectedLinhas.join(',')}::${selectedColecoes.join(',')}::${selectedSubgrupos.join(',')}::${selectedGrades.join(',')}::${groupByColor}::${selectedProductId ?? 'all'}::${searchTerm.trim()}`,
-    [range.startDate, range.endDate, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, groupByColor, selectedProductId, searchTerm]
+      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}::${selectedGrupos.join(',')}::${selectedLinhas.join(',')}::${selectedColecoes.join(',')}::${selectedSubgrupos.join(',')}::${selectedGrades.join(',')}::${groupByColor}::${acimaDoTicket}::${selectedProductId ?? 'all'}::${searchTerm.trim()}`,
+    [range.startDate, range.endDate, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, groupByColor, acimaDoTicket, selectedProductId, searchTerm]
   );
 
   useEffect(() => {
@@ -551,8 +562,8 @@ export default function ProductsPage({
       setError(null);
       try {
         const [productsData, summaryData] = await Promise.all([
-          fetchProducts(companyKey, range, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, groupByColor, selectedProductId, selectedProductId ? null : (searchTerm && searchTerm.trim().length >= 2 ? searchTerm.trim() : null)),
-          fetchSummary(companyKey, range, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, selectedProductId, selectedProductId ? null : (searchTerm && searchTerm.trim().length >= 2 ? searchTerm.trim() : null)),
+          fetchProducts(companyKey, range, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, groupByColor, acimaDoTicket, selectedProductId, selectedProductId ? null : (searchTerm && searchTerm.trim().length >= 2 ? searchTerm.trim() : null)),
+          fetchSummary(companyKey, range, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, acimaDoTicket, selectedProductId, selectedProductId ? null : (searchTerm && searchTerm.trim().length >= 2 ? searchTerm.trim() : null)),
         ]);
         if (active) {
           setData(productsData);
@@ -578,7 +589,7 @@ export default function ProductsPage({
     return () => {
       active = false;
     };
-  }, [companyKey, range, rangeKey, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades]);
+  }, [companyKey, range, rangeKey, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, acimaDoTicket]);
 
   return (
     <div className={styles.wrapper}>
@@ -762,6 +773,8 @@ export default function ProductsPage({
           summary={loading ? EMPTY_SUMMARY : summary}
           companyName={companyName}
           dateRange={range}
+          acimaDoTicket={acimaDoTicket}
+          filteredData={acimaDoTicket ? data : undefined}
         />
 
         <div className={styles.tableControls}>
@@ -774,9 +787,24 @@ export default function ProductsPage({
             />
             <span className={styles.switchText}>Por cor</span>
           </label>
+          <label className={styles.switchLabel}>
+            <input
+              type="checkbox"
+              className={styles.switch}
+              checked={acimaDoTicket}
+              onChange={(e) => setAcimaDoTicket(e.target.checked)}
+            />
+            <span className={styles.switchText}>Acima do ticket</span>
+          </label>
         </div>
 
-        <ProductsTable data={data} loading={loading} groupByColor={groupByColor} companyKey={companyKey} />
+        <ProductsTable 
+          data={data} 
+          loading={loading} 
+          groupByColor={groupByColor} 
+          companyKey={companyKey}
+          acimaDoTicket={acimaDoTicket}
+        />
       </div>
     </div>
   );

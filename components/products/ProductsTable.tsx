@@ -10,6 +10,7 @@ interface ProductsTableProps {
   loading?: boolean;
   groupByColor?: boolean;
   companyKey?: string;
+  acimaDoTicket?: boolean;
 }
 
 export default function ProductsTable({
@@ -17,6 +18,7 @@ export default function ProductsTable({
   loading,
   groupByColor = false,
   companyKey,
+  acimaDoTicket = false,
 }: ProductsTableProps) {
   const [sortColumn, setSortColumn] = useState<keyof ProductDetail>("totalRevenue");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -177,17 +179,6 @@ export default function ProductsTable({
                 )}
               </th>
               <th
-                className={`${styles.sortable} ${styles.varianceHeader}`}
-                onClick={() => handleSort("revenueVariance")}
-              >
-                VAR. %
-                {sortColumn === "revenueVariance" && (
-                  <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "↑" : "↓"}
-                  </span>
-                )}
-              </th>
-              <th
                 className={`${styles.sortable} ${styles.numberHeader}`}
                 onClick={() => handleSort("totalQuantity")}
               >
@@ -209,6 +200,19 @@ export default function ProductsTable({
                   </span>
                 )}
               </th>
+              {acimaDoTicket ? (
+                <>
+                  <th className={styles.currencyHeader}>
+                    PREÇO SUGERIDO
+                  </th>
+                  <th className={styles.currencyHeader}>
+                    DIFERENÇA
+                  </th>
+                  <th className={styles.currencyHeader}>
+                    DIFERENÇA TOTAL
+                  </th>
+                </>
+              ) : null}
               <th
                 className={`${styles.sortable} ${styles.currencyHeader}`}
                 onClick={() => handleSort("cost")}
@@ -220,17 +224,19 @@ export default function ProductsTable({
                   </span>
                 )}
               </th>
-              <th
-                className={`${styles.sortable} ${styles.markupHeader}`}
-                onClick={() => handleSort("markup")}
-              >
-                MARKUP
-                {sortColumn === "markup" && (
-                  <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "↑" : "↓"}
-                  </span>
-                )}
-              </th>
+              {!acimaDoTicket && (
+                <th
+                  className={`${styles.sortable} ${styles.markupHeader}`}
+                  onClick={() => handleSort("markup")}
+                >
+                  MARKUP
+                  {sortColumn === "markup" && (
+                    <span className={styles.sortIndicator}>
+                      {sortDirection === "asc" ? "↑" : "↓"}
+                    </span>
+                  )}
+                </th>
+              )}
               <th
                 className={`${styles.sortable} ${styles.numberHeader}`}
                 onClick={() => handleSort("stock")}
@@ -276,36 +282,31 @@ export default function ProductsTable({
                     </td>
                   )}
                   <td className={styles.currencyCell}>{formatCurrency(product.totalRevenue)}</td>
-                  <td className={styles.varianceCell}>
-                    {product.isNew ? (
-                      <span className={styles.newBadge}>NOVO</span>
-                    ) : (() => {
-                      const variance = formatVariance(product.revenueVariance, product.totalRevenue);
-                      return variance.text !== "--" ? (
-                        <span
-                          className={`${styles.varianceValue} ${
-                            variance.isPositive
-                              ? styles.variancePositive
-                              : variance.isNegative
-                                ? styles.varianceNegative
-                                : styles.varianceNeutral
-                          }`}
-                        >
-                          {variance.isPositive && "↑"}
-                          {variance.isNegative && "↓"}
-                          {variance.text}
-                        </span>
-                      ) : (
-                        "--"
-                      );
-                    })()}
-                  </td>
                   <td className={styles.numberCell}>{formatNumber(product.totalQuantity)}</td>
                   <td className={styles.currencyCell}>{formatCurrency(product.averagePrice)}</td>
+                  {acimaDoTicket ? (
+                    <>
+                      <td className={styles.currencyCell}>
+                        {product.suggestedPrice ? formatCurrency(product.suggestedPrice) : '--'}
+                      </td>
+                      <td className={styles.currencyCell}>
+                        {product.suggestedPrice
+                          ? formatCurrency(product.averagePrice - product.suggestedPrice)
+                          : '--'}
+                      </td>
+                      <td className={styles.currencyCell}>
+                        {product.suggestedPrice
+                          ? formatCurrency((product.averagePrice - product.suggestedPrice) * product.totalQuantity)
+                          : '--'}
+                      </td>
+                    </>
+                  ) : null}
                   <td className={styles.currencyCell}>{formatCurrency(product.cost)}</td>
-                  <td className={styles.markupCell}>
-                    <span className={styles.markupValue}>{formatMarkup(product.markup)}</span>
-                  </td>
+                  {!acimaDoTicket && (
+                    <td className={styles.markupCell}>
+                      <span className={styles.markupValue}>{formatMarkup(product.markup)}</span>
+                    </td>
+                  )}
                   <td className={styles.numberCell}>{formatNumber(product.stock)}</td>
                   {companyKey === "scarfme" && (
                     <td className={styles.numberCell}>
@@ -340,19 +341,6 @@ export default function ProductsTable({
                           {groupByColor && product.descCorProduto && (
                             <span className={styles.cardColor}>{product.descCorProduto}</span>
                           )}
-                          {!product.isNew && (
-                            <span
-                              className={`${styles.cardVariance} ${
-                                variance.isPositive
-                                  ? styles.variancePositive
-                                  : variance.isNegative
-                                    ? styles.varianceNegative
-                                    : styles.varianceNeutral
-                              }`}
-                            >
-                              {variance.text}
-                            </span>
-                          )}
                         </div>
                       </div>
                       <div className={styles.cardRevenue}>
@@ -380,9 +368,20 @@ export default function ProductsTable({
                         <span className={styles.cardPriceItem}>
                           <span className={styles.cardPriceLabel}>Preço:</span> {formatCurrency(product.averagePrice)}
                         </span>
-                        <span className={styles.cardPriceItem}>
-                          <span className={styles.cardPriceLabel}>Custo:</span> {formatCurrency(product.cost)}
-                        </span>
+                        {acimaDoTicket && product.suggestedPrice ? (
+                          <>
+                            <span className={styles.cardPriceItem}>
+                              <span className={styles.cardPriceLabel}>Preço Sugerido:</span> {formatCurrency(product.suggestedPrice)}
+                            </span>
+                            <span className={styles.cardPriceItem}>
+                              <span className={styles.cardPriceLabel}>Diferença:</span> {formatCurrency((product.averagePrice - product.suggestedPrice) * product.totalQuantity)}
+                            </span>
+                          </>
+                        ) : (
+                          <span className={styles.cardPriceItem}>
+                            <span className={styles.cardPriceLabel}>Custo:</span> {formatCurrency(product.cost)}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

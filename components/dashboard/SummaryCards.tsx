@@ -4,11 +4,15 @@ import { shiftRangeByMonths } from "@/lib/utils/date";
 
 import styles from "./SummaryCards.module.css";
 
+import type { ProductDetail } from "@/lib/repositories/products";
+
 interface SummaryCardsProps {
   summary: SalesSummary;
   companyName: string;
   periodLabel?: string;
   dateRange?: DateRangeValue;
+  acimaDoTicket?: boolean;
+  filteredData?: ProductDetail[];
 }
 
 type MetricFormatter = (value: number) => string;
@@ -70,6 +74,8 @@ export default function SummaryCards({
   companyName,
   periodLabel = "Mês atual",
   dateRange,
+  acimaDoTicket = false,
+  filteredData,
 }: SummaryCardsProps) {
   const trendClassMap: Record<
     ReturnType<typeof resolveChangeBadge>["trend"],
@@ -101,6 +107,39 @@ export default function SummaryCards({
     return `MÊS ANTERIOR (${startDay}-${endDay})`;
   })();
 
+  // Calcular diferenças quando "acima do ticket" estiver ativo
+  // A diferença é o valor adicional obtido por vender acima do preço sugerido
+  const calculateDifferences = () => {
+    if (!acimaDoTicket || !filteredData) {
+      return null;
+    }
+
+    let totalDifference = 0;
+    let totalQuantity = 0;
+    let totalRevenue = 0;
+
+    filteredData.forEach(product => {
+      if (product.suggestedPrice && product.averagePrice > product.suggestedPrice) {
+        // Diferença = (preço médio - preço sugerido) * quantidade total vendida
+        const difference = (product.averagePrice - product.suggestedPrice) * product.totalQuantity;
+        totalDifference += difference;
+        totalQuantity += product.totalQuantity;
+        totalRevenue += product.totalRevenue;
+      }
+    });
+
+    // Ticket médio da diferença = diferença total / quantidade total
+    const ticketMedioDifference = totalQuantity > 0 ? totalDifference / totalQuantity : 0;
+
+    return {
+      totalDifference,
+      totalQuantity,
+      ticketMedioDifference,
+    };
+  };
+
+  const differences = calculateDifferences();
+
   const items: Array<{
     label: string;
     metric: MetricSummary;
@@ -112,13 +151,15 @@ export default function SummaryCards({
       format: MetricFormatter;
       label: string;
     };
+    differenceValue?: number;
   }> = [
     {
       label: "Vendas Total",
       metric: summary.totalRevenue,
-      description: `${companyName} · ${periodLabel}`,
+      description: acimaDoTicket ? `DIFERENÇA · ${periodLabel}` : `${companyName} · ${periodLabel}`,
       format: formatCurrency,
       highlight: true,
+      differenceValue: differences?.totalDifference,
     },
     {
       label: "Produtos Vendidos",
@@ -129,8 +170,9 @@ export default function SummaryCards({
     {
       label: "Ticket Médio",
       metric: summary.averageTicket,
-      description: `${formatInteger(summary.totalTickets.currentValue)} tickets`,
+      description: acimaDoTicket ? "Diferença de ticket médio" : `${formatInteger(summary.totalTickets.currentValue)} tickets`,
       format: formatCurrency,
+      differenceValue: differences?.ticketMedioDifference,
     },
     {
       label: "Estoque Total",
@@ -176,7 +218,19 @@ export default function SummaryCards({
               )}
             </div>
 
-            {item.metric.changePercentage !== null && (
+            {acimaDoTicket && item.differenceValue !== undefined ? (
+              <>
+                <div className={styles.divider} aria-hidden />
+                <div className={styles.comparison}>
+                  <div className={styles.previous}>
+                    <span className={styles.previousLabel}>DIFERENÇA</span>
+                    <strong className={styles.previousValue}>
+                      {item.format(item.differenceValue)}
+                    </strong>
+                  </div>
+                </div>
+              </>
+            ) : item.metric.changePercentage !== null && (
               <>
                 <div className={styles.divider} aria-hidden />
                 <div className={styles.comparison}>

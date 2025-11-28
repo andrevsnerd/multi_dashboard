@@ -26,6 +26,7 @@ export interface ProductDetail {
   descCorProduto?: string | null; // Descrição da cor do produto
   grade?: string | null; // Grade do produto (apenas para scarfme)
   estoqueRede?: number; // Estoque total em todas as filiais (apenas para scarfme)
+  suggestedPrice?: number | null; // Preço sugerido (REVENDA da tabela PRODUTOS)
 }
 
 export interface ProductsQueryParams {
@@ -48,6 +49,7 @@ export interface ProductsQueryParams {
   groupByColor?: boolean; // Se true, agrupa produtos por cor
   produtoId?: string;
   produtoSearchTerm?: string;
+  acimaDoTicket?: boolean; // Se true, filtra apenas vendas acima do preço sugerido
 }
 
 function resolveRange(range?: { start?: string | Date; end?: string | Date }) {
@@ -395,17 +397,18 @@ export async function fetchProductsWithDetails({
   groupByColor = false,
   produtoId,
   produtoSearchTerm,
+  acimaDoTicket = false,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   // Se for e-commerce, usar função específica de e-commerce
   if (isEcommerceFilial(company, filial)) {
-    return fetchProductsWithDetailsEcommerce({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm });
+    return fetchProductsWithDetailsEcommerce({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm, acimaDoTicket });
   }
 
   // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
   if (company === 'scarfme' && filial === null) {
     const [salesProducts, ecommerceProducts] = await Promise.all([
-      fetchProductsWithDetailsSales({ company, range, filial: VAREJO_VALUE, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm }),
-      fetchProductsWithDetailsEcommerce({ company, range, filial: null, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm }),
+      fetchProductsWithDetailsSales({ company, range, filial: VAREJO_VALUE, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm, acimaDoTicket }),
+      fetchProductsWithDetailsEcommerce({ company, range, filial: null, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm, acimaDoTicket }),
     ]);
 
     // Agregar produtos por productId (e cor se groupByColor estiver ativo)
@@ -472,7 +475,7 @@ export async function fetchProductsWithDetails({
   }
 
   // Função normal para vendas de loja
-  return fetchProductsWithDetailsSales({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm });
+  return fetchProductsWithDetailsSales({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm, acimaDoTicket });
 }
 
 /**
@@ -495,6 +498,7 @@ async function fetchProductsWithDetailsSales({
   groupByColor = false,
   produtoId,
   produtoSearchTerm,
+  acimaDoTicket = false,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   return withRequest(async (request) => {
     const { start, end } = resolveRange(range);
@@ -539,6 +543,23 @@ async function fetchProductsWithDetailsSales({
       : '';
 
     // Query para período atual
+    // Se acimaDoTicket estiver ativo, filtrar apenas vendas individuais onde PRECO_LIQUIDO > preço sugerido
+    const suggestedPriceField = 'CASE WHEN p.PRECO_REPOSICAO_1 IS NULL OR p.PRECO_REPOSICAO_1 = 0 THEN NULL ELSE CAST(p.PRECO_REPOSICAO_1 AS DECIMAL(18, 2)) END';
+    
+    let acimaDoTicketFilter = '';
+    if (acimaDoTicket) {
+      acimaDoTicketFilter = `AND p.PRECO_REPOSICAO_1 IS NOT NULL 
+         AND p.PRECO_REPOSICAO_1 > 0 
+         AND vp.PRECO_LIQUIDO > CAST(p.PRECO_REPOSICAO_1 AS DECIMAL(18, 2))`;
+      
+      // Para NERD, remover linha ASSISTENCIA nesta visão
+      if (company === 'nerd') {
+        acimaDoTicketFilter += `
+         AND UPPER(LTRIM(RTRIM(ISNULL(vp.LINHA, '')))) <> 'ASSISTENCIA'
+         AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) <> 'ASSISTENCIA'`;
+      }
+    }
+    
     const currentQuery = `
       SELECT 
         vp.PRODUTO AS productId,
@@ -558,7 +579,8 @@ async function fetchProductsWithDetailsSales({
             WHEN vp.QTDE_CANCELADA > 0 THEN NULL
             ELSE vp.CUSTO
           END
-        ) AS cost
+        ) AS cost,
+        MAX(${suggestedPriceField}) AS suggestedPrice
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       ${groupByColor ? 'LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR' : ''}
@@ -572,7 +594,9 @@ async function fetchProductsWithDetailsSales({
         ${subgrupoFilter}
         ${gradeFilter}
         ${produtoFilter}
+        ${acimaDoTicketFilter}
       GROUP BY ${groupByFields}
+      ${acimaDoTicket ? `HAVING MAX(${suggestedPriceField}) IS NOT NULL` : ''}
     `;
 
     // Query para período anterior
@@ -640,6 +664,7 @@ async function fetchProductsWithDetailsSales({
         totalRevenue: number | null;
         totalQuantity: number | null;
         cost: number | null;
+        suggestedPrice: number | null;
       }>(currentQuery),
       request.query<{
         productId: string;
@@ -679,6 +704,7 @@ async function fetchProductsWithDetailsSales({
       const revenue = Number(row.totalRevenue ?? 0);
       const quantity = Number(row.totalQuantity ?? 0);
       const cost = Number(row.cost ?? 0);
+      const suggestedPrice = row.suggestedPrice != null && row.suggestedPrice > 0 ? Number(row.suggestedPrice) : null;
       const grupo = (row.grupo && row.grupo.trim() !== '') ? row.grupo.trim() : null;
       
       // Obter chave para buscar dados do período anterior (inclui cor se groupByColor estiver ativo)
@@ -738,6 +764,7 @@ async function fetchProductsWithDetailsSales({
         descCorProduto,
         grade,
         estoqueRede: 0, // Será preenchido abaixo para scarfme
+        suggestedPrice,
       };
     });
 
@@ -928,6 +955,22 @@ async function fetchProductsWithDetailsEcommerce({
       : '';
 
     // Query para período atual
+    // Se acimaDoTicket estiver ativo, filtrar apenas vendas individuais onde PRECO > preço sugerido
+    const ecommerceSuggestedPriceField = 'CASE WHEN p.PRECO_REPOSICAO_1 IS NULL OR p.PRECO_REPOSICAO_1 = 0 THEN NULL ELSE CAST(p.PRECO_REPOSICAO_1 AS DECIMAL(18, 2)) END';
+    
+    let ecommerceAcimaDoTicketFilter = '';
+    if (acimaDoTicket) {
+      ecommerceAcimaDoTicketFilter = `AND p.PRECO_REPOSICAO_1 IS NOT NULL 
+         AND p.PRECO_REPOSICAO_1 > 0 
+         AND fp.PRECO > CAST(p.PRECO_REPOSICAO_1 AS DECIMAL(18, 2))`;
+      
+      // Para NERD, remover linha ASSISTENCIA nesta visão
+      if (company === 'nerd') {
+        ecommerceAcimaDoTicketFilter += `
+         AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) <> 'ASSISTENCIA'`;
+      }
+    }
+    
     const currentQuery = `
       SELECT 
         fp.PRODUTO AS productId,
@@ -936,7 +979,8 @@ async function fetchProductsWithDetailsEcommerce({
         ${ecommerceColorSelectFields}
         SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue,
         SUM(fp.QTDE) AS totalQuantity,
-        AVG(ISNULL(fp.CUSTO_NA_DATA, 0)) AS cost
+        AVG(ISNULL(fp.CUSTO_NA_DATA, 0)) AS cost,
+        MAX(${ecommerceSuggestedPriceField}) AS suggestedPrice
       FROM FATURAMENTO f WITH (NOLOCK)
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
@@ -951,7 +995,9 @@ async function fetchProductsWithDetailsEcommerce({
         ${subgrupoFilter}
         ${gradeFilter}
         ${produtoFilter}
+        ${ecommerceAcimaDoTicketFilter}
       GROUP BY ${ecommerceGroupByFields}
+      ${acimaDoTicket ? `HAVING MAX(${ecommerceSuggestedPriceField}) IS NOT NULL` : ''}
     `;
 
     // Query para período anterior
@@ -1016,6 +1062,7 @@ async function fetchProductsWithDetailsEcommerce({
         totalRevenue: number | null;
         totalQuantity: number | null;
         cost: number | null;
+        suggestedPrice: number | null;
       }>(currentQuery),
       request.query<{
         productId: string;
@@ -1055,6 +1102,7 @@ async function fetchProductsWithDetailsEcommerce({
       const revenue = Number(row.totalRevenue ?? 0);
       const quantity = Number(row.totalQuantity ?? 0);
       const cost = Number(row.cost ?? 0);
+      const suggestedPrice = row.suggestedPrice != null && row.suggestedPrice > 0 ? Number(row.suggestedPrice) : null;
       
       // Obter chave para buscar dados do período anterior (inclui cor se groupByColor estiver ativo)
       const previousKey = groupByColor && row.corProduto
@@ -1113,6 +1161,7 @@ async function fetchProductsWithDetailsEcommerce({
         descCorProduto,
         grade,
         estoqueRede: 0, // Será preenchido abaixo para scarfme
+        suggestedPrice,
       };
     });
 

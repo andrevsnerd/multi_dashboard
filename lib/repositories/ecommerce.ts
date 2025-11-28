@@ -184,6 +184,7 @@ export async function fetchEcommerceSummary({
   grades,
   produtoId,
   produtoSearchTerm,
+  acimaDoTicket = false,
 }: SummaryQueryParams = {}): Promise<SalesSummaryResult> {
   return withRequest(async (request) => {
     const currentRange = resolveRange(range);
@@ -288,6 +289,26 @@ export async function fetchEcommerceSummary({
       produtoFilter = `AND p.DESC_PRODUTO LIKE @produtoSearchTermEcommerce`;
     }
 
+    // Se acimaDoTicket estiver ativo, precisamos do JOIN com PRODUTOS
+    if (acimaDoTicket && !produtoJoin) {
+      produtoJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO`;
+    }
+    
+    // Filtro para acimaDoTicket - apenas vendas onde PRECO > preço sugerido
+    // No e-commerce, o preço unitário é fp.PRECO e o valor total é fp.VALOR_LIQUIDO
+    let acimaDoTicketFilter = '';
+    if (acimaDoTicket) {
+      acimaDoTicketFilter = `AND p.PRECO_REPOSICAO_1 IS NOT NULL 
+         AND p.PRECO_REPOSICAO_1 > 0 
+         AND fp.PRECO > CAST(p.PRECO_REPOSICAO_1 AS DECIMAL(18, 2))`;
+      
+      // Para NERD, remover linha ASSISTENCIA nesta visão
+      if (company === 'nerd') {
+        acimaDoTicketFilter += `
+         AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) <> 'ASSISTENCIA'`;
+      }
+    }
+
     // DEBUG: Log dos parâmetros e filtros
     console.log('[fetchEcommerceSummary] DEBUG - Parâmetros:', {
       company,
@@ -335,6 +356,7 @@ export async function fetchEcommerceSummary({
           ${subgrupoFilter}
           ${gradeFilter}
           ${produtoFilter}
+          ${acimaDoTicketFilter}
 
         UNION ALL
 
@@ -359,6 +381,7 @@ export async function fetchEcommerceSummary({
           ${subgrupoFilter}
           ${gradeFilter}
           ${produtoFilter}
+          ${acimaDoTicketFilter}
       )
       SELECT period, totalRevenue, totalQuantity, totalTickets, lastSaleDate, totalRows FROM summary;
     `;

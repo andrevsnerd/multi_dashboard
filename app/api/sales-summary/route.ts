@@ -18,6 +18,7 @@ export async function GET(request: Request) {
   const grades = searchParams.getAll('grade');
   const produtoId = searchParams.get('produtoId');
   const produtoSearchTerm = searchParams.get('produtoSearchTerm');
+  const acimaDoTicketParam = searchParams.get('acimaDoTicket');
   
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
@@ -30,6 +31,8 @@ export async function GET(request: Request) {
       : undefined;
 
   try {
+    const acimaDoTicket = acimaDoTicketParam === 'true';
+
     const {
       summary,
       currentPeriodLastSaleDate,
@@ -45,6 +48,7 @@ export async function GET(request: Request) {
       grades: grades.length > 0 ? grades : null,
       produtoId: produtoId || undefined,
       produtoSearchTerm: produtoSearchTerm || undefined,
+      acimaDoTicket,
     });
 
     return NextResponse.json({
