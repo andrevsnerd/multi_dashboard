@@ -164,3 +164,4 @@ SELECT
 2. **Vendedor:** Manter nome completo (JOIN) ou usar apenas código?
 3. **Campos:** Adicionar CELULAR e EMAIL na busca?
 
+

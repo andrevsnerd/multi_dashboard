@@ -318,3 +318,4 @@ FRONTEND (ClientesPage.tsx)
 
 **A lógica é baseada no seu script Python original e segue os mesmos princípios.**
 
+

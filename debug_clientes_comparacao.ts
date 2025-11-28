@@ -213,3 +213,4 @@ async function compararQueries() {
 // Executar
 compararQueries().catch(console.error);
 
+

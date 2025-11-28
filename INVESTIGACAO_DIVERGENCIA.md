@@ -91,3 +91,4 @@ Adicionei logs detalhados no código para investigar:
 - Clientes com nomes mal formatados sendo ignorados
 - Problema com o filtro de filial (mas já corrigimos com LTRIM/RTRIM)
 
+
