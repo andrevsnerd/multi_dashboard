@@ -27,6 +27,7 @@ export interface ProductDetail {
   grade?: string | null; // Grade do produto (apenas para scarfme)
   estoqueRede?: number; // Estoque total em todas as filiais (apenas para scarfme)
   suggestedPrice?: number | null; // Preço sugerido (REVENDA da tabela PRODUTOS)
+  registrationDate?: string | null; // Data de cadastramento do produto (DATA_CADASTRAMENTO)
 }
 
 export interface ProductsQueryParams {
@@ -50,6 +51,7 @@ export interface ProductsQueryParams {
   produtoId?: string;
   produtoSearchTerm?: string;
   acimaDoTicket?: boolean; // Se true, filtra apenas vendas acima do preço sugerido
+  filterByRegistrationDate?: boolean; // Se true, filtra produtos pela data de cadastramento ao invés da data de venda
 }
 
 function resolveRange(range?: { start?: string | Date; end?: string | Date }) {
@@ -398,17 +400,18 @@ export async function fetchProductsWithDetails({
   produtoId,
   produtoSearchTerm,
   acimaDoTicket = false,
+  filterByRegistrationDate = false,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   // Se for e-commerce, usar função específica de e-commerce
   if (isEcommerceFilial(company, filial)) {
-    return fetchProductsWithDetailsEcommerce({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm, acimaDoTicket });
+    return fetchProductsWithDetailsEcommerce({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm, acimaDoTicket, filterByRegistrationDate });
   }
 
   // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
   if (company === 'scarfme' && filial === null) {
     const [salesProducts, ecommerceProducts] = await Promise.all([
-      fetchProductsWithDetailsSales({ company, range, filial: VAREJO_VALUE, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm, acimaDoTicket }),
-      fetchProductsWithDetailsEcommerce({ company, range, filial: null, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm, acimaDoTicket }),
+      fetchProductsWithDetailsSales({ company, range, filial: VAREJO_VALUE, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm, acimaDoTicket, filterByRegistrationDate }),
+      fetchProductsWithDetailsEcommerce({ company, range, filial: null, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm, acimaDoTicket, filterByRegistrationDate }),
     ]);
 
     // Agregar produtos por productId (e cor se groupByColor estiver ativo)
@@ -475,7 +478,7 @@ export async function fetchProductsWithDetails({
   }
 
   // Função normal para vendas de loja
-  return fetchProductsWithDetailsSales({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm, acimaDoTicket });
+  return fetchProductsWithDetailsSales({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm, acimaDoTicket, filterByRegistrationDate });
 }
 
 /**
@@ -499,6 +502,7 @@ async function fetchProductsWithDetailsSales({
   produtoId,
   produtoSearchTerm,
   acimaDoTicket = false,
+  filterByRegistrationDate = false,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   return withRequest(async (request) => {
     const { start, end } = resolveRange(range);
@@ -560,13 +564,26 @@ async function fetchProductsWithDetailsSales({
       }
     }
     
-    const currentQuery = `
+    // Se filterByRegistrationDate for true, filtrar produtos pela data de cadastramento no período
+    // e ainda filtrar vendas pelo período também
+    const dateFilter = filterByRegistrationDate
+      ? `vp.DATA_VENDA >= @startDate
+        AND vp.DATA_VENDA < @endDate
+        AND p.DATA_CADASTRAMENTO >= @startDate
+        AND p.DATA_CADASTRAMENTO < @endDate
+        AND p.DATA_CADASTRAMENTO IS NOT NULL`
+      : `vp.DATA_VENDA >= @startDate
+        AND vp.DATA_VENDA < @endDate`;
+    
+    // Query base para produtos com vendas
+    let currentQuery = `
       SELECT 
         vp.PRODUTO AS productId,
         MAX(vp.DESC_PRODUTO) AS productName,
         MAX(COALESCE(vp.GRUPO_PRODUTO, p.GRUPO_PRODUTO, '')) AS grupo,
         ${gradeSelectField}
         ${colorSelectFields}
+        MAX(p.DATA_CADASTRAMENTO) AS registrationDate,
         SUM(
           CASE
             WHEN vp.QTDE_CANCELADA > 0 THEN 0
@@ -584,8 +601,7 @@ async function fetchProductsWithDetailsSales({
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       ${groupByColor ? 'LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR' : ''}
-      WHERE vp.DATA_VENDA >= @startDate
-        AND vp.DATA_VENDA < @endDate
+      WHERE ${dateFilter}
         AND vp.QTDE > 0
         ${filialFilter}
         ${grupoFilter}
@@ -598,6 +614,74 @@ async function fetchProductsWithDetailsSales({
       GROUP BY ${groupByFields}
       ${acimaDoTicket ? `HAVING MAX(${suggestedPriceField}) IS NOT NULL` : ''}
     `;
+
+    // Se filterByRegistrationDate estiver ativo, adicionar produtos sem venda no final
+    if (filterByRegistrationDate && !acimaDoTicket) {
+      // Função auxiliar para adaptar filtros para usar apenas tabela p (produtos sem venda)
+      const adaptFilterForProductsOnly = (filter: string): string => {
+        if (!filter) return '';
+        // Remover referências a vp. e manter apenas p.
+        return filter
+          .replace(/UPPER\(LTRIM\(RTRIM\(ISNULL\(vp\.([^,)]+), ''\)\)\)\)/g, 'UPPER(LTRIM(RTRIM(ISNULL(p.$1, \'\'))))')
+          .replace(/vp\.([A-Z_]+)/g, 'p.$1')
+          .replace(/OR UPPER\(LTRIM\(RTRIM\(ISNULL\(vp\.([^,)]+), ''\)\)\)\)/g, '');
+      };
+
+      let produtoSemVendaProdutoFilter = '';
+      
+      if (produtoId) {
+        produtoSemVendaProdutoFilter = `AND p.PRODUTO = @produtoId`;
+      } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
+        produtoSemVendaProdutoFilter = `AND p.DESC_PRODUTO LIKE @produtoSearchTerm`;
+      }
+
+      // Para produtos sem venda, não agrupamos por cor (não há vendas para diferenciar)
+      const produtoSemVendaColorFields = groupByColor
+        ? `NULL AS corProduto, NULL AS descCorProduto,`
+        : '';
+
+      // Adaptar filtros para usar apenas tabela p
+      const produtoSemVendaGrupoFilter = adaptFilterForProductsOnly(grupoFilter);
+      const produtoSemVendaLinhaFilter = adaptFilterForProductsOnly(linhaFilter);
+      const produtoSemVendaColecaoFilter = adaptFilterForProductsOnly(colecaoFilter);
+      const produtoSemVendaSubgrupoFilter = adaptFilterForProductsOnly(subgrupoFilter);
+      const produtoSemVendaGradeFilter = adaptFilterForProductsOnly(gradeFilter);
+
+      // Query para produtos cadastrados no período mas sem vendas
+      const produtosSemVendaQuery = `
+        UNION ALL
+        SELECT 
+          p.PRODUTO AS productId,
+          p.DESC_PRODUTO AS productName,
+          COALESCE(p.GRUPO_PRODUTO, '') AS grupo,
+          ${gradeSelectField}
+          ${produtoSemVendaColorFields}
+          p.DATA_CADASTRAMENTO AS registrationDate,
+          0 AS totalRevenue,
+          0 AS totalQuantity,
+          NULL AS cost,
+          ${suggestedPriceField} AS suggestedPrice
+        FROM PRODUTOS p WITH (NOLOCK)
+        LEFT JOIN W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp_check WITH (NOLOCK) 
+          ON p.PRODUTO = vp_check.PRODUTO
+          AND vp_check.DATA_VENDA >= @startDate
+          AND vp_check.DATA_VENDA < @endDate
+          AND vp_check.QTDE > 0
+          ${filialFilter.replace(/vp\./g, 'vp_check.')}
+        WHERE p.DATA_CADASTRAMENTO >= @startDate
+          AND p.DATA_CADASTRAMENTO < @endDate
+          AND p.DATA_CADASTRAMENTO IS NOT NULL
+          AND vp_check.PRODUTO IS NULL
+          ${produtoSemVendaGrupoFilter}
+          ${produtoSemVendaLinhaFilter}
+          ${produtoSemVendaColecaoFilter}
+          ${produtoSemVendaSubgrupoFilter}
+          ${produtoSemVendaGradeFilter}
+          ${produtoSemVendaProdutoFilter}
+      `;
+
+      currentQuery += produtosSemVendaQuery;
+    }
 
     // Query para período anterior
     const previousColorSelectFields = groupByColor
@@ -661,6 +745,7 @@ async function fetchProductsWithDetailsSales({
         grade?: string | null;
         corProduto?: string | null;
         descCorProduto?: string | null;
+        registrationDate?: string | Date | null;
         totalRevenue: number | null;
         totalQuantity: number | null;
         cost: number | null;
@@ -748,6 +833,16 @@ async function fetchProductsWithDetailsSales({
         ? (row.grade && row.grade.trim() !== '' ? row.grade.trim() : null)
         : undefined;
 
+      // Processar data de cadastramento
+      let registrationDate: string | null = null;
+      if (row.registrationDate) {
+        if (row.registrationDate instanceof Date) {
+          registrationDate = row.registrationDate.toISOString();
+        } else if (typeof row.registrationDate === 'string') {
+          registrationDate = row.registrationDate;
+        }
+      }
+
       return {
         productId: row.productId,
         productName: row.productName || 'Sem descrição',
@@ -765,6 +860,7 @@ async function fetchProductsWithDetailsSales({
         grade,
         estoqueRede: 0, // Será preenchido abaixo para scarfme
         suggestedPrice,
+        registrationDate,
       };
     });
 
@@ -804,7 +900,19 @@ async function fetchProductsWithDetailsSales({
       }
     }
 
-    return products.sort((a, b) => b.totalRevenue - a.totalRevenue);
+    // Ordenar produtos: quando filterByRegistrationDate está ativo, produtos sem venda vão para o final
+    return products.sort((a, b) => {
+      if (filterByRegistrationDate) {
+        // Produtos com venda primeiro (revenue > 0), depois produtos sem venda (revenue = 0)
+        const aHasRevenue = a.totalRevenue > 0;
+        const bHasRevenue = b.totalRevenue > 0;
+        if (aHasRevenue !== bHasRevenue) {
+          return aHasRevenue ? -1 : 1;
+        }
+      }
+      // Ordenar por revenue descendente
+      return b.totalRevenue - a.totalRevenue;
+    });
   });
 }
 
@@ -828,6 +936,8 @@ async function fetchProductsWithDetailsEcommerce({
   groupByColor = false,
   produtoId,
   produtoSearchTerm,
+  acimaDoTicket = false,
+  filterByRegistrationDate = false,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   return withRequest(async (request) => {
     const { start, end } = resolveRange(range);
@@ -971,12 +1081,14 @@ async function fetchProductsWithDetailsEcommerce({
       }
     }
     
-    const currentQuery = `
+    // Query base para produtos com vendas
+    let currentQuery = `
       SELECT 
         fp.PRODUTO AS productId,
         MAX(p.DESC_PRODUTO) AS productName,
         ${ecommerceGradeSelectField}
         ${ecommerceColorSelectFields}
+        MAX(p.DATA_CADASTRAMENTO) AS registrationDate,
         SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue,
         SUM(fp.QTDE) AS totalQuantity,
         AVG(ISNULL(fp.CUSTO_NA_DATA, 0)) AS cost,
@@ -985,10 +1097,18 @@ async function fetchProductsWithDetailsEcommerce({
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO
-      WHERE f.EMISSAO >= @startDate
+      WHERE ${filterByRegistrationDate
+        ? `f.EMISSAO >= @startDate
+        AND f.EMISSAO < @endDate
+        AND p.DATA_CADASTRAMENTO >= @startDate
+        AND p.DATA_CADASTRAMENTO < @endDate
+        AND p.DATA_CADASTRAMENTO IS NOT NULL
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')`
+        : `f.EMISSAO >= @startDate
         AND f.EMISSAO < @endDate
         AND f.NOTA_CANCELADA = 0
-        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')`}
         ${filialFilter}
         ${linhaFilter}
         ${colecaoFilter}
@@ -999,6 +1119,62 @@ async function fetchProductsWithDetailsEcommerce({
       GROUP BY ${ecommerceGroupByFields}
       ${acimaDoTicket ? `HAVING MAX(${ecommerceSuggestedPriceField}) IS NOT NULL` : ''}
     `;
+
+    // Se filterByRegistrationDate estiver ativo, adicionar produtos sem venda no final
+    if (filterByRegistrationDate && !acimaDoTicket) {
+      let produtoSemVendaProdutoFilter = '';
+      
+      if (produtoId) {
+        produtoSemVendaProdutoFilter = `AND p.PRODUTO = @produtoIdEcommerce`;
+      } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
+        produtoSemVendaProdutoFilter = `AND p.DESC_PRODUTO LIKE @produtoSearchTermEcommerce`;
+      }
+
+      // Para produtos sem venda, não agrupamos por cor (não há vendas para diferenciar)
+      const produtoSemVendaColorFields = groupByColor
+        ? `NULL AS corProduto,`
+        : '';
+
+      // Query para produtos cadastrados no período mas sem vendas de e-commerce
+      // Nota: Para produtos sem venda, não podemos filtrar por filial diretamente (não há vendas),
+      // então o filtro de filial é ignorado para produtos sem venda
+      const produtosSemVendaQuery = `
+        UNION ALL
+        SELECT 
+          p.PRODUTO AS productId,
+          p.DESC_PRODUTO AS productName,
+          ${ecommerceGradeSelectField}
+          ${produtoSemVendaColorFields}
+          p.DATA_CADASTRAMENTO AS registrationDate,
+          0 AS totalRevenue,
+          0 AS totalQuantity,
+          NULL AS cost,
+          ${ecommerceSuggestedPriceField} AS suggestedPrice
+        FROM PRODUTOS p WITH (NOLOCK)
+        LEFT JOIN FATURAMENTO f_check WITH (NOLOCK)
+          ON f_check.NOTA_CANCELADA = 0
+          AND f_check.NATUREZA_SAIDA IN ('100.02', '100.022')
+        LEFT JOIN W_FATURAMENTO_PROD_02 fp_check WITH (NOLOCK)
+          ON f_check.FILIAL = fp_check.FILIAL
+          AND f_check.NF_SAIDA = fp_check.NF_SAIDA
+          AND f_check.SERIE_NF = fp_check.SERIE_NF
+          AND fp_check.PRODUTO = p.PRODUTO
+          AND f_check.EMISSAO >= @startDate
+          AND f_check.EMISSAO < @endDate
+          ${filialFilter.replace(/f\./g, 'f_check.')}
+        WHERE p.DATA_CADASTRAMENTO >= @startDate
+          AND p.DATA_CADASTRAMENTO < @endDate
+          AND p.DATA_CADASTRAMENTO IS NOT NULL
+          AND fp_check.PRODUTO IS NULL
+          ${linhaFilter}
+          ${colecaoFilter}
+          ${subgrupoFilter}
+          ${gradeFilter}
+          ${produtoSemVendaProdutoFilter}
+      `;
+
+      currentQuery += produtosSemVendaQuery;
+    }
 
     // Query para período anterior
     const previousEcommerceColorSelectFields = groupByColor
@@ -1059,6 +1235,7 @@ async function fetchProductsWithDetailsEcommerce({
         productName: string;
         grade?: string | null;
         corProduto?: string | null;
+        registrationDate?: string | Date | null;
         totalRevenue: number | null;
         totalQuantity: number | null;
         cost: number | null;
@@ -1145,6 +1322,16 @@ async function fetchProductsWithDetailsEcommerce({
         ? (row.grade && row.grade.trim() !== '' ? row.grade.trim() : null)
         : undefined;
 
+      // Processar data de cadastramento
+      let registrationDate: string | null = null;
+      if (row.registrationDate) {
+        if (row.registrationDate instanceof Date) {
+          registrationDate = row.registrationDate.toISOString();
+        } else if (typeof row.registrationDate === 'string') {
+          registrationDate = row.registrationDate;
+        }
+      }
+
       return {
         productId: row.productId,
         productName: row.productName || 'Sem descrição',
@@ -1162,6 +1349,7 @@ async function fetchProductsWithDetailsEcommerce({
         grade,
         estoqueRede: 0, // Será preenchido abaixo para scarfme
         suggestedPrice,
+        registrationDate,
       };
     });
 
@@ -1203,7 +1391,19 @@ async function fetchProductsWithDetailsEcommerce({
       }
     }
 
-    return products.sort((a, b) => b.totalRevenue - a.totalRevenue);
+    // Ordenar produtos: quando filterByRegistrationDate está ativo, produtos sem venda vão para o final
+    return products.sort((a, b) => {
+      if (filterByRegistrationDate) {
+        // Produtos com venda primeiro (revenue > 0), depois produtos sem venda (revenue = 0)
+        const aHasRevenue = a.totalRevenue > 0;
+        const bHasRevenue = b.totalRevenue > 0;
+        if (aHasRevenue !== bHasRevenue) {
+          return aHasRevenue ? -1 : 1;
+        }
+      }
+      // Ordenar por revenue descendente
+      return b.totalRevenue - a.totalRevenue;
+    });
   });
 }
 

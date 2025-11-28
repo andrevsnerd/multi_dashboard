@@ -19,6 +19,7 @@ export async function GET(request: Request) {
   const produtoId = searchParams.get('produtoId');
   const produtoSearchTerm = searchParams.get('produtoSearchTerm');
   const acimaDoTicketParam = searchParams.get('acimaDoTicket');
+  const filterByRegistrationDateParam = searchParams.get('filterByRegistrationDate');
   
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
@@ -32,6 +33,7 @@ export async function GET(request: Request) {
 
   try {
     const acimaDoTicket = acimaDoTicketParam === 'true';
+    const filterByRegistrationDate = filterByRegistrationDateParam === 'true';
 
     const {
       summary,
@@ -49,6 +51,7 @@ export async function GET(request: Request) {
       produtoId: produtoId || undefined,
       produtoSearchTerm: produtoSearchTerm || undefined,
       acimaDoTicket,
+      filterByRegistrationDate,
     });
 
     return NextResponse.json({

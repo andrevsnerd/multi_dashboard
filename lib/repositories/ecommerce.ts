@@ -95,6 +95,8 @@ export interface SummaryQueryParams {
   grades?: string[] | null;
   produtoId?: string;
   produtoSearchTerm?: string;
+  acimaDoTicket?: boolean;
+  filterByRegistrationDate?: boolean; // Se true, filtra produtos pela data de cadastramento ao invés da data de venda
 }
 
 export interface SalesSummaryResult {
@@ -185,6 +187,7 @@ export async function fetchEcommerceSummary({
   produtoId,
   produtoSearchTerm,
   acimaDoTicket = false,
+  filterByRegistrationDate = false,
 }: SummaryQueryParams = {}): Promise<SalesSummaryResult> {
   return withRequest(async (request) => {
     const currentRange = resolveRange(range);
@@ -309,6 +312,20 @@ export async function fetchEcommerceSummary({
       }
     }
 
+    // Se filterByRegistrationDate estiver ativo, filtrar produtos pela data de cadastramento no período
+    // Usamos o mesmo filtro de cadastramento para ambos os períodos (current e previous)
+    // para comparar as vendas dos mesmos produtos em períodos diferentes
+    let registrationDateFilter = '';
+    if (filterByRegistrationDate) {
+      // Garantir que temos o JOIN com PRODUTOS
+      if (!produtoJoin) {
+        produtoJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO`;
+      }
+      registrationDateFilter = `AND p.DATA_CADASTRAMENTO >= @startDate
+        AND p.DATA_CADASTRAMENTO < @endDate
+        AND p.DATA_CADASTRAMENTO IS NOT NULL`;
+    }
+
     // DEBUG: Log dos parâmetros e filtros
     console.log('[fetchEcommerceSummary] DEBUG - Parâmetros:', {
       company,
@@ -357,6 +374,7 @@ export async function fetchEcommerceSummary({
           ${gradeFilter}
           ${produtoFilter}
           ${acimaDoTicketFilter}
+          ${registrationDateFilter}
 
         UNION ALL
 
@@ -382,6 +400,7 @@ export async function fetchEcommerceSummary({
           ${gradeFilter}
           ${produtoFilter}
           ${acimaDoTicketFilter}
+          ${registrationDateFilter}
       )
       SELECT period, totalRevenue, totalQuantity, totalTickets, lastSaleDate, totalRows FROM summary;
     `;
@@ -998,6 +1017,8 @@ export async function fetchEcommerceSummary({
       grade,
       grades,
       ecommerceOnly: !filial, // Se filial é null, buscar apenas filiais de e-commerce
+      filterByRegistrationDate,
+      registrationDateRange: filterByRegistrationDate ? currentRange : undefined,
     });
 
     const summary: SalesSummary = {

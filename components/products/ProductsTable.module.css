@@ -143,6 +143,20 @@
   background-color: #f9fafb;
 }
 
+.table tbody tr.noSaleRow {
+  position: relative;
+  border-left: 3px solid #fca5a5;
+}
+
+.table tbody tr.noSaleRow:hover {
+  background-color: #f9fafb;
+  border-left-color: #f87171;
+}
+
+.table tbody tr.noSaleRow td:first-child {
+  padding-left: 13px; /* Ajuste para compensar a borda */
+}
+
 .table tbody tr:last-child td {
   border-bottom: none;
 }
@@ -291,10 +305,32 @@
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
   background: #ffffff;
   transition: background-color 0.2s;
+  position: relative;
 }
 
 .card:last-child {
   border-bottom: none;
+}
+
+.card.noSaleCard {
+  border-left: 3px solid #fca5a5;
+  padding-left: 13px; /* Ajuste para compensar a borda */
+}
+
+.card.noSaleCard::before {
+  content: 'Sem venda';
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  font-size: 9px;
+  font-weight: 600;
+  color: #991b1b;
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  padding: 3px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  box-shadow: 0 1px 2px rgba(220, 38, 38, 0.1);
 }
 
 .card:active {
@@ -342,6 +378,14 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+
+.cardDate {
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  line-height: 1.3;
+  margin-bottom: 4px;
 }
 
 .cardProductCode {

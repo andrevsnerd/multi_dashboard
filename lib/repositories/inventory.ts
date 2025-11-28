@@ -264,6 +264,8 @@ export interface StockSummaryParams {
   ecommerceOnly?: boolean; // Se true e filial é null, buscar apenas filiais de e-commerce
   produtoId?: string;
   produtoSearchTerm?: string;
+  filterByRegistrationDate?: boolean; // Se true, filtra produtos pela data de cadastramento
+  registrationDateRange?: { start: Date; end: Date }; // Período para filtrar por data de cadastramento
 }
 
 export interface StockSummary {
@@ -292,6 +294,8 @@ export async function fetchStockSummary({
   ecommerceOnly = false,
   produtoId,
   produtoSearchTerm,
+  filterByRegistrationDate = false,
+  registrationDateRange,
 }: StockSummaryParams = {}): Promise<StockSummary> {
   return withRequest(async (request) => {
     // Criar filtro de grupo para NERD (suporta múltiplos)
@@ -418,7 +422,17 @@ export async function fetchStockSummary({
       produtoFilter = `AND p.DESC_PRODUTO LIKE @produtoSearchTermEstoque`;
     }
 
-    // CORREÇÃO: Quando há QUALQUER filtro de produto (coleção, linha, subgrupo, grade, produtoSearchTerm), usar INNER JOIN
+    // Filtro de data de cadastramento
+    let registrationDateFilter = '';
+    if (filterByRegistrationDate && registrationDateRange) {
+      request.input('registrationStartDate', sql.DateTime, registrationDateRange.start);
+      request.input('registrationEndDate', sql.DateTime, registrationDateRange.end);
+      registrationDateFilter = `AND p.DATA_CADASTRAMENTO >= @registrationStartDate
+        AND p.DATA_CADASTRAMENTO < @registrationEndDate
+        AND p.DATA_CADASTRAMENTO IS NOT NULL`;
+    }
+
+    // CORREÇÃO: Quando há QUALQUER filtro de produto (coleção, linha, subgrupo, grade, produtoSearchTerm, filterByRegistrationDate), usar INNER JOIN
     // para garantir que apenas produtos que existem em PRODUTOS e atendem aos filtros sejam incluídos
     // Isso evita incluir produtos sem os atributos filtrados ou produtos que não existem em PRODUTOS
     const hasProductFilter = !!(colecao || (colecoes && colecoes.length > 0) || 
@@ -426,7 +440,8 @@ export async function fetchStockSummary({
                                  subgrupo || (subgrupos && subgrupos.length > 0) || 
                                  grade || (grades && grades.length > 0) ||
                                  (company === 'nerd' && (grupo || (grupos && grupos.length > 0))) ||
-                                 (produtoSearchTerm && produtoSearchTerm.trim().length >= 2));
+                                 (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) ||
+                                 filterByRegistrationDate);
     const joinType = hasProductFilter ? 'INNER' : 'LEFT';
     
     // DEBUG: Log quando filial é VAREJO ou quando há filtros de produto
@@ -476,6 +491,7 @@ export async function fetchStockSummary({
         ${subgrupoFilter}
         ${gradeFilter}
         ${produtoFilter}
+        ${registrationDateFilter}
       GROUP BY e.PRODUTO
     `;
 
@@ -578,6 +594,7 @@ export async function fetchStockSummary({
           ${gradeFilter}
           ${grupoFilter}
           ${produtoFilter}
+          ${registrationDateFilter}
           AND e.ESTOQUE > 0
       `;
       
@@ -772,6 +789,7 @@ export async function fetchStockSummary({
           ${subgrupoFilter}
           ${gradeFilter}
           ${produtoFilter}
+          ${registrationDateFilter}
       `;
       
       const resultTotal = await request.query<{
@@ -804,6 +822,7 @@ export async function fetchStockSummary({
           ${subgrupoFilter}
           ${gradeFilter}
           ${produtoFilter}
+          ${registrationDateFilter}
           AND e.PRODUTO NOT IN (
             SELECT DISTINCT e2.PRODUTO
             FROM ESTOQUE_PRODUTOS e2 WITH (NOLOCK)
@@ -872,6 +891,7 @@ export async function fetchStockSummary({
             ${subgrupoFilter}
             ${gradeFilter}
             ${produtoFilter}
+            ${registrationDateFilter}
             AND e.ESTOQUE > 0
         `;
         

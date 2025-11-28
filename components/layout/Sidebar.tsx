@@ -16,6 +16,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
   const { isOpen, toggle, close } = useSidebar();
   const [isMobile, setIsMobile] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [produtosExpanded, setProdutosExpanded] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -29,15 +30,16 @@ export default function Sidebar({ companyName }: SidebarProps) {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Extrair o caminho base da empresa (remover /estoque-por-filial, /produtos, /produto-detalhado, /vendedores e /clientes se estiver presente)
+  // Extrair o caminho base da empresa (remover /estoque-por-filial, /produtos, /produtos-recentes, /produto-detalhado, /vendedores e /clientes se estiver presente)
   const getBasePath = () => {
     if (!pathname || pathname === "/") {
       return "/";
     }
-    // Remove /estoque-por-filial, /produtos, /produto-detalhado, /vendedores e /clientes do final do pathname se existir
+    // Remove /estoque-por-filial, /produtos, /produtos-recentes, /produto-detalhado, /vendedores e /clientes do final do pathname se existir
     return pathname
       .replace(/\/estoque-por-filial$/, "")
       .replace(/\/produto-detalhado$/, "")
+      .replace(/\/produtos-recentes$/, "")
       .replace(/\/produtos$/, "")
       .replace(/\/vendedores$/, "")
       .replace(/\/clientes$/, "");
@@ -71,11 +73,34 @@ export default function Sidebar({ companyName }: SidebarProps) {
     ? `${basePath}/clientes`
     : "/clientes";
 
+  // Construir o link para produtos recentes baseado no caminho base
+  const produtosRecentHref = basePath && basePath !== "/" 
+    ? `${basePath}/produtos-recentes`
+    : "/produtos-recentes";
+
+  // Verificar se está em alguma página relacionada a produtos
+  const isProdutosSubItemActive = pathname?.includes("/produto-detalhado") || pathname?.includes("/produtos-recentes");
+  const isProdutosPageActive = pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado");
+  const isAnyProdutosPage = isProdutosSubItemActive || isProdutosPageActive;
+  
+  // Expandir submenu de Produtos se estiver em qualquer página relacionada a produtos
+  useEffect(() => {
+    if (isAnyProdutosPage) {
+      setProdutosExpanded(true);
+    }
+  }, [isAnyProdutosPage]);
+
   const navItems = [
     { label: "Home", href: "/" },
     { label: "Dashboard", href: basePath },
-    { label: "Produtos", href: produtosHref },
-    { label: "Produto Detalhado", href: produtoDetalhadoHref },
+    { 
+      label: "Produtos", 
+      href: produtosHref,
+      subItems: [
+        { label: "Produto Detalhado", href: produtoDetalhadoHref },
+        { label: "Produtos por Cadastro", href: produtosRecentHref },
+      ]
+    },
     { label: "Vendedores", href: vendedoresHref },
     { label: "Clientes", href: clientesHref },
     // TODO: Descomentar quando estoque por filial estiver pronto
@@ -135,25 +160,35 @@ export default function Sidebar({ companyName }: SidebarProps) {
         <nav className={styles.nav}>
           {navItems.map((item) => {
             let isActive = false;
+            let hasActiveSubItem = false;
             
             if (item.label === "Home") {
               // Home só está ativo na raiz
               isActive = pathname === "/";
             } else if (item.label === "Dashboard") {
-              // Dashboard está ativo quando está no caminho base (não em estoque-por-filial, produtos, produto-detalhado, vendedores ou clientes)
+              // Dashboard está ativo quando está no caminho base (não em estoque-por-filial, produtos, produtos-recentes, produto-detalhado, vendedores ou clientes)
               isActive = pathname === item.href && 
                 !pathname.includes("/estoque-por-filial") && 
                 !pathname.includes("/produtos") &&
+                !pathname.includes("/produtos-recentes") &&
                 !pathname.includes("/produto-detalhado") &&
                 !pathname.includes("/vendedores") &&
                 !pathname.includes("/clientes");
             } else if (item.label === "Produtos") {
-              // Produtos está ativo quando o pathname inclui /produtos mas não /produto-detalhado
+              // Produtos está ativo quando o pathname inclui /produtos mas não /produtos-recentes nem /produto-detalhado
               isActive = (pathname?.includes("/produtos") || pathname === item.href) && 
+                !pathname?.includes("/produtos-recentes") &&
                 !pathname?.includes("/produto-detalhado");
-            } else if (item.label === "Produto Detalhado") {
-              // Produto Detalhado está ativo quando o pathname inclui /produto-detalhado
-              isActive = pathname?.includes("/produto-detalhado") || pathname === item.href;
+              
+              // Verificar se algum subitem está ativo
+              hasActiveSubItem = item.subItems?.some(subItem => {
+                if (subItem.label === "Produto Detalhado") {
+                  return pathname?.includes("/produto-detalhado");
+                } else if (subItem.label === "Produtos por Cadastro") {
+                  return pathname?.includes("/produtos-recentes");
+                }
+                return false;
+              }) || false;
             } else if (item.label === "Vendedores") {
               // Vendedores está ativo quando o pathname inclui /vendedores
               isActive = pathname?.includes("/vendedores") || pathname === item.href;
@@ -167,15 +202,85 @@ export default function Sidebar({ companyName }: SidebarProps) {
             //   isActive = pathname?.includes("/estoque-por-filial") || pathname === item.href;
             // }
             
+            const isProdutosItem = item.label === "Produtos" && item.subItems;
+            const isExpanded = isProdutosItem && (produtosExpanded || hasActiveSubItem);
+            
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
-                onClick={handleLinkClick}
-              >
-                <span className={styles.navLabel}>{item.label}</span>
-              </Link>
+              <div key={item.href || item.label}>
+                {isProdutosItem ? (
+                  <div className={styles.navGroup}>
+                    <div className={`${styles.navItem} ${styles.navItemWithSubmenu} ${(isActive || hasActiveSubItem) ? styles.navItemActive : ""}`}>
+                      <Link
+                        href={item.href!}
+                        className={styles.navLabel}
+                        onClick={() => {
+                          setProdutosExpanded(true);
+                          handleLinkClick();
+                        }}
+                      >
+                        {item.label}
+                      </Link>
+                      <button
+                        type="button"
+                        className={styles.submenuToggle}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setProdutosExpanded(!produtosExpanded);
+                        }}
+                        aria-label={isExpanded ? "Recolher submenu" : "Expandir submenu"}
+                      >
+                        <svg
+                          className={`${styles.submenuIcon} ${isExpanded ? styles.submenuIconExpanded : ""}`}
+                          width="16"
+                          height="16"
+                          viewBox="0 0 16 16"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M6 12L10 8L6 4"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                    {isExpanded && item.subItems && (
+                      <div className={styles.submenu}>
+                        {item.subItems.map((subItem) => {
+                          let isSubItemActive = false;
+                          if (subItem.label === "Produto Detalhado") {
+                            isSubItemActive = pathname?.includes("/produto-detalhado") || pathname === subItem.href;
+                          } else if (subItem.label === "Produtos por Cadastro") {
+                            isSubItemActive = pathname?.includes("/produtos-recentes") || pathname === subItem.href;
+                          }
+                          
+                          return (
+                            <Link
+                              key={subItem.href}
+                              href={subItem.href}
+                              className={`${styles.submenuItem} ${isSubItemActive ? styles.submenuItemActive : ""}`}
+                              onClick={handleLinkClick}
+                            >
+                              <span className={styles.submenuLabel}>{subItem.label}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <Link
+                    href={item.href!}
+                    className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
+                    onClick={handleLinkClick}
+                  >
+                    <span className={styles.navLabel}>{item.label}</span>
+                  </Link>
+                )}
+              </div>
             );
           })}
         </nav>

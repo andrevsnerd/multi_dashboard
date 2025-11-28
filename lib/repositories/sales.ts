@@ -157,6 +157,7 @@ export interface SummaryQueryParams {
   produtoId?: string;
   produtoSearchTerm?: string;
   acimaDoTicket?: boolean; // Se true, filtra apenas vendas acima do preço sugerido
+  filterByRegistrationDate?: boolean; // Se true, filtra produtos pela data de cadastramento ao invés da data de venda
 }
 
 export interface SalesSummaryResult {
@@ -288,18 +289,22 @@ export async function fetchSalesSummary({
   produtoId,
   produtoSearchTerm,
   acimaDoTicket = false,
+  filterByRegistrationDate = false,
 }: SummaryQueryParams = {}): Promise<SalesSummaryResult> {
+  // Resolver o range uma vez para usar em toda a função
+  const currentRange = resolveRange(range);
+  
   // Se for e-commerce, usar função específica de e-commerce
   if (isEcommerceFilial(company, filial)) {
-    return fetchEcommerceSummary({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, produtoId, produtoSearchTerm, acimaDoTicket });
+    return fetchEcommerceSummary({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, produtoId, produtoSearchTerm, acimaDoTicket, filterByRegistrationDate });
   }
 
   // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
   if (shouldAggregateEcommerce(company, filial)) {
     // Buscar vendas normais (varejo) e ecommerce em paralelo
     const [salesResult, ecommerceResult] = await Promise.all([
-      fetchSalesSummary({ company, range, filial: VAREJO_VALUE, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, produtoId, produtoSearchTerm, acimaDoTicket }),
-      fetchEcommerceSummary({ company, range, filial: null, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, produtoId, produtoSearchTerm, acimaDoTicket }),
+      fetchSalesSummary({ company, range, filial: VAREJO_VALUE, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, produtoId, produtoSearchTerm, acimaDoTicket, filterByRegistrationDate }),
+      fetchEcommerceSummary({ company, range, filial: null, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, produtoId, produtoSearchTerm, acimaDoTicket, filterByRegistrationDate }),
     ]);
 
     // Agregar os resultados
@@ -344,6 +349,8 @@ export async function fetchSalesSummary({
       colecoes,
       subgrupo,
       subgrupos,
+      filterByRegistrationDate,
+      registrationDateRange: filterByRegistrationDate ? currentRange : undefined,
       grade,
       grades,
       produtoId,
@@ -463,7 +470,6 @@ export async function fetchSalesSummary({
 
   // Função normal para vendas de loja
   return withRequest(async (request) => {
-    const currentRange = resolveRange(range);
     const { start, end } = currentRange;
     const previousRange = shiftRangeByMonths(currentRange, -1);
     
@@ -482,8 +488,8 @@ export async function fetchSalesSummary({
     // Criar filtro de grupo para NERD (suporta múltiplos)
     let grupoFilter = '';
     let grupoJoin = '';
-    // Se acimaDoTicket estiver ativo, precisamos do JOIN com PRODUTOS mesmo sem filtro de grupo
-    if (acimaDoTicket && company !== 'scarfme') {
+    // Se acimaDoTicket ou filterByRegistrationDate estiver ativo, precisamos do JOIN com PRODUTOS
+    if ((acimaDoTicket || filterByRegistrationDate) && company !== 'scarfme') {
       grupoJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
     }
     const gruposList = grupos && grupos.length > 0 ? grupos : grupo ? [grupo] : [];
@@ -519,10 +525,10 @@ export async function fetchSalesSummary({
     let scarfmeJoin = '';
     
     if (company === 'scarfme') {
-      // Garantir que temos o JOIN com PRODUTOS se não tiver sido adicionado pelo grupo ou acimaDoTicket
-      if (!grupoJoin && !acimaDoTicket) {
+      // Garantir que temos o JOIN com PRODUTOS se não tiver sido adicionado pelo grupo, acimaDoTicket ou filterByRegistrationDate
+      if (!grupoJoin && !acimaDoTicket && !filterByRegistrationDate) {
         scarfmeJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
-      } else if (acimaDoTicket && !grupoJoin) {
+      } else if ((acimaDoTicket || filterByRegistrationDate) && !grupoJoin) {
         grupoJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
       }
       
@@ -631,6 +637,18 @@ export async function fetchSalesSummary({
       }
     }
 
+    // Se filterByRegistrationDate estiver ativo, filtrar produtos pela data de cadastramento no período
+    let registrationDateFilter = '';
+    if (filterByRegistrationDate) {
+      // Garantir que temos o JOIN com PRODUTOS
+      if (!grupoJoin && !scarfmeJoin) {
+        grupoJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
+      }
+      registrationDateFilter = `AND p.DATA_CADASTRAMENTO >= @startDate
+        AND p.DATA_CADASTRAMENTO < @endDate
+        AND p.DATA_CADASTRAMENTO IS NOT NULL`;
+    }
+
     // Otimizar query usando uma única passada pela tabela com CASE para separar períodos
     // Isso é mais eficiente que UNION ALL com duas queries separadas
     const query = `
@@ -699,6 +717,7 @@ export async function fetchSalesSummary({
         ${gradeFilter}
         ${produtoFilter}
         ${acimaDoTicketFilter}
+        ${registrationDateFilter}
     `;
 
     const result = await request.query<{
@@ -775,6 +794,8 @@ export async function fetchSalesSummary({
       grades,
       produtoId,
       produtoSearchTerm,
+      filterByRegistrationDate,
+      registrationDateRange: filterByRegistrationDate ? currentRange : undefined,
     });
 
     const summary: SalesSummary = {

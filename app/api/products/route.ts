@@ -18,6 +18,7 @@ export async function GET(request: Request) {
   
   const groupByColorParam = searchParams.get('groupByColor');
   const acimaDoTicketParam = searchParams.get('acimaDoTicket');
+  const filterByRegistrationDateParam = searchParams.get('filterByRegistrationDate');
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
 
@@ -35,6 +36,7 @@ export async function GET(request: Request) {
 
   const groupByColor = groupByColorParam === 'true';
   const acimaDoTicket = acimaDoTicketParam === 'true';
+  const filterByRegistrationDate = filterByRegistrationDateParam === 'true';
 
   try {
     const data = await fetchProductsWithDetails({
@@ -50,6 +52,7 @@ export async function GET(request: Request) {
       produtoId: produtoId || undefined,
       produtoSearchTerm: produtoSearchTerm || undefined,
       acimaDoTicket,
+      filterByRegistrationDate,
     });
 
     return NextResponse.json({ data });

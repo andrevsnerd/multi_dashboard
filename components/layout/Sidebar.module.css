@@ -174,22 +174,124 @@
 }
 
 .navItem:hover {
-  background: rgba(15, 23, 42, 0.05);
-  color: #0f172a;
+  background: rgba(15, 23, 42, 0.03);
+  color: #475569;
 }
 
 .navItemActive {
-  background: rgba(15, 23, 42, 0.1);
+  background: rgba(15, 23, 42, 0.05);
   color: #0f172a;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .navItemActive:hover {
-  background: rgba(15, 23, 42, 0.1);
+  background: rgba(15, 23, 42, 0.08);
   color: #0f172a;
 }
 
 .navLabel {
+  flex: 1;
+  text-decoration: none;
+  color: inherit;
+}
+
+.navGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.navItemWithSubmenu {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.navItemWithSubmenu .navLabel {
+  flex: 1;
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.navItemWithSubmenu .navLabel:hover {
+  text-decoration: none;
+}
+
+.submenuToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: currentColor;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+
+.submenuToggle:hover {
+  background: rgba(15, 23, 42, 0.1);
+}
+
+.submenuToggle:active {
+  transform: scale(0.95);
+}
+
+.submenuIcon {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.2s ease;
+  color: currentColor;
+}
+
+.submenuIconExpanded {
+  transform: rotate(90deg);
+}
+
+.submenu {
+  display: flex;
+  flex-direction: column;
+  padding-left: 12px;
+  margin-top: 4px;
+  gap: 2px;
+}
+
+.submenuItem {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 6px;
+  text-decoration: none;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 400;
+  transition: all 0.2s;
+  margin-left: 8px;
+  border-left: 2px solid transparent;
+}
+
+.submenuItem:hover {
+  background: rgba(15, 23, 42, 0.03);
+  color: #475569;
+  border-left-color: rgba(15, 23, 42, 0.1);
+}
+
+.submenuItemActive {
+  background: rgba(15, 23, 42, 0.04);
+  color: #0f172a;
+  font-weight: 500;
+  border-left-color: rgba(15, 23, 42, 0.3);
+}
+
+.submenuItemActive:hover {
+  background: rgba(15, 23, 42, 0.06);
+  color: #0f172a;
+  border-left-color: rgba(15, 23, 42, 0.4);
+}
+
+.submenuLabel {
   flex: 1;
 }
 
