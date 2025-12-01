@@ -194,7 +194,18 @@ export function exportProductsToExcel(options: ExportProductsOptions): void {
       } else if (type === 'string') {
         row[dbName] = String(value);
       } else {
-        row[dbName] = value;
+        // Para date ou qualquer outro tipo (incluindo boolean), converter para string
+        // Se for uma data (objeto com toISOString), converter para ISO string
+        const valueAsAny = value as any;
+        if (type === 'date' && valueAsAny && typeof valueAsAny === 'object' && typeof valueAsAny.toISOString === 'function') {
+          try {
+            row[dbName] = valueAsAny.toISOString();
+          } catch {
+            row[dbName] = String(value);
+          }
+        } else {
+          row[dbName] = String(value);
+        }
       }
     });
 
