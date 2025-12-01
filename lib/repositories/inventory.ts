@@ -248,6 +248,150 @@ export async function fetchMultipleProductsStock(
   });
 }
 
+/**
+ * Busca o estoque de múltiplos produtos por produto e cor
+ * Retorna um mapa de "productId-corProduto" -> stock
+ * Se corProduto for null ou undefined, busca estoque total do produto (todas as cores)
+ * Processa em lotes para evitar exceder o limite de 2100 parâmetros do SQL Server
+ */
+export async function fetchMultipleProductsStockByColor(
+  products: Array<{ productId: string; corProduto?: string | null }>,
+  { company, filial, ecommerceOnly = false }: ProductStockParams = {}
+): Promise<Map<string, number>> {
+  if (products.length === 0) {
+    return new Map();
+  }
+
+  // Agrupar produtos por (productId, corProduto) e remover duplicatas
+  const productColorPairs = new Map<string, { productId: string; corProduto: string | null }>();
+  products.forEach((product) => {
+    const key = product.corProduto 
+      ? `${product.productId}-${product.corProduto}` 
+      : `${product.productId}-null`;
+    if (!productColorPairs.has(key)) {
+      productColorPairs.set(key, {
+        productId: product.productId,
+        corProduto: product.corProduto || null,
+      });
+    }
+  });
+
+  const pairsArray = Array.from(productColorPairs.values());
+  
+  // Processar em lotes para evitar exceder o limite de 2100 parâmetros
+  // Cada combinação produto+cor pode usar até 2 parâmetros (produto e cor)
+  // Usar lotes de 500 para garantir que não excedemos o limite (deixando margem para filtros de filial)
+  const BATCH_SIZE = 500;
+  const stockMap = new Map<string, number>();
+
+  // Processar em lotes
+  for (let i = 0; i < pairsArray.length; i += BATCH_SIZE) {
+    const batch = pairsArray.slice(i, i + BATCH_SIZE);
+    
+    const batchResult = await withRequest(async (request) => {
+      let filialFilter = '';
+      if (ecommerceOnly && !filial && company) {
+        // Buscar apenas filiais de e-commerce
+        const companyConfig = resolveCompany(company);
+        const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
+        if (ecommerceFilials.length > 0) {
+          ecommerceFilials.forEach((filial, index) => {
+            request.input(`estoqueEcommerceFilial${index}`, sql.VarChar, filial);
+          });
+          const placeholders = ecommerceFilials
+            .map((_, index) => `@estoqueEcommerceFilial${index}`)
+            .join(', ');
+          filialFilter = `AND e.FILIAL IN (${placeholders})`;
+        }
+      } else {
+        filialFilter = buildFilialFilter(request, company, filial);
+      }
+
+      // Criar condições WHERE para cada combinação de produto e cor no lote
+      const conditions: string[] = [];
+      let paramIndex = 0;
+
+      batch.forEach((pair) => {
+        const productParam = `productId${paramIndex}`;
+        request.input(productParam, sql.VarChar, pair.productId);
+        
+        if (pair.corProduto !== null) {
+          const colorParam = `corProduto${paramIndex}`;
+          request.input(colorParam, sql.VarChar, pair.corProduto);
+          conditions.push(`(e.PRODUTO = @${productParam} AND e.COR_PRODUTO = @${colorParam})`);
+        } else {
+          conditions.push(`(e.PRODUTO = @${productParam})`);
+        }
+        
+        paramIndex++;
+      });
+
+      // Construir WHERE clause
+      let whereClause = '';
+      if (conditions.length > 0) {
+        whereClause = `WHERE (${conditions.join(' OR ')})`;
+        if (filialFilter) {
+          whereClause += ` ${filialFilter}`;
+        }
+      } else if (filialFilter) {
+        // Se não há condições de produto/cor mas há filtro de filial
+        whereClause = `WHERE ${filialFilter.replace(/^AND /, '')}`;
+      }
+
+      const query = `
+        SELECT 
+          e.PRODUTO AS productId,
+          e.COR_PRODUTO AS corProduto,
+          SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS positiveStock,
+          SUM(CASE WHEN e.ESTOQUE < 0 THEN e.ESTOQUE ELSE 0 END) AS negativeStock,
+          COUNT(CASE WHEN e.ESTOQUE > 0 THEN 1 END) AS positiveCount
+        FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+        ${whereClause}
+        GROUP BY e.PRODUTO, e.COR_PRODUTO
+      `;
+
+      const result = await request.query<{
+        productId: string;
+        corProduto: string | null;
+        positiveStock: number | null;
+        negativeStock: number | null;
+        positiveCount: number | null;
+      }>(query);
+
+      return result.recordset;
+    });
+
+    // Processar resultados do lote
+    batchResult.forEach((row) => {
+      const positiveStock = Number(row.positiveStock ?? 0);
+      const negativeStock = Number(row.negativeStock ?? 0);
+      const positiveCount = Number(row.positiveCount ?? 0);
+      
+      // Se houver estoque positivo, usar apenas a soma dos positivos
+      // Caso contrário, usar a soma dos negativos
+      const finalStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
+      
+      // Chave: "productId-corProduto" ou "productId-null" se corProduto for null
+      const key = row.corProduto 
+        ? `${row.productId}-${row.corProduto}` 
+        : `${row.productId}-null`;
+      stockMap.set(key, finalStock);
+    });
+  }
+
+  // Garantir que todos os produtos tenham entrada no mapa (mesmo que com 0)
+  products.forEach((product) => {
+    const key = product.corProduto 
+      ? `${product.productId}-${product.corProduto}` 
+      : `${product.productId}-null`;
+    if (!stockMap.has(key)) {
+      stockMap.set(key, 0);
+    }
+  });
+
+  return stockMap;
+}
+
 export interface StockSummaryParams {
   company?: string;
   filial?: string | null;
