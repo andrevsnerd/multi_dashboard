@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "./SidebarContext";
@@ -17,6 +17,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [produtosExpanded, setProdutosExpanded] = useState(false);
+  const prevPathnameRef = useRef<string | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -79,24 +80,34 @@ export default function Sidebar({ companyName }: SidebarProps) {
     : "/produtos-recentes";
 
   // Verificar se está em alguma página relacionada a produtos
-  const isProdutosSubItemActive = pathname?.includes("/produto-detalhado") || pathname?.includes("/produtos-recentes");
+  const isProdutosSubItemActive = pathname?.includes("/produto-detalhado") || pathname?.includes("/produtos-recentes") || (pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado"));
   const isProdutosPageActive = pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado");
   const isAnyProdutosPage = isProdutosSubItemActive || isProdutosPageActive;
   
-  // Expandir submenu de Produtos se estiver em qualquer página relacionada a produtos
+  // Expandir submenu de Produtos automaticamente quando navegar para uma página de produtos
+  // Só expande quando o pathname muda (navegação), não a cada render
   useEffect(() => {
-    if (isAnyProdutosPage) {
-      setProdutosExpanded(true);
+    if (pathname && pathname !== prevPathnameRef.current) {
+      prevPathnameRef.current = pathname;
+      // Verificar se é uma página de produtos
+      const isProdutosSubItem = pathname?.includes("/produto-detalhado") || pathname?.includes("/produtos-recentes");
+      const isProdutosPage = pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado");
+      const isAnyProdutos = isProdutosSubItem || isProdutosPage;
+      
+      if (isAnyProdutos) {
+        setProdutosExpanded(true);
+      }
     }
-  }, [isAnyProdutosPage]);
+  }, [pathname]);
 
   const navItems = [
     { label: "Home", href: "/" },
     { label: "Dashboard", href: basePath },
     { 
       label: "Produtos", 
-      href: produtosHref,
+      href: undefined,
       subItems: [
+        { label: "Produtos por Venda", href: produtosHref },
         { label: "Produto Detalhado", href: produtoDetalhadoHref },
         { label: "Produtos por Cadastro", href: produtosRecentHref },
       ]
@@ -175,14 +186,14 @@ export default function Sidebar({ companyName }: SidebarProps) {
                 !pathname.includes("/vendedores") &&
                 !pathname.includes("/clientes");
             } else if (item.label === "Produtos") {
-              // Produtos está ativo quando o pathname inclui /produtos mas não /produtos-recentes nem /produto-detalhado
-              isActive = (pathname?.includes("/produtos") || pathname === item.href) && 
-                !pathname?.includes("/produtos-recentes") &&
-                !pathname?.includes("/produto-detalhado");
+              // Produtos não tem href próprio, apenas expande/recolhe o submenu
+              isActive = false;
               
               // Verificar se algum subitem está ativo
               hasActiveSubItem = item.subItems?.some(subItem => {
-                if (subItem.label === "Produto Detalhado") {
+                if (subItem.label === "Produtos por Venda") {
+                  return pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado");
+                } else if (subItem.label === "Produto Detalhado") {
                   return pathname?.includes("/produto-detalhado");
                 } else if (subItem.label === "Produtos por Cadastro") {
                   return pathname?.includes("/produtos-recentes");
@@ -203,23 +214,22 @@ export default function Sidebar({ companyName }: SidebarProps) {
             // }
             
             const isProdutosItem = item.label === "Produtos" && item.subItems;
-            const isExpanded = isProdutosItem && (produtosExpanded || hasActiveSubItem);
+            const isExpanded = isProdutosItem && produtosExpanded;
             
             return (
               <div key={item.href || item.label}>
                 {isProdutosItem ? (
                   <div className={styles.navGroup}>
-                    <div className={`${styles.navItem} ${styles.navItemWithSubmenu} ${(isActive || hasActiveSubItem) ? styles.navItemActive : ""}`}>
-                      <Link
-                        href={item.href!}
+                    <div className={`${styles.navItem} ${styles.navItemWithSubmenu} ${hasActiveSubItem ? styles.navItemActive : ""}`}>
+                      <button
+                        type="button"
                         className={styles.navLabel}
                         onClick={() => {
-                          setProdutosExpanded(true);
-                          handleLinkClick();
+                          setProdutosExpanded(!produtosExpanded);
                         }}
                       >
                         {item.label}
-                      </Link>
+                      </button>
                       <button
                         type="button"
                         className={styles.submenuToggle}
@@ -251,7 +261,9 @@ export default function Sidebar({ companyName }: SidebarProps) {
                       <div className={styles.submenu}>
                         {item.subItems.map((subItem) => {
                           let isSubItemActive = false;
-                          if (subItem.label === "Produto Detalhado") {
+                          if (subItem.label === "Produtos por Venda") {
+                            isSubItemActive = pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado");
+                          } else if (subItem.label === "Produto Detalhado") {
                             isSubItemActive = pathname?.includes("/produto-detalhado") || pathname === subItem.href;
                           } else if (subItem.label === "Produtos por Cadastro") {
                             isSubItemActive = pathname?.includes("/produtos-recentes") || pathname === subItem.href;

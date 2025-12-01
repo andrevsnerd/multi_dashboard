@@ -92,3 +92,4 @@ Adicionei logs detalhados no código para investigar:
 - Problema com o filtro de filial (mas já corrigimos com LTRIM/RTRIM)
 
 
+

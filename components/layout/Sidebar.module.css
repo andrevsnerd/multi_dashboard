@@ -193,6 +193,13 @@
   flex: 1;
   text-decoration: none;
   color: inherit;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: inherit;
+  font-weight: inherit;
+  padding: 0;
+  text-align: left;
 }
 
 .navGroup {
