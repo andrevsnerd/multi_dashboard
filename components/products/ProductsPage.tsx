@@ -13,6 +13,7 @@ import type { ProductDetail } from "@/lib/repositories/products";
 import type { SalesSummary } from "@/types/dashboard";
 import { getCurrentMonthRange } from "@/lib/utils/date";
 import type { CompanyKey } from "@/lib/config/company";
+import { exportProductsToExcel } from "@/lib/utils/exportProductsToExcel";
 
 import styles from "./ProductsPage.module.css";
 
@@ -757,6 +758,48 @@ export default function ProductsPage({
               </div>
             )}
           </div>
+          <button
+            type="button"
+            className={styles.exportButton}
+            onClick={() => {
+              exportProductsToExcel({
+                products: data,
+                summary,
+                companyKey,
+                companyName,
+                dateRange: range,
+                groupByColor,
+                acimaDoTicket,
+                filters: {
+                  filial: selectedFilial,
+                  grupos: selectedGrupos.length > 0 ? selectedGrupos : undefined,
+                  linhas: selectedLinhas.length > 0 ? selectedLinhas : undefined,
+                  colecoes: selectedColecoes.length > 0 ? selectedColecoes : undefined,
+                  subgrupos: selectedSubgrupos.length > 0 ? selectedSubgrupos : undefined,
+                  grades: selectedGrades.length > 0 ? selectedGrades : undefined,
+                },
+              });
+            }}
+            disabled={loading || data.length === 0}
+            title="Exportar produtos para Excel"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M8 2V11M8 11L5 8M8 11L11 8M2 14H14"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Exportar Excel
+          </button>
           {error ? <span className={styles.error}>{error}</span> : null}
         </div>
       </div>

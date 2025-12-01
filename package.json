@@ -19,12 +19,14 @@
     "react-date-range": "^2.0.1",
     "react-dom": "19.2.0",
     "recharts": "^3.4.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/xlsx": "^0.0.35",
     "eslint": "^9",
     "eslint-config-next": "16.0.2"
   }

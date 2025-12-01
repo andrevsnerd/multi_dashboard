@@ -232,6 +232,43 @@
   border-radius: 6px;
 }
 
+.exportButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  height: fit-content;
+}
+
+.exportButton:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #9ca3af;
+  color: #1f2937;
+}
+
+.exportButton:active:not(:disabled) {
+  background: #f3f4f6;
+  transform: translateY(1px);
+}
+
+.exportButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.exportButton svg {
+  flex-shrink: 0;
+}
+
 @media (max-width: 768px) {
   .wrapper {
     gap: 16px;

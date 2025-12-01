@@ -612,7 +612,13 @@ async function fetchProductsWithDetailsSales({
         ${produtoFilter}
         ${acimaDoTicketFilter}
       GROUP BY ${groupByFields}
-      ${acimaDoTicket ? `HAVING MAX(${suggestedPriceField}) IS NOT NULL` : ''}
+      ${acimaDoTicket ? `HAVING MAX(${suggestedPriceField}) IS NOT NULL 
+        AND (SUM(
+          CASE
+            WHEN vp.QTDE_CANCELADA > 0 THEN 0
+            ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
+          END
+        ) / NULLIF(SUM(vp.QTDE), 0)) > MAX(${suggestedPriceField})` : ''}
     `;
 
     // Se filterByRegistrationDate estiver ativo, adicionar produtos sem venda no final
@@ -900,8 +906,18 @@ async function fetchProductsWithDetailsSales({
       }
     }
 
+    // Filtrar produtos quando acimaDoTicket estiver ativo: apenas produtos com preço médio > preço sugerido
+    let filteredProducts = products;
+    if (acimaDoTicket) {
+      filteredProducts = products.filter(product => {
+        return product.suggestedPrice !== null 
+          && product.suggestedPrice > 0 
+          && product.averagePrice > product.suggestedPrice;
+      });
+    }
+
     // Ordenar produtos: quando filterByRegistrationDate está ativo, produtos sem venda vão para o final
-    return products.sort((a, b) => {
+    return filteredProducts.sort((a, b) => {
       if (filterByRegistrationDate) {
         // Produtos com venda primeiro (revenue > 0), depois produtos sem venda (revenue = 0)
         const aHasRevenue = a.totalRevenue > 0;
@@ -1117,7 +1133,8 @@ async function fetchProductsWithDetailsEcommerce({
         ${produtoFilter}
         ${ecommerceAcimaDoTicketFilter}
       GROUP BY ${ecommerceGroupByFields}
-      ${acimaDoTicket ? `HAVING MAX(${ecommerceSuggestedPriceField}) IS NOT NULL` : ''}
+      ${acimaDoTicket ? `HAVING MAX(${ecommerceSuggestedPriceField}) IS NOT NULL 
+        AND (SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) / NULLIF(SUM(fp.QTDE), 0)) > MAX(${ecommerceSuggestedPriceField})` : ''}
     `;
 
     // Se filterByRegistrationDate estiver ativo, adicionar produtos sem venda no final
@@ -1391,8 +1408,18 @@ async function fetchProductsWithDetailsEcommerce({
       }
     }
 
+    // Filtrar produtos quando acimaDoTicket estiver ativo: apenas produtos com preço médio > preço sugerido
+    let filteredProducts = products;
+    if (acimaDoTicket) {
+      filteredProducts = products.filter(product => {
+        return product.suggestedPrice !== null 
+          && product.suggestedPrice > 0 
+          && product.averagePrice > product.suggestedPrice;
+      });
+    }
+
     // Ordenar produtos: quando filterByRegistrationDate está ativo, produtos sem venda vão para o final
-    return products.sort((a, b) => {
+    return filteredProducts.sort((a, b) => {
       if (filterByRegistrationDate) {
         // Produtos com venda primeiro (revenue > 0), depois produtos sem venda (revenue = 0)
         const aHasRevenue = a.totalRevenue > 0;
