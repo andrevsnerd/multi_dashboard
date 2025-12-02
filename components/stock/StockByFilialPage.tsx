@@ -10,7 +10,6 @@ import StockByFilialTable from "@/components/stock/StockByFilialTable";
 import type { StockByFilialItem } from "@/lib/repositories/stockByFilial";
 import { getCurrentMonthRange } from "@/lib/utils/date";
 import type { CompanyKey } from "@/lib/config/company";
-import { generateStockActionsPDF } from "@/lib/utils/generateStockActionsPDF";
 
 import styles from "./StockByFilialPage.module.css";
 
@@ -195,20 +194,6 @@ export default function StockByFilialPage({
     return result;
   }, [data, showItemsWithoutSales, companyKey, linha, subgrupo, grade, colecao]);
 
-  const handleGeneratePDF = () => {
-    if (filteredData.length === 0) {
-      alert("Não há dados para gerar o relatório.");
-      return;
-    }
-    
-    try {
-      generateStockActionsPDF(filteredData, companyKey, companyName, range);
-    } catch (error) {
-      console.error("Erro ao gerar PDF:", error);
-      alert("Erro ao gerar PDF. Por favor, tente novamente.");
-    }
-  };
-
   return (
     <div className={styles.wrapper}>
       <div className={styles.header}>
@@ -243,14 +228,6 @@ export default function StockByFilialPage({
               />
             </>
           )}
-          <button
-            onClick={handleGeneratePDF}
-            className={styles.pdfButton}
-            disabled={loading || filteredData.length === 0}
-            title="Gerar PDF com ações de estoque"
-          >
-            📄 Gerar PDF de Ações
-          </button>
           {loading ? (
             <span className={styles.loading}>Carregando dados…</span>
           ) : null}

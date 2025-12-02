@@ -43,3 +43,4 @@ echo "   Para maior segurança, você pode restringir apenas aos IPs do Vercel"
 echo "   Editando a regra e mudando source-ranges"
 
 
+
