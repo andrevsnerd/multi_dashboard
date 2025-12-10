@@ -3,8 +3,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   transpilePackages: ["recharts"],
   // Configuração do Turbopack (Next.js 16+)
-  // Configuração vazia para silenciar o aviso - Turbopack funciona bem sem configuração customizada
-  turbopack: {},
+  // Define o diretório raiz do workspace para evitar avisos sobre múltiplos lockfiles
+  turbopack: {
+    root: __dirname,
+  },
   // Manter webpack config para builds de produção (quando não usar Turbopack)
   webpack: (config, { isServer }) => {
     // Resolver problemas com es-toolkit usado pelo recharts

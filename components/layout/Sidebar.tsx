@@ -36,14 +36,15 @@ export default function Sidebar({ companyName }: SidebarProps) {
     if (!pathname || pathname === "/") {
       return "/";
     }
-    // Remove /estoque-por-filial, /produtos, /produtos-recentes, /produto-detalhado, /vendedores e /clientes do final do pathname se existir
+    // Remove /estoque-por-filial, /produtos, /produtos-recentes, /produto-detalhado, /vendedores, /clientes e /exportar-relatorios do final do pathname se existir
     return pathname
       .replace(/\/estoque-por-filial$/, "")
       .replace(/\/produto-detalhado$/, "")
       .replace(/\/produtos-recentes$/, "")
       .replace(/\/produtos$/, "")
       .replace(/\/vendedores$/, "")
-      .replace(/\/clientes$/, "");
+      .replace(/\/clientes$/, "")
+      .replace(/\/exportar-relatorios$/, "");
   };
 
   const basePath = getBasePath();
@@ -78,6 +79,11 @@ export default function Sidebar({ companyName }: SidebarProps) {
   const produtosRecentHref = basePath && basePath !== "/" 
     ? `${basePath}/produtos-recentes`
     : "/produtos-recentes";
+
+  // Construir o link para exportar relatórios baseado no caminho base
+  const exportarRelatoriosHref = basePath && basePath !== "/" 
+    ? `${basePath}/exportar-relatorios`
+    : "/exportar-relatorios";
 
   // Verificar se está em alguma página relacionada a produtos
   const isProdutosSubItemActive = pathname?.includes("/produto-detalhado") || pathname?.includes("/produtos-recentes") || (pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado"));
@@ -114,6 +120,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     },
     { label: "Vendedores", href: vendedoresHref },
     { label: "Clientes", href: clientesHref },
+    { label: "Exportar Relatórios", href: exportarRelatoriosHref },
     // TODO: Descomentar quando estoque por filial estiver pronto
     // { label: "Estoque por Filial", href: stockByFilialHref },
   ];
@@ -184,7 +191,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
                 !pathname.includes("/produtos-recentes") &&
                 !pathname.includes("/produto-detalhado") &&
                 !pathname.includes("/vendedores") &&
-                !pathname.includes("/clientes");
+                !pathname.includes("/clientes") &&
+                !pathname.includes("/exportar-relatorios");
             } else if (item.label === "Produtos") {
               // Produtos não tem href próprio, apenas expande/recolhe o submenu
               isActive = false;
@@ -206,6 +214,9 @@ export default function Sidebar({ companyName }: SidebarProps) {
             } else if (item.label === "Clientes") {
               // Clientes está ativo quando o pathname inclui /clientes
               isActive = pathname?.includes("/clientes") || pathname === item.href;
+            } else if (item.label === "Exportar Relatórios") {
+              // Exportar Relatórios está ativo quando o pathname inclui /exportar-relatorios
+              isActive = pathname?.includes("/exportar-relatorios") || pathname === item.href;
             }
             // TODO: Descomentar quando estoque por filial estiver pronto
             // else if (item.label === "Estoque por Filial") {
