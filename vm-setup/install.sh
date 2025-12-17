@@ -59,7 +59,7 @@ if [ ! -f "$PROJECT_DIR/.env.local" ]; then
     echo -e "${YELLOW}📝 Criando arquivo .env.local de exemplo...${NC}"
     cat > "$PROJECT_DIR/.env.local" << EOF
 # Configurações do Banco de Dados
-DB_SERVER=189.126.197.82
+DB_SERVER=177.92.78.250
 DB_DATABASE=LINX_PRODUCAO
 DB_USERNAME=andre.nerd
 DB_PASSWORD=nerd123@
@@ -111,6 +111,7 @@ echo "  pm2 status          # Ver status"
 echo "  pm2 logs proxy-server  # Ver logs"
 echo "  pm2 restart proxy-server  # Reiniciar"
 echo "  pm2 stop proxy-server    # Parar"
+
 
 
 
