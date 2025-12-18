@@ -1,4 +1,5 @@
-import ExcelJS from 'exceljs';
+// @ts-ignore - xlsx não tem tipos perfeitos
+import * as XLSX from 'xlsx';
 import type { ProductDetail } from '@/lib/repositories/products';
 import type { SalesSummary } from '@/types/dashboard';
 import type { DateRangeValue } from '@/components/filters/DateRangeFilter';
@@ -115,7 +116,7 @@ export function exportProductsToExcel(options: ExportProductsOptions): void {
     filters,
   } = options;
 
-  const workbook = new ExcelJS.Workbook();
+  const workbook = XLSX.utils.book_new();
 
   // ===== ABA 1: KPIs =====
   const kpiData: Array<Record<string, string | number>> = [
@@ -169,14 +170,8 @@ export function exportProductsToExcel(options: ExportProductsOptions): void {
     kpiData.push({ Métrica: 'Acima do Ticket', Valor: acimaDoTicket ? 'Sim' : 'Não' });
   }
 
-  const kpiWorksheet = workbook.addWorksheet('KPIs');
-  kpiWorksheet.columns = [
-    { header: 'Métrica', key: 'Métrica', width: 40 },
-    { header: 'Valor', key: 'Valor', width: 20 },
-  ];
-  kpiData.forEach((row) => {
-    kpiWorksheet.addRow(row);
-  });
+  const kpiWorksheet = XLSX.utils.json_to_sheet(kpiData);
+  XLSX.utils.book_append_sheet(workbook, kpiWorksheet, 'KPIs');
 
   // ===== ABA 2: PRODUTOS =====
   const columnMapping = getColumnMapping(companyKey, groupByColor, acimaDoTicket);
@@ -231,54 +226,36 @@ export function exportProductsToExcel(options: ExportProductsOptions): void {
   });
 
   // Criar worksheet com os dados
-  const productsWorksheet = workbook.addWorksheet('Produtos');
+  const productsWorksheet = XLSX.utils.json_to_sheet(productsData);
 
-  // Preparar colunas
-  const columns = columnMapping.map(({ dbName }) => ({
-    header: dbName,
-    key: dbName,
-    width: Math.min(
-      Math.max(
-        dbName.length,
-        ...productsData.map((row) => {
-          const value = row[dbName];
-          return value ? String(value).length : 0;
-        })
-      ) + 2,
-      50
-    ),
-  }));
+  // Ajustar larguras das colunas
+  const columnWidths = columnMapping.map(({ dbName }) => {
+    // Calcular largura baseada no nome da coluna e no conteúdo
+    const maxLength = Math.max(
+      dbName.length,
+      ...productsData.map((row) => {
+        const value = row[dbName];
+        return value ? String(value).length : 0;
+      })
+    );
+    return { wch: Math.min(Math.max(maxLength + 2, 10), 50) };
+  });
 
-  // Adicionar colunas calculadas se necessário
+  // Adicionar larguras para campos calculados se necessário
   if (acimaDoTicket) {
-    columns.push({ header: 'DIFERENCA', key: 'DIFERENCA', width: 15 });
-    columns.push({ header: 'DIFERENCA_TOTAL', key: 'DIFERENCA_TOTAL', width: 18 });
+    columnWidths.push({ wch: 15 }); // DIFERENCA
+    columnWidths.push({ wch: 18 }); // DIFERENCA_TOTAL
   }
 
-  productsWorksheet.columns = columns;
+  productsWorksheet['!cols'] = columnWidths;
 
-  // Adicionar dados
-  productsData.forEach((row) => {
-    productsWorksheet.addRow(row);
-  });
+  XLSX.utils.book_append_sheet(workbook, productsWorksheet, 'Produtos');
 
   // Gerar nome do arquivo
   const dateStr = new Date().toISOString().split('T')[0];
   const filename = `produtos-por-venda-${companyKey}-${dateStr}.xlsx`;
 
   // Fazer download
-  workbook.xlsx.writeBuffer().then((buffer) => {
-    const blob = new Blob([buffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  });
+  XLSX.writeFile(workbook, filename);
 }
 
