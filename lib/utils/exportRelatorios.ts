@@ -1,5 +1,4 @@
-// @ts-ignore - xlsx não tem tipos perfeitos
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 /**
  * Formata data para o formato usado pelo Python (dd/mm/yyyy)
@@ -96,41 +95,56 @@ export function exportToExcel(
     return novoRow;
   });
 
-  const workbook = XLSX.utils.book_new();
-  const worksheet = XLSX.utils.json_to_sheet(dadosFormatados);
+  // Criar workbook e worksheet
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet(nomeRelatorio.substring(0, 31)); // Limite de 31 caracteres para nome da sheet
+
+  // Adicionar cabeçalhos
+  worksheet.columns = colunas.map((col) => ({
+    header: col,
+    key: col,
+    width: Math.min(
+      Math.max(
+        col.length,
+        ...dadosFormatados.map((row) => {
+          const value = row[col];
+          return value != null ? String(value).length : 0;
+        })
+      ) + 2,
+      50
+    ),
+  }));
 
   // Definir formato de data para colunas de data (dd/mm/yyyy)
-  const dateColumns: string[] = [];
-  colunas.forEach(col => {
+  colunas.forEach((col, colIndex) => {
     const firstValue = dadosFormatados[0]?.[col];
-    if (firstValue instanceof Date || (firstValue && typeof firstValue === 'string' && /^\d{4}-\d{2}-\d{2}/.test(firstValue))) {
-      dateColumns.push(col);
+    if (firstValue instanceof Date) {
+      worksheet.getColumn(colIndex + 1).numFmt = 'dd/mm/yyyy';
     }
   });
 
-  // Ajustar larguras das colunas
-  const colWidths: { wch: number }[] = [];
-  colunas.forEach((col) => {
-    const maxLength = Math.max(
-      col.length,
-      ...dadosFormatados.map((row) => {
-        const value = row[col];
-        return value != null ? String(value).length : 0;
-      })
-    );
-    colWidths.push({ wch: Math.min(Math.max(maxLength + 2, 10), 50) });
+  // Adicionar dados
+  dadosFormatados.forEach((row) => {
+    worksheet.addRow(row);
   });
-
-  worksheet['!cols'] = colWidths;
-
-  // Adicionar worksheet ao workbook
-  XLSX.utils.book_append_sheet(workbook, worksheet, nomeRelatorio.substring(0, 31)); // Limite de 31 caracteres para nome da sheet
 
   // Gerar nome do arquivo (sem timestamp, como no script Python)
   const filename = `${nomeRelatorio}.xlsx`;
 
   // Fazer download
-  XLSX.writeFile(workbook, filename);
+  workbook.xlsx.writeBuffer().then((buffer) => {
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  });
 }
 
 /**
