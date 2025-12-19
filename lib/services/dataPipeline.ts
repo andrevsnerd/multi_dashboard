@@ -136,16 +136,17 @@ export async function processVendas(
   // 3) Calcular valor total da venda (antes de considerar trocas)
   //    Este será o valor que vai para TOTAL_VENDA
   const withTotalVenda = enriched.map((item) => {
-    const qtdeCancelada = toNumber(item.QTDE_CANCELADA);
-    const precoLiquido = toNumber(item.PRECO_LIQUIDO);
-    const qtde = toNumber(item.QTDE);
-    const descontoVenda = toNumber(item.DESCONTO_VENDA);
+    const record = item as AnyRecord;
+    const qtdeCancelada = toNumber(record.QTDE_CANCELADA);
+    const precoLiquido = toNumber(record.PRECO_LIQUIDO);
+    const qtde = toNumber(record.QTDE);
+    const descontoVenda = toNumber(record.DESCONTO_VENDA);
 
     const totalVenda =
       qtdeCancelada > 0 ? 0 : precoLiquido * qtde - descontoVenda;
 
     return {
-      ...item,
+      ...record,
       TOTAL_VENDA: totalVenda,
     };
   });
@@ -153,26 +154,28 @@ export async function processVendas(
   // 4) Calcular quantidade total da venda (antes de considerar trocas)
   //    Este será o valor que vai para TOTAL_QTDE_VENDA
   const withTotalQtdeVenda = withTotalVenda.map((item) => {
-    const qtdeCancelada = toNumber(item.QTDE_CANCELADA);
-    const qtde = toNumber(item.QTDE);
+    const record = item as AnyRecord;
+    const qtdeCancelada = toNumber(record.QTDE_CANCELADA);
+    const qtde = toNumber(record.QTDE);
 
     const totalQtdeVenda = qtdeCancelada > 0 ? 0 : qtde;
 
     return {
-      ...item,
+      ...record,
       TOTAL_QTDE_VENDA: totalQtdeVenda,
     };
   });
 
   // 5) Garantir que as colunas de troca existam e estejam preenchidas
   const withTroca = withTotalQtdeVenda.map((item) => {
-    const qtdeTrocaItem = toNumber(item.QTDE_TROCA_ITEM);
-    const valorTrocaItem = toNumber(item.VALOR_TROCA_ITEM);
-    const qtdeTrocaTicket = toNumber(item.QTDE_TROCA_TICKET);
-    const valorTrocaTicket = toNumber(item.VALOR_TROCA_TICKET);
+    const record = item as AnyRecord;
+    const qtdeTrocaItem = toNumber(record.QTDE_TROCA_ITEM);
+    const valorTrocaItem = toNumber(record.VALOR_TROCA_ITEM);
+    const qtdeTrocaTicket = toNumber(record.QTDE_TROCA_TICKET);
+    const valorTrocaTicket = toNumber(record.VALOR_TROCA_TICKET);
 
     return {
-      ...item,
+      ...record,
       QTDE_TROCA_ITEM: qtdeTrocaItem,
       VALOR_TROCA_ITEM: valorTrocaItem,
       QTDE_TROCA_TICKET: qtdeTrocaTicket,
@@ -184,33 +187,35 @@ export async function processVendas(
   //    Agrupar por TICKET e CODIGO_FILIAL para calcular o total do ticket
   const ticketTotals = new Map<string, number>();
   withTroca.forEach((item) => {
-    const key = `${item.TICKET}|${item.CODIGO_FILIAL}`;
-    const totalVenda = toNumber(item.TOTAL_VENDA);
+    const record = item as AnyRecord;
+    const key = `${record.TICKET}|${record.CODIGO_FILIAL}`;
+    const totalVenda = toNumber(record.TOTAL_VENDA);
     ticketTotals.set(key, (ticketTotals.get(key) ?? 0) + totalVenda);
   });
 
   // 7) Distribuir troca do ticket proporcionalmente
   const withTrocaProporcional = withTroca.map((item) => {
-    const key = `${item.TICKET}|${item.CODIGO_FILIAL}`;
+    const record = item as AnyRecord;
+    const key = `${record.TICKET}|${record.CODIGO_FILIAL}`;
     const totalVendaTicket = ticketTotals.get(key) ?? 0;
-    const totalVenda = toNumber(item.TOTAL_VENDA);
+    const totalVenda = toNumber(record.TOTAL_VENDA);
 
     const proporcao = totalVendaTicket > 0 ? totalVenda / totalVendaTicket : 0;
 
-    const valorTrocaTicketProp = toNumber(item.VALOR_TROCA_TICKET) * proporcao;
-    const qtdeTrocaTicketProp = toNumber(item.QTDE_TROCA_TICKET) * proporcao;
+    const valorTrocaTicketProp = toNumber(record.VALOR_TROCA_TICKET) * proporcao;
+    const qtdeTrocaTicketProp = toNumber(record.QTDE_TROCA_TICKET) * proporcao;
 
     // Usar troca por item se existir, senão usar troca por ticket (proporcional)
-    const qtdeTroca = toNumber(item.QTDE_TROCA_ITEM) > 0
-      ? toNumber(item.QTDE_TROCA_ITEM)
+    const qtdeTroca = toNumber(record.QTDE_TROCA_ITEM) > 0
+      ? toNumber(record.QTDE_TROCA_ITEM)
       : qtdeTrocaTicketProp;
 
-    const valorTroca = toNumber(item.VALOR_TROCA_ITEM) > 0
-      ? toNumber(item.VALOR_TROCA_ITEM)
+    const valorTroca = toNumber(record.VALOR_TROCA_ITEM) > 0
+      ? toNumber(record.VALOR_TROCA_ITEM)
       : valorTrocaTicketProp;
 
     return {
-      ...item,
+      ...record,
       QTDE_TROCA: qtdeTroca,
       VALOR_TROCA: valorTroca,
     };
@@ -220,16 +225,17 @@ export async function processVendas(
   //    valor_liquido = total_venda - valor_troca
   //    qtde_liquida = total_qtde_venda - qtde_troca
   const withValorLiquido = withTrocaProporcional.map((item) => {
-    const totalVenda = toNumber(item.TOTAL_VENDA);
-    const valorTroca = toNumber(item.VALOR_TROCA);
-    const totalQtdeVenda = toNumber(item.TOTAL_QTDE_VENDA);
-    const qtdeTroca = toNumber(item.QTDE_TROCA);
+    const record = item as AnyRecord;
+    const totalVenda = toNumber(record.TOTAL_VENDA);
+    const valorTroca = toNumber(record.VALOR_TROCA);
+    const totalQtdeVenda = toNumber(record.TOTAL_QTDE_VENDA);
+    const qtdeTroca = toNumber(record.QTDE_TROCA);
 
     const valorLiquido = totalVenda - valorTroca;
     const qtdeLiquida = totalQtdeVenda - qtdeTroca;
 
     return {
-      ...item,
+      ...record,
       VALOR_LIQUIDO: valorLiquido,
       QTDE: qtdeLiquida,
     };
