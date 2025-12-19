@@ -157,30 +157,98 @@ def processar_vendas(df, df_codigos_barra):
     #    (equivalente ao enrichWithBarcode com prioritizeSize=True)
     df = enriquecer_com_codigo_barra(df, df_codigos_barra, prioridade_tamanho=True)
     
-    # 4) Calcula valor líquido (mesma fórmula do site, com tratamento de nulos)
-    df['VALOR_LIQUIDO'] = np.where(
+    # 4) Calcular valor total da venda (antes de considerar trocas)
+    #    Este será o valor que vai para TOTAL_VENDA
+    df['TOTAL_VENDA'] = np.where(
         df['QTDE_CANCELADA'].fillna(0) > 0,
         0,
         (df['PRECO_LIQUIDO'].fillna(0) * df['QTDE'].fillna(0)) - df['DESCONTO_VENDA'].fillna(0)
     )
     
-    # 5) Remover colunas técnicas, igual ao SALES_COLUMNS_TO_DROP do site
+    # 5) Calcular quantidade total da venda (antes de considerar trocas)
+    #    Este será o valor que vai para TOTAL_QTDE_VENDA
+    df['TOTAL_QTDE_VENDA'] = np.where(
+        df['QTDE_CANCELADA'].fillna(0) > 0,
+        0,
+        df['QTDE'].fillna(0)
+    )
+    
+    # 6) Garantir que as colunas de troca existam e estejam preenchidas
+    # Usar troca por item se existir, senão usar troca por ticket
+    if 'QTDE_TROCA_ITEM' not in df.columns:
+        df['QTDE_TROCA_ITEM'] = 0
+    if 'VALOR_TROCA_ITEM' not in df.columns:
+        df['VALOR_TROCA_ITEM'] = 0
+    if 'QTDE_TROCA_TICKET' not in df.columns:
+        df['QTDE_TROCA_TICKET'] = 0
+    if 'VALOR_TROCA_TICKET' not in df.columns:
+        df['VALOR_TROCA_TICKET'] = 0
+    
+    df['QTDE_TROCA_ITEM'] = df['QTDE_TROCA_ITEM'].fillna(0)
+    df['VALOR_TROCA_ITEM'] = df['VALOR_TROCA_ITEM'].fillna(0)
+    df['QTDE_TROCA_TICKET'] = df['QTDE_TROCA_TICKET'].fillna(0)
+    df['VALOR_TROCA_TICKET'] = df['VALOR_TROCA_TICKET'].fillna(0)
+    
+    # Usar troca por item se existir, senão usar troca por ticket
+    # IMPORTANTE: Para evitar duplicação quando há múltiplas linhas no mesmo ticket,
+    # distribuir a troca do ticket proporcionalmente pelo TOTAL_VENDA de cada linha
+    df['TOTAL_VENDA_TICKET'] = df.groupby(['TICKET', 'CODIGO_FILIAL'])['TOTAL_VENDA'].transform('sum')
+    df['PROPORCAO'] = np.where(
+        df['TOTAL_VENDA_TICKET'] > 0,
+        df['TOTAL_VENDA'] / df['TOTAL_VENDA_TICKET'],
+        0
+    )
+    
+    # Distribuir troca do ticket proporcionalmente
+    df['VALOR_TROCA_TICKET_PROP'] = df['VALOR_TROCA_TICKET'] * df['PROPORCAO']
+    df['QTDE_TROCA_TICKET_PROP'] = df['QTDE_TROCA_TICKET'] * df['PROPORCAO']
+    
+    # Usar troca por item se existir, senão usar troca por ticket (proporcional)
+    df['QTDE_TROCA'] = np.where(df['QTDE_TROCA_ITEM'] > 0, df['QTDE_TROCA_ITEM'], df['QTDE_TROCA_TICKET_PROP'])
+    df['VALOR_TROCA'] = np.where(df['VALOR_TROCA_ITEM'] > 0, df['VALOR_TROCA_ITEM'], df['VALOR_TROCA_TICKET_PROP'])
+    
+    # 7) Calcular valores líquidos usando a lógica descoberta:
+    #    valor_liquido = total_venda - valor_troca
+    #    qtde_liquida = total_qtde_venda - qtde_troca
+    df['VALOR_LIQUIDO'] = df['TOTAL_VENDA'] - df['VALOR_TROCA']
+    
+    # Substituir QTDE pela quantidade líquida calculada
+    df['QTDE'] = df['TOTAL_QTDE_VENDA'] - df['QTDE_TROCA']
+    
+    # 7.5) Não filtrar linhas - incluir todas (mesma lógica do arquivo de referência dezembro.csv)
+    #      O arquivo dezembro.csv inclui todas as linhas, incluindo as com qtde_liquida <= 0
+    
+    # 8) Remover colunas técnicas, igual ao SALES_COLUMNS_TO_DROP do site
     df.drop(columns=COLS_REMOVER['vendas'], inplace=True, errors='ignore')
     
-    # 6) Reordenar colunas como no processVendas do site:
-    #    VALOR_LIQUIDO logo após QTDE, e PRECO_LIQUIDO/DESCONTO_VENDA no final
+    # 9) Reordenar colunas: manter ordem original, mas colocar TOTAL_VENDA, TOTAL_QTDE_VENDA,
+    #    QTDE_TROCA e VALOR_TROCA no final (nomes do Linx)
     cols = list(df.columns)
+    
+    # Remover colunas que serão reposicionadas
+    colunas_para_final = ['TOTAL_VENDA', 'TOTAL_QTDE_VENDA', 'QTDE_TROCA', 'VALOR_TROCA']
+    for col in colunas_para_final:
+        if col in cols:
+            cols.remove(col)
+    
+    # Manter ordem: VALOR_LIQUIDO logo após QTDE
     if 'VALOR_LIQUIDO' in cols and 'QTDE' in cols:
         cols.remove('VALOR_LIQUIDO')
         qtde_idx = cols.index('QTDE') + 1
         cols.insert(qtde_idx, 'VALOR_LIQUIDO')
     
+    # PRECO_LIQUIDO e DESCONTO_VENDA no final (antes das colunas do Linx)
     if 'PRECO_LIQUIDO' in cols:
         cols.remove('PRECO_LIQUIDO')
         cols.append('PRECO_LIQUIDO')
     if 'DESCONTO_VENDA' in cols:
         cols.remove('DESCONTO_VENDA')
         cols.append('DESCONTO_VENDA')
+    
+    # Adicionar colunas do Linx no final
+    for col in colunas_para_final:
+        if col in df.columns:
+            cols.append(col)
     
     df = df[cols]
     
@@ -367,17 +435,49 @@ def main():
         'vendas': """
             SELECT vp.FILIAL, vp.DATA_VENDA, vp.PRODUTO, vp.DESC_PRODUTO,
                    vp.COR_PRODUTO, vp.DESC_COR_PRODUTO, vp.TAMANHO, p.GRADE, 
-                   vp.PEDIDO, vp.TICKET, vp.QTDE, vp.QTDE_CANCELADA, 
+                   vp.PEDIDO, vp.TICKET, vp.CODIGO_FILIAL, vp.QTDE, vp.QTDE_CANCELADA, 
                    vp.PRECO_LIQUIDO, vp.DESCONTO_ITEM, vp.DESCONTO_VENDA, 
                    vp.FATOR_VENDA_LIQ, vp.CUSTO, vp.GRUPO_PRODUTO, 
                    vp.SUBGRUPO_PRODUTO, vp.LINHA, vp.COLECAO, vp.GRIFFE, 
                    vp.VENDEDOR, v.VALOR_TIKET, v.DESCONTO, v.VALOR_VENDA_BRUTA, 
                    v.CODIGO_TAB_PRECO, v.CODIGO_DESCONTO, v.OPERACAO_VENDA, 
-                   v.DATA_HORA_CANCELAMENTO, v.VENDEDOR_APELIDO
+                   v.DATA_HORA_CANCELAMENTO, v.VENDEDOR_APELIDO,
+                   ISNULL(troca_item.QTDE_TROCA, 0) AS QTDE_TROCA_ITEM,
+                   ISNULL(troca_item.VALOR_TROCA, 0) AS VALOR_TROCA_ITEM,
+                   ISNULL(troca_ticket.QTDE_TROCA_TICKET, 0) AS QTDE_TROCA_TICKET,
+                   ISNULL(troca_ticket.VALOR_TROCA_TICKET, 0) AS VALOR_TROCA_TICKET
     FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
     LEFT JOIN W_CTB_LOJA_VENDA_PEDIDO v WITH (NOLOCK)
         ON v.FILIAL = vp.FILIAL AND v.PEDIDO = vp.PEDIDO AND v.TICKET = vp.TICKET
-            LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO
+    LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO
+    LEFT JOIN (
+        SELECT 
+            TICKET,
+            CODIGO_FILIAL,
+            PRODUTO,
+            COR_PRODUTO,
+            TAMANHO,
+            SUM(QTDE) AS QTDE_TROCA,
+            SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA
+        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
+        WHERE QTDE_CANCELADA = 0
+        GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
+    ) troca_item ON troca_item.TICKET = vp.TICKET 
+        AND troca_item.CODIGO_FILIAL = vp.CODIGO_FILIAL
+        AND troca_item.PRODUTO = vp.PRODUTO
+        AND ISNULL(troca_item.COR_PRODUTO, '') = ISNULL(vp.COR_PRODUTO, '')
+        AND ISNULL(troca_item.TAMANHO, 0) = ISNULL(vp.TAMANHO, 0)
+    LEFT JOIN (
+        SELECT 
+            TICKET,
+            CODIGO_FILIAL,
+            SUM(QTDE) AS QTDE_TROCA_TICKET,
+            SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA_TICKET
+        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
+        WHERE QTDE_CANCELADA = 0
+        GROUP BY TICKET, CODIGO_FILIAL
+    ) troca_ticket ON troca_ticket.TICKET = vp.TICKET 
+        AND troca_ticket.CODIGO_FILIAL = vp.CODIGO_FILIAL
     WHERE vp.DATA_VENDA >= '2024-01-01'
         """,
         'ecommerce': """
