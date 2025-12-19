@@ -125,28 +125,124 @@ export async function processVendas(
   const barcodes: BarcodeRow[] =
     produtosBarra ?? (data.produtosBarra as BarcodeRow[]);
 
+  // 1) Manter apenas linhas com quantidade positiva (mesma lógica do site)
   const filtered = data.vendas.filter((item) => toNumber(item.QTDE) > 0);
   const converted = convertDates(filtered, ['DATA_VENDA']);
 
-  const withValue = converted.map((item) => {
+  // 2) Enriquecimento com códigos de barra usando a mesma lógica do site:
+  //    prioridade PRODUTO+COR+TAMANHO, depois PRODUTO+COR, depois PRODUTO
+  const enriched = enrichWithBarcode(converted, barcodes, { prioritizeSize: true });
+
+  // 3) Calcular valor total da venda (antes de considerar trocas)
+  //    Este será o valor que vai para TOTAL_VENDA
+  const withTotalVenda = enriched.map((item) => {
     const qtdeCancelada = toNumber(item.QTDE_CANCELADA);
     const precoLiquido = toNumber(item.PRECO_LIQUIDO);
     const qtde = toNumber(item.QTDE);
     const descontoVenda = toNumber(item.DESCONTO_VENDA);
 
-    const valorLiquido =
+    const totalVenda =
       qtdeCancelada > 0 ? 0 : precoLiquido * qtde - descontoVenda;
 
     return {
       ...item,
-      VALOR_LIQUIDO: valorLiquido,
+      TOTAL_VENDA: totalVenda,
     };
   });
 
-  const trimmed = dropColumns(withValue, SALES_COLUMNS_TO_DROP);
-  const enriched = enrichWithBarcode(trimmed, barcodes, { prioritizeSize: true });
+  // 4) Calcular quantidade total da venda (antes de considerar trocas)
+  //    Este será o valor que vai para TOTAL_QTDE_VENDA
+  const withTotalQtdeVenda = withTotalVenda.map((item) => {
+    const qtdeCancelada = toNumber(item.QTDE_CANCELADA);
+    const qtde = toNumber(item.QTDE);
 
-  const reordered = enriched.map((item) => {
+    const totalQtdeVenda = qtdeCancelada > 0 ? 0 : qtde;
+
+    return {
+      ...item,
+      TOTAL_QTDE_VENDA: totalQtdeVenda,
+    };
+  });
+
+  // 5) Garantir que as colunas de troca existam e estejam preenchidas
+  const withTroca = withTotalQtdeVenda.map((item) => {
+    const qtdeTrocaItem = toNumber(item.QTDE_TROCA_ITEM);
+    const valorTrocaItem = toNumber(item.VALOR_TROCA_ITEM);
+    const qtdeTrocaTicket = toNumber(item.QTDE_TROCA_TICKET);
+    const valorTrocaTicket = toNumber(item.VALOR_TROCA_TICKET);
+
+    return {
+      ...item,
+      QTDE_TROCA_ITEM: qtdeTrocaItem,
+      VALOR_TROCA_ITEM: valorTrocaItem,
+      QTDE_TROCA_TICKET: qtdeTrocaTicket,
+      VALOR_TROCA_TICKET: valorTrocaTicket,
+    };
+  });
+
+  // 6) Calcular TOTAL_VENDA_TICKET para distribuição proporcional
+  //    Agrupar por TICKET e CODIGO_FILIAL para calcular o total do ticket
+  const ticketTotals = new Map<string, number>();
+  withTroca.forEach((item) => {
+    const key = `${item.TICKET}|${item.CODIGO_FILIAL}`;
+    const totalVenda = toNumber(item.TOTAL_VENDA);
+    ticketTotals.set(key, (ticketTotals.get(key) ?? 0) + totalVenda);
+  });
+
+  // 7) Distribuir troca do ticket proporcionalmente
+  const withTrocaProporcional = withTroca.map((item) => {
+    const key = `${item.TICKET}|${item.CODIGO_FILIAL}`;
+    const totalVendaTicket = ticketTotals.get(key) ?? 0;
+    const totalVenda = toNumber(item.TOTAL_VENDA);
+
+    const proporcao = totalVendaTicket > 0 ? totalVenda / totalVendaTicket : 0;
+
+    const valorTrocaTicketProp = toNumber(item.VALOR_TROCA_TICKET) * proporcao;
+    const qtdeTrocaTicketProp = toNumber(item.QTDE_TROCA_TICKET) * proporcao;
+
+    // Usar troca por item se existir, senão usar troca por ticket (proporcional)
+    const qtdeTroca = toNumber(item.QTDE_TROCA_ITEM) > 0
+      ? toNumber(item.QTDE_TROCA_ITEM)
+      : qtdeTrocaTicketProp;
+
+    const valorTroca = toNumber(item.VALOR_TROCA_ITEM) > 0
+      ? toNumber(item.VALOR_TROCA_ITEM)
+      : valorTrocaTicketProp;
+
+    return {
+      ...item,
+      QTDE_TROCA: qtdeTroca,
+      VALOR_TROCA: valorTroca,
+    };
+  });
+
+  // 8) Calcular valores líquidos usando a lógica descoberta:
+  //    valor_liquido = total_venda - valor_troca
+  //    qtde_liquida = total_qtde_venda - qtde_troca
+  const withValorLiquido = withTrocaProporcional.map((item) => {
+    const totalVenda = toNumber(item.TOTAL_VENDA);
+    const valorTroca = toNumber(item.VALOR_TROCA);
+    const totalQtdeVenda = toNumber(item.TOTAL_QTDE_VENDA);
+    const qtdeTroca = toNumber(item.QTDE_TROCA);
+
+    const valorLiquido = totalVenda - valorTroca;
+    const qtdeLiquida = totalQtdeVenda - qtdeTroca;
+
+    return {
+      ...item,
+      VALOR_LIQUIDO: valorLiquido,
+      QTDE: qtdeLiquida,
+    };
+  });
+
+  // 9) Não filtrar linhas - incluir todas (mesma lógica do arquivo de referência)
+  //    O arquivo inclui todas as linhas, incluindo as com qtde_liquida <= 0
+
+  // 10) Remover colunas técnicas, igual ao SALES_COLUMNS_TO_DROP do site
+  const trimmed = dropColumns(withValorLiquido, SALES_COLUMNS_TO_DROP);
+
+  // 11) Reordenar colunas: VALOR_LIQUIDO logo após QTDE
+  const reordered = trimmed.map((item) => {
     if (!('VALOR_LIQUIDO' in item)) {
       return item;
     }

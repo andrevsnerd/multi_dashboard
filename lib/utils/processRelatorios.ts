@@ -266,69 +266,184 @@ export function processarVendas(
   vendas: Record<string, any>[],
   codigosBarra: Record<string, any>[]
 ): Record<string, any>[] {
-  // Filtrar apenas QTDE > 0
+  // 1) Manter apenas linhas com quantidade positiva (mesma lógica do site)
   let result = vendas.filter(row => (row.QTDE ?? 0) > 0);
   
-  // Converter datas
+  // 2) Converter datas (DATA_VENDA) para datetime
   result = converterDatas(result, ['DATA_VENDA']);
   
-  // Enriquecer com código de barras (produto + cor + tamanho)
+  // 3) Enriquecimento com códigos de barra usando a mesma lógica do site:
+  //    prioridade PRODUTO+COR+TAMANHO, depois PRODUTO+COR, depois PRODUTO
   result = enriquecerComCodigoBarra(result, codigosBarra);
   
-  // Calcular VALOR_LIQUIDO
+  // 4) Calcular valor total da venda (antes de considerar trocas)
+  //    Este será o valor que vai para TOTAL_VENDA
   result = result.map(row => {
-    const qtdeCancelada = row.QTDE_CANCELADA ?? 0;
-    const precoLiquido = row.PRECO_LIQUIDO ?? 0;
-    const qtde = row.QTDE ?? 0;
-    const descontoVenda = row.DESCONTO_VENDA ?? 0;
+    const qtdeCancelada = Number(row.QTDE_CANCELADA ?? 0);
+    const precoLiquido = Number(row.PRECO_LIQUIDO ?? 0);
+    const qtde = Number(row.QTDE ?? 0);
+    const descontoVenda = Number(row.DESCONTO_VENDA ?? 0);
     
-    const valorLiquido = qtdeCancelada > 0
+    const totalVenda = qtdeCancelada > 0
       ? 0
-      : (Number(precoLiquido) * Number(qtde)) - Number(descontoVenda);
+      : (precoLiquido * qtde) - descontoVenda;
     
     return {
       ...row,
-      VALOR_LIQUIDO: valorLiquido
+      TOTAL_VENDA: totalVenda
     };
   });
   
-  // Remover colunas
+  // 5) Calcular quantidade total da venda (antes de considerar trocas)
+  //    Este será o valor que vai para TOTAL_QTDE_VENDA
+  result = result.map(row => {
+    const qtdeCancelada = Number(row.QTDE_CANCELADA ?? 0);
+    const qtde = Number(row.QTDE ?? 0);
+    
+    const totalQtdeVenda = qtdeCancelada > 0 ? 0 : qtde;
+    
+    return {
+      ...row,
+      TOTAL_QTDE_VENDA: totalQtdeVenda
+    };
+  });
+  
+  // 6) Garantir que as colunas de troca existam e estejam preenchidas
+  result = result.map(row => {
+    const qtdeTrocaItem = Number(row.QTDE_TROCA_ITEM ?? 0);
+    const valorTrocaItem = Number(row.VALOR_TROCA_ITEM ?? 0);
+    const qtdeTrocaTicket = Number(row.QTDE_TROCA_TICKET ?? 0);
+    const valorTrocaTicket = Number(row.VALOR_TROCA_TICKET ?? 0);
+    
+    return {
+      ...row,
+      QTDE_TROCA_ITEM: qtdeTrocaItem,
+      VALOR_TROCA_ITEM: valorTrocaItem,
+      QTDE_TROCA_TICKET: qtdeTrocaTicket,
+      VALOR_TROCA_TICKET: valorTrocaTicket
+    };
+  });
+  
+  // 7) Calcular TOTAL_VENDA_TICKET para distribuição proporcional
+  //    Agrupar por TICKET e CODIGO_FILIAL para calcular o total do ticket
+  const ticketTotals = new Map<string, number>();
+  result.forEach(row => {
+    const key = `${row.TICKET}|${row.CODIGO_FILIAL}`;
+    const totalVenda = Number(row.TOTAL_VENDA ?? 0);
+    ticketTotals.set(key, (ticketTotals.get(key) ?? 0) + totalVenda);
+  });
+  
+  // 8) Distribuir troca do ticket proporcionalmente
+  result = result.map(row => {
+    const key = `${row.TICKET}|${row.CODIGO_FILIAL}`;
+    const totalVendaTicket = ticketTotals.get(key) ?? 0;
+    const totalVenda = Number(row.TOTAL_VENDA ?? 0);
+    
+    const proporcao = totalVendaTicket > 0 ? totalVenda / totalVendaTicket : 0;
+    
+    const valorTrocaTicketProp = Number(row.VALOR_TROCA_TICKET ?? 0) * proporcao;
+    const qtdeTrocaTicketProp = Number(row.QTDE_TROCA_TICKET ?? 0) * proporcao;
+    
+    // Usar troca por item se existir, senão usar troca por ticket (proporcional)
+    const qtdeTroca = Number(row.QTDE_TROCA_ITEM ?? 0) > 0
+      ? Number(row.QTDE_TROCA_ITEM ?? 0)
+      : qtdeTrocaTicketProp;
+    
+    const valorTroca = Number(row.VALOR_TROCA_ITEM ?? 0) > 0
+      ? Number(row.VALOR_TROCA_ITEM ?? 0)
+      : valorTrocaTicketProp;
+    
+    return {
+      ...row,
+      QTDE_TROCA: qtdeTroca,
+      VALOR_TROCA: valorTroca
+    };
+  });
+  
+  // 9) Calcular valores líquidos usando a lógica descoberta:
+  //    valor_liquido = total_venda - valor_troca
+  //    qtde_liquida = total_qtde_venda - qtde_troca
+  result = result.map(row => {
+    const totalVenda = Number(row.TOTAL_VENDA ?? 0);
+    const valorTroca = Number(row.VALOR_TROCA ?? 0);
+    const totalQtdeVenda = Number(row.TOTAL_QTDE_VENDA ?? 0);
+    const qtdeTroca = Number(row.QTDE_TROCA ?? 0);
+    
+    const valorLiquido = totalVenda - valorTroca;
+    const qtdeLiquida = totalQtdeVenda - qtdeTroca;
+    
+    return {
+      ...row,
+      VALOR_LIQUIDO: valorLiquido,
+      QTDE: qtdeLiquida
+    };
+  });
+  
+  // 10) Não filtrar linhas - incluir todas (mesma lógica do arquivo de referência)
+  //     O arquivo inclui todas as linhas, incluindo as com qtde_liquida <= 0
+  
+  // 11) Remover colunas técnicas, igual ao SALES_COLUMNS_TO_DROP do site
   result = removerColunas(result, COLS_REMOVER.vendas);
   
-  // Reordenar colunas (VALOR_LIQUIDO após QTDE)
+  // 12) Reordenar colunas: manter ordem original, mas colocar TOTAL_VENDA, TOTAL_QTDE_VENDA,
+  //     QTDE_TROCA e VALOR_TROCA no final (nomes do Linx)
   if (result.length > 0) {
     const cols = Object.keys(result[0]);
-    const qtdeIndex = cols.indexOf('QTDE');
+    
+    // Remover colunas que serão reposicionadas
+    const colunasParaFinal = ['TOTAL_VENDA', 'TOTAL_QTDE_VENDA', 'QTDE_TROCA', 'VALOR_TROCA'];
+    const colsSemFinal = cols.filter(col => !colunasParaFinal.includes(col));
+    
+    // Manter ordem: VALOR_LIQUIDO logo após QTDE
+    const colsReordenadas: string[] = [];
+    let qtdeIndex = colsSemFinal.indexOf('QTDE');
     
     if (qtdeIndex !== -1) {
-      const valorLiquidoIndex = cols.indexOf('VALOR_LIQUIDO');
-      if (valorLiquidoIndex !== -1) {
-        cols.splice(valorLiquidoIndex, 1);
-        cols.splice(qtdeIndex + 1, 0, 'VALOR_LIQUIDO');
-        
-        // Garantir que PRECO_LIQUIDO e DESCONTO_VENDA fiquem no final
-        const precoLiquidoIndex = cols.indexOf('PRECO_LIQUIDO');
-        const descontoVendaIndex = cols.indexOf('DESCONTO_VENDA');
-        
-        if (precoLiquidoIndex !== -1) {
-          cols.splice(precoLiquidoIndex, 1);
-          cols.push('PRECO_LIQUIDO');
-        }
-        
-        if (descontoVendaIndex !== -1) {
-          cols.splice(descontoVendaIndex, 1);
-          cols.push('DESCONTO_VENDA');
-        }
-        
-        result = result.map(row => {
-          const newRow: Record<string, any> = {};
-          cols.forEach(col => {
-            newRow[col] = row[col];
-          });
-          return newRow;
-        });
+      // Adicionar todas as colunas até QTDE
+      for (let i = 0; i <= qtdeIndex; i++) {
+        colsReordenadas.push(colsSemFinal[i]);
       }
+      // Adicionar VALOR_LIQUIDO após QTDE
+      if (colsSemFinal.includes('VALOR_LIQUIDO')) {
+        colsReordenadas.push('VALOR_LIQUIDO');
+      }
+      // Adicionar o resto das colunas (exceto VALOR_LIQUIDO, PRECO_LIQUIDO, DESCONTO_VENDA)
+      for (let i = qtdeIndex + 1; i < colsSemFinal.length; i++) {
+        const col = colsSemFinal[i];
+        if (col !== 'VALOR_LIQUIDO' && col !== 'PRECO_LIQUIDO' && col !== 'DESCONTO_VENDA') {
+          colsReordenadas.push(col);
+        }
+      }
+    } else {
+      colsReordenadas.push(...colsSemFinal.filter(col => 
+        col !== 'PRECO_LIQUIDO' && col !== 'DESCONTO_VENDA'
+      ));
     }
+    
+    // PRECO_LIQUIDO e DESCONTO_VENDA no final (antes das colunas do Linx)
+    if (colsSemFinal.includes('PRECO_LIQUIDO')) {
+      colsReordenadas.push('PRECO_LIQUIDO');
+    }
+    if (colsSemFinal.includes('DESCONTO_VENDA')) {
+      colsReordenadas.push('DESCONTO_VENDA');
+    }
+    
+    // Adicionar colunas do Linx no final
+    colunasParaFinal.forEach(col => {
+      if (cols.includes(col)) {
+        colsReordenadas.push(col);
+      }
+    });
+    
+    result = result.map(row => {
+      const newRow: Record<string, any> = {};
+      colsReordenadas.forEach(col => {
+        if (col in row) {
+          newRow[col] = row[col];
+        }
+      });
+      return newRow;
+    });
   }
   
   return result;

@@ -39,41 +39,51 @@ export function fetchProductBarcodes() {
 
 export function fetchSales() {
   const queryText = `
-    SELECT vp.FILIAL,
-           vp.DATA_VENDA,
-           vp.PRODUTO,
-           vp.DESC_PRODUTO,
-           vp.COR_PRODUTO,
-           vp.DESC_COR_PRODUTO,
-           vp.TAMANHO,
-           p.GRADE,
-           vp.PEDIDO,
-           vp.TICKET,
-           vp.QTDE,
-           vp.QTDE_CANCELADA,
-           vp.PRECO_LIQUIDO,
-           vp.DESCONTO_ITEM,
-           vp.DESCONTO_VENDA,
-           vp.FATOR_VENDA_LIQ,
-           vp.CUSTO,
-           vp.GRUPO_PRODUTO,
-           vp.SUBGRUPO_PRODUTO,
-           vp.LINHA,
-           vp.COLECAO,
-           vp.GRIFFE,
-           vp.VENDEDOR,
-           v.VALOR_TIKET,
-           v.DESCONTO,
-           v.VALOR_VENDA_BRUTA,
-           v.CODIGO_TAB_PRECO,
-           v.CODIGO_DESCONTO,
-           v.OPERACAO_VENDA,
-           v.DATA_HORA_CANCELAMENTO,
-           v.VENDEDOR_APELIDO
+    SELECT vp.FILIAL, vp.DATA_VENDA, vp.PRODUTO, vp.DESC_PRODUTO,
+           vp.COR_PRODUTO, vp.DESC_COR_PRODUTO, vp.TAMANHO, p.GRADE, 
+           vp.PEDIDO, vp.TICKET, vp.CODIGO_FILIAL, vp.QTDE, vp.QTDE_CANCELADA, 
+           vp.PRECO_LIQUIDO, vp.DESCONTO_ITEM, vp.DESCONTO_VENDA, 
+           vp.FATOR_VENDA_LIQ, vp.CUSTO, vp.GRUPO_PRODUTO, 
+           vp.SUBGRUPO_PRODUTO, vp.LINHA, vp.COLECAO, vp.GRIFFE, 
+           vp.VENDEDOR, v.VALOR_TIKET, v.DESCONTO, v.VALOR_VENDA_BRUTA, 
+           v.CODIGO_TAB_PRECO, v.CODIGO_DESCONTO, v.OPERACAO_VENDA, 
+           v.DATA_HORA_CANCELAMENTO, v.VENDEDOR_APELIDO,
+           ISNULL(troca_item.QTDE_TROCA, 0) AS QTDE_TROCA_ITEM,
+           ISNULL(troca_item.VALOR_TROCA, 0) AS VALOR_TROCA_ITEM,
+           ISNULL(troca_ticket.QTDE_TROCA_TICKET, 0) AS QTDE_TROCA_TICKET,
+           ISNULL(troca_ticket.VALOR_TROCA_TICKET, 0) AS VALOR_TROCA_TICKET
     FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
     LEFT JOIN W_CTB_LOJA_VENDA_PEDIDO v WITH (NOLOCK)
-      ON v.FILIAL = vp.FILIAL AND v.PEDIDO = vp.PEDIDO AND v.TICKET = vp.TICKET
+        ON v.FILIAL = vp.FILIAL AND v.PEDIDO = vp.PEDIDO AND v.TICKET = vp.TICKET
     LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO
+    LEFT JOIN (
+        SELECT 
+            TICKET,
+            CODIGO_FILIAL,
+            PRODUTO,
+            COR_PRODUTO,
+            TAMANHO,
+            SUM(QTDE) AS QTDE_TROCA,
+            SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA
+        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
+        WHERE QTDE_CANCELADA = 0
+        GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
+    ) troca_item ON troca_item.TICKET = vp.TICKET 
+        AND troca_item.CODIGO_FILIAL = vp.CODIGO_FILIAL
+        AND troca_item.PRODUTO = vp.PRODUTO
+        AND ISNULL(troca_item.COR_PRODUTO, '') = ISNULL(vp.COR_PRODUTO, '')
+        AND ISNULL(troca_item.TAMANHO, 0) = ISNULL(vp.TAMANHO, 0)
+    LEFT JOIN (
+        SELECT 
+            TICKET,
+            CODIGO_FILIAL,
+            SUM(QTDE) AS QTDE_TROCA_TICKET,
+            SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA_TICKET
+        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
+        WHERE QTDE_CANCELADA = 0
+        GROUP BY TICKET, CODIGO_FILIAL
+    ) troca_ticket ON troca_ticket.TICKET = vp.TICKET 
+        AND troca_ticket.CODIGO_FILIAL = vp.CODIGO_FILIAL
     WHERE vp.DATA_VENDA >= '2024-01-01'
   `;
 

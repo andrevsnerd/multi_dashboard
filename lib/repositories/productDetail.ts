@@ -460,49 +460,178 @@ export async function fetchProductDetail({
 
     // Buscar vendas do período atual
     const currentSalesQuery = `
-      SELECT 
-        SUM(
-          CASE
+      WITH vendas_base AS (
+        SELECT 
+          vp.*,
+          c.DESC_COR,
+          CASE 
             WHEN vp.QTDE_CANCELADA > 0 THEN 0
             ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
-          END
-        ) AS totalRevenue,
-        SUM(vp.QTDE) AS totalQuantity,
-        vp.FILIAL,
-        vp.COR_PRODUTO,
-        ISNULL(c.DESC_COR, '') AS corBanco,
+          END AS TOTAL_VENDA,
+          CASE 
+            WHEN vp.QTDE_CANCELADA > 0 THEN 0
+            ELSE vp.QTDE
+          END AS TOTAL_QTDE_VENDA
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
+        WHERE vp.PRODUTO = @productId
+          AND vp.DATA_VENDA >= @startDate
+          AND vp.DATA_VENDA < @endDate
+          AND vp.QTDE > 0
+          ${filialFilter}
+      ),
+      trocas_item AS (
+        SELECT 
+          TICKET,
+          CODIGO_FILIAL,
+          PRODUTO,
+          COR_PRODUTO,
+          TAMANHO,
+          SUM(QTDE) AS QTDE_TROCA,
+          SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA
+        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
+        WHERE QTDE_CANCELADA = 0
+        GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
+      ),
+      trocas_ticket AS (
+        SELECT 
+          TICKET,
+          CODIGO_FILIAL,
+          SUM(QTDE) AS QTDE_TROCA_TICKET,
+          SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA_TICKET
+        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
+        WHERE QTDE_CANCELADA = 0
+        GROUP BY TICKET, CODIGO_FILIAL
+      ),
+      vendas_com_troca AS (
+        SELECT 
+          vb.*,
+          ISNULL(ti.QTDE_TROCA, 0) AS QTDE_TROCA_ITEM,
+          ISNULL(ti.VALOR_TROCA, 0) AS VALOR_TROCA_ITEM,
+          ISNULL(tt.QTDE_TROCA_TICKET, 0) AS QTDE_TROCA_TICKET,
+          ISNULL(tt.VALOR_TROCA_TICKET, 0) AS VALOR_TROCA_TICKET,
+          SUM(vb.TOTAL_VENDA) OVER (PARTITION BY vb.TICKET, vb.CODIGO_FILIAL) AS TOTAL_VENDA_TICKET
+        FROM vendas_base vb
+        LEFT JOIN trocas_item ti ON ti.TICKET = vb.TICKET 
+          AND ti.CODIGO_FILIAL = vb.CODIGO_FILIAL
+          AND ti.PRODUTO = vb.PRODUTO
+          AND ISNULL(ti.COR_PRODUTO, '') = ISNULL(vb.COR_PRODUTO, '')
+          AND ISNULL(ti.TAMANHO, 0) = ISNULL(vb.TAMANHO, 0)
+        LEFT JOIN trocas_ticket tt ON tt.TICKET = vb.TICKET 
+          AND tt.CODIGO_FILIAL = vb.CODIGO_FILIAL
+      ),
+      vendas_liquidas AS (
+        SELECT 
+          *,
+          CASE 
+            WHEN TOTAL_VENDA_TICKET > 0 THEN CAST(TOTAL_VENDA AS FLOAT) / CAST(TOTAL_VENDA_TICKET AS FLOAT)
+            ELSE 0
+          END AS PROPORCAO
+        FROM vendas_com_troca
+      ),
+      vendas_finais AS (
+        SELECT 
+          *,
+          CASE 
+            WHEN ISNULL(QTDE_TROCA_ITEM, 0) > 0 THEN ISNULL(QTDE_TROCA_ITEM, 0)
+            ELSE ISNULL(QTDE_TROCA_TICKET, 0) * PROPORCAO
+          END AS QTDE_TROCA,
+          CASE 
+            WHEN ISNULL(VALOR_TROCA_ITEM, 0) > 0 THEN ISNULL(VALOR_TROCA_ITEM, 0)
+            ELSE ISNULL(VALOR_TROCA_TICKET, 0) * PROPORCAO
+          END AS VALOR_TROCA
+        FROM vendas_liquidas
+      )
+      SELECT 
+        SUM(TOTAL_VENDA - VALOR_TROCA) AS totalRevenue,
+        SUM(TOTAL_QTDE_VENDA - QTDE_TROCA) AS totalQuantity,
+        FILIAL,
+        COR_PRODUTO,
+        ISNULL(DESC_COR, '') AS corBanco,
         AVG(
           CASE
-            WHEN vp.QTDE_CANCELADA > 0 THEN NULL
-            ELSE vp.CUSTO
+            WHEN QTDE_CANCELADA > 0 THEN NULL
+            ELSE CUSTO
           END
         ) AS cost
-      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
-      WHERE vp.PRODUTO = @productId
-        AND vp.DATA_VENDA >= @startDate
-        AND vp.DATA_VENDA < @endDate
-        AND vp.QTDE > 0
-        ${filialFilter}
-      GROUP BY vp.FILIAL, vp.COR_PRODUTO, c.DESC_COR
+      FROM vendas_finais
+      GROUP BY FILIAL, COR_PRODUTO, DESC_COR
     `;
 
     // Buscar vendas do período anterior
     const previousSalesQuery = `
-      SELECT 
-        SUM(
-          CASE
+      WITH vendas_base AS (
+        SELECT 
+          vp.*,
+          CASE 
             WHEN vp.QTDE_CANCELADA > 0 THEN 0
             ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
-          END
-        ) AS totalRevenue
-      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      WHERE vp.PRODUTO = @productId
-        AND vp.DATA_VENDA >= @previousStartDate
-        AND vp.DATA_VENDA < @previousEndDate
-        AND vp.QTDE > 0
-        ${filialFilter}
-      GROUP BY vp.FILIAL
+          END AS TOTAL_VENDA
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        WHERE vp.PRODUTO = @productId
+          AND vp.DATA_VENDA >= @previousStartDate
+          AND vp.DATA_VENDA < @previousEndDate
+          AND vp.QTDE > 0
+          ${filialFilter}
+      ),
+      trocas_item AS (
+        SELECT 
+          TICKET,
+          CODIGO_FILIAL,
+          PRODUTO,
+          COR_PRODUTO,
+          TAMANHO,
+          SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA
+        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
+        WHERE QTDE_CANCELADA = 0
+        GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
+      ),
+      trocas_ticket AS (
+        SELECT 
+          TICKET,
+          CODIGO_FILIAL,
+          SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA_TICKET
+        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
+        WHERE QTDE_CANCELADA = 0
+        GROUP BY TICKET, CODIGO_FILIAL
+      ),
+      vendas_com_troca AS (
+        SELECT 
+          vb.*,
+          ISNULL(ti.VALOR_TROCA, 0) AS VALOR_TROCA_ITEM,
+          ISNULL(tt.VALOR_TROCA_TICKET, 0) AS VALOR_TROCA_TICKET,
+          SUM(vb.TOTAL_VENDA) OVER (PARTITION BY vb.TICKET, vb.CODIGO_FILIAL) AS TOTAL_VENDA_TICKET
+        FROM vendas_base vb
+        LEFT JOIN trocas_item ti ON ti.TICKET = vb.TICKET 
+          AND ti.CODIGO_FILIAL = vb.CODIGO_FILIAL
+          AND ti.PRODUTO = vb.PRODUTO
+          AND ISNULL(ti.COR_PRODUTO, '') = ISNULL(vb.COR_PRODUTO, '')
+          AND ISNULL(ti.TAMANHO, 0) = ISNULL(vb.TAMANHO, 0)
+        LEFT JOIN trocas_ticket tt ON tt.TICKET = vb.TICKET 
+          AND tt.CODIGO_FILIAL = vb.CODIGO_FILIAL
+      ),
+      vendas_liquidas AS (
+        SELECT 
+          *,
+          CASE 
+            WHEN TOTAL_VENDA_TICKET > 0 THEN CAST(TOTAL_VENDA AS FLOAT) / CAST(TOTAL_VENDA_TICKET AS FLOAT)
+            ELSE 0
+          END AS PROPORCAO
+        FROM vendas_com_troca
+      ),
+      vendas_finais AS (
+        SELECT 
+          *,
+          CASE 
+            WHEN ISNULL(VALOR_TROCA_ITEM, 0) > 0 THEN ISNULL(VALOR_TROCA_ITEM, 0)
+            ELSE ISNULL(VALOR_TROCA_TICKET, 0) * PROPORCAO
+          END AS VALOR_TROCA
+        FROM vendas_liquidas
+      )
+      SELECT 
+        SUM(TOTAL_VENDA - VALOR_TROCA) AS totalRevenue
+      FROM vendas_finais
+      GROUP BY FILIAL
     `;
 
     // Buscar estoque por filial
@@ -940,41 +1069,169 @@ export async function fetchProductStockByFilial({
     // Buscar vendas por filial - período atual
     const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp', 'vendasFilial');
     const currentSalesQuery = `
-      SELECT 
-        vp.FILIAL,
-        SUM(
-          CASE
+      WITH vendas_base AS (
+        SELECT 
+          vp.*,
+          CASE 
             WHEN vp.QTDE_CANCELADA > 0 THEN 0
             ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
-          END
-        ) AS totalRevenue,
-        SUM(vp.QTDE) AS totalQuantity
-      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      WHERE vp.PRODUTO = @productId
-        AND vp.DATA_VENDA >= @startDate
-        AND vp.DATA_VENDA < @endDate
-        AND vp.QTDE > 0
-        ${filialFilter}
-      GROUP BY vp.FILIAL
+          END AS TOTAL_VENDA,
+          CASE 
+            WHEN vp.QTDE_CANCELADA > 0 THEN 0
+            ELSE vp.QTDE
+          END AS TOTAL_QTDE_VENDA
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        WHERE vp.PRODUTO = @productId
+          AND vp.DATA_VENDA >= @startDate
+          AND vp.DATA_VENDA < @endDate
+          AND vp.QTDE > 0
+          ${filialFilter}
+      ),
+      trocas_item AS (
+        SELECT 
+          TICKET,
+          CODIGO_FILIAL,
+          PRODUTO,
+          COR_PRODUTO,
+          TAMANHO,
+          SUM(QTDE) AS QTDE_TROCA,
+          SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA
+        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
+        WHERE QTDE_CANCELADA = 0
+        GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
+      ),
+      trocas_ticket AS (
+        SELECT 
+          TICKET,
+          CODIGO_FILIAL,
+          SUM(QTDE) AS QTDE_TROCA_TICKET,
+          SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA_TICKET
+        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
+        WHERE QTDE_CANCELADA = 0
+        GROUP BY TICKET, CODIGO_FILIAL
+      ),
+      vendas_com_troca AS (
+        SELECT 
+          vb.*,
+          ISNULL(ti.QTDE_TROCA, 0) AS QTDE_TROCA_ITEM,
+          ISNULL(ti.VALOR_TROCA, 0) AS VALOR_TROCA_ITEM,
+          ISNULL(tt.QTDE_TROCA_TICKET, 0) AS QTDE_TROCA_TICKET,
+          ISNULL(tt.VALOR_TROCA_TICKET, 0) AS VALOR_TROCA_TICKET,
+          SUM(vb.TOTAL_VENDA) OVER (PARTITION BY vb.TICKET, vb.CODIGO_FILIAL) AS TOTAL_VENDA_TICKET
+        FROM vendas_base vb
+        LEFT JOIN trocas_item ti ON ti.TICKET = vb.TICKET 
+          AND ti.CODIGO_FILIAL = vb.CODIGO_FILIAL
+          AND ti.PRODUTO = vb.PRODUTO
+          AND ISNULL(ti.COR_PRODUTO, '') = ISNULL(vb.COR_PRODUTO, '')
+          AND ISNULL(ti.TAMANHO, 0) = ISNULL(vb.TAMANHO, 0)
+        LEFT JOIN trocas_ticket tt ON tt.TICKET = vb.TICKET 
+          AND tt.CODIGO_FILIAL = vb.CODIGO_FILIAL
+      ),
+      vendas_liquidas AS (
+        SELECT 
+          *,
+          CASE 
+            WHEN TOTAL_VENDA_TICKET > 0 THEN CAST(TOTAL_VENDA AS FLOAT) / CAST(TOTAL_VENDA_TICKET AS FLOAT)
+            ELSE 0
+          END AS PROPORCAO
+        FROM vendas_com_troca
+      ),
+      vendas_finais AS (
+        SELECT 
+          *,
+          CASE 
+            WHEN ISNULL(QTDE_TROCA_ITEM, 0) > 0 THEN ISNULL(QTDE_TROCA_ITEM, 0)
+            ELSE ISNULL(QTDE_TROCA_TICKET, 0) * PROPORCAO
+          END AS QTDE_TROCA,
+          CASE 
+            WHEN ISNULL(VALOR_TROCA_ITEM, 0) > 0 THEN ISNULL(VALOR_TROCA_ITEM, 0)
+            ELSE ISNULL(VALOR_TROCA_TICKET, 0) * PROPORCAO
+          END AS VALOR_TROCA
+        FROM vendas_liquidas
+      )
+      SELECT 
+        FILIAL,
+        SUM(TOTAL_VENDA - VALOR_TROCA) AS totalRevenue,
+        SUM(TOTAL_QTDE_VENDA - QTDE_TROCA) AS totalQuantity
+      FROM vendas_finais
+      GROUP BY FILIAL
     `;
 
     // Buscar vendas por filial - período anterior
     const previousSalesQuery = `
-      SELECT 
-        vp.FILIAL,
-        SUM(
-          CASE
+      WITH vendas_base AS (
+        SELECT 
+          vp.*,
+          CASE 
             WHEN vp.QTDE_CANCELADA > 0 THEN 0
             ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
-          END
-        ) AS totalRevenue
-      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      WHERE vp.PRODUTO = @productId
-        AND vp.DATA_VENDA >= @previousStartDate
-        AND vp.DATA_VENDA < @previousEndDate
-        AND vp.QTDE > 0
-        ${filialFilter}
-      GROUP BY vp.FILIAL
+          END AS TOTAL_VENDA
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        WHERE vp.PRODUTO = @productId
+          AND vp.DATA_VENDA >= @previousStartDate
+          AND vp.DATA_VENDA < @previousEndDate
+          AND vp.QTDE > 0
+          ${filialFilter}
+      ),
+      trocas_item AS (
+        SELECT 
+          TICKET,
+          CODIGO_FILIAL,
+          PRODUTO,
+          COR_PRODUTO,
+          TAMANHO,
+          SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA
+        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
+        WHERE QTDE_CANCELADA = 0
+        GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
+      ),
+      trocas_ticket AS (
+        SELECT 
+          TICKET,
+          CODIGO_FILIAL,
+          SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA_TICKET
+        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
+        WHERE QTDE_CANCELADA = 0
+        GROUP BY TICKET, CODIGO_FILIAL
+      ),
+      vendas_com_troca AS (
+        SELECT 
+          vb.*,
+          ISNULL(ti.VALOR_TROCA, 0) AS VALOR_TROCA_ITEM,
+          ISNULL(tt.VALOR_TROCA_TICKET, 0) AS VALOR_TROCA_TICKET,
+          SUM(vb.TOTAL_VENDA) OVER (PARTITION BY vb.TICKET, vb.CODIGO_FILIAL) AS TOTAL_VENDA_TICKET
+        FROM vendas_base vb
+        LEFT JOIN trocas_item ti ON ti.TICKET = vb.TICKET 
+          AND ti.CODIGO_FILIAL = vb.CODIGO_FILIAL
+          AND ti.PRODUTO = vb.PRODUTO
+          AND ISNULL(ti.COR_PRODUTO, '') = ISNULL(vb.COR_PRODUTO, '')
+          AND ISNULL(ti.TAMANHO, 0) = ISNULL(vb.TAMANHO, 0)
+        LEFT JOIN trocas_ticket tt ON tt.TICKET = vb.TICKET 
+          AND tt.CODIGO_FILIAL = vb.CODIGO_FILIAL
+      ),
+      vendas_liquidas AS (
+        SELECT 
+          *,
+          CASE 
+            WHEN TOTAL_VENDA_TICKET > 0 THEN CAST(TOTAL_VENDA AS FLOAT) / CAST(TOTAL_VENDA_TICKET AS FLOAT)
+            ELSE 0
+          END AS PROPORCAO
+        FROM vendas_com_troca
+      ),
+      vendas_finais AS (
+        SELECT 
+          *,
+          CASE 
+            WHEN ISNULL(VALOR_TROCA_ITEM, 0) > 0 THEN ISNULL(VALOR_TROCA_ITEM, 0)
+            ELSE ISNULL(VALOR_TROCA_TICKET, 0) * PROPORCAO
+          END AS VALOR_TROCA
+        FROM vendas_liquidas
+      )
+      SELECT 
+        FILIAL,
+        SUM(TOTAL_VENDA - VALOR_TROCA) AS totalRevenue
+      FROM vendas_finais
+      GROUP BY FILIAL
     `;
 
     const [stockResult, currentSalesResult, previousSalesResult] = await Promise.all([
