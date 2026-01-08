@@ -125,129 +125,55 @@ export async function processVendas(
   const barcodes: BarcodeRow[] =
     produtosBarra ?? (data.produtosBarra as BarcodeRow[]);
 
-  // 1) Manter apenas linhas com quantidade positiva (mesma lógica do site)
-  const filtered = data.vendas.filter((item) => toNumber(item.QTDE) > 0);
-  const converted = convertDates(filtered, ['DATA_VENDA']);
+  // 1) NÃO filtrar linhas - incluir todas (incluindo valores negativos de trocas puras)
+  //    O SQL já calcula VALOR_LIQUIDO_CALC e QTDE_LIQUIDA_CALC corretamente
+  const converted = convertDates(data.vendas, ['DATA_VENDA']);
 
   // 2) Enriquecimento com códigos de barra usando a mesma lógica do site:
   //    prioridade PRODUTO+COR+TAMANHO, depois PRODUTO+COR, depois PRODUTO
   const enriched = enrichWithBarcode(converted, barcodes, { prioritizeSize: true });
 
-  // 3) Calcular valor total da venda (antes de considerar trocas)
-  //    Este será o valor que vai para TOTAL_VENDA
-  const withTotalVenda = enriched.map((item) => {
+  // 3) Usar diretamente os valores calculados no SQL (VALOR_LIQUIDO_CALC e QTDE_LIQUIDA_CALC)
+  //    Não recalcular no JavaScript para evitar erros de ponto flutuante
+  const withValoresCalculados = enriched.map((item) => {
     const record = item as AnyRecord;
+    
+    // Usar valores calculados diretamente do SQL
+    const valorLiquidoCalc = toNumber(record.VALOR_LIQUIDO_CALC ?? 0);
+    const qtdeLiquidaCalc = toNumber(record.QTDE_LIQUIDA_CALC ?? 0);
+    
+    // Calcular TOTAL_VENDA para manter compatibilidade (se necessário)
     const qtdeCancelada = toNumber(record.QTDE_CANCELADA);
     const precoLiquido = toNumber(record.PRECO_LIQUIDO);
     const qtde = toNumber(record.QTDE);
     const descontoVenda = toNumber(record.DESCONTO_VENDA);
-
-    const totalVenda =
-      qtdeCancelada > 0 ? 0 : precoLiquido * qtde - descontoVenda;
+    const totalVenda = qtdeCancelada > 0 ? 0 : precoLiquido * qtde - descontoVenda;
+    const totalQtdeVenda = qtdeCancelada > 0 ? 0 : qtde;
+    
+    // Garantir que as colunas de troca existam
+    const qtdeTrocaItem = toNumber(record.QTDE_TROCA_ITEM ?? 0);
+    const valorTrocaItem = toNumber(record.VALOR_TROCA_ITEM ?? 0);
+    const qtdeTroca = toNumber(record.QTDE_TROCA ?? qtdeTrocaItem);
+    const valorTroca = toNumber(record.VALOR_TROCA ?? valorTrocaItem);
 
     return {
       ...record,
       TOTAL_VENDA: totalVenda,
-    };
-  });
-
-  // 4) Calcular quantidade total da venda (antes de considerar trocas)
-  //    Este será o valor que vai para TOTAL_QTDE_VENDA
-  const withTotalQtdeVenda = withTotalVenda.map((item) => {
-    const record = item as AnyRecord;
-    const qtdeCancelada = toNumber(record.QTDE_CANCELADA);
-    const qtde = toNumber(record.QTDE);
-
-    const totalQtdeVenda = qtdeCancelada > 0 ? 0 : qtde;
-
-    return {
-      ...record,
       TOTAL_QTDE_VENDA: totalQtdeVenda,
-    };
-  });
-
-  // 5) Garantir que as colunas de troca existam e estejam preenchidas
-  const withTroca = withTotalQtdeVenda.map((item) => {
-    const record = item as AnyRecord;
-    const qtdeTrocaItem = toNumber(record.QTDE_TROCA_ITEM);
-    const valorTrocaItem = toNumber(record.VALOR_TROCA_ITEM);
-    const qtdeTrocaTicket = toNumber(record.QTDE_TROCA_TICKET);
-    const valorTrocaTicket = toNumber(record.VALOR_TROCA_TICKET);
-
-    return {
-      ...record,
       QTDE_TROCA_ITEM: qtdeTrocaItem,
       VALOR_TROCA_ITEM: valorTrocaItem,
-      QTDE_TROCA_TICKET: qtdeTrocaTicket,
-      VALOR_TROCA_TICKET: valorTrocaTicket,
-    };
-  });
-
-  // 6) Calcular TOTAL_VENDA_TICKET para distribuição proporcional
-  //    Agrupar por TICKET e CODIGO_FILIAL para calcular o total do ticket
-  const ticketTotals = new Map<string, number>();
-  withTroca.forEach((item) => {
-    const record = item as AnyRecord;
-    const key = `${record.TICKET}|${record.CODIGO_FILIAL}`;
-    const totalVenda = toNumber(record.TOTAL_VENDA);
-    ticketTotals.set(key, (ticketTotals.get(key) ?? 0) + totalVenda);
-  });
-
-  // 7) Distribuir troca do ticket proporcionalmente
-  const withTrocaProporcional = withTroca.map((item) => {
-    const record = item as AnyRecord;
-    const key = `${record.TICKET}|${record.CODIGO_FILIAL}`;
-    const totalVendaTicket = ticketTotals.get(key) ?? 0;
-    const totalVenda = toNumber(record.TOTAL_VENDA);
-
-    const proporcao = totalVendaTicket > 0 ? totalVenda / totalVendaTicket : 0;
-
-    const valorTrocaTicketProp = toNumber(record.VALOR_TROCA_TICKET) * proporcao;
-    const qtdeTrocaTicketProp = toNumber(record.QTDE_TROCA_TICKET) * proporcao;
-
-    // Usar troca por item se existir, senão usar troca por ticket (proporcional)
-    const qtdeTroca = toNumber(record.QTDE_TROCA_ITEM) > 0
-      ? toNumber(record.QTDE_TROCA_ITEM)
-      : qtdeTrocaTicketProp;
-
-    const valorTroca = toNumber(record.VALOR_TROCA_ITEM) > 0
-      ? toNumber(record.VALOR_TROCA_ITEM)
-      : valorTrocaTicketProp;
-
-    return {
-      ...record,
       QTDE_TROCA: qtdeTroca,
       VALOR_TROCA: valorTroca,
+      // Usar valores calculados diretamente do SQL
+      VALOR_LIQUIDO: valorLiquidoCalc,
+      QTDE: Math.round(qtdeLiquidaCalc), // Garantir valores inteiros
     };
   });
 
-  // 8) Calcular valores líquidos usando a lógica descoberta:
-  //    valor_liquido = total_venda - valor_troca
-  //    qtde_liquida = total_qtde_venda - qtde_troca
-  const withValorLiquido = withTrocaProporcional.map((item) => {
-    const record = item as AnyRecord;
-    const totalVenda = toNumber(record.TOTAL_VENDA);
-    const valorTroca = toNumber(record.VALOR_TROCA);
-    const totalQtdeVenda = toNumber(record.TOTAL_QTDE_VENDA);
-    const qtdeTroca = toNumber(record.QTDE_TROCA);
+  // 4) Remover colunas técnicas, igual ao SALES_COLUMNS_TO_DROP do site
+  const trimmed = dropColumns(withValoresCalculados, SALES_COLUMNS_TO_DROP);
 
-    const valorLiquido = totalVenda - valorTroca;
-    const qtdeLiquida = totalQtdeVenda - qtdeTroca;
-
-    return {
-      ...record,
-      VALOR_LIQUIDO: valorLiquido,
-      QTDE: qtdeLiquida,
-    };
-  });
-
-  // 9) Não filtrar linhas - incluir todas (mesma lógica do arquivo de referência)
-  //    O arquivo inclui todas as linhas, incluindo as com qtde_liquida <= 0
-
-  // 10) Remover colunas técnicas, igual ao SALES_COLUMNS_TO_DROP do site
-  const trimmed = dropColumns(withValorLiquido, SALES_COLUMNS_TO_DROP);
-
-  // 11) Reordenar colunas: VALOR_LIQUIDO logo após QTDE
+  // 5) Reordenar colunas: VALOR_LIQUIDO logo após QTDE
   const reordered = trimmed.map((item) => {
     if (!('VALOR_LIQUIDO' in item)) {
       return item;

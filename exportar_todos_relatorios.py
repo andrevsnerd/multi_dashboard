@@ -17,6 +17,7 @@ from datetime import datetime
 # Config conexão
 DB_CONFIG = {
     'server': '177.92.78.250',
+    'server_fallback': '189.126.197.82',
     'database': 'LINX_PRODUCAO',
     'username': 'andre.nerd',
     'password': 'nerd123@'
@@ -26,7 +27,7 @@ DB_CONFIG = {
 COLS_REMOVER = {
     'produtos': ['CODIGO_PRECO', 'MATERIAL', 'TABELA_OPERACOES', 'FATOR_OPERACOES', 'TABELA_MEDIDAS', 'CARTELA', 'UNIDADE', 'REVENDA', 'MODELAGEM', 'SORTIMENTO_COR', 'SORTIMENTO_TAMANHO', 'VARIA_PRECO_COR', 'VARIA_PRECO_TAM', 'PONTEIRO_PRECO_TAM', 'VARIA_CUSTO_COR', 'PERTENCE_A_CONJUNTO', 'TRIBUT_ICMS', 'TRIBUT_ORIGEM', 'VARIA_CUSTO_TAM', 'CUSTO_REPOSICAO2', 'CUSTO_REPOSICAO3', 'CUSTO_REPOSICAO4', 'ESTILISTA', 'MODELISTA', 'TAMANHO_BASE', 'GIRO_ENTREGA', 'TIMESTAMP', 'INATIVO', 'ENVIA_LOJA_VAREJO', 'ENVIA_LOJA_ATACADO', 'ENVIA_REPRESENTANTE', 'ENVIA_VAREJO_INTERNET', 'ENVIA_ATACADO_INTERNET', 'MODELO', 'REDE_LOJAS', 'FABRICANTE_ICMS_ABATER', 'FABRICANTE_PRAZO_PGTO', 'TAXA_JUROS_DEFLACIONAR', 'TAXAS_IMPOSTOS_APLICAR', 'PRECO_REPOSICAO_2', 'PRECO_REPOSICAO_3', 'PRECO_REPOSICAO_4', 'PRECO_A_VISTA_REPOSICAO_2', 'PRECO_A_VISTA_REPOSICAO_3', 'PRECO_A_VISTA_REPOSICAO_4', 'FABRICANTE_FRETE', 'DROP_DE_TAMANHOS', 'STATUS_PRODUTO', 'TIPO_STATUS_PRODUTO', 'OBS', 'COMPOSICAO', 'RESTRICAO_LAVAGEM', 'ORCAMENTO', 'CLIENTE_DO_PRODUTO', 'CONTA_CONTABIL', 'ESPESSURA', 'ALTURA', 'LARGURA', 'COMPRIMENTO', 'EMPILHAMENTO_MAXIMO', 'PARTE_TIPO', 'VERSAO_FICHA', 'COD_FLUXO_PRODUTO', 'DATA_INICIO_DESENVOLVIMENTO', 'INDICADOR_CFOP', 'MONTAGEM_KIT', 'MRP_AGRUPAR_NECESSIDADE_DIAS', 'MRP_AGRUPAR_NECESSIDADE_TIPO', 'MRP_DIAS_SEGURANCA', 'MRP_EMISSAO_LIBERACAO_DIAS', 'MRP_ENTREGA_GIRO_DIAS', 'MRP_PARTICIPANTE', 'MRP_MAIOR_GIRO_MP_DIAS', 'MRP_FP', 'MRP_RR', 'OP_POR_COR', 'OP_QTDE_MAXIMA', 'OP_QTDE_MINIMA', 'QUALIDADE', 'SEMI_ACABADO', 'CONTA_CONTABIL_COMPRA', 'CONTA_CONTABIL_VENDA', 'CONTA_CONTABIL_DEV_COMPRA', 'CONTA_CONTABIL_DEV_VENDA', 'ID_EXCECAO_GRUPO', 'ID_EXCECAO_IMPOSTO', 'DIAS_COMPRA', 'FATOR_P', 'FATOR_Q', 'FATOR_F', 'CONTINUIDADE', 'COD_PRODUTO_SOLUCAO', 'COD_PRODUTO_SEGMENTO', 'ID_PRECO', 'TIPO_ITEM_SPED', 'PERC_COMISSAO', 'ACEITA_ENCOMENDA', 'DIAS_GARANTIA_LOJA', 'DIAS_GARANTIA_FABRICANTE', 'POSSUI_MONTAGEM', 'PERMITE_ENTREGA_FUTURA', 'NATUREZA_RECEITA', 'COD_ALIQUOTA_PIS_COFINS_DIF', 'DATA_LIMITE_PEDIDO', 'LX_STATUS_REGISTRO', 'ARREDONDA', 'ID_ARTIGO', 'LX_HASH', 'SPED_DATA_FIM', 'SPED_DATA_INI', 'TIPO_PP', 'FATOR_A', 'FATOR_B', 'FATOR_BUFFER', 'FATOR_LT', 'TIPO_CANAL', 'NAO_ENVIA_ETL', 'TITULO_B2C', 'DESCRICAO_B2C', 'PRE_VENDA', 'TAGS', 'VIDEO_EMBED', 'CARACTERISTICAS_TECNICAS_B2C', 'FRETE_GRATIS', 'ESTOQUE_MINIMO', 'DATA_PUBLICACAO_B2C', 'GRUPO_PRODUTO_B2C', 'SUBGRUPO_PRODUTO_B2C', 'TIPO_PRODUTO_B2C', 'GRIFFE_B2C', 'LINHA_B2C', 'FABRICANTE_B2C', 'CATEGORIA_B2C', 'SUBCATEGORIA_B2C', 'REPOSICAO_B2C', 'IMG_ESTILO', 'DESCRICAO_B2C_2', 'DESCRICAO_B2C_3', 'SUJEITO_SUBSTITUTICAO_TRIBUTARIA', 'OPTION_TITULO', 'OPTION_DESC', 'OPTION_CARACTERISTICA','EMPRESA','SEXO_TIPO','PESO','DIAS_ACERTO_CONSIGNACAO','POSSUI_GTIN'],
     'estoque': ['CUSTO_MEDIO1', 'CUSTO_MEDIO2', 'CUSTO_MEDIO3', 'CUSTO_MEDIO4', 'ULTIMO_CUSTO1', 'ULTIMO_CUSTO2', 'ULTIMO_CUSTO3', 'ULTIMO_CUSTO4', 'DATA_CUSTO_MEDIO', 'DATA_ULT_CUSTO'] + [f'ES{i}' for i in range(1, 49)] + ['TIMESTAMP', 'PRIMEIRA_ENTRADA', 'LX_STATUS_REGISTRO', 'LX_HASH'],
-    'vendas': ['TAMANHO', 'PEDIDO', 'DESCONTO_ITEM', 'CODIGO_DESCONTO', 'CODIGO_TAB_PRECO', 'OPERACAO_VENDA', 'FATOR_VENDA_LIQ', 'VALOR_TIKET', 'DESCONTO', 'DATA_HORA_CANCELAMENTO', 'QTDE_CANCELADA']
+    'vendas': ['TAMANHO', 'DESCONTO_ITEM', 'CODIGO_DESCONTO', 'CODIGO_TAB_PRECO', 'OPERACAO_VENDA', 'FATOR_VENDA_LIQ', 'VALOR_TIKET', 'DESCONTO_VENDA', 'DATA_HORA_CANCELAMENTO', 'QTDE_CANCELADA']
 }
 
 def enriquecer_com_codigo_barra(df_base, df_codigos_barra, prioridade_tamanho=True):
@@ -60,18 +61,38 @@ def enriquecer_com_codigo_barra(df_base, df_codigos_barra, prioridade_tamanho=Tr
     return df_resultado
 
 def conectar_banco():
-    """Conecta ao SQL Server"""
-    try:
-        print("Conectando ao banco...")
-        conn_str = (f"DRIVER={{ODBC Driver 17 for SQL Server}};"
-                   f"SERVER={DB_CONFIG['server']};"
-                   f"DATABASE={DB_CONFIG['database']};"
-                   f"UID={DB_CONFIG['username']};"
-                   f"PWD={DB_CONFIG['password']};")
-        return pyodbc.connect(conn_str)
-    except Exception as e:
-        print(f"✗ Erro conexão: {e}")
-        sys.exit(1)
+    """Conecta ao SQL Server com timeout e fallback"""
+    servidores = [
+        ('principal', DB_CONFIG['server']),
+        ('fallback', DB_CONFIG['server_fallback'])
+    ]
+    
+    ultimo_erro = None
+    for nome, servidor in servidores:
+        try:
+            print(f"Conectando ao banco ({nome}: {servidor})...")
+            conn_str = (f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+                       f"SERVER={servidor};"
+                       f"DATABASE={DB_CONFIG['database']};"
+                       f"UID={DB_CONFIG['username']};"
+                       f"PWD={DB_CONFIG['password']};"
+                       f"Connection Timeout=30;")
+            conn = pyodbc.connect(conn_str)
+            # Configurar timeout de comando (em segundos)
+            conn.timeout = 300  # 5 minutos
+            if nome == 'fallback':
+                print(f"✓ Conectado via servidor fallback ({servidor})")
+            return conn
+        except Exception as e:
+            ultimo_erro = e
+            print(f"✗ Erro conexão com {nome} ({servidor}): {e}")
+            if nome == 'principal':
+                print("⚠ Tentando servidor fallback...")
+            continue
+    
+    # Se chegou aqui, ambos os servidores falharam
+    print(f"✗ Erro conexão: Falha em todos os servidores. Último erro: {ultimo_erro}")
+    sys.exit(1)
 
 def converter_datas(df, colunas):
     """Converte colunas para datetime (vetorizado)"""
@@ -146,77 +167,49 @@ def processar_vendas(df, df_codigos_barra):
     t = time.time()
     print("\n[VENDAS]")
     
-    # 1) Manter apenas linhas com quantidade positiva (mesma lógica do site)
-    df = df[df['QTDE'] > 0].copy()
-    
-    # 2) Converter datas (DATA_VENDA) para datetime
+    # 1) Converter datas (DATA_VENDA) para datetime
     df = converter_datas(df, ['DATA_VENDA'])
     
-    # 3) Enriquecimento com códigos de barra usando a mesma lógica do site:
+    # 2) Enriquecimento com códigos de barra usando a mesma lógica do site:
     #    prioridade PRODUTO+COR+TAMANHO, depois PRODUTO+COR, depois PRODUTO
     #    (equivalente ao enrichWithBarcode com prioritizeSize=True)
     df = enriquecer_com_codigo_barra(df, df_codigos_barra, prioridade_tamanho=True)
     
-    # 4) Calcular valor total da venda (antes de considerar trocas)
-    #    Este será o valor que vai para TOTAL_VENDA
-    df['TOTAL_VENDA'] = np.where(
-        df['QTDE_CANCELADA'].fillna(0) > 0,
-        0,
-        (df['PRECO_LIQUIDO'].fillna(0) * df['QTDE'].fillna(0)) - df['DESCONTO_VENDA'].fillna(0)
-    )
+    # 3) Calcular valor total da venda (antes de considerar trocas)
+    #    TOTAL_VENDA = (PRECO_LIQUIDO * QTDE) - DESCONTO
+    #    O DESCONTO é o desconto do ticket (renomeado de DESCONTO_VENDA no SQL)
+    df['TOTAL_VENDA'] = (df['PRECO_LIQUIDO'].fillna(0) * df['QTDE'].fillna(0)) - df['DESCONTO'].fillna(0)
     
-    # 5) Calcular quantidade total da venda (antes de considerar trocas)
+    # 4) Calcular quantidade total da venda (antes de considerar trocas)
     #    Este será o valor que vai para TOTAL_QTDE_VENDA
-    df['TOTAL_QTDE_VENDA'] = np.where(
-        df['QTDE_CANCELADA'].fillna(0) > 0,
-        0,
-        df['QTDE'].fillna(0)
-    )
+    df['TOTAL_QTDE_VENDA'] = df['QTDE'].fillna(0)
     
-    # 6) Garantir que as colunas de troca existam e estejam preenchidas
-    # Usar troca por item se existir, senão usar troca por ticket
+    # 5) Garantir que as colunas de troca por item existam e estejam preenchidas
     if 'QTDE_TROCA_ITEM' not in df.columns:
         df['QTDE_TROCA_ITEM'] = 0
     if 'VALOR_TROCA_ITEM' not in df.columns:
         df['VALOR_TROCA_ITEM'] = 0
-    if 'QTDE_TROCA_TICKET' not in df.columns:
-        df['QTDE_TROCA_TICKET'] = 0
-    if 'VALOR_TROCA_TICKET' not in df.columns:
-        df['VALOR_TROCA_TICKET'] = 0
     
     df['QTDE_TROCA_ITEM'] = df['QTDE_TROCA_ITEM'].fillna(0)
     df['VALOR_TROCA_ITEM'] = df['VALOR_TROCA_ITEM'].fillna(0)
-    df['QTDE_TROCA_TICKET'] = df['QTDE_TROCA_TICKET'].fillna(0)
-    df['VALOR_TROCA_TICKET'] = df['VALOR_TROCA_TICKET'].fillna(0)
     
-    # Usar troca por item se existir, senão usar troca por ticket
-    # IMPORTANTE: Para evitar duplicação quando há múltiplas linhas no mesmo ticket,
-    # distribuir a troca do ticket proporcionalmente pelo TOTAL_VENDA de cada linha
-    df['TOTAL_VENDA_TICKET'] = df.groupby(['TICKET', 'CODIGO_FILIAL'])['TOTAL_VENDA'].transform('sum')
-    df['PROPORCAO'] = np.where(
-        df['TOTAL_VENDA_TICKET'] > 0,
-        df['TOTAL_VENDA'] / df['TOTAL_VENDA_TICKET'],
-        0
-    )
+    # 6) Cálculo direto por item (sem distribuição proporcional)
+    #    VALOR_TROCA = VALOR_TROCA_ITEM
+    #    QTDE_TROCA = QTDE_TROCA_ITEM
+    df['QTDE_TROCA'] = df['QTDE_TROCA_ITEM']
+    df['VALOR_TROCA'] = df['VALOR_TROCA_ITEM']
     
-    # Distribuir troca do ticket proporcionalmente
-    df['VALOR_TROCA_TICKET_PROP'] = df['VALOR_TROCA_TICKET'] * df['PROPORCAO']
-    df['QTDE_TROCA_TICKET_PROP'] = df['QTDE_TROCA_TICKET'] * df['PROPORCAO']
-    
-    # Usar troca por item se existir, senão usar troca por ticket (proporcional)
-    df['QTDE_TROCA'] = np.where(df['QTDE_TROCA_ITEM'] > 0, df['QTDE_TROCA_ITEM'], df['QTDE_TROCA_TICKET_PROP'])
-    df['VALOR_TROCA'] = np.where(df['VALOR_TROCA_ITEM'] > 0, df['VALOR_TROCA_ITEM'], df['VALOR_TROCA_TICKET_PROP'])
-    
-    # 7) Calcular valores líquidos usando a lógica descoberta:
-    #    valor_liquido = total_venda - valor_troca
-    #    qtde_liquida = total_qtde_venda - qtde_troca
+    # 7) Calcular valores líquidos:
+    #    VALOR_LIQUIDO = TOTAL_VENDA - VALOR_TROCA
+    #    QTDE (Coluna Final) = TOTAL_QTDE_VENDA - QTDE_TROCA
     df['VALOR_LIQUIDO'] = df['TOTAL_VENDA'] - df['VALOR_TROCA']
     
-    # Substituir QTDE pela quantidade líquida calculada
-    df['QTDE'] = df['TOTAL_QTDE_VENDA'] - df['QTDE_TROCA']
+    # Substituir QTDE pela quantidade líquida calculada (garantindo valores inteiros)
+    df['QTDE'] = (df['TOTAL_QTDE_VENDA'] - df['QTDE_TROCA']).astype(int)
     
-    # 7.5) Não filtrar linhas - incluir todas (mesma lógica do arquivo de referência dezembro.csv)
-    #      O arquivo dezembro.csv inclui todas as linhas, incluindo as com qtde_liquida <= 0
+    # Garantir que TOTAL_QTDE_VENDA e QTDE_TROCA também sejam inteiros
+    df['TOTAL_QTDE_VENDA'] = df['TOTAL_QTDE_VENDA'].astype(int)
+    df['QTDE_TROCA'] = df['QTDE_TROCA'].astype(int)
     
     # 8) Remover colunas técnicas, igual ao SALES_COLUMNS_TO_DROP do site
     df.drop(columns=COLS_REMOVER['vendas'], inplace=True, errors='ignore')
@@ -352,7 +345,7 @@ def copiar_arquivos(relatorios_gerados=None):
         print(f"✗ Erro cópia: {e}")
 
 def exibir_menu():
-    """Exibe menu de seleção de relatórios e retorna a escolha"""
+    """Exibe menu de seleção de relatórios e retorna a escolha (pode ser lista ou 'todos')"""
     print("\n" + "="*60)
     print("SELECIONE O RELATÓRIO PARA EXPORTAR")
     print("="*60)
@@ -362,6 +355,7 @@ def exibir_menu():
     print("3 - Vendas")
     print("4 - E-commerce")
     print("5 - Entradas")
+    print("\n💡 Dica: Você pode selecionar múltiplos separando por vírgula (ex: 1,2,3)")
     print("\n" + "-"*60)
     
     escolha = input("Digite o número da opção (ou Enter para todos): ").strip()
@@ -377,11 +371,32 @@ def exibir_menu():
         '5': 'entradas'
     }
     
-    if escolha in opcoes:
-        return opcoes[escolha]
-    else:
-        print(f"⚠ Opção inválida '{escolha}'. Exportando todos os relatórios.")
+    # Separar por vírgula e processar múltiplas seleções
+    escolhas = [e.strip() for e in escolha.split(',')]
+    relatorios_selecionados = []
+    opcoes_invalidas = []
+    
+    for e in escolhas:
+        if e in opcoes:
+            relatorio = opcoes[e]
+            # Evitar duplicatas
+            if relatorio not in relatorios_selecionados:
+                relatorios_selecionados.append(relatorio)
+        else:
+            opcoes_invalidas.append(e)
+    
+    if opcoes_invalidas:
+        print(f"⚠ Opções inválidas ignoradas: {', '.join(opcoes_invalidas)}")
+    
+    if not relatorios_selecionados:
+        print(f"⚠ Nenhuma opção válida selecionada. Exportando todos os relatórios.")
         return 'todos'
+    
+    # Se selecionou todos os 5, retornar 'todos' para otimização
+    if len(relatorios_selecionados) == 5:
+        return 'todos'
+    
+    return relatorios_selecionados
 
 def main():
     """Orquestrador principal"""
@@ -393,17 +408,23 @@ def main():
     # Menu de seleção
     relatorio_escolhido = exibir_menu()
     
+    nomes_relatorios = {
+        'produtos': 'Produtos',
+        'estoque': 'Estoque',
+        'vendas': 'Vendas',
+        'ecommerce': 'E-commerce',
+        'entradas': 'Entradas'
+    }
+    
+    # Determinar quais relatórios processar
     if relatorio_escolhido == 'todos':
+        relatorios_processar = ['produtos', 'estoque', 'vendas', 'ecommerce', 'entradas']
         print("\n✓ Exportando TODOS os relatórios")
     else:
-        nomes_relatorios = {
-            'produtos': 'Produtos',
-            'estoque': 'Estoque',
-            'vendas': 'Vendas',
-            'ecommerce': 'E-commerce',
-            'entradas': 'Entradas'
-        }
-        print(f"\n✓ Exportando apenas: {nomes_relatorios.get(relatorio_escolhido, relatorio_escolhido)}")
+        # relatorio_escolhido já é uma lista
+        relatorios_processar = relatorio_escolhido
+        nomes = [nomes_relatorios.get(r, r) for r in relatorios_processar]
+        print(f"\n✓ Exportando: {', '.join(nomes)}")
     
     # Definir dependências de cada relatório
     dependencias = {
@@ -413,12 +434,6 @@ def main():
         'ecommerce': [],
         'entradas': ['produtos', 'cores']
     }
-    
-    # Determinar quais relatórios processar
-    if relatorio_escolhido == 'todos':
-        relatorios_processar = ['produtos', 'estoque', 'vendas', 'ecommerce', 'entradas']
-    else:
-        relatorios_processar = [relatorio_escolhido]
     
     # Determinar quais queries são necessárias
     queries_necessarias = set()
@@ -433,52 +448,209 @@ def main():
         'estoque': "SELECT * FROM ESTOQUE_PRODUTOS",
         'produtos_barra': "SELECT PRODUTO, COR_PRODUTO, TAMANHO, CODIGO_BARRA FROM PRODUTOS_BARRA",
         'vendas': """
-            SELECT vp.FILIAL, vp.DATA_VENDA, vp.PRODUTO, vp.DESC_PRODUTO,
-                   vp.COR_PRODUTO, vp.DESC_COR_PRODUTO, vp.TAMANHO, p.GRADE, 
-                   vp.PEDIDO, vp.TICKET, vp.CODIGO_FILIAL, vp.QTDE, vp.QTDE_CANCELADA, 
-                   vp.PRECO_LIQUIDO, vp.DESCONTO_ITEM, vp.DESCONTO_VENDA, 
-                   vp.FATOR_VENDA_LIQ, vp.CUSTO, vp.GRUPO_PRODUTO, 
-                   vp.SUBGRUPO_PRODUTO, vp.LINHA, vp.COLECAO, vp.GRIFFE, 
-                   vp.VENDEDOR, v.VALOR_TIKET, v.DESCONTO, v.VALOR_VENDA_BRUTA, 
-                   v.CODIGO_TAB_PRECO, v.CODIGO_DESCONTO, v.OPERACAO_VENDA, 
-                   v.DATA_HORA_CANCELAMENTO, v.VENDEDOR_APELIDO,
-                   ISNULL(troca_item.QTDE_TROCA, 0) AS QTDE_TROCA_ITEM,
-                   ISNULL(troca_item.VALOR_TROCA, 0) AS VALOR_TROCA_ITEM,
-                   ISNULL(troca_ticket.QTDE_TROCA_TICKET, 0) AS QTDE_TROCA_TICKET,
-                   ISNULL(troca_ticket.VALOR_TROCA_TICKET, 0) AS VALOR_TROCA_TICKET
-    FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-    LEFT JOIN W_CTB_LOJA_VENDA_PEDIDO v WITH (NOLOCK)
-        ON v.FILIAL = vp.FILIAL AND v.PEDIDO = vp.PEDIDO AND v.TICKET = vp.TICKET
-    LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO
-    LEFT JOIN (
-        SELECT 
-            TICKET,
-            CODIGO_FILIAL,
-            PRODUTO,
-            COR_PRODUTO,
-            TAMANHO,
-            SUM(QTDE) AS QTDE_TROCA,
-            SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA
-        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
-        WHERE QTDE_CANCELADA = 0
-        GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
-    ) troca_item ON troca_item.TICKET = vp.TICKET 
-        AND troca_item.CODIGO_FILIAL = vp.CODIGO_FILIAL
-        AND troca_item.PRODUTO = vp.PRODUTO
-        AND ISNULL(troca_item.COR_PRODUTO, '') = ISNULL(vp.COR_PRODUTO, '')
-        AND ISNULL(troca_item.TAMANHO, 0) = ISNULL(vp.TAMANHO, 0)
-    LEFT JOIN (
-        SELECT 
-            TICKET,
-            CODIGO_FILIAL,
-            SUM(QTDE) AS QTDE_TROCA_TICKET,
-            SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA_TICKET
-        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
-        WHERE QTDE_CANCELADA = 0
-        GROUP BY TICKET, CODIGO_FILIAL
-    ) troca_ticket ON troca_ticket.TICKET = vp.TICKET 
-        AND troca_ticket.CODIGO_FILIAL = vp.CODIGO_FILIAL
-    WHERE vp.DATA_VENDA >= '2024-01-01'
+            WITH VendasBase AS (
+                SELECT 
+                    vp.TICKET,
+                    vp.CODIGO_FILIAL,
+                    vp.DATA_VENDA,
+                    vp.PRODUTO,
+                    vp.COR_PRODUTO,
+                    vp.TAMANHO,
+                    vp.QTDE,
+                    vp.QTDE_CANCELADA,
+                    vp.PRECO_LIQUIDO,
+                    vp.DESCONTO_ITEM,
+                    vp.CUSTO,
+                    vp.FATOR_VENDA_LIQ,
+                    f.FILIAL,
+                    v.VENDEDOR,
+                    (vp.QTDE * vp.PRECO_LIQUIDO * vp.FATOR_DESCONTO_VENDA) AS DESCONTO_VENDA,
+                    v.VALOR_TIKET,
+                    v.VALOR_VENDA_BRUTA,
+                    v.CODIGO_TAB_PRECO,
+                    v.CODIGO_DESCONTO,
+                    v.OPERACAO_VENDA,
+                    v.DATA_HORA_CANCELAMENTO,
+                    p.DESC_PRODUTO,
+                    p.GRUPO_PRODUTO,
+                    p.SUBGRUPO_PRODUTO,
+                    p.LINHA,
+                    p.COLECAO,
+                    p.GRIFFE,
+                    p.GRADE,
+                    c.DESC_COR AS DESC_COR_PRODUTO
+                FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+                INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+                    ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL 
+                    AND v.TICKET = vp.TICKET
+                LEFT JOIN FILIAIS f WITH (NOLOCK)
+                    ON f.COD_FILIAL = vp.CODIGO_FILIAL
+                LEFT JOIN PRODUTOS p WITH (NOLOCK) 
+                    ON p.PRODUTO = vp.PRODUTO
+                LEFT JOIN CORES_BASICAS c WITH (NOLOCK) 
+                    ON c.COR = vp.COR_PRODUTO
+                WHERE vp.DATA_VENDA >= '2024-01-01'
+            ),
+            TrocasItem AS (
+                SELECT 
+                    vt.TICKET,
+                    vt.CODIGO_FILIAL,
+                    vt.PRODUTO,
+                    vt.COR_PRODUTO,
+                    vt.TAMANHO,
+                    SUM(vt.QTDE) AS QTDE_TROCA,
+                    SUM(vt.PRECO_LIQUIDO * vt.QTDE) AS VALOR_TROCA
+                FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+                WHERE vt.QTDE_CANCELADA = 0
+                GROUP BY vt.TICKET, vt.CODIGO_FILIAL, vt.PRODUTO, vt.COR_PRODUTO, vt.TAMANHO
+            ),
+            TrocasPuras AS (
+                -- Trocas que não têm venda correspondente (trocas avulsas/devoluções puras)
+                SELECT 
+                    vt.TICKET,
+                    vt.CODIGO_FILIAL,
+                    v.DATA_VENDA,
+                    vt.PRODUTO,
+                    vt.COR_PRODUTO,
+                    vt.TAMANHO,
+                    0 AS QTDE,
+                    0 AS QTDE_CANCELADA,
+                    vt.PRECO_LIQUIDO,
+                    vt.DESCONTO_ITEM,
+                    vt.CUSTO,
+                    NULL AS FATOR_VENDA_LIQ,
+                    f.FILIAL,
+                    v.VENDEDOR,
+                    0 AS DESCONTO_VENDA,
+                    v.VALOR_TIKET,
+                    v.VALOR_VENDA_BRUTA,
+                    v.CODIGO_TAB_PRECO,
+                    v.CODIGO_DESCONTO,
+                    v.OPERACAO_VENDA,
+                    v.DATA_HORA_CANCELAMENTO,
+                    p.DESC_PRODUTO,
+                    p.GRUPO_PRODUTO,
+                    p.SUBGRUPO_PRODUTO,
+                    p.LINHA,
+                    p.COLECAO,
+                    p.GRIFFE,
+                    p.GRADE,
+                    c.DESC_COR AS DESC_COR_PRODUTO,
+                    vt.QTDE AS QTDE_TROCA_ITEM,
+                    (vt.PRECO_LIQUIDO * vt.QTDE) AS VALOR_TROCA_ITEM
+                FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+                INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+                    ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL 
+                    AND v.TICKET = vt.TICKET
+                LEFT JOIN FILIAIS f WITH (NOLOCK)
+                    ON f.COD_FILIAL = vt.CODIGO_FILIAL
+                LEFT JOIN PRODUTOS p WITH (NOLOCK) 
+                    ON p.PRODUTO = vt.PRODUTO
+                LEFT JOIN CORES_BASICAS c WITH (NOLOCK) 
+                    ON c.COR = vt.COR_PRODUTO
+                WHERE vt.QTDE_CANCELADA = 0
+                    AND v.DATA_VENDA >= '2024-01-01'
+                    AND NOT EXISTS (
+                        SELECT 1 
+                        FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+                        WHERE vp.TICKET = vt.TICKET
+                            AND vp.CODIGO_FILIAL = vt.CODIGO_FILIAL
+                            AND vp.PRODUTO = vt.PRODUTO
+                            AND ISNULL(vp.COR_PRODUTO, '') = ISNULL(vt.COR_PRODUTO, '')
+                            AND ISNULL(vp.TAMANHO, 0) = ISNULL(vt.TAMANHO, 0)
+                    )
+            ),
+            VendasComNumero AS (
+                SELECT 
+                    vb.*,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY vb.TICKET, vb.CODIGO_FILIAL, vb.PRODUTO, vb.COR_PRODUTO, vb.TAMANHO
+                        ORDER BY vb.TICKET, vb.CODIGO_FILIAL, vb.PRODUTO, vb.COR_PRODUTO, vb.TAMANHO
+                    ) AS RN
+                FROM VendasBase vb
+            )
+            SELECT 
+                vb.FILIAL,
+                vb.DATA_VENDA,
+                vb.PRODUTO,
+                vb.DESC_PRODUTO,
+                vb.COR_PRODUTO,
+                vb.DESC_COR_PRODUTO,
+                vb.TAMANHO,
+                vb.GRADE,
+                vb.TICKET,
+                vb.CODIGO_FILIAL,
+                vb.QTDE,
+                vb.QTDE_CANCELADA,
+                vb.PRECO_LIQUIDO,
+                vb.DESCONTO_ITEM,
+                vb.DESCONTO_VENDA,
+                vb.FATOR_VENDA_LIQ,
+                vb.CUSTO,
+                vb.GRUPO_PRODUTO,
+                vb.SUBGRUPO_PRODUTO,
+                vb.LINHA,
+                vb.COLECAO,
+                vb.GRIFFE,
+                vb.VENDEDOR,
+                vb.VALOR_TIKET,
+                vb.DESCONTO_VENDA AS DESCONTO,
+                vb.VALOR_VENDA_BRUTA,
+                vb.CODIGO_TAB_PRECO,
+                vb.CODIGO_DESCONTO,
+                vb.OPERACAO_VENDA,
+                vb.DATA_HORA_CANCELAMENTO,
+                NULL AS VENDEDOR_APELIDO,
+                CASE WHEN vb.RN = 1 THEN ISNULL(ti.QTDE_TROCA, 0) ELSE 0 END AS QTDE_TROCA_ITEM,
+                CASE WHEN vb.RN = 1 THEN ISNULL(ti.VALOR_TROCA, 0) ELSE 0 END AS VALOR_TROCA_ITEM,
+                0 AS QTDE_TROCA_TICKET,
+                0 AS VALOR_TROCA_TICKET
+            FROM VendasComNumero vb
+            LEFT JOIN TrocasItem ti ON ti.TICKET = vb.TICKET 
+                AND ti.CODIGO_FILIAL = vb.CODIGO_FILIAL
+                AND ti.PRODUTO = vb.PRODUTO
+                AND ISNULL(ti.COR_PRODUTO, '') = ISNULL(vb.COR_PRODUTO, '')
+                AND ISNULL(ti.TAMANHO, 0) = ISNULL(vb.TAMANHO, 0)
+            
+            UNION ALL
+            
+            SELECT 
+                tp.FILIAL,
+                tp.DATA_VENDA,
+                tp.PRODUTO,
+                tp.DESC_PRODUTO,
+                tp.COR_PRODUTO,
+                tp.DESC_COR_PRODUTO,
+                tp.TAMANHO,
+                tp.GRADE,
+                tp.TICKET,
+                tp.CODIGO_FILIAL,
+                tp.QTDE,
+                tp.QTDE_CANCELADA,
+                tp.PRECO_LIQUIDO,
+                tp.DESCONTO_ITEM,
+                tp.DESCONTO_VENDA,
+                tp.FATOR_VENDA_LIQ,
+                tp.CUSTO,
+                tp.GRUPO_PRODUTO,
+                tp.SUBGRUPO_PRODUTO,
+                tp.LINHA,
+                tp.COLECAO,
+                tp.GRIFFE,
+                tp.VENDEDOR,
+                tp.VALOR_TIKET,
+                tp.DESCONTO_VENDA AS DESCONTO,
+                tp.VALOR_VENDA_BRUTA,
+                tp.CODIGO_TAB_PRECO,
+                tp.CODIGO_DESCONTO,
+                tp.OPERACAO_VENDA,
+                tp.DATA_HORA_CANCELAMENTO,
+                NULL AS VENDEDOR_APELIDO,
+                tp.QTDE_TROCA_ITEM,
+                tp.VALOR_TROCA_ITEM,
+                0 AS QTDE_TROCA_TICKET,
+                0 AS VALOR_TROCA_TICKET
+            FROM TrocasPuras tp
         """,
         'ecommerce': """
             SELECT f.NF_SAIDA, f.SERIE_NF, f.FILIAL, f.NOME_CLIFOR, fp.PRODUTO,
@@ -528,12 +700,30 @@ def main():
         
         # Extrai apenas os dados necessários
         dfs = {}
+        nomes_amigaveis = {
+            'produtos': 'Produtos',
+            'estoque': 'Estoque',
+            'vendas': 'Vendas',
+            'ecommerce': 'E-commerce',
+            'entradas': 'Entradas',
+            'produtos_barra': 'Códigos de Barra',
+            'cores': 'Cores'
+        }
+        
         for nome in queries_necessarias:
             if nome in queries:
-                dfs[nome] = pd.read_sql(queries[nome], conn)
-                print(f"✓ {nome}: {len(dfs[nome]):,}")
+                nome_display = nomes_amigaveis.get(nome, nome)
+                print(f"⏳ Extraindo {nome_display}...", end=' ', flush=True)
+                t_query = time.time()
+                try:
+                    dfs[nome] = pd.read_sql(queries[nome], conn)
+                    tempo_query = time.time() - t_query
+                    print(f"✓ {len(dfs[nome]):,} registros ({tempo_query:.1f}s)")
+                except Exception as e:
+                    print(f"✗ Erro: {e}")
+                    raise
         
-        print(f"Extração: {time.time()-t_ext:.2f}s")
+        print(f"\n✓ Extração concluída: {time.time()-t_ext:.2f}s")
 
     finally:
         if conn:
@@ -575,7 +765,7 @@ def main():
     print(f"\nProcessamento: {time.time()-t_proc:.2f}s")
     
     # Cópia
-    copiar_arquivos(relatorios_processar if relatorio_escolhido != 'todos' else None)
+    copiar_arquivos(relatorios_processar)
     
     print("\n" + "="*60)
     print(f"CONCLUÍDO! Tempo total: {time.time()-t_total:.2f}s")

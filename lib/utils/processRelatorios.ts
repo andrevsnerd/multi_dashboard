@@ -266,8 +266,9 @@ export function processarVendas(
   vendas: Record<string, any>[],
   codigosBarra: Record<string, any>[]
 ): Record<string, any>[] {
-  // 1) Manter apenas linhas com quantidade positiva (mesma lógica do site)
-  let result = vendas.filter(row => (row.QTDE ?? 0) > 0);
+  // 1) NÃO filtrar linhas - incluir todas (incluindo valores negativos de trocas puras)
+  //    O SQL já calcula VALOR_LIQUIDO_CALC e QTDE_LIQUIDA_CALC corretamente
+  let result = vendas;
   
   // 2) Converter datas (DATA_VENDA) para datetime
   result = converterDatas(result, ['DATA_VENDA']);
@@ -312,77 +313,61 @@ export function processarVendas(
   result = result.map(row => {
     const qtdeTrocaItem = Number(row.QTDE_TROCA_ITEM ?? 0);
     const valorTrocaItem = Number(row.VALOR_TROCA_ITEM ?? 0);
-    const qtdeTrocaTicket = Number(row.QTDE_TROCA_TICKET ?? 0);
-    const valorTrocaTicket = Number(row.VALOR_TROCA_TICKET ?? 0);
     
     return {
       ...row,
       QTDE_TROCA_ITEM: qtdeTrocaItem,
-      VALOR_TROCA_ITEM: valorTrocaItem,
-      QTDE_TROCA_TICKET: qtdeTrocaTicket,
-      VALOR_TROCA_TICKET: valorTrocaTicket
+      VALOR_TROCA_ITEM: valorTrocaItem
     };
   });
   
-  // 7) Calcular TOTAL_VENDA_TICKET para distribuição proporcional
-  //    Agrupar por TICKET e CODIGO_FILIAL para calcular o total do ticket
-  const ticketTotals = new Map<string, number>();
-  result.forEach(row => {
-    const key = `${row.TICKET}|${row.CODIGO_FILIAL}`;
-    const totalVenda = Number(row.TOTAL_VENDA ?? 0);
-    ticketTotals.set(key, (ticketTotals.get(key) ?? 0) + totalVenda);
-  });
-  
-  // 8) Distribuir troca do ticket proporcionalmente
+  // 7) Cálculo direto por item (sem distribuição proporcional)
+  //    VALOR_TROCA = VALOR_TROCA_ITEM
+  //    QTDE_TROCA = QTDE_TROCA_ITEM
   result = result.map(row => {
-    const key = `${row.TICKET}|${row.CODIGO_FILIAL}`;
-    const totalVendaTicket = ticketTotals.get(key) ?? 0;
-    const totalVenda = Number(row.TOTAL_VENDA ?? 0);
-    
-    const proporcao = totalVendaTicket > 0 ? totalVenda / totalVendaTicket : 0;
-    
-    const valorTrocaTicketProp = Number(row.VALOR_TROCA_TICKET ?? 0) * proporcao;
-    const qtdeTrocaTicketProp = Number(row.QTDE_TROCA_TICKET ?? 0) * proporcao;
-    
-    // Usar troca por item se existir, senão usar troca por ticket (proporcional)
-    const qtdeTroca = Number(row.QTDE_TROCA_ITEM ?? 0) > 0
-      ? Number(row.QTDE_TROCA_ITEM ?? 0)
-      : qtdeTrocaTicketProp;
-    
-    const valorTroca = Number(row.VALOR_TROCA_ITEM ?? 0) > 0
-      ? Number(row.VALOR_TROCA_ITEM ?? 0)
-      : valorTrocaTicketProp;
+    const qtdeTrocaItem = Number(row.QTDE_TROCA_ITEM ?? 0);
+    const valorTrocaItem = Number(row.VALOR_TROCA_ITEM ?? 0);
     
     return {
       ...row,
-      QTDE_TROCA: qtdeTroca,
-      VALOR_TROCA: valorTroca
+      QTDE_TROCA: qtdeTrocaItem,
+      VALOR_TROCA: valorTrocaItem
     };
   });
   
-  // 9) Calcular valores líquidos usando a lógica descoberta:
-  //    valor_liquido = total_venda - valor_troca
-  //    qtde_liquida = total_qtde_venda - qtde_troca
+  // 8) Usar diretamente os valores calculados no SQL (VALOR_LIQUIDO_CALC e QTDE_LIQUIDA_CALC)
+  //    Não recalcular no JavaScript para evitar erros de ponto flutuante
   result = result.map(row => {
+    // Usar valores calculados diretamente do SQL
+    const valorLiquidoCalc = Number(row.VALOR_LIQUIDO_CALC ?? 0);
+    const qtdeLiquidaCalc = Number(row.QTDE_LIQUIDA_CALC ?? 0);
+    
+    // Se não existirem os valores calculados, calcular manualmente (fallback)
     const totalVenda = Number(row.TOTAL_VENDA ?? 0);
     const valorTroca = Number(row.VALOR_TROCA ?? 0);
     const totalQtdeVenda = Number(row.TOTAL_QTDE_VENDA ?? 0);
     const qtdeTroca = Number(row.QTDE_TROCA ?? 0);
     
-    const valorLiquido = totalVenda - valorTroca;
-    const qtdeLiquida = totalQtdeVenda - qtdeTroca;
+    const valorLiquido = row.VALOR_LIQUIDO_CALC !== undefined ? valorLiquidoCalc : (totalVenda - valorTroca);
+    const qtdeLiquida = row.QTDE_LIQUIDA_CALC !== undefined ? qtdeLiquidaCalc : (totalQtdeVenda - qtdeTroca);
     
     return {
       ...row,
       VALOR_LIQUIDO: valorLiquido,
-      QTDE: qtdeLiquida
+      QTDE: Math.round(qtdeLiquida) // Garantir valores inteiros
     };
   });
   
-  // 10) Não filtrar linhas - incluir todas (mesma lógica do arquivo de referência)
-  //     O arquivo inclui todas as linhas, incluindo as com qtde_liquida <= 0
+  // 9) Garantir que TOTAL_QTDE_VENDA e QTDE_TROCA também sejam inteiros
+  result = result.map(row => {
+    return {
+      ...row,
+      TOTAL_QTDE_VENDA: Math.round(Number(row.TOTAL_QTDE_VENDA ?? 0)),
+      QTDE_TROCA: Math.round(Number(row.QTDE_TROCA ?? 0))
+    };
+  });
   
-  // 11) Remover colunas técnicas, igual ao SALES_COLUMNS_TO_DROP do site
+  // 10) Remover colunas técnicas, igual ao SALES_COLUMNS_TO_DROP do site
   result = removerColunas(result, COLS_REMOVER.vendas);
   
   // 12) Reordenar colunas: manter ordem original, mas colocar TOTAL_VENDA, TOTAL_QTDE_VENDA,

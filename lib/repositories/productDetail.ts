@@ -488,59 +488,29 @@ export async function fetchProductDetail({
           COR_PRODUTO,
           TAMANHO,
           SUM(QTDE) AS QTDE_TROCA,
-          SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA
+          SUM(PRECO_LIQUIDO * QTDE) AS VALOR_TROCA
         FROM LOJA_VENDA_TROCA WITH (NOLOCK)
         WHERE QTDE_CANCELADA = 0
         GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
-      ),
-      trocas_ticket AS (
-        SELECT 
-          TICKET,
-          CODIGO_FILIAL,
-          SUM(QTDE) AS QTDE_TROCA_TICKET,
-          SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA_TICKET
-        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
-        WHERE QTDE_CANCELADA = 0
-        GROUP BY TICKET, CODIGO_FILIAL
       ),
       vendas_com_troca AS (
         SELECT 
           vb.*,
           ISNULL(ti.QTDE_TROCA, 0) AS QTDE_TROCA_ITEM,
-          ISNULL(ti.VALOR_TROCA, 0) AS VALOR_TROCA_ITEM,
-          ISNULL(tt.QTDE_TROCA_TICKET, 0) AS QTDE_TROCA_TICKET,
-          ISNULL(tt.VALOR_TROCA_TICKET, 0) AS VALOR_TROCA_TICKET,
-          SUM(vb.TOTAL_VENDA) OVER (PARTITION BY vb.TICKET, vb.CODIGO_FILIAL) AS TOTAL_VENDA_TICKET
+          ISNULL(ti.VALOR_TROCA, 0) AS VALOR_TROCA_ITEM
         FROM vendas_base vb
         LEFT JOIN trocas_item ti ON ti.TICKET = vb.TICKET 
           AND ti.CODIGO_FILIAL = vb.CODIGO_FILIAL
           AND ti.PRODUTO = vb.PRODUTO
           AND ISNULL(ti.COR_PRODUTO, '') = ISNULL(vb.COR_PRODUTO, '')
           AND ISNULL(ti.TAMANHO, 0) = ISNULL(vb.TAMANHO, 0)
-        LEFT JOIN trocas_ticket tt ON tt.TICKET = vb.TICKET 
-          AND tt.CODIGO_FILIAL = vb.CODIGO_FILIAL
-      ),
-      vendas_liquidas AS (
-        SELECT 
-          *,
-          CASE 
-            WHEN TOTAL_VENDA_TICKET > 0 THEN CAST(TOTAL_VENDA AS FLOAT) / CAST(TOTAL_VENDA_TICKET AS FLOAT)
-            ELSE 0
-          END AS PROPORCAO
-        FROM vendas_com_troca
       ),
       vendas_finais AS (
         SELECT 
           *,
-          CASE 
-            WHEN ISNULL(QTDE_TROCA_ITEM, 0) > 0 THEN ISNULL(QTDE_TROCA_ITEM, 0)
-            ELSE ISNULL(QTDE_TROCA_TICKET, 0) * PROPORCAO
-          END AS QTDE_TROCA,
-          CASE 
-            WHEN ISNULL(VALOR_TROCA_ITEM, 0) > 0 THEN ISNULL(VALOR_TROCA_ITEM, 0)
-            ELSE ISNULL(VALOR_TROCA_TICKET, 0) * PROPORCAO
-          END AS VALOR_TROCA
-        FROM vendas_liquidas
+          ISNULL(QTDE_TROCA_ITEM, 0) AS QTDE_TROCA,
+          ISNULL(VALOR_TROCA_ITEM, 0) AS VALOR_TROCA
+        FROM vendas_com_troca
       )
       SELECT 
         SUM(TOTAL_VENDA - VALOR_TROCA) AS totalRevenue,
@@ -581,52 +551,27 @@ export async function fetchProductDetail({
           PRODUTO,
           COR_PRODUTO,
           TAMANHO,
-          SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA
+          SUM(PRECO_LIQUIDO * QTDE) AS VALOR_TROCA
         FROM LOJA_VENDA_TROCA WITH (NOLOCK)
         WHERE QTDE_CANCELADA = 0
         GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
       ),
-      trocas_ticket AS (
-        SELECT 
-          TICKET,
-          CODIGO_FILIAL,
-          SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA_TICKET
-        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
-        WHERE QTDE_CANCELADA = 0
-        GROUP BY TICKET, CODIGO_FILIAL
-      ),
       vendas_com_troca AS (
         SELECT 
           vb.*,
-          ISNULL(ti.VALOR_TROCA, 0) AS VALOR_TROCA_ITEM,
-          ISNULL(tt.VALOR_TROCA_TICKET, 0) AS VALOR_TROCA_TICKET,
-          SUM(vb.TOTAL_VENDA) OVER (PARTITION BY vb.TICKET, vb.CODIGO_FILIAL) AS TOTAL_VENDA_TICKET
+          ISNULL(ti.VALOR_TROCA, 0) AS VALOR_TROCA_ITEM
         FROM vendas_base vb
         LEFT JOIN trocas_item ti ON ti.TICKET = vb.TICKET 
           AND ti.CODIGO_FILIAL = vb.CODIGO_FILIAL
           AND ti.PRODUTO = vb.PRODUTO
           AND ISNULL(ti.COR_PRODUTO, '') = ISNULL(vb.COR_PRODUTO, '')
           AND ISNULL(ti.TAMANHO, 0) = ISNULL(vb.TAMANHO, 0)
-        LEFT JOIN trocas_ticket tt ON tt.TICKET = vb.TICKET 
-          AND tt.CODIGO_FILIAL = vb.CODIGO_FILIAL
-      ),
-      vendas_liquidas AS (
-        SELECT 
-          *,
-          CASE 
-            WHEN TOTAL_VENDA_TICKET > 0 THEN CAST(TOTAL_VENDA AS FLOAT) / CAST(TOTAL_VENDA_TICKET AS FLOAT)
-            ELSE 0
-          END AS PROPORCAO
-        FROM vendas_com_troca
       ),
       vendas_finais AS (
         SELECT 
           *,
-          CASE 
-            WHEN ISNULL(VALOR_TROCA_ITEM, 0) > 0 THEN ISNULL(VALOR_TROCA_ITEM, 0)
-            ELSE ISNULL(VALOR_TROCA_TICKET, 0) * PROPORCAO
-          END AS VALOR_TROCA
-        FROM vendas_liquidas
+          ISNULL(VALOR_TROCA_ITEM, 0) AS VALOR_TROCA
+        FROM vendas_com_troca
       )
       SELECT 
         SUM(TOTAL_VENDA - VALOR_TROCA) AS totalRevenue
@@ -1095,59 +1040,29 @@ export async function fetchProductStockByFilial({
           COR_PRODUTO,
           TAMANHO,
           SUM(QTDE) AS QTDE_TROCA,
-          SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA
+          SUM(PRECO_LIQUIDO * QTDE) AS VALOR_TROCA
         FROM LOJA_VENDA_TROCA WITH (NOLOCK)
         WHERE QTDE_CANCELADA = 0
         GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
-      ),
-      trocas_ticket AS (
-        SELECT 
-          TICKET,
-          CODIGO_FILIAL,
-          SUM(QTDE) AS QTDE_TROCA_TICKET,
-          SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA_TICKET
-        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
-        WHERE QTDE_CANCELADA = 0
-        GROUP BY TICKET, CODIGO_FILIAL
       ),
       vendas_com_troca AS (
         SELECT 
           vb.*,
           ISNULL(ti.QTDE_TROCA, 0) AS QTDE_TROCA_ITEM,
-          ISNULL(ti.VALOR_TROCA, 0) AS VALOR_TROCA_ITEM,
-          ISNULL(tt.QTDE_TROCA_TICKET, 0) AS QTDE_TROCA_TICKET,
-          ISNULL(tt.VALOR_TROCA_TICKET, 0) AS VALOR_TROCA_TICKET,
-          SUM(vb.TOTAL_VENDA) OVER (PARTITION BY vb.TICKET, vb.CODIGO_FILIAL) AS TOTAL_VENDA_TICKET
+          ISNULL(ti.VALOR_TROCA, 0) AS VALOR_TROCA_ITEM
         FROM vendas_base vb
         LEFT JOIN trocas_item ti ON ti.TICKET = vb.TICKET 
           AND ti.CODIGO_FILIAL = vb.CODIGO_FILIAL
           AND ti.PRODUTO = vb.PRODUTO
           AND ISNULL(ti.COR_PRODUTO, '') = ISNULL(vb.COR_PRODUTO, '')
           AND ISNULL(ti.TAMANHO, 0) = ISNULL(vb.TAMANHO, 0)
-        LEFT JOIN trocas_ticket tt ON tt.TICKET = vb.TICKET 
-          AND tt.CODIGO_FILIAL = vb.CODIGO_FILIAL
-      ),
-      vendas_liquidas AS (
-        SELECT 
-          *,
-          CASE 
-            WHEN TOTAL_VENDA_TICKET > 0 THEN CAST(TOTAL_VENDA AS FLOAT) / CAST(TOTAL_VENDA_TICKET AS FLOAT)
-            ELSE 0
-          END AS PROPORCAO
-        FROM vendas_com_troca
       ),
       vendas_finais AS (
         SELECT 
           *,
-          CASE 
-            WHEN ISNULL(QTDE_TROCA_ITEM, 0) > 0 THEN ISNULL(QTDE_TROCA_ITEM, 0)
-            ELSE ISNULL(QTDE_TROCA_TICKET, 0) * PROPORCAO
-          END AS QTDE_TROCA,
-          CASE 
-            WHEN ISNULL(VALOR_TROCA_ITEM, 0) > 0 THEN ISNULL(VALOR_TROCA_ITEM, 0)
-            ELSE ISNULL(VALOR_TROCA_TICKET, 0) * PROPORCAO
-          END AS VALOR_TROCA
-        FROM vendas_liquidas
+          ISNULL(QTDE_TROCA_ITEM, 0) AS QTDE_TROCA,
+          ISNULL(VALOR_TROCA_ITEM, 0) AS VALOR_TROCA
+        FROM vendas_com_troca
       )
       SELECT 
         FILIAL,
@@ -1180,52 +1095,27 @@ export async function fetchProductStockByFilial({
           PRODUTO,
           COR_PRODUTO,
           TAMANHO,
-          SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA
+          SUM(PRECO_LIQUIDO * QTDE) AS VALOR_TROCA
         FROM LOJA_VENDA_TROCA WITH (NOLOCK)
         WHERE QTDE_CANCELADA = 0
         GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
       ),
-      trocas_ticket AS (
-        SELECT 
-          TICKET,
-          CODIGO_FILIAL,
-          SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA_TICKET
-        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
-        WHERE QTDE_CANCELADA = 0
-        GROUP BY TICKET, CODIGO_FILIAL
-      ),
       vendas_com_troca AS (
         SELECT 
           vb.*,
-          ISNULL(ti.VALOR_TROCA, 0) AS VALOR_TROCA_ITEM,
-          ISNULL(tt.VALOR_TROCA_TICKET, 0) AS VALOR_TROCA_TICKET,
-          SUM(vb.TOTAL_VENDA) OVER (PARTITION BY vb.TICKET, vb.CODIGO_FILIAL) AS TOTAL_VENDA_TICKET
+          ISNULL(ti.VALOR_TROCA, 0) AS VALOR_TROCA_ITEM
         FROM vendas_base vb
         LEFT JOIN trocas_item ti ON ti.TICKET = vb.TICKET 
           AND ti.CODIGO_FILIAL = vb.CODIGO_FILIAL
           AND ti.PRODUTO = vb.PRODUTO
           AND ISNULL(ti.COR_PRODUTO, '') = ISNULL(vb.COR_PRODUTO, '')
           AND ISNULL(ti.TAMANHO, 0) = ISNULL(vb.TAMANHO, 0)
-        LEFT JOIN trocas_ticket tt ON tt.TICKET = vb.TICKET 
-          AND tt.CODIGO_FILIAL = vb.CODIGO_FILIAL
-      ),
-      vendas_liquidas AS (
-        SELECT 
-          *,
-          CASE 
-            WHEN TOTAL_VENDA_TICKET > 0 THEN CAST(TOTAL_VENDA AS FLOAT) / CAST(TOTAL_VENDA_TICKET AS FLOAT)
-            ELSE 0
-          END AS PROPORCAO
-        FROM vendas_com_troca
       ),
       vendas_finais AS (
         SELECT 
           *,
-          CASE 
-            WHEN ISNULL(VALOR_TROCA_ITEM, 0) > 0 THEN ISNULL(VALOR_TROCA_ITEM, 0)
-            ELSE ISNULL(VALOR_TROCA_TICKET, 0) * PROPORCAO
-          END AS VALOR_TROCA
-        FROM vendas_liquidas
+          ISNULL(VALOR_TROCA_ITEM, 0) AS VALOR_TROCA
+        FROM vendas_com_troca
       )
       SELECT 
         FILIAL,
