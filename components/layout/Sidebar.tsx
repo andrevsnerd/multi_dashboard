@@ -36,9 +36,10 @@ export default function Sidebar({ companyName }: SidebarProps) {
     if (!pathname || pathname === "/") {
       return "/";
     }
-    // Remove /estoque-por-filial, /produtos, /produtos-recentes, /produto-detalhado, /vendedores, /clientes e /exportar-relatorios do final do pathname se existir
+    // Remove /estoque-por-filial, /controle-estoque, /produtos, /produtos-recentes, /produto-detalhado, /vendedores, /clientes e /exportar-relatorios do final do pathname se existir
     return pathname
       .replace(/\/estoque-por-filial$/, "")
+      .replace(/\/controle-estoque$/, "")
       .replace(/\/produto-detalhado$/, "")
       .replace(/\/produtos-recentes$/, "")
       .replace(/\/produtos$/, "")
@@ -85,6 +86,11 @@ export default function Sidebar({ companyName }: SidebarProps) {
     ? `${basePath}/exportar-relatorios`
     : "/exportar-relatorios";
 
+  // Construir o link para controle de estoque baseado no caminho base
+  const controleEstoqueHref = basePath && basePath !== "/" 
+    ? `${basePath}/controle-estoque`
+    : "/controle-estoque";
+
   // Verificar se está em alguma página relacionada a produtos
   const isProdutosSubItemActive = pathname?.includes("/produto-detalhado") || pathname?.includes("/produtos-recentes") || (pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado"));
   const isProdutosPageActive = pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado");
@@ -120,6 +126,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     },
     { label: "Vendedores", href: vendedoresHref },
     { label: "Clientes", href: clientesHref },
+    { label: "Controle de Estoque", href: controleEstoqueHref },
     { label: "Exportar Relatórios", href: exportarRelatoriosHref },
     // TODO: Descomentar quando estoque por filial estiver pronto
     // { label: "Estoque por Filial", href: stockByFilialHref },
@@ -184,9 +191,10 @@ export default function Sidebar({ companyName }: SidebarProps) {
               // Home só está ativo na raiz
               isActive = pathname === "/";
             } else if (item.label === "Dashboard") {
-              // Dashboard está ativo quando está no caminho base (não em estoque-por-filial, produtos, produtos-recentes, produto-detalhado, vendedores ou clientes)
+              // Dashboard está ativo quando está no caminho base (não em estoque-por-filial, controle-estoque, produtos, produtos-recentes, produto-detalhado, vendedores ou clientes)
               isActive = pathname === item.href && 
                 !pathname.includes("/estoque-por-filial") && 
+                !pathname.includes("/controle-estoque") &&
                 !pathname.includes("/produtos") &&
                 !pathname.includes("/produtos-recentes") &&
                 !pathname.includes("/produto-detalhado") &&
@@ -214,6 +222,9 @@ export default function Sidebar({ companyName }: SidebarProps) {
             } else if (item.label === "Clientes") {
               // Clientes está ativo quando o pathname inclui /clientes
               isActive = pathname?.includes("/clientes") || pathname === item.href;
+            } else if (item.label === "Controle de Estoque") {
+              // Controle de Estoque está ativo quando o pathname inclui /controle-estoque
+              isActive = pathname?.includes("/controle-estoque") || pathname === item.href;
             } else if (item.label === "Exportar Relatórios") {
               // Exportar Relatórios está ativo quando o pathname inclui /exportar-relatorios
               isActive = pathname?.includes("/exportar-relatorios") || pathname === item.href;
