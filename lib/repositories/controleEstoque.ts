@@ -526,32 +526,37 @@ export async function fetchEstoquePorCategoria({
     const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
     const gradeFilter = buildGradeFilter(request, company, grades, 'p');
 
+    // Determinar se devemos mostrar detalhes (quando há filtros selecionados)
+    const mostrarDetalhes = company === 'scarfme' && (
+      (linhas && linhas.length > 0) || 
+      (colecoes && colecoes.length > 0) || 
+      (subgrupos && subgrupos.length > 0) || 
+      (grades && grades.length > 0)
+    );
+
     // Determinar campo de categoria baseado na empresa
     const categoriaField = company === 'nerd' 
       ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
       : 'ISNULL(p.LINHA, \'SEM LINHA\')';
 
-    // Debug temporário
-    if (grupos && grupos.length > 0 || linhas && linhas.length > 0 || colecoes && colecoes.length > 0 || subgrupos && subgrupos.length > 0 || grades && grades.length > 0) {
-      console.log('[fetchEstoquePorCategoria] Filtros aplicados:', {
-        company,
-        grupos,
-        linhas,
-        colecoes,
-        subgrupos,
-        grades,
-        grupoFilter: grupoFilter ? grupoFilter.substring(0, 50) : 'vazio',
-        linhaFilter: linhaFilter ? linhaFilter.substring(0, 50) : 'vazio',
-        colecaoFilter: colecaoFilter ? colecaoFilter.substring(0, 50) : 'vazio',
-        subgrupoFilter: subgrupoFilter ? subgrupoFilter.substring(0, 50) : 'vazio',
-        gradeFilter: gradeFilter ? gradeFilter.substring(0, 50) : 'vazio',
-      });
-    }
+    // Se mostrar detalhes, incluir campos adicionais e agrupar por eles
+    const camposAdicionais = mostrarDetalhes
+      ? `, ISNULL(p.LINHA, '') AS linha, ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo, ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade, ISNULL(p.COLECAO, '') AS colecao`
+      : '';
+    
+    const groupByAdicional = mostrarDetalhes
+      ? `, ISNULL(p.LINHA, ''), ISNULL(p.SUBGRUPO_PRODUTO, ''), ISNULL(CONVERT(VARCHAR, p.GRADE), ''), ISNULL(p.COLECAO, '')`
+      : '';
 
-    // Estoque por categoria
+    // Campos adicionais para queries de vendas (mesmo que camposAdicionais, mas para queries de vendas)
+    const camposVendasAdicionais = camposAdicionais;
+    const groupByVendasAdicional = groupByAdicional;
+
+    // Estoque por categoria (com detalhes se necessário)
     const estoqueQuery = `
       SELECT 
-        ${categoriaField} AS categoria,
+        ${categoriaField} AS categoria
+        ${camposAdicionais},
         SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoqueAtual,
         SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0) ELSE 0 END) AS custoTotal,
         AVG(CASE WHEN e.ESTOQUE > 0 THEN ISNULL(p.CUSTO_REPOSICAO1, 0) ELSE NULL END) AS custoUnitario
@@ -568,12 +573,16 @@ export async function fetchEstoquePorCategoria({
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
-      GROUP BY ${categoriaField}
+      GROUP BY ${categoriaField}${groupByAdicional}
       HAVING SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) > 0
     `;
 
     const estoqueResult = await request.query<{
       categoria: string;
+      linha?: string;
+      subgrupo?: string;
+      grade?: string;
+      colecao?: string;
       estoqueAtual: number | null;
       custoTotal: number | null;
       custoUnitario: number | null;
@@ -586,10 +595,11 @@ export async function fetchEstoquePorCategoria({
       mesesVendas.push(currentMonthNum - i + 1);
     }
 
-    // Buscar vendas por mês e categoria
+    // Buscar vendas por mês e categoria (com detalhes se necessário)
     const vendasMensaisQuery = `
       SELECT 
-        ${categoriaField} AS categoria,
+        ${categoriaField} AS categoria
+        ${camposVendasAdicionais},
         MONTH(vp.DATA_VENDA) AS mes,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
@@ -606,7 +616,7 @@ export async function fetchEstoquePorCategoria({
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
-      GROUP BY ${categoriaField}, MONTH(vp.DATA_VENDA)
+      GROUP BY ${categoriaField}${groupByVendasAdicional}, MONTH(vp.DATA_VENDA)
     `;
 
     request.input('currentYear', sql.Int, currentYear);
@@ -616,21 +626,29 @@ export async function fetchEstoquePorCategoria({
 
     const vendasMensaisResult = await request.query<{
       categoria: string;
+      linha?: string;
+      subgrupo?: string;
+      grade?: string;
+      colecao?: string;
       mes: number;
       vendas: number | null;
     }>(vendasMensaisQuery);
 
-    // Agrupar vendas por categoria e mês
+    // Agrupar vendas por categoria e mês (usar chave composta quando mostrarDetalhes)
     const vendasPorCategoriaMes = new Map<string, Map<number, number>>();
     vendasMensaisResult.recordset.forEach(row => {
       const categoria = row.categoria?.trim() || '';
+      // Se mostrarDetalhes, criar chave composta incluindo os campos adicionais
+      const chaveCategoria = mostrarDetalhes
+        ? `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`
+        : categoria;
       const mes = row.mes;
       const vendas = Number(row.vendas ?? 0);
       
-      if (!vendasPorCategoriaMes.has(categoria)) {
-        vendasPorCategoriaMes.set(categoria, new Map());
+      if (!vendasPorCategoriaMes.has(chaveCategoria)) {
+        vendasPorCategoriaMes.set(chaveCategoria, new Map());
       }
-      vendasPorCategoriaMes.get(categoria)!.set(mes, vendas);
+      vendasPorCategoriaMes.get(chaveCategoria)!.set(mes, vendas);
     });
 
     // Vendas da semana/mês anterior para calcular tendência
@@ -652,7 +670,8 @@ export async function fetchEstoquePorCategoria({
     
     const vendasPeriodoAnteriorQuery = `
       SELECT 
-        ${categoriaField} AS categoria,
+        ${categoriaField} AS categoria
+        ${camposVendasAdicionais},
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendasPeriodo
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
@@ -668,17 +687,26 @@ export async function fetchEstoquePorCategoria({
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
-      GROUP BY ${categoriaField}
+      GROUP BY ${categoriaField}${groupByVendasAdicional}
     `;
 
     const vendasPeriodoAnteriorResult = await request.query<{
       categoria: string;
+      linha?: string;
+      subgrupo?: string;
+      grade?: string;
+      colecao?: string;
       vendasPeriodo: number | null;
     }>(vendasPeriodoAnteriorQuery);
 
     const vendasPeriodoAnteriorMap = new Map<string, number>();
     vendasPeriodoAnteriorResult.recordset.forEach(row => {
-      vendasPeriodoAnteriorMap.set(row.categoria, Number(row.vendasPeriodo ?? 0));
+      const categoria = row.categoria?.trim() || '';
+      // Usar chave composta quando mostrarDetalhes
+      const chaveCategoria = mostrarDetalhes
+        ? `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`
+        : categoria;
+      vendasPeriodoAnteriorMap.set(chaveCategoria, Number(row.vendasPeriodo ?? 0));
     });
 
     // Processar resultados conforme lógica do Python
@@ -687,9 +715,20 @@ export async function fetchEstoquePorCategoria({
       const estoqueAtual = Number(row.estoqueAtual ?? 0);
       const custoTotal = Number(row.custoTotal ?? 0);
       const custoUnitario = Number(row.custoUnitario ?? 0);
+
+      // Campos detalhados (quando mostrarDetalhes é true)
+      const linha = mostrarDetalhes ? (row.linha?.trim() || '') : undefined;
+      const subgrupo = mostrarDetalhes ? (row.subgrupo?.trim() || '') : undefined;
+      const grade = mostrarDetalhes ? (row.grade?.trim() || '') : undefined;
+      const colecao = mostrarDetalhes ? (row.colecao?.trim() || '') : undefined;
+
+      // Criar chave para buscar vendas (usar chave composta quando mostrarDetalhes)
+      const chaveCategoria = mostrarDetalhes
+        ? `${categoria}|${linha || ''}|${subgrupo || ''}|${grade || ''}|${colecao || ''}`
+        : categoria;
       
       // Buscar vendas dos últimos meses para esta categoria
-      const vendasMeses = vendasPorCategoriaMes.get(categoria);
+      const vendasMeses = vendasPorCategoriaMes.get(chaveCategoria);
       const vendasMensais: number[] = [];
       if (vendasMeses) {
         mesesVendas.forEach(mes => {
@@ -721,7 +760,7 @@ export async function fetchEstoquePorCategoria({
       const vendasMes = vendasMensais.length > 0 ? vendasMensais[vendasMensais.length - 1] : 0;
 
       // Calcular tendência semanal
-      const vendasPeriodoAnterior = vendasPeriodoAnteriorMap.get(categoria) || 0;
+      const vendasPeriodoAnterior = vendasPeriodoAnteriorMap.get(chaveCategoria) || 0;
       const tendenciaSemanal = vendasPeriodoAnterior > 0
         ? ((vendasMes - vendasPeriodoAnterior) / vendasPeriodoAnterior) * 100
         : 0;
@@ -736,6 +775,12 @@ export async function fetchEstoquePorCategoria({
         projecaoMes: estoqueFinalMes, // Estoque Final Mês
         projecaoAnual: estoqueFinalAno, // Estoque Final Ano
         tendenciaSemanal: Number(tendenciaSemanal.toFixed(1)),
+        ...(mostrarDetalhes && {
+          linha,
+          subgrupo,
+          grade,
+          colecao,
+        }),
       };
     });
 
@@ -920,10 +965,32 @@ export async function fetchPrevisoesEstoque({
       ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
       : 'ISNULL(p.LINHA, \'SEM LINHA\')';
 
-    // Estoque por categoria
+    // Determinar se devemos mostrar detalhes (quando há filtros selecionados)
+    const mostrarDetalhes = company === 'scarfme' && (
+      (linhas && linhas.length > 0) || 
+      (colecoes && colecoes.length > 0) || 
+      (subgrupos && subgrupos.length > 0) || 
+      (grades && grades.length > 0)
+    );
+
+    // Se mostrar detalhes, incluir campos adicionais e agrupar por eles
+    const camposAdicionais = mostrarDetalhes
+      ? `, ISNULL(p.LINHA, '') AS linha, ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo, ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade, ISNULL(p.COLECAO, '') AS colecao`
+      : '';
+    
+    const groupByAdicional = mostrarDetalhes
+      ? `, ISNULL(p.LINHA, ''), ISNULL(p.SUBGRUPO_PRODUTO, ''), ISNULL(CONVERT(VARCHAR, p.GRADE), ''), ISNULL(p.COLECAO, '')`
+      : '';
+
+    // Campos adicionais para queries de vendas (mesmo que camposAdicionais, mas para queries de vendas)
+    const camposVendasAdicionais = camposAdicionais;
+    const groupByVendasAdicional = groupByAdicional;
+
+    // Estoque por categoria (com detalhes se necessário)
     const estoqueQuery = `
       SELECT 
-        ${categoriaField} AS categoria,
+        ${categoriaField} AS categoria
+        ${camposAdicionais},
         SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoqueAtual
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
@@ -938,12 +1005,16 @@ export async function fetchPrevisoesEstoque({
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
-      GROUP BY ${categoriaField}
+      GROUP BY ${categoriaField}${groupByAdicional}
       HAVING SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) > 0
     `;
 
     const estoqueResult = await request.query<{
       categoria: string;
+      linha?: string;
+      subgrupo?: string;
+      grade?: string;
+      colecao?: string;
       estoqueAtual: number | null;
     }>(estoqueQuery);
 
@@ -954,10 +1025,11 @@ export async function fetchPrevisoesEstoque({
       mesesVendas.push(currentMonthNum - i + 1);
     }
 
-    // Buscar vendas por mês e categoria
+    // Buscar vendas por mês e categoria (com detalhes se necessário)
     const vendasMensaisQuery = `
       SELECT 
-        ${categoriaField} AS categoria,
+        ${categoriaField} AS categoria
+        ${camposVendasAdicionais},
         MONTH(vp.DATA_VENDA) AS mes,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
@@ -974,7 +1046,7 @@ export async function fetchPrevisoesEstoque({
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
-      GROUP BY ${categoriaField}, MONTH(vp.DATA_VENDA)
+      GROUP BY ${categoriaField}${groupByVendasAdicional}, MONTH(vp.DATA_VENDA)
     `;
 
     request.input('currentYear', sql.Int, currentYear);
@@ -984,21 +1056,29 @@ export async function fetchPrevisoesEstoque({
 
     const vendasMensaisResult = await request.query<{
       categoria: string;
+      linha?: string;
+      subgrupo?: string;
+      grade?: string;
+      colecao?: string;
       mes: number;
       vendas: number | null;
     }>(vendasMensaisQuery);
 
-    // Agrupar vendas por categoria e mês
+    // Agrupar vendas por categoria e mês (usar chave composta quando mostrarDetalhes)
     const vendasPorCategoriaMes = new Map<string, Map<number, number>>();
     vendasMensaisResult.recordset.forEach(row => {
       const categoria = row.categoria?.trim() || '';
+      // Se mostrarDetalhes, criar chave composta incluindo os campos adicionais
+      const chaveCategoria = mostrarDetalhes
+        ? `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`
+        : categoria;
       const mes = row.mes;
       const vendas = Number(row.vendas ?? 0);
       
-      if (!vendasPorCategoriaMes.has(categoria)) {
-        vendasPorCategoriaMes.set(categoria, new Map());
+      if (!vendasPorCategoriaMes.has(chaveCategoria)) {
+        vendasPorCategoriaMes.set(chaveCategoria, new Map());
       }
-      vendasPorCategoriaMes.get(categoria)!.set(mes, vendas);
+      vendasPorCategoriaMes.get(chaveCategoria)!.set(mes, vendas);
     });
 
     // Processar resultados conforme lógica do Python
@@ -1006,8 +1086,19 @@ export async function fetchPrevisoesEstoque({
       const categoria = row.categoria?.trim() || '';
       const estoqueAtual = Number(row.estoqueAtual ?? 0);
       
+      // Campos detalhados (quando mostrarDetalhes é true)
+      const linha = mostrarDetalhes ? (row.linha?.trim() || '') : undefined;
+      const subgrupo = mostrarDetalhes ? (row.subgrupo?.trim() || '') : undefined;
+      const grade = mostrarDetalhes ? (row.grade?.trim() || '') : undefined;
+      const colecao = mostrarDetalhes ? (row.colecao?.trim() || '') : undefined;
+
+      // Criar chave para buscar vendas (usar chave composta quando mostrarDetalhes)
+      const chaveCategoria = mostrarDetalhes
+        ? `${categoria}|${linha || ''}|${subgrupo || ''}|${grade || ''}|${colecao || ''}`
+        : categoria;
+      
       // Buscar vendas dos últimos meses para esta categoria
-      const vendasMeses = vendasPorCategoriaMes.get(categoria);
+      const vendasMeses = vendasPorCategoriaMes.get(chaveCategoria);
       const vendasMensais: number[] = [];
       if (vendasMeses) {
         mesesVendas.forEach(mes => {

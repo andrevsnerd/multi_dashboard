@@ -1559,7 +1559,16 @@ export async function fetchAvailableGrupos({
   company,
   range,
   filial,
-}: Omit<ProductsQueryParams, 'grupo'> = {}): Promise<string[]> {
+  linhas,
+  colecoes,
+  subgrupos,
+  grades,
+}: Omit<ProductsQueryParams, 'grupo'> & {
+  linhas?: string[] | null;
+  colecoes?: string[] | null;
+  subgrupos?: string[] | null;
+  grades?: string[] | null;
+} = {}): Promise<string[]> {
   if (company !== 'nerd') {
     return [];
   }
@@ -1570,6 +1579,8 @@ export async function fetchAvailableGrupos({
     request.input('endDate', sql.DateTime, end);
 
     const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+    // Aplicar filtros dependentes (apenas para ScarfMe, mas não aplicamos aqui pois é NERD)
+    // Para NERD, não há filtros dependentes de outros campos
 
     const query = `
       SELECT DISTINCT 
@@ -1612,7 +1623,14 @@ export async function fetchAvailableLinhas({
   company,
   range,
   filial,
-}: Omit<ProductsQueryParams, 'linha'> = {}): Promise<string[]> {
+  colecoes,
+  subgrupos,
+  grades,
+}: Omit<ProductsQueryParams, 'linha'> & {
+  colecoes?: string[] | null;
+  subgrupos?: string[] | null;
+  grades?: string[] | null;
+} = {}): Promise<string[]> {
   if (company !== 'scarfme') {
     return [];
   }
@@ -1623,6 +1641,9 @@ export async function fetchAvailableLinhas({
     request.input('endDate', sql.DateTime, end);
 
     const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+    const colecaoFilter = buildColecaoFilterForProducts(request, company, null, colecoes);
+    const subgrupoFilter = buildSubgrupoFilterForProducts(request, company, null, subgrupos);
+    const gradeFilter = buildGradeFilterForProducts(request, company, null, grades);
 
     const query = `
       SELECT DISTINCT 
@@ -1634,6 +1655,9 @@ export async function fetchAvailableLinhas({
         AND vp.QTDE > 0
         AND COALESCE(vp.LINHA, p.LINHA, '') <> ''
         ${filialFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
       ORDER BY linha
     `;
 
@@ -1664,7 +1688,14 @@ export async function fetchAvailableColecoes({
   company,
   range,
   filial,
-}: Omit<ProductsQueryParams, 'colecao'> = {}): Promise<string[]> {
+  linhas,
+  subgrupos,
+  grades,
+}: Omit<ProductsQueryParams, 'colecao'> & {
+  linhas?: string[] | null;
+  subgrupos?: string[] | null;
+  grades?: string[] | null;
+} = {}): Promise<string[]> {
   if (company !== 'scarfme') {
     return [];
   }
@@ -1675,6 +1706,9 @@ export async function fetchAvailableColecoes({
     request.input('endDate', sql.DateTime, end);
 
     const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+    const linhaFilter = buildLinhaFilterForProducts(request, company, null, linhas);
+    const subgrupoFilter = buildSubgrupoFilterForProducts(request, company, null, subgrupos);
+    const gradeFilter = buildGradeFilterForProducts(request, company, null, grades);
 
     const query = `
       SELECT DISTINCT 
@@ -1686,6 +1720,9 @@ export async function fetchAvailableColecoes({
         AND vp.QTDE > 0
         AND COALESCE(vp.COLECAO, p.COLECAO, '') <> ''
         ${filialFilter}
+        ${linhaFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
       ORDER BY colecao
     `;
 
@@ -1716,7 +1753,14 @@ export async function fetchAvailableSubgrupos({
   company,
   range,
   filial,
-}: Omit<ProductsQueryParams, 'subgrupo'> = {}): Promise<string[]> {
+  linhas,
+  colecoes,
+  grades,
+}: Omit<ProductsQueryParams, 'subgrupo'> & {
+  linhas?: string[] | null;
+  colecoes?: string[] | null;
+  grades?: string[] | null;
+} = {}): Promise<string[]> {
   if (company !== 'scarfme') {
     return [];
   }
@@ -1727,6 +1771,9 @@ export async function fetchAvailableSubgrupos({
     request.input('endDate', sql.DateTime, end);
 
     const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+    const linhaFilter = buildLinhaFilterForProducts(request, company, null, linhas);
+    const colecaoFilter = buildColecaoFilterForProducts(request, company, null, colecoes);
+    const gradeFilter = buildGradeFilterForProducts(request, company, null, grades);
 
     const query = `
       SELECT DISTINCT 
@@ -1738,6 +1785,9 @@ export async function fetchAvailableSubgrupos({
         AND vp.QTDE > 0
         AND COALESCE(vp.SUBGRUPO_PRODUTO, p.SUBGRUPO_PRODUTO, '') <> ''
         ${filialFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${gradeFilter}
       ORDER BY subgrupo
     `;
 
@@ -1768,7 +1818,14 @@ export async function fetchAvailableGrades({
   company,
   range,
   filial,
-}: Omit<ProductsQueryParams, 'grade'> = {}): Promise<string[]> {
+  linhas,
+  colecoes,
+  subgrupos,
+}: Omit<ProductsQueryParams, 'grade'> & {
+  linhas?: string[] | null;
+  colecoes?: string[] | null;
+  subgrupos?: string[] | null;
+} = {}): Promise<string[]> {
   if (company !== 'scarfme') {
     return [];
   }
@@ -1779,6 +1836,9 @@ export async function fetchAvailableGrades({
     request.input('endDate', sql.DateTime, end);
 
     const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+    const linhaFilter = buildLinhaFilterForProducts(request, company, null, linhas);
+    const colecaoFilter = buildColecaoFilterForProducts(request, company, null, colecoes);
+    const subgrupoFilter = buildSubgrupoFilterForProducts(request, company, null, subgrupos);
 
     const query = `
       SELECT DISTINCT 
@@ -1790,6 +1850,9 @@ export async function fetchAvailableGrades({
         AND vp.QTDE > 0
         AND p.GRADE IS NOT NULL
         ${filialFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
       ORDER BY grade
     `;
 

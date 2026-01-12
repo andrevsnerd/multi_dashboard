@@ -397,6 +397,11 @@ export default function ControleEstoquePage({
           searchParams.set("filial", selectedFilial);
         }
 
+        // Adicionar filtros dependentes (colecoes, subgrupos, grades)
+        selectedColecoes.forEach(c => searchParams.append("colecoes", c));
+        selectedSubgrupos.forEach(s => searchParams.append("subgrupos", s));
+        selectedGrades.forEach(g => searchParams.append("grades", g));
+
         const response = await fetch(`/api/products/linhas?${searchParams.toString()}`, {
           cache: "no-store",
         });
@@ -422,7 +427,7 @@ export default function ControleEstoquePage({
     return () => {
       active = false;
     };
-  }, [companyKey, range.startDate, range.endDate, selectedFilial]);
+  }, [companyKey, range.startDate, range.endDate, selectedFilial, selectedColecoes, selectedSubgrupos, selectedGrades]);
 
   // Buscar coleções disponíveis para ScarfMe
   useEffect(() => {
@@ -444,6 +449,11 @@ export default function ControleEstoquePage({
         if (selectedFilial) {
           searchParams.set("filial", selectedFilial);
         }
+
+        // Adicionar filtros dependentes (linhas, subgrupos, grades)
+        selectedLinhas.forEach(l => searchParams.append("linhas", l));
+        selectedSubgrupos.forEach(s => searchParams.append("subgrupos", s));
+        selectedGrades.forEach(g => searchParams.append("grades", g));
 
         const response = await fetch(`/api/products/colecoes?${searchParams.toString()}`, {
           cache: "no-store",
@@ -470,7 +480,7 @@ export default function ControleEstoquePage({
     return () => {
       active = false;
     };
-  }, [companyKey, range.startDate, range.endDate, selectedFilial]);
+  }, [companyKey, range.startDate, range.endDate, selectedFilial, selectedLinhas, selectedSubgrupos, selectedGrades]);
 
   // Buscar subgrupos disponíveis para ScarfMe
   useEffect(() => {
@@ -492,6 +502,11 @@ export default function ControleEstoquePage({
         if (selectedFilial) {
           searchParams.set("filial", selectedFilial);
         }
+
+        // Adicionar filtros dependentes (linhas, colecoes, grades)
+        selectedLinhas.forEach(l => searchParams.append("linhas", l));
+        selectedColecoes.forEach(c => searchParams.append("colecoes", c));
+        selectedGrades.forEach(g => searchParams.append("grades", g));
 
         const response = await fetch(`/api/products/subgrupos?${searchParams.toString()}`, {
           cache: "no-store",
@@ -518,7 +533,7 @@ export default function ControleEstoquePage({
     return () => {
       active = false;
     };
-  }, [companyKey, range.startDate, range.endDate, selectedFilial]);
+  }, [companyKey, range.startDate, range.endDate, selectedFilial, selectedLinhas, selectedColecoes, selectedGrades]);
 
   // Buscar grades disponíveis para ScarfMe
   useEffect(() => {
@@ -540,6 +555,11 @@ export default function ControleEstoquePage({
         if (selectedFilial) {
           searchParams.set("filial", selectedFilial);
         }
+
+        // Adicionar filtros dependentes (linhas, colecoes, subgrupos)
+        selectedLinhas.forEach(l => searchParams.append("linhas", l));
+        selectedColecoes.forEach(c => searchParams.append("colecoes", c));
+        selectedSubgrupos.forEach(s => searchParams.append("subgrupos", s));
 
         const response = await fetch(`/api/products/grades?${searchParams.toString()}`, {
           cache: "no-store",
@@ -566,7 +586,7 @@ export default function ControleEstoquePage({
     return () => {
       active = false;
     };
-  }, [companyKey, range.startDate, range.endDate, selectedFilial]);
+  }, [companyKey, range.startDate, range.endDate, selectedFilial, selectedLinhas, selectedColecoes, selectedSubgrupos]);
 
   // Atualizar categorias selecionadas quando categorias mudarem
   useEffect(() => {
@@ -802,7 +822,18 @@ export default function ControleEstoquePage({
           {categoriasFiltradas.map((cat, index) => (
             <div key={cat.categoria} className={styles.categoriaCard}>
               <div className={styles.categoriaHeader}>
-                <span className={styles.categoriaName}>{cat.categoria}</span>
+                <div className={styles.categoriaNameWrapper}>
+                  <span className={styles.categoriaName}>{cat.categoria}</span>
+                  {/* Mostrar detalhes quando disponíveis */}
+                  {(cat.linha || cat.subgrupo || cat.grade || cat.colecao) && (
+                    <div className={styles.categoriaDetails}>
+                      {cat.linha && <span className={styles.detailTag}>Linha: {cat.linha}</span>}
+                      {cat.subgrupo && <span className={styles.detailTag}>Subgrupo: {cat.subgrupo}</span>}
+                      {cat.grade && <span className={styles.detailTag}>Grade: {cat.grade}</span>}
+                      {cat.colecao && <span className={styles.detailTag}>Coleção: {cat.colecao}</span>}
+                    </div>
+                  )}
+                </div>
                 <div className={`${styles.tendencia} ${cat.tendenciaSemanal >= 0 ? styles.positive : styles.negative}`}>
                   {cat.tendenciaSemanal >= 0 ? "▲" : "▼"} {Math.abs(cat.tendenciaSemanal).toFixed(1)}% {periodType === "semanal" ? "Semanal" : "Mensal"}
                 </div>

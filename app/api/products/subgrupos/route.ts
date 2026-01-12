@@ -9,6 +9,11 @@ export async function GET(request: Request) {
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
 
+  // Extrair filtros dependentes
+  const linhas = searchParams.getAll('linhas').filter(Boolean);
+  const colecoes = searchParams.getAll('colecoes').filter(Boolean);
+  const grades = searchParams.getAll('grades').filter(Boolean);
+
   if (!startParam || !endParam) {
     return NextResponse.json(
       { error: 'Parâmetros start e end são obrigatórios' },
@@ -26,6 +31,9 @@ export async function GET(request: Request) {
       company,
       range,
       filial: filial || null,
+      linhas: linhas.length > 0 ? linhas : null,
+      colecoes: colecoes.length > 0 ? colecoes : null,
+      grades: grades.length > 0 ? grades : null,
     });
 
     return NextResponse.json({ data });
