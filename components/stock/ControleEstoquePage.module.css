@@ -204,6 +204,13 @@
   color: #666;
 }
 
+.estoqueSemanaPassada {
+  font-size: 12px;
+  font-weight: 400;
+  color: #999;
+  margin-top: 4px;
+}
+
 .categoriaInfo {
   display: flex;
   flex-direction: column;

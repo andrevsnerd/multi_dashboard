@@ -349,7 +349,14 @@ export interface CategoriaEstoque {
   duracao: number; // dias
   projecaoMes: number;
   projecaoAnual: number;
-  tendenciaSemanal: number; // percentual
+  projecaoVendasMes: number; // projeção de vendas mensal (média dos últimos meses)
+  tendenciaSemanal: number; // quantidade real (diferença semanal)
+  estoqueSemanaPassada: number; // estoque de uma semana atrás
+  // Campos detalhados quando há filtros selecionados
+  linha?: string;
+  subgrupo?: string;
+  grade?: string;
+  colecao?: string;
 }
 
 export interface EvolucaoEstoqueData {
@@ -517,6 +524,10 @@ export async function fetchEstoquePorCategoria({
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonthNum = now.getMonth() + 1; // 1-12
+    const currentMonth = {
+      start: new Date(now.getFullYear(), now.getMonth(), 1),
+      end: new Date(now.getFullYear(), now.getMonth() + 1, 1), // Início do próximo mês (exclusivo)
+    };
     
     const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
     const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
@@ -588,24 +599,23 @@ export async function fetchEstoquePorCategoria({
       custoUnitario: number | null;
     }>(estoqueQuery);
 
-    // Buscar vendas mensais dos últimos 3 meses (ou menos se não houver)
-    const mesesParaCalcular = Math.min(3, currentMonthNum);
-    const mesesVendas: number[] = [];
-    for (let i = mesesParaCalcular; i > 0; i--) {
-      mesesVendas.push(currentMonthNum - i + 1);
-    }
+    // Buscar vendas do mês atual até hoje para calcular projeção
+    // Projeção = (vendas até hoje / dias corridos) × total de dias do mês
+    const hoje = new Date(now.getTime());
+    hoje.setHours(23, 59, 59, 999); // Fim do dia de hoje
 
-    // Buscar vendas por mês e categoria (com detalhes se necessário)
+    // Buscar vendas do mês atual até hoje
     const vendasMensaisQuery = `
       SELECT 
         ${categoriaField} AS categoria
         ${camposVendasAdicionais},
+        YEAR(vp.DATA_VENDA) AS ano,
         MONTH(vp.DATA_VENDA) AS mes,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-      WHERE YEAR(vp.DATA_VENDA) = @currentYear
-        AND MONTH(vp.DATA_VENDA) IN (${mesesVendas.map((_, i) => `@mes${i}`).join(', ')})
+      WHERE vp.DATA_VENDA >= @currentMonthStart
+        AND vp.DATA_VENDA <= @hoje
         AND vp.QTDE > 0
         ${vendasFilialFilter}
         ${grupoFilter}
@@ -616,13 +626,11 @@ export async function fetchEstoquePorCategoria({
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
-      GROUP BY ${categoriaField}${groupByVendasAdicional}, MONTH(vp.DATA_VENDA)
+      GROUP BY ${categoriaField}${groupByVendasAdicional}, YEAR(vp.DATA_VENDA), MONTH(vp.DATA_VENDA)
     `;
 
-    request.input('currentYear', sql.Int, currentYear);
-    mesesVendas.forEach((mes, index) => {
-      request.input(`mes${index}`, sql.Int, mes);
-    });
+    request.input('currentMonthStart', sql.DateTime, currentMonth.start);
+    request.input('hoje', sql.DateTime, hoje);
 
     const vendasMensaisResult = await request.query<{
       categoria: string;
@@ -630,32 +638,290 @@ export async function fetchEstoquePorCategoria({
       subgrupo?: string;
       grade?: string;
       colecao?: string;
+      ano: number;
       mes: number;
       vendas: number | null;
     }>(vendasMensaisQuery);
 
     // Agrupar vendas por categoria e mês (usar chave composta quando mostrarDetalhes)
-    const vendasPorCategoriaMes = new Map<string, Map<number, number>>();
+    // Usar chave ano-mês para garantir que pegamos os últimos 3 meses completos
+    const vendasPorCategoriaMes = new Map<string, Map<string, number>>();
     vendasMensaisResult.recordset.forEach(row => {
       const categoria = row.categoria?.trim() || '';
       // Se mostrarDetalhes, criar chave composta incluindo os campos adicionais
       const chaveCategoria = mostrarDetalhes
         ? `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`
         : categoria;
-      const mes = row.mes;
+      const chaveAnoMes = `${row.ano}-${row.mes}`;
       const vendas = Number(row.vendas ?? 0);
       
       if (!vendasPorCategoriaMes.has(chaveCategoria)) {
         vendasPorCategoriaMes.set(chaveCategoria, new Map());
       }
-      vendasPorCategoriaMes.get(chaveCategoria)!.set(mes, vendas);
+      vendasPorCategoriaMes.get(chaveCategoria)!.set(chaveAnoMes, vendas);
+    });
+
+    // Calcular histórico semanal: estoque da semana passada
+    // Estoque Semana Passada = Estoque Atual - Entradas (7 dias) + Vendas (7 dias) + E-commerce (7 dias)
+    const data7DiasAtras = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    request.input('data7DiasAtras', sql.DateTime, data7DiasAtras);
+
+    // Criar filtro de filial para entradas com a mesma lógica do buildFilialFilter
+    // Mas com nomes de parâmetros únicos para evitar conflitos (EDUPEPARAM)
+    let entradasFilialFilter = '';
+    if (company) {
+      const companyConfig = resolveCompany(company);
+      if (companyConfig) {
+        const isScarfme = company === 'scarfme';
+        const filiais = companyConfig.filialFilters['inventory'] ?? [];
+        const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
+
+        // Se uma filial específica foi selecionada, usar apenas ela
+        if (filial && filial !== VAREJO_VALUE) {
+          request.input('entradasSemanaFilial', sql.VarChar, filial);
+          entradasFilialFilter = `AND E.FILIAL = @entradasSemanaFilial`;
+        }
+        // Para scarfme: se for "VAREJO", mostrar apenas filiais normais (sem ecommerce)
+        else if (isScarfme && filial === VAREJO_VALUE) {
+          const normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
+          if (normalFiliais.length > 0) {
+            normalFiliais.forEach((f, index) => {
+              request.input(`entradasSemanaFilial${index}`, sql.VarChar, f);
+            });
+            const placeholders = normalFiliais.map((_, i) => `@entradasSemanaFilial${i}`).join(', ');
+            entradasFilialFilter = `AND E.FILIAL IN (${placeholders})`;
+          }
+        }
+        // Para scarfme: se for "Todas as filiais" (null), incluir também ecommerce
+        else if (isScarfme && filial === null) {
+          if (filiais.length > 0) {
+            filiais.forEach((f, index) => {
+              request.input(`entradasSemanaFilial${index}`, sql.VarChar, f);
+            });
+            const placeholders = filiais.map((_, i) => `@entradasSemanaFilial${i}`).join(', ');
+            entradasFilialFilter = `AND E.FILIAL IN (${placeholders})`;
+          }
+        }
+        // Para outras empresas (ou comportamento padrão): usar apenas filiais normais (sem ecommerce)
+        else {
+          const normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
+          if (normalFiliais.length > 0) {
+            normalFiliais.forEach((f, index) => {
+              request.input(`entradasSemanaFilial${index}`, sql.VarChar, f);
+            });
+            const placeholders = normalFiliais.map((_, i) => `@entradasSemanaFilial${i}`).join(', ');
+            entradasFilialFilter = `AND E.FILIAL IN (${placeholders})`;
+          }
+        }
+      }
+    }
+
+    // Criar filtros separados para query de entradas (usar prefixo 'pr')
+    // Nota: Como os filtros já foram criados com 'p', vamos reutilizar os mesmos parâmetros SQL
+    // mas ajustar o prefixo da tabela na string do filtro
+    const grupoFilterEntradas = grupoFilter ? grupoFilter.replace(/p\./g, 'pr.') : '';
+    const linhaFilterEntradas = linhaFilter ? linhaFilter.replace(/p\./g, 'pr.') : '';
+    const colecaoFilterEntradas = colecaoFilter ? colecaoFilter.replace(/p\./g, 'pr.') : '';
+    const subgrupoFilterEntradas = subgrupoFilter ? subgrupoFilter.replace(/p\./g, 'pr.') : '';
+    const gradeFilterEntradas = gradeFilter ? gradeFilter.replace(/p\./g, 'pr.') : '';
+
+    // Campos adicionais para query de entradas (usar alias 'pr' ao invés de 'p')
+    const camposEntradasAdicionais = mostrarDetalhes
+      ? `, ISNULL(pr.LINHA, '') AS linha, ISNULL(pr.SUBGRUPO_PRODUTO, '') AS subgrupo, ISNULL(CONVERT(VARCHAR, pr.GRADE), '') AS grade, ISNULL(pr.COLECAO, '') AS colecao`
+      : '';
+    const groupByEntradasAdicional = mostrarDetalhes
+      ? `, ISNULL(pr.LINHA, ''), ISNULL(pr.SUBGRUPO_PRODUTO, ''), ISNULL(CONVERT(VARCHAR, pr.GRADE), ''), ISNULL(pr.COLECAO, '')`
+      : '';
+
+    // Ajustar categoriaField para usar alias 'pr' nas queries de entradas
+    const categoriaFieldEntradas = company === 'nerd' 
+      ? 'ISNULL(pr.GRUPO_PRODUTO, \'SEM GRUPO\')'
+      : 'ISNULL(pr.LINHA, \'SEM LINHA\')';
+
+    // Buscar entradas dos últimos 7 dias
+    const entradasSemanaQuery = `
+      SELECT 
+        ${categoriaFieldEntradas} AS categoria
+        ${camposEntradasAdicionais},
+        SUM(CAST(P.QTDE AS FLOAT)) AS entradas
+      FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+      LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+      LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
+      WHERE pr.PRODUTO IS NOT NULL
+        AND E.EMISSAO >= @data7DiasAtras
+        ${entradasFilialFilter}
+        ${grupoFilterEntradas}
+        ${linhaFilterEntradas}
+        ${colecaoFilterEntradas}
+        ${subgrupoFilterEntradas}
+        ${gradeFilterEntradas}
+        AND ${categoriaFieldEntradas} <> ''
+        AND ${categoriaFieldEntradas} <> 'SEM GRUPO'
+        AND ${categoriaFieldEntradas} <> 'SEM LINHA'
+      GROUP BY ${categoriaFieldEntradas}${groupByEntradasAdicional}
+    `;
+
+    const entradasSemanaResult = await request.query<{
+      categoria: string;
+      linha?: string;
+      subgrupo?: string;
+      grade?: string;
+      colecao?: string;
+      entradas: number | null;
+    }>(entradasSemanaQuery);
+
+    // Buscar vendas dos últimos 7 dias (já usa vendasFilialFilter que foi criado anteriormente)
+    const vendasSemanaQuery = `
+      SELECT 
+        ${categoriaField} AS categoria
+        ${camposVendasAdicionais},
+        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      WHERE vp.DATA_VENDA >= @data7DiasAtras
+        AND vp.QTDE > 0
+        ${vendasFilialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        AND ${categoriaField} <> ''
+        AND ${categoriaField} <> 'SEM GRUPO'
+        AND ${categoriaField} <> 'SEM LINHA'
+      GROUP BY ${categoriaField}${groupByVendasAdicional}
+    `;
+
+    const vendasSemanaResult = await request.query<{
+      categoria: string;
+      linha?: string;
+      subgrupo?: string;
+      grade?: string;
+      colecao?: string;
+      vendas: number | null;
+    }>(vendasSemanaQuery);
+
+    // Criar filtro de filial para e-commerce com a mesma lógica do buildFilialFilter
+    // Mas com nomes de parâmetros únicos para evitar conflitos (EDUPEPARAM)
+    let ecommerceFilialFilter = '';
+    if (company === 'scarfme') {
+      const companyConfig = resolveCompany(company);
+      if (companyConfig) {
+        const isScarfme = company === 'scarfme';
+        const filiais = companyConfig.filialFilters['inventory'] ?? [];
+        const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
+
+        // Se uma filial específica foi selecionada, usar apenas ela
+        if (filial && filial !== VAREJO_VALUE) {
+          request.input('ecommerceSemanaFilial', sql.VarChar, filial);
+          ecommerceFilialFilter = `AND f.FILIAL = @ecommerceSemanaFilial`;
+        }
+        // Para scarfme: se for "VAREJO", mostrar apenas filiais normais (sem ecommerce)
+        else if (isScarfme && filial === VAREJO_VALUE) {
+          const normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
+          if (normalFiliais.length > 0) {
+            normalFiliais.forEach((f, index) => {
+              request.input(`ecommerceSemanaFilial${index}`, sql.VarChar, f);
+            });
+            const placeholders = normalFiliais.map((_, i) => `@ecommerceSemanaFilial${i}`).join(', ');
+            ecommerceFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+          }
+        }
+        // Para scarfme: se for "Todas as filiais" (null), incluir também ecommerce
+        else if (isScarfme && filial === null) {
+          if (filiais.length > 0) {
+            filiais.forEach((f, index) => {
+              request.input(`ecommerceSemanaFilial${index}`, sql.VarChar, f);
+            });
+            const placeholders = filiais.map((_, i) => `@ecommerceSemanaFilial${i}`).join(', ');
+            ecommerceFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+          }
+        }
+        // Para outras empresas (ou comportamento padrão): usar apenas filiais normais (sem ecommerce)
+        else {
+          const normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
+          if (normalFiliais.length > 0) {
+            normalFiliais.forEach((f, index) => {
+              request.input(`ecommerceSemanaFilial${index}`, sql.VarChar, f);
+            });
+            const placeholders = normalFiliais.map((_, i) => `@ecommerceSemanaFilial${i}`).join(', ');
+            ecommerceFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+          }
+        }
+      }
+    }
+
+    // Campos adicionais para query de e-commerce (usar alias 'p' - mesmo que vendas)
+    // categoriaField também usa 'p', então está correto
+
+    // Buscar e-commerce dos últimos 7 dias (apenas para ScarfMe)
+    let ecommerceSemanaResult: { recordset: Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; ecommerce: number | null }> } = { recordset: [] };
+    if (company === 'scarfme') {
+      const ecommerceSemanaQuery = `
+        SELECT 
+          ${categoriaField} AS categoria
+          ${camposVendasAdicionais},
+          SUM(CAST(fp.QTDE AS FLOAT)) AS ecommerce
+        FROM FATURAMENTO f WITH (NOLOCK)
+        JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) 
+          ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
+        WHERE f.EMISSAO >= @data7DiasAtras
+          AND f.NOTA_CANCELADA = 0
+          AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+          AND CAST(fp.QTDE AS FLOAT) > 0
+          ${ecommerceFilialFilter}
+          ${grupoFilter}
+          ${linhaFilter}
+          ${colecaoFilter}
+          ${subgrupoFilter}
+          ${gradeFilter}
+          AND ${categoriaField} <> ''
+          AND ${categoriaField} <> 'SEM GRUPO'
+          AND ${categoriaField} <> 'SEM LINHA'
+        GROUP BY ${categoriaField}${groupByVendasAdicional}
+      `;
+
+      ecommerceSemanaResult = await request.query<{
+        categoria: string;
+        linha?: string;
+        subgrupo?: string;
+        grade?: string;
+        colecao?: string;
+        ecommerce: number | null;
+      }>(ecommerceSemanaQuery);
+    }
+
+    // Agrupar movimentações por categoria
+    const entradasSemanaMap = new Map<string, number>();
+    entradasSemanaResult.recordset.forEach(row => {
+      const categoria = row.categoria?.trim() || '';
+      const chaveCategoria = mostrarDetalhes
+        ? `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`
+        : categoria;
+      entradasSemanaMap.set(chaveCategoria, Number(row.entradas ?? 0));
+    });
+
+    const vendasSemanaMap = new Map<string, number>();
+    vendasSemanaResult.recordset.forEach(row => {
+      const categoria = row.categoria?.trim() || '';
+      const chaveCategoria = mostrarDetalhes
+        ? `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`
+        : categoria;
+      vendasSemanaMap.set(chaveCategoria, Number(row.vendas ?? 0));
+    });
+
+    const ecommerceSemanaMap = new Map<string, number>();
+    ecommerceSemanaResult.recordset.forEach(row => {
+      const categoria = row.categoria?.trim() || '';
+      const chaveCategoria = mostrarDetalhes
+        ? `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`
+        : categoria;
+      ecommerceSemanaMap.set(chaveCategoria, Number(row.ecommerce ?? 0));
     });
 
     // Vendas da semana/mês anterior para calcular tendência
-    const currentMonth = {
-      start: new Date(now.getFullYear(), now.getMonth(), 1),
-      end: new Date(now.getFullYear(), now.getMonth() + 1, 1),
-    };
+    // currentMonth já está definido no início da função
     const previousMonth = shiftRangeByMonths(currentMonth, -1);
     
     const periodStart = periodType === 'semanal' 
@@ -727,18 +993,21 @@ export async function fetchEstoquePorCategoria({
         ? `${categoria}|${linha || ''}|${subgrupo || ''}|${grade || ''}|${colecao || ''}`
         : categoria;
       
-      // Buscar vendas dos últimos meses para esta categoria
+      // Buscar vendas do mês atual até hoje para calcular projeção
+      // Projeção = (vendas até hoje / dias corridos) × total de dias do mês
+      const chaveMesAtual = `${currentYear}-${currentMonthNum}`;
       const vendasMeses = vendasPorCategoriaMes.get(chaveCategoria);
-      const vendasMensais: number[] = [];
-      if (vendasMeses) {
-        mesesVendas.forEach(mes => {
-          vendasMensais.push(vendasMeses.get(mes) || 0);
-        });
-      }
-
-      // Calcular Projeção Mensal = média dos últimos 3 meses (ou menos)
-      const projecaoMensal = vendasMensais.length > 0
-        ? Math.round(vendasMensais.reduce((sum, v) => sum + v, 0) / vendasMensais.length)
+      const vendasAteHoje = vendasMeses?.get(chaveMesAtual) || 0;
+      
+      // Calcular dias corridos do mês até hoje
+      const diasCorridos = now.getDate(); // Dia do mês (1-31)
+      
+      // Calcular total de dias do mês
+      const totalDiasMes = new Date(currentYear, currentMonthNum, 0).getDate(); // Último dia do mês
+      
+      // Calcular Projeção Mensal = (vendas até hoje / dias corridos) × total de dias do mês
+      const projecaoMensal = diasCorridos > 0
+        ? Math.round((vendasAteHoje / diasCorridos) * totalDiasMes)
         : 0;
 
       // Calcular Projeção Ano = Projeção Mensal × meses restantes
@@ -751,19 +1020,29 @@ export async function fetchEstoquePorCategoria({
       // Calcular Estoque Final Ano = Estoque - Projeção Ano
       const estoqueFinalAno = Math.round(estoqueAtual - projecaoAnual);
 
-      // Calcular Dias de Estoque = (Estoque / Projeção Mensal) × 30
+      // Calcular Dias de Estoque = (Estoque / Projeção Mensal) × total de dias do mês
+      // Isso calcula quantos dias o estoque atual durará baseado na projeção de vendas mensal
+      // Exemplo: Se temos 100 unidades e a projeção mensal é 50 unidades (em 31 dias),
+      // então temos 2 meses de estoque = 2 × 31 = 62 dias
       const diasEstoque = projecaoMensal > 0
-        ? Math.round((estoqueAtual / projecaoMensal) * 30 * 10) / 10
+        ? Math.round((estoqueAtual / projecaoMensal) * totalDiasMes * 10) / 10
         : 999;
 
       // Vendas do mês atual para exibição
-      const vendasMes = vendasMensais.length > 0 ? vendasMensais[vendasMensais.length - 1] : 0;
+      const vendasMes = vendasAteHoje;
 
-      // Calcular tendência semanal
-      const vendasPeriodoAnterior = vendasPeriodoAnteriorMap.get(chaveCategoria) || 0;
-      const tendenciaSemanal = vendasPeriodoAnterior > 0
-        ? ((vendasMes - vendasPeriodoAnterior) / vendasPeriodoAnterior) * 100
-        : 0;
+      // Calcular estoque da semana passada conforme lógica do Python
+      // Estoque Semana Passada = Estoque Atual - Entradas (7 dias) + Vendas (7 dias) + E-commerce (7 dias)
+      const entradasSemana = entradasSemanaMap.get(chaveCategoria) || 0;
+      const vendasSemana = vendasSemanaMap.get(chaveCategoria) || 0;
+      const ecommerceSemana = ecommerceSemanaMap.get(chaveCategoria) || 0;
+      
+      const estoqueSemanaPassada = Math.max(0, Math.round(
+        estoqueAtual - entradasSemana + vendasSemana + ecommerceSemana
+      ));
+
+      // Calcular diferença semanal (quantidade real, não percentual)
+      const diferencaSemanal = Math.round(estoqueAtual - estoqueSemanaPassada);
 
       return {
         categoria,
@@ -774,7 +1053,9 @@ export async function fetchEstoquePorCategoria({
         duracao: Math.round(diasEstoque),
         projecaoMes: estoqueFinalMes, // Estoque Final Mês
         projecaoAnual: estoqueFinalAno, // Estoque Final Ano
-        tendenciaSemanal: Number(tendenciaSemanal.toFixed(1)),
+        projecaoVendasMes: Math.round(projecaoMensal), // Projeção de vendas mensal
+        tendenciaSemanal: diferencaSemanal, // Diferença em quantidade real
+        estoqueSemanaPassada,
         ...(mostrarDetalhes && {
           linha,
           subgrupo,
@@ -953,6 +1234,10 @@ export async function fetchPrevisoesEstoque({
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonthNum = now.getMonth() + 1; // 1-12
+    const currentMonth = {
+      start: new Date(now.getFullYear(), now.getMonth(), 1),
+      end: new Date(now.getFullYear(), now.getMonth() + 1, 1), // Início do próximo mês (exclusivo)
+    };
     
     const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
     const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
@@ -1018,24 +1303,23 @@ export async function fetchPrevisoesEstoque({
       estoqueAtual: number | null;
     }>(estoqueQuery);
 
-    // Buscar vendas mensais dos últimos 3 meses (ou menos se não houver)
-    const mesesParaCalcular = Math.min(3, currentMonthNum);
-    const mesesVendas: number[] = [];
-    for (let i = mesesParaCalcular; i > 0; i--) {
-      mesesVendas.push(currentMonthNum - i + 1);
-    }
+    // Buscar vendas do mês atual até hoje para calcular projeção
+    // Projeção = (vendas até hoje / dias corridos) × total de dias do mês
+    const hoje = new Date(now.getTime());
+    hoje.setHours(23, 59, 59, 999); // Fim do dia de hoje
 
-    // Buscar vendas por mês e categoria (com detalhes se necessário)
+    // Buscar vendas do mês atual até hoje
     const vendasMensaisQuery = `
       SELECT 
         ${categoriaField} AS categoria
         ${camposVendasAdicionais},
+        YEAR(vp.DATA_VENDA) AS ano,
         MONTH(vp.DATA_VENDA) AS mes,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-      WHERE YEAR(vp.DATA_VENDA) = @currentYear
-        AND MONTH(vp.DATA_VENDA) IN (${mesesVendas.map((_, i) => `@mes${i}`).join(', ')})
+      WHERE vp.DATA_VENDA >= @currentMonthStart
+        AND vp.DATA_VENDA <= @hoje
         AND vp.QTDE > 0
         ${vendasFilialFilter}
         ${grupoFilter}
@@ -1046,13 +1330,11 @@ export async function fetchPrevisoesEstoque({
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
-      GROUP BY ${categoriaField}${groupByVendasAdicional}, MONTH(vp.DATA_VENDA)
+      GROUP BY ${categoriaField}${groupByVendasAdicional}, YEAR(vp.DATA_VENDA), MONTH(vp.DATA_VENDA)
     `;
 
-    request.input('currentYear', sql.Int, currentYear);
-    mesesVendas.forEach((mes, index) => {
-      request.input(`mes${index}`, sql.Int, mes);
-    });
+    request.input('currentMonthStart', sql.DateTime, currentMonth.start);
+    request.input('hoje', sql.DateTime, hoje);
 
     const vendasMensaisResult = await request.query<{
       categoria: string;
@@ -1060,25 +1342,27 @@ export async function fetchPrevisoesEstoque({
       subgrupo?: string;
       grade?: string;
       colecao?: string;
+      ano: number;
       mes: number;
       vendas: number | null;
     }>(vendasMensaisQuery);
 
     // Agrupar vendas por categoria e mês (usar chave composta quando mostrarDetalhes)
-    const vendasPorCategoriaMes = new Map<string, Map<number, number>>();
+    // Usar chave ano-mês para garantir que pegamos os últimos 3 meses completos
+    const vendasPorCategoriaMes = new Map<string, Map<string, number>>();
     vendasMensaisResult.recordset.forEach(row => {
       const categoria = row.categoria?.trim() || '';
       // Se mostrarDetalhes, criar chave composta incluindo os campos adicionais
       const chaveCategoria = mostrarDetalhes
         ? `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`
         : categoria;
-      const mes = row.mes;
+      const chaveAnoMes = `${row.ano}-${row.mes}`;
       const vendas = Number(row.vendas ?? 0);
       
       if (!vendasPorCategoriaMes.has(chaveCategoria)) {
         vendasPorCategoriaMes.set(chaveCategoria, new Map());
       }
-      vendasPorCategoriaMes.get(chaveCategoria)!.set(mes, vendas);
+      vendasPorCategoriaMes.get(chaveCategoria)!.set(chaveAnoMes, vendas);
     });
 
     // Processar resultados conforme lógica do Python
@@ -1097,18 +1381,21 @@ export async function fetchPrevisoesEstoque({
         ? `${categoria}|${linha || ''}|${subgrupo || ''}|${grade || ''}|${colecao || ''}`
         : categoria;
       
-      // Buscar vendas dos últimos meses para esta categoria
+      // Buscar vendas do mês atual até hoje para calcular projeção
+      // Projeção = (vendas até hoje / dias corridos) × total de dias do mês
+      const chaveMesAtual = `${currentYear}-${currentMonthNum}`;
       const vendasMeses = vendasPorCategoriaMes.get(chaveCategoria);
-      const vendasMensais: number[] = [];
-      if (vendasMeses) {
-        mesesVendas.forEach(mes => {
-          vendasMensais.push(vendasMeses.get(mes) || 0);
-        });
-      }
-
-      // Calcular Projeção Mensal = média dos últimos 3 meses (ou menos)
-      const projecaoMensal = vendasMensais.length > 0
-        ? Math.round(vendasMensais.reduce((sum, v) => sum + v, 0) / vendasMensais.length)
+      const vendasAteHoje = vendasMeses?.get(chaveMesAtual) || 0;
+      
+      // Calcular dias corridos do mês até hoje
+      const diasCorridos = now.getDate(); // Dia do mês (1-31)
+      
+      // Calcular total de dias do mês
+      const totalDiasMes = new Date(currentYear, currentMonthNum, 0).getDate(); // Último dia do mês
+      
+      // Calcular Projeção Mensal = (vendas até hoje / dias corridos) × total de dias do mês
+      const projecaoMensal = diasCorridos > 0
+        ? Math.round((vendasAteHoje / diasCorridos) * totalDiasMes)
         : 0;
 
       // Calcular Projeção Ano = Projeção Mensal × meses restantes
@@ -1121,13 +1408,16 @@ export async function fetchPrevisoesEstoque({
       // Calcular Estoque Final Ano = Estoque - Projeção Ano
       const prevFimAno = Math.round(estoqueAtual - projecaoAnual);
 
-      // Calcular Dias de Estoque = (Estoque / Projeção Mensal) × 30
+      // Calcular Dias de Estoque = (Estoque / Projeção Mensal) × total de dias do mês
+      // Isso calcula quantos dias o estoque atual durará baseado na projeção de vendas mensal
+      // Exemplo: Se temos 100 unidades e a projeção mensal é 50 unidades (em 31 dias),
+      // então temos 2 meses de estoque = 2 × 31 = 62 dias
       const diasEstoque = projecaoMensal > 0
-        ? Math.round((estoqueAtual / projecaoMensal) * 30 * 10) / 10
+        ? Math.round((estoqueAtual / projecaoMensal) * totalDiasMes * 10) / 10
         : 999;
 
-      // Média diária = Projeção Mensal / 30
-      const mediaDia = projecaoMensal > 0 ? projecaoMensal / 30 : 0;
+      // Média diária = Projeção Mensal / total de dias do mês
+      const mediaDia = projecaoMensal > 0 ? projecaoMensal / totalDiasMes : 0;
 
       // Determinar status baseado em dias de estoque (conforme script Python: <=90 verde, 90-180 amarelo, >180 vermelho)
       let status: 'OK' | 'ALERTA' | 'CRITICO' = 'OK';

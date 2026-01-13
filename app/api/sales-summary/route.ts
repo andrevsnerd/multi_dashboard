@@ -65,6 +65,18 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('Erro ao carregar resumo de vendas', error);
     
+    // Log detalhado do erro
+    if (error instanceof Error) {
+      console.error('Erro detalhado:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        ...(error as any),
+      });
+    } else {
+      console.error('Erro não é instância de Error:', error);
+    }
+    
     // Verificar se é um erro de timeout
     if (error instanceof Error && 'code' in error && error.code === 'ETIMEOUT') {
       return NextResponse.json(
@@ -76,8 +88,10 @@ export async function GET(request: Request) {
       );
     }
     
+    // Retornar mensagem de erro mais informativa
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
     return NextResponse.json(
-      { error: 'Erro ao carregar resumo de vendas' },
+      { error: 'Erro ao carregar resumo de vendas', details: errorMessage },
       { status: 500 }
     );
   }

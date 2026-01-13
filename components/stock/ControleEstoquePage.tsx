@@ -49,7 +49,13 @@ interface CategoriaEstoque {
   duracao: number;
   projecaoMes: number;
   projecaoAnual: number;
+  projecaoVendasMes: number;
   tendenciaSemanal: number;
+  estoqueSemanaPassada: number;
+  linha?: string;
+  subgrupo?: string;
+  grade?: string;
+  colecao?: string;
 }
 
 interface EvolucaoEstoqueData {
@@ -317,16 +323,70 @@ export default function ControleEstoquePage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Calcular percentuais de mudança
+  // Linhas a serem excluídas da visualização
+  const linhasExcluidas = useMemo(() => {
+    return new Set([
+      'PRIVATE LABEL',
+      'GASTRONOMICA',
+      'PERFUMARIA',
+      'CASHMERE',
+      'ELETRONICOS',
+      'EMBALAGENS'
+    ]);
+  }, []);
+
+  // Filtrar categorias selecionadas e remover linhas excluídas
+  const categoriasFiltradas = useMemo(() => {
+    return categorias.filter(c => {
+      const categoriaUpper = c.categoria.toUpperCase();
+      // Remover linhas excluídas
+      if (linhasExcluidas.has(categoriaUpper)) {
+        return false;
+      }
+      // Filtrar por categorias selecionadas
+      return selectedCategorias.has(c.categoria);
+    });
+  }, [categorias, selectedCategorias, linhasExcluidas]);
+
+  // Recalcular KPIs baseado nas categorias filtradas
+  const kpisFiltrados = useMemo(() => {
+    if (!kpis) return null;
+
+    // Calcular estoque total e valor em estoque das categorias filtradas
+    const estoqueTotalFiltrado = categoriasFiltradas.reduce((sum, cat) => sum + cat.estoqueAtual, 0);
+    const valorEmEstoqueFiltrado = categoriasFiltradas.reduce((sum, cat) => sum + cat.custoTotal, 0);
+    const vendasEsteMesFiltrado = categoriasFiltradas.reduce((sum, cat) => sum + cat.vendasMes, 0);
+    const categoriasAtivasFiltrado = categoriasFiltradas.length;
+
+    // Calcular valores do período anterior baseado na proporção
+    // Se temos X% do estoque total, assumimos X% do estoque anterior também
+    const proporcaoEstoque = kpis.estoqueTotal > 0 ? estoqueTotalFiltrado / kpis.estoqueTotal : 0;
+    const estoqueTotalAnteriorFiltrado = Math.round(kpis.estoqueTotalAnterior * proporcaoEstoque);
+    
+    // Para vendas, usar a mesma proporção ou calcular baseado nas vendas filtradas
+    const proporcaoVendas = kpis.vendasEsteMes > 0 ? vendasEsteMesFiltrado / kpis.vendasEsteMes : 0;
+    const vendasMesAnteriorFiltrado = Math.round(kpis.vendasMesAnterior * proporcaoVendas);
+
+    return {
+      estoqueTotal: estoqueTotalFiltrado,
+      valorEmEstoque: valorEmEstoqueFiltrado,
+      vendasEsteMes: vendasEsteMesFiltrado,
+      categoriasAtivas: categoriasAtivasFiltrado,
+      estoqueTotalAnterior: estoqueTotalAnteriorFiltrado,
+      vendasMesAnterior: vendasMesAnteriorFiltrado,
+    };
+  }, [kpis, categoriasFiltradas]);
+
+  // Calcular percentuais de mudança baseado nos KPIs filtrados
   const estoqueChangePercent = useMemo(() => {
-    if (!kpis || kpis.estoqueTotalAnterior === 0) return 0;
-    return ((kpis.estoqueTotal - kpis.estoqueTotalAnterior) / kpis.estoqueTotalAnterior) * 100;
-  }, [kpis]);
+    if (!kpisFiltrados || kpisFiltrados.estoqueTotalAnterior === 0) return 0;
+    return ((kpisFiltrados.estoqueTotal - kpisFiltrados.estoqueTotalAnterior) / kpisFiltrados.estoqueTotalAnterior) * 100;
+  }, [kpisFiltrados]);
 
   const vendasChangePercent = useMemo(() => {
-    if (!kpis || kpis.vendasMesAnterior === 0) return 0;
-    return ((kpis.vendasEsteMes - kpis.vendasMesAnterior) / kpis.vendasMesAnterior) * 100;
-  }, [kpis]);
+    if (!kpisFiltrados || kpisFiltrados.vendasMesAnterior === 0) return 0;
+    return ((kpisFiltrados.vendasEsteMes - kpisFiltrados.vendasMesAnterior) / kpisFiltrados.vendasMesAnterior) * 100;
+  }, [kpisFiltrados]);
 
   // Buscar grupos disponíveis para NERD
   useEffect(() => {
@@ -637,11 +697,6 @@ export default function ControleEstoquePage({
     };
   }, [companyKey, selectedFilial, range, periodType, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades]);
 
-  // Filtrar categorias selecionadas
-  const categoriasFiltradas = useMemo(() => {
-    return categorias.filter(c => selectedCategorias.has(c.categoria));
-  }, [categorias, selectedCategorias]);
-
   const evolucaoFiltrada = useMemo(() => {
     if (evolucao.length === 0) return [];
     
@@ -657,12 +712,28 @@ export default function ControleEstoquePage({
   }, [evolucao, categoriasFiltradas]);
 
   const vendasFiltradas = useMemo(() => {
-    return vendas.filter(v => selectedCategorias.has(v.categoria));
-  }, [vendas, selectedCategorias]);
+    return vendas.filter(v => {
+      const categoriaUpper = v.categoria.toUpperCase();
+      // Remover linhas excluídas
+      if (linhasExcluidas.has(categoriaUpper)) {
+        return false;
+      }
+      // Filtrar por categorias selecionadas
+      return selectedCategorias.has(v.categoria);
+    });
+  }, [vendas, selectedCategorias, linhasExcluidas]);
 
   const previsoesFiltradas = useMemo(() => {
-    return previsoes.filter(p => selectedCategorias.has(p.categoria));
-  }, [previsoes, selectedCategorias]);
+    return previsoes.filter(p => {
+      const categoriaUpper = p.categoria.toUpperCase();
+      // Remover linhas excluídas
+      if (linhasExcluidas.has(categoriaUpper)) {
+        return false;
+      }
+      // Filtrar por categorias selecionadas
+      return selectedCategorias.has(p.categoria);
+    });
+  }, [previsoes, selectedCategorias, linhasExcluidas]);
 
   const toggleCategoria = (categoria: string) => {
     setSelectedCategorias(prev => {
@@ -740,8 +811,8 @@ export default function ControleEstoquePage({
       <div className={styles.kpisGrid}>
         <div className={styles.kpiCard}>
           <div className={styles.kpiLabel}>ESTOQUE TOTAL</div>
-          <div className={styles.kpiValue}>{formatNumber(kpis?.estoqueTotal ?? 0)} un</div>
-          {kpis && estoqueChangePercent !== 0 && (
+          <div className={styles.kpiValue}>{formatNumber(kpisFiltrados?.estoqueTotal ?? 0)} un</div>
+          {kpisFiltrados && estoqueChangePercent !== 0 && (
             <div className={`${styles.kpiChange} ${estoqueChangePercent > 0 ? styles.positive : styles.negative}`}>
               {estoqueChangePercent > 0 ? "▲" : "▼"} {Math.abs(estoqueChangePercent).toFixed(1)}% vs mês anterior
             </div>
@@ -750,13 +821,13 @@ export default function ControleEstoquePage({
 
         <div className={styles.kpiCard}>
           <div className={styles.kpiLabel}>VALOR EM ESTOQUE</div>
-          <div className={styles.kpiValue}>{formatCurrency(kpis?.valorEmEstoque ?? 0)}</div>
+          <div className={styles.kpiValue}>{formatCurrency(kpisFiltrados?.valorEmEstoque ?? 0)}</div>
         </div>
 
         <div className={styles.kpiCard}>
           <div className={styles.kpiLabel}>VENDAS ESTE MÊS</div>
-          <div className={styles.kpiValue}>{formatNumber(kpis?.vendasEsteMes ?? 0)} un</div>
-          {kpis && vendasChangePercent !== 0 && (
+          <div className={styles.kpiValue}>{formatNumber(kpisFiltrados?.vendasEsteMes ?? 0)} un</div>
+          {kpisFiltrados && vendasChangePercent !== 0 && (
             <div className={`${styles.kpiChange} ${vendasChangePercent > 0 ? styles.positive : styles.negative}`}>
               {vendasChangePercent > 0 ? "▲" : "▼"} {Math.abs(vendasChangePercent).toFixed(1)}% vs mês anterior
             </div>
@@ -765,7 +836,7 @@ export default function ControleEstoquePage({
 
         <div className={styles.kpiCard}>
           <div className={styles.kpiLabel}>CATEGORIAS ATIVAS</div>
-          <div className={styles.kpiValue}>{kpis?.categoriasAtivas ?? 0}</div>
+          <div className={styles.kpiValue}>{kpisFiltrados?.categoriasAtivas ?? 0}</div>
         </div>
       </div>
 
@@ -835,26 +906,27 @@ export default function ControleEstoquePage({
                   )}
                 </div>
                 <div className={`${styles.tendencia} ${cat.tendenciaSemanal >= 0 ? styles.positive : styles.negative}`}>
-                  {cat.tendenciaSemanal >= 0 ? "▲" : "▼"} {Math.abs(cat.tendenciaSemanal).toFixed(1)}% {periodType === "semanal" ? "Semanal" : "Mensal"}
+                  {cat.tendenciaSemanal >= 0 ? "+" : ""}{formatNumber(cat.tendenciaSemanal)} na Semana
                 </div>
               </div>
               <div className={styles.categoriaContent}>
                 <div className={styles.estoqueValue}>
                   {formatNumber(cat.estoqueAtual)} <span className={styles.estoqueUnit}>unidades</span>
                 </div>
+                {cat.estoqueSemanaPassada !== undefined && (
+                  <div className={styles.estoqueSemanaPassada}>
+                    {formatNumber(cat.estoqueSemanaPassada)} semana passada
+                  </div>
+                )}
                 <div className={styles.categoriaInfo}>
                   <div className={styles.infoRow}>
                     <span className={styles.infoLabel}>Custo total:</span>
                     <span className={styles.infoValue}>{formatCurrency(cat.custoTotal)}</span>
                   </div>
-                  <div className={styles.infoRow}>
-                    <span className={styles.infoLabel}>Custo unitário:</span>
-                    <span className={styles.infoValue}>{formatCurrency(cat.custoUnitario)}</span>
-                  </div>
                 </div>
                 <div className={styles.categoriaMetrics}>
                   <div className={styles.metricItem}>
-                    <span className={styles.metricLabel}>Vendas (mês):</span>
+                    <span className={styles.metricLabel}>Venda acumulada (mês):</span>
                     <span className={styles.metricValue}>{formatNumber(cat.vendasMes)}</span>
                   </div>
                   <div className={styles.metricItem}>
@@ -862,15 +934,21 @@ export default function ControleEstoquePage({
                     <span className={styles.metricValue}>{cat.duracao} dias</span>
                   </div>
                   <div className={styles.metricItem}>
-                    <span className={styles.metricLabel}>Projeção mês:</span>
+                    <span className={styles.metricLabel}>Estoque final mês:</span>
                     <span className={styles.metricValue}>
                       {formatNumber(cat.projecaoMes)} un
                     </span>
                   </div>
                   <div className={styles.metricItem}>
-                    <span className={styles.metricLabel}>Projeção anual:</span>
+                    <span className={styles.metricLabel}>Estoque final ano:</span>
                     <span className={styles.metricValue}>
                       {formatNumber(cat.projecaoAnual)} un
+                    </span>
+                  </div>
+                  <div className={styles.metricItem}>
+                    <span className={styles.metricLabel}>Projeção vendas mês:</span>
+                    <span className={styles.metricValue}>
+                      {formatNumber(cat.projecaoVendasMes)} un
                     </span>
                   </div>
                 </div>

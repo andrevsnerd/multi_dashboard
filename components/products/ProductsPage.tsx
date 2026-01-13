@@ -162,7 +162,9 @@ async function fetchSummary(
   });
 
   if (!response.ok) {
-    throw new Error("Erro ao carregar resumo de vendas");
+    const errorData = await response.json().catch(() => ({}));
+    const errorMessage = errorData?.error || errorData?.details || "Erro ao carregar resumo de vendas";
+    throw new Error(errorMessage);
   }
 
   const json = (await response.json()) as {
