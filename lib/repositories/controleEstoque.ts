@@ -4,6 +4,7 @@ import { resolveCompany, VAREJO_VALUE } from '@/lib/config/company';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import { normalizeRangeForQuery, shiftRangeByMonths } from '@/lib/utils/date';
+import { getColorDescription } from '@/lib/utils/colorMapping';
 import type { DateRangeInput } from '@/types/dashboard';
 
 function resolveRange(range?: DateRangeInput) {
@@ -1445,6 +1446,7 @@ export interface ProdutoDetalheEstoque {
   produto: string;
   descricao: string;
   cor?: string;
+  descCor?: string; // Descrição da cor (nome ao invés do código)
   estoque: number;
   custoUnitario: number;
   custoTotal: number;
@@ -1458,6 +1460,7 @@ export interface ProdutoDetalheEstoque {
 export interface ControleEstoqueDetalhesParams {
   company: string;
   categoria: string;
+  produto?: string;
   filial?: string | null;
   grupos?: string[];
   linhas?: string[];
@@ -1472,6 +1475,7 @@ export interface ControleEstoqueDetalhesParams {
 export async function fetchDetalhesCategoria({
   company,
   categoria,
+  produto,
   filial,
   grupos,
   linhas,
@@ -1492,12 +1496,16 @@ export async function fetchDetalhesCategoria({
       ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
       : 'ISNULL(p.LINHA, \'SEM LINHA\')';
 
+    // Filtro por produto se especificado
+    const produtoFilter = produto ? 'AND p.PRODUTO = @produto' : '';
+
     // Query para buscar produtos individuais da categoria
     const query = `
       SELECT 
         p.PRODUTO AS produto,
         ISNULL(p.DESC_PRODUTO, '') AS descricao,
         ISNULL(e.COR_PRODUTO, '') AS cor,
+        ISNULL(c.DESC_COR, '') AS descCor,
         e.FILIAL AS filial,
         e.ESTOQUE AS estoque,
         ISNULL(p.CUSTO_REPOSICAO1, 0) AS custoUnitario,
@@ -1508,6 +1516,7 @@ export async function fetchDetalhesCategoria({
         ISNULL(p.COLECAO, '') AS colecao
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
       WHERE 1=1
         ${estoqueFilialFilter}
         ${grupoFilter}
@@ -1520,15 +1529,20 @@ export async function fetchDetalhesCategoria({
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
+        ${produtoFilter}
       ORDER BY p.DESC_PRODUTO, e.COR_PRODUTO, e.FILIAL
     `;
 
     request.input('categoria', sql.NVarChar, categoria.trim());
+    if (produto) {
+      request.input('produto', sql.NVarChar, produto.trim());
+    }
 
     const result = await request.query<{
       produto: string;
       descricao: string;
       cor: string | null;
+      descCor: string | null;
       filial: string;
       estoque: number;
       custoUnitario: number;
@@ -1543,6 +1557,7 @@ export async function fetchDetalhesCategoria({
       produto: row.produto?.trim() || '',
       descricao: row.descricao?.trim() || '',
       cor: row.cor?.trim() || undefined,
+      descCor: getColorDescription(row.cor, row.descCor) || undefined,
       estoque: Number(row.estoque ?? 0),
       custoUnitario: Number(row.custoUnitario ?? 0),
       custoTotal: Number(row.custoTotal ?? 0),

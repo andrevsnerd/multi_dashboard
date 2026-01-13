@@ -6,6 +6,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const company = searchParams.get('company');
   const categoria = searchParams.get('categoria');
+  const produto = searchParams.get('produto');
   const filial = searchParams.get('filial') || null;
   const grupos = searchParams.get('grupos')?.split(',').filter(Boolean) || [];
   const linhas = searchParams.get('linhas')?.split(',').filter(Boolean) || [];
@@ -24,6 +25,7 @@ export async function GET(request: Request) {
     const detalhes = await fetchDetalhesCategoria({
       company,
       categoria: decodeURIComponent(categoria),
+      produto: produto ? decodeURIComponent(produto) : undefined,
       filial,
       grupos,
       linhas,
