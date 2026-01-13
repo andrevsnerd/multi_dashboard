@@ -537,20 +537,16 @@ export async function fetchEstoquePorCategoria({
     const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
     const gradeFilter = buildGradeFilter(request, company, grades, 'p');
 
-    // Determinar se devemos mostrar detalhes (quando há filtros selecionados)
-    const mostrarDetalhes = company === 'scarfme' && (
-      (linhas && linhas.length > 0) || 
-      (colecoes && colecoes.length > 0) || 
-      (subgrupos && subgrupos.length > 0) || 
-      (grades && grades.length > 0)
-    );
+    // Para ScarfMe, sempre buscar dados detalhados (linha, subgrupo, grade, coleção)
+    // para permitir expansão progressiva dos cards
+    const mostrarDetalhes = company === 'scarfme';
 
     // Determinar campo de categoria baseado na empresa
     const categoriaField = company === 'nerd' 
       ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
       : 'ISNULL(p.LINHA, \'SEM LINHA\')';
 
-    // Se mostrar detalhes, incluir campos adicionais e agrupar por eles
+    // Para ScarfMe, sempre incluir campos adicionais para permitir expansão
     const camposAdicionais = mostrarDetalhes
       ? `, ISNULL(p.LINHA, '') AS linha, ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo, ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade, ISNULL(p.COLECAO, '') AS colecao`
       : '';

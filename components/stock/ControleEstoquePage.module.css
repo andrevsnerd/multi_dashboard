@@ -108,11 +108,39 @@
   margin-bottom: 32px;
 }
 
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
 .sectionTitle {
   font-size: 20px;
   font-weight: 700;
   color: #1a1a1a;
-  margin-bottom: 16px;
+  margin: 0;
+}
+
+.backButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.backButton:hover {
+  background: #f5f5f5;
+  border-color: #d5d5d5;
+  color: #1a1a1a;
 }
 
 .categoriasGrid {
