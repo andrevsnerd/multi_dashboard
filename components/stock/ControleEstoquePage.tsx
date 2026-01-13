@@ -335,9 +335,18 @@ export default function ControleEstoquePage({
       'PERFUMARIA',
       'CASHMERE',
       'ELETRONICOS',
-      'EMBALAGENS'
+      'EMBALAGENS',
+      'CAPAS E ACESSORIOS P/ CEL'
     ]);
   }, []);
+
+  // Filtrar linhas disponíveis removendo as excluídas
+  const linhasDisponiveis = useMemo(() => {
+    return availableLinhas.filter(linha => {
+      const linhaUpper = linha.toUpperCase().trim();
+      return !linhasExcluidas.has(linhaUpper);
+    });
+  }, [availableLinhas, linhasExcluidas]);
 
   // Função para reagrupar dados baseado no nível de expansão
   const reagruparPorNivel = useMemo(() => {
@@ -429,13 +438,33 @@ export default function ControleEstoquePage({
   // Filtrar categorias selecionadas e remover linhas excluídas, depois reagrupar por nível de expansão
   const categoriasFiltradas = useMemo(() => {
     // Primeiro filtrar e remover linhas excluídas
-    const filtradas = categorias.filter(c => {
+    let filtradas = categorias.filter(c => {
       const categoriaUpper = c.categoria.toUpperCase();
       if (linhasExcluidas.has(categoriaUpper)) {
         return false;
       }
       return selectedCategorias.has(c.categoria);
     });
+
+    // Se há linhas selecionadas nos filtros, filtrar por elas também
+    if (companyKey === 'scarfme' && selectedLinhas.length > 0) {
+      filtradas = filtradas.filter(c => selectedLinhas.includes(c.categoria));
+    }
+
+    // Se há subgrupos selecionados, filtrar por eles
+    if (companyKey === 'scarfme' && selectedSubgrupos.length > 0) {
+      filtradas = filtradas.filter(c => c.subgrupo && selectedSubgrupos.includes(c.subgrupo));
+    }
+
+    // Se há grades selecionadas, filtrar por elas
+    if (companyKey === 'scarfme' && selectedGrades.length > 0) {
+      filtradas = filtradas.filter(c => c.grade && selectedGrades.includes(c.grade));
+    }
+
+    // Se há coleções selecionadas, filtrar por elas
+    if (companyKey === 'scarfme' && selectedColecoes.length > 0) {
+      filtradas = filtradas.filter(c => c.colecao && selectedColecoes.includes(c.colecao));
+    }
 
     // Agrupar por categoria e aplicar expansão
     const categoriasAgrupadas = new Map<string, CategoriaEstoque[]>();
@@ -643,7 +672,12 @@ export default function ControleEstoquePage({
         };
 
         if (active) {
-          setAvailableLinhas(json.data || []);
+          // Filtrar linhas excluídas diretamente ao carregar
+          const linhasFiltradas = (json.data || []).filter(linha => {
+            const linhaUpper = linha.toUpperCase().trim();
+            return !linhasExcluidas.has(linhaUpper);
+          });
+          setAvailableLinhas(linhasFiltradas);
         }
       } catch (err) {
         // Silenciosamente falhar
@@ -655,7 +689,7 @@ export default function ControleEstoquePage({
     return () => {
       active = false;
     };
-  }, [companyKey, range.startDate, range.endDate, selectedFilial, selectedColecoes, selectedSubgrupos, selectedGrades]);
+  }, [companyKey, range.startDate, range.endDate, selectedFilial, selectedColecoes, selectedSubgrupos, selectedGrades, linhasExcluidas]);
 
   // Buscar coleções disponíveis para ScarfMe
   useEffect(() => {
@@ -1029,26 +1063,130 @@ export default function ControleEstoquePage({
             <MultiSelectFilter
               label="Linha"
               value={selectedLinhas}
-              options={availableLinhas}
-              onChange={setSelectedLinhas}
+              options={linhasDisponiveis}
+              onChange={(linhas) => {
+                setSelectedLinhas(linhas);
+                // Quando selecionar uma linha, selecionar a categoria correspondente e expandir para nível 1
+                if (linhas.length > 0) {
+                  linhas.forEach(linha => {
+                    // Selecionar a categoria correspondente
+                    setSelectedCategorias(prev => {
+                      const novo = new Set(prev);
+                      novo.add(linha);
+                      return novo;
+                    });
+                    // Expandir para nível 1
+                    setCategoriaExpansao(prev => {
+                      const novo = new Map(prev);
+                      novo.set(linha, { nivel: 1 });
+                      return novo;
+                    });
+                  });
+                } else {
+                  // Se remover todas as linhas, desmarcar categorias e colapsar
+                  selectedLinhas.forEach(linha => {
+                    setSelectedCategorias(prev => {
+                      const novo = new Set(prev);
+                      novo.delete(linha);
+                      return novo;
+                    });
+                    setCategoriaExpansao(prev => {
+                      const novo = new Map(prev);
+                      novo.delete(linha);
+                      return novo;
+                    });
+                  });
+                }
+              }}
             />
             <MultiSelectFilter
               label="Coleção"
               value={selectedColecoes}
               options={availableColecoes}
-              onChange={setSelectedColecoes}
+              onChange={(colecoes) => {
+                setSelectedColecoes(colecoes);
+                // Quando selecionar coleção, expandir para nível 2 se já estiver no nível 1
+                if (colecoes.length > 0 && selectedLinhas.length > 0) {
+                  selectedLinhas.forEach(linha => {
+                    setCategoriaExpansao(prev => {
+                      const novo = new Map(prev);
+                      const expansao = novo.get(linha);
+                      if (expansao && expansao.nivel === 1) {
+                        // Se já está no nível 1, expandir para nível 2
+                        // Mas precisamos do subgrupo e grade selecionados
+                        // Por enquanto, vamos apenas manter no nível 1 se não tiver subgrupo/grade
+                      }
+                      return novo;
+                    });
+                  });
+                }
+              }}
             />
             <MultiSelectFilter
               label="Subgrupo"
               value={selectedSubgrupos}
               options={availableSubgrupos}
-              onChange={setSelectedSubgrupos}
+              onChange={(subgrupos) => {
+                setSelectedSubgrupos(subgrupos);
+                // Quando selecionar subgrupo, expandir para nível 2 se tiver grade também
+                if (subgrupos.length > 0 && selectedGrades.length > 0 && selectedLinhas.length > 0) {
+                  selectedLinhas.forEach(linha => {
+                    setCategoriaExpansao(prev => {
+                      const novo = new Map(prev);
+                      novo.set(linha, {
+                        nivel: 2,
+                        subgrupoSelecionado: subgrupos[0], // Usar o primeiro selecionado
+                        gradeSelecionado: selectedGrades[0], // Usar o primeiro selecionado
+                      });
+                      return novo;
+                    });
+                  });
+                } else if (subgrupos.length > 0 && selectedLinhas.length > 0) {
+                  // Se só tem subgrupo, manter no nível 1
+                  selectedLinhas.forEach(linha => {
+                    setCategoriaExpansao(prev => {
+                      const novo = new Map(prev);
+                      if (!novo.has(linha)) {
+                        novo.set(linha, { nivel: 1 });
+                      }
+                      return novo;
+                    });
+                  });
+                }
+              }}
             />
             <MultiSelectFilter
               label="Grade"
               value={selectedGrades}
               options={availableGrades}
-              onChange={setSelectedGrades}
+              onChange={(grades) => {
+                setSelectedGrades(grades);
+                // Quando selecionar grade, expandir para nível 2 se tiver subgrupo também
+                if (grades.length > 0 && selectedSubgrupos.length > 0 && selectedLinhas.length > 0) {
+                  selectedLinhas.forEach(linha => {
+                    setCategoriaExpansao(prev => {
+                      const novo = new Map(prev);
+                      novo.set(linha, {
+                        nivel: 2,
+                        subgrupoSelecionado: selectedSubgrupos[0], // Usar o primeiro selecionado
+                        gradeSelecionado: grades[0], // Usar o primeiro selecionado
+                      });
+                      return novo;
+                    });
+                  });
+                } else if (grades.length > 0 && selectedLinhas.length > 0) {
+                  // Se só tem grade, manter no nível 1
+                  selectedLinhas.forEach(linha => {
+                    setCategoriaExpansao(prev => {
+                      const novo = new Map(prev);
+                      if (!novo.has(linha)) {
+                        novo.set(linha, { nivel: 1 });
+                      }
+                      return novo;
+                    });
+                  });
+                }
+              }}
             />
           </>
         )}
@@ -1057,7 +1195,6 @@ export default function ControleEstoquePage({
       {/* Por Categoria */}
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Por Categoria</h2>
           {(() => {
             // Verificar se há categorias expandidas para mostrar botão de voltar
             const categoriasExpandidas = Array.from(categoriaExpansao.entries()).filter(([_, expansao]) => expansao.nivel > 0);
@@ -1086,6 +1223,7 @@ export default function ControleEstoquePage({
             }
             return null;
           })()}
+          <h2 className={styles.sectionTitle}>Por Categoria</h2>
         </div>
         <div className={styles.categoriasGrid}>
           {categoriasFiltradas.map((cat, index) => {
@@ -1217,8 +1355,10 @@ export default function ControleEstoquePage({
                     <span className={styles.metricValue}>{formatNumber(cat.vendasMes)}</span>
                   </div>
                   <div className={styles.metricItem}>
-                    <span className={styles.metricLabel}>Duração:</span>
-                    <span className={styles.metricValue}>{cat.duracao} dias</span>
+                    <span className={styles.metricLabel}>Projeção vendas mês:</span>
+                    <span className={styles.metricValue}>
+                      {formatNumber(cat.projecaoVendasMes)} un
+                    </span>
                   </div>
                   <div className={styles.metricItem}>
                     <span className={styles.metricLabel}>Estoque final mês:</span>
@@ -1233,10 +1373,8 @@ export default function ControleEstoquePage({
                     </span>
                   </div>
                   <div className={styles.metricItem}>
-                    <span className={styles.metricLabel}>Projeção vendas mês:</span>
-                    <span className={styles.metricValue}>
-                      {formatNumber(cat.projecaoVendasMes)} un
-                    </span>
+                    <span className={styles.metricLabel}>Duração:</span>
+                    <span className={styles.metricValue}>{cat.duracao} dias</span>
                   </div>
                 </div>
               </div>
