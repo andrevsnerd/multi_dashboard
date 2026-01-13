@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   LineChart,
   Line,
@@ -894,7 +895,20 @@ export default function ControleEstoquePage({
             <div key={cat.categoria} className={styles.categoriaCard}>
               <div className={styles.categoriaHeader}>
                 <div className={styles.categoriaNameWrapper}>
-                  <span className={styles.categoriaName}>{cat.categoria}</span>
+                  <Link 
+                    href={`/${companyKey}/controle-estoque/${encodeURIComponent(cat.categoria)}?${new URLSearchParams({
+                      ...(selectedFilial && { filial: selectedFilial }),
+                      ...(selectedGrupos.length > 0 && { grupos: selectedGrupos.join(',') }),
+                      ...(selectedLinhas.length > 0 && { linhas: selectedLinhas.join(',') }),
+                      ...(selectedColecoes.length > 0 && { colecoes: selectedColecoes.join(',') }),
+                      ...(selectedSubgrupos.length > 0 && { subgrupos: selectedSubgrupos.join(',') }),
+                      ...(selectedGrades.length > 0 && { grades: selectedGrades.join(',') }),
+                      ...(range && { start: range.startDate.toISOString(), end: range.endDate.toISOString() }),
+                    }).toString()}`}
+                    className={styles.categoriaName}
+                  >
+                    {cat.categoria}
+                  </Link>
                   {/* Mostrar detalhes quando disponíveis */}
                   {(cat.linha || cat.subgrupo || cat.grade || cat.colecao) && (
                     <div className={styles.categoriaDetails}>

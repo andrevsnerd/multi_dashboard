@@ -1,0 +1,134 @@
+.container {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.backButton {
+  padding: 8px 16px;
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.backButton:hover {
+  background: #e0e0e0;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.summary {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #f9f9f9;
+  border-radius: 8px;
+}
+
+.summaryItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summaryLabel {
+  font-size: 12px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.summaryValue {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.tableContainer {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table thead {
+  background: #f5f5f5;
+}
+
+.table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 14px;
+  color: #333;
+}
+
+.table tbody tr:hover {
+  background: #f9f9f9;
+}
+
+.numberCell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.produtoCell {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.descricaoCell {
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.emptyMessage {
+  text-align: center;
+  padding: 48px;
+  color: #999;
+  font-style: italic;
+}
+
+.loading,
+.error {
+  padding: 48px;
+  text-align: center;
+  color: #666;
+}
+
+.error {
+  color: #d32f2f;
+}

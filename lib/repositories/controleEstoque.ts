@@ -569,8 +569,7 @@ export async function fetchEstoquePorCategoria({
         ${categoriaField} AS categoria
         ${camposAdicionais},
         SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoqueAtual,
-        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0) ELSE 0 END) AS custoTotal,
-        AVG(CASE WHEN e.ESTOQUE > 0 THEN ISNULL(p.CUSTO_REPOSICAO1, 0) ELSE NULL END) AS custoUnitario
+        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0) ELSE 0 END) AS custoTotal
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
       WHERE 1=1
@@ -596,7 +595,6 @@ export async function fetchEstoquePorCategoria({
       colecao?: string;
       estoqueAtual: number | null;
       custoTotal: number | null;
-      custoUnitario: number | null;
     }>(estoqueQuery);
 
     // Buscar vendas do mês atual até hoje para calcular projeção
@@ -980,7 +978,10 @@ export async function fetchEstoquePorCategoria({
       const categoria = row.categoria?.trim() || '';
       const estoqueAtual = Number(row.estoqueAtual ?? 0);
       const custoTotal = Number(row.custoTotal ?? 0);
-      const custoUnitario = Number(row.custoUnitario ?? 0);
+      // Custo unitário não faz sentido para categorias agregadas (múltiplos produtos diferentes)
+      // Cada produto tem seu próprio custo unitário real, que é mostrado na página de detalhes
+      // Para categorias agregadas, não calculamos custo unitário (seria uma média, não um valor real)
+      const custoUnitario = 0; // Não aplicável para categorias agregadas
 
       // Campos detalhados (quando mostrarDetalhes é true)
       const linha = mostrarDetalhes ? (row.linha?.trim() || '') : undefined;
@@ -1441,5 +1442,119 @@ export async function fetchPrevisoesEstoque({
     });
 
     return previsoes.sort((a, b) => b.estoqueAtual - a.estoqueAtual);
+  });
+}
+
+export interface ProdutoDetalheEstoque {
+  produto: string;
+  descricao: string;
+  cor?: string;
+  estoque: number;
+  custoUnitario: number;
+  custoTotal: number;
+  filial: string;
+  linha?: string;
+  subgrupo?: string;
+  grade?: string;
+  colecao?: string;
+}
+
+export interface ControleEstoqueDetalhesParams {
+  company: string;
+  categoria: string;
+  filial?: string | null;
+  grupos?: string[];
+  linhas?: string[];
+  colecoes?: string[];
+  subgrupos?: string[];
+  grades?: string[];
+}
+
+/**
+ * Busca produtos individuais de uma categoria específica
+ */
+export async function fetchDetalhesCategoria({
+  company,
+  categoria,
+  filial,
+  grupos,
+  linhas,
+  colecoes,
+  subgrupos,
+  grades,
+}: ControleEstoqueDetalhesParams): Promise<ProdutoDetalheEstoque[]> {
+  return withRequest(async (request) => {
+    const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
+    const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
+    const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
+    const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
+    const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
+    const gradeFilter = buildGradeFilter(request, company, grades, 'p');
+
+    // Determinar campo de categoria baseado na empresa
+    const categoriaField = company === 'nerd' 
+      ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
+      : 'ISNULL(p.LINHA, \'SEM LINHA\')';
+
+    // Query para buscar produtos individuais da categoria
+    const query = `
+      SELECT 
+        p.PRODUTO AS produto,
+        ISNULL(p.DESC_PRODUTO, '') AS descricao,
+        ISNULL(e.COR_PRODUTO, '') AS cor,
+        e.FILIAL AS filial,
+        e.ESTOQUE AS estoque,
+        ISNULL(p.CUSTO_REPOSICAO1, 0) AS custoUnitario,
+        e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0) AS custoTotal,
+        ISNULL(p.LINHA, '') AS linha,
+        ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
+        ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
+        ISNULL(p.COLECAO, '') AS colecao
+      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+      WHERE 1=1
+        ${estoqueFilialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        AND e.ESTOQUE > 0
+        AND ${categoriaField} = @categoria
+        AND ${categoriaField} <> ''
+        AND ${categoriaField} <> 'SEM GRUPO'
+        AND ${categoriaField} <> 'SEM LINHA'
+      ORDER BY p.DESC_PRODUTO, e.COR_PRODUTO, e.FILIAL
+    `;
+
+    request.input('categoria', sql.NVarChar, categoria.trim());
+
+    const result = await request.query<{
+      produto: string;
+      descricao: string;
+      cor: string | null;
+      filial: string;
+      estoque: number;
+      custoUnitario: number;
+      custoTotal: number;
+      linha: string;
+      subgrupo: string;
+      grade: string;
+      colecao: string;
+    }>(query);
+
+    return result.recordset.map(row => ({
+      produto: row.produto?.trim() || '',
+      descricao: row.descricao?.trim() || '',
+      cor: row.cor?.trim() || undefined,
+      estoque: Number(row.estoque ?? 0),
+      custoUnitario: Number(row.custoUnitario ?? 0),
+      custoTotal: Number(row.custoTotal ?? 0),
+      filial: row.filial?.trim() || '',
+      linha: row.linha?.trim() || undefined,
+      subgrupo: row.subgrupo?.trim() || undefined,
+      grade: row.grade?.trim() || undefined,
+      colecao: row.colecao?.trim() || undefined,
+    }));
   });
 }
