@@ -1489,6 +1489,7 @@ export interface ProdutoDetalhesParams {
   subgrupo?: string; // Subgrupo específico
   grade?: string; // Grade específica
   colecao?: string; // Coleção específica
+  cor?: string; // Cor específica
 }
 
 /**
@@ -1712,6 +1713,7 @@ export async function fetchProdutoDetalhesPorFilial({
   subgrupo,
   grade,
   colecao,
+  cor,
 }: ProdutoDetalhesParams): Promise<ProdutoDetalhesCompletoPorFilial> {
   return withRequest(async (request) => {
     const now = new Date();
@@ -1751,6 +1753,13 @@ export async function fetchProdutoDetalhesPorFilial({
       produtoFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao`;
     }
 
+    // Filtro de cor (se fornecido)
+    let corFilter = '';
+    if (cor) {
+      request.input('corFiltro', sql.VarChar, cor.trim());
+      corFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(COALESCE(c.DESC_COR, e.COR_PRODUTO), '')))) = UPPER(LTRIM(RTRIM(@corFiltro)))`;
+    }
+
     // Buscar todas as variações do produto com estoque por filial
     const variacoesQuery = `
       SELECT 
@@ -1771,6 +1780,7 @@ export async function fetchProdutoDetalhesPorFilial({
       WHERE 1=1
         ${estoqueFilialFilter}
         ${produtoFilter}
+        ${corFilter}
         AND e.ESTOQUE > 0
         AND ISNULL(p.LINHA, '') <> ''
       GROUP BY 
@@ -1804,6 +1814,7 @@ export async function fetchProdutoDetalhesPorFilial({
     // Se temos produtoNome (código do produto), filtrar APENAS por ele (SEM filtro de filial)
     let vendasFilter = '';
     let usarFiltroFilialVendas = true;
+    let vendasCorFilter = '';
     
     if (produtoNome) {
       // Quando temos código do produto específico, buscar vendas em TODAS as filiais
@@ -1815,6 +1826,12 @@ export async function fetchProdutoDetalhesPorFilial({
     } else {
       // Senão, usar os filtros normais (linha, subgrupo, etc) E filtro de filial
       vendasFilter = produtoFilter;
+    }
+    
+    // Filtro de cor para vendas (se fornecido)
+    if (cor) {
+      request.input('corFiltroVendas', sql.VarChar, cor.trim());
+      vendasCorFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), '')))) = UPPER(LTRIM(RTRIM(@corFiltroVendas)))`;
     }
     
     const vendasQuery = `
@@ -1830,6 +1847,7 @@ export async function fetchProdutoDetalhesPorFilial({
         AND vp.QTDE > 0
         ${usarFiltroFilialVendas ? vendasFilialFilter : ''}
         ${vendasFilter}
+        ${vendasCorFilter}
       GROUP BY 
         vp.PRODUTO,
         COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO),
@@ -1842,10 +1860,6 @@ export async function fetchProdutoDetalhesPorFilial({
       filial: string;
       vendasTotais: number | null;
     }>(vendasQuery);
-
-    // Debug: log das vendas encontradas
-    console.log('VENDAS ENCONTRADAS:', vendasResult.recordset.length);
-    console.log('VENDAS RESULT:', vendasResult.recordset);
 
     // Função para normalizar strings (remover espaços extras e trim)
     const normalizeString = (str: string | null | undefined): string => {

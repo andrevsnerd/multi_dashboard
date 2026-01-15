@@ -289,6 +289,7 @@ export default function EstoqueDetalhado01Page({
               // Construir URL para estoquedetalhado02 com os parâmetros necessários
               const params = new URLSearchParams();
               if (variacao.produto) params.set("produtoNome", variacao.produto);
+              if (variacao.cor) params.set("cor", variacao.cor); // Adicionar cor para filtrar
               if (filtros.linha || variacao.linha) params.set("linha", filtros.linha || variacao.linha || '');
               if (filtros.subgrupo || variacao.subgrupo) params.set("subgrupo", filtros.subgrupo || variacao.subgrupo || '');
               if (filtros.grade || variacao.grade) params.set("grade", filtros.grade || variacao.grade || '');

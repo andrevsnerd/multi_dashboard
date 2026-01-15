@@ -11,6 +11,7 @@ export async function GET(request: Request) {
   const subgrupo = searchParams.get('subgrupo') || undefined;
   const grade = searchParams.get('grade') || undefined;
   const colecao = searchParams.get('colecao') || undefined;
+  const cor = searchParams.get('cor') || undefined;
 
   try {
     const detalhes = await fetchProdutoDetalhesPorFilial({
@@ -21,6 +22,7 @@ export async function GET(request: Request) {
       subgrupo,
       grade,
       colecao,
+      cor,
     });
 
     return NextResponse.json({ data: detalhes });

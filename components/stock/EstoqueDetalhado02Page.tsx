@@ -61,7 +61,8 @@ async function fetchDetalhesPorFilial(
   linha?: string,
   subgrupo?: string,
   grade?: string,
-  colecao?: string
+  colecao?: string,
+  cor?: string
 ): Promise<ProdutoDetalhesCompletoPorFilial> {
   const searchParams = new URLSearchParams({
     company,
@@ -89,6 +90,10 @@ async function fetchDetalhesPorFilial(
 
   if (colecao) {
     searchParams.set("colecao", colecao);
+  }
+
+  if (cor) {
+    searchParams.set("cor", cor);
   }
 
   const response = await fetch(`/api/controle-estoque/detalhes-por-filial?${searchParams.toString()}`, {
@@ -127,6 +132,7 @@ export default function EstoqueDetalhado02Page({
     const subgrupo = params.get("subgrupo") || undefined;
     const grade = params.get("grade") || undefined;
     const colecao = params.get("colecao") || undefined;
+    const cor = params.get("cor") || undefined;
     const filial = params.get("filial") || null;
 
     setSelectedFilial(filial);
@@ -146,7 +152,8 @@ export default function EstoqueDetalhado02Page({
           linha,
           subgrupo,
           grade,
-          colecao
+          colecao,
+          cor
         );
 
         if (active) {
