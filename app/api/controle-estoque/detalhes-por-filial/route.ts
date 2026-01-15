@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { fetchProdutoDetalhes } from '@/lib/repositories/controleEstoque';
+import { fetchProdutoDetalhesPorFilial } from '@/lib/repositories/controleEstoque';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const colecao = searchParams.get('colecao') || undefined;
 
   try {
-    const detalhes = await fetchProdutoDetalhes({
+    const detalhes = await fetchProdutoDetalhesPorFilial({
       company,
       filial,
       produtoNome,
@@ -25,9 +25,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ data: detalhes });
   } catch (error) {
-    console.error('Erro ao carregar detalhes do produto:', error);
+    console.error('Erro ao carregar detalhes do produto por filial:', error);
     return NextResponse.json(
-      { error: 'Erro ao carregar detalhes do produto' },
+      { error: 'Erro ao carregar detalhes do produto por filial' },
       { status: 500 }
     );
   }

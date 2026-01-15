@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   LineChart,
   Line,
@@ -291,6 +291,7 @@ export default function ControleEstoquePage({
   companyKey,
   companyName,
 }: ControleEstoquePageProps) {
+  const router = useRouter();
   const initialRange = useMemo(() => {
     const range = getCurrentMonthRange();
     return {
@@ -1182,7 +1183,7 @@ export default function ControleEstoquePage({
       </div>
 
       {/* Por Categoria */}
-      <div className={styles.section}>
+      <div className={styles.section} id="categorias-section">
         <div className={styles.sectionHeader}>
           {(() => {
             // Verificar se há categorias expandidas para mostrar botão de voltar
@@ -1235,27 +1236,31 @@ export default function ControleEstoquePage({
                     const temDetalhes = cat.linha || cat.subgrupo || cat.grade || cat.colecao;
                     const isCardExpandido = nivelAtual > 0 && temDetalhes;
                     
-                    // Se é nível 2 (com coleção), clicar vai para detalhes
+                    // Se é nível 2 (com coleção), clicar navega para página de detalhes
                     // Se é nível 1 (sem coleção), clicar expande para nível 2
                     // Se é nível 0, clicar expande para nível 1
                     if (nivelAtual === 2 && isCardExpandido) {
-                      // Nível 2: clicar vai para página de detalhes
+                      // Nível 2: clicar navega para página de detalhes
                       return (
                         <>
-                          <Link 
-                            href={`/${companyKey}/controle-estoque/${encodeURIComponent(cat.categoria)}?${new URLSearchParams({
-                              ...(selectedFilial && { filial: selectedFilial }),
-                              ...(selectedGrupos.length > 0 && { grupos: selectedGrupos.join(',') }),
-                              ...(cat.linha && { linhas: cat.linha }),
-                              ...(cat.subgrupo && { subgrupos: cat.subgrupo }),
-                              ...(cat.grade && { grades: cat.grade }),
-                              ...(cat.colecao && { colecoes: cat.colecao }),
-                              ...(range && { start: range.startDate.toISOString(), end: range.endDate.toISOString() }),
-                            }).toString()}`}
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              const params = new URLSearchParams();
+                              if (cat.linha) params.set("linha", cat.linha);
+                              if (cat.subgrupo) params.set("subgrupo", cat.subgrupo);
+                              if (cat.grade) params.set("grade", cat.grade);
+                              if (cat.colecao) params.set("colecao", cat.colecao);
+                              if (selectedFilial) params.set("filial", selectedFilial);
+                              // Scroll para o topo antes de navegar
+                              window.scrollTo({ top: 0, behavior: 'instant' });
+                              router.push(`/${companyKey}/controle-estoque/estoquedetalhado01?${params.toString()}`);
+                            }}
                             className={styles.categoriaName}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
                           >
                             {cat.categoria}
-                          </Link>
+                          </button>
                           {/* Mostrar detalhes: linha, subgrupo, grade, coleção */}
                           <div className={styles.categoriaDetails}>
                             {cat.linha && <span className={styles.detailTag}>Linha: {cat.linha}</span>}
@@ -1282,6 +1287,7 @@ export default function ControleEstoquePage({
                                 });
                                 return novo;
                               });
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
                             }}
                             className={styles.categoriaName}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
@@ -1308,6 +1314,7 @@ export default function ControleEstoquePage({
                                 novo.set(cat.categoria, { nivel: 1 });
                                 return novo;
                               });
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
                             }}
                             className={styles.categoriaName}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}

@@ -1442,130 +1442,388 @@ export async function fetchPrevisoesEstoque({
   });
 }
 
-export interface ProdutoDetalheEstoque {
+/**
+ * Interface para detalhes de variação de produto
+ */
+export interface ProdutoVariacaoDetalhes {
   produto: string;
   descricao: string;
-  cor?: string;
-  descCor?: string; // Descrição da cor (nome ao invés do código)
+  linha: string;
+  subgrupo: string;
+  grade: string;
+  colecao: string;
+  cor: string;
   estoque: number;
   custoUnitario: number;
   custoTotal: number;
-  filial: string;
-  linha?: string;
-  subgrupo?: string;
-  grade?: string;
-  colecao?: string;
-}
-
-export interface ControleEstoqueDetalhesParams {
-  company: string;
-  categoria: string;
-  produto?: string;
-  filial?: string | null;
-  grupos?: string[];
-  linhas?: string[];
-  colecoes?: string[];
-  subgrupos?: string[];
-  grades?: string[];
 }
 
 /**
- * Busca produtos individuais de uma categoria específica
+ * Interface para resumo de detalhes do produto
  */
-export async function fetchDetalhesCategoria({
+export interface ProdutoDetalhesResumo {
+  totalItens: number;
+  estoqueTotal: number;
+  custoTotal: number;
+}
+
+/**
+ * Interface para resposta completa de detalhes do produto
+ */
+export interface ProdutoDetalhesCompleto {
+  nomeProduto: string;
+  resumo: ProdutoDetalhesResumo;
+  variacoes: ProdutoVariacaoDetalhes[];
+}
+
+/**
+ * Parâmetros para buscar detalhes de um produto
+ */
+export interface ProdutoDetalhesParams {
+  company?: string;
+  filial?: string | null;
+  produtoNome?: string; // Nome do produto/linha (ex: "PASHMINA")
+  linha?: string; // Linha específica
+  subgrupo?: string; // Subgrupo específico
+  grade?: string; // Grade específica
+  colecao?: string; // Coleção específica
+}
+
+/**
+ * Busca detalhes de um produto específico com todas as suas variações
+ */
+export async function fetchProdutoDetalhes({
   company,
-  categoria,
-  produto,
   filial,
-  grupos,
-  linhas,
-  colecoes,
-  subgrupos,
-  grades,
-}: ControleEstoqueDetalhesParams): Promise<ProdutoDetalheEstoque[]> {
+  produtoNome,
+  linha,
+  subgrupo,
+  grade,
+  colecao,
+}: ProdutoDetalhesParams): Promise<ProdutoDetalhesCompleto> {
   return withRequest(async (request) => {
     const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
-    const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
-    const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
-    const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
-    const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
-    const gradeFilter = buildGradeFilter(request, company, grades, 'p');
+    
+    // Construir filtros baseados nos parâmetros
+    let produtoFilter = '';
+    
+    // Se linha for fornecida, usar ela; senão, usar produtoNome como linha
+    const linhaParaFiltrar = linha || produtoNome;
+    if (linhaParaFiltrar) {
+      request.input('linhaFiltro', sql.VarChar, linhaParaFiltrar.toUpperCase().trim());
+      produtoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linhaFiltro`;
+    }
+    
+    if (subgrupo) {
+      request.input('subgrupo', sql.VarChar, subgrupo.toUpperCase().trim());
+      produtoFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupo`;
+    }
+    
+    if (grade) {
+      request.input('grade', sql.VarChar, grade.toUpperCase().trim());
+      produtoFilter += ` AND UPPER(LTRIM(RTRIM(CONVERT(VARCHAR, p.GRADE)))) = @grade`;
+    }
+    
+    if (colecao) {
+      request.input('colecao', sql.VarChar, colecao.toUpperCase().trim());
+      produtoFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao`;
+    }
 
-    // Determinar campo de categoria baseado na empresa
-    const categoriaField = company === 'nerd' 
-      ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
-      : 'ISNULL(p.LINHA, \'SEM LINHA\')';
-
-    // Filtro por produto se especificado
-    const produtoFilter = produto ? 'AND p.PRODUTO = @produto' : '';
-
-    // Query para buscar produtos individuais da categoria
-    const query = `
+    // Buscar todas as variações do produto com estoque
+    const variacoesQuery = `
       SELECT 
-        p.PRODUTO AS produto,
+        e.PRODUTO AS produto,
         ISNULL(p.DESC_PRODUTO, '') AS descricao,
-        ISNULL(e.COR_PRODUTO, '') AS cor,
-        ISNULL(c.DESC_COR, '') AS descCor,
-        e.FILIAL AS filial,
-        e.ESTOQUE AS estoque,
-        ISNULL(p.CUSTO_REPOSICAO1, 0) AS custoUnitario,
-        e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0) AS custoTotal,
         ISNULL(p.LINHA, '') AS linha,
         ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
         ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
-        ISNULL(p.COLECAO, '') AS colecao
+        ISNULL(p.COLECAO, '') AS colecao,
+        ISNULL(COALESCE(c.DESC_COR, e.COR_PRODUTO), '') AS cor,
+        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoque,
+        ISNULL(p.CUSTO_REPOSICAO1, 0) AS custoUnitario,
+        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0) ELSE 0 END) AS custoTotal
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
       WHERE 1=1
         ${estoqueFilialFilter}
-        ${grupoFilter}
-        ${linhaFilter}
-        ${colecaoFilter}
-        ${subgrupoFilter}
-        ${gradeFilter}
-        AND e.ESTOQUE > 0
-        AND ${categoriaField} = @categoria
-        AND ${categoriaField} <> ''
-        AND ${categoriaField} <> 'SEM GRUPO'
-        AND ${categoriaField} <> 'SEM LINHA'
         ${produtoFilter}
-      ORDER BY p.DESC_PRODUTO, e.COR_PRODUTO, e.FILIAL
+        AND e.ESTOQUE > 0
+        AND ISNULL(p.LINHA, '') <> ''
+      GROUP BY 
+        e.PRODUTO,
+        p.DESC_PRODUTO,
+        p.LINHA,
+        p.SUBGRUPO_PRODUTO,
+        p.GRADE,
+        p.COLECAO,
+        COALESCE(c.DESC_COR, e.COR_PRODUTO),
+        p.CUSTO_REPOSICAO1
+      HAVING SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) > 0
+      ORDER BY e.PRODUTO, COALESCE(c.DESC_COR, e.COR_PRODUTO)
     `;
 
-    request.input('categoria', sql.NVarChar, categoria.trim());
-    if (produto) {
-      request.input('produto', sql.NVarChar, produto.trim());
-    }
-
-    const result = await request.query<{
+    const variacoesResult = await request.query<{
       produto: string;
       descricao: string;
-      cor: string | null;
-      descCor: string | null;
-      filial: string;
-      estoque: number;
-      custoUnitario: number;
-      custoTotal: number;
       linha: string;
       subgrupo: string;
       grade: string;
       colecao: string;
-    }>(query);
+      cor: string;
+      estoque: number | null;
+      custoUnitario: number | null;
+      custoTotal: number | null;
+    }>(variacoesQuery);
 
-    return result.recordset.map(row => ({
+    const variacoes: ProdutoVariacaoDetalhes[] = variacoesResult.recordset.map((row) => ({
       produto: row.produto?.trim() || '',
       descricao: row.descricao?.trim() || '',
-      cor: row.cor?.trim() || undefined,
-      descCor: getColorDescription(row.cor, row.descCor) || undefined,
-      estoque: Number(row.estoque ?? 0),
+      linha: row.linha?.trim() || '',
+      subgrupo: row.subgrupo?.trim() || '',
+      grade: row.grade?.trim() || '',
+      colecao: row.colecao?.trim() || '',
+      cor: row.cor?.trim() || '',
+      estoque: Math.round(Number(row.estoque ?? 0)),
       custoUnitario: Number(row.custoUnitario ?? 0),
       custoTotal: Number(row.custoTotal ?? 0),
-      filial: row.filial?.trim() || '',
-      linha: row.linha?.trim() || undefined,
-      subgrupo: row.subgrupo?.trim() || undefined,
-      grade: row.grade?.trim() || undefined,
-      colecao: row.colecao?.trim() || undefined,
     }));
+
+    // Calcular resumo
+    const totalItens = variacoes.length;
+    const estoqueTotal = variacoes.reduce((sum, v) => sum + v.estoque, 0);
+    const custoTotal = variacoes.reduce((sum, v) => sum + v.custoTotal, 0);
+
+    // Determinar nome do produto (usar linha se disponível, senão usar produtoNome ou linha do parâmetro)
+    const nomeProduto = variacoes.length > 0 
+      ? variacoes[0].linha || linha || produtoNome || 'Produto'
+      : linha || produtoNome || 'Produto';
+
+    return {
+      nomeProduto,
+      resumo: {
+        totalItens,
+        estoqueTotal,
+        custoTotal,
+      },
+      variacoes,
+    };
+  });
+}
+
+/**
+ * Interface para detalhes de variação de produto por filial
+ */
+export interface ProdutoVariacaoDetalhesPorFilial {
+  produto: string;
+  descricao: string;
+  linha: string;
+  subgrupo: string;
+  grade: string;
+  colecao: string;
+  cor: string;
+  filial: string;
+  estoque: number;
+  custoUnitario: number;
+  custoTotal: number;
+  vendasAcumuladas: number;
+}
+
+/**
+ * Interface para resumo de detalhes do produto por filial
+ */
+export interface ProdutoDetalhesResumoPorFilial {
+  totalFiliais: number;
+  estoqueTotal: number;
+  custoTotal: number;
+  vendasAcumuladas: number;
+}
+
+/**
+ * Interface para resposta completa de detalhes do produto por filial
+ */
+export interface ProdutoDetalhesCompletoPorFilial {
+  nomeProduto: string;
+  resumo: ProdutoDetalhesResumoPorFilial;
+  variacoes: ProdutoVariacaoDetalhesPorFilial[];
+}
+
+/**
+ * Busca detalhes de um produto específico com todas as suas variações por filial
+ */
+export async function fetchProdutoDetalhesPorFilial({
+  company,
+  filial,
+  produtoNome,
+  linha,
+  subgrupo,
+  grade,
+  colecao,
+}: ProdutoDetalhesParams): Promise<ProdutoDetalhesCompletoPorFilial> {
+  return withRequest(async (request) => {
+    const now = new Date();
+    const currentMonth = {
+      start: new Date(now.getFullYear(), now.getMonth(), 1),
+      end: new Date(now.getFullYear(), now.getMonth() + 1, 1),
+    };
+
+    request.input('startDate', sql.DateTime, currentMonth.start);
+    request.input('endDate', sql.DateTime, currentMonth.end);
+
+    const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
+    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
+    
+    // Construir filtros baseados nos parâmetros
+    let produtoFilter = '';
+    
+    // Se linha for fornecida, usar ela; senão, usar produtoNome como linha
+    const linhaParaFiltrar = linha || produtoNome;
+    if (linhaParaFiltrar) {
+      request.input('linhaFiltro', sql.VarChar, linhaParaFiltrar.toUpperCase().trim());
+      produtoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linhaFiltro`;
+    }
+    
+    if (subgrupo) {
+      request.input('subgrupo', sql.VarChar, subgrupo.toUpperCase().trim());
+      produtoFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupo`;
+    }
+    
+    if (grade) {
+      request.input('grade', sql.VarChar, grade.toUpperCase().trim());
+      produtoFilter += ` AND UPPER(LTRIM(RTRIM(CONVERT(VARCHAR, p.GRADE)))) = @grade`;
+    }
+    
+    if (colecao) {
+      request.input('colecao', sql.VarChar, colecao.toUpperCase().trim());
+      produtoFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao`;
+    }
+
+    // Buscar todas as variações do produto com estoque por filial
+    const variacoesQuery = `
+      SELECT 
+        e.PRODUTO AS produto,
+        ISNULL(p.DESC_PRODUTO, '') AS descricao,
+        ISNULL(p.LINHA, '') AS linha,
+        ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
+        ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
+        ISNULL(p.COLECAO, '') AS colecao,
+        ISNULL(COALESCE(c.DESC_COR, e.COR_PRODUTO), '') AS cor,
+        e.FILIAL AS filial,
+        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoque,
+        ISNULL(p.CUSTO_REPOSICAO1, 0) AS custoUnitario,
+        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0) ELSE 0 END) AS custoTotal
+      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
+      WHERE 1=1
+        ${estoqueFilialFilter}
+        ${produtoFilter}
+        AND e.ESTOQUE > 0
+        AND ISNULL(p.LINHA, '') <> ''
+      GROUP BY 
+        e.PRODUTO,
+        p.DESC_PRODUTO,
+        p.LINHA,
+        p.SUBGRUPO_PRODUTO,
+        p.GRADE,
+        p.COLECAO,
+        COALESCE(c.DESC_COR, e.COR_PRODUTO),
+        p.CUSTO_REPOSICAO1,
+        e.FILIAL
+      HAVING SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) > 0
+    `;
+
+    const variacoesResult = await request.query<{
+      produto: string;
+      descricao: string;
+      linha: string;
+      subgrupo: string;
+      grade: string;
+      colecao: string;
+      cor: string;
+      filial: string;
+      estoque: number | null;
+      custoUnitario: number | null;
+      custoTotal: number | null;
+    }>(variacoesQuery);
+
+    // Buscar vendas acumuladas por produto, cor e filial
+    const vendasQuery = `
+      SELECT 
+        vp.PRODUTO AS produto,
+        ISNULL(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), '') AS cor,
+        vp.FILIAL AS filial,
+        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.QTDE END) AS vendasAcumuladas
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
+      WHERE vp.DATA_VENDA >= @startDate
+        AND vp.DATA_VENDA < @endDate
+        AND vp.QTDE > 0
+        ${vendasFilialFilter}
+        ${produtoFilter}
+        AND ISNULL(p.LINHA, '') <> ''
+      GROUP BY 
+        vp.PRODUTO,
+        COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO),
+        vp.FILIAL
+    `;
+
+    const vendasResult = await request.query<{
+      produto: string;
+      cor: string;
+      filial: string;
+      vendasAcumuladas: number | null;
+    }>(vendasQuery);
+
+    // Criar mapa de vendas: chave = produto|cor|filial
+    const vendasMap = new Map<string, number>();
+    vendasResult.recordset.forEach((row) => {
+      const key = `${row.produto?.trim() || ''}|${row.cor?.trim() || ''}|${row.filial?.trim() || ''}`;
+      vendasMap.set(key, Math.round(Number(row.vendasAcumuladas ?? 0)));
+    });
+
+    const variacoes: ProdutoVariacaoDetalhesPorFilial[] = variacoesResult.recordset.map((row) => {
+      const key = `${row.produto?.trim() || ''}|${row.cor?.trim() || ''}|${row.filial?.trim() || ''}`;
+      const vendas = vendasMap.get(key) || 0;
+
+      return {
+        produto: row.produto?.trim() || '',
+        descricao: row.descricao?.trim() || '',
+        linha: row.linha?.trim() || '',
+        subgrupo: row.subgrupo?.trim() || '',
+        grade: row.grade?.trim() || '',
+        colecao: row.colecao?.trim() || '',
+        cor: row.cor?.trim() || '',
+        filial: row.filial?.trim() || '',
+        estoque: Math.round(Number(row.estoque ?? 0)),
+        custoUnitario: Number(row.custoUnitario ?? 0),
+        custoTotal: Number(row.custoTotal ?? 0),
+        vendasAcumuladas: vendas,
+      };
+    });
+
+    // Calcular resumo
+    const filiaisUnicas = new Set(variacoes.map(v => v.filial));
+    const totalFiliais = filiaisUnicas.size;
+    const estoqueTotal = variacoes.reduce((sum, v) => sum + v.estoque, 0);
+    const custoTotal = variacoes.reduce((sum, v) => sum + v.custoTotal, 0);
+    const vendasAcumuladas = variacoes.reduce((sum, v) => sum + v.vendasAcumuladas, 0);
+
+    // Determinar nome do produto (usar linha se disponível, senão usar produtoNome ou linha do parâmetro)
+    const nomeProduto = variacoes.length > 0 
+      ? variacoes[0].linha || linha || produtoNome || 'Produto'
+      : linha || produtoNome || 'Produto';
+
+    return {
+      nomeProduto,
+      resumo: {
+        totalFiliais,
+        estoqueTotal,
+        custoTotal,
+        vendasAcumuladas,
+      },
+      variacoes,
+    };
   });
 }
