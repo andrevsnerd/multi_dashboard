@@ -24,14 +24,14 @@ interface ProdutoVariacaoDetalhesPorFilial {
   estoque: number;
   custoUnitario: number;
   custoTotal: number;
-  vendasAcumuladas: number;
+  vendasTotais: number;
 }
 
 interface ProdutoDetalhesResumoPorFilial {
   totalFiliais: number;
   estoqueTotal: number;
   custoTotal: number;
-  vendasAcumuladas: number;
+  vendasTotais: number;
 }
 
 interface ProdutoDetalhesCompletoPorFilial {
@@ -273,9 +273,9 @@ export default function EstoqueDetalhado02Page({
           </div>
         </div>
         <div className={styles.metricCard}>
-          <div className={styles.metricLabel}>VENDAS ACUMULADAS</div>
+          <div className={styles.metricLabel}>VENDAS TOTAIS</div>
           <div className={styles.metricValue}>
-            {formatNumber(detalhes.resumo.vendasAcumuladas)} unidades
+            {formatNumber(detalhes.resumo.vendasTotais)} unidades
           </div>
         </div>
       </div>
@@ -291,7 +291,7 @@ export default function EstoqueDetalhado02Page({
               <th>ESTOQUE</th>
               <th>CUSTO UNIT.</th>
               <th>CUSTO TOTAL</th>
-              <th>VENDAS ACUM.</th>
+              <th>VENDAS TOTAIS</th>
             </tr>
           </thead>
           <tbody>
@@ -303,7 +303,7 @@ export default function EstoqueDetalhado02Page({
                 <td>{formatNumber(variacao.estoque)}</td>
                 <td>{formatCurrency(variacao.custoUnitario)}</td>
                 <td>{formatCurrency(variacao.custoTotal)}</td>
-                <td>{formatNumber(variacao.vendasAcumuladas)}</td>
+                <td>{formatNumber(variacao.vendasTotais)}</td>
               </tr>
             ))}
           </tbody>

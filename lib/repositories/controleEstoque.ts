@@ -1456,6 +1456,7 @@ export interface ProdutoVariacaoDetalhes {
   estoque: number;
   custoUnitario: number;
   custoTotal: number;
+  vendasTotais: number;
 }
 
 /**
@@ -1465,6 +1466,7 @@ export interface ProdutoDetalhesResumo {
   totalItens: number;
   estoqueTotal: number;
   custoTotal: number;
+  vendasTotais: number;
 }
 
 /**
@@ -1502,7 +1504,17 @@ export async function fetchProdutoDetalhes({
   colecao,
 }: ProdutoDetalhesParams): Promise<ProdutoDetalhesCompleto> {
   return withRequest(async (request) => {
+    const now = new Date();
+    const currentMonth = {
+      start: new Date(now.getFullYear(), now.getMonth(), 1),
+      end: new Date(now.getFullYear(), now.getMonth() + 1, 1),
+    };
+
+    request.input('startDate', sql.DateTime, currentMonth.start);
+    request.input('endDate', sql.DateTime, currentMonth.end);
+
     const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
+    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
     
     // Construir filtros baseados nos parâmetros
     let produtoFilter = '';
@@ -1576,23 +1588,63 @@ export async function fetchProdutoDetalhes({
       custoTotal: number | null;
     }>(variacoesQuery);
 
-    const variacoes: ProdutoVariacaoDetalhes[] = variacoesResult.recordset.map((row) => ({
-      produto: row.produto?.trim() || '',
-      descricao: row.descricao?.trim() || '',
-      linha: row.linha?.trim() || '',
-      subgrupo: row.subgrupo?.trim() || '',
-      grade: row.grade?.trim() || '',
-      colecao: row.colecao?.trim() || '',
-      cor: row.cor?.trim() || '',
-      estoque: Math.round(Number(row.estoque ?? 0)),
-      custoUnitario: Number(row.custoUnitario ?? 0),
-      custoTotal: Number(row.custoTotal ?? 0),
-    }));
+    // Buscar vendas acumuladas por produto e cor
+    const vendasQuery = `
+      SELECT 
+        vp.PRODUTO AS produto,
+        ISNULL(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), '') AS cor,
+        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.QTDE END) AS vendasTotais
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
+      WHERE vp.DATA_VENDA >= @startDate
+        AND vp.DATA_VENDA < @endDate
+        AND vp.QTDE > 0
+        ${vendasFilialFilter}
+        ${produtoFilter}
+        AND ISNULL(p.LINHA, '') <> ''
+      GROUP BY 
+        vp.PRODUTO,
+        COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO)
+    `;
+
+    const vendasResult = await request.query<{
+      produto: string;
+      cor: string;
+      vendasTotais: number | null;
+    }>(vendasQuery);
+
+    // Criar mapa de vendas: chave = produto|cor
+    const vendasMap = new Map<string, number>();
+    vendasResult.recordset.forEach((row) => {
+      const key = `${row.produto?.trim() || ''}|${row.cor?.trim() || ''}`;
+      vendasMap.set(key, Math.round(Number(row.vendasTotais ?? 0)));
+    });
+
+    const variacoes: ProdutoVariacaoDetalhes[] = variacoesResult.recordset.map((row) => {
+      const key = `${row.produto?.trim() || ''}|${row.cor?.trim() || ''}`;
+      const vendas = vendasMap.get(key) || 0;
+
+      return {
+        produto: row.produto?.trim() || '',
+        descricao: row.descricao?.trim() || '',
+        linha: row.linha?.trim() || '',
+        subgrupo: row.subgrupo?.trim() || '',
+        grade: row.grade?.trim() || '',
+        colecao: row.colecao?.trim() || '',
+        cor: row.cor?.trim() || '',
+        estoque: Math.round(Number(row.estoque ?? 0)),
+        custoUnitario: Number(row.custoUnitario ?? 0),
+        custoTotal: Number(row.custoTotal ?? 0),
+        vendasTotais: vendas,
+      };
+    });
 
     // Calcular resumo
     const totalItens = variacoes.length;
     const estoqueTotal = variacoes.reduce((sum, v) => sum + v.estoque, 0);
     const custoTotal = variacoes.reduce((sum, v) => sum + v.custoTotal, 0);
+    const vendasTotais = variacoes.reduce((sum, v) => sum + v.vendasTotais, 0);
 
     // Determinar nome do produto (usar linha se disponível, senão usar produtoNome ou linha do parâmetro)
     const nomeProduto = variacoes.length > 0 
@@ -1605,6 +1657,7 @@ export async function fetchProdutoDetalhes({
         totalItens,
         estoqueTotal,
         custoTotal,
+        vendasTotais,
       },
       variacoes,
     };
@@ -1626,7 +1679,7 @@ export interface ProdutoVariacaoDetalhesPorFilial {
   estoque: number;
   custoUnitario: number;
   custoTotal: number;
-  vendasAcumuladas: number;
+  vendasTotais: number;
 }
 
 /**
@@ -1636,7 +1689,7 @@ export interface ProdutoDetalhesResumoPorFilial {
   totalFiliais: number;
   estoqueTotal: number;
   custoTotal: number;
-  vendasAcumuladas: number;
+  vendasTotais: number;
 }
 
 /**
@@ -1673,7 +1726,7 @@ export async function fetchProdutoDetalhesPorFilial({
     const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
     const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
     
-    // Construir filtros baseados nos parâmetros
+    // Construir filtros baseados nos parâmetros - IGUAL AO DETALHADO 01
     let produtoFilter = '';
     
     // Se linha for fornecida, usar ela; senão, usar produtoNome como linha
@@ -1747,22 +1800,36 @@ export async function fetchProdutoDetalhesPorFilial({
       custoTotal: number | null;
     }>(variacoesQuery);
 
-    // Buscar vendas acumuladas por produto, cor e filial
+    // Buscar vendas SIMPLES: apenas do produto específico, agrupado por cor e filial
+    // Se temos produtoNome (código do produto), filtrar APENAS por ele (SEM filtro de filial)
+    let vendasFilter = '';
+    let usarFiltroFilialVendas = true;
+    
+    if (produtoNome) {
+      // Quando temos código do produto específico, buscar vendas em TODAS as filiais
+      // Normalizar o código do produto (remover espaços e converter para maiúsculo)
+      const produtoCodigoNormalizado = produtoNome.toUpperCase().trim().replace(/\s+/g, '');
+      request.input('produtoCodigo', sql.VarChar, produtoCodigoNormalizado);
+      vendasFilter = `AND UPPER(REPLACE(LTRIM(RTRIM(vp.PRODUTO)), ' ', '')) = @produtoCodigo`;
+      usarFiltroFilialVendas = false; // Não filtrar por filial quando temos produto específico
+    } else {
+      // Senão, usar os filtros normais (linha, subgrupo, etc) E filtro de filial
+      vendasFilter = produtoFilter;
+    }
+    
     const vendasQuery = `
       SELECT 
         vp.PRODUTO AS produto,
         ISNULL(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), '') AS cor,
         vp.FILIAL AS filial,
-        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.QTDE END) AS vendasAcumuladas
+        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.QTDE END) AS vendasTotais
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
       WHERE vp.DATA_VENDA >= @startDate
         AND vp.DATA_VENDA < @endDate
         AND vp.QTDE > 0
-        ${vendasFilialFilter}
-        ${produtoFilter}
-        AND ISNULL(p.LINHA, '') <> ''
+        ${usarFiltroFilialVendas ? vendasFilialFilter : ''}
+        ${vendasFilter}
       GROUP BY 
         vp.PRODUTO,
         COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO),
@@ -1773,21 +1840,51 @@ export async function fetchProdutoDetalhesPorFilial({
       produto: string;
       cor: string;
       filial: string;
-      vendasAcumuladas: number | null;
+      vendasTotais: number | null;
     }>(vendasQuery);
 
-    // Criar mapa de vendas: chave = produto|cor|filial
+    // Debug: log das vendas encontradas
+    console.log('VENDAS ENCONTRADAS:', vendasResult.recordset.length);
+    console.log('VENDAS RESULT:', vendasResult.recordset);
+
+    // Função para normalizar strings (remover espaços extras e trim)
+    const normalizeString = (str: string | null | undefined): string => {
+      if (!str) return '';
+      return str.trim().replace(/\s+/g, ' ');
+    };
+
+    // Criar mapa de vendas: chave = produto|cor|filial (para distribuir as vendas por filial)
     const vendasMap = new Map<string, number>();
     vendasResult.recordset.forEach((row) => {
-      const key = `${row.produto?.trim() || ''}|${row.cor?.trim() || ''}|${row.filial?.trim() || ''}`;
-      vendasMap.set(key, Math.round(Number(row.vendasAcumuladas ?? 0)));
+      const produtoNorm = normalizeString(row.produto);
+      const corNorm = normalizeString(row.cor);
+      const filialNorm = normalizeString(row.filial);
+      const key = `${produtoNorm}|${corNorm}|${filialNorm}`;
+      vendasMap.set(key, Math.round(Number(row.vendasTotais ?? 0)));
     });
 
-    const variacoes: ProdutoVariacaoDetalhesPorFilial[] = variacoesResult.recordset.map((row) => {
-      const key = `${row.produto?.trim() || ''}|${row.cor?.trim() || ''}|${row.filial?.trim() || ''}`;
+    // Criar mapa de variações existentes (do estoque): chave = produto|cor|filial
+    const variacoesMap = new Map<string, typeof variacoesResult.recordset[0]>();
+    variacoesResult.recordset.forEach((row) => {
+      const produtoNorm = normalizeString(row.produto);
+      const corNorm = normalizeString(row.cor);
+      const filialNorm = normalizeString(row.filial);
+      const key = `${produtoNorm}|${corNorm}|${filialNorm}`;
+      variacoesMap.set(key, row);
+    });
+
+    // Criar lista de variações: incluir todas do estoque + filiais com vendas mas sem estoque
+    const variacoes: ProdutoVariacaoDetalhesPorFilial[] = [];
+    
+    // Primeiro, adicionar todas as variações do estoque com suas vendas
+    variacoesResult.recordset.forEach((row) => {
+      const produtoNorm = normalizeString(row.produto);
+      const corNorm = normalizeString(row.cor);
+      const filialNorm = normalizeString(row.filial);
+      const key = `${produtoNorm}|${corNorm}|${filialNorm}`;
       const vendas = vendasMap.get(key) || 0;
 
-      return {
+      variacoes.push({
         produto: row.produto?.trim() || '',
         descricao: row.descricao?.trim() || '',
         linha: row.linha?.trim() || '',
@@ -1799,8 +1896,36 @@ export async function fetchProdutoDetalhesPorFilial({
         estoque: Math.round(Number(row.estoque ?? 0)),
         custoUnitario: Number(row.custoUnitario ?? 0),
         custoTotal: Number(row.custoTotal ?? 0),
-        vendasAcumuladas: vendas,
-      };
+        vendasTotais: vendas,
+      });
+    });
+
+    // Depois, adicionar filiais que têm vendas mas não têm estoque
+    vendasResult.recordset.forEach((row) => {
+      const produtoNorm = normalizeString(row.produto);
+      const corNorm = normalizeString(row.cor);
+      const filialNorm = normalizeString(row.filial);
+      const key = `${produtoNorm}|${corNorm}|${filialNorm}`;
+      
+      // Se não existe no estoque, adicionar com estoque 0
+      if (!variacoesMap.has(key)) {
+        // Buscar dados do produto de uma variação existente para pegar descrição, linha, etc
+        const primeiraVariacao = variacoesResult.recordset[0];
+        variacoes.push({
+          produto: row.produto?.trim() || '',
+          descricao: primeiraVariacao?.descricao?.trim() || '',
+          linha: primeiraVariacao?.linha?.trim() || '',
+          subgrupo: primeiraVariacao?.subgrupo?.trim() || '',
+          grade: primeiraVariacao?.grade?.trim() || '',
+          colecao: primeiraVariacao?.colecao?.trim() || '',
+          cor: row.cor?.trim() || '',
+          filial: row.filial?.trim() || '',
+          estoque: 0,
+          custoUnitario: primeiraVariacao ? Number(primeiraVariacao.custoUnitario ?? 0) : 0,
+          custoTotal: 0,
+          vendasTotais: Math.round(Number(row.vendasTotais ?? 0)),
+        });
+      }
     });
 
     // Calcular resumo
@@ -1808,7 +1933,7 @@ export async function fetchProdutoDetalhesPorFilial({
     const totalFiliais = filiaisUnicas.size;
     const estoqueTotal = variacoes.reduce((sum, v) => sum + v.estoque, 0);
     const custoTotal = variacoes.reduce((sum, v) => sum + v.custoTotal, 0);
-    const vendasAcumuladas = variacoes.reduce((sum, v) => sum + v.vendasAcumuladas, 0);
+    const vendasTotais = variacoes.reduce((sum, v) => sum + v.vendasTotais, 0);
 
     // Determinar nome do produto (usar linha se disponível, senão usar produtoNome ou linha do parâmetro)
     const nomeProduto = variacoes.length > 0 
@@ -1821,7 +1946,7 @@ export async function fetchProdutoDetalhesPorFilial({
         totalFiliais,
         estoqueTotal,
         custoTotal,
-        vendasAcumuladas,
+        vendasTotais,
       },
       variacoes,
     };

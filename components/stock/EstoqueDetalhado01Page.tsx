@@ -23,12 +23,14 @@ interface ProdutoVariacaoDetalhes {
   estoque: number;
   custoUnitario: number;
   custoTotal: number;
+  vendasTotais: number;
 }
 
 interface ProdutoDetalhesResumo {
   totalItens: number;
   estoqueTotal: number;
   custoTotal: number;
+  vendasTotais: number;
 }
 
 interface ProdutoDetalhesCompleto {
@@ -260,6 +262,12 @@ export default function EstoqueDetalhado01Page({
             {formatCurrency(detalhes.resumo.custoTotal)}
           </div>
         </div>
+        <div className={styles.metricCard}>
+          <div className={styles.metricLabel}>VENDAS TOTAIS</div>
+          <div className={styles.metricValue}>
+            {formatNumber(detalhes.resumo.vendasTotais)} unidades
+          </div>
+        </div>
       </div>
 
       {/* Tabela de Variações */}
@@ -273,6 +281,7 @@ export default function EstoqueDetalhado01Page({
               <th>ESTOQUE</th>
               <th>CUSTO UNIT.</th>
               <th>CUSTO TOTAL</th>
+              <th>VENDAS TOTAIS</th>
             </tr>
           </thead>
           <tbody>
@@ -301,6 +310,7 @@ export default function EstoqueDetalhado01Page({
                   <td>{formatNumber(variacao.estoque)}</td>
                   <td>{formatCurrency(variacao.custoUnitario)}</td>
                   <td>{formatCurrency(variacao.custoTotal)}</td>
+                  <td>{formatNumber(variacao.vendasTotais)}</td>
                 </tr>
               );
             })}
