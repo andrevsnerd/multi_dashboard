@@ -1023,7 +1023,7 @@ export async function fetchEstoquePorCategoria({
       // Exemplo: Se temos 100 unidades e a projeção mensal é 50 unidades (em 31 dias),
       // então temos 2 meses de estoque = 2 × 31 = 62 dias
       const diasEstoque = projecaoMensal > 0
-        ? Math.round((estoqueAtual / projecaoMensal) * totalDiasMes * 10) / 10
+        ? Math.round((estoqueAtual / projecaoMensal) * totalDiasMes)
         : 999;
 
       // Vendas do mês atual para exibição
@@ -1048,7 +1048,7 @@ export async function fetchEstoquePorCategoria({
         custoTotal,
         custoUnitario,
         vendasMes: Math.round(vendasMes),
-        duracao: Math.round(diasEstoque),
+        duracao: diasEstoque,
         projecaoMes: estoqueFinalMes, // Estoque Final Mês
         projecaoAnual: estoqueFinalAno, // Estoque Final Ano
         projecaoVendasMes: Math.round(projecaoMensal), // Projeção de vendas mensal
@@ -1411,7 +1411,7 @@ export async function fetchPrevisoesEstoque({
       // Exemplo: Se temos 100 unidades e a projeção mensal é 50 unidades (em 31 dias),
       // então temos 2 meses de estoque = 2 × 31 = 62 dias
       const diasEstoque = projecaoMensal > 0
-        ? Math.round((estoqueAtual / projecaoMensal) * totalDiasMes * 10) / 10
+        ? Math.round((estoqueAtual / projecaoMensal) * totalDiasMes)
         : 999;
 
       // Média diária = Projeção Mensal / total de dias do mês
@@ -1431,7 +1431,7 @@ export async function fetchPrevisoesEstoque({
         categoria,
         estoqueAtual: Math.round(estoqueAtual),
         mediaDia: Number(mediaDia.toFixed(1)),
-        duracao: Math.round(diasEstoque),
+        duracao: diasEstoque,
         prevFimMes,
         prevFimAno,
         status,

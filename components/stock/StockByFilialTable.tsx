@@ -44,9 +44,9 @@ function organizeFiliais(
   if (companyKey === "nerd") {
     matriz = "NERD";
   } else if (companyKey === "scarfme") {
-    // Para scarfme, a matriz é "SCARF ME - MATRIZ" e o e-commerce é "SCARFME MATRIZ CMS"
+    // Para scarfme, a matriz é "SCARF ME - MATRIZ" e o e-commerce inclui "SCARFME MATRIZ CMS" e "SCARF ME - MATRIZ LLL"
     matriz = "SCARF ME - MATRIZ";
-    ecommerce = "SCARFME MATRIZ CMS";
+    ecommerce = "SCARFME MATRIZ CMS"; // Primeira filial de e-commerce (usado para referência, mas o filtro usa company.ecommerceFilials)
   }
 
   // Obter todas as filiais da configuração de inventory

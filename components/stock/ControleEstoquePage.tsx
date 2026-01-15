@@ -386,7 +386,7 @@ export default function ControleEstoquePage({
             acc[key].projecaoMes = Math.round(totalEstoque - totalProjecaoVendas);
             acc[key].projecaoAnual = Math.round(totalEstoque - (totalProjecaoVendas * mesesRestantes));
             acc[key].duracao = totalProjecaoVendas > 0 
-              ? Math.round((totalEstoque / totalProjecaoVendas) * totalDiasMes * 10) / 10
+              ? Math.round((totalEstoque / totalProjecaoVendas) * totalDiasMes)
               : 999;
           }
           return acc;
@@ -422,7 +422,7 @@ export default function ControleEstoquePage({
             acc[key].projecaoMes = Math.round(totalEstoque - totalProjecaoVendas);
             acc[key].projecaoAnual = Math.round(totalEstoque - (totalProjecaoVendas * mesesRestantes));
             acc[key].duracao = totalProjecaoVendas > 0 
-              ? Math.round((totalEstoque / totalProjecaoVendas) * totalDiasMes * 10) / 10
+              ? Math.round((totalEstoque / totalProjecaoVendas) * totalDiasMes)
               : 999;
           }
           return acc;
@@ -937,17 +937,6 @@ export default function ControleEstoquePage({
     });
   }, [previsoes, selectedCategorias, linhasExcluidas]);
 
-  const toggleCategoria = (categoria: string) => {
-    setSelectedCategorias(prev => {
-      const next = new Set(prev);
-      if (next.has(categoria)) {
-        next.delete(categoria);
-      } else {
-        next.add(categoria);
-      }
-      return next;
-    });
-  };
 
   const currentDate = format(new Date(), "EEEE, d 'De' MMMM 'De' yyyy", { locale: ptBR });
 
@@ -1384,30 +1373,8 @@ export default function ControleEstoquePage({
         </div>
       </div>
 
-      {/* Filtros de Categoria e Período */}
+      {/* Filtros de Período */}
       <div className={styles.categoryFilters}>
-        <div className={styles.categoryButtons}>
-          {categorias.map(cat => (
-            <button
-              key={cat.categoria}
-              className={`${styles.categoryButton} ${selectedCategorias.has(cat.categoria) ? styles.active : ""}`}
-              onClick={() => toggleCategoria(cat.categoria)}
-            >
-              {selectedCategorias.has(cat.categoria) && (
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path
-                    d="M13.3333 4L6 11.3333L2.66667 8"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              )}
-              {cat.categoria}
-            </button>
-          ))}
-        </div>
         <div className={styles.periodButtons}>
           <button
             className={`${styles.periodButton} ${periodType === "semanal" ? styles.active : ""}`}

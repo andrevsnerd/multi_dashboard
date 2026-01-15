@@ -88,7 +88,7 @@ export function analyzeStockActions(
     matriz = "NERD";
   } else if (companyKey === "scarfme") {
     matriz = "SCARF ME - MATRIZ";
-    ecommerce = "SCARFME MATRIZ CMS";
+    ecommerce = "SCARFME MATRIZ CMS"; // Primeira filial de e-commerce (usado para referência, mas o filtro usa company.ecommerceFilials)
   }
 
   const allFiliais = company.filialFilters['inventory'] ?? [];

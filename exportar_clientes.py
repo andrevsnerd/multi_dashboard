@@ -55,8 +55,10 @@ COMPANIES = {
             'SCARF ME - HIGIENOPOLIS 2',
             'SCARFME - IBIRAPUERA LLL',
             'SCARFME ME - PAULISTA FFF',
+            'SCARF ME - PAULISTA RSR',
             'SCARF ME - MATRIZ',
             'SCARFME MATRIZ CMS',
+            'SCARF ME - MATRIZ LLL',
             'VILLA LOBOS - LLL',
         ],
         'filial_display_names': {
@@ -67,11 +69,13 @@ COMPANIES = {
             'SCARF ME - HIGIENOPOLIS 2': 'HIGIENÓPOLIS',
             'SCARFME - IBIRAPUERA LLL': 'IBIRAPUERA',
             'SCARFME ME - PAULISTA FFF': 'PAULISTA',
+            'SCARF ME - PAULISTA RSR': 'PAULISTA',
             'SCARF ME - MATRIZ': 'MATRIZ',
             'SCARFME MATRIZ CMS': 'E-COMMERCE',
+            'SCARF ME - MATRIZ LLL': 'E-COMMERCE',
             'VILLA LOBOS - LLL': 'VILLA LOBOS',
         },
-        'ecommerce_filiais': ['SCARFME MATRIZ CMS']
+        'ecommerce_filiais': ['SCARFME MATRIZ CMS', 'SCARF ME - MATRIZ LLL']
     }
 }
 
