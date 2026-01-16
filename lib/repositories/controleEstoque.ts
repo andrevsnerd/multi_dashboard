@@ -370,6 +370,55 @@ export interface VendasCategoriaData {
   vendas: number;
 }
 
+export interface DetalheEntradaSemana {
+  data: Date | string;
+  romaneio: string;
+  produto: string;
+  descricao: string;
+  cor: string;
+  corDescricao: string;
+  linha?: string;
+  subgrupo?: string;
+  grade?: string;
+  colecao?: string;
+  quantidade: number;
+  filial: string;
+  vendas?: number; // Vendas do produto+cor na mesma semana
+}
+
+export interface DetalheVendaSemana {
+  data: Date | string;
+  ticket: string;
+  produto: string;
+  descricao: string;
+  cor: string;
+  corDescricao: string;
+  linha?: string;
+  subgrupo?: string;
+  grade?: string;
+  colecao?: string;
+  quantidade: number;
+  filial: string;
+  valorLiquido?: number;
+}
+
+export interface DetalheEcommerceSemana {
+  data: Date | string;
+  nf: string;
+  serie: string;
+  produto: string;
+  descricao: string;
+  cor: string;
+  corDescricao: string;
+  linha?: string;
+  subgrupo?: string;
+  grade?: string;
+  colecao?: string;
+  quantidade: number;
+  filial: string;
+  valorLiquido?: number;
+}
+
 export interface PrevisaoEstoque {
   categoria: string;
   estoqueAtual: number;
@@ -1176,6 +1225,604 @@ export async function fetchEvolucaoEstoque({
     });
 
     return data;
+  });
+}
+
+/**
+ * Busca detalhes das entradas da semana para uma categoria específica
+ * Retorna lista detalhada de produtos que entraram na matriz (compras reais, sem devoluções)
+ */
+export async function fetchDetalhesEntradasSemana({
+  company,
+  filial,
+  categoria,
+  linha,
+  subgrupo,
+  grade,
+  colecao,
+  grupos,
+  linhas,
+  colecoes,
+  subgrupos,
+  grades,
+}: {
+  company?: string;
+  filial?: string | null;
+  categoria: string;
+  linha?: string;
+  subgrupo?: string;
+  grade?: string;
+  colecao?: string;
+  grupos?: string[];
+  linhas?: string[];
+  colecoes?: string[];
+  subgrupos?: string[];
+  grades?: string[];
+}): Promise<DetalheEntradaSemana[]> {
+  return withRequest(async (request) => {
+    const now = new Date();
+    const data7DiasAtras = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    request.input('data7DiasAtras', sql.DateTime, data7DiasAtras);
+
+    const companyConfig = resolveCompany(company);
+    
+    // Identificar matriz
+    let matrizFiliais: string[] = [];
+    if (company === 'scarfme') {
+      matrizFiliais = ['SCARF ME - MATRIZ'];
+    } else if (company === 'nerd') {
+      matrizFiliais = ['NERD'];
+    }
+    
+    let matrizFilialFilter = '';
+    if (matrizFiliais.length > 0) {
+      matrizFiliais.forEach((filialMatriz, index) => {
+        request.input(`matrizFilial${index}`, sql.VarChar, filialMatriz);
+      });
+      const placeholders = matrizFiliais.map((_, i) => `@matrizFilial${i}`).join(', ');
+      matrizFilialFilter = `AND E.FILIAL IN (${placeholders})`;
+    }
+
+    // Criar filtros de categoria
+    const categoriaField = company === 'nerd' 
+      ? 'ISNULL(pr.LINHA, \'SEM LINHA\')'
+      : 'ISNULL(pr.LINHA, \'SEM LINHA\')';
+    
+    let categoriaFilter = '';
+    request.input('categoria', sql.VarChar, categoria.trim());
+    
+    // Se categoria é grupo (NERD) ou linha (SCARFME), usar campo apropriado
+    if (company === 'nerd') {
+      categoriaFilter = `AND ISNULL(pr.GRUPO_PRODUTO, 'SEM GRUPO') = @categoria`;
+    } else {
+      categoriaFilter = `AND ISNULL(pr.LINHA, 'SEM LINHA') = @categoria`;
+    }
+
+    // Filtros adicionais (linha, subgrupo, grade, colecao)
+    const grupoFilter = buildGrupoFilter(request, company, grupos, 'pr');
+    const linhaFilter = buildLinhaFilter(request, company, linhas || (linha ? [linha] : []), 'pr');
+    const colecaoFilter = buildColecaoFilter(request, company, colecoes || (colecao ? [colecao] : []), 'pr');
+    const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos || (subgrupo ? [subgrupo] : []), 'pr');
+    const gradeFilter = buildGradeFilter(request, company, grades || (grade ? [grade] : []), 'pr');
+
+    // Criar filtro para excluir devoluções (lojas normais, não matriz/ecommerce)
+    let lojasFilterSaidas = '';
+    if (companyConfig) {
+      const filiais = companyConfig.filialFilters['inventory'] ?? [];
+      const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
+      const lojasNormais = filiais.filter(f => {
+        if (company === 'scarfme') {
+          return f !== 'SCARF ME - MATRIZ' && !ecommerceFilials.includes(f);
+        } else if (company === 'nerd') {
+          return f !== 'NERD';
+        }
+        return true;
+      });
+      
+      if (lojasNormais.length > 0) {
+        lojasNormais.forEach((filialLoja, index) => {
+          request.input(`lojaSaida${index}`, sql.VarChar, filialLoja);
+        });
+        const placeholders = lojasNormais.map((_, i) => `@lojaSaida${i}`).join(', ');
+        lojasFilterSaidas = `AND S.FILIAL IN (${placeholders})`;
+      }
+    }
+
+    // Buscar entradas detalhadas
+    const query = `
+      SELECT 
+        E.EMISSAO AS data,
+        E.ROMANEIO_PRODUTO AS romaneio,
+        P.PRODUTO AS produto,
+        ISNULL(prd.DESC_PRODUTO, '') AS descricao,
+        ISNULL(P.COR_PRODUTO, '') AS cor,
+        ISNULL(c.DESC_COR, '') AS corDescricao,
+        ISNULL(prd.LINHA, '') AS linha,
+        ISNULL(prd.SUBGRUPO_PRODUTO, '') AS subgrupo,
+        ISNULL(CONVERT(VARCHAR, prd.GRADE), '') AS grade,
+        ISNULL(prd.COLECAO, '') AS colecao,
+        CAST(P.QTDE AS FLOAT) AS quantidade,
+        E.FILIAL AS filial
+      FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+      LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+      LEFT JOIN PRODUTOS prd WITH (NOLOCK) ON prd.PRODUTO = P.PRODUTO
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = P.COR_PRODUTO
+      WHERE prd.PRODUTO IS NOT NULL
+        AND E.EMISSAO >= @data7DiasAtras
+        ${matrizFilialFilter}
+        ${categoriaFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        -- EXCLUIR devoluções
+        AND NOT EXISTS (
+          SELECT 1
+          FROM ESTOQUE_PROD_SAI AS S WITH (NOLOCK)
+          LEFT JOIN ESTOQUE_PROD1_SAI AS PS WITH (NOLOCK) ON S.ROMANEIO_PRODUTO = PS.ROMANEIO_PRODUTO
+          WHERE PS.PRODUTO = P.PRODUTO
+            AND ISNULL(PS.COR_PRODUTO, '') = ISNULL(P.COR_PRODUTO, '')
+            AND CAST(S.EMISSAO AS DATE) = CAST(E.EMISSAO AS DATE)
+            ${lojasFilterSaidas}
+        )
+      ORDER BY E.EMISSAO DESC, prd.DESC_PRODUTO, P.COR_PRODUTO
+    `;
+
+    const result = await request.query<{
+      data: Date;
+      romaneio: string;
+      produto: string;
+      descricao: string;
+      cor: string;
+      corDescricao: string;
+      linha: string | null;
+      subgrupo: string | null;
+      grade: string | null;
+      colecao: string | null;
+      quantidade: number | null;
+      filial: string;
+    }>(query);
+
+    // Buscar vendas para cada produto+cor na semana
+    const produtosCores = new Map<string, number>();
+    result.recordset.forEach(row => {
+      const chave = `${row.produto}|${row.cor}`;
+      produtosCores.set(chave, 0);
+    });
+
+    if (produtosCores.size > 0) {
+      // Criar placeholders para produtos e cores
+      const produtosUnicos = Array.from(new Set(result.recordset.map(r => r.produto)));
+      const coresUnicas = Array.from(new Set(result.recordset.map(r => r.cor).filter(c => c)));
+
+      produtosUnicos.forEach((produto, index) => {
+        request.input(`produtoVenda${index}`, sql.VarChar, produto);
+      });
+      coresUnicas.forEach((cor, index) => {
+        request.input(`corVenda${index}`, sql.VarChar, cor);
+      });
+
+      const produtoPlaceholders = produtosUnicos.map((_, i) => `@produtoVenda${i}`).join(', ');
+      const corPlaceholders = coresUnicas.length > 0 
+        ? coresUnicas.map((_, i) => `@corVenda${i}`).join(', ')
+        : '';
+
+      const vendasFilialFilter = buildFilialFilter(request, company, filial, 'vp');
+      
+      const vendasQuery = `
+        SELECT 
+          vp.PRODUTO,
+          ISNULL(vp.COR_PRODUTO, '') AS cor,
+          SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        WHERE vp.DATA_VENDA >= @data7DiasAtras
+          AND vp.QTDE > 0
+          AND vp.PRODUTO IN (${produtoPlaceholders})
+          ${corPlaceholders ? `AND ISNULL(vp.COR_PRODUTO, '') IN (${corPlaceholders})` : ''}
+          ${vendasFilialFilter}
+        GROUP BY vp.PRODUTO, ISNULL(vp.COR_PRODUTO, '')
+      `;
+
+      const vendasResult = await request.query<{
+        PRODUTO: string;
+        cor: string;
+        vendas: number | null;
+      }>(vendasQuery);
+
+      vendasResult.recordset.forEach(row => {
+        const chave = `${row.PRODUTO}|${row.cor}`;
+        produtosCores.set(chave, Number(row.vendas ?? 0));
+      });
+    }
+
+    // Montar resultado final
+    return result.recordset.map(row => {
+      const chave = `${row.produto}|${row.cor}`;
+      const vendas = produtosCores.get(chave) || 0;
+
+      return {
+        data: row.data,
+        romaneio: row.romaneio || '',
+        produto: row.produto || '',
+        descricao: row.descricao || '',
+        cor: row.cor || '',
+        corDescricao: row.corDescricao || '',
+        linha: row.linha || undefined,
+        subgrupo: row.subgrupo || undefined,
+        grade: row.grade || undefined,
+        colecao: row.colecao || undefined,
+        quantidade: Number(row.quantidade ?? 0),
+        filial: row.filial || '',
+        vendas,
+      };
+    });
+  });
+}
+
+/**
+ * Busca detalhes das vendas da semana para uma categoria específica
+ * Retorna lista detalhada de produtos vendidos na semana
+ */
+export async function fetchDetalhesVendasSemana({
+  company,
+  filial,
+  categoria,
+  linha,
+  subgrupo,
+  grade,
+  colecao,
+  grupos,
+  linhas,
+  colecoes,
+  subgrupos,
+  grades,
+}: {
+  company?: string;
+  filial?: string | null;
+  categoria: string;
+  linha?: string;
+  subgrupo?: string;
+  grade?: string;
+  colecao?: string;
+  grupos?: string[];
+  linhas?: string[];
+  colecoes?: string[];
+  subgrupos?: string[];
+  grades?: string[];
+}): Promise<DetalheVendaSemana[]> {
+  return withRequest(async (request) => {
+    const now = new Date();
+    const data7DiasAtras = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    request.input('data7DiasAtras', sql.DateTime, data7DiasAtras);
+
+    // Criar filtros de categoria
+    const categoriaField = company === 'nerd' 
+      ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
+      : 'ISNULL(p.LINHA, \'SEM LINHA\')';
+    
+    let categoriaFilter = '';
+    request.input('categoria', sql.VarChar, categoria.trim());
+    
+    if (company === 'nerd') {
+      categoriaFilter = `AND ISNULL(p.GRUPO_PRODUTO, 'SEM GRUPO') = @categoria`;
+    } else {
+      categoriaFilter = `AND ISNULL(p.LINHA, 'SEM LINHA') = @categoria`;
+    }
+
+    // Filtros adicionais
+    const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
+    const linhaFilter = buildLinhaFilter(request, company, linhas || (linha ? [linha] : []), 'p');
+    const colecaoFilter = buildColecaoFilter(request, company, colecoes || (colecao ? [colecao] : []), 'p');
+    const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos || (subgrupo ? [subgrupo] : []), 'p');
+    const gradeFilter = buildGradeFilter(request, company, grades || (grade ? [grade] : []), 'p');
+    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
+
+    // Filtro de filial para e-commerce (apenas ScarfMe)
+    let ecommerceFilialFilter = '';
+    if (company === 'scarfme') {
+      const companyConfig = resolveCompany(company);
+      if (companyConfig) {
+        const filiais = companyConfig.filialFilters['inventory'] ?? [];
+        const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
+
+        if (filial && filial !== VAREJO_VALUE) {
+          request.input('ecommerceDetalheFilial', sql.VarChar, filial);
+          ecommerceFilialFilter = `AND f.FILIAL = @ecommerceDetalheFilial`;
+        } else if (filial === null) {
+          // Todas as filiais (incluindo e-commerce)
+          if (filiais.length > 0) {
+            filiais.forEach((f, index) => {
+              request.input(`ecommerceDetalheFilial${index}`, sql.VarChar, f);
+            });
+            const placeholders = filiais.map((_, i) => `@ecommerceDetalheFilial${i}`).join(', ');
+            ecommerceFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+          }
+        } else {
+          // Apenas e-commerce quando filial é VAREJO ou undefined
+          if (ecommerceFilials.length > 0) {
+            ecommerceFilials.forEach((f, index) => {
+              request.input(`ecommerceDetalheFilial${index}`, sql.VarChar, f);
+            });
+            const placeholders = ecommerceFilials.map((_, i) => `@ecommerceDetalheFilial${i}`).join(', ');
+            ecommerceFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+          }
+        }
+      }
+    }
+
+    // Buscar vendas detalhadas (normais + e-commerce)
+    const query = `
+      -- Vendas normais (loja)
+      SELECT 
+        vp.DATA_VENDA AS data,
+        vp.TICKET AS ticket,
+        vp.PRODUTO AS produto,
+        ISNULL(vp.DESC_PRODUTO, '') AS descricao,
+        ISNULL(vp.COR_PRODUTO, '') AS cor,
+        ISNULL(c.DESC_COR, '') AS corDescricao,
+        ISNULL(p.LINHA, '') AS linha,
+        ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
+        ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
+        ISNULL(p.COLECAO, '') AS colecao,
+        CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END AS quantidade,
+        vp.FILIAL AS filial,
+        CASE 
+          WHEN vp.QTDE_CANCELADA = 0 THEN 
+            (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
+          ELSE 0
+        END AS valorLiquido
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = vp.COR_PRODUTO
+      WHERE vp.DATA_VENDA >= @data7DiasAtras
+        AND vp.QTDE > 0
+        ${vendasFilialFilter}
+        ${categoriaFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        AND ${categoriaField} <> ''
+        AND ${categoriaField} <> 'SEM GRUPO'
+        AND ${categoriaField} <> 'SEM LINHA'
+      
+      ${company === 'scarfme' ? `
+      UNION ALL
+      
+      -- Vendas de e-commerce
+      SELECT 
+        f.EMISSAO AS data,
+        CONCAT(f.NF_SAIDA, '-', f.SERIE_NF) AS ticket,
+        fp.PRODUTO AS produto,
+        ISNULL(p.DESC_PRODUTO, '') AS descricao,
+        ISNULL(fp.COR_PRODUTO, '') AS cor,
+        ISNULL(c.DESC_COR, '') AS corDescricao,
+        ISNULL(p.LINHA, '') AS linha,
+        ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
+        ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
+        ISNULL(p.COLECAO, '') AS colecao,
+        CAST(fp.QTDE AS FLOAT) AS quantidade,
+        f.FILIAL AS filial,
+        ISNULL(fp.VALOR_LIQUIDO, 0) AS valorLiquido
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = fp.COR_PRODUTO
+      WHERE f.EMISSAO >= @data7DiasAtras
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND CAST(fp.QTDE AS FLOAT) > 0
+        ${ecommerceFilialFilter}
+        ${categoriaFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        AND ${categoriaField} <> ''
+        AND ${categoriaField} <> 'SEM GRUPO'
+        AND ${categoriaField} <> 'SEM LINHA'
+      ` : ''}
+      
+      ORDER BY data DESC, ticket, produto, cor
+    `;
+
+    const result = await request.query<{
+      data: Date;
+      ticket: string;
+      produto: string;
+      descricao: string;
+      cor: string;
+      corDescricao: string;
+      linha: string | null;
+      subgrupo: string | null;
+      grade: string | null;
+      colecao: string | null;
+      quantidade: number | null;
+      filial: string;
+      valorLiquido: number | null;
+    }>(query);
+
+    // Montar resultado final
+    return result.recordset.map(row => ({
+      data: row.data,
+      ticket: row.ticket || '',
+      produto: row.produto || '',
+      descricao: row.descricao || '',
+      cor: row.cor || '',
+      corDescricao: row.corDescricao || '',
+      linha: row.linha || undefined,
+      subgrupo: row.subgrupo || undefined,
+      grade: row.grade || undefined,
+      colecao: row.colecao || undefined,
+      quantidade: Number(row.quantidade ?? 0),
+      filial: row.filial || '',
+      valorLiquido: Number(row.valorLiquido ?? 0),
+    }));
+  });
+}
+
+/**
+ * Busca detalhes das vendas de e-commerce da semana para uma categoria específica
+ */
+export async function fetchDetalhesEcommerceSemana({
+  company,
+  filial,
+  categoria,
+  linha,
+  subgrupo,
+  grade,
+  colecao,
+  grupos,
+  linhas,
+  colecoes,
+  subgrupos,
+  grades,
+}: {
+  company?: string;
+  filial?: string | null;
+  categoria: string;
+  linha?: string;
+  subgrupo?: string;
+  grade?: string;
+  colecao?: string;
+  grupos?: string[];
+  linhas?: string[];
+  colecoes?: string[];
+  subgrupos?: string[];
+  grades?: string[];
+}): Promise<DetalheEcommerceSemana[]> {
+  return withRequest(async (request) => {
+    // E-commerce só existe para ScarfMe
+    if (company !== 'scarfme') {
+      return [];
+    }
+
+    const now = new Date();
+    const data7DiasAtras = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    request.input('data7DiasAtras', sql.DateTime, data7DiasAtras);
+
+    // Criar filtros de categoria
+    const categoriaField = 'ISNULL(p.LINHA, \'SEM LINHA\')';
+    
+    let categoriaFilter = '';
+    request.input('categoria', sql.VarChar, categoria.trim());
+    categoriaFilter = `AND ISNULL(p.LINHA, 'SEM LINHA') = @categoria`;
+
+    // Filtros adicionais
+    const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
+    const linhaFilter = buildLinhaFilter(request, company, linhas || (linha ? [linha] : []), 'p');
+    const colecaoFilter = buildColecaoFilter(request, company, colecoes || (colecao ? [colecao] : []), 'p');
+    const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos || (subgrupo ? [subgrupo] : []), 'p');
+    const gradeFilter = buildGradeFilter(request, company, grades || (grade ? [grade] : []), 'p');
+
+    // Filtro de filial para e-commerce
+    let ecommerceFilialFilter = '';
+    const companyConfig = resolveCompany(company);
+    if (companyConfig) {
+      const filiais = companyConfig.filialFilters['inventory'] ?? [];
+      const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
+
+      if (filial && filial !== VAREJO_VALUE) {
+        request.input('ecommerceDetalheFilial', sql.VarChar, filial);
+        ecommerceFilialFilter = `AND f.FILIAL = @ecommerceDetalheFilial`;
+      } else if (filial === null) {
+        // Todas as filiais (incluindo e-commerce)
+        if (filiais.length > 0) {
+          filiais.forEach((f, index) => {
+            request.input(`ecommerceDetalheFilial${index}`, sql.VarChar, f);
+          });
+          const placeholders = filiais.map((_, i) => `@ecommerceDetalheFilial${i}`).join(', ');
+          ecommerceFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+        }
+      } else {
+        // Apenas e-commerce quando filial é VAREJO ou undefined
+        if (ecommerceFilials.length > 0) {
+          ecommerceFilials.forEach((f, index) => {
+            request.input(`ecommerceDetalheFilial${index}`, sql.VarChar, f);
+          });
+          const placeholders = ecommerceFilials.map((_, i) => `@ecommerceDetalheFilial${i}`).join(', ');
+          ecommerceFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+        }
+      }
+    }
+
+    // Buscar e-commerce detalhado
+    const query = `
+      SELECT 
+        f.EMISSAO AS data,
+        f.NF_SAIDA AS nf,
+        f.SERIE_NF AS serie,
+        fp.PRODUTO AS produto,
+        ISNULL(p.DESC_PRODUTO, '') AS descricao,
+        ISNULL(fp.COR_PRODUTO, '') AS cor,
+        ISNULL(c.DESC_COR, '') AS corDescricao,
+        ISNULL(p.LINHA, '') AS linha,
+        ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
+        ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
+        ISNULL(p.COLECAO, '') AS colecao,
+        CAST(fp.QTDE AS FLOAT) AS quantidade,
+        f.FILIAL AS filial,
+        ISNULL(fp.VALOR_LIQUIDO, 0) AS valorLiquido
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = fp.COR_PRODUTO
+      WHERE f.EMISSAO >= @data7DiasAtras
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND CAST(fp.QTDE AS FLOAT) > 0
+        ${ecommerceFilialFilter}
+        ${categoriaFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        AND ${categoriaField} <> ''
+        AND ${categoriaField} <> 'SEM GRUPO'
+        AND ${categoriaField} <> 'SEM LINHA'
+      ORDER BY f.EMISSAO DESC, f.NF_SAIDA, fp.PRODUTO, fp.COR_PRODUTO
+    `;
+
+    const result = await request.query<{
+      data: Date;
+      nf: string;
+      serie: string;
+      produto: string;
+      descricao: string;
+      cor: string;
+      corDescricao: string;
+      linha: string | null;
+      subgrupo: string | null;
+      grade: string | null;
+      colecao: string | null;
+      quantidade: number | null;
+      filial: string;
+      valorLiquido: number | null;
+    }>(query);
+
+    // Montar resultado final
+    return result.recordset.map(row => ({
+      data: row.data,
+      nf: row.nf || '',
+      serie: row.serie || '',
+      produto: row.produto || '',
+      descricao: row.descricao || '',
+      cor: row.cor || '',
+      corDescricao: row.corDescricao || '',
+      linha: row.linha || undefined,
+      subgrupo: row.subgrupo || undefined,
+      grade: row.grade || undefined,
+      colecao: row.colecao || undefined,
+      quantidade: Number(row.quantidade ?? 0),
+      filial: row.filial || '',
+      valorLiquido: Number(row.valorLiquido ?? 0),
+    }));
   });
 }
 

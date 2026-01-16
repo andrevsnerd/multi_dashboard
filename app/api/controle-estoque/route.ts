@@ -6,6 +6,9 @@ import {
   fetchEvolucaoEstoque,
   fetchVendasPorCategoria,
   fetchPrevisoesEstoque,
+  fetchDetalhesEntradasSemana,
+  fetchDetalhesVendasSemana,
+  fetchDetalhesEcommerceSemana,
 } from '@/lib/repositories/controleEstoque';
 
 export async function GET(request: Request) {
@@ -13,7 +16,7 @@ export async function GET(request: Request) {
   const company = searchParams.get('company') ?? undefined;
   const filial = searchParams.get('filial') || null;
   const periodType = (searchParams.get('periodType') as 'semanal' | 'mensal') || 'semanal';
-  const dataType = searchParams.get('dataType'); // 'kpis', 'categorias', 'evolucao', 'vendas', 'previsoes'
+  const dataType = searchParams.get('dataType'); // 'kpis', 'categorias', 'evolucao', 'vendas', 'previsoes', 'detalhes-entradas'
 
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
@@ -59,9 +62,87 @@ export async function GET(request: Request) {
         const previsoes = await fetchPrevisoesEstoque({ company, filial, range, ...filters });
         return NextResponse.json({ data: previsoes });
       }
+      case 'detalhes-entradas': {
+        const categoria = searchParams.get('categoria');
+        const linha = searchParams.get('linha') || undefined;
+        const subgrupo = searchParams.get('subgrupo') || undefined;
+        const grade = searchParams.get('grade') || undefined;
+        const colecao = searchParams.get('colecao') || undefined;
+        
+        if (!categoria) {
+          return NextResponse.json(
+            { error: 'Categoria é obrigatória para detalhes de entradas' },
+            { status: 400 }
+          );
+        }
+        
+        const detalhes = await fetchDetalhesEntradasSemana({
+          company,
+          filial,
+          categoria,
+          linha,
+          subgrupo,
+          grade,
+          colecao,
+          ...filters,
+        });
+        return NextResponse.json({ data: detalhes });
+      }
+      case 'detalhes-vendas': {
+        const categoria = searchParams.get('categoria');
+        const linha = searchParams.get('linha') || undefined;
+        const subgrupo = searchParams.get('subgrupo') || undefined;
+        const grade = searchParams.get('grade') || undefined;
+        const colecao = searchParams.get('colecao') || undefined;
+        
+        if (!categoria) {
+          return NextResponse.json(
+            { error: 'Categoria é obrigatória para detalhes de vendas' },
+            { status: 400 }
+          );
+        }
+        
+        const detalhes = await fetchDetalhesVendasSemana({
+          company,
+          filial,
+          categoria,
+          linha,
+          subgrupo,
+          grade,
+          colecao,
+          ...filters,
+        });
+        return NextResponse.json({ data: detalhes });
+      }
+      case 'detalhes-ecommerce': {
+        const categoria = searchParams.get('categoria');
+        const linha = searchParams.get('linha') || undefined;
+        const subgrupo = searchParams.get('subgrupo') || undefined;
+        const grade = searchParams.get('grade') || undefined;
+        const colecao = searchParams.get('colecao') || undefined;
+        
+        if (!categoria) {
+          return NextResponse.json(
+            { error: 'Categoria é obrigatória para detalhes de e-commerce' },
+            { status: 400 }
+          );
+        }
+        
+        const detalhes = await fetchDetalhesEcommerceSemana({
+          company,
+          filial,
+          categoria,
+          linha,
+          subgrupo,
+          grade,
+          colecao,
+          ...filters,
+        });
+        return NextResponse.json({ data: detalhes });
+      }
       default:
         return NextResponse.json(
-          { error: 'Tipo de dados inválido. Use: kpis, categorias, evolucao, vendas ou previsoes' },
+          { error: 'Tipo de dados inválido. Use: kpis, categorias, evolucao, vendas, previsoes, detalhes-entradas, detalhes-vendas ou detalhes-ecommerce' },
           { status: 400 }
         );
     }

@@ -327,6 +327,42 @@ export default function ControleEstoquePage({
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Estado para modal de detalhes das entradas/vendas
+  const [modalEntradasAberto, setModalEntradasAberto] = useState(false);
+  const [categoriaModal, setCategoriaModal] = useState<CategoriaEstoque | null>(null);
+  const [abaAtiva, setAbaAtiva] = useState<'entradas' | 'vendas'>('entradas');
+  const [detalhesEntradas, setDetalhesEntradas] = useState<Array<{
+    data: Date | string;
+    romaneio: string;
+    produto: string;
+    descricao: string;
+    cor: string;
+    corDescricao: string;
+    linha?: string;
+    subgrupo?: string;
+    grade?: string;
+    colecao?: string;
+    quantidade: number;
+    filial: string;
+    vendas?: number;
+  }>>([]);
+  const [detalhesVendas, setDetalhesVendas] = useState<Array<{
+    data: Date | string;
+    ticket: string;
+    produto: string;
+    descricao: string;
+    cor: string;
+    corDescricao: string;
+    linha?: string;
+    subgrupo?: string;
+    grade?: string;
+    colecao?: string;
+    quantidade: number;
+    filial: string;
+    valorLiquido?: number;
+  }>>([]);
+  const [loadingDetalhes, setLoadingDetalhes] = useState(false);
 
   // Linhas a serem excluídas da visualização
   const linhasExcluidas = useMemo(() => {
@@ -1326,7 +1362,55 @@ export default function ControleEstoquePage({
                     }
                   })()}
                 </div>
-                <div className={`${styles.tendencia} ${cat.tendenciaSemanal >= 0 ? styles.positive : styles.negative}`}>
+                <div 
+                  className={`${styles.tendencia} ${cat.tendenciaSemanal >= 0 ? styles.positive : styles.negative}`}
+                  style={{ cursor: 'pointer' }}
+                  onClick={async () => {
+                    setCategoriaModal(cat);
+                    setModalEntradasAberto(true);
+                    setAbaAtiva('entradas');
+                    setLoadingDetalhes(true);
+                    
+                    // Buscar detalhes das entradas e vendas em paralelo
+                    const baseParams = new URLSearchParams({
+                      company: companyKey,
+                      categoria: cat.categoria,
+                      start: range.startDate.toISOString(),
+                      end: range.endDate.toISOString(),
+                    });
+                    
+                    if (selectedFilial) {
+                      baseParams.set('filial', selectedFilial);
+                    }
+                    
+                    if (cat.linha) baseParams.set('linha', cat.linha);
+                    if (cat.subgrupo) baseParams.set('subgrupo', cat.subgrupo);
+                    if (cat.grade) baseParams.set('grade', cat.grade);
+                    if (cat.colecao) baseParams.set('colecao', cat.colecao);
+                    
+                    selectedGrupos.forEach(g => baseParams.append('grupos', g));
+                    selectedLinhas.forEach(l => baseParams.append('linhas', l));
+                    selectedSubgrupos.forEach(s => baseParams.append('subgrupos', s));
+                    selectedGrades.forEach(g => baseParams.append('grades', g));
+                    selectedColecoes.forEach(c => baseParams.append('colecoes', c));
+                    
+                    // Buscar entradas e vendas (que já inclui e-commerce) em paralelo
+                    const [entradasRes, vendasRes] = await Promise.all([
+                      fetch(`/api/controle-estoque?${baseParams.toString()}&dataType=detalhes-entradas`),
+                      fetch(`/api/controle-estoque?${baseParams.toString()}&dataType=detalhes-vendas`),
+                    ]);
+                    
+                    const [entradasData, vendasData] = await Promise.all([
+                      entradasRes.json(),
+                      vendasRes.json(),
+                    ]);
+                    
+                    setDetalhesEntradas(entradasData.data || []);
+                    setDetalhesVendas(vendasData.data || []);
+                    setLoadingDetalhes(false);
+                  }}
+                  title="Clique para ver detalhes das entradas da semana"
+                >
                   {cat.tendenciaSemanal >= 0 ? "+" : ""}{formatNumber(cat.tendenciaSemanal)} na Semana
                 </div>
               </div>
@@ -1494,6 +1578,158 @@ export default function ControleEstoquePage({
           </table>
         </div>
       </div>
+
+      {/* Modal de Detalhes das Entradas */}
+      {modalEntradasAberto && categoriaModal && (
+        <div 
+          className={styles.modalOverlay}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setModalEntradasAberto(false);
+              setCategoriaModal(null);
+              setDetalhesEntradas([]);
+            }
+          }}
+        >
+          <div className={styles.modalContent}>
+            <div className={styles.modalHeader}>
+              <h2>Detalhes da Semana</h2>
+              <button 
+                className={styles.modalClose}
+                onClick={() => {
+                  setModalEntradasAberto(false);
+                  setCategoriaModal(null);
+                  setDetalhesEntradas([]);
+                  setDetalhesVendas([]);
+                  setAbaAtiva('entradas');
+                }}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className={styles.modalBody}>
+              <div className={styles.modalInfo}>
+                <strong>Categoria:</strong> {categoriaModal.categoria}
+                {categoriaModal.linha && <>, <strong>Linha:</strong> {categoriaModal.linha}</>}
+                {categoriaModal.subgrupo && <>, <strong>Subgrupo:</strong> {categoriaModal.subgrupo}</>}
+                {categoriaModal.grade && <>, <strong>Grade:</strong> {categoriaModal.grade}</>}
+                {categoriaModal.colecao && <>, <strong>Coleção:</strong> {categoriaModal.colecao}</>}
+              </div>
+
+              {/* Resumo */}
+              <div className={styles.modalResumo}>
+                <div className={styles.resumoItem}>
+                  <span className={styles.resumoLabel}>Entradas:</span>
+                  <span className={styles.resumoValue}>{detalhesEntradas.reduce((sum, e) => sum + e.quantidade, 0)}</span>
+                </div>
+                <div className={styles.resumoItem}>
+                  <span className={styles.resumoLabel}>Vendas:</span>
+                  <span className={styles.resumoValue}>{detalhesVendas.reduce((sum, v) => sum + v.quantidade, 0)}</span>
+                </div>
+                <div className={styles.resumoItem}>
+                  <span className={styles.resumoLabel}>Variação:</span>
+                  <span className={`${styles.resumoValue} ${categoriaModal.tendenciaSemanal < 0 ? styles.negative : styles.positive}`}>
+                    {categoriaModal.tendenciaSemanal >= 0 ? '+' : ''}{categoriaModal.tendenciaSemanal}
+                  </span>
+                </div>
+              </div>
+
+              {/* Abas */}
+              <div className={styles.modalTabs}>
+                <button
+                  className={`${styles.modalTab} ${abaAtiva === 'entradas' ? styles.modalTabActive : ''}`}
+                  onClick={() => setAbaAtiva('entradas')}
+                >
+                  Entradas ({detalhesEntradas.length})
+                </button>
+                <button
+                  className={`${styles.modalTab} ${abaAtiva === 'vendas' ? styles.modalTabActive : ''}`}
+                  onClick={() => setAbaAtiva('vendas')}
+                >
+                  Vendas ({detalhesVendas.length})
+                </button>
+              </div>
+              
+              {loadingDetalhes ? (
+                <div className={styles.modalLoading}>Carregando detalhes...</div>
+              ) : abaAtiva === 'entradas' ? (
+                detalhesEntradas.length === 0 ? (
+                  <div className={styles.modalEmpty}>Nenhuma entrada encontrada na semana.</div>
+                ) : (
+                  <div className={styles.detalhesTable}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Data</th>
+                          <th>Romaneio</th>
+                          <th>Descrição</th>
+                          <th>Cor</th>
+                          <th>Linha</th>
+                          <th>Grade</th>
+                          <th>Qtd</th>
+                          <th>Filial</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detalhesEntradas.map((entrada, idx) => (
+                          <tr key={`${entrada.romaneio}-${entrada.produto}-${entrada.cor}-${idx}`}>
+                            <td>{format(new Date(entrada.data), 'dd/MM/yyyy', { locale: ptBR })}</td>
+                            <td>{entrada.romaneio}</td>
+                            <td>{entrada.descricao}</td>
+                            <td>{entrada.corDescricao || entrada.cor || '-'}</td>
+                            <td>{entrada.linha || '-'}</td>
+                            <td>{entrada.grade || '-'}</td>
+                            <td>{formatNumber(entrada.quantidade)}</td>
+                            <td>{entrada.filial}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              ) : (
+                detalhesVendas.length === 0 ? (
+                  <div className={styles.modalEmpty}>Nenhuma venda encontrada na semana.</div>
+                ) : (
+                  <div className={styles.detalhesTable}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Data</th>
+                          <th>Produto</th>
+                          <th>Descrição</th>
+                          <th>Cor</th>
+                          <th>Linha</th>
+                          <th>Grade</th>
+                          <th>Qtd</th>
+                          <th>Valor</th>
+                          <th>Filial</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detalhesVendas.map((venda, idx) => (
+                          <tr key={`${venda.ticket}-${venda.produto}-${venda.cor}-${idx}`}>
+                            <td>{format(new Date(venda.data), 'dd/MM/yyyy', { locale: ptBR })}</td>
+                            <td>{venda.produto}</td>
+                            <td>{venda.descricao}</td>
+                            <td>{venda.corDescricao || venda.cor || '-'}</td>
+                            <td>{venda.linha || '-'}</td>
+                            <td>{venda.grade || '-'}</td>
+                            <td>{formatNumber(venda.quantidade)}</td>
+                            <td>{formatCurrency(venda.valorLiquido || 0)}</td>
+                            <td>{venda.filial}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
