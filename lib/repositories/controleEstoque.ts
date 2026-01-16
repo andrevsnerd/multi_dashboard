@@ -657,59 +657,12 @@ export async function fetchEstoquePorCategoria({
     });
 
     // Calcular histórico semanal: estoque da semana passada
-    // Estoque Semana Passada = Estoque Atual - Entradas (7 dias) + Vendas (7 dias) + E-commerce (7 dias)
+    // IMPORTANTE: As principais entradas sempre são na matriz (SCARF ME - MATRIZ ou NERD)
+    // Produtos entram primeiro na matriz após compra, depois são transferidos para lojas
+    // Transferências não devem ser contadas como entradas reais (mantém mesma quantidade total)
+    // Estoque Semana Passada = Estoque Atual - Entradas na Matriz (7 dias) + Vendas (7 dias) + E-commerce (7 dias)
     const data7DiasAtras = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     request.input('data7DiasAtras', sql.DateTime, data7DiasAtras);
-
-    // Criar filtro de filial para entradas com a mesma lógica do buildFilialFilter
-    // Mas com nomes de parâmetros únicos para evitar conflitos (EDUPEPARAM)
-    let entradasFilialFilter = '';
-    if (company) {
-      const companyConfig = resolveCompany(company);
-      if (companyConfig) {
-        const isScarfme = company === 'scarfme';
-        const filiais = companyConfig.filialFilters['inventory'] ?? [];
-        const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
-
-        // Se uma filial específica foi selecionada, usar apenas ela
-        if (filial && filial !== VAREJO_VALUE) {
-          request.input('entradasSemanaFilial', sql.VarChar, filial);
-          entradasFilialFilter = `AND E.FILIAL = @entradasSemanaFilial`;
-        }
-        // Para scarfme: se for "VAREJO", mostrar apenas filiais normais (sem ecommerce)
-        else if (isScarfme && filial === VAREJO_VALUE) {
-          const normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
-          if (normalFiliais.length > 0) {
-            normalFiliais.forEach((f, index) => {
-              request.input(`entradasSemanaFilial${index}`, sql.VarChar, f);
-            });
-            const placeholders = normalFiliais.map((_, i) => `@entradasSemanaFilial${i}`).join(', ');
-            entradasFilialFilter = `AND E.FILIAL IN (${placeholders})`;
-          }
-        }
-        // Para scarfme: se for "Todas as filiais" (null), incluir também ecommerce
-        else if (isScarfme && filial === null) {
-          if (filiais.length > 0) {
-            filiais.forEach((f, index) => {
-              request.input(`entradasSemanaFilial${index}`, sql.VarChar, f);
-            });
-            const placeholders = filiais.map((_, i) => `@entradasSemanaFilial${i}`).join(', ');
-            entradasFilialFilter = `AND E.FILIAL IN (${placeholders})`;
-          }
-        }
-        // Para outras empresas (ou comportamento padrão): usar apenas filiais normais (sem ecommerce)
-        else {
-          const normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
-          if (normalFiliais.length > 0) {
-            normalFiliais.forEach((f, index) => {
-              request.input(`entradasSemanaFilial${index}`, sql.VarChar, f);
-            });
-            const placeholders = normalFiliais.map((_, i) => `@entradasSemanaFilial${i}`).join(', ');
-            entradasFilialFilter = `AND E.FILIAL IN (${placeholders})`;
-          }
-        }
-      }
-    }
 
     // Criar filtros separados para query de entradas (usar prefixo 'pr')
     // Nota: Como os filtros já foram criados com 'p', vamos reutilizar os mesmos parâmetros SQL
@@ -733,7 +686,70 @@ export async function fetchEstoquePorCategoria({
       ? 'ISNULL(pr.GRUPO_PRODUTO, \'SEM GRUPO\')'
       : 'ISNULL(pr.LINHA, \'SEM LINHA\')';
 
+    // Identificar filiais matriz para considerar apenas entradas reais (compras)
+    // As principais entradas sempre são na matriz, transferências para lojas não devem contar
+    let matrizFilialFilter = '';
+    const companyConfig = resolveCompany(company);
+    if (companyConfig) {
+      // Identificar matriz baseada na empresa
+      let matrizFiliais: string[] = [];
+      if (company === 'scarfme') {
+        // Para SCARFME, a matriz é apenas "SCARF ME - MATRIZ"
+        matrizFiliais = ['SCARF ME - MATRIZ'];
+      } else if (company === 'nerd') {
+        // Para NERD, a matriz é simplesmente "NERD"
+        matrizFiliais = ['NERD'];
+      }
+
+      // Se há filial específica selecionada E não é matriz, não contar entradas
+      // (porque isso seria uma visão de filial específica, não do total)
+      if (filial && filial !== VAREJO_VALUE && !matrizFiliais.includes(filial)) {
+        // Se filial específica não é matriz, usar filtro de filial (mas não há entradas reais lá)
+        // Manter o entradasFilialFilter existente, mas ainda precisamos filtrar apenas matriz
+        // Na verdade, para histórico correto, SEMPRE contar apenas entradas da matriz
+        // independente do filtro de filial, porque entradas reais só acontecem na matriz
+      }
+
+      // Sempre filtrar entradas apenas na matriz para cálculo correto de histórico
+      // Transferências para lojas não são entradas reais, são apenas movimentações internas
+      if (matrizFiliais.length > 0) {
+        matrizFiliais.forEach((filialMatriz, index) => {
+          request.input(`matrizFilial${index}`, sql.VarChar, filialMatriz);
+        });
+        const placeholders = matrizFiliais.map((_, i) => `@matrizFilial${i}`).join(', ');
+        matrizFilialFilter = `AND E.FILIAL IN (${placeholders})`;
+      }
+    }
+
+    // Criar filtro para excluir filiais matriz/ecommerce das saídas
+    // Queremos verificar se houve saída de LOJA (não matriz) no mesmo dia
+    let lojasFilterSaidas = '';
+    if (companyConfig) {
+      const filiais = companyConfig.filialFilters['inventory'] ?? [];
+      const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
+      // Filtrar apenas filiais que NÃO são matriz nem ecommerce
+      const lojasNormais = filiais.filter(f => {
+        if (company === 'scarfme') {
+          return f !== 'SCARF ME - MATRIZ' && !ecommerceFilials.includes(f);
+        } else if (company === 'nerd') {
+          return f !== 'NERD';
+        }
+        return true;
+      });
+      
+      if (lojasNormais.length > 0) {
+        lojasNormais.forEach((filialLoja, index) => {
+          request.input(`lojaSaida${index}`, sql.VarChar, filialLoja);
+        });
+        const placeholders = lojasNormais.map((_, i) => `@lojaSaida${i}`).join(', ');
+        lojasFilterSaidas = `AND S.FILIAL IN (${placeholders})`;
+      }
+    }
+
     // Buscar entradas dos últimos 7 dias
+    // IMPORTANTE: Considerar apenas entradas na matriz que NÃO são devoluções/transferências
+    // Regra: Se um produto SAIU de uma loja no mesmo dia que ENTROU na matriz, é devolução (não conta)
+    // Apenas entradas na matriz SEM saída correspondente de loja são compras reais
     const entradasSemanaQuery = `
       SELECT 
         ${categoriaFieldEntradas} AS categoria
@@ -744,7 +760,7 @@ export async function fetchEstoquePorCategoria({
       LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
       WHERE pr.PRODUTO IS NOT NULL
         AND E.EMISSAO >= @data7DiasAtras
-        ${entradasFilialFilter}
+        ${matrizFilialFilter}
         ${grupoFilterEntradas}
         ${linhaFilterEntradas}
         ${colecaoFilterEntradas}
@@ -753,6 +769,16 @@ export async function fetchEstoquePorCategoria({
         AND ${categoriaFieldEntradas} <> ''
         AND ${categoriaFieldEntradas} <> 'SEM GRUPO'
         AND ${categoriaFieldEntradas} <> 'SEM LINHA'
+        -- EXCLUIR devoluções/transferências: se houve saída de LOJA (não matriz) no mesmo dia com mesmo produto+cor, é devolução
+        AND NOT EXISTS (
+          SELECT 1
+          FROM ESTOQUE_PROD_SAI AS S WITH (NOLOCK)
+          LEFT JOIN ESTOQUE_PROD1_SAI AS PS WITH (NOLOCK) ON S.ROMANEIO_PRODUTO = PS.ROMANEIO_PRODUTO
+          WHERE PS.PRODUTO = P.PRODUTO
+            AND ISNULL(PS.COR_PRODUTO, '') = ISNULL(P.COR_PRODUTO, '')
+            AND CAST(S.EMISSAO AS DATE) = CAST(E.EMISSAO AS DATE)
+            ${lojasFilterSaidas}
+        )
       GROUP BY ${categoriaFieldEntradas}${groupByEntradasAdicional}
     `;
 
@@ -1029,12 +1055,17 @@ export async function fetchEstoquePorCategoria({
       // Vendas do mês atual para exibição
       const vendasMes = vendasAteHoje;
 
-      // Calcular estoque da semana passada conforme lógica do Python
-      // Estoque Semana Passada = Estoque Atual - Entradas (7 dias) + Vendas (7 dias) + E-commerce (7 dias)
-      const entradasSemana = entradasSemanaMap.get(chaveCategoria) || 0;
+      // Calcular estoque da semana passada
+      // IMPORTANTE: entradasSemana agora contém apenas entradas na matriz (compras reais)
+      // Transferências para lojas são movimentações internas e não alteram o estoque total
+      // Estoque Semana Passada = Estoque Atual - Entradas na Matriz (7 dias) + Vendas (7 dias) + E-commerce (7 dias)
+      const entradasSemana = entradasSemanaMap.get(chaveCategoria) || 0; // Apenas entradas na matriz (compras reais)
       const vendasSemana = vendasSemanaMap.get(chaveCategoria) || 0;
       const ecommerceSemana = ecommerceSemanaMap.get(chaveCategoria) || 0;
       
+      // Vendas e e-commerce realmente reduzem o estoque total
+      // Entradas na matriz aumentam o estoque total (são compras reais)
+      // Transferências não são consideradas aqui (já filtradas na query de entradas)
       const estoqueSemanaPassada = Math.max(0, Math.round(
         estoqueAtual - entradasSemana + vendasSemana + ecommerceSemana
       ));

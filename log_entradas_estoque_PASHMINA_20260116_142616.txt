@@ -1,0 +1,582 @@
+
+====================================================================================================
+ANÁLISE DETALHADA DE ENTRADAS DE ESTOQUE
+====================================================================================================
+
+[PERÍODOS DE ANÁLISE]
+  Data Hoje: 16/01/2026 14:26:17
+  Últimos 7 dias (Semana Atual): 09/01/2026 até 16/01/2026
+  Semana Passada (7-14 dias atrás): 02/01/2026 até 09/01/2026
+  Mês Atual: 01/01/2026 até 16/01/2026
+
+[1] ESTOQUE ATUAL
+----------------------------------------------------------------------------------------------------
+  ✓ 675 registros de estoque encontrados
+  ✓ 155 produtos únicos (PRODUTO+COR)
+
+  [ESTOQUE ATUAL POR PRODUTO+COR]
+    • PASHMINA LISA VISCOSE                    | AMARELO                  : 24 unidades
+    • PASHMINA LISA VISCOSE                    | AZUL                     : 23 unidades
+    • PASHMINA LISA VISCOSE                    | VERDE                    : 3 unidades
+    • PASHMINA LISA VISCOSE                    | VERMELHO                 : 73 unidades
+    • PASHMINA LISA VISCOSE                    | MARROM                   : 22 unidades
+    • PASHMINA LISA VISCOSE                    | ROSA CHICLETE            : 9 unidades
+    • PASHMINA LISA VISCOSE                    | CHÁ VERDE                : 24 unidades
+    • PASHMINA LISA VISCOSE                    | VERDE BANDEIRA           : 103 unidades
+    • PASHMINA LISA VISCOSE                    | LARANJA                  : 38 unidades
+    • PASHMINA LISA VISCOSE                    | VERDE PETRÓLEO           : 4 unidades
+
+[2] ENTRADAS DA SEMANA (Últimos 7 dias)
+----------------------------------------------------------------------------------------------------
+  Período: 09/01/2026 até 16/01/2026
+
+  ⚠ IMPORTANTE: Estas são as entradas que estão sendo consideradas no cálculo!
+  ✓ 129 registros de entrada encontrados
+
+  📋 LISTA COMPLETA DE TODAS AS ENTRADAS CONSIDERADAS NO CÁLCULO:
+  ====================================================================================================
+    [1] Romaneio: 028737   | Data: 13/01/2026 | Produto: D. FACE FLORAL EM ACRILICO 08/25         | Cor: AREIA/JEANS               | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [2] Romaneio: 028739   | Data: 13/01/2026 | Produto: D. FACE PASHMINA EM ACRILICO 04/25       | Cor: CAPUCCINO                 | Filial: SCARFME MATRIZ CMS        | Quantidade: 4 unidades
+    [3] Romaneio: 028737   | Data: 13/01/2026 | Produto: D. FACE PASHMINA EM ACRILICO 04/25       | Cor: MARINHO/VERDE             | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 12 unidades
+    [4] Romaneio: 028737   | Data: 13/01/2026 | Produto: FINE DIAMOND WRAP 07/24                  | Cor: ROSA                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [5] Romaneio: 028737   | Data: 13/01/2026 | Produto: FINE DIAMOND WRAP 07/24                  | Cor: FUCSIA                    | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [6] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA ALICIA EM ACRILICO 05/25        | Cor: OFF/FENDI                 | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 25 unidades
+    [7] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRÍLICO 06/23               | Cor: PRETO/OFF WHITE           | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 5 unidades
+    [8] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRÍLICO 06/23               | Cor: PRETO/CAMELO              | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 22 unidades
+    [9] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: AZUL                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 3 unidades
+    [10] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: VERDE                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [11] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: VERMELHO                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 7 unidades
+    [12] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: PRETO                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 10 unidades
+    [13] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: OFF WHITE                 | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [14] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: VINHO                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 14 unidades
+    [15] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: ROXO                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 5 unidades
+    [16] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: AREIA                     | Filial: SCARFME MATRIZ CMS        | Quantidade: 12 unidades
+    [17] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: GOIABA                    | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 8 unidades
+    [18] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: TERRACOTA                 | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 22 unidades
+    [19] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO GEOMETRICO 04/25    | Cor: PRETO/OFF WHITE           | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 6 unidades
+    [20] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO GEOMETRICO 04/25    | Cor: OFF/FENDI                 | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 2 unidades
+    [21] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO NERISSA 06/25 | Cor: PRETO/GRAF./MARROM        | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 2 unidades
+    [22] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA GEOMETRICO 04/24                | Cor: AZUL/FENDHI               | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 11 unidades
+    [23] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA GEOMETRICO COM LISTRAS 06/25    | Cor: MARROM/AZUL               | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [24] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA GEOMÉTRICO EM ACRILICO 06/25 | Cor: PRETO/LARANJA             | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [25] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: AMARELO                   | Filial: SCARFME MATRIZ CMS        | Quantidade: 13 unidades
+    [26] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: PRETO                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 3 unidades
+    [27] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: ROSA CHICLETE             | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 9 unidades
+    [28] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: CHÁ VERDE                 | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [29] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: VERDE BANDEIRA            | Filial: SCARFME MATRIZ CMS        | Quantidade: 1 unidades
+    [30] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: LARANJA                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [31] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: OFF WHITE                 | Filial: SCARFME MATRIZ CMS        | Quantidade: 4 unidades
+    [32] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: VINHO                     | Filial: SCARFME MATRIZ CMS        | Quantidade: 1 unidades
+    [33] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: UVA                       | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 16 unidades
+    [34] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: BEGE                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 3 unidades
+    [35] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: CORAL                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 20 unidades
+    [36] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: CREME                     | Filial: SCARFME MATRIZ CMS        | Quantidade: 1 unidades
+    [37] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: CHOCOLATE                 | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 3 unidades
+    [38] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: JEANS                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 6 unidades
+    [39] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: MARINHO                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 2 unidades
+    [40] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: CARAMELO                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 50 unidades
+    [41] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: NUDE                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 6 unidades
+    [42] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: ROSA CLARO                | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 6 unidades
+    [43] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: PETROLEO                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [44] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: AZUL ROYAL                | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 7 unidades
+    [45] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: CEREJA                    | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 48 unidades
+    [46] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: FUCSIA                    | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 2 unidades
+    [47] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: CONCRETO                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 2 unidades
+    [48] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: VERDE MILITAR             | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 2 unidades
+    [49] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: OCRE                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [50] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: VERDE CLARO               | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 33 unidades
+    [51] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: VERDE LIMA                | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 2 unidades
+    [52] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: CAQUI                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 18 unidades
+    [53] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: VERDE PISTACHE            | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 2 unidades
+    [54] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA C 08/25                    | Cor: BEGE                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 21 unidades
+    [55] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA C 08/25                    | Cor: CREME                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 20 unidades
+    [56] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA C 08/25                    | Cor: MARINHO                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 28 unidades
+    [57] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA C 08/25                    | Cor: PETROLEO                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 19 unidades
+    [58] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA EM ACRILICO 04/25          | Cor: PRETO                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 11 unidades
+    [59] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA EM ACRILICO 04/25          | Cor: NUDE                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 13 unidades
+    [60] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA EM ACRILICO 04/25          | Cor: FENDHI                    | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 2 unidades
+    [61] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA EM ACRILICO 04/25          | Cor: GRAFITE                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 3 unidades
+    [62] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA EM ACRILICO 04/25          | Cor: OCRE                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 25 unidades
+    [63] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA EM ACRILICO 04/25          | Cor: LAVANDA                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 19 unidades
+    [64] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA EM ACRILICO 04/25          | Cor: AMBAR                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 10 unidades
+    [65] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: AZUL                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 16 unidades
+    [66] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: VERMELHO                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [67] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: PRETO                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 3 unidades
+    [68] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: CINZA                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 2 unidades
+    [69] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: VERDE BANDEIRA            | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 22 unidades
+    [70] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: PÊSSEGO                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 7 unidades
+    [71] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: OFF WHITE                 | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 7 unidades
+    [72] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: VINHO                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [73] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: AREIA                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 14 unidades
+    [74] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: JEANS                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 9 unidades
+    [75] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: MOSTARDA                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 16 unidades
+    [76] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: MENTA                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 7 unidades
+    [77] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: MARINHO                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 10 unidades
+    [78] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: TERRACOTA                 | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [79] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: AMARELO                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 11 unidades
+    [80] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: AZUL                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 19 unidades
+    [81] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: VERDE                     | Filial: SCARFME MATRIZ CMS        | Quantidade: 3 unidades
+    [82] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: VERMELHO                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 21 unidades
+    [83] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: MARROM                    | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 9 unidades
+    [84] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: ROSA CHICLETE             | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [85] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: CHÁ VERDE                 | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 20 unidades
+    [86] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: VERDE BANDEIRA            | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 59 unidades
+    [87] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: LARANJA                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 11 unidades
+    [88] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: VERDE PETRÓLEO            | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [89] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: AZUL TURQUESA             | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 19 unidades
+    [90] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: PÊSSEGO                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [91] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: VINHO                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 16 unidades
+    [92] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: UVA                       | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 27 unidades
+    [93] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: MOCHA                     | Filial: SCARFME MATRIZ CMS        | Quantidade: 2 unidades
+    [94] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: ROXO                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 21 unidades
+    [95] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: BEGE                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 20 unidades
+    [96] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: CORAL                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 19 unidades
+    [97] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: CHOCOLATE                 | Filial: SCARFME MATRIZ CMS        | Quantidade: 6 unidades
+    [98] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: AREIA                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 4 unidades
+    [99] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: JEANS                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 18 unidades
+    [100] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: MOSTARDA                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 20 unidades
+    [101] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: MENTA                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 40 unidades
+    [102] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: PRATA                     | Filial: SCARFME MATRIZ CMS        | Quantidade: 4 unidades
+    [103] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: MARINHO                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 27 unidades
+    [104] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: CARAMELO                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 58 unidades
+    [105] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: NUDE                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 12 unidades
+    [106] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: ROSA CLARO                | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 12 unidades
+    [107] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: PINK                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 18 unidades
+    [108] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: AZUL PETROLEO             | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 34 unidades
+    [109] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: AZUL ROYAL                | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 36 unidades
+    [110] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: FUCSIA                    | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 22 unidades
+    [111] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: ESMERALDA                 | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 23 unidades
+    [112] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: PISCINA                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 33 unidades
+    [113] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: LIMA                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 5 unidades
+    [114] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: FENDHI                    | Filial: SCARFME MATRIZ CMS        | Quantidade: 7 unidades
+    [115] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: CONCRETO                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 8 unidades
+    [116] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: ROSA ANTIGO               | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 54 unidades
+    [117] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: VERDE MILITAR             | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 13 unidades
+    [118] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: CHUMBO                    | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 16 unidades
+    [119] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: OCRE                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 15 unidades
+    [120] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: VERDE CLARO               | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 26 unidades
+    [121] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: CAQUI                     | Filial: SCARFME MATRIZ CMS        | Quantidade: 5 unidades
+    [122] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: LAVANDA                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 25 unidades
+    [123] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: CAFE                      | Filial: SCARFME MATRIZ CMS        | Quantidade: 14 unidades
+    [124] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: VERDE PISTACHE            | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 8 unidades
+    [125] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: AÇAI                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 45 unidades
+    [126] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: JADE                      | Filial: SCARFME MATRIZ CMS        | Quantidade: 2 unidades
+    [127] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA XADREZ 04/24                    | Cor: PRETO/OFF WHITE           | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [128] Romaneio: 028737   | Data: 13/01/2026 | Produto: POA PASHMINA EM ACRILICO  04/25          | Cor: PRETO / AREIA             | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [129] Romaneio: 028739   | Data: 13/01/2026 | Produto: XALE PASHMINA DE VISCOSE 08/24           | Cor: CONCRETO                  | Filial: SCARFME MATRIZ CMS        | Quantidade: 2 unidades
+  ====================================================================================================
+
+  ✓ Total de entradas na semana: 1,622 unidades
+  ✓ 129 produtos únicos com entradas
+
+  [RESUMO AGRUPADO POR PRODUTO+COR]
+    • PASHMINA LISA VISCOSE                    | AMARELO                  :
+        Total: 11 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 11
+    • PASHMINA LISA VISCOSE                    | AZUL                     :
+        Total: 19 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 19
+    • PASHMINA LISA VISCOSE                    | VERDE                    :
+        Total: 3 unidades em 1 romaneio(s)
+          - Romaneio 028739   | 13/01/2026 | Filial: SCARFME MATRIZ CMS        | Qtd: 3
+    • PASHMINA LISA VISCOSE                    | VERMELHO                 :
+        Total: 21 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 21
+    • PASHMINA LISA VISCOSE                    | MARROM                   :
+        Total: 9 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 9
+    • PASHMINA LISA VISCOSE                    | ROSA CHICLETE            :
+        Total: 1 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 1
+    • PASHMINA LISA VISCOSE                    | CHÁ VERDE                :
+        Total: 20 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 20
+    • PASHMINA LISA VISCOSE                    | VERDE BANDEIRA           :
+        Total: 59 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 59
+    • PASHMINA LISA VISCOSE                    | LARANJA                  :
+        Total: 11 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 11
+    • PASHMINA LISA VISCOSE                    | VERDE PETRÓLEO           :
+        Total: 1 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 1
+    • PASHMINA LISA VISCOSE                    | AZUL TURQUESA            :
+        Total: 19 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 19
+    • PASHMINA LISA VISCOSE                    | PÊSSEGO                  :
+        Total: 1 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 1
+    • PASHMINA LISA VISCOSE                    | VINHO                    :
+        Total: 16 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 16
+    • PASHMINA LISA VISCOSE                    | UVA                      :
+        Total: 27 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 27
+    • PASHMINA LISA VISCOSE                    | MOCHA                    :
+        Total: 2 unidades em 1 romaneio(s)
+          - Romaneio 028739   | 13/01/2026 | Filial: SCARFME MATRIZ CMS        | Qtd: 2
+    • PASHMINA LISA VISCOSE                    | ROXO                     :
+        Total: 21 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 21
+    • PASHMINA LISA VISCOSE                    | BEGE                     :
+        Total: 20 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 20
+    • PASHMINA LISA VISCOSE                    | CORAL                    :
+        Total: 19 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 19
+    • PASHMINA LISA VISCOSE                    | CHOCOLATE                :
+        Total: 6 unidades em 1 romaneio(s)
+          - Romaneio 028739   | 13/01/2026 | Filial: SCARFME MATRIZ CMS        | Qtd: 6
+    • PASHMINA LISA VISCOSE                    | AREIA                    :
+        Total: 4 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 4
+    • PASHMINA LISA VISCOSE                    | JEANS                    :
+        Total: 18 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 18
+    • PASHMINA LISA VISCOSE                    | MOSTARDA                 :
+        Total: 20 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 20
+    • PASHMINA LISA VISCOSE                    | MENTA                    :
+        Total: 40 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 40
+    • PASHMINA LISA VISCOSE                    | PRATA                    :
+        Total: 4 unidades em 1 romaneio(s)
+          - Romaneio 028739   | 13/01/2026 | Filial: SCARFME MATRIZ CMS        | Qtd: 4
+    • PASHMINA LISA VISCOSE                    | MARINHO                  :
+        Total: 27 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 27
+    • PASHMINA LISA VISCOSE                    | CARAMELO                 :
+        Total: 58 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 58
+    • PASHMINA LISA VISCOSE                    | NUDE                     :
+        Total: 12 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 12
+    • PASHMINA LISA VISCOSE                    | ROSA CLARO               :
+        Total: 12 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 12
+    • PASHMINA LISA VISCOSE                    | PINK                     :
+        Total: 18 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 18
+    • PASHMINA LISA VISCOSE                    | AZUL PETROLEO            :
+        Total: 34 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 34
+    • PASHMINA LISA VISCOSE                    | AZUL ROYAL               :
+        Total: 36 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 36
+    • PASHMINA LISA VISCOSE                    | FUCSIA                   :
+        Total: 22 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 22
+    • PASHMINA LISA VISCOSE                    | ESMERALDA                :
+        Total: 23 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 23
+    • PASHMINA LISA VISCOSE                    | PISCINA                  :
+        Total: 33 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 33
+    • PASHMINA LISA VISCOSE                    | LIMA                     :
+        Total: 5 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 5
+    • PASHMINA LISA VISCOSE                    | FENDHI                   :
+        Total: 7 unidades em 1 romaneio(s)
+          - Romaneio 028739   | 13/01/2026 | Filial: SCARFME MATRIZ CMS        | Qtd: 7
+    • PASHMINA LISA VISCOSE                    | CONCRETO                 :
+        Total: 8 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 8
+    • PASHMINA LISA VISCOSE                    | ROSA ANTIGO              :
+        Total: 54 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 54
+    • PASHMINA LISA VISCOSE                    | VERDE MILITAR            :
+        Total: 13 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 13
+    • PASHMINA LISA VISCOSE                    | CHUMBO                   :
+        Total: 16 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 16
+    • PASHMINA LISA VISCOSE                    | OCRE                     :
+        Total: 15 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 15
+    • PASHMINA LISA VISCOSE                    | VERDE CLARO              :
+        Total: 26 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 26
+    • PASHMINA LISA VISCOSE                    | CAQUI                    :
+        Total: 5 unidades em 1 romaneio(s)
+          - Romaneio 028739   | 13/01/2026 | Filial: SCARFME MATRIZ CMS        | Qtd: 5
+    • PASHMINA LISA VISCOSE                    | LAVANDA                  :
+        Total: 25 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 25
+    • PASHMINA LISA VISCOSE                    | CAFE                     :
+        Total: 14 unidades em 1 romaneio(s)
+          - Romaneio 028739   | 13/01/2026 | Filial: SCARFME MATRIZ CMS        | Qtd: 14
+    • PASHMINA LISA VISCOSE                    | VERDE PISTACHE           :
+        Total: 8 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 8
+    • PASHMINA LISA VISCOSE                    | AÇAI                     :
+        Total: 45 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 45
+    • PASHMINA LISA VISCOSE                    | JADE                     :
+        Total: 2 unidades em 1 romaneio(s)
+          - Romaneio 028739   | 13/01/2026 | Filial: SCARFME MATRIZ CMS        | Qtd: 2
+    • PASHMINA LEVE DE VISCOSE 20              | AMARELO                  :
+        Total: 13 unidades em 1 romaneio(s)
+          - Romaneio 028739   | 13/01/2026 | Filial: SCARFME MATRIZ CMS        | Qtd: 13
+    • PASHMINA LEVE DE VISCOSE 20              | PRETO                    :
+        Total: 3 unidades em 1 romaneio(s)
+          - Romaneio 028737   | 13/01/2026 | Filial: SCARF ME - MATRIZ LLL     | Qtd: 3
+
+[3] ENTRADAS DO MÊS ATUAL
+----------------------------------------------------------------------------------------------------
+  Período: 01/01/2026 até 16/01/2026
+
+  ⚠ IMPORTANTE: Estas são as entradas do mês atual que estão sendo consideradas!
+  ✓ 141 registros de entrada encontrados
+
+  📋 LISTA COMPLETA DE TODAS AS ENTRADAS DO MÊS ATUAL:
+  ====================================================================================================
+    [1] Romaneio: 028737   | Data: 13/01/2026 | Produto: D. FACE FLORAL EM ACRILICO 08/25         | Cor: AREIA/JEANS               | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [2] Romaneio: 028739   | Data: 13/01/2026 | Produto: D. FACE PASHMINA EM ACRILICO 04/25       | Cor: CAPUCCINO                 | Filial: SCARFME MATRIZ CMS        | Quantidade: 4 unidades
+    [3] Romaneio: 028737   | Data: 13/01/2026 | Produto: D. FACE PASHMINA EM ACRILICO 04/25       | Cor: MARINHO/VERDE             | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 12 unidades
+    [4] Romaneio: 028737   | Data: 13/01/2026 | Produto: FINE DIAMOND WRAP 07/24                  | Cor: ROSA                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [5] Romaneio: 028737   | Data: 13/01/2026 | Produto: FINE DIAMOND WRAP 07/24                  | Cor: FUCSIA                    | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [6] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA ALICIA EM ACRILICO 05/25        | Cor: OFF/FENDI                 | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 25 unidades
+    [7] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRÍLICO 06/23               | Cor: PRETO/OFF WHITE           | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 5 unidades
+    [8] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRÍLICO 06/23               | Cor: PRETO/CAMELO              | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 22 unidades
+    [9] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: AZUL                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 3 unidades
+    [10] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: VERDE                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [11] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: VERMELHO                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 7 unidades
+    [12] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: PRETO                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 10 unidades
+    [13] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: OFF WHITE                 | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [14] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: VINHO                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 14 unidades
+    [15] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: ROXO                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 5 unidades
+    [16] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: AREIA                     | Filial: SCARFME MATRIZ CMS        | Quantidade: 12 unidades
+    [17] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: GOIABA                    | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 8 unidades
+    [18] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: TERRACOTA                 | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 22 unidades
+    [19] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO GEOMETRICO 04/25    | Cor: PRETO/OFF WHITE           | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 6 unidades
+    [20] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO GEOMETRICO 04/25    | Cor: OFF/FENDI                 | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 2 unidades
+    [21] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA EM ACRILICO NERISSA 06/25 | Cor: PRETO/GRAF./MARROM        | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 2 unidades
+    [22] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA GEOMETRICO 04/24                | Cor: AZUL/FENDHI               | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 11 unidades
+    [23] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA GEOMETRICO COM LISTRAS 06/25    | Cor: MARROM/AZUL               | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [24] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA GEOMÉTRICO EM ACRILICO 06/25 | Cor: PRETO/LARANJA             | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [25] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: AMARELO                   | Filial: SCARFME MATRIZ CMS        | Quantidade: 13 unidades
+    [26] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: PRETO                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 3 unidades
+    [27] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: ROSA CHICLETE             | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 9 unidades
+    [28] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: CHÁ VERDE                 | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [29] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: VERDE BANDEIRA            | Filial: SCARFME MATRIZ CMS        | Quantidade: 1 unidades
+    [30] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: LARANJA                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [31] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: OFF WHITE                 | Filial: SCARFME MATRIZ CMS        | Quantidade: 4 unidades
+    [32] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: VINHO                     | Filial: SCARFME MATRIZ CMS        | Quantidade: 1 unidades
+    [33] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: UVA                       | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 16 unidades
+    [34] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: BEGE                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 3 unidades
+    [35] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: CORAL                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 20 unidades
+    [36] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: CREME                     | Filial: SCARFME MATRIZ CMS        | Quantidade: 1 unidades
+    [37] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: CHOCOLATE                 | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 3 unidades
+    [38] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: JEANS                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 6 unidades
+    [39] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: MARINHO                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 2 unidades
+    [40] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: CARAMELO                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 50 unidades
+    [41] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: NUDE                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 6 unidades
+    [42] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: ROSA CLARO                | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 6 unidades
+    [43] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: PETROLEO                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [44] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: AZUL ROYAL                | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 7 unidades
+    [45] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: CEREJA                    | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 48 unidades
+    [46] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: FUCSIA                    | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 2 unidades
+    [47] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: CONCRETO                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 2 unidades
+    [48] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: VERDE MILITAR             | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 2 unidades
+    [49] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: OCRE                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [50] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: VERDE CLARO               | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 33 unidades
+    [51] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: VERDE LIMA                | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 2 unidades
+    [52] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: CAQUI                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 18 unidades
+    [53] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LEVE DE VISCOSE 20              | Cor: VERDE PISTACHE            | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 2 unidades
+    [54] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA C 08/25                    | Cor: BEGE                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 21 unidades
+    [55] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA C 08/25                    | Cor: CREME                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 20 unidades
+    [56] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA C 08/25                    | Cor: MARINHO                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 28 unidades
+    [57] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA C 08/25                    | Cor: PETROLEO                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 19 unidades
+    [58] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA EM ACRILICO 04/25          | Cor: PRETO                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 11 unidades
+    [59] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA EM ACRILICO 04/25          | Cor: NUDE                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 13 unidades
+    [60] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA EM ACRILICO 04/25          | Cor: FENDHI                    | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 2 unidades
+    [61] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA EM ACRILICO 04/25          | Cor: GRAFITE                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 3 unidades
+    [62] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA EM ACRILICO 04/25          | Cor: OCRE                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 25 unidades
+    [63] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA EM ACRILICO 04/25          | Cor: LAVANDA                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 19 unidades
+    [64] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA EM ACRILICO 04/25          | Cor: AMBAR                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 10 unidades
+    [65] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: AZUL                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 16 unidades
+    [66] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: VERMELHO                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [67] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: PRETO                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 3 unidades
+    [68] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: CINZA                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 2 unidades
+    [69] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: VERDE BANDEIRA            | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 22 unidades
+    [70] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: PÊSSEGO                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 7 unidades
+    [71] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: OFF WHITE                 | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 7 unidades
+    [72] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: VINHO                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [73] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: AREIA                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 14 unidades
+    [74] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: JEANS                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 9 unidades
+    [75] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: MOSTARDA                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 16 unidades
+    [76] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: MENTA                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 7 unidades
+    [77] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: MARINHO                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 10 unidades
+    [78] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: TERRACOTA                 | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [79] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: AMARELO                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 11 unidades
+    [80] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: AZUL                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 19 unidades
+    [81] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: VERDE                     | Filial: SCARFME MATRIZ CMS        | Quantidade: 3 unidades
+    [82] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: VERMELHO                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 21 unidades
+    [83] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: MARROM                    | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 9 unidades
+    [84] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: ROSA CHICLETE             | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [85] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: CHÁ VERDE                 | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 20 unidades
+    [86] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: VERDE BANDEIRA            | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 59 unidades
+    [87] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: LARANJA                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 11 unidades
+    [88] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: VERDE PETRÓLEO            | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [89] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: AZUL TURQUESA             | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 19 unidades
+    [90] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: PÊSSEGO                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [91] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: VINHO                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 16 unidades
+    [92] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: UVA                       | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 27 unidades
+    [93] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: MOCHA                     | Filial: SCARFME MATRIZ CMS        | Quantidade: 2 unidades
+    [94] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: ROXO                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 21 unidades
+    [95] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: BEGE                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 20 unidades
+    [96] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: CORAL                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 19 unidades
+    [97] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: CHOCOLATE                 | Filial: SCARFME MATRIZ CMS        | Quantidade: 6 unidades
+    [98] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: AREIA                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 4 unidades
+    [99] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: JEANS                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 18 unidades
+    [100] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: MOSTARDA                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 20 unidades
+    [101] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: MENTA                     | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 40 unidades
+    [102] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: PRATA                     | Filial: SCARFME MATRIZ CMS        | Quantidade: 4 unidades
+    [103] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: MARINHO                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 27 unidades
+    [104] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: CARAMELO                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 58 unidades
+    [105] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: NUDE                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 12 unidades
+    [106] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: ROSA CLARO                | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 12 unidades
+    [107] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: PINK                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 18 unidades
+    [108] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: AZUL PETROLEO             | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 34 unidades
+    [109] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: AZUL ROYAL                | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 36 unidades
+    [110] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: FUCSIA                    | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 22 unidades
+    [111] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: ESMERALDA                 | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 23 unidades
+    [112] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: PISCINA                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 33 unidades
+    [113] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: LIMA                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 5 unidades
+    [114] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: FENDHI                    | Filial: SCARFME MATRIZ CMS        | Quantidade: 7 unidades
+    [115] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: CONCRETO                  | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 8 unidades
+    [116] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: ROSA ANTIGO               | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 54 unidades
+    [117] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: VERDE MILITAR             | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 13 unidades
+    [118] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: CHUMBO                    | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 16 unidades
+    [119] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: OCRE                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 15 unidades
+    [120] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: VERDE CLARO               | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 26 unidades
+    [121] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: CAQUI                     | Filial: SCARFME MATRIZ CMS        | Quantidade: 5 unidades
+    [122] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: LAVANDA                   | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 25 unidades
+    [123] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: CAFE                      | Filial: SCARFME MATRIZ CMS        | Quantidade: 14 unidades
+    [124] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: VERDE PISTACHE            | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 8 unidades
+    [125] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: AÇAI                      | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 45 unidades
+    [126] Romaneio: 028739   | Data: 13/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: JADE                      | Filial: SCARFME MATRIZ CMS        | Quantidade: 2 unidades
+    [127] Romaneio: 028737   | Data: 13/01/2026 | Produto: PASHMINA XADREZ 04/24                    | Cor: PRETO/OFF WHITE           | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [128] Romaneio: 028737   | Data: 13/01/2026 | Produto: POA PASHMINA EM ACRILICO  04/25          | Cor: PRETO / AREIA             | Filial: SCARF ME - MATRIZ LLL     | Quantidade: 1 unidades
+    [129] Romaneio: 028739   | Data: 13/01/2026 | Produto: XALE PASHMINA DE VISCOSE 08/24           | Cor: CONCRETO                  | Filial: SCARFME MATRIZ CMS        | Quantidade: 2 unidades
+    [130] Romaneio: 028676   | Data: 06/01/2026 | Produto: PASHMINA EM ACRÍLICO 06/23               | Cor: PRETO/OFF WHITE           | Filial: OSCAR FREIRE - FSZ        | Quantidade: 2 unidades
+    [131] Romaneio: 028676   | Data: 06/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: VERDE                     | Filial: OSCAR FREIRE - FSZ        | Quantidade: 2 unidades
+    [132] Romaneio: T015919  | Data: 06/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: OFF WHITE                 | Filial: MORUMBI - JJJ             | Quantidade: 1 unidades
+    [133] Romaneio: 028676   | Data: 06/01/2026 | Produto: PASHMINA EM ACRILICO 08/23               | Cor: TERRACOTA                 | Filial: OSCAR FREIRE - FSZ        | Quantidade: 2 unidades
+    [134] Romaneio: 028679   | Data: 06/01/2026 | Produto: PASHMINA EM ACRILICO GEOMETRICO 04/25    | Cor: PRETO/OFF WHITE           | Filial: MORUMBI - JJJ             | Quantidade: 1 unidades
+    [135] Romaneio: 028676   | Data: 06/01/2026 | Produto: PASHMINA GEOMETRICO 04/24                | Cor: AZUL/FENDHI               | Filial: OSCAR FREIRE - FSZ        | Quantidade: 1 unidades
+    [136] Romaneio: T015919  | Data: 06/01/2026 | Produto: PASHMINA LISA C 08/25                    | Cor: CREME                     | Filial: MORUMBI - JJJ             | Quantidade: 1 unidades
+    [137] Romaneio: 028676   | Data: 06/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: AZUL                      | Filial: OSCAR FREIRE - FSZ        | Quantidade: 2 unidades
+    [138] Romaneio: 028676   | Data: 06/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: JEANS                     | Filial: OSCAR FREIRE - FSZ        | Quantidade: 1 unidades
+    [139] Romaneio: 028676   | Data: 06/01/2026 | Produto: PASHMINA LISA TOQUE DE LA 06/24          | Cor: MOSTARDA                  | Filial: OSCAR FREIRE - FSZ        | Quantidade: 1 unidades
+    [140] Romaneio: 028683   | Data: 06/01/2026 | Produto: PASHMINA LISA VISCOSE                    | Cor: PRATA                     | Filial: IGUATEMI SP - JJJ         | Quantidade: 1 unidades
+    [141] Romaneio: 028679   | Data: 06/01/2026 | Produto: PASHMINA XADREZ 04/24                    | Cor: PRETO/OFF WHITE           | Filial: MORUMBI - JJJ             | Quantidade: 1 unidades
+  ====================================================================================================
+
+  ✓ Total de entradas no mês atual: 1,638 unidades
+  ✓ 129 produtos únicos com entradas
+
+[4] ENTRADAS DA SEMANA PASSADA (7-14 dias atrás)
+----------------------------------------------------------------------------------------------------
+  Período: 02/01/2026 até 09/01/2026
+  ✓ 12 registros de entrada encontrados
+  ✓ Total de entradas na semana passada: 16 unidades
+  ✓ 12 produtos únicos com entradas
+
+[5] VENDAS DA SEMANA (Últimos 7 dias)
+----------------------------------------------------------------------------------------------------
+  ✓ 25 registros de venda encontrados
+  ✓ Total de vendas na semana: 26 unidades
+
+[6] E-COMMERCE DA SEMANA (Últimos 7 dias)
+----------------------------------------------------------------------------------------------------
+  ✓ 38 registros de e-commerce encontrados
+  ✓ Total de e-commerce na semana: 43 unidades
+
+[7] CÁLCULO DO ESTOQUE DA SEMANA PASSADA
+----------------------------------------------------------------------------------------------------
+  Fórmula: Estoque Semana Passada = Estoque Atual - Entradas (7 dias) + Vendas (7 dias) + E-commerce (7 dias)
+
+  [RESUMO POR PRODUTO+COR]
+  Produto                                            Cor                    Estoque Atual    Entradas Semana    Entradas Sem Pass   Estoque Sem Pass    Diferença
+  -------------------------------------------------- -------------------- --------------- ------------------ -------------------- ------------------ ------------
+  PASHMINA LISA C 08/25                              PETROLEO                         286                 19                    0                268          +18
+  PASHMINA LISA C 08/25                              MARINHO                          262                 28                    0                235          +27
+  PASHMINA LISA C 08/25                              BEGE                             257                 21                    0                240          +17
+  PASHMINA LISA C 08/25                              CREME                            244                 20                    1                228          +16
+  PASHMINA LISA VISCOSE                              CORAL                            135                 19                    0                116          +19
+  PASHMINA LISA VISCOSE                              VERDE BANDEIRA                   103                 59                    0                 44          +59
+  PASHMINA LISA TOQUE DE LA 06/24                    VERDE BANDEIRA                    98                 22                    0                 76          +22
+  PASHMINA LISA VISCOSE                              VERDE CLARO                       96                 26                    0                 70          +26
+  PASHMINA LISA VISCOSE                              MOSTARDA                          79                 20                    0                 60          +19
+  PASHMINA LISA VISCOSE                              MARINHO                           78                 27                    0                 51          +27
+  PASHMINA LISA VISCOSE                              MENTA                             78                 40                    0                 38          +40
+  PASHMINA LISA VISCOSE                              CARAMELO                          77                 58                    0                 19          +58
+  PASHMINA LISA VISCOSE                              VERMELHO                          73                 21                    0                 53          +20
+  PASHMINA LISA VISCOSE                              ROSA ANTIGO                       70                 54                    0                 17          +53
+  PASHMINA LISA VISCOSE                              ROXO                              67                 21                    0                 46          +21
+  PASHMINA LISA VISCOSE                              UVA                               64                 27                    0                 37          +27
+  PASHMINA LISA VISCOSE                              LAVANDA                           62                 25                    0                 38          +24
+  PASHMINA LISA VISCOSE                              AÇAI                              61                 45                    0                 17          +44
+  PASHMINA LEVE DE VISCOSE 20                        CARAMELO                          60                 50                    0                 10          +50
+  PASHMINA LISA VISCOSE                              FUCSIA                            53                 22                    0                 32          +21
+  PASHMINA LISA EM ACRILICO 04/25                    LAVANDA                           52                 19                    0                 33          +19
+  PASHMINA LISA VISCOSE                              AZUL ROYAL                        51                 36                    0                 15          +36
+  PASHMINA LISA VISCOSE                              JEANS                             49                 18                    0                 37          +12
+  PASHMINA LISA VISCOSE                              PISCINA                           48                 33                    0                 15          +33
+  PASHMINA LEVE DE VISCOSE 20                        CEREJA                            48                 48                    0                  1          +47
+  PASHMINA LISA VISCOSE                              AZUL PETROLEO                     46                 34                    0                 15          +31
+  PASHMINA EM ACRILICO 08/23                         PRETO                             44                 10                    0                 34          +10
+  PASHMINA EM ACRÍLICO 06/23                         PRETO/CAMELO                      43                 22                    0                 22          +21
+  PASHMINA LISA EM ACRILICO 04/25                    OCRE                              40                 25                    0                 17          +23
+  PASHMINA LEVE DE VISCOSE 20                        VERDE CLARO                       39                 33                    0                  6          +33
+  PASHMINA LISA VISCOSE                              LARANJA                           38                 11                    0                 27          +11
+  PASHMINA LISA TOQUE DE LA 06/24                    JEANS                             38                  9                    1                 29           +9
+  PASHMINA LISA TOQUE DE LA 06/24                    AZUL                              38                 16                    2                 22          +16
+  PASHMINA LISA VISCOSE                              VERDE PISTACHE                    38                  8                    0                 30           +8
+  PASHMINA LISA VISCOSE                              OCRE                              37                 15                    0                 23          +14
+  PASHMINA LISA EM ACRILICO 04/25                    AMBAR                             35                 10                    0                 25          +10
+  PASHMINA LISA TOQUE DE LA 06/24                    MOSTARDA                          34                 16                    1                 19          +15
+  PASHMINA EM ACRILICO 08/23                         TERRACOTA                         33                 22                    2                 12          +21
+  PASHMINA EM ACRÍLICO 06/23                         PRETO/OFF WHITE                   31                  5                    2                 26           +5
+  PASHMINA LISA VISCOSE                              AZUL TURQUESA                     31                 19                    0                 12          +19
+  PASHMINA ALICIA EM ACRILICO 05/25                  OFF/FENDI                         30                 25                    0                  5          +25
+  PASHMINA LISA VISCOSE                              ESMERALDA                         29                 23                    0                  7          +22
+  PASHMINA LISA VISCOSE                              PINK                              28                 18                    0                 10          +18
+  PASHMINA LISA EM ACRILICO 04/25                    PRETO                             28                 11                    0                 17          +11
+  PASHMINA LISA TOQUE DE LA 06/24                    PRETO                             27                  3                    0                 25           +2
+  PASHMINA LISA VISCOSE                              NUDE                              27                 12                    0                 16          +11
+  PASHMINA LISA VISCOSE                              VINHO                             24                 16                    0                 15           +9
+  PASHMINA LISA VISCOSE                              AMARELO                           24                 11                    0                 13          +11
+  PASHMINA LISA VISCOSE                              CHÁ VERDE                         24                 20                    0                  7          +17
+  PASHMINA LISA VISCOSE                              CHUMBO                            23                 16                    0                  7          +16
+
+[8] EXEMPLO DETALHADO - PRIMEIRO PRODUTO COM MAIOR ESTOQUE
+----------------------------------------------------------------------------------------------------
+  Produto: PASHMINA LISA C 08/25                   
+  Cor: PETROLEO                 
+  Código Produto: 07.80.0085  
+  Código Cor: 68        
+
+  [CÁLCULOS]
+    Estoque Atual: 286 unidades
+    Entradas na Semana (últimos 7 dias): 19 unidades
+    Vendas na Semana (últimos 7 dias): 1 unidades
+    E-commerce na Semana (últimos 7 dias): 0 unidades
+
+    Estoque Semana Passada = Estoque Atual - Entradas + Vendas + E-commerce
+    Estoque Semana Passada = 286 - 19 + 1 + 0
+    Estoque Semana Passada = 268 unidades
+
+    Diferença Semanal = Estoque Atual - Estoque Semana Passada
+    Diferença Semanal = 286 - 268
+    Diferença Semanal = +18 unidades
+
+    Entradas Semana Passada (7-14 dias atrás): 0 unidades
+
+  [DETALHES DAS ENTRADAS DA SEMANA PARA ESTE PRODUTO]
+    • Romaneio: 028737  
+      Data: 13/01/2026
+      Filial: SCARF ME - MATRIZ LLL    
+      Quantidade: 19 unidades
+

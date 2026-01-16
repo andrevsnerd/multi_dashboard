@@ -1,0 +1,1788 @@
+================================================================================
+RELATÓRIO DE INVESTIGAÇÃO - TABELAS DE SAÍDA
+Data: 2026-01-16 15:11:29
+================================================================================
+
+RESUMO:
+  - Tabelas candidatas analisadas: 67
+  - Tabelas por padrão encontradas: 2
+
+DETALHES DAS TABELAS CANDIDATAS:
+
+dbo.AF_LOCAL_SAIDA
+  Colunas: 12
+  Colunas similares: 1
+  Registros: N/A
+  Estrutura completa:
+    - FILIAL: varchar(25.0)
+    - NF_SAIDA: char(15.0)
+    - SERIE_NF: varchar(6.0)
+    - ITEM_IMPRESSAO: char(4.0)
+    - SUB_ITEM_TAMANHO: int(nan)
+    - DATA_SAIDA: datetime(nan)
+    - MOTIVO_MOVTO: char(4.0)
+    - ID_LOCAL_DESTINO: int(nan)
+    - ID_LOCAL_IMOBILIZADO: int(nan)
+    - EMPRESA: int(nan)
+    - LX_STATUS_SAIDA: tinyint(nan)
+    - STATUS_DO_IMOBILIZADO: char(2.0)
+
+dbo.BANCOS_A_PAGAR_LAYOUT
+  Colunas: 10
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - TIPO_ENVIO: varchar(25.0)
+    - NOME_CAMPO: varchar(25.0)
+    - BANCO: char(5.0)
+    - TOPOLOGIA: char(1.0)
+    - POSICAO: int(nan)
+    - TAMANHO: int(nan)
+    - TIPO_DADO: char(1.0)
+    - TIPO_CONTEUDO: char(1.0)
+    - CAMPO: varchar(250.0)
+    - DECIMAIS: int(nan)
+
+dbo.BANCOS_LAYOUT
+  Colunas: 9
+  Colunas similares: 0
+  Registros: 2,116
+  Estrutura completa:
+    - NOME_CAMPO: varchar(25.0)
+    - BANCO: char(5.0)
+    - TOPOLOGIA: char(1.0)
+    - POSICAO: int(nan)
+    - TAMANHO: int(nan)
+    - TIPO_DADO: char(1.0)
+    - TIPO_CONTEUDO: char(1.0)
+    - CAMPO: varchar(250.0)
+    - DECIMAIS: int(nan)
+
+dbo.CM_LOJA_SAIDAS_PA
+  Colunas: 45
+  Colunas similares: 10
+  Registros: N/A
+  Estrutura completa:
+    - SEQUENCIA: int(nan)
+    - ITEM_COMPOSICAO: char(10.0)
+    - DOC: varchar(40.0)
+    - OP_PED_ROMAN: char(40.0)
+    - SERIE_NF: char(6.0)
+    - ESPECIE_SERIE: varchar(40.0)
+    - PRODUTO: char(12.0)
+    - COR_PRODUTO: char(10.0)
+    - FILIAL: varchar(25.0)
+    - DATA_MOV: datetime(nan)
+    - QTDE: int(nan)
+    - VALOR: numeric(nan)
+    - VALOR_ENCARGO: numeric(nan)
+    - VALOR_DESCONTO: numeric(nan)
+    - VALOR_ENCARGO_IMPORTACAO: numeric(nan)
+    - VALOR_IMPOSTO_DESTACAR: numeric(nan)
+    - VALOR_IMPOSTO_AGREGAR: numeric(nan)
+    - VALOR_FRETE: numeric(nan)
+    - VALOR_SEGURO: numeric(nan)
+    - VALOR_FRETE_TRANSPORTADORA: numeric(nan)
+    - VALOR_DESPESAS: numeric(nan)
+    - VALOR_RESERVAS: numeric(nan)
+    - VALOR_CONHECIMENTO_RELACIONADO: numeric(nan)
+    - VALOR_LIQ: numeric(nan)
+    - VALOR_PRODUCAO: numeric(nan)
+    - VALOR_BRUTO: numeric(nan)
+    - VALOR_ESTOQUE: numeric(nan)
+    - VALOR_BASE_IPI: numeric(nan)
+    - VALOR_IPI: numeric(nan)
+    - GRADE: varchar(25.0)
+    - CONTA_CONTABIL_ESTOQUE: varchar(20.0)
+    - CONTA_CONTABIL_MOVTO: varchar(20.0)
+    - RATEIO_FILIAL: varchar(15.0)
+    - RATEIO_CENTRO_CUSTO: varchar(15.0)
+    - FILIAL_ORIGEM: varchar(25.0)
+    - FILIAL_ORIGINAL: varchar(25.0)
+    - COD_TRANSACAO: varchar(23.0)
+    - TIPO_OPERACAO: char(1.0)
+    - CFOP: char(4.0)
+    - DESCRICAO_CFOP: varchar(250.0)
+    - UNIDADE: char(5.0)
+    - CLASSIF_FISCAL: char(10.0)
+    - MATRIZ_FISCAL: varchar(25.0)
+    - COD_TERCEIRO: varchar(14.0)
+    - ITEM: int(nan)
+
+dbo.CM_SAIDAS_ESTOQUE_PA
+  Colunas: 45
+  Colunas similares: 10
+  Registros: N/A
+  Estrutura completa:
+    - SEQUENCIA: int(nan)
+    - ITEM_COMPOSICAO: char(10.0)
+    - DOC: varchar(40.0)
+    - OP_PED_ROMAN: char(40.0)
+    - SERIE_NF: char(6.0)
+    - ESPECIE_SERIE: varchar(40.0)
+    - PRODUTO: char(12.0)
+    - COR_PRODUTO: char(10.0)
+    - FILIAL: varchar(25.0)
+    - DATA_MOV: datetime(nan)
+    - QTDE: int(nan)
+    - VALOR: numeric(nan)
+    - VALOR_ENCARGO: numeric(nan)
+    - VALOR_DESCONTO: numeric(nan)
+    - VALOR_ENCARGO_IMPORTACAO: numeric(nan)
+    - VALOR_IMPOSTO_DESTACAR: numeric(nan)
+    - VALOR_IMPOSTO_AGREGAR: numeric(nan)
+    - VALOR_FRETE: numeric(nan)
+    - VALOR_SEGURO: numeric(nan)
+    - VALOR_FRETE_TRANSPORTADORA: numeric(nan)
+    - VALOR_DESPESAS: numeric(nan)
+    - VALOR_RESERVAS: numeric(nan)
+    - VALOR_CONHECIMENTO_RELACIONADO: numeric(nan)
+    - VALOR_LIQ: numeric(nan)
+    - VALOR_PRODUCAO: numeric(nan)
+    - VALOR_BRUTO: numeric(nan)
+    - VALOR_ESTOQUE: numeric(nan)
+    - VALOR_BASE_IPI: numeric(nan)
+    - VALOR_IPI: numeric(nan)
+    - GRADE: varchar(25.0)
+    - CONTA_CONTABIL_ESTOQUE: varchar(20.0)
+    - CONTA_CONTABIL_MOVTO: varchar(20.0)
+    - RATEIO_FILIAL: varchar(15.0)
+    - RATEIO_CENTRO_CUSTO: varchar(15.0)
+    - FILIAL_ORIGEM: varchar(25.0)
+    - FILIAL_ORIGINAL: varchar(25.0)
+    - COD_TRANSACAO: varchar(23.0)
+    - TIPO_OPERACAO: char(1.0)
+    - CFOP: char(4.0)
+    - DESCRICAO_CFOP: varchar(250.0)
+    - UNIDADE: char(5.0)
+    - CLASSIF_FISCAL: char(10.0)
+    - MATRIZ_FISCAL: varchar(25.0)
+    - COD_TERCEIRO: varchar(14.0)
+    - ITEM: int(nan)
+
+dbo.CONTROLE_NF_SAIDAS_ST
+  Colunas: 27
+  Colunas similares: 4
+  Registros: N/A
+  Estrutura completa:
+    - ID: int(nan)
+    - ID_CONTROLE_NF_SALDO_ST: int(nan)
+    - FILIAL: varchar(25.0)
+    - NOME_CLIFOR: varchar(40.0)
+    - NF_SAIDA: varchar(15.0)
+    - SERIE_NF: varchar(6.0)
+    - CHAVE_NFE: varchar(44.0)
+    - TIPO_DOCUMENTO: varchar(40.0)
+    - INDICA_CONSUMIDOR_FINAL: bit(nan)
+    - QTDE_SAIDA: int(nan)
+    - VALOR_TOTAL: numeric(nan)
+    - ICMS_EFETIVO: numeric(nan)
+    - ICMS_PRESUMIDO: numeric(nan)
+    - COMPLEMENTO: numeric(nan)
+    - RESTITUICAO: numeric(nan)
+    - DATA_EMISSAO: datetime(nan)
+    - COD_TRANSACAO: varchar(23.0)
+    - ORIGEM_ITEM: char(1.0)
+    - CTB_TIPO_OPERACAO: int(nan)
+    - NOTA_COMPLEMENTAR: bit(nan)
+    - INFORMACAO_COMPLEMENTAR: varchar(500.0)
+    - EMPRESA: int(nan)
+    - DATA_VENDA: datetime(nan)
+    - CODIGO_FILIAL: char(6.0)
+    - TICKET: char(8.0)
+    - ID_LOJA_CF_SAT: int(nan)
+    - CF_NUMERO: numeric(nan)
+
+dbo.CONTROLE_NF_SAIDAS_ST_MOV
+  Colunas: 71
+  Colunas similares: 4
+  Registros: N/A
+  Estrutura completa:
+    - ID: int(nan)
+    - ID_CONTROLE_NF_SALDO_ST: int(nan)
+    - ID_CONTROLE_NF_SAIDAS_ST: int(nan)
+    - FILIAL: varchar(25.0)
+    - NOME_CLIFOR: varchar(40.0)
+    - NF_SAIDA: varchar(15.0)
+    - SERIE_NF: varchar(6.0)
+    - CODIGO_ITEM: varchar(50.0)
+    - DESCRICAO_ITEM: varchar(80.0)
+    - REFERENCIA: varchar(50.0)
+    - REFERENCIA_ITEM: varchar(12.0)
+    - COR_ITEM: varchar(20.0)
+    - ITEM_IMPRESSAO: char(4.0)
+    - SUB_ITEM_TAMANHO: int(nan)
+    - TAMANHO: varchar(8.0)
+    - QTDE_ITEM: int(nan)
+    - SALDO_NECESSIDADE: int(nan)
+    - UNIDADE: varchar(8.0)
+    - PRECO_UNITARIO: numeric(nan)
+    - ORIGEM_ITEM: char(1.0)
+    - CODIGO_FISCAL_OPERACAO: char(4.0)
+    - CST: char(6.0)
+    - BASE_EFETIVA: numeric(nan)
+    - ICMS_EFETIVO: numeric(nan)
+    - FECP_ST_EFETIVO: numeric(nan)
+    - VALOR_ICMS_EFETIVO: numeric(nan)
+    - ALIQUOTA_ICMS: numeric(nan)
+    - BASE_ICMS: numeric(nan)
+    - VALOR_ICMS: numeric(nan)
+    - ALIQUOTA_ICMS_ST: numeric(nan)
+    - BASE_ICMS_ST: numeric(nan)
+    - VALOR_ICMS_ST: numeric(nan)
+    - ALIQUOTA_FECP: numeric(nan)
+    - BASE_FECP: numeric(nan)
+    - VALOR_FECP: numeric(nan)
+    - ALIQUOTA_FECP_ST: numeric(nan)
+    - BASE_FECP_ST: numeric(nan)
+    - VALOR_FECP_ST: numeric(nan)
+    - ALIQUOTA_ICMS_STA: numeric(nan)
+    - BASE_ICMS_STA: numeric(nan)
+    - VALOR_ICMS_STA: numeric(nan)
+    - ALIQUOTA_FECP_STA: numeric(nan)
+    - BASE_FECP_STA: numeric(nan)
+    - VALOR_FECP_STA: numeric(nan)
+    - ALIQUOTA_ICMS_SUBSTITUTO: numeric(nan)
+    - BASE_ICMS_SUBSTITUTO: numeric(nan)
+    - VALOR_ICMS_SUBSTITUTO: numeric(nan)
+    - ALIQUOTA_ICMS_PRESUMIDO: numeric(nan)
+    - BASE_ICMS_PRESUMIDO: numeric(nan)
+    - VALOR_ICMS_PRESUMIDO: numeric(nan)
+    - VALOR_ICMS_SUBSITUTO_ENTRADA: numeric(nan)
+    - VALOR_ICMS_ENTRADA: numeric(nan)
+    - MEDIA_ICMS: numeric(nan)
+    - MEDIA_BASE_ICMS_ST: numeric(nan)
+    - VALOR_ICMS_ST_ACUMULADO: numeric(nan)
+    - MEDIA_BASE_ICMS: numeric(nan)
+    - MEDIA_ICMS_ST: numeric(nan)
+    - VALOR_IMPOSTO_FECP_ACUMULADO: numeric(nan)
+    - MEDIA_FECP_ST: numeric(nan)
+    - COMPLEMENTO: numeric(nan)
+    - RESTITUICAO: numeric(nan)
+    - RESSARCIMENTO: numeric(nan)
+    - MOTIVO: varchar(10.0)
+    - DATA_EMISSAO: datetime(nan)
+    - DATA_VENDA: datetime(nan)
+    - CODIGO_FILIAL: char(6.0)
+    - TICKET: char(8.0)
+    - ITEM: char(4.0)
+    - ID_LOJA_CF_SAT: int(nan)
+    - CF_NUMERO: numeric(nan)
+    - TRIBUT_ORIGEM: char(3.0)
+
+dbo.CONTROLE_NF_SAIDAS_ST_MOV_RELACIONADA
+  Colunas: 49
+  Colunas similares: 6
+  Registros: N/A
+  Estrutura completa:
+    - ID: int(nan)
+    - ID_CONTROLE_NF_SALDO_ST: int(nan)
+    - ID_CONTROLE_NF_SAIDAS_ST: int(nan)
+    - ID_CONTROLE_NF_SAIDAS_ST_MOV: int(nan)
+    - ID_CONTROLE_NF_ENTRADAS_ST_MOV: int(nan)
+    - NF_ENTRADA: varchar(15.0)
+    - SERIE_NF_ENTRADA: varchar(6.0)
+    - FILIAL_ENTRADA: varchar(25.0)
+    - NOME_CLIFOR: varchar(40.0)
+    - QTDE_ITEM_ORIGINAL_ENT: int(nan)
+    - SALDO_DISPONIVEL: int(nan)
+    - NF_SAIDA_RELACIONADA: varchar(15.0)
+    - SERIE_NF_RELACIONADA: varchar(6.0)
+    - FILIAL_NF_SAIDA_RELACIONADA: varchar(25.0)
+    - QTDE_ITEM_ORIGINAL_SAI: int(nan)
+    - QTDE_CONSUMIDA: int(nan)
+    - QTDE_A_CONSUMIR: int(nan)
+    - CODIGO_ITEM: varchar(50.0)
+    - REFERENCIA: varchar(50.0)
+    - REFERENCIA_ITEM: varchar(12.0)
+    - ITEM_IMPRESSAO: char(4.0)
+    - SUB_ITEM_TAMANHO: int(nan)
+    - RECEBIMENTO: datetime(nan)
+    - TIPO_REMETENTE: tinyint(nan)
+    - ALIQUOTA_ICMS: numeric(nan)
+    - BASE_ICMS: numeric(nan)
+    - VALOR_ICMS: numeric(nan)
+    - VALOR_ICMS_PRESUMIDO: numeric(nan)
+    - ALIQUOTA_ICMS_ST: numeric(nan)
+    - BASE_ICMS_ST: numeric(nan)
+    - VALOR_ICMS_ST: numeric(nan)
+    - ALIQUOTA_FECP: numeric(nan)
+    - BASE_FECP: numeric(nan)
+    - VALOR_FECP: numeric(nan)
+    - ALIQUOTA_FECP_ST: numeric(nan)
+    - BASE_FECP_ST: numeric(nan)
+    - VALOR_FECP_ST: numeric(nan)
+    - ALIQUOTA_ICMS_STA: numeric(nan)
+    - BASE_ICMS_STA: numeric(nan)
+    - VALOR_ICMS_STA: numeric(nan)
+    - ALIQUOTA_FECP_STA: numeric(nan)
+    - BASE_FECP_STA: numeric(nan)
+    - VALOR_FECP_STA: numeric(nan)
+    - BASE_ICMS_SUBSTITUTO: numeric(nan)
+    - VALOR_ICMS_SUBSTITUTO: numeric(nan)
+    - ALIQUOTA_ICMS_SUBSTITUTO: numeric(nan)
+    - SEQ_ITEM_SUBSTITUTO: char(4.0)
+    - CHAVE_NFE_SUBSTITUTO: varchar(25.0)
+    - INDICADOR_CFOP: tinyint(nan)
+
+dbo.CONTROLE_SAIDAS_ST_MOV
+  Colunas: 16
+  Colunas similares: 2
+  Registros: N/A
+  Estrutura completa:
+    - ID: int(nan)
+    - EMPRESA: int(nan)
+    - FILIAL: varchar(25.0)
+    - NOME_CLIFOR: varchar(25.0)
+    - NF_SAIDA: char(15.0)
+    - SERIE_NF_SAIDA: varchar(6.0)
+    - ITEM: char(12.0)
+    - COR_ITEM: char(10.0)
+    - TAMANHO: varchar(8.0)
+    - ID_IMPOSTO: tinyint(nan)
+    - QTDE_TOTAL: int(nan)
+    - BASE_IMPOSTO: numeric(nan)
+    - DATA_SAIDA: datetime(nan)
+    - DATA_FECHAMENTO: datetime(nan)
+    - COD_TABELA_FILHA: char(1.0)
+    - STATUS_NFE: smallint(nan)
+
+dbo.CTB_BORDERO_LAYOUT
+  Colunas: 23
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - DESC_LAYOUT: varchar(40.0)
+    - DIRETORIO_ARQUIVO: varchar(100.0)
+    - INATIVO: bit(nan)
+    - LAYOUT: char(4.0)
+    - LISTA_CODIGO_LIQUIDACAO: varchar(40.0)
+    - LOTE: smallint(nan)
+    - LX_TIPO_BORDERO: int(nan)
+    - MASCARA_ARQUIVO: varchar(12.0)
+    - MASCARA_DATA: varchar(10.0)
+    - SEQUENCIAL_LAYOUT: char(8.0)
+    - SEQUENCIAL_NUMERO_BOLETA: int(nan)
+    - SEQUENCIAL_NUMERO_BOLETA_FINAL: int(nan)
+    - TAMANHO_REGISTRO: int(nan)
+    - GERAR_NUMERO_BANCARIO: bit(nan)
+    - GERA_LOTE_BANCO: bit(nan)
+    - TIPO_VALOR: tinyint(nan)
+    - INDICA_TERMINADOR: bit(nan)
+    - TRANSACAO: smallint(nan)
+    - TIPO_CONCILIACAO: tinyint(nan)
+    - DELIMITADOR: char(1.0)
+    - ID_LAYOUT: int(nan)
+    - DATA_PARA_TRANSFERENCIA: datetime(nan)
+    - AGRUPA_DESCONTO_JUROS: bit(nan)
+
+dbo.CTB_BORDERO_LAYOUT_CAMPO
+  Colunas: 8
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - DECIMAIS: int(nan)
+    - ID_COMANDO: int(nan)
+    - LAYOUT: char(4.0)
+    - LX_TOPOLOGIA: char(5.0)
+    - PARAMETROS: varchar(250.0)
+    - POSICAO: int(nan)
+    - TAMANHO: int(nan)
+    - DATA_PARA_TRANSFERENCIA: datetime(nan)
+
+dbo.CTB_BORDERO_LAYOUT_CMD
+  Colunas: 9
+  Colunas similares: 0
+  Registros: 13
+  Estrutura completa:
+    - COMANDO: varchar(3000.0)
+    - DESC_COMANDO: varchar(40.0)
+    - DESC_PARAMS: varchar(250.0)
+    - ID_COMANDO: int(nan)
+    - LX_TIPO_BORDERO: int(nan)
+    - LX_TIPO_CONTEUDO: char(1.0)
+    - LX_TIPO_DADO: char(1.0)
+    - DATA_PARA_TRANSFERENCIA: datetime(nan)
+    - INDICA_PARAMETRO: bit(nan)
+
+dbo.CTB_BORDERO_LAYOUT_CONTABILIZACAO
+  Colunas: 6
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - LAYOUT: char(4.0)
+    - LX_TOPOLOGIA: char(5.0)
+    - POSICAO: int(nan)
+    - LX_TIPO_LANCAMENTO: char(3.0)
+    - CONTA_CONTABIL: varchar(20.0)
+    - CODIGO_HISTORICO: char(4.0)
+
+dbo.CTB_BORDERO_LAYOUT_LANC_PADRAO
+  Colunas: 2
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - LAYOUT: char(4.0)
+    - LANCAMENTO_PADRAO: int(nan)
+
+dbo.CTB_BORDERO_LAYOUT_MODIF_CARTEIRA
+  Colunas: 7
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - OCORRENCIA: varchar(10)
+    - MOVITO_OCORRENCIA: varchar(10)
+    - CONTRATO: varchar(20)
+    - LAYOUT: char(4)
+    - CARTEIRA: varchar(25)
+    - CONTA_CONTABIL: varchar(20)
+    - MOTIVO_OCORRENCIA: varchar(10)
+
+dbo.CTB_BORDERO_LAYOUT_VALIDA
+  Colunas: 22
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - DESCRICAO_CAMPO: varchar(100.0)
+    - LAYOUT: char(4.0)
+    - LX_TIPO_OCORRENCIA: char(3.0)
+    - LX_TOPOLOGIA: char(5.0)
+    - PADRAO: bit(nan)
+    - POSICAO: int(nan)
+    - VALOR_CAMPO: varchar(10.0)
+    - CODIGO_HISTORICO: char(4.0)
+    - CONTA_CONTABIL: varchar(20.0)
+    - LX_TIPO_LANCAMENTO: char(3.0)
+    - TIPO_COMPROVANTE: varchar(3.0)
+    - DATA_PARA_TRANSFERENCIA: datetime(nan)
+    - COD_CLIFOR: char(6.0)
+    - INDICA_ESTORNO: bit(nan)
+    - LX_TIPO_DOCUMENTO: int(nan)
+    - LX_STATUS_CONCILIACAO: char(2.0)
+    - AGRUPAMENTO: int(nan)
+    - BANCO: char(5.0)
+    - INICIO_DESCRICAO: smallint(nan)
+    - TAMANHO_DESCRICAO: smallint(nan)
+    - RATEIO_CENTRO_CUSTO: varchar(15.0)
+    - OCORRENCIA_AGRUPAMENTO: varchar(10.0)
+
+dbo.CTB_CONTA_LAYOUT
+  Colunas: 18
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - CONTA_CORRENTE: varchar(20.0)
+    - CONTA_PORTADOR: varchar(20.0)
+    - CONTRATO_DATA_INICIO: datetime(nan)
+    - CONTRATO_DESAGIO: numeric(nan)
+    - CONTRATO_DESATIVADO: bit(nan)
+    - CONTRATO_IOF: decimal(nan)
+    - CONTRATO_NUMERO: varchar(20.0)
+    - CONTRATO_TAXA: decimal(nan)
+    - CONTRATO_VALOR_TOTAL: numeric(nan)
+    - DIAS_ULTIMO_AVISO: smallint(nan)
+    - LAYOUT: char(4.0)
+    - LX_TIPO_LANCAMENTO_CP: char(3.0)
+    - LX_TIPO_LANCAMENTO_CC: char(3.0)
+    - CONTRA_PARTIDA: varchar(20.0)
+    - CONTA_DESPESA: varchar(20.0)
+    - CONTA_DESPESA_FINANCEIRA: varchar(20.0)
+    - INDICA_LAYOUT_AUTOMATICO: bit(nan)
+    - AGRUPAR_CONTRA_PARTIDA: bit(nan)
+
+dbo.CTB_LX_LAYOUT
+  Colunas: 2
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - ID_LAYOUT: int(nan)
+    - DESC_LAYOUT: varchar(60.0)
+
+dbo.CTB_TRANSFERENCIAS
+  Colunas: 23
+  Colunas similares: 1
+  Registros: N/A
+  Estrutura completa:
+    - ID_TRANSFERENCIA: int(nan)
+    - TIPO_TRANSFERENCIA: tinyint(nan)
+    - FILIAL: varchar(25.0)
+    - DATA_TRANSFERENCIA: datetime(nan)
+    - ID_CONTA_ENVIO: varchar(36.0)
+    - COD_CONTA_DESTINO: varchar(20.0)
+    - CHAVE_PIX: varchar(77.0)
+    - VALOR: numeric(nan)
+    - DESCRICAO: varchar(200.0)
+    - AGENCIA: char(4.0)
+    - BANCO: varchar(8.0)
+    - TIPO_CONTA: char(2.0)
+    - FAVORECIDO: varchar(80.0)
+    - DOCUMENTO: varchar(20.0)
+    - TIPO_DOCUMENTO: char(4.0)
+    - RETORNO: varchar(-1.0)
+    - TIPO_CHAVE_PIX: varchar(25.0)
+    - ID_DEBITO: int(nan)
+    - ID_CREDITO: int(nan)
+    - CTB_LANCAMENTO: int(nan)
+    - CTB_ITEM: int(nan)
+    - STATUS_TRANSFERENCIA: int(nan)
+    - ID_CONSULTA: varchar(40.0)
+
+dbo.EDI_LAYOUT
+  Colunas: 6
+  Colunas similares: 0
+  Registros: 1
+  Estrutura completa:
+    - COD_LAYOUT: smallint(nan)
+    - DESC_LAYOUT: varchar(40.0)
+    - TIPO_ARQUIVO: tinyint(nan)
+    - CARACTER_SEPARADOR: varchar(5.0)
+    - TIPO_PROCESSO: char(1.0)
+    - QUERY_EXPORTACAO: text(2147483647.0)
+
+dbo.ENTRADA_DEVOLUCAO_ACERTO
+  Colunas: 6
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - NOME_CLIFOR: varchar(25.0)
+    - NF_ENTRADA: char(15.0)
+    - FATURA: char(15.0)
+    - PARCELA: char(2.0)
+    - VALOR_DEVOLUCAO: numeric(nan)
+    - SERIE_NF_ENTRADA: varchar(6.0)
+
+dbo.ESTOQUE_SUGESTAO_TRANSFERENCIA
+  Colunas: 8
+  Colunas similares: 1
+  Registros: N/A
+  Estrutura completa:
+    - SUGESTAO_TRANSFERENCIA: char(5.0)
+    - EMISSAO: datetime(nan)
+    - DESC_SUGESTAO: varchar(40.0)
+    - RESPONSAVEL: varchar(25.0)
+    - DATA_LIMITE_EFETIVACAO: datetime(nan)
+    - OBS: text(2147483647.0)
+    - STATUS_SUGESTAO: char(1.0)
+    - DATA_PARA_TRANSFERENCIA: datetime(nan)
+
+dbo.FATURAMENTO_DEVOLUCAO_ACERTO
+  Colunas: 7
+  Colunas similares: 1
+  Registros: N/A
+  Estrutura completa:
+    - FATURA: char(15.0)
+    - NOME_CLIFOR: varchar(25.0)
+    - PARCELA: char(2.0)
+    - NF_SAIDA: char(15.0)
+    - FILIAL: varchar(25.0)
+    - SERIE_NF: varchar(6.0)
+    - VALOR_DEVOLUCAO: numeric(nan)
+
+dbo.FATURAMENTO_ENTRADA_DEVOLUCAO
+  Colunas: 12
+  Colunas similares: 2
+  Registros: 3,873
+  Estrutura completa:
+    - QTDE_DEVOLVIDA: numeric(nan)
+    - ITEM_IMPRESSAO_SAIDA: char(4.0)
+    - ORIGEM_ENTRADA_SAIDA: char(1.0)
+    - ITEM_IMPRESSAO_ENTRADA: char(4.0)
+    - SUB_ITEM_SAIDA: int(nan)
+    - SUB_ITEM_ENTRADA: int(nan)
+    - FILIAL: varchar(25.0)
+    - NF_SAIDA: char(15.0)
+    - SERIE_NF: varchar(6.0)
+    - NOME_CLIFOR: varchar(25.0)
+    - NF_ENTRADA: char(15.0)
+    - SERIE_NF_ENTRADA: varchar(6.0)
+
+dbo.LCF_ATIVO_MOVIMENTO_OUTROS
+  Colunas: 9
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - ID_ATIVO_MOVIMENTO_OUTROS: int(nan)
+    - NUMERO_PARCELA_CIAP: char(10.0)
+    - DATA_INICIAL: datetime(nan)
+    - DATA_FINAL: datetime(nan)
+    - VALOR_PARCELA_PASSIVEL_APROPRIACAO: numeric(nan)
+    - VALOR_TRIBUTADAS_EXPORTACAO: numeric(nan)
+    - VALOR_TOTAL_SAIDAS: numeric(nan)
+    - VALOR_PARCELA_CIAP: numeric(nan)
+    - ID_ATIVO_MOVIMENTO: int(nan)
+
+dbo.LCF_CONTROLE_SAIDAS_ST
+  Colunas: 16
+  Colunas similares: 1
+  Registros: N/A
+  Estrutura completa:
+    - ID_CONTROLE_SAIDA: int(nan)
+    - ID_CONTROLE_SALDO_ST_UF: int(nan)
+    - ID_NOTA: int(nan)
+    - ID_REDUCAO: int(nan)
+    - ID_CUPOM: int(nan)
+    - ID_CFE: int(nan)
+    - INDICA_CONSUMIDOR_FINAL: bit(nan)
+    - QTDE_SAIDA: numeric(nan)
+    - VALOR_TOTAL: numeric(nan)
+    - ICMS_EFETIVO: numeric(nan)
+    - ICMS_PRESUMIDO: numeric(nan)
+    - COMPLEMENTO: numeric(nan)
+    - CTB_TIPO_OPERACAO: int(nan)
+    - INDICA_ENTRADA_SAIDA: char(1.0)
+    - TIPO_OPERACAO: char(1.0)
+    - RESTITUICAO: numeric(nan)
+
+dbo.LCF_CONTROLE_SAIDAS_ST_MOV
+  Colunas: 54
+  Colunas similares: 1
+  Registros: N/A
+  Estrutura completa:
+    - ID_CONTROLE_SAIDA: int(nan)
+    - ID_CONTROLE_SAIDA_MOV: int(nan)
+    - ID_CONTROLE_SALDO_ST_UF: int(nan)
+    - ID_NOTA: int(nan)
+    - ID_ITEM: int(nan)
+    - ID_REDUCAO: int(nan)
+    - ID_CUPOM: int(nan)
+    - ID_ITEM_CUPOM: int(nan)
+    - ID_CFE: int(nan)
+    - ID_ITEM_CFE: int(nan)
+    - QTDE_ITEM: int(nan)
+    - PRECO_UNITARIO: numeric(nan)
+    - CST: char(6.0)
+    - BASE_EFETIVA: numeric(nan)
+    - ICMS_EFETIVO: numeric(nan)
+    - FECP_ST_EFETIVO: numeric(nan)
+    - VALOR_ICMS_EFETIVO: numeric(nan)
+    - ALIQUOTA_ICMS: numeric(nan)
+    - BASE_ICMS: numeric(nan)
+    - VALOR_ICMS: numeric(nan)
+    - ALIQUOTA_ICMS_ST: numeric(nan)
+    - BASE_ICMS_ST: numeric(nan)
+    - VALOR_ICMS_ST: numeric(nan)
+    - ALIQUOTA_FECP: numeric(nan)
+    - BASE_FECP: numeric(nan)
+    - VALOR_FECP: numeric(nan)
+    - ALIQUOTA_FECP_ST: numeric(nan)
+    - BASE_FECP_ST: numeric(nan)
+    - VALOR_FECP_ST: numeric(nan)
+    - ALIQUOTA_ICMS_STA: numeric(nan)
+    - BASE_ICMS_STA: numeric(nan)
+    - VALOR_ICMS_STA: numeric(nan)
+    - ALIQUOTA_FECP_STA: numeric(nan)
+    - BASE_FECP_STA: numeric(nan)
+    - VALOR_FECP_STA: numeric(nan)
+    - ALIQUOTA_ICMS_SUBSTITUTO: numeric(nan)
+    - BASE_ICMS_SUBSTITUTO: numeric(nan)
+    - VALOR_ICMS_SUBSTITUTO: numeric(nan)
+    - ALIQUOTA_ICMS_PRESUMIDO: numeric(nan)
+    - BASE_ICMS_PRESUMIDO: numeric(nan)
+    - VALOR_ICMS_PRESUMIDO: numeric(nan)
+    - VALOR_ICMS_SUBSTITUTO_ENTRADA: numeric(nan)
+    - VALOR_ICMS_ENTRADA: numeric(nan)
+    - COMPLEMENTO: numeric(nan)
+    - MOTIVO: varchar(10.0)
+    - RESTITUICAO: numeric(nan)
+    - RESSARCIMENTO: numeric(nan)
+    - MEDIA_BASE_ICMS_ST: numeric(nan)
+    - VALOR_ICMS_ST_ACUMULADO: numeric(nan)
+    - MEDIA_BASE_ICMS: numeric(nan)
+    - MEDIA_ICMS_ST: numeric(nan)
+    - MEDIA_ICMS: numeric(nan)
+    - VALOR_IMPOSTO_FECP_ACUMULADO: numeric(nan)
+    - MEDIA_FECP_ST: numeric(nan)
+
+dbo.LCF_CONTROLE_SAIDAS_ST_MOV_RELACIONADA
+  Colunas: 23
+  Colunas similares: 4
+  Registros: N/A
+  Estrutura completa:
+    - ID_RELACIONADA: int(nan)
+    - ID_CONTROLE_SAIDAS_ST_MOV: int(nan)
+    - ID_CONTROLE_ENTRADAS_ST_MOV: int(nan)
+    - ID_NOTA_ENTRADA: int(nan)
+    - ID_ITEM_ENTRADA: int(nan)
+    - ID_NOTA_SAIDA: int(nan)
+    - ID_ITEM_SAIDA: int(nan)
+    - QTDE_ITEM_ORIGINAL_ENT: int(nan)
+    - SALDO_DISPONIVEL: int(nan)
+    - QTDE_ITEM_ORIGINAL_SAI: int(nan)
+    - QTDE_CONSUMIDA: int(nan)
+    - QTDE_A_CONSUMIR: int(nan)
+    - TIPO_REMETENTE: tinyint(nan)
+    - ALIQUOTA_ICMS: numeric(nan)
+    - BASE_ICMS: numeric(nan)
+    - IMPOSTO_ICMS: numeric(nan)
+    - BASE_ICMS_ST: numeric(nan)
+    - IMPOSTO_ICMS_ST: numeric(nan)
+    - IMPOSTO_FECP_ST: numeric(nan)
+    - ICMS_PRESUMIDO: numeric(nan)
+    - SEQ_ITEM_SUBSTITUTO: char(4.0)
+    - CHAVE_NFE_SUBSTITUTO: varchar(25.0)
+    - INDICADOR_CFOP: tinyint(nan)
+
+dbo.LCF_ERRO_NOTA_SAIDA
+  Colunas: 55
+  Colunas similares: 2
+  Registros: 174
+  Estrutura completa:
+    - ID_LCF_ERRO_NOTA_SAIDA: int(nan)
+    - COD_CLIFOR: varchar(25.0)
+    - ORIGEM_TERCEIRO: tinyint(nan)
+    - COD_FILIAL: char(6.0)
+    - NF_SAIDA: char(15.0)
+    - SERIE_NF: varchar(25.0)
+    - BK_SERIE: char(6.0)
+    - COD_MATRIZ_FISCAL: char(6.0)
+    - ESPECIE_SERIE: int(nan)
+    - EMISSAO: datetime(nan)
+    - COD_CLIENTE: varchar(14.0)
+    - TOTAL_DESCONTO: numeric(nan)
+    - TOTAL_FRETE: numeric(nan)
+    - TOTAL_SEGURO: numeric(nan)
+    - TOTAL_ENCARGO: numeric(nan)
+    - NOTA_CANCELADA: bit(nan)
+    - DATA_CANCELAMENTO: datetime(nan)
+    - VALOR_CANCELADO: numeric(nan)
+    - TERMINAL: char(3.0)
+    - OBS: varchar(1000.0)
+    - OBS_COMPLEMENTAR: varchar(1000.0)
+    - ID_OBS: int(nan)
+    - ID_OBS_COMPLEMENTAR: int(nan)
+    - CTB_LANCAMENTO: int(nan)
+    - CTB_ITEM: int(nan)
+    - INDICA_CONSUMIDOR_FINAL: bit(nan)
+    - NOTA_COMPLEMENTAR: bit(nan)
+    - CONDICAO_PGTO: char(3.0)
+    - ORIGEM: varchar(40.0)
+    - CHAVE_NFE: varchar(44.0)
+    - AIDF: varchar(40.0)
+    - TRANSPORTADORA: varchar(25.0)
+    - MODELO_FISCAL: char(3.0)
+    - NATUREZA: varchar(15.0)
+    - NATUREZA_EXPORTACAO: tinyint(nan)
+    - PESO_LIQUIDO_TOTAL: numeric(nan)
+    - PESO_BRUTO_TOTAL: numeric(nan)
+    - STATUS_NFE: smallint(nan)
+    - SITUACAO_NOTA: char(2.0)
+    - TIPO_FRETE: tinyint(nan)
+    - NR_DECLARACAO: varchar(15.0)
+    - DATA_DECLARACAO: datetime(nan)
+    - NR_REGISTRO: varchar(15.0)
+    - DATA_REGISTRO: datetime(nan)
+    - NR_EMBARQUE: varchar(20.0)
+    - DATA_EMBARQUE: datetime(nan)
+    - DATA_AVERBACAO: datetime(nan)
+    - TIPO_CONHECIMENTO: char(2.0)
+    - VOLUMES: int(nan)
+    - ID_NOTA: int(nan)
+    - SK_TERCEIRO: int(nan)
+    - SK_TRANSPORTADOR: int(nan)
+    - SK_MATRIZ_FISCAL: int(nan)
+    - SK_SERIE: int(nan)
+    - ID_NATUREZA: int(nan)
+
+dbo.LCF_ERRO_NOTA_SAIDA_IMPOSTO
+  Colunas: 31
+  Colunas similares: 2
+  Registros: 2,833
+  Estrutura completa:
+    - ID_LCF_ERRO_NOTA_SAIDA_IMPOSTO: int(nan)
+    - COD_FILIAL: char(6.0)
+    - NF_SAIDA: varchar(15.0)
+    - BK_SERIE: char(6.0)
+    - COD_CLIFOR: varchar(25.0)
+    - COD_MATRIZ_FISCAL: char(6.0)
+    - ORIGEM_TERCEIRO: tinyint(nan)
+    - SUB_ITEM_TAMANHO: int(nan)
+    - ITEM_IMPRESSAO: char(4.0)
+    - ID_IMPOSTO: int(nan)
+    - VALOR_CONTABIL: numeric(nan)
+    - BASE_IMPOSTO: numeric(nan)
+    - TAXA_IMPOSTO: numeric(nan)
+    - VALOR_IMPOSTO: numeric(nan)
+    - VALOR_IMPOSTO_OUTROS: numeric(nan)
+    - VALOR_IMPOSTO_ISENTO: numeric(nan)
+    - VALOR_IMPOSTO_AGREGADO: numeric(nan)
+    - VALOR_IMPOSTO_AGREGADO_IPI: numeric(nan)
+    - TEXTO_LEGAL: varchar(-1.0)
+    - INCIDENCIA: tinyint(nan)
+    - BASE_IMPOSTO_AGREGADO: numeric(nan)
+    - ORIGEM: varchar(40.0)
+    - ST_IMPOSTO: char(6.0)
+    - ID_EXCECAO_IMPOSTO: int(nan)
+    - TIPO_CREDITO: varchar(10.0)
+    - NATUREZA_RECEITA: char(3.0)
+    - COD_CONTRIBUICAO_SOCIAL_APURADA: char(2.0)
+    - INDICA_POR_QTDE: bit(nan)
+    - VALOR_IMPOSTO_APURACAO: numeric(nan)
+    - EXCECAO_CLASSIF_FISCAL: char(3.0)
+    - COD_BC_CREDITO: char(2.0)
+
+dbo.LCF_ERRO_NOTA_SAIDA_ITEM
+  Colunas: 53
+  Colunas similares: 3
+  Registros: 687
+  Estrutura completa:
+    - ID_LCF_ERRO_NOTA_SAIDA_ITEM: int(nan)
+    - NF_SAIDA: char(15.0)
+    - COD_CLIFOR: varchar(25.0)
+    - COD_MATRIZ_FISCAL: char(6.0)
+    - ORIGEM_TERCEIRO: tinyint(nan)
+    - SERIE_NF: varchar(25.0)
+    - BK_SERIE: char(6.0)
+    - CODIGO_FISCAL_OPERACAO: char(4.0)
+    - EMPRESA: int(nan)
+    - DESCONTO: numeric(nan)
+    - FRETE: numeric(nan)
+    - SEGURO: numeric(nan)
+    - ENCARGO: numeric(nan)
+    - CONTA_CONTABIL: varchar(20.0)
+    - ORIGEM_ITEM: char(1.0)
+    - CODIGO_ITEM: varchar(50.0)
+    - BK_ITEM: varchar(100.0)
+    - SK_ITEM: int(nan)
+    - DESCRICAO_ITEM: varchar(250.0)
+    - DESCRICAO_NF: varchar(250.0)
+    - UNIDADE: char(5.0)
+    - ID_UNIDADE: int(nan)
+    - ID_UNIDADE_FORNECEDOR: int(nan)
+    - DESC_UNIDADE: varchar(250.0)
+    - DESC_UNIDADE_FORNECEDOR: varchar(250.0)
+    - CLASSIF_FISCAL: char(10.0)
+    - TRIBUT_ICMS: char(3.0)
+    - TRIBUT_ORIGEM: char(3.0)
+    - QTDE_ITEM: numeric(nan)
+    - PRECO_UNITARIO: numeric(nan)
+    - VALOR_BRUTO_ITEM: numeric(nan)
+    - COD_TABELA_FILHA: char(1.0)
+    - INDICADOR_CFOP: tinyint(nan)
+    - ITEM_IMPRESSAO: char(4.0)
+    - MPADRAO_VALOR_DESCONTOS: numeric(nan)
+    - ORIGEM: varchar(40.0)
+    - SUB_ITEM_TAMANHO: int(nan)
+    - REFERENCIA: varchar(50.0)
+    - TIPO_ITEM_SPED: char(5.0)
+    - NATUREZA_RECEITA: char(3.0)
+    - INDICA_POR_QTDE: int(nan)
+    - EXCECAO_CLASSIF_FISCAL: char(3.0)
+    - LX_ORIGEM_ITEM: int(nan)
+    - DATA_CADASTRO_ITEM: datetime(nan)
+    - FATOR_CONVERSAO: numeric(nan)
+    - UNIDADE_FORNECEDOR: char(6.0)
+    - COD_GENERO_SPED: char(2.0)
+    - IND_NAT_FRT: tinyint(nan)
+    - COD_ALIQUOTA_PIS_COFINS_DIF: char(9.0)
+    - COD_FILIAL: char(6.0)
+    - PESO_LIQUIDO: numeric(nan)
+    - PESO_BRUTO: numeric(nan)
+    - TIPO_RECEITA_COMUNICACAO_SPED: char(1.0)
+
+dbo.LCF_NOTA_SAIDA
+  Colunas: 35
+  Colunas similares: 2
+  Registros: 174
+  Estrutura completa:
+    - ID_NOTA: int(nan)
+    - SK_MATRIZ_FISCAL: int(nan)
+    - SK_TERCEIRO: int(nan)
+    - SK_TRANSPORTADOR: int(nan)
+    - NF_SAIDA: varchar(15.0)
+    - NF_SAIDA_FINAL: varchar(15.0)
+    - EMISSAO: smalldatetime(nan)
+    - DATA_SAIDA: smalldatetime(nan)
+    - NOTA_CANCELADA: bit(nan)
+    - DATA_CANCELAMENTO: smalldatetime(nan)
+    - VALOR_CANCELADO: numeric(nan)
+    - TIPO_FRETE: char(2.0)
+    - NOTA_COMPLEMENTAR: bit(nan)
+    - TIPO_PGTO: char(1.0)
+    - TERMINAL: char(3.0)
+    - ORIGEM_DOCUMENTO: varchar(20.0)
+    - CHAVE_NFE: varchar(44.0)
+    - VOLUMES: int(nan)
+    - ID_SUB_ITEM_MOV: int(nan)
+    - AIDF: varchar(20.0)
+    - BK_LANCAMENTO: int(nan)
+    - BK_ITEM: int(nan)
+    - SK_SERIE: int(nan)
+    - ID_NATUREZA: int(nan)
+    - ID_LX_SITUACAO_NOTA: int(nan)
+    - CNPJ_CPF_INFORMATIVO: varchar(20.0)
+    - PESO_BRUTO_TOTAL: numeric(nan)
+    - PESO_LIQUIDO_TOTAL: numeric(nan)
+    - ID_OBS: int(nan)
+    - ID_OBS_COMPLEMENTAR: int(nan)
+    - CONSTRUCAO_CIVIL: tinyint(nan)
+    - CADASTRO_CNO: varchar(14.0)
+    - NUMERO_CONHECIMENTO_RELACIONADO: char(15.0)
+    - SK_INTERMEDIADOR: int(nan)
+    - TIPO_EMISSAO_NFE: tinyint(nan)
+
+dbo.LCF_NOTA_SAIDA_AJUSTE
+  Colunas: 34
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - ID_LCF_NOTA_SAIDA_AJUSTE: bigint(nan)
+    - ID_NOTA: int(nan)
+    - ID_ITEM: int(nan)
+    - ID_IMPOSTO_AJUSTE: int(nan)
+    - ID_IMPOSTO_AJUSTE_SPED: int(nan)
+    - ID_SUB_ITEM_APURACAO: int(nan)
+    - COD_BENEFICIO_FISCAL: varchar(15.0)
+    - CODIGO_AJUSTE: varchar(15.0)
+    - CODIGO_AJUSTE_SPED: varchar(15.0)
+    - INDICADOR_APURACAO: int(nan)
+    - LX_CODIGO_APURACAO: varchar(4.0)
+    - GERAR_C197_SPED: bit(nan)
+    - GERAR_E111_SPED: bit(nan)
+    - GERAR_E113_SPED: bit(nan)
+    - AJ_DEC_DOCUMENTO_FISCAL: bit(nan)
+    - BASE_IMPOSTO: numeric(nan)
+    - TAXA_IMPOSTO: numeric(nan)
+    - VALOR_IMPOSTO: numeric(nan)
+    - GERAR_E115_SPED: bit(nan)
+    - GERAR_C597_SPED: bit(nan)
+    - GERAR_D197_SPED: bit(nan)
+    - GERAR_E220_SPED: bit(nan)
+    - GERAR_E311_SPED: bit(nan)
+    - GERAR_1921_SPED: bit(nan)
+    - CAMPO_07_08: tinyint(nan)
+    - TABELA: varchar(6.0)
+    - GERAR_C857_SPED: bit(nan)
+    - GERAR_C897_SPED: bit(nan)
+    - GERAR_E112_SPED: bit(nan)
+    - GERAR_E230_SPED: bit(nan)
+    - NUMERO_PROCESSO: varchar(21.0)
+    - ICMS_ANTECIPADO: bit(nan)
+    - GERAR_E240_SPED: bit(nan)
+    - CREDITO_PRESUMIDO: bit(nan)
+
+dbo.LCF_NOTA_SAIDA_DOC_ARRECADACAO
+  Colunas: 6
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - ID_DOC_ARRECADACAO: int(nan)
+    - ID_NOTA: int(nan)
+    - NUM_DOC_ARRECADACAO: char(11.0)
+    - VALOR_DOCUMENTO: numeric(nan)
+    - DATA_VENCIMENTO: smalldatetime(nan)
+    - DATA_PGTO: smalldatetime(nan)
+
+dbo.LCF_NOTA_SAIDA_EXPORTACAO
+  Colunas: 13
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - ID_NOTA: int(nan)
+    - ID_EXPORTACAO: int(nan)
+    - NR_DECLARACAO: varchar(50.0)
+    - DATA_DECLARACAO: datetime(nan)
+    - NR_REGISTRO: varchar(50.0)
+    - DATA_REGISTRO: datetime(nan)
+    - NR_EMBARQUE: varchar(50.0)
+    - DATA_EMBARQUE: datetime(nan)
+    - DATA_AVERBACAO: datetime(nan)
+    - NATUREZA_EXPORTACAO: tinyint(nan)
+    - INDICA_DOCUMENTO: tinyint(nan)
+    - INDICA_SIMPLIFICADA: bit(nan)
+    - ID_LX_TIPO_EMBARQUE: int(nan)
+
+dbo.LCF_NOTA_SAIDA_IMPOSTO
+  Colunas: 31
+  Colunas similares: 1
+  Registros: 2,833
+  Estrutura completa:
+    - ID_NOTA: int(nan)
+    - ID_ITEM: smallint(nan)
+    - ID_IMPOSTO: int(nan)
+    - VALOR_CONTABIL: numeric(nan)
+    - BASE_IMPOSTO: numeric(nan)
+    - TAXA_IMPOSTO: numeric(nan)
+    - VALOR_IMPOSTO: numeric(nan)
+    - VALOR_ISENTO: numeric(nan)
+    - VALOR_OUTROS: numeric(nan)
+    - VALOR_APURACAO: numeric(nan)
+    - VALOR_AGREGADO_IPI: numeric(nan)
+    - VALOR_AGREGADO: numeric(nan)
+    - SITUACAO_TRIBUTARIA: char(3.0)
+    - INCIDENCIA: tinyint(nan)
+    - EXCECAO_CLASSIF_FISCAL: varchar(5.0)
+    - COD_CONTRIBUICAO_SOCIAL_APURADA: char(2.0)
+    - COD_BC_CREDITO: char(2.0)
+    - TIPO_CREDITO: varchar(10.0)
+    - NATUREZA_RECEITA: char(3.0)
+    - INDICA_POR_QTDE: bit(nan)
+    - VALOR_ADICIONAL: numeric(nan)
+    - VALOR_NAO_RETIDO: numeric(nan)
+    - VALOR_ADICIONAL_NAO_RETIDO: numeric(nan)
+    - SUBCONTRATADO_RETIDO: numeric(nan)
+    - BASE_IMPOSTO_EXCLUSAO: numeric(nan)
+    - TAXA_IMPOSTO_EXCLUSAO: numeric(nan)
+    - VALOR_IMPOSTO_EXCLUSAO: numeric(nan)
+    - VALOR_ICMS_EXCLUSAO: numeric(nan)
+    - LANCAMENTO_FINANCEIRO: int(nan)
+    - ITEM_FINANCEIRO: smallint(nan)
+    - CODIGO_ARRECADACAO: varchar(20.0)
+
+dbo.LCF_NOTA_SAIDA_IMPOSTO_PARCIAL
+  Colunas: 13
+  Colunas similares: 2
+  Registros: N/A
+  Estrutura completa:
+    - ID_PARCIAL: int(nan)
+    - DATA_INICIAL: datetime(nan)
+    - DATA_FINAL: datetime(nan)
+    - NF_SAIDA: char(15.0)
+    - NOME_CLIFOR: varchar(25.0)
+    - SERIE_NF: varchar(6.0)
+    - FILIAL: varchar(25.0)
+    - ITEM_IMPRESSAO: varchar(4.0)
+    - SUB_ITEM_TAMANHO: int(nan)
+    - ID_IMPOSTO: int(nan)
+    - CAMPO: varchar(200.0)
+    - PROBLEMA: varchar(200.0)
+    - EMISSAO: datetime(nan)
+
+dbo.LCF_NOTA_SAIDA_ITEM
+  Colunas: 30
+  Colunas similares: 1
+  Registros: 687
+  Estrutura completa:
+    - ID_NOTA: int(nan)
+    - ID_ITEM: smallint(nan)
+    - ITEM_IMPRESSAO: char(4.0)
+    - SK_ITEM: int(nan)
+    - VALOR_BRUTO_ITEM: numeric(nan)
+    - PRECO_UNITARIO: numeric(nan)
+    - QTDE_ITEM: numeric(nan)
+    - FATOR_CONVERSAO: numeric(nan)
+    - DESCONTO: numeric(nan)
+    - FRETE: numeric(nan)
+    - SEGURO: numeric(nan)
+    - ENCARGO: numeric(nan)
+    - INCIDENCIA: tinyint(nan)
+    - CONTA_CONTABIL: varchar(20.0)
+    - TRIBUT_ICMS: char(3.0)
+    - TRIBUT_ORIGEM: char(3.0)
+    - INDICADOR_CFOP: tinyint(nan)
+    - CFOP: varchar(5.0)
+    - ID_CONTA: int(nan)
+    - ID_UNIDADE: int(nan)
+    - PESO_LIQUIDO: numeric(nan)
+    - PESO_BRUTO: numeric(nan)
+    - INDICA_MOVIMENTACAO_FISICA: bit(nan)
+    - SUB_ITEM_TAMANHO: int(nan)
+    - ID_SUB_ITEM_MOV: int(nan)
+    - ORIGEM_DOCUMENTO: varchar(20.0)
+    - DESC_ITEM_NF: varchar(255.0)
+    - ID_CEST: int(nan)
+    - COD_INF_ADICIONAL: varchar(8.0)
+    - ID_EXCECAO_IMPOSTO: int(nan)
+
+dbo.LCF_NOTA_SAIDA_ITEM_EXPORTACAO
+  Colunas: 6
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - ID_ITEM_EXPORTACAO: int
+    - ID_NOTA: int
+    - ID_ITEM: smallint
+    - ID_NOTA_ENTRADA: int
+    - ID_UNIDADE: int
+    - QUANTIDADE: decimal
+
+dbo.LCF_NOTA_SAIDA_ITEM_PARCIAL
+  Colunas: 12
+  Colunas similares: 2
+  Registros: N/A
+  Estrutura completa:
+    - ID_PARCIAL: int(nan)
+    - DATA_INICIAL: datetime(nan)
+    - DATA_FINAL: datetime(nan)
+    - NF_SAIDA: char(15.0)
+    - NOME_CLIFOR: varchar(25.0)
+    - SERIE_NF: varchar(6.0)
+    - FILIAL: varchar(25.0)
+    - ITEM_IMPRESSAO: varchar(4.0)
+    - SUB_ITEM_TAMANHO: int(nan)
+    - CAMPO: varchar(200.0)
+    - PROBLEMA: varchar(200.0)
+    - EMISSAO: datetime(nan)
+
+dbo.LCF_NOTA_SAIDA_PARCELA
+  Colunas: 4
+  Colunas similares: 0
+  Registros: 160
+  Estrutura completa:
+    - ID_NOTA: int
+    - ID_PARCELA: int
+    - VENCIMENTO: datetime
+    - VALOR_PARCELA: numeric
+
+dbo.LCF_NOTA_SAIDA_PARCIAL
+  Colunas: 10
+  Colunas similares: 2
+  Registros: N/A
+  Estrutura completa:
+    - ID_PARCIAL: int(nan)
+    - DATA_INICIAL: datetime(nan)
+    - DATA_FINAL: datetime(nan)
+    - NF_SAIDA: char(15.0)
+    - NOME_CLIFOR: varchar(25.0)
+    - SERIE_NF: varchar(6.0)
+    - FILIAL: varchar(25.0)
+    - CAMPO: varchar(200.0)
+    - PROBLEMA: varchar(200.0)
+    - EMISSAO: datetime(nan)
+
+dbo.LCF_NOTA_SAIDA_PGTO
+  Colunas: 9
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - ID_NOTA: int(nan)
+    - ID_PGTO: int(nan)
+    - SK_TERCEIRO: int(nan)
+    - SK_INTERMEDIADOR: int(nan)
+    - VALOR_CONTABIL: numeric(nan)
+    - BASE_ICMS: numeric(nan)
+    - BASE_ISS: numeric(nan)
+    - VALOR_OUTROS: numeric(nan)
+    - TIPO_PGTO: char(1.0)
+
+dbo.LF_REGISTRO_SAIDA
+  Colunas: 55
+  Colunas similares: 2
+  Registros: 10,459
+  Estrutura completa:
+    - NF_SAIDA: varchar(15.0)
+    - SERIE_NF: varchar(6.0)
+    - NF_SAIDA_FINAL: varchar(15.0)
+    - ESPECIE: varchar(4.0)
+    - VALOR_CONTABIL: numeric(nan)
+    - BASE_IMPOSTO: numeric(nan)
+    - TAXA_IMPOSTO: numeric(nan)
+    - VALOR_IMPOSTO: numeric(nan)
+    - VALOR_IMPOSTO_ISENTO: numeric(nan)
+    - VALOR_IMPOSTO_OUTROS: numeric(nan)
+    - EMISSAO: datetime(nan)
+    - DATA_SAIDA: datetime(nan)
+    - EMPRESA: int(nan)
+    - TIPO_FRETE: char(2.0)
+    - DESCONTO: numeric(nan)
+    - FRETE: numeric(nan)
+    - SEGURO: numeric(nan)
+    - ENCARGO: numeric(nan)
+    - VALOR_IMPOSTO_AGREGADO: numeric(nan)
+    - VALOR_IMPOSTO_AGREGADO_IPI: numeric(nan)
+    - NOTA_CANCELADA: bit(nan)
+    - DATA_CANCELAMENTO: datetime(nan)
+    - VALOR_CANCELADO: numeric(nan)
+    - TERMINAL: char(3.0)
+    - TEXTO_LEGAL: varchar(500.0)
+    - OBS: varchar(1000.0)
+    - CTB_LANCAMENTO: int(nan)
+    - ORIGEM_DOCUMENTO: varchar(20.0)
+    - USUARIO: varchar(25.0)
+    - DATA_MOV: datetime(nan)
+    - CODIGO_FISCAL_OPERACAO: char(4.0)
+    - ID_IMPOSTO: tinyint(nan)
+    - COD_MATRIZ_FISCAL: char(6.0)
+    - COD_FILIAL: char(6.0)
+    - COD_CLIFOR: char(6.0)
+    - ITEM: int(nan)
+    - INCIDENCIA: tinyint(nan)
+    - CONTA_CONTABIL: varchar(20.0)
+    - NUMERO_CORRELATIVO: int(nan)
+    - VALOR_IMPOSTO_APURACAO: numeric(nan)
+    - CODIGO_CLIENTE: varchar(14.0)
+    - NOTA_COMPLEMENTAR: bit(nan)
+    - CONDICAO_PGTO: char(3.0)
+    - VALOR_IMPOSTO_OBS: numeric(nan)
+    - BASE_IMPOSTO_OBS: numeric(nan)
+    - ID_FISCAL: bigint(nan)
+    - SITUACAO_TRIBUTARIA: char(4.0)
+    - SERIE_CFE_SAT: numeric(nan)
+    - INDICA_ENDERECO_ENTREGA: bit(nan)
+    - BASE_IMPOSTO_EXCLUSAO: numeric(nan)
+    - TAXA_IMPOSTO_EXCLUSAO: numeric(nan)
+    - VALOR_IMPOSTO_EXCLUSAO: numeric(nan)
+    - VALOR_ICMS_EXCLUSAO: numeric(nan)
+    - STATUS_NF: int(nan)
+    - ID_EQUIPAMENTO: numeric(nan)
+
+dbo.LF_REGISTRO_SAIDA_ITEM
+  Colunas: 59
+  Colunas similares: 2
+  Registros: 32,729
+  Estrutura completa:
+    - VALOR_CONTABIL: numeric(nan)
+    - BASE_IMPOSTO: numeric(nan)
+    - VALOR_IMPOSTO: numeric(nan)
+    - VALOR_IMPOSTO_ISENTO: numeric(nan)
+    - VALOR_IMPOSTO_OUTROS: numeric(nan)
+    - DESCONTO: numeric(nan)
+    - FRETE: numeric(nan)
+    - SEGURO: numeric(nan)
+    - ENCARGO: numeric(nan)
+    - VALOR_IMPOSTO_AGREGADO: numeric(nan)
+    - VALOR_IMPOSTO_AGREGADO_IPI: numeric(nan)
+    - INCIDENCIA: tinyint(nan)
+    - CONTA_CONTABIL: varchar(20.0)
+    - VALOR_IMPOSTO_APURACAO: numeric(nan)
+    - ITEM_IMPRESSAO: char(4.0)
+    - MPADRAO_VALOR_DESCONTOS: numeric(nan)
+    - CODIGO_ITEM: varchar(50.0)
+    - DESCRICAO_ITEM: varchar(80.0)
+    - UNIDADE: varchar(5.0)
+    - CLASSIF_FISCAL: char(10.0)
+    - TRIBUT_ICMS: char(3.0)
+    - TRIBUT_ORIGEM: char(3.0)
+    - QTDE_ITEM: numeric(nan)
+    - PRECO_UNITARIO: numeric(nan)
+    - VALOR_BRUTO_ITEM: numeric(nan)
+    - COD_TABELA_FILHA: char(1.0)
+    - INDICADOR_CFOP: tinyint(nan)
+    - COD_FILIAL: char(6.0)
+    - NF_SAIDA: varchar(15.0)
+    - SERIE_NF: varchar(6.0)
+    - NF_SAIDA_FINAL: varchar(15.0)
+    - COD_MATRIZ_FISCAL: char(6.0)
+    - CODIGO_FISCAL_OPERACAO: char(4.0)
+    - ID_IMPOSTO: tinyint(nan)
+    - TAXA_IMPOSTO: numeric(nan)
+    - ITEM: int(nan)
+    - BASE_IMPOSTO_AGREGADO: numeric(nan)
+    - TEXTO_LEGAL: varchar(500.0)
+    - ID_FISCAL: bigint(nan)
+    - ID_FISCAL_ITEM: int(nan)
+    - SUB_ITEM_TAMANHO: int(nan)
+    - ITEM_NOTA: int(nan)
+    - VALOR_IMPOSTO_OBS: numeric(nan)
+    - BASE_IMPOSTO_OBS: numeric(nan)
+    - ID_EXCECAO_IMPOSTO: int(nan)
+    - SITUACAO_TRIBUTARIA: char(4.0)
+    - ORIGEM_ITEM: char(1.0)
+    - VALOR_ADICIONAL: numeric(nan)
+    - VALOR_NAO_RETIDO: numeric(nan)
+    - VALOR_ADICIONAL_NAO_RETIDO: numeric(nan)
+    - SUBCONTRATADO_RETIDO: numeric(nan)
+    - BASE_IMPOSTO_EXCLUSAO: numeric(nan)
+    - TAXA_IMPOSTO_EXCLUSAO: numeric(nan)
+    - VALOR_IMPOSTO_EXCLUSAO: numeric(nan)
+    - VALOR_ICMS_EXCLUSAO: numeric(nan)
+    - NATUREZA_RECEITA: char(3.0)
+    - COD_CONTRIBUICAO_SOCIAL_APURADA: char(2.0)
+    - TIPO_CREDITO: varchar(10.0)
+    - ID_EQUIPAMENTO: numeric(nan)
+
+dbo.LOJA_MOTIVO_DEVOLUCAO
+  Colunas: 6
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - ID_MOTIVO_DEVOLUCAO: smallint(nan)
+    - COD_MOTIVO_DEVOLUCAO: varchar(5.0)
+    - DESC_MOTIVO_DEVOLUCAO: varchar(60.0)
+    - APROVACAO_GERENTE: bit(nan)
+    - INATIVO: bit(nan)
+    - LX_STATUS_REGISTRO: int(nan)
+
+dbo.LOJA_PEDIDO_DEVOLUCAO
+  Colunas: 7
+  Colunas similares: 1
+  Registros: N/A
+  Estrutura completa:
+    - CODIGO_FILIAL_ORIGEM: char(6.0)
+    - PEDIDO: int(nan)
+    - TICKET: char(8.0)
+    - DATA_VENDA: datetime(nan)
+    - NF_NUMERO: char(15.0)
+    - SERIE_NF: char(6.0)
+    - DATA_PARA_TRANSFERENCIA: datetime(nan)
+
+dbo.LOJA_PEDIDO_SAIDA
+  Colunas: 8
+  Colunas similares: 9
+  Registros: N/A
+  Estrutura completa:
+    - PEDIDO: int(nan)
+    - CODIGO_FILIAL_ORIGEM: char(6.0)
+    - ITEM: int(nan)
+    - PRODUTO: char(12.0)
+    - COR_PRODUTO: char(10.0)
+    - ROMANEIO_PRODUTO: char(15.0)
+    - FILIAL: varchar(25.0)
+    - DATA_PARA_TRANSFERENCIA: datetime(nan)
+
+dbo.LOJA_SAIDAS
+  Colunas: 28
+  Colunas similares: 7
+  Registros: 2,325
+  Estrutura completa:
+    - ROMANEIO_PRODUTO: char(15.0)
+    - FILIAL: varchar(25.0)
+    - CODIGO_TAB_PRECO: char(2.0)
+    - TIPO_ENTRADA_SAIDA: char(2.0)
+    - FILIAL_DESTINO: varchar(25.0)
+    - NUMERO_NF_TRANSFERENCIA: char(15.0)
+    - RESPONSAVEL: varchar(25.0)
+    - INDICA_DEVOLUCAO: bit(nan)
+    - FORNECEDOR_DEVOLUCAO: varchar(40.0)
+    - EMISSAO: datetime(nan)
+    - TIMESTAMP: timestamp(nan)
+    - QTDE_TOTAL: int(nan)
+    - VALOR_TOTAL: numeric(nan)
+    - FATOR_PRECO: numeric(nan)
+    - DATA_PARA_TRANSFERENCIA: datetime(nan)
+    - STATUS_TRANSITO: char(1.0)
+    - SERIE_NF: varchar(6.0)
+    - OBS: text(2147483647.0)
+    - NF_SAIDA: char(15.0)
+    - SAIDA_ENCERRADA: bit(nan)
+    - ROMANEIO_AJUSTE: bit(nan)
+    - MOV_NF_SAIDA: char(15.0)
+    - MOV_SERIE_NF: varchar(6.0)
+    - MOV_FILIAL: varchar(25.0)
+    - SAIDA_CANCELADA: bit(nan)
+    - SUGESTAO_TRANSFERENCIA: char(5.0)
+    - LX_STATUS_SAIDA: tinyint(nan)
+    - CODIGO_CLIENTE: varchar(14.0)
+
+dbo.LOJA_SAIDAS_ORIGEM
+  Colunas: 56
+  Colunas similares: 12
+  Registros: 484
+  Estrutura completa:
+    - ROMANEIO_PRODUTO: char(15.0)
+    - FILIAL: varchar(25.0)
+    - PRODUTO: char(12.0)
+    - COR_PRODUTO: char(10.0)
+    - ROMANEIO_PRODUTO_ENTRADA: char(8.0)
+    - FILIAL_ENTRADA: varchar(25.0)
+    - QTDE_ENTRADA: int(nan)
+    - EN1: int(nan)
+    - EN2: int(nan)
+    - EN3: int(nan)
+    - EN4: int(nan)
+    - EN5: int(nan)
+    - EN6: int(nan)
+    - EN7: int(nan)
+    - EN8: int(nan)
+    - EN9: int(nan)
+    - EN10: int(nan)
+    - EN11: int(nan)
+    - EN12: int(nan)
+    - EN13: int(nan)
+    - EN14: int(nan)
+    - EN15: int(nan)
+    - EN16: int(nan)
+    - EN17: int(nan)
+    - EN18: int(nan)
+    - EN19: int(nan)
+    - EN20: int(nan)
+    - EN21: int(nan)
+    - EN22: int(nan)
+    - EN23: int(nan)
+    - EN24: int(nan)
+    - EN25: int(nan)
+    - EN26: int(nan)
+    - EN27: int(nan)
+    - EN28: int(nan)
+    - EN29: int(nan)
+    - EN30: int(nan)
+    - EN31: int(nan)
+    - EN32: int(nan)
+    - EN33: int(nan)
+    - EN34: int(nan)
+    - EN35: int(nan)
+    - EN36: int(nan)
+    - EN37: int(nan)
+    - EN38: int(nan)
+    - EN39: int(nan)
+    - EN40: int(nan)
+    - EN41: int(nan)
+    - EN42: int(nan)
+    - EN43: int(nan)
+    - EN44: int(nan)
+    - EN45: int(nan)
+    - EN46: int(nan)
+    - EN47: int(nan)
+    - EN48: int(nan)
+    - DATA_PARA_TRANSFERENCIA: datetime(nan)
+
+dbo.LOJA_SAIDAS_PRODUTO
+  Colunas: 60
+  Colunas similares: 9
+  Registros: 11,319
+  Estrutura completa:
+    - ROMANEIO_PRODUTO: char(15.0)
+    - FILIAL: varchar(25.0)
+    - PRODUTO: char(12.0)
+    - COR_PRODUTO: char(10.0)
+    - EN1: int(nan)
+    - EN2: int(nan)
+    - EN3: int(nan)
+    - EN4: int(nan)
+    - EN5: int(nan)
+    - EN6: int(nan)
+    - EN7: int(nan)
+    - EN8: int(nan)
+    - EN9: int(nan)
+    - EN10: int(nan)
+    - EN11: int(nan)
+    - EN12: int(nan)
+    - EN13: int(nan)
+    - EN14: int(nan)
+    - EN15: int(nan)
+    - EN16: int(nan)
+    - EN17: int(nan)
+    - EN18: int(nan)
+    - EN19: int(nan)
+    - EN20: int(nan)
+    - EN21: int(nan)
+    - EN22: int(nan)
+    - EN23: int(nan)
+    - EN24: int(nan)
+    - EN25: int(nan)
+    - EN26: int(nan)
+    - EN27: int(nan)
+    - EN28: int(nan)
+    - EN29: int(nan)
+    - EN30: int(nan)
+    - EN31: int(nan)
+    - EN32: int(nan)
+    - EN33: int(nan)
+    - EN34: int(nan)
+    - EN35: int(nan)
+    - EN36: int(nan)
+    - EN37: int(nan)
+    - EN38: int(nan)
+    - EN39: int(nan)
+    - EN40: int(nan)
+    - EN41: int(nan)
+    - EN42: int(nan)
+    - EN43: int(nan)
+    - EN44: int(nan)
+    - EN45: int(nan)
+    - EN46: int(nan)
+    - EN47: int(nan)
+    - EN48: int(nan)
+    - TIMESTAMP: timestamp(nan)
+    - VALOR: numeric(nan)
+    - PRECO4: numeric(nan)
+    - PRECO3: numeric(nan)
+    - PRECO2: numeric(nan)
+    - PRECO1: numeric(nan)
+    - QTDE_SAIDA: int(nan)
+    - DATA_PARA_TRANSFERENCIA: datetime(nan)
+
+dbo.LOJA_SAIDAS_ROMANEIO
+  Colunas: 15
+  Colunas similares: 4
+  Registros: N/A
+  Estrutura completa:
+    - ROMANEIO_PRODUTO: char(15.0)
+    - FILIAL: varchar(25.0)
+    - NOME_CLIFOR: varchar(25.0)
+    - EMISSAO: datetime(nan)
+    - ID_ROMANEIO_STATUS: smallint(nan)
+    - ID_ROMANEIO_STATUS_LAST: smallint(nan)
+    - TIPO_ENTRADA_SAIDA: char(2.0)
+    - RESPONSAVEL: varchar(25.0)
+    - CODIGO_TAB_PRECO: char(2.0)
+    - SOLICITA_APROVACAO: bit(nan)
+    - RESPONSAVEL_MATRIZ: varchar(25.0)
+    - DATA_PARA_TRANSFERENCIA: datetime(nan)
+    - JUSTIFICATIVA_REJEICAO: varchar(100.0)
+    - RETORNO_LOJA: smalldatetime(nan)
+    - AGRUPAMENTO_NF: smallint(nan)
+
+dbo.LOJA_SAIDAS_ROMANEIO_FISCAL
+  Colunas: 19
+  Colunas similares: 10
+  Registros: N/A
+  Estrutura completa:
+    - ROMANEIO_PRODUTO: char(15.0)
+    - FILIAL: varchar(25.0)
+    - PRODUTO: char(12.0)
+    - COR_PRODUTO: varchar(25.0)
+    - TAMANHO: smallint(nan)
+    - QTD_RELACIONADA: smallint(nan)
+    - QTD_DEVOLVIDA_LOJA: smallint(nan)
+    - VALOR_UNIT_ENTRADA: numeric(nan)
+    - VALOR_ENTRADA: numeric(nan)
+    - NOME_CLIFOR: varchar(25.0)
+    - SERIE_NF_ENTRADA: char(6.0)
+    - NF_ENTRADA: char(15.0)
+    - ITEM_IMPRESSAO: char(4.0)
+    - SUB_ITEM_TAMANHO: smallint(nan)
+    - CHAVE_NFE: varchar(44.0)
+    - DATA_PARA_TRANSFERENCIA: datetime(nan)
+    - CODIGO_ITEM: varchar(50.0)
+    - ROMANEIO_PRODUTO_ENTRADA: char(15.0)
+    - NF_LOJA_GERADO: bit(nan)
+
+dbo.LOJA_SAIDAS_ROMANEIO_PRODUTO
+  Colunas: 12
+  Colunas similares: 9
+  Registros: N/A
+  Estrutura completa:
+    - ROMANEIO_PRODUTO: char(15.0)
+    - FILIAL: varchar(25.0)
+    - PRODUTO: char(12.0)
+    - COR_PRODUTO: varchar(25.0)
+    - TAMANHO: smallint(nan)
+    - DESC_TAMANHO: varchar(25.0)
+    - QTDE: smallint(nan)
+    - PRECO_LIQUIDO: numeric(nan)
+    - VALOR_LIQUIDO: numeric(nan)
+    - REJEITADO: bit(nan)
+    - DATA_PARA_TRANSFERENCIA: datetime(nan)
+    - JUSTIFICATIVA_REJEICAO: varchar(100.0)
+
+dbo.LOJA_TIPOS_ENTRADA_SAIDA
+  Colunas: 10
+  Colunas similares: 0
+  Registros: 12
+  Estrutura completa:
+    - TIPO_ENTRADA_SAIDA: char(2.0)
+    - DESC_TIPO_ENTRADA_SAIDA: varchar(40.0)
+    - INDICADOR_ENTRADA_SAIDA: char(1.0)
+    - TIMESTAMP: timestamp(nan)
+    - DATA_PARA_TRANSFERENCIA: datetime(nan)
+    - LX_TIPO_ENTRADA_SAIDA: tinyint(nan)
+    - CM_OPERACAO: char(10.0)
+    - NATUREZA_OPERACAO_ESTADUAL: varchar(8.0)
+    - NATUREZA_OPERACAO_INTERESTADUAL: varchar(8.0)
+    - LX_STATUS_REGISTRO: int(nan)
+
+dbo.MCX_INTEGRACAO_LOJA_SAIDAS
+  Colunas: 19
+  Colunas similares: 6
+  Registros: N/A
+  Estrutura completa:
+    - ID_CONTROLE: int(nan)
+    - CNPJ: varchar(14.0)
+    - DOCUMENTO: int(nan)
+    - IDENTIFICADOR: varchar(254.0)
+    - ROMANEIO_PRODUTO: varchar(15.0)
+    - FILIAL: varchar(25.0)
+    - CODIGO_TAB_PRECO: varchar(2.0)
+    - TIPO_ENTRADA_SAIDA: varchar(2.0)
+    - FILIAL_DESTINO: varchar(25.0)
+    - NUMERO_NF_TRANSFERENCIA: varchar(15.0)
+    - RESPONSAVEL: varchar(25.0)
+    - INDICA_DEVOLUCAO: bit(nan)
+    - FORNECEDOR_DEVOLUCAO: varchar(25.0)
+    - EMISSAO: datetime(nan)
+    - QTDE_TOTAL: numeric(nan)
+    - VALOR_TOTAL: numeric(nan)
+    - FATOR_PRECO: numeric(nan)
+    - SAIDA_ENCERRADA: bit(nan)
+    - SAIDA_CANCELADA: bit(nan)
+
+dbo.MCX_INTEGRACAO_LOJA_SAIDAS_PRODUTO
+  Colunas: 17
+  Colunas similares: 10
+  Registros: N/A
+  Estrutura completa:
+    - ID_CONTROLE: int(nan)
+    - CNPJ: varchar(14.0)
+    - DOCUMENTO: int(nan)
+    - IDENTIFICADOR: varchar(254.0)
+    - PRODUTO_MCX: varchar(20.0)
+    - CODIGO_BARRA_MCX: varchar(20.0)
+    - ROMANEIO_PRODUTO: varchar(15.0)
+    - FILIAL: varchar(25.0)
+    - CODIGO_TAB_PRECO: varchar(2.0)
+    - PRODUTO: varchar(12.0)
+    - COR_PRODUTO: varchar(10.0)
+    - CODIGO_BARRA: varchar(20.0)
+    - GRADE: varchar(10.0)
+    - TAMANHO: int(nan)
+    - QTDE: numeric(nan)
+    - VALOR: numeric(nan)
+    - PRECO_UNITARIO: numeric(nan)
+
+dbo.NATUREZAS_SAIDAS
+  Colunas: 21
+  Colunas similares: 0
+  Registros: 60
+  Estrutura completa:
+    - NATUREZA_SAIDA: char(7.0)
+    - DESC_NATUREZA: varchar(40.0)
+    - DESC_NF: varchar(40.0)
+    - ACERTO_CONTAS: char(1.0)
+    - IRRF: numeric(nan)
+    - POSSUI_ICMS: bit(nan)
+    - TIPO_OPERACAO: char(1.0)
+    - INATIVO: bit(nan)
+    - OBS1: varchar(250.0)
+    - OBS2: varchar(250.0)
+    - CLASIF_CONTABLE: char(16.0)
+    - CLASSIF_CONTABIL: char(16.0)
+    - CTB_TIPO_OPERACAO: int(nan)
+    - LANCAMENTO_PADRAO: int(nan)
+    - LX_TIPO_LANCAMENTO: char(3.0)
+    - NAO_MOSTRA_VALORES: bit(nan)
+    - NATUREZA_ENTRADA_AUTOMATICA: char(15.0)
+    - LANCAMENTO_PADRAO_IMPOSTO: int(nan)
+    - CM_ITEM_COMPOSICAO: char(10.0)
+    - TIPO_FATURAMENTO: varchar(25.0)
+    - INTERCOMPANY: bit(nan)
+
+dbo.RETORNO_A_PAGAR_LAYOUT
+  Colunas: 12
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - BANCO: char(5.0)
+    - TIPO_RETORNO: varchar(25.0)
+    - NOME_CAMPO: varchar(25.0)
+    - POSICAO: int(nan)
+    - TAMANHO: int(nan)
+    - TIPO_DADO: char(1.0)
+    - TIPO_CONTEUDO: char(1.0)
+    - DECIMAIS: int(nan)
+    - ASSINATURA_LINHA: varchar(50.0)
+    - CAMPO_ALTERAR: varchar(50.0)
+    - GRUPO_LAYOUT: varchar(10.0)
+    - CABECALHO_DETALHE: bit(nan)
+
+dbo.RETORNO_A_RECEBER_LAYOUT
+  Colunas: 9
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - BANCO: char(5.0)
+    - NOME_CAMPO: varchar(25.0)
+    - POSICAO: int(nan)
+    - TAMANHO: int(nan)
+    - TIPO_DADO: char(1.0)
+    - TIPO_CONTEUDO: char(1.0)
+    - DECIMAIS: int(nan)
+    - TOPOLOGIA: char(1.0)
+    - CAMPO_ALTERAR: varchar(50.0)
+
+dbo.TRANSACOES_LAYOUT
+  Colunas: 12
+  Colunas similares: 0
+  Registros: 129
+  Estrutura completa:
+    - COD_LAYOUT_TRANSACAO: int(nan)
+    - COD_TRANSACAO: char(23.0)
+    - DESC_LAYOUT_TRANSACAO: varchar(250.0)
+    - OBJETO: varchar(250.0)
+    - USUARIO: varchar(25.0)
+    - LAYOUT_PUBLICO: bit(nan)
+    - LAYOUT_LINX: bit(nan)
+    - ULT_ATUALIZACAO: datetime(nan)
+    - IDIOMA: int(nan)
+    - OBJETO_CFG: text(2147483647.0)
+    - LAYOUT_BLOQUEADO: bit(nan)
+    - EMPRESA: int(nan)
+
+dbo.TRANSACOES_LAYOUT_USUARIO
+  Colunas: 8
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - COD_LAYOUT_TRANSACAO: int(nan)
+    - COD_TRANSACAO: char(23.0)
+    - USUARIO: varchar(25.0)
+    - PERMITE_DRILL_DOWN: bit(nan)
+    - PERMITE_MODIFICAR_FILTRO: bit(nan)
+    - PERMITE_MODIFICAR_LAYOUT: bit(nan)
+    - PERMITE_INCLUIR_DADOS: bit(nan)
+    - PERMITE_INCLUIR_DIMENSOES: bit(nan)
+
+dbo.TRANSFERENCIA_FILIAL_QUALIDADE_LOG_B2C
+  Colunas: 17
+  Colunas similares: 4
+  Registros: N/A
+  Estrutura completa:
+    - OPERACAO: char(1.0)
+    - CODIGO_FILIAL: char(6.0)
+    - FILIAL: varchar(25.0)
+    - TICKET: char(8.0)
+    - DATA_VENDA: datetime(nan)
+    - ROMANEIO_SAIDA: char(8.0)
+    - EMISSAO_ROMANEIO: datetime(nan)
+    - RESPONSAVEL: varchar(100.0)
+    - FILIAL_DESTINO: varchar(25.0)
+    - ROMANEIO_ENTRADA: char(8.0)
+    - NF_ENTRADA: char(15.0)
+    - SERIE_NF_ENTRADA: varchar(6.0)
+    - NF_SAIDA: char(15.0)
+    - SERIE_NF_SAIDA: varchar(6.0)
+    - DATA_LOG: datetime(nan)
+    - COMANDO: text(2147483647.0)
+    - OBS: text(2147483647.0)
+
+dbo.TRANSFERENCIA_TABELAS
+  Colunas: 6
+  Colunas similares: 0
+  Registros: N/A
+  Estrutura completa:
+    - TABELA: varchar(50.0)
+    - tipo_transf: int(nan)
+    - ORDEM: int(nan)
+    - ULTIMA_TRANSFERENCIA: datetime(nan)
+    - ATIVO: char(1.0)
+    - FILTROS_SELECT: varchar(250.0)
+
+dbo.VENDAS_PRODUTO_DEVOLUCAO
+  Colunas: 11
+  Colunas similares: 8
+  Registros: N/A
+  Estrutura completa:
+    - ID_VENDA_PROD_DEV: int(nan)
+    - PRODUTO: char(12.0)
+    - NF_SAIDA: char(15.0)
+    - SERIE_NF: varchar(6.0)
+    - COR_PRODUTO: char(10.0)
+    - EMISSAO: datetime(nan)
+    - COD_DOCA_AGENDA_RECEB: int(nan)
+    - QTDE: int(nan)
+    - ITEM: char(6.0)
+    - FILIAL: varchar(25.0)
+    - NOTA_FISCAL: char(15.0)
+
+dbo.VENDAS_TERCEIRO_DEVOLUCAO
+  Colunas: 6
+  Colunas similares: 1
+  Registros: N/A
+  Estrutura completa:
+    - DATA_DEVOLUCAO: datetime(nan)
+    - VALOR_DEVOLUCAO: numeric(nan)
+    - QTDE_DEVOLUCAO: numeric(nan)
+    - DATA_DIGITACAO: datetime(nan)
+    - NF_FORNECEDOR: varchar(15.0)
+    - FORNECEDOR: varchar(25.0)
+
+dbo.VENDAS_TERCEIRO_NF_DEVOLUCAO
+  Colunas: 12
+  Colunas similares: 1
+  Registros: N/A
+  Estrutura completa:
+    - NF_DEVOLUCAO: varchar(15.0)
+    - NOME_CLIFOR: varchar(25.0)
+    - SERIE_NF_DEVOLUCAO: char(7.0)
+    - EMISSAO: datetime(nan)
+    - DATA_DIGITACAO: datetime(nan)
+    - RECEBIMENTO: datetime(nan)
+    - VALOR_DESCONTO: numeric(nan)
+    - VALOR_TOTAL: numeric(nan)
+    - VALOR_IMPOSTOS_AGREGAR: numeric(nan)
+    - FORNECEDOR: varchar(25.0)
+    - DESCONTO_PEDIDO: numeric(nan)
+    - NOME_CLIENTE: varchar(25.0)
+
+TABELAS POR PADRÃO:
+  - dbo.ESTOQUE_PROD_SAI
+  - dbo.ESTOQUE_PROD1_SAI
