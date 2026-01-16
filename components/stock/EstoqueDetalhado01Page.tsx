@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { CompanyKey } from "@/lib/config/company";
@@ -117,6 +117,8 @@ export default function EstoqueDetalhado01Page({
     grade?: string;
     colecao?: string;
   }>({});
+  const [sortColumn, setSortColumn] = useState<'estoque' | 'vendasTotais' | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // Scroll para o topo quando o componente montar
   useEffect(() => {
@@ -186,6 +188,38 @@ export default function EstoqueDetalhado01Page({
     };
   }, [companyKey]);
 
+  // Função para ordenar variações usando useMemo para garantir recálculo quando estado mudar
+  // DEVE estar antes dos returns condicionais para seguir as regras dos Hooks
+  const sortedVariacoes = useMemo(() => {
+    if (!detalhes) return [];
+    
+    return [...detalhes.variacoes].sort((a, b) => {
+      if (!sortColumn) {
+        // Ordenação padrão: por estoque (maior para menor)
+        return b.estoque - a.estoque;
+      }
+      
+      let aValue: number;
+      let bValue: number;
+      
+      if (sortColumn === 'estoque') {
+        aValue = a.estoque;
+        bValue = b.estoque;
+      } else if (sortColumn === 'vendasTotais') {
+        aValue = a.vendasTotais;
+        bValue = b.vendasTotais;
+      } else {
+        return b.estoque - a.estoque;
+      }
+      
+      if (sortDirection === 'asc') {
+        return aValue - bValue;
+      } else {
+        return bValue - aValue;
+      }
+    });
+  }, [detalhes?.variacoes, sortColumn, sortDirection]);
+
   if (loading) {
     return (
       <div className={styles.wrapper}>
@@ -209,6 +243,25 @@ export default function EstoqueDetalhado01Page({
       </div>
     );
   }
+
+  const handleSort = (column: 'estoque' | 'vendasTotais') => {
+    if (sortColumn === column) {
+      // Se já está ordenando por essa coluna, inverte a direção
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Se é uma nova coluna, verificar se a ordenação padrão já é por essa coluna
+      // Se a ordenação padrão já é por estoque DESC e clicou em estoque, começar com ASC
+      if (column === 'estoque' && !sortColumn) {
+        // Primeira vez clicando em estoque: já está ordenado por estoque DESC, então inverte para ASC
+        setSortColumn(column);
+        setSortDirection('asc');
+      } else {
+        // Nova coluna ou mudando de coluna: começa com desc (maior para menor)
+        setSortColumn(column);
+        setSortDirection('desc');
+      }
+    }
+  };
 
   return (
     <div className={styles.wrapper}>
@@ -278,14 +331,34 @@ export default function EstoqueDetalhado01Page({
               <th>PRODUTO</th>
               <th>DESCRIÇÃO</th>
               <th>COR</th>
-              <th>ESTOQUE</th>
+              <th 
+                className={styles.sortableHeader}
+                onClick={() => handleSort('estoque')}
+              >
+                ESTOQUE
+                {sortColumn === 'estoque' && (
+                  <span className={styles.sortIndicator}>
+                    {sortDirection === 'asc' ? ' ↑' : ' ↓'}
+                  </span>
+                )}
+              </th>
               <th>CUSTO UNIT.</th>
               <th>CUSTO TOTAL</th>
-              <th>VENDAS TOTAIS</th>
+              <th 
+                className={styles.sortableHeader}
+                onClick={() => handleSort('vendasTotais')}
+              >
+                VENDAS TOTAIS
+                {sortColumn === 'vendasTotais' && (
+                  <span className={styles.sortIndicator}>
+                    {sortDirection === 'asc' ? ' ↑' : ' ↓'}
+                  </span>
+                )}
+              </th>
             </tr>
           </thead>
           <tbody>
-            {detalhes.variacoes.map((variacao, index) => {
+            {sortedVariacoes.map((variacao, index) => {
               // Construir URL para estoquedetalhado02 com os parâmetros necessários
               const params = new URLSearchParams();
               if (variacao.produto) params.set("produtoNome", variacao.produto);

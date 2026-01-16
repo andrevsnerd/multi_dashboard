@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { CompanyKey } from "@/lib/config/company";
@@ -123,6 +123,8 @@ export default function EstoqueDetalhado02Page({
     grade?: string;
     colecao?: string;
   }>({});
+  const [sortColumn, setSortColumn] = useState<'estoque' | 'vendasTotais' | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // Obter parâmetros da URL
   useEffect(() => {
@@ -187,6 +189,38 @@ export default function EstoqueDetalhado02Page({
     };
   }, [companyKey]);
 
+  // Função para ordenar variações usando useMemo para garantir recálculo quando estado mudar
+  // DEVE estar antes dos returns condicionais para seguir as regras dos Hooks
+  const sortedVariacoes = useMemo(() => {
+    if (!detalhes) return [];
+    
+    return [...detalhes.variacoes].sort((a, b) => {
+      if (!sortColumn) {
+        // Ordenação padrão: por estoque (maior para menor)
+        return b.estoque - a.estoque;
+      }
+      
+      let aValue: number;
+      let bValue: number;
+      
+      if (sortColumn === 'estoque') {
+        aValue = a.estoque;
+        bValue = b.estoque;
+      } else if (sortColumn === 'vendasTotais') {
+        aValue = a.vendasTotais;
+        bValue = b.vendasTotais;
+      } else {
+        return b.estoque - a.estoque;
+      }
+      
+      if (sortDirection === 'asc') {
+        return aValue - bValue;
+      } else {
+        return bValue - aValue;
+      }
+    });
+  }, [detalhes?.variacoes, sortColumn, sortDirection]);
+
   if (loading) {
     return (
       <div className={styles.wrapper}>
@@ -210,6 +244,25 @@ export default function EstoqueDetalhado02Page({
       </div>
     );
   }
+
+  const handleSort = (column: 'estoque' | 'vendasTotais') => {
+    if (sortColumn === column) {
+      // Se já está ordenando por essa coluna, inverte a direção
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Se é uma nova coluna, verificar se a ordenação padrão já é por essa coluna
+      // Se a ordenação padrão já é por estoque DESC e clicou em estoque, começar com ASC
+      if (column === 'estoque' && !sortColumn) {
+        // Primeira vez clicando em estoque: já está ordenado por estoque DESC, então inverte para ASC
+        setSortColumn(column);
+        setSortDirection('asc');
+      } else {
+        // Nova coluna ou mudando de coluna: começa com desc (maior para menor)
+        setSortColumn(column);
+        setSortDirection('desc');
+      }
+    }
+  };
 
   // Função para voltar para estoquedetalhado01
   const handleVoltar = () => {
@@ -295,14 +348,34 @@ export default function EstoqueDetalhado02Page({
               <th>DESCRIÇÃO</th>
               <th>COR</th>
               <th>FILIAL</th>
-              <th>ESTOQUE</th>
+              <th 
+                className={styles.sortableHeader}
+                onClick={() => handleSort('estoque')}
+              >
+                ESTOQUE
+                {sortColumn === 'estoque' && (
+                  <span className={styles.sortIndicator}>
+                    {sortDirection === 'asc' ? ' ↑' : ' ↓'}
+                  </span>
+                )}
+              </th>
               <th>CUSTO UNIT.</th>
               <th>CUSTO TOTAL</th>
-              <th>VENDAS TOTAIS</th>
+              <th 
+                className={styles.sortableHeader}
+                onClick={() => handleSort('vendasTotais')}
+              >
+                VENDAS TOTAIS
+                {sortColumn === 'vendasTotais' && (
+                  <span className={styles.sortIndicator}>
+                    {sortDirection === 'asc' ? ' ↑' : ' ↓'}
+                  </span>
+                )}
+              </th>
             </tr>
           </thead>
           <tbody>
-            {detalhes.variacoes.map((variacao, index) => (
+            {sortedVariacoes.map((variacao, index) => (
               <tr key={`${variacao.produto}-${variacao.cor}-${variacao.filial}-${index}`} className={index % 2 === 0 ? styles.evenRow : styles.oddRow}>
                 <td>{variacao.descricao}</td>
                 <td>{variacao.cor}</td>

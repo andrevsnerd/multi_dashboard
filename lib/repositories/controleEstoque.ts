@@ -1573,7 +1573,7 @@ export async function fetchProdutoDetalhes({
         COALESCE(c.DESC_COR, e.COR_PRODUTO),
         p.CUSTO_REPOSICAO1
       HAVING SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) > 0
-      ORDER BY e.PRODUTO, COALESCE(c.DESC_COR, e.COR_PRODUTO)
+      ORDER BY SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) DESC, e.PRODUTO, COALESCE(c.DESC_COR, e.COR_PRODUTO)
     `;
 
     const variacoesResult = await request.query<{
@@ -1794,6 +1794,7 @@ export async function fetchProdutoDetalhesPorFilial({
         p.CUSTO_REPOSICAO1,
         e.FILIAL
       HAVING SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) > 0
+      ORDER BY SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) DESC, e.PRODUTO, COALESCE(c.DESC_COR, e.COR_PRODUTO), e.FILIAL
     `;
 
     const variacoesResult = await request.query<{

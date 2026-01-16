@@ -310,6 +310,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
                     href={item.href!}
                     className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
                     onClick={handleLinkClick}
+                    replace={item.label === "Controle de Estoque" && pathname?.includes("/controle-estoque")}
                   >
                     <span className={styles.navLabel}>{item.label}</span>
                   </Link>

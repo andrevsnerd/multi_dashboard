@@ -1221,10 +1221,10 @@ export default function ControleEstoquePage({
             const nivelAtual = expansao?.nivel || 0;
             const temDetalhes = cat.linha || cat.subgrupo || cat.grade || cat.colecao;
             const isCardExpandido = nivelAtual > 0 && temDetalhes;
-            // Criar chave única para cards expandidos
+            // Criar chave única sempre (usar index para garantir unicidade)
             const cardKey = isCardExpandido 
-              ? `${cat.categoria}-${cat.linha || ''}-${cat.subgrupo || ''}-${cat.grade || ''}-${nivelAtual === 2 ? cat.colecao || '' : ''}`
-              : cat.categoria;
+              ? `${cat.categoria}-${cat.linha || ''}-${cat.subgrupo || ''}-${cat.grade || ''}-${nivelAtual === 2 ? cat.colecao || '' : ''}-${index}`
+              : `${cat.categoria}-${index}`;
             
             return (
             <div key={cardKey} className={styles.categoriaCard}>
@@ -1414,7 +1414,7 @@ export default function ControleEstoquePage({
                 <Legend />
                 {categoriasFiltradas.map((cat, index) => (
                   <Line
-                    key={cat.categoria}
+                    key={`${cat.categoria}-${index}`}
                     type="monotone"
                     dataKey={cat.categoria}
                     stroke={colors[index % colors.length]}
@@ -1460,8 +1460,8 @@ export default function ControleEstoquePage({
               </tr>
             </thead>
             <tbody>
-              {previsoesFiltradas.map(prev => (
-                <tr key={prev.categoria}>
+              {previsoesFiltradas.map((prev, index) => (
+                <tr key={`${prev.categoria}-${index}`}>
                   <td>{prev.categoria}</td>
                   <td>{formatNumber(prev.estoqueAtual)}</td>
                   <td>{prev.mediaDia.toFixed(1)}</td>

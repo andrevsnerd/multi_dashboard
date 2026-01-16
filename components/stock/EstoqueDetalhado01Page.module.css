@@ -138,6 +138,22 @@
   border-bottom: 2px solid #e0e0e0;
 }
 
+.sortableHeader {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s;
+}
+
+.sortableHeader:hover {
+  background-color: #e9ecef;
+}
+
+.sortIndicator {
+  margin-left: 4px;
+  color: #0066cc;
+  font-weight: 700;
+}
+
 .detailsTable td {
   padding: 12px 16px;
   font-size: 14px;
