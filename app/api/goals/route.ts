@@ -1,48 +1,5 @@
 import { NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
-
-const GOALS_FILE_PATH = path.join(process.cwd(), 'data', 'goals.json');
-
-interface GoalData {
-  [companyKey: string]: {
-    [year: string]: {
-      [month: string]: {
-        [filial: string]: number;
-      };
-    };
-  };
-}
-
-async function ensureGoalsFile(): Promise<void> {
-  const dataDir = path.join(process.cwd(), 'data');
-  try {
-    await fs.access(dataDir);
-  } catch {
-    await fs.mkdir(dataDir, { recursive: true });
-  }
-
-  try {
-    await fs.access(GOALS_FILE_PATH);
-  } catch {
-    await fs.writeFile(GOALS_FILE_PATH, JSON.stringify({}), 'utf-8');
-  }
-}
-
-async function readGoals(): Promise<GoalData> {
-  await ensureGoalsFile();
-  try {
-    const content = await fs.readFile(GOALS_FILE_PATH, 'utf-8');
-    return JSON.parse(content) as GoalData;
-  } catch {
-    return {};
-  }
-}
-
-async function writeGoals(goals: GoalData): Promise<void> {
-  await ensureGoalsFile();
-  await fs.writeFile(GOALS_FILE_PATH, JSON.stringify(goals, null, 2), 'utf-8');
-}
+import { readGoals, writeGoals } from '@/lib/utils/goals-storage';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
