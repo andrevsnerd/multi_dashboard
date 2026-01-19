@@ -85,7 +85,11 @@ export async function GET(request: Request) {
           grade,
           colecao,
           range,
-          ...filters,
+          grupos: filters.grupos ?? undefined,
+          linhas: filters.linhas ?? undefined,
+          colecoes: filters.colecoes ?? undefined,
+          subgrupos: filters.subgrupos ?? undefined,
+          grades: filters.grades ?? undefined,
         });
         return NextResponse.json({ data: detalhes });
       }
@@ -112,7 +116,11 @@ export async function GET(request: Request) {
           grade,
           colecao,
           range,
-          ...filters,
+          grupos: filters.grupos ?? undefined,
+          linhas: filters.linhas ?? undefined,
+          colecoes: filters.colecoes ?? undefined,
+          subgrupos: filters.subgrupos ?? undefined,
+          grades: filters.grades ?? undefined,
         });
         return NextResponse.json({ data: detalhes });
       }
@@ -139,7 +147,11 @@ export async function GET(request: Request) {
           grade,
           colecao,
           range,
-          ...filters,
+          grupos: filters.grupos ?? undefined,
+          linhas: filters.linhas ?? undefined,
+          colecoes: filters.colecoes ?? undefined,
+          subgrupos: filters.subgrupos ?? undefined,
+          grades: filters.grades ?? undefined,
         });
         return NextResponse.json({ data: detalhes });
       }

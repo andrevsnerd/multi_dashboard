@@ -596,7 +596,7 @@ export default function ControleEstoquePage({
             // Para ScarfMe, quando expandimos "LENÇOS", mostrar apenas cards onde linha = "LENÇOS"
             if (cat.categoria === cat.linha) {
               // Se está no nível 2, filtrar pelo subgrupo e grade selecionados
-              if (nivel === 2 && expansao.subgrupoSelecionado && expansao.gradeSelecionado) {
+              if (nivel === 2 && expansao?.subgrupoSelecionado && expansao?.gradeSelecionado) {
                 if (cat.subgrupo === expansao.subgrupoSelecionado && cat.grade === expansao.gradeSelecionado) {
                   resultadoFiltrado.push(cat);
                 }
@@ -607,7 +607,7 @@ export default function ControleEstoquePage({
             }
           } else {
             // Para NERD, apenas verificar se a categoria corresponde
-            if (nivel === 2 && expansao.subgrupoSelecionado && expansao.gradeSelecionado) {
+            if (nivel === 2 && expansao?.subgrupoSelecionado && expansao?.gradeSelecionado) {
               if (cat.subgrupo === expansao.subgrupoSelecionado && cat.grade === expansao.gradeSelecionado) {
                 resultadoFiltrado.push(cat);
               }
