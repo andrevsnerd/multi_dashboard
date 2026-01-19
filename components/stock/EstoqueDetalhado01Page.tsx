@@ -263,11 +263,16 @@ export default function EstoqueDetalhado01Page({
     }
   };
 
+  // Função para voltar para a página principal de controle de estoque
+  const handleVoltar = () => {
+    router.push(`/${companyKey}/controle-estoque`);
+  };
+
   return (
     <div className={styles.wrapper}>
       <div className={styles.header}>
         <button
-          onClick={() => router.back()}
+          onClick={handleVoltar}
           className={styles.backButton}
         >
           ← Voltar
