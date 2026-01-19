@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   LineChart,
   Line,
@@ -1671,6 +1672,7 @@ export default function ControleEstoquePage({
                         <tr>
                           <th>Data</th>
                           <th>Romaneio</th>
+                          <th>Produto</th>
                           <th>Descrição</th>
                           <th>Cor</th>
                           <th>Linha</th>
@@ -1680,18 +1682,39 @@ export default function ControleEstoquePage({
                         </tr>
                       </thead>
                       <tbody>
-                        {detalhesEntradas.map((entrada, idx) => (
-                          <tr key={`${entrada.romaneio}-${entrada.produto}-${entrada.cor}-${idx}`}>
-                            <td>{format(new Date(entrada.data), 'dd/MM/yyyy', { locale: ptBR })}</td>
-                            <td>{entrada.romaneio}</td>
-                            <td>{entrada.descricao}</td>
-                            <td>{entrada.corDescricao || entrada.cor || '-'}</td>
-                            <td>{entrada.linha || '-'}</td>
-                            <td>{entrada.grade || '-'}</td>
-                            <td>{formatNumber(entrada.quantidade)}</td>
-                            <td>{entrada.filial}</td>
-                          </tr>
-                        ))}
+                        {detalhesEntradas.map((entrada, idx) => {
+                          const params = new URLSearchParams();
+                          if (entrada.produto) params.set("produtoNome", entrada.produto.trim());
+                          // Usar corDescricao se disponível, senão usar cor
+                          const corParaUrl = entrada.corDescricao?.trim() || entrada.cor?.trim();
+                          if (corParaUrl) params.set("cor", corParaUrl);
+                          if (entrada.linha) params.set("linha", entrada.linha.trim());
+                          if (entrada.subgrupo) params.set("subgrupo", entrada.subgrupo.trim());
+                          if (entrada.grade) params.set("grade", entrada.grade.trim());
+                          if (entrada.colecao) params.set("colecao", entrada.colecao.trim());
+                          if (selectedFilial) params.set("filial", selectedFilial);
+                          
+                          return (
+                            <tr key={`${entrada.romaneio}-${entrada.produto}-${entrada.cor}-${idx}`}>
+                              <td>{format(new Date(entrada.data), 'dd/MM/yyyy', { locale: ptBR })}</td>
+                              <td>{entrada.romaneio}</td>
+                              <td>
+                                <Link
+                                  href={`/${companyKey}/controle-estoque/estoquedetalhado02?${params.toString()}`}
+                                  className={styles.productLink}
+                                >
+                                  {entrada.produto}
+                                </Link>
+                              </td>
+                              <td>{entrada.descricao}</td>
+                              <td>{entrada.corDescricao || entrada.cor || '-'}</td>
+                              <td>{entrada.linha || '-'}</td>
+                              <td>{entrada.grade || '-'}</td>
+                              <td>{formatNumber(entrada.quantidade)}</td>
+                              <td>{entrada.filial}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -1716,19 +1739,39 @@ export default function ControleEstoquePage({
                         </tr>
                       </thead>
                       <tbody>
-                        {detalhesVendas.map((venda, idx) => (
-                          <tr key={`${venda.ticket}-${venda.produto}-${venda.cor}-${idx}`}>
-                            <td>{format(new Date(venda.data), 'dd/MM/yyyy', { locale: ptBR })}</td>
-                            <td>{venda.produto}</td>
-                            <td>{venda.descricao}</td>
-                            <td>{venda.corDescricao || venda.cor || '-'}</td>
-                            <td>{venda.linha || '-'}</td>
-                            <td>{venda.grade || '-'}</td>
-                            <td>{formatNumber(venda.quantidade)}</td>
-                            <td>{formatCurrency(venda.valorLiquido || 0)}</td>
-                            <td>{venda.filial}</td>
-                          </tr>
-                        ))}
+                        {detalhesVendas.map((venda, idx) => {
+                          const params = new URLSearchParams();
+                          if (venda.produto) params.set("produtoNome", venda.produto.trim());
+                          // Usar corDescricao se disponível, senão usar cor
+                          const corParaUrl = venda.corDescricao?.trim() || venda.cor?.trim();
+                          if (corParaUrl) params.set("cor", corParaUrl);
+                          if (venda.linha) params.set("linha", venda.linha.trim());
+                          if (venda.subgrupo) params.set("subgrupo", venda.subgrupo.trim());
+                          if (venda.grade) params.set("grade", venda.grade.trim());
+                          if (venda.colecao) params.set("colecao", venda.colecao.trim());
+                          if (selectedFilial) params.set("filial", selectedFilial);
+                          
+                          return (
+                            <tr key={`${venda.ticket}-${venda.produto}-${venda.cor}-${idx}`}>
+                              <td>{format(new Date(venda.data), 'dd/MM/yyyy', { locale: ptBR })}</td>
+                              <td>
+                                <Link
+                                  href={`/${companyKey}/controle-estoque/estoquedetalhado02?${params.toString()}`}
+                                  className={styles.productLink}
+                                >
+                                  {venda.produto}
+                                </Link>
+                              </td>
+                              <td>{venda.descricao}</td>
+                              <td>{venda.corDescricao || venda.cor || '-'}</td>
+                              <td>{venda.linha || '-'}</td>
+                              <td>{venda.grade || '-'}</td>
+                              <td>{formatNumber(venda.quantidade)}</td>
+                              <td>{formatCurrency(venda.valorLiquido || 0)}</td>
+                              <td>{venda.filial}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

@@ -709,6 +709,17 @@
   border-bottom: none;
 }
 
+.productLink {
+  color: #0066cc;
+  text-decoration: underline;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.productLink:hover {
+  color: #0052a3;
+}
+
 @media (max-width: 768px) {
   .modalContent {
     max-width: 100%;

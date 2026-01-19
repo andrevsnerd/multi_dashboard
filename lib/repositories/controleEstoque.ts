@@ -2451,10 +2451,15 @@ export async function fetchProdutoDetalhesPorFilial({
     // Construir filtros baseados nos parâmetros - IGUAL AO DETALHADO 01
     let produtoFilter = '';
     
-    // Se linha for fornecida, usar ela; senão, usar produtoNome como linha
-    const linhaParaFiltrar = linha || produtoNome;
-    if (linhaParaFiltrar) {
-      request.input('linhaFiltro', sql.VarChar, linhaParaFiltrar.toUpperCase().trim());
+    // Se produtoNome (código do produto) for fornecido, filtrar pelo código do produto diretamente
+    if (produtoNome) {
+      // Normalizar o código do produto (remover todos os espaços e converter para maiúsculo)
+      const produtoCodigoNormalizado = produtoNome.toUpperCase().trim().replace(/\s+/g, '');
+      request.input('produtoCodigoEstoque', sql.VarChar, produtoCodigoNormalizado);
+      produtoFilter = `AND UPPER(REPLACE(LTRIM(RTRIM(e.PRODUTO)), ' ', '')) = @produtoCodigoEstoque`;
+    } else if (linha) {
+      // Se não tiver produtoNome mas tiver linha, usar linha
+      request.input('linhaFiltro', sql.VarChar, linha.toUpperCase().trim());
       produtoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linhaFiltro`;
     }
     
@@ -2476,8 +2481,10 @@ export async function fetchProdutoDetalhesPorFilial({
     // Filtro de cor (se fornecido)
     let corFilter = '';
     if (cor) {
-      request.input('corFiltro', sql.VarChar, cor.trim());
-      corFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(COALESCE(c.DESC_COR, e.COR_PRODUTO), '')))) = UPPER(LTRIM(RTRIM(@corFiltro)))`;
+      // Normalizar cor (remover espaços extras e converter para maiúsculo)
+      const corNormalizada = cor.trim().replace(/\s+/g, ' ').toUpperCase();
+      request.input('corFiltro', sql.VarChar, corNormalizada);
+      corFilter = `AND UPPER(LTRIM(RTRIM(REPLACE(ISNULL(COALESCE(c.DESC_COR, e.COR_PRODUTO), ''), ' ', '')))) = UPPER(REPLACE(LTRIM(RTRIM(@corFiltro)), ' ', ''))`;
     }
 
     // Buscar todas as variações do produto com estoque por filial
@@ -2551,8 +2558,10 @@ export async function fetchProdutoDetalhesPorFilial({
     
     // Filtro de cor para vendas (se fornecido)
     if (cor) {
-      request.input('corFiltroVendas', sql.VarChar, cor.trim());
-      vendasCorFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), '')))) = UPPER(LTRIM(RTRIM(@corFiltroVendas)))`;
+      // Normalizar cor (remover espaços extras e converter para maiúsculo)
+      const corNormalizadaVendas = cor.trim().replace(/\s+/g, ' ').toUpperCase();
+      request.input('corFiltroVendas', sql.VarChar, corNormalizadaVendas);
+      vendasCorFilter = `AND UPPER(REPLACE(LTRIM(RTRIM(ISNULL(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), ''))), ' ', '')) = UPPER(REPLACE(LTRIM(RTRIM(@corFiltroVendas)), ' ', ''))`;
     }
     
     const vendasQuery = `
