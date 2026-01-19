@@ -5,14 +5,14 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { CompanyKey } from "@/lib/config/company";
 
-import styles from "./EstoqueDetalhado02Page.module.css";
+import styles from "./EstoqueDetalhado01Page.module.css";
 
-interface EstoqueDetalhado02PageProps {
+interface EstoqueDetalhado01ProdutoPageProps {
   companyKey: CompanyKey;
   companyName: string;
 }
 
-interface ProdutoVariacaoDetalhesPorFilial {
+interface ProdutoVariacaoDetalhes {
   produto: string;
   descricao: string;
   linha: string;
@@ -20,24 +20,23 @@ interface ProdutoVariacaoDetalhesPorFilial {
   grade: string;
   colecao: string;
   cor: string;
-  filial: string;
   estoque: number;
   custoUnitario: number;
   custoTotal: number;
   vendasTotais: number;
 }
 
-interface ProdutoDetalhesResumoPorFilial {
-  totalFiliais: number;
+interface ProdutoDetalhesResumo {
+  totalItens: number;
   estoqueTotal: number;
   custoTotal: number;
   vendasTotais: number;
 }
 
-interface ProdutoDetalhesCompletoPorFilial {
+interface ProdutoDetalhesCompleto {
   nomeProduto: string;
-  resumo: ProdutoDetalhesResumoPorFilial;
-  variacoes: ProdutoVariacaoDetalhesPorFilial[];
+  resumo: ProdutoDetalhesResumo;
+  variacoes: ProdutoVariacaoDetalhes[];
 }
 
 function formatCurrency(value: number): string {
@@ -54,7 +53,7 @@ function formatNumber(value: number): string {
   });
 }
 
-async function fetchDetalhesPorFilial(
+async function fetchDetalhes(
   company: string,
   filial: string | null,
   produtoNome?: string,
@@ -62,9 +61,8 @@ async function fetchDetalhesPorFilial(
   grupo?: string,
   subgrupo?: string,
   grade?: string,
-  colecao?: string,
-  cor?: string
-): Promise<ProdutoDetalhesCompletoPorFilial> {
+  colecao?: string
+): Promise<ProdutoDetalhesCompleto> {
   const searchParams = new URLSearchParams({
     company,
   });
@@ -97,11 +95,7 @@ async function fetchDetalhesPorFilial(
     searchParams.set("colecao", colecao);
   }
 
-  if (cor) {
-    searchParams.set("cor", cor);
-  }
-
-  const response = await fetch(`/api/controle-estoque/detalhes-por-filial?${searchParams.toString()}`, {
+  const response = await fetch(`/api/controle-estoque/detalhes?${searchParams.toString()}`, {
     cache: "no-store",
   });
 
@@ -109,21 +103,20 @@ async function fetchDetalhesPorFilial(
     throw new Error("Erro ao carregar detalhes");
   }
 
-  const json = (await response.json()) as { data: ProdutoDetalhesCompletoPorFilial };
+  const json = (await response.json()) as { data: ProdutoDetalhesCompleto };
   return json.data;
 }
 
-export default function EstoqueDetalhado02Page({
+export default function EstoqueDetalhado01ProdutoPage({
   companyKey,
   companyName,
-}: EstoqueDetalhado02PageProps) {
+}: EstoqueDetalhado01ProdutoPageProps) {
   const router = useRouter();
-  const [detalhes, setDetalhes] = useState<ProdutoDetalhesCompletoPorFilial | null>(null);
+  const [detalhes, setDetalhes] = useState<ProdutoDetalhesCompleto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
   const [filtros, setFiltros] = useState<{
-    produtoNome?: string;
     linha?: string;
     grupo?: string; // Para NERD
     subgrupo?: string;
@@ -132,6 +125,11 @@ export default function EstoqueDetalhado02Page({
   }>({});
   const [sortColumn, setSortColumn] = useState<'estoque' | 'vendasTotais' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  // Scroll para o topo quando o componente montar
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
 
   // Obter parâmetros da URL
   useEffect(() => {
@@ -142,13 +140,11 @@ export default function EstoqueDetalhado02Page({
     const subgrupo = params.get("subgrupo") || undefined;
     const grade = params.get("grade") || undefined;
     const colecao = params.get("colecao") || undefined;
-    const cor = params.get("cor") || undefined;
     const filial = params.get("filial") || null;
 
     setSelectedFilial(filial);
     // Para NERD, usar grupo; para SCARFME, usar linha
     setFiltros({ 
-      produtoNome,
       linha: companyKey === 'nerd' ? undefined : linha, 
       grupo: companyKey === 'nerd' ? grupo : undefined,
       subgrupo, 
@@ -163,7 +159,7 @@ export default function EstoqueDetalhado02Page({
       setError(null);
 
       try {
-        const data = await fetchDetalhesPorFilial(
+        const data = await fetchDetalhes(
           companyKey,
           filial,
           produtoNome,
@@ -171,22 +167,24 @@ export default function EstoqueDetalhado02Page({
           grupo, // Para NERD
           subgrupo,
           grade,
-          colecao,
-          cor
+          colecao
         );
 
         if (active) {
           setDetalhes(data);
           // Se não tiver filtros da URL, usar os dados da primeira variação
-          if (!linha && !subgrupo && !grade && !colecao && data.variacoes.length > 0) {
+          if (!linha && !grupo && !subgrupo && !grade && !colecao && data.variacoes.length > 0) {
             const primeiraVariacao = data.variacoes[0];
             setFiltros({
-              linha: primeiraVariacao.linha,
+              linha: companyKey === 'nerd' ? undefined : primeiraVariacao.linha,
+              grupo: companyKey === 'nerd' ? primeiraVariacao.linha : undefined, // Para NERD, linha é na verdade grupo
               subgrupo: primeiraVariacao.subgrupo,
               grade: primeiraVariacao.grade,
               colecao: primeiraVariacao.colecao,
             });
           }
+          // Scroll para o topo quando os dados carregarem
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }
       } catch (err) {
         if (active) {
@@ -206,37 +204,103 @@ export default function EstoqueDetalhado02Page({
     };
   }, [companyKey]);
 
-  // Função para ordenar variações usando useMemo para garantir recálculo quando estado mudar
-  // DEVE estar antes dos returns condicionais para seguir as regras dos Hooks
+  const handleSort = (column: 'estoque' | 'vendasTotais') => {
+    if (sortColumn === column) {
+      // Se já está ordenando por essa coluna, inverte a direção
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Se é uma nova coluna, verificar se a ordenação padrão já é por essa coluna
+      // Se a ordenação padrão já é por estoque DESC e clicou em estoque, começar com ASC
+      if (column === 'estoque' && !sortColumn) {
+        // Primeira vez clicando em estoque: já está ordenado por estoque DESC, então inverte para ASC
+        setSortColumn(column);
+        setSortDirection('asc');
+      } else {
+        // Nova coluna ou mudando de coluna: começa com desc (maior para menor)
+        setSortColumn(column);
+        setSortDirection('desc');
+      }
+    }
+  };
+
+  // Função para voltar para estoquedetalhado01 (visão de linha/grupo)
+  const handleVoltar = () => {
+    const params = new URLSearchParams();
+    
+    // Obter valores dos filtros ou dos detalhes (prioridade para filtros)
+    const primeiraVariacao = detalhes?.variacoes[0];
+    
+    // Para NERD, usar grupo; para SCARFME, usar linha
+    if (companyKey === 'nerd') {
+      const grupo = filtros.grupo || primeiraVariacao?.linha;
+      if (grupo) {
+        params.set("grupo", grupo);
+      }
+      
+      // Na NERD, não precisamos filtrar por coleção/grade/subgrupo ao voltar
+      // Vai direto para a visão do grupo apenas
+      if (selectedFilial) {
+        params.set("filial", selectedFilial);
+      }
+      
+      // NÃO incluir produtoNome, subgrupo, grade ou colecao - queremos ver todos os produtos do grupo
+      router.push(`/${companyKey}/controle-estoque/estoquedetalhado01?${params.toString()}`);
+    } else {
+      // SCARFME: manter a lógica original com todos os filtros
+      const linha = filtros.linha || primeiraVariacao?.linha;
+      if (linha) {
+        params.set("linha", linha);
+      }
+      
+      // Incluir filtros adicionais se existirem
+      const subgrupo = filtros.subgrupo || primeiraVariacao?.subgrupo;
+      if (subgrupo) {
+        params.set("subgrupo", subgrupo);
+      }
+      
+      const grade = filtros.grade || primeiraVariacao?.grade;
+      if (grade) {
+        params.set("grade", grade);
+      }
+      
+      const colecao = filtros.colecao || primeiraVariacao?.colecao;
+      if (colecao) {
+        params.set("colecao", colecao);
+      }
+      
+      if (selectedFilial) {
+        params.set("filial", selectedFilial);
+      }
+      
+      // NÃO incluir produtoNome - queremos ver todos os produtos da linha/grupo
+      router.push(`/${companyKey}/controle-estoque/estoquedetalhado01?${params.toString()}`);
+    }
+  };
+
+  // Ordenar variações
   const sortedVariacoes = useMemo(() => {
     if (!detalhes) return [];
     
-    return [...detalhes.variacoes].sort((a, b) => {
-      if (!sortColumn) {
-        // Ordenação padrão: por estoque (maior para menor)
-        return b.estoque - a.estoque;
-      }
-      
-      let aValue: number;
-      let bValue: number;
-      
-      if (sortColumn === 'estoque') {
-        aValue = a.estoque;
-        bValue = b.estoque;
-      } else if (sortColumn === 'vendasTotais') {
-        aValue = a.vendasTotais;
-        bValue = b.vendasTotais;
-      } else {
-        return b.estoque - a.estoque;
-      }
-      
-      if (sortDirection === 'asc') {
-        return aValue - bValue;
-      } else {
-        return bValue - aValue;
-      }
-    });
-  }, [detalhes?.variacoes, sortColumn, sortDirection]);
+    let sorted = [...detalhes.variacoes];
+    
+    if (sortColumn) {
+      sorted.sort((a, b) => {
+        const aValue = a[sortColumn];
+        const bValue = b[sortColumn];
+        
+        if (sortDirection === 'asc') {
+          return aValue - bValue;
+        } else {
+          return bValue - aValue;
+        }
+      });
+    } else {
+      // Ordenação padrão: por estoque DESC
+      sorted.sort((a, b) => b.estoque - a.estoque);
+    }
+    
+    return sorted;
+  }, [detalhes, sortColumn, sortDirection]);
 
   if (loading) {
     return (
@@ -262,56 +326,6 @@ export default function EstoqueDetalhado02Page({
     );
   }
 
-  const handleSort = (column: 'estoque' | 'vendasTotais') => {
-    if (sortColumn === column) {
-      // Se já está ordenando por essa coluna, inverte a direção
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      // Se é uma nova coluna, verificar se a ordenação padrão já é por essa coluna
-      // Se a ordenação padrão já é por estoque DESC e clicou em estoque, começar com ASC
-      if (column === 'estoque' && !sortColumn) {
-        // Primeira vez clicando em estoque: já está ordenado por estoque DESC, então inverte para ASC
-        setSortColumn(column);
-        setSortDirection('asc');
-      } else {
-        // Nova coluna ou mudando de coluna: começa com desc (maior para menor)
-        setSortColumn(column);
-        setSortDirection('desc');
-      }
-    }
-  };
-
-  // Função para voltar para estoquedetalhado01
-  const handleVoltar = () => {
-    const params = new URLSearchParams();
-    
-    // Incluir produtoNome para voltar para a página intermediária do produto (estoquedetalhado01-produto)
-    const produtoNome = filtros.produtoNome || detalhes.variacoes[0]?.produto;
-    if (produtoNome) {
-      params.set("produtoNome", produtoNome);
-    }
-    
-    // Para NERD, usar grupo; para SCARFME, usar linha
-    if (companyKey === 'nerd') {
-      if (filtros.grupo || detalhes.variacoes[0]?.linha) {
-        // Para NERD, linha é na verdade grupo
-        params.set("grupo", filtros.grupo || detalhes.variacoes[0]?.linha || '');
-      }
-    } else {
-      if (filtros.linha || detalhes.variacoes[0]?.linha) {
-        params.set("linha", filtros.linha || detalhes.variacoes[0]?.linha || '');
-      }
-    }
-    
-    if (filtros.subgrupo || detalhes.variacoes[0]?.subgrupo) params.set("subgrupo", filtros.subgrupo || detalhes.variacoes[0]?.subgrupo || '');
-    if (filtros.grade || detalhes.variacoes[0]?.grade) params.set("grade", filtros.grade || detalhes.variacoes[0]?.grade || '');
-    if (filtros.colecao || detalhes.variacoes[0]?.colecao) params.set("colecao", filtros.colecao || detalhes.variacoes[0]?.colecao || '');
-    if (selectedFilial) params.set("filial", selectedFilial);
-    
-    // Navegar para estoquedetalhado01-produto (página intermediária que mostra o produto com todas as cores)
-    router.push(`/${companyKey}/controle-estoque/estoquedetalhado01-produto?${params.toString()}`);
-  };
-
   return (
     <div className={styles.wrapper}>
       <div className={styles.header}>
@@ -321,19 +335,15 @@ export default function EstoqueDetalhado02Page({
         >
           ← Voltar
         </button>
-        <h1 className={styles.title}>Detalhes: {detalhes.nomeProduto}</h1>
+        <h1 className={styles.title}>Produto: {detalhes.variacoes[0]?.produto || detalhes.nomeProduto}</h1>
       </div>
 
       {/* Cabeçalho com informações do produto */}
       <div className={styles.infoHeader}>
         <div className={styles.infoRow}>
           <div className={styles.infoItem}>
-            <span className={styles.infoLabel}>PRODUTO:</span>
-            <span className={styles.infoValue}>{detalhes.variacoes[0]?.produto || '-'}</span>
-          </div>
-          <div className={styles.infoItem}>
-            <span className={styles.infoLabel}>LINHA:</span>
-            <span className={styles.infoValue}>{filtros.linha || detalhes.variacoes[0]?.linha || '-'}</span>
+            <span className={styles.infoLabel}>{companyKey === 'nerd' ? 'GRUPO:' : 'LINHA:'}</span>
+            <span className={styles.infoValue}>{companyKey === 'nerd' ? (filtros.grupo || detalhes.variacoes[0]?.linha || '-') : (filtros.linha || detalhes.variacoes[0]?.linha || '-')}</span>
           </div>
           <div className={styles.infoItem}>
             <span className={styles.infoLabel}>SUBGRUPO:</span>
@@ -353,8 +363,8 @@ export default function EstoqueDetalhado02Page({
       {/* Resumo de Métricas */}
       <div className={styles.metricsGrid}>
         <div className={styles.metricCard}>
-          <div className={styles.metricLabel}>TOTAL DE FILIAIS</div>
-          <div className={styles.metricValue}>{detalhes.resumo.totalFiliais}</div>
+          <div className={styles.metricLabel}>TOTAL DE CORES</div>
+          <div className={styles.metricValue}>{detalhes.resumo.totalItens}</div>
         </div>
         <div className={styles.metricCard}>
           <div className={styles.metricLabel}>ESTOQUE TOTAL</div>
@@ -376,14 +386,14 @@ export default function EstoqueDetalhado02Page({
         </div>
       </div>
 
-      {/* Tabela de Variações por Filial */}
+      {/* Tabela de Variações por Cor */}
       <div className={styles.tableWrapper}>
         <table className={styles.detailsTable}>
           <thead>
             <tr>
+              <th>PRODUTO</th>
               <th>DESCRIÇÃO</th>
               <th>COR</th>
-              <th>FILIAL</th>
               <th 
                 className={styles.sortableHeader}
                 onClick={() => handleSort('estoque')}
@@ -411,17 +421,43 @@ export default function EstoqueDetalhado02Page({
             </tr>
           </thead>
           <tbody>
-            {sortedVariacoes.map((variacao, index) => (
-              <tr key={`${variacao.produto}-${variacao.cor}-${variacao.filial}-${index}`} className={index % 2 === 0 ? styles.evenRow : styles.oddRow}>
-                <td>{variacao.descricao}</td>
-                <td>{variacao.cor}</td>
-                <td>{variacao.filial}</td>
-                <td>{formatNumber(variacao.estoque)}</td>
-                <td>{formatCurrency(variacao.custoUnitario)}</td>
-                <td>{formatCurrency(variacao.custoTotal)}</td>
-                <td>{formatNumber(variacao.vendasTotais)}</td>
-              </tr>
-            ))}
+            {sortedVariacoes.map((variacao, index) => {
+              // Construir URL para estoquedetalhado02 (produto por cor e filial) - com cor
+              const paramsCor = new URLSearchParams();
+              if (variacao.produto) paramsCor.set("produtoNome", variacao.produto);
+              if (variacao.cor) paramsCor.set("cor", variacao.cor); // Adicionar cor para filtrar
+              
+              // Para NERD, passar grupo; para SCARFME, passar linha
+              if (companyKey === 'nerd') {
+                if (filtros.grupo || variacao.linha) paramsCor.set("grupo", filtros.grupo || variacao.linha || ''); // Para NERD, linha é grupo
+              } else {
+                if (filtros.linha || variacao.linha) paramsCor.set("linha", filtros.linha || variacao.linha || '');
+              }
+              
+              if (filtros.subgrupo || variacao.subgrupo) paramsCor.set("subgrupo", filtros.subgrupo || variacao.subgrupo || '');
+              if (filtros.grade || variacao.grade) paramsCor.set("grade", filtros.grade || variacao.grade || '');
+              if (filtros.colecao || variacao.colecao) paramsCor.set("colecao", filtros.colecao || variacao.colecao || '');
+              if (selectedFilial) paramsCor.set("filial", selectedFilial);
+
+              return (
+                <tr key={`${variacao.produto}-${variacao.cor}-${index}`} className={index % 2 === 0 ? styles.evenRow : styles.oddRow}>
+                  <td>{variacao.produto}</td>
+                  <td>{variacao.descricao}</td>
+                  <td>
+                    <Link
+                      href={`/${companyKey}/controle-estoque/estoquedetalhado02?${paramsCor.toString()}`}
+                      className={styles.productLink}
+                    >
+                      {variacao.cor}
+                    </Link>
+                  </td>
+                  <td>{formatNumber(variacao.estoque)}</td>
+                  <td>{formatCurrency(variacao.custoUnitario)}</td>
+                  <td>{formatCurrency(variacao.custoTotal)}</td>
+                  <td>{formatNumber(variacao.vendasTotais)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

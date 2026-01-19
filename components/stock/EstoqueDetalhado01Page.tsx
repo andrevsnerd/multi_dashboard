@@ -58,6 +58,7 @@ async function fetchDetalhes(
   filial: string | null,
   produtoNome?: string,
   linha?: string,
+  grupo?: string,
   subgrupo?: string,
   grade?: string,
   colecao?: string
@@ -76,6 +77,10 @@ async function fetchDetalhes(
 
   if (linha) {
     searchParams.set("linha", linha);
+  }
+
+  if (grupo) {
+    searchParams.set("grupo", grupo);
   }
 
   if (subgrupo) {
@@ -113,6 +118,7 @@ export default function EstoqueDetalhado01Page({
   const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
   const [filtros, setFiltros] = useState<{
     linha?: string;
+    grupo?: string; // Para NERD
     subgrupo?: string;
     grade?: string;
     colecao?: string;
@@ -130,13 +136,21 @@ export default function EstoqueDetalhado01Page({
     const params = new URLSearchParams(window.location.search);
     const produtoNome = params.get("produtoNome") || undefined;
     const linha = params.get("linha") || undefined;
+    const grupo = params.get("grupo") || undefined; // Para NERD
     const subgrupo = params.get("subgrupo") || undefined;
     const grade = params.get("grade") || undefined;
     const colecao = params.get("colecao") || undefined;
     const filial = params.get("filial") || null;
 
     setSelectedFilial(filial);
-    setFiltros({ linha, subgrupo, grade, colecao });
+    // Para NERD, usar grupo; para SCARFME, usar linha
+    setFiltros({ 
+      linha: companyKey === 'nerd' ? undefined : linha, 
+      grupo: companyKey === 'nerd' ? grupo : undefined,
+      subgrupo, 
+      grade, 
+      colecao 
+    });
 
     let active = true;
 
@@ -150,6 +164,7 @@ export default function EstoqueDetalhado01Page({
           filial,
           produtoNome,
           linha,
+          grupo, // Para NERD
           subgrupo,
           grade,
           colecao
@@ -158,10 +173,11 @@ export default function EstoqueDetalhado01Page({
         if (active) {
           setDetalhes(data);
           // Se não tiver filtros da URL, usar os dados da primeira variação
-          if (!linha && !subgrupo && !grade && !colecao && data.variacoes.length > 0) {
+          if (!linha && !grupo && !subgrupo && !grade && !colecao && data.variacoes.length > 0) {
             const primeiraVariacao = data.variacoes[0];
             setFiltros({
-              linha: primeiraVariacao.linha,
+              linha: companyKey === 'nerd' ? undefined : primeiraVariacao.linha,
+              grupo: companyKey === 'nerd' ? primeiraVariacao.linha : undefined, // Para NERD, linha é na verdade grupo
               subgrupo: primeiraVariacao.subgrupo,
               grade: primeiraVariacao.grade,
               colecao: primeiraVariacao.colecao,
@@ -263,9 +279,88 @@ export default function EstoqueDetalhado01Page({
     }
   };
 
-  // Função para voltar para a página principal de controle de estoque
+  // Função para voltar progressivamente pelos níveis
+  // Volta progressivamente: colecao -> grade -> subgrupo -> linha/grupo -> principal
   const handleVoltar = () => {
-    router.push(`/${companyKey}/controle-estoque`);
+    // Ler parâmetros diretamente da URL para garantir que temos os valores corretos
+    const urlParams = new URLSearchParams(window.location.search);
+    const linha = urlParams.get("linha");
+    const grupo = urlParams.get("grupo");
+    const subgrupo = urlParams.get("subgrupo");
+    const grade = urlParams.get("grade");
+    const colecao = urlParams.get("colecao");
+    const filial = urlParams.get("filial");
+    
+    // Verificar se os valores não estão vazios
+    const temColecao = colecao && colecao.trim() !== '';
+    const temGrade = grade && grade.trim() !== '';
+    const temSubgrupo = subgrupo && subgrupo.trim() !== '';
+    
+    let targetUrl = '';
+    
+    if (companyKey === 'nerd') {
+      // NERD: usar grupo
+      if (grupo && grupo.trim() !== '') {
+        // Voltar progressivamente removendo níveis mais específicos
+        if (temColecao && temGrade && temSubgrupo) {
+          // Tem tudo: voltar removendo colecao, grade e subgrupo, mantendo apenas grupo
+          const params = new URLSearchParams();
+          params.set("grupo", grupo.trim());
+          if (filial) params.set("filial", filial);
+          targetUrl = `/${companyKey}/controle-estoque/estoquedetalhado01?${params.toString()}`;
+        } else if (temGrade && temSubgrupo) {
+          // Tem grade e subgrupo: voltar removendo grade e subgrupo, mantendo apenas grupo
+          const params = new URLSearchParams();
+          params.set("grupo", grupo.trim());
+          if (filial) params.set("filial", filial);
+          targetUrl = `/${companyKey}/controle-estoque/estoquedetalhado01?${params.toString()}`;
+        } else if (temSubgrupo) {
+          // Tem só subgrupo: voltar removendo subgrupo, mantendo apenas grupo
+          const params = new URLSearchParams();
+          params.set("grupo", grupo.trim());
+          if (filial) params.set("filial", filial);
+          targetUrl = `/${companyKey}/controle-estoque/estoquedetalhado01?${params.toString()}`;
+        } else {
+          // Só tem grupo: voltar para página principal sem filtros
+          targetUrl = `/${companyKey}/controle-estoque`;
+        }
+      }
+    } else {
+      // SCARFME: usar linha
+      if (linha && linha.trim() !== '') {
+        // Voltar progressivamente removendo níveis mais específicos
+        if (temColecao && temGrade && temSubgrupo) {
+          // Tem tudo: voltar removendo colecao, grade e subgrupo, mantendo apenas linha
+          const params = new URLSearchParams();
+          params.set("linha", linha.trim());
+          if (filial) params.set("filial", filial);
+          targetUrl = `/${companyKey}/controle-estoque/estoquedetalhado01?${params.toString()}`;
+        } else if (temGrade && temSubgrupo) {
+          // Tem grade e subgrupo: voltar removendo grade e subgrupo, mantendo apenas linha
+          const params = new URLSearchParams();
+          params.set("linha", linha.trim());
+          if (filial) params.set("filial", filial);
+          targetUrl = `/${companyKey}/controle-estoque/estoquedetalhado01?${params.toString()}`;
+        } else if (temSubgrupo) {
+          // Tem só subgrupo: voltar removendo subgrupo, mantendo apenas linha
+          const params = new URLSearchParams();
+          params.set("linha", linha.trim());
+          if (filial) params.set("filial", filial);
+          targetUrl = `/${companyKey}/controle-estoque/estoquedetalhado01?${params.toString()}`;
+        } else {
+          // Só tem linha: voltar para página principal sem filtros
+          targetUrl = `/${companyKey}/controle-estoque`;
+        }
+      }
+    }
+    
+    // Se não há nenhum filtro ou targetUrl não foi definido, voltar para página principal limpa
+    if (!targetUrl) {
+      targetUrl = `/${companyKey}/controle-estoque`;
+    }
+    
+    // Usar window.location.href para forçar uma navegação completa
+    window.location.href = targetUrl;
   };
 
   return (
@@ -364,28 +459,59 @@ export default function EstoqueDetalhado01Page({
           </thead>
           <tbody>
             {sortedVariacoes.map((variacao, index) => {
-              // Construir URL para estoquedetalhado02 com os parâmetros necessários
-              const params = new URLSearchParams();
-              if (variacao.produto) params.set("produtoNome", variacao.produto);
-              if (variacao.cor) params.set("cor", variacao.cor); // Adicionar cor para filtrar
-              if (filtros.linha || variacao.linha) params.set("linha", filtros.linha || variacao.linha || '');
-              if (filtros.subgrupo || variacao.subgrupo) params.set("subgrupo", filtros.subgrupo || variacao.subgrupo || '');
-              if (filtros.grade || variacao.grade) params.set("grade", filtros.grade || variacao.grade || '');
-              if (filtros.colecao || variacao.colecao) params.set("colecao", filtros.colecao || variacao.colecao || '');
-              if (selectedFilial) params.set("filial", selectedFilial);
+              // Construir URL para estoquedetalhado01 (produto específico com todas as cores) - sem cor
+              const paramsProduto = new URLSearchParams();
+              if (variacao.produto) paramsProduto.set("produtoNome", variacao.produto);
+              // Não passar cor aqui - queremos ver todas as cores do produto
+              
+              // Para NERD, passar grupo; para SCARFME, passar linha
+              if (companyKey === 'nerd') {
+                if (filtros.grupo || variacao.linha) paramsProduto.set("grupo", filtros.grupo || variacao.linha || ''); // Para NERD, linha é grupo
+              } else {
+                if (filtros.linha || variacao.linha) paramsProduto.set("linha", filtros.linha || variacao.linha || '');
+              }
+              
+              if (filtros.subgrupo || variacao.subgrupo) paramsProduto.set("subgrupo", filtros.subgrupo || variacao.subgrupo || '');
+              if (filtros.grade || variacao.grade) paramsProduto.set("grade", filtros.grade || variacao.grade || '');
+              if (filtros.colecao || variacao.colecao) paramsProduto.set("colecao", filtros.colecao || variacao.colecao || '');
+              if (selectedFilial) paramsProduto.set("filial", selectedFilial);
+
+              // Construir URL para estoquedetalhado02 (produto por cor e filial) - com cor
+              const paramsCor = new URLSearchParams();
+              if (variacao.produto) paramsCor.set("produtoNome", variacao.produto);
+              if (variacao.cor) paramsCor.set("cor", variacao.cor); // Adicionar cor para filtrar
+              
+              // Para NERD, passar grupo; para SCARFME, passar linha
+              if (companyKey === 'nerd') {
+                if (filtros.grupo || variacao.linha) paramsCor.set("grupo", filtros.grupo || variacao.linha || ''); // Para NERD, linha é grupo
+              } else {
+                if (filtros.linha || variacao.linha) paramsCor.set("linha", filtros.linha || variacao.linha || '');
+              }
+              
+              if (filtros.subgrupo || variacao.subgrupo) paramsCor.set("subgrupo", filtros.subgrupo || variacao.subgrupo || '');
+              if (filtros.grade || variacao.grade) paramsCor.set("grade", filtros.grade || variacao.grade || '');
+              if (filtros.colecao || variacao.colecao) paramsCor.set("colecao", filtros.colecao || variacao.colecao || '');
+              if (selectedFilial) paramsCor.set("filial", selectedFilial);
 
               return (
                 <tr key={`${variacao.produto}-${variacao.cor}-${index}`} className={index % 2 === 0 ? styles.evenRow : styles.oddRow}>
                   <td>
                     <Link
-                      href={`/${companyKey}/controle-estoque/estoquedetalhado02?${params.toString()}`}
+                      href={`/${companyKey}/controle-estoque/estoquedetalhado01-produto?${paramsProduto.toString()}`}
                       className={styles.productLink}
                     >
                       {variacao.produto}
                     </Link>
                   </td>
                   <td>{variacao.descricao}</td>
-                  <td>{variacao.cor}</td>
+                  <td>
+                    <Link
+                      href={`/${companyKey}/controle-estoque/estoquedetalhado02?${paramsCor.toString()}`}
+                      className={styles.productLink}
+                    >
+                      {variacao.cor}
+                    </Link>
+                  </td>
                   <td>{formatNumber(variacao.estoque)}</td>
                   <td>{formatCurrency(variacao.custoUnitario)}</td>
                   <td>{formatCurrency(variacao.custoTotal)}</td>

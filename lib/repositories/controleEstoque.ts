@@ -2205,7 +2205,8 @@ export interface ProdutoDetalhesParams {
   company?: string;
   filial?: string | null;
   produtoNome?: string; // Nome do produto/linha (ex: "PASHMINA")
-  linha?: string; // Linha específica
+  linha?: string; // Linha específica (SCARFME)
+  grupo?: string; // Grupo específico (NERD)
   subgrupo?: string; // Subgrupo específico
   grade?: string; // Grade específica
   colecao?: string; // Coleção específica
@@ -2220,6 +2221,7 @@ export async function fetchProdutoDetalhes({
   filial,
   produtoNome,
   linha,
+  grupo,
   subgrupo,
   grade,
   colecao,
@@ -2238,28 +2240,56 @@ export async function fetchProdutoDetalhes({
     const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
     
     // Construir filtros baseados nos parâmetros
-    let produtoFilter = '';
+    // Criar filtros separados para estoque (alias 'e') e vendas (alias 'vp')
+    let produtoFilterEstoque = '';
+    let produtoFilterVendas = '';
     
-    // Se linha for fornecida, usar ela; senão, usar produtoNome como linha
-    const linhaParaFiltrar = linha || produtoNome;
-    if (linhaParaFiltrar) {
-      request.input('linhaFiltro', sql.VarChar, linhaParaFiltrar.toUpperCase().trim());
-      produtoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linhaFiltro`;
+    // PRIORIDADE 1: Se produtoNome for fornecido, filtrar diretamente pelo código do produto
+    if (produtoNome) {
+      const produtoNormalizado = produtoNome.trim().replace(/\s+/g, '');
+      request.input('produtoCodigoEstoque', sql.VarChar, produtoNormalizado);
+      request.input('produtoCodigoVendas', sql.VarChar, produtoNormalizado);
+      produtoFilterEstoque = `AND LTRIM(RTRIM(e.PRODUTO)) = @produtoCodigoEstoque`;
+      produtoFilterVendas = `AND LTRIM(RTRIM(vp.PRODUTO)) = @produtoCodigoVendas`;
+    } else {
+      // Se não houver produtoNome, usar filtros por categoria (grupo/linha)
+      // Para NERD: usar grupo, para SCARFME: usar linha
+      if (company === 'nerd' && grupo) {
+        request.input('grupoFiltro', sql.VarChar, grupo.toUpperCase().trim());
+        produtoFilterEstoque = `AND UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupoFiltro`;
+        produtoFilterVendas = `AND UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupoFiltro`;
+      } else if (linha) {
+        // SCARFME: Se linha for fornecida, usar ela
+        request.input('linhaFiltro', sql.VarChar, linha.toUpperCase().trim());
+        produtoFilterEstoque = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linhaFiltro`;
+        produtoFilterVendas = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linhaFiltro`;
+      }
     }
     
+    // Filtros adicionais (subgrupo, grade, colecao) - aplicar em ambos os filtros
     if (subgrupo) {
       request.input('subgrupo', sql.VarChar, subgrupo.toUpperCase().trim());
-      produtoFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupo`;
+      produtoFilterEstoque += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupo`;
+      produtoFilterVendas += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupo`;
     }
     
     if (grade) {
       request.input('grade', sql.VarChar, grade.toUpperCase().trim());
-      produtoFilter += ` AND UPPER(LTRIM(RTRIM(CONVERT(VARCHAR, p.GRADE)))) = @grade`;
+      produtoFilterEstoque += ` AND UPPER(LTRIM(RTRIM(CONVERT(VARCHAR, p.GRADE)))) = @grade`;
+      produtoFilterVendas += ` AND UPPER(LTRIM(RTRIM(CONVERT(VARCHAR, p.GRADE)))) = @grade`;
     }
     
     if (colecao) {
       request.input('colecao', sql.VarChar, colecao.toUpperCase().trim());
-      produtoFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao`;
+      produtoFilterEstoque += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao`;
+      produtoFilterVendas += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao`;
+    }
+    
+    // Para NERD, também aplicar filtro de grupo se fornecido (para garantir que está no grupo correto)
+    if (produtoNome && company === 'nerd' && grupo) {
+      request.input('grupoFiltro', sql.VarChar, grupo.toUpperCase().trim());
+      produtoFilterEstoque += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupoFiltro`;
+      produtoFilterVendas += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupoFiltro`;
     }
 
     // Buscar todas as variações do produto com estoque
@@ -2267,7 +2297,7 @@ export async function fetchProdutoDetalhes({
       SELECT 
         e.PRODUTO AS produto,
         ISNULL(p.DESC_PRODUTO, '') AS descricao,
-        ISNULL(p.LINHA, '') AS linha,
+        ${company === 'nerd' ? 'ISNULL(p.GRUPO_PRODUTO, \'\') AS linha,' : 'ISNULL(p.LINHA, \'\') AS linha,'}
         ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
         ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
         ISNULL(p.COLECAO, '') AS colecao,
@@ -2280,13 +2310,13 @@ export async function fetchProdutoDetalhes({
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
       WHERE 1=1
         ${estoqueFilialFilter}
-        ${produtoFilter}
+        ${produtoFilterEstoque}
         AND e.ESTOQUE > 0
-        AND ISNULL(p.LINHA, '') <> ''
+        ${company === 'nerd' ? `AND ISNULL(p.GRUPO_PRODUTO, '') <> ''` : `AND ISNULL(p.LINHA, '') <> ''`}
       GROUP BY 
         e.PRODUTO,
         p.DESC_PRODUTO,
-        p.LINHA,
+        ${company === 'nerd' ? 'p.GRUPO_PRODUTO,' : 'p.LINHA,'}
         p.SUBGRUPO_PRODUTO,
         p.GRADE,
         p.COLECAO,
@@ -2322,8 +2352,8 @@ export async function fetchProdutoDetalhes({
         AND vp.DATA_VENDA < @endDate
         AND vp.QTDE > 0
         ${vendasFilialFilter}
-        ${produtoFilter}
-        AND ISNULL(p.LINHA, '') <> ''
+        ${produtoFilterVendas}
+        ${company === 'nerd' ? `AND ISNULL(p.GRUPO_PRODUTO, '') <> ''` : `AND ISNULL(p.LINHA, '') <> ''`}
       GROUP BY 
         vp.PRODUTO,
         COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO)
@@ -2367,10 +2397,10 @@ export async function fetchProdutoDetalhes({
     const custoTotal = variacoes.reduce((sum, v) => sum + v.custoTotal, 0);
     const vendasTotais = variacoes.reduce((sum, v) => sum + v.vendasTotais, 0);
 
-    // Determinar nome do produto (usar linha se disponível, senão usar produtoNome ou linha do parâmetro)
+    // Determinar nome do produto (usar linha/grupo se disponível, senão usar produtoNome ou linha/grupo do parâmetro)
     const nomeProduto = variacoes.length > 0 
-      ? variacoes[0].linha || linha || produtoNome || 'Produto'
-      : linha || produtoNome || 'Produto';
+      ? variacoes[0].linha || (company === 'nerd' ? grupo : linha) || produtoNome || 'Produto'
+      : (company === 'nerd' ? grupo : linha) || produtoNome || 'Produto';
 
     return {
       nomeProduto,
@@ -2430,6 +2460,7 @@ export async function fetchProdutoDetalhesPorFilial({
   filial,
   produtoNome,
   linha,
+  grupo,
   subgrupo,
   grade,
   colecao,
@@ -2457,10 +2488,16 @@ export async function fetchProdutoDetalhesPorFilial({
       const produtoCodigoNormalizado = produtoNome.toUpperCase().trim().replace(/\s+/g, '');
       request.input('produtoCodigoEstoque', sql.VarChar, produtoCodigoNormalizado);
       produtoFilter = `AND UPPER(REPLACE(LTRIM(RTRIM(e.PRODUTO)), ' ', '')) = @produtoCodigoEstoque`;
-    } else if (linha) {
-      // Se não tiver produtoNome mas tiver linha, usar linha
-      request.input('linhaFiltro', sql.VarChar, linha.toUpperCase().trim());
-      produtoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linhaFiltro`;
+    } else {
+      // Para NERD: usar grupo, para SCARFME: usar linha
+      if (company === 'nerd' && grupo) {
+        request.input('grupoFiltro', sql.VarChar, grupo.toUpperCase().trim());
+        produtoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupoFiltro`;
+      } else if (linha) {
+        // SCARFME: Se não tiver produtoNome mas tiver linha, usar linha
+        request.input('linhaFiltro', sql.VarChar, linha.toUpperCase().trim());
+        produtoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linhaFiltro`;
+      }
     }
     
     if (subgrupo) {
@@ -2492,7 +2529,7 @@ export async function fetchProdutoDetalhesPorFilial({
       SELECT 
         e.PRODUTO AS produto,
         ISNULL(p.DESC_PRODUTO, '') AS descricao,
-        ISNULL(p.LINHA, '') AS linha,
+        ${company === 'nerd' ? 'ISNULL(p.GRUPO_PRODUTO, \'\') AS linha,' : 'ISNULL(p.LINHA, \'\') AS linha,'}
         ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
         ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
         ISNULL(p.COLECAO, '') AS colecao,
@@ -2509,11 +2546,11 @@ export async function fetchProdutoDetalhesPorFilial({
         ${produtoFilter}
         ${corFilter}
         AND e.ESTOQUE > 0
-        AND ISNULL(p.LINHA, '') <> ''
+        ${company === 'nerd' ? `AND ISNULL(p.GRUPO_PRODUTO, '') <> ''` : `AND ISNULL(p.LINHA, '') <> ''`}
       GROUP BY 
         e.PRODUTO,
         p.DESC_PRODUTO,
-        p.LINHA,
+        ${company === 'nerd' ? 'p.GRUPO_PRODUTO,' : 'p.LINHA,'}
         p.SUBGRUPO_PRODUTO,
         p.GRADE,
         p.COLECAO,

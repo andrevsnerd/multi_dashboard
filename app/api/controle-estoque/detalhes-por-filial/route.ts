@@ -8,6 +8,7 @@ export async function GET(request: Request) {
   const filial = searchParams.get('filial') || null;
   const produtoNome = searchParams.get('produtoNome') || undefined;
   const linha = searchParams.get('linha') || undefined;
+  const grupo = searchParams.get('grupo') || undefined; // Para NERD
   const subgrupo = searchParams.get('subgrupo') || undefined;
   const grade = searchParams.get('grade') || undefined;
   const colecao = searchParams.get('colecao') || undefined;
@@ -19,6 +20,7 @@ export async function GET(request: Request) {
       filial,
       produtoNome,
       linha,
+      grupo, // Para NERD
       subgrupo,
       grade,
       colecao,
