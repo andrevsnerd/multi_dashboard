@@ -24,23 +24,34 @@ export interface GoalData {
  * Obtém as variáveis de ambiente do Redis (suporta prefixo customizado)
  */
 function getRedisEnv() {
-  // Tenta primeiro com prefixo padrão (UPSTASH_REDIS_REST_*)
+  // Tenta primeiro com prefixo padrão do Upstash (UPSTASH_REDIS_REST_*)
   let url = process.env.UPSTASH_REDIS_REST_URL;
   let token = process.env.UPSTASH_REDIS_REST_TOKEN;
   
-  // Se não encontrar, tenta com prefixo customizado (procura qualquer variável que termine com _REDIS_REST_URL)
+  // Se não encontrar, tenta com prefixo do Vercel KV (KV_REST_API_*)
   if (!url || !token) {
-    // Procura variáveis que terminam com _REDIS_REST_URL e _REDIS_REST_TOKEN
+    url = process.env.KV_REST_API_URL;
+    token = process.env.KV_REST_API_TOKEN;
+    
+    if (url && token) {
+      console.log('[goals-storage] Variáveis encontradas com prefixo KV_REST_API_*');
+    }
+  }
+  
+  // Se ainda não encontrar, tenta com prefixo customizado (procura qualquer variável relacionada)
+  if (!url || !token) {
     const envKeys = Object.keys(process.env);
     const urlKey = envKeys.find(key => 
       key.endsWith('_REDIS_REST_URL') || 
       key.endsWith('_REDIS_URL') ||
-      key.includes('UPSTASH') && key.includes('URL')
+      (key.includes('UPSTASH') && key.includes('URL')) ||
+      (key.includes('KV') && key.includes('URL') && key.includes('REST'))
     );
     const tokenKey = envKeys.find(key => 
       key.endsWith('_REDIS_REST_TOKEN') || 
       key.endsWith('_REDIS_TOKEN') ||
-      key.includes('UPSTASH') && key.includes('TOKEN')
+      (key.includes('UPSTASH') && key.includes('TOKEN')) ||
+      (key.includes('KV') && key.includes('TOKEN') && key.includes('REST'))
     );
     
     if (urlKey && tokenKey) {
