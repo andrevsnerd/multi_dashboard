@@ -84,6 +84,7 @@ export async function GET(request: Request) {
           subgrupo,
           grade,
           colecao,
+          range,
           ...filters,
         });
         return NextResponse.json({ data: detalhes });
@@ -110,6 +111,7 @@ export async function GET(request: Request) {
           subgrupo,
           grade,
           colecao,
+          range,
           ...filters,
         });
         return NextResponse.json({ data: detalhes });
@@ -136,6 +138,7 @@ export async function GET(request: Request) {
           subgrupo,
           grade,
           colecao,
+          range,
           ...filters,
         });
         return NextResponse.json({ data: detalhes });

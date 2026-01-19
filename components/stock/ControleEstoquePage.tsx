@@ -1409,9 +1409,9 @@ export default function ControleEstoquePage({
                     setDetalhesVendas(vendasData.data || []);
                     setLoadingDetalhes(false);
                   }}
-                  title="Clique para ver detalhes das entradas da semana"
+                  title="Clique para ver detalhes das entradas do período"
                 >
-                  {cat.tendenciaSemanal >= 0 ? "+" : ""}{formatNumber(cat.tendenciaSemanal)} na Semana
+                  {cat.tendenciaSemanal >= 0 ? "+" : ""}{formatNumber(cat.tendenciaSemanal)} no Período
                 </div>
               </div>
               <div className={styles.categoriaContent}>
@@ -1593,7 +1593,7 @@ export default function ControleEstoquePage({
         >
           <div className={styles.modalContent}>
             <div className={styles.modalHeader}>
-              <h2>Detalhes da Semana</h2>
+              <h2>Detalhes do Período</h2>
               <button 
                 className={styles.modalClose}
                 onClick={() => {
@@ -1618,22 +1618,30 @@ export default function ControleEstoquePage({
               </div>
 
               {/* Resumo */}
-              <div className={styles.modalResumo}>
-                <div className={styles.resumoItem}>
-                  <span className={styles.resumoLabel}>Entradas:</span>
-                  <span className={styles.resumoValue}>{detalhesEntradas.reduce((sum, e) => sum + e.quantidade, 0)}</span>
-                </div>
-                <div className={styles.resumoItem}>
-                  <span className={styles.resumoLabel}>Vendas:</span>
-                  <span className={styles.resumoValue}>{detalhesVendas.reduce((sum, v) => sum + v.quantidade, 0)}</span>
-                </div>
-                <div className={styles.resumoItem}>
-                  <span className={styles.resumoLabel}>Variação:</span>
-                  <span className={`${styles.resumoValue} ${categoriaModal.tendenciaSemanal < 0 ? styles.negative : styles.positive}`}>
-                    {categoriaModal.tendenciaSemanal >= 0 ? '+' : ''}{categoriaModal.tendenciaSemanal}
-                  </span>
-                </div>
-              </div>
+              {(() => {
+                const totalEntradas = detalhesEntradas.reduce((sum, e) => sum + (e.quantidade || 0), 0);
+                const totalVendas = detalhesVendas.reduce((sum, v) => sum + (v.quantidade || 0), 0);
+                const variacao = totalEntradas - totalVendas;
+                
+                return (
+                  <div className={styles.modalResumo}>
+                    <div className={styles.resumoItem}>
+                      <span className={styles.resumoLabel}>Entradas:</span>
+                      <span className={styles.resumoValue}>{totalEntradas}</span>
+                    </div>
+                    <div className={styles.resumoItem}>
+                      <span className={styles.resumoLabel}>Vendas:</span>
+                      <span className={styles.resumoValue}>{totalVendas}</span>
+                    </div>
+                    <div className={styles.resumoItem}>
+                      <span className={styles.resumoLabel}>Variação:</span>
+                      <span className={`${styles.resumoValue} ${variacao < 0 ? styles.negative : styles.positive}`}>
+                        {variacao >= 0 ? '+' : ''}{variacao}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Abas */}
               <div className={styles.modalTabs}>
@@ -1641,13 +1649,13 @@ export default function ControleEstoquePage({
                   className={`${styles.modalTab} ${abaAtiva === 'entradas' ? styles.modalTabActive : ''}`}
                   onClick={() => setAbaAtiva('entradas')}
                 >
-                  Entradas ({detalhesEntradas.length})
+                  Entradas ({detalhesEntradas.reduce((sum, e) => sum + (e.quantidade || 0), 0)})
                 </button>
                 <button
                   className={`${styles.modalTab} ${abaAtiva === 'vendas' ? styles.modalTabActive : ''}`}
                   onClick={() => setAbaAtiva('vendas')}
                 >
-                  Vendas ({detalhesVendas.length})
+                  Vendas ({detalhesVendas.reduce((sum, v) => sum + (v.quantidade || 0), 0)})
                 </button>
               </div>
               
@@ -1655,7 +1663,7 @@ export default function ControleEstoquePage({
                 <div className={styles.modalLoading}>Carregando detalhes...</div>
               ) : abaAtiva === 'entradas' ? (
                 detalhesEntradas.length === 0 ? (
-                  <div className={styles.modalEmpty}>Nenhuma entrada encontrada na semana.</div>
+                  <div className={styles.modalEmpty}>Nenhuma entrada encontrada no período.</div>
                 ) : (
                   <div className={styles.detalhesTable}>
                     <table>
@@ -1690,7 +1698,7 @@ export default function ControleEstoquePage({
                 )
               ) : (
                 detalhesVendas.length === 0 ? (
-                  <div className={styles.modalEmpty}>Nenhuma venda encontrada na semana.</div>
+                  <div className={styles.modalEmpty}>Nenhuma venda encontrada no período.</div>
                 ) : (
                   <div className={styles.detalhesTable}>
                     <table>

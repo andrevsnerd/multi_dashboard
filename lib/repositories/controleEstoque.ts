@@ -705,13 +705,21 @@ export async function fetchEstoquePorCategoria({
       vendasPorCategoriaMes.get(chaveCategoria)!.set(chaveAnoMes, vendas);
     });
 
-    // Calcular histórico semanal: estoque da semana passada
-    // IMPORTANTE: As principais entradas sempre são na matriz (SCARF ME - MATRIZ ou NERD)
-    // Produtos entram primeiro na matriz após compra, depois são transferidos para lojas
-    // Transferências não devem ser contadas como entradas reais (mantém mesma quantidade total)
-    // Estoque Semana Passada = Estoque Atual - Entradas na Matriz (7 dias) + Vendas (7 dias) + E-commerce (7 dias)
-    const data7DiasAtras = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    request.input('data7DiasAtras', sql.DateTime, data7DiasAtras);
+    // Calcular período baseado no range selecionado
+    // Usar normalizeRangeForQuery para garantir tratamento correto de timezone e inclusão do último dia
+    const normalizedRange = normalizeRangeForQuery(range);
+    const periodoStart = normalizedRange.start;
+    const periodoEnd = normalizedRange.end;
+    
+    // Calcular período anterior com a mesma duração
+    const duracaoPeriodo = periodoEnd.getTime() - periodoStart.getTime();
+    const periodoAnteriorEnd = new Date(periodoStart.getTime() - 1); // Um dia antes do início do período atual
+    const periodoAnteriorStart = new Date(periodoAnteriorEnd.getTime() - duracaoPeriodo);
+    
+    request.input('periodoStart', sql.DateTime, periodoStart);
+    request.input('periodoEnd', sql.DateTime, periodoEnd);
+    request.input('periodoAnteriorStart', sql.DateTime, periodoAnteriorStart);
+    request.input('periodoAnteriorEnd', sql.DateTime, periodoAnteriorEnd);
 
     // Criar filtros separados para query de entradas (usar prefixo 'pr')
     // Nota: Como os filtros já foram criados com 'p', vamos reutilizar os mesmos parâmetros SQL
@@ -808,7 +816,8 @@ export async function fetchEstoquePorCategoria({
       LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
       LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
       WHERE pr.PRODUTO IS NOT NULL
-        AND E.EMISSAO >= @data7DiasAtras
+        AND E.EMISSAO >= @periodoStart
+        AND E.EMISSAO < @periodoEnd
         ${matrizFilialFilter}
         ${grupoFilterEntradas}
         ${linhaFilterEntradas}
@@ -848,7 +857,8 @@ export async function fetchEstoquePorCategoria({
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-      WHERE vp.DATA_VENDA >= @data7DiasAtras
+      WHERE vp.DATA_VENDA >= @periodoStart
+        AND vp.DATA_VENDA < @periodoEnd
         AND vp.QTDE > 0
         ${vendasFilialFilter}
         ${grupoFilter}
@@ -936,7 +946,8 @@ export async function fetchEstoquePorCategoria({
         JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) 
           ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
         LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
-        WHERE f.EMISSAO >= @data7DiasAtras
+        WHERE f.EMISSAO >= @periodoStart
+          AND f.EMISSAO < @periodoEnd
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
           AND CAST(fp.QTDE AS FLOAT) > 0
@@ -1115,12 +1126,12 @@ export async function fetchEstoquePorCategoria({
       // Vendas e e-commerce realmente reduzem o estoque total
       // Entradas na matriz aumentam o estoque total (são compras reais)
       // Transferências não são consideradas aqui (já filtradas na query de entradas)
-      const estoqueSemanaPassada = Math.max(0, Math.round(
+      const estoquePeriodoAnterior = Math.max(0, Math.round(
         estoqueAtual - entradasSemana + vendasSemana + ecommerceSemana
       ));
 
-      // Calcular diferença semanal (quantidade real, não percentual)
-      const diferencaSemanal = Math.round(estoqueAtual - estoqueSemanaPassada);
+      // Calcular diferença do período (quantidade real, não percentual)
+      const diferencaPeriodo = Math.round(estoqueAtual - estoquePeriodoAnterior);
 
       return {
         categoria,
@@ -1132,8 +1143,8 @@ export async function fetchEstoquePorCategoria({
         projecaoMes: estoqueFinalMes, // Estoque Final Mês
         projecaoAnual: estoqueFinalAno, // Estoque Final Ano
         projecaoVendasMes: Math.round(projecaoMensal), // Projeção de vendas mensal
-        tendenciaSemanal: diferencaSemanal, // Diferença em quantidade real
-        estoqueSemanaPassada,
+        tendenciaSemanal: diferencaPeriodo, // Diferença em quantidade real
+        estoqueSemanaPassada: estoquePeriodoAnterior,
         ...(mostrarDetalhes && {
           linha,
           subgrupo,
@@ -1245,6 +1256,7 @@ export async function fetchDetalhesEntradasSemana({
   colecoes,
   subgrupos,
   grades,
+  range,
 }: {
   company?: string;
   filial?: string | null;
@@ -1258,11 +1270,17 @@ export async function fetchDetalhesEntradasSemana({
   colecoes?: string[];
   subgrupos?: string[];
   grades?: string[];
+  range?: { start?: Date | string; end?: Date | string };
 }): Promise<DetalheEntradaSemana[]> {
   return withRequest(async (request) => {
-    const now = new Date();
-    const data7DiasAtras = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    request.input('data7DiasAtras', sql.DateTime, data7DiasAtras);
+    // Calcular período baseado no range selecionado
+    // Usar normalizeRangeForQuery para garantir tratamento correto de timezone e inclusão do último dia
+    const normalizedRange = normalizeRangeForQuery(range);
+    const periodoStart = normalizedRange.start;
+    const periodoEnd = normalizedRange.end;
+    
+    request.input('periodoStart', sql.DateTime, periodoStart);
+    request.input('periodoEnd', sql.DateTime, periodoEnd);
 
     const companyConfig = resolveCompany(company);
     
@@ -1284,26 +1302,29 @@ export async function fetchDetalhesEntradasSemana({
     }
 
     // Criar filtros de categoria
+    // Usar alias 'prd' que é usado na query
     const categoriaField = company === 'nerd' 
-      ? 'ISNULL(pr.LINHA, \'SEM LINHA\')'
-      : 'ISNULL(pr.LINHA, \'SEM LINHA\')';
+      ? 'ISNULL(prd.GRUPO_PRODUTO, \'SEM GRUPO\')'
+      : 'ISNULL(prd.LINHA, \'SEM LINHA\')';
     
     let categoriaFilter = '';
-    request.input('categoria', sql.VarChar, categoria.trim());
+    const categoriaNormalizada = categoria.trim();
+    request.input('categoria', sql.VarChar, categoriaNormalizada);
     
     // Se categoria é grupo (NERD) ou linha (SCARFME), usar campo apropriado
+    // Usar TRIM para garantir que espaços não causem problemas
     if (company === 'nerd') {
-      categoriaFilter = `AND ISNULL(pr.GRUPO_PRODUTO, 'SEM GRUPO') = @categoria`;
+      categoriaFilter = `AND LTRIM(RTRIM(ISNULL(prd.GRUPO_PRODUTO, 'SEM GRUPO'))) = @categoria`;
     } else {
-      categoriaFilter = `AND ISNULL(pr.LINHA, 'SEM LINHA') = @categoria`;
+      categoriaFilter = `AND LTRIM(RTRIM(ISNULL(prd.LINHA, 'SEM LINHA'))) = @categoria`;
     }
 
-    // Filtros adicionais (linha, subgrupo, grade, colecao)
-    const grupoFilter = buildGrupoFilter(request, company, grupos, 'pr');
-    const linhaFilter = buildLinhaFilter(request, company, linhas || (linha ? [linha] : []), 'pr');
-    const colecaoFilter = buildColecaoFilter(request, company, colecoes || (colecao ? [colecao] : []), 'pr');
-    const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos || (subgrupo ? [subgrupo] : []), 'pr');
-    const gradeFilter = buildGradeFilter(request, company, grades || (grade ? [grade] : []), 'pr');
+    // Filtros adicionais (linha, subgrupo, grade, colecao) - usar alias 'prd' da query
+    const grupoFilter = buildGrupoFilter(request, company, grupos, 'prd');
+    const linhaFilter = buildLinhaFilter(request, company, linhas || (linha ? [linha] : []), 'prd');
+    const colecaoFilter = buildColecaoFilter(request, company, colecoes || (colecao ? [colecao] : []), 'prd');
+    const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos || (subgrupo ? [subgrupo] : []), 'prd');
+    const gradeFilter = buildGradeFilter(request, company, grades || (grade ? [grade] : []), 'prd');
 
     // Criar filtro para excluir devoluções (lojas normais, não matriz/ecommerce)
     let lojasFilterSaidas = '';
@@ -1348,7 +1369,8 @@ export async function fetchDetalhesEntradasSemana({
       LEFT JOIN PRODUTOS prd WITH (NOLOCK) ON prd.PRODUTO = P.PRODUTO
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = P.COR_PRODUTO
       WHERE prd.PRODUTO IS NOT NULL
-        AND E.EMISSAO >= @data7DiasAtras
+        AND E.EMISSAO >= @periodoStart
+        AND E.EMISSAO < @periodoEnd
         ${matrizFilialFilter}
         ${categoriaFilter}
         ${grupoFilter}
@@ -1416,7 +1438,8 @@ export async function fetchDetalhesEntradasSemana({
           ISNULL(vp.COR_PRODUTO, '') AS cor,
           SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
         FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-        WHERE vp.DATA_VENDA >= @data7DiasAtras
+        WHERE vp.DATA_VENDA >= @periodoStart
+        AND vp.DATA_VENDA < @periodoEnd
           AND vp.QTDE > 0
           AND vp.PRODUTO IN (${produtoPlaceholders})
           ${corPlaceholders ? `AND ISNULL(vp.COR_PRODUTO, '') IN (${corPlaceholders})` : ''}
@@ -1477,6 +1500,7 @@ export async function fetchDetalhesVendasSemana({
   colecoes,
   subgrupos,
   grades,
+  range,
 }: {
   company?: string;
   filial?: string | null;
@@ -1490,24 +1514,32 @@ export async function fetchDetalhesVendasSemana({
   colecoes?: string[];
   subgrupos?: string[];
   grades?: string[];
+  range?: { start?: Date | string; end?: Date | string };
 }): Promise<DetalheVendaSemana[]> {
   return withRequest(async (request) => {
-    const now = new Date();
-    const data7DiasAtras = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    request.input('data7DiasAtras', sql.DateTime, data7DiasAtras);
+    // Calcular período baseado no range selecionado
+    // Usar normalizeRangeForQuery para garantir tratamento correto de timezone e inclusão do último dia
+    const normalizedRange = normalizeRangeForQuery(range);
+    const periodoStart = normalizedRange.start;
+    const periodoEnd = normalizedRange.end;
+    
+    request.input('periodoStart', sql.DateTime, periodoStart);
+    request.input('periodoEnd', sql.DateTime, periodoEnd);
 
     // Criar filtros de categoria
     const categoriaField = company === 'nerd' 
       ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
       : 'ISNULL(p.LINHA, \'SEM LINHA\')';
     
-    let categoriaFilter = '';
-    request.input('categoria', sql.VarChar, categoria.trim());
+    // Usar TRIM para garantir que espaços não causem problemas
+    const categoriaNormalizada = categoria.trim();
+    request.input('categoria', sql.VarChar, categoriaNormalizada);
     
+    let categoriaFilter = '';
     if (company === 'nerd') {
-      categoriaFilter = `AND ISNULL(p.GRUPO_PRODUTO, 'SEM GRUPO') = @categoria`;
+      categoriaFilter = `AND LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, 'SEM GRUPO'))) = @categoria`;
     } else {
-      categoriaFilter = `AND ISNULL(p.LINHA, 'SEM LINHA') = @categoria`;
+      categoriaFilter = `AND LTRIM(RTRIM(ISNULL(p.LINHA, 'SEM LINHA'))) = @categoria`;
     }
 
     // Filtros adicionais
@@ -1575,7 +1607,8 @@ export async function fetchDetalhesVendasSemana({
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = vp.COR_PRODUTO
-      WHERE vp.DATA_VENDA >= @data7DiasAtras
+      WHERE vp.DATA_VENDA >= @periodoStart
+        AND vp.DATA_VENDA < @periodoEnd
         AND vp.QTDE > 0
         ${vendasFilialFilter}
         ${categoriaFilter}
@@ -1611,7 +1644,8 @@ export async function fetchDetalhesVendasSemana({
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = fp.COR_PRODUTO
-      WHERE f.EMISSAO >= @data7DiasAtras
+        WHERE f.EMISSAO >= @periodoStart
+          AND f.EMISSAO < @periodoEnd
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         AND CAST(fp.QTDE AS FLOAT) > 0
@@ -1681,6 +1715,7 @@ export async function fetchDetalhesEcommerceSemana({
   colecoes,
   subgrupos,
   grades,
+  range,
 }: {
   company?: string;
   filial?: string | null;
@@ -1694,6 +1729,7 @@ export async function fetchDetalhesEcommerceSemana({
   colecoes?: string[];
   subgrupos?: string[];
   grades?: string[];
+  range?: { start?: Date | string; end?: Date | string };
 }): Promise<DetalheEcommerceSemana[]> {
   return withRequest(async (request) => {
     // E-commerce só existe para ScarfMe
@@ -1701,9 +1737,14 @@ export async function fetchDetalhesEcommerceSemana({
       return [];
     }
 
-    const now = new Date();
-    const data7DiasAtras = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    request.input('data7DiasAtras', sql.DateTime, data7DiasAtras);
+    // Calcular período baseado no range selecionado
+    // Usar normalizeRangeForQuery para garantir tratamento correto de timezone e inclusão do último dia
+    const normalizedRange = normalizeRangeForQuery(range);
+    const periodoStart = normalizedRange.start;
+    const periodoEnd = normalizedRange.end;
+    
+    request.input('periodoStart', sql.DateTime, periodoStart);
+    request.input('periodoEnd', sql.DateTime, periodoEnd);
 
     // Criar filtros de categoria
     const categoriaField = 'ISNULL(p.LINHA, \'SEM LINHA\')';
@@ -1772,7 +1813,8 @@ export async function fetchDetalhesEcommerceSemana({
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = fp.COR_PRODUTO
-      WHERE f.EMISSAO >= @data7DiasAtras
+        WHERE f.EMISSAO >= @periodoStart
+          AND f.EMISSAO < @periodoEnd
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         AND CAST(fp.QTDE AS FLOAT) > 0
