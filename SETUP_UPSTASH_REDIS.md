@@ -66,7 +66,45 @@ O Vercel **automaticamente** adiciona as seguintes variáveis de ambiente ao seu
 4. Recarregue a página - as metas devem estar lá!
 5. Faça um novo deploy - as metas devem continuar salvas!
 
+## 🔍 Verificar Configuração (IMPORTANTE!)
+
+### 1. Testar Endpoint de Debug
+
+Após o deploy, acesse:
+```
+https://seu-dominio.vercel.app/api/goals?debug=true
+```
+
+Isso mostrará:
+- ✅ Se as variáveis de ambiente estão configuradas
+- ❌ Quais variáveis estão faltando
+- 📋 Lista de todas as variáveis relacionadas ao Redis encontradas
+
+### 2. Verificar Variáveis no Vercel Dashboard
+
+1. Acesse o [Vercel Dashboard](https://vercel.com/dashboard)
+2. Selecione seu projeto `multi-dashboard`
+3. Vá em **Settings** → **Environment Variables**
+4. Procure por variáveis que contenham:
+   - `REDIS`
+   - `UPSTASH`
+   - Ou qualquer variável relacionada ao Redis
+
+**Se não encontrar nenhuma variável:**
+- O Redis não foi conectado corretamente ao projeto
+- Volte para **Storage** → Selecione o Redis → **Settings** → **Connect to Project**
+
 ## 🐛 Troubleshooting
+
+### Erro: "EROFS: read-only file system"
+
+**Causa**: As variáveis de ambiente do Redis não estão configuradas, então o código está tentando usar arquivo local (que não funciona em produção).
+
+**Solução**:
+1. Verifique se o Redis está conectado ao projeto (veja seção acima)
+2. Verifique as variáveis de ambiente no Vercel Dashboard
+3. Se não existirem, reconecte o Redis ao projeto
+4. Faça um novo deploy após conectar
 
 ### Erro: "UPSTASH_REDIS_REST_URL is not defined"
 
@@ -75,11 +113,22 @@ O Vercel **automaticamente** adiciona as seguintes variáveis de ambiente ao seu
 - Faça um novo deploy após conectar o Redis
 - No painel do Upstash, verifique se o banco está ativo
 
+### Log mostra: "[goals-storage] Usando fallback para arquivo local"
+
+**Causa**: As variáveis de ambiente do Redis não estão sendo detectadas.
+
+**Solução**:
+1. Acesse o endpoint de debug: `https://seu-dominio.vercel.app/api/goals?debug=true`
+2. Verifique quais variáveis estão faltando
+3. No Vercel Dashboard, verifique se as variáveis existem
+4. Se não existirem, reconecte o Redis ao projeto
+
 ### Metas não estão sendo salvas
 
 - Verifique os logs do Vercel (Dashboard > Deployments > [seu deploy] > Functions)
 - Certifique-se de que o Redis está ativo e conectado
 - Verifique se não há erros no console do navegador
+- Use o endpoint de debug para verificar a configuração
 - No painel do Upstash, verifique se não excedeu o limite de comandos (10.000/dia no plano free)
 
 ## 💰 Custos

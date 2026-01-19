@@ -32,12 +32,26 @@ function getRedisEnv() {
   if (!url || !token) {
     // Procura variáveis que terminam com _REDIS_REST_URL e _REDIS_REST_TOKEN
     const envKeys = Object.keys(process.env);
-    const urlKey = envKeys.find(key => key.endsWith('_REDIS_REST_URL'));
-    const tokenKey = envKeys.find(key => key.endsWith('_REDIS_REST_TOKEN'));
+    const urlKey = envKeys.find(key => 
+      key.endsWith('_REDIS_REST_URL') || 
+      key.endsWith('_REDIS_URL') ||
+      key.includes('UPSTASH') && key.includes('URL')
+    );
+    const tokenKey = envKeys.find(key => 
+      key.endsWith('_REDIS_REST_TOKEN') || 
+      key.endsWith('_REDIS_TOKEN') ||
+      key.includes('UPSTASH') && key.includes('TOKEN')
+    );
     
     if (urlKey && tokenKey) {
       url = process.env[urlKey];
       token = process.env[tokenKey];
+      console.log('[goals-storage] Variáveis encontradas com prefixo customizado:', {
+        urlKey,
+        tokenKey,
+        hasUrl: !!url,
+        hasToken: !!token
+      });
     }
   }
   

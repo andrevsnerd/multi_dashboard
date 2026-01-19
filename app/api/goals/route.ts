@@ -21,14 +21,38 @@ export async function GET(request: Request) {
       k.includes('REDIS') || k.includes('UPSTASH')
     );
     
+    // Tentar encontrar variáveis com diferentes padrões
+    const urlKey = envKeys.find(key => 
+      key.endsWith('_REDIS_REST_URL') || 
+      key.endsWith('_REDIS_URL') ||
+      (key.includes('UPSTASH') && key.includes('URL'))
+    );
+    const tokenKey = envKeys.find(key => 
+      key.endsWith('_REDIS_REST_TOKEN') || 
+      key.endsWith('_REDIS_TOKEN') ||
+      (key.includes('UPSTASH') && key.includes('TOKEN'))
+    );
+    
     return NextResponse.json({
+      status: 'debug',
       redisEnv,
-      redisKeys,
-      allEnvKeys: redisKeys.map(k => ({
+      foundKeys: {
+        urlKey: urlKey || null,
+        tokenKey: tokenKey || null,
+        hasUrl: urlKey ? !!process.env[urlKey] : false,
+        hasToken: tokenKey ? !!process.env[tokenKey] : false,
+      },
+      allRedisKeys: redisKeys.map(k => ({
         key: k,
         hasValue: !!process.env[k],
-        valueLength: process.env[k]?.length || 0
-      }))
+        valueLength: process.env[k]?.length || 0,
+        valuePreview: process.env[k]?.substring(0, 20) + '...' || null
+      })),
+      message: redisKeys.length === 0 
+        ? '❌ Nenhuma variável de ambiente do Redis encontrada! Configure o Redis no Vercel.'
+        : (!urlKey || !tokenKey)
+        ? '⚠️ Variáveis encontradas mas não no formato esperado'
+        : '✅ Variáveis encontradas!'
     });
   }
 
