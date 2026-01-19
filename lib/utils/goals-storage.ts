@@ -89,20 +89,33 @@ async function ensureGoalsFile(): Promise<void> {
  * Lê metas do Redis ou arquivo
  */
 export async function readGoals(): Promise<GoalData> {
-  if (shouldUseRedis()) {
+  const { url, token } = getRedisEnv();
+  const usingRedis = shouldUseRedis();
+  
+  console.log('[goals-storage] Verificando Redis:', {
+    hasUrl: !!url,
+    hasToken: !!token,
+    usingRedis,
+    envKeys: Object.keys(process.env).filter(k => k.includes('REDIS') || k.includes('UPSTASH'))
+  });
+  
+  if (usingRedis) {
     const redis = getRedis();
     if (redis) {
       try {
+        console.log('[goals-storage] Tentando ler do Redis...');
         const data = await redis.get<GoalData>(REDIS_KEY);
+        console.log('[goals-storage] Dados lidos do Redis:', data ? 'encontrados' : 'vazios');
         return data || {};
       } catch (error) {
-        console.error('Erro ao ler metas do Redis:', error);
+        console.error('[goals-storage] Erro ao ler metas do Redis:', error);
         return {};
       }
     }
   }
   
   // Fallback para arquivo em desenvolvimento
+  console.log('[goals-storage] Usando fallback para arquivo local');
   await ensureGoalsFile();
   try {
     const content = await fs.readFile(GOALS_FILE_PATH, 'utf-8');
@@ -116,20 +129,33 @@ export async function readGoals(): Promise<GoalData> {
  * Salva metas no Redis ou arquivo
  */
 export async function writeGoals(goals: GoalData): Promise<void> {
-  if (shouldUseRedis()) {
+  const { url, token } = getRedisEnv();
+  const usingRedis = shouldUseRedis();
+  
+  console.log('[goals-storage] Salvando metas:', {
+    hasUrl: !!url,
+    hasToken: !!token,
+    usingRedis,
+    goalsCount: Object.keys(goals).length
+  });
+  
+  if (usingRedis) {
     const redis = getRedis();
     if (redis) {
       try {
+        console.log('[goals-storage] Tentando salvar no Redis...');
         await redis.set(REDIS_KEY, goals);
+        console.log('[goals-storage] Metas salvas no Redis com sucesso!');
         return;
       } catch (error) {
-        console.error('Erro ao salvar metas no Redis:', error);
+        console.error('[goals-storage] Erro ao salvar metas no Redis:', error);
         throw error;
       }
     }
   }
   
   // Fallback para arquivo em desenvolvimento
+  console.log('[goals-storage] Usando fallback para arquivo local');
   await ensureGoalsFile();
   await fs.writeFile(GOALS_FILE_PATH, JSON.stringify(goals, null, 2), 'utf-8');
 }

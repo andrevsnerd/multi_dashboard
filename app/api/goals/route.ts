@@ -6,6 +6,31 @@ export async function GET(request: Request) {
   const companyKey = searchParams.get('company');
   const month = searchParams.get('month');
   const year = searchParams.get('year');
+  const debug = searchParams.get('debug') === 'true';
+
+  // Endpoint de debug para verificar configuração do Redis
+  if (debug) {
+    const redisEnv = {
+      UPSTASH_REDIS_REST_URL: !!process.env.UPSTASH_REDIS_REST_URL,
+      UPSTASH_REDIS_REST_TOKEN: !!process.env.UPSTASH_REDIS_REST_TOKEN,
+    };
+    
+    // Procurar variáveis com prefixo customizado
+    const envKeys = Object.keys(process.env);
+    const redisKeys = envKeys.filter(k => 
+      k.includes('REDIS') || k.includes('UPSTASH')
+    );
+    
+    return NextResponse.json({
+      redisEnv,
+      redisKeys,
+      allEnvKeys: redisKeys.map(k => ({
+        key: k,
+        hasValue: !!process.env[k],
+        valueLength: process.env[k]?.length || 0
+      }))
+    });
+  }
 
   if (!companyKey || month === null || year === null) {
     return NextResponse.json(
