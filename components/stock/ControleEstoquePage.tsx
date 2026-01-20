@@ -328,6 +328,7 @@ export default function ControleEstoquePage({
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filtrarPorVendas, setFiltrarPorVendas] = useState(false);
   
   // Estado para modal de detalhes das entradas/vendas
   const [modalEntradasAberto, setModalEntradasAberto] = useState(false);
@@ -663,11 +664,17 @@ export default function ControleEstoquePage({
       });
     }
 
-    // Ordenar por quantidade de estoque (do maior para o menor)
-    resultadoFiltrado.sort((a, b) => b.estoqueAtual - a.estoqueAtual);
+    // Filtrar por vendas se o toggle estiver ativo
+    let resultadoComFiltroVendas = resultadoFiltrado;
+    if (filtrarPorVendas) {
+      resultadoComFiltroVendas = resultadoFiltrado.filter(cat => cat.vendasPeriodo > 0);
+    }
 
-    return resultadoFiltrado;
-  }, [categorias, selectedCategorias, linhasExcluidas, categoriaExpansao, reagruparPorNivel, companyKey]);
+    // Ordenar por quantidade de estoque (do maior para o menor)
+    resultadoComFiltroVendas.sort((a, b) => b.estoqueAtual - a.estoqueAtual);
+
+    return resultadoComFiltroVendas;
+  }, [categorias, selectedCategorias, linhasExcluidas, categoriaExpansao, reagruparPorNivel, companyKey, filtrarPorVendas]);
 
   // Recalcular KPIs baseado nas categorias filtradas
   const kpisFiltrados = useMemo(() => {
@@ -1391,6 +1398,19 @@ export default function ControleEstoquePage({
             />
           </>
         )}
+      </div>
+
+      {/* Toggle de Vendas */}
+      <div className={styles.filterRow}>
+        <button
+          className={`${styles.toggleButton} ${filtrarPorVendas ? styles.toggleButtonActive : ''}`}
+          onClick={() => setFiltrarPorVendas(!filtrarPorVendas)}
+        >
+          <span className={styles.toggleSwitch}>
+            <span className={styles.toggleSlider}></span>
+          </span>
+          <span className={styles.toggleLabel}>Vendas</span>
+        </button>
       </div>
 
       {/* Por Categoria */}
