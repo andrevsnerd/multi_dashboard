@@ -590,10 +590,12 @@ export async function fetchEstoquePorCategoria({
     // RESOLVER PERÍODO: Usar o range selecionado pelo usuário em vez de forçar o mês atual
     const { start: periodoStart, end: periodoEnd } = resolveRange(range);
 
-    // FILTRO DE VENDAS INCLUSIVO (CORREÇÃO: "juntar vendas de ecommerce")
-    // Em vez de usar buildVendasFilialFilter (que remove ecommerce no varejo),
-    // construímos um filtro que força a inclusão de TODAS as filiais de venda da empresa.
-    let vendasTotalFilter = '';
+    // ============================================
+    // MUDANÇA CRÍTICA 2: Vendas SEM filtro de filial
+    // ============================================
+    // Construir filtro que INCLUI TODAS as filiais (físicas + ecommerce)
+    // para garantir que não perdemos vendas no cálculo de "Vendas Totais (período)"
+    let vendasGlobaisFilter = '';
     if (company) {
       const companyConfig = resolveCompany(company);
       if (companyConfig) {
@@ -607,33 +609,24 @@ export async function fetchEstoquePorCategoria({
            const filiaisArray = Array.from(todasFiliais);
            filiaisArray.forEach((f, i) => request.input(`vendaGlobalFilial${i}`, sql.VarChar, f));
            const placeholders = filiaisArray.map((_, i) => `@vendaGlobalFilial${i}`).join(', ');
-           vendasTotalFilter = `AND vp.FILIAL IN (${placeholders})`;
+           vendasGlobaisFilter = `AND vp.FILIAL IN (${placeholders})`;
         }
       }
     }
 
-    // Para ScarfMe, sempre buscar dados detalhados (linha, subgrupo, grade, coleção)
-    // para permitir expansão progressiva dos cards
-    const mostrarDetalhes = company === 'scarfme' && (
-      (linhas && linhas.length > 0) || 
-      (colecoes && colecoes.length > 0) || 
-      (subgrupos && subgrupos.length > 0) || 
-      (grades && grades.length > 0)
-    );
-
+    // ============================================
+    // MUDANÇA CRÍTICA 1: SEMPRE retornar detalhes
+    // ============================================
+    // SEMPRE retornar dados no nível mais granular (Linha + Subgrupo + Grade + Coleção)
+    // para permitir expansão no frontend sem precisar fazer novas queries
     // Determinar campo de categoria baseado na empresa
     const categoriaField = company === 'nerd' 
       ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
       : 'ISNULL(p.LINHA, \'SEM LINHA\')';
 
-    // Para ScarfMe, sempre incluir campos adicionais para permitir expansão
-    const camposAdicionais = mostrarDetalhes
-      ? `, ISNULL(p.LINHA, '') AS linha, ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo, ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade, ISNULL(p.COLECAO, '') AS colecao`
-      : '';
-    
-    const groupByAdicional = mostrarDetalhes
-      ? `, ISNULL(p.LINHA, ''), ISNULL(p.SUBGRUPO_PRODUTO, ''), ISNULL(CONVERT(VARCHAR, p.GRADE), ''), ISNULL(p.COLECAO, '')`
-      : '';
+    // SEMPRE incluir campos detalhados para permitir expansão no frontend
+    const camposAdicionais = `, ISNULL(p.LINHA, '') AS linha, ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo, ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade, ISNULL(p.COLECAO, '') AS colecao`;
+    const groupByAdicional = `, ISNULL(p.LINHA, ''), ISNULL(p.SUBGRUPO_PRODUTO, ''), ISNULL(CONVERT(VARCHAR, p.GRADE), ''), ISNULL(p.COLECAO, '')`;
 
     // Campos adicionais para queries de vendas (mesmo que camposAdicionais, mas para queries de vendas)
     const camposVendasAdicionais = camposAdicionais;
@@ -692,12 +685,10 @@ export async function fetchEstoquePorCategoria({
       WHERE vp.DATA_VENDA >= @periodoStart
         AND vp.DATA_VENDA < @periodoEnd
         AND vp.QTDE > 0
-        ${vendasTotalFilter} 
+        ${vendasGlobaisFilter} 
         ${grupoFilter}
-        ${linhaFilter}
-        ${colecaoFilter}
-        ${subgrupoFilter}
-        ${gradeFilter}
+        -- NÃO aplicar linhaFilter, colecaoFilter, subgrupoFilter, gradeFilter aqui
+        -- para não perder vendas que pertencem à categoria
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
@@ -756,10 +747,8 @@ export async function fetchEstoquePorCategoria({
           AND CAST(fp.QTDE AS FLOAT) > 0
           ${ecommercePeriodoFilialFilter}
           ${grupoFilter}
-          ${linhaFilter}
-          ${colecaoFilter}
-          ${subgrupoFilter}
-          ${gradeFilter}
+          -- NÃO aplicar linhaFilter, colecaoFilter, subgrupoFilter, gradeFilter aqui
+          -- para não perder vendas que pertencem à categoria
           AND ${categoriaField} <> ''
           AND ${categoriaField} <> 'SEM GRUPO'
           AND ${categoriaField} <> 'SEM LINHA'
@@ -778,66 +767,49 @@ export async function fetchEstoquePorCategoria({
       }>(ecommercePeriodoQuery);
     }
 
-    // Processamento: Agrupar vendas totais (físicas + e-commerce) e identificar vendas do mês atual para projeção
+    // ============================================
+    // PROCESSAMENTO: Agrupar vendas por chave detalhada
+    // ============================================
+    // SEMPRE usar chave detalhada (categoria|linha|subgrupo|grade|colecao)
     const vendasPorCategoriaTotal = new Map<string, number>();
-    const vendasPorCategoriaMesAtual = new Map<string, number>(); // Para manter a projeção funcionando
-    const vendasPorCategoriaMes = new Map<string, Map<string, number>>(); // Mantido para compatibilidade
+    const vendasPorCategoriaMesAtual = new Map<string, number>();
 
     // Processar vendas físicas
     vendasMensaisResult.recordset.forEach((row: any) => {
       const categoria = row.categoria?.trim() || '';
-      // Chave para agrupamento (simples ou composta)
-      const chave = mostrarDetalhes
-        ? `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`
-        : categoria;
+      // SEMPRE usar chave detalhada
+      const chave = `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
 
       const qtd = Number(row.vendas || 0);
 
-      // 1. Somar ao total do período (Venda Total)
+      // Somar ao total do período (Venda Total)
       const totalAtual = vendasPorCategoriaTotal.get(chave) || 0;
       vendasPorCategoriaTotal.set(chave, totalAtual + qtd);
 
-      // 2. Verificar se pertence ao mês atual (para projeção)
+      // Verificar se pertence ao mês atual (para projeção)
       if (row.ano === currentYear && row.mes === currentMonthNum) {
         const mesAtual = vendasPorCategoriaMesAtual.get(chave) || 0;
         vendasPorCategoriaMesAtual.set(chave, mesAtual + qtd);
       }
-
-      // 3. Manter estrutura antiga para compatibilidade (se necessário)
-      const chaveAnoMes = `${row.ano}-${row.mes}`;
-      if (!vendasPorCategoriaMes.has(chave)) {
-        vendasPorCategoriaMes.set(chave, new Map());
-      }
-      vendasPorCategoriaMes.get(chave)!.set(chaveAnoMes, qtd);
     });
 
     // Processar vendas de e-commerce e somar ao total
     ecommercePeriodoResult.recordset.forEach((row: any) => {
       const categoria = row.categoria?.trim() || '';
-      // Chave para agrupamento (simples ou composta)
-      const chave = mostrarDetalhes
-        ? `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`
-        : categoria;
+      // SEMPRE usar chave detalhada
+      const chave = `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
 
       const qtd = Number(row.vendas || 0);
 
-      // 1. Somar ao total do período (Venda Total) - INCLUINDO E-COMMERCE
+      // Somar ao total do período (Venda Total) - INCLUINDO E-COMMERCE
       const totalAtual = vendasPorCategoriaTotal.get(chave) || 0;
       vendasPorCategoriaTotal.set(chave, totalAtual + qtd);
 
-      // 2. Verificar se pertence ao mês atual (para projeção)
+      // Verificar se pertence ao mês atual (para projeção)
       if (row.ano === currentYear && row.mes === currentMonthNum) {
         const mesAtual = vendasPorCategoriaMesAtual.get(chave) || 0;
         vendasPorCategoriaMesAtual.set(chave, mesAtual + qtd);
       }
-
-      // 3. Manter estrutura antiga para compatibilidade (se necessário)
-      const chaveAnoMes = `${row.ano}-${row.mes}`;
-      if (!vendasPorCategoriaMes.has(chave)) {
-        vendasPorCategoriaMes.set(chave, new Map());
-      }
-      const vendasAnoMesAtual = vendasPorCategoriaMes.get(chave)!.get(chaveAnoMes) || 0;
-      vendasPorCategoriaMes.get(chave)!.set(chaveAnoMes, vendasAnoMesAtual + qtd);
     });
 
     // Calcular período anterior com a mesma duração (para outras queries que ainda usam)
@@ -860,12 +832,9 @@ export async function fetchEstoquePorCategoria({
     const gradeFilterEntradas = gradeFilter ? gradeFilter.replace(/p\./g, 'pr.') : '';
 
     // Campos adicionais para query de entradas (usar alias 'pr' ao invés de 'p')
-    const camposEntradasAdicionais = mostrarDetalhes
-      ? `, ISNULL(pr.LINHA, '') AS linha, ISNULL(pr.SUBGRUPO_PRODUTO, '') AS subgrupo, ISNULL(CONVERT(VARCHAR, pr.GRADE), '') AS grade, ISNULL(pr.COLECAO, '') AS colecao`
-      : '';
-    const groupByEntradasAdicional = mostrarDetalhes
-      ? `, ISNULL(pr.LINHA, ''), ISNULL(pr.SUBGRUPO_PRODUTO, ''), ISNULL(CONVERT(VARCHAR, pr.GRADE), ''), ISNULL(pr.COLECAO, '')`
-      : '';
+    // SEMPRE incluir campos detalhados
+    const camposEntradasAdicionais = `, ISNULL(pr.LINHA, '') AS linha, ISNULL(pr.SUBGRUPO_PRODUTO, '') AS subgrupo, ISNULL(CONVERT(VARCHAR, pr.GRADE), '') AS grade, ISNULL(pr.COLECAO, '') AS colecao`;
+    const groupByEntradasAdicional = `, ISNULL(pr.LINHA, ''), ISNULL(pr.SUBGRUPO_PRODUTO, ''), ISNULL(CONVERT(VARCHAR, pr.GRADE), ''), ISNULL(pr.COLECAO, '')`;
 
     // Ajustar categoriaField para usar alias 'pr' nas queries de entradas
     const categoriaFieldEntradas = company === 'nerd' 
@@ -1106,27 +1075,24 @@ export async function fetchEstoquePorCategoria({
     const entradasSemanaMap = new Map<string, number>();
     entradasSemanaResult.recordset.forEach(row => {
       const categoria = row.categoria?.trim() || '';
-      const chaveCategoria = mostrarDetalhes
-        ? `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`
-        : categoria;
+      // SEMPRE usar chave detalhada
+      const chaveCategoria = `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
       entradasSemanaMap.set(chaveCategoria, Number(row.entradas ?? 0));
     });
 
     const vendasSemanaMap = new Map<string, number>();
     vendasSemanaResult.recordset.forEach(row => {
       const categoria = row.categoria?.trim() || '';
-      const chaveCategoria = mostrarDetalhes
-        ? `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`
-        : categoria;
+      // SEMPRE usar chave detalhada
+      const chaveCategoria = `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
       vendasSemanaMap.set(chaveCategoria, Number(row.vendas ?? 0));
     });
 
     const ecommerceSemanaMap = new Map<string, number>();
     ecommerceSemanaResult.recordset.forEach(row => {
       const categoria = row.categoria?.trim() || '';
-      const chaveCategoria = mostrarDetalhes
-        ? `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`
-        : categoria;
+      // SEMPRE usar chave detalhada
+      const chaveCategoria = `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
       ecommerceSemanaMap.set(chaveCategoria, Number(row.ecommerce ?? 0));
     });
 
@@ -1178,33 +1144,95 @@ export async function fetchEstoquePorCategoria({
     const vendasPeriodoAnteriorMap = new Map<string, number>();
     vendasPeriodoAnteriorResult.recordset.forEach(row => {
       const categoria = row.categoria?.trim() || '';
-      // Usar chave composta quando mostrarDetalhes
-      const chaveCategoria = mostrarDetalhes
-        ? `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`
-        : categoria;
+      // SEMPRE usar chave detalhada
+      const chaveCategoria = `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
       vendasPeriodoAnteriorMap.set(chaveCategoria, Number(row.vendasPeriodo ?? 0));
     });
 
-    // Processar resultados conforme lógica do Python
-    const categorias: CategoriaEstoque[] = estoqueResult.recordset.map(row => {
+    // ============================================
+    // IMPORTANTE: Criar lista de TODAS as categorias que aparecem nas VENDAS
+    // (não apenas no estoque), para não perder vendas de produtos sem estoque
+    // ============================================
+    const categoriasUnicasVendas = new Map<string, { categoria: string; linha: string; subgrupo: string; grade: string; colecao: string }>();
+    
+    // Adicionar todas as categorias que aparecem nas vendas físicas
+    vendasMensaisResult.recordset.forEach((row: any) => {
       const categoria = row.categoria?.trim() || '';
-      const estoqueAtual = Number(row.estoqueAtual ?? 0);
-      const custoTotal = Number(row.custoTotal ?? 0);
-      // Custo unitário não faz sentido para categorias agregadas (múltiplos produtos diferentes)
-      // Cada produto tem seu próprio custo unitário real, que é mostrado na página de detalhes
-      // Para categorias agregadas, não calculamos custo unitário (seria uma média, não um valor real)
+      const linha = row.linha?.trim() || '';
+      const subgrupo = row.subgrupo?.trim() || '';
+      const grade = row.grade?.trim() || '';
+      const colecao = row.colecao?.trim() || '';
+      const chave = `${categoria}|${linha}|${subgrupo}|${grade}|${colecao}`;
+      
+      if (!categoriasUnicasVendas.has(chave)) {
+        categoriasUnicasVendas.set(chave, { categoria, linha, subgrupo, grade, colecao });
+      }
+    });
+    
+    // Adicionar todas as categorias que aparecem no e-commerce
+    ecommercePeriodoResult.recordset.forEach((row: any) => {
+      const categoria = row.categoria?.trim() || '';
+      const linha = row.linha?.trim() || '';
+      const subgrupo = row.subgrupo?.trim() || '';
+      const grade = row.grade?.trim() || '';
+      const colecao = row.colecao?.trim() || '';
+      const chave = `${categoria}|${linha}|${subgrupo}|${grade}|${colecao}`;
+      
+      if (!categoriasUnicasVendas.has(chave)) {
+        categoriasUnicasVendas.set(chave, { categoria, linha, subgrupo, grade, colecao });
+      }
+    });
+    
+    // Adicionar também categorias que aparecem no estoque (caso não tenham vendas)
+    estoqueResult.recordset.forEach(row => {
+      const categoria = row.categoria?.trim() || '';
+      const linha = row.linha?.trim() || '';
+      const subgrupo = row.subgrupo?.trim() || '';
+      const grade = row.grade?.trim() || '';
+      const colecao = row.colecao?.trim() || '';
+      const chave = `${categoria}|${linha}|${subgrupo}|${grade}|${colecao}`;
+      
+      if (!categoriasUnicasVendas.has(chave)) {
+        categoriasUnicasVendas.set(chave, { categoria, linha, subgrupo, grade, colecao });
+      }
+    });
+    
+    // Criar um mapa de estoque por chave
+    const estoquePorChave = new Map<string, { estoqueAtual: number; custoTotal: number }>();
+    estoqueResult.recordset.forEach(row => {
+      const categoria = row.categoria?.trim() || '';
+      const linha = row.linha?.trim() || '';
+      const subgrupo = row.subgrupo?.trim() || '';
+      const grade = row.grade?.trim() || '';
+      const colecao = row.colecao?.trim() || '';
+      const chave = `${categoria}|${linha}|${subgrupo}|${grade}|${colecao}`;
+      
+      estoquePorChave.set(chave, {
+        estoqueAtual: Number(row.estoqueAtual ?? 0),
+        custoTotal: Number(row.custoTotal ?? 0),
+      });
+    });
+    
+    // Processar resultados: criar lista baseada em TODAS as categorias (vendas + estoque)
+    const categorias: CategoriaEstoque[] = Array.from(categoriasUnicasVendas.values()).map(detalhes => {
+      const categoria = detalhes.categoria;
+      const linha = detalhes.linha;
+      const subgrupo = detalhes.subgrupo;
+      const grade = detalhes.grade;
+      const colecao = detalhes.colecao;
+      
+      // SEMPRE usar chave detalhada
+      const chaveCategoria = `${categoria}|${linha}|${subgrupo}|${grade}|${colecao}`;
+      
+      // Buscar estoque (pode ser 0 se não houver estoque)
+      const estoqueInfo = estoquePorChave.get(chaveCategoria) || {
+        estoqueAtual: 0,
+        custoTotal: 0,
+      };
+      
+      const estoqueAtual = estoqueInfo.estoqueAtual;
+      const custoTotal = estoqueInfo.custoTotal;
       const custoUnitario = 0; // Não aplicável para categorias agregadas
-
-      // Campos detalhados (quando mostrarDetalhes é true)
-      const linha = mostrarDetalhes ? (row.linha?.trim() || '') : undefined;
-      const subgrupo = mostrarDetalhes ? (row.subgrupo?.trim() || '') : undefined;
-      const grade = mostrarDetalhes ? (row.grade?.trim() || '') : undefined;
-      const colecao = mostrarDetalhes ? (row.colecao?.trim() || '') : undefined;
-
-      // Criar chave para buscar vendas (usar chave composta quando mostrarDetalhes)
-      const chaveCategoria = mostrarDetalhes
-        ? `${categoria}|${linha || ''}|${subgrupo || ''}|${grade || ''}|${colecao || ''}`
-        : categoria;
       
       // RECUPERAR VALORES CALCULADOS
       const vendasPeriodo = vendasPorCategoriaTotal.get(chaveCategoria) || 0; // Venda Total (Período)
@@ -1262,16 +1290,20 @@ export async function fetchEstoquePorCategoria({
         projecaoVendasMes: Math.round(projecaoMensal), // Projeção de vendas mensal
         tendenciaSemanal: diferencaPeriodo, // Diferença em quantidade real
         estoqueSemanaPassada: estoquePeriodoAnterior,
-        ...(mostrarDetalhes && {
-          linha,
-          subgrupo,
-          grade,
-          colecao,
-        }),
+        // SEMPRE retornar campos detalhados
+        linha: linha || undefined,
+        subgrupo: subgrupo || undefined,
+        grade: grade || undefined,
+        colecao: colecao || undefined,
       };
     });
+    
+    // Filtrar apenas categorias que têm estoque OU vendas (para não mostrar categorias vazias)
+    const categoriasFiltradas = categorias.filter(cat => 
+      cat.estoqueAtual > 0 || cat.vendasPeriodo > 0
+    );
 
-    return categorias.sort((a, b) => b.estoqueAtual - a.estoqueAtual);
+    return categoriasFiltradas.sort((a, b) => b.estoqueAtual - a.estoqueAtual);
   });
 }
 
@@ -2188,9 +2220,8 @@ export async function fetchPrevisoesEstoque({
     vendasMensaisResult.recordset.forEach(row => {
       const categoria = row.categoria?.trim() || '';
       // Se mostrarDetalhes, criar chave composta incluindo os campos adicionais
-      const chaveCategoria = mostrarDetalhes
-        ? `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`
-        : categoria;
+      // SEMPRE usar chave detalhada
+      const chaveCategoria = `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
       const chaveAnoMes = `${row.ano}-${row.mes}`;
       const vendas = Number(row.vendas ?? 0);
       
