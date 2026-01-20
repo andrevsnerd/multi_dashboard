@@ -1149,6 +1149,93 @@ export async function fetchEstoquePorCategoria({
       vendasPeriodoAnteriorMap.set(chaveCategoria, Number(row.vendasPeriodo ?? 0));
     });
 
+    // Buscar vendas do mês anterior completo para usar como fallback nos primeiros dias do mês
+    request.input('previousMonthStart', sql.DateTime, previousMonth.start);
+    request.input('previousMonthEnd', sql.DateTime, previousMonth.end);
+    
+    const vendasMesAnteriorQuery = `
+      SELECT 
+        ${categoriaField} AS categoria
+        ${camposVendasAdicionais},
+        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendasMes
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      WHERE vp.DATA_VENDA >= @previousMonthStart
+        AND vp.DATA_VENDA < @previousMonthEnd
+        AND vp.QTDE > 0
+        ${vendasFilialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        AND ${categoriaField} <> ''
+        AND ${categoriaField} <> 'SEM GRUPO'
+        AND ${categoriaField} <> 'SEM LINHA'
+      GROUP BY ${categoriaField}${groupByVendasAdicional}
+    `;
+
+    const vendasMesAnteriorResult = await request.query<{
+      categoria: string;
+      linha?: string;
+      subgrupo?: string;
+      grade?: string;
+      colecao?: string;
+      vendasMes: number | null;
+    }>(vendasMesAnteriorQuery);
+
+    const vendasMesAnteriorMap = new Map<string, number>();
+    vendasMesAnteriorResult.recordset.forEach(row => {
+      const categoria = row.categoria?.trim() || '';
+      // SEMPRE usar chave detalhada
+      const chaveCategoria = `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
+      vendasMesAnteriorMap.set(chaveCategoria, Number(row.vendasMes ?? 0));
+    });
+
+    // Buscar também vendas dos últimos 30 dias como alternativa ao mês anterior
+    const ultimos30DiasStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    request.input('ultimos30DiasStart', sql.DateTime, ultimos30DiasStart);
+    request.input('ultimos30DiasEnd', sql.DateTime, now);
+    
+    const vendasUltimos30DiasQuery = `
+      SELECT 
+        ${categoriaField} AS categoria
+        ${camposVendasAdicionais},
+        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas30Dias
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      WHERE vp.DATA_VENDA >= @ultimos30DiasStart
+        AND vp.DATA_VENDA < @ultimos30DiasEnd
+        AND vp.QTDE > 0
+        ${vendasFilialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        AND ${categoriaField} <> ''
+        AND ${categoriaField} <> 'SEM GRUPO'
+        AND ${categoriaField} <> 'SEM LINHA'
+      GROUP BY ${categoriaField}${groupByVendasAdicional}
+    `;
+
+    const vendasUltimos30DiasResult = await request.query<{
+      categoria: string;
+      linha?: string;
+      subgrupo?: string;
+      grade?: string;
+      colecao?: string;
+      vendas30Dias: number | null;
+    }>(vendasUltimos30DiasQuery);
+
+    const vendasUltimos30DiasMap = new Map<string, number>();
+    vendasUltimos30DiasResult.recordset.forEach(row => {
+      const categoria = row.categoria?.trim() || '';
+      // SEMPRE usar chave detalhada
+      const chaveCategoria = `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
+      vendasUltimos30DiasMap.set(chaveCategoria, Number(row.vendas30Dias ?? 0));
+    });
+
     // ============================================
     // IMPORTANTE: Criar lista de TODAS as categorias que aparecem nas VENDAS
     // (não apenas no estoque), para não perder vendas de produtos sem estoque
@@ -1242,16 +1329,56 @@ export async function fetchEstoquePorCategoria({
       const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
       const currentDay = now.getDate();
       
-      // Projeção baseada na performance do mês ATUAL (vendas totais do mês)
-      const projecaoMensal = currentDay > 0 
-        ? Math.round((vendasMesAtual / currentDay) * daysInMonth) 
+      // FALLBACK: Se estivermos nos primeiros 5 dias do mês, usar média do mês anterior ou últimos 30 dias
+      let vendasParaProjecao = vendasMesAtual;
+      let diasParaProjecao = currentDay;
+      
+      if (currentDay <= 5 && vendasMesAtual === 0) {
+        // Tentar usar vendas do mês anterior primeiro
+        const vendasMesAnterior = vendasMesAnteriorMap.get(chaveCategoria) || 0;
+        const daysInPreviousMonth = new Date(previousMonth.end.getTime() - 1).getDate();
+        
+        if (vendasMesAnterior > 0) {
+          // Usar média diária do mês anterior
+          const mediaDiariaMesAnterior = vendasMesAnterior / daysInPreviousMonth;
+          vendasParaProjecao = mediaDiariaMesAnterior * currentDay;
+          diasParaProjecao = currentDay;
+        } else {
+          // Se não houver vendas no mês anterior, tentar últimos 30 dias
+          const vendas30Dias = vendasUltimos30DiasMap.get(chaveCategoria) || 0;
+          if (vendas30Dias > 0) {
+            // Usar média diária dos últimos 30 dias
+            const mediaDiaria30Dias = vendas30Dias / 30;
+            vendasParaProjecao = mediaDiaria30Dias * currentDay;
+            diasParaProjecao = currentDay;
+          }
+        }
+      } else if (currentDay <= 5 && vendasMesAtual > 0) {
+        // Se temos algumas vendas mas ainda estamos nos primeiros 5 dias,
+        // usar uma média ponderada: 70% do mês anterior + 30% do mês atual
+        const vendasMesAnterior = vendasMesAnteriorMap.get(chaveCategoria) || 0;
+        const daysInPreviousMonth = new Date(previousMonth.end.getTime() - 1).getDate();
+        
+        if (vendasMesAnterior > 0) {
+          const mediaDiariaMesAnterior = vendasMesAnterior / daysInPreviousMonth;
+          const mediaDiariaMesAtual = vendasMesAtual / currentDay;
+          // Média ponderada: 70% mês anterior, 30% mês atual
+          const mediaPonderada = (mediaDiariaMesAnterior * 0.7) + (mediaDiariaMesAtual * 0.3);
+          vendasParaProjecao = mediaPonderada * currentDay;
+          diasParaProjecao = currentDay;
+        }
+      }
+      
+      // Projeção baseada na performance (mês atual ou fallback)
+      const projecaoMensal = diasParaProjecao > 0 
+        ? Math.round((vendasParaProjecao / diasParaProjecao) * daysInMonth) 
         : 0;
       
       // Calcular vendas restantes do mês (apenas o que falta vender)
       // Dias restantes = total de dias do mês - dia atual
       const diasRestantes = daysInMonth - currentDay;
-      const projecaoVendasRestantes = currentDay > 0 && diasRestantes > 0
-        ? Math.round((vendasMesAtual / currentDay) * diasRestantes)
+      const projecaoVendasRestantes = diasParaProjecao > 0 && diasRestantes > 0
+        ? Math.round((vendasParaProjecao / diasParaProjecao) * diasRestantes)
         : 0;
       
       // Calcular projeção anual corretamente
