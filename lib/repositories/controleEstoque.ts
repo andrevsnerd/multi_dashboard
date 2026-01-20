@@ -346,7 +346,7 @@ export interface CategoriaEstoque {
   estoqueAtual: number;
   custoTotal: number;
   custoUnitario: number;
-  vendasMes: number;
+  vendasPeriodo: number; // Renomeado de vendasMes - Venda Total (período)
   duracao: number; // dias
   projecaoMes: number;
   projecaoAnual: number;
@@ -587,9 +587,39 @@ export async function fetchEstoquePorCategoria({
     const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
     const gradeFilter = buildGradeFilter(request, company, grades, 'p');
 
+    // RESOLVER PERÍODO: Usar o range selecionado pelo usuário em vez de forçar o mês atual
+    const { start: periodoStart, end: periodoEnd } = resolveRange(range);
+
+    // FILTRO DE VENDAS INCLUSIVO (CORREÇÃO: "juntar vendas de ecommerce")
+    // Em vez de usar buildVendasFilialFilter (que remove ecommerce no varejo),
+    // construímos um filtro que força a inclusão de TODAS as filiais de venda da empresa.
+    let vendasTotalFilter = '';
+    if (company) {
+      const companyConfig = resolveCompany(company);
+      if (companyConfig) {
+        // Unir filiais de venda e filiais de ecommerce em um único conjunto
+        const todasFiliais = new Set([
+          ...(companyConfig.filialFilters['sales'] ?? []),
+          ...(companyConfig.ecommerceFilials ?? [])
+        ]);
+
+        if (todasFiliais.size > 0) {
+           const filiaisArray = Array.from(todasFiliais);
+           filiaisArray.forEach((f, i) => request.input(`vendaGlobalFilial${i}`, sql.VarChar, f));
+           const placeholders = filiaisArray.map((_, i) => `@vendaGlobalFilial${i}`).join(', ');
+           vendasTotalFilter = `AND vp.FILIAL IN (${placeholders})`;
+        }
+      }
+    }
+
     // Para ScarfMe, sempre buscar dados detalhados (linha, subgrupo, grade, coleção)
     // para permitir expansão progressiva dos cards
-    const mostrarDetalhes = company === 'scarfme';
+    const mostrarDetalhes = company === 'scarfme' && (
+      (linhas && linhas.length > 0) || 
+      (colecoes && colecoes.length > 0) || 
+      (subgrupos && subgrupos.length > 0) || 
+      (grades && grades.length > 0)
+    );
 
     // Determinar campo de categoria baseado na empresa
     const categoriaField = company === 'nerd' 
@@ -643,12 +673,13 @@ export async function fetchEstoquePorCategoria({
       custoTotal: number | null;
     }>(estoqueQuery);
 
-    // Buscar vendas do mês atual até hoje para calcular projeção
-    // Projeção = (vendas até hoje / dias corridos) × total de dias do mês
+    // QUERY DE VENDAS REFEITA
+    // - Usa o período selecionado (periodoStart/End)
+    // - Usa o filtro inclusivo (vendasTotalFilter) para incluir todas as filiais (físicas + ecommerce)
+    // - Agrupa por ano/mês também para permitir cálculos de projeção se necessário
     const hoje = new Date(now.getTime());
     hoje.setHours(23, 59, 59, 999); // Fim do dia de hoje
 
-    // Buscar vendas do mês atual até hoje
     const vendasMensaisQuery = `
       SELECT 
         ${categoriaField} AS categoria
@@ -658,10 +689,10 @@ export async function fetchEstoquePorCategoria({
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-      WHERE vp.DATA_VENDA >= @currentMonthStart
-        AND vp.DATA_VENDA <= @hoje
+      WHERE vp.DATA_VENDA >= @periodoStart
+        AND vp.DATA_VENDA < @periodoEnd
         AND vp.QTDE > 0
-        ${vendasFilialFilter}
+        ${vendasTotalFilter} 
         ${grupoFilter}
         ${linhaFilter}
         ${colecaoFilter}
@@ -673,6 +704,8 @@ export async function fetchEstoquePorCategoria({
       GROUP BY ${categoriaField}${groupByVendasAdicional}, YEAR(vp.DATA_VENDA), MONTH(vp.DATA_VENDA)
     `;
 
+    request.input('periodoStart', sql.DateTime, periodoStart);
+    request.input('periodoEnd', sql.DateTime, periodoEnd);
     request.input('currentMonthStart', sql.DateTime, currentMonth.start);
     request.input('hoje', sql.DateTime, hoje);
 
@@ -687,37 +720,133 @@ export async function fetchEstoquePorCategoria({
       vendas: number | null;
     }>(vendasMensaisQuery);
 
-    // Agrupar vendas por categoria e mês (usar chave composta quando mostrarDetalhes)
-    // Usar chave ano-mês para garantir que pegamos os últimos 3 meses completos
-    const vendasPorCategoriaMes = new Map<string, Map<string, number>>();
-    vendasMensaisResult.recordset.forEach(row => {
+    // Buscar vendas de e-commerce do período (apenas para ScarfMe)
+    // IMPORTANTE: Incluir e-commerce na "Venda Total (período)"
+    let ecommercePeriodoResult: { recordset: Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; ano: number; mes: number; vendas: number | null }> } = { recordset: [] };
+    if (company === 'scarfme') {
+      // Criar filtro de filial para e-commerce que inclua todas as filiais de e-commerce
+      let ecommercePeriodoFilialFilter = '';
+      const companyConfig = resolveCompany(company);
+      if (companyConfig) {
+        const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
+        if (ecommerceFilials.length > 0) {
+          ecommerceFilials.forEach((f, index) => {
+            request.input(`ecommercePeriodoFilial${index}`, sql.VarChar, f);
+          });
+          const placeholders = ecommerceFilials.map((_, i) => `@ecommercePeriodoFilial${i}`).join(', ');
+          ecommercePeriodoFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+        }
+      }
+
+      const ecommercePeriodoQuery = `
+        SELECT 
+          ${categoriaField} AS categoria
+          ${camposVendasAdicionais},
+          YEAR(f.EMISSAO) AS ano,
+          MONTH(f.EMISSAO) AS mes,
+          SUM(CAST(fp.QTDE AS FLOAT)) AS vendas
+        FROM FATURAMENTO f WITH (NOLOCK)
+        JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) 
+          ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
+        WHERE f.EMISSAO >= @periodoStart
+          AND f.EMISSAO < @periodoEnd
+          AND f.NOTA_CANCELADA = 0
+          AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+          AND CAST(fp.QTDE AS FLOAT) > 0
+          ${ecommercePeriodoFilialFilter}
+          ${grupoFilter}
+          ${linhaFilter}
+          ${colecaoFilter}
+          ${subgrupoFilter}
+          ${gradeFilter}
+          AND ${categoriaField} <> ''
+          AND ${categoriaField} <> 'SEM GRUPO'
+          AND ${categoriaField} <> 'SEM LINHA'
+        GROUP BY ${categoriaField}${groupByVendasAdicional}, YEAR(f.EMISSAO), MONTH(f.EMISSAO)
+      `;
+
+      ecommercePeriodoResult = await request.query<{
+        categoria: string;
+        linha?: string;
+        subgrupo?: string;
+        grade?: string;
+        colecao?: string;
+        ano: number;
+        mes: number;
+        vendas: number | null;
+      }>(ecommercePeriodoQuery);
+    }
+
+    // Processamento: Agrupar vendas totais (físicas + e-commerce) e identificar vendas do mês atual para projeção
+    const vendasPorCategoriaTotal = new Map<string, number>();
+    const vendasPorCategoriaMesAtual = new Map<string, number>(); // Para manter a projeção funcionando
+    const vendasPorCategoriaMes = new Map<string, Map<string, number>>(); // Mantido para compatibilidade
+
+    // Processar vendas físicas
+    vendasMensaisResult.recordset.forEach((row: any) => {
       const categoria = row.categoria?.trim() || '';
-      // Se mostrarDetalhes, criar chave composta incluindo os campos adicionais
-      const chaveCategoria = mostrarDetalhes
+      // Chave para agrupamento (simples ou composta)
+      const chave = mostrarDetalhes
         ? `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`
         : categoria;
-      const chaveAnoMes = `${row.ano}-${row.mes}`;
-      const vendas = Number(row.vendas ?? 0);
-      
-      if (!vendasPorCategoriaMes.has(chaveCategoria)) {
-        vendasPorCategoriaMes.set(chaveCategoria, new Map());
+
+      const qtd = Number(row.vendas || 0);
+
+      // 1. Somar ao total do período (Venda Total)
+      const totalAtual = vendasPorCategoriaTotal.get(chave) || 0;
+      vendasPorCategoriaTotal.set(chave, totalAtual + qtd);
+
+      // 2. Verificar se pertence ao mês atual (para projeção)
+      if (row.ano === currentYear && row.mes === currentMonthNum) {
+        const mesAtual = vendasPorCategoriaMesAtual.get(chave) || 0;
+        vendasPorCategoriaMesAtual.set(chave, mesAtual + qtd);
       }
-      vendasPorCategoriaMes.get(chaveCategoria)!.set(chaveAnoMes, vendas);
+
+      // 3. Manter estrutura antiga para compatibilidade (se necessário)
+      const chaveAnoMes = `${row.ano}-${row.mes}`;
+      if (!vendasPorCategoriaMes.has(chave)) {
+        vendasPorCategoriaMes.set(chave, new Map());
+      }
+      vendasPorCategoriaMes.get(chave)!.set(chaveAnoMes, qtd);
     });
 
-    // Calcular período baseado no range selecionado
-    // Usar normalizeRangeForQuery para garantir tratamento correto de timezone e inclusão do último dia
-    const normalizedRange = normalizeRangeForQuery(range);
-    const periodoStart = normalizedRange.start;
-    const periodoEnd = normalizedRange.end;
-    
-    // Calcular período anterior com a mesma duração
+    // Processar vendas de e-commerce e somar ao total
+    ecommercePeriodoResult.recordset.forEach((row: any) => {
+      const categoria = row.categoria?.trim() || '';
+      // Chave para agrupamento (simples ou composta)
+      const chave = mostrarDetalhes
+        ? `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`
+        : categoria;
+
+      const qtd = Number(row.vendas || 0);
+
+      // 1. Somar ao total do período (Venda Total) - INCLUINDO E-COMMERCE
+      const totalAtual = vendasPorCategoriaTotal.get(chave) || 0;
+      vendasPorCategoriaTotal.set(chave, totalAtual + qtd);
+
+      // 2. Verificar se pertence ao mês atual (para projeção)
+      if (row.ano === currentYear && row.mes === currentMonthNum) {
+        const mesAtual = vendasPorCategoriaMesAtual.get(chave) || 0;
+        vendasPorCategoriaMesAtual.set(chave, mesAtual + qtd);
+      }
+
+      // 3. Manter estrutura antiga para compatibilidade (se necessário)
+      const chaveAnoMes = `${row.ano}-${row.mes}`;
+      if (!vendasPorCategoriaMes.has(chave)) {
+        vendasPorCategoriaMes.set(chave, new Map());
+      }
+      const vendasAnoMesAtual = vendasPorCategoriaMes.get(chave)!.get(chaveAnoMes) || 0;
+      vendasPorCategoriaMes.get(chave)!.set(chaveAnoMes, vendasAnoMesAtual + qtd);
+    });
+
+    // Calcular período anterior com a mesma duração (para outras queries que ainda usam)
+    // Nota: periodoStart e periodoEnd já foram calculados no início da função e declarados como inputs acima
     const duracaoPeriodo = periodoEnd.getTime() - periodoStart.getTime();
     const periodoAnteriorEnd = new Date(periodoStart.getTime() - 1); // Um dia antes do início do período atual
     const periodoAnteriorStart = new Date(periodoAnteriorEnd.getTime() - duracaoPeriodo);
     
-    request.input('periodoStart', sql.DateTime, periodoStart);
-    request.input('periodoEnd', sql.DateTime, periodoEnd);
+    // Declarar apenas os parâmetros do período anterior (periodoStart e periodoEnd já foram declarados acima)
     request.input('periodoAnteriorStart', sql.DateTime, periodoAnteriorStart);
     request.input('periodoAnteriorEnd', sql.DateTime, periodoAnteriorEnd);
 
@@ -1077,43 +1206,31 @@ export async function fetchEstoquePorCategoria({
         ? `${categoria}|${linha || ''}|${subgrupo || ''}|${grade || ''}|${colecao || ''}`
         : categoria;
       
-      // Buscar vendas do mês atual até hoje para calcular projeção
-      // Projeção = (vendas até hoje / dias corridos) × total de dias do mês
-      const chaveMesAtual = `${currentYear}-${currentMonthNum}`;
-      const vendasMeses = vendasPorCategoriaMes.get(chaveCategoria);
-      const vendasAteHoje = vendasMeses?.get(chaveMesAtual) || 0;
-      
-      // Calcular dias corridos do mês até hoje
-      const diasCorridos = now.getDate(); // Dia do mês (1-31)
-      
-      // Calcular total de dias do mês
-      const totalDiasMes = new Date(currentYear, currentMonthNum, 0).getDate(); // Último dia do mês
-      
-      // Calcular Projeção Mensal = (vendas até hoje / dias corridos) × total de dias do mês
-      const projecaoMensal = diasCorridos > 0
-        ? Math.round((vendasAteHoje / diasCorridos) * totalDiasMes)
-        : 0;
+      // RECUPERAR VALORES CALCULADOS
+      const vendasPeriodo = vendasPorCategoriaTotal.get(chaveCategoria) || 0; // Venda Total (Período)
+      const vendasMesAtual = vendasPorCategoriaMesAtual.get(chaveCategoria) || 0; // Apenas para projeção
 
-      // Calcular Projeção Ano = Projeção Mensal × meses restantes
-      const mesesRestantes = Math.max(0, 12 - currentMonthNum + 1);
-      const projecaoAnual = Math.round(projecaoMensal * mesesRestantes);
+      // Cálculos de Projeção (mantidos baseados no mês atual para consistência)
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const currentDay = now.getDate();
+      
+      // Projeção baseada na performance do mês ATUAL
+      const projecaoMensal = currentDay > 0 
+        ? Math.round((vendasMesAtual / currentDay) * daysInMonth) 
+        : 0;
+        
+      const projecaoAnual = projecaoMensal * 12;
+      
+      // Duração do estoque baseada na projeção mensal
+      const diasEstoque = projecaoMensal > 0 
+        ? Math.round((estoqueAtual / projecaoMensal) * 30) 
+        : 999;
 
       // Calcular Estoque Final Mês = Estoque - Projeção Mensal
       const estoqueFinalMes = Math.round(estoqueAtual - projecaoMensal);
 
       // Calcular Estoque Final Ano = Estoque - Projeção Ano
       const estoqueFinalAno = Math.round(estoqueAtual - projecaoAnual);
-
-      // Calcular Dias de Estoque = (Estoque / Projeção Mensal) × total de dias do mês
-      // Isso calcula quantos dias o estoque atual durará baseado na projeção de vendas mensal
-      // Exemplo: Se temos 100 unidades e a projeção mensal é 50 unidades (em 31 dias),
-      // então temos 2 meses de estoque = 2 × 31 = 62 dias
-      const diasEstoque = projecaoMensal > 0
-        ? Math.round((estoqueAtual / projecaoMensal) * totalDiasMes)
-        : 999;
-
-      // Vendas do mês atual para exibição
-      const vendasMes = vendasAteHoje;
 
       // Calcular estoque da semana passada
       // IMPORTANTE: entradasSemana agora contém apenas entradas na matriz (compras reais)
@@ -1138,7 +1255,7 @@ export async function fetchEstoquePorCategoria({
         estoqueAtual: Math.round(estoqueAtual),
         custoTotal,
         custoUnitario,
-        vendasMes: Math.round(vendasMes),
+        vendasPeriodo: Math.round(vendasPeriodo), // Campo novo com valor total do período
         duracao: diasEstoque,
         projecaoMes: estoqueFinalMes, // Estoque Final Mês
         projecaoAnual: estoqueFinalAno, // Estoque Final Ano

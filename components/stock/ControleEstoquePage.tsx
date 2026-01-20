@@ -47,7 +47,7 @@ interface CategoriaEstoque {
   estoqueAtual: number;
   custoTotal: number;
   custoUnitario: number;
-  vendasMes: number;
+  vendasPeriodo: number; // Renomeado de vendasMes - Venda Total (período)
   duracao: number;
   projecaoMes: number;
   projecaoAnual: number;
@@ -410,7 +410,7 @@ export default function ControleEstoquePage({
             // Somar valores simples
             acc[key].estoqueAtual += cat.estoqueAtual;
             acc[key].custoTotal += cat.custoTotal;
-            acc[key].vendasMes += cat.vendasMes;
+            acc[key].vendasPeriodo += cat.vendasPeriodo;
             acc[key].estoqueSemanaPassada = (acc[key].estoqueSemanaPassada || 0) + (cat.estoqueSemanaPassada || 0);
             acc[key].tendenciaSemanal = (acc[key].tendenciaSemanal || 0) + (cat.tendenciaSemanal || 0);
             acc[key].projecaoVendasMes = (acc[key].projecaoVendasMes || 0) + (cat.projecaoVendasMes || 0);
@@ -449,7 +449,7 @@ export default function ControleEstoquePage({
               // Somar valores simples
               acc[key].estoqueAtual += cat.estoqueAtual;
               acc[key].custoTotal += cat.custoTotal;
-              acc[key].vendasMes += cat.vendasMes;
+              acc[key].vendasPeriodo += cat.vendasPeriodo;
               acc[key].estoqueSemanaPassada = (acc[key].estoqueSemanaPassada || 0) + (cat.estoqueSemanaPassada || 0);
               acc[key].tendenciaSemanal = (acc[key].tendenciaSemanal || 0) + (cat.tendenciaSemanal || 0);
               acc[key].projecaoVendasMes = (acc[key].projecaoVendasMes || 0) + (cat.projecaoVendasMes || 0);
@@ -485,7 +485,7 @@ export default function ControleEstoquePage({
               // Somar valores simples
               acc[key].estoqueAtual += cat.estoqueAtual;
               acc[key].custoTotal += cat.custoTotal;
-              acc[key].vendasMes += cat.vendasMes;
+              acc[key].vendasPeriodo += cat.vendasPeriodo;
               acc[key].estoqueSemanaPassada = (acc[key].estoqueSemanaPassada || 0) + (cat.estoqueSemanaPassada || 0);
               acc[key].tendenciaSemanal = (acc[key].tendenciaSemanal || 0) + (cat.tendenciaSemanal || 0);
               acc[key].projecaoVendasMes = (acc[key].projecaoVendasMes || 0) + (cat.projecaoVendasMes || 0);
@@ -638,7 +638,7 @@ export default function ControleEstoquePage({
     // Calcular estoque total e valor em estoque das categorias filtradas
     const estoqueTotalFiltrado = categoriasFiltradas.reduce((sum, cat) => sum + cat.estoqueAtual, 0);
     const valorEmEstoqueFiltrado = categoriasFiltradas.reduce((sum, cat) => sum + cat.custoTotal, 0);
-    const vendasEsteMesFiltrado = categoriasFiltradas.reduce((sum, cat) => sum + cat.vendasMes, 0);
+    const vendasEsteMesFiltrado = categoriasFiltradas.reduce((sum, cat) => sum + cat.vendasPeriodo, 0);
     const categoriasAtivasFiltrado = categoriasFiltradas.length;
 
     // Calcular valores do período anterior baseado na proporção
@@ -1657,8 +1657,8 @@ export default function ControleEstoquePage({
                 </div>
                 <div className={styles.categoriaMetrics}>
                   <div className={styles.metricItem}>
-                    <span className={styles.metricLabel}>Venda acumulada (mês):</span>
-                    <span className={styles.metricValue}>{formatNumber(cat.vendasMes)}</span>
+                    <span className={styles.metricLabel}>Venda Total (período):</span>
+                    <span className={styles.metricValue}>{formatNumber(cat.vendasPeriodo)}</span>
                   </div>
                   <div className={styles.metricItem}>
                     <span className={styles.metricLabel}>Projeção vendas mês:</span>
