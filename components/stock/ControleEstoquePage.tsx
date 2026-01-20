@@ -690,10 +690,6 @@ export default function ControleEstoquePage({
     // Para vendas, usar o valor do KPI diretamente (já está correto)
     const vendasMesAnteriorFiltrado = kpis.vendasMesAnterior;
 
-    // Calcular valor em estoque anterior usando proporção baseada no estoque anterior
-    const proporcaoEstoqueAnterior = kpis.estoqueTotalAnterior > 0 ? estoqueTotalAnteriorFiltrado / kpis.estoqueTotalAnterior : 0;
-    const valorEmEstoqueAnteriorFiltrado = (kpis.valorEmEstoqueAnterior ?? 0) * proporcaoEstoqueAnterior;
-
     return {
       estoqueTotal: estoqueTotalFiltrado,
       valorEmEstoque: valorEmEstoqueFiltrado,
@@ -701,7 +697,7 @@ export default function ControleEstoquePage({
       categoriasAtivas: categoriasAtivasFiltrado,
       estoqueTotalAnterior: estoqueTotalAnteriorFiltrado,
       vendasMesAnterior: vendasMesAnteriorFiltrado,
-      valorEmEstoqueAnterior: valorEmEstoqueAnteriorFiltrado,
+      valorEmEstoqueAnterior: undefined, // Removido - não está alinhado com a quantidade do período anterior
     };
   }, [kpis, categoriasFiltradas]);
 
@@ -1222,24 +1218,6 @@ export default function ControleEstoquePage({
         <div className={styles.kpiCard}>
           <div className={styles.kpiLabel}>VALOR EM ESTOQUE</div>
           <div className={styles.kpiValue}>{formatCurrency(kpisFiltrados?.valorEmEstoque ?? 0)}</div>
-          {kpisFiltrados && kpisFiltrados.valorEmEstoqueAnterior !== undefined && (
-            <>
-              <div className={styles.kpiPrevious}>
-                Início do período: {formatCurrency(kpisFiltrados.valorEmEstoqueAnterior)}
-              </div>
-              {(() => {
-                const diferenca = (kpisFiltrados.valorEmEstoque ?? 0) - (kpisFiltrados.valorEmEstoqueAnterior ?? 0);
-                if (diferenca !== 0) {
-                  return (
-                    <div className={`${styles.kpiChange} ${diferenca > 0 ? styles.positive : styles.negative}`}>
-                      {diferenca > 0 ? "▲" : "▼"} {formatCurrency(Math.abs(diferenca))}
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-            </>
-          )}
         </div>
 
         <div className={styles.kpiCard}>
