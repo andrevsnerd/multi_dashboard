@@ -36,16 +36,18 @@ export default function Sidebar({ companyName }: SidebarProps) {
     if (!pathname || pathname === "/") {
       return "/";
     }
-    // Remove /estoque-por-filial, /controle-estoque, /produtos, /produtos-recentes, /produto-detalhado, /vendedores, /clientes e /exportar-relatorios do final do pathname se existir
-    return pathname
-      .replace(/\/estoque-por-filial$/, "")
-      .replace(/\/controle-estoque$/, "")
+    // Remove sub-rotas e rotas principais. Para controle-estoque, remove tudo que vem depois também
+    let base = pathname
+      .replace(/\/estoque-por-filial.*$/, "")
+      .replace(/\/controle-estoque.*$/, "") // Remove /controle-estoque e qualquer coisa depois
       .replace(/\/produto-detalhado$/, "")
       .replace(/\/produtos-recentes$/, "")
       .replace(/\/produtos$/, "")
       .replace(/\/vendedores$/, "")
       .replace(/\/clientes$/, "")
       .replace(/\/exportar-relatorios$/, "");
+    
+    return base;
   };
 
   const basePath = getBasePath();

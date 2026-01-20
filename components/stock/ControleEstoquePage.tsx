@@ -628,6 +628,9 @@ export default function ControleEstoquePage({
       });
     }
 
+    // Ordenar por quantidade de estoque (do maior para o menor)
+    resultadoFiltrado.sort((a, b) => b.estoqueAtual - a.estoqueAtual);
+
     return resultadoFiltrado;
   }, [categorias, selectedCategorias, linhasExcluidas, categoriaExpansao, reagruparPorNivel, companyKey]);
 
@@ -1646,7 +1649,7 @@ export default function ControleEstoquePage({
                 </div>
                 {cat.estoqueSemanaPassada !== undefined && (
                   <div className={styles.estoqueSemanaPassada}>
-                    {formatNumber(cat.estoqueSemanaPassada)} semana passada
+                    {formatNumber(cat.estoqueSemanaPassada)} início do período
                   </div>
                 )}
                 <div className={styles.categoriaInfo}>
