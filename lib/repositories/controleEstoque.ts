@@ -1242,22 +1242,38 @@ export async function fetchEstoquePorCategoria({
       const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
       const currentDay = now.getDate();
       
-      // Projeção baseada na performance do mês ATUAL
+      // Projeção baseada na performance do mês ATUAL (vendas totais do mês)
       const projecaoMensal = currentDay > 0 
         ? Math.round((vendasMesAtual / currentDay) * daysInMonth) 
         : 0;
-        
-      const projecaoAnual = projecaoMensal * 12;
+      
+      // Calcular vendas restantes do mês (apenas o que falta vender)
+      // Dias restantes = total de dias do mês - dia atual
+      const diasRestantes = daysInMonth - currentDay;
+      const projecaoVendasRestantes = currentDay > 0 && diasRestantes > 0
+        ? Math.round((vendasMesAtual / currentDay) * diasRestantes)
+        : 0;
+      
+      // Calcular projeção anual corretamente
+      // IMPORTANTE: Não podemos multiplicar projecaoMensal pelos meses restantes,
+      // porque projecaoMensal é do mês INTEIRO e já vendemos parte do mês atual
+      // Exemplo: Se estamos em 20/01, devemos usar:
+      // - Vendas restantes de janeiro (11 dias): projecaoVendasRestantes
+      // - Vendas dos próximos 11 meses completos (fev a dez): projecaoMensal * 11
+      const mesesCompletosRestantes = 12 - (now.getMonth() + 1); // Meses após o mês atual
+      const projecaoAnual = projecaoVendasRestantes + (projecaoMensal * mesesCompletosRestantes);
       
       // Duração do estoque baseada na projeção mensal
       const diasEstoque = projecaoMensal > 0 
         ? Math.round((estoqueAtual / projecaoMensal) * 30) 
         : 999;
 
-      // Calcular Estoque Final Mês = Estoque - Projeção Mensal
-      const estoqueFinalMes = Math.round(estoqueAtual - projecaoMensal);
+      // Calcular Estoque Final Mês = Estoque Atual - Vendas Restantes do Mês
+      // IMPORTANTE: Subtrair apenas o que falta vender, não o mês inteiro
+      const estoqueFinalMes = Math.round(estoqueAtual - projecaoVendasRestantes);
 
-      // Calcular Estoque Final Ano = Estoque - Projeção Ano
+      // Calcular Estoque Final Ano = Estoque Atual - Projeção dos Meses Restantes
+      // IMPORTANTE: Multiplicar pelos meses restantes, não por 12
       const estoqueFinalAno = Math.round(estoqueAtual - projecaoAnual);
 
       // Calcular estoque da semana passada

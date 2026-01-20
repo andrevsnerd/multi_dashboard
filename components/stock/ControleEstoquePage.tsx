@@ -422,9 +422,28 @@ export default function ControleEstoquePage({
             const totalDiasMes = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
             
             // Recalcular projeções
-            const mesesRestantes = Math.max(0, 12 - (new Date().getMonth() + 1) + 1);
-            acc[key].projecaoMes = Math.round(totalEstoque - totalProjecaoVendas);
-            acc[key].projecaoAnual = Math.round(totalEstoque - (totalProjecaoVendas * mesesRestantes));
+            // IMPORTANTE: No frontend, não temos acesso a vendasMesAtual (vendas reais até hoje),
+            // apenas a projecaoVendasMes (projeção do mês inteiro). Por isso, precisamos estimar.
+            // Assumimos que projecaoVendasMes foi calculado como: (vendasMesAtual / diasCorridos) * totalDiasMes
+            // Então: vendasMesAtual = (projecaoVendasMes * diasCorridos) / totalDiasMes
+            
+            // Calcular vendas restantes do mês (apenas o que falta vender)
+            const diasRestantes = totalDiasMes - diasCorridos;
+            const vendasMesAtualEstimada = diasCorridos > 0 && totalDiasMes > 0
+              ? (totalProjecaoVendas * diasCorridos) / totalDiasMes
+              : 0;
+            const projecaoVendasRestantes = diasCorridos > 0 && diasRestantes > 0
+              ? Math.round((vendasMesAtualEstimada / diasCorridos) * diasRestantes)
+              : 0;
+            
+            // Calcular projeção anual corretamente
+            // IMPORTANTE: Não podemos multiplicar projecaoVendasMes pelos meses restantes,
+            // porque projecaoVendasMes é do mês INTEIRO e já vendemos parte do mês atual
+            const mesesCompletosRestantes = 12 - (new Date().getMonth() + 1); // Meses após o mês atual
+            const projecaoAnual = projecaoVendasRestantes + (totalProjecaoVendas * mesesCompletosRestantes);
+            
+            acc[key].projecaoMes = Math.round(totalEstoque - projecaoVendasRestantes);
+            acc[key].projecaoAnual = Math.round(totalEstoque - projecaoAnual);
             acc[key].duracao = totalProjecaoVendas > 0 
               ? Math.round((totalEstoque / totalProjecaoVendas) * totalDiasMes)
               : 999;
@@ -461,8 +480,16 @@ export default function ControleEstoquePage({
               const totalDiasMes = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
               
               // Recalcular projeções
-              const mesesRestantes = Math.max(0, 12 - (new Date().getMonth() + 1) + 1);
-              acc[key].projecaoMes = Math.round(totalEstoque - totalProjecaoVendas);
+              // Calcular vendas restantes do mês (apenas o que falta vender)
+              const diasRestantes = totalDiasMes - diasCorridos;
+              const projecaoVendasRestantes = diasCorridos > 0 && diasRestantes > 0
+                ? Math.round((totalProjecaoVendas / diasCorridos) * diasRestantes)
+                : 0;
+              
+              // Calcular meses restantes do ano (incluindo o mês atual)
+              const mesesRestantes = 12 - new Date().getMonth();
+              
+              acc[key].projecaoMes = Math.round(totalEstoque - projecaoVendasRestantes);
               acc[key].projecaoAnual = Math.round(totalEstoque - (totalProjecaoVendas * mesesRestantes));
               acc[key].duracao = totalProjecaoVendas > 0 
                 ? Math.round((totalEstoque / totalProjecaoVendas) * totalDiasMes)
@@ -497,8 +524,16 @@ export default function ControleEstoquePage({
               const totalDiasMes = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
               
               // Recalcular projeções
-              const mesesRestantes = Math.max(0, 12 - (new Date().getMonth() + 1) + 1);
-              acc[key].projecaoMes = Math.round(totalEstoque - totalProjecaoVendas);
+              // Calcular vendas restantes do mês (apenas o que falta vender)
+              const diasRestantes = totalDiasMes - diasCorridos;
+              const projecaoVendasRestantes = diasCorridos > 0 && diasRestantes > 0
+                ? Math.round((totalProjecaoVendas / diasCorridos) * diasRestantes)
+                : 0;
+              
+              // Calcular meses restantes do ano (incluindo o mês atual)
+              const mesesRestantes = 12 - new Date().getMonth();
+              
+              acc[key].projecaoMes = Math.round(totalEstoque - projecaoVendasRestantes);
               acc[key].projecaoAnual = Math.round(totalEstoque - (totalProjecaoVendas * mesesRestantes));
               acc[key].duracao = totalProjecaoVendas > 0 
                 ? Math.round((totalEstoque / totalProjecaoVendas) * totalDiasMes)
