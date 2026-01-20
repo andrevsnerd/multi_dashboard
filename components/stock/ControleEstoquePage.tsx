@@ -676,17 +676,22 @@ export default function ControleEstoquePage({
     // Calcular estoque total e valor em estoque das categorias filtradas
     const estoqueTotalFiltrado = categoriasFiltradas.reduce((sum, cat) => sum + cat.estoqueAtual, 0);
     const valorEmEstoqueFiltrado = categoriasFiltradas.reduce((sum, cat) => sum + cat.custoTotal, 0);
-    const vendasEsteMesFiltrado = categoriasFiltradas.reduce((sum, cat) => sum + cat.vendasPeriodo, 0);
     const categoriasAtivasFiltrado = categoriasFiltradas.length;
+
+    // IMPORTANTE: Usar o valor do KPI diretamente para vendas, pois ele já inclui TODAS as vendas
+    // (incluindo produtos sem estoque), enquanto vendasPeriodo das categorias pode não incluir tudo
+    const vendasEsteMesFiltrado = kpis.vendasEsteMes;
 
     // Calcular valores do período anterior baseado na proporção
     // Se temos X% do estoque total, assumimos X% do estoque anterior também
     const proporcaoEstoque = kpis.estoqueTotal > 0 ? estoqueTotalFiltrado / kpis.estoqueTotal : 0;
     const estoqueTotalAnteriorFiltrado = Math.round(kpis.estoqueTotalAnterior * proporcaoEstoque);
     
-    // Para vendas, usar a mesma proporção ou calcular baseado nas vendas filtradas
-    const proporcaoVendas = kpis.vendasEsteMes > 0 ? vendasEsteMesFiltrado / kpis.vendasEsteMes : 0;
-    const vendasMesAnteriorFiltrado = Math.round(kpis.vendasMesAnterior * proporcaoVendas);
+    // Para vendas, usar o valor do KPI diretamente (já está correto)
+    const vendasMesAnteriorFiltrado = kpis.vendasMesAnterior;
+
+    // Calcular valor em estoque anterior usando o valor do backend e aplicando a proporção
+    const valorEmEstoqueAnteriorFiltrado = (kpis.valorEmEstoqueAnterior ?? 0) * proporcaoEstoque;
 
     return {
       estoqueTotal: estoqueTotalFiltrado,
@@ -695,6 +700,7 @@ export default function ControleEstoquePage({
       categoriasAtivas: categoriasAtivasFiltrado,
       estoqueTotalAnterior: estoqueTotalAnteriorFiltrado,
       vendasMesAnterior: vendasMesAnteriorFiltrado,
+      valorEmEstoqueAnterior: valorEmEstoqueAnteriorFiltrado,
     };
   }, [kpis, categoriasFiltradas]);
 
@@ -1189,25 +1195,66 @@ export default function ControleEstoquePage({
         <div className={styles.kpiCard}>
           <div className={styles.kpiLabel}>ESTOQUE TOTAL</div>
           <div className={styles.kpiValue}>{formatNumber(kpisFiltrados?.estoqueTotal ?? 0)} un</div>
-          {kpisFiltrados && estoqueChangePercent !== 0 && (
-            <div className={`${styles.kpiChange} ${estoqueChangePercent > 0 ? styles.positive : styles.negative}`}>
-              {estoqueChangePercent > 0 ? "▲" : "▼"} {Math.abs(estoqueChangePercent).toFixed(1)}% vs mês anterior
-            </div>
+          {kpisFiltrados && kpisFiltrados.estoqueTotalAnterior !== undefined && (
+            <>
+              <div className={styles.kpiPrevious}>
+                Início do período: {formatNumber(kpisFiltrados.estoqueTotalAnterior)} un
+              </div>
+              {(() => {
+                const diferenca = (kpisFiltrados.estoqueTotal ?? 0) - (kpisFiltrados.estoqueTotalAnterior ?? 0);
+                if (diferenca !== 0) {
+                  return (
+                    <div className={`${styles.kpiChange} ${diferenca > 0 ? styles.positive : styles.negative}`}>
+                      {diferenca > 0 ? "▲" : "▼"} {formatNumber(Math.abs(diferenca))} un
+                      {estoqueChangePercent !== 0 && (
+                        <span> ({estoqueChangePercent > 0 ? "+" : ""}{estoqueChangePercent.toFixed(1)}%)</span>
+                      )}
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+            </>
           )}
         </div>
 
         <div className={styles.kpiCard}>
           <div className={styles.kpiLabel}>VALOR EM ESTOQUE</div>
           <div className={styles.kpiValue}>{formatCurrency(kpisFiltrados?.valorEmEstoque ?? 0)}</div>
+          {kpisFiltrados && kpisFiltrados.valorEmEstoqueAnterior !== undefined && (
+            <>
+              <div className={styles.kpiPrevious}>
+                Início do período: {formatCurrency(kpisFiltrados.valorEmEstoqueAnterior)}
+              </div>
+              {(() => {
+                const diferenca = (kpisFiltrados.valorEmEstoque ?? 0) - (kpisFiltrados.valorEmEstoqueAnterior ?? 0);
+                if (diferenca !== 0) {
+                  return (
+                    <div className={`${styles.kpiChange} ${diferenca > 0 ? styles.positive : styles.negative}`}>
+                      {diferenca > 0 ? "▲" : "▼"} {formatCurrency(Math.abs(diferenca))}
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+            </>
+          )}
         </div>
 
         <div className={styles.kpiCard}>
-          <div className={styles.kpiLabel}>VENDAS ESTE MÊS</div>
+          <div className={styles.kpiLabel}>VENDAS TOTAIS</div>
           <div className={styles.kpiValue}>{formatNumber(kpisFiltrados?.vendasEsteMes ?? 0)} un</div>
-          {kpisFiltrados && vendasChangePercent !== 0 && (
-            <div className={`${styles.kpiChange} ${vendasChangePercent > 0 ? styles.positive : styles.negative}`}>
-              {vendasChangePercent > 0 ? "▲" : "▼"} {Math.abs(vendasChangePercent).toFixed(1)}% vs mês anterior
-            </div>
+          {kpisFiltrados && kpisFiltrados.vendasMesAnterior !== undefined && (
+            <>
+              <div className={styles.kpiPrevious}>
+                Período anterior: {formatNumber(kpisFiltrados.vendasMesAnterior)} un
+              </div>
+              {vendasChangePercent !== 0 && (
+                <div className={`${styles.kpiChange} ${vendasChangePercent > 0 ? styles.positive : styles.negative}`}>
+                  {vendasChangePercent > 0 ? "▲" : "▼"} {Math.abs(vendasChangePercent).toFixed(1)}% vs período anterior
+                </div>
+              )}
+            </>
           )}
         </div>
 

@@ -142,17 +142,19 @@ function buildVendasFilialFilter(
   }
 
   if (isScarfme && specificFilial === null) {
-    const allFiliais = filiais;
+    // Quando "Todas as filiais" (null), excluir e-commerce da query de varejo
+    // pois e-commerce tem query separada
+    const normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
     
-    if (allFiliais.length === 0) {
+    if (normalFiliais.length === 0) {
       return '';
     }
 
-    allFiliais.forEach((filial, index) => {
+    normalFiliais.forEach((filial, index) => {
       request.input(`vendasFilial${index}`, sql.VarChar, filial);
     });
 
-    const placeholders = allFiliais
+    const placeholders = normalFiliais
       .map((_, index) => `@vendasFilial${index}`)
       .join(', ');
 
@@ -338,6 +340,7 @@ export interface EstoqueKPI {
   vendasEsteMes: number;
   categoriasAtivas: number;
   estoqueTotalAnterior: number;
+  valorEmEstoqueAnterior: number;
   vendasMesAnterior: number;
 }
 
@@ -352,7 +355,7 @@ export interface CategoriaEstoque {
   projecaoAnual: number;
   projecaoVendasMes: number; // projeção de vendas mensal (média dos últimos meses)
   tendenciaSemanal: number; // quantidade real (diferença semanal)
-  estoqueSemanaPassada: number; // estoque de uma semana atrás
+  estoqueSemanaPassada: number; // estoque do início do período selecionado (calculado: estoque atual - entradas + vendas + e-commerce)
   // Campos detalhados quando há filtros selecionados
   linha?: string;
   subgrupo?: string;
@@ -443,6 +446,30 @@ export async function fetchEstoqueKPIs({
   grades,
 }: ControleEstoqueParams): Promise<EstoqueKPI> {
   return withRequest(async (request) => {
+    // Usar o período selecionado pelo usuário (range) para calcular vendas
+    const { start: periodoStartKPI, end: periodoEndKPI } = resolveRange(range);
+    
+    // Calcular período anterior: mesmos dias do mês anterior
+    // Se período atual é 01/01 a 20/01 (inclusivo), período anterior é 01/12 a 20/12 (inclusivo)
+    // O periodoEndKPI é exclusivo (21/01), então precisamos calcular corretamente
+    // Calcular a duração do período atual em milissegundos
+    const duracaoPeriodo = periodoEndKPI.getTime() - periodoStartKPI.getTime();
+    
+    // Calcular data de início do período anterior (mesmo dia do mês anterior)
+    const periodoAnteriorStart = new Date(periodoStartKPI);
+    const mesAtual = periodoStartKPI.getUTCMonth();
+    if (mesAtual === 0) {
+      // Se estamos em janeiro, voltar para dezembro do ano anterior
+      periodoAnteriorStart.setUTCFullYear(periodoStartKPI.getUTCFullYear() - 1);
+      periodoAnteriorStart.setUTCMonth(11);
+    } else {
+      periodoAnteriorStart.setUTCMonth(mesAtual - 1);
+    }
+    
+    // Calcular data de fim do período anterior mantendo a mesma duração
+    const periodoAnteriorEnd = new Date(periodoAnteriorStart.getTime() + duracaoPeriodo);
+    
+    // Manter currentMonth apenas para comparação com mês anterior (vendasMesAnterior)
     const now = new Date();
     const currentMonth = {
       start: new Date(now.getFullYear(), now.getMonth(), 1),
@@ -450,6 +477,7 @@ export async function fetchEstoqueKPIs({
     };
     const previousMonth = shiftRangeByMonths(currentMonth, -1);
     
+    const companyConfig = resolveCompany(company);
     const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
     const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
     const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
@@ -493,17 +521,17 @@ export async function fetchEstoqueKPIs({
       categoriasAtivas: 0,
     };
 
-    // Vendas do mês atual
-    request.input('currentStart', sql.DateTime, currentMonth.start);
-    request.input('currentEnd', sql.DateTime, currentMonth.end);
+    // Vendas do período selecionado (varejo)
+    request.input('periodoStartKPI', sql.DateTime, periodoStartKPI);
+    request.input('periodoEndKPI', sql.DateTime, periodoEndKPI);
     
     const vendasAtualQuery = `
       SELECT 
-        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendasMes
+        SUM(vp.QTDE - ISNULL(vp.QTDE_CANCELADA, 0)) AS vendasMes
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-      WHERE vp.DATA_VENDA >= @currentStart
-        AND vp.DATA_VENDA < @currentEnd
+      WHERE vp.DATA_VENDA >= @periodoStartKPI
+        AND vp.DATA_VENDA < @periodoEndKPI
         AND vp.QTDE > 0
         ${vendasFilialFilter}
         ${grupoFilter}
@@ -517,17 +545,64 @@ export async function fetchEstoqueKPIs({
       vendasMes: number | null;
     }>(vendasAtualQuery);
 
-    // Vendas do mês anterior
-    request.input('prevStart', sql.DateTime, previousMonth.start);
-    request.input('prevEnd', sql.DateTime, previousMonth.end);
+    // Buscar vendas de e-commerce do período selecionado (apenas para ScarfMe quando filial é null)
+    let ecommerceVendasMes = 0;
+    let ecommerceFilialFilter = '';
+    const isScarfme = company === 'scarfme';
+    const hasEcommerce = (companyConfig?.ecommerceFilials?.length ?? 0) > 0;
+    const shouldIncludeEcommerce = isScarfme && hasEcommerce && filial === null;
+    
+    if (shouldIncludeEcommerce) {
+      // Para "Todas as filiais" (null), buscar todas as filiais de e-commerce
+      const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
+      if (ecommerceFilials.length > 0) {
+        ecommerceFilials.forEach((filialEcommerce, index) => {
+          request.input(`ecommerceFilialKPI${index}`, sql.VarChar, filialEcommerce);
+        });
+        const placeholders = ecommerceFilials.map((_, i) => `@ecommerceFilialKPI${i}`).join(', ');
+        ecommerceFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+      }
+
+      if (ecommerceFilialFilter) {
+        const ecommerceVendasQuery = `
+          SELECT 
+            SUM(CAST(fp.QTDE AS FLOAT)) AS vendasMes
+          FROM FATURAMENTO f WITH (NOLOCK)
+          JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) 
+            ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+          LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
+          WHERE f.EMISSAO >= @periodoStartKPI
+            AND f.EMISSAO < @periodoEndKPI
+            AND f.NOTA_CANCELADA = 0
+            AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+            AND CAST(fp.QTDE AS FLOAT) > 0
+            ${ecommerceFilialFilter}
+            ${grupoFilter}
+            ${linhaFilter}
+            ${colecaoFilter}
+            ${subgrupoFilter}
+            ${gradeFilter}
+        `;
+
+        const ecommerceVendasResult = await request.query<{
+          vendasMes: number | null;
+        }>(ecommerceVendasQuery);
+
+        ecommerceVendasMes = Number(ecommerceVendasResult.recordset[0]?.vendasMes ?? 0);
+      }
+    }
+
+    // Vendas do período anterior (com a mesma duração do período selecionado)
+    request.input('periodoAnteriorStartKPI', sql.DateTime, periodoAnteriorStart);
+    request.input('periodoAnteriorEndKPI', sql.DateTime, periodoAnteriorEnd);
     
     const vendasAnteriorQuery = `
       SELECT 
-        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendasMes
+        SUM(vp.QTDE - ISNULL(vp.QTDE_CANCELADA, 0)) AS vendasMes
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-      WHERE vp.DATA_VENDA >= @prevStart
-        AND vp.DATA_VENDA < @prevEnd
+      WHERE vp.DATA_VENDA >= @periodoAnteriorStartKPI
+        AND vp.DATA_VENDA < @periodoAnteriorEndKPI
         AND vp.QTDE > 0
         ${vendasFilialFilter}
         ${grupoFilter}
@@ -541,17 +616,215 @@ export async function fetchEstoqueKPIs({
       vendasMes: number | null;
     }>(vendasAnteriorQuery);
 
-    // Estoque do mês anterior (simplificado - usar mesmo estoque atual como base)
-    // Em um sistema real, isso seria calculado com base em histórico
-    const estoqueAnterior = Number(estoqueRow.estoqueTotal ?? 0);
+    // Buscar vendas de e-commerce do período anterior (apenas para ScarfMe quando filial é null)
+    let ecommerceVendasMesAnterior = 0;
+    if (shouldIncludeEcommerce) {
+      const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
+      if (ecommerceFilials.length > 0) {
+        const ecommerceFilialFilterAnterior = ecommerceFilialFilter; // Reutilizar o mesmo filtro
+        
+        const ecommerceVendasAnteriorQuery = `
+          SELECT 
+            SUM(CAST(fp.QTDE AS FLOAT)) AS vendasMes
+          FROM FATURAMENTO f WITH (NOLOCK)
+          JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) 
+            ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+          LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
+          WHERE f.EMISSAO >= @periodoAnteriorStartKPI
+            AND f.EMISSAO < @periodoAnteriorEndKPI
+            AND f.NOTA_CANCELADA = 0
+            AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+            AND CAST(fp.QTDE AS FLOAT) > 0
+            ${ecommerceFilialFilterAnterior}
+            ${grupoFilter}
+            ${linhaFilter}
+            ${colecaoFilter}
+            ${subgrupoFilter}
+            ${gradeFilter}
+        `;
+
+        const ecommerceVendasAnteriorResult = await request.query<{
+          vendasMes: number | null;
+        }>(ecommerceVendasAnteriorQuery);
+
+        ecommerceVendasMesAnterior = Number(ecommerceVendasAnteriorResult.recordset[0]?.vendasMes ?? 0);
+      }
+    }
+
+    // Calcular estoque anterior usando a mesma lógica dos cards de categorias
+    // Estoque Anterior = Estoque Atual - Entradas (período) + Vendas (período) + E-commerce (período)
+    // Usar o período selecionado pelo usuário (range) - reutilizar as variáveis já declaradas
+
+    // Buscar entradas do período selecionado (apenas na matriz, excluindo devoluções)
+    let matrizFilialFilterKPI = '';
+    let lojasFilterSaidasKPI = '';
+    
+    if (companyConfig) {
+      let matrizFiliais: string[] = [];
+      if (company === 'scarfme') {
+        matrizFiliais = ['SCARF ME - MATRIZ'];
+      } else if (company === 'nerd') {
+        matrizFiliais = ['NERD'];
+      }
+
+      if (matrizFiliais.length > 0) {
+        matrizFiliais.forEach((filialMatriz, index) => {
+          request.input(`matrizFilialKPI${index}`, sql.VarChar, filialMatriz);
+        });
+        const placeholders = matrizFiliais.map((_, i) => `@matrizFilialKPI${i}`).join(', ');
+        matrizFilialFilterKPI = `AND E.FILIAL IN (${placeholders})`;
+      }
+
+      const filiais = companyConfig.filialFilters['inventory'] ?? [];
+      const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
+      const lojasNormais = filiais.filter(f => {
+        if (company === 'scarfme') {
+          return f !== 'SCARF ME - MATRIZ' && !ecommerceFilials.includes(f);
+        } else if (company === 'nerd') {
+          return f !== 'NERD';
+        }
+        return true;
+      });
+      
+      if (lojasNormais.length > 0) {
+        lojasNormais.forEach((filialLoja, index) => {
+          request.input(`lojaSaidaKPI${index}`, sql.VarChar, filialLoja);
+        });
+        const placeholders = lojasNormais.map((_, i) => `@lojaSaidaKPI${i}`).join(', ');
+        lojasFilterSaidasKPI = `AND S.FILIAL IN (${placeholders})`;
+      }
+    }
+
+    request.input('periodoStartKPIEntradas', sql.DateTime, periodoStartKPI);
+    request.input('periodoEndKPIEntradas', sql.DateTime, periodoEndKPI);
+
+    // Criar filtros para entradas usando o alias 'pr'
+    const grupoFilterEntradasKPI = buildGrupoFilter(request, company, grupos, 'pr');
+    const linhaFilterEntradasKPI = buildLinhaFilter(request, company, linhas, 'pr');
+    const colecaoFilterEntradasKPI = buildColecaoFilter(request, company, colecoes, 'pr');
+    const subgrupoFilterEntradasKPI = buildSubgrupoFilter(request, company, subgrupos, 'pr');
+    const gradeFilterEntradasKPI = buildGradeFilter(request, company, grades, 'pr');
+    const categoriaFieldEntradasKPI = company === 'nerd' 
+      ? 'pr.GRUPO_PRODUTO'
+      : 'pr.LINHA';
+
+    const entradasPeriodoQuery = `
+      SELECT 
+        SUM(CAST(P.QTDE AS FLOAT)) AS entradas
+      FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+      LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+      LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
+      WHERE pr.PRODUTO IS NOT NULL
+        AND E.EMISSAO >= @periodoStartKPIEntradas
+        AND E.EMISSAO < @periodoEndKPIEntradas
+        ${matrizFilialFilterKPI}
+        ${grupoFilterEntradasKPI}
+        ${linhaFilterEntradasKPI}
+        ${colecaoFilterEntradasKPI}
+        ${subgrupoFilterEntradasKPI}
+        ${gradeFilterEntradasKPI}
+        AND ${categoriaFieldEntradasKPI} <> ''
+        AND ${categoriaFieldEntradasKPI} <> 'SEM GRUPO'
+        AND ${categoriaFieldEntradasKPI} <> 'SEM LINHA'
+        -- EXCLUIR devoluções/transferências
+        AND NOT EXISTS (
+          SELECT 1
+          FROM ESTOQUE_PROD_SAI AS S WITH (NOLOCK)
+          LEFT JOIN ESTOQUE_PROD1_SAI AS PS WITH (NOLOCK) ON S.ROMANEIO_PRODUTO = PS.ROMANEIO_PRODUTO
+          WHERE PS.PRODUTO = P.PRODUTO
+            AND ISNULL(PS.COR_PRODUTO, '') = ISNULL(P.COR_PRODUTO, '')
+            AND CAST(S.EMISSAO AS DATE) = CAST(E.EMISSAO AS DATE)
+            ${lojasFilterSaidasKPI}
+        )
+    `;
+
+    const entradasPeriodoResult = await request.query<{
+      entradas: number | null;
+    }>(entradasPeriodoQuery);
+
+    // Buscar vendas do período selecionado
+    const vendasPeriodoQuery = `
+      SELECT 
+        SUM(vp.QTDE - ISNULL(vp.QTDE_CANCELADA, 0)) AS vendas
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      WHERE vp.DATA_VENDA >= @periodoStartKPI
+        AND vp.DATA_VENDA < @periodoEndKPI
+        AND vp.QTDE > 0
+        ${vendasFilialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+    `;
+
+    const vendasPeriodoResult = await request.query<{
+      vendas: number | null;
+    }>(vendasPeriodoQuery);
+
+    // Buscar e-commerce do período selecionado (apenas para ScarfMe)
+    let ecommercePeriodo = 0;
+    if (company === 'scarfme') {
+      request.input('periodoStartKPIEcommerce', sql.DateTime, periodoStartKPI);
+      request.input('periodoEndKPIEcommerce', sql.DateTime, periodoEndKPI);
+      const ecommercePeriodoQuery = `
+        SELECT 
+          SUM(CAST(fp.QTDE AS FLOAT)) AS ecommerce
+        FROM FATURAMENTO f WITH (NOLOCK)
+        JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) 
+          ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
+        WHERE f.EMISSAO >= @periodoStartKPIEcommerce
+          AND f.EMISSAO < @periodoEndKPIEcommerce
+          AND f.NOTA_CANCELADA = 0
+          AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+          AND CAST(fp.QTDE AS FLOAT) > 0
+          ${grupoFilter}
+          ${linhaFilter}
+          ${colecaoFilter}
+          ${subgrupoFilter}
+          ${gradeFilter}
+      `;
+
+      const ecommercePeriodoResult = await request.query<{
+        ecommerce: number | null;
+      }>(ecommercePeriodoQuery);
+
+      ecommercePeriodo = Number(ecommercePeriodoResult.recordset[0]?.ecommerce ?? 0);
+    }
+
+    const entradasPeriodo = Number(entradasPeriodoResult.recordset[0]?.entradas ?? 0);
+    const vendasPeriodo = Number(vendasPeriodoResult.recordset[0]?.vendas ?? 0);
+    const estoqueAtual = Number(estoqueRow.estoqueTotal ?? 0);
+
+    // Calcular estoque anterior: Estoque Atual - Entradas + Vendas + E-commerce
+    const estoqueAnterior = Math.max(0, Math.round(
+      estoqueAtual - entradasPeriodo + vendasPeriodo + ecommercePeriodo
+    ));
+
+    // Calcular valor em estoque anterior usando o valor médio por unidade
+    const valorEmEstoqueAtual = Number(estoqueRow.valorTotal ?? 0);
+    const valorMedioPorUnidade = estoqueAtual > 0 
+      ? valorEmEstoqueAtual / estoqueAtual 
+      : 0;
+    const valorEmEstoqueAnterior = Math.max(0, valorMedioPorUnidade * estoqueAnterior);
+
+    // Somar vendas de varejo + e-commerce
+    const vendasVarejoMes = Math.round(Number(vendasAtualResult.recordset[0]?.vendasMes ?? 0));
+    const vendasVarejoMesAnterior = Math.round(Number(vendasAnteriorResult.recordset[0]?.vendasMes ?? 0));
+    
+    const vendasTotalMes = vendasVarejoMes + ecommerceVendasMes;
+    const vendasTotalMesAnterior = vendasVarejoMesAnterior + ecommerceVendasMesAnterior;
 
     return {
-      estoqueTotal: Math.round(Number(estoqueRow.estoqueTotal ?? 0)),
-      valorEmEstoque: Number(estoqueRow.valorTotal ?? 0),
-      vendasEsteMes: Math.round(Number(vendasAtualResult.recordset[0]?.vendasMes ?? 0)),
+      estoqueTotal: Math.round(estoqueAtual),
+      valorEmEstoque: valorEmEstoqueAtual,
+      vendasEsteMes: vendasTotalMes,
       categoriasAtivas: Number(estoqueRow.categoriasAtivas ?? 0),
       estoqueTotalAnterior: estoqueAnterior,
-      vendasMesAnterior: Math.round(Number(vendasAnteriorResult.recordset[0]?.vendasMes ?? 0)),
+      valorEmEstoqueAnterior: valorEmEstoqueAnterior,
+      vendasMesAnterior: vendasTotalMesAnterior,
     };
   });
 }
@@ -901,7 +1174,7 @@ export async function fetchEstoquePorCategoria({
       }
     }
 
-    // Buscar entradas dos últimos 7 dias
+    // Buscar entradas do período selecionado
     // IMPORTANTE: Considerar apenas entradas na matriz que NÃO são devoluções/transferências
     // Regra: Se um produto SAIU de uma loja no mesmo dia que ENTROU na matriz, é devolução (não conta)
     // Apenas entradas na matriz SEM saída correspondente de loja são compras reais
@@ -947,7 +1220,7 @@ export async function fetchEstoquePorCategoria({
       entradas: number | null;
     }>(entradasSemanaQuery);
 
-    // Buscar vendas dos últimos 7 dias (já usa vendasFilialFilter que foi criado anteriormente)
+    // Buscar vendas do período selecionado (já usa vendasFilialFilter que foi criado anteriormente)
     const vendasSemanaQuery = `
       SELECT 
         ${categoriaField} AS categoria
@@ -1032,7 +1305,7 @@ export async function fetchEstoquePorCategoria({
     // Campos adicionais para query de e-commerce (usar alias 'p' - mesmo que vendas)
     // categoriaField também usa 'p', então está correto
 
-    // Buscar e-commerce dos últimos 7 dias (apenas para ScarfMe)
+    // Buscar e-commerce do período selecionado (apenas para ScarfMe)
     let ecommerceSemanaResult: { recordset: Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; ecommerce: number | null }> } = { recordset: [] };
     if (company === 'scarfme') {
       const ecommerceSemanaQuery = `
@@ -1096,16 +1369,14 @@ export async function fetchEstoquePorCategoria({
       ecommerceSemanaMap.set(chaveCategoria, Number(row.ecommerce ?? 0));
     });
 
-    // Vendas da semana/mês anterior para calcular tendência
-    // currentMonth já está definido no início da função
-    const previousMonth = shiftRangeByMonths(currentMonth, -1);
+    // Vendas do período anterior para calcular tendência
+    // Calcular período anterior com a mesma duração do período atual
+    // Nota: duracaoPeriodo, periodoAnteriorEnd e periodoAnteriorStart já foram calculados acima
+    const periodStart = periodoAnteriorStart;
+    const periodEnd = periodoAnteriorEnd;
     
-    const periodStart = periodType === 'semanal' 
-      ? new Date(currentMonth.start.getTime() - 7 * 24 * 60 * 60 * 1000)
-      : previousMonth.start;
-    const periodEnd = periodType === 'semanal'
-      ? currentMonth.start
-      : previousMonth.end;
+    // Manter previousMonth para uso no fallback de projeção
+    const previousMonth = shiftRangeByMonths(currentMonth, -1);
 
     request.input('periodStart', sql.DateTime, periodStart);
     request.input('periodEnd', sql.DateTime, periodEnd);
@@ -1403,10 +1674,10 @@ export async function fetchEstoquePorCategoria({
       // IMPORTANTE: Multiplicar pelos meses restantes, não por 12
       const estoqueFinalAno = Math.round(estoqueAtual - projecaoAnual);
 
-      // Calcular estoque da semana passada
+      // Calcular estoque do período anterior
       // IMPORTANTE: entradasSemana agora contém apenas entradas na matriz (compras reais)
       // Transferências para lojas são movimentações internas e não alteram o estoque total
-      // Estoque Semana Passada = Estoque Atual - Entradas na Matriz (7 dias) + Vendas (7 dias) + E-commerce (7 dias)
+      // Estoque Período Anterior = Estoque Atual - Entradas na Matriz (período) + Vendas (período) + E-commerce (período)
       const entradasSemana = entradasSemanaMap.get(chaveCategoria) || 0; // Apenas entradas na matriz (compras reais)
       const vendasSemana = vendasSemanaMap.get(chaveCategoria) || 0;
       const ecommerceSemana = ecommerceSemanaMap.get(chaveCategoria) || 0;

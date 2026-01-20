@@ -83,9 +83,18 @@
   margin-bottom: 8px;
 }
 
+.kpiPrevious {
+  font-size: 12px;
+  font-weight: 400;
+  color: #64748b;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
 .kpiChange {
   font-size: 12px;
   font-weight: 500;
+  margin-top: 2px;
 }
 
 .kpiChange.positive {
