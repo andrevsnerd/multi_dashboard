@@ -682,16 +682,17 @@ export default function ControleEstoquePage({
     // (incluindo produtos sem estoque), enquanto vendasPeriodo das categorias pode não incluir tudo
     const vendasEsteMesFiltrado = kpis.vendasEsteMes;
 
-    // Calcular valores do período anterior baseado na proporção
-    // Se temos X% do estoque total, assumimos X% do estoque anterior também
-    const proporcaoEstoque = kpis.estoqueTotal > 0 ? estoqueTotalFiltrado / kpis.estoqueTotal : 0;
-    const estoqueTotalAnteriorFiltrado = Math.round(kpis.estoqueTotalAnterior * proporcaoEstoque);
+    // IMPORTANTE: Calcular estoque anterior como soma dos estoques anteriores das categorias individuais
+    // Isso garante que o total seja EXATAMENTE igual à soma das partes
+    // Quando não há filtros, isso deve ser igual ao estoque anterior do KPI geral
+    const estoqueTotalAnteriorFiltrado = categoriasFiltradas.reduce((sum, cat) => sum + (cat.estoqueSemanaPassada || 0), 0);
     
     // Para vendas, usar o valor do KPI diretamente (já está correto)
     const vendasMesAnteriorFiltrado = kpis.vendasMesAnterior;
 
-    // Calcular valor em estoque anterior usando o valor do backend e aplicando a proporção
-    const valorEmEstoqueAnteriorFiltrado = (kpis.valorEmEstoqueAnterior ?? 0) * proporcaoEstoque;
+    // Calcular valor em estoque anterior usando proporção baseada no estoque anterior
+    const proporcaoEstoqueAnterior = kpis.estoqueTotalAnterior > 0 ? estoqueTotalAnteriorFiltrado / kpis.estoqueTotalAnterior : 0;
+    const valorEmEstoqueAnteriorFiltrado = (kpis.valorEmEstoqueAnterior ?? 0) * proporcaoEstoqueAnterior;
 
     return {
       estoqueTotal: estoqueTotalFiltrado,

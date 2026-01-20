@@ -507,6 +507,9 @@ export async function fetchEstoqueKPIs({
         ${subgrupoFilter}
         ${gradeFilter}
         AND e.ESTOQUE > 0
+        AND ${categoriaFieldKPI} <> ''
+        AND ${categoriaFieldKPI} <> 'SEM GRUPO'
+        AND ${categoriaFieldKPI} <> 'SEM LINHA'
     `;
 
     const estoqueResult = await request.query<{
@@ -757,6 +760,9 @@ export async function fetchEstoqueKPIs({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        AND ${categoriaFieldKPI} <> ''
+        AND ${categoriaFieldKPI} <> 'SEM GRUPO'
+        AND ${categoriaFieldKPI} <> 'SEM LINHA'
     `;
 
     const vendasPeriodoResult = await request.query<{
@@ -764,41 +770,81 @@ export async function fetchEstoqueKPIs({
     }>(vendasPeriodoQuery);
 
     // Buscar e-commerce do período selecionado (apenas para ScarfMe)
+    // Usar a mesma lógica das categorias individuais para garantir consistência
     let ecommercePeriodo = 0;
     if (company === 'scarfme') {
-      request.input('periodoStartKPIEcommerce', sql.DateTime, periodoStartKPI);
-      request.input('periodoEndKPIEcommerce', sql.DateTime, periodoEndKPI);
-      const ecommercePeriodoQuery = `
-        SELECT 
-          SUM(CAST(fp.QTDE AS FLOAT)) AS ecommerce
-        FROM FATURAMENTO f WITH (NOLOCK)
-        JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) 
-          ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
-        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
-        WHERE f.EMISSAO >= @periodoStartKPIEcommerce
-          AND f.EMISSAO < @periodoEndKPIEcommerce
-          AND f.NOTA_CANCELADA = 0
-          AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-          AND CAST(fp.QTDE AS FLOAT) > 0
-          ${grupoFilter}
-          ${linhaFilter}
-          ${colecaoFilter}
-          ${subgrupoFilter}
-          ${gradeFilter}
-      `;
+      const companyConfig = resolveCompany(company);
+      if (companyConfig) {
+        const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
+        let ecommerceFilialFilterKPI = '';
+        
+        // Aplicar a mesma lógica de filtro de filial das categorias individuais
+        if (filial && filial !== VAREJO_VALUE) {
+          // Se uma filial específica foi selecionada, usar apenas ela (se for e-commerce)
+          if (ecommerceFilials.includes(filial)) {
+            request.input('ecommercePeriodoFilialKPI', sql.VarChar, filial);
+            ecommerceFilialFilterKPI = `AND f.FILIAL = @ecommercePeriodoFilialKPI`;
+          } else {
+            // Se a filial selecionada não é e-commerce, não incluir e-commerce
+            ecommerceFilialFilterKPI = `AND 1=0`; // Sempre falso
+          }
+        } else if (filial === VAREJO_VALUE) {
+          // Se for "VAREJO", não incluir e-commerce
+          ecommerceFilialFilterKPI = `AND 1=0`; // Sempre falso
+        } else if (filial === null) {
+          // Se for "Todas as filiais", incluir todas as filiais de e-commerce
+          if (ecommerceFilials.length > 0) {
+            ecommerceFilials.forEach((f, index) => {
+              request.input(`ecommercePeriodoFilialKPI${index}`, sql.VarChar, f);
+            });
+            const placeholders = ecommerceFilials.map((_, i) => `@ecommercePeriodoFilialKPI${i}`).join(', ');
+            ecommerceFilialFilterKPI = `AND f.FILIAL IN (${placeholders})`;
+          }
+        }
+        
+        if (ecommerceFilialFilterKPI && !ecommerceFilialFilterKPI.includes('1=0')) {
+          request.input('periodoStartKPIEcommerce', sql.DateTime, periodoStartKPI);
+          request.input('periodoEndKPIEcommerce', sql.DateTime, periodoEndKPI);
+          const ecommercePeriodoQuery = `
+            SELECT 
+              SUM(CAST(fp.QTDE AS FLOAT)) AS ecommerce
+            FROM FATURAMENTO f WITH (NOLOCK)
+            JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) 
+              ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+            LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
+            WHERE f.EMISSAO >= @periodoStartKPIEcommerce
+              AND f.EMISSAO < @periodoEndKPIEcommerce
+              AND f.NOTA_CANCELADA = 0
+              AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+              AND CAST(fp.QTDE AS FLOAT) > 0
+              ${ecommerceFilialFilterKPI}
+              ${grupoFilter}
+              ${linhaFilter}
+              ${colecaoFilter}
+              ${subgrupoFilter}
+              ${gradeFilter}
+              AND ${categoriaFieldKPI} <> ''
+              AND ${categoriaFieldKPI} <> 'SEM GRUPO'
+              AND ${categoriaFieldKPI} <> 'SEM LINHA'
+          `;
 
-      const ecommercePeriodoResult = await request.query<{
-        ecommerce: number | null;
-      }>(ecommercePeriodoQuery);
+          const ecommercePeriodoResult = await request.query<{
+            ecommerce: number | null;
+          }>(ecommercePeriodoQuery);
 
-      ecommercePeriodo = Number(ecommercePeriodoResult.recordset[0]?.ecommerce ?? 0);
+          ecommercePeriodo = Number(ecommercePeriodoResult.recordset[0]?.ecommerce ?? 0);
+        }
+      }
     }
 
     const entradasPeriodo = Number(entradasPeriodoResult.recordset[0]?.entradas ?? 0);
     const vendasPeriodo = Number(vendasPeriodoResult.recordset[0]?.vendas ?? 0);
     const estoqueAtual = Number(estoqueRow.estoqueTotal ?? 0);
 
-    // Calcular estoque anterior: Estoque Atual - Entradas + Vendas + E-commerce
+    // IMPORTANTE: Calcular estoque anterior usando EXATAMENTE a mesma fórmula das categorias individuais
+    // Fórmula: Estoque Período Anterior = Estoque Atual - Entradas na Matriz (período) + Vendas (período) + E-commerce (período)
+    // As variáveis entradasPeriodo, vendasPeriodo e ecommercePeriodo já foram calculadas com os mesmos filtros
+    // que as categorias individuais usam (incluindo filtro de categoria)
     const estoqueAnterior = Math.max(0, Math.round(
       estoqueAtual - entradasPeriodo + vendasPeriodo + ecommercePeriodo
     ));
