@@ -68,6 +68,36 @@
   flex: 1;
 }
 
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 2px solid rgba(15, 23, 42, 0.08);
+}
+
+.tab {
+  padding: 12px 24px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s;
+}
+
+.tab:hover {
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+.tabActive {
+  color: #0f172a;
+  border-bottom-color: #0f172a;
+}
+
 .summary {
   display: flex;
   gap: 24px;
@@ -174,6 +204,21 @@
   text-align: right;
   font-weight: 600;
   color: #0f172a;
+}
+
+.dateCell {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.filialCell {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.diferencaPositiva {
+  color: #10b981;
+  font-weight: 700;
 }
 
 .loading,

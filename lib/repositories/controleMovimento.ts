@@ -391,228 +391,74 @@ export async function fetchControleMovimentoKPIs({
     const gradeFilterVendas = buildGradeFilter(request, company, grades, 'p');
     const exclusionFilterVendas = buildExclusionFilter(request, company, 'p', 'excludedLineVendas');
 
-    // 1. Buscar entradas do período atual (apenas na matriz, descontando devoluções)
-    // IMPORTANTE: Não remove completamente, apenas desconta a quantidade devolvida
+    // 1. Buscar entradas do período atual (apenas na matriz, sem descontar devoluções)
     const entradasQuery = `
-      WITH EntradasBase AS (
-        SELECT 
-          E.EMISSAO,
-          P.PRODUTO,
-          ISNULL(P.COR_PRODUTO, '') AS COR_PRODUTO,
-          CAST(P.QTDE AS FLOAT) AS QTDE_ENTRADA,
-          CAST(P.QTDE AS FLOAT) * ISNULL(pr.CUSTO_REPOSICAO1, 0) AS CUSTO_ENTRADA
-        FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
-        LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
-        LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
-        WHERE pr.PRODUTO IS NOT NULL
-          AND E.EMISSAO >= @startDate
-          AND E.EMISSAO < @endDate
-          ${matrizFilialFilter}
-          ${grupoFilterEntradas}
-          ${linhaFilterEntradas}
-          ${colecaoFilterEntradas}
-          ${subgrupoFilterEntradas}
-          ${gradeFilterEntradas}
-          ${exclusionFilterEntradas}
-          AND ${categoriaField} <> ''
-          AND ${categoriaField} <> 'SEM GRUPO'
-          AND ${categoriaField} <> 'SEM LINHA'
-      ),
-      SaidasLojas AS (
-        SELECT 
-          CAST(S.EMISSAO AS DATE) AS DATA_SAIDA,
-          PS.PRODUTO,
-          ISNULL(PS.COR_PRODUTO, '') AS COR_PRODUTO,
-          SUM(CAST(PS.QTDE AS FLOAT)) AS QTDE_SAIDA
-        FROM ESTOQUE_PROD_SAI AS S WITH (NOLOCK)
-        LEFT JOIN ESTOQUE_PROD1_SAI AS PS WITH (NOLOCK) ON S.ROMANEIO_PRODUTO = PS.ROMANEIO_PRODUTO
-        WHERE PS.PRODUTO IS NOT NULL
-          AND CAST(S.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-          AND CAST(S.EMISSAO AS DATE) < CAST(@endDate AS DATE)
-          ${lojasFilterSaidas}
-        GROUP BY CAST(S.EMISSAO AS DATE), PS.PRODUTO, PS.COR_PRODUTO
-      ),
-      EntradasAgrupadas AS (
-        SELECT 
-          eb.EMISSAO,
-          eb.PRODUTO,
-          eb.COR_PRODUTO,
-          SUM(eb.QTDE_ENTRADA) AS QTDE_ENTRADA_TOTAL,
-          SUM(eb.CUSTO_ENTRADA) AS CUSTO_ENTRADA_TOTAL
-        FROM EntradasBase eb
-        GROUP BY eb.EMISSAO, eb.PRODUTO, eb.COR_PRODUTO
-      ),
-      EntradasComSaidas AS (
-        SELECT 
-          ea.EMISSAO,
-          ea.PRODUTO,
-          ea.COR_PRODUTO,
-          ea.QTDE_ENTRADA_TOTAL AS QTDE_ENTRADA,
-          ea.CUSTO_ENTRADA_TOTAL AS CUSTO_ENTRADA,
-          ISNULL(sl.QTDE_SAIDA, 0) AS QTDE_SAIDA,
-          CASE 
-            WHEN ISNULL(sl.QTDE_SAIDA, 0) >= ea.QTDE_ENTRADA_TOTAL THEN 0
-            ELSE ea.QTDE_ENTRADA_TOTAL - ISNULL(sl.QTDE_SAIDA, 0)
-          END AS QTDE_LIQUIDA,
-          CASE 
-            WHEN ISNULL(sl.QTDE_SAIDA, 0) >= ea.QTDE_ENTRADA_TOTAL THEN 0
-            WHEN ea.QTDE_ENTRADA_TOTAL = 0 THEN 0
-            ELSE ea.CUSTO_ENTRADA_TOTAL * (CAST(ea.QTDE_ENTRADA_TOTAL - ISNULL(sl.QTDE_SAIDA, 0) AS FLOAT) / CAST(ea.QTDE_ENTRADA_TOTAL AS FLOAT))
-          END AS CUSTO_LIQUIDO
-        FROM EntradasAgrupadas ea
-        LEFT JOIN SaidasLojas sl ON sl.PRODUTO = ea.PRODUTO
-          AND sl.COR_PRODUTO = ea.COR_PRODUTO
-          AND CAST(sl.DATA_SAIDA AS DATE) = CAST(ea.EMISSAO AS DATE)
-      )
       SELECT 
-        ISNULL(SUM(QTDE_LIQUIDA), 0) AS quantidade,
-        ISNULL(SUM(CUSTO_LIQUIDO), 0) AS custo
-      FROM EntradasComSaidas
-      WHERE QTDE_LIQUIDA > 0
+        ISNULL(SUM(CAST(P.QTDE AS FLOAT)), 0) AS quantidade,
+        ISNULL(SUM(CAST(P.QTDE AS FLOAT) * ISNULL(pr.CUSTO_REPOSICAO1, 0)), 0) AS custo
+      FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+      LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+      LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
+      WHERE pr.PRODUTO IS NOT NULL
+        AND E.EMISSAO >= @startDate
+        AND E.EMISSAO < @endDate
+        ${matrizFilialFilter}
+        ${grupoFilterEntradas}
+        ${linhaFilterEntradas}
+        ${colecaoFilterEntradas}
+        ${subgrupoFilterEntradas}
+        ${gradeFilterEntradas}
+        ${exclusionFilterEntradas}
+        AND ${categoriaField} <> ''
+        AND ${categoriaField} <> 'SEM GRUPO'
+        AND ${categoriaField} <> 'SEM LINHA'
     `;
 
-    // 2. Buscar entradas do período anterior (apenas na matriz, descontando devoluções)
-    // IMPORTANTE: Não remove completamente, apenas desconta a quantidade devolvida
+    // 2. Buscar entradas do período anterior (apenas na matriz, sem descontar devoluções)
     const entradasAnteriorQuery = `
-      WITH EntradasBase AS (
-        SELECT 
-          E.EMISSAO,
-          P.PRODUTO,
-          ISNULL(P.COR_PRODUTO, '') AS COR_PRODUTO,
-          CAST(P.QTDE AS FLOAT) AS QTDE_ENTRADA,
-          CAST(P.QTDE AS FLOAT) * ISNULL(pr.CUSTO_REPOSICAO1, 0) AS CUSTO_ENTRADA
-        FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
-        LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
-        LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
-        WHERE pr.PRODUTO IS NOT NULL
-          AND E.EMISSAO >= @previousStartDate
-          AND E.EMISSAO < @previousEndDate
-          ${matrizFilialFilter}
-          ${grupoFilterEntradas}
-          ${linhaFilterEntradas}
-          ${colecaoFilterEntradas}
-          ${subgrupoFilterEntradas}
-          ${gradeFilterEntradas}
-          ${exclusionFilterEntradas}
-          AND ${categoriaField} <> ''
-          AND ${categoriaField} <> 'SEM GRUPO'
-          AND ${categoriaField} <> 'SEM LINHA'
-      ),
-      SaidasLojas AS (
-        SELECT 
-          CAST(S.EMISSAO AS DATE) AS DATA_SAIDA,
-          PS.PRODUTO,
-          ISNULL(PS.COR_PRODUTO, '') AS COR_PRODUTO,
-          SUM(CAST(PS.QTDE AS FLOAT)) AS QTDE_SAIDA
-        FROM ESTOQUE_PROD_SAI AS S WITH (NOLOCK)
-        LEFT JOIN ESTOQUE_PROD1_SAI AS PS WITH (NOLOCK) ON S.ROMANEIO_PRODUTO = PS.ROMANEIO_PRODUTO
-        WHERE PS.PRODUTO IS NOT NULL
-          AND CAST(S.EMISSAO AS DATE) >= CAST(@previousStartDate AS DATE)
-          AND CAST(S.EMISSAO AS DATE) < CAST(@previousEndDate AS DATE)
-          ${lojasFilterSaidas}
-        GROUP BY CAST(S.EMISSAO AS DATE), PS.PRODUTO, PS.COR_PRODUTO
-      ),
-      EntradasAgrupadas AS (
-        SELECT 
-          eb.EMISSAO,
-          eb.PRODUTO,
-          eb.COR_PRODUTO,
-          SUM(eb.QTDE_ENTRADA) AS QTDE_ENTRADA_TOTAL,
-          SUM(eb.CUSTO_ENTRADA) AS CUSTO_ENTRADA_TOTAL
-        FROM EntradasBase eb
-        GROUP BY eb.EMISSAO, eb.PRODUTO, eb.COR_PRODUTO
-      ),
-      EntradasComSaidas AS (
-        SELECT 
-          ea.EMISSAO,
-          ea.PRODUTO,
-          ea.COR_PRODUTO,
-          ea.QTDE_ENTRADA_TOTAL AS QTDE_ENTRADA,
-          ea.CUSTO_ENTRADA_TOTAL AS CUSTO_ENTRADA,
-          ISNULL(sl.QTDE_SAIDA, 0) AS QTDE_SAIDA,
-          CASE 
-            WHEN ISNULL(sl.QTDE_SAIDA, 0) >= ea.QTDE_ENTRADA_TOTAL THEN 0
-            ELSE ea.QTDE_ENTRADA_TOTAL - ISNULL(sl.QTDE_SAIDA, 0)
-          END AS QTDE_LIQUIDA,
-          CASE 
-            WHEN ISNULL(sl.QTDE_SAIDA, 0) >= ea.QTDE_ENTRADA_TOTAL THEN 0
-            WHEN ea.QTDE_ENTRADA_TOTAL = 0 THEN 0
-            ELSE ea.CUSTO_ENTRADA_TOTAL * (CAST(ea.QTDE_ENTRADA_TOTAL - ISNULL(sl.QTDE_SAIDA, 0) AS FLOAT) / CAST(ea.QTDE_ENTRADA_TOTAL AS FLOAT))
-          END AS CUSTO_LIQUIDO
-        FROM EntradasAgrupadas ea
-        LEFT JOIN SaidasLojas sl ON sl.PRODUTO = ea.PRODUTO
-          AND sl.COR_PRODUTO = ea.COR_PRODUTO
-          AND CAST(sl.DATA_SAIDA AS DATE) = CAST(ea.EMISSAO AS DATE)
-      )
       SELECT 
-        ISNULL(SUM(QTDE_LIQUIDA), 0) AS quantidade,
-        ISNULL(SUM(CUSTO_LIQUIDO), 0) AS custo
-      FROM EntradasComSaidas
-      WHERE QTDE_LIQUIDA > 0
+        ISNULL(SUM(CAST(P.QTDE AS FLOAT)), 0) AS quantidade,
+        ISNULL(SUM(CAST(P.QTDE AS FLOAT) * ISNULL(pr.CUSTO_REPOSICAO1, 0)), 0) AS custo
+      FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+      LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+      LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
+      WHERE pr.PRODUTO IS NOT NULL
+        AND E.EMISSAO >= @previousStartDate
+        AND E.EMISSAO < @previousEndDate
+        ${matrizFilialFilter}
+        ${grupoFilterEntradas}
+        ${linhaFilterEntradas}
+        ${colecaoFilterEntradas}
+        ${subgrupoFilterEntradas}
+        ${gradeFilterEntradas}
+        ${exclusionFilterEntradas}
+        AND ${categoriaField} <> ''
+        AND ${categoriaField} <> 'SEM GRUPO'
+        AND ${categoriaField} <> 'SEM LINHA'
     `;
 
     // 3. Buscar produtos que entraram no período (para relacionar com vendas)
-    // Apenas produtos que entraram na matriz (mesmo que parcialmente devolvidos)
+    // Apenas produtos que entraram na matriz
     const produtosEntradosQuery = `
-      WITH EntradasBase AS (
-        SELECT 
-          E.EMISSAO,
-          P.PRODUTO,
-          ISNULL(P.COR_PRODUTO, '') AS COR_PRODUTO,
-          CAST(P.QTDE AS FLOAT) AS QTDE_ENTRADA
-        FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
-        LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
-        LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
-        WHERE pr.PRODUTO IS NOT NULL
-          AND E.EMISSAO >= @startDate
-          AND E.EMISSAO < @endDate
-          ${matrizFilialFilter}
-          ${grupoFilterEntradas}
-          ${linhaFilterEntradas}
-          ${colecaoFilterEntradas}
-          ${subgrupoFilterEntradas}
-          ${gradeFilterEntradas}
-          ${exclusionFilterEntradas}
-          AND ${categoriaField} <> ''
-          AND ${categoriaField} <> 'SEM GRUPO'
-          AND ${categoriaField} <> 'SEM LINHA'
-      ),
-      SaidasLojas AS (
-        SELECT 
-          CAST(S.EMISSAO AS DATE) AS DATA_SAIDA,
-          PS.PRODUTO,
-          ISNULL(PS.COR_PRODUTO, '') AS COR_PRODUTO,
-          SUM(CAST(PS.QTDE AS FLOAT)) AS QTDE_SAIDA
-        FROM ESTOQUE_PROD_SAI AS S WITH (NOLOCK)
-        LEFT JOIN ESTOQUE_PROD1_SAI AS PS WITH (NOLOCK) ON S.ROMANEIO_PRODUTO = PS.ROMANEIO_PRODUTO
-        WHERE PS.PRODUTO IS NOT NULL
-          AND CAST(S.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-          AND CAST(S.EMISSAO AS DATE) < CAST(@endDate AS DATE)
-          ${lojasFilterSaidas}
-        GROUP BY CAST(S.EMISSAO AS DATE), PS.PRODUTO, PS.COR_PRODUTO
-      ),
-      EntradasAgrupadas AS (
-        SELECT 
-          eb.EMISSAO,
-          eb.PRODUTO,
-          eb.COR_PRODUTO,
-          SUM(eb.QTDE_ENTRADA) AS QTDE_ENTRADA_TOTAL
-        FROM EntradasBase eb
-        GROUP BY eb.EMISSAO, eb.PRODUTO, eb.COR_PRODUTO
-      ),
-      EntradasComSaidas AS (
-        SELECT 
-          ea.PRODUTO,
-          ea.COR_PRODUTO,
-          CASE 
-            WHEN ISNULL(sl.QTDE_SAIDA, 0) >= ea.QTDE_ENTRADA_TOTAL THEN 0
-            ELSE ea.QTDE_ENTRADA_TOTAL - ISNULL(sl.QTDE_SAIDA, 0)
-          END AS QTDE_LIQUIDA
-        FROM EntradasAgrupadas ea
-        LEFT JOIN SaidasLojas sl ON sl.PRODUTO = ea.PRODUTO
-          AND sl.COR_PRODUTO = ea.COR_PRODUTO
-          AND CAST(sl.DATA_SAIDA AS DATE) = CAST(ea.EMISSAO AS DATE)
-      )
+      SELECT DISTINCT
+        P.PRODUTO,
+        ISNULL(P.COR_PRODUTO, '') AS COR_PRODUTO
+      FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+      LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+      LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
+      WHERE pr.PRODUTO IS NOT NULL
+        AND E.EMISSAO >= @startDate
+        AND E.EMISSAO < @endDate
+        ${matrizFilialFilter}
+        ${grupoFilterEntradas}
+        ${linhaFilterEntradas}
+        ${colecaoFilterEntradas}
+        ${subgrupoFilterEntradas}
+        ${gradeFilterEntradas}
+        ${exclusionFilterEntradas}
+        AND ${categoriaField} <> ''
+        AND ${categoriaField} <> 'SEM GRUPO'
+        AND ${categoriaField} <> 'SEM LINHA'
     `;
 
     // Debug: Log da query para identificar problema de sintaxe
@@ -620,18 +466,9 @@ export async function fetchControleMovimentoKPIs({
     console.log('[fetchControleMovimentoKPIs] DEBUG - produtosEntradosQuery (últimos 200 chars):', produtosEntradosQuery.substring(produtosEntradosQuery.length - 200));
 
     // 4. Buscar vendas do período atual (apenas dos produtos que entraram)
-    // Remover WITH inicial e espaços em branco do início
-    const produtosEntradosQuerySemWith = produtosEntradosQuery.trim().replace(/^WITH\s+/i, '');
-    console.log('[fetchControleMovimentoKPIs] DEBUG - produtosEntradosQuerySemWith (primeiros 200 chars):', produtosEntradosQuerySemWith.substring(0, 200));
-    console.log('[fetchControleMovimentoKPIs] DEBUG - produtosEntradosQuerySemWith (últimos 100 chars):', produtosEntradosQuerySemWith.substring(produtosEntradosQuerySemWith.length - 100));
     const vendasQuery = `
-      WITH ${produtosEntradosQuerySemWith},
-      ProdutosEntrados AS (
-        SELECT DISTINCT
-          PRODUTO,
-          COR_PRODUTO
-        FROM EntradasComSaidas
-        WHERE QTDE_LIQUIDA > 0
+      WITH ProdutosEntrados AS (
+        ${produtosEntradosQuery}
       ),
       VendasBase AS (
         SELECT 
@@ -691,79 +528,30 @@ export async function fetchControleMovimentoKPIs({
     `;
 
     // 5. Buscar vendas do período anterior (apenas dos produtos que entraram no período anterior)
-    // Apenas produtos que entraram na matriz (mesmo que parcialmente devolvidos)
     const produtosEntradosAnteriorQuery = `
-      WITH EntradasBase AS (
-        SELECT 
-          E.EMISSAO,
-          P.PRODUTO,
-          ISNULL(P.COR_PRODUTO, '') AS COR_PRODUTO,
-          CAST(P.QTDE AS FLOAT) AS QTDE_ENTRADA
-        FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
-        LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
-        LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
-        WHERE pr.PRODUTO IS NOT NULL
-          AND E.EMISSAO >= @previousStartDate
-          AND E.EMISSAO < @previousEndDate
-          ${matrizFilialFilter}
-          ${grupoFilterEntradas}
-          ${linhaFilterEntradas}
-          ${colecaoFilterEntradas}
-          ${subgrupoFilterEntradas}
-          ${gradeFilterEntradas}
-          ${exclusionFilterEntradas}
-          AND ${categoriaField} <> ''
-          AND ${categoriaField} <> 'SEM GRUPO'
-          AND ${categoriaField} <> 'SEM LINHA'
-      ),
-      SaidasLojas AS (
-        SELECT 
-          CAST(S.EMISSAO AS DATE) AS DATA_SAIDA,
-          PS.PRODUTO,
-          ISNULL(PS.COR_PRODUTO, '') AS COR_PRODUTO,
-          SUM(CAST(PS.QTDE AS FLOAT)) AS QTDE_SAIDA
-        FROM ESTOQUE_PROD_SAI AS S WITH (NOLOCK)
-        LEFT JOIN ESTOQUE_PROD1_SAI AS PS WITH (NOLOCK) ON S.ROMANEIO_PRODUTO = PS.ROMANEIO_PRODUTO
-        WHERE PS.PRODUTO IS NOT NULL
-          AND CAST(S.EMISSAO AS DATE) >= CAST(@previousStartDate AS DATE)
-          AND CAST(S.EMISSAO AS DATE) < CAST(@previousEndDate AS DATE)
-          ${lojasFilterSaidas}
-        GROUP BY CAST(S.EMISSAO AS DATE), PS.PRODUTO, PS.COR_PRODUTO
-      ),
-      EntradasAgrupadas AS (
-        SELECT 
-          eb.EMISSAO,
-          eb.PRODUTO,
-          eb.COR_PRODUTO,
-          SUM(eb.QTDE_ENTRADA) AS QTDE_ENTRADA_TOTAL
-        FROM EntradasBase eb
-        GROUP BY eb.EMISSAO, eb.PRODUTO, eb.COR_PRODUTO
-      ),
-      EntradasComSaidas AS (
-        SELECT 
-          ea.PRODUTO,
-          ea.COR_PRODUTO,
-          CASE 
-            WHEN ISNULL(sl.QTDE_SAIDA, 0) >= ea.QTDE_ENTRADA_TOTAL THEN 0
-            ELSE ea.QTDE_ENTRADA_TOTAL - ISNULL(sl.QTDE_SAIDA, 0)
-          END AS QTDE_LIQUIDA
-        FROM EntradasAgrupadas ea
-        LEFT JOIN SaidasLojas sl ON sl.PRODUTO = ea.PRODUTO
-          AND sl.COR_PRODUTO = ea.COR_PRODUTO
-          AND CAST(sl.DATA_SAIDA AS DATE) = CAST(ea.EMISSAO AS DATE)
-      )
+      SELECT DISTINCT
+        P.PRODUTO,
+        ISNULL(P.COR_PRODUTO, '') AS COR_PRODUTO
+      FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+      LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+      LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
+      WHERE pr.PRODUTO IS NOT NULL
+        AND E.EMISSAO >= @previousStartDate
+        AND E.EMISSAO < @previousEndDate
+        ${matrizFilialFilter}
+        ${grupoFilterEntradas}
+        ${linhaFilterEntradas}
+        ${colecaoFilterEntradas}
+        ${subgrupoFilterEntradas}
+        ${gradeFilterEntradas}
+        ${exclusionFilterEntradas}
+        AND ${categoriaField} <> ''
+        AND ${categoriaField} <> 'SEM GRUPO'
+        AND ${categoriaField} <> 'SEM LINHA'
     `;
-
-    // Remover WITH inicial e espaços em branco do início
-    const produtosEntradosAnteriorQuerySemWith = produtosEntradosAnteriorQuery.trim().replace(/^WITH\s+/i, '');
     const vendasAnteriorQuery = `
-      WITH ${produtosEntradosAnteriorQuerySemWith},
-      ProdutosEntrados AS (
-        SELECT DISTINCT
-          PRODUTO,
-          COR_PRODUTO
-        FROM EntradasComSaidas
-        WHERE QTDE_LIQUIDA > 0
+      WITH ProdutosEntrados AS (
+        ${produtosEntradosAnteriorQuery}
       ),
       VendasBase AS (
         SELECT 
@@ -978,106 +766,36 @@ export async function fetchMovimentoDetalhes({
     const exclusionFilterVendas = buildExclusionFilter(request, company, 'p', 'excludedLineVendas');
 
     if (tipo === 'entradas') {
-      // Buscar produtos que entraram no período
+      // Buscar produtos que entraram no período (todas as entradas, sem descontar devoluções)
       const query = `
-        WITH EntradasBase AS (
-          SELECT 
-            E.EMISSAO,
-            P.PRODUTO,
-            ISNULL(P.COR_PRODUTO, '') AS COR_PRODUTO,
-            CAST(P.QTDE AS FLOAT) AS QTDE_ENTRADA,
-            CAST(P.QTDE AS FLOAT) * ISNULL(pr.CUSTO_REPOSICAO1, 0) AS CUSTO_ENTRADA,
-            pr.DESC_PRODUTO,
-            pr.LINHA,
-            pr.GRUPO_PRODUTO,
-            pr.COLECAO,
-            pr.SUBGRUPO_PRODUTO,
-            pr.GRADE
-          FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
-          LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
-          LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
-          WHERE pr.PRODUTO IS NOT NULL
-            AND E.EMISSAO >= @startDate
-            AND E.EMISSAO < @endDate
-            ${matrizFilialFilter}
-            ${grupoFilterEntradas}
-            ${linhaFilterEntradas}
-            ${colecaoFilterEntradas}
-            ${subgrupoFilterEntradas}
-            ${gradeFilterEntradas}
-            ${exclusionFilterEntradas}
-            AND ${categoriaField} <> ''
-            AND ${categoriaField} <> 'SEM GRUPO'
-            AND ${categoriaField} <> 'SEM LINHA'
-        ),
-        SaidasLojas AS (
-          SELECT 
-            CAST(S.EMISSAO AS DATE) AS DATA_SAIDA,
-            PS.PRODUTO,
-            ISNULL(PS.COR_PRODUTO, '') AS COR_PRODUTO,
-            SUM(CAST(PS.QTDE AS FLOAT)) AS QTDE_SAIDA
-          FROM ESTOQUE_PROD_SAI AS S WITH (NOLOCK)
-          LEFT JOIN ESTOQUE_PROD1_SAI AS PS WITH (NOLOCK) ON S.ROMANEIO_PRODUTO = PS.ROMANEIO_PRODUTO
-          WHERE PS.PRODUTO IS NOT NULL
-            AND CAST(S.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-            AND CAST(S.EMISSAO AS DATE) < CAST(@endDate AS DATE)
-            ${lojasFilterSaidas}
-          GROUP BY CAST(S.EMISSAO AS DATE), PS.PRODUTO, PS.COR_PRODUTO
-        ),
-        EntradasAgrupadas AS (
-          SELECT 
-            eb.EMISSAO,
-            eb.PRODUTO,
-            eb.COR_PRODUTO,
-            eb.DESC_PRODUTO,
-            eb.LINHA,
-            eb.GRUPO_PRODUTO,
-            eb.COLECAO,
-            eb.SUBGRUPO_PRODUTO,
-            eb.GRADE,
-            SUM(eb.QTDE_ENTRADA) AS QTDE_ENTRADA_TOTAL,
-            SUM(eb.CUSTO_ENTRADA) AS CUSTO_ENTRADA_TOTAL
-          FROM EntradasBase eb
-          GROUP BY eb.EMISSAO, eb.PRODUTO, eb.COR_PRODUTO, eb.DESC_PRODUTO, eb.LINHA, eb.GRUPO_PRODUTO, eb.COLECAO, eb.SUBGRUPO_PRODUTO, eb.GRADE
-        ),
-        EntradasComSaidas AS (
-          SELECT 
-            ea.PRODUTO,
-            ea.COR_PRODUTO,
-            ea.DESC_PRODUTO,
-            ea.LINHA,
-            ea.GRUPO_PRODUTO,
-            ea.COLECAO,
-            ea.SUBGRUPO_PRODUTO,
-            ea.GRADE,
-            CASE 
-              WHEN ISNULL(sl.QTDE_SAIDA, 0) >= ea.QTDE_ENTRADA_TOTAL THEN 0
-              ELSE ea.QTDE_ENTRADA_TOTAL - ISNULL(sl.QTDE_SAIDA, 0)
-            END AS QTDE_LIQUIDA,
-            CASE 
-              WHEN ISNULL(sl.QTDE_SAIDA, 0) >= ea.QTDE_ENTRADA_TOTAL THEN 0
-              WHEN ea.QTDE_ENTRADA_TOTAL = 0 THEN 0
-              ELSE ea.CUSTO_ENTRADA_TOTAL * (CAST(ea.QTDE_ENTRADA_TOTAL - ISNULL(sl.QTDE_SAIDA, 0) AS FLOAT) / CAST(ea.QTDE_ENTRADA_TOTAL AS FLOAT))
-            END AS CUSTO_LIQUIDO
-          FROM EntradasAgrupadas ea
-          LEFT JOIN SaidasLojas sl ON sl.PRODUTO = ea.PRODUTO
-            AND sl.COR_PRODUTO = ea.COR_PRODUTO
-            AND CAST(sl.DATA_SAIDA AS DATE) = CAST(ea.EMISSAO AS DATE)
-        )
         SELECT 
-          PRODUTO AS produto,
-          COR_PRODUTO AS corProduto,
-          DESC_PRODUTO AS descProduto,
-          SUM(QTDE_LIQUIDA) AS quantidade,
-          SUM(CUSTO_LIQUIDO) AS custo,
-          LINHA AS linha,
-          GRUPO_PRODUTO AS grupo,
-          COLECAO AS colecao,
-          SUBGRUPO_PRODUTO AS subgrupo,
-          GRADE AS grade
-        FROM EntradasComSaidas
-        WHERE QTDE_LIQUIDA > 0
-        GROUP BY PRODUTO, COR_PRODUTO, DESC_PRODUTO, LINHA, GRUPO_PRODUTO, COLECAO, SUBGRUPO_PRODUTO, GRADE
+          P.PRODUTO AS produto,
+          ISNULL(P.COR_PRODUTO, '') AS corProduto,
+          pr.DESC_PRODUTO AS descProduto,
+          SUM(CAST(P.QTDE AS FLOAT)) AS quantidade,
+          SUM(CAST(P.QTDE AS FLOAT) * ISNULL(pr.CUSTO_REPOSICAO1, 0)) AS custo,
+          pr.LINHA AS linha,
+          pr.GRUPO_PRODUTO AS grupo,
+          pr.COLECAO AS colecao,
+          pr.SUBGRUPO_PRODUTO AS subgrupo,
+          pr.GRADE AS grade
+        FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+        LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+        LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
+        WHERE pr.PRODUTO IS NOT NULL
+          AND E.EMISSAO >= @startDate
+          AND E.EMISSAO < @endDate
+          ${matrizFilialFilter}
+          ${grupoFilterEntradas}
+          ${linhaFilterEntradas}
+          ${colecaoFilterEntradas}
+          ${subgrupoFilterEntradas}
+          ${gradeFilterEntradas}
+          ${exclusionFilterEntradas}
+          AND ${categoriaField} <> ''
+          AND ${categoriaField} <> 'SEM GRUPO'
+          AND ${categoriaField} <> 'SEM LINHA'
+        GROUP BY P.PRODUTO, P.COR_PRODUTO, pr.DESC_PRODUTO, pr.LINHA, pr.GRUPO_PRODUTO, pr.COLECAO, pr.SUBGRUPO_PRODUTO, pr.GRADE
         ORDER BY quantidade DESC
       `;
 
@@ -1086,76 +804,30 @@ export async function fetchMovimentoDetalhes({
     } else if (tipo === 'vendidos') {
       // Buscar produtos vendidos (que entraram no período)
       const produtosEntradosQuery = `
-        WITH EntradasBase AS (
-          SELECT 
-            E.EMISSAO,
-            P.PRODUTO,
-            ISNULL(P.COR_PRODUTO, '') AS COR_PRODUTO,
-            CAST(P.QTDE AS FLOAT) AS QTDE_ENTRADA
-          FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
-          LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
-          LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
-          WHERE pr.PRODUTO IS NOT NULL
-            AND E.EMISSAO >= @startDate
-            AND E.EMISSAO < @endDate
-            ${matrizFilialFilter}
-            ${grupoFilterEntradas}
-            ${linhaFilterEntradas}
-            ${colecaoFilterEntradas}
-            ${subgrupoFilterEntradas}
-            ${gradeFilterEntradas}
-            ${exclusionFilterEntradas}
-            AND ${categoriaField} <> ''
-            AND ${categoriaField} <> 'SEM GRUPO'
-            AND ${categoriaField} <> 'SEM LINHA'
-        ),
-        SaidasLojas AS (
-          SELECT 
-            CAST(S.EMISSAO AS DATE) AS DATA_SAIDA,
-            PS.PRODUTO,
-            ISNULL(PS.COR_PRODUTO, '') AS COR_PRODUTO,
-            SUM(CAST(PS.QTDE AS FLOAT)) AS QTDE_SAIDA
-          FROM ESTOQUE_PROD_SAI AS S WITH (NOLOCK)
-          LEFT JOIN ESTOQUE_PROD1_SAI AS PS WITH (NOLOCK) ON S.ROMANEIO_PRODUTO = PS.ROMANEIO_PRODUTO
-          WHERE PS.PRODUTO IS NOT NULL
-            AND CAST(S.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-            AND CAST(S.EMISSAO AS DATE) < CAST(@endDate AS DATE)
-            ${lojasFilterSaidas}
-          GROUP BY CAST(S.EMISSAO AS DATE), PS.PRODUTO, PS.COR_PRODUTO
-        ),
-        EntradasAgrupadas AS (
-          SELECT 
-            eb.EMISSAO,
-            eb.PRODUTO,
-            eb.COR_PRODUTO,
-            SUM(eb.QTDE_ENTRADA) AS QTDE_ENTRADA_TOTAL
-          FROM EntradasBase eb
-          GROUP BY eb.EMISSAO, eb.PRODUTO, eb.COR_PRODUTO
-        ),
-        EntradasComSaidas AS (
-          SELECT 
-            ea.PRODUTO,
-            ea.COR_PRODUTO,
-            CASE 
-              WHEN ISNULL(sl.QTDE_SAIDA, 0) >= ea.QTDE_ENTRADA_TOTAL THEN 0
-              ELSE ea.QTDE_ENTRADA_TOTAL - ISNULL(sl.QTDE_SAIDA, 0)
-            END AS QTDE_LIQUIDA
-          FROM EntradasAgrupadas ea
-          LEFT JOIN SaidasLojas sl ON sl.PRODUTO = ea.PRODUTO
-            AND sl.COR_PRODUTO = ea.COR_PRODUTO
-            AND CAST(sl.DATA_SAIDA AS DATE) = CAST(ea.EMISSAO AS DATE)
-        )
+        SELECT DISTINCT
+          P.PRODUTO,
+          ISNULL(P.COR_PRODUTO, '') AS COR_PRODUTO
+        FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+        LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+        LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
+        WHERE pr.PRODUTO IS NOT NULL
+          AND E.EMISSAO >= @startDate
+          AND E.EMISSAO < @endDate
+          ${matrizFilialFilter}
+          ${grupoFilterEntradas}
+          ${linhaFilterEntradas}
+          ${colecaoFilterEntradas}
+          ${subgrupoFilterEntradas}
+          ${gradeFilterEntradas}
+          ${exclusionFilterEntradas}
+          AND ${categoriaField} <> ''
+          AND ${categoriaField} <> 'SEM GRUPO'
+          AND ${categoriaField} <> 'SEM LINHA'
       `;
 
-      const produtosEntradosQuerySemWith = produtosEntradosQuery.trim().replace(/^WITH\s+/i, '');
       const query = `
-        WITH ${produtosEntradosQuerySemWith},
-        ProdutosEntrados AS (
-          SELECT DISTINCT
-            PRODUTO,
-            COR_PRODUTO
-          FROM EntradasComSaidas
-          WHERE QTDE_LIQUIDA > 0
+        WITH ProdutosEntrados AS (
+          ${produtosEntradosQuery}
         ),
         VendasBase AS (
           SELECT 
@@ -1223,184 +895,65 @@ export async function fetchMovimentoDetalhes({
 
       const result = await request.query<ProdutoMovimentoDetalhe>(query);
       return result.recordset;
-    } else {
+    } else if (tipo === 'parados') {
       // tipo === 'parados': produtos que entraram mas não venderam
       // Primeiro buscar entradas, depois vendas, e calcular diferença
       const entradasQuery = `
-        WITH EntradasBase AS (
-          SELECT 
-            E.EMISSAO,
-            P.PRODUTO,
-            ISNULL(P.COR_PRODUTO, '') AS COR_PRODUTO,
-            CAST(P.QTDE AS FLOAT) AS QTDE_ENTRADA,
-            CAST(P.QTDE AS FLOAT) * ISNULL(pr.CUSTO_REPOSICAO1, 0) AS CUSTO_ENTRADA,
-            pr.DESC_PRODUTO,
-            pr.LINHA,
-            pr.GRUPO_PRODUTO,
-            pr.COLECAO,
-            pr.SUBGRUPO_PRODUTO,
-            pr.GRADE
-          FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
-          LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
-          LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
-          WHERE pr.PRODUTO IS NOT NULL
-            AND E.EMISSAO >= @startDate
-            AND E.EMISSAO < @endDate
-            ${matrizFilialFilter}
-            ${grupoFilterEntradas}
-            ${linhaFilterEntradas}
-            ${colecaoFilterEntradas}
-            ${subgrupoFilterEntradas}
-            ${gradeFilterEntradas}
-            ${exclusionFilterEntradas}
-            AND ${categoriaField} <> ''
-            AND ${categoriaField} <> 'SEM GRUPO'
-            AND ${categoriaField} <> 'SEM LINHA'
-        ),
-        SaidasLojas AS (
-          SELECT 
-            CAST(S.EMISSAO AS DATE) AS DATA_SAIDA,
-            PS.PRODUTO,
-            ISNULL(PS.COR_PRODUTO, '') AS COR_PRODUTO,
-            SUM(CAST(PS.QTDE AS FLOAT)) AS QTDE_SAIDA
-          FROM ESTOQUE_PROD_SAI AS S WITH (NOLOCK)
-          LEFT JOIN ESTOQUE_PROD1_SAI AS PS WITH (NOLOCK) ON S.ROMANEIO_PRODUTO = PS.ROMANEIO_PRODUTO
-          WHERE PS.PRODUTO IS NOT NULL
-            AND CAST(S.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-            AND CAST(S.EMISSAO AS DATE) < CAST(@endDate AS DATE)
-            ${lojasFilterSaidas}
-          GROUP BY CAST(S.EMISSAO AS DATE), PS.PRODUTO, PS.COR_PRODUTO
-        ),
-        EntradasAgrupadas AS (
-          SELECT 
-            eb.EMISSAO,
-            eb.PRODUTO,
-            eb.COR_PRODUTO,
-            eb.DESC_PRODUTO,
-            eb.LINHA,
-            eb.GRUPO_PRODUTO,
-            eb.COLECAO,
-            eb.SUBGRUPO_PRODUTO,
-            eb.GRADE,
-            SUM(eb.QTDE_ENTRADA) AS QTDE_ENTRADA_TOTAL,
-            SUM(eb.CUSTO_ENTRADA) AS CUSTO_ENTRADA_TOTAL
-          FROM EntradasBase eb
-          GROUP BY eb.EMISSAO, eb.PRODUTO, eb.COR_PRODUTO, eb.DESC_PRODUTO, eb.LINHA, eb.GRUPO_PRODUTO, eb.COLECAO, eb.SUBGRUPO_PRODUTO, eb.GRADE
-        ),
-        EntradasComSaidas AS (
-          SELECT 
-            ea.PRODUTO,
-            ea.COR_PRODUTO,
-            ea.DESC_PRODUTO,
-            ea.LINHA,
-            ea.GRUPO_PRODUTO,
-            ea.COLECAO,
-            ea.SUBGRUPO_PRODUTO,
-            ea.GRADE,
-            CASE 
-              WHEN ISNULL(sl.QTDE_SAIDA, 0) >= ea.QTDE_ENTRADA_TOTAL THEN 0
-              ELSE ea.QTDE_ENTRADA_TOTAL - ISNULL(sl.QTDE_SAIDA, 0)
-            END AS QTDE_LIQUIDA,
-            CASE 
-              WHEN ISNULL(sl.QTDE_SAIDA, 0) >= ea.QTDE_ENTRADA_TOTAL THEN 0
-              WHEN ea.QTDE_ENTRADA_TOTAL = 0 THEN 0
-              ELSE ea.CUSTO_ENTRADA_TOTAL * (CAST(ea.QTDE_ENTRADA_TOTAL - ISNULL(sl.QTDE_SAIDA, 0) AS FLOAT) / CAST(ea.QTDE_ENTRADA_TOTAL AS FLOAT))
-            END AS CUSTO_LIQUIDO
-          FROM EntradasAgrupadas ea
-          LEFT JOIN SaidasLojas sl ON sl.PRODUTO = ea.PRODUTO
-            AND sl.COR_PRODUTO = ea.COR_PRODUTO
-            AND CAST(sl.DATA_SAIDA AS DATE) = CAST(ea.EMISSAO AS DATE)
-        ),
-        EntradasFinais AS (
-          SELECT 
-            PRODUTO,
-            COR_PRODUTO,
-            DESC_PRODUTO,
-            LINHA,
-            GRUPO_PRODUTO,
-            COLECAO,
-            SUBGRUPO_PRODUTO,
-            GRADE,
-            SUM(QTDE_LIQUIDA) AS QTDE_ENTRADA,
-            SUM(CUSTO_LIQUIDO) AS CUSTO_ENTRADA
-          FROM EntradasComSaidas
-          WHERE QTDE_LIQUIDA > 0
-          GROUP BY PRODUTO, COR_PRODUTO, DESC_PRODUTO, LINHA, GRUPO_PRODUTO, COLECAO, SUBGRUPO_PRODUTO, GRADE
-        )
-        SELECT * FROM EntradasFinais
+        SELECT 
+          P.PRODUTO,
+          ISNULL(P.COR_PRODUTO, '') AS COR_PRODUTO,
+          pr.DESC_PRODUTO,
+          pr.LINHA,
+          pr.GRUPO_PRODUTO,
+          pr.COLECAO,
+          pr.SUBGRUPO_PRODUTO,
+          pr.GRADE,
+          SUM(CAST(P.QTDE AS FLOAT)) AS QTDE_ENTRADA,
+          SUM(CAST(P.QTDE AS FLOAT) * ISNULL(pr.CUSTO_REPOSICAO1, 0)) AS CUSTO_ENTRADA
+        FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+        LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+        LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
+        WHERE pr.PRODUTO IS NOT NULL
+          AND E.EMISSAO >= @startDate
+          AND E.EMISSAO < @endDate
+          ${matrizFilialFilter}
+          ${grupoFilterEntradas}
+          ${linhaFilterEntradas}
+          ${colecaoFilterEntradas}
+          ${subgrupoFilterEntradas}
+          ${gradeFilterEntradas}
+          ${exclusionFilterEntradas}
+          AND ${categoriaField} <> ''
+          AND ${categoriaField} <> 'SEM GRUPO'
+          AND ${categoriaField} <> 'SEM LINHA'
+        GROUP BY P.PRODUTO, P.COR_PRODUTO, pr.DESC_PRODUTO, pr.LINHA, pr.GRUPO_PRODUTO, pr.COLECAO, pr.SUBGRUPO_PRODUTO, pr.GRADE
       `;
 
       const produtosEntradosQuery = `
-        WITH EntradasBase AS (
-          SELECT 
-            E.EMISSAO,
-            P.PRODUTO,
-            ISNULL(P.COR_PRODUTO, '') AS COR_PRODUTO,
-            CAST(P.QTDE AS FLOAT) AS QTDE_ENTRADA
-          FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
-          LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
-          LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
-          WHERE pr.PRODUTO IS NOT NULL
-            AND E.EMISSAO >= @startDate
-            AND E.EMISSAO < @endDate
-            ${matrizFilialFilter}
-            ${grupoFilterEntradas}
-            ${linhaFilterEntradas}
-            ${colecaoFilterEntradas}
-            ${subgrupoFilterEntradas}
-            ${gradeFilterEntradas}
-            ${exclusionFilterEntradas}
-            AND ${categoriaField} <> ''
-            AND ${categoriaField} <> 'SEM GRUPO'
-            AND ${categoriaField} <> 'SEM LINHA'
-        ),
-        SaidasLojas AS (
-          SELECT 
-            CAST(S.EMISSAO AS DATE) AS DATA_SAIDA,
-            PS.PRODUTO,
-            ISNULL(PS.COR_PRODUTO, '') AS COR_PRODUTO,
-            SUM(CAST(PS.QTDE AS FLOAT)) AS QTDE_SAIDA
-          FROM ESTOQUE_PROD_SAI AS S WITH (NOLOCK)
-          LEFT JOIN ESTOQUE_PROD1_SAI AS PS WITH (NOLOCK) ON S.ROMANEIO_PRODUTO = PS.ROMANEIO_PRODUTO
-          WHERE PS.PRODUTO IS NOT NULL
-            AND CAST(S.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-            AND CAST(S.EMISSAO AS DATE) < CAST(@endDate AS DATE)
-            ${lojasFilterSaidas}
-          GROUP BY CAST(S.EMISSAO AS DATE), PS.PRODUTO, PS.COR_PRODUTO
-        ),
-        EntradasAgrupadas AS (
-          SELECT 
-            eb.EMISSAO,
-            eb.PRODUTO,
-            eb.COR_PRODUTO,
-            SUM(eb.QTDE_ENTRADA) AS QTDE_ENTRADA_TOTAL
-          FROM EntradasBase eb
-          GROUP BY eb.EMISSAO, eb.PRODUTO, eb.COR_PRODUTO
-        ),
-        EntradasComSaidas AS (
-          SELECT 
-            ea.PRODUTO,
-            ea.COR_PRODUTO,
-            CASE 
-              WHEN ISNULL(sl.QTDE_SAIDA, 0) >= ea.QTDE_ENTRADA_TOTAL THEN 0
-              ELSE ea.QTDE_ENTRADA_TOTAL - ISNULL(sl.QTDE_SAIDA, 0)
-            END AS QTDE_LIQUIDA
-          FROM EntradasAgrupadas ea
-          LEFT JOIN SaidasLojas sl ON sl.PRODUTO = ea.PRODUTO
-            AND sl.COR_PRODUTO = ea.COR_PRODUTO
-            AND CAST(sl.DATA_SAIDA AS DATE) = CAST(ea.EMISSAO AS DATE)
-        )
+        SELECT DISTINCT
+          P.PRODUTO,
+          ISNULL(P.COR_PRODUTO, '') AS COR_PRODUTO
+        FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+        LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+        LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
+        WHERE pr.PRODUTO IS NOT NULL
+          AND E.EMISSAO >= @startDate
+          AND E.EMISSAO < @endDate
+          ${matrizFilialFilter}
+          ${grupoFilterEntradas}
+          ${linhaFilterEntradas}
+          ${colecaoFilterEntradas}
+          ${subgrupoFilterEntradas}
+          ${gradeFilterEntradas}
+          ${exclusionFilterEntradas}
+          AND ${categoriaField} <> ''
+          AND ${categoriaField} <> 'SEM GRUPO'
+          AND ${categoriaField} <> 'SEM LINHA'
       `;
 
-      const produtosEntradosQuerySemWith = produtosEntradosQuery.trim().replace(/^WITH\s+/i, '');
       const vendasQuery = `
-        WITH ${produtosEntradosQuerySemWith},
-        ProdutosEntrados AS (
-          SELECT DISTINCT
-            PRODUTO,
-            COR_PRODUTO
-          FROM EntradasComSaidas
-          WHERE QTDE_LIQUIDA > 0
+        WITH ProdutosEntrados AS (
+          ${produtosEntradosQuery}
         ),
         VendasBase AS (
           SELECT 
@@ -1497,5 +1050,9 @@ export async function fetchMovimentoDetalhes({
 
       return parados.sort((a, b) => b.quantidade - a.quantidade);
     }
+    
+    
+    // Se nenhum tipo corresponder, retornar array vazio
+    return [];
   });
 }
