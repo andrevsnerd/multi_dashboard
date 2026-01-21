@@ -40,6 +40,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     let base = pathname
       .replace(/\/estoque-por-filial.*$/, "")
       .replace(/\/controle-estoque.*$/, "") // Remove /controle-estoque e qualquer coisa depois
+      .replace(/\/controle-movimento.*$/, "") // Remove /controle-movimento e qualquer coisa depois
       .replace(/\/produto-detalhado$/, "")
       .replace(/\/produtos-recentes$/, "")
       .replace(/\/produtos$/, "")
@@ -93,6 +94,11 @@ export default function Sidebar({ companyName }: SidebarProps) {
     ? `${basePath}/controle-estoque`
     : "/controle-estoque";
 
+  // Construir o link para controle de movimento baseado no caminho base
+  const controleMovimentoHref = basePath && basePath !== "/" 
+    ? `${basePath}/controle-movimento`
+    : "/controle-movimento";
+
   // Verificar se está em alguma página relacionada a produtos
   const isProdutosSubItemActive = pathname?.includes("/produto-detalhado") || pathname?.includes("/produtos-recentes") || (pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado"));
   const isProdutosPageActive = pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado");
@@ -129,6 +135,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     { label: "Vendedores", href: vendedoresHref },
     { label: "Clientes", href: clientesHref },
     { label: "Controle de Estoque", href: controleEstoqueHref },
+    { label: "Controle de Movimento", href: controleMovimentoHref },
     { label: "Exportar Relatórios", href: exportarRelatoriosHref },
     // TODO: Descomentar quando estoque por filial estiver pronto
     // { label: "Estoque por Filial", href: stockByFilialHref },
@@ -193,10 +200,11 @@ export default function Sidebar({ companyName }: SidebarProps) {
               // Home só está ativo na raiz
               isActive = pathname === "/";
             } else if (item.label === "Dashboard") {
-              // Dashboard está ativo quando está no caminho base (não em estoque-por-filial, controle-estoque, produtos, produtos-recentes, produto-detalhado, vendedores ou clientes)
+              // Dashboard está ativo quando está no caminho base (não em estoque-por-filial, controle-estoque, controle-movimento, produtos, produtos-recentes, produto-detalhado, vendedores ou clientes)
               isActive = pathname === item.href && 
                 !pathname.includes("/estoque-por-filial") && 
                 !pathname.includes("/controle-estoque") &&
+                !pathname.includes("/controle-movimento") &&
                 !pathname.includes("/produtos") &&
                 !pathname.includes("/produtos-recentes") &&
                 !pathname.includes("/produto-detalhado") &&
@@ -227,6 +235,9 @@ export default function Sidebar({ companyName }: SidebarProps) {
             } else if (item.label === "Controle de Estoque") {
               // Controle de Estoque está ativo quando o pathname inclui /controle-estoque
               isActive = pathname?.includes("/controle-estoque") || pathname === item.href;
+            } else if (item.label === "Controle de Movimento") {
+              // Controle de Movimento está ativo quando o pathname inclui /controle-movimento
+              isActive = pathname?.includes("/controle-movimento") || pathname === item.href;
             } else if (item.label === "Exportar Relatórios") {
               // Exportar Relatórios está ativo quando o pathname inclui /exportar-relatorios
               isActive = pathname?.includes("/exportar-relatorios") || pathname === item.href;
@@ -312,7 +323,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
                     href={item.href!}
                     className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
                     onClick={handleLinkClick}
-                    replace={item.label === "Controle de Estoque" && pathname?.includes("/controle-estoque")}
+                    replace={(item.label === "Controle de Estoque" && pathname?.includes("/controle-estoque")) ||
+                             (item.label === "Controle de Movimento" && pathname?.includes("/controle-movimento"))}
                   >
                     <span className={styles.navLabel}>{item.label}</span>
                   </Link>
