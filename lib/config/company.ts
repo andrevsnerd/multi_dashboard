@@ -12,6 +12,7 @@ export interface CompanyConfig {
   filialFilters: Record<CompanyModule, string[]>;
   filialDisplayNames?: Record<string, string>;
   ecommerceFilials?: string[];
+  excludedLines?: string[]; // Linhas excluídas de cálculos de estoque e vendas
 }
 
 const companyConfigs: Record<CompanyKey, CompanyConfig> = {
@@ -91,6 +92,15 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
       'VILLA LOBOS - LLL': 'VILLA LOBOS',
     },
     ecommerceFilials: ['SCARFME MATRIZ CMS', 'SCARF ME - MATRIZ LLL'],
+    excludedLines: [
+      'PRIVATE LABEL',
+      'GASTRONOMICA',
+      'PERFUMARIA',
+      'CASHMERE',
+      'ELETRONICOS',
+      'EMBALAGENS',
+      'CAPAS E ACESSORIOS P/ CEL',
+    ],
   },
 };
 

@@ -322,6 +322,46 @@ function buildGradeFilter(
   return `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, ${prefix}.GRADE), '')))) IN (${placeholders})`;
 }
 
+/**
+ * Cria filtro de exclusão de linhas para ScarfMe
+ * Exclui linhas configuradas em excludedLines da configuração da empresa
+ * @param paramPrefix Prefixo único para os parâmetros SQL (para evitar duplicação quando chamado múltiplas vezes)
+ */
+function buildExclusionFilter(
+  request: sql.Request | RequestLike,
+  company: string | undefined,
+  prefix: string = 'p',
+  paramPrefix: string = 'excludedLine'
+): string {
+  if (company !== 'scarfme') {
+    return '';
+  }
+
+  const companyConfig = resolveCompany(company);
+  if (!companyConfig || !companyConfig.excludedLines || companyConfig.excludedLines.length === 0) {
+    return '';
+  }
+
+  const linhasExcluidas = companyConfig.excludedLines.map(l => l.trim().toUpperCase()).filter(l => l !== '');
+  if (linhasExcluidas.length === 0) {
+    return '';
+  }
+
+  // Para ScarfMe, a linha pode estar em p.LINHA ou vp.LINHA (dependendo da query)
+  // Vamos criar um filtro que funciona para ambos os casos
+  if (linhasExcluidas.length === 1) {
+    request.input(paramPrefix, sql.VarChar, linhasExcluidas[0]);
+    return `AND UPPER(LTRIM(RTRIM(ISNULL(${prefix}.LINHA, '')))) <> @${paramPrefix}`;
+  }
+
+  linhasExcluidas.forEach((l, index) => {
+    request.input(`${paramPrefix}${index}`, sql.VarChar, l);
+  });
+
+  const placeholders = linhasExcluidas.map((_, index) => `@${paramPrefix}${index}`).join(', ');
+  return `AND UPPER(LTRIM(RTRIM(ISNULL(${prefix}.LINHA, '')))) NOT IN (${placeholders})`;
+}
+
 export interface ControleEstoqueParams {
   company?: string;
   filial?: string | null;
@@ -485,6 +525,7 @@ export async function fetchEstoqueKPIs({
     const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
     const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
     const gradeFilter = buildGradeFilter(request, company, grades, 'p');
+    const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineKPI');
 
     // Estoque atual
     // Para categorias ativas, usar o campo correto baseado na empresa
@@ -506,6 +547,7 @@ export async function fetchEstoqueKPIs({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${exclusionFilter}
         AND e.ESTOQUE > 0
         AND ${categoriaFieldKPI} <> ''
         AND ${categoriaFieldKPI} <> 'SEM GRUPO'
@@ -542,6 +584,7 @@ export async function fetchEstoqueKPIs({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${exclusionFilter}
     `;
 
     const vendasAtualResult = await request.query<{
@@ -585,6 +628,7 @@ export async function fetchEstoqueKPIs({
             ${colecaoFilter}
             ${subgrupoFilter}
             ${gradeFilter}
+            ${exclusionFilter}
         `;
 
         const ecommerceVendasResult = await request.query<{
@@ -613,6 +657,7 @@ export async function fetchEstoqueKPIs({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${exclusionFilter}
     `;
 
     const vendasAnteriorResult = await request.query<{
@@ -644,6 +689,7 @@ export async function fetchEstoqueKPIs({
             ${colecaoFilter}
             ${subgrupoFilter}
             ${gradeFilter}
+            ${exclusionFilter}
         `;
 
         const ecommerceVendasAnteriorResult = await request.query<{
@@ -707,6 +753,7 @@ export async function fetchEstoqueKPIs({
     const colecaoFilterEntradasKPI = buildColecaoFilter(request, company, colecoes, 'pr');
     const subgrupoFilterEntradasKPI = buildSubgrupoFilter(request, company, subgrupos, 'pr');
     const gradeFilterEntradasKPI = buildGradeFilter(request, company, grades, 'pr');
+    const exclusionFilterEntradasKPI = buildExclusionFilter(request, company, 'pr', 'excludedLineKPIEntradas');
     const categoriaFieldEntradasKPI = company === 'nerd' 
       ? 'pr.GRUPO_PRODUTO'
       : 'pr.LINHA';
@@ -726,6 +773,7 @@ export async function fetchEstoqueKPIs({
         ${colecaoFilterEntradasKPI}
         ${subgrupoFilterEntradasKPI}
         ${gradeFilterEntradasKPI}
+        ${exclusionFilterEntradasKPI}
         AND ${categoriaFieldEntradasKPI} <> ''
         AND ${categoriaFieldEntradasKPI} <> 'SEM GRUPO'
         AND ${categoriaFieldEntradasKPI} <> 'SEM LINHA'
@@ -760,6 +808,7 @@ export async function fetchEstoqueKPIs({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${exclusionFilter}
         AND ${categoriaFieldKPI} <> ''
         AND ${categoriaFieldKPI} <> 'SEM GRUPO'
         AND ${categoriaFieldKPI} <> 'SEM LINHA'
@@ -823,6 +872,7 @@ export async function fetchEstoqueKPIs({
               ${colecaoFilter}
               ${subgrupoFilter}
               ${gradeFilter}
+              ${exclusionFilter}
               AND ${categoriaFieldKPI} <> ''
               AND ${categoriaFieldKPI} <> 'SEM GRUPO'
               AND ${categoriaFieldKPI} <> 'SEM LINHA'
@@ -905,6 +955,7 @@ export async function fetchEstoquePorCategoria({
     const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
     const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
     const gradeFilter = buildGradeFilter(request, company, grades, 'p');
+    const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineCategoria');
 
     // RESOLVER PERÍODO: Usar o range selecionado pelo usuário em vez de forçar o mês atual
     const { start: periodoStart, end: periodoEnd } = resolveRange(range);
@@ -967,6 +1018,7 @@ export async function fetchEstoquePorCategoria({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${exclusionFilter}
         AND e.ESTOQUE > 0
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
@@ -1006,6 +1058,7 @@ export async function fetchEstoquePorCategoria({
         AND vp.QTDE > 0
         ${vendasGlobaisFilter} 
         ${grupoFilter}
+        ${exclusionFilter}
         -- NÃO aplicar linhaFilter, colecaoFilter, subgrupoFilter, gradeFilter aqui
         -- para não perder vendas que pertencem à categoria
         AND ${categoriaField} <> ''
@@ -1066,6 +1119,7 @@ export async function fetchEstoquePorCategoria({
           AND CAST(fp.QTDE AS FLOAT) > 0
           ${ecommercePeriodoFilialFilter}
           ${grupoFilter}
+          ${exclusionFilter}
           -- NÃO aplicar linhaFilter, colecaoFilter, subgrupoFilter, gradeFilter aqui
           -- para não perder vendas que pertencem à categoria
           AND ${categoriaField} <> ''
@@ -1149,6 +1203,8 @@ export async function fetchEstoquePorCategoria({
     const colecaoFilterEntradas = colecaoFilter ? colecaoFilter.replace(/p\./g, 'pr.') : '';
     const subgrupoFilterEntradas = subgrupoFilter ? subgrupoFilter.replace(/p\./g, 'pr.') : '';
     const gradeFilterEntradas = gradeFilter ? gradeFilter.replace(/p\./g, 'pr.') : '';
+    // Criar novo filtro de exclusão para entradas com prefixo único
+    const exclusionFilterEntradas = buildExclusionFilter(request, company, 'pr', 'excludedLineCategoriaEntradas');
 
     // Campos adicionais para query de entradas (usar alias 'pr' ao invés de 'p')
     // SEMPRE incluir campos detalhados
@@ -1241,6 +1297,7 @@ export async function fetchEstoquePorCategoria({
         ${colecaoFilterEntradas}
         ${subgrupoFilterEntradas}
         ${gradeFilterEntradas}
+        ${exclusionFilterEntradas}
         AND ${categoriaFieldEntradas} <> ''
         AND ${categoriaFieldEntradas} <> 'SEM GRUPO'
         AND ${categoriaFieldEntradas} <> 'SEM LINHA'
@@ -1283,6 +1340,7 @@ export async function fetchEstoquePorCategoria({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${exclusionFilter}
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
@@ -1374,6 +1432,7 @@ export async function fetchEstoquePorCategoria({
           ${colecaoFilter}
           ${subgrupoFilter}
           ${gradeFilter}
+          ${exclusionFilter}
           AND ${categoriaField} <> ''
           AND ${categoriaField} <> 'SEM GRUPO'
           AND ${categoriaField} <> 'SEM LINHA'
@@ -1443,6 +1502,7 @@ export async function fetchEstoquePorCategoria({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${exclusionFilter}
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
@@ -1486,6 +1546,7 @@ export async function fetchEstoquePorCategoria({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${exclusionFilter}
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'

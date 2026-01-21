@@ -24,6 +24,7 @@ import DateRangeFilter, {
 import FilialFilter from "@/components/filters/FilialFilter";
 import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
 import type { CompanyKey } from "@/lib/config/company";
+import { resolveCompany } from "@/lib/config/company";
 import { getCurrentMonthRange } from "@/lib/utils/date";
 
 import styles from "./ControleEstoquePage.module.css";
@@ -368,6 +369,12 @@ export default function ControleEstoquePage({
 
   // Linhas a serem excluídas da visualização
   const linhasExcluidas = useMemo(() => {
+    // Usar configuração da empresa se disponível, caso contrário usar lista padrão
+    const companyConfig = resolveCompany(companyKey);
+    if (companyConfig?.excludedLines && companyConfig.excludedLines.length > 0) {
+      return new Set(companyConfig.excludedLines.map(l => l.toUpperCase().trim()));
+    }
+    // Fallback para lista hardcoded (caso não haja configuração)
     return new Set([
       'PRIVATE LABEL',
       'GASTRONOMICA',
@@ -377,7 +384,7 @@ export default function ControleEstoquePage({
       'EMBALAGENS',
       'CAPAS E ACESSORIOS P/ CEL'
     ]);
-  }, []);
+  }, [companyKey]);
 
   // Filtrar linhas disponíveis removendo as excluídas
   const linhasDisponiveis = useMemo(() => {
