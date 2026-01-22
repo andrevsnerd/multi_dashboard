@@ -2607,6 +2607,7 @@ export async function fetchVendasPorCategoria({
 
 /**
  * Busca vendas por categoria para Controle de Giro (com detalhes e usando período selecionado)
+ * Inclui vendas de varejo e ecommerce
  */
 export async function fetchVendasPorCategoriaGiro({
   company,
@@ -2634,6 +2635,7 @@ export async function fetchVendasPorCategoriaGiro({
     const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
     const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
     const gradeFilter = buildGradeFilter(request, company, grades, 'p');
+    const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineGiro');
     const categoriaField = company === 'nerd' 
       ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
       : 'ISNULL(p.LINHA, \'SEM LINHA\')';
@@ -2681,7 +2683,8 @@ export async function fetchVendasPorCategoriaGiro({
               : `, ISNULL(p.SUBGRUPO_PRODUTO, ''), ISNULL(CONVERT(VARCHAR, p.GRADE), ''), ISNULL(p.COLECAO, '')`))
       : '';
 
-    const query = `
+    // Buscar vendas de varejo
+    const queryVarejo = `
       SELECT 
         ${categoriaField} AS categoria${camposAdicionais},
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
@@ -2696,31 +2699,169 @@ export async function fetchVendasPorCategoriaGiro({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${exclusionFilter}
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
       GROUP BY ${categoriaField}${groupByAdicional}
       HAVING SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) > 0
-      ORDER BY vendas DESC
     `;
 
-    const result = await request.query<{
+    const resultVarejo = await request.query<{
       categoria: string;
       linha?: string;
       subgrupo?: string;
       grade?: string;
       colecao?: string;
       vendas: number | null;
-    }>(query);
+    }>(queryVarejo);
 
-    return result.recordset.map(row => ({
-      categoria: row.categoria?.trim() || '',
-      vendas: Math.round(Number(row.vendas ?? 0)),
-      linha: row.linha?.trim() || undefined,
-      subgrupo: row.subgrupo?.trim() || undefined,
-      grade: row.grade?.trim() || undefined,
-      colecao: row.colecao?.trim() || undefined,
-    }));
+    // Criar filtro de filial para e-commerce com a mesma lógica usada em outras funções
+    let ecommerceFilialFilter = '';
+    if (company === 'scarfme') {
+      const companyConfig = resolveCompany(company);
+      if (companyConfig) {
+        const isScarfme = company === 'scarfme';
+        const filiais = companyConfig.filialFilters['inventory'] ?? [];
+        const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
+
+        // Se uma filial específica foi selecionada, usar apenas ela (se for e-commerce)
+        if (filial && filial !== VAREJO_VALUE) {
+          if (ecommerceFilials.includes(filial)) {
+            request.input('ecommerceGiroFilial', sql.VarChar, filial);
+            ecommerceFilialFilter = `AND f.FILIAL = @ecommerceGiroFilial`;
+          } else {
+            // Se a filial selecionada não é e-commerce, não incluir e-commerce
+            ecommerceFilialFilter = `AND 1=0`; // Sempre falso
+          }
+        }
+        // Para scarfme: se for "VAREJO", não incluir e-commerce
+        else if (isScarfme && filial === VAREJO_VALUE) {
+          ecommerceFilialFilter = `AND 1=0`; // Sempre falso
+        }
+        // Para scarfme: se for "Todas as filiais" (null), incluir todas as filiais de e-commerce
+        else if (isScarfme && filial === null) {
+          if (ecommerceFilials.length > 0) {
+            ecommerceFilials.forEach((f, index) => {
+              request.input(`ecommerceGiroFilial${index}`, sql.VarChar, f);
+            });
+            const placeholders = ecommerceFilials.map((_, i) => `@ecommerceGiroFilial${i}`).join(', ');
+            ecommerceFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+          }
+        }
+      }
+    }
+
+    // Buscar vendas de ecommerce (apenas para ScarfMe quando aplicável)
+    let resultEcommerce: { recordset: Array<{
+      categoria: string;
+      linha?: string;
+      subgrupo?: string;
+      grade?: string;
+      colecao?: string;
+      vendas: number | null;
+    }> } = { recordset: [] };
+
+    if (company === 'scarfme' && ecommerceFilialFilter && !ecommerceFilialFilter.includes('1=0')) {
+      const queryEcommerce = `
+        SELECT 
+          ${categoriaField} AS categoria${camposAdicionais},
+          SUM(CAST(fp.QTDE AS FLOAT)) AS vendas
+        FROM FATURAMENTO f WITH (NOLOCK)
+        JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) 
+          ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
+        WHERE f.EMISSAO >= @periodoStart
+          AND f.EMISSAO < @periodoEnd
+          AND f.NOTA_CANCELADA = 0
+          AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+          AND CAST(fp.QTDE AS FLOAT) > 0
+          ${ecommerceFilialFilter}
+          ${grupoFilter}
+          ${linhaFilter}
+          ${colecaoFilter}
+          ${subgrupoFilter}
+          ${gradeFilter}
+          ${exclusionFilter}
+          AND ${categoriaField} <> ''
+          AND ${categoriaField} <> 'SEM GRUPO'
+          AND ${categoriaField} <> 'SEM LINHA'
+        GROUP BY ${categoriaField}${groupByAdicional}
+        HAVING SUM(CAST(fp.QTDE AS FLOAT)) > 0
+      `;
+
+      resultEcommerce = await request.query<{
+        categoria: string;
+        linha?: string;
+        subgrupo?: string;
+        grade?: string;
+        colecao?: string;
+        vendas: number | null;
+      }>(queryEcommerce);
+    }
+
+    // Agregar vendas de varejo e ecommerce por categoria
+    const vendasMap = new Map<string, {
+      categoria: string;
+      vendas: number;
+      linha?: string;
+      subgrupo?: string;
+      grade?: string;
+      colecao?: string;
+    }>();
+
+    // Adicionar vendas de varejo
+    resultVarejo.recordset.forEach(row => {
+      const categoria = row.categoria?.trim() || '';
+      const linha = row.linha?.trim() || '';
+      const subgrupo = row.subgrupo?.trim() || '';
+      const grade = row.grade?.trim() || '';
+      const colecao = row.colecao?.trim() || '';
+      const chave = `${categoria}|${linha}|${subgrupo}|${grade}|${colecao}`;
+      const vendas = Math.round(Number(row.vendas ?? 0));
+
+      if (vendasMap.has(chave)) {
+        vendasMap.get(chave)!.vendas += vendas;
+      } else {
+        vendasMap.set(chave, {
+          categoria,
+          vendas,
+          linha: linha || undefined,
+          subgrupo: subgrupo || undefined,
+          grade: grade || undefined,
+          colecao: colecao || undefined,
+        });
+      }
+    });
+
+    // Adicionar vendas de ecommerce
+    resultEcommerce.recordset.forEach(row => {
+      const categoria = row.categoria?.trim() || '';
+      const linha = row.linha?.trim() || '';
+      const subgrupo = row.subgrupo?.trim() || '';
+      const grade = row.grade?.trim() || '';
+      const colecao = row.colecao?.trim() || '';
+      const chave = `${categoria}|${linha}|${subgrupo}|${grade}|${colecao}`;
+      const vendas = Math.round(Number(row.vendas ?? 0));
+
+      if (vendasMap.has(chave)) {
+        vendasMap.get(chave)!.vendas += vendas;
+      } else {
+        vendasMap.set(chave, {
+          categoria,
+          vendas,
+          linha: linha || undefined,
+          subgrupo: subgrupo || undefined,
+          grade: grade || undefined,
+          colecao: colecao || undefined,
+        });
+      }
+    });
+
+    // Converter mapa para array e ordenar por vendas (decrescente)
+    return Array.from(vendasMap.values())
+      .filter(item => item.vendas > 0)
+      .sort((a, b) => b.vendas - a.vendas);
   });
 }
 
