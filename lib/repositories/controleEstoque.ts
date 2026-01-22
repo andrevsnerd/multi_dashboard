@@ -2641,8 +2641,18 @@ export async function fetchVendasPorCategoriaGiro({
     request.input('periodoStart', sql.DateTime, periodoStart);
     request.input('periodoEnd', sql.DateTime, periodoEnd);
 
-    // Determinar se devemos mostrar detalhes (quando há filtros selecionados)
+    // Determinar se devemos mostrar detalhes (quando há filtros selecionados ou linhas para expandir)
+    // Para SCARFME: mostrar subgrupos quando há linhas selecionadas (expansão)
+    // Se há apenas linhas (expansão), mostrar apenas subgrupo (sem grade/coleção)
+    // Se há outros filtros, mostrar todos os detalhes
+    const apenasExpansaoSubgrupo = company === 'scarfme' && 
+      (linhas && linhas.length > 0) && 
+      !(colecoes && colecoes.length > 0) && 
+      !(subgrupos && subgrupos.length > 0) && 
+      !(grades && grades.length > 0);
+    
     const mostrarDetalhes = (company === 'scarfme' && (
+      (linhas && linhas.length > 0) || // Linhas selecionadas = expansão para subgrupos
       (colecoes && colecoes.length > 0) || 
       (subgrupos && subgrupos.length > 0) || 
       (grades && grades.length > 0)
@@ -2652,17 +2662,23 @@ export async function fetchVendasPorCategoriaGiro({
       (colecoes && colecoes.length > 0)
     ));
 
-    // Incluir campos detalhados apenas se houver filtros selecionados
+    // Incluir campos detalhados
+    // Se é apenas expansão de subgrupo, mostrar apenas subgrupo
+    // Caso contrário, mostrar todos os detalhes
     const camposAdicionais = mostrarDetalhes
-      ? (company === 'scarfme'
-          ? `, ISNULL(p.LINHA, '') AS linha, ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo, ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade, ISNULL(p.COLECAO, '') AS colecao`
-          : `, ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo, ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade, ISNULL(p.COLECAO, '') AS colecao`)
+      ? (apenasExpansaoSubgrupo
+          ? `, ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo`
+          : (company === 'scarfme'
+              ? `, ISNULL(p.LINHA, '') AS linha, ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo, ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade, ISNULL(p.COLECAO, '') AS colecao`
+              : `, ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo, ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade, ISNULL(p.COLECAO, '') AS colecao`))
       : '';
     
     const groupByAdicional = mostrarDetalhes
-      ? (company === 'scarfme'
-          ? `, ISNULL(p.LINHA, ''), ISNULL(p.SUBGRUPO_PRODUTO, ''), ISNULL(CONVERT(VARCHAR, p.GRADE), ''), ISNULL(p.COLECAO, '')`
-          : `, ISNULL(p.SUBGRUPO_PRODUTO, ''), ISNULL(CONVERT(VARCHAR, p.GRADE), ''), ISNULL(p.COLECAO, '')`)
+      ? (apenasExpansaoSubgrupo
+          ? `, ISNULL(p.SUBGRUPO_PRODUTO, '')`
+          : (company === 'scarfme'
+              ? `, ISNULL(p.LINHA, ''), ISNULL(p.SUBGRUPO_PRODUTO, ''), ISNULL(CONVERT(VARCHAR, p.GRADE), ''), ISNULL(p.COLECAO, '')`
+              : `, ISNULL(p.SUBGRUPO_PRODUTO, ''), ISNULL(CONVERT(VARCHAR, p.GRADE), ''), ISNULL(p.COLECAO, '')`))
       : '';
 
     const query = `

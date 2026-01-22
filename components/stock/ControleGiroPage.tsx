@@ -135,6 +135,9 @@ export default function ControleGiroPage({
   const [selectedSubgrupos, setSelectedSubgrupos] = useState<string[]>([]);
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
   const [selectedCategorias, setSelectedCategorias] = useState<Set<string>>(new Set());
+  // Estado para controlar expansão de linhas (apenas SCARFME)
+  // Map<linha, boolean> - true = expandida, false = colapsada
+  const [linhasExpandidas, setLinhasExpandidas] = useState<Set<string>>(new Set());
 
   const [availableGrupos, setAvailableGrupos] = useState<string[]>([]);
   const [availableLinhas, setAvailableLinhas] = useState<string[]>([]);
@@ -175,6 +178,39 @@ export default function ControleGiroPage({
 
   // Filtrar categorias selecionadas e remover linhas excluídas
   const categoriasFiltradas = useMemo(() => {
+    // Para SCARFME: Se há linhas expandidas, mostrar apenas subgrupos dessas linhas
+    // Se não há linhas expandidas, mostrar apenas linhas (nível 0)
+    if (companyKey === 'scarfme') {
+      const linhasExpandidasList = Array.from(linhasExpandidas);
+      
+      if (linhasExpandidasList.length > 0) {
+        // Mostrar apenas subgrupos das linhas expandidas (agrupados por subgrupo)
+        // Os dados já vêm agrupados por categoria+subgrupo da API
+        return categorias.filter(c => {
+          const categoriaUpper = c.categoria.toUpperCase();
+          if (linhasExcluidas.has(categoriaUpper)) {
+            return false;
+          }
+          // Deve ter subgrupo e a categoria (linha) deve estar expandida
+          return c.subgrupo && linhasExpandidas.has(c.categoria);
+        }).sort((a, b) => b.vendas - a.vendas);
+      } else {
+        // Mostrar apenas linhas (sem subgrupo) - nível 0
+        return categorias.filter(c => {
+          const categoriaUpper = c.categoria.toUpperCase();
+          if (linhasExcluidas.has(categoriaUpper)) {
+            return false;
+          }
+          if (!selectedCategorias.has(c.categoria)) {
+            return false;
+          }
+          // Não deve ter subgrupo (é uma linha no nível 0)
+          return !c.subgrupo;
+        }).sort((a, b) => b.vendas - a.vendas);
+      }
+    }
+
+    // Para NERD: sempre mostrar apenas grupos (sem expansão)
     let filtradas = categorias.filter(c => {
       const categoriaUpper = c.categoria.toUpperCase();
       if (linhasExcluidas.has(categoriaUpper)) {
@@ -183,31 +219,16 @@ export default function ControleGiroPage({
       return selectedCategorias.has(c.categoria);
     });
 
-    // Se há linhas selecionadas nos filtros, filtrar por elas também
-    if (companyKey === 'scarfme' && selectedLinhas.length > 0) {
-      filtradas = filtradas.filter(c => selectedLinhas.includes(c.categoria));
-    }
-
-    // Se há subgrupos selecionados, filtrar por eles
-    if (companyKey === 'scarfme' && selectedSubgrupos.length > 0) {
-      filtradas = filtradas.filter(c => c.subgrupo && selectedSubgrupos.includes(c.subgrupo));
-    }
-
-    // Se há grades selecionadas, filtrar por elas
-    if (companyKey === 'scarfme' && selectedGrades.length > 0) {
-      filtradas = filtradas.filter(c => c.grade && selectedGrades.includes(c.grade));
-    }
-
-    // Se há coleções selecionadas, filtrar por elas
-    if (companyKey === 'scarfme' && selectedColecoes.length > 0) {
-      filtradas = filtradas.filter(c => c.colecao && selectedColecoes.includes(c.colecao));
+    // Se há grupos selecionados nos filtros, filtrar por eles também
+    if (companyKey === 'nerd' && selectedGrupos.length > 0) {
+      filtradas = filtradas.filter(c => selectedGrupos.includes(c.categoria));
     }
 
     // Ordenar por vendas (do maior para o menor)
     filtradas.sort((a, b) => b.vendas - a.vendas);
 
     return filtradas;
-  }, [categorias, selectedCategorias, linhasExcluidas, companyKey, selectedLinhas, selectedSubgrupos, selectedGrades, selectedColecoes]);
+  }, [categorias, selectedCategorias, linhasExcluidas, companyKey, selectedGrupos, linhasExpandidas]);
 
   // Buscar grupos disponíveis para NERD
   useEffect(() => {
@@ -485,9 +506,15 @@ export default function ControleGiroPage({
       setError(null);
 
       try {
+        // Para SCARFME: Se há linhas expandidas, buscar dados com subgrupos dessas linhas
+        // Caso contrário, buscar apenas linhas (nível 0)
+        const linhasParaBuscar = companyKey === 'scarfme' && linhasExpandidas.size > 0
+          ? Array.from(linhasExpandidas)
+          : selectedLinhas;
+
         const [kpisData, categoriasData] = await Promise.all([
-          fetchKPIs(companyKey, selectedFilial, range, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades),
-          fetchCategorias(companyKey, selectedFilial, range, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades),
+          fetchKPIs(companyKey, selectedFilial, range, selectedGrupos, linhasParaBuscar, selectedColecoes, selectedSubgrupos, selectedGrades),
+          fetchCategorias(companyKey, selectedFilial, range, selectedGrupos, linhasParaBuscar, selectedColecoes, selectedSubgrupos, selectedGrades),
         ]);
 
         if (active) {
@@ -510,7 +537,7 @@ export default function ControleGiroPage({
     return () => {
       active = false;
     };
-  }, [companyKey, selectedFilial, range, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades]);
+  }, [companyKey, selectedFilial, range, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, linhasExpandidas]);
 
   const currentDate = format(new Date(), "EEEE, d 'De' MMMM 'De' yyyy", { locale: ptBR });
 
@@ -645,33 +672,54 @@ export default function ControleGiroPage({
       {/* Por Categoria */}
       <div className={styles.section} id="categorias-section">
         <div className={styles.sectionHeader}>
+          {companyKey === 'scarfme' && linhasExpandidas.size > 0 && (
+            <button
+              onClick={() => {
+                setLinhasExpandidas(new Set());
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={styles.backButton}
+            >
+              ← Voltar
+            </button>
+          )}
           <h2 className={styles.sectionTitle}>Por Categoria</h2>
         </div>
         <div className={styles.categoriasGrid}>
           {categoriasFiltradas.map((cat, index) => {
-            // Determinar se deve mostrar detalhes (apenas se houver filtros selecionados)
-            const temDetalhes = cat.linha || cat.subgrupo || cat.grade || cat.colecao;
-            // Para SCARFME, se linha existe e é diferente da categoria, mostrar (mas no primeiro nível não deve ter)
-            // Para NERD, linha não existe, então verificar apenas subgrupo/grade/colecao
-            const mostrarDetalhes = companyKey === 'scarfme' 
-              ? (cat.linha && cat.linha !== cat.categoria) || cat.subgrupo || cat.grade || cat.colecao
-              : cat.subgrupo || cat.grade || cat.colecao;
+            // Para SCARFME: Se está no nível 0 (sem subgrupo), é uma linha clicável
+            // Se tem subgrupo, é um subgrupo expandido
+            const isLinhaNivel0 = companyKey === 'scarfme' && !cat.subgrupo && linhasExpandidas.size === 0;
+            const isSubgrupoExpandido = companyKey === 'scarfme' && cat.subgrupo && linhasExpandidas.has(cat.categoria);
             
             return (
-              <div key={`${cat.categoria}-${index}`} className={styles.categoriaCard}>
+              <div key={`${cat.categoria}-${cat.subgrupo || ''}-${index}`} className={styles.categoriaCard}>
                 <div className={styles.categoriaHeader}>
                   <div className={styles.categoriaNameWrapper}>
-                    <div className={styles.categoriaName}>
-                      {cat.categoria}
-                    </div>
-                    {mostrarDetalhes && temDetalhes && (
+                    {isLinhaNivel0 ? (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setLinhasExpandidas(prev => {
+                            const novo = new Set(prev);
+                            novo.add(cat.categoria);
+                            return novo;
+                          });
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className={styles.categoriaName}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
+                      >
+                        {cat.categoria}
+                      </button>
+                    ) : (
+                      <div className={styles.categoriaName}>
+                        {cat.categoria}
+                      </div>
+                    )}
+                    {isSubgrupoExpandido && cat.subgrupo && (
                       <div className={styles.categoriaDetails}>
-                        {companyKey === 'scarfme' && cat.linha && cat.linha !== cat.categoria && (
-                          <span className={styles.detailTag}>Linha: {cat.linha}</span>
-                        )}
-                        {cat.subgrupo && <span className={styles.detailTag}>Subgrupo: {cat.subgrupo}</span>}
-                        {cat.grade && <span className={styles.detailTag}>Grade: {cat.grade}</span>}
-                        {cat.colecao && <span className={styles.detailTag}>Coleção: {cat.colecao}</span>}
+                        <span className={styles.detailTag}>Subgrupo: {cat.subgrupo}</span>
                       </div>
                     )}
                   </div>
