@@ -40,6 +40,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     let base = pathname
       .replace(/\/estoque-por-filial.*$/, "")
       .replace(/\/controle-estoque.*$/, "") // Remove /controle-estoque e qualquer coisa depois
+      .replace(/\/controle-giro.*$/, "") // Remove /controle-giro e qualquer coisa depois
       .replace(/\/controle-movimento.*$/, "") // Remove /controle-movimento e qualquer coisa depois
       .replace(/\/produto-detalhado$/, "")
       .replace(/\/produtos-recentes$/, "")
@@ -99,6 +100,11 @@ export default function Sidebar({ companyName }: SidebarProps) {
     ? `${basePath}/controle-movimento`
     : "/controle-movimento";
 
+  // Construir o link para controle de giro baseado no caminho base
+  const controleGiroHref = basePath && basePath !== "/" 
+    ? `${basePath}/controle-giro`
+    : "/controle-giro";
+
   // Verificar se está em alguma página relacionada a produtos
   const isProdutosSubItemActive = pathname?.includes("/produto-detalhado") || pathname?.includes("/produtos-recentes") || (pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado"));
   const isProdutosPageActive = pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado");
@@ -135,6 +141,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     { label: "Vendedores", href: vendedoresHref },
     { label: "Clientes", href: clientesHref },
     { label: "Controle de Estoque", href: controleEstoqueHref },
+    { label: "Controle de Giro", href: controleGiroHref },
     { label: "Controle de Movimento", href: controleMovimentoHref },
     { label: "Exportar Relatórios", href: exportarRelatoriosHref },
     // TODO: Descomentar quando estoque por filial estiver pronto

@@ -2606,6 +2606,109 @@ export async function fetchVendasPorCategoria({
 }
 
 /**
+ * Busca vendas por categoria para Controle de Giro (com detalhes e usando período selecionado)
+ */
+export async function fetchVendasPorCategoriaGiro({
+  company,
+  filial,
+  range,
+  grupos,
+  linhas,
+  colecoes,
+  subgrupos,
+  grades,
+}: ControleEstoqueParams): Promise<Array<{
+  categoria: string;
+  vendas: number;
+  linha?: string;
+  subgrupo?: string;
+  grade?: string;
+  colecao?: string;
+}>> {
+  return withRequest(async (request) => {
+    const { start: periodoStart, end: periodoEnd } = resolveRange(range);
+    
+    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
+    const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
+    const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
+    const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
+    const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
+    const gradeFilter = buildGradeFilter(request, company, grades, 'p');
+    const categoriaField = company === 'nerd' 
+      ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
+      : 'ISNULL(p.LINHA, \'SEM LINHA\')';
+
+    request.input('periodoStart', sql.DateTime, periodoStart);
+    request.input('periodoEnd', sql.DateTime, periodoEnd);
+
+    // Determinar se devemos mostrar detalhes (quando há filtros selecionados)
+    const mostrarDetalhes = (company === 'scarfme' && (
+      (colecoes && colecoes.length > 0) || 
+      (subgrupos && subgrupos.length > 0) || 
+      (grades && grades.length > 0)
+    )) || (company === 'nerd' && (
+      (subgrupos && subgrupos.length > 0) || 
+      (grades && grades.length > 0) ||
+      (colecoes && colecoes.length > 0)
+    ));
+
+    // Incluir campos detalhados apenas se houver filtros selecionados
+    const camposAdicionais = mostrarDetalhes
+      ? (company === 'scarfme'
+          ? `, ISNULL(p.LINHA, '') AS linha, ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo, ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade, ISNULL(p.COLECAO, '') AS colecao`
+          : `, ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo, ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade, ISNULL(p.COLECAO, '') AS colecao`)
+      : '';
+    
+    const groupByAdicional = mostrarDetalhes
+      ? (company === 'scarfme'
+          ? `, ISNULL(p.LINHA, ''), ISNULL(p.SUBGRUPO_PRODUTO, ''), ISNULL(CONVERT(VARCHAR, p.GRADE), ''), ISNULL(p.COLECAO, '')`
+          : `, ISNULL(p.SUBGRUPO_PRODUTO, ''), ISNULL(CONVERT(VARCHAR, p.GRADE), ''), ISNULL(p.COLECAO, '')`)
+      : '';
+
+    const query = `
+      SELECT 
+        ${categoriaField} AS categoria${camposAdicionais},
+        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      WHERE vp.DATA_VENDA >= @periodoStart
+        AND vp.DATA_VENDA < @periodoEnd
+        AND vp.QTDE > 0
+        ${vendasFilialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        AND ${categoriaField} <> ''
+        AND ${categoriaField} <> 'SEM GRUPO'
+        AND ${categoriaField} <> 'SEM LINHA'
+      GROUP BY ${categoriaField}${groupByAdicional}
+      HAVING SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) > 0
+      ORDER BY vendas DESC
+    `;
+
+    const result = await request.query<{
+      categoria: string;
+      linha?: string;
+      subgrupo?: string;
+      grade?: string;
+      colecao?: string;
+      vendas: number | null;
+    }>(query);
+
+    return result.recordset.map(row => ({
+      categoria: row.categoria?.trim() || '',
+      vendas: Math.round(Number(row.vendas ?? 0)),
+      linha: row.linha?.trim() || undefined,
+      subgrupo: row.subgrupo?.trim() || undefined,
+      grade: row.grade?.trim() || undefined,
+      colecao: row.colecao?.trim() || undefined,
+    }));
+  });
+}
+
+/**
  * Busca previsões de vendas e estoque
  */
 export async function fetchPrevisoesEstoque({

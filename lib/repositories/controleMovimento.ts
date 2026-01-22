@@ -633,10 +633,130 @@ export async function fetchControleMovimentoKPIs({
     const vendidosQuantidadeAnterior = Number(vendasAnteriorResult.recordset[0]?.quantidade ?? 0);
     const vendidosValorAnterior = Number(vendasAnteriorResult.recordset[0]?.valor ?? 0);
 
-    // Calcular custo médio das entradas para calcular custo dos itens parados
-    const custoMedio = entradasQuantidade > 0 ? entradasCusto / entradasQuantidade : 0;
-    const itensParadosQuantidade = Math.max(0, entradasQuantidade - vendidosQuantidade);
-    const itensParadosCusto = itensParadosQuantidade * custoMedio;
+    // 6. Calcular itens parados produto por produto (igual ao modal)
+    // Buscar entradas agrupadas por produto+cor
+    const entradasDetalhadasQuery = `
+      SELECT 
+        P.PRODUTO,
+        ISNULL(P.COR_PRODUTO, '') AS COR_PRODUTO,
+        SUM(CAST(P.QTDE AS FLOAT)) AS QTDE_ENTRADA,
+        SUM(CAST(P.QTDE AS FLOAT) * ISNULL(pr.CUSTO_REPOSICAO1, 0)) AS CUSTO_ENTRADA
+      FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+      LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+      LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
+      WHERE pr.PRODUTO IS NOT NULL
+        AND E.EMISSAO >= @startDate
+        AND E.EMISSAO < @endDate
+        ${matrizFilialFilter}
+        ${grupoFilterEntradas}
+        ${linhaFilterEntradas}
+        ${colecaoFilterEntradas}
+        ${subgrupoFilterEntradas}
+        ${gradeFilterEntradas}
+        ${exclusionFilterEntradas}
+        AND ${categoriaField} <> ''
+        AND ${categoriaField} <> 'SEM GRUPO'
+        AND ${categoriaField} <> 'SEM LINHA'
+      GROUP BY P.PRODUTO, P.COR_PRODUTO
+    `;
+
+    // Buscar vendas agrupadas por produto+cor
+    const vendasDetalhadasQuery = `
+      WITH ProdutosEntrados AS (
+        ${produtosEntradosQuery}
+      ),
+      VendasBase AS (
+        SELECT 
+          vp.PRODUTO,
+          ISNULL(vp.COR_PRODUTO, '') AS COR_PRODUTO,
+          vp.QTDE,
+          vp.QTDE_CANCELADA
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+        WHERE vp.DATA_VENDA >= @startDate
+          AND vp.DATA_VENDA < @endDate
+          AND vp.QTDE > 0
+          ${vendasFilialFilter}
+          ${grupoFilterVendas}
+          ${linhaFilterVendas}
+          ${colecaoFilterVendas}
+          ${subgrupoFilterVendas}
+          ${gradeFilterVendas}
+          ${exclusionFilterVendas}
+      ),
+      TrocasItem AS (
+        SELECT 
+          vt.PRODUTO,
+          ISNULL(vt.COR_PRODUTO, '') AS COR_PRODUTO,
+          SUM(vt.QTDE) AS QTDE_TROCA
+        FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+        WHERE vt.QTDE_CANCELADA = 0
+          AND CAST(vt.DATA_VENDA AS DATE) >= CAST(@startDate AS DATE)
+          AND CAST(vt.DATA_VENDA AS DATE) < CAST(@endDate AS DATE)
+        GROUP BY vt.PRODUTO, vt.COR_PRODUTO
+      ),
+      VendasComTrocas AS (
+        SELECT 
+          vb.PRODUTO,
+          vb.COR_PRODUTO,
+          SUM(CASE WHEN vb.QTDE_CANCELADA > 0 THEN 0 ELSE vb.QTDE - ISNULL(ti.QTDE_TROCA, 0) END) AS QTDE_VENDIDA
+        FROM VendasBase vb
+        LEFT JOIN TrocasItem ti ON ti.PRODUTO = vb.PRODUTO AND ti.COR_PRODUTO = vb.COR_PRODUTO
+        INNER JOIN ProdutosEntrados pe ON pe.PRODUTO = vb.PRODUTO AND pe.COR_PRODUTO = vb.COR_PRODUTO
+        GROUP BY vb.PRODUTO, vb.COR_PRODUTO
+      )
+      SELECT 
+        PRODUTO,
+        COR_PRODUTO,
+        QTDE_VENDIDA
+      FROM VendasComTrocas
+    `;
+
+    const [entradasDetalhadasResult, vendasDetalhadasResult] = await Promise.all([
+      request.query<{
+        PRODUTO: string;
+        COR_PRODUTO: string;
+        QTDE_ENTRADA: number;
+        CUSTO_ENTRADA: number;
+      }>(entradasDetalhadasQuery),
+      request.query<{
+        PRODUTO: string;
+        COR_PRODUTO: string;
+        QTDE_VENDIDA: number;
+      }>(vendasDetalhadasQuery),
+    ]);
+
+    // Criar map de vendas
+    const vendasMap = new Map<string, number>();
+    vendasDetalhadasResult.recordset.forEach((v) => {
+      const key = `${v.PRODUTO}|${v.COR_PRODUTO}`;
+      vendasMap.set(key, v.QTDE_VENDIDA);
+    });
+
+    // Calcular itens parados produto por produto
+    // Parados = produtos que entraram mas não venderam (ou venderam menos do que entraram)
+    // Vendidos mantém o valor total (pode incluir vendas de estoque anterior)
+    let itensParadosQuantidade = 0;
+    let itensParadosCusto = 0;
+    
+    entradasDetalhadasResult.recordset.forEach((e) => {
+      const key = `${e.PRODUTO}|${e.COR_PRODUTO}`;
+      const vendida = vendasMap.get(key) || 0;
+      
+      // Parados = entrada - venda (só conta se > 0)
+      // Se vendeu mais do que entrou, não há parados (pode ter vendido estoque anterior)
+      const parada = e.QTDE_ENTRADA - vendida;
+      
+      if (parada > 0) {
+        const custoMedio = e.QTDE_ENTRADA > 0 ? e.CUSTO_ENTRADA / e.QTDE_ENTRADA : 0;
+        itensParadosQuantidade += parada;
+        itensParadosCusto += parada * custoMedio;
+      }
+    });
+    
+    // Vendidos mantém o valor total (todas as vendas dos produtos que entraram)
+    const vendidosQuantidadeFinal = vendidosQuantidade;
+    const vendidosValorFinal = vendidosValor;
 
     return {
       entradasPeriodo: {
