@@ -38,7 +38,15 @@ export async function GET(request: Request) {
         // Para KPI, vamos calcular o total de vendas
         const vendas = await fetchVendasPorCategoriaGiro({ company, filial, range, ...filters });
         const totalVendas = vendas.reduce((sum, v) => sum + v.vendas, 0);
-        return NextResponse.json({ data: { totalVendas } });
+        const totalVendasVarejo = vendas.reduce((sum, v) => sum + v.vendasVarejo, 0);
+        const totalVendasEcommerce = vendas.reduce((sum, v) => sum + v.vendasEcommerce, 0);
+        return NextResponse.json({ 
+          data: { 
+            totalVendas,
+            totalVendasVarejo,
+            totalVendasEcommerce
+          } 
+        });
       }
       case 'categorias': {
         // Buscar vendas por categoria com detalhes (linha, subgrupo, grade, coleção)

@@ -22,11 +22,15 @@ interface ControleGiroPageProps {
 
 interface GiroKPI {
   totalVendas: number;
+  totalVendasVarejo: number;
+  totalVendasEcommerce: number;
 }
 
 interface CategoriaGiro {
   categoria: string;
   vendas: number;
+  vendasVarejo: number;
+  vendasEcommerce: number;
   linha?: string;
   subgrupo?: string;
   grade?: string;
@@ -601,6 +605,23 @@ export default function ControleGiroPage({
         <div className={styles.kpiCard}>
           <div className={styles.kpiLabel}>TOTAL VENDAS</div>
           <div className={styles.kpiValue}>{formatNumber(kpis?.totalVendas ?? 0)} un</div>
+          {(kpis && (kpis.totalVendasVarejo > 0 || kpis.totalVendasEcommerce > 0)) && (
+            <div className={styles.vendasBreakdown}>
+              {kpis.totalVendasVarejo > 0 && (
+                <span className={styles.vendasDetail}>
+                  Varejo: {formatNumber(kpis.totalVendasVarejo)}
+                </span>
+              )}
+              {kpis.totalVendasVarejo > 0 && kpis.totalVendasEcommerce > 0 && (
+                <span className={styles.vendasSeparator}> • </span>
+              )}
+              {kpis.totalVendasEcommerce > 0 && (
+                <span className={styles.vendasDetail}>
+                  E-commerce: {formatNumber(kpis.totalVendasEcommerce)}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -728,6 +749,23 @@ export default function ControleGiroPage({
                   <div className={styles.estoqueValue}>
                     {formatNumber(cat.vendas)} <span className={styles.estoqueUnit}>unidades</span>
                   </div>
+                  {(cat.vendasVarejo > 0 || cat.vendasEcommerce > 0) && (
+                    <div className={styles.vendasBreakdown}>
+                      {cat.vendasVarejo > 0 && (
+                        <span className={styles.vendasDetail}>
+                          Varejo: {formatNumber(cat.vendasVarejo)}
+                        </span>
+                      )}
+                      {cat.vendasVarejo > 0 && cat.vendasEcommerce > 0 && (
+                        <span className={styles.vendasSeparator}> • </span>
+                      )}
+                      {cat.vendasEcommerce > 0 && (
+                        <span className={styles.vendasDetail}>
+                          E-commerce: {formatNumber(cat.vendasEcommerce)}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             );

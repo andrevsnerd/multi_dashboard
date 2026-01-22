@@ -2621,6 +2621,8 @@ export async function fetchVendasPorCategoriaGiro({
 }: ControleEstoqueParams): Promise<Array<{
   categoria: string;
   vendas: number;
+  vendasVarejo: number;
+  vendasEcommerce: number;
   linha?: string;
   subgrupo?: string;
   grade?: string;
@@ -2804,6 +2806,8 @@ export async function fetchVendasPorCategoriaGiro({
     const vendasMap = new Map<string, {
       categoria: string;
       vendas: number;
+      vendasVarejo: number;
+      vendasEcommerce: number;
       linha?: string;
       subgrupo?: string;
       grade?: string;
@@ -2821,11 +2825,15 @@ export async function fetchVendasPorCategoriaGiro({
       const vendas = Math.round(Number(row.vendas ?? 0));
 
       if (vendasMap.has(chave)) {
-        vendasMap.get(chave)!.vendas += vendas;
+        const item = vendasMap.get(chave)!;
+        item.vendasVarejo += vendas;
+        item.vendas += vendas;
       } else {
         vendasMap.set(chave, {
           categoria,
           vendas,
+          vendasVarejo: vendas,
+          vendasEcommerce: 0,
           linha: linha || undefined,
           subgrupo: subgrupo || undefined,
           grade: grade || undefined,
@@ -2845,11 +2853,15 @@ export async function fetchVendasPorCategoriaGiro({
       const vendas = Math.round(Number(row.vendas ?? 0));
 
       if (vendasMap.has(chave)) {
-        vendasMap.get(chave)!.vendas += vendas;
+        const item = vendasMap.get(chave)!;
+        item.vendasEcommerce += vendas;
+        item.vendas += vendas;
       } else {
         vendasMap.set(chave, {
           categoria,
           vendas,
+          vendasVarejo: 0,
+          vendasEcommerce: vendas,
           linha: linha || undefined,
           subgrupo: subgrupo || undefined,
           grade: grade || undefined,

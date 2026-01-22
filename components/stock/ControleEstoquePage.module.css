@@ -325,6 +325,22 @@
   color: #666;
 }
 
+.vendasBreakdown {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+.vendasDetail {
+  color: #64748b;
+}
+
+.vendasSeparator {
+  color: #cbd5e1;
+  margin: 0 4px;
+}
+
 .estoqueSemanaPassada {
   font-size: 12px;
   font-weight: 400;
