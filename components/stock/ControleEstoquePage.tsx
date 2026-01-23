@@ -311,9 +311,9 @@ export default function ControleEstoquePage({
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
   const [periodType, setPeriodType] = useState<"semanal" | "mensal">("semanal");
   const [selectedCategorias, setSelectedCategorias] = useState<Set<string>>(new Set());
-  // Estado para controlar expansão: Map<categoria, { nivel: number, subgrupoSelecionado?: string, gradeSelecionado?: string }>
-  // nível 0 = categoria, 1 = linha+subgrupo+grade, 2 = linha+subgrupo+grade+coleção
-  const [categoriaExpansao, setCategoriaExpansao] = useState<Map<string, { nivel: number; subgrupoSelecionado?: string; gradeSelecionado?: string }>>(new Map());
+  // Estado para controlar expansão: Map<categoria, { nivel: number, subgrupoSelecionado?: string }>
+  // nível 0 = categoria, 1 = subgrupos, 2 = grades do subgrupo selecionado
+  const [categoriaExpansao, setCategoriaExpansao] = useState<Map<string, { nivel: number; subgrupoSelecionado?: string }>>(new Map());
 
   const [availableGrupos, setAvailableGrupos] = useState<string[]>([]);
   const [availableLinhas, setAvailableLinhas] = useState<string[]>([]);
@@ -398,7 +398,7 @@ export default function ControleEstoquePage({
   const reagruparPorNivel = useMemo(() => {
     const isNerd = companyKey === 'nerd';
     
-    return (cats: CategoriaEstoque[], categoria: string, nivel: number): CategoriaEstoque[] => {
+    return (cats: CategoriaEstoque[], categoria: string, nivel: number, subgrupoSelecionado?: string): CategoriaEstoque[] => {
       // Filtrar apenas a categoria específica
       const catsCategoria = cats.filter(c => c.categoria === categoria);
       
@@ -460,109 +460,103 @@ export default function ControleEstoquePage({
         }, {} as Record<string, CategoriaEstoque>);
         return Object.values(agrupado);
       } else if (nivel === 1) {
-        if (isNerd) {
-          // NERD Nível 1: Agrupar por categoria (grupo) + subgrupo (mostrar subgrupos do grupo)
-          const agrupado = catsCategoria.reduce((acc, cat) => {
-            // Agrupar apenas por subgrupo (grupo já é a categoria)
-            const key = `${cat.categoria}|${cat.subgrupo || ''}`;
-            if (!acc[key]) {
-              acc[key] = {
-                ...cat,
-                linha: undefined, // NERD não usa linha
-                grade: undefined, // Não mostrar grade no nível 1
-                colecao: undefined, // Não mostrar coleção no nível 1
-              };
-            } else {
-              // Somar valores simples
-              acc[key].estoqueAtual += cat.estoqueAtual;
-              acc[key].custoTotal += cat.custoTotal;
-              acc[key].vendasPeriodo += cat.vendasPeriodo;
-              acc[key].estoqueSemanaPassada = (acc[key].estoqueSemanaPassada || 0) + (cat.estoqueSemanaPassada || 0);
-              acc[key].tendenciaSemanal = (acc[key].tendenciaSemanal || 0) + (cat.tendenciaSemanal || 0);
-              acc[key].projecaoVendasMes = (acc[key].projecaoVendasMes || 0) + (cat.projecaoVendasMes || 0);
-              
-              // Recalcular métricas derivadas
-              const totalEstoque = acc[key].estoqueAtual;
-              const totalProjecaoVendas = acc[key].projecaoVendasMes;
-              const diasCorridos = new Date().getDate();
-              const totalDiasMes = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-              
-              // Recalcular projeções
-              // Calcular vendas restantes do mês (apenas o que falta vender)
-              const diasRestantes = totalDiasMes - diasCorridos;
-              const projecaoVendasRestantes = diasCorridos > 0 && diasRestantes > 0
-                ? Math.round((totalProjecaoVendas / diasCorridos) * diasRestantes)
-                : 0;
-              
-              // Calcular meses restantes do ano (incluindo o mês atual)
-              const mesesRestantes = 12 - new Date().getMonth();
-              
-              acc[key].projecaoMes = Math.round(totalEstoque - projecaoVendasRestantes);
-              acc[key].projecaoAnual = Math.round(totalEstoque - (totalProjecaoVendas * mesesRestantes));
-              acc[key].duracao = totalProjecaoVendas > 0 
-                ? Math.round((totalEstoque / totalProjecaoVendas) * totalDiasMes)
-                : 999;
-            }
-            return acc;
-          }, {} as Record<string, CategoriaEstoque>);
-          return Object.values(agrupado);
-        } else {
-          // SCARFME Nível 1: Agrupar por categoria + linha + subgrupo + grade (sem coleção)
-          const agrupado = catsCategoria.reduce((acc, cat) => {
-            // Agrupar por linha+subgrupo+grade, ignorando coleção
-            const key = `${cat.categoria}|${cat.linha || ''}|${cat.subgrupo || ''}|${cat.grade || ''}`;
-            if (!acc[key]) {
-              acc[key] = {
-                ...cat,
-                colecao: undefined, // Não mostrar coleção no nível 1
-              };
-            } else {
-              // Somar valores simples
-              acc[key].estoqueAtual += cat.estoqueAtual;
-              acc[key].custoTotal += cat.custoTotal;
-              acc[key].vendasPeriodo += cat.vendasPeriodo;
-              acc[key].estoqueSemanaPassada = (acc[key].estoqueSemanaPassada || 0) + (cat.estoqueSemanaPassada || 0);
-              acc[key].tendenciaSemanal = (acc[key].tendenciaSemanal || 0) + (cat.tendenciaSemanal || 0);
-              acc[key].projecaoVendasMes = (acc[key].projecaoVendasMes || 0) + (cat.projecaoVendasMes || 0);
-              
-              // Recalcular métricas derivadas
-              const totalEstoque = acc[key].estoqueAtual;
-              const totalProjecaoVendas = acc[key].projecaoVendasMes;
-              const diasCorridos = new Date().getDate();
-              const totalDiasMes = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-              
-              // Recalcular projeções
-              // Calcular vendas restantes do mês (apenas o que falta vender)
-              const diasRestantes = totalDiasMes - diasCorridos;
-              const projecaoVendasRestantes = diasCorridos > 0 && diasRestantes > 0
-                ? Math.round((totalProjecaoVendas / diasCorridos) * diasRestantes)
-                : 0;
-              
-              // Calcular meses restantes do ano (incluindo o mês atual)
-              const mesesRestantes = 12 - new Date().getMonth();
-              
-              acc[key].projecaoMes = Math.round(totalEstoque - projecaoVendasRestantes);
-              acc[key].projecaoAnual = Math.round(totalEstoque - (totalProjecaoVendas * mesesRestantes));
-              acc[key].duracao = totalProjecaoVendas > 0 
-                ? Math.round((totalEstoque / totalProjecaoVendas) * totalDiasMes)
-                : 999;
-            }
-            return acc;
-          }, {} as Record<string, CategoriaEstoque>);
-          return Object.values(agrupado);
-        }
+        // Nível 1: Agrupar por subgrupos (igual para NERD e SCARFME)
+        const agrupado = catsCategoria.reduce((acc, cat) => {
+          // Agrupar apenas por subgrupo
+          const key = `${cat.categoria}|${cat.subgrupo || ''}`;
+          if (!acc[key]) {
+            acc[key] = {
+              ...cat,
+              grade: undefined, // Não mostrar grade no nível 1
+              colecao: undefined, // Não mostrar coleção no nível 1
+            };
+          } else {
+            // Somar valores simples
+            acc[key].estoqueAtual += cat.estoqueAtual;
+            acc[key].custoTotal += cat.custoTotal;
+            acc[key].vendasPeriodo += cat.vendasPeriodo;
+            acc[key].estoqueSemanaPassada = (acc[key].estoqueSemanaPassada || 0) + (cat.estoqueSemanaPassada || 0);
+            acc[key].tendenciaSemanal = (acc[key].tendenciaSemanal || 0) + (cat.tendenciaSemanal || 0);
+            acc[key].projecaoVendasMes = (acc[key].projecaoVendasMes || 0) + (cat.projecaoVendasMes || 0);
+            
+            // Recalcular métricas derivadas
+            const totalEstoque = acc[key].estoqueAtual;
+            const totalProjecaoVendas = acc[key].projecaoVendasMes;
+            const diasCorridos = new Date().getDate();
+            const totalDiasMes = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+            
+            // Recalcular projeções
+            // Calcular vendas restantes do mês (apenas o que falta vender)
+            const diasRestantes = totalDiasMes - diasCorridos;
+            const projecaoVendasRestantes = diasCorridos > 0 && diasRestantes > 0
+              ? Math.round((totalProjecaoVendas / diasCorridos) * diasRestantes)
+              : 0;
+            
+            // Calcular meses restantes do ano (incluindo o mês atual)
+            const mesesRestantes = 12 - new Date().getMonth();
+            
+            acc[key].projecaoMes = Math.round(totalEstoque - projecaoVendasRestantes);
+            acc[key].projecaoAnual = Math.round(totalEstoque - (totalProjecaoVendas * mesesRestantes));
+            acc[key].duracao = totalProjecaoVendas > 0 
+              ? Math.round((totalEstoque / totalProjecaoVendas) * totalDiasMes)
+              : 999;
+          }
+          return acc;
+        }, {} as Record<string, CategoriaEstoque>);
+        return Object.values(agrupado);
       } else {
-        // Nível 2: Mostrar tudo
-        if (isNerd) {
-          // NERD Nível 2: Mostrar categoria (grupo) + subgrupo + grade + coleção
-          return catsCategoria;
-        } else {
-          // SCARFME Nível 2: Mostrar categoria + linha + subgrupo + grade + coleção
-          return catsCategoria;
+        // Nível 2: Mostrar as diferentes grades do subgrupo selecionado
+        // Filtrar apenas os cards que correspondem ao subgrupo selecionado
+        if (subgrupoSelecionado) {
+          // Filtrar por subgrupo selecionado e agrupar por grade
+          const filtradas = catsCategoria.filter(cat => cat.subgrupo === subgrupoSelecionado);
+          const agrupado = filtradas.reduce((acc, cat) => {
+            // Agrupar por grade
+            const key = `${cat.categoria}|${cat.subgrupo || ''}|${cat.grade || ''}`;
+            if (!acc[key]) {
+              acc[key] = {
+                ...cat,
+                colecao: undefined, // Não mostrar coleção no nível 2
+              };
+            } else {
+              // Somar valores simples
+              acc[key].estoqueAtual += cat.estoqueAtual;
+              acc[key].custoTotal += cat.custoTotal;
+              acc[key].vendasPeriodo += cat.vendasPeriodo;
+              acc[key].estoqueSemanaPassada = (acc[key].estoqueSemanaPassada || 0) + (cat.estoqueSemanaPassada || 0);
+              acc[key].tendenciaSemanal = (acc[key].tendenciaSemanal || 0) + (cat.tendenciaSemanal || 0);
+              acc[key].projecaoVendasMes = (acc[key].projecaoVendasMes || 0) + (cat.projecaoVendasMes || 0);
+              
+              // Recalcular métricas derivadas
+              const totalEstoque = acc[key].estoqueAtual;
+              const totalProjecaoVendas = acc[key].projecaoVendasMes;
+              const diasCorridos = new Date().getDate();
+              const totalDiasMes = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+              
+              // Recalcular projeções
+              const diasRestantes = totalDiasMes - diasCorridos;
+              const projecaoVendasRestantes = diasCorridos > 0 && diasRestantes > 0
+                ? Math.round((totalProjecaoVendas / diasCorridos) * diasRestantes)
+                : 0;
+              
+              const mesesRestantes = 12 - new Date().getMonth();
+              
+              acc[key].projecaoMes = Math.round(totalEstoque - projecaoVendasRestantes);
+              acc[key].projecaoAnual = Math.round(totalEstoque - (totalProjecaoVendas * mesesRestantes));
+              acc[key].duracao = totalProjecaoVendas > 0 
+                ? Math.round((totalEstoque / totalProjecaoVendas) * totalDiasMes)
+                : 999;
+            }
+            return acc;
+          }, {} as Record<string, CategoriaEstoque>);
+          return Object.values(agrupado);
         }
+        
+        // Se não há subgrupo selecionado, retornar vazio (não deveria acontecer)
+        return [];
       }
     };
-  }, [companyKey]);
+  }, [companyKey, categoriaExpansao]);
 
   // Filtrar categorias selecionadas e remover linhas excluídas, depois reagrupar por nível de expansão
   const categoriasFiltradas = useMemo(() => {
@@ -611,7 +605,8 @@ export default function ControleEstoquePage({
     categoriasAgrupadas.forEach((cats, categoria) => {
       const expansao = categoriaExpansao.get(categoria);
       const nivel = expansao?.nivel || 0;
-      const reagrupadas = reagruparPorNivel(cats, categoria, nivel);
+      const subgrupoSelecionado = expansao?.subgrupoSelecionado;
+      const reagrupadas = reagruparPorNivel(cats, categoria, nivel, subgrupoSelecionado);
       resultado.push(...reagrupadas);
     });
 
@@ -634,29 +629,14 @@ export default function ControleEstoquePage({
         
         // Só mostrar cards expandidos (nível > 0) da categoria expandida
         if (nivel > 0 && categoriasExpandidas.has(cat.categoria)) {
-          // Para ScarfMe, categoria = linha, então garantir que linha === categoria
-          if (companyKey === 'scarfme') {
-            // Para ScarfMe, quando expandimos "LENÇOS", mostrar apenas cards onde linha = "LENÇOS"
-            if (cat.categoria === cat.linha) {
-              // Se está no nível 2, filtrar pelo subgrupo e grade selecionados
-              if (nivel === 2 && expansao?.subgrupoSelecionado && expansao?.gradeSelecionado) {
-                if (cat.subgrupo === expansao.subgrupoSelecionado && cat.grade === expansao.gradeSelecionado) {
-                  resultadoFiltrado.push(cat);
-                }
-              } else {
-                // Nível 1: mostrar todos os cards da categoria (sem coleção)
-                resultadoFiltrado.push(cat);
-              }
-            }
-          } else {
-            // Para NERD, apenas verificar se a categoria corresponde
-            if (nivel === 2 && expansao?.subgrupoSelecionado && expansao?.gradeSelecionado) {
-              if (cat.subgrupo === expansao.subgrupoSelecionado && cat.grade === expansao.gradeSelecionado) {
-                resultadoFiltrado.push(cat);
-              }
-            } else {
+          // Se está no nível 2, filtrar pelo subgrupo selecionado
+          if (nivel === 2 && expansao?.subgrupoSelecionado) {
+            if (cat.subgrupo === expansao.subgrupoSelecionado) {
               resultadoFiltrado.push(cat);
             }
+          } else {
+            // Nível 1: mostrar todos os cards da categoria (agrupados por subgrupo)
+            resultadoFiltrado.push(cat);
           }
         }
       });
@@ -681,7 +661,7 @@ export default function ControleEstoquePage({
     resultadoComFiltroVendas.sort((a, b) => b.estoqueAtual - a.estoqueAtual);
 
     return resultadoComFiltroVendas;
-  }, [categorias, selectedCategorias, linhasExcluidas, categoriaExpansao, reagruparPorNivel, companyKey, filtrarPorVendas]);
+  }, [categorias, selectedCategorias, linhasExcluidas, categoriaExpansao, reagruparPorNivel, companyKey, filtrarPorVendas, selectedLinhas, selectedSubgrupos, selectedGrades, selectedColecoes]);
 
   // Recalcular KPIs baseado nas categorias filtradas
   const kpisFiltrados = useMemo(() => {
@@ -801,30 +781,21 @@ export default function ControleEstoquePage({
         const novo = new Map(prev);
         
         // Determinar o nível baseado nos parâmetros disponíveis
-        if (colecao && colecao.trim() !== '' && grade && grade.trim() !== '' && subgrupo && subgrupo.trim() !== '') {
-          // Nível 2: tem tudo (colecao + grade + subgrupo)
+        // Nova lógica: Nível 1 = subgrupos, Nível 2 = grades do subgrupo
+        if (grade && grade.trim() !== '' && subgrupo && subgrupo.trim() !== '') {
+          // Nível 2: tem grade e subgrupo (mostrar grades do subgrupo)
           novo.set(categoriaParaExpandir.trim(), {
             nivel: 2,
             subgrupoSelecionado: subgrupo.trim(),
-            gradeSelecionado: grade.trim(),
           });
-        } else if (grade && grade.trim() !== '' && subgrupo && subgrupo.trim() !== '') {
-          // Nível 1: tem grade e subgrupo (sem colecao)
+        } else if (subgrupo && subgrupo.trim() !== '') {
+          // Nível 1: tem só subgrupo (mostrar subgrupos)
           novo.set(categoriaParaExpandir.trim(), {
             nivel: 1,
             subgrupoSelecionado: subgrupo.trim(),
-            gradeSelecionado: grade.trim(),
           });
-        } else if (subgrupo && subgrupo.trim() !== '') {
-          // Nível 1: tem só subgrupo (para NERD)
-          if (companyKey === 'nerd') {
-            novo.set(categoriaParaExpandir.trim(), {
-              nivel: 1,
-              subgrupoSelecionado: subgrupo.trim(),
-            });
-          }
         } else {
-          // Nível 0: só tem linha/grupo, não expandir (ou expandir para nível 1 se necessário)
+          // Nível 0: só tem linha/grupo, não expandir
           // Não fazer nada, deixar no nível 0
         }
         
@@ -1428,26 +1399,17 @@ export default function ControleEstoquePage({
             const categoriasExpandidas = Array.from(categoriaExpansao.entries()).filter(([_, expansao]) => expansao.nivel > 0);
             if (categoriasExpandidas.length > 0) {
               const [categoriaExpandida, expansao] = categoriasExpandidas[0];
-              const isNerd = companyKey === 'nerd';
               return (
                 <button
                   onClick={() => {
                     setCategoriaExpansao(prev => {
                       const novo = new Map(prev);
-                      if (isNerd) {
-                        // NERD: Nível 1 -> Nível 0 (colapsar)
-                        if (expansao.nivel === 1) {
-                          novo.delete(categoriaExpandida);
-                        }
-                      } else {
-                        // SCARFME: Lógica original
-                        if (expansao.nivel === 2) {
-                          // Voltar do nível 2 para nível 1 (remover filtro de coleção, manter subgrupo/grade)
-                          novo.set(categoriaExpandida, { nivel: 1 });
-                        } else if (expansao.nivel === 1) {
-                          // Voltar do nível 1 para nível 0 (colapsar)
-                          novo.delete(categoriaExpandida);
-                        }
+                      if (expansao.nivel === 2) {
+                        // Voltar do nível 2 para nível 1 (remover subgrupo selecionado)
+                        novo.set(categoriaExpandida, { nivel: 1 });
+                      } else if (expansao.nivel === 1) {
+                        // Voltar do nível 1 para nível 0 (colapsar)
+                        novo.delete(categoriaExpandida);
                       }
                       return novo;
                     });
@@ -1492,154 +1454,91 @@ export default function ControleEstoquePage({
                       : (cat.linha || cat.subgrupo || cat.grade || cat.colecao);
                     const isCardExpandido = nivelAtual > 0 && temDetalhes;
                     
-                    // Lógica diferente para NERD e SCARFME
-                    const isNerd = companyKey === 'nerd';
-                    
-                    if (isNerd) {
-                      // NERD: Nível 0 -> mostra subgrupos, Nível 1 -> vai para detalhes
-                      if (nivelAtual === 1 && isCardExpandido) {
-                        // NERD Nível 1: clicar navega para estoquedetalhado01 (grupo + subgrupo)
-                        // Mostrar todos os produtos do subgrupo, sem filtrar por grade/colecao ainda
-                        return (
-                          <>
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                const params = new URLSearchParams();
-                                // Para NERD, categoria é o grupo, então passar como grupo
+                    // Nova lógica: Nível 0 -> subgrupos, Nível 1 -> grades do subgrupo, Nível 2 -> navega para detalhes
+                    if (nivelAtual === 2 && isCardExpandido) {
+                      // Nível 2: clicar navega para página de detalhes
+                      return (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              const params = new URLSearchParams();
+                              if (companyKey === 'nerd') {
                                 params.set("grupo", cat.categoria);
-                                // Passar apenas subgrupo (sem grade/colecao) para mostrar todos os produtos
-                                if (cat.subgrupo) params.set("subgrupo", cat.subgrupo);
-                                // Não passar grade nem colecao aqui - isso será o nível intermediário
-                                if (selectedFilial) params.set("filial", selectedFilial);
-                                // Scroll para o topo antes de navegar
-                                window.scrollTo({ top: 0, behavior: 'instant' });
-                                router.push(`/${companyKey}/controle-estoque/estoquedetalhado01?${params.toString()}`);
-                              }}
-                              className={styles.categoriaName}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
-                            >
-                              {cat.categoria}
-                            </button>
-                            {/* Mostrar detalhes: subgrupo */}
-                            <div className={styles.categoriaDetails}>
-                              {cat.subgrupo && <span className={styles.detailTag}>Subgrupo: {cat.subgrupo}</span>}
-                            </div>
-                          </>
-                        );
-                      } else {
-                        // NERD Nível 0: clicar navega direto para página de detalhes (grupo)
-                        return (
-                          <>
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                const params = new URLSearchParams();
-                                // Para NERD, categoria é o grupo, então passar como grupo
-                                params.set("grupo", cat.categoria);
-                                if (selectedFilial) params.set("filial", selectedFilial);
-                                // Scroll para o topo antes de navegar
-                                window.scrollTo({ top: 0, behavior: 'instant' });
-                                router.push(`/${companyKey}/controle-estoque/estoquedetalhado01?${params.toString()}`);
-                              }}
-                              className={styles.categoriaName}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
-                            >
-                              {cat.categoria}
-                            </button>
-                          </>
-                        );
-                      }
+                              } else {
+                                const linhaParaUsar = cat.linha || cat.categoria;
+                                if (linhaParaUsar) params.set("linha", linhaParaUsar);
+                              }
+                              if (cat.subgrupo) params.set("subgrupo", cat.subgrupo);
+                              if (cat.grade) params.set("grade", cat.grade);
+                              if (cat.colecao) params.set("colecao", cat.colecao);
+                              if (selectedFilial) params.set("filial", selectedFilial);
+                              // Scroll para o topo antes de navegar
+                              window.scrollTo({ top: 0, behavior: 'instant' });
+                              router.push(`/${companyKey}/controle-estoque/estoquedetalhado01?${params.toString()}`);
+                            }}
+                            className={styles.categoriaName}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
+                          >
+                            {cat.categoria}
+                          </button>
+                          {/* Mostrar detalhes: subgrupo e grade */}
+                          <div className={styles.categoriaDetails}>
+                            {cat.subgrupo && <span className={styles.detailTag}>Subgrupo: {cat.subgrupo}</span>}
+                            {cat.grade && <span className={styles.detailTag}>Grade: {cat.grade}</span>}
+                          </div>
+                        </>
+                      );
+                    } else if (nivelAtual === 1 && isCardExpandido) {
+                      // Nível 1: clicar expande para nível 2 (mostrar grades do subgrupo selecionado)
+                      return (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setCategoriaExpansao(prev => {
+                                const novo = new Map(prev);
+                                // Salvar o subgrupo selecionado para filtrar as grades
+                                novo.set(cat.categoria, {
+                                  nivel: 2,
+                                  subgrupoSelecionado: cat.subgrupo,
+                                });
+                                return novo;
+                              });
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            className={styles.categoriaName}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
+                          >
+                            {cat.categoria}
+                          </button>
+                          {/* Mostrar detalhes: subgrupo */}
+                          <div className={styles.categoriaDetails}>
+                            {cat.subgrupo && <span className={styles.detailTag}>Subgrupo: {cat.subgrupo}</span>}
+                          </div>
+                        </>
+                      );
                     } else {
-                      // SCARFME: Lógica original
-                      // Se é nível 2 (com coleção), clicar navega para página de detalhes
-                      // Se é nível 1 (sem coleção), clicar expande para nível 2
-                      // Se é nível 0, clicar expande para nível 1
-                      if (nivelAtual === 2 && isCardExpandido) {
-                        // Nível 2: clicar navega para página de detalhes
-                        return (
-                          <>
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                const params = new URLSearchParams();
-                                if (cat.linha) params.set("linha", cat.linha);
-                                if (cat.subgrupo) params.set("subgrupo", cat.subgrupo);
-                                if (cat.grade) params.set("grade", cat.grade);
-                                if (cat.colecao) params.set("colecao", cat.colecao);
-                                if (selectedFilial) params.set("filial", selectedFilial);
-                                // Scroll para o topo antes de navegar
-                                window.scrollTo({ top: 0, behavior: 'instant' });
-                                router.push(`/${companyKey}/controle-estoque/estoquedetalhado01?${params.toString()}`);
-                              }}
-                              className={styles.categoriaName}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
-                            >
-                              {cat.categoria}
-                            </button>
-                            {/* Mostrar detalhes: linha, subgrupo, grade, coleção */}
-                            <div className={styles.categoriaDetails}>
-                              {cat.linha && <span className={styles.detailTag}>Linha: {cat.linha}</span>}
-                              {cat.subgrupo && <span className={styles.detailTag}>Subgrupo: {cat.subgrupo}</span>}
-                              {cat.grade && <span className={styles.detailTag}>Grade: {cat.grade}</span>}
-                              {cat.colecao && <span className={styles.detailTag}>Coleção: {cat.colecao}</span>}
-                            </div>
-                          </>
-                        );
-                      } else if (nivelAtual === 1 && isCardExpandido) {
-                        // Nível 1: clicar expande para nível 2 (mostrar coleção) do subgrupo específico
-                        return (
-                          <>
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setCategoriaExpansao(prev => {
-                                  const novo = new Map(prev);
-                                  // Salvar o subgrupo e grade selecionados para filtrar as coleções
-                                  novo.set(cat.categoria, {
-                                    nivel: 2,
-                                    subgrupoSelecionado: cat.subgrupo,
-                                    gradeSelecionado: cat.grade,
-                                  });
-                                  return novo;
-                                });
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
-                              }}
-                              className={styles.categoriaName}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
-                            >
-                              {cat.categoria}
-                            </button>
-                            {/* Mostrar detalhes: linha, subgrupo, grade (sem coleção) */}
-                            <div className={styles.categoriaDetails}>
-                              {cat.linha && <span className={styles.detailTag}>Linha: {cat.linha}</span>}
-                              {cat.subgrupo && <span className={styles.detailTag}>Subgrupo: {cat.subgrupo}</span>}
-                              {cat.grade && <span className={styles.detailTag}>Grade: {cat.grade}</span>}
-                            </div>
-                          </>
-                        );
-                      } else {
-                        // Nível 0: clicar expande para nível 1
-                        return (
-                          <>
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setCategoriaExpansao(prev => {
-                                  const novo = new Map(prev);
-                                  novo.set(cat.categoria, { nivel: 1 });
-                                  return novo;
-                                });
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
-                              }}
-                              className={styles.categoriaName}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
-                            >
-                              {cat.categoria}
-                            </button>
-                          </>
-                        );
-                      }
+                      // Nível 0: clicar expande para nível 1 (mostrar subgrupos)
+                      return (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setCategoriaExpansao(prev => {
+                                const novo = new Map(prev);
+                                novo.set(cat.categoria, { nivel: 1 });
+                                return novo;
+                              });
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            className={styles.categoriaName}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
+                          >
+                            {cat.categoria}
+                          </button>
+                        </>
+                      );
                     }
                   })()}
                 </div>
