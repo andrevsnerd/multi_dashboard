@@ -2685,28 +2685,96 @@ export async function fetchVendasPorCategoriaGiro({
               : `, ISNULL(p.SUBGRUPO_PRODUTO, ''), ISNULL(CONVERT(VARCHAR, p.GRADE), ''), ISNULL(p.COLECAO, '')`))
       : '';
 
-    // Buscar vendas de varejo
+    // Buscar vendas de varejo usando a tabela bruta LOJA_VENDA_PRODUTO
+    // Seguindo a mesma lógica do exportar_todos_relatorios.py para garantir consistência
+    // Ajustar o filtro de filial: buildVendasFilialFilter gera "vp.FILIAL" mas a tabela bruta não tem essa coluna
+    // Precisamos usar "f.FILIAL" (nome da filial) após o JOIN com FILIAIS
+    const vendasFilialFilterAjustado = vendasFilialFilter.replace(/vp\.FILIAL/g, 'f.FILIAL');
+    
     const queryVarejo = `
+      WITH VendasBase AS (
+        SELECT 
+          vp.TICKET,
+          vp.CODIGO_FILIAL,
+          vp.DATA_VENDA,
+          vp.PRODUTO,
+          vp.COR_PRODUTO,
+          vp.TAMANHO,
+          vp.QTDE,
+          vp.QTDE_CANCELADA,
+          f.FILIAL,
+          p.GRUPO_PRODUTO,
+          p.SUBGRUPO_PRODUTO,
+          p.LINHA,
+          p.COLECAO,
+          p.GRADE,
+          p.GRIFFE
+        FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+          ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL 
+          AND v.TICKET = vp.TICKET
+        LEFT JOIN FILIAIS f WITH (NOLOCK)
+          ON f.COD_FILIAL = vp.CODIGO_FILIAL
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) 
+          ON p.PRODUTO = vp.PRODUTO
+        WHERE vp.DATA_VENDA >= @periodoStart
+          AND vp.DATA_VENDA < @periodoEnd
+          AND vp.QTDE > 0
+          ${vendasFilialFilterAjustado}
+          ${grupoFilter}
+          ${linhaFilter}
+          ${colecaoFilter}
+          ${subgrupoFilter}
+          ${gradeFilter}
+          ${exclusionFilter}
+      ),
+      TrocasItem AS (
+        SELECT 
+          vt.TICKET,
+          vt.CODIGO_FILIAL,
+          vt.PRODUTO,
+          vt.COR_PRODUTO,
+          vt.TAMANHO,
+          SUM(vt.QTDE) AS QTDE_TROCA
+        FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+        WHERE vt.QTDE_CANCELADA = 0
+        GROUP BY vt.TICKET, vt.CODIGO_FILIAL, vt.PRODUTO, vt.COR_PRODUTO, vt.TAMANHO
+      ),
+      VendasComNumero AS (
+        SELECT 
+          vb.*,
+          ROW_NUMBER() OVER (
+            PARTITION BY vb.TICKET, vb.CODIGO_FILIAL, vb.PRODUTO, vb.COR_PRODUTO, vb.TAMANHO
+            ORDER BY vb.TICKET, vb.CODIGO_FILIAL, vb.PRODUTO, vb.COR_PRODUTO, vb.TAMANHO
+          ) AS RN
+        FROM VendasBase vb
+      ),
+      VendasComTrocas AS (
+        SELECT 
+          vcn.*,
+          CASE WHEN vcn.RN = 1 THEN ISNULL(ti.QTDE_TROCA, 0) ELSE 0 END AS QTDE_TROCA
+        FROM VendasComNumero vcn
+        LEFT JOIN TrocasItem ti ON ti.TICKET = vcn.TICKET 
+          AND ti.CODIGO_FILIAL = vcn.CODIGO_FILIAL
+          AND ti.PRODUTO = vcn.PRODUTO
+          AND ISNULL(ti.COR_PRODUTO, '') = ISNULL(vcn.COR_PRODUTO, '')
+          AND ISNULL(ti.TAMANHO, 0) = ISNULL(vcn.TAMANHO, 0)
+      )
       SELECT 
-        ${categoriaField} AS categoria${camposAdicionais},
-        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
-      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-      WHERE vp.DATA_VENDA >= @periodoStart
-        AND vp.DATA_VENDA < @periodoEnd
-        AND vp.QTDE > 0
-        ${vendasFilialFilter}
-        ${grupoFilter}
-        ${linhaFilter}
-        ${colecaoFilter}
-        ${subgrupoFilter}
-        ${gradeFilter}
-        ${exclusionFilter}
-        AND ${categoriaField} <> ''
-        AND ${categoriaField} <> 'SEM GRUPO'
-        AND ${categoriaField} <> 'SEM LINHA'
-      GROUP BY ${categoriaField}${groupByAdicional}
-      HAVING SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) > 0
+        ${company === 'nerd' ? 'ISNULL(vct.GRUPO_PRODUTO, \'SEM GRUPO\')' : 'ISNULL(vct.LINHA, \'SEM LINHA\')'} AS categoria${camposAdicionais.replace(/p\./g, 'vct.')},
+        SUM(CASE 
+          WHEN vct.QTDE_CANCELADA = 0 THEN (vct.QTDE - vct.QTDE_TROCA)
+          ELSE 0 
+        END) AS vendas
+      FROM VendasComTrocas vct
+      WHERE ${company === 'nerd' ? 'ISNULL(vct.GRUPO_PRODUTO, \'SEM GRUPO\')' : 'ISNULL(vct.LINHA, \'SEM LINHA\')'} <> ''
+        AND ${company === 'nerd' ? 'ISNULL(vct.GRUPO_PRODUTO, \'SEM GRUPO\')' : 'ISNULL(vct.LINHA, \'SEM LINHA\')'} <> 'SEM GRUPO'
+        AND ${company === 'nerd' ? 'ISNULL(vct.GRUPO_PRODUTO, \'SEM GRUPO\')' : 'ISNULL(vct.LINHA, \'SEM LINHA\')'} <> 'SEM LINHA'
+      GROUP BY ${company === 'nerd' ? 'ISNULL(vct.GRUPO_PRODUTO, \'SEM GRUPO\')' : 'ISNULL(vct.LINHA, \'SEM LINHA\')'}${groupByAdicional.replace(/p\./g, 'vct.')}
+      HAVING SUM(CASE 
+        WHEN vct.QTDE_CANCELADA = 0 THEN (vct.QTDE - vct.QTDE_TROCA)
+        ELSE 0 
+      END) > 0
     `;
 
     const resultVarejo = await request.query<{

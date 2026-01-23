@@ -4,7 +4,7 @@ import { fetchControleMovimentoKPIs } from '@/lib/repositories/controleMovimento
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const company = searchParams.get('company') ?? undefined;
+  const company = searchParams.get('company');
   const filial = searchParams.get('filial') || null;
 
   const startParam = searchParams.get('start');
@@ -20,6 +20,13 @@ export async function GET(request: Request) {
   const colecoes = searchParams.getAll('colecoes').filter(Boolean);
   const subgrupos = searchParams.getAll('subgrupos').filter(Boolean);
   const grades = searchParams.getAll('grades').filter(Boolean);
+
+  if (!company) {
+    return NextResponse.json(
+      { error: 'Parâmetro company é obrigatório' },
+      { status: 400 }
+    );
+  }
 
   try {
     const kpis = await fetchControleMovimentoKPIs({

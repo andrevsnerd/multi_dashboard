@@ -4,7 +4,7 @@ import { fetchMovimentoDetalhes } from '@/lib/repositories/controleMovimento';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const company = searchParams.get('company') ?? undefined;
+  const company = searchParams.get('company');
   const tipo = searchParams.get('tipo') as 'entradas' | 'vendidos' | 'parados' | null;
   const filial = searchParams.get('filial') || null;
   const startParam = searchParams.get('start');
@@ -17,9 +17,9 @@ export async function GET(request: Request) {
   const subgrupos = searchParams.getAll('subgrupos').filter(Boolean);
   const grades = searchParams.getAll('grades').filter(Boolean);
 
-  if (!tipo || !startParam || !endParam) {
+  if (!company || !tipo || !startParam || !endParam) {
     return NextResponse.json(
-      { error: 'Parâmetros tipo, start e end são obrigatórios' },
+      { error: 'Parâmetros company, tipo, start e end são obrigatórios' },
       { status: 400 }
     );
   }
