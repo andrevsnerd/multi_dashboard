@@ -1,0 +1,310 @@
+.wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.transferGroup {
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.header {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  padding: 20px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: white;
+}
+
+.originInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.originIcon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: white;
+}
+
+.originIcon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.originText {
+  display: flex;
+  flex-direction: column;
+}
+
+.originName {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.originLabel {
+  font-size: 14px;
+  opacity: 0.9;
+  margin-top: 2px;
+}
+
+.totalBox {
+  background-color: rgba(255, 255, 255, 0.15);
+  padding: 16px 24px;
+  border-radius: 8px;
+  text-align: center;
+  min-width: 140px;
+}
+
+.totalLabel {
+  font-size: 14px;
+  opacity: 0.9;
+  margin-bottom: 4px;
+}
+
+.totalValue {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #ffffff;
+}
+
+.table thead {
+  background-color: #f9fafb;
+}
+
+.table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.produtoHeader {
+  width: 140px;
+}
+
+.descricaoHeader {
+  width: auto;
+  min-width: 200px;
+}
+
+.corHeader {
+  width: 100px;
+}
+
+.destinoHeader {
+  width: 200px;
+}
+
+.quantidadeHeader {
+  width: 120px;
+  text-align: center;
+}
+
+.table tbody tr {
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.15s;
+}
+
+.table tbody tr:nth-child(even) {
+  background-color: #f9fafb;
+}
+
+.table tbody tr:nth-child(odd) {
+  background-color: #ffffff;
+}
+
+.table tbody tr:hover {
+  background-color: #f3f4f6;
+}
+
+.table td {
+  padding: 16px;
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.produtoCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.produtoIcon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.produtoIcon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.descricaoCell {
+  color: #374151;
+}
+
+.corCell {
+  padding: 8px 16px;
+}
+
+.corBadge {
+  display: inline-block;
+  padding: 4px 12px;
+  background-color: #f3f4f6;
+  border-radius: 12px;
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.destinoCell {
+  padding: 8px 16px;
+}
+
+.destinoBadge {
+  display: inline-block;
+  padding: 4px 12px;
+  background-color: #10b981;
+  color: white;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.quantidadeCell {
+  text-align: center;
+  padding: 8px 16px;
+}
+
+.quantidadeBadge {
+  display: inline-block;
+  padding: 4px 12px;
+  background-color: #3b82f6;
+  color: white;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: center;
+}
+
+.footer {
+  background-color: #f9fafb;
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #e5e7eb;
+}
+
+.footerLeft {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.footerRight {
+  font-size: 14px;
+  color: #1f2937;
+  font-weight: 500;
+}
+
+.footerTotal {
+  display: inline-block;
+  padding: 4px 12px;
+  background-color: #3b82f6;
+  color: white;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.loading,
+.empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: #6b7280;
+  font-size: 16px;
+}
+
+/* Responsividade */
+@media (max-width: 1024px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .totalBox {
+    width: 100%;
+  }
+
+  .table {
+    font-size: 12px;
+  }
+
+  .table th,
+  .table td {
+    padding: 12px 8px;
+  }
+}
+
+@media (max-width: 768px) {
+  .wrapper {
+    padding: 12px;
+  }
+
+  .originName {
+    font-size: 20px;
+  }
+
+  .totalValue {
+    font-size: 24px;
+  }
+
+  .table {
+    font-size: 11px;
+  }
+
+  .table th,
+  .table td {
+    padding: 8px 4px;
+  }
+
+  .produtoHeader,
+  .descricaoHeader,
+  .corHeader,
+  .destinoHeader,
+  .quantidadeHeader {
+    font-size: 10px;
+  }
+}
