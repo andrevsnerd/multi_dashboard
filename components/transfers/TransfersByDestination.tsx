@@ -172,7 +172,7 @@ export default function TransfersByDestination({
 
       <div className={styles.destinationsList}>
         {transfersByDestination.map((group) => {
-          const destinoDisplayName = company.filialDisplayNames?.[group.destino] || group.destino;
+          const destinoDisplayName = company?.filialDisplayNames?.[group.destino] || group.destino;
 
           return (
             <div key={group.destino} className={styles.destinationGroup}>
@@ -214,7 +214,7 @@ export default function TransfersByDestination({
                   </thead>
                   <tbody>
                     {group.items.map((transfer, index) => {
-                      const origemDisplayName = company.filialDisplayNames?.[transfer.origem] || transfer.origem;
+                      const origemDisplayName = company?.filialDisplayNames?.[transfer.origem] || transfer.origem;
                       
                       return (
                         <tr key={`${transfer.produto}-${transfer.cor}-${transfer.origem}-${index}`}>
