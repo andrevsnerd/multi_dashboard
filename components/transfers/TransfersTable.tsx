@@ -23,6 +23,22 @@ interface TransferItem {
   destino: string;
   quantidade: number;
   itemOriginal: StockByFilialItem; // Dados originais do produto
+  // Informações detalhadas para o relatório
+  motivoDetalhado?: {
+    prioridadeDestino: number;
+    motivoPrioridadeDestino: string;
+    motivoOrigem: string;
+    estoqueOrigemAntes: number;
+    estoqueOrigemDepois: number;
+    estoqueDestinoAntes: number;
+    estoqueDestinoDepois: number;
+    quantidadeNecessaria: number;
+    quantidadeFaltante: number;
+    quantidadeJaTransferida: number;
+    motivoQuantidade: string;
+    outrasOrigensConsideradas: string[];
+    outrasDestinosConsiderados: string[];
+  };
 }
 
 interface TransferByOrigin {
@@ -115,8 +131,9 @@ function organizeFiliais(
 
 /**
  * Calcula as transferências necessárias
+ * Exportada para uso no componente de relatório
  */
-function calculateTransfers(
+export function calculateTransfers(
   data: StockByFilialItem[],
   companyKey: CompanyKey,
   dateRange?: DateRangeValue
@@ -145,12 +162,16 @@ function calculateTransfers(
       return;
     }
 
-    // Verificar se há estoque suficiente para transferir
-    // Estoque total >= (número de filiais sem matriz) × 2 E alguma filial com vendas tem estoque < 1
+    // Verificar se há necessidade de transferir
+    // Se alguma filial com vendas tem estoque < 1 E há estoque disponível em outras filiais
     const filiaisComVendas = item.filiais.filter(f => f.sales > 0);
     const algumaFilialComEstoqueBaixo = filiaisComVendas.some(f => f.stock < 1);
+    
+    // Verificar se há estoque disponível (pelo menos 1 unidade em alguma filial)
+    const temEstoqueDisponivel = item.filiais.some(f => f.stock >= 1);
 
-    if (!(totalEstoque >= (filiaisCount * 2) && algumaFilialComEstoqueBaixo)) {
+    // Se não há loja precisando OU não há estoque disponível, pular
+    if (!algumaFilialComEstoqueBaixo || !temEstoqueDisponivel) {
       return;
     }
 
@@ -178,9 +199,23 @@ function calculateTransfers(
       return;
     }
 
-    // Identificar filiais com estoque disponível (estoque >= 2)
+    // Identificar filiais com estoque disponível
+    // Matriz sempre pode transferir (mesmo com 1 unidade, pois não vende)
+    // Se a filial também tem vendas, precisa ter pelo menos 2 para poder transferir 1
+    // Se não tem vendas (loja parada), pode transferir mesmo tendo apenas 1
     const filiaisComEstoque = item.filiais
-      .filter(f => f.stock >= 2)
+      .filter(f => {
+        // Matriz sempre pode transferir (mesmo com 1 unidade)
+        if (f.filial === matriz) {
+          return f.stock >= 1;
+        }
+        // Se tem vendas, precisa ter pelo menos 2 para transferir (deixar 1)
+        if (f.sales > 0) {
+          return f.stock >= 2;
+        }
+        // Se não tem vendas (loja parada), pode transferir mesmo tendo apenas 1
+        return f.stock >= 1;
+      })
       .map(f => ({
         filial: f.filial,
         stock: f.stock,
@@ -229,19 +264,58 @@ function calculateTransfers(
     const daysInPeriod = dateRange ? 
       Math.max(1, Math.ceil((new Date(dateRange.endDate).getTime() - new Date(dateRange.startDate).getTime()) / (1000 * 60 * 60 * 24))) : 30;
 
+    // Se há múltiplas lojas precisando, calcular distribuição proporcional
+    // A distribuição deve considerar TODAS as lojas que vendem (incluindo origens)
+    const totalVendasDestinos = filiaisQuePrecisam.reduce((sum, f) => sum + f.sales, 0);
+    
+    // Calcular total de vendas de TODAS as lojas (destinos + origens que vendem)
+    const totalVendasTodasLojas = item.filiais
+      .filter(f => f.sales > 0)
+      .reduce((sum, f) => sum + f.sales, 0);
+    
+    const temMultiplasLojas = filiaisQuePrecisam.length > 1;
+    
+    // Calcular estoque total disponível (soma de todas as origens)
+    let estoqueTotalDisponivel = 0;
+    filiaisComEstoque.forEach(f => {
+      estoqueTotalDisponivel += f.stock;
+    });
+    
+    // Se há múltiplas lojas, usar distribuição proporcional baseada nas vendas
+    // A distribuição considera TODAS as lojas que vendem (origens também participam)
+    const usarDistribuicaoProporcional = temMultiplasLojas;
+
     filiaisQuePrecisam.forEach((filialDestino) => {
       // Chave única para rastrear transferências já feitas para este destino
       const destinoKey = `${item.produto}|${item.cor}|${filialDestino.filial}`;
       const quantidadeJaTransferida = quantidadeTransferidaPorDestino.get(destinoKey) || 0;
 
       // Calcular necessidade da filial destino
-      const vendaDiariaDestino = filialDestino.sales / daysInPeriod;
-      const estoqueMinimoDestino = Math.max(15, vendaDiariaDestino * 15);
-      const estoqueIdealDestino = Math.max(20, vendaDiariaDestino * 25);
-      const estoqueAtualDestino = filialDestino.stock;
+      let quantidadeTotalNecessaria: number;
       
-      // Calcular quantidade total necessária
-      const quantidadeTotalNecessaria = Math.max(estoqueMinimoDestino - estoqueAtualDestino, 2);
+      if (usarDistribuicaoProporcional) {
+        // Distribuição proporcional baseada nas vendas de TODAS as lojas (incluindo origens)
+        // A distribuição respeita a hierarquia: quem vende mais, recebe mais proporcionalmente
+        // 
+        // Primeiro, calcular quanto cada loja (incluindo origens) deveria ter proporcionalmente
+        // Depois, calcular quanto esta loja destino precisa receber
+        
+        // Proporção desta loja destino = vendas desta loja / total de vendas de todas as lojas
+        const proporcaoDestino = filialDestino.sales / totalVendasTodasLojas;
+        
+        // Quantidade que esta loja destino deveria ter = proporção × estoque total disponível
+        const quantidadeIdealDestino = Math.floor(estoqueTotalDisponivel * proporcaoDestino);
+        
+        // Quantidade necessária = quantidade ideal - estoque atual
+        // Garantir mínimo de 1 unidade se necessário
+        quantidadeTotalNecessaria = Math.max(1, quantidadeIdealDestino - filialDestino.stock);
+      } else {
+        // Lógica normal: enviar pelo menos o equivalente às vendas do período
+        // Estoque mínimo = vendas do período (ou mínimo de 2 unidades)
+        const estoqueMinimoFinal = Math.max(2, filialDestino.sales);
+        const estoqueAtualDestino = filialDestino.stock;
+        quantidadeTotalNecessaria = Math.max(estoqueMinimoFinal - estoqueAtualDestino, 2);
+      }
       
       // Verificar se já foi transferida quantidade suficiente
       // Se já foi transferido pelo menos o mínimo necessário, pular esta loja
@@ -263,9 +337,11 @@ function calculateTransfers(
       let melhorOrigem: typeof filiaisComEstoque[0] | null = null;
       
       // 1. Primeiro, verificar se matriz tem estoque disponível
+      // Matriz sempre prioridade, mesmo com apenas 1 unidade (não vende, serve só para abastecer)
       const matrizDisponivel = filiaisComEstoque.find(f => {
         const disponivel = estoqueDisponivelPorOrigem.get(f.filial) || 0;
-        return f.filial === matriz && disponivel >= 2;
+        // Matriz pode transferir mesmo tendo apenas 1 unidade
+        return f.filial === matriz && disponivel >= 1;
       });
       
       if (matrizDisponivel) {
@@ -274,7 +350,8 @@ function calculateTransfers(
         // 2. Depois, tentar encontrar lojas paradas ou e-commerce parado
         const lojasParadasOuEcommerceParado = filiaisComEstoque.filter(f => {
           const disponivel = estoqueDisponivelPorOrigem.get(f.filial) || 0;
-          return (f.isParada || f.isEcommerceParado) && disponivel >= 2;
+          // Lojas paradas podem transferir mesmo tendo apenas 1 unidade
+          return (f.isParada || f.isEcommerceParado) && disponivel >= 1;
         });
         
         if (lojasParadasOuEcommerceParado.length > 0) {
@@ -289,7 +366,9 @@ function calculateTransfers(
           // 3. Por último, usar outras filiais com estoque
           melhorOrigem = filiaisComEstoque.find(f => {
             const disponivel = estoqueDisponivelPorOrigem.get(f.filial) || 0;
-            return disponivel >= 2;
+            // Se também vende, precisa ter pelo menos 2, senão pode ter apenas 1
+            const minimoNecessario = f.sales > 0 ? 2 : 1;
+            return disponivel >= minimoNecessario;
           }) || null;
         }
       }
@@ -300,21 +379,37 @@ function calculateTransfers(
 
       const estoqueOrigem = estoqueDisponivelPorOrigem.get(melhorOrigem.filial) || 0;
 
-      // Calcular quantidade a transferir (só o que falta, não mais que o necessário)
-      let quantidade = Math.min(quantidadeFaltante, estoqueOrigem - 1);
+      // Calcular quantidade a transferir
+      // Matriz pode transferir tudo (não vende, serve só para abastecer)
+      // Se a origem também vende, deixar pelo menos 1 unidade
+      // Se a origem não vende (loja parada), pode transferir tudo se necessário
+      let estoqueMinimoNaOrigem = 0;
+      if (melhorOrigem.filial === matriz) {
+        // Matriz pode transferir tudo (não vende)
+        estoqueMinimoNaOrigem = 0;
+      } else if (melhorOrigem.sales > 0) {
+        // Lojas que vendem deixam pelo menos 1
+        estoqueMinimoNaOrigem = 1;
+      } else {
+        // Lojas paradas podem transferir tudo
+        estoqueMinimoNaOrigem = 0;
+      }
+      
+      let quantidade = Math.min(quantidadeFaltante, estoqueOrigem - estoqueMinimoNaOrigem);
 
-      // Se a origem também tem vendas, não zerar completamente
-      // Deixar pelo menos estoque mínimo para a origem
-      if (melhorOrigem.sales > 0) {
-        const vendaDiariaOrigem = melhorOrigem.sales / daysInPeriod;
-        const estoqueMinimoOrigem = Math.max(15, vendaDiariaOrigem * 15);
-        const estoqueAtualOrigem = melhorOrigem.stock;
-        const estoqueAposTransferencia = estoqueAtualOrigem - quantidade;
-        
-        // Se após transferência ficar abaixo do mínimo, ajustar quantidade
-        if (estoqueAposTransferencia < estoqueMinimoOrigem) {
-          quantidade = Math.max(1, estoqueAtualOrigem - estoqueMinimoOrigem);
+      // Se há distribuição proporcional, não proteger tanto a origem que vende
+      // A distribuição proporcional já garante justiça entre as lojas
+      if (usarDistribuicaoProporcional) {
+        // Na distribuição proporcional, apenas garantir que não zere completamente
+        // Lojas que vendem deixam pelo menos 1 unidade
+        if (melhorOrigem.sales > 0 && melhorOrigem.filial !== matriz) {
+          quantidade = Math.min(quantidade, estoqueOrigem - 1);
         }
+        // Matriz e lojas paradas podem transferir tudo se necessário
+      } else if (melhorOrigem.sales > 0 && melhorOrigem.filial !== matriz) {
+        // Se é apenas uma loja precisando e origem também vende
+        // Deixar pelo menos 1 unidade na origem
+        quantidade = Math.min(quantidade, estoqueOrigem - 1);
       } else {
         // Se é loja parada ou e-commerce parado, só transferir o necessário
         // Só transferir tudo se a loja parada/e-commerce parado tiver poucas unidades (<= 5) e for obrigatório
@@ -332,6 +427,52 @@ function calculateTransfers(
         const origemDisplayName = company.filialDisplayNames?.[melhorOrigem.filial] || melhorOrigem.filial;
         const destinoDisplayName = company.filialDisplayNames?.[filialDestino.filial] || filialDestino.filial;
 
+        // Calcular prioridade do destino (posição na lista ordenada)
+        const prioridadeDestino = filiaisQuePrecisam.findIndex(f => f.filial === filialDestino.filial) + 1;
+        const motivoPrioridadeDestino = prioridadeDestino === 1 
+          ? `Primeira prioridade: vendeu ${filialDestino.sales} unidades (maior venda entre as lojas que precisam)`
+          : `Prioridade ${prioridadeDestino}: vendeu ${filialDestino.sales} unidades`;
+
+        // Motivo da origem
+        let motivoOrigem = "";
+        if (melhorOrigem.filial === matriz) {
+          motivoOrigem = `Matriz sempre tem prioridade como origem (não vende, serve unicamente para abastecer lojas). ${origemDisplayName} tem ${melhorOrigem.stock} unidades disponíveis.`;
+        } else if (melhorOrigem.isParada || melhorOrigem.isEcommerceParado) {
+          motivoOrigem = `Lojas paradas têm prioridade. ${origemDisplayName} tem ${melhorOrigem.stock} unidades paradas (sem vendas no período nem nos últimos 30 dias)`;
+        } else {
+          motivoOrigem = `${origemDisplayName} foi escolhida por ter estoque disponível (${melhorOrigem.stock} unidades)`;
+        }
+
+        // Motivo da quantidade
+        let motivoQuantidade = "";
+        if (usarDistribuicaoProporcional) {
+          const proporcao = ((filialDestino.sales / totalVendasTodasLojas) * 100).toFixed(1);
+          const quantidadeIdeal = Math.floor(estoqueTotalDisponivel * (filialDestino.sales / totalVendasTodasLojas));
+          motivoQuantidade = `Distribuição proporcional: ${filialDestino.sales} vendas de ${totalVendasTodasLojas} totais (${proporcao}%). Quantidade ideal: ${quantidadeIdeal} unidades. Respeita a hierarquia de vendas - lojas que vendem mais recebem mais proporcionalmente.`;
+        } else if (melhorOrigem.sales > 0) {
+          motivoQuantidade = `Quantidade limitada para manter estoque mínimo na origem (${melhorOrigem.sales} vendas no período). Origem ficará com ${Math.ceil(estoqueOrigem - quantidade)} unidades após transferência.`;
+        } else if (melhorOrigem.isParada || melhorOrigem.isEcommerceParado) {
+          if (melhorOrigem.stock <= 5) {
+            motivoQuantidade = `Lojas paradas com poucas unidades (≤5) podem transferir tudo se necessário. Transferindo ${Math.ceil(quantidade)} unidades.`;
+          } else {
+            motivoQuantidade = `Transferindo apenas o necessário (${Math.ceil(quantidade)} unidades) para não esvaziar completamente a loja parada. Origem ficará com ${Math.ceil(estoqueOrigem - quantidade)} unidades.`;
+          }
+        } else {
+          motivoQuantidade = `Transferindo ${Math.ceil(quantidade)} unidades (equivalente às vendas do período: ${filialDestino.sales} unidades).`;
+        }
+
+        // Outras origens consideradas
+        const outrasOrigensConsideradas = filiaisComEstoque
+          .filter(f => f.filial !== melhorOrigem.filial)
+          .slice(0, 3)
+          .map(f => company.filialDisplayNames?.[f.filial] || f.filial);
+
+        // Outras destinos considerados
+        const outrasDestinosConsiderados = filiaisQuePrecisam
+          .filter(f => f.filial !== filialDestino.filial)
+          .slice(0, 3)
+          .map(f => company.filialDisplayNames?.[f.filial] || f.filial);
+
         transfers.push({
           produto: item.produto,
           descricao: productInfo.name,
@@ -341,6 +482,21 @@ function calculateTransfers(
           destino: destinoDisplayName,
           quantidade: Math.ceil(quantidade),
           itemOriginal: item, // Guardar dados originais
+          motivoDetalhado: {
+            prioridadeDestino,
+            motivoPrioridadeDestino,
+            motivoOrigem,
+            estoqueOrigemAntes: melhorOrigem.stock,
+            estoqueOrigemDepois: Math.ceil(estoqueOrigem - quantidade),
+            estoqueDestinoAntes: filialDestino.stock,
+            estoqueDestinoDepois: Math.ceil(filialDestino.stock + quantidade),
+            quantidadeNecessaria: quantidadeTotalNecessaria,
+            quantidadeFaltante,
+            quantidadeJaTransferida,
+            motivoQuantidade,
+            outrasOrigensConsideradas,
+            outrasDestinosConsiderados,
+          },
         });
 
         // Atualizar estoque disponível na origem
@@ -348,7 +504,124 @@ function calculateTransfers(
         estoqueDisponivelPorOrigem.set(melhorOrigem.filial, novoEstoque);
 
         // Registrar quantidade transferida para este destino
-        quantidadeTransferidaPorDestino.set(destinoKey, quantidadeJaTransferida + quantidade);
+        let quantidadeTotalTransferida = quantidadeJaTransferida + quantidade;
+        quantidadeTransferidaPorDestino.set(destinoKey, quantidadeTotalTransferida);
+        
+        // Se ainda falta quantidade, tentar completar com outras origens
+        // Isso permite que múltiplas origens transfiram para a mesma loja destino
+        let quantidadeAindaFaltante = quantidadeTotalNecessaria - quantidadeTotalTransferida;
+        
+        while (quantidadeAindaFaltante > 0) {
+          // Buscar outras origens disponíveis (exceto a que já foi usada)
+          const outrasOrigensDisponiveis = filiaisComEstoque.filter(f => {
+            const disponivel = estoqueDisponivelPorOrigem.get(f.filial) || 0;
+            if (f.filial === melhorOrigem.filial) return false; // Já foi usada
+            
+            if (f.filial === matriz) {
+              return disponivel >= 1; // Matriz pode ter apenas 1
+            }
+            const minimoNecessario = f.sales > 0 ? 2 : 1;
+            return disponivel >= minimoNecessario;
+          });
+          
+          if (outrasOrigensDisponiveis.length === 0) break;
+          
+          // Ordenar por prioridade: matriz primeiro, depois lojas paradas, depois outras
+          outrasOrigensDisponiveis.sort((a, b) => {
+            if (a.filial === matriz) return -1;
+            if (b.filial === matriz) return 1;
+            const aIsParada = a.isParada || a.isEcommerceParado;
+            const bIsParada = b.isParada || b.isEcommerceParado;
+            if (aIsParada !== bIsParada) {
+              return aIsParada ? -1 : 1;
+            }
+            const estoqueA = estoqueDisponivelPorOrigem.get(a.filial) || 0;
+            const estoqueB = estoqueDisponivelPorOrigem.get(b.filial) || 0;
+            return bIsParada ? estoqueB - estoqueA : estoqueB - estoqueA;
+          });
+          
+          const outraOrigem = outrasOrigensDisponiveis[0];
+          const estoqueOutraOrigem = estoqueDisponivelPorOrigem.get(outraOrigem.filial) || 0;
+          
+          if (estoqueOutraOrigem <= 0) break;
+          
+          let estoqueMinimoOutraOrigem = 0;
+          if (outraOrigem.filial === matriz) {
+            estoqueMinimoOutraOrigem = 0; // Matriz pode transferir tudo
+          } else if (outraOrigem.sales > 0) {
+            estoqueMinimoOutraOrigem = 1; // Lojas que vendem deixam 1
+          }
+          
+          const quantidadeCompletar = Math.min(quantidadeAindaFaltante, estoqueOutraOrigem - estoqueMinimoOutraOrigem);
+          
+          if (quantidadeCompletar > 0) {
+            const origemDisplayNameCompletar = company.filialDisplayNames?.[outraOrigem.filial] || outraOrigem.filial;
+            
+            // Motivo da origem para completar
+            let motivoOrigemCompletar = "";
+            if (outraOrigem.filial === matriz) {
+              motivoOrigemCompletar = `Matriz sempre tem prioridade como origem (não vende, serve unicamente para abastecer lojas). ${origemDisplayNameCompletar} tem ${outraOrigem.stock} unidades disponíveis.`;
+            } else if (outraOrigem.isParada || outraOrigem.isEcommerceParado) {
+              motivoOrigemCompletar = `Lojas paradas têm prioridade. ${origemDisplayNameCompletar} tem ${outraOrigem.stock} unidades paradas (sem vendas no período nem nos últimos 30 dias)`;
+            } else {
+              motivoOrigemCompletar = `${origemDisplayNameCompletar} foi escolhida para completar a transferência (${outraOrigem.stock} unidades disponíveis)`;
+            }
+            
+            // Motivo da quantidade para completar
+            let motivoQuantidadeCompletar = "";
+            if (usarDistribuicaoProporcional) {
+              const proporcao = ((filialDestino.sales / totalVendasTodasLojas) * 100).toFixed(1);
+              motivoQuantidadeCompletar = `Distribuição proporcional: ${filialDestino.sales} vendas de ${totalVendasTodasLojas} totais (${proporcao}%). Completando transferência com ${quantidadeCompletar} unidades adicionais para atingir a quantidade proporcional.`;
+            } else {
+              motivoQuantidadeCompletar = `Completando transferência: ${quantidadeCompletar} unidades adicionais para atingir o necessário (${quantidadeTotalNecessaria} unidades totais).`;
+            }
+            
+            transfers.push({
+              produto: item.produto,
+              descricao: productInfo.name,
+              codigo: productInfo.code,
+              cor: item.cor,
+              origem: origemDisplayNameCompletar,
+              destino: destinoDisplayName,
+              quantidade: Math.ceil(quantidadeCompletar),
+              itemOriginal: item,
+              motivoDetalhado: {
+                prioridadeDestino,
+                motivoPrioridadeDestino,
+                motivoOrigem: motivoOrigemCompletar,
+                estoqueOrigemAntes: outraOrigem.stock,
+                estoqueOrigemDepois: Math.ceil(estoqueOutraOrigem - quantidadeCompletar),
+                estoqueDestinoAntes: filialDestino.stock + quantidadeTotalTransferida,
+                estoqueDestinoDepois: Math.ceil(filialDestino.stock + quantidadeTotalTransferida + quantidadeCompletar),
+                quantidadeNecessaria: quantidadeTotalNecessaria,
+                quantidadeFaltante: quantidadeAindaFaltante,
+                quantidadeJaTransferida: quantidadeTotalTransferida,
+                motivoQuantidade: motivoQuantidadeCompletar,
+                outrasOrigensConsideradas: [],
+                outrasDestinosConsiderados: filiaisQuePrecisam
+                  .filter(f => f.filial !== filialDestino.filial)
+                  .slice(0, 3)
+                  .map(f => company.filialDisplayNames?.[f.filial] || f.filial),
+              },
+            });
+            
+            // Atualizar estoque disponível
+            const novoEstoqueOutraOrigem = estoqueOutraOrigem - quantidadeCompletar;
+            estoqueDisponivelPorOrigem.set(outraOrigem.filial, novoEstoqueOutraOrigem);
+            
+            // Atualizar quantidade transferida
+            quantidadeTotalTransferida += quantidadeCompletar;
+            quantidadeTransferidaPorDestino.set(destinoKey, quantidadeTotalTransferida);
+            
+            // Recalcular quantidade faltante
+            quantidadeAindaFaltante = quantidadeTotalNecessaria - quantidadeTotalTransferida;
+            
+            // Se completou, sair do loop
+            if (quantidadeAindaFaltante <= 0) break;
+          } else {
+            break;
+          }
+        }
       }
     });
   });

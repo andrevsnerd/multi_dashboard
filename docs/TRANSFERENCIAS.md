@@ -28,20 +28,23 @@ Se totalVendas === 0 OU projecaoVendaMes === 0
 
 **Por quê?** Produtos sem vendas não precisam ser transferidos, pois não há demanda.
 
-### 2. Condição de estoque suficiente
+### 2. Condição básica de transferência
 ```typescript
-Se estoque total >= (número de filiais sem matriz) × 2
-  E alguma filial com vendas tem estoque < 1
+Se alguma filial com vendas tem estoque < 1
+  E há estoque disponível em outras filiais (≥ 1 unidade)
   → Produto pode ser transferido
 ```
 
 **Exemplo:**
-- 5 filiais (sem contar matriz)
-- Estoque total necessário: 5 × 2 = 10 unidades
-- Se o produto tem 10+ unidades E alguma loja vendendo está zerada
-- → Pode transferir
+- Loja A: vendeu 3 unidades, estoque 0
+- Loja B: vendeu 1 unidade, estoque 3 unidades
+- → **Pode transferir** (Loja B tem estoque disponível)
 
-**Por quê?** Garante que há estoque suficiente para distribuir sem esgotar completamente as origens.
+**Regras de estoque disponível:**
+- Se a loja origem **também vende**: precisa ter pelo menos **2 unidades** (para deixar 1)
+- Se a loja origem **não vende** (loja parada): pode transferir mesmo tendo apenas **1 unidade**
+
+**Por quê?** Não precisa de estoque excessivo. Se há estoque disponível e uma loja precisa, deve transferir. A única restrição é não zerar lojas que também vendem.
 
 ---
 
@@ -70,7 +73,8 @@ O sistema identifica quais filiais precisam receber estoque:
 O sistema identifica quais filiais podem ser origem das transferências:
 
 ### Critérios:
-- ✅ Estoque ≥ 2 (pode transferir pelo menos 1, deixando 1 na origem)
+- ✅ Se a filial **também vende**: Estoque ≥ 2 (pode transferir pelo menos 1, deixando 1 na origem)
+- ✅ Se a filial **não vende** (loja parada): Estoque ≥ 1 (pode transferir mesmo tendo apenas 1)
 
 ### Identificação de Lojas Paradas (Laranja):
 ```typescript
@@ -140,25 +144,48 @@ O sistema evita que múltiplas lojas transfiram o mesmo produto para a mesma loj
 
 Para cada filial destino, o sistema calcula quanto estoque ela precisa:
 
-### Fórmula:
+### Lógica Conservadora (Evita Estoques Excessivos):
+
+Como haverá transferências semanais regulares, o sistema não cria estoques muito grandes. A lógica é mais conservadora:
+
+#### Caso 1: Uma única loja precisa
 ```typescript
-vendaDiariaDestino = vendas no período / dias no período
-estoqueMinimoDestino = max(15, vendaDiariaDestino × 15)
-quantidadeNecessaria = max(estoqueMinimoDestino - estoqueAtual, 2)
+estoqueMinimo = max(2, vendas do período)
+quantidadeNecessaria = max(estoqueMinimo - estoqueAtual, 2)
 ```
 
-### Exemplo Prático:
+**Exemplo:**
+- LEBLON vendeu 5 unidades em 30 dias
+- Estoque atual: 0
+- Estoque mínimo = max(2, 5) = **5 unidades**
+- Quantidade necessária = max(5 - 0, 2) = **5 unidades**
+
+**Por quê?** Envia pelo menos o equivalente às vendas do período, já que haverá novas transferências semanais se necessário.
+
+#### Caso 2: Múltiplas lojas precisam (Distribuição Proporcional)
+
+Quando há múltiplas lojas precisando do mesmo produto, o sistema divide proporcionalmente baseado nas vendas de cada uma:
+
+```typescript
+totalVendas = soma de todas as vendas das lojas que precisam
+estoqueTotalDisponivel = soma do estoque de todas as origens
+proporcao = vendas desta loja / totalVendas
+quantidade = proporcao × estoqueTotalDisponivel
+```
+
+**Exemplo Prático:**
 
 **Cenário:**
-- LEBLON vendeu 30 unidades em 30 dias
-- Estoque atual: 0
+- Estoque disponível: 5 unidades
+- Loja A: vendeu 5 unidades
+- Loja B: vendeu 3 unidades
+- Total de vendas: 8 unidades
 
 **Cálculo:**
-1. Venda diária = 30 / 30 = **1 unidade/dia**
-2. Estoque mínimo = max(15, 1 × 15) = **15 unidades**
-3. Quantidade necessária = max(15 - 0, 2) = **15 unidades**
+1. Loja A: (5/8) × 5 = 3.125 → **3 unidades**
+2. Loja B: (3/8) × 5 = 1.875 → **2 unidades**
 
-**Por quê?** Garante estoque suficiente para 15 dias de vendas, com mínimo de 15 unidades ou 2 unidades (o que for maior).
+**Por quê?** Evita que uma loja fique com todo o estoque. Distribui de forma justa baseado nas vendas de cada loja.
 
 ---
 
@@ -168,8 +195,10 @@ O sistema escolhe a melhor filial para transferir de:
 
 ### Processo:
 
-1. **Verifica Matriz**
-   - Se matriz tem estoque ≥ 2 → **Usa matriz**
+1. **Verifica Matriz (Sempre Prioridade)**
+   - Matriz pode transferir mesmo tendo apenas **1 unidade**
+   - **Por quê?** Matriz não vende, serve unicamente para abastecer lojas
+   - Se matriz tem estoque ≥ 1 → **Usa matriz primeiro**
 
 2. **Se não houver matriz disponível**
    - Busca lojas paradas ou e-commerce parado
@@ -179,11 +208,22 @@ O sistema escolhe a melhor filial para transferir de:
 3. **Se não houver lojas paradas**
    - Usa outras filiais com estoque disponível
 
+### Múltiplas Origens para o Mesmo Destino:
+
+Se uma loja precisa de mais unidades do que uma origem pode fornecer, o sistema **completa com outras origens** seguindo a ordem de prioridade:
+
 **Exemplo:**
-- Matriz: 5 unidades disponíveis → **Escolhe matriz**
-- Se matriz não disponível:
-  - LEBLON (parada): 30 unidades → **Escolhe LEBLON**
-  - VILLA LOBOS (parada): 15 unidades → Não escolhe (LEBLON tem mais)
+- Loja precisa de **5 unidades**
+- Matriz tem **1 unidade** → Transfere 1 da matriz
+- Loja parada tem **4 unidades** → Transfere 4 da loja parada
+- **Resultado:** Loja recebe 5 unidades (1 da matriz + 4 da loja parada)
+
+**Ordem de completar:**
+1. Matriz (se ainda tiver estoque)
+2. Lojas paradas (maior estoque primeiro)
+3. Outras filiais
+
+**Por quê?** Garante que a loja receba a quantidade necessária, mesmo que precise vir de múltiplas origens.
 
 ---
 
@@ -198,24 +238,56 @@ quantidade = min(quantidadeFaltante, estoqueOrigem - 1)
 
 ### Regras Especiais:
 
-#### 1. Se a Origem também tem Vendas:
+#### 1. Distribuição Proporcional (Múltiplas Lojas):
+Quando há múltiplas lojas precisando do mesmo produto, o sistema divide proporcionalmente:
+
 ```typescript
-Se origem.vendas > 0:
-  - Calcula estoque mínimo da origem
-  - Se após transferência ficar abaixo do mínimo:
-    - Ajusta quantidade para não zerar origem
+Se múltiplas lojas precisam:
+  - Calcula proporção baseada nas vendas
+  - Divide estoque disponível proporcionalmente
+  - Garante mínimo de 1 unidade para cada loja
 ```
 
 **Exemplo:**
-- Origem: 20 unidades, vende 2/dia
-- Estoque mínimo origem: 30 unidades (2 × 15)
-- Quantidade necessária destino: 15 unidades
-- **Problema:** 20 - 15 = 5 (abaixo do mínimo de 30)
-- **Solução:** Transfere apenas 1 unidade (deixa 19 na origem)
+- Estoque disponível: 5 unidades
+- Loja A vendeu 5, Loja B vendeu 3
+- Loja A recebe: (5/8) × 5 = 3 unidades
+- Loja B recebe: (3/8) × 5 = 2 unidades
 
-**Por quê?** Protege lojas que também vendem, não as deixa sem estoque mínimo.
+**Por quê?** Evita que uma loja fique com todo o estoque, distribui de forma justa.
 
-#### 2. Se é Lojas Parada:
+#### 2. Se a Origem também tem Vendas:
+
+**Quando há distribuição proporcional (múltiplas lojas precisando):**
+- A distribuição proporcional já garante justiça
+- Lojas que vendem deixam apenas **1 unidade** (mínimo)
+- Não calcula estoque mínimo baseado em vendas da origem
+- **Por quê?** A distribuição proporcional prioriza as lojas que mais precisam, respeitando a hierarquia de vendas
+
+**Quando há apenas uma loja precisando:**
+- Lojas que vendem deixam pelo menos **1 unidade**
+- Transfere o necessário para a loja destino
+
+**Exemplo com distribuição proporcional:**
+- Loja 1 (origem): 20 unidades, vendeu 5
+- Loja 2 (destino): 0 unidades, vendeu 8 → **Prioridade 1**
+- Loja 3 (destino): 0 unidades, vendeu 4 → **Prioridade 2**
+- Estoque total disponível: 20 unidades
+- **Total vendas de TODAS as lojas:** 5 + 8 + 4 = 17 unidades
+
+**Distribuição proporcional (considerando TODAS as lojas):**
+- Loja 1 deveria ter: (5/17) × 20 = 5.88 → **6 unidades** (fica com 6)
+- Loja 2 deveria ter: (8/17) × 20 = 9.41 → **9 unidades** (recebe 9)
+- Loja 3 deveria ter: (4/17) × 20 = 4.71 → **5 unidades** (recebe 5)
+
+**Transferências:**
+- Loja 1 transfere: 20 - 6 = **14 unidades**
+- Loja 2 recebe: **9 unidades**
+- Loja 3 recebe: **5 unidades**
+
+**Por quê?** A distribuição considera TODAS as lojas que vendem (incluindo a origem). Quem vendeu mais recebe mais proporcionalmente. A loja 1 que vendeu 5 não fica com apenas 1 unidade, fica com 6 (proporcional às suas vendas).
+
+#### 3. Se é Lojas Parada:
 ```typescript
 Se origem é loja parada:
   - Normalmente: transfere só o necessário
@@ -385,40 +457,72 @@ Para cada filial de origem:
 
 ## 📚 Exemplo Completo
 
-### Cenário:
+### Exemplo 1: Uma Loja Precisa
 
 **Produto:** N5.16.0002 - PT BEEP HYDROGEL CLEAR (CLEAR)
 
 **Situação:**
 - MORUMBI: 25 unidades, sem vendas (parada)
-- LEBLON: 0 unidades, vendeu 12 unidades
-- VILLA LOBOS: 0 unidades, vendeu 8 unidades
-- CENTER NORTE: 5 unidades, vendeu 3 unidades
+- LEBLON: 0 unidades, vendeu 5 unidades
 
 ### Processo:
 
-1. **Filtros:** ✅ Produto tem vendas, estoque total (30) ≥ 4 (2 filiais × 2)
+1. **Filtros:** ✅ Produto tem vendas, estoque total (25) ≥ 4 (2 filiais × 2)
 
 2. **Lojas que precisam:**
-   - LEBLON: 12 vendas, estoque 0 → **Prioridade 1**
-   - VILLA LOBOS: 8 vendas, estoque 0 → **Prioridade 2**
+   - LEBLON: 5 vendas, estoque 0 → **Única loja que precisa**
 
 3. **Lojas com estoque:**
    - MORUMBI: 25 unidades, parada → **Prioridade 1** (loja parada)
-   - CENTER NORTE: 5 unidades, com vendas → **Prioridade 2**
 
 4. **Cálculo de necessidade:**
-   - LEBLON: 12 vendas / 30 dias = 0.4/dia → mínimo 15 → precisa 15
-   - VILLA LOBOS: 8 vendas / 30 dias = 0.27/dia → mínimo 15 → precisa 15
+   - LEBLON: vendeu 5 unidades → precisa de **5 unidades** (equivalente às vendas)
 
 5. **Transferências:**
-   - MORUMBI → LEBLON: 15 unidades
-   - MORUMBI → VILLA LOBOS: 10 unidades (restante disponível: 25 - 15 = 10)
+   - MORUMBI → LEBLON: 5 unidades
 
 6. **Resultado:**
-   - MORUMBI: 25 → 0 unidades (esvaziou, mas era parada)
-   - LEBLON: 0 → 15 unidades (recebeu)
-   - VILLA LOBOS: 0 → 10 unidades (recebeu parcialmente)
+   - MORUMBI: 25 → 20 unidades (ficou com 20)
+   - LEBLON: 0 → 5 unidades (recebeu equivalente às vendas)
+
+---
+
+### Exemplo 2: Múltiplas Lojas (Distribuição Proporcional)
+
+**Produto:** N5.16.0002 - PT BEEP HYDROGEL CLEAR (CLEAR)
+
+**Situação:**
+- MORUMBI: 5 unidades, sem vendas (parada)
+- LEBLON: 0 unidades, vendeu 5 unidades
+- VILLA LOBOS: 0 unidades, vendeu 3 unidades
+
+### Processo:
+
+1. **Filtros:** ✅ Produto tem vendas, estoque total (5) ≥ 4 (2 filiais × 2)
+
+2. **Lojas que precisam:**
+   - LEBLON: 5 vendas, estoque 0
+   - VILLA LOBOS: 3 vendas, estoque 0
+   - **Total de vendas:** 8 unidades
+
+3. **Lojas com estoque:**
+   - MORUMBI: 5 unidades, parada → **Prioridade 1** (loja parada)
+
+4. **Cálculo de necessidade (Distribuição Proporcional):**
+   - Estoque disponível: 5 unidades
+   - LEBLON: (5/8) × 5 = 3.125 → **3 unidades**
+   - VILLA LOBOS: (3/8) × 5 = 1.875 → **2 unidades**
+
+5. **Transferências:**
+   - MORUMBI → LEBLON: 3 unidades
+   - MORUMBI → VILLA LOBOS: 2 unidades
+
+6. **Resultado:**
+   - MORUMBI: 5 → 0 unidades (esvaziou)
+   - LEBLON: 0 → 3 unidades (recebeu proporcionalmente)
+   - VILLA LOBOS: 0 → 2 unidades (recebeu proporcionalmente)
+
+**Por quê distribuição proporcional?** Evita que LEBLON (que vendeu mais) fique com todas as 5 unidades, garantindo que VILLA LOBOS também receba uma parte justa.
 
 ---
 
@@ -429,5 +533,14 @@ A página de Transferências automatiza a redistribuição de estoque de forma i
 - Lojas paradas como origem
 - Proteção de estoque mínimo
 - Evitar desperdícios e duplicações
+- **Distribuição proporcional** quando múltiplas lojas precisam
+- **Lógica conservadora** para evitar estoques excessivos
 
-O sistema garante que cada loja receba exatamente o que precisa, quando precisa, maximizando as vendas e otimizando o estoque.
+### Princípios Fundamentais:
+
+1. **Conservadorismo:** Não cria estoques muito maiores que as vendas, já que haverá transferências semanais
+2. **Proporcionalidade:** Quando há múltiplas lojas, divide proporcionalmente baseado nas vendas
+3. **Justiça:** Evita que uma loja fique com todo o estoque disponível
+4. **Eficiência:** Transfere apenas o necessário, não tudo
+
+O sistema garante que cada loja receba exatamente o que precisa, quando precisa, maximizando as vendas e otimizando o estoque de forma justa e eficiente.

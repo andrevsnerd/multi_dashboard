@@ -6,6 +6,7 @@ import DateRangeFilter, {
   type DateRangeValue,
 } from "@/components/filters/DateRangeFilter";
 import TransfersTable from "@/components/transfers/TransfersTable";
+import TransfersReport from "@/components/transfers/TransfersReport";
 import type { StockByFilialItem } from "@/lib/repositories/stockByFilial";
 import { getCurrentMonthRange } from "@/lib/utils/date";
 import type { CompanyKey } from "@/lib/config/company";
@@ -63,6 +64,7 @@ export default function TransfersPage({
   const [data, setData] = useState<StockByFilialItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"table" | "report">("table");
 
   const rangeKey = useMemo(
     () =>
@@ -121,12 +123,38 @@ export default function TransfersPage({
         </div>
       </div>
 
-      <TransfersTable
-        companyKey={companyKey}
-        data={data}
-        loading={loading}
-        dateRange={range}
-      />
+      <div className={styles.tabs}>
+        <button
+          type="button"
+          className={`${styles.tab} ${activeTab === "table" ? styles.tabActive : ""}`}
+          onClick={() => setActiveTab("table")}
+        >
+          Lista de Transferências
+        </button>
+        <button
+          type="button"
+          className={`${styles.tab} ${activeTab === "report" ? styles.tabActive : ""}`}
+          onClick={() => setActiveTab("report")}
+        >
+          Relatório Detalhado
+        </button>
+      </div>
+
+      {activeTab === "table" ? (
+        <TransfersTable
+          companyKey={companyKey}
+          data={data}
+          loading={loading}
+          dateRange={range}
+        />
+      ) : (
+        <TransfersReport
+          companyKey={companyKey}
+          data={data}
+          loading={loading}
+          dateRange={range}
+        />
+      )}
     </div>
   );
 }
