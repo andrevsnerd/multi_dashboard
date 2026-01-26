@@ -312,9 +312,9 @@ export default function ControleEstoquePage({
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
   const [periodType, setPeriodType] = useState<"semanal" | "mensal">("semanal");
   const [selectedCategorias, setSelectedCategorias] = useState<Set<string>>(new Set());
-  // Estado para controlar expansão: Map<categoria, { nivel: number, subgrupoSelecionado?: string }>
+  // Estado para controlar expansão: Map<categoria, { nivel: number, subgrupoSelecionado?: string, gradeSelecionado?: string }>
   // nível 0 = categoria, 1 = subgrupos, 2 = grades do subgrupo selecionado
-  const [categoriaExpansao, setCategoriaExpansao] = useState<Map<string, { nivel: number; subgrupoSelecionado?: string }>>(new Map());
+  const [categoriaExpansao, setCategoriaExpansao] = useState<Map<string, { nivel: number; subgrupoSelecionado?: string; gradeSelecionado?: string }>>(new Map());
 
   const [availableGrupos, setAvailableGrupos] = useState<string[]>([]);
   const [availableLinhas, setAvailableLinhas] = useState<string[]>([]);
