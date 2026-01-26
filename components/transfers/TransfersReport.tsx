@@ -57,9 +57,6 @@ export default function TransfersReport({
     <div className={styles.wrapper}>
       <div className={styles.header}>
         <h2 className={styles.title}>Relatório Detalhado de Transferências</h2>
-        <p className={styles.subtitle}>
-          Explicação detalhada do motivo de cada transferência
-        </p>
       </div>
 
       <div className={styles.transfersList}>
@@ -70,34 +67,104 @@ export default function TransfersReport({
 
           return (
             <div key={`${transfer.produto}-${transfer.cor}-${transfer.destino}-${index}`} className={styles.transferCard}>
+              {/* Header compacto com produto e transferência */}
               <div className={styles.cardHeader}>
                 <div className={styles.productInfo}>
-                  <div className={styles.productCode}>{transfer.codigo}</div>
-                  <div className={styles.productName}>{transfer.descricao}</div>
-                  <div className={styles.productColor}>{transfer.cor}</div>
+                  <span className={styles.productCode}>{transfer.codigo}</span>
+                  <span className={styles.productName}>{transfer.descricao}</span>
+                  <span className={styles.productColor}>{transfer.cor}</span>
                 </div>
-                <div className={styles.transferArrow}>
-                  <div className={styles.originBadge}>{transfer.origem}</div>
-                  <div className={styles.arrow}>→</div>
-                  <div className={styles.destinyBadge}>{transfer.destino}</div>
-                  <div className={styles.quantityBadge}>{transfer.quantidade} unidades</div>
+                <div className={styles.transferFlow}>
+                  <span className={styles.originBadge}>{transfer.origem}</span>
+                  <span className={styles.arrow}>→</span>
+                  <span className={styles.destinyBadge}>{transfer.destino}</span>
+                  <span className={styles.quantityBadge}>{transfer.quantidade} un</span>
                 </div>
               </div>
 
+              {/* Conteúdo em layout horizontal compacto */}
               <div className={styles.cardContent}>
-                <div className={styles.section}>
-                  <div className={styles.sectionTitle}>
-                    <span className={styles.icon}>🎯</span>
-                    Prioridade do Destino
-                  </div>
-                  <div className={styles.sectionContent}>
-                    <div className={styles.priorityBadge}>
-                      Prioridade #{motivo.prioridadeDestino}
+                {/* Linha 1: Prioridade e Origem lado a lado */}
+                <div className={styles.infoRow}>
+                  <div className={styles.infoItem}>
+                    <div className={styles.infoLabel}>🎯 Prioridade</div>
+                    <div className={styles.infoValue}>
+                      <span className={styles.priorityBadge}>#{motivo.prioridadeDestino}</span>
+                      <span className={styles.infoText}>{motivo.motivoPrioridadeDestino}</span>
                     </div>
-                    <p className={styles.explanation}>{motivo.motivoPrioridadeDestino}</p>
+                  </div>
+                  <div className={styles.infoItem}>
+                    <div className={styles.infoLabel}>📦 Origem</div>
+                    <div className={styles.infoValue}>
+                      <span className={styles.infoText}>{motivo.motivoOrigem}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Linha 2: Quantidades em formato compacto */}
+                <div className={styles.quantityRow}>
+                  <div className={styles.quantityItem}>
+                    <span className={styles.quantityLabel}>Necessária:</span>
+                    <span className={styles.quantityValue}>{motivo.quantidadeNecessaria}</span>
+                  </div>
+                  {motivo.quantidadeJaTransferida > 0 && (
+                    <div className={styles.quantityItem}>
+                      <span className={styles.quantityLabel}>Já transferido:</span>
+                      <span className={styles.quantityValue}>{motivo.quantidadeJaTransferida}</span>
+                    </div>
+                  )}
+                  <div className={styles.quantityItem}>
+                    <span className={styles.quantityLabel}>Faltante:</span>
+                    <span className={styles.quantityValue}>{motivo.quantidadeFaltante}</span>
+                  </div>
+                  <div className={styles.quantityItem}>
+                    <span className={styles.quantityLabel}>A transferir:</span>
+                    <span className={styles.quantityValueHighlight}>{transfer.quantidade}</span>
+                  </div>
+                </div>
+
+                {/* Linha 3: Estoque antes/depois lado a lado */}
+                <div className={styles.stockRow}>
+                  <div className={styles.stockItem}>
+                    <div className={styles.stockHeader}>Origem ({transfer.origem})</div>
+                    <div className={styles.stockValues}>
+                      <span className={styles.stockBefore}>{motivo.estoqueOrigemAntes}</span>
+                      <span className={styles.arrow}>→</span>
+                      <span className={styles.stockAfter}>{motivo.estoqueOrigemDepois}</span>
+                      <span className={styles.stockChange}>
+                        {motivo.estoqueOrigemDepois < motivo.estoqueOrigemAntes 
+                          ? `-${motivo.estoqueOrigemAntes - motivo.estoqueOrigemDepois}` 
+                          : '0'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className={styles.stockItem}>
+                    <div className={styles.stockHeader}>Destino ({transfer.destino})</div>
+                    <div className={styles.stockValues}>
+                      <span className={styles.stockBefore}>{motivo.estoqueDestinoAntes}</span>
+                      <span className={styles.arrow}>→</span>
+                      <span className={styles.stockAfter}>{motivo.estoqueDestinoDepois}</span>
+                      <span className={styles.stockChange}>
+                        {motivo.estoqueDestinoDepois > motivo.estoqueDestinoAntes 
+                          ? `+${motivo.estoqueDestinoDepois - motivo.estoqueDestinoAntes}` 
+                          : '0'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Motivo da quantidade */}
+                <div className={styles.explanationRow}>
+                  <span className={styles.explanationLabel}>💡 Motivo:</span>
+                  <span className={styles.explanationText}>{motivo.motivoQuantidade}</span>
+                </div>
+
+                {/* Outras opções se houver */}
+                {(motivo.outrasDestinosConsiderados.length > 0 || motivo.outrasOrigensConsideradas.length > 0) && (
+                  <div className={styles.otherOptionsRow}>
                     {motivo.outrasDestinosConsiderados.length > 0 && (
-                      <div className={styles.otherOptions}>
-                        <span className={styles.otherLabel}>Outras lojas que também precisam:</span>
+                      <div className={styles.otherItem}>
+                        <span className={styles.otherLabel}>Outras lojas:</span>
                         <div className={styles.otherTags}>
                           {motivo.outrasDestinosConsiderados.map((dest, i) => (
                             <span key={i} className={styles.otherTag}>{dest}</span>
@@ -105,19 +172,9 @@ export default function TransfersReport({
                         </div>
                       </div>
                     )}
-                  </div>
-                </div>
-
-                <div className={styles.section}>
-                  <div className={styles.sectionTitle}>
-                    <span className={styles.icon}>📦</span>
-                    Origem da Transferência
-                  </div>
-                  <div className={styles.sectionContent}>
-                    <p className={styles.explanation}>{motivo.motivoOrigem}</p>
                     {motivo.outrasOrigensConsideradas.length > 0 && (
-                      <div className={styles.otherOptions}>
-                        <span className={styles.otherLabel}>Outras origens consideradas:</span>
+                      <div className={styles.otherItem}>
+                        <span className={styles.otherLabel}>Outras origens:</span>
                         <div className={styles.otherTags}>
                           {motivo.outrasOrigensConsideradas.map((orig, i) => (
                             <span key={i} className={styles.otherTag}>{orig}</span>
@@ -126,95 +183,7 @@ export default function TransfersReport({
                       </div>
                     )}
                   </div>
-                </div>
-
-                <div className={styles.section}>
-                  <div className={styles.sectionTitle}>
-                    <span className={styles.icon}>🔢</span>
-                    Quantidade Transferida
-                  </div>
-                  <div className={styles.sectionContent}>
-                    <div className={styles.quantityDetails}>
-                      <div className={styles.quantityRow}>
-                        <span className={styles.quantityLabel}>Quantidade necessária:</span>
-                        <span className={styles.quantityValue}>{motivo.quantidadeNecessaria} unidades</span>
-                      </div>
-                      {motivo.quantidadeJaTransferida > 0 && (
-                        <div className={styles.quantityRow}>
-                          <span className={styles.quantityLabel}>Já transferido anteriormente:</span>
-                          <span className={styles.quantityValue}>{motivo.quantidadeJaTransferida} unidades</span>
-                        </div>
-                      )}
-                      <div className={styles.quantityRow}>
-                        <span className={styles.quantityLabel}>Quantidade faltante:</span>
-                        <span className={styles.quantityValue}>{motivo.quantidadeFaltante} unidades</span>
-                      </div>
-                      <div className={styles.quantityRow}>
-                        <span className={styles.quantityLabel}>Quantidade a transferir:</span>
-                        <span className={styles.quantityValueHighlight}>{transfer.quantidade} unidades</span>
-                      </div>
-                    </div>
-                    <p className={styles.explanation}>{motivo.motivoQuantidade}</p>
-                  </div>
-                </div>
-
-                <div className={styles.section}>
-                  <div className={styles.sectionTitle}>
-                    <span className={styles.icon}>📊</span>
-                    Estoque Antes e Depois
-                  </div>
-                  <div className={styles.sectionContent}>
-                    <div className={styles.stockComparison}>
-                      <div className={styles.stockBox}>
-                        <div className={styles.stockLabel}>Origem ({transfer.origem})</div>
-                        <div className={styles.stockValues}>
-                          <div className={styles.stockBefore}>
-                            <span className={styles.stockLabelSmall}>Antes:</span>
-                            <span className={styles.stockNumber}>{motivo.estoqueOrigemAntes}</span>
-                          </div>
-                          <div className={styles.stockArrow}>→</div>
-                          <div className={styles.stockAfter}>
-                            <span className={styles.stockLabelSmall}>Depois:</span>
-                            <span className={styles.stockNumber}>{motivo.estoqueOrigemDepois}</span>
-                          </div>
-                        </div>
-                        <div className={styles.stockDifference}>
-                          {motivo.estoqueOrigemDepois < motivo.estoqueOrigemAntes ? (
-                            <span className={styles.stockNegative}>
-                              -{motivo.estoqueOrigemAntes - motivo.estoqueOrigemDepois} unidades
-                            </span>
-                          ) : (
-                            <span className={styles.stockNeutral}>Sem alteração</span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className={styles.stockBox}>
-                        <div className={styles.stockLabel}>Destino ({transfer.destino})</div>
-                        <div className={styles.stockValues}>
-                          <div className={styles.stockBefore}>
-                            <span className={styles.stockLabelSmall}>Antes:</span>
-                            <span className={styles.stockNumber}>{motivo.estoqueDestinoAntes}</span>
-                          </div>
-                          <div className={styles.stockArrow}>→</div>
-                          <div className={styles.stockAfter}>
-                            <span className={styles.stockLabelSmall}>Depois:</span>
-                            <span className={styles.stockNumber}>{motivo.estoqueDestinoDepois}</span>
-                          </div>
-                        </div>
-                        <div className={styles.stockDifference}>
-                          {motivo.estoqueDestinoDepois > motivo.estoqueDestinoAntes ? (
-                            <span className={styles.stockPositive}>
-                              +{motivo.estoqueDestinoDepois - motivo.estoqueDestinoAntes} unidades
-                            </span>
-                          ) : (
-                            <span className={styles.stockNeutral}>Sem alteração</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           );
