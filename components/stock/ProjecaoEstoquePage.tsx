@@ -113,6 +113,27 @@ export default function ProjecaoEstoquePage({
   const [selectedSubgrupos, setSelectedSubgrupos] = useState<string[]>([]);
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
 
+  // Ler parâmetros da URL ao montar o componente
+  useEffect(() => {
+    const filial = searchParams.get("filial");
+    if (filial) setSelectedFilial(filial);
+
+    const grupos = searchParams.getAll("grupos");
+    if (grupos.length > 0) setSelectedGrupos(grupos);
+
+    const linhas = searchParams.getAll("linhas");
+    if (linhas.length > 0) setSelectedLinhas(linhas);
+
+    const colecoes = searchParams.getAll("colecoes");
+    if (colecoes.length > 0) setSelectedColecoes(colecoes);
+
+    const subgrupos = searchParams.getAll("subgrupos");
+    if (subgrupos.length > 0) setSelectedSubgrupos(subgrupos);
+
+    const grades = searchParams.getAll("grades");
+    if (grades.length > 0) setSelectedGrades(grades);
+  }, [searchParams]);
+
   const [availableGrupos, setAvailableGrupos] = useState<string[]>([]);
   const [availableLinhas, setAvailableLinhas] = useState<string[]>([]);
   const [availableColecoes, setAvailableColecoes] = useState<string[]>([]);
@@ -390,14 +411,30 @@ export default function ProjecaoEstoquePage({
       setError(null);
 
       try {
+        // Ler parâmetros da URL diretamente para garantir que estão atualizados
+        const filial = searchParams.get("filial");
+        const grupos = searchParams.getAll("grupos");
+        const linhas = searchParams.getAll("linhas");
+        const colecoes = searchParams.getAll("colecoes");
+        const subgrupos = searchParams.getAll("subgrupos");
+        const grades = searchParams.getAll("grades");
+
+        // Atualizar estados se necessário
+        if (filial !== selectedFilial) setSelectedFilial(filial);
+        if (grupos.length > 0 && JSON.stringify(grupos) !== JSON.stringify(selectedGrupos)) setSelectedGrupos(grupos);
+        if (linhas.length > 0 && JSON.stringify(linhas) !== JSON.stringify(selectedLinhas)) setSelectedLinhas(linhas);
+        if (colecoes.length > 0 && JSON.stringify(colecoes) !== JSON.stringify(selectedColecoes)) setSelectedColecoes(colecoes);
+        if (subgrupos.length > 0 && JSON.stringify(subgrupos) !== JSON.stringify(selectedSubgrupos)) setSelectedSubgrupos(subgrupos);
+        if (grades.length > 0 && JSON.stringify(grades) !== JSON.stringify(selectedGrades)) setSelectedGrades(grades);
+
         const data = await fetchProjecaoMensal(
           companyKey,
-          selectedFilial,
-          selectedGrupos,
-          selectedLinhas,
-          selectedColecoes,
-          selectedSubgrupos,
-          selectedGrades
+          filial,
+          grupos,
+          linhas,
+          colecoes,
+          subgrupos,
+          grades
         );
 
         if (active) {
@@ -419,7 +456,7 @@ export default function ProjecaoEstoquePage({
     return () => {
       active = false;
     };
-  }, [companyKey, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades]);
+  }, [companyKey, searchParams, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades]);
 
   // Gerar meses para exibição (12 meses a partir do mês atual)
   const mesesExibicao = useMemo(() => {

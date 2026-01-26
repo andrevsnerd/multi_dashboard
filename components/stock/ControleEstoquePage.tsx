@@ -1385,11 +1385,95 @@ export default function ControleEstoquePage({
           onClick={() => {
             const params = new URLSearchParams();
             if (selectedFilial) params.set("filial", selectedFilial);
-            selectedGrupos.forEach(g => params.append("grupos", g));
-            selectedLinhas.forEach(l => params.append("linhas", l));
-            selectedColecoes.forEach(c => params.append("colecoes", c));
-            selectedSubgrupos.forEach(s => params.append("subgrupos", s));
-            selectedGrades.forEach(g => params.append("grades", g));
+            
+            // Verificar se há categorias expandidas
+            const categoriasExpandidas = Array.from(categoriaExpansao.entries()).filter(([_, expansao]) => expansao.nivel > 0);
+            
+            if (categoriasExpandidas.length > 0) {
+              // Se há expansão, aplicar filtros baseados no nível de expansão
+              const [categoriaExpandida, expansao] = categoriasExpandidas[0];
+              const nivel = expansao.nivel;
+              const subgrupoSelecionado = expansao.subgrupoSelecionado;
+              
+              // Usar categorias originais (antes do reagrupamento) para extrair subgrupos e grades
+              const categoriasOriginais = categorias.filter(cat => {
+                // Aplicar mesmos filtros básicos
+                const categoriaUpper = cat.categoria.toUpperCase();
+                if (linhasExcluidas.has(categoriaUpper)) return false;
+                if (!selectedCategorias.has(cat.categoria)) return false;
+                
+                // Filtrar pela categoria expandida
+                if (cat.categoria !== categoriaExpandida) return false;
+                
+                // Aplicar filtros de linha/subgrupo/grade/coleção se existirem
+                if (companyKey === 'scarfme') {
+                  if (selectedLinhas.length > 0 && !selectedLinhas.includes(cat.categoria)) return false;
+                  if (selectedSubgrupos.length > 0 && cat.subgrupo && !selectedSubgrupos.includes(cat.subgrupo)) return false;
+                  if (selectedGrades.length > 0 && cat.grade && !selectedGrades.includes(cat.grade)) return false;
+                  if (selectedColecoes.length > 0 && cat.colecao && !selectedColecoes.includes(cat.colecao)) return false;
+                }
+                
+                return true;
+              });
+              
+              if (companyKey === 'scarfme') {
+                // Para ScarfMe, categoria expandida é a linha
+                params.append("linhas", categoriaExpandida);
+                
+                if (nivel === 1) {
+                  // Nível 1: mostrar apenas os subgrupos dessa linha
+                  const subgruposUnicos = new Set<string>();
+                  categoriasOriginais
+                    .filter(cat => cat.subgrupo)
+                    .forEach(cat => {
+                      if (cat.subgrupo) subgruposUnicos.add(cat.subgrupo);
+                    });
+                  subgruposUnicos.forEach(s => params.append("subgrupos", s));
+                } else if (nivel === 2 && subgrupoSelecionado) {
+                  // Nível 2: mostrar apenas as grades do subgrupo selecionado
+                  params.append("subgrupos", subgrupoSelecionado);
+                  const gradesUnicas = new Set<string>();
+                  categoriasOriginais
+                    .filter(cat => cat.subgrupo === subgrupoSelecionado && cat.grade)
+                    .forEach(cat => {
+                      if (cat.grade) gradesUnicas.add(cat.grade);
+                    });
+                  gradesUnicas.forEach(g => params.append("grades", g));
+                }
+              } else if (companyKey === 'nerd') {
+                // Para NERD, categoria expandida é o grupo
+                params.append("grupos", categoriaExpandida);
+                
+                if (nivel === 1) {
+                  // Nível 1: mostrar apenas os subgrupos desse grupo
+                  const subgruposUnicos = new Set<string>();
+                  categoriasOriginais
+                    .filter(cat => cat.subgrupo)
+                    .forEach(cat => {
+                      if (cat.subgrupo) subgruposUnicos.add(cat.subgrupo);
+                    });
+                  subgruposUnicos.forEach(s => params.append("subgrupos", s));
+                } else if (nivel === 2 && subgrupoSelecionado) {
+                  // Nível 2: mostrar apenas as grades do subgrupo selecionado
+                  params.append("subgrupos", subgrupoSelecionado);
+                  const gradesUnicas = new Set<string>();
+                  categoriasOriginais
+                    .filter(cat => cat.subgrupo === subgrupoSelecionado && cat.grade)
+                    .forEach(cat => {
+                      if (cat.grade) gradesUnicas.add(cat.grade);
+                    });
+                  gradesUnicas.forEach(g => params.append("grades", g));
+                }
+              }
+            } else {
+              // Sem expansão: usar filtros selecionados normalmente
+              selectedGrupos.forEach(g => params.append("grupos", g));
+              selectedLinhas.forEach(l => params.append("linhas", l));
+              selectedColecoes.forEach(c => params.append("colecoes", c));
+              selectedSubgrupos.forEach(s => params.append("subgrupos", s));
+              selectedGrades.forEach(g => params.append("grades", g));
+            }
+            
             router.push(`/${companyKey}/controle-estoque/projecao?${params.toString()}`);
           }}
         >
