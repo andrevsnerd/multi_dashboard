@@ -760,7 +760,8 @@ export async function fetchEstoqueKPIs({
 
     const entradasPeriodoQuery = `
       SELECT 
-        SUM(CAST(P.QTDE AS FLOAT)) AS entradas
+        SUM(CAST(P.QTDE AS FLOAT)) AS entradas,
+        SUM(CAST(P.QTDE AS FLOAT) * ISNULL(pr.CUSTO_REPOSICAO1, 0)) AS valorEntradas
       FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
       LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
       LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
@@ -791,12 +792,14 @@ export async function fetchEstoqueKPIs({
 
     const entradasPeriodoResult = await request.query<{
       entradas: number | null;
+      valorEntradas: number | null;
     }>(entradasPeriodoQuery);
 
     // Buscar vendas do período selecionado
     const vendasPeriodoQuery = `
       SELECT 
-        SUM(vp.QTDE - ISNULL(vp.QTDE_CANCELADA, 0)) AS vendas
+        SUM(vp.QTDE - ISNULL(vp.QTDE_CANCELADA, 0)) AS vendas,
+        SUM((vp.QTDE - ISNULL(vp.QTDE_CANCELADA, 0)) * ISNULL(p.CUSTO_REPOSICAO1, 0)) AS valorVendas
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       WHERE vp.DATA_VENDA >= @periodoStartKPI
@@ -816,11 +819,13 @@ export async function fetchEstoqueKPIs({
 
     const vendasPeriodoResult = await request.query<{
       vendas: number | null;
+      valorVendas: number | null;
     }>(vendasPeriodoQuery);
 
     // Buscar e-commerce do período selecionado (apenas para ScarfMe)
     // Usar a mesma lógica das categorias individuais para garantir consistência
     let ecommercePeriodo = 0;
+    let valorEcommercePeriodo = 0;
     if (company === 'scarfme') {
       const companyConfig = resolveCompany(company);
       if (companyConfig) {
@@ -856,7 +861,8 @@ export async function fetchEstoqueKPIs({
           request.input('periodoEndKPIEcommerce', sql.DateTime, periodoEndKPI);
           const ecommercePeriodoQuery = `
             SELECT 
-              SUM(CAST(fp.QTDE AS FLOAT)) AS ecommerce
+              SUM(CAST(fp.QTDE AS FLOAT)) AS ecommerce,
+              SUM(CAST(fp.QTDE AS FLOAT) * ISNULL(p.CUSTO_REPOSICAO1, 0)) AS valorEcommerce
             FROM FATURAMENTO f WITH (NOLOCK)
             JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) 
               ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
@@ -880,15 +886,19 @@ export async function fetchEstoqueKPIs({
 
           const ecommercePeriodoResult = await request.query<{
             ecommerce: number | null;
+            valorEcommerce: number | null;
           }>(ecommercePeriodoQuery);
 
           ecommercePeriodo = Number(ecommercePeriodoResult.recordset[0]?.ecommerce ?? 0);
+          valorEcommercePeriodo = Number(ecommercePeriodoResult.recordset[0]?.valorEcommerce ?? 0);
         }
       }
     }
 
     const entradasPeriodo = Number(entradasPeriodoResult.recordset[0]?.entradas ?? 0);
+    const valorEntradasPeriodo = Number(entradasPeriodoResult.recordset[0]?.valorEntradas ?? 0);
     const vendasPeriodo = Number(vendasPeriodoResult.recordset[0]?.vendas ?? 0);
+    const valorVendasPeriodo = Number(vendasPeriodoResult.recordset[0]?.valorVendas ?? 0);
     const estoqueAtual = Number(estoqueRow.estoqueTotal ?? 0);
 
     // IMPORTANTE: Calcular estoque anterior usando EXATAMENTE a mesma fórmula das categorias individuais
@@ -899,12 +909,12 @@ export async function fetchEstoqueKPIs({
       estoqueAtual - entradasPeriodo + vendasPeriodo + ecommercePeriodo
     ));
 
-    // Calcular valor em estoque anterior usando o valor médio por unidade
+    // Calcular valor em estoque anterior usando a mesma fórmula do estoque total
+    // Fórmula: Valor em Estoque Anterior = Valor em Estoque Atual - Valor Entradas (período) + Valor Vendas (período) + Valor E-commerce (período)
     const valorEmEstoqueAtual = Number(estoqueRow.valorTotal ?? 0);
-    const valorMedioPorUnidade = estoqueAtual > 0 
-      ? valorEmEstoqueAtual / estoqueAtual 
-      : 0;
-    const valorEmEstoqueAnterior = Math.max(0, valorMedioPorUnidade * estoqueAnterior);
+    const valorEmEstoqueAnterior = Math.max(0, 
+      valorEmEstoqueAtual - valorEntradasPeriodo + valorVendasPeriodo + valorEcommercePeriodo
+    );
 
     // Somar vendas de varejo + e-commerce
     const vendasVarejoMes = Math.round(Number(vendasAtualResult.recordset[0]?.vendasMes ?? 0));
@@ -3843,7 +3853,7 @@ export async function fetchProjecaoMensal({
       estoqueAtual: number | null;
     }>(estoqueQuery);
 
-    // 2. Buscar vendas do ano passado por categoria e mês
+    // 2. Buscar vendas do ano passado por categoria e mês (varejo)
     const vendasAnoPassadoQuery = `
       SELECT 
         ${categoriaField} AS categoria
@@ -3877,7 +3887,60 @@ export async function fetchProjecaoMensal({
       vendas: number | null;
     }>(vendasAnoPassadoQuery);
 
-    // 3. Buscar vendas do mês atual (até hoje)
+    // 2.1. Buscar vendas de e-commerce do ano passado por categoria e mês (apenas ScarfMe)
+    let ecommerceAnoPassadoResult: { recordset: Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; mes: number; vendas: number | null }> } = { recordset: [] };
+    if (company === 'scarfme') {
+      const companyConfig = resolveCompany(company);
+      if (companyConfig) {
+        const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
+        let ecommerceAnoPassadoFilialFilter = '';
+        
+        if (ecommerceFilials.length > 0) {
+          ecommerceFilials.forEach((f, index) => {
+            request.input(`ecommerceAnoPassadoFilial${index}`, sql.VarChar, f);
+          });
+          const placeholders = ecommerceFilials.map((_, i) => `@ecommerceAnoPassadoFilial${i}`).join(', ');
+          ecommerceAnoPassadoFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+        }
+
+        if (ecommerceAnoPassadoFilialFilter) {
+          const ecommerceAnoPassadoQuery = `
+            SELECT 
+              ${categoriaField} AS categoria
+              ${camposAdicionais},
+              MONTH(f.EMISSAO) AS mes,
+              SUM(CAST(fp.QTDE AS FLOAT)) AS vendas
+            FROM FATURAMENTO f WITH (NOLOCK)
+            JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) 
+              ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+            LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
+            WHERE YEAR(f.EMISSAO) = ${anoPassado}
+              AND f.NOTA_CANCELADA = 0
+              AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+              AND CAST(fp.QTDE AS FLOAT) > 0
+              ${ecommerceAnoPassadoFilialFilter}
+              ${grupoFilter}
+              ${exclusionFilter}
+              AND ${categoriaField} <> ''
+              AND ${categoriaField} <> 'SEM GRUPO'
+              AND ${categoriaField} <> 'SEM LINHA'
+            GROUP BY ${categoriaField}${groupByAdicional}, MONTH(f.EMISSAO)
+          `;
+
+          ecommerceAnoPassadoResult = await request.query<{
+            categoria: string;
+            linha?: string;
+            subgrupo?: string;
+            grade?: string;
+            colecao?: string;
+            mes: number;
+            vendas: number | null;
+          }>(ecommerceAnoPassadoQuery);
+        }
+      }
+    }
+
+    // 3. Buscar vendas do mês atual (até hoje) - varejo
     const hoje = new Date();
     const inicioMesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
     const diasNoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
@@ -3918,6 +3981,58 @@ export async function fetchProjecaoMensal({
       vendas: number | null;
     }>(vendasMesAtualQuery);
 
+    // 3.1. Buscar vendas de e-commerce do mês atual (até hoje) - apenas ScarfMe
+    let ecommerceMesAtualResult: { recordset: Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; vendas: number | null }> } = { recordset: [] };
+    if (company === 'scarfme') {
+      const companyConfig = resolveCompany(company);
+      if (companyConfig) {
+        const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
+        let ecommerceMesAtualFilialFilter = '';
+        
+        if (ecommerceFilials.length > 0) {
+          ecommerceFilials.forEach((f, index) => {
+            request.input(`ecommerceMesAtualFilial${index}`, sql.VarChar, f);
+          });
+          const placeholders = ecommerceFilials.map((_, i) => `@ecommerceMesAtualFilial${i}`).join(', ');
+          ecommerceMesAtualFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+        }
+
+        if (ecommerceMesAtualFilialFilter) {
+          const ecommerceMesAtualQuery = `
+            SELECT 
+              ${categoriaField} AS categoria
+              ${camposAdicionais},
+              SUM(CAST(fp.QTDE AS FLOAT)) AS vendas
+            FROM FATURAMENTO f WITH (NOLOCK)
+            JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) 
+              ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+            LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
+            WHERE f.EMISSAO >= @inicioMesAtual
+              AND f.EMISSAO <= @fimMesAtual
+              AND f.NOTA_CANCELADA = 0
+              AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+              AND CAST(fp.QTDE AS FLOAT) > 0
+              ${ecommerceMesAtualFilialFilter}
+              ${grupoFilter}
+              ${exclusionFilter}
+              AND ${categoriaField} <> ''
+              AND ${categoriaField} <> 'SEM GRUPO'
+              AND ${categoriaField} <> 'SEM LINHA'
+            GROUP BY ${categoriaField}${groupByAdicional}
+          `;
+
+          ecommerceMesAtualResult = await request.query<{
+            categoria: string;
+            linha?: string;
+            subgrupo?: string;
+            grade?: string;
+            colecao?: string;
+            vendas: number | null;
+          }>(ecommerceMesAtualQuery);
+        }
+      }
+    }
+
     // Processar dados
     const mesesNomes = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
     
@@ -3949,7 +4064,7 @@ export async function fetchProjecaoMensal({
       estoqueMap.set(key, (estoqueMap.get(key) || 0) + estoqueAtual);
     });
 
-    // Mapear vendas do ano passado por mês
+    // Mapear vendas do ano passado por mês (varejo)
     const vendasAnoPassadoMap = new Map<string, Map<number, number>>();
     vendasAnoPassadoResult.recordset.forEach(row => {
       // Criar chave baseada no nível de agrupamento
@@ -3971,7 +4086,28 @@ export async function fetchProjecaoMensal({
       mesMap.set(mesNumero, (mesMap.get(mesNumero) || 0) + vendasAtual);
     });
 
-    // Mapear vendas do mês atual
+    // Somar vendas de e-commerce do ano passado
+    ecommerceAnoPassadoResult.recordset.forEach(row => {
+      // Criar chave baseada no nível de agrupamento
+      let key: string;
+      if (nivelAgrupamento === 0) {
+        key = row.categoria;
+      } else if (nivelAgrupamento === 1) {
+        key = `${row.categoria}|${row.subgrupo || ''}`;
+      } else {
+        key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
+      }
+      
+      if (!vendasAnoPassadoMap.has(key)) {
+        vendasAnoPassadoMap.set(key, new Map());
+      }
+      const mesMap = vendasAnoPassadoMap.get(key)!;
+      const mesNumero = row.mes;
+      const vendasEcommerce = Number(row.vendas ?? 0);
+      mesMap.set(mesNumero, (mesMap.get(mesNumero) || 0) + vendasEcommerce);
+    });
+
+    // Mapear vendas do mês atual (varejo)
     const vendasMesAtualMap = new Map<string, number>();
     vendasMesAtualResult.recordset.forEach(row => {
       // Criar chave baseada no nível de agrupamento
@@ -3986,6 +4122,22 @@ export async function fetchProjecaoMensal({
       
       const vendasAtual = Number(row.vendas ?? 0);
       vendasMesAtualMap.set(key, (vendasMesAtualMap.get(key) || 0) + vendasAtual);
+    });
+
+    // Somar vendas de e-commerce do mês atual
+    ecommerceMesAtualResult.recordset.forEach(row => {
+      // Criar chave baseada no nível de agrupamento
+      let key: string;
+      if (nivelAgrupamento === 0) {
+        key = row.categoria;
+      } else if (nivelAgrupamento === 1) {
+        key = `${row.categoria}|${row.subgrupo || ''}`;
+      } else {
+        key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
+      }
+      
+      const vendasEcommerce = Number(row.vendas ?? 0);
+      vendasMesAtualMap.set(key, (vendasMesAtualMap.get(key) || 0) + vendasEcommerce);
     });
 
     // Gerar projeções para 12 meses a partir do mês atual
@@ -4037,45 +4189,45 @@ export async function fetchProjecaoMensal({
       const vendasAnoPassadoPorMes = vendasAnoPassadoMap.get(key) || new Map();
       const vendasMesAtual = vendasMesAtualMap.get(key) || 0;
 
-      // Calcular total de vendas do ano passado
+      // Calcular total de vendas do ano passado (para usar como fallback se não houver dados do mês específico)
       let totalVendasAnoPassado = 0;
       vendasAnoPassadoPorMes.forEach(v => totalVendasAnoPassado += v);
-      
-      // Projeção mensal média do ano passado + 10%
-      const projecaoMensalMedia = (totalVendasAnoPassado / 12) * 1.1;
+      const projecaoMensalMedia = totalVendasAnoPassado > 0 ? (totalVendasAnoPassado / 12) * 1.1 : 0;
 
       for (let i = 0; i < 12; i++) {
         const mesIndex = (mesAtual - 1 + i) % 12;
         const ano = anoAtual + Math.floor((mesAtual - 1 + i) / 12);
         const mesNumero = mesIndex + 1;
         const isMesAtual = i === 0;
-        const isMesPassado = i < 0;
 
         let vendas: number;
+        let estoqueProjecao: number;
+        
         if (isMesAtual) {
-          // Mês atual: usar vendas reais até hoje e projetar o restante do mês
-          const vendasAteHoje = vendasMesAtual;
-          const diasRestantes = diasNoMes - diasCorridos;
-          const mediaDiaria = diasCorridos > 0 ? vendasAteHoje / diasCorridos : 0;
-          const projecaoRestante = mediaDiaria * diasRestantes;
-          vendas = Math.round(vendasAteHoje + projecaoRestante);
+          // Mês atual: mostrar vendas atuais (até hoje) e estoque atual
+          vendas = Math.round(vendasMesAtual);
+          estoqueProjecao = estoqueAtual; // Estoque atual (não muda)
         } else {
-          // Meses futuros: usar projeção baseada no ano passado + 10%
-          // Se temos dados do mês específico do ano passado, usar ele; senão usar média
+          // Próximos meses: buscar vendas do mesmo mês do ano passado e adicionar 10%
           const vendasMesAnoPassado = vendasAnoPassadoPorMes.get(mesNumero) || 0;
           if (vendasMesAnoPassado > 0) {
+            // Usar vendas do mesmo mês do ano passado + 10%
             vendas = Math.round(vendasMesAnoPassado * 1.1);
           } else {
+            // Se não houver dados do mês específico, usar média mensal + 10%
             vendas = Math.round(projecaoMensalMedia);
           }
+          
+          // Calcular estoque futuro: estoque do mês anterior - vendas projetadas deste mês
+          estoqueProjecao = Math.max(0, estoqueAtual - vendas);
+          
+          // Atualizar estoque atual para o próximo mês (acumulativo)
+          estoqueAtual = estoqueProjecao;
         }
-
-        // Calcular estoque após vendas do mês
-        estoqueAtual = Math.max(0, estoqueAtual - vendas);
 
         // Calcular duração (dias que o estoque durará)
         const diasNoMesProjecao = new Date(ano, mesIndex + 1, 0).getDate();
-        const duracao = vendas > 0 ? Math.round((estoqueAtual / vendas) * diasNoMesProjecao) : 999;
+        const duracao = vendas > 0 ? Math.round((estoqueProjecao / vendas) * diasNoMesProjecao) : 999;
 
         projecao.meses.push({
           categoria,
@@ -4087,7 +4239,7 @@ export async function fetchProjecaoMensal({
           mesNumero,
           ano,
           vendas,
-          estoque: estoqueAtual,
+          estoque: estoqueProjecao,
           duracao,
           isMesAtual,
           isMesPassado: false,
