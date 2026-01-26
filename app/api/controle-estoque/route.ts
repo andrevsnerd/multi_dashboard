@@ -9,6 +9,7 @@ import {
   fetchDetalhesEntradasSemana,
   fetchDetalhesVendasSemana,
   fetchDetalhesEcommerceSemana,
+  fetchProjecaoMensal,
 } from '@/lib/repositories/controleEstoque';
 
 export async function GET(request: Request) {
@@ -155,9 +156,17 @@ export async function GET(request: Request) {
         });
         return NextResponse.json({ data: detalhes });
       }
+      case 'projecao-mensal': {
+        const projecao = await fetchProjecaoMensal({
+          company,
+          filial,
+          ...filters,
+        });
+        return NextResponse.json({ data: projecao });
+      }
       default:
         return NextResponse.json(
-          { error: 'Tipo de dados inválido. Use: kpis, categorias, evolucao, vendas, previsoes, detalhes-entradas, detalhes-vendas ou detalhes-ecommerce' },
+          { error: 'Tipo de dados inválido. Use: kpis, categorias, evolucao, vendas, previsoes, detalhes-entradas, detalhes-vendas, detalhes-ecommerce ou projecao-mensal' },
           { status: 400 }
         );
     }

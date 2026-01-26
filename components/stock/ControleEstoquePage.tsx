@@ -1378,6 +1378,25 @@ export default function ControleEstoquePage({
         )}
       </div>
 
+      {/* Botão PROJEÇÃO */}
+      <div className={styles.filterRow}>
+        <button
+          className={styles.projecaoButton}
+          onClick={() => {
+            const params = new URLSearchParams();
+            if (selectedFilial) params.set("filial", selectedFilial);
+            selectedGrupos.forEach(g => params.append("grupos", g));
+            selectedLinhas.forEach(l => params.append("linhas", l));
+            selectedColecoes.forEach(c => params.append("colecoes", c));
+            selectedSubgrupos.forEach(s => params.append("subgrupos", s));
+            selectedGrades.forEach(g => params.append("grades", g));
+            router.push(`/${companyKey}/controle-estoque/projecao?${params.toString()}`);
+          }}
+        >
+          PROJEÇÃO
+        </button>
+      </div>
+
       {/* Toggle de Vendas */}
       <div className={styles.filterRow}>
         <button

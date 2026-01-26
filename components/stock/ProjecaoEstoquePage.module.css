@@ -1,0 +1,254 @@
+.wrapper {
+  padding: 24px;
+  background: #f7f7f7;
+  min-height: 100vh;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 32px;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.iconWrapper {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border-radius: 8px;
+  color: #212121;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #212121;
+  margin: 0 0 4px 0;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: #555555;
+  margin: 0;
+}
+
+.backButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #fff;
+  border: 1px solid #d1d1d1;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #555555;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.backButton:hover {
+  background: #f9f9f9;
+  border-color: #cccccc;
+  color: #212121;
+}
+
+.filtersRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.tableWrapper {
+  background: #fff;
+  border-radius: 4px;
+  padding: 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  overflow-x: auto;
+  border: 1px solid #d1d1d1;
+}
+
+.projecaoTable {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1200px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Cabeçalho - meses */
+.projecaoTable thead th {
+  background: #fff;
+  padding: 16px 14px;
+  text-align: center;
+  font-weight: 500;
+  font-size: 11px;
+  color: #555555;
+  border: none;
+  border-bottom: 1px solid #d1d1d1;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+/* Cabeçalho lateral - Categoria */
+.categoriaHeader {
+  background: #e8e8e8 !important;
+  color: #212121 !important;
+  font-weight: 500 !important;
+  text-align: left !important;
+  padding: 16px 14px !important;
+  font-size: 12px !important;
+  border: none !important;
+  border-bottom: 1px solid #d1d1d1 !important;
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Cabeçalho lateral - Tipo */
+.labelHeader {
+  background: #e8e8e8 !important;
+  color: #555555 !important;
+  font-weight: 500 !important;
+  text-align: center !important;
+  padding: 16px 14px !important;
+  border: none !important;
+  border-bottom: 1px solid #d1d1d1 !important;
+  font-size: 11px !important;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Células do corpo */
+.projecaoTable tbody td {
+  padding: 16px 14px;
+  text-align: center;
+  border: none;
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.projecaoTable tbody tr {
+  border-bottom: none;
+}
+
+/* Linha de VENDA - Branco puro */
+.categoriaRow {
+  background: #ffffff;
+}
+
+/* Célula de Categoria - Cinza Névoa */
+.categoriaCell {
+  background: #ededed;
+  font-weight: 500;
+  color: #212121;
+  text-align: left;
+  vertical-align: middle;
+  border: none;
+  padding: 16px 14px;
+  font-size: 13px;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+
+/* Label (VENDA, ESTOQUE, DURAÇÃO) - Cinza Médio */
+.labelCell {
+  background: #ededed;
+  font-weight: 400;
+  color: #808080;
+  text-align: left;
+  padding: 16px 14px;
+  border: none;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* Informações detalhadas */
+.detailInfo {
+  font-size: 10px;
+  font-weight: 400;
+  color: #808080;
+  margin-top: 6px;
+  display: block;
+  text-transform: none;
+}
+
+/* Células de VENDA - Grafite Escuro, Bold */
+.vendasCell {
+  color: #1a1a1a;
+  font-weight: 700;
+  background: #ffffff;
+  font-size: 13px;
+  padding: 16px 14px;
+}
+
+/* Linha de ESTOQUE - Cinza Claríssimo */
+.estoqueRow {
+  background: #f9f9f9;
+}
+
+/* Células de ESTOQUE - Cinza Chumbo, Regular */
+.estoqueCell {
+  color: #555555;
+  font-weight: 400;
+  background: #f9f9f9;
+  padding: 16px 14px;
+  font-size: 13px;
+}
+
+/* Linha de DURAÇÃO - Branco puro */
+.duracaoRow {
+  background: #ffffff;
+  border-bottom: none;
+}
+
+/* Borda horizontal apenas entre grupos de categorias */
+.duracaoRow.categorySeparator {
+  border-bottom: 1px solid #d1d1d1;
+}
+
+/* Células de DURAÇÃO - Cinza Chumbo, Regular */
+.duracaoCell {
+  color: #555555;
+  font-weight: 400;
+  background: #ffffff;
+  padding: 16px 14px;
+  font-size: 13px;
+}
+
+/* Remover qualquer destaque de mês atual */
+.mesAtual {
+  /* Sem destaque visual - design monocromático neutro */
+}
+
+.loading,
+.error {
+  text-align: center;
+  padding: 48px;
+  font-size: 16px;
+  color: #555555;
+}
+
+.error {
+  color: #808080;
+}
