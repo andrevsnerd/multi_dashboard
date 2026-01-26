@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 import type { StockByFilialItem } from "@/lib/repositories/stockByFilial";
 import type { DateRangeValue } from "@/components/filters/DateRangeFilter";
@@ -22,6 +22,7 @@ interface TransferItem {
   origem: string;
   destino: string;
   quantidade: number;
+  itemOriginal: StockByFilialItem; // Dados originais do produto
 }
 
 interface TransferByOrigin {
@@ -339,6 +340,7 @@ function calculateTransfers(
           origem: origemDisplayName,
           destino: destinoDisplayName,
           quantidade: Math.ceil(quantidade),
+          itemOriginal: item, // Guardar dados originais
         });
 
         // Atualizar estoque disponível na origem
@@ -385,10 +387,25 @@ export default function TransfersTable({
   loading,
   dateRange,
 }: TransfersTableProps) {
+  const company = resolveCompany(companyKey);
   const transfersByOrigin = useMemo(
     () => calculateTransfers(data, companyKey, dateRange),
     [data, companyKey, dateRange]
   );
+
+  const [hoveredItem, setHoveredItem] = useState<TransferItem | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Limpar timeout ao desmontar
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -453,7 +470,79 @@ export default function TransfersTable({
                     </div>
                     {item.codigo}
                   </td>
-                  <td className={styles.descricaoCell}>{item.descricao}</td>
+                  <td 
+                    className={styles.descricaoCell}
+                    onMouseMove={(e) => {
+                      if (hoverTimeoutRef.current) {
+                        clearTimeout(hoverTimeoutRef.current);
+                      }
+                      const tooltipWidth = 400;
+                      const tooltipHeight = 300;
+                      const offset = 15; // Distância do cursor
+                      
+                      // Posição baseada no cursor
+                      let x = e.clientX + offset;
+                      let y = e.clientY + offset;
+                      
+                      // Verificar se sai da tela à direita
+                      if (x + tooltipWidth > window.innerWidth) {
+                        x = e.clientX - tooltipWidth - offset;
+                      }
+                      
+                      // Verificar se sai da tela embaixo
+                      if (y + tooltipHeight > window.innerHeight) {
+                        y = e.clientY - tooltipHeight - offset;
+                      }
+                      
+                      // Garantir que não saia da tela à esquerda
+                      if (x < 10) {
+                        x = 10;
+                      }
+                      
+                      // Garantir que não saia da tela em cima
+                      if (y < 10) {
+                        y = 10;
+                      }
+                      
+                      setTooltipPosition({ x, y });
+                      if (!hoveredItem || hoveredItem.produto !== item.produto || hoveredItem.cor !== item.cor) {
+                        setHoveredItem(item);
+                      }
+                    }}
+                    onMouseEnter={(e) => {
+                      if (hoverTimeoutRef.current) {
+                        clearTimeout(hoverTimeoutRef.current);
+                      }
+                      const tooltipWidth = 400;
+                      const tooltipHeight = 300;
+                      const offset = 15;
+                      
+                      let x = e.clientX + offset;
+                      let y = e.clientY + offset;
+                      
+                      if (x + tooltipWidth > window.innerWidth) {
+                        x = e.clientX - tooltipWidth - offset;
+                      }
+                      
+                      if (y + tooltipHeight > window.innerHeight) {
+                        y = e.clientY - tooltipHeight - offset;
+                      }
+                      
+                      if (x < 10) x = 10;
+                      if (y < 10) y = 10;
+                      
+                      setTooltipPosition({ x, y });
+                      setHoveredItem(item);
+                    }}
+                    onMouseLeave={() => {
+                      hoverTimeoutRef.current = setTimeout(() => {
+                        setHoveredItem(null);
+                      }, 200);
+                    }}
+                    style={{ cursor: 'help' }}
+                  >
+                    {item.descricao}
+                  </td>
                   <td className={styles.corCell}>
                     <span className={styles.corBadge}>{item.cor}</span>
                   </td>
@@ -478,6 +567,85 @@ export default function TransfersTable({
           </div>
         </div>
       ))}
+      
+      {/* Tooltip com detalhes do produto */}
+      {hoveredItem && (
+        <div
+          ref={tooltipRef}
+          className={styles.tooltip}
+          style={{
+            left: `${tooltipPosition.x}px`,
+            top: `${tooltipPosition.y}px`,
+          }}
+          onMouseEnter={() => {
+            if (hoverTimeoutRef.current) {
+              clearTimeout(hoverTimeoutRef.current);
+            }
+          }}
+          onMouseLeave={() => {
+            setHoveredItem(null);
+          }}
+        >
+          <div className={styles.tooltipHeader}>
+            <div className={styles.tooltipTitle}>{hoveredItem.descricao}</div>
+            <div className={styles.tooltipSubtitle}>
+              {hoveredItem.codigo} • {hoveredItem.cor}
+            </div>
+          </div>
+          <div className={styles.tooltipContent}>
+            <div className={styles.tooltipSection}>
+              <div className={styles.tooltipSectionTitle}>Estoque e Vendas por Filial</div>
+              {hoveredItem.itemOriginal.filiais
+                .sort((a, b) => {
+                  // Ordenar: matriz primeiro, depois por nome
+                  const company = resolveCompany(companyKey);
+                  const matriz = companyKey === "nerd" ? "NERD" : companyKey === "scarfme" ? "SCARF ME - MATRIZ" : null;
+                  if (a.filial === matriz) return -1;
+                  if (b.filial === matriz) return 1;
+                  return a.filial.localeCompare(b.filial);
+                })
+                .map((filial) => {
+                  const displayName = company?.filialDisplayNames?.[filial.filial] || filial.filial;
+                  const isParada = filial.stock > 1 && filial.sales === 0 && filial.salesLast30Days === 0;
+                  
+                  // Calcular dias parado (se não teve venda no período e nos últimos 30 dias e tem estoque)
+                  let diasParado: number | null = null;
+                  if (filial.stock > 0 && filial.sales === 0 && filial.salesLast30Days === 0) {
+                    // Se não teve venda no período nem nos últimos 30 dias, está parado há pelo menos 30 dias
+                    // Se teve venda nos últimos 30 dias mas não no período, calcular baseado no período
+                    const daysInPeriod = dateRange ? 
+                      Math.max(1, Math.ceil((new Date(dateRange.endDate).getTime() - new Date(dateRange.startDate).getTime()) / (1000 * 60 * 60 * 24))) : 30;
+                    diasParado = Math.max(30, daysInPeriod);
+                  } else if (filial.stock > 0 && filial.sales === 0 && filial.salesLast30Days > 0) {
+                    // Teve venda nos últimos 30 dias mas não no período atual
+                    const daysInPeriod = dateRange ? 
+                      Math.max(1, Math.ceil((new Date(dateRange.endDate).getTime() - new Date(dateRange.startDate).getTime()) / (1000 * 60 * 60 * 24))) : 30;
+                    diasParado = daysInPeriod;
+                  }
+                  
+                  return (
+                    <div key={filial.filial} className={styles.tooltipFilialRow}>
+                      <div className={styles.tooltipFilialName}>{displayName}</div>
+                      <div className={styles.tooltipFilialData}>
+                        <span className={styles.tooltipEstoque}>
+                          Estoque: <strong>{filial.stock}</strong>
+                        </span>
+                        <span className={styles.tooltipVendas}>
+                          Vendas: <strong>{filial.sales}</strong>
+                        </span>
+                        {isParada && diasParado !== null && (
+                          <span className={styles.tooltipParado}>
+                            Parado há: <strong>{diasParado}+ dias</strong>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
