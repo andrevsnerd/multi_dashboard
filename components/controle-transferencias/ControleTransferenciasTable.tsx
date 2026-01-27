@@ -941,15 +941,53 @@ export default function ControleTransferenciasTable({
           <div className={styles.tooltipContent}>
             <div className={styles.tooltipSection}>
               <div className={styles.tooltipSectionTitle}>Estoque e Vendas por Filial</div>
-              {hoveredItem.itemOriginal.filiais
-                .sort((a, b) => {
-                  const matriz = companyKey === "nerd" ? "NERD" : companyKey === "scarfme" ? "SCARF ME - MATRIZ" : null;
+              {(() => {
+                const matriz = companyKey === "nerd" ? "NERD" : companyKey === "scarfme" ? "SCARF ME - MATRIZ" : null;
+                const ecommerceFilials = company?.ecommerceFilials ?? [];
+                const normalizedEcommerceFilials = ecommerceFilials.map(f => f.trim().toUpperCase());
+                
+                // Separar filiais normais e e-commerce
+                const normalFiliais: typeof hoveredItem.itemOriginal.filiais = [];
+                const ecommerceFiliais: typeof hoveredItem.itemOriginal.filiais = [];
+                
+                hoveredItem.itemOriginal.filiais.forEach(filial => {
+                  const normalizedFilial = filial.filial.trim().toUpperCase();
+                  if (normalizedEcommerceFilials.includes(normalizedFilial)) {
+                    ecommerceFiliais.push(filial);
+                  } else {
+                    normalFiliais.push(filial);
+                  }
+                });
+                
+                // Agregar filiais de e-commerce
+                let ecommerceAggregated: typeof hoveredItem.itemOriginal.filiais[0] | null = null;
+                if (ecommerceFiliais.length > 0) {
+                  const totalStock = ecommerceFiliais.reduce((sum, f) => sum + f.stock, 0);
+                  const totalSales = ecommerceFiliais.reduce((sum, f) => sum + f.sales, 0);
+                  const totalSalesLast30Days = ecommerceFiliais.reduce((sum, f) => sum + f.salesLast30Days, 0);
+                  
+                  ecommerceAggregated = {
+                    filial: 'E-COMMERCE',
+                    stock: totalStock,
+                    sales: totalSales,
+                    salesLast30Days: totalSalesLast30Days,
+                  };
+                }
+                
+                // Combinar e ordenar
+                const allFiliaisToShow = [
+                  ...normalFiliais,
+                  ...(ecommerceAggregated ? [ecommerceAggregated] : []),
+                ].sort((a, b) => {
                   if (a.filial === matriz) return -1;
                   if (b.filial === matriz) return 1;
                   return a.filial.localeCompare(b.filial);
-                })
-                .map((filial) => {
-                  const displayName = company?.filialDisplayNames?.[filial.filial] || filial.filial;
+                });
+                
+                return allFiliaisToShow.map((filial) => {
+                  const displayName = filial.filial === 'E-COMMERCE' 
+                    ? 'E-COMMERCE'
+                    : (company?.filialDisplayNames?.[filial.filial] || filial.filial);
                   const isParada = filial.stock > 1 && filial.sales === 0 && filial.salesLast30Days === 0;
                   
                   let diasParado: number | null = null;
@@ -981,7 +1019,8 @@ export default function ControleTransferenciasTable({
                       </div>
                     </div>
                   );
-                })}
+                });
+              })()}
             </div>
           </div>
         </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 
-import { resolveCompany, type CompanyKey } from "@/lib/config/company";
+import { resolveCompany, type CompanyKey, isEcommerceFilial } from "@/lib/config/company";
 
 import styles from "./GoalsModal.module.css";
 
@@ -59,8 +59,49 @@ export default function GoalsModal({
   monthYear,
 }: GoalsModalProps) {
   const company = resolveCompany(companyKey);
-  const filiais = company?.filialFilters.sales ?? [];
+  const allFiliais = company?.filialFilters.sales ?? [];
   const displayNames = company?.filialDisplayNames ?? {};
+  const ecommerceFilials = company?.ecommerceFilials ?? [];
+
+  // Normalizar nomes para comparação (trim e uppercase)
+  const normalizedEcommerceFilials = ecommerceFilials.map(f => f.trim().toUpperCase());
+  
+  // Agrupar filiais: separar normais e e-commerce
+  // Filtrar filiais que NÃO são e-commerce (comparação case-insensitive e com trim)
+  const normalFiliais = allFiliais.filter(f => {
+    const normalizedFilial = f.trim().toUpperCase();
+    return !normalizedEcommerceFilials.includes(normalizedFilial);
+  });
+  
+  const hasEcommerce = ecommerceFilials.length > 0;
+  const ecommerceDisplayName = hasEcommerce 
+    ? (ecommerceFilials.map(f => displayNames[f]).find(name => name) || 'E-COMMERCE')
+    : null;
+
+  // Criar lista de filiais para exibição (normais + e-commerce agrupado)
+  const filiaisToDisplay = useMemo(() => {
+    const result: Array<{ key: string; displayName: string; isEcommerce: boolean }> = [];
+    
+    // Adicionar filiais normais
+    normalFiliais.forEach(filial => {
+      result.push({
+        key: filial,
+        displayName: displayNames[filial] ?? filial,
+        isEcommerce: false,
+      });
+    });
+    
+    // Adicionar e-commerce como uma única entrada (apenas se houver filiais de e-commerce)
+    if (hasEcommerce && ecommerceDisplayName) {
+      result.push({
+        key: 'E-COMMERCE',
+        displayName: ecommerceDisplayName,
+        isEcommerce: true,
+      });
+    }
+    
+    return result;
+  }, [normalFiliais, hasEcommerce, ecommerceDisplayName, displayNames]);
 
   const [goals, setGoals] = useState<GoalData>({});
   const [loading, setLoading] = useState(false);
@@ -70,19 +111,71 @@ export default function GoalsModal({
       setLoading(true);
       loadGoals(companyKey, monthYear.month, monthYear.year)
         .then((loadedGoals) => {
-          setGoals(loadedGoals);
+          // Agregar valores de e-commerce se houver múltiplas filiais
+          const processedGoals: GoalData = { ...loadedGoals };
+          
+          if (hasEcommerce && ecommerceFilials.length > 0) {
+            // Calcular total de e-commerce (soma de todas as filiais de e-commerce)
+            const normalizedEcommerceFilials = ecommerceFilials.map(f => f.trim().toUpperCase());
+            const ecommerceTotal = Object.keys(loadedGoals).reduce((sum, filialKey) => {
+              const normalizedKey = filialKey.trim().toUpperCase();
+              if (normalizedEcommerceFilials.includes(normalizedKey)) {
+                return sum + (loadedGoals[filialKey] || 0);
+              }
+              return sum;
+            }, 0);
+            
+            // Remover entradas individuais de e-commerce do processedGoals
+            Object.keys(processedGoals).forEach(key => {
+              const normalizedKey = key.trim().toUpperCase();
+              if (normalizedEcommerceFilials.includes(normalizedKey)) {
+                delete processedGoals[key];
+              }
+            });
+            
+            // Adicionar entrada agregada para E-COMMERCE
+            processedGoals['E-COMMERCE'] = ecommerceTotal;
+          }
+          
+          setGoals(processedGoals);
         })
         .finally(() => {
           setLoading(false);
         });
     }
-  }, [isOpen, companyKey, monthYear.month, monthYear.year]);
+  }, [isOpen, companyKey, monthYear.month, monthYear.year, hasEcommerce, ecommerceFilials]);
 
-  const handleGoalChange = async (filial: string, value: string) => {
+  const handleGoalChange = async (filialKey: string, value: string) => {
     const numValue = value === "" ? 0 : parseFloat(value) || 0;
-    const newGoals = { ...goals, [filial]: numValue };
+    const newGoals = { ...goals };
+    
+    // Se for E-COMMERCE, distribuir o valor para todas as filiais de e-commerce
+    if (filialKey === 'E-COMMERCE' && hasEcommerce) {
+      // Remover valores antigos das filiais de e-commerce
+      ecommerceFilials.forEach(filial => {
+        delete newGoals[filial];
+      });
+      
+      // Distribuir o valor igualmente entre as filiais de e-commerce
+      const valuePerFilial = ecommerceFilials.length > 0 ? numValue / ecommerceFilials.length : 0;
+      ecommerceFilials.forEach(filial => {
+        newGoals[filial] = valuePerFilial;
+      });
+      
+      // Manter a entrada agregada para exibição
+      newGoals['E-COMMERCE'] = numValue;
+    } else {
+      // Para filiais normais, apenas atualizar o valor
+      newGoals[filialKey] = numValue;
+    }
+    
     setGoals(newGoals);
-    await saveGoals(companyKey, monthYear.month, monthYear.year, newGoals);
+    
+    // Preparar goals para salvar (sem a chave agregada E-COMMERCE)
+    const goalsToSave: GoalData = { ...newGoals };
+    delete goalsToSave['E-COMMERCE'];
+    
+    await saveGoals(companyKey, monthYear.month, monthYear.year, goalsToSave);
   };
 
   const monthName = useMemo(() => {
@@ -91,8 +184,22 @@ export default function GoalsModal({
   }, [monthYear.month, monthYear.year]);
 
   const totalGoal = useMemo(() => {
-    return Object.values(goals).reduce((sum, goal) => sum + goal, 0);
-  }, [goals]);
+    // Calcular total excluindo a entrada agregada E-COMMERCE (já que ela é a soma das filiais individuais)
+    const normalizedEcommerceFilials = ecommerceFilials.map(f => f.trim().toUpperCase());
+    return Object.entries(goals).reduce((sum, [key, value]) => {
+      const normalizedKey = key.trim().toUpperCase();
+      // Se for a entrada agregada E-COMMERCE, incluir (é a soma total)
+      if (key === 'E-COMMERCE') {
+        return sum + value;
+      }
+      // Se for uma filial de e-commerce individual, não incluir (já está na entrada agregada)
+      if (normalizedEcommerceFilials.includes(normalizedKey)) {
+        return sum;
+      }
+      // Para filiais normais, incluir
+      return sum + value;
+    }, 0);
+  }, [goals, ecommerceFilials]);
 
   if (!isOpen) {
     return null;
@@ -121,18 +228,17 @@ export default function GoalsModal({
             <div className={styles.loading}>Carregando metas...</div>
           ) : (
             <div className={styles.filialList}>
-              {filiais.map((filial) => {
-                const displayName = displayNames[filial] ?? filial;
+              {filiaisToDisplay.map((filial) => {
                 return (
-                  <div key={filial} className={styles.filialItem}>
-                    <label className={styles.filialLabel}>{displayName}</label>
+                  <div key={filial.key} className={styles.filialItem}>
+                    <label className={styles.filialLabel}>{filial.displayName}</label>
                     <div className={styles.inputWrapper}>
                       <span className={styles.currency}>R$</span>
                       <input
                         type="number"
                         className={styles.input}
-                        value={goals[filial] || ""}
-                        onChange={(e) => handleGoalChange(filial, e.target.value)}
+                        value={goals[filial.key] || ""}
+                        onChange={(e) => handleGoalChange(filial.key, e.target.value)}
                         placeholder="0,00"
                         min="0"
                         step="0.01"
