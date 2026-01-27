@@ -738,6 +738,10 @@ export default function ControleTransferenciasTable({
                     );
                     const estoqueOrigem = filialOrigemData?.stock || 0;
                     
+                    // Calcular altura do tooltip baseada no número de filiais deste item
+                    const numFiliais = item.itemOriginal.filiais.length;
+                    const tooltipHeightEstimate = Math.min(700, 100 + (numFiliais * 28));
+                    
                     return (
                 <tr key={`${item.produto}-${item.cor}-${item.destino}-${index}`}>
                   <td className={styles.produtoCell}>
@@ -758,8 +762,8 @@ export default function ControleTransferenciasTable({
                       if (hoverTimeoutRef.current) {
                         clearTimeout(hoverTimeoutRef.current);
                       }
-                      const tooltipWidth = 400;
-                      const tooltipHeight = 300;
+                      const tooltipWidth = 480;
+                      const tooltipHeight = tooltipHeightEstimate;
                       const offset = 15;
                       
                       let x = e.clientX + offset;
@@ -785,8 +789,8 @@ export default function ControleTransferenciasTable({
                       if (hoverTimeoutRef.current) {
                         clearTimeout(hoverTimeoutRef.current);
                       }
-                      const tooltipWidth = 400;
-                      const tooltipHeight = 300;
+                      const tooltipWidth = 480;
+                      const tooltipHeight = tooltipHeightEstimate;
                       const offset = 15;
                       
                       let x = e.clientX + offset;
@@ -897,14 +901,14 @@ export default function ControleTransferenciasTable({
                       <div className={styles.tooltipFilialName}>{displayName}</div>
                       <div className={styles.tooltipFilialData}>
                         <span className={styles.tooltipEstoque}>
-                          Estoque: <strong>{filial.stock}</strong>
+                          Est: <strong>{filial.stock}</strong>
                         </span>
                         <span className={styles.tooltipVendas}>
-                          Vendas: <strong>{filial.sales}</strong>
+                          Vnd: <strong>{filial.sales}</strong>
                         </span>
                         {isParada && diasParado !== null && (
                           <span className={styles.tooltipParado}>
-                            Parado há: <strong>{diasParado}+ dias</strong>
+                            Parado: <strong>{diasParado}+d</strong>
                           </span>
                         )}
                       </div>
