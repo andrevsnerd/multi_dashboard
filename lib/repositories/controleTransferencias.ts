@@ -123,6 +123,24 @@ export async function fetchControleTransferencias({
     const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
     const vendasFilialFilter = buildFilialFilter(request, company, filial, 'vp');
 
+    // Verificar se precisa buscar vendas de e-commerce (ScarfMe e filial null)
+    const companyConfig = resolveCompany(company);
+    const isScarfme = company === 'scarfme';
+    const shouldIncludeEcommerce = isScarfme && filial === null;
+    const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
+    
+    // Criar filtro de filial para e-commerce
+    let ecommerceFilialFilter = '';
+    if (shouldIncludeEcommerce && ecommerceFilials.length > 0) {
+      ecommerceFilials.forEach((filialName, index) => {
+        request.input(`ecommerceFilial${index}`, sql.VarChar, filialName);
+      });
+      const placeholders = ecommerceFilials
+        .map((_, index) => `@ecommerceFilial${index}`)
+        .join(', ');
+      ecommerceFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+    }
+
     // Query otimizada: busca estoque agrupado por produto+cor+filial
     const estoqueQuery = `
       SELECT 
@@ -172,6 +190,48 @@ export async function fetchControleTransferencias({
         ${vendasFilialFilter}
       GROUP BY vp.PRODUTO, vp.COR_PRODUTO, COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), vp.FILIAL
     `;
+
+    // Query para buscar vendas de e-commerce do período (apenas ScarfMe quando filial é null)
+    const ecommerceVendasQuery = shouldIncludeEcommerce ? `
+      SELECT 
+        fp.PRODUTO AS produto,
+        fp.COR_PRODUTO AS corProduto,
+        ISNULL(c.DESC_COR, '') AS corBanco,
+        f.FILIAL AS filial,
+        SUM(CAST(fp.QTDE AS FLOAT)) AS vendas
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON fp.COR_PRODUTO = c.COR
+      WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND CAST(fp.QTDE AS FLOAT) > 0
+        ${ecommerceFilialFilter}
+      GROUP BY fp.PRODUTO, fp.COR_PRODUTO, c.DESC_COR, f.FILIAL
+    ` : 'SELECT NULL AS produto, NULL AS corProduto, NULL AS corBanco, NULL AS filial, 0 AS vendas WHERE 1=0';
+
+    // Query para buscar vendas de e-commerce dos últimos 30 dias
+    const ecommerceVendasLast30DaysQuery = shouldIncludeEcommerce ? `
+      SELECT 
+        fp.PRODUTO AS produto,
+        fp.COR_PRODUTO AS corProduto,
+        ISNULL(c.DESC_COR, '') AS corBanco,
+        f.FILIAL AS filial,
+        SUM(CAST(fp.QTDE AS FLOAT)) AS vendas
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON fp.COR_PRODUTO = c.COR
+      WHERE CAST(f.EMISSAO AS DATE) >= CAST(@thirtyDaysAgo AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND CAST(fp.QTDE AS FLOAT) > 0
+        ${ecommerceFilialFilter}
+      GROUP BY fp.PRODUTO, fp.COR_PRODUTO, c.DESC_COR, f.FILIAL
+    ` : 'SELECT NULL AS produto, NULL AS corProduto, NULL AS corBanco, NULL AS filial, 0 AS vendas WHERE 1=0';
 
     // Query para buscar última data de entrada por produto+cor+filial
     // Busca em ESTOQUE_PROD_ENT e também em LOJA_ENTRADAS_PRODUTO (priorizando a mais recente)
@@ -227,7 +287,7 @@ export async function fetchControleTransferencias({
 
     // Query para informações do produto (descrição e código)
     // Para scarfme, também buscar subgrupo e grade
-    const isScarfme = company === 'scarfme';
+    // isScarfme já foi declarado acima, reutilizar
     const subgrupoFieldEstoque = isScarfme ? ', ISNULL(p.SUBGRUPO_PRODUTO, \'\') AS subgrupo' : '';
     const gradeFieldEstoque = isScarfme ? ', ISNULL(CONVERT(VARCHAR, p.GRADE), \'\') AS grade' : '';
     const subgrupoFieldVendas = isScarfme ? ', ISNULL(COALESCE(vp.SUBGRUPO_PRODUTO, p.SUBGRUPO_PRODUTO), \'\') AS subgrupo' : '';
@@ -279,7 +339,7 @@ export async function fetchControleTransferencias({
     `;
 
     // Executar todas as queries em paralelo
-    const [estoqueResult, vendasResult, vendasLast30DaysResult, produtoInfoResult, codigoBarraResult, ultimaEntradaResult] = await Promise.all([
+    const [estoqueResult, vendasResult, vendasLast30DaysResult, ecommerceVendasResult, ecommerceVendasLast30DaysResult, produtoInfoResult, codigoBarraResult, ultimaEntradaResult] = await Promise.all([
       request.query<{
         produto: string;
         corProduto: string | null;
@@ -302,6 +362,20 @@ export async function fetchControleTransferencias({
         filial: string;
         vendas: number | null;
       }>(vendasLast30DaysQuery),
+      request.query<{
+        produto: string;
+        corProduto: string | null;
+        corBanco: string;
+        filial: string;
+        vendas: number | null;
+      }>(ecommerceVendasQuery),
+      request.query<{
+        produto: string;
+        corProduto: string | null;
+        corBanco: string;
+        filial: string;
+        vendas: number | null;
+      }>(ecommerceVendasLast30DaysQuery),
       request.query<{
         produto: string;
         corProduto: string | null;
@@ -332,7 +406,7 @@ export async function fetchControleTransferencias({
 
     // Criar mapeamento reverso de filialDisplayNames para encontrar nome canônico
     // Se "LEBLON" está mapeado para "NERD LEBLON", precisamos encontrar "NERD LEBLON" quando vier "LEBLON"
-    const companyConfig = resolveCompany(company);
+    // companyConfig já foi declarado acima, reutilizar
     const filialCanonicoMap = new Map<string, string>();
     if (companyConfig?.filialDisplayNames) {
       // Criar mapeamento reverso: displayName -> nomeCanonico
@@ -422,7 +496,7 @@ export async function fetchControleTransferencias({
       filialMap.set(filialCanonico, (filialMap.get(filialCanonico) || 0) + stock);
     });
 
-    // Processar vendas
+    // Processar vendas normais
     vendasResult.recordset.forEach(row => {
       const produto = row.produto?.trim() || '';
       const corNormalizada = getColorDescription(row.corProduto, row.corBanco);
@@ -440,7 +514,29 @@ export async function fetchControleTransferencias({
       filialMap.set(filialCanonico, (filialMap.get(filialCanonico) || 0) + vendas);
     });
 
-    // Processar vendas últimos 30 dias
+    // Processar vendas de e-commerce (agregar com vendas normais)
+    if (shouldIncludeEcommerce) {
+      ecommerceVendasResult.recordset.forEach(row => {
+        const produto = row.produto?.trim() || '';
+        if (!produto) return; // Ignorar linhas vazias da query dummy
+        
+        const corNormalizada = getColorDescription(row.corProduto, row.corBanco);
+        const chave = `${produto}|${corNormalizada}`;
+        
+        if (!vendasMap.has(chave)) {
+          vendasMap.set(chave, new Map());
+        }
+        
+        const filialMap = vendasMap.get(chave)!;
+        const vendas = Number(row.vendas ?? 0);
+        
+        // Usar nome canônico da filial para agrupar
+        const filialCanonico = getFilialCanonico(row.filial);
+        filialMap.set(filialCanonico, (filialMap.get(filialCanonico) || 0) + vendas);
+      });
+    }
+
+    // Processar vendas últimos 30 dias (normais)
     vendasLast30DaysResult.recordset.forEach(row => {
       const produto = row.produto?.trim() || '';
       const corNormalizada = getColorDescription(row.corProduto, row.corBanco);
@@ -457,6 +553,28 @@ export async function fetchControleTransferencias({
       const filialCanonico = getFilialCanonico(row.filial);
       filialMap.set(filialCanonico, (filialMap.get(filialCanonico) || 0) + vendas);
     });
+
+    // Processar vendas de e-commerce dos últimos 30 dias (agregar com vendas normais)
+    if (shouldIncludeEcommerce) {
+      ecommerceVendasLast30DaysResult.recordset.forEach(row => {
+        const produto = row.produto?.trim() || '';
+        if (!produto) return; // Ignorar linhas vazias da query dummy
+        
+        const corNormalizada = getColorDescription(row.corProduto, row.corBanco);
+        const chave = `${produto}|${corNormalizada}`;
+        
+        if (!vendasLast30DaysMap.has(chave)) {
+          vendasLast30DaysMap.set(chave, new Map());
+        }
+        
+        const filialMap = vendasLast30DaysMap.get(chave)!;
+        const vendas = Number(row.vendas ?? 0);
+        
+        // Usar nome canônico da filial para agrupar
+        const filialCanonico = getFilialCanonico(row.filial);
+        filialMap.set(filialCanonico, (filialMap.get(filialCanonico) || 0) + vendas);
+      });
+    }
 
     // Processar informações do produto
     produtoInfoResult.recordset.forEach(row => {
