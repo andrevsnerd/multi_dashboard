@@ -103,7 +103,19 @@ export default function ControleTransferenciasPage({
           null // Sempre carregar todas as filiais
         );
         if (active) {
-          setData(transferenciasData);
+          // Converter ultimaEntrada de string para Date (JSON serializa Date como string)
+          const dataWithDates = transferenciasData.map(item => ({
+            ...item,
+            filiais: item.filiais.map(filial => ({
+              ...filial,
+              ultimaEntrada: filial.ultimaEntrada 
+                ? (typeof filial.ultimaEntrada === 'string' 
+                    ? new Date(filial.ultimaEntrada) 
+                    : filial.ultimaEntrada)
+                : null,
+            })),
+          }));
+          setData(dataWithDates);
         }
       } catch (err) {
         if (active) {

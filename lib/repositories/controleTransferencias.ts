@@ -20,6 +20,7 @@ export interface FilialData {
   stock: number;
   sales: number;
   salesLast30Days: number;
+  ultimaEntrada?: Date | null; // Data da última entrada na filial
 }
 
 export interface ProdutoTransferencia {
@@ -172,6 +173,58 @@ export async function fetchControleTransferencias({
       GROUP BY vp.PRODUTO, vp.COR_PRODUTO, COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), vp.FILIAL
     `;
 
+    // Query para buscar última data de entrada por produto+cor+filial
+    // Busca em ESTOQUE_PROD_ENT e também em LOJA_ENTRADAS_PRODUTO (priorizando a mais recente)
+    // Criar filtro de filial para a query de entrada (usando alias E, mas com prefixo diferente para evitar conflito de variáveis)
+    const ultimaEntradaFilialFilter = buildFilialFilter(request, company, filial, 'ent');
+    // Ajustar o filtro para usar o alias E na query (substituir 'ent.' por 'E.')
+    const ultimaEntradaFilialFilterAjustado = ultimaEntradaFilialFilter.replace(/ent\./g, 'E.');
+    // Criar filtro para LOJA_ENTRADAS (usando prefixo 'le' para evitar conflito)
+    const lojaEntradasFilialFilter = buildFilialFilter(request, company, filial, 'le');
+    // Ajustar o filtro para usar o alias LE na query (substituir 'le.' por 'LE.')
+    const lojaEntradasFilialFilterAjustado = lojaEntradasFilialFilter.replace(/le\./g, 'LE.');
+    const ultimaEntradaQuery = `
+      SELECT 
+        produto,
+        corProduto,
+        corBanco,
+        filial,
+        MAX(ultimaEntrada) AS ultimaEntrada
+      FROM (
+        -- Entradas de ESTOQUE_PROD_ENT
+        SELECT 
+          P.PRODUTO AS produto,
+          P.COR_PRODUTO AS corProduto,
+          ISNULL(c.DESC_COR, '') AS corBanco,
+          E.FILIAL AS filial,
+          E.EMISSAO AS ultimaEntrada
+        FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+        LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) 
+          ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+        LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON P.COR_PRODUTO = c.COR
+        WHERE P.PRODUTO IS NOT NULL
+          ${ultimaEntradaFilialFilterAjustado}
+        
+        UNION ALL
+        
+        -- Entradas de LOJA_ENTRADAS_PRODUTO
+        SELECT 
+          LEP.PRODUTO AS produto,
+          LEP.COR_PRODUTO AS corProduto,
+          ISNULL(c.DESC_COR, '') AS corBanco,
+          LE.FILIAL AS filial,
+          LE.EMISSAO AS ultimaEntrada
+        FROM LOJA_ENTRADAS_PRODUTO AS LEP WITH (NOLOCK)
+        INNER JOIN LOJA_ENTRADAS AS LE WITH (NOLOCK)
+          ON LEP.FILIAL = LE.FILIAL
+          AND LEP.ROMANEIO_PRODUTO = LE.ROMANEIO_PRODUTO
+        LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON LEP.COR_PRODUTO = c.COR
+        WHERE LEP.PRODUTO IS NOT NULL
+          ${lojaEntradasFilialFilterAjustado}
+      ) AS todas_entradas
+      GROUP BY produto, corProduto, corBanco, filial
+    `;
+
     // Query para informações do produto (descrição e código)
     // Para scarfme, também buscar subgrupo e grade
     const isScarfme = company === 'scarfme';
@@ -226,7 +279,7 @@ export async function fetchControleTransferencias({
     `;
 
     // Executar todas as queries em paralelo
-    const [estoqueResult, vendasResult, vendasLast30DaysResult, produtoInfoResult, codigoBarraResult] = await Promise.all([
+    const [estoqueResult, vendasResult, vendasLast30DaysResult, produtoInfoResult, codigoBarraResult, ultimaEntradaResult] = await Promise.all([
       request.query<{
         produto: string;
         corProduto: string | null;
@@ -263,6 +316,13 @@ export async function fetchControleTransferencias({
         corBanco: string;
         codigoBarra: string | null;
       }>(codigoBarraQuery),
+      request.query<{
+        produto: string;
+        corProduto: string | null;
+        corBanco: string;
+        filial: string;
+        ultimaEntrada: Date | null;
+      }>(ultimaEntradaQuery),
     ]);
 
     // Função auxiliar para normalizar filial (usar em todos os lugares)
@@ -338,6 +398,7 @@ export async function fetchControleTransferencias({
     const estoqueMap = new Map<string, Map<string, number>>();
     const vendasMap = new Map<string, Map<string, number>>();
     const vendasLast30DaysMap = new Map<string, Map<string, number>>();
+    const ultimaEntradaMap = new Map<string, Map<string, Date | null>>(); // produto+cor -> filial -> data
     const produtoInfoMap = new Map<string, { descricao: string; cor: string; subgrupo?: string; grade?: string }>();
     const codigoBarraMap = new Map<string, string>();
 
@@ -434,6 +495,26 @@ export async function fetchControleTransferencias({
       }
     });
 
+    // Processar última entrada por produto+cor+filial
+    ultimaEntradaResult.recordset.forEach(row => {
+      const produto = row.produto?.trim() || '';
+      const corNormalizada = getColorDescription(row.corProduto, row.corBanco);
+      const chave = `${produto}|${corNormalizada}`;
+      const filialCanonico = getFilialCanonico(row.filial);
+      const ultimaEntrada = row.ultimaEntrada ? new Date(row.ultimaEntrada) : null;
+      
+      if (!ultimaEntradaMap.has(chave)) {
+        ultimaEntradaMap.set(chave, new Map());
+      }
+      
+      const filialMap = ultimaEntradaMap.get(chave)!;
+      // Manter a data mais recente se houver múltiplas entradas
+      const dataExistente = filialMap.get(filialCanonico);
+      if (!dataExistente || (ultimaEntrada && (!dataExistente || ultimaEntrada > dataExistente))) {
+        filialMap.set(filialCanonico, ultimaEntrada);
+      }
+    });
+
     // Combinar dados
     const produtosMap = new Map<string, ProdutoTransferencia>();
     const allChaves = new Set([
@@ -449,12 +530,14 @@ export async function fetchControleTransferencias({
       const estoquePorFilial = estoqueMap.get(chave) || new Map();
       const vendasPorFilial = vendasMap.get(chave) || new Map();
       const vendasLast30DaysPorFilial = vendasLast30DaysMap.get(chave) || new Map();
+      const ultimaEntradaPorFilial = ultimaEntradaMap.get(chave) || new Map();
       
       // Obter todas as filiais únicas
       const todasFiliais = new Set([
         ...estoquePorFilial.keys(),
         ...vendasPorFilial.keys(),
         ...vendasLast30DaysPorFilial.keys(),
+        ...ultimaEntradaPorFilial.keys(),
       ]);
 
       const filiais: FilialData[] = Array.from(todasFiliais).map(filial => ({
@@ -462,6 +545,7 @@ export async function fetchControleTransferencias({
         stock: estoquePorFilial.get(filial) || 0,
         sales: vendasPorFilial.get(filial) || 0,
         salesLast30Days: vendasLast30DaysPorFilial.get(filial) || 0,
+        ultimaEntrada: ultimaEntradaPorFilial.get(filial) || null,
       }));
 
       const totalVendas = Array.from(vendasPorFilial.values()).reduce((sum, v) => sum + v, 0);

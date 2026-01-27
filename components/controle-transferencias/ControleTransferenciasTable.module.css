@@ -524,10 +524,24 @@
   white-space: nowrap;
 }
 
+.tooltipUltimaEntrada {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+  color: #6b7280;
+  font-size: 11px;
+}
+
 .tooltipEstoque strong,
 .tooltipVendas strong {
   color: #1f2937;
   font-weight: 600;
+}
+
+.tooltipUltimaEntrada strong {
+  color: #4b5563;
+  font-weight: 500;
 }
 
 .tooltipParado {

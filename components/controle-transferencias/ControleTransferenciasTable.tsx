@@ -227,15 +227,41 @@ export function calculateTransfers(
       .map(f => {
         // IMPORTANTE: Usar apenas estoque positivo para cálculos
         const estoquePositivo = Math.max(0, f.stock);
+        
+        // Verificar se está parada há pelo menos 14 dias desde a última entrada
+        // Regra: estoque positivo (>= 1) sem vendas há 14+ dias desde última entrada
+        let isParada = false;
+        let isEcommerceParado = false;
+        
+        if (estoquePositivo >= 1 && f.sales === 0 && f.salesLast30Days === 0) {
+          // Verificar se a última entrada foi há pelo menos 14 dias
+          if (f.ultimaEntrada) {
+            const hoje = new Date();
+            const dataUltimaEntrada = new Date(f.ultimaEntrada);
+            const diasDesdeUltimaEntrada = Math.floor((hoje.getTime() - dataUltimaEntrada.getTime()) / (1000 * 60 * 60 * 24));
+            
+            // Só é considerada parada se a última entrada foi há 14+ dias
+            if (diasDesdeUltimaEntrada >= 14) {
+              isParada = true;
+              isEcommerceParado = f.filial === ecommerce;
+            }
+          } else {
+            // Se não há data de entrada registrada, considerar parada (comportamento antigo)
+            isParada = true;
+            isEcommerceParado = f.filial === ecommerce;
+          }
+        }
+        
         return {
           filial: f.filial,
           stock: estoquePositivo, // Usar apenas estoque positivo
           sales: f.sales,
           salesLast30Days: f.salesLast30Days,
-          // Identificação de Lojas Paradas: estoque > 1 E vendas no período === 0 E vendas últimos 30 dias === 0
-          isParada: estoquePositivo > 1 && f.sales === 0 && f.salesLast30Days === 0,
+          ultimaEntrada: f.ultimaEntrada,
+          // Identificação de Lojas Paradas: estoque >= 1 E vendas no período === 0 E vendas últimos 30 dias === 0 E última entrada há 14+ dias
+          isParada,
           // Identificação de E-commerce Parado
-          isEcommerceParado: f.filial === ecommerce && estoquePositivo > 1 && f.sales === 0 && f.salesLast30Days === 0,
+          isEcommerceParado,
         };
       })
       .sort((a, b) => {
@@ -389,9 +415,15 @@ export function calculateTransfers(
       if (melhorOrigem.filial === matriz) {
         estoqueMinimoNaOrigem = 0;
       } else if (melhorOrigem.sales > 0) {
+        // Lojas que vendem sempre deixam pelo menos 1 unidade
         estoqueMinimoNaOrigem = 1;
-      } else {
+      } else if (melhorOrigem.isParada || melhorOrigem.isEcommerceParado) {
+        // Lojas paradas há 14+ dias podem transferir tudo (sem estoque mínimo)
         estoqueMinimoNaOrigem = 0;
+      } else {
+        // Lojas que não vendem mas entraram há menos de 14 dias: deixam pelo menos 1 unidade
+        // (não podem ficar com 0, pois não estão paradas há tempo suficiente)
+        estoqueMinimoNaOrigem = 1;
       }
       
       let quantidade = Math.min(quantidadeFaltante, estoqueOrigem - estoqueMinimoNaOrigem);
@@ -408,8 +440,11 @@ export function calculateTransfers(
         if (melhorOrigem.sales > 0 && melhorOrigem.filial !== matriz) {
           // Lojas que vendem deixam pelo menos 1 unidade
           quantidade = Math.min(quantidade, estoqueOrigem - 1);
+        } else if (!melhorOrigem.isParada && !melhorOrigem.isEcommerceParado && melhorOrigem.filial !== matriz) {
+          // Lojas que não vendem mas não estão paradas há 14+ dias: deixam pelo menos 1 unidade
+          quantidade = Math.min(quantidade, estoqueOrigem - 1);
         }
-        // Matriz e lojas paradas podem transferir tudo se necessário
+        // Matriz e lojas paradas há 14+ dias podem transferir tudo se necessário
       } else {
         // Quando há apenas uma loja precisando:
         // Lojas que vendem deixam pelo menos 1 unidade
@@ -417,17 +452,22 @@ export function calculateTransfers(
         if (melhorOrigem.sales > 0 && melhorOrigem.filial !== matriz) {
           quantidade = Math.min(quantidade, estoqueOrigem - 1);
         } else {
-          // Se é loja parada:
+          // Se é loja parada há 14+ dias:
           // Normalmente: transfere só o necessário
           // Exceção: se loja parada tem ≤ 5 unidades E é obrigatório enviar: pode transferir tudo
           const isLojaparadaOuEcommerceParado = melhorOrigem.isParada || melhorOrigem.isEcommerceParado;
           const isLojaparadaComPoucasUnidades = isLojaparadaOuEcommerceParado && estoqueOrigem <= 5;
           
-          if (!isLojaparadaComPoucasUnidades) {
-            // Limitar a quantidade ao necessário, não transferir tudo
-            quantidade = Math.min(quantidade, quantidadeFaltante);
+          if (isLojaparadaOuEcommerceParado) {
+            if (!isLojaparadaComPoucasUnidades) {
+              // Limitar a quantidade ao necessário, não transferir tudo
+              quantidade = Math.min(quantidade, quantidadeFaltante);
+            }
+            // Se for loja parada/e-commerce parado com poucas unidades, pode transferir tudo se necessário
+          } else {
+            // Se não está parada há 14+ dias: deixar pelo menos 1 unidade
+            quantidade = Math.min(quantidade, estoqueOrigem - 1);
           }
-          // Se for loja parada/e-commerce parado com poucas unidades, pode transferir tudo se necessário
         }
       }
 
@@ -465,6 +505,11 @@ export function calculateTransfers(
             if (f.filial === matriz) {
               return disponivel >= 1;
             }
+            // Se está parada há 14+ dias, pode transferir mesmo tendo apenas 1
+            if (f.isParada || f.isEcommerceParado) {
+              return disponivel >= 1;
+            }
+            // Se não está parada há 14+ dias, precisa ter pelo menos 2 (deixa 1)
             const minimoNecessario = f.sales > 0 ? 2 : 1;
             return disponivel >= minimoNecessario;
           });
@@ -493,6 +538,13 @@ export function calculateTransfers(
           if (outraOrigem.filial === matriz) {
             estoqueMinimoOutraOrigem = 0;
           } else if (outraOrigem.sales > 0) {
+            // Lojas que vendem sempre deixam pelo menos 1 unidade
+            estoqueMinimoOutraOrigem = 1;
+          } else if (outraOrigem.isParada || outraOrigem.isEcommerceParado) {
+            // Lojas paradas há 14+ dias podem transferir tudo (sem estoque mínimo)
+            estoqueMinimoOutraOrigem = 0;
+          } else {
+            // Lojas que não vendem mas entraram há menos de 14 dias: deixam pelo menos 1 unidade
             estoqueMinimoOutraOrigem = 1;
           }
           
@@ -966,43 +1018,126 @@ export default function ControleTransferenciasTable({
                   const totalSales = ecommerceFiliais.reduce((sum, f) => sum + f.sales, 0);
                   const totalSalesLast30Days = ecommerceFiliais.reduce((sum, f) => sum + f.salesLast30Days, 0);
                   
+                  // Pegar a data de entrada mais recente entre todas as filiais de e-commerce
+                  const ultimaEntradaEcommerce = ecommerceFiliais
+                    .map(f => f.ultimaEntrada)
+                    .filter(date => date !== null && date !== undefined)
+                    .map(date => new Date(date as Date | string))
+                    .filter(date => !isNaN(date.getTime())) // Filtrar datas inválidas
+                    .sort((a, b) => b.getTime() - a.getTime())[0] || null;
+                  
                   ecommerceAggregated = {
                     filial: 'E-COMMERCE',
                     stock: totalStock,
                     sales: totalSales,
                     salesLast30Days: totalSalesLast30Days,
+                    ultimaEntrada: ultimaEntradaEcommerce,
                   };
                 }
                 
+                // Agrupar filiais que têm o mesmo display name (ex: PAULISTA pode vir de múltiplas filiais)
+                const filiaisPorDisplayName = new Map<string, typeof hoveredItem.itemOriginal.filiais>();
+                
+                normalFiliais.forEach(filial => {
+                  const displayName = company?.filialDisplayNames?.[filial.filial] || filial.filial;
+                  if (!filiaisPorDisplayName.has(displayName)) {
+                    filiaisPorDisplayName.set(displayName, []);
+                  }
+                  filiaisPorDisplayName.get(displayName)!.push(filial);
+                });
+                
+                // Agregar filiais com mesmo display name
+                const filiaisAgregadas = Array.from(filiaisPorDisplayName.entries()).map(([displayName, filiais]) => {
+                  if (filiais.length === 1) {
+                    // Se só tem uma filial, retornar como está
+                    return {
+                      ...filiais[0],
+                      displayName,
+                    };
+                  } else {
+                    // Se tem múltiplas filiais com mesmo display name, agregar
+                    const totalStock = filiais.reduce((sum, f) => sum + f.stock, 0);
+                    const totalSales = filiais.reduce((sum, f) => sum + f.sales, 0);
+                    const totalSalesLast30Days = filiais.reduce((sum, f) => sum + f.salesLast30Days, 0);
+                    
+                    // Pegar a data de entrada mais recente
+                    const ultimaEntradaAgregada = filiais
+                      .map(f => f.ultimaEntrada)
+                      .filter(date => date !== null && date !== undefined)
+                      .map(date => new Date(date as Date | string))
+                      .filter(date => !isNaN(date.getTime()))
+                      .sort((a, b) => b.getTime() - a.getTime())[0] || null;
+                    
+                    return {
+                      filial: displayName, // Usar display name como identificador
+                      stock: totalStock,
+                      sales: totalSales,
+                      salesLast30Days: totalSalesLast30Days,
+                      ultimaEntrada: ultimaEntradaAgregada,
+                      displayName,
+                    };
+                  }
+                });
+                
                 // Combinar e ordenar
                 const allFiliaisToShow = [
-                  ...normalFiliais,
+                  ...filiaisAgregadas,
                   ...(ecommerceAggregated ? [ecommerceAggregated] : []),
                 ].sort((a, b) => {
-                  if (a.filial === matriz) return -1;
-                  if (b.filial === matriz) return 1;
-                  return a.filial.localeCompare(b.filial);
+                  const filialA = (a as any).displayName || a.filial;
+                  const filialB = (b as any).displayName || b.filial;
+                  if (filialA === matriz) return -1;
+                  if (filialB === matriz) return 1;
+                  return filialA.localeCompare(filialB);
                 });
                 
                 return allFiliaisToShow.map((filial) => {
                   const displayName = filial.filial === 'E-COMMERCE' 
                     ? 'E-COMMERCE'
-                    : (company?.filialDisplayNames?.[filial.filial] || filial.filial);
-                  const isParada = filial.stock > 1 && filial.sales === 0 && filial.salesLast30Days === 0;
-                  
+                    : ((filial as any).displayName || company?.filialDisplayNames?.[filial.filial] || filial.filial);
+                  // Verificar se está parada há pelo menos 14 dias desde a última entrada
+                  let isParada = false;
                   let diasParado: number | null = null;
-                  if (filial.stock > 0 && filial.sales === 0 && filial.salesLast30Days === 0) {
+                  let dataUltimaEntradaFormatada: string | null = null;
+                  
+                  // SEMPRE formatar a data da última entrada se existir (independente de estar parada ou não)
+                  if (filial.ultimaEntrada) {
+                    const hoje = new Date();
+                    const dataUltimaEntrada = new Date(filial.ultimaEntrada);
+                    const diasDesdeUltimaEntrada = Math.floor((hoje.getTime() - dataUltimaEntrada.getTime()) / (1000 * 60 * 60 * 24));
+                    
+                    // Formatar data da última entrada
+                    dataUltimaEntradaFormatada = dataUltimaEntrada.toLocaleDateString('pt-BR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric'
+                    });
+                    
+                    // Verificar se está parada (estoque >= 1, sem vendas, e última entrada há 14+ dias)
+                    if (filial.stock >= 1 && filial.sales === 0 && filial.salesLast30Days === 0 && diasDesdeUltimaEntrada >= 14) {
+                      isParada = true;
+                      diasParado = diasDesdeUltimaEntrada;
+                    }
+                  } else if (filial.stock >= 1 && filial.sales === 0 && filial.salesLast30Days === 0) {
+                    // Se não há data de entrada, usar o período selecionado como fallback
                     const daysInPeriod = dateRange ? 
                       Math.max(1, Math.ceil((new Date(dateRange.endDate).getTime() - new Date(dateRange.startDate).getTime()) / (1000 * 60 * 60 * 24))) : 30;
-                    diasParado = Math.max(30, daysInPeriod);
+                    // Se o período for >= 14 dias, considerar parado
+                    if (daysInPeriod >= 14) {
+                      isParada = true;
+                      diasParado = Math.max(14, daysInPeriod);
+                    }
                   } else if (filial.stock > 0 && filial.sales === 0 && filial.salesLast30Days > 0) {
+                    // Teve vendas nos últimos 30 dias, mas não no período: mostrar dias do período
                     const daysInPeriod = dateRange ? 
                       Math.max(1, Math.ceil((new Date(dateRange.endDate).getTime() - new Date(dateRange.startDate).getTime()) / (1000 * 60 * 60 * 24))) : 30;
-                    diasParado = daysInPeriod;
+                    if (daysInPeriod >= 14) {
+                      diasParado = daysInPeriod;
+                    }
                   }
                   
                   return (
-                    <div key={filial.filial} className={styles.tooltipFilialRow}>
+                    <div key={displayName} className={styles.tooltipFilialRow}>
                       <div className={styles.tooltipFilialName}>{displayName}</div>
                       <div className={styles.tooltipFilialData}>
                         <span className={styles.tooltipEstoque}>
@@ -1011,6 +1146,11 @@ export default function ControleTransferenciasTable({
                         <span className={styles.tooltipVendas}>
                           Vnd: <strong>{filial.sales}</strong>
                         </span>
+                        {dataUltimaEntradaFormatada && (
+                          <span className={styles.tooltipUltimaEntrada}>
+                            Últ. Entrada: <strong>{dataUltimaEntradaFormatada}</strong>
+                          </span>
+                        )}
                         {isParada && diasParado !== null && (
                           <span className={styles.tooltipParado}>
                             Parado: <strong>{diasParado}+d</strong>
