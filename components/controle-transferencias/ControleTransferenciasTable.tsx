@@ -152,9 +152,16 @@ export function calculateTransfers(
     // Se alguma filial com vendas tem estoque < 1
     // E há estoque disponível em outras filiais (≥ 1 unidade)
     // → Produto pode ser transferido
+    // IMPORTANTE: Considerar apenas estoque positivo para verificar disponibilidade
     const filiaisComVendas = item.filiais.filter(f => f.sales > 0);
-    const algumaFilialComEstoqueBaixo = filiaisComVendas.some(f => f.stock < 1);
-    const temEstoqueDisponivel = item.filiais.some(f => f.stock >= 1);
+    const algumaFilialComEstoqueBaixo = filiaisComVendas.some(f => {
+      const estoquePositivo = Math.max(0, f.stock);
+      return estoquePositivo < 1;
+    });
+    const temEstoqueDisponivel = item.filiais.some(f => {
+      const estoquePositivo = Math.max(0, f.stock);
+      return estoquePositivo >= 1;
+    });
 
     if (!algumaFilialComEstoqueBaixo || !temEstoqueDisponivel) {
       return;
@@ -164,17 +171,25 @@ export function calculateTransfers(
 
     // Identificar filiais que precisam de estoque
     // Critérios: Tem vendas no período (sales > 0) E Estoque < 1 (zero ou negativo)
+    // IMPORTANTE: Considerar apenas estoque positivo - estoque negativo é tratado como zero
     // Ordenação de Prioridade:
     // 1. Quem vendeu mais primeiro
     // 2. Em caso de empate, quem tem menos estoque primeiro
     const filiaisQuePrecisam = filiaisComVendas
-      .filter(f => f.stock < 1)
-      .map(f => ({
-        filial: f.filial,
-        stock: f.stock,
-        sales: f.sales,
-        salesLast30Days: f.salesLast30Days,
-      }))
+      .filter(f => {
+        const estoquePositivo = Math.max(0, f.stock);
+        return estoquePositivo < 1;
+      })
+      .map(f => {
+        // IMPORTANTE: Usar apenas estoque positivo para ordenação
+        const estoquePositivo = Math.max(0, f.stock);
+        return {
+          filial: f.filial,
+          stock: estoquePositivo, // Usar apenas estoque positivo
+          sales: f.sales,
+          salesLast30Days: f.salesLast30Days,
+        };
+      })
       .sort((a, b) => {
         // Priorizar: quem vendeu mais primeiro
         if (b.sales !== a.sales) {
@@ -206,16 +221,20 @@ export function calculateTransfers(
         // Se não tem vendas (loja parada): pode transferir mesmo tendo apenas 1
         return f.stock >= 1;
       })
-      .map(f => ({
-        filial: f.filial,
-        stock: f.stock,
-        sales: f.sales,
-        salesLast30Days: f.salesLast30Days,
-        // Identificação de Lojas Paradas: estoque > 1 E vendas no período === 0 E vendas últimos 30 dias === 0
-        isParada: f.stock > 1 && f.sales === 0 && f.salesLast30Days === 0,
-        // Identificação de E-commerce Parado
-        isEcommerceParado: f.filial === ecommerce && f.stock > 1 && f.sales === 0 && f.salesLast30Days === 0,
-      }))
+      .map(f => {
+        // IMPORTANTE: Usar apenas estoque positivo para cálculos
+        const estoquePositivo = Math.max(0, f.stock);
+        return {
+          filial: f.filial,
+          stock: estoquePositivo, // Usar apenas estoque positivo
+          sales: f.sales,
+          salesLast30Days: f.salesLast30Days,
+          // Identificação de Lojas Paradas: estoque > 1 E vendas no período === 0 E vendas últimos 30 dias === 0
+          isParada: estoquePositivo > 1 && f.sales === 0 && f.salesLast30Days === 0,
+          // Identificação de E-commerce Parado
+          isEcommerceParado: f.filial === ecommerce && estoquePositivo > 1 && f.sales === 0 && f.salesLast30Days === 0,
+        };
+      })
       .sort((a, b) => {
         // Ordenação de Prioridade para Origem:
         // 1. Matriz (sempre primeiro)
@@ -245,9 +264,12 @@ export function calculateTransfers(
     }
 
     // Mapa para rastrear estoque disponível por origem
+    // IMPORTANTE: Ignorar estoque negativo - usar apenas estoque positivo
     const estoqueDisponivelPorOrigem = new Map<string, number>();
     filiaisComEstoque.forEach(f => {
-      estoqueDisponivelPorOrigem.set(f.filial, f.stock);
+      // Usar apenas estoque positivo (ignorar negativo)
+      const estoquePositivo = Math.max(0, f.stock);
+      estoqueDisponivelPorOrigem.set(f.filial, estoquePositivo);
     });
 
     const daysInPeriod = dateRange ? 
@@ -261,9 +283,11 @@ export function calculateTransfers(
     const temMultiplasLojas = filiaisQuePrecisam.length > 1;
     
     // Calcular estoque total disponível (soma de todas as origens)
+    // IMPORTANTE: Ignorar estoque negativo - usar apenas estoque positivo
     let estoqueTotalDisponivel = 0;
     filiaisComEstoque.forEach(f => {
-      estoqueTotalDisponivel += f.stock;
+      const estoquePositivo = Math.max(0, f.stock);
+      estoqueTotalDisponivel += estoquePositivo;
     });
     
     const usarDistribuicaoProporcional = temMultiplasLojas;
@@ -274,6 +298,10 @@ export function calculateTransfers(
 
       let quantidadeTotalNecessaria: number;
       
+      // IMPORTANTE: Ignorar estoque negativo - considerar apenas estoque positivo ou zero
+      // A quantidade a transferir deve ser baseada nas vendas, não no déficit de estoque
+      const estoqueAtualDestinoPositivo = Math.max(0, filialDestino.stock);
+      
       if (usarDistribuicaoProporcional) {
         // Distribuição proporcional: considera TODAS as lojas que vendem (incluindo origens)
         // Proporção desta loja destino = vendas desta loja / total de vendas de todas as lojas
@@ -282,17 +310,21 @@ export function calculateTransfers(
         // Quantidade que esta loja destino deveria ter = proporção × estoque total disponível
         const quantidadeIdealDestino = Math.floor(estoqueTotalDisponivel * proporcaoDestino);
         
-        // Quantidade necessária = quantidade ideal - estoque atual
+        // Quantidade necessária = quantidade ideal - estoque atual (apenas positivo)
         // Garantir mínimo de 1 unidade se necessário
-        quantidadeTotalNecessaria = Math.max(1, quantidadeIdealDestino - filialDestino.stock);
+        quantidadeTotalNecessaria = Math.max(1, quantidadeIdealDestino - estoqueAtualDestinoPositivo);
       } else {
         // Caso 1: Uma única loja precisa
         // estoqueMinimo = max(2, vendas do período)
         // quantidadeNecessaria = max(estoqueMinimo - estoqueAtual, 2)
+        // IMPORTANTE: Se estoque é negativo, tratar como zero
         const estoqueMinimo = Math.max(2, filialDestino.sales);
-        const estoqueAtualDestino = filialDestino.stock;
-        quantidadeTotalNecessaria = Math.max(estoqueMinimo - estoqueAtualDestino, 2);
+        quantidadeTotalNecessaria = Math.max(estoqueMinimo - estoqueAtualDestinoPositivo, 2);
       }
+      
+      // GARANTIA: A quantidade nunca deve ser maior que as vendas do destino
+      // Se uma loja tem -15 de estoque e vendeu 1, deve enviar apenas 1 (não 16)
+      quantidadeTotalNecessaria = Math.min(quantidadeTotalNecessaria, filialDestino.sales);
       
       if (quantidadeJaTransferida >= quantidadeTotalNecessaria) {
         return;
@@ -360,6 +392,10 @@ export function calculateTransfers(
       }
       
       let quantidade = Math.min(quantidadeFaltante, estoqueOrigem - estoqueMinimoNaOrigem);
+      
+      // GARANTIA: A quantidade nunca deve ser maior que as vendas do destino
+      // Se uma loja tem -15 de estoque e vendeu 1, deve enviar apenas 1 (não 16)
+      quantidade = Math.min(quantidade, filialDestino.sales);
 
       if (usarDistribuicaoProporcional) {
         // Quando há distribuição proporcional (múltiplas lojas precisando):
@@ -454,7 +490,12 @@ export function calculateTransfers(
             estoqueMinimoOutraOrigem = 1;
           }
           
-          const quantidadeCompletar = Math.min(quantidadeAindaFaltante, estoqueOutraOrigem - estoqueMinimoOutraOrigem);
+          let quantidadeCompletar = Math.min(quantidadeAindaFaltante, estoqueOutraOrigem - estoqueMinimoOutraOrigem);
+          
+          // GARANTIA: A quantidade nunca deve ser maior que as vendas do destino
+          // Se uma loja tem -15 de estoque e vendeu 1, deve enviar apenas 1 (não 16)
+          const quantidadeMaximaPermitida = filialDestino.sales - quantidadeTotalTransferida;
+          quantidadeCompletar = Math.min(quantidadeCompletar, Math.max(0, quantidadeMaximaPermitida));
           
           if (quantidadeCompletar > 0) {
             const origemDisplayNameCompletar = company.filialDisplayNames?.[outraOrigem.filial] || outraOrigem.filial;
