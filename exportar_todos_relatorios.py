@@ -300,18 +300,48 @@ def processar_entradas(df_mov, df_produtos, df_cores):
     df = df_mov.merge(df_produtos[cols_prod], on='PRODUTO', how='left')
     
     # Merge cores
-    df_cores = df_cores.rename(columns={'COR': 'COR_PRODUTO', 'DESC_COR': 'DESC_COR_PRODUTO'})
-    df = df.merge(df_cores, on='COR_PRODUTO', how='left')
+    df_cores_copy = df_cores.rename(columns={'COR': 'COR_PRODUTO', 'DESC_COR': 'DESC_COR_PRODUTO'})
+    df = df.merge(df_cores_copy, on='COR_PRODUTO', how='left')
     
     df = converter_datas(df, ['EMISSAO'])
     
     # Ordena colunas
     ordem = ['EMISSAO', 'FILIAL', 'ROMANEIO_PRODUTO', 'PRODUTO', 'DESC_PRODUTO',
-             'COR_PRODUTO', 'DESC_COR_PRODUTO', 'QTDE_TOTAL', 'GRUPO_PRODUTO',
-             'SUBGRUPO_PRODUTO', 'LINHA', 'COLECAO']
+             'COR_PRODUTO', 'DESC_COR_PRODUTO', 'QTDE_TOTAL', 'TIPO_ENTRADA', 'TIPO_ROMANEIO',
+             'GRUPO_PRODUTO', 'SUBGRUPO_PRODUTO', 'LINHA', 'COLECAO']
     df = df[[c for c in ordem if c in df.columns]]
     
     salvar_relatorio(df, 'entradas', 'EntradasEnriquecidas')
+    print(f"Tempo: {time.time()-t:.2f}s")
+
+def processar_saidas(df_saidas, df_produtos, df_cores):
+    """Processa relatório de saídas"""
+    t = time.time()
+    print("\n[SAÍDAS]")
+    
+    if df_saidas.empty:
+        print("✗ Sem dados de saídas")
+        return
+    
+    df_saidas.dropna(subset=['PRODUTO'], inplace=True)
+    
+    # Merge produtos
+    cols_prod = ['PRODUTO', 'DESC_PRODUTO', 'GRUPO_PRODUTO', 'SUBGRUPO_PRODUTO', 'LINHA', 'COLECAO']
+    df = df_saidas.merge(df_produtos[cols_prod], on='PRODUTO', how='left')
+    
+    # Merge cores
+    df_cores_copy = df_cores.rename(columns={'COR': 'COR_PRODUTO', 'DESC_COR': 'DESC_COR_PRODUTO'})
+    df = df.merge(df_cores_copy, on='COR_PRODUTO', how='left')
+    
+    df = converter_datas(df, ['EMISSAO'])
+    
+    # Ordena colunas
+    ordem = ['EMISSAO', 'FILIAL', 'FILIAL_DESTINO', 'ROMANEIO_PRODUTO', 'PRODUTO', 'DESC_PRODUTO',
+             'COR_PRODUTO', 'DESC_COR_PRODUTO', 'QTDE_TOTAL', 'TIPO_ROMANEIO',
+             'GRUPO_PRODUTO', 'SUBGRUPO_PRODUTO', 'LINHA', 'COLECAO']
+    df = df[[c for c in ordem if c in df.columns]]
+    
+    salvar_relatorio(df, 'saidas', 'SaidasEnriquecidas')
     print(f"Tempo: {time.time()-t:.2f}s")
 
 def copiar_arquivos(relatorios_gerados=None):
@@ -333,12 +363,13 @@ def copiar_arquivos(relatorios_gerados=None):
             'estoque': 'estoque_tratados',
             'vendas': 'vendas_tratadas',
             'ecommerce': 'ecommerce',
-            'entradas': 'entradas'
+            'entradas': 'entradas',
+            'saidas': 'saidas'
         }
         
         # Se não especificado, copia todos
         if relatorios_gerados is None:
-            bases = ['produtos_tratados', 'estoque_tratados', 'vendas_tratadas', 'ecommerce', 'entradas']
+            bases = ['produtos_tratados', 'estoque_tratados', 'vendas_tratadas', 'ecommerce', 'entradas', 'saidas']
         else:
             bases = [mapeamento_arquivos[r] for r in relatorios_gerados if r in mapeamento_arquivos]
         
@@ -368,6 +399,7 @@ def exibir_menu():
     print("3 - Vendas")
     print("4 - E-commerce")
     print("5 - Entradas")
+    print("6 - Saídas")
     print("\n💡 Dica: Você pode selecionar múltiplos separando por vírgula (ex: 1,2,3)")
     print("\n" + "-"*60)
     
@@ -381,7 +413,8 @@ def exibir_menu():
         '2': 'estoque',
         '3': 'vendas',
         '4': 'ecommerce',
-        '5': 'entradas'
+        '5': 'entradas',
+        '6': 'saidas'
     }
     
     # Separar por vírgula e processar múltiplas seleções
@@ -405,8 +438,8 @@ def exibir_menu():
         print(f"⚠ Nenhuma opção válida selecionada. Exportando todos os relatórios.")
         return 'todos'
     
-    # Se selecionou todos os 5, retornar 'todos' para otimização
-    if len(relatorios_selecionados) == 5:
+    # Se selecionou todos os 6, retornar 'todos' para otimização
+    if len(relatorios_selecionados) == 6:
         return 'todos'
     
     return relatorios_selecionados
@@ -426,12 +459,13 @@ def main():
         'estoque': 'Estoque',
         'vendas': 'Vendas',
         'ecommerce': 'E-commerce',
-        'entradas': 'Entradas'
+        'entradas': 'Entradas',
+        'saidas': 'Saídas'
     }
     
     # Determinar quais relatórios processar
     if relatorio_escolhido == 'todos':
-        relatorios_processar = ['produtos', 'estoque', 'vendas', 'ecommerce', 'entradas']
+        relatorios_processar = ['produtos', 'estoque', 'vendas', 'ecommerce', 'entradas', 'saidas']
         print("\n✓ Exportando TODOS os relatórios")
     else:
         # relatorio_escolhido já é uma lista
@@ -445,15 +479,36 @@ def main():
         'estoque': ['produtos', 'produtos_barra'],
         'vendas': ['produtos_barra'],
         'ecommerce': [],
-        'entradas': ['produtos', 'cores']
+        'entradas': ['produtos', 'cores'],
+        'saidas': ['produtos', 'cores']
     }
     
-    # Determinar quais queries são necessárias
-    queries_necessarias = set()
+    # Determinar quais queries são necessárias (incluindo dependências recursivas)
+    queries_necessarias = set(relatorios_processar)
+    
+    # Adicionar dependências diretas
     for relatorio in relatorios_processar:
-        queries_necessarias.add(relatorio)
         if relatorio in dependencias:
             queries_necessarias.update(dependencias[relatorio])
+    
+    # Adicionar dependências indiretas (recursivamente)
+    # Ex: se 'estoque' precisa de 'produtos', e 'produtos' precisa de 'produtos_barra',
+    # então 'estoque' também precisa de 'produtos_barra'
+    mudou = True
+    while mudou:
+        mudou = False
+        novas_deps = set()
+        for item in queries_necessarias:
+            if item in dependencias:
+                for dep in dependencias[item]:
+                    if dep not in queries_necessarias:
+                        novas_deps.add(dep)
+                        mudou = True
+        queries_necessarias.update(novas_deps)
+    
+    # Debug: mostrar queries necessárias (apenas em caso de erro)
+    # print(f"\n[DEBUG] Relatórios a processar: {relatorios_processar}")
+    # print(f"[DEBUG] Queries necessárias: {sorted(queries_necessarias)}")
     
     # Queries otimizadas
     queries = {
@@ -505,7 +560,7 @@ def main():
                     ON c.COR = vp.COR_PRODUTO
                 LEFT JOIN LOJA_VENDEDORES lv WITH (NOLOCK)
                     ON LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR))) = LTRIM(RTRIM(CAST(lv.VENDEDOR AS VARCHAR)))
-                WHERE vp.DATA_VENDA >= '2024-01-01'
+                WHERE vp.DATA_VENDA >= '2025-01-01'
             ),
             TrocasItem AS (
                 SELECT 
@@ -568,7 +623,7 @@ def main():
                 LEFT JOIN LOJA_VENDEDORES lv WITH (NOLOCK)
                     ON LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR))) = LTRIM(RTRIM(CAST(lv.VENDEDOR AS VARCHAR)))
                 WHERE vt.QTDE_CANCELADA = 0
-                    AND v.DATA_VENDA >= '2024-01-01'
+                    AND v.DATA_VENDA >= '2025-01-01'
                     AND NOT EXISTS (
                         SELECT 1 
                         FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
@@ -699,14 +754,29 @@ def main():
             LEFT JOIN PRODUTOS p WITH(NOLOCK) ON fp.PRODUTO = p.PRODUTO
             LEFT JOIN FILIAIS fl WITH(NOLOCK) ON f.FILIAL = fl.FILIAL
             LEFT JOIN CLIENTES_VAREJO cv WITH(NOLOCK) ON f.NOME_CLIFOR = cv.CLIENTE_VAREJO
-            WHERE f.EMISSAO >= '2024-01-01' AND f.NOTA_CANCELADA = 0
+            WHERE f.EMISSAO >= '2025-01-01' AND f.NOTA_CANCELADA = 0
       AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         """,
         'entradas': """
             SELECT E.ROMANEIO_PRODUTO, E.EMISSAO, E.FILIAL, P.PRODUTO,
-                   P.COR_PRODUTO, P.QTDE AS QTDE_TOTAL
-            FROM ESTOQUE_PROD_ENT AS E
-            LEFT JOIN ESTOQUE_PROD1_ENT AS P ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+                   P.COR_PRODUTO, P.QTDE AS QTDE_TOTAL,
+                   E.TIPO_ENTRADA, E.TIPO_ROMANEIO
+            FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+            LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) 
+                ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+            WHERE E.EMISSAO >= '2025-01-01'
+                AND P.PRODUTO IS NOT NULL
+        """,
+        'saidas': """
+            SELECT S.ROMANEIO_PRODUTO, S.EMISSAO, S.FILIAL, S.FILIAL_DESTINO,
+                   P.PRODUTO, P.COR_PRODUTO, P.QTDE AS QTDE_TOTAL,
+                   S.TIPO_ROMANEIO
+            FROM ESTOQUE_PROD_SAI AS S WITH (NOLOCK)
+            LEFT JOIN ESTOQUE_PROD1_SAI AS P WITH (NOLOCK) 
+                ON S.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+                AND S.FILIAL = P.FILIAL
+            WHERE S.EMISSAO >= '2025-01-01'
+                AND P.PRODUTO IS NOT NULL
         """,
         'cores': "SELECT COR, DESC_COR FROM CORES_BASICAS"
     }
@@ -725,6 +795,7 @@ def main():
             'vendas': 'Vendas',
             'ecommerce': 'E-commerce',
             'entradas': 'Entradas',
+            'saidas': 'Saídas',
             'produtos_barra': 'Códigos de Barra',
             'cores': 'Cores'
         }
@@ -740,9 +811,46 @@ def main():
                     print(f"✓ {len(dfs[nome]):,} registros ({tempo_query:.1f}s)")
                 except Exception as e:
                     print(f"✗ Erro: {e}")
+                    # Não adicionar ao dfs se falhou, para que a verificação posterior detecte
                     raise
+            else:
+                print(f"⚠ Aviso: Query '{nome}' não encontrada no dicionário de queries")
+                # Criar DataFrame vazio para evitar KeyError, mas a verificação posterior detectará
+                dfs[nome] = pd.DataFrame()
         
         print(f"\n✓ Extração concluída: {time.time()-t_ext:.2f}s")
+        
+        # Verificar se todas as dependências necessárias foram extraídas
+        chaves_faltando = []
+        
+        # Verificar se os próprios relatórios foram extraídos
+        for relatorio in relatorios_processar:
+            if relatorio not in dfs:
+                chaves_faltando.append(f"Relatório principal '{relatorio}' não foi extraído")
+        
+        # Verificar dependências de cada relatório
+        for relatorio in relatorios_processar:
+            if relatorio in dependencias:
+                for dep in dependencias[relatorio]:
+                    if dep not in dfs:
+                        chaves_faltando.append(f"Dependência '{dep}' de '{relatorio}' não foi extraída")
+        
+        # Verificar também se há relatórios que são dependências de outros
+        # (ex: 'produtos' pode ser necessário para 'estoque', 'entradas', 'saidas')
+        for relatorio in relatorios_processar:
+            if relatorio in dependencias:
+                for dep in dependencias[relatorio]:
+                    if dep not in dfs:
+                        chaves_faltando.append(f"Dependência '{dep}' necessária para '{relatorio}' não foi extraída")
+        
+        if chaves_faltando:
+            print(f"\n✗ ERRO: Dados faltando após extração:")
+            for chave in chaves_faltando:
+                print(f"   • {chave}")
+            print(f"\n📋 Chaves disponíveis em dfs: {list(dfs.keys())}")
+            print(f"📋 Queries necessárias: {sorted(queries_necessarias)}")
+            print("\n✗ Não é possível continuar o processamento.")
+            return
 
     finally:
         if conn:
@@ -758,9 +866,28 @@ def main():
     # Processar relatórios na ordem correta (respeitando dependências)
     # Produtos: salvar apenas se estiver na lista de processar
     if 'produtos' in relatorios_processar:
+        # Verificar se todas as dependências estão disponíveis
+        if 'produtos' not in dfs:
+            print(f"\n✗ ERRO: DataFrame 'produtos' não encontrado em dfs")
+            print(f"   Chaves disponíveis: {list(dfs.keys())}")
+            return
+        if 'produtos_barra' not in dfs:
+            print(f"\n✗ ERRO: DataFrame 'produtos_barra' não encontrado em dfs (dependência necessária)")
+            print(f"   Chaves disponíveis: {list(dfs.keys())}")
+            print(f"   Queries necessárias calculadas: {sorted(queries_necessarias)}")
+            return
         df_produtos = processar_produtos(dfs['produtos'], dfs['produtos_barra'], salvar=True)
     elif 'produtos' in queries_necessarias:
         # Processar em memória sem salvar (é dependência de outro relatório)
+        if 'produtos' not in dfs:
+            print(f"\n✗ ERRO: DataFrame 'produtos' não encontrado em dfs (dependência necessária)")
+            print(f"   Chaves disponíveis: {list(dfs.keys())}")
+            return
+        if 'produtos_barra' not in dfs:
+            print(f"\n✗ ERRO: DataFrame 'produtos_barra' não encontrado em dfs (dependência necessária)")
+            print(f"   Chaves disponíveis: {list(dfs.keys())}")
+            print(f"   Queries necessárias calculadas: {sorted(queries_necessarias)}")
+            return
         df_produtos = processar_produtos(dfs['produtos'], dfs['produtos_barra'], salvar=False)
     
     if 'estoque' in relatorios_processar:
@@ -780,6 +907,12 @@ def main():
             # Se produtos não foi processado mas é necessário, processar agora (sem salvar)
             df_produtos = processar_produtos(dfs['produtos'], dfs['produtos_barra'], salvar=False)
         processar_entradas(dfs['entradas'], df_produtos, dfs['cores'])
+    
+    if 'saidas' in relatorios_processar:
+        if df_produtos is None:
+            # Se produtos não foi processado mas é necessário, processar agora (sem salvar)
+            df_produtos = processar_produtos(dfs['produtos'], dfs['produtos_barra'], salvar=False)
+        processar_saidas(dfs['saidas'], df_produtos, dfs['cores'])
     
     print(f"\nProcessamento: {time.time()-t_proc:.2f}s")
     
