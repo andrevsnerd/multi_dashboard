@@ -2,35 +2,35 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import PageLayout from "@/components/layout/PageLayout";
-import TransfersPage from "@/components/transfers/TransfersPage";
+import ControleTransferenciasPage from "@/components/controle-transferencias/ControleTransferenciasPage";
 import { resolveCompany } from "@/lib/config/company";
 
 import styles from "../page.module.css";
 
-interface TransfersPageProps {
+interface ControleTransferenciasPageProps {
   params: Promise<{
     company: string;
   }>;
 }
 
-export async function generateMetadata({ params }: TransfersPageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: ControleTransferenciasPageProps): Promise<Metadata> {
   const { company: companySlug } = await params;
   const company = resolveCompany(companySlug);
 
   if (!company) {
     return {
-      title: "Transferências",
+      title: "Controle de Transferências",
     };
   }
 
   return {
-    title: `Transferências | ${company.name}`,
+    title: `Controle de Transferências | ${company.name}`,
   };
 }
 
-export default async function TransfersPageRoute({
+export default async function ControleTransferenciasPageRoute({
   params,
-}: TransfersPageProps) {
+}: ControleTransferenciasPageProps) {
   const { company: companySlug } = await params;
   const company = resolveCompany(companySlug);
 
@@ -42,7 +42,7 @@ export default async function TransfersPageRoute({
     <PageLayout companyName={company.name}>
       <div className={styles.page}>
         <div className={styles.content}>
-          <TransfersPage
+          <ControleTransferenciasPage
             companyKey={company.key}
             companyName={company.name}
           />

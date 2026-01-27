@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { resolveCompany, type CompanyKey, VAREJO_VALUE, isEcommerceFilial } from "@/lib/config/company";
+import { resolveCompany, type CompanyKey, type CompanyModule, VAREJO_VALUE, isEcommerceFilial } from "@/lib/config/company";
 
 import styles from "./FilialFilter.module.css";
 
@@ -11,6 +11,7 @@ interface FilialFilterProps {
   value: string | null;
   onChange: (value: string | null) => void;
   label?: string;
+  module?: CompanyModule; // Permite escolher entre 'sales' ou 'inventory'
 }
 
 export default function FilialFilter({
@@ -18,11 +19,12 @@ export default function FilialFilter({
   value,
   onChange,
   label = "Filial",
+  module = "sales",
 }: FilialFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const company = resolveCompany(companyKey);
-  const filiais = company?.filialFilters.sales ?? [];
+  const filiais = company?.filialFilters[module] ?? [];
   const displayNames = company?.filialDisplayNames ?? {};
   const isScarfme = companyKey === 'scarfme';
   const ecommerceFilials = company?.ecommerceFilials ?? [];

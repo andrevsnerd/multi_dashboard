@@ -41,7 +41,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
       .replace(/\/estoque-por-filial.*$/, "")
       .replace(/\/controle-estoque.*$/, "") // Remove /controle-estoque e qualquer coisa depois
       .replace(/\/controle-giro.*$/, "") // Remove /controle-giro e qualquer coisa depois
-      .replace(/\/transferencias.*$/, "") // Remove /transferencias e qualquer coisa depois
+      .replace(/\/controle-transferencias.*$/, "") // Remove /controle-transferencias e qualquer coisa depois
       .replace(/\/produto-detalhado$/, "")
       .replace(/\/produtos-recentes$/, "")
       .replace(/\/produtos$/, "")
@@ -100,10 +100,10 @@ export default function Sidebar({ companyName }: SidebarProps) {
     ? `${basePath}/controle-giro`
     : "/controle-giro";
 
-  // Construir o link para transferências baseado no caminho base
-  const transferenciasHref = basePath && basePath !== "/" 
-    ? `${basePath}/transferencias`
-    : "/transferencias";
+  // Construir o link para controle de transferências baseado no caminho base
+  const controleTransferenciasHref = basePath && basePath !== "/" 
+    ? `${basePath}/controle-transferencias`
+    : "/controle-transferencias";
 
   // Verificar se está em alguma página relacionada a produtos
   const isProdutosSubItemActive = pathname?.includes("/produto-detalhado") || pathname?.includes("/produtos-recentes") || (pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado"));
@@ -142,7 +142,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     { label: "Clientes", href: clientesHref },
     { label: "Controle de Estoque", href: controleEstoqueHref },
     { label: "Controle de Giro", href: controleGiroHref },
-    { label: "Transferências", href: transferenciasHref },
+    { label: "Controle de Transferências", href: controleTransferenciasHref },
     { label: "Exportar Relatórios", href: exportarRelatoriosHref },
     // TODO: Descomentar quando estoque por filial estiver pronto
     // { label: "Estoque por Filial", href: stockByFilialHref },
@@ -212,7 +212,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
                 !pathname.includes("/estoque-por-filial") && 
                 !pathname.includes("/controle-estoque") &&
                 !pathname.includes("/controle-giro") &&
-                !pathname.includes("/transferencias") &&
+                !pathname.includes("/controle-transferencias") &&
                 !pathname.includes("/produtos") &&
                 !pathname.includes("/produtos-recentes") &&
                 !pathname.includes("/produto-detalhado") &&
@@ -246,9 +246,9 @@ export default function Sidebar({ companyName }: SidebarProps) {
             } else if (item.label === "Controle de Giro") {
               // Controle de Giro está ativo quando o pathname inclui /controle-giro
               isActive = pathname?.includes("/controle-giro") || pathname === item.href;
-            } else if (item.label === "Transferências") {
-              // Transferências está ativo quando o pathname inclui /transferencias
-              isActive = pathname?.includes("/transferencias") || pathname === item.href;
+            } else if (item.label === "Controle de Transferências") {
+              // Controle de Transferências está ativo quando o pathname inclui /controle-transferencias
+              isActive = pathname?.includes("/controle-transferencias") || pathname === item.href;
             } else if (item.label === "Exportar Relatórios") {
               // Exportar Relatórios está ativo quando o pathname inclui /exportar-relatorios
               isActive = pathname?.includes("/exportar-relatorios") || pathname === item.href;
