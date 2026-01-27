@@ -27,6 +27,8 @@ interface TransferItem {
   descricao: string;
   codigo: string;
   codigoBarra?: string;
+  subgrupo?: string;
+  grade?: string;
   cor: string;
   origem: string;
   destino: string;
@@ -438,6 +440,8 @@ export function calculateTransfers(
           descricao: productInfo.name,
           codigo: productInfo.code,
           codigoBarra: item.codigoBarra,
+          subgrupo: item.subgrupo,
+          grade: item.grade,
           cor: item.cor,
           origem: origemDisplayName,
           destino: destinoDisplayName,
@@ -506,6 +510,9 @@ export function calculateTransfers(
               produto: item.produto,
               descricao: productInfo.name,
               codigo: productInfo.code,
+              codigoBarra: item.codigoBarra,
+              subgrupo: item.subgrupo,
+              grade: item.grade,
               cor: item.cor,
               origem: origemDisplayNameCompletar,
               destino: destinoDisplayName,
@@ -605,7 +612,33 @@ export default function ControleTransferenciasTable({
           return {
             destino,
             items: items.sort((a, b) => {
-              // Ordenar por produto, depois por cor
+              // Ordenar por estoque da origem (maior primeiro), depois por produto, depois por cor
+              const estoqueA = (() => {
+                const filialOrigemData = a.itemOriginal.filiais.find(
+                  f => {
+                    const filialDisplayName = company?.filialDisplayNames?.[f.filial] || f.filial;
+                    return f.filial === a.origem || filialDisplayName === a.origem;
+                  }
+                );
+                return filialOrigemData?.stock || 0;
+              })();
+              
+              const estoqueB = (() => {
+                const filialOrigemData = b.itemOriginal.filiais.find(
+                  f => {
+                    const filialDisplayName = company?.filialDisplayNames?.[f.filial] || f.filial;
+                    return f.filial === b.origem || filialDisplayName === b.origem;
+                  }
+                );
+                return filialOrigemData?.stock || 0;
+              })();
+              
+              // Ordenar por estoque decrescente
+              if (estoqueA !== estoqueB) {
+                return estoqueB - estoqueA;
+              }
+              
+              // Se estoque igual, ordenar por produto, depois por cor
               if (a.produto !== b.produto) {
                 return a.produto.localeCompare(b.produto);
               }
@@ -710,6 +743,12 @@ export default function ControleTransferenciasTable({
                     <th className={styles.produtoHeader}>Produto</th>
                     <th className={styles.codigoBarraHeader}>Código de Barras</th>
                     <th className={styles.estoqueHeader}>Estoque {group.origem}</th>
+                    {companyKey === 'scarfme' && (
+                      <>
+                        <th className={styles.subgrupoHeader}>Subgrupo</th>
+                        <th className={styles.gradeHeader}>Grade</th>
+                      </>
+                    )}
                     <th className={styles.descricaoHeader}>Descrição</th>
                     <th className={styles.corHeader}>Cor</th>
                     <th className={styles.destinoHeader}>Destino</th>
@@ -766,6 +805,24 @@ export default function ControleTransferenciasTable({
                   <td className={styles.estoqueCell}>
                     <span className={styles.estoqueBadge}>{estoqueOrigem}</span>
                   </td>
+                  {companyKey === 'scarfme' && (
+                    <>
+                      <td className={styles.subgrupoCell}>
+                        {item.subgrupo ? (
+                          <span className={styles.subgrupoBadge}>{item.subgrupo}</span>
+                        ) : (
+                          <span className={styles.subgrupoEmpty}>-</span>
+                        )}
+                      </td>
+                      <td className={styles.gradeCell}>
+                        {item.grade ? (
+                          <span className={styles.gradeBadge}>{item.grade}</span>
+                        ) : (
+                          <span className={styles.gradeEmpty}>-</span>
+                        )}
+                      </td>
+                    </>
+                  )}
                   <td 
                     className={styles.descricaoCell}
                     onMouseMove={(e) => {

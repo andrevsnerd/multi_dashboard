@@ -102,16 +102,26 @@
 }
 
 .produtoHeader {
-  width: 140px;
+  width: 120px;
 }
 
 .codigoBarraHeader {
-  width: 180px;
+  width: 150px;
   text-align: center;
 }
 
 .estoqueHeader {
-  width: 150px;
+  width: 120px;
+  text-align: center;
+}
+
+.subgrupoHeader {
+  width: 120px;
+  text-align: center;
+}
+
+.gradeHeader {
+  width: 100px;
   text-align: center;
 }
 
@@ -161,6 +171,7 @@
   align-items: center;
   gap: 8px;
   font-weight: 500;
+  padding: 16px 12px;
 }
 
 .produtoIcon {
@@ -180,7 +191,7 @@
 
 .codigoBarraCell {
   text-align: center;
-  padding: 8px 16px;
+  padding: 16px 12px;
 }
 
 .codigoBarraBadge {
@@ -207,7 +218,7 @@
 
 .estoqueCell {
   text-align: center;
-  padding: 8px 16px;
+  padding: 16px 12px;
 }
 
 .estoqueBadge {
@@ -220,6 +231,46 @@
   font-weight: 600;
   min-width: 40px;
   text-align: center;
+}
+
+.subgrupoCell {
+  text-align: center;
+  padding: 16px 12px;
+}
+
+.subgrupoBadge {
+  display: inline-block;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #1f2937;
+  font-weight: 500;
+}
+
+.subgrupoEmpty {
+  color: #9ca3af;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.gradeCell {
+  text-align: center;
+  padding: 16px 12px;
+}
+
+.gradeBadge {
+  display: inline-block;
+  padding: 4px 12px;
+  background-color: #fef3c7;
+  border-radius: 12px;
+  font-size: 12px;
+  color: #92400e;
+  font-weight: 500;
+}
+
+.gradeEmpty {
+  color: #9ca3af;
+  font-size: 12px;
+  font-style: italic;
 }
 
 .corCell {
@@ -534,6 +585,8 @@
 
   .produtoHeader,
   .codigoBarraHeader,
+  .subgrupoHeader,
+  .gradeHeader,
   .descricaoHeader,
   .corHeader,
   .destinoHeader,

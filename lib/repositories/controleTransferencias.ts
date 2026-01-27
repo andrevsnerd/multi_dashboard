@@ -28,6 +28,8 @@ export interface ProdutoTransferencia {
   descricao: string;
   codigo: string;
   codigoBarra?: string;
+  subgrupo?: string;
+  grade?: string;
   filiais: FilialData[];
   totalVendas: number;
   totalEstoque: number;
@@ -171,12 +173,21 @@ export async function fetchControleTransferencias({
     `;
 
     // Query para informações do produto (descrição e código)
+    // Para scarfme, também buscar subgrupo e grade
+    const isScarfme = company === 'scarfme';
+    const subgrupoFieldEstoque = isScarfme ? ', ISNULL(p.SUBGRUPO_PRODUTO, \'\') AS subgrupo' : '';
+    const gradeFieldEstoque = isScarfme ? ', ISNULL(CONVERT(VARCHAR, p.GRADE), \'\') AS grade' : '';
+    const subgrupoFieldVendas = isScarfme ? ', ISNULL(COALESCE(vp.SUBGRUPO_PRODUTO, p.SUBGRUPO_PRODUTO), \'\') AS subgrupo' : '';
+    const gradeFieldVendas = isScarfme ? ', ISNULL(CONVERT(VARCHAR, p.GRADE), \'\') AS grade' : '';
+    
     const produtoInfoQuery = `
       SELECT DISTINCT
         e.PRODUTO AS produto,
         e.COR_PRODUTO AS corProduto,
         ISNULL(c.DESC_COR, '') AS corBanco,
         ISNULL(p.DESC_PRODUTO, '') AS descricao
+        ${subgrupoFieldEstoque}
+        ${gradeFieldEstoque}
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
@@ -190,6 +201,8 @@ export async function fetchControleTransferencias({
         vp.COR_PRODUTO AS corProduto,
         ISNULL(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), '') AS corBanco,
         ISNULL(vp.DESC_PRODUTO, '') AS descricao
+        ${subgrupoFieldVendas}
+        ${gradeFieldVendas}
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
@@ -241,6 +254,8 @@ export async function fetchControleTransferencias({
         corProduto: string | null;
         corBanco: string;
         descricao: string;
+        subgrupo?: string;
+        grade?: string;
       }>(produtoInfoQuery),
       request.query<{
         produto: string;
@@ -323,7 +338,7 @@ export async function fetchControleTransferencias({
     const estoqueMap = new Map<string, Map<string, number>>();
     const vendasMap = new Map<string, Map<string, number>>();
     const vendasLast30DaysMap = new Map<string, Map<string, number>>();
-    const produtoInfoMap = new Map<string, { descricao: string; cor: string }>();
+    const produtoInfoMap = new Map<string, { descricao: string; cor: string; subgrupo?: string; grade?: string }>();
     const codigoBarraMap = new Map<string, string>();
 
     // Processar estoque
@@ -392,6 +407,8 @@ export async function fetchControleTransferencias({
         produtoInfoMap.set(chave, {
           descricao: row.descricao?.trim() || '',
           cor: corNormalizada,
+          subgrupo: isScarfme ? (row.subgrupo?.trim() || undefined) : undefined,
+          grade: isScarfme ? (row.grade?.trim() || undefined) : undefined,
         });
       }
     });
@@ -469,6 +486,8 @@ export async function fetchControleTransferencias({
         descricao: descricao || 'Sem descrição',
         codigo,
         codigoBarra,
+        subgrupo: produtoInfo.subgrupo,
+        grade: produtoInfo.grade,
         filiais,
         totalVendas,
         totalEstoque,
