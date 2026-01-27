@@ -56,7 +56,7 @@ export function exportTransfersToPDF(
 
   // Título principal
   doc.setFontSize(20);
-  doc.setTextColor(...colorBlue);
+  doc.setTextColor(colorBlue[0], colorBlue[1], colorBlue[2]);
   doc.setFont('helvetica', 'bold');
   doc.text('Controle de Transferências', margin, currentY);
   currentY += 8;
@@ -64,7 +64,7 @@ export function exportTransfersToPDF(
   // Informações do período
   if (dateRange) {
     doc.setFontSize(10);
-    doc.setTextColor(...colorGray);
+    doc.setTextColor(colorGray[0], colorGray[1], colorGray[2]);
     doc.setFont('helvetica', 'normal');
     const startDateStr = dateRange.startDate.toLocaleDateString('pt-BR');
     const endDateStr = dateRange.endDate.toLocaleDateString('pt-BR');
@@ -84,7 +84,7 @@ export function exportTransfersToPDF(
 
     // Header principal: Filial de origem (azul)
     const headerHeight = 25;
-    doc.setFillColor(...colorBlue);
+    doc.setFillColor(colorBlue[0], colorBlue[1], colorBlue[2]);
     doc.roundedRect(margin, currentY, contentWidth, headerHeight, 3, 3, 'F');
     
     // Texto do header
@@ -122,7 +122,7 @@ export function exportTransfersToPDF(
 
       // Header menor: Filial de destino (verde)
       const destHeaderHeight = 18;
-      doc.setFillColor(...colorGreen);
+      doc.setFillColor(colorGreen[0], colorGreen[1], colorGreen[2]);
       doc.roundedRect(margin, currentY, contentWidth, destHeaderHeight, 2, 2, 'F');
       
       doc.setTextColor(255, 255, 255);
@@ -188,8 +188,8 @@ export function exportTransfersToPDF(
           textColor: [31, 41, 55], // #1f2937
         },
         headStyles: {
-          fillColor: colorLightGray,
-          textColor: colorGray,
+          fillColor: [colorLightGray[0], colorLightGray[1], colorLightGray[2]] as [number, number, number],
+          textColor: [colorGray[0], colorGray[1], colorGray[2]] as [number, number, number],
           fontStyle: 'bold',
           fontSize: 7,
         },
