@@ -105,6 +105,11 @@
   width: 140px;
 }
 
+.codigoBarraHeader {
+  width: 180px;
+  text-align: center;
+}
+
 .estoqueHeader {
   width: 150px;
   text-align: center;
@@ -171,6 +176,29 @@
 .produtoIcon svg {
   width: 16px;
   height: 16px;
+}
+
+.codigoBarraCell {
+  text-align: center;
+  padding: 8px 16px;
+}
+
+.codigoBarraBadge {
+  display: inline-block;
+  padding: 4px 12px;
+  background-color: #f3f4f6;
+  border-radius: 12px;
+  font-size: 12px;
+  color: #1f2937;
+  font-weight: 500;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.5px;
+}
+
+.codigoBarraEmpty {
+  color: #9ca3af;
+  font-size: 12px;
+  font-style: italic;
 }
 
 .descricaoCell {
@@ -505,6 +533,7 @@
   }
 
   .produtoHeader,
+  .codigoBarraHeader,
   .descricaoHeader,
   .corHeader,
   .destinoHeader,

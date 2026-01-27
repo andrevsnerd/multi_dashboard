@@ -26,6 +26,7 @@ interface TransferItem {
   produto: string;
   descricao: string;
   codigo: string;
+  codigoBarra?: string;
   cor: string;
   origem: string;
   destino: string;
@@ -436,6 +437,7 @@ export function calculateTransfers(
           produto: item.produto,
           descricao: productInfo.name,
           codigo: productInfo.code,
+          codigoBarra: item.codigoBarra,
           cor: item.cor,
           origem: origemDisplayName,
           destino: destinoDisplayName,
@@ -706,6 +708,7 @@ export default function ControleTransferenciasTable({
                 <thead>
                   <tr>
                     <th className={styles.produtoHeader}>Produto</th>
+                    <th className={styles.codigoBarraHeader}>Código de Barras</th>
                     <th className={styles.estoqueHeader}>Estoque {group.origem}</th>
                     <th className={styles.descricaoHeader}>Descrição</th>
                     <th className={styles.corHeader}>Cor</th>
@@ -752,6 +755,13 @@ export default function ControleTransferenciasTable({
                       </svg>
                     </div>
                     {item.codigo}
+                  </td>
+                  <td className={styles.codigoBarraCell}>
+                    {item.codigoBarra ? (
+                      <span className={styles.codigoBarraBadge}>{item.codigoBarra}</span>
+                    ) : (
+                      <span className={styles.codigoBarraEmpty}>-</span>
+                    )}
                   </td>
                   <td className={styles.estoqueCell}>
                     <span className={styles.estoqueBadge}>{estoqueOrigem}</span>

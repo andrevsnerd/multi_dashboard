@@ -27,6 +27,7 @@ export interface ProdutoTransferencia {
   cor: string;
   descricao: string;
   codigo: string;
+  codigoBarra?: string;
   filiais: FilialData[];
   totalVendas: number;
   totalEstoque: number;
@@ -198,8 +199,21 @@ export async function fetchControleTransferencias({
         ${vendasFilialFilter}
     `;
 
+    // Query para buscar códigos de barras
+    const codigoBarraQuery = `
+      SELECT DISTINCT
+        pb.PRODUTO AS produto,
+        pb.COR_PRODUTO AS corProduto,
+        ISNULL(COALESCE(c.DESC_COR, ''), '') AS corBanco,
+        pb.CODIGO_BARRA AS codigoBarra
+      FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON pb.COR_PRODUTO = c.COR
+      WHERE pb.CODIGO_BARRA IS NOT NULL
+        AND pb.CODIGO_BARRA <> ''
+    `;
+
     // Executar todas as queries em paralelo
-    const [estoqueResult, vendasResult, vendasLast30DaysResult, produtoInfoResult] = await Promise.all([
+    const [estoqueResult, vendasResult, vendasLast30DaysResult, produtoInfoResult, codigoBarraResult] = await Promise.all([
       request.query<{
         produto: string;
         corProduto: string | null;
@@ -228,6 +242,12 @@ export async function fetchControleTransferencias({
         corBanco: string;
         descricao: string;
       }>(produtoInfoQuery),
+      request.query<{
+        produto: string;
+        corProduto: string | null;
+        corBanco: string;
+        codigoBarra: string | null;
+      }>(codigoBarraQuery),
     ]);
 
     // Função auxiliar para normalizar filial (usar em todos os lugares)
@@ -304,6 +324,7 @@ export async function fetchControleTransferencias({
     const vendasMap = new Map<string, Map<string, number>>();
     const vendasLast30DaysMap = new Map<string, Map<string, number>>();
     const produtoInfoMap = new Map<string, { descricao: string; cor: string }>();
+    const codigoBarraMap = new Map<string, string>();
 
     // Processar estoque
     estoqueResult.recordset.forEach(row => {
@@ -375,6 +396,27 @@ export async function fetchControleTransferencias({
       }
     });
 
+    // Processar códigos de barras
+    // Prioridade: PRODUTO+COR+TAMANHO > PRODUTO+COR > PRODUTO
+    codigoBarraResult.recordset.forEach(row => {
+      const produto = row.produto?.trim() || '';
+      const corNormalizada = getColorDescription(row.corProduto, row.corBanco);
+      const codigoBarra = row.codigoBarra?.trim() || '';
+      
+      if (!codigoBarra) return;
+      
+      // Tentar chave mais específica primeiro (produto+cor)
+      const chaveProdutoCor = `${produto}|${corNormalizada}`;
+      if (!codigoBarraMap.has(chaveProdutoCor)) {
+        codigoBarraMap.set(chaveProdutoCor, codigoBarra);
+      }
+      
+      // Também mapear apenas por produto (fallback)
+      if (!codigoBarraMap.has(produto)) {
+        codigoBarraMap.set(produto, codigoBarra);
+      }
+    });
+
     // Combinar dados
     const produtosMap = new Map<string, ProdutoTransferencia>();
     const allChaves = new Set([
@@ -418,11 +460,15 @@ export async function fetchControleTransferencias({
         codigo = produto;
       }
 
+      // Buscar código de barras (prioridade: produto+cor, depois apenas produto)
+      const codigoBarra = codigoBarraMap.get(chave) || codigoBarraMap.get(produto) || undefined;
+
       produtosMap.set(chave, {
         produto,
         cor: produtoInfo.cor,
         descricao: descricao || 'Sem descrição',
         codigo,
+        codigoBarra,
         filiais,
         totalVendas,
         totalEstoque,
