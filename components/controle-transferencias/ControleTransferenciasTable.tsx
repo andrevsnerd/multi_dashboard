@@ -4,6 +4,7 @@ import { useMemo, useState, useRef, useEffect } from "react";
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 import type { ProdutoTransferencia } from "@/lib/repositories/controleTransferencias";
 import type { DateRangeValue } from "@/components/filters/DateRangeFilter";
+import { exportTransfersToPDF } from "./exportToPDF";
 
 import styles from "./ControleTransferenciasTable.module.css";
 
@@ -744,8 +745,57 @@ export default function ControleTransferenciasTable({
     );
   }
 
+  // Função para exportar PDF
+  const handleExportPDF = () => {
+    // Preparar dados para exportação incluindo estoqueOrigem
+    const dataForExport = transfersByOriginAndDestination.map((group) => ({
+      origem: group.origem,
+      totalQuantidade: group.totalQuantidade,
+      destinationGroups: group.destinationGroups.map((destGroup) => ({
+        destino: destGroup.destino,
+        totalQuantidade: destGroup.totalQuantidade,
+        items: destGroup.items.map((item) => {
+          // Buscar estoque da origem
+          const filialOrigemData = item.itemOriginal.filiais.find(
+            f => {
+              const filialDisplayName = company?.filialDisplayNames?.[f.filial] || f.filial;
+              return f.filial === item.origem || filialDisplayName === item.origem;
+            }
+          );
+          return {
+            produto: item.produto,
+            descricao: item.descricao,
+            codigo: item.codigo,
+            codigoBarra: item.codigoBarra,
+            subgrupo: item.subgrupo,
+            grade: item.grade,
+            cor: item.cor,
+            origem: item.origem,
+            destino: item.destino,
+            quantidade: item.quantidade,
+            estoqueOrigem: filialOrigemData?.stock || 0,
+          };
+        }),
+      })),
+    }));
+
+    exportTransfersToPDF(dataForExport, companyKey, dateRange);
+  };
+
   return (
     <div className={styles.wrapper}>
+      {/* Botão de exportar PDF */}
+      <div className={styles.exportButtonContainer}>
+        <button onClick={handleExportPDF} className={styles.exportButton}>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M17.5 12.5V15.8333C17.5 16.2754 17.3244 16.6993 17.0118 17.0118C16.6993 17.3244 16.2754 17.5 15.8333 17.5H4.16667C3.72464 17.5 3.30072 17.3244 2.98816 17.0118C2.67559 16.6993 2.5 16.2754 2.5 15.8333V12.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M14.1667 6.66667L10 2.5L5.83333 6.66667" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M10 2.5V12.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Exportar PDF
+        </button>
+      </div>
+
       {transfersByOriginAndDestination.map((group) => (
         <div key={group.origem} className={styles.transferGroup}>
           {/* Header principal: Filial de origem */}
