@@ -1,0 +1,958 @@
+"use client";
+
+import { useState, useEffect, useCallback, useRef } from "react";
+import { resolveCompany, type CompanyKey } from "@/lib/config/company";
+
+import styles from "./TransferenciaProdutosPage.module.css";
+
+interface Filial {
+  codFilial: string;
+  filial: string;
+}
+
+interface Produto {
+  produto: string;
+  descProduto: string;
+  codigoBarra: string | null;
+  corProduto: string | null;
+  descCor: string;
+  estoques: Array<{
+    filial: string;
+    nomeFilial: string;
+    estoque: number;
+  }>;
+}
+
+interface ProdutoSelecionado {
+  produto: string;
+  descProduto: string;
+  corProduto: string | null;
+  descCor: string;
+  filialOrigem: string;
+  nomeFilialOrigem: string;
+  estoqueOrigem: number;
+  quantidade: number;
+}
+
+interface TransferenciaLog {
+  romaneio: string;
+  filialOrigem: string;
+  filialDestino: string;
+  dataEmissao: string;
+  qtdProdutos: number;
+  qtdItens: number;
+  status: string;
+}
+
+interface TransferenciaProdutosPageProps {
+  companyKey: CompanyKey;
+  companyName: string;
+}
+
+async function fetchFiliais(): Promise<Filial[]> {
+  const response = await fetch("/api/transferencia-produtos/filiais", {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("Erro ao carregar filiais");
+  }
+
+  const json = (await response.json()) as { data: Filial[] };
+  return json.data;
+}
+
+async function buscarProdutoPorCodigoBarras(codigoBarras: string): Promise<{
+  produto: string;
+  descProduto: string;
+  corProduto: string | null;
+  produtosEncontrados: number;
+  todosProdutos: Array<{ produto: string; cor: string; tamanho: string }>;
+} | null> {
+  const response = await fetch(`/api/transferencia-produtos/produto-por-codigo-barras?codigoBarras=${encodeURIComponent(codigoBarras)}`, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const json = (await response.json()) as { data: any };
+  return json.data || null;
+}
+
+async function searchProdutos(searchTerm: string, filialOrigem?: string, corProduto?: string | null): Promise<Produto[]> {
+  if (!searchTerm || searchTerm.trim().length < 2) {
+    return [];
+  }
+
+  const params = new URLSearchParams({
+    q: searchTerm.trim(),
+  });
+
+  if (filialOrigem) {
+    params.set("filialOrigem", filialOrigem);
+  }
+
+  if (corProduto) {
+    params.set("corProduto", corProduto);
+  }
+
+  const response = await fetch(`/api/transferencia-produtos/produtos?${params.toString()}`, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const json = (await response.json()) as { data: Produto[] };
+  return json.data || [];
+}
+
+async function fetchTiposRomaneio(): Promise<string[]> {
+  const response = await fetch("/api/transferencia-produtos/tipos-romaneio", {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    return ['TRANSFERENCIA', 'TRANSFERENCIA ENTRE LOJAS', 'DEFEITO'];
+  }
+
+  const json = (await response.json()) as { data: string[] };
+  return json.data || ['TRANSFERENCIA', 'TRANSFERENCIA ENTRE LOJAS', 'DEFEITO'];
+}
+
+async function fetchResponsaveis(): Promise<Array<{ responsavel: string; qtd: number }>> {
+  const response = await fetch("/api/transferencia-produtos/responsaveis", {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const json = (await response.json()) as { data: Array<{ responsavel: string; qtd: number }> };
+  return json.data || [];
+}
+
+async function executarTransferencia(
+  produto: string,
+  corProduto: string | null,
+  filialOrigem: string,
+  filialDestino: string,
+  qtdeSaida: number,
+  qtdeEntrada: number,
+  tipoRomaneio: string,
+  responsavel: string
+): Promise<{ success: boolean; message: string; romaneioSaida?: string; romaneioEntrada?: string }> {
+  const response = await fetch("/api/transferencia-produtos/executar", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      produto,
+      corProduto,
+      filialOrigem,
+      filialDestino,
+      qtdeSaida,
+      qtdeEntrada,
+      tipoRomaneio,
+      responsavel,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = (await response.json()) as { error: string };
+    throw new Error(error.error || "Erro ao executar transferência");
+  }
+
+  const json = (await response.json()) as {
+    success: boolean;
+    message: string;
+    romaneioSaida?: string;
+    romaneioEntrada?: string;
+  };
+
+  return json;
+}
+
+async function fetchLogTransferencias(): Promise<TransferenciaLog[]> {
+  const response = await fetch("/api/transferencia-produtos/log?limit=50", {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const json = (await response.json()) as { data: TransferenciaLog[] };
+  return json.data || [];
+}
+
+export default function TransferenciaProdutosPage({
+  companyKey,
+  companyName,
+}: TransferenciaProdutosPageProps) {
+  const [filiais, setFiliais] = useState<Filial[]>([]);
+  const [filialOrigem, setFilialOrigem] = useState<Filial | null>(null);
+  const [filialDestino, setFilialDestino] = useState<Filial | null>(null);
+  const [produtosSelecionados, setProdutosSelecionados] = useState<ProdutoSelecionado[]>([]);
+  const [modalAberto, setModalAberto] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [loadingProdutos, setLoadingProdutos] = useState(false);
+  const [notificacao, setNotificacao] = useState<{ mensagem: string; tipo: "success" | "error" } | null>(null);
+  const [processandoTransferencia, setProcessandoTransferencia] = useState(false);
+  const [filaTransferencias, setFilaTransferencias] = useState<ProdutoSelecionado[]>([]);
+  const [logTransferencias, setLogTransferencias] = useState<TransferenciaLog[]>([]);
+  const [loadingLog, setLoadingLog] = useState(false);
+  const [tiposRomaneio, setTiposRomaneio] = useState<string[]>([]);
+  const [tipoRomaneioSelecionado, setTipoRomaneioSelecionado] = useState<string>("TRANSFERENCIA ENTRE LOJAS");
+  const [responsaveis, setResponsaveis] = useState<Array<{ responsavel: string; qtd: number }>>([]);
+  const [responsavelSelecionado, setResponsavelSelecionado] = useState<string>("LOGISTICA");
+  const [responsavelFinal, setResponsavelFinal] = useState<string>("LOGISTICA");
+  const [mostrarInputResponsavel, setMostrarInputResponsavel] = useState(false);
+  const [inputResponsavelCustomizado, setInputResponsavelCustomizado] = useState("");
+
+  const notificacaoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Carregar filiais
+  useEffect(() => {
+    async function loadFiliais() {
+      try {
+        const data = await fetchFiliais();
+        setFiliais(data);
+        // Selecionar primeira filial como padrão
+        if (data.length > 0) {
+          setFilialOrigem(data[0]);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar filiais", error);
+      }
+    }
+    loadFiliais();
+  }, []);
+
+  // Carregar tipos de romaneio
+  useEffect(() => {
+    async function loadTiposRomaneio() {
+      try {
+        const data = await fetchTiposRomaneio();
+        setTiposRomaneio(data);
+        if (data.length > 0) {
+          // Sempre usar "TRANSFERENCIA ENTRE LOJAS" como padrão se existir, senão usar o primeiro
+          const tipoPadrao = data.find(tipo => tipo.toUpperCase() === 'TRANSFERENCIA ENTRE LOJAS') || data[0];
+          setTipoRomaneioSelecionado(tipoPadrao);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar tipos de romaneio", error);
+      }
+    }
+    loadTiposRomaneio();
+  }, []);
+
+  // Carregar responsáveis
+  useEffect(() => {
+    async function loadResponsaveis() {
+      try {
+        const data = await fetchResponsaveis();
+        setResponsaveis(data);
+        if (data.length > 0) {
+          setResponsavelSelecionado(data[0].responsavel);
+          setResponsavelFinal(data[0].responsavel);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar responsáveis", error);
+      }
+    }
+    loadResponsaveis();
+  }, []);
+
+  // Atualizar responsável final quando mudar
+  useEffect(() => {
+    if (mostrarInputResponsavel && inputResponsavelCustomizado.trim()) {
+      setResponsavelFinal(inputResponsavelCustomizado.trim().toUpperCase());
+    } else {
+      setResponsavelFinal(responsavelSelecionado);
+    }
+  }, [mostrarInputResponsavel, inputResponsavelCustomizado, responsavelSelecionado]);
+
+  const mostrarNotificacao = useCallback((mensagem: string, tipo: "success" | "error" = "success") => {
+    setNotificacao({ mensagem, tipo });
+    
+    if (notificacaoTimeoutRef.current) {
+      clearTimeout(notificacaoTimeoutRef.current);
+    }
+
+    notificacaoTimeoutRef.current = setTimeout(() => {
+      setNotificacao(null);
+    }, 3000);
+  }, []);
+
+  // Carregar log de transferências
+  useEffect(() => {
+    async function loadLog() {
+      setLoadingLog(true);
+      try {
+        const data = await fetchLogTransferencias();
+        setLogTransferencias(data);
+      } catch (error) {
+        console.error("Erro ao carregar log", error);
+      } finally {
+        setLoadingLog(false);
+      }
+    }
+    loadLog();
+  }, []);
+
+  // Buscar produtos ao digitar
+  useEffect(() => {
+    if (!searchTerm || searchTerm.trim().length < 2) {
+      setProdutos([]);
+      return;
+    }
+
+    let active = true;
+    setLoadingProdutos(true);
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        // Tentar buscar por código de barras primeiro (mesmo que não seja só números)
+        const searchTermTrimmed = searchTerm.trim();
+        let results: Produto[] = [];
+        let corProdutoCodigoBarras: string | null = null;
+        
+        // Tentar buscar por código de barras se tiver pelo menos 3 caracteres
+        if (searchTermTrimmed.length >= 3) {
+          const produtoCodigoBarras = await buscarProdutoPorCodigoBarras(searchTermTrimmed);
+          
+          if (produtoCodigoBarras) {
+            // Se encontrou por código de barras, usar a cor específica se houver
+            corProdutoCodigoBarras = produtoCodigoBarras.corProduto || null;
+            
+            // Buscar estoques desse produto, filtrando por cor se o código de barras tiver cor específica
+            results = await searchProdutos(
+              produtoCodigoBarras.produto,
+              filialOrigem?.codFilial,
+              corProdutoCodigoBarras
+            );
+            
+            // Se encontrou múltiplos produtos com mesmo código de barras, avisar
+            if (produtoCodigoBarras.produtosEncontrados > 1 && active) {
+              mostrarNotificacao(
+                `Código de barras encontrado em ${produtoCodigoBarras.produtosEncontrados} produto(s). Usando o primeiro.`,
+                "success"
+              );
+            }
+            
+            // Se não encontrou estoques com a cor específica, buscar todas as cores (igual ao script)
+            if (results.length === 0 && corProdutoCodigoBarras) {
+              results = await searchProdutos(
+                produtoCodigoBarras.produto,
+                filialOrigem?.codFilial,
+                null
+              );
+            }
+          }
+        }
+        
+        // Se não encontrou por código de barras ou não é só números, buscar normalmente
+        if (results.length === 0) {
+          results = await searchProdutos(searchTermTrimmed, filialOrigem?.codFilial, null);
+        }
+        
+        if (active) {
+          setProdutos(results);
+        }
+      } catch (error) {
+        if (active) {
+          setProdutos([]);
+        }
+      } finally {
+        if (active) {
+          setLoadingProdutos(false);
+        }
+      }
+    }, 300);
+
+    return () => {
+      active = false;
+      clearTimeout(timeoutId);
+    };
+  }, [searchTerm, filialOrigem, mostrarNotificacao]);
+
+  const adicionarProduto = useCallback((produto: Produto) => {
+    if (!filialOrigem) {
+      mostrarNotificacao("Selecione uma filial de origem primeiro", "error");
+      return;
+    }
+
+    // Debug: verificar o que está vindo
+    console.log('[ADICIONAR PRODUTO]', {
+      produto: produto.produto,
+      filialOrigemCodFilial: filialOrigem.codFilial,
+      filialOrigemCodFilialLen: filialOrigem.codFilial.length,
+      estoques: produto.estoques.map(e => ({ 
+        filial: e.filial, 
+        filialLen: e.filial.length,
+        filialTrim: e.filial.trim(),
+        nomeFilial: e.nomeFilial, 
+        estoque: e.estoque,
+        match: e.filial.trim() === filialOrigem.codFilial.trim() || e.filial === filialOrigem.codFilial
+      }))
+    });
+
+    // Encontrar estoque na filial origem - comparar com trim e também verificar se começa com o código
+    const estoqueOrigem = produto.estoques.find(e => {
+      const filialTrim = e.filial.trim();
+      const codFilialTrim = filialOrigem.codFilial.trim();
+      return filialTrim === codFilialTrim || 
+             e.filial === filialOrigem.codFilial ||
+             filialTrim.startsWith(codFilialTrim) ||
+             codFilialTrim.startsWith(filialTrim);
+    });
+    
+    if (!estoqueOrigem) {
+      mostrarNotificacao(`Produto não possui estoque na filial ${filialOrigem.filial}`, "error");
+      return;
+    }
+
+    const produtoSelecionado: ProdutoSelecionado = {
+      produto: produto.produto,
+      descProduto: produto.descProduto,
+      corProduto: produto.corProduto,
+      descCor: produto.descCor,
+      filialOrigem: filialOrigem.codFilial,
+      nomeFilialOrigem: filialOrigem.filial,
+      estoqueOrigem: estoqueOrigem.estoque,
+      quantidade: 1,
+    };
+
+    setProdutosSelecionados(prev => [...prev, produtoSelecionado]);
+    mostrarNotificacao(`${produto.descProduto} adicionado à transferência`);
+    
+    // Limpar busca mas manter modal aberto
+    setSearchTerm("");
+    setProdutos([]);
+  }, [filialOrigem, mostrarNotificacao]);
+
+  const removerProduto = useCallback((index: number) => {
+    setProdutosSelecionados(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const atualizarQuantidade = useCallback((index: number, quantidade: number) => {
+    if (quantidade < 1) return;
+    
+    setProdutosSelecionados(prev => {
+      const novo = [...prev];
+      const produto = novo[index];
+      if (quantidade > produto.estoqueOrigem) {
+        mostrarNotificacao(`Quantidade não pode ser maior que o estoque disponível (${produto.estoqueOrigem})`, "error");
+        return prev;
+      }
+      novo[index] = { ...produto, quantidade };
+      return novo;
+    });
+  }, [mostrarNotificacao]);
+
+  const processarFilaTransferencias = useCallback(async () => {
+    if (filaTransferencias.length === 0 || processandoTransferencia || !filialDestino) {
+      return;
+    }
+
+    setProcessandoTransferencia(true);
+    const produto = filaTransferencias[0];
+
+    // Retry automático se romaneio duplicado (igual ao script)
+    let tentativas = 0;
+    const maxTentativas = 5;
+    let sucesso = false;
+
+    while (!sucesso && tentativas < maxTentativas) {
+      try {
+        await executarTransferencia(
+          produto.produto,
+          produto.corProduto,
+          produto.filialOrigem,
+          filialDestino.codFilial,
+          produto.quantidade,
+          produto.quantidade,
+          tipoRomaneioSelecionado,
+          responsavelFinal || 'LOGISTICA'
+        );
+
+        sucesso = true;
+
+        // Remover da fila e da lista de selecionados
+        setFilaTransferencias(prev => prev.slice(1));
+        setProdutosSelecionados(prev => prev.filter(p => 
+          p.produto !== produto.produto || 
+          p.corProduto !== produto.corProduto ||
+          p.filialOrigem !== produto.filialOrigem
+        ));
+
+        // Recarregar log
+        const novoLog = await fetchLogTransferencias();
+        setLogTransferencias(novoLog);
+
+        mostrarNotificacao(`Transferência de ${produto.descProduto} concluída com sucesso!`);
+      } catch (error: any) {
+        const errorMessage = error.message || "Erro ao processar transferência";
+        
+        // Se falhou por PRIMARY KEY ou romaneio duplicado, tentar novamente
+        if (
+          errorMessage.includes('PRIMARY KEY') ||
+          errorMessage.toLowerCase().includes('duplicate key') ||
+          errorMessage.includes('ROMANEIO_DUPLICADO') ||
+          (errorMessage.toLowerCase().includes('ja existe') && errorMessage.toLowerCase().includes('saida')) ||
+          (errorMessage.toLowerCase().includes('já existe') && errorMessage.toLowerCase().includes('saida'))
+        ) {
+          tentativas++;
+          if (tentativas < maxTentativas) {
+            mostrarNotificacao(`Romaneio duplicado detectado. Tentando novamente... (${tentativas}/${maxTentativas})`, "success");
+            // Aguardar um pouco antes de tentar novamente
+            await new Promise(resolve => setTimeout(resolve, 500));
+            continue;
+          } else {
+            mostrarNotificacao(`Não foi possível gerar um romaneio único após ${maxTentativas} tentativas.`, "error");
+            // Remover da fila mesmo em caso de erro para não travar
+            setFilaTransferencias(prev => prev.slice(1));
+            break;
+          }
+        } else {
+          // Outro tipo de erro - não tentar novamente
+          mostrarNotificacao(errorMessage, "error");
+          // Remover da fila mesmo em caso de erro para não travar
+          setFilaTransferencias(prev => prev.slice(1));
+          break;
+        }
+      }
+    }
+
+    setProcessandoTransferencia(false);
+  }, [filaTransferencias, processandoTransferencia, filialDestino, mostrarNotificacao, tipoRomaneioSelecionado, responsavelFinal]);
+
+  // Processar próximo item da fila quando terminar o anterior
+  useEffect(() => {
+    if (!processandoTransferencia && filaTransferencias.length > 0) {
+      processarFilaTransferencias();
+    }
+  }, [processandoTransferencia, filaTransferencias.length, processarFilaTransferencias]);
+
+  const iniciarTransferencia = useCallback(() => {
+    if (!filialDestino) {
+      mostrarNotificacao("Selecione uma filial de destino", "error");
+      return;
+    }
+
+    if (produtosSelecionados.length === 0) {
+      mostrarNotificacao("Adicione pelo menos um produto", "error");
+      return;
+    }
+
+    // Adicionar todos os produtos à fila
+    setFilaTransferencias([...produtosSelecionados]);
+  }, [filialDestino, produtosSelecionados, mostrarNotificacao]);
+
+  const totalItens = produtosSelecionados.reduce((sum, p) => sum + p.quantidade, 0);
+  const totalProdutos = produtosSelecionados.length;
+
+  return (
+    <div className={styles.wrapper}>
+      {/* Header */}
+      <div className={styles.header}>
+        <div>
+          <h1 className={styles.title}>
+            <span className={styles.icon}>⇄</span>
+            Transferência de Produtos
+          </h1>
+          <p className={styles.subtitle}>Movimente produtos entre filiais</p>
+        </div>
+      </div>
+
+      {/* Layout principal */}
+      <div className={styles.layout}>
+        {/* Coluna esquerda - Filial Origem */}
+        <div className={styles.column}>
+          <div className={styles.section}>
+            <label className={styles.sectionLabel}>FILIAL ORIGEM</label>
+            <div className={styles.selectWrapper}>
+              <select
+                className={styles.select}
+                value={filialOrigem?.codFilial || ""}
+                onChange={(e) => {
+                  const filial = filiais.find(f => f.codFilial === e.target.value);
+                  setFilialOrigem(filial || null);
+                  // Limpar produtos selecionados ao mudar origem
+                  setProdutosSelecionados([]);
+                }}
+              >
+                <option value="">Selecione uma filial</option>
+                {filiais.map(f => (
+                  <option key={f.codFilial} value={f.codFilial}>
+                    {f.filial}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {filialOrigem && (
+              <div className={styles.filialCard}>
+                <div className={styles.filialIcon}>🏢</div>
+                <div className={styles.filialInfo}>
+                  <div className={styles.filialName}>{filialOrigem.filial}</div>
+                  <div className={styles.filialCode}>{filialOrigem.codFilial}</div>
+                </div>
+                <div className={styles.checkmark}>✓</div>
+              </div>
+            )}
+          </div>
+
+          {/* Log de Transferências */}
+          <div className={styles.section}>
+            <label className={styles.sectionLabel}>LOG DE TRANSFERÊNCIAS</label>
+            {loadingLog ? (
+              <div className={styles.emptyState}>Carregando...</div>
+            ) : logTransferencias.length === 0 ? (
+              <div className={styles.emptyState}>
+                <div className={styles.emptyIcon}>📄</div>
+                <div>Nenhuma transferência realizada</div>
+              </div>
+            ) : (
+              <div className={styles.logList}>
+                {logTransferencias.map((log, index) => (
+                  <div key={index} className={styles.logItem}>
+                    <div className={styles.logHeader}>
+                      <span className={styles.logRomaneio}>#{log.romaneio}</span>
+                      <span className={styles.logStatus}>{log.status}</span>
+                    </div>
+                    <div className={styles.logDetails}>
+                      {log.filialOrigem} → {log.filialDestino}
+                    </div>
+                    <div className={styles.logFooter}>
+                      <span>👁 {log.qtdProdutos} produtos • {log.qtdItens} itens</span>
+                      <span className={styles.logDate}>
+                        {new Date(log.dataEmissao).toLocaleString("pt-BR")}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Coluna central - Produtos e Resumo */}
+        <div className={styles.column}>
+          {/* Produtos para Transferir */}
+          <div className={styles.section}>
+            <div className={styles.sectionHeader}>
+              <label className={styles.sectionLabel}>PRODUTOS PARA TRANSFERIR</label>
+              <span className={styles.itemCount}>{totalItens} itens</span>
+            </div>
+
+            {produtosSelecionados.length === 0 ? (
+              <div className={styles.emptyState}>
+                <div className={styles.emptyIcon}>📦</div>
+                <div>Nenhum produto adicionado</div>
+                <div className={styles.emptySubtext}>Adicione produtos para transferir</div>
+              </div>
+            ) : (
+              <div className={styles.produtosList}>
+                {produtosSelecionados.map((produto, index) => (
+                  <div key={index} className={styles.produtoItem}>
+                    <div className={styles.produtoInfo}>
+                      <div className={styles.produtoName}>{produto.descProduto}</div>
+                      <div className={styles.produtoSku}>
+                        SKU: {produto.produto}
+                        {produto.corProduto && ` • Cor: ${produto.descCor || produto.corProduto}`}
+                      </div>
+                    </div>
+                    <div className={styles.produtoControls}>
+                      <div className={styles.quantityControls}>
+                        <button
+                          className={styles.quantityButton}
+                          onClick={() => atualizarQuantidade(index, produto.quantidade - 1)}
+                          disabled={produto.quantidade <= 1}
+                        >
+                          −
+                        </button>
+                        <input
+                          type="number"
+                          className={styles.quantityInput}
+                          value={produto.quantidade}
+                          onChange={(e) => {
+                            const qty = parseInt(e.target.value) || 1;
+                            atualizarQuantidade(index, qty);
+                          }}
+                          min={1}
+                          max={produto.estoqueOrigem}
+                        />
+                        <button
+                          className={styles.quantityButton}
+                          onClick={() => atualizarQuantidade(index, produto.quantidade + 1)}
+                          disabled={produto.quantidade >= produto.estoqueOrigem}
+                        >
+                          +
+                        </button>
+                      </div>
+                      <div className={styles.stockIndicator}>
+                        {produto.quantidade}/{produto.estoqueOrigem}
+                      </div>
+                      <button
+                        className={styles.removeButton}
+                        onClick={() => removerProduto(index)}
+                        title="Remover produto"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              className={styles.addButton}
+              onClick={() => setModalAberto(true)}
+              disabled={!filialOrigem}
+            >
+              <span className={styles.addIcon}>+</span>
+              Adicionar Produto
+            </button>
+          </div>
+
+          {/* Resumo da Transferência */}
+          <div className={styles.section}>
+            <label className={styles.sectionLabel}>RESUMO DA TRANSFERÊNCIA</label>
+            <div className={styles.resumo}>
+              <div className={styles.resumoOrigem}>
+                <span>Origem</span>
+                <strong>{filialOrigem?.filial || "—"}</strong>
+              </div>
+              <div className={styles.resumoArrow}>→</div>
+              <div className={styles.resumoDestino}>
+                <span>Destino</span>
+                <strong>{filialDestino?.filial || "—"}</strong>
+              </div>
+            </div>
+            <div className={styles.resumoCards}>
+              <div className={styles.resumoCard}>
+                <div className={styles.resumoCardValue}>{totalProdutos}</div>
+                <div className={styles.resumoCardLabel}>Produtos</div>
+              </div>
+              <div className={styles.resumoCard}>
+                <div className={styles.resumoCardValue}>{totalItens}</div>
+                <div className={styles.resumoCardLabel}>Itens Total</div>
+              </div>
+            </div>
+
+            {/* Tipo de Romaneio */}
+            <div className={styles.configSection}>
+              <label className={styles.configLabel}>Tipo de Romaneio</label>
+              <select
+                className={styles.configSelect}
+                value={tipoRomaneioSelecionado}
+                onChange={(e) => setTipoRomaneioSelecionado(e.target.value)}
+              >
+                {tiposRomaneio.map(tipo => (
+                  <option key={tipo} value={tipo}>{tipo}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Responsável */}
+            <div className={styles.configSection}>
+              <label className={styles.configLabel}>Responsável</label>
+              {!mostrarInputResponsavel ? (
+                <>
+                  <select
+                    className={styles.configSelect}
+                    value={responsavelSelecionado}
+                    onChange={(e) => {
+                      if (e.target.value === "__CUSTOM__") {
+                        setMostrarInputResponsavel(true);
+                      } else {
+                        setResponsavelSelecionado(e.target.value);
+                      }
+                    }}
+                  >
+                    {responsaveis.map((resp, idx) => (
+                      <option key={idx} value={resp.responsavel}>
+                        {resp.responsavel} ({resp.qtd} entradas)
+                      </option>
+                    ))}
+                    <option value="__CUSTOM__">+ Digitar outro responsável</option>
+                  </select>
+                </>
+              ) : (
+                <div className={styles.customInputWrapper}>
+                  <input
+                    type="text"
+                    className={styles.customInput}
+                    placeholder="Digite o login do responsável"
+                    value={inputResponsavelCustomizado}
+                    onChange={(e) => setInputResponsavelCustomizado(e.target.value)}
+                    onBlur={() => {
+                      if (inputResponsavelCustomizado.trim()) {
+                        setResponsavelSelecionado(inputResponsavelCustomizado.trim().toUpperCase());
+                      }
+                    }}
+                  />
+                  <button
+                    className={styles.cancelCustomButton}
+                    onClick={() => {
+                      setMostrarInputResponsavel(false);
+                      setInputResponsavelCustomizado("");
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+            </div>
+            <button
+              className={`${styles.transferButton} ${
+                !filialDestino || produtosSelecionados.length === 0 || processandoTransferencia || filaTransferencias.length > 0
+                  ? styles.transferButtonDisabled
+                  : ""
+              }`}
+              onClick={iniciarTransferencia}
+              disabled={!filialDestino || produtosSelecionados.length === 0 || processandoTransferencia || filaTransferencias.length > 0}
+            >
+              <span className={styles.transferIcon}>✈️</span>
+              {processandoTransferencia || filaTransferencias.length > 0
+                ? `Processando... (${filaTransferencias.length} restantes)`
+                : "Transferir Produtos"}
+            </button>
+          </div>
+        </div>
+
+        {/* Coluna direita - Filial Destino */}
+        <div className={styles.column}>
+          <div className={styles.section}>
+            <label className={styles.sectionLabel}>FILIAL DESTINO</label>
+            <div className={styles.selectWrapper}>
+              <select
+                className={styles.select}
+                value={filialDestino?.codFilial || ""}
+                onChange={(e) => {
+                  const filial = filiais.find(f => f.codFilial === e.target.value);
+                  setFilialDestino(filial || null);
+                }}
+                disabled={!filialOrigem}
+              >
+                <option value="">Selecione uma filial</option>
+                {filiais
+                  .filter(f => f.codFilial !== filialOrigem?.codFilial)
+                  .map(f => (
+                    <option key={f.codFilial} value={f.codFilial}>
+                      {f.filial}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            {filialDestino && (
+              <div className={styles.filialCard}>
+                <div className={styles.filialIcon}>🏢</div>
+                <div className={styles.filialInfo}>
+                  <div className={styles.filialName}>{filialDestino.filial}</div>
+                  <div className={styles.filialCode}>{filialDestino.codFilial}</div>
+                </div>
+                <div className={styles.checkmark}>✓</div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Modal de Adicionar Produto */}
+      {modalAberto && (
+        <div className={styles.modalOverlay} onClick={() => setModalAberto(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Adicionar Produto</h2>
+              <button
+                className={styles.modalClose}
+                onClick={() => setModalAberto(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className={styles.modalContent}>
+              <div className={styles.searchWrapper}>
+                <span className={styles.searchIcon}>🔍</span>
+                <input
+                  type="text"
+                  className={styles.searchInput}
+                  placeholder="Buscar por nome ou SKU..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              {loadingProdutos ? (
+                <div className={styles.loading}>Buscando produtos...</div>
+              ) : produtos.length === 0 && searchTerm.length >= 2 ? (
+                <div className={styles.emptyState}>Nenhum produto encontrado</div>
+              ) : (
+                <div className={styles.produtosModalList}>
+                  {produtos.map((produto, index) => {
+                    // Debug: verificar comparação
+                    console.log('[MODAL PRODUTO]', {
+                      produto: produto.produto,
+                      filialOrigemCodFilial: filialOrigem?.codFilial,
+                      estoques: produto.estoques.map(e => ({
+                        filial: e.filial,
+                        filialTrim: e.filial.trim(),
+                        codFilial: filialOrigem?.codFilial,
+                        match: e.filial.trim() === filialOrigem?.codFilial?.trim(),
+                        estoque: e.estoque
+                      }))
+                    });
+                    const estoqueOrigem = produto.estoques.find(e => 
+                      e.filial.trim() === filialOrigem?.codFilial?.trim() || 
+                      e.filial === filialOrigem?.codFilial
+                    );
+                    return (
+                      <div key={index} className={styles.produtoModalItem}>
+                        <div className={styles.produtoModalIcon}>📦</div>
+                        <div className={styles.produtoModalInfo}>
+                          <div className={styles.produtoModalName}>{produto.descProduto}</div>
+                          <div className={styles.produtoModalDetails}>
+                            SKU: {produto.produto}
+                            {produto.corProduto && ` • Cor: ${produto.descCor || produto.corProduto}`}
+                            {estoqueOrigem && ` • Estoque: ${estoqueOrigem.estoque}`}
+                          </div>
+                        </div>
+                        <button
+                          className={styles.addProdutoButton}
+                          onClick={() => adicionarProduto(produto)}
+                          disabled={!estoqueOrigem}
+                          title={estoqueOrigem ? `Adicionar produto (Estoque: ${estoqueOrigem.estoque})` : `Produto não possui estoque na filial ${filialOrigem?.filial}`}
+                        >
+                          +
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notificação */}
+      {notificacao && (
+        <div className={`${styles.notification} ${styles[`notification${notificacao.tipo}`]}`}>
+          <span className={styles.notificationIcon}>
+            {notificacao.tipo === "success" ? "✓" : "✗"}
+          </span>
+          <span className={styles.notificationMessage}>{notificacao.mensagem}</span>
+        </div>
+      )}
+    </div>
+  );
+}
