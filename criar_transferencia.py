@@ -209,6 +209,71 @@ def buscar_tipos_romaneio_disponiveis(conn) -> List[str]:
     
     return tipos_lista
 
+def buscar_responsaveis_disponiveis(conn) -> pd.DataFrame:
+    """Busca responsáveis já utilizados em ESTOQUE_PROD_ENT (Nerd / Scarfme)."""
+    query = """
+        SELECT TOP 50
+            LTRIM(RTRIM(ISNULL(RESPONSAVEL, ''))) AS RESPONSAVEL,
+            COUNT(*) AS QTD
+        FROM ESTOQUE_PROD_ENT WITH (NOLOCK)
+        WHERE RESPONSAVEL IS NOT NULL
+          AND LTRIM(RTRIM(RESPONSAVEL)) <> ''
+          AND (
+                FILIAL LIKE 'NERD%' OR
+                FILIAL LIKE 'SCARF%' OR
+                FILIAL LIKE 'SCARFME%'
+          )
+        GROUP BY LTRIM(RTRIM(ISNULL(RESPONSAVEL, '')))
+        ORDER BY QTD DESC, RESPONSAVEL
+    """
+    try:
+        df = pd.read_sql(query, conn)
+        return df
+    except Exception as e:
+        print(f"⚠ Erro ao buscar responsáveis: {e}")
+        return pd.DataFrame()
+
+
+def selecionar_responsavel(conn) -> str:
+    """Permite escolher um responsável real."""
+    df = buscar_responsaveis_disponiveis(conn)
+
+    print("\n" + "=" * 100)
+    print("SELECIONAR RESPONSÁVEL")
+    print("=" * 100)
+
+    if df.empty:
+        print("\n⚠ Não foi possível listar responsáveis existentes.")
+        resp = input("Digite manualmente o responsável (login LINX): ").strip().upper()
+        return resp or "LOGISTICA"
+
+    print("\n💡 Responsáveis mais utilizados (Nerd / Scarfme):")
+    print("-" * 100)
+    for idx, row in df.iterrows():
+        print(f"{idx + 1:2d}. {row['RESPONSAVEL']:<20}  ({int(row['QTD'])} entradas)")
+    print("-" * 100)
+    print("  99. Digitar outro responsável manualmente")
+
+    while True:
+        esc = input(f"\n🎯 Escolha (1-{len(df)}, 99): ").strip()
+        try:
+            n = int(esc)
+            if n == 99:
+                outro = input("Digite o login do responsável: ").strip().upper()
+                if outro:
+                    return outro
+                else:
+                    print("⚠ Valor vazio, tente novamente.")
+            elif 1 <= n <= len(df):
+                resp = str(df.iloc[n - 1]["RESPONSAVEL"]).strip()
+                print(f"\n✓ Responsável selecionado: {resp}")
+                return resp
+            else:
+                print(f"⚠ Número inválido. Use 1-{len(df)} ou 99.")
+        except ValueError:
+            print("⚠ Valor inválido. Digite um número.")
+
+
 def selecionar_tipo_romaneio(conn) -> str:
     """Permite ao usuário selecionar o tipo de romaneio"""
     tipos_disponiveis = buscar_tipos_romaneio_disponiveis(conn)
@@ -504,6 +569,66 @@ INSERT INTO ESTOQUE_PROD1_ENT (
     
     return sql_saida_cab, sql_saida_item, sql_entrada_cab, sql_entrada_item
 
+def determinar_cm_operacao_romaneio_destino(conn, filial_origem: str, filial_destino: str) -> Tuple[str, bool]:
+    """
+    Determina CM_OPERACAO baseado na regra de empresas:
+    - Mesma empresa → CM_OPERACAO='012' (SAIDA DO ESTOQUE PARA TRANSFERENCIA)
+    - Empresa diferente → CM_OPERACAO='011' (SAIDA DO ESTOQUE)
+    
+    IMPORTANTE: CM_OPERACAO é INDEPENDENTE de TIPO_ROMANEIO.
+    TIPO_ROMANEIO pode ser "TRANSFERENCIA ENTRE LOJAS" (descreve a operação),
+    mas CM_OPERACAO será determinado pelas empresas (questão burocrática/contábil).
+    
+    Exemplo: Transferência de Villa Lobos (empresa 8) para Leblon (empresa 12):
+    - TIPO_ROMANEIO = "TRANSFERENCIA ENTRE LOJAS" (correto, é uma transferência)
+    - CM_OPERACAO = '011' (empresas diferentes, então "SAIDA DO ESTOQUE")
+    
+    ROMANEIO_DESTINO sempre será preenchido (por organização), mesmo que a stored procedure possa atualizar depois.
+    
+    Retorna: (cm_operacao, preencher_romaneio_destino)
+    """
+    try:
+        # Buscar empresas das filiais
+        query = """
+            SELECT FILIAL, EMPRESA
+            FROM FILIAIS WITH (NOLOCK)
+            WHERE FILIAL IN (?, ?)
+        """
+        cursor = conn.cursor()
+        cursor.execute(query, [filial_origem, filial_destino])
+        rows = cursor.fetchall()
+        
+        empresa_origem = None
+        empresa_destino = None
+        
+        for row in rows:
+            filial = str(row[0]).strip()
+            empresa = row[1] if row[1] is not None else None
+            
+            if filial == filial_origem.strip():
+                empresa_origem = empresa
+            elif filial == filial_destino.strip():
+                empresa_destino = empresa
+        
+        if empresa_origem is None or empresa_destino is None:
+            print(f"⚠️  Não foi possível determinar empresas. Usando padrão CM_OPERACAO='011'")
+            return '011', True  # Sempre preencher ROMANEIO_DESTINO
+        
+        # Aplicar regra
+        if empresa_origem == empresa_destino:
+            # Mesma empresa → CM_OPERACAO='012'
+            print(f"✓ Mesma empresa ({empresa_origem}) → CM_OPERACAO='012', ROMANEIO_DESTINO será preenchido")
+            return '012', True
+        else:
+            # Empresa diferente → CM_OPERACAO='011', mas ROMANEIO_DESTINO também será preenchido (organização)
+            print(f"✓ Empresas diferentes ({empresa_origem} → {empresa_destino}) → CM_OPERACAO='011', ROMANEIO_DESTINO será preenchido (organização)")
+            return '011', True
+            
+    except Exception as e:
+        print(f"⚠️  Erro ao determinar CM_OPERACAO: {e}. Usando padrão CM_OPERACAO='011'")
+        return '011', True  # Sempre preencher ROMANEIO_DESTINO
+
+
 def executar_transferencia(
     conn,
     produto: str,
@@ -515,7 +640,8 @@ def executar_transferencia(
     romaneio_saida: str,
     romaneio_entrada: str,
     data_transferencia: datetime,
-    tipo_romaneio: str = 'TRANSFERENCIA'
+    tipo_romaneio: str = 'TRANSFERENCIA',
+    responsavel: str = ' '
 ) -> Tuple[bool, str]:
     """
     Executa a transferência no banco de dados usando a stored procedure do LINX
@@ -542,20 +668,37 @@ def executar_transferencia(
         cor_escaped = cor_produto.replace("'", "''") if cor_produto else ''
         data_str = data_transferencia.strftime('%Y-%m-%d %H:%M:%S')
         
+        # Determinar CM_OPERACAO baseado na regra de empresas
+        cm_operacao, preencher_romaneio_destino = determinar_cm_operacao_romaneio_destino(conn, filial_origem, filial_destino)
+        
+        # ROMANEIO_DESTINO: sempre preencher (por organização)
+        # A stored procedure pode atualizar depois, mas deixamos preenchido desde o início
+        romaneio_destino_valor = romaneio_entrada if preencher_romaneio_destino else romaneio_entrada
+        
+        # FILIAL_DESTINO: IMPORTANTE para aparecer na planilha correta do LINX
+        # Se CM_OPERACAO='011' (empresa diferente), FILIAL_DESTINO deve ser NULL
+        # para aparecer na planilha "Saída de produto acabado do estoque"
+        # Se CM_OPERACAO='012' (mesma empresa), FILIAL_DESTINO deve ser preenchido
+        filial_destino_valor = None if cm_operacao == '011' else filial_destino_escaped
+        
+        if cm_operacao == '011':
+            print(f"  ℹ️  FILIAL_DESTINO será NULL (para aparecer na planilha 'Saída do estoque')")
+        else:
+            print(f"  ℹ️  FILIAL_DESTINO será preenchido (para aparecer na planilha 'Saída por transferência')")
+        
         # 1. Inserir cabeçalho de SAÍDA (ESTOQUE_PROD_SAI)
-        # Nota: Não preencher ROMANEIO_DESTINO ainda, a stored procedure vai gerar
-        # tipo_romaneio deve ser passado como parâmetro para executar_transferencia
         query_saida_cab = """
             INSERT INTO ESTOQUE_PROD_SAI (
                 ROMANEIO_PRODUTO, FILIAL, EMISSAO, RESPONSAVEL,
-                FILIAL_DESTINO, DATA_PARA_TRANSFERENCIA,
+                FILIAL_DESTINO, ROMANEIO_DESTINO, DATA_PARA_TRANSFERENCIA,
                 DATA_DIGITACAO, SEGUNDA_QUALIDADE, NAO_VALIDAR_ENTRADA, MOV_INTERNA,
-                TIPO_ROMANEIO
-            ) VALUES (?, ?, ?, ?, ?, ?, GETDATE(), 0, 0, 0, ?)
+                TIPO_ROMANEIO, CM_OPERACAO
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, GETDATE(), 0, 0, 0, ?, ?)
         """
         cursor.execute(query_saida_cab, [
-            romaneio_saida, filial_origem_escaped, data_str, ' ',
-            filial_destino_escaped, data_str, tipo_romaneio
+            romaneio_saida, filial_origem_escaped, data_str, responsavel or ' ',
+            filial_destino_valor, romaneio_destino_valor, data_str,
+            tipo_romaneio, cm_operacao
         ])
         
         # 2. Inserir item de SAÍDA (ESTOQUE_PROD1_SAI)
@@ -582,7 +725,7 @@ def executar_transferencia(
         # NUMERO_NF_TRANSFERENCIA é obrigatório (char, não pode ser NULL)
         numero_nf_transferencia = ''  # Vazio por padrão
         cursor.execute(query_loja_saidas_cab, [
-            romaneio_saida, filial_origem_escaped, data_str, ' ',
+            romaneio_saida, filial_origem_escaped, data_str, responsavel or ' ',
             filial_destino_escaped, numero_nf_transferencia,
             qtde_saida, data_str
         ])
@@ -1648,6 +1791,9 @@ def main():
         # Selecionar tipo de romaneio
         tipo_romaneio = selecionar_tipo_romaneio(conn)
         
+        # Selecionar responsável
+        responsavel = selecionar_responsavel(conn)
+        
         # Gerar romaneios
         print("\n🔍 Gerando romaneios...")
         filial_origem_cod_temp = str(estoque_origem['FILIAL']).strip()
@@ -1821,7 +1967,8 @@ def main():
                 romaneio_saida,
                 romaneio_entrada,
                 data_transferencia,
-                tipo_romaneio
+                tipo_romaneio,
+                responsavel
             )
             
             # Se falhou por PRIMARY KEY ou romaneio de saída duplicado, tentar novamente

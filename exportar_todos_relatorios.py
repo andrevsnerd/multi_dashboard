@@ -308,6 +308,7 @@ def processar_entradas(df_mov, df_produtos, df_cores):
     # Ordena colunas
     ordem = ['EMISSAO', 'FILIAL', 'ROMANEIO_PRODUTO', 'PRODUTO', 'DESC_PRODUTO',
              'COR_PRODUTO', 'DESC_COR_PRODUTO', 'QTDE_TOTAL', 'TIPO_ENTRADA', 'TIPO_ROMANEIO',
+             'RESPONSAVEL', 'CM_OPERACAO', 'CM_DESC_OPERACAO', 'EMPRESA',
              'GRUPO_PRODUTO', 'SUBGRUPO_PRODUTO', 'LINHA', 'COLECAO']
     df = df[[c for c in ordem if c in df.columns]]
     
@@ -337,7 +338,7 @@ def processar_saidas(df_saidas, df_produtos, df_cores):
     
     # Ordena colunas
     ordem = ['EMISSAO', 'FILIAL', 'FILIAL_DESTINO', 'ROMANEIO_PRODUTO', 'PRODUTO', 'DESC_PRODUTO',
-             'COR_PRODUTO', 'DESC_COR_PRODUTO', 'QTDE_TOTAL', 'TIPO_ROMANEIO',
+             'COR_PRODUTO', 'DESC_COR_PRODUTO', 'QTDE_TOTAL', 'TIPO_ROMANEIO', 'RESPONSAVEL',
              'GRUPO_PRODUTO', 'SUBGRUPO_PRODUTO', 'LINHA', 'COLECAO']
     df = df[[c for c in ordem if c in df.columns]]
     
@@ -760,7 +761,8 @@ def main():
         'entradas': """
             SELECT E.ROMANEIO_PRODUTO, E.EMISSAO, E.FILIAL, P.PRODUTO,
                    P.COR_PRODUTO, P.QTDE AS QTDE_TOTAL,
-                   E.TIPO_ENTRADA, E.TIPO_ROMANEIO
+                   E.TIPO_ENTRADA, E.TIPO_ROMANEIO, E.RESPONSAVEL,
+                   E.CM_OPERACAO, E.CM_DESC_OPERACAO, E.EMPRESA
             FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
             LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) 
                 ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
@@ -770,7 +772,7 @@ def main():
         'saidas': """
             SELECT S.ROMANEIO_PRODUTO, S.EMISSAO, S.FILIAL, S.FILIAL_DESTINO,
                    P.PRODUTO, P.COR_PRODUTO, P.QTDE AS QTDE_TOTAL,
-                   S.TIPO_ROMANEIO
+                   S.TIPO_ROMANEIO, S.RESPONSAVEL
             FROM ESTOQUE_PROD_SAI AS S WITH (NOLOCK)
             LEFT JOIN ESTOQUE_PROD1_SAI AS P WITH (NOLOCK) 
                 ON S.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
