@@ -108,29 +108,53 @@ def buscar_info_produto(conn, codigo_produto: str) -> Optional[pd.DataFrame]:
         print(f"✗ Erro ao buscar produto: {e}")
         return None
 
-def buscar_estoque_produto(conn, codigo_produto: str) -> pd.DataFrame:
-    """Busca todos os registros de estoque do produto"""
+def buscar_estoque_produto(conn, codigo_produto: str, cor_produto: Optional[str] = None) -> pd.DataFrame:
+    """
+    Busca registros de estoque do produto
+    Se cor_produto for informado, filtra apenas essa cor
+    """
     codigo_limpo = str(codigo_produto).strip()
     
-    query = """
-        SELECT 
-            e.PRODUTO,
-            e.COR_PRODUTO,
-            e.FILIAL,
-            e.ESTOQUE,
-            p.DESC_PRODUTO,
-            ISNULL(c.DESC_COR, '') AS DESC_COR,
-            f.FILIAL AS NOME_FILIAL
-        FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
-        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = e.PRODUTO
-        LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = e.COR_PRODUTO
-        LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.COD_FILIAL = e.FILIAL
-        WHERE e.PRODUTO = ?
-        ORDER BY e.FILIAL, e.COR_PRODUTO
-    """
+    if cor_produto:
+        cor_limpa = str(cor_produto).strip()
+        query = """
+            SELECT 
+                e.PRODUTO,
+                e.COR_PRODUTO,
+                e.FILIAL,
+                e.ESTOQUE,
+                p.DESC_PRODUTO,
+                ISNULL(c.DESC_COR, '') AS DESC_COR,
+                f.FILIAL AS NOME_FILIAL
+            FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+            LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = e.PRODUTO
+            LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = e.COR_PRODUTO
+            LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.COD_FILIAL = e.FILIAL
+            WHERE e.PRODUTO = ? AND e.COR_PRODUTO = ?
+            ORDER BY e.FILIAL, e.COR_PRODUTO
+        """
+        params = [codigo_limpo, cor_limpa]
+    else:
+        query = """
+            SELECT 
+                e.PRODUTO,
+                e.COR_PRODUTO,
+                e.FILIAL,
+                e.ESTOQUE,
+                p.DESC_PRODUTO,
+                ISNULL(c.DESC_COR, '') AS DESC_COR,
+                f.FILIAL AS NOME_FILIAL
+            FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+            LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = e.PRODUTO
+            LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = e.COR_PRODUTO
+            LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.COD_FILIAL = e.FILIAL
+            WHERE e.PRODUTO = ?
+            ORDER BY e.FILIAL, e.COR_PRODUTO
+        """
+        params = [codigo_limpo]
     
     try:
-        df = pd.read_sql(query, conn, params=[codigo_limpo])
+        df = pd.read_sql(query, conn, params=params)
         
         # Limpar e formatar dados
         if not df.empty:
@@ -569,7 +593,27 @@ INSERT INTO ESTOQUE_PROD1_ENT (
     
     return sql_saida_cab, sql_saida_item, sql_entrada_cab, sql_entrada_item
 
-def determinar_cm_operacao_romaneio_destino(conn, filial_origem: str, filial_destino: str) -> Tuple[str, bool]:
+def buscar_empresa_filial(conn, filial: str) -> Optional[int]:
+    """Busca a empresa de uma filial"""
+    try:
+        query = """
+            SELECT EMPRESA
+            FROM FILIAIS WITH (NOLOCK)
+            WHERE FILIAL = ?
+        """
+        cursor = conn.cursor()
+        cursor.execute(query, [filial])
+        row = cursor.fetchone()
+        cursor.close()
+        
+        if row and row[0] is not None:
+            return int(row[0])
+        return None
+    except Exception as e:
+        print(f"⚠️  Erro ao buscar empresa da filial {filial}: {e}")
+        return None
+
+def determinar_cm_operacao_romaneio_destino(conn, filial_origem: str, filial_destino: str) -> Tuple[str, bool, Optional[int], Optional[int]]:
     """
     Determina CM_OPERACAO baseado na regra de empresas:
     - Mesma empresa → CM_OPERACAO='012' (SAIDA DO ESTOQUE PARA TRANSFERENCIA)
@@ -585,7 +629,7 @@ def determinar_cm_operacao_romaneio_destino(conn, filial_origem: str, filial_des
     
     ROMANEIO_DESTINO sempre será preenchido (por organização), mesmo que a stored procedure possa atualizar depois.
     
-    Retorna: (cm_operacao, preencher_romaneio_destino)
+    Retorna: (cm_operacao, preencher_romaneio_destino, empresa_origem, empresa_destino)
     """
     try:
         # Buscar empresas das filiais
@@ -597,6 +641,7 @@ def determinar_cm_operacao_romaneio_destino(conn, filial_origem: str, filial_des
         cursor = conn.cursor()
         cursor.execute(query, [filial_origem, filial_destino])
         rows = cursor.fetchall()
+        cursor.close()
         
         empresa_origem = None
         empresa_destino = None
@@ -606,27 +651,132 @@ def determinar_cm_operacao_romaneio_destino(conn, filial_origem: str, filial_des
             empresa = row[1] if row[1] is not None else None
             
             if filial == filial_origem.strip():
-                empresa_origem = empresa
+                empresa_origem = int(empresa) if empresa is not None else None
             elif filial == filial_destino.strip():
-                empresa_destino = empresa
+                empresa_destino = int(empresa) if empresa is not None else None
         
         if empresa_origem is None or empresa_destino is None:
             print(f"⚠️  Não foi possível determinar empresas. Usando padrão CM_OPERACAO='011'")
-            return '011', True  # Sempre preencher ROMANEIO_DESTINO
+            return '011', True, empresa_origem, empresa_destino  # Sempre preencher ROMANEIO_DESTINO
         
         # Aplicar regra
         if empresa_origem == empresa_destino:
             # Mesma empresa → CM_OPERACAO='012'
             print(f"✓ Mesma empresa ({empresa_origem}) → CM_OPERACAO='012', ROMANEIO_DESTINO será preenchido")
-            return '012', True
+            return '012', True, empresa_origem, empresa_destino
         else:
             # Empresa diferente → CM_OPERACAO='011', mas ROMANEIO_DESTINO também será preenchido (organização)
             print(f"✓ Empresas diferentes ({empresa_origem} → {empresa_destino}) → CM_OPERACAO='011', ROMANEIO_DESTINO será preenchido (organização)")
-            return '011', True
+            return '011', True, empresa_origem, empresa_destino
             
     except Exception as e:
         print(f"⚠️  Erro ao determinar CM_OPERACAO: {e}. Usando padrão CM_OPERACAO='011'")
-        return '011', True  # Sempre preencher ROMANEIO_DESTINO
+        return '011', True, None, None  # Sempre preencher ROMANEIO_DESTINO
+
+def obter_cm_desc_operacao(cm_operacao: str) -> str:
+    """Retorna a descrição do CM_OPERACAO"""
+    descricoes = {
+        '003': 'ENTRADA DE ESTOQUE',
+        '011': 'SAIDA DO ESTOQUE',
+        '012': 'SAIDA DO ESTOQUE PARA TRANSFERENCIA'
+    }
+    return descricoes.get(cm_operacao, '')
+
+def determinar_tipo_entrada(tipo_romaneio: str) -> str:
+    """Determina TIPO_ENTRADA baseado no TIPO_ROMANEIO"""
+    # Baseado nos exemplos do Linx, TIPO_ENTRADA parece ser sempre "1" para transferências
+    # Mas pode variar conforme o tipo de romaneio
+    tipo_entrada_map = {
+        'TRANSFERENCIA ENTRE LOJAS': '1',
+        'TRANSFERENCIA': '1',
+        'ENTRADA AVULSA': '1',
+        'ENTRADA POR MOV. INTERNA': '1',
+        'DEFEITO': '1'
+    }
+    return tipo_entrada_map.get(tipo_romaneio.upper(), '1')
+
+def garantir_informacoes_joins_saida(conn, romaneio_saida: str, filial: str, cm_operacao: str):
+    """
+    Garante que as informações necessárias para JOINs do Linx estejam disponíveis.
+    EMPRESA e CM_DESC_OPERACAO aparecem no Linx através de JOINs com FILIAIS e tabelas de códigos.
+    Esta função garante que os campos relacionados estejam corretos para que os JOINs funcionem.
+    """
+    cursor = conn.cursor()
+    try:
+        # Verificar se o registro existe e tem os dados corretos
+        # O Linx faz JOIN assim: 
+        # SELECT e.*, f.EMPRESA, cm.DESC_OPERACAO as CM_DESC_OPERACAO
+        # FROM ESTOQUE_PROD_SAI e
+        # LEFT JOIN FILIAIS f ON e.FILIAL = f.FILIAL
+        # LEFT JOIN CODIGOS_OPERACAO cm ON e.CM_OPERACAO = cm.CODIGO
+        
+        # Verificar se FILIAL está correta para o JOIN funcionar
+        query_verificar = """
+            SELECT e.ROMANEIO_PRODUTO, e.FILIAL, e.CM_OPERACAO, f.EMPRESA
+            FROM ESTOQUE_PROD_SAI e WITH (NOLOCK)
+            LEFT JOIN FILIAIS f WITH (NOLOCK) ON e.FILIAL = f.FILIAL
+            WHERE e.ROMANEIO_PRODUTO = ?
+        """
+        cursor.execute(query_verificar, [romaneio_saida])
+        row = cursor.fetchone()
+        
+        if row:
+            filial_atual = str(row[1]).strip() if row[1] else None
+            cm_operacao_atual = str(row[2]).strip() if row[2] else None
+            empresa_join = row[3] if row[3] is not None else None
+            
+            if filial_atual == filial.strip() and cm_operacao_atual == cm_operacao:
+                print(f"   ✓ JOINs validados para saída: FILIAL={filial_atual}, CM_OPERACAO={cm_operacao_atual}, EMPRESA={empresa_join}")
+                return True
+            else:
+                print(f"   ⚠️  Dados para JOIN podem estar incorretos: FILIAL={filial_atual}, CM_OPERACAO={cm_operacao_atual}")
+                return False
+        else:
+            print(f"   ⚠️  Registro não encontrado para validação de JOINs")
+            return False
+    except Exception as e:
+        print(f"   ⚠️  Erro ao validar JOINs para saída: {e}")
+        return False
+    finally:
+        cursor.close()
+
+def garantir_informacoes_joins_entrada(conn, romaneio_entrada: str, filial: str, cm_operacao: str):
+    """
+    Garante que as informações necessárias para JOINs do Linx estejam disponíveis.
+    EMPRESA e CM_DESC_OPERACAO aparecem no Linx através de JOINs com FILIAIS e tabelas de códigos.
+    Esta função garante que os campos relacionados estejam corretos para que os JOINs funcionem.
+    """
+    cursor = conn.cursor()
+    try:
+        # Verificar se o registro existe e tem os dados corretos
+        query_verificar = """
+            SELECT e.ROMANEIO_PRODUTO, e.FILIAL, e.CM_OPERACAO, f.EMPRESA
+            FROM ESTOQUE_PROD_ENT e WITH (NOLOCK)
+            LEFT JOIN FILIAIS f WITH (NOLOCK) ON e.FILIAL = f.FILIAL
+            WHERE e.ROMANEIO_PRODUTO = ?
+        """
+        cursor.execute(query_verificar, [romaneio_entrada])
+        row = cursor.fetchone()
+        
+        if row:
+            filial_atual = str(row[1]).strip() if row[1] else None
+            cm_operacao_atual = str(row[2]).strip() if row[2] else None
+            empresa_join = row[3] if row[3] is not None else None
+            
+            if filial_atual == filial.strip() and cm_operacao_atual == cm_operacao:
+                print(f"   ✓ JOINs validados para entrada: FILIAL={filial_atual}, CM_OPERACAO={cm_operacao_atual}, EMPRESA={empresa_join}")
+                return True
+            else:
+                print(f"   ⚠️  Dados para JOIN podem estar incorretos: FILIAL={filial_atual}, CM_OPERACAO={cm_operacao_atual}")
+                return False
+        else:
+            print(f"   ⚠️  Registro não encontrado para validação de JOINs")
+            return False
+    except Exception as e:
+        print(f"   ⚠️  Erro ao validar JOINs para entrada: {e}")
+        return False
+    finally:
+        cursor.close()
 
 
 def executar_transferencia(
@@ -669,24 +819,75 @@ def executar_transferencia(
         data_str = data_transferencia.strftime('%Y-%m-%d %H:%M:%S')
         
         # Determinar CM_OPERACAO baseado na regra de empresas
-        cm_operacao, preencher_romaneio_destino = determinar_cm_operacao_romaneio_destino(conn, filial_origem, filial_destino)
+        cm_operacao, preencher_romaneio_destino, empresa_origem, empresa_destino = determinar_cm_operacao_romaneio_destino(conn, filial_origem, filial_destino)
         
-        # ROMANEIO_DESTINO: sempre preencher (por organização)
-        # A stored procedure pode atualizar depois, mas deixamos preenchido desde o início
-        romaneio_destino_valor = romaneio_entrada if preencher_romaneio_destino else romaneio_entrada
+        # Garantir que temos empresas (buscar individualmente se necessário)
+        if empresa_origem is None:
+            empresa_origem = buscar_empresa_filial(conn, filial_origem)
+            if empresa_origem is None:
+                print(f"⚠️  Não foi possível determinar empresa da filial origem. Usando padrão.")
+                empresa_origem = 8  # Empresa padrão (NERD)
         
-        # FILIAL_DESTINO: IMPORTANTE para aparecer na planilha correta do LINX
-        # Se CM_OPERACAO='011' (empresa diferente), FILIAL_DESTINO deve ser NULL
-        # para aparecer na planilha "Saída de produto acabado do estoque"
-        # Se CM_OPERACAO='012' (mesma empresa), FILIAL_DESTINO deve ser preenchido
-        filial_destino_valor = None if cm_operacao == '011' else filial_destino_escaped
+        if empresa_destino is None:
+            empresa_destino = buscar_empresa_filial(conn, filial_destino)
+            if empresa_destino is None:
+                print(f"⚠️  Não foi possível determinar empresa da filial destino. Usando padrão.")
+                empresa_destino = 8  # Empresa padrão (NERD)
         
+        # Obter descrição do CM_OPERACAO
+        cm_desc_operacao_saida = obter_cm_desc_operacao(cm_operacao)
+        
+        # CM_OPERACAO para entrada é sempre '003' (ENTRADA DE ESTOQUE)
+        cm_operacao_entrada = '003'
+        cm_desc_operacao_entrada = obter_cm_desc_operacao(cm_operacao_entrada)
+        
+        # TIPO_ENTRADA para entrada
+        tipo_entrada = determinar_tipo_entrada(tipo_romaneio)
+        
+        print(f"   ℹ️  Empresa origem: {empresa_origem}, Empresa destino: {empresa_destino}")
+        print(f"   ℹ️  CM_OPERACAO saída: {cm_operacao} ({cm_desc_operacao_saida})")
+        print(f"   ℹ️  CM_OPERACAO entrada: {cm_operacao_entrada} ({cm_desc_operacao_entrada})")
+        print(f"   ℹ️  TIPO_ENTRADA: {tipo_entrada}")
+        
+        # ============================================================================================
+        # REGRA CRÍTICA: Dois tipos de saídas no Linx baseado em empresas
+        # ============================================================================================
+        # 1. EMPRESAS DIFERENTES (CM_OPERACAO='011'):
+        #    - Tipo: "SAIDA DO ESTOQUE"
+        #    - FILIAL_DESTINO = NULL (obrigatório!)
+        #    - ROMANEIO_DESTINO = NULL (obrigatório!)
+        #    - Aparece na planilha: "Saída de produto acabado do estoque"
+        #    - Exemplo: NERD VILLA LOBOS (empresa 8) → NERD LEBLON (empresa 12)
+        #
+        # 2. MESMA EMPRESA (CM_OPERACAO='012'):
+        #    - Tipo: "SAIDA DO ESTOQUE PARA TRANSFERENCIA"
+        #    - FILIAL_DESTINO = preenchido (obrigatório!)
+        #    - ROMANEIO_DESTINO = preenchido (obrigatório!)
+        #    - Aparece na planilha: "Saída por transferência"
+        #    - Exemplo: NERD VILLA LOBOS (empresa 8) → NERD HIGIENOPOLIS (empresa 8)
+        # ============================================================================================
+        
+        # FILIAL_DESTINO e ROMANEIO_DESTINO: NULL para empresas diferentes, preenchido para mesma empresa
         if cm_operacao == '011':
-            print(f"  ℹ️  FILIAL_DESTINO será NULL (para aparecer na planilha 'Saída do estoque')")
+            # Empresas diferentes → NULL para aparecer na planilha "Saída do estoque"
+            filial_destino_valor = None
+            romaneio_destino_valor = None
+            print(f"  ✓ Tipo: SAIDA DO ESTOQUE (empresas diferentes)")
+            print(f"  ✓ FILIAL_DESTINO = NULL")
+            print(f"  ✓ ROMANEIO_DESTINO = NULL")
+            print(f"  ✓ Aparecerá na planilha 'Saída do estoque'")
         else:
-            print(f"  ℹ️  FILIAL_DESTINO será preenchido (para aparecer na planilha 'Saída por transferência')")
+            # Mesma empresa → preenchido para aparecer na planilha "Saída por transferência"
+            filial_destino_valor = filial_destino_escaped
+            romaneio_destino_valor = romaneio_entrada
+            print(f"  ✓ Tipo: SAIDA DO ESTOQUE PARA TRANSFERENCIA (mesma empresa)")
+            print(f"  ✓ FILIAL_DESTINO = {filial_destino_escaped}")
+            print(f"  ✓ ROMANEIO_DESTINO = {romaneio_entrada}")
+            print(f"  ✓ Aparecerá na planilha 'Saída por transferência'")
         
         # 1. Inserir cabeçalho de SAÍDA (ESTOQUE_PROD_SAI)
+        # NOTA: EMPRESA e CM_DESC_OPERACAO não existem como colunas físicas nas tabelas,
+        # mas aparecem nas views/relatórios do Linx através de JOINs com outras tabelas
         query_saida_cab = """
             INSERT INTO ESTOQUE_PROD_SAI (
                 ROMANEIO_PRODUTO, FILIAL, EMISSAO, RESPONSAVEL,
@@ -700,6 +901,12 @@ def executar_transferencia(
             filial_destino_valor, romaneio_destino_valor, data_str,
             tipo_romaneio, cm_operacao
         ])
+        # Commit após criar cabeçalho de saída
+        conn.commit()
+        print(f"   ✓ Cabeçalho de SAÍDA criado: Romaneio {romaneio_saida}")
+        
+        # Validar que os JOINs funcionarão corretamente
+        garantir_informacoes_joins_saida(conn, romaneio_saida, filial_origem, cm_operacao)
         
         # 2. Inserir item de SAÍDA (ESTOQUE_PROD1_SAI)
         query_saida_item = """
@@ -711,6 +918,9 @@ def executar_transferencia(
             filial_origem_escaped, romaneio_saida, produto_escaped,
             cor_escaped if cor_escaped else None, qtde_saida
         ])
+        # Commit após criar item de saída
+        conn.commit()
+        print(f"   ✓ Item de SAÍDA criado")
         
         # 3. Inserir cabeçalho em LOJA_SAIDAS (necessário para a stored procedure)
         # A stored procedure verifica se existe em LOJA_SAIDAS antes de gerar entrada
@@ -729,7 +939,34 @@ def executar_transferencia(
             filial_destino_escaped, numero_nf_transferencia,
             qtde_saida, data_str
         ])
+        # IMPORTANTE: Fazer commit imediatamente após criar LOJA_SAIDAS
+        # para garantir que esteja disponível para LOJA_SAIDAS_PRODUTO
+        conn.commit()
         print(f"   ✓ LOJA_SAIDAS criada: Romaneio {romaneio_saida}")
+        
+        # 3.1. Tentar atualizar LOJA_SAIDAS com informações adicionais (opcional)
+        # Se falhar, não é crítico - as informações aparecem via JOINs no Linx
+        try:
+            # Atualizar TIPO_ENTRADA_SAIDA em LOJA_SAIDAS baseado no CM_OPERACAO
+            tipo_entrada_saida_loja = '2' if cm_operacao == '012' else '1'  # 2 = Transferência, 1 = Saída normal
+            query_update_loja_saidas = """
+                UPDATE LOJA_SAIDAS
+                SET TIPO_ENTRADA_SAIDA = ?
+                WHERE ROMANEIO_PRODUTO = ? AND FILIAL = ?
+            """
+            cursor.execute(query_update_loja_saidas, [
+                tipo_entrada_saida_loja, romaneio_saida, filial_origem_escaped
+            ])
+            if cursor.rowcount > 0:
+                conn.commit()
+                print(f"   ✓ LOJA_SAIDAS atualizada com TIPO_ENTRADA_SAIDA={tipo_entrada_saida_loja}")
+            else:
+                print(f"   ℹ️  TIPO_ENTRADA_SAIDA não atualizado (pode não ser necessário)")
+        except Exception as e:
+            # Não fazer rollback - apenas avisar que não foi possível atualizar
+            # LOJA_SAIDAS já foi criada e commitada, isso é apenas um ajuste opcional
+            print(f"   ℹ️  Não foi possível atualizar TIPO_ENTRADA_SAIDA em LOJA_SAIDAS: {e}")
+            print(f"   (Não é crítico - informações aparecem via JOINs no Linx)")
         
         # 4. Inserir item em LOJA_SAIDAS_PRODUTO (necessário para a stored procedure)
         # A stored procedure também verifica se existe em LOJA_SAIDAS_PRODUTO
@@ -742,17 +979,19 @@ def executar_transferencia(
             romaneio_saida, filial_origem_escaped, produto_escaped,
             cor_escaped if cor_escaped else None, qtde_saida
         ])
+        # IMPORTANTE: Fazer commit após criar LOJA_SAIDAS_PRODUTO
+        conn.commit()
         print(f"   ✓ LOJA_SAIDAS_PRODUTO criada")
         
         # Verificar se LOJA_SAIDAS foi criada corretamente ANTES de chamar stored procedure
+        # IMPORTANTE: FILIAL_DESTINO pode ser NULL para CM_OPERACAO='011', então não usar na verificação
         query_verificar_antes_sp = """
             SELECT SAIDA_CANCELADA, SAIDA_ENCERRADA
             FROM LOJA_SAIDAS
             WHERE ROMANEIO_PRODUTO = ? 
-                AND FILIAL = ? 
-                AND FILIAL_DESTINO = ?
+                AND FILIAL = ?
         """
-        cursor.execute(query_verificar_antes_sp, [romaneio_saida, filial_origem_escaped, filial_destino_escaped])
+        cursor.execute(query_verificar_antes_sp, [romaneio_saida, filial_origem_escaped])
         row_verif_antes = cursor.fetchone()
         if not row_verif_antes:
             raise Exception(f"ERRO: LOJA_SAIDAS nao foi criada antes de chamar stored procedure. Romaneio: {romaneio_saida}")
@@ -1007,16 +1246,37 @@ def executar_transferencia(
         cursor.execute(query_verificar_entrada_estoque, [romaneio_entrada, filial_destino_escaped])
         row_verif_entrada = cursor.fetchone()
         
-        # Se existe em ESTOQUE_PROD_ENT, atualizar TIPO_ROMANEIO (a stored procedure pode não ter preenchido)
+        # Se existe em ESTOQUE_PROD_ENT, atualizar campos faltantes (a stored procedure pode não ter preenchido)
         if row_verif_entrada and row_verif_entrada[0] > 0:
-            query_update_tipo_romaneio_entrada = """
+            query_update_entrada = """
                 UPDATE ESTOQUE_PROD_ENT
-                SET TIPO_ROMANEIO = ?
+                SET TIPO_ROMANEIO = ?,
+                    TIPO_ENTRADA = ?,
+                    CM_OPERACAO = ?
                 WHERE ROMANEIO_PRODUTO = ? AND FILIAL = ?
             """
-            cursor.execute(query_update_tipo_romaneio_entrada, [tipo_romaneio, romaneio_entrada, filial_destino_escaped])
+            cursor.execute(query_update_entrada, [
+                tipo_romaneio, tipo_entrada, cm_operacao_entrada,
+                romaneio_entrada, filial_destino_escaped
+            ])
             conn.commit()
-            print(f"   ✓ TIPO_ROMANEIO atualizado na entrada: {tipo_romaneio}")
+            print(f"   ✓ Campos atualizados na entrada: TIPO_ROMANEIO={tipo_romaneio}, TIPO_ENTRADA={tipo_entrada}, CM_OPERACAO={cm_operacao_entrada}")
+            
+            # Atualizar LOJA_ENTRADAS se existir (para garantir que as informações estejam disponíveis via JOINs)
+            try:
+                query_update_loja_entradas = """
+                    UPDATE LOJA_ENTRADAS
+                    SET TIPO_ENTRADA_SAIDA = ?
+                    WHERE ROMANEIO_PRODUTO = ? AND FILIAL = ?
+                """
+                cursor.execute(query_update_loja_entradas, [
+                    tipo_entrada, romaneio_entrada, filial_destino_escaped
+                ])
+                if cursor.rowcount > 0:
+                    conn.commit()
+                    print(f"   ✓ LOJA_ENTRADAS atualizada com TIPO_ENTRADA_SAIDA={tipo_entrada}")
+            except Exception as e:
+                print(f"   ⚠️  Não foi possível atualizar LOJA_ENTRADAS: {e}")
         
         # Se não existe em ESTOQUE_PROD_ENT, mas existe em LOJA_ENTRADAS, criar manualmente
         if not row_verif_entrada or row_verif_entrada[0] == 0:
@@ -1049,13 +1309,37 @@ def executar_transferencia(
                     ROMANEIO_PRODUTO, FILIAL, EMISSAO, RESPONSAVEL,
                     FILIAL_ORIGEM, ROMANEIO_ORIGEM, DATA_PARA_TRANSFERENCIA,
                     DATA_DIGITACAO, SEGUNDA_QUALIDADE, ACERTO_ENTRADA,
-                    NAO_VALIDAR_ENTRADA, NF_ENTRADA_PROPRIA, TIPO_ROMANEIO
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, GETDATE(), 0, 0, 0, 0, ?)
+                    NAO_VALIDAR_ENTRADA, NF_ENTRADA_PROPRIA, TIPO_ROMANEIO,
+                    TIPO_ENTRADA, CM_OPERACAO
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, GETDATE(), 0, 0, 0, 0, ?, ?, ?)
             """
             cursor.execute(query_insert_entrada_cab, [
                 romaneio_entrada, filial_destino_escaped, data_entrada, responsavel_entrada,
-                filial_origem_entrada, romaneio_origem_entrada, data_entrada, tipo_romaneio
+                filial_origem_entrada, romaneio_origem_entrada, data_entrada, tipo_romaneio,
+                tipo_entrada, cm_operacao_entrada
             ])
+            # IMPORTANTE: Fazer commit após criar ESTOQUE_PROD_ENT antes de criar ESTOQUE_PROD1_ENT
+            conn.commit()
+            print(f"   ✓ Cabeçalho de ENTRADA criado: Romaneio {romaneio_entrada}")
+            
+            # Validar que os JOINs funcionarão corretamente
+            garantir_informacoes_joins_entrada(conn, romaneio_entrada, filial_destino, cm_operacao_entrada)
+            
+            # Atualizar LOJA_ENTRADAS após criar entrada manualmente (opcional)
+            try:
+                query_update_loja_entradas_manual = """
+                    UPDATE LOJA_ENTRADAS
+                    SET TIPO_ENTRADA_SAIDA = ?
+                    WHERE ROMANEIO_PRODUTO = ? AND FILIAL = ?
+                """
+                cursor.execute(query_update_loja_entradas_manual, [
+                    tipo_entrada, romaneio_entrada, filial_destino_escaped
+                ])
+                if cursor.rowcount > 0:
+                    conn.commit()
+                    print(f"   ✓ LOJA_ENTRADAS atualizada após criação manual")
+            except Exception as e:
+                print(f"   ℹ️  Não foi possível atualizar LOJA_ENTRADAS após criação manual: {e}")
             
             # Criar item em ESTOQUE_PROD1_ENT
             query_insert_entrada_item = """
@@ -1067,7 +1351,9 @@ def executar_transferencia(
                 romaneio_entrada, produto_escaped, filial_destino_escaped,
                 cor_escaped if cor_escaped else None, qtde_entrada
             ])
-            
+            # Commit após criar item de entrada
+            conn.commit()
+            print(f"   ✓ Item de ENTRADA criado")
             print(f"   ✓ Registros criados manualmente em ESTOQUE_PROD_ENT e ESTOQUE_PROD1_ENT")
         else:
             print(f"   ✓ Entrada (ESTOQUE_PROD_ENT) criada: Romaneio {romaneio_entrada}")
@@ -1535,6 +1821,7 @@ def main():
         # Se não encontrar, tenta por código de produto
         df_produto = None
         codigo_produto = None
+        cor_produto_codigo_barras = None  # Cor encontrada via código de barras
         
         # Verificar se parece ser código de barras (só números)
         if codigo_informado.isdigit():
@@ -1544,7 +1831,18 @@ def main():
             if df_produto is not None and not df_produto.empty:
                 # Se encontrou múltiplos produtos com mesmo código de barras, pegar o primeiro
                 codigo_produto = str(df_produto.iloc[0]['PRODUTO']).strip()
-                print(f"✓ Produto encontrado por código de barras: {codigo_produto}")
+                # Pegar a cor do código de barras (se houver e não estiver vazia)
+                if 'COR_PRODUTO' in df_produto.columns:
+                    cor_raw = df_produto.iloc[0]['COR_PRODUTO']
+                    if pd.notna(cor_raw) and str(cor_raw).strip():
+                        cor_produto_codigo_barras = str(cor_raw).strip()
+                        print(f"✓ Produto encontrado por código de barras: {codigo_produto}")
+                        print(f"✓ Cor identificada pelo código de barras: {cor_produto_codigo_barras}")
+                    else:
+                        print(f"✓ Produto encontrado por código de barras: {codigo_produto}")
+                        print(f"   (Produto sem cor específica no código de barras)")
+                else:
+                    print(f"✓ Produto encontrado por código de barras: {codigo_produto}")
                 
                 # Se tem múltiplos produtos, avisar
                 if len(df_produto) > 1:
@@ -1576,10 +1874,21 @@ def main():
         print(f"\n✓ Produto encontrado:")
         print(f"   Código: {produto_info['PRODUTO']}")
         print(f"   Descrição: {produto_info['DESC_PRODUTO']}")
+        if cor_produto_codigo_barras:
+            print(f"   Cor (do código de barras): {cor_produto_codigo_barras}")
         
         # Buscar estoques do produto
+        # Se foi encontrado por código de barras e tem cor específica, filtrar apenas essa cor
         print("\n🔍 Buscando estoques do produto...")
-        df_estoque = buscar_estoque_produto(conn, codigo_produto)
+        if cor_produto_codigo_barras:
+            print(f"   ✓ Filtrando apenas cor: {cor_produto_codigo_barras} (identificada pelo código de barras)")
+            df_estoque = buscar_estoque_produto(conn, codigo_produto, cor_produto_codigo_barras)
+            if df_estoque.empty:
+                print(f"   ⚠️  Nenhum estoque encontrado para cor {cor_produto_codigo_barras}")
+                print(f"   Buscando todas as cores...")
+                df_estoque = buscar_estoque_produto(conn, codigo_produto)
+        else:
+            df_estoque = buscar_estoque_produto(conn, codigo_produto)
         
         if df_estoque.empty:
             print(f"\n✗ Nenhum estoque encontrado para o produto '{codigo_produto}'.")
