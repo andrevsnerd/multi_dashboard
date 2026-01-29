@@ -465,11 +465,10 @@ export interface DetalheEcommerceSemana {
 export interface PrevisaoEstoque {
   categoria: string;
   estoqueAtual: number;
-  mediaDia: number;
+  vendaTotal: number;
   duracao: number;
   prevFimMes: number;
   prevFimAno: number;
-  status: 'OK' | 'ALERTA' | 'CRITICO';
 }
 
 /**
@@ -3041,6 +3040,116 @@ export async function fetchPrevisoesEstoque({
       estoqueAtual: number | null;
     }>(estoqueQuery);
 
+    // Resolver período do range selecionado
+    const { start: periodoStart, end: periodoEnd } = resolveRange(range);
+    
+    // Buscar vendas reais do período selecionado para calcular vendaTotal
+    const vendasPeriodoQuery = `
+      SELECT 
+        ${categoriaField} AS categoria
+        ${camposVendasAdicionais},
+        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      WHERE vp.DATA_VENDA >= @periodoStart
+        AND vp.DATA_VENDA < @periodoEnd
+        AND vp.QTDE > 0
+        ${vendasFilialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        AND ${categoriaField} <> ''
+        AND ${categoriaField} <> 'SEM GRUPO'
+        AND ${categoriaField} <> 'SEM LINHA'
+      GROUP BY ${categoriaField}${groupByVendasAdicional}
+    `;
+
+    request.input('periodoStart', sql.DateTime, periodoStart);
+    request.input('periodoEnd', sql.DateTime, periodoEnd);
+
+    const vendasPeriodoResult = await request.query<{
+      categoria: string;
+      linha?: string;
+      subgrupo?: string;
+      grade?: string;
+      colecao?: string;
+      vendas: number | null;
+    }>(vendasPeriodoQuery);
+
+    // Agrupar vendas totais por categoria (varejo)
+    const vendasPorCategoria = new Map<string, number>();
+    vendasPeriodoResult.recordset.forEach(row => {
+      const categoria = row.categoria?.trim() || '';
+      // SEMPRE usar chave detalhada para manter consistência
+      const chaveCategoria = `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
+      const vendas = Number(row.vendas ?? 0);
+      vendasPorCategoria.set(chaveCategoria, (vendasPorCategoria.get(chaveCategoria) || 0) + vendas);
+    });
+
+    // Buscar vendas de e-commerce do período (apenas para ScarfMe)
+    let ecommercePeriodoResult: { recordset: Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; vendas: number | null }> } = { recordset: [] };
+    if (company === 'scarfme') {
+      // Criar filtro de filial para e-commerce que inclua todas as filiais de e-commerce
+      let ecommercePeriodoFilialFilter = '';
+      const companyConfig = resolveCompany(company);
+      if (companyConfig) {
+        const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
+        if (ecommerceFilials.length > 0) {
+          ecommerceFilials.forEach((f, index) => {
+            request.input(`ecommercePeriodoFilial${index}`, sql.VarChar, f);
+          });
+          const placeholders = ecommerceFilials.map((_, i) => `@ecommercePeriodoFilial${i}`).join(', ');
+          ecommercePeriodoFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+        }
+      }
+
+      const ecommercePeriodoQuery = `
+        SELECT 
+          ${categoriaField} AS categoria
+          ${camposVendasAdicionais},
+          SUM(CAST(fp.QTDE AS FLOAT)) AS vendas
+        FROM FATURAMENTO f WITH (NOLOCK)
+        JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) 
+          ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
+        WHERE f.EMISSAO >= @periodoStart
+          AND f.EMISSAO < @periodoEnd
+          AND f.NOTA_CANCELADA = 0
+          AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+          AND CAST(fp.QTDE AS FLOAT) > 0
+          ${ecommercePeriodoFilialFilter}
+          ${grupoFilter}
+          ${linhaFilter}
+          ${colecaoFilter}
+          ${subgrupoFilter}
+          ${gradeFilter}
+          AND ${categoriaField} <> ''
+          AND ${categoriaField} <> 'SEM GRUPO'
+          AND ${categoriaField} <> 'SEM LINHA'
+        GROUP BY ${categoriaField}${groupByVendasAdicional}
+      `;
+
+      ecommercePeriodoResult = await request.query<{
+        categoria: string;
+        linha?: string;
+        subgrupo?: string;
+        grade?: string;
+        colecao?: string;
+        vendas: number | null;
+      }>(ecommercePeriodoQuery);
+
+      // Adicionar vendas de e-commerce às vendas totais
+      ecommercePeriodoResult.recordset.forEach(row => {
+        const categoria = row.categoria?.trim() || '';
+        // SEMPRE usar chave detalhada para manter consistência
+        const chaveCategoria = `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
+        const vendas = Number(row.vendas ?? 0);
+        vendasPorCategoria.set(chaveCategoria, (vendasPorCategoria.get(chaveCategoria) || 0) + vendas);
+      });
+    }
+
     // Buscar vendas do mês atual até hoje para calcular projeção
     // Projeção = (vendas até hoje / dias corridos) × total de dias do mês
     const hoje = new Date(now.getTime());
@@ -3113,10 +3222,11 @@ export async function fetchPrevisoesEstoque({
       const grade = mostrarDetalhes ? (row.grade?.trim() || '') : undefined;
       const colecao = mostrarDetalhes ? (row.colecao?.trim() || '') : undefined;
 
-      // Criar chave para buscar vendas (usar chave composta quando mostrarDetalhes)
-      const chaveCategoria = mostrarDetalhes
-        ? `${categoria}|${linha || ''}|${subgrupo || ''}|${grade || ''}|${colecao || ''}`
-        : categoria;
+      // Criar chave para buscar vendas (SEMPRE usar chave detalhada para manter consistência)
+      const chaveCategoria = `${categoria}|${linha || ''}|${subgrupo || ''}|${grade || ''}|${colecao || ''}`;
+      
+      // Buscar vendas totais do período selecionado
+      const vendaTotal = Number(vendasPorCategoria.get(chaveCategoria) || 0);
       
       // Buscar vendas do mês atual até hoje para calcular projeção
       // Projeção = (vendas até hoje / dias corridos) × total de dias do mês
@@ -3153,27 +3263,13 @@ export async function fetchPrevisoesEstoque({
         ? Math.round((estoqueAtual / projecaoMensal) * totalDiasMes)
         : 999;
 
-      // Média diária = Projeção Mensal / total de dias do mês
-      const mediaDia = projecaoMensal > 0 ? projecaoMensal / totalDiasMes : 0;
-
-      // Determinar status baseado em dias de estoque (conforme script Python: <=90 verde, 90-180 amarelo, >180 vermelho)
-      let status: 'OK' | 'ALERTA' | 'CRITICO' = 'OK';
-      if (diasEstoque <= 90) {
-        status = 'OK';
-      } else if (diasEstoque <= 180) {
-        status = 'ALERTA';
-      } else {
-        status = 'CRITICO';
-      }
-
       return {
         categoria,
         estoqueAtual: Math.round(estoqueAtual),
-        mediaDia: Number(mediaDia.toFixed(1)),
+        vendaTotal: Math.round(vendaTotal || 0),
         duracao: diasEstoque,
         prevFimMes,
         prevFimAno,
-        status,
       };
     });
 

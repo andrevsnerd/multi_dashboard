@@ -4,13 +4,15 @@ echo    Iniciando Proxy + Cloudflare Tunnel
 echo ============================================
 echo.
 
+REM Definir caminho do cloudflared
+set "CLOUDFLARED_PATH=%USERPROFILE%\cloudflared.exe"
+
 REM Verificar se cloudflared está instalado
-where cloudflared >nul 2>&1
-if %ERRORLEVEL% NEQ 0 (
-    echo [ERRO] cloudflared nao encontrado!
+if not exist "%CLOUDFLARED_PATH%" (
+    echo [ERRO] cloudflared nao encontrado em: %CLOUDFLARED_PATH%
     echo.
     echo Por favor, instale o cloudflared primeiro.
-    echo Veja o guia em: docs/CLOUDFLARE_TUNNEL_SETUP.md
+    echo Execute: powershell -ExecutionPolicy Bypass -File install-cloudflared.ps1
     echo.
     pause
     exit /b 1
@@ -28,7 +30,7 @@ timeout /t 5 /nobreak > nul
 REM Iniciar Cloudflare Tunnel
 echo.
 echo [2/2] Iniciando Cloudflare Tunnel...
-start "Cloudflare Tunnel" cmd /k "cloudflared tunnel --url http://localhost:3001"
+start "Cloudflare Tunnel" cmd /k ""%CLOUDFLARED_PATH%" tunnel --url http://localhost:3001"
 
 echo.
 echo ============================================

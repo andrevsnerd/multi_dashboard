@@ -75,11 +75,10 @@ interface VendasCategoriaData {
 interface PrevisaoEstoque {
   categoria: string;
   estoqueAtual: number;
-  mediaDia: number;
+  vendaTotal: number;
   duracao: number;
   prevFimMes: number;
   prevFimAno: number;
-  status: "OK" | "ALERTA" | "CRITICO";
 }
 
 async function fetchKPIs(
@@ -284,7 +283,10 @@ function formatCurrency(value: number): string {
   });
 }
 
-function formatNumber(value: number): string {
+function formatNumber(value: number | undefined | null): string {
+  if (value === undefined || value === null || isNaN(value)) {
+    return "0";
+  }
   return value.toLocaleString("pt-BR", {
     maximumFractionDigits: 0,
   });
@@ -1886,11 +1888,10 @@ export default function ControleEstoquePage({
               <tr>
                 <th>Categoria</th>
                 <th>Estoque Atual</th>
-                <th>Média/Dia</th>
+                <th>Venda Total</th>
                 <th>Duração (dias)</th>
                 <th>Prev. Fim Mês</th>
                 <th>Prev. Fim Ano</th>
-                <th>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -1898,29 +1899,13 @@ export default function ControleEstoquePage({
                 <tr key={`${prev.categoria}-${index}`}>
                   <td>{prev.categoria}</td>
                   <td>{formatNumber(prev.estoqueAtual)}</td>
-                  <td>{prev.mediaDia.toFixed(1)}</td>
+                  <td>{formatNumber(prev.vendaTotal)}</td>
                   <td>{prev.duracao}</td>
                   <td>
                     {formatNumber(prev.prevFimMes)}
                   </td>
                   <td>
                     {formatNumber(prev.prevFimAno)}
-                  </td>
-                  <td>
-                    <span className={`${styles.statusBadge} ${styles[prev.status.toLowerCase()]}`}>
-                      {prev.status === "OK" && (
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path
-                            d="M13.3333 4L6 11.3333L2.66667 8"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      )}
-                      {prev.status}
-                    </span>
                   </td>
                 </tr>
               ))}
