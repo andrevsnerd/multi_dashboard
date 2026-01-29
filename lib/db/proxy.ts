@@ -5,6 +5,9 @@
 
 const PROXY_URL = process.env.PROXY_URL || '';
 const PROXY_SECRET = process.env.PROXY_SECRET || '';
+const REQUEST_TIMEOUT = 30000; // 30 segundos
+const MAX_RETRIES = 2;
+const RETRY_DELAY = 1000; // 1 segundo
 
 /**
  * Verifica se deve usar o proxy (quando está no Vercel)
@@ -15,19 +18,69 @@ export function shouldUseProxy(): boolean {
 }
 
 /**
- * Executa uma query através do proxy
+ * Cria um AbortController com timeout
  */
-export async function queryViaProxy<T>(
+function createTimeoutController(timeout: number): { controller: AbortController; cleanup: () => void } {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  return {
+    controller,
+    cleanup: () => clearTimeout(timeoutId),
+  };
+}
+
+/**
+ * Detecta o tipo de erro e retorna mensagem apropriada
+ */
+function getErrorMessage(error: unknown, proxyUrl: string): string {
+  if (error instanceof Error) {
+    const errorMessage = error.message.toLowerCase();
+    const cause = (error as any).cause;
+
+    // Erro de conexão TLS/SSL
+    if (
+      errorMessage.includes('tls') ||
+      errorMessage.includes('ssl') ||
+      errorMessage.includes('econnreset') ||
+      errorMessage.includes('socket disconnected') ||
+      (cause && (cause.code === 'ECONNRESET' || cause.code === 'ECONNREFUSED'))
+    ) {
+      return `Erro de conexão com o proxy: O servidor proxy não está acessível. Verifique se o túnel ngrok está rodando e se a URL ${proxyUrl} está correta no Vercel. O túnel pode ter caído ou a URL pode ter mudado.`;
+    }
+
+    // Erro de timeout
+    if (errorMessage.includes('timeout') || errorMessage.includes('aborted')) {
+      return `Timeout ao conectar com o proxy: O servidor proxy não respondeu em ${REQUEST_TIMEOUT}ms. Verifique se o proxy está rodando e acessível.`;
+    }
+
+    // Erro de rede genérico
+    if (errorMessage.includes('fetch failed') || errorMessage.includes('network')) {
+      return `Erro de rede ao conectar com o proxy: Não foi possível estabelecer conexão com ${proxyUrl}. Verifique se o túnel está ativo.`;
+    }
+
+    return error.message;
+  }
+
+  return String(error);
+}
+
+/**
+ * Executa uma query através do proxy com retry
+ */
+async function queryViaProxyWithRetry<T>(
   queryText: string,
-  params: Record<string, any> = {}
+  params: Record<string, any> = {},
+  retryCount: number = 0
 ): Promise<T[]> {
   if (!PROXY_URL) {
-    throw new Error('PROXY_URL não configurada');
+    throw new Error('PROXY_URL não configurada. Configure a variável de ambiente PROXY_URL no Vercel.');
   }
 
   if (!PROXY_SECRET) {
-    throw new Error('PROXY_SECRET não configurada');
+    throw new Error('PROXY_SECRET não configurada. Configure a variável de ambiente PROXY_SECRET no Vercel.');
   }
+
+  const { controller, cleanup } = createTimeoutController(REQUEST_TIMEOUT);
 
   try {
     const response = await fetch(`${PROXY_URL}/query`, {
@@ -40,10 +93,23 @@ export async function queryViaProxy<T>(
         query: queryText,
         params,
       }),
+      signal: controller.signal,
     });
 
+    // Limpar timeout se a requisição completar com sucesso
+    cleanup();
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: `Erro HTTP ${response.status}` }));
+      const errorData = await response.json().catch(() => ({ 
+        error: `Erro HTTP ${response.status}` 
+      }));
+      
+      // Se for erro 502/503/504, pode ser problema de conexão - tentar retry
+      if ((response.status === 502 || response.status === 503 || response.status === 504) && retryCount < MAX_RETRIES) {
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (retryCount + 1)));
+        return queryViaProxyWithRetry(queryText, params, retryCount + 1);
+      }
+      
       throw new Error(errorData.error || `Erro HTTP ${response.status}`);
     }
 
@@ -55,12 +121,43 @@ export async function queryViaProxy<T>(
 
     return result.data as T[];
   } catch (error) {
-    console.error('Erro ao executar query via proxy:', error);
-    if (error instanceof Error) {
-      throw error;
+    // Limpar timeout em caso de erro também
+    cleanup();
+    
+    // Se for erro de abort (timeout) ou conexão, tentar retry
+    if (
+      (error instanceof Error && 
+       (error.name === 'AbortError' || 
+        error.message.includes('ECONNRESET') ||
+        error.message.includes('ECONNREFUSED') ||
+        error.message.includes('fetch failed'))) &&
+      retryCount < MAX_RETRIES
+    ) {
+      console.warn(`Tentativa ${retryCount + 1} falhou, tentando novamente...`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (retryCount + 1)));
+      return queryViaProxyWithRetry(queryText, params, retryCount + 1);
     }
-    throw new Error(String(error));
+
+    // Erro final - formatar mensagem
+    const errorMessage = getErrorMessage(error, PROXY_URL);
+    console.error('Erro ao executar query via proxy:', {
+      error: errorMessage,
+      proxyUrl: PROXY_URL,
+      retryCount,
+    });
+    
+    throw new Error(errorMessage);
   }
+}
+
+/**
+ * Executa uma query através do proxy
+ */
+export async function queryViaProxy<T>(
+  queryText: string,
+  params: Record<string, any> = {}
+): Promise<T[]> {
+  return queryViaProxyWithRetry<T>(queryText, params, 0);
 }
 
 /**
@@ -97,10 +194,15 @@ export async function testProxyConnection(): Promise<boolean> {
   }
 
   try {
-    const response = await fetch(`${PROXY_URL}/health`);
+    const { controller, cleanup } = createTimeoutController(5000); // 5 segundos para health check
+    const response = await fetch(`${PROXY_URL}/health`, {
+      signal: controller.signal,
+    });
+    cleanup();
     return response.ok;
   } catch (error) {
-    console.error('Erro ao testar conexão com proxy:', error);
+    const errorMessage = getErrorMessage(error, PROXY_URL);
+    console.error('Erro ao testar conexão com proxy:', errorMessage);
     return false;
   }
 }
