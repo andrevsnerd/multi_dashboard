@@ -1,0 +1,3 @@
+# Cole aqui o token do túnel fixo (uma linha, sem espaços no início/fim)
+# Depois renomeie este arquivo para: cloudflare-tunnel-token.txt
+# O arquivo cloudflare-tunnel-token.txt não é versionado (está no .gitignore).

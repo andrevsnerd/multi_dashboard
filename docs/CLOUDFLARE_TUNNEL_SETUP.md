@@ -194,3 +194,11 @@ Criamos scripts para facilitar o uso. Veja os arquivos:
 ## 🎉 Pronto!
 
 Agora você está usando Cloudflare Tunnel ao invés de ngrok. A principal vantagem é que **não há warning page** e a conexão é mais estável!
+
+---
+
+## Túnel fixo (connector gerenciado pelo dashboard)
+
+Se você criou um **connector** no dashboard do Cloudflare (túnel fixo, gerenciado remotamente), use o guia separado:
+
+- **[TUNEL_FIXO_CLOUDFLARE.md](TUNEL_FIXO_CLOUDFLARE.md)** – instalação do túnel fixo como serviço do Windows (script `install-tunnel-fixo-admin.bat`).
