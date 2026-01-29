@@ -59,6 +59,7 @@ function isNgrokUrl(url: string): boolean {
     const urlObj = new URL(url);
     return urlObj.hostname.includes('ngrok.io') || 
            urlObj.hostname.includes('ngrok-free.app') ||
+           urlObj.hostname.includes('ngrok-free.dev') ||
            urlObj.hostname.includes('ngrok.app');
   } catch {
     return false;
@@ -120,11 +121,15 @@ async function queryViaProxyWithRetry<T>(
 
   try {
     // Headers necessários para ngrok free plan (bypass warning page)
+    // Nota: No plano gratuito, o header pode não funcionar para requisições server-to-server
+    // Tentamos múltiplas variações para garantir compatibilidade
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'X-Proxy-Token': PROXY_SECRET,
-      'ngrok-skip-browser-warning': 'true', // Bypass ngrok free plan warning (case-insensitive)
-      'User-Agent': 'multi-dashboard-proxy-client/1.0', // User-Agent específico para evitar bloqueios
+      'ngrok-skip-browser-warning': 'true', // Bypass ngrok free plan warning
+      'Ngrok-Skip-Browser-Warning': 'true', // Variação com maiúsculas
+      'User-Agent': 'curl/7.68.0', // User-Agent de CLI tool para evitar detecção como navegador
+      'Accept': 'application/json', // Especificar que esperamos JSON
     };
 
     // Log para debug (apenas primeira tentativa)
@@ -162,8 +167,11 @@ async function queryViaProxyWithRetry<T>(
         responseText.includes('Visit Site') || 
         responseText.includes('ngrok.io') || 
         responseText.includes('ngrok-free.app') ||
+        responseText.includes('ngrok-free.dev') ||
         responseText.includes('You are about to visit') ||
-        responseText.includes('ngrok.com')
+        responseText.includes('ngrok.com') ||
+        responseText.includes('Continue to Site') ||
+        responseText.includes('interstitial')
       );
 
       // Se detectamos warning do ngrok, tratar imediatamente
@@ -298,7 +306,9 @@ export async function testProxyConnection(): Promise<boolean> {
     const response = await fetch(`${PROXY_URL}/health`, {
       headers: {
         'ngrok-skip-browser-warning': 'true', // Bypass ngrok free plan warning
-        'User-Agent': 'multi-dashboard-proxy-client/1.0',
+        'Ngrok-Skip-Browser-Warning': 'true', // Variação com maiúsculas
+        'User-Agent': 'curl/7.68.0', // User-Agent de CLI tool
+        'Accept': 'application/json',
       },
       signal: controller.signal,
     });
