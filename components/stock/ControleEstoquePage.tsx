@@ -1902,7 +1902,7 @@ export default function ControleEstoquePage({
                 <YAxis tick={{ fill: "#666", fontSize: 12 }} axisLine={{ stroke: "#ddd" }} tickLine={false} tickFormatter={v => v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} />
                 <Tooltip formatter={(value: number) => [value.toLocaleString("pt-BR", { maximumFractionDigits: 0 }), "Vendas"]} contentStyle={{ backgroundColor: "#fff", border: "1px solid #eee", borderRadius: 8 }} />
                 <Bar dataKey="vendas" fill="url(#vendasBarGradient)" radius={[6, 6, 0, 0]} maxBarSize={48}>
-                  <LabelList dataKey="vendas" position="top" formatter={(v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} style={{ fill: "#666", fontSize: 12 }} />
+                  <LabelList dataKey="vendas" position="top" formatter={(v) => (typeof v === "number" ? v.toLocaleString("pt-BR", { maximumFractionDigits: 0 }) : String(v ?? ""))} style={{ fill: "#666", fontSize: 12 }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>

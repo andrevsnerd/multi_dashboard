@@ -399,6 +399,13 @@ export async function fetchControleTransferencias({
       }>(ultimaEntradaQuery),
     ]);
 
+    // Chave estável por código de produto e código de cor (evita duplicatas quando corBanco vem diferente das queries)
+    const getChaveStable = (produto: string, corProduto: string | null | undefined): string => {
+      const p = (produto || '').trim();
+      const c = (corProduto || '').trim().toUpperCase();
+      return `${p}|${c}`;
+    };
+
     // Função auxiliar para normalizar filial (usar em todos os lugares)
     const normalizeFilial = (filial: string | null | undefined): string => {
       return (filial || '').trim().toUpperCase();
@@ -476,11 +483,10 @@ export async function fetchControleTransferencias({
     const produtoInfoMap = new Map<string, { descricao: string; cor: string; subgrupo?: string; grade?: string }>();
     const codigoBarraMap = new Map<string, string>();
 
-    // Processar estoque
+    // Processar estoque (chave estável por produto+corProduto para evitar duplicatas)
     estoqueResult.recordset.forEach(row => {
       const produto = row.produto?.trim() || '';
-      const corNormalizada = getColorDescription(row.corProduto, row.corBanco);
-      const chave = `${produto}|${corNormalizada}`;
+      const chave = getChaveStable(produto, row.corProduto);
       
       if (!estoqueMap.has(chave)) {
         estoqueMap.set(chave, new Map());
@@ -496,11 +502,10 @@ export async function fetchControleTransferencias({
       filialMap.set(filialCanonico, (filialMap.get(filialCanonico) || 0) + stock);
     });
 
-    // Processar vendas normais
+    // Processar vendas normais (chave estável)
     vendasResult.recordset.forEach(row => {
       const produto = row.produto?.trim() || '';
-      const corNormalizada = getColorDescription(row.corProduto, row.corBanco);
-      const chave = `${produto}|${corNormalizada}`;
+      const chave = getChaveStable(produto, row.corProduto);
       
       if (!vendasMap.has(chave)) {
         vendasMap.set(chave, new Map());
@@ -514,14 +519,13 @@ export async function fetchControleTransferencias({
       filialMap.set(filialCanonico, (filialMap.get(filialCanonico) || 0) + vendas);
     });
 
-    // Processar vendas de e-commerce (agregar com vendas normais)
+    // Processar vendas de e-commerce (agregar com vendas normais, chave estável)
     if (shouldIncludeEcommerce) {
       ecommerceVendasResult.recordset.forEach(row => {
         const produto = row.produto?.trim() || '';
         if (!produto) return; // Ignorar linhas vazias da query dummy
         
-        const corNormalizada = getColorDescription(row.corProduto, row.corBanco);
-        const chave = `${produto}|${corNormalizada}`;
+        const chave = getChaveStable(produto, row.corProduto);
         
         if (!vendasMap.has(chave)) {
           vendasMap.set(chave, new Map());
@@ -536,11 +540,10 @@ export async function fetchControleTransferencias({
       });
     }
 
-    // Processar vendas últimos 30 dias (normais)
+    // Processar vendas últimos 30 dias (normais, chave estável)
     vendasLast30DaysResult.recordset.forEach(row => {
       const produto = row.produto?.trim() || '';
-      const corNormalizada = getColorDescription(row.corProduto, row.corBanco);
-      const chave = `${produto}|${corNormalizada}`;
+      const chave = getChaveStable(produto, row.corProduto);
       
       if (!vendasLast30DaysMap.has(chave)) {
         vendasLast30DaysMap.set(chave, new Map());
@@ -554,14 +557,13 @@ export async function fetchControleTransferencias({
       filialMap.set(filialCanonico, (filialMap.get(filialCanonico) || 0) + vendas);
     });
 
-    // Processar vendas de e-commerce dos últimos 30 dias (agregar com vendas normais)
+    // Processar vendas de e-commerce dos últimos 30 dias (chave estável)
     if (shouldIncludeEcommerce) {
       ecommerceVendasLast30DaysResult.recordset.forEach(row => {
         const produto = row.produto?.trim() || '';
         if (!produto) return; // Ignorar linhas vazias da query dummy
         
-        const corNormalizada = getColorDescription(row.corProduto, row.corBanco);
-        const chave = `${produto}|${corNormalizada}`;
+        const chave = getChaveStable(produto, row.corProduto);
         
         if (!vendasLast30DaysMap.has(chave)) {
           vendasLast30DaysMap.set(chave, new Map());
@@ -576,48 +578,51 @@ export async function fetchControleTransferencias({
       });
     }
 
-    // Processar informações do produto
+    // Processar informações do produto (chave estável; preferir descrição/cor não vazias ao mesclar)
     produtoInfoResult.recordset.forEach(row => {
       const produto = row.produto?.trim() || '';
-      const corNormalizada = getColorDescription(row.corProduto, row.corBanco);
-      const chave = `${produto}|${corNormalizada}`;
+      const chave = getChaveStable(produto, row.corProduto);
+      const descricao = row.descricao?.trim() || '';
+      const corDisplay = getColorDescription(row.corProduto, row.corBanco);
       
-      if (!produtoInfoMap.has(chave)) {
+      const existente = produtoInfoMap.get(chave);
+      if (!existente) {
         produtoInfoMap.set(chave, {
-          descricao: row.descricao?.trim() || '',
-          cor: corNormalizada,
+          descricao,
+          cor: corDisplay,
           subgrupo: isScarfme ? (row.subgrupo?.trim() || undefined) : undefined,
           grade: isScarfme ? (row.grade?.trim() || undefined) : undefined,
         });
+      } else {
+        // Mesclar: preferir descrição e cor não vazias
+        if (descricao && !existente.descricao) existente.descricao = descricao;
+        if (corDisplay && !existente.cor) existente.cor = corDisplay;
+        if (isScarfme && row.subgrupo?.trim() && !existente.subgrupo) existente.subgrupo = row.subgrupo.trim();
+        if (isScarfme && row.grade?.trim() && !existente.grade) existente.grade = row.grade.trim();
       }
     });
 
-    // Processar códigos de barras
-    // Prioridade: PRODUTO+COR+TAMANHO > PRODUTO+COR > PRODUTO
+    // Processar códigos de barras (chave estável produto+corProduto)
     codigoBarraResult.recordset.forEach(row => {
       const produto = row.produto?.trim() || '';
-      const corNormalizada = getColorDescription(row.corProduto, row.corBanco);
       const codigoBarra = row.codigoBarra?.trim() || '';
       
       if (!codigoBarra) return;
       
-      // Tentar chave mais específica primeiro (produto+cor)
-      const chaveProdutoCor = `${produto}|${corNormalizada}`;
+      const chaveProdutoCor = getChaveStable(produto, row.corProduto);
       if (!codigoBarraMap.has(chaveProdutoCor)) {
         codigoBarraMap.set(chaveProdutoCor, codigoBarra);
       }
       
-      // Também mapear apenas por produto (fallback)
       if (!codigoBarraMap.has(produto)) {
         codigoBarraMap.set(produto, codigoBarra);
       }
     });
 
-    // Processar última entrada por produto+cor+filial
+    // Processar última entrada por produto+cor+filial (chave estável)
     ultimaEntradaResult.recordset.forEach(row => {
       const produto = row.produto?.trim() || '';
-      const corNormalizada = getColorDescription(row.corProduto, row.corBanco);
-      const chave = `${produto}|${corNormalizada}`;
+      const chave = getChaveStable(produto, row.corProduto);
       const filialCanonico = getFilialCanonico(row.filial);
       const ultimaEntrada = row.ultimaEntrada ? new Date(row.ultimaEntrada) : null;
       
@@ -626,7 +631,6 @@ export async function fetchControleTransferencias({
       }
       
       const filialMap = ultimaEntradaMap.get(chave)!;
-      // Manter a data mais recente se houver múltiplas entradas
       const dataExistente = filialMap.get(filialCanonico);
       if (!dataExistente || (ultimaEntrada && (!dataExistente || ultimaEntrada > dataExistente))) {
         filialMap.set(filialCanonico, ultimaEntrada);
@@ -642,8 +646,11 @@ export async function fetchControleTransferencias({
     ]);
 
     allChaves.forEach(chave => {
-      const [produto, cor] = chave.split('|');
-      const produtoInfo = produtoInfoMap.get(chave) || { descricao: '', cor };
+      const [produto, corProduto] = chave.split('|');
+      const produtoInfo = produtoInfoMap.get(chave) || {
+        descricao: '',
+        cor: getColorDescription(corProduto, ''),
+      };
       
       const estoquePorFilial = estoqueMap.get(chave) || new Map();
       const vendasPorFilial = vendasMap.get(chave) || new Map();
@@ -696,6 +703,57 @@ export async function fetchControleTransferencias({
       });
     });
 
-    return Array.from(produtosMap.values());
+    // Mesclar entradas que representam o mesmo produto+cor de exibição (ex.: códigos 051545 e 051548 → AZUL).
+    // Só mesclar quando a cor de exibição for não vazia; senão manter chave original (produto|corProduto)
+    // para não agrupar cores diferentes que tenham descrição vazia.
+    const mergedByDisplayCor = new Map<string, ProdutoTransferencia>();
+    const chaveDisplay = (p: ProdutoTransferencia) =>
+      `${(p.produto || '').trim()}|${(p.cor || '').trim().toUpperCase()}`;
+
+    produtosMap.forEach((item, chaveOriginal) => {
+      const corPreenchida = (item.cor || '').trim().length > 0;
+      const key = corPreenchida ? chaveDisplay(item) : chaveOriginal;
+      const existente = mergedByDisplayCor.get(key);
+      if (!existente) {
+        mergedByDisplayCor.set(key, { ...item });
+        return;
+      }
+      // Mesclar: somar estoque/vendas por filial, manter descrição/código de barras não vazios
+      const filiaisMap = new Map<string, FilialData>();
+      [...existente.filiais, ...item.filiais].forEach((f) => {
+        const filial = f.filial;
+        if (!filiaisMap.has(filial)) {
+          filiaisMap.set(filial, {
+            filial,
+            stock: 0,
+            sales: 0,
+            salesLast30Days: 0,
+            ultimaEntrada: null,
+          });
+        }
+        const acc = filiaisMap.get(filial)!;
+        acc.stock += f.stock;
+        acc.sales += f.sales;
+        acc.salesLast30Days += f.salesLast30Days;
+        acc.ultimaEntrada =
+          !acc.ultimaEntrada && f.ultimaEntrada
+            ? f.ultimaEntrada
+            : acc.ultimaEntrada && f.ultimaEntrada
+              ? (acc.ultimaEntrada > f.ultimaEntrada ? acc.ultimaEntrada : f.ultimaEntrada)
+              : acc.ultimaEntrada ?? f.ultimaEntrada ?? null;
+      });
+      mergedByDisplayCor.set(key, {
+        ...existente,
+        descricao: existente.descricao || item.descricao,
+        codigoBarra: existente.codigoBarra || item.codigoBarra,
+        subgrupo: existente.subgrupo || item.subgrupo,
+        grade: existente.grade || item.grade,
+        filiais: Array.from(filiaisMap.values()),
+        totalVendas: existente.totalVendas + item.totalVendas,
+        totalEstoque: existente.totalEstoque + item.totalEstoque,
+      });
+    });
+
+    return Array.from(mergedByDisplayCor.values());
   });
 }

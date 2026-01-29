@@ -590,9 +590,24 @@ export function calculateTransfers(
     });
   });
 
+  // Consolidar itens duplicados (mesmo produto+cor+origem+destino): somar quantidades
+  const transferKey = (t: TransferItem) =>
+    `${t.produto}|${t.cor}|${t.origem}|${t.destino}`;
+  const consolidatedMap = new Map<string, TransferItem>();
+  transfers.forEach((t) => {
+    const k = transferKey(t);
+    const existente = consolidatedMap.get(k);
+    if (existente) {
+      existente.quantidade += t.quantidade;
+    } else {
+      consolidatedMap.set(k, { ...t });
+    }
+  });
+  const consolidatedTransfers = Array.from(consolidatedMap.values());
+
   // Agrupar por origem
   const transfersByOrigin = new Map<string, TransferItem[]>();
-  transfers.forEach(transfer => {
+  consolidatedTransfers.forEach((transfer) => {
     if (!transfersByOrigin.has(transfer.origem)) {
       transfersByOrigin.set(transfer.origem, []);
     }
