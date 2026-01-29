@@ -746,26 +746,25 @@ export default function ControleTransferenciasTable({
   const [markedKeys, setMarkedKeys] = useState<Set<string>>(new Set());
   const [savingMarked, setSavingMarked] = useState(false);
 
-  // Carregar marcações da API (em produção grava no Redis; local retorna vazio e não grava)
+  // Carregar marcações da API (mesmo Redis/KV das metas no Vercel)
   useEffect(() => {
     let active = true;
     (async () => {
       try {
         const res = await fetch(`/api/transferencias-realizadas?company=${encodeURIComponent(companyKey)}`);
         if (!active) return;
-        const json = await res.json();
         if (!res.ok) return;
-        const stored: string[] = json.markedKeys || [];
+        const json = await res.json();
+        const stored: string[] = Array.isArray(json.markedKeys) ? json.markedKeys : [];
         const visible = visibleItemKeys;
         const filtered = stored.filter((k) => visible.has(k));
         setMarkedKeys(new Set(filtered));
         // Limpar do banco as chaves que não estão mais visíveis
         if (stored.length > filtered.length) {
-          const pruned = filtered;
           await fetch("/api/transferencias-realizadas", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ companyKey, markedKeys: pruned }),
+            body: JSON.stringify({ companyKey, markedKeys: filtered }),
           });
         }
       } catch {
