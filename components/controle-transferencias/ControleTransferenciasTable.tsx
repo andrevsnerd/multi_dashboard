@@ -37,6 +37,11 @@ interface TransferItem {
   itemOriginal: ProdutoTransferencia;
 }
 
+/** Chave estável do item para marcar como "realizada" (persiste só em produção). */
+function getTransferItemKey(item: TransferItem): string {
+  return `${item.produto}|${item.cor}|${item.origem}|${item.destino}`;
+}
+
 /**
  * Formata a descrição do produto com código
  */
@@ -727,6 +732,70 @@ export default function ControleTransferenciasTable({
     });
   }, [data, companyKey, dateRange, selectedFilial, company]);
 
+  // Chaves dos itens atualmente visíveis na lista (para persistir só marcações visíveis)
+  const visibleItemKeys = useMemo(() => {
+    const set = new Set<string>();
+    transfersByOriginAndDestination.forEach((group) => {
+      group.destinationGroups.forEach((dg) => {
+        dg.items.forEach((item) => set.add(getTransferItemKey(item)));
+      });
+    });
+    return set;
+  }, [transfersByOriginAndDestination]);
+
+  const [markedKeys, setMarkedKeys] = useState<Set<string>>(new Set());
+  const [savingMarked, setSavingMarked] = useState(false);
+
+  // Carregar marcações da API (em produção grava no Redis; local retorna vazio e não grava)
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/transferencias-realizadas?company=${encodeURIComponent(companyKey)}`);
+        if (!active) return;
+        const json = await res.json();
+        if (!res.ok) return;
+        const stored: string[] = json.markedKeys || [];
+        const visible = visibleItemKeys;
+        const filtered = stored.filter((k) => visible.has(k));
+        setMarkedKeys(new Set(filtered));
+        // Limpar do banco as chaves que não estão mais visíveis
+        if (stored.length > filtered.length) {
+          const pruned = filtered;
+          await fetch("/api/transferencias-realizadas", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ companyKey, markedKeys: pruned }),
+          });
+        }
+      } catch {
+        if (active) setMarkedKeys(new Set());
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [companyKey, visibleItemKeys]);
+
+  const toggleMarked = async (item: TransferItem) => {
+    const key = getTransferItemKey(item);
+    const next = new Set(markedKeys);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setMarkedKeys(next);
+    const toSave = Array.from(next).filter((k) => visibleItemKeys.has(k));
+    setSavingMarked(true);
+    try {
+      await fetch("/api/transferencias-realizadas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyKey, markedKeys: toSave }),
+      });
+    } finally {
+      setSavingMarked(false);
+    }
+  };
+
   const [hoveredItem, setHoveredItem] = useState<TransferItem | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -794,7 +863,7 @@ export default function ControleTransferenciasTable({
       })),
     }));
 
-    exportTransfersToPDF(dataForExport, companyKey, dateRange);
+    exportTransfersToPDF(dataForExport, companyKey, dateRange, markedKeys);
   };
 
   return (
@@ -857,6 +926,9 @@ export default function ControleTransferenciasTable({
               <table className={styles.table}>
                 <thead>
                   <tr>
+                    <th className={styles.realizadaHeader} title="Marcar como já realizada (pendente de atualização no sistema)">
+                      Realizada
+                    </th>
                     <th className={styles.produtoHeader}>Produto</th>
                     <th className={styles.codigoBarraHeader}>Código de Barras</th>
                     <th className={styles.estoqueHeader}>Estoque {group.origem}</th>
@@ -900,9 +972,28 @@ export default function ControleTransferenciasTable({
                     // Calcular altura do tooltip baseada no número de filiais deste item
                     const numFiliais = item.itemOriginal.filiais.length;
                     const tooltipHeightEstimate = Math.min(700, 100 + (numFiliais * 28));
+                    const itemKey = getTransferItemKey(item);
+                    const isMarkedRealizada = markedKeys.has(itemKey);
                     
                     return (
-                <tr key={`${item.produto}-${item.cor}-${item.destino}-${index}`}>
+                <tr
+                  key={`${item.produto}-${item.cor}-${item.destino}-${index}`}
+                  className={isMarkedRealizada ? styles.rowRealizada : undefined}
+                >
+                  <td className={styles.realizadaCell}>
+                    <label className={styles.realizadaCheckboxLabel} title="Já realizada, pendente de atualização no sistema">
+                      <input
+                        type="checkbox"
+                        checked={isMarkedRealizada}
+                        onChange={() => toggleMarked(item)}
+                        disabled={savingMarked}
+                        className={styles.realizadaCheckbox}
+                      />
+                      {isMarkedRealizada && (
+                        <span className={styles.realizadaCheckboxText}>Realizada</span>
+                      )}
+                    </label>
+                  </td>
                   <td className={styles.produtoCell}>
                     <div className={styles.produtoIcon}>
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">

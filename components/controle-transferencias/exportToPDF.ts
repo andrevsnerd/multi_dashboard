@@ -3,33 +3,40 @@ import autoTable from 'jspdf-autotable';
 import type { CompanyKey } from '@/lib/config/company';
 import { resolveCompany } from '@/lib/config/company';
 
+interface TransferItemExport {
+  produto: string;
+  descricao: string;
+  codigo: string;
+  codigoBarra?: string;
+  subgrupo?: string;
+  grade?: string;
+  cor: string;
+  origem: string;
+  destino: string;
+  quantidade: number;
+  estoqueOrigem?: number;
+}
+
 interface TransferByOriginAndDestination {
   origem: string;
   destinationGroups: {
     destino: string;
-    items: Array<{
-      produto: string;
-      descricao: string;
-      codigo: string;
-      codigoBarra?: string;
-      subgrupo?: string;
-      grade?: string;
-      cor: string;
-      origem: string;
-      destino: string;
-      quantidade: number;
-      estoqueOrigem?: number;
-    }>;
+    items: TransferItemExport[];
     totalQuantidade: number;
   }[];
   totalQuantidade: number;
   totalItens?: number;
 }
 
+function getItemKey(item: TransferItemExport): string {
+  return `${item.produto}|${item.cor}|${item.origem}|${item.destino}`;
+}
+
 export function exportTransfersToPDF(
   transfers: TransferByOriginAndDestination[],
   companyKey: CompanyKey,
-  dateRange?: { startDate: Date; endDate: Date }
+  dateRange?: { startDate: Date; endDate: Date },
+  markedKeys?: Set<string>
 ): void {
   const doc = new jsPDF({
     orientation: 'landscape',
@@ -51,6 +58,7 @@ export function exportTransfersToPDF(
   const colorGray = [107, 114, 128]; // #6b7280
   const colorLightGray = [249, 250, 251]; // #f9fafb
   const colorBorder = [229, 231, 235]; // #e5e7eb
+  const colorRowRealizada = [226, 232, 240]; // fundo cinza claro para linha "realizada"
 
   let currentY = margin;
 
@@ -138,7 +146,12 @@ export function exportTransfersToPDF(
 
       currentY += destHeaderHeight + 3;
 
-      // Preparar dados da tabela
+      // Linhas marcadas como "realizada" (para fundo cinza no PDF)
+      const realizadaRows = markedKeys
+        ? destGroup.items.map(item => markedKeys.has(getItemKey(item)))
+        : [];
+
+      // Preparar dados da tabela (incluindo coluna Realizada)
       const tableData = destGroup.items.map(item => {
         const estoqueOrigem = item.estoqueOrigem ?? 0;
         const row: any[] = [
@@ -157,13 +170,14 @@ export function exportTransfersToPDF(
           item.descricao,
           item.cor,
           item.destino,
-          item.quantidade.toString()
+          item.quantidade.toString(),
+          markedKeys?.has(getItemKey(item)) ? 'Sim' : '-'
         );
 
         return row;
       });
 
-      // Cabeçalhos da tabela
+      // Cabeçalhos da tabela (incluindo Realizada)
       const headers: string[] = [
         'Produto',
         'Código de Barras',
@@ -174,7 +188,36 @@ export function exportTransfersToPDF(
         headers.push('Subgrupo', 'Grade');
       }
 
-      headers.push('Descrição', 'Cor', 'Destino', 'Quantidade');
+      headers.push('Descrição', 'Cor', 'Destino', 'Quantidade', 'Realizada');
+
+      const numCols = headers.length;
+      const quantidadeColIndex = numCols - 2;
+      const realizadaColIndex = numCols - 1;
+      // Larguras fixas que somam contentWidth (277mm) – Descrição com boa largura para não espremer
+      const colStylesScarfme: Record<number, { cellWidth: number; halign: string; overflow?: 'ellipsize' }> = {
+        0: { cellWidth: 20, halign: 'left' },           // Produto
+        1: { cellWidth: 26, halign: 'center' },         // Código de Barras
+        2: { cellWidth: 18, halign: 'center' },         // Estoque
+        3: { cellWidth: 18, halign: 'center' },         // Subgrupo
+        4: { cellWidth: 16, halign: 'center' },         // Grade
+        5: { cellWidth: 92, halign: 'left', overflow: 'ellipsize' },  // Descrição (92 = 277 - resto)
+        6: { cellWidth: 20, halign: 'left' },          // Cor
+        7: { cellWidth: 32, halign: 'left' },          // Destino
+        [quantidadeColIndex]: { cellWidth: 20, halign: 'center' },
+        [realizadaColIndex]: { cellWidth: 15, halign: 'center' },
+      };
+      const colStylesNerd: Record<number, { cellWidth: number; halign: string; overflow?: 'ellipsize' }> = {
+        0: { cellWidth: 24, halign: 'left' },          // Produto
+        1: { cellWidth: 28, halign: 'center' },         // Código de Barras
+        2: { cellWidth: 22, halign: 'center' },         // Estoque
+        3: { cellWidth: 106, halign: 'left', overflow: 'ellipsize' }, // Descrição (106 = 277 - resto)
+        4: { cellWidth: 22, halign: 'left' },           // Cor
+        5: { cellWidth: 38, halign: 'left' },           // Destino
+        [quantidadeColIndex]: { cellWidth: 22, halign: 'center' },
+        [realizadaColIndex]: { cellWidth: 15, halign: 'center' },
+      };
+      const columnStyles = companyKey === 'scarfme' ? colStylesScarfme : colStylesNerd;
+      (columnStyles[quantidadeColIndex] as { cellWidth: number; halign: string; fontStyle?: string }).fontStyle = 'bold';
 
       // Criar tabela
       autoTable(doc, {
@@ -182,9 +225,10 @@ export function exportTransfersToPDF(
         body: tableData,
         startY: currentY,
         margin: { left: margin, right: margin },
+        tableWidth: 'wrap',
         styles: {
-          fontSize: 8,
-          cellPadding: 3,
+          fontSize: 7,
+          cellPadding: 2,
           textColor: [31, 41, 55], // #1f2937
         },
         headStyles: {
@@ -192,25 +236,21 @@ export function exportTransfersToPDF(
           textColor: [colorGray[0], colorGray[1], colorGray[2]] as [number, number, number],
           fontStyle: 'bold',
           fontSize: 7,
+          cellPadding: 2,
+        },
+        bodyStyles: {
+          cellPadding: 2,
         },
         alternateRowStyles: {
           fillColor: [255, 255, 255],
         },
-        columnStyles: {
-          0: { cellWidth: 30, halign: 'left' }, // Produto
-          1: { cellWidth: 35, halign: 'center' }, // Código de Barras
-          2: { cellWidth: 30, halign: 'center' }, // Estoque
-          ...(companyKey === 'scarfme' ? {
-            3: { cellWidth: 30, halign: 'center' }, // Subgrupo
-            4: { cellWidth: 25, halign: 'center' }, // Grade
-          } : {}),
-          [companyKey === 'scarfme' ? 5 : 3]: { cellWidth: 'auto', halign: 'left' }, // Descrição
-          [companyKey === 'scarfme' ? 6 : 4]: { cellWidth: 30, halign: 'left' }, // Cor
-          [companyKey === 'scarfme' ? 7 : 5]: { cellWidth: 40, halign: 'left' }, // Destino
-          [companyKey === 'scarfme' ? 8 : 6]: { cellWidth: 25, halign: 'center', fontStyle: 'bold' }, // Quantidade
+        columnStyles: columnStyles as any,
+        didParseCell: (data: any) => {
+          if (data.section === 'body' && realizadaRows[data.row.index]) {
+            data.cell.styles.fillColor = colorRowRealizada as [number, number, number];
+          }
         },
         didDrawPage: (data: any) => {
-          // Atualizar posição Y após desenhar a tabela
           currentY = data.cursor.y;
         },
       });
