@@ -106,11 +106,6 @@ export default function Sidebar({ companyName }: SidebarProps) {
     ? `${basePath}/controle-transferencias`
     : "/controle-transferencias";
 
-  // Construir o link para transferência de produtos baseado no caminho base
-  const transferenciaProdutosHref = basePath && basePath !== "/" 
-    ? `${basePath}/transferencia-produtos`
-    : "/transferencia-produtos";
-
   // Verificar se está em alguma página relacionada a produtos
   const isProdutosSubItemActive = pathname?.includes("/produto-detalhado") || pathname?.includes("/produtos-recentes") || (pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado"));
   const isProdutosPageActive = pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado");
@@ -149,7 +144,6 @@ export default function Sidebar({ companyName }: SidebarProps) {
     { label: "Controle de Estoque", href: controleEstoqueHref },
     { label: "Controle de Giro", href: controleGiroHref },
     { label: "Controle de Transferências", href: controleTransferenciasHref },
-    { label: "Transferência de Produtos", href: transferenciaProdutosHref },
     { label: "Exportar Relatórios", href: exportarRelatoriosHref },
     // TODO: Descomentar quando estoque por filial estiver pronto
     // { label: "Estoque por Filial", href: stockByFilialHref },
@@ -257,9 +251,6 @@ export default function Sidebar({ companyName }: SidebarProps) {
             } else if (item.label === "Controle de Transferências") {
               // Controle de Transferências está ativo quando o pathname inclui /controle-transferencias
               isActive = pathname?.includes("/controle-transferencias") || pathname === item.href;
-            } else if (item.label === "Transferência de Produtos") {
-              // Transferência de Produtos está ativo quando o pathname inclui /transferencia-produtos
-              isActive = pathname?.includes("/transferencia-produtos") || pathname === item.href;
             } else if (item.label === "Exportar Relatórios") {
               // Exportar Relatórios está ativo quando o pathname inclui /exportar-relatorios
               isActive = pathname?.includes("/exportar-relatorios") || pathname === item.href;

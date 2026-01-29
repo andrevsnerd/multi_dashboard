@@ -39,9 +39,23 @@ interface TransferenciaLog {
   filialOrigem: string;
   filialDestino: string;
   dataEmissao: string;
+  responsavel?: string;
   qtdProdutos: number;
   qtdItens: number;
   status: string;
+}
+
+interface LogDetalheItem {
+  produto: string;
+  corProduto: string | null;
+  descProduto: string;
+  descCor: string;
+  codigoBarra: string | null;
+  qtde: number;
+  estoqueOrigem: number;
+  estoqueDestino: number;
+  filialOrigem?: string;
+  filialDestino?: string;
 }
 
 interface TransferenciaProdutosPageProps {
@@ -178,7 +192,20 @@ async function executarTransferencia(
   return json;
 }
 
-async function fetchLogTransferencias(): Promise<TransferenciaLog[]> {
+async function fetchLogSaidas(): Promise<TransferenciaLog[]> {
+  const response = await fetch("/api/transferencia-produtos/log-saidas?limit=50", {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const json = (await response.json()) as { data: TransferenciaLog[] };
+  return json.data || [];
+}
+
+async function fetchLogEntradas(): Promise<TransferenciaLog[]> {
   const response = await fetch("/api/transferencia-produtos/log?limit=50", {
     cache: "no-store",
   });
@@ -188,6 +215,26 @@ async function fetchLogTransferencias(): Promise<TransferenciaLog[]> {
   }
 
   const json = (await response.json()) as { data: TransferenciaLog[] };
+  return json.data || [];
+}
+
+async function fetchLogDetalhes(
+  tipo: "saida" | "entrada",
+  romaneio: string,
+  filialOrigem: string,
+  filialDestino: string
+): Promise<LogDetalheItem[]> {
+  const params = new URLSearchParams({
+    tipo,
+    romaneio,
+    filialOrigem,
+    filialDestino,
+  });
+  const response = await fetch(`/api/transferencia-produtos/log-detalhes?${params.toString()}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) return [];
+  const json = (await response.json()) as { data: LogDetalheItem[] };
   return json.data || [];
 }
 
@@ -206,8 +253,10 @@ export default function TransferenciaProdutosPage({
   const [notificacao, setNotificacao] = useState<{ mensagem: string; tipo: "success" | "error" } | null>(null);
   const [processandoTransferencia, setProcessandoTransferencia] = useState(false);
   const [filaTransferencias, setFilaTransferencias] = useState<ProdutoSelecionado[]>([]);
-  const [logTransferencias, setLogTransferencias] = useState<TransferenciaLog[]>([]);
-  const [loadingLog, setLoadingLog] = useState(false);
+  const [logSaidas, setLogSaidas] = useState<TransferenciaLog[]>([]);
+  const [logEntradas, setLogEntradas] = useState<TransferenciaLog[]>([]);
+  const [loadingLogSaidas, setLoadingLogSaidas] = useState(false);
+  const [loadingLogEntradas, setLoadingLogEntradas] = useState(false);
   const [tiposRomaneio, setTiposRomaneio] = useState<string[]>([]);
   const [tipoRomaneioSelecionado, setTipoRomaneioSelecionado] = useState<string>("TRANSFERENCIA ENTRE LOJAS");
   const [responsaveis, setResponsaveis] = useState<Array<{ responsavel: string; qtd: number }>>([]);
@@ -217,6 +266,11 @@ export default function TransferenciaProdutosPage({
   const [inputResponsavelCustomizado, setInputResponsavelCustomizado] = useState("");
 
   const notificacaoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hoverRef = useRef<NodeJS.Timeout | null>(null);
+  const leaveRef = useRef<NodeJS.Timeout | null>(null);
+  const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
+  const [detalhesCache, setDetalhesCache] = useState<Record<string, LogDetalheItem[]>>({});
+  const [loadingDetalhesKey, setLoadingDetalhesKey] = useState<string | null>(null);
 
   // Carregar filiais
   useEffect(() => {
@@ -291,20 +345,26 @@ export default function TransferenciaProdutosPage({
     }, 3000);
   }, []);
 
-  // Carregar log de transferências
+  // Carregar logs de saídas e entradas
   useEffect(() => {
-    async function loadLog() {
-      setLoadingLog(true);
+    async function loadLogs() {
+      setLoadingLogSaidas(true);
+      setLoadingLogEntradas(true);
       try {
-        const data = await fetchLogTransferencias();
-        setLogTransferencias(data);
+        const [saidas, entradas] = await Promise.all([
+          fetchLogSaidas(),
+          fetchLogEntradas(),
+        ]);
+        setLogSaidas(saidas);
+        setLogEntradas(entradas);
       } catch (error) {
-        console.error("Erro ao carregar log", error);
+        console.error("Erro ao carregar logs", error);
       } finally {
-        setLoadingLog(false);
+        setLoadingLogSaidas(false);
+        setLoadingLogEntradas(false);
       }
     }
-    loadLog();
+    loadLogs();
   }, []);
 
   // Buscar produtos ao digitar
@@ -493,9 +553,13 @@ export default function TransferenciaProdutosPage({
           p.filialOrigem !== produto.filialOrigem
         ));
 
-        // Recarregar log
-        const novoLog = await fetchLogTransferencias();
-        setLogTransferencias(novoLog);
+        // Recarregar logs de saídas e entradas
+        const [novoSaidas, novoEntradas] = await Promise.all([
+          fetchLogSaidas(),
+          fetchLogEntradas(),
+        ]);
+        setLogSaidas(novoSaidas);
+        setLogEntradas(novoEntradas);
 
         mostrarNotificacao(`Transferência de ${produto.descProduto} concluída com sucesso!`);
       } catch (error: any) {
@@ -540,6 +604,39 @@ export default function TransferenciaProdutosPage({
       processarFilaTransferencias();
     }
   }, [processandoTransferencia, filaTransferencias.length, processarFilaTransferencias]);
+
+  useEffect(() => {
+    if (!hoveredLogKey) return;
+    if (detalhesCache[hoveredLogKey]) return;
+    let cancelled = false;
+    setLoadingDetalhesKey(hoveredLogKey);
+    const parts = hoveredLogKey.split("|");
+    const [tipo, romaneio, fo, fd] = parts;
+    if (tipo && romaneio && fo && fd) {
+      fetchLogDetalhes(tipo as "saida" | "entrada", romaneio, fo, fd).then((data) => {
+        if (!cancelled) {
+          setDetalhesCache((prev) => ({ ...prev, [hoveredLogKey]: data }));
+          setLoadingDetalhesKey((prev) => (prev === hoveredLogKey ? null : prev));
+        }
+      }).catch(() => {
+        if (!cancelled) setLoadingDetalhesKey((prev) => (prev === hoveredLogKey ? null : prev));
+      });
+    } else {
+      setLoadingDetalhesKey(null);
+    }
+    return () => { cancelled = true; };
+  }, [hoveredLogKey]);
+
+  const onLogCardEnter = useCallback((key: string) => {
+    if (leaveRef.current) { clearTimeout(leaveRef.current); leaveRef.current = null; }
+    if (hoverRef.current) clearTimeout(hoverRef.current);
+    hoverRef.current = setTimeout(() => setHoveredLogKey(key), 80);
+  }, []);
+
+  const onLogCardLeave = useCallback(() => {
+    if (hoverRef.current) { clearTimeout(hoverRef.current); hoverRef.current = null; }
+    leaveRef.current = setTimeout(() => setHoveredLogKey(null), 80);
+  }, []);
 
   const iniciarTransferencia = useCallback(() => {
     if (!filialDestino) {
@@ -609,35 +706,81 @@ export default function TransferenciaProdutosPage({
             )}
           </div>
 
-          {/* Log de Transferências */}
+          {/* Log de Saídas */}
           <div className={styles.section}>
-            <label className={styles.sectionLabel}>LOG DE TRANSFERÊNCIAS</label>
-            {loadingLog ? (
+            <label className={styles.sectionLabel}>LOG DE SAÍDAS</label>
+            {loadingLogSaidas ? (
               <div className={styles.emptyState}>Carregando...</div>
-            ) : logTransferencias.length === 0 ? (
+            ) : logSaidas.length === 0 ? (
               <div className={styles.emptyState}>
                 <div className={styles.emptyIcon}>📄</div>
-                <div>Nenhuma transferência realizada</div>
+                <div>Nenhuma saída realizada</div>
               </div>
             ) : (
               <div className={styles.logList}>
-                {logTransferencias.map((log, index) => (
-                  <div key={index} className={styles.logItem}>
-                    <div className={styles.logHeader}>
-                      <span className={styles.logRomaneio}>#{log.romaneio}</span>
-                      <span className={styles.logStatus}>{log.status}</span>
+                {logSaidas.map((log, index) => {
+                  const logKey = `saida|${log.romaneio}|${log.filialOrigem}|${log.filialDestino}`;
+                  const show = hoveredLogKey === logKey;
+                  const detalhes = show ? detalhesCache[logKey] : undefined;
+                  const loading = loadingDetalhesKey === logKey;
+                  return (
+                    <div
+                      key={index}
+                      className={styles.logItemWrapper}
+                      onMouseEnter={() => onLogCardEnter(logKey)}
+                      onMouseLeave={onLogCardLeave}
+                    >
+                      <div className={styles.logItem}>
+                        <div className={styles.logHeader}>
+                          <span className={styles.logRomaneio}>#{log.romaneio}</span>
+                          <span className={styles.logStatus}>{log.status}</span>
+                        </div>
+                        <div className={styles.logDetails}>
+                          {log.filialOrigem} → {log.filialDestino}
+                        </div>
+                        {log.responsavel && (
+                          <div className={styles.logResponsavel}>Responsável: {log.responsavel}</div>
+                        )}
+                        <div className={styles.logFooter}>
+                          <span>👁 {log.qtdProdutos} produtos • {log.qtdItens} itens</span>
+                          <span className={styles.logDate}>
+                            {new Date(log.dataEmissao).toLocaleString("pt-BR")}
+                          </span>
+                        </div>
+                      </div>
+                      {show && (
+                        <div className={styles.logPopover}>
+                          {loading ? (
+                            <div className={styles.logPopoverLoad}>…</div>
+                          ) : detalhes?.length ? (
+                            <div className={styles.logPopoverList}>
+                              {detalhes.map((it, i) => {
+                                const lojaO = it.filialOrigem ?? log.filialOrigem;
+                                const lojaD = it.filialDestino ?? log.filialDestino;
+                                return (
+                                <div key={i} className={styles.logPopoverRow}>
+                                  <div className={styles.logPopoverNome}>{it.descProduto || it.produto}</div>
+                                  <div className={styles.logPopoverMeta}>
+                                    {it.produto}{it.descCor ? ` · ${it.descCor}` : ""}
+                                    {it.codigoBarra ? ` · ${it.codigoBarra}` : ""}
+                                  </div>
+                                  <div className={styles.logPopoverEstoque}>
+                                    <div>Qtd transferida: {it.qtde}</div>
+                                    <div><strong>{lojaO}</strong>: {it.estoqueOrigem} un</div>
+                                    <div><strong>{lojaD}</strong>: {it.estoqueDestino} un</div>
+                                  </div>
+                                </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className={styles.logPopoverLoad}>—</div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <div className={styles.logDetails}>
-                      {log.filialOrigem} → {log.filialDestino}
-                    </div>
-                    <div className={styles.logFooter}>
-                      <span>👁 {log.qtdProdutos} produtos • {log.qtdItens} itens</span>
-                      <span className={styles.logDate}>
-                        {new Date(log.dataEmissao).toLocaleString("pt-BR")}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -861,6 +1004,85 @@ export default function TransferenciaProdutosPage({
                   <div className={styles.filialCode}>{filialDestino.codFilial}</div>
                 </div>
                 <div className={styles.checkmark}>✓</div>
+              </div>
+            )}
+          </div>
+
+          {/* Log de Entradas */}
+          <div className={styles.section}>
+            <label className={styles.sectionLabel}>LOG DE ENTRADAS</label>
+            {loadingLogEntradas ? (
+              <div className={styles.emptyState}>Carregando...</div>
+            ) : logEntradas.length === 0 ? (
+              <div className={styles.emptyState}>
+                <div className={styles.emptyIcon}>📄</div>
+                <div>Nenhuma entrada realizada</div>
+              </div>
+            ) : (
+              <div className={styles.logList}>
+                {logEntradas.map((log, index) => {
+                  const logKey = `entrada|${log.romaneio}|${log.filialOrigem}|${log.filialDestino}`;
+                  const show = hoveredLogKey === logKey;
+                  const detalhes = show ? detalhesCache[logKey] : undefined;
+                  const loading = loadingDetalhesKey === logKey;
+                  return (
+                    <div
+                      key={index}
+                      className={styles.logItemWrapper}
+                      onMouseEnter={() => onLogCardEnter(logKey)}
+                      onMouseLeave={onLogCardLeave}
+                    >
+                      <div className={styles.logItem}>
+                        <div className={styles.logHeader}>
+                          <span className={styles.logRomaneio}>#{log.romaneio}</span>
+                          <span className={styles.logStatus}>{log.status}</span>
+                        </div>
+                        <div className={styles.logDetails}>
+                          {log.filialOrigem} → {log.filialDestino}
+                        </div>
+                        {log.responsavel && (
+                          <div className={styles.logResponsavel}>Responsável: {log.responsavel}</div>
+                        )}
+                        <div className={styles.logFooter}>
+                          <span>👁 {log.qtdProdutos} produtos • {log.qtdItens} itens</span>
+                          <span className={styles.logDate}>
+                            {new Date(log.dataEmissao).toLocaleString("pt-BR")}
+                          </span>
+                        </div>
+                      </div>
+                      {show && (
+                        <div className={styles.logPopover}>
+                          {loading ? (
+                            <div className={styles.logPopoverLoad}>…</div>
+                          ) : detalhes?.length ? (
+                            <div className={styles.logPopoverList}>
+                              {detalhes.map((it, i) => {
+                                const lojaO = it.filialOrigem ?? log.filialOrigem;
+                                const lojaD = it.filialDestino ?? log.filialDestino;
+                                return (
+                                <div key={i} className={styles.logPopoverRow}>
+                                  <div className={styles.logPopoverNome}>{it.descProduto || it.produto}</div>
+                                  <div className={styles.logPopoverMeta}>
+                                    {it.produto}{it.descCor ? ` · ${it.descCor}` : ""}
+                                    {it.codigoBarra ? ` · ${it.codigoBarra}` : ""}
+                                  </div>
+                                  <div className={styles.logPopoverEstoque}>
+                                    <div>Qtd transferida: {it.qtde}</div>
+                                    <div><strong>{lojaO}</strong>: {it.estoqueOrigem} un</div>
+                                    <div><strong>{lojaD}</strong>: {it.estoqueDestino} un</div>
+                                  </div>
+                                </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className={styles.logPopoverLoad}>—</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
