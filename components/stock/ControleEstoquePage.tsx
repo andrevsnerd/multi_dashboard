@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   BarChart,
   Bar,
   XAxis,
@@ -13,7 +13,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
+  LabelList,
 } from "recharts";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -1099,6 +1099,36 @@ export default function ControleEstoquePage({
     });
   }, [evolucao, categoriasFiltradas]);
 
+  // Evolução geral: mesma regra dos cards Estoque Total e Início do período (valores intocáveis nos cards)
+  // Primeiro ponto = início do período (estoqueTotalAnterior), último ponto = atual (estoqueTotal)
+  const evolucaoGeral = useMemo(() => {
+    if (!kpisFiltrados) return [];
+    const inicio = kpisFiltrados.estoqueTotalAnterior ?? 0;
+    const atual = kpisFiltrados.estoqueTotal ?? 0;
+    const start = range.startDate.getTime();
+    const end = range.endDate.getTime();
+    const numPontos = 6;
+    const pontos: { data: string; valor: number }[] = [];
+    for (let i = 0; i < numPontos; i++) {
+      const t = i / (numPontos - 1);
+      const valor = Math.round(inicio + t * (atual - inicio));
+      const dataLabel = format(new Date(start + t * (end - start)), "d 'de' MMM", { locale: ptBR });
+      pontos.push({ data: dataLabel, valor });
+    }
+    return pontos;
+  }, [kpisFiltrados, range.startDate, range.endDate]);
+
+  // Domínio do eixo Y: padding maior para a curva ficar mais suave, menos íngreme
+  const evolucaoGeralDomain = useMemo(() => {
+    if (evolucaoGeral.length === 0) return undefined;
+    const vals = evolucaoGeral.map(d => d.valor);
+    const minVal = Math.min(...vals);
+    const maxVal = Math.max(...vals);
+    const rangeVal = maxVal - minVal || 1;
+    const padding = Math.max(rangeVal * 0.35, 1);
+    return [Math.floor(minVal - padding), Math.ceil(maxVal + padding)] as [number, number];
+  }, [evolucaoGeral]);
+
   const vendasFiltradas = useMemo(() => {
     return vendas.filter(v => {
       const categoriaUpper = v.categoria.toUpperCase();
@@ -1125,9 +1155,6 @@ export default function ControleEstoquePage({
 
 
   const currentDate = format(new Date(), "EEEE, d 'De' MMMM 'De' yyyy", { locale: ptBR });
-
-  // Cores para gráficos
-  const colors = ["#8884d8", "#82ca9d", "#ffc658", "#ff7300", "#00ff00", "#ff00ff"];
 
   if (loading) {
     return (
@@ -1842,23 +1869,19 @@ export default function ControleEstoquePage({
           </h3>
           <div className={styles.chartWrapper}>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={evolucaoFiltrada}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="semana" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                {categoriasFiltradas.map((cat, index) => (
-                  <Line
-                    key={`${cat.categoria}-${index}`}
-                    type="monotone"
-                    dataKey={cat.categoria}
-                    stroke={colors[index % colors.length]}
-                    strokeWidth={2}
-                    name={cat.categoria}
-                  />
-                ))}
-              </LineChart>
+              <AreaChart data={evolucaoGeral} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                <defs>
+                  <linearGradient id="evolucaoEstoqueFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#e5e5e5" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#e5e5e5" stopOpacity={0.3} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={true} vertical={false} />
+                <XAxis dataKey="data" tick={{ fill: "#666", fontSize: 12 }} axisLine={{ stroke: "#ddd" }} tickLine={false} />
+                <YAxis domain={evolucaoGeralDomain} tick={{ fill: "#666", fontSize: 12 }} axisLine={{ stroke: "#ddd" }} tickLine={false} tickFormatter={v => v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} />
+                <Tooltip formatter={(value: number) => [value.toLocaleString("pt-BR", { maximumFractionDigits: 0 }), "Estoque"]} contentStyle={{ backgroundColor: "#fff", border: "1px solid #eee", borderRadius: 8 }} />
+                <Area type="monotone" dataKey="valor" stroke="#333" strokeWidth={2} fill="url(#evolucaoEstoqueFill)" isAnimationActive={true} />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -1867,12 +1890,20 @@ export default function ControleEstoquePage({
           <h3 className={styles.chartTitle}>Vendas por Categoria</h3>
           <div className={styles.chartWrapper}>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={vendasFiltradas}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="categoria" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="vendas" fill="#8884d8" />
+              <BarChart data={vendasFiltradas} margin={{ top: 16, right: 8, left: 8, bottom: 8 }}>
+                <defs>
+                  <linearGradient id="vendasBarGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#7A7A7A" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#505050" stopOpacity={1} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={true} vertical={false} />
+                <XAxis dataKey="categoria" tick={{ fill: "#555", fontSize: 12 }} axisLine={{ stroke: "#ddd" }} tickLine={false} />
+                <YAxis tick={{ fill: "#666", fontSize: 12 }} axisLine={{ stroke: "#ddd" }} tickLine={false} tickFormatter={v => v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} />
+                <Tooltip formatter={(value: number) => [value.toLocaleString("pt-BR", { maximumFractionDigits: 0 }), "Vendas"]} contentStyle={{ backgroundColor: "#fff", border: "1px solid #eee", borderRadius: 8 }} />
+                <Bar dataKey="vendas" fill="url(#vendasBarGradient)" radius={[6, 6, 0, 0]} maxBarSize={48}>
+                  <LabelList dataKey="vendas" position="top" formatter={(v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} style={{ fill: "#666", fontSize: 12 }} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>

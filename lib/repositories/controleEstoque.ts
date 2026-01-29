@@ -63,7 +63,9 @@ function buildFilialFilter(
   // Para scarfme: se for "Todas as filiais" (null), incluir também ecommerce
   // Para outras empresas: usar apenas filiais normais (sem ecommerce)
   if (isScarfme && specificFilial === null) {
-    const allFiliais = filiais;
+    // Incluir todas as filiais (normais + e-commerce)
+    // Combinar filiais normais com filiais de e-commerce para garantir que todas sejam incluídas
+    const allFiliais = [...new Set([...filiais, ...ecommerceFilials])];
     
     if (allFiliais.length === 0) {
       return '';
@@ -1851,6 +1853,7 @@ export async function fetchEvolucaoEstoque({
   grades,
 }: ControleEstoqueParams): Promise<EvolucaoEstoqueData[]> {
   return withRequest(async (request) => {
+    const companyConfig = resolveCompany(company);
     const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
     const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
@@ -1861,7 +1864,12 @@ export async function fetchEvolucaoEstoque({
       ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
       : 'ISNULL(p.LINHA, \'SEM LINHA\')';
 
-    // Buscar categorias principais
+    // Para ScarfMe com filial null (Todas as filiais), garantir que inclui e-commerce
+    // O buildFilialFilter já inclui todas as filiais quando filial === null para ScarfMe
+    // que inclui as filiais normais + e-commerce (se estiverem em filialFilters['inventory'])
+    // Mas vamos garantir que está funcionando corretamente
+    
+    // Buscar categorias principais (já inclui e-commerce quando filial === null para ScarfMe)
     const categoriasQuery = `
       SELECT TOP 5
         ${categoriaField} AS categoria,
@@ -2548,7 +2556,8 @@ export async function fetchDetalhesEcommerceSemana({
 }
 
 /**
- * Busca dados de vendas por categoria
+ * Busca dados de vendas por categoria (varejo + e-commerce, mesma regra dos cards)
+ * Inclui exclusionFilter igual aos KPIs para o total bater com o card "Vendas"
  */
 export async function fetchVendasPorCategoria({
   company,
@@ -2561,23 +2570,21 @@ export async function fetchVendasPorCategoria({
   grades,
 }: ControleEstoqueParams): Promise<VendasCategoriaData[]> {
   return withRequest(async (request) => {
-    const now = new Date();
-    const currentMonth = {
-      start: new Date(now.getFullYear(), now.getMonth(), 1),
-      end: new Date(now.getFullYear(), now.getMonth() + 1, 1), // Início do próximo mês (exclusivo)
-    };
+    const { start: periodoStart, end: periodoEnd } = resolveRange(range);
+    const companyConfig = resolveCompany(company);
     const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
     const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
     const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
     const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
     const gradeFilter = buildGradeFilter(request, company, grades, 'p');
+    const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineVendasCat');
     const categoriaField = company === 'nerd' 
       ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
       : 'ISNULL(p.LINHA, \'SEM LINHA\')';
 
-    request.input('currentStart', sql.DateTime, currentMonth.start);
-    request.input('currentEnd', sql.DateTime, currentMonth.end);
+    request.input('periodoStart', sql.DateTime, periodoStart);
+    request.input('periodoEnd', sql.DateTime, periodoEnd);
 
     const query = `
       SELECT 
@@ -2585,8 +2592,8 @@ export async function fetchVendasPorCategoria({
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-      WHERE vp.DATA_VENDA >= @currentStart
-        AND vp.DATA_VENDA < @currentEnd
+      WHERE vp.DATA_VENDA >= @periodoStart
+        AND vp.DATA_VENDA < @periodoEnd
         AND vp.QTDE > 0
         ${vendasFilialFilter}
         ${grupoFilter}
@@ -2594,6 +2601,7 @@ export async function fetchVendasPorCategoria({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${exclusionFilter}
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
@@ -2607,10 +2615,56 @@ export async function fetchVendasPorCategoria({
       vendas: number | null;
     }>(query);
 
-    return result.recordset.map(row => ({
-      categoria: row.categoria?.trim() || '',
-      vendas: Math.round(Number(row.vendas ?? 0)),
-    }));
+    const vendasPorCategoria = new Map<string, number>();
+    result.recordset.forEach(row => {
+      const cat = row.categoria?.trim() || '';
+      vendasPorCategoria.set(cat, Math.round(Number(row.vendas ?? 0)));
+    });
+
+    // E-commerce do período: mesma regra dos cards (ScarfMe quando "Todas as filiais")
+    const shouldIncludeEcommerce = company === 'scarfme' && (filial === null || filial === undefined) && companyConfig && (companyConfig.ecommerceFilials?.length ?? 0) > 0;
+    if (shouldIncludeEcommerce) {
+      const ecommerceFilials = companyConfig!.ecommerceFilials ?? [];
+      ecommerceFilials.forEach((f, index) => {
+        request.input(`ecommerceVendasCatFilial${index}`, sql.VarChar, f);
+      });
+      const placeholders = ecommerceFilials.map((_, i) => `@ecommerceVendasCatFilial${i}`).join(', ');
+      const ecommerceQuery = `
+        SELECT 
+          ${categoriaField} AS categoria,
+          SUM(CAST(fp.QTDE AS FLOAT)) AS vendas
+        FROM FATURAMENTO f WITH (NOLOCK)
+        JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) 
+          ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
+        WHERE f.EMISSAO >= @periodoStart
+          AND f.EMISSAO < @periodoEnd
+          AND f.NOTA_CANCELADA = 0
+          AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+          AND CAST(fp.QTDE AS FLOAT) > 0
+          AND f.FILIAL IN (${placeholders})
+          ${grupoFilter}
+          ${linhaFilter}
+          ${colecaoFilter}
+          ${subgrupoFilter}
+          ${gradeFilter}
+          ${exclusionFilter}
+          AND ${categoriaField} <> ''
+          AND ${categoriaField} <> 'SEM GRUPO'
+          AND ${categoriaField} <> 'SEM LINHA'
+        GROUP BY ${categoriaField}
+      `;
+      const ecommerceResult = await request.query<{ categoria: string; vendas: number | null }>(ecommerceQuery);
+      ecommerceResult.recordset.forEach(row => {
+        const cat = row.categoria?.trim() || '';
+        const v = Math.round(Number(row.vendas ?? 0));
+        vendasPorCategoria.set(cat, (vendasPorCategoria.get(cat) ?? 0) + v);
+      });
+    }
+
+    return Array.from(vendasPorCategoria.entries())
+      .map(([categoria, vendas]) => ({ categoria, vendas }))
+      .sort((a, b) => b.vendas - a.vendas);
   });
 }
 
