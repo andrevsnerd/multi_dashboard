@@ -29,24 +29,39 @@ Servidor proxy que atua como ponte entre o Vercel (internet) e seu SQL Server (r
 
 Use um túnel para expor o servidor:
 
-### ngrok (Recomendado - Mais Simples)
+### Cloudflare Tunnel (Recomendado - Sem Warning Page)
+
+**✅ RECOMENDADO**: Cloudflare Tunnel é mais estável e não tem warning page!
+
+1. **Instalar cloudflared**:
+   - Windows: Baixe de https://github.com/cloudflare/cloudflared/releases
+   - Ou use: `start-cloudflare.bat` (instala automaticamente)
+   
+2. **Iniciar túnel**:
+   ```bash
+   cloudflared tunnel --url http://localhost:3001
+   ```
+   - Ou use: `start-cloudflare.bat`
+   - Ou use: `start-all-cloudflare.bat` (inicia proxy + tunnel)
+
+3. **Copiar a URL** fornecida (ex: `https://random-words-1234.trycloudflare.com`)
+
+📖 **Guia completo**: Veja `docs/CLOUDFLARE_TUNNEL_SETUP.md` para instruções detalhadas
+
+### ngrok (Alternativa)
 
 1. Instalar: `npm install -g ngrok`
 2. Autenticar: `ngrok config add-authtoken SEU_TOKEN`
 3. Iniciar túnel: `ngrok http 3001`
 4. Copiar a URL fornecida (ex: `https://abc123.ngrok-free.app`)
 
-### Cloudflare Tunnel (Mais Estável)
-
-1. Baixar: https://github.com/cloudflare/cloudflared/releases
-2. Executar: `cloudflared tunnel --url http://localhost:3001`
-3. Copiar a URL fornecida
+⚠️ **Nota**: ngrok free plan tem warning page que pode causar problemas
 
 ## ⚙️ Configurar no Vercel
 
 No Vercel, adicione as variáveis:
 
-- `PROXY_URL`: URL do túnel (ex: `https://abc123.ngrok-free.app`)
+- `PROXY_URL`: URL do túnel (ex: `https://random-words-1234.trycloudflare.com` para Cloudflare ou `https://abc123.ngrok-free.app` para ngrok)
 - `PROXY_SECRET`: Mesmo valor do `.env.local`
 - `NODE_ENV`: `production`
 
@@ -65,6 +80,7 @@ X-Proxy-Token: seu-token-secreto
 ## ⚠️ Importante
 
 - Mantenha o servidor rodando enquanto o app estiver no Vercel
-- A URL do ngrok muda a cada reinício (plano gratuito)
-- Se mudar a URL, atualize no Vercel
+- **Cloudflare Tunnel**: URL temporária muda a cada reinício, mas pode criar túnel nomeado para URL fixa
+- **ngrok**: URL muda a cada reinício (plano gratuito)
+- Se mudar a URL, atualize `PROXY_URL` no Vercel
 
