@@ -110,6 +110,7 @@ async function queryViaProxyWithRetry<T>(
       'Content-Type': 'application/json',
       'X-Proxy-Token': PROXY_SECRET,
       'ngrok-skip-browser-warning': 'true', // Bypass ngrok free plan warning
+      'User-Agent': 'multi-dashboard-proxy-client/1.0', // User-Agent específico para evitar bloqueios
     };
 
     // Log para debug (apenas primeira tentativa)
@@ -256,6 +257,7 @@ export async function testProxyConnection(): Promise<boolean> {
     const response = await fetch(`${PROXY_URL}/health`, {
       headers: {
         'ngrok-skip-browser-warning': 'true', // Bypass ngrok free plan warning
+        'User-Agent': 'multi-dashboard-proxy-client/1.0',
       },
       signal: controller.signal,
     });
