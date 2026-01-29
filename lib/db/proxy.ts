@@ -153,36 +153,49 @@ async function queryViaProxyWithRetry<T>(
     // Verificar content-type antes de processar
     const contentType = response.headers.get('content-type') || '';
     const isHtml = contentType.includes('text/html');
+    
+    // Se for HTML, ler como texto primeiro para verificar se é warning do ngrok
+    if (isHtml) {
+      const responseText = await response.text().catch(() => '');
+      const isNgrokWarning = responseText && (
+        responseText.includes('ngrok') || 
+        responseText.includes('Visit Site') || 
+        responseText.includes('ngrok.io') || 
+        responseText.includes('ngrok-free.app') ||
+        responseText.includes('You are about to visit') ||
+        responseText.includes('ngrok.com')
+      );
 
-    if (!response.ok) {
-      // Se retornou HTML, pode ser página de warning do ngrok
-      if (isHtml) {
-        const htmlText = await response.text().catch(() => '');
-        if (htmlText.includes('ngrok') || htmlText.includes('Visit Site') || htmlText.includes('ngrok.io') || htmlText.includes('ngrok-free.app')) {
-          // Log detalhado para debug
-          const isNgrok = isNgrokUrl(PROXY_URL);
-          console.error('[Proxy] Ngrok warning page detectada (erro HTTP):', {
-            url: PROXY_URL,
-            status: response.status,
-            contentType,
-            isNgrokUrl: isNgrok,
-            htmlPreview: htmlText.substring(0, 200),
-          });
-          
-          if (isNgrok) {
-            throw new Error(
-              'Ngrok está retornando página de warning. Possíveis causas:\n' +
-              '1. O túnel ngrok pode ter sido reiniciado e a URL mudou - atualize PROXY_URL no Vercel\n' +
-              '2. O túnel ngrok pode estar inativo - verifique se o ngrok está rodando localmente\n' +
-              '3. O header ngrok-skip-browser-warning pode não estar funcionando no plano gratuito\n' +
-              'Solução: Verifique a URL do ngrok e atualize a variável PROXY_URL no Vercel.'
-            );
-          }
-          throw new Error('Ngrok está retornando página de warning. Verifique se o header ngrok-skip-browser-warning está sendo enviado corretamente e se a URL do túnel ngrok no Vercel está atualizada.');
+      // Se detectamos warning do ngrok, tratar imediatamente
+      if (isNgrokWarning) {
+        const isNgrok = isNgrokUrl(PROXY_URL);
+        console.error('[Proxy] Ngrok warning page detectada:', {
+          url: PROXY_URL,
+          status: response.status,
+          contentType,
+          isNgrokUrl: isNgrok,
+          htmlPreview: responseText.substring(0, 300),
+          headersSent: Object.keys(headers),
+        });
+        
+        if (isNgrok) {
+          throw new Error(
+            'Ngrok está retornando página de warning. Possíveis causas:\n' +
+            '1. O túnel ngrok pode ter sido reiniciado e a URL mudou - atualize PROXY_URL no Vercel\n' +
+            '2. O túnel ngrok pode estar inativo - verifique se o ngrok está rodando localmente\n' +
+            '3. O header ngrok-skip-browser-warning pode não estar funcionando no plano gratuito\n' +
+            'Solução: Verifique a URL do ngrok e atualize a variável PROXY_URL no Vercel.'
+          );
         }
-        throw new Error(`Erro HTTP ${response.status}: Resposta HTML inesperada`);
+        throw new Error('Ngrok está retornando página de warning. Verifique se o header ngrok-skip-browser-warning está sendo enviado corretamente e se a URL do túnel ngrok no Vercel está atualizada.');
       }
       
+      // Se é HTML mas não é warning do ngrok, é um erro
+      throw new Error(`Erro HTTP ${response.status}: Resposta HTML inesperada do proxy`);
+    }
+
+    // Se não é HTML, processar normalmente
+    if (!response.ok) {
       // Tentar ler como JSON
       const errorData = await response.json().catch(() => ({ 
         error: `Erro HTTP ${response.status}` 
@@ -197,35 +210,10 @@ async function queryViaProxyWithRetry<T>(
       throw new Error(errorData.error || `Erro HTTP ${response.status}`);
     }
 
-    // Verificar se a resposta é HTML (página de warning do ngrok) mesmo com status OK
-    if (isHtml) {
-      const htmlText = await response.text().catch(() => '');
-      if (htmlText.includes('ngrok') || htmlText.includes('Visit Site') || htmlText.includes('ngrok.io') || htmlText.includes('ngrok-free.app')) {
-        // Log detalhado para debug
-        const isNgrok = isNgrokUrl(PROXY_URL);
-        console.error('[Proxy] Ngrok warning page detectada (status OK):', {
-          url: PROXY_URL,
-          status: response.status,
-          contentType,
-          isNgrokUrl: isNgrok,
-          htmlPreview: htmlText.substring(0, 200),
-        });
-        
-        if (isNgrok) {
-          throw new Error(
-            'Ngrok retornou página de warning ao invés de JSON. Possíveis causas:\n' +
-            '1. O túnel ngrok pode ter sido reiniciado e a URL mudou - atualize PROXY_URL no Vercel\n' +
-            '2. O túnel ngrok pode estar inativo - verifique se o ngrok está rodando localmente\n' +
-            '3. O header ngrok-skip-browser-warning pode não estar funcionando no plano gratuito\n' +
-            'Solução: Verifique a URL do ngrok e atualize a variável PROXY_URL no Vercel.'
-          );
-        }
-        throw new Error('Ngrok retornou página de warning ao invés de JSON. O header ngrok-skip-browser-warning pode não estar funcionando. Verifique se o túnel ngrok está configurado corretamente e se a URL no Vercel está atualizada.');
-      }
-      throw new Error('Resposta HTML inesperada do proxy');
-    }
-
-    const result = await response.json();
+    // Resposta OK e não é HTML, ler como JSON
+    const result = await response.json().catch((jsonError) => {
+      throw new Error(`Erro ao processar resposta JSON: ${jsonError.message}`);
+    });
     
     if (!result.success) {
       throw new Error(result.error || 'Erro ao executar query');
