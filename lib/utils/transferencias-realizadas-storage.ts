@@ -15,17 +15,25 @@ export type TransferenciasRealizadasData = Record<string, string[]>;
  * Em produção (Vercel com Redis/KV configurado): lê do mesmo banco das metas.
  */
 export async function readTransferenciasRealizadas(companyKey: string): Promise<string[]> {
-  if (!isRedisConfigured()) {
+  const configured = isRedisConfigured();
+  console.log('[tr-realizadas] storage read: companyKey=', companyKey, 'isRedisConfigured=', configured);
+  if (!configured) {
+    console.log('[tr-realizadas] storage read: Redis nao configurado, retornando []');
     return [];
   }
   const redis = getRedis();
-  if (!redis) return [];
+  if (!redis) {
+    console.log('[tr-realizadas] storage read: getRedis() null, retornando []');
+    return [];
+  }
   try {
     const key = REDIS_KEY_PREFIX + companyKey;
     const raw = await redis.get<string[]>(key);
-    return Array.isArray(raw) ? raw : [];
+    const result = Array.isArray(raw) ? raw : [];
+    console.log('[tr-realizadas] storage read: key=', key, 'count=', result.length);
+    return result;
   } catch (error) {
-    console.error('[transferencias-realizadas-storage] Erro ao ler', error);
+    console.error('[tr-realizadas] storage read ERRO:', error);
     return [];
   }
 }
@@ -39,16 +47,23 @@ export async function writeTransferenciasRealizadas(
   companyKey: string,
   markedKeys: string[]
 ): Promise<void> {
-  if (!isRedisConfigured()) {
+  const configured = isRedisConfigured();
+  console.log('[tr-realizadas] storage write: companyKey=', companyKey, 'markedKeys.length=', markedKeys?.length, 'isRedisConfigured=', configured);
+  if (!configured) {
+    console.log('[tr-realizadas] storage write: Redis nao configurado, no-op');
     return;
   }
   const redis = getRedis();
-  if (!redis) return;
+  if (!redis) {
+    console.log('[tr-realizadas] storage write: getRedis() null, no-op');
+    return;
+  }
   try {
     const key = REDIS_KEY_PREFIX + companyKey;
     await redis.set(key, markedKeys);
+    console.log('[tr-realizadas] storage write: key=', key, 'salvo count=', markedKeys.length);
   } catch (error) {
-    console.error('[transferencias-realizadas-storage] Erro ao salvar', error);
+    console.error('[tr-realizadas] storage write ERRO:', error);
     throw error;
   }
 }

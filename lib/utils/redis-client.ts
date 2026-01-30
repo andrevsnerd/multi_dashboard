@@ -41,6 +41,8 @@ export function getRedisEnv(): { url: string | undefined; token: string | undefi
 
 export function getRedis(): Redis | null {
   const { url, token } = getRedisEnv();
+  const ok = !!(url && token);
+  console.log('[tr-realizadas] redis-client getRedis:', { hasUrl: !!url, hasToken: !!token, willUseRedis: ok });
   if (url && token) {
     return new Redis({ url, token });
   }
@@ -49,5 +51,7 @@ export function getRedis(): Redis | null {
 
 export function isRedisConfigured(): boolean {
   const { url, token } = getRedisEnv();
-  return !!(url && token);
+  const ok = !!(url && token);
+  console.log('[tr-realizadas] redis-client isRedisConfigured:', ok, 'envKeys:', Object.keys(process.env).filter(k => /REDIS|UPSTASH|KV/.test(k)));
+  return ok;
 }
