@@ -5,7 +5,7 @@
 
 const PROXY_URL = process.env.PROXY_URL || '';
 const PROXY_SECRET = process.env.PROXY_SECRET || '';
-const REQUEST_TIMEOUT = 30000; // 30 segundos
+const REQUEST_TIMEOUT = 300000; // 5 min (vendedores e outros relatórios pesados)
 const MAX_RETRIES = 2;
 const RETRY_DELAY = 1000; // 1 segundo
 

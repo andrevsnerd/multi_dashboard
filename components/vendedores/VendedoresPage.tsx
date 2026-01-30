@@ -8,8 +8,7 @@ import DateRangeFilter, {
 import FilialFilter from "@/components/filters/FilialFilter";
 import VendedoresTable from "@/components/vendedores/VendedoresTable";
 import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
-import type { VendedorItem } from "@/lib/repositories/vendedores";
-import { getCurrentMonthRange } from "@/lib/utils/date";
+import type { VendedorItem } from "@/lib/repositories/vendedores-v2";
 import type { CompanyKey } from "@/lib/config/company";
 
 import styles from "./VendedoresPage.module.css";
@@ -113,11 +112,10 @@ export default function VendedoresPage({
   companyName,
 }: VendedoresPageProps) {
   const initialRange = useMemo(() => {
-    const range = getCurrentMonthRange();
-    return {
-      startDate: range.start,
-      endDate: range.end,
-    };
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 14);
+    return { startDate: start, endDate: end };
   }, []);
 
   const [range, setRange] = useState<DateRangeValue>(initialRange);
@@ -144,6 +142,11 @@ export default function VendedoresPage({
   const [availableColecoes, setAvailableColecoes] = useState<string[]>([]);
   const [availableSubgrupos, setAvailableSubgrupos] = useState<string[]>([]);
   const [availableGrades, setAvailableGrades] = useState<string[]>([]);
+  const [loadingLinhas, setLoadingLinhas] = useState(false);
+  const [loadingColecoes, setLoadingColecoes] = useState(false);
+  const [loadingSubgrupos, setLoadingSubgrupos] = useState(false);
+  const [loadingGrades, setLoadingGrades] = useState(false);
+  const loadedFiltersRef = useRef<Set<string>>(new Set());
 
   const rangeKey = useMemo(
     () =>
@@ -270,59 +273,59 @@ export default function VendedoresPage({
     };
   }, [companyKey, range.startDate, range.endDate, selectedFilial]);
 
-  // Buscar filtros para ScarfMe (linha, coleção, subgrupo, grade)
+  // Limpar cache dos filtros ScarfMe quando período ou filial mudar (para refetch ao abrir)
   useEffect(() => {
-    if (companyKey !== "scarfme") {
-      setAvailableLinhas([]);
-      setAvailableColecoes([]);
-      setAvailableSubgrupos([]);
-      setAvailableGrades([]);
-      return;
-    }
-
-    let active = true;
-
-    async function loadFilter(endpoint: string, setter: (values: string[]) => void) {
-      try {
-        const searchParams = new URLSearchParams({
-          company: companyKey,
-          start: range.startDate.toISOString(),
-          end: range.endDate.toISOString(),
-        });
-
-        if (selectedFilial) {
-          searchParams.set("filial", selectedFilial);
-        }
-
-        const response = await fetch(`/api/products/${endpoint}?${searchParams.toString()}`, {
-          cache: "no-store",
-        });
-
-        if (!response.ok) {
-          return;
-        }
-
-        const json = (await response.json()) as {
-          data: string[];
-        };
-
-        if (active) {
-          setter(json.data || []);
-        }
-      } catch {
-        // silencioso
-      }
-    }
-
-    void loadFilter("linhas", setAvailableLinhas);
-    void loadFilter("colecoes", setAvailableColecoes);
-    void loadFilter("subgrupos", setAvailableSubgrupos);
-    void loadFilter("grades", setAvailableGrades);
-
-    return () => {
-      active = false;
-    };
+    if (companyKey !== "scarfme") return;
+    loadedFiltersRef.current.clear();
+    setAvailableLinhas([]);
+    setAvailableColecoes([]);
+    setAvailableSubgrupos([]);
+    setAvailableGrades([]);
   }, [companyKey, range.startDate, range.endDate, selectedFilial]);
+
+  const loadFilterIfNeeded = useCallback(
+    (endpoint: "linhas" | "colecoes" | "subgrupos" | "grades") => {
+      if (companyKey !== "scarfme") return;
+      if (loadedFiltersRef.current.has(endpoint)) return;
+
+      loadedFiltersRef.current.add(endpoint);
+      const setLoading =
+        endpoint === "linhas"
+          ? setLoadingLinhas
+          : endpoint === "colecoes"
+            ? setLoadingColecoes
+            : endpoint === "subgrupos"
+              ? setLoadingSubgrupos
+              : setLoadingGrades;
+      const setter =
+        endpoint === "linhas"
+          ? setAvailableLinhas
+          : endpoint === "colecoes"
+            ? setAvailableColecoes
+            : endpoint === "subgrupos"
+              ? setAvailableSubgrupos
+              : setAvailableGrades;
+
+      setLoading(true);
+      const searchParams = new URLSearchParams({
+        company: companyKey,
+        start: range.startDate.toISOString(),
+        end: range.endDate.toISOString(),
+      });
+      if (selectedFilial) searchParams.set("filial", selectedFilial);
+
+      fetch(`/api/products/${endpoint}?${searchParams.toString()}`, { cache: "no-store" })
+        .then((res) => (res.ok ? res.json() : Promise.resolve({ data: [] })))
+        .then((json: { data: string[] }) => {
+          setter(json.data || []);
+        })
+        .catch(() => {
+          loadedFiltersRef.current.delete(endpoint);
+        })
+        .finally(() => setLoading(false));
+    },
+    [companyKey, range.startDate, range.endDate, selectedFilial]
+  );
 
   useEffect(() => {
     let active = true;
@@ -394,24 +397,32 @@ export default function VendedoresPage({
                 value={selectedLinhas}
                 options={availableLinhas}
                 onChange={setSelectedLinhas}
+                onOpen={() => loadFilterIfNeeded("linhas")}
+                loading={loadingLinhas}
               />
               <MultiSelectFilter
                 label="Coleção"
                 value={selectedColecoes}
                 options={availableColecoes}
                 onChange={setSelectedColecoes}
+                onOpen={() => loadFilterIfNeeded("colecoes")}
+                loading={loadingColecoes}
               />
               <MultiSelectFilter
                 label="Subgrupo"
                 value={selectedSubgrupos}
                 options={availableSubgrupos}
                 onChange={setSelectedSubgrupos}
+                onOpen={() => loadFilterIfNeeded("subgrupos")}
+                loading={loadingSubgrupos}
               />
               <MultiSelectFilter
                 label="Grade"
                 value={selectedGrades}
                 options={availableGrades}
                 onChange={setSelectedGrades}
+                onOpen={() => loadFilterIfNeeded("grades")}
+                loading={loadingGrades}
               />
             </>
           )}

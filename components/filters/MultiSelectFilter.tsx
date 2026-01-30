@@ -9,6 +9,9 @@ interface MultiSelectFilterProps {
   value: string[];
   options: string[];
   onChange: (value: string[]) => void;
+  /** Chamado quando o usuário abre o dropdown (para lazy load das opções) */
+  onOpen?: () => void;
+  loading?: boolean;
 }
 
 export default function MultiSelectFilter({
@@ -16,11 +19,20 @@ export default function MultiSelectFilter({
   value,
   options,
   onChange,
+  onOpen,
+  loading = false,
 }: MultiSelectFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const handleToggleOpen = () => {
+    if (!isOpen) {
+      onOpen?.();
+    }
+    setIsOpen((prev) => !prev);
+  };
 
   // Filtrar opções baseado no termo de pesquisa
   const filteredOptions = useMemo(() => {
@@ -128,7 +140,7 @@ export default function MultiSelectFilter({
       <button
         type="button"
         className={`${styles.button} ${isOpen ? styles.buttonActive : ""}`}
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={handleToggleOpen}
       >
         <span className={styles.buttonValue}>
           <span className={styles.valuePrimary}>{displayValue}</span>
@@ -192,7 +204,9 @@ export default function MultiSelectFilter({
               )}
             </div>
 
-            {filteredOptions.length === 0 ? (
+            {loading ? (
+              <div className={styles.noResults}>Carregando…</div>
+            ) : filteredOptions.length === 0 ? (
               <div className={styles.noResults}>Nenhum resultado encontrado</div>
             ) : (
               <>

@@ -44,7 +44,7 @@ const dbConfig = {
     min: 1,
     idleTimeoutMillis: 30000,
   },
-  requestTimeout: 120000, // 120s (sales-summary pode levar 65s+)
+  requestTimeout: 300000, // 5 min (vendedores/sales-summary podem levar 2min+)
   connectionTimeout: 30000,
 };
 

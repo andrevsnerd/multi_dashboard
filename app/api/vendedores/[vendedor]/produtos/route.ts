@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
+import { fetchVendedorProdutosList } from '@/lib/repositories/vendedores-v2';
 
-import { fetchVendedorProdutos } from '@/lib/repositories/vendedores';
-
-export const maxDuration = 60; // 60 segundos
+export const maxDuration = 60;
 
 export async function GET(
   request: Request,
@@ -13,13 +12,18 @@ export async function GET(
   const filial = searchParams.get('filial');
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
+  const range =
+    startParam && endParam
+      ? { start: startParam, end: endParam }
+      : undefined;
+
   const grupos = searchParams.getAll('grupo');
   const linhas = searchParams.getAll('linha');
   const colecoes = searchParams.getAll('colecao');
   const subgrupos = searchParams.getAll('subgrupo');
   const grades = searchParams.getAll('grade');
-  const produtoId = searchParams.get('produtoId');
-  const produtoSearchTerm = searchParams.get('produtoSearchTerm');
+  const produtoId = searchParams.get('produtoId') ?? undefined;
+  const produtoSearchTerm = searchParams.get('produtoSearchTerm') ?? undefined;
 
   const { vendedor: vendedorEncoded } = await params;
   const vendedor = decodeURIComponent(vendedorEncoded);
@@ -31,16 +35,8 @@ export async function GET(
     );
   }
 
-  const range =
-    startParam && endParam
-      ? {
-          start: startParam,
-          end: endParam,
-        }
-      : undefined;
-
   try {
-    const data = await fetchVendedorProdutos({
+    const data = await fetchVendedorProdutosList({
       company,
       vendedor,
       filial,
@@ -50,29 +46,21 @@ export async function GET(
       colecoes,
       subgrupos,
       grades,
-      produtoId: produtoId || undefined,
-      produtoSearchTerm: produtoSearchTerm || undefined,
+      produtoId,
+      produtoSearchTerm,
     });
-
     return NextResponse.json({ data });
   } catch (error) {
     console.error('Erro ao carregar produtos do vendedor', error);
-    
-    // Verificar se é um erro de timeout
     if (error instanceof Error && 'code' in error && error.code === 'ETIMEOUT') {
       return NextResponse.json(
-        { 
-          error: 'Timeout: A consulta demorou muito para ser executada. Tente novamente.',
-          code: 'ETIMEOUT'
-        },
-        { status: 504 } // Gateway Timeout
+        { error: 'Timeout: A consulta demorou muito.', code: 'ETIMEOUT' },
+        { status: 504 }
       );
     }
-    
     return NextResponse.json(
       { error: 'Erro ao carregar produtos do vendedor' },
       { status: 500 }
     );
   }
 }
-
