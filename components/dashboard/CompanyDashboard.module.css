@@ -84,8 +84,27 @@
 }
 
 .error {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
   font-size: 13px;
   color: #dc2626;
+}
+
+.retryButton {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #dc2626;
+  background: transparent;
+  border: 1px solid #dc2626;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.retryButton:hover {
+  background: rgba(220, 38, 38, 0.08);
 }
 
 .exportButton {

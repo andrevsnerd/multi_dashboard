@@ -33,7 +33,7 @@ const config: sql.config = {
     min: 1,
     idleTimeoutMillis: 30000,
   },
-  requestTimeout: 60000, // 60 segundos (aumentado para queries complexas)
+  requestTimeout: 120000, // 120 segundos (sales-summary pode levar 65s+)
   connectionTimeout: 30000, // 30 segundos para estabelecer conexão
 };
 

@@ -67,7 +67,23 @@ async function fetchSummary(
   });
 
   if (!response.ok) {
-    throw new Error("Erro ao carregar resumo de vendas");
+    let message = "Erro ao carregar resumo de vendas";
+    try {
+      const errJson = (await response.json()) as { error?: string; code?: string };
+      if (response.status === 504 || errJson.code === "ETIMEOUT") {
+        message =
+          errJson.error ||
+          "A consulta demorou muito. Os dados são pesados; tente novamente.";
+      } else if (errJson.error) {
+        message = errJson.error;
+      }
+    } catch {
+      if (response.status === 504) {
+        message =
+          "A consulta demorou muito. Os dados são pesados; tente novamente.";
+      }
+    }
+    throw new Error(message);
   }
 
   const json = (await response.json()) as {
@@ -121,6 +137,7 @@ export default function CompanyDashboard({
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
   const [projectionRevenue, setProjectionRevenue] = useState<number>(0);
 
@@ -282,7 +299,12 @@ export default function CompanyDashboard({
     return () => {
       active = false;
     };
-  }, [companyKey, range, rangeKey]);
+  }, [companyKey, range, rangeKey, retryKey]);
+
+  const handleRetry = () => {
+    setError(null);
+    setRetryKey((k) => k + 1);
+  };
 
   return (
     <>
@@ -306,7 +328,18 @@ export default function CompanyDashboard({
               value={selectedFilial}
               onChange={setSelectedFilial}
             />
-            {error ? <span className={styles.error}>{error}</span> : null}
+            {error ? (
+              <span className={styles.error}>
+                {error}
+                <button
+                  type="button"
+                  className={styles.retryButton}
+                  onClick={handleRetry}
+                >
+                  Tentar novamente
+                </button>
+              </span>
+            ) : null}
           </div>
           <EngineButton onMetasClick={() => setIsGoalsModalOpen(true)} />
         </div>
