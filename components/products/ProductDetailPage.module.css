@@ -14,6 +14,14 @@
   overflow: visible;
 }
 
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
 .title {
   font-size: 28px;
   font-weight: 700;
@@ -21,12 +29,11 @@
   margin: 0;
 }
 
-.controls {
+.controlsStatus {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 12px;
-  align-items: flex-end;
-  position: relative;
+  flex-wrap: wrap;
 }
 
 .searchContainer {
@@ -44,9 +51,21 @@
   align-items: center;
 }
 
+.searchIcon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  pointer-events: none;
+}
+
 .searchInput {
   width: 100%;
-  padding: 10px 40px 10px 16px;
+  padding: 10px 40px 10px 44px;
   font-size: 14px;
   border: 1px solid #d1d5db;
   border-radius: 8px;
@@ -84,8 +103,7 @@
   background-color: #e5e7eb;
 }
 
-/* Ajustar alinhamento do DateRangeFilter para ficar alinhado com o input */
-.controls :global([class*="DateRangeFilter"]) {
+.headerRow :global([class*="DateRangeFilter"]) {
   margin-bottom: 0;
   position: relative;
   z-index: 100;
@@ -160,9 +178,10 @@
 
 .productHeaderContainer {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 8px;
+  grid-template-columns: 1fr auto auto;
+  gap: 24px;
+  align-items: stretch;
+  margin-bottom: 24px;
 }
 
 .productHeader {
@@ -173,6 +192,7 @@
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
 }
 
+.markupCard,
 .projectionCard {
   background: #ffffff;
   border-radius: 20px;
@@ -182,30 +202,29 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-}
-
-.projectionContent {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.projectionItem {
-  display: flex;
-  flex-direction: column;
   gap: 8px;
+  min-width: 180px;
 }
 
-.projectionLabel {
-  font-size: 14px;
-  font-weight: 500;
+.markupCardLabel,
+.projectionCardLabel {
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: #64748b;
+  font-weight: 600;
 }
 
-.projectionValue {
+.markupCardValue {
   font-size: 24px;
   font-weight: 700;
   color: #0f172a;
+}
+
+.projectionCardValue {
+  font-size: 24px;
+  font-weight: 700;
+  color: #2563eb;
 }
 
 .productName {
@@ -284,40 +303,14 @@
     gap: 12px;
   }
 
-  .controls {
+  .headerRow {
     flex-direction: column;
-    gap: 12px;
     align-items: stretch;
   }
 
   .searchContainer {
     min-width: 100%;
     width: 100%;
-    order: 1;
-  }
-
-  /* DateRangeFilter no mobile deve vir depois do input */
-  .controls :global([class*="DateRangeFilter"]) {
-    order: 2;
-    width: 100%;
-    z-index: 50;
-  }
-
-  /* Garantir que o dropdown do filtro não interfira com o input de busca */
-  .controls :global([class*="DateRangeFilter"]) {
-    z-index: 50;
-  }
-  
-  /* Quando o input está focado, o dropdown do filtro deve ter z-index menor */
-  .searchContainer:has(.searchInput:focus) ~ :global([class*="DateRangeFilter"]) {
-    z-index: 1;
-  }
-  
-  /* Fallback para navegadores que não suportam :has() */
-  @supports not selector(:has(*)) {
-    .controls :global([class*="DateRangeFilter"]) {
-      z-index: 50;
-    }
   }
 
   .searchResults {
@@ -339,7 +332,16 @@
     gap: 12px;
   }
 
-  .productHeader,
+  .markupCard,
+  .projectionCard {
+    min-width: 100%;
+  }
+
+  .productHeader {
+    padding: 16px;
+  }
+
+  .markupCard,
   .projectionCard {
     padding: 16px;
   }
@@ -354,65 +356,10 @@
     gap: 8px;
   }
 
-  .projectionValue {
+  .markupCardValue,
+  .projectionCardValue {
     font-size: 20px;
   }
-
-  .mobileVendasTotalCard {
-    display: block;
-    background: #ffffff;
-    border-radius: 20px;
-    border: 1px solid rgba(15, 23, 42, 0.08);
-    padding: 20px;
-    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
-    order: 2;
-  }
-
-  .mobileVendasTotalContent {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .mobileVendasTotalLabel {
-    font-size: 12px;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: #94a3b8;
-  }
-
-  .mobileVendasTotalValue {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .mobileVendasTotalAmount {
-    font-size: 28px;
-    font-weight: 700;
-    color: #0f172a;
-    line-height: 1.2;
-  }
-
-  .mobileVendasTotalVariance {
-    font-size: 16px;
-    font-weight: 600;
-    padding: 4px 8px;
-    border-radius: 6px;
-    white-space: nowrap;
-  }
-
-  .mobileVendasTotalDescription {
-    margin: 0;
-    font-size: 14px;
-    color: #64748b;
-  }
 }
 
-@media (min-width: 769px) {
-  .mobileVendasTotalCard {
-    display: none;
-  }
-}
 

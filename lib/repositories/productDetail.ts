@@ -161,6 +161,10 @@ export interface ProductDetailInfo {
   totalMarkup: number;
   averagePrice: number;
   averageCost: number;
+  /** Custo cadastrado (PRODUTOS.CUSTO_REPOSICAO1) */
+  registeredCost: number;
+  /** Preço de venda cadastrado (PRODUTOS.PRECO_REPOSICAO_1) */
+  registeredPrice: number;
   topFilial: string | null;
   topFilialDisplayName: string | null;
   topFilialRevenue: number;
@@ -399,6 +403,8 @@ export async function fetchProductDetail({
       topFilialDisplayName,
       topFilialRevenue,
       revenueVariance,
+      registeredCost: salesResult.registeredCost,
+      registeredPrice: salesResult.registeredPrice,
     };
   }
 
@@ -414,11 +420,13 @@ export async function fetchProductDetail({
 
     const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
 
-    // Buscar dados básicos do produto e última entrada
+    // Buscar dados básicos do produto, última entrada e preço/custo cadastrados
     const productQuery = `
       SELECT TOP 1
         p.PRODUTO AS productId,
         p.DESC_PRODUTO AS productName,
+        ISNULL(p.CUSTO_REPOSICAO1, 0) AS registeredCost,
+        ISNULL(p.PRECO_REPOSICAO_1, 0) AS registeredPrice,
         (
           SELECT TOP 1
             E.EMISSAO
@@ -444,6 +452,8 @@ export async function fetchProductDetail({
     const productResult = await request.query<{
       productId: string;
       productName: string | null;
+      registeredCost: number;
+      registeredPrice: number;
       lastEntryDate: Date | null;
       lastEntryFilial: string | null;
     }>(productQuery);
@@ -451,6 +461,8 @@ export async function fetchProductDetail({
     const productRow = productResult.recordset[0] ?? {
       productId,
       productName: null,
+      registeredCost: 0,
+      registeredPrice: 0,
       lastEntryDate: null,
       lastEntryFilial: null,
     };
@@ -707,10 +719,17 @@ export async function fetchProductDetail({
         ? (totalRevenue > 0 ? null : 0)
         : Number((((totalRevenue - previousRevenue) / previousRevenue) * 100).toFixed(1));
 
-    // Calcular markup total
+    // Calcular markup: preferir cadastrado (registeredPrice/registeredCost) quando ambos > 0
+    const registeredCost = Number(productRow.registeredCost ?? 0);
+    const registeredPrice = Number(productRow.registeredPrice ?? 0);
     const averageCost = totalQuantity > 0 ? totalCostWeighted / totalQuantity : 0;
     const averagePrice = totalQuantity > 0 ? totalRevenue / totalQuantity : 0;
-    const totalMarkup = averageCost > 0 ? averagePrice / averageCost : 0;
+    const totalMarkup =
+      registeredCost > 0 && registeredPrice > 0
+        ? registeredPrice / registeredCost
+        : averageCost > 0
+          ? averagePrice / averageCost
+          : 0;
 
     // Converter lastEntryDate para Date se existir
     let lastEntryDate: Date | null = null;
@@ -736,6 +755,8 @@ export async function fetchProductDetail({
       totalMarkup,
       averagePrice,
       averageCost,
+      registeredCost,
+      registeredPrice,
       topFilial,
       topFilialDisplayName,
       topFilialRevenue,
