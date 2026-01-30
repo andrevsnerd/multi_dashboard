@@ -7,8 +7,8 @@ import {
 } from "@/lib/auth/users-store";
 import type { RoleKey, PermissionKey } from "@/types/auth";
 
-function isAdmin(username: string): boolean {
-  const user = findUserByUsername(username);
+async function isAdmin(username: string): Promise<boolean> {
+  const user = await findUserByUsername(username);
   return user?.role === "admin";
 }
 
@@ -18,11 +18,11 @@ export async function GET(
 ) {
   try {
     const username = _request.headers.get("x-auth-username");
-    if (!username || !isAdmin(username)) {
+    if (!username || !(await isAdmin(username))) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
     const { id } = await params;
-    const user = findUserById(id);
+    const user = await findUserById(id);
     if (!user) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
     }
@@ -47,7 +47,7 @@ export async function PATCH(
 ) {
   try {
     const username = request.headers.get("x-auth-username");
-    if (!username || !isAdmin(username)) {
+    if (!username || !(await isAdmin(username))) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
     const { id } = await params;
@@ -63,7 +63,7 @@ export async function PATCH(
     if (password !== undefined) updates.password = String(password);
     if (role !== undefined) updates.role = role as RoleKey;
     if (permissions !== undefined) updates.permissions = permissions as PermissionKey[];
-    const user = updateUser(id, updates);
+    const user = await updateUser(id, updates);
     return NextResponse.json({
       id: user.id,
       username: user.username,
@@ -87,18 +87,18 @@ export async function DELETE(
 ) {
   try {
     const username = request.headers.get("x-auth-username");
-    if (!username || !isAdmin(username)) {
+    if (!username || !(await isAdmin(username))) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
     const { id } = await params;
-    const currentUser = findUserById(id);
+    const currentUser = await findUserById(id);
     if (currentUser?.username === username) {
       return NextResponse.json(
         { error: "Não é possível remover seu próprio usuário" },
         { status: 400 }
       );
     }
-    deleteUser(id);
+    await deleteUser(id);
     return NextResponse.json({ ok: true });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro ao remover usuário";

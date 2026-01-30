@@ -29,8 +29,15 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
+## Autenticação e banco de usuários
+
+- **Local (sem banco):** usuários ficam em `data/users.json`; o seed cria `andre.sabetta` / `asabetta` (admin) e `logistica` / `logistica123` (logística) no primeiro login.
+- **Produção (Vercel):** use Postgres (Neon) para persistir usuários. Veja **[docs/VERCEL_NEON_SETUP.md](docs/VERCEL_NEON_SETUP.md)** para criar o banco no Vercel e configurar `DATABASE_URL` ou `POSTGRES_URL`.
+
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Depois do deploy, crie o banco de usuários em **Storage → Create Database → Postgres (Neon)** e faça um redeploy. Ver [docs/VERCEL_NEON_SETUP.md](docs/VERCEL_NEON_SETUP.md).
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

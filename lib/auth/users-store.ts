@@ -1,17 +1,13 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import fs from "fs";
 import path from "path";
+import { hasPostgres } from "@/lib/db/neon";
+import * as neonStore from "./users-store-neon";
 import type { PermissionKey, RoleKey, UserRecord } from "@/types/auth";
 
 const USERS_FILE = path.join(process.cwd(), "data", "users.json");
 
-function ensureDataDir() {
-  const dir = path.dirname(USERS_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-}
-
+// ---------- Helpers (hash/verify) - usados em ambos os stores ----------
 function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
   const derived = scryptSync(password, salt, 64);
@@ -29,53 +25,68 @@ export function verifyPassword(storedHash: string, password: string): boolean {
   }
 }
 
-function readUsers(): UserRecord[] {
-  ensureDataDir();
-  if (!fs.existsSync(USERS_FILE)) {
-    return [];
+// ---------- Store em arquivo (local, sem DATABASE_URL) ----------
+function ensureDataDir() {
+  const dir = path.dirname(USERS_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
-  const raw = fs.readFileSync(USERS_FILE, "utf-8");
+}
+
+function readUsersFile(): UserRecord[] {
+  ensureDataDir();
+  if (!fs.existsSync(USERS_FILE)) return [];
   try {
-    return JSON.parse(raw);
+    return JSON.parse(fs.readFileSync(USERS_FILE, "utf-8"));
   } catch {
     return [];
   }
 }
 
-function writeUsers(users: UserRecord[]) {
+function writeUsersFile(users: UserRecord[]) {
   ensureDataDir();
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf-8");
 }
 
-export function findUserByUsername(username: string): UserRecord | null {
-  const users = readUsers();
+// ---------- API unificada: usa Neon se POSTGRES_URL/DATABASE_URL existir, senão arquivo ----------
+export async function findUserByUsername(username: string): Promise<UserRecord | null> {
+  if (hasPostgres()) return neonStore.findUserByUsername(username);
+  const users = readUsersFile();
   const normalized = username.trim().toLowerCase();
   return users.find((u) => u.username.toLowerCase() === normalized) ?? null;
 }
 
-export function findUserById(id: string): UserRecord | null {
-  const users = readUsers();
+export async function findUserById(id: string): Promise<UserRecord | null> {
+  if (hasPostgres()) return neonStore.findUserById(id);
+  const users = readUsersFile();
   return users.find((u) => u.id === id) ?? null;
 }
 
-export function authenticate(username: string, password: string): UserRecord | null {
-  const user = findUserByUsername(username);
+export async function authenticate(
+  username: string,
+  password: string
+): Promise<UserRecord | null> {
+  const user = await findUserByUsername(username);
   if (!user || !verifyPassword(user.passwordHash, password)) return null;
   return user;
 }
 
-export function createUser(
+export async function createUser(
   username: string,
   password: string,
   role: RoleKey,
   permissions: PermissionKey[]
-): UserRecord {
-  const users = readUsers();
+): Promise<UserRecord> {
+  if (hasPostgres()) return neonStore.createUser(username, password, role, permissions);
+  const users = readUsersFile();
   const normalized = username.trim().toLowerCase();
   if (users.some((u) => u.username.toLowerCase() === normalized)) {
     throw new Error("Usuário já existe");
   }
-  const id = createHash("sha256").update(`${normalized}-${Date.now()}`).digest("hex").slice(0, 12);
+  const id = createHash("sha256")
+    .update(`${normalized}-${Date.now()}`)
+    .digest("hex")
+    .slice(0, 12);
   const record: UserRecord = {
     id,
     username: normalized,
@@ -84,15 +95,21 @@ export function createUser(
     permissions: role === "admin" ? [] : permissions,
   };
   users.push(record);
-  writeUsers(users);
+  writeUsersFile(users);
   return record;
 }
 
-export function updateUser(
+export async function updateUser(
   id: string,
-  updates: { username?: string; password?: string; role?: RoleKey; permissions?: PermissionKey[] }
-): UserRecord {
-  const users = readUsers();
+  updates: {
+    username?: string;
+    password?: string;
+    role?: RoleKey;
+    permissions?: PermissionKey[];
+  }
+): Promise<UserRecord> {
+  if (hasPostgres()) return neonStore.updateUser(id, updates);
+  const users = readUsersFile();
   const index = users.findIndex((u) => u.id === id);
   if (index === -1) throw new Error("Usuário não encontrado");
   const current = users[index];
@@ -108,28 +125,32 @@ export function updateUser(
   }
   if (updates.role !== undefined) {
     current.role = updates.role;
-    current.permissions = updates.role === "admin" ? [] : (updates.permissions ?? current.permissions);
+    current.permissions =
+      updates.role === "admin" ? [] : (updates.permissions ?? current.permissions);
   }
   if (updates.permissions !== undefined && current.role !== "admin") {
     current.permissions = updates.permissions;
   }
-  writeUsers(users);
+  writeUsersFile(users);
   return { ...current };
 }
 
-export function deleteUser(id: string): void {
-  const users = readUsers();
+export async function deleteUser(id: string): Promise<void> {
+  if (hasPostgres()) return neonStore.deleteUser(id);
+  const users = readUsersFile();
   const filtered = users.filter((u) => u.id !== id);
   if (filtered.length === users.length) throw new Error("Usuário não encontrado");
-  writeUsers(filtered);
+  writeUsersFile(filtered);
 }
 
-export function listUsers(): UserRecord[] {
-  return readUsers();
+export async function listUsers(): Promise<UserRecord[]> {
+  if (hasPostgres()) return neonStore.listUsers();
+  return readUsersFile();
 }
 
-export function seedInitialUsersIfEmpty(): void {
-  const users = readUsers();
+export async function seedInitialUsersIfEmpty(): Promise<void> {
+  if (hasPostgres()) return neonStore.seedInitialUsersIfEmpty();
+  const users = readUsersFile();
   if (users.length > 0) return;
   const admin: UserRecord = {
     id: "admin-initial",
@@ -145,5 +166,5 @@ export function seedInitialUsersIfEmpty(): void {
     role: "logistica",
     permissions: ["controle-transferencias"],
   };
-  writeUsers([admin, logistica]);
+  writeUsersFile([admin, logistica]);
 }

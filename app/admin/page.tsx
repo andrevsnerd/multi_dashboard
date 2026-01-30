@@ -32,7 +32,7 @@ export default function AdminPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
-  const authHeader = () =>
+  const authHeader = (): Record<string, string> =>
     currentUser ? { "X-Auth-Username": currentUser.username } : {};
 
   async function loadUsers() {

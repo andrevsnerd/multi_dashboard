@@ -4,7 +4,7 @@ import type { UserSession } from "@/types/auth";
 
 export async function POST(request: NextRequest) {
   try {
-    seedInitialUsersIfEmpty();
+    await seedInitialUsersIfEmpty();
     const body = await request.json();
     const { username, password } = body;
     if (!username || !password) {
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const user = authenticate(String(username).trim(), String(password));
+    const user = await authenticate(String(username).trim(), String(password));
     if (!user) {
       return NextResponse.json(
         { error: "Usuário ou senha inválidos" },

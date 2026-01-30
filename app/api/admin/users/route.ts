@@ -7,19 +7,20 @@ import {
 } from "@/lib/auth/users-store";
 import type { RoleKey, PermissionKey } from "@/types/auth";
 
-function isAdmin(username: string): boolean {
-  const user = findUserByUsername(username);
+async function isAdmin(username: string): Promise<boolean> {
+  const user = await findUserByUsername(username);
   return user?.role === "admin";
 }
 
 export async function GET(request: NextRequest) {
   try {
     const username = request.headers.get("x-auth-username");
-    if (!username || !isAdmin(username)) {
+    if (!username || !(await isAdmin(username))) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
-    seedInitialUsersIfEmpty();
-    const users = listUsers().map((u) => ({
+    await seedInitialUsersIfEmpty();
+    const allUsers = await listUsers();
+    const users = allUsers.map((u) => ({
       id: u.id,
       username: u.username,
       role: u.role,
@@ -38,10 +39,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const username = request.headers.get("x-auth-username");
-    if (!username || !isAdmin(username)) {
+    if (!username || !(await isAdmin(username))) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
-    seedInitialUsersIfEmpty();
+    await seedInitialUsersIfEmpty();
     const body = await request.json();
     const { username: newUsername, password, role, permissions } = body;
     if (!newUsername || !password || !role) {
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const user = createUser(
+    const user = await createUser(
       String(newUsername).trim(),
       String(password),
       role as RoleKey,
