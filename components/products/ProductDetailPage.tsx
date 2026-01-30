@@ -299,6 +299,7 @@ export default function ProductDetailPage({
         companyName={companyName}
         range={range}
         saleHistory={data.saleHistory}
+        stockByFilial={data.stockByFilial}
       />
 
       <ProductPerformanceTable

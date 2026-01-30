@@ -103,6 +103,11 @@
   font-weight: 600;
 }
 
+.stockLow {
+  color: #dc2626;
+  font-weight: 600;
+}
+
 /* Chart row */
 .chartRow {
   display: grid;

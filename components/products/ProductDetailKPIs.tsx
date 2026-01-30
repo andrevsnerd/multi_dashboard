@@ -12,7 +12,11 @@ import {
 } from "recharts";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import type { ProductDetailInfo, ProductSaleHistory, ProductStockByFilial } from "@/lib/repositories/productDetail";
+import type {
+  ProductDetailInfo,
+  ProductSaleHistory,
+  ProductStockByFilial,
+} from "@/lib/repositories/productDetail";
 
 import styles from "./ProductDetailKPIs.module.css";
 
@@ -45,6 +49,7 @@ export default function ProductDetailKPIs({
   detail,
   range,
   saleHistory,
+  stockByFilial,
 }: ProductDetailKPIsProps) {
   const start = new Date(range.startDate);
   const end = new Date(range.endDate);
@@ -106,6 +111,10 @@ export default function ProductDetailKPIs({
   const topFilialSalesCount = saleHistory
     .filter((s) => (s.filialDisplayName || s.filial) === (detail.topFilialDisplayName || detail.topFilial))
     .length;
+
+  const topFilialStock = detail.topFilial
+    ? stockByFilial.find((f) => f.filial === detail.topFilial || f.filialDisplayName === detail.topFilialDisplayName)?.stock ?? 0
+    : 0;
 
   const topColorPct = detail.totalQuantity > 0 && detail.topColorQuantity > 0
     ? Math.round((detail.topColorQuantity / detail.totalQuantity) * 100)
@@ -201,6 +210,12 @@ export default function ProductDetailKPIs({
               <>
                 <span className={styles.topFilialRevenue}>{formatCurrency(detail.topFilialRevenue)}</span>
                 <span> {topFilialSalesCount} vendas</span>
+                <span>
+                  {" · "}
+                  <span className={topFilialStock <= 0 ? styles.stockLow : ""}>
+                    {formatInteger(topFilialStock)} estoque
+                  </span>
+                </span>
               </>
             ) : (
               "Nenhuma venda registrada"

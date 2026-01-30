@@ -91,11 +91,6 @@ export default function Sidebar({ companyName }: SidebarProps) {
     ? `${basePath}/clientes`
     : "/clientes";
 
-  // Construir o link para produtos recentes baseado no caminho base
-  const produtosRecentHref = basePath && basePath !== "/" 
-    ? `${basePath}/produtos-recentes`
-    : "/produtos-recentes";
-
   // Construir o link para exportar relatórios baseado no caminho base
   const exportarRelatoriosHref = basePath && basePath !== "/" 
     ? `${basePath}/exportar-relatorios`
@@ -147,7 +142,6 @@ export default function Sidebar({ companyName }: SidebarProps) {
       subItems: [
         { label: "Produtos por Venda", href: produtosHref },
         { label: "Produto Detalhado", href: produtoDetalhadoHref },
-        { label: "Produtos por Cadastro", href: produtosRecentHref },
       ],
     },
     { label: "Vendedores", href: vendedoresHref, permission: "vendedores" },
@@ -254,8 +248,6 @@ export default function Sidebar({ companyName }: SidebarProps) {
                   return pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado");
                 } else if (subItem.label === "Produto Detalhado") {
                   return pathname?.includes("/produto-detalhado");
-                } else if (subItem.label === "Produtos por Cadastro") {
-                  return pathname?.includes("/produtos-recentes");
                 }
                 return false;
               }) || false;
@@ -336,8 +328,6 @@ export default function Sidebar({ companyName }: SidebarProps) {
                             isSubItemActive = pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado");
                           } else if (subItem.label === "Produto Detalhado") {
                             isSubItemActive = pathname?.includes("/produto-detalhado") || pathname === subItem.href;
-                          } else if (subItem.label === "Produtos por Cadastro") {
-                            isSubItemActive = pathname?.includes("/produtos-recentes") || pathname === subItem.href;
                           }
                           
                           return (
