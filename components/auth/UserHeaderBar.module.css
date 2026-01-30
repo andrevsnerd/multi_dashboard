@@ -1,0 +1,39 @@
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  width: 100%;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.content {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 12px clamp(24px, 5vw, 48px);
+  max-width: 100%;
+}
+
+.userName {
+  font-size: 14px;
+  font-weight: 500;
+  color: #475569;
+}
+
+.logoutBtn {
+  font-size: 14px;
+  color: #64748b;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+.logoutBtn:hover {
+  color: #0f172a;
+  background: #f1f5f9;
+}

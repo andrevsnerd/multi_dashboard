@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "./SidebarContext";
+import { useAuth } from "@/components/auth/AuthContext";
+import type { PermissionKey } from "@/types/auth";
 
 import styles from "./Sidebar.module.css";
 
@@ -11,8 +13,16 @@ interface SidebarProps {
   companyName: string;
 }
 
+type NavItemBase = {
+  label: string;
+  permission?: PermissionKey | "admin" | "home";
+  href?: string;
+  subItems?: { label: string; href: string }[];
+};
+
 export default function Sidebar({ companyName }: SidebarProps) {
   const pathname = usePathname();
+  const { user } = useAuth();
   const { isOpen, toggle, close } = useSidebar();
   const [isMobile, setIsMobile] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -127,27 +137,40 @@ export default function Sidebar({ companyName }: SidebarProps) {
     }
   }, [pathname]);
 
-  const navItems = [
-    { label: "Home", href: "/" },
-    { label: "Dashboard", href: basePath },
-    { 
-      label: "Produtos", 
+  const allNavItems: NavItemBase[] = [
+    { label: "Home", href: "/", permission: "home" },
+    { label: "Dashboard", href: basePath, permission: "dashboard" },
+    {
+      label: "Produtos",
       href: undefined,
+      permission: "produtos",
       subItems: [
         { label: "Produtos por Venda", href: produtosHref },
         { label: "Produto Detalhado", href: produtoDetalhadoHref },
         { label: "Produtos por Cadastro", href: produtosRecentHref },
-      ]
+      ],
     },
-    { label: "Vendedores", href: vendedoresHref },
-    { label: "Clientes", href: clientesHref },
-    { label: "Controle de Estoque", href: controleEstoqueHref },
-    { label: "Controle de Giro", href: controleGiroHref },
-    { label: "Controle de Transferências", href: controleTransferenciasHref },
-    { label: "Exportar Relatórios", href: exportarRelatoriosHref },
-    // TODO: Descomentar quando estoque por filial estiver pronto
-    // { label: "Estoque por Filial", href: stockByFilialHref },
+    { label: "Vendedores", href: vendedoresHref, permission: "vendedores" },
+    { label: "Clientes", href: clientesHref, permission: "clientes" },
+    { label: "Controle de Estoque", href: controleEstoqueHref, permission: "controle-estoque" },
+    { label: "Controle de Giro", href: controleGiroHref, permission: "controle-giro" },
+    { label: "Controle de Transferências", href: controleTransferenciasHref, permission: "controle-transferencias" },
+    { label: "Exportar Relatórios", href: exportarRelatoriosHref, permission: "exportar-relatorios" },
   ];
+
+  const navItems =
+    !user
+      ? allNavItems
+      : user.role === "admin"
+        ? [
+            ...allNavItems,
+            { label: "Admin", href: "/admin", permission: "admin" as const },
+          ]
+        : allNavItems.filter((item) => {
+            if (item.permission === "home") return true;
+            if (item.permission === "admin") return false;
+            return item.permission ? user.permissions.includes(item.permission) : false;
+          });
 
   const handleLinkClick = () => {
     // Fechar sidebar no mobile ao clicar em um link

@@ -1,4 +1,5 @@
 .container {
+  position: relative;
   min-height: 100vh;
   padding: 48px clamp(24px, 6vw, 80px);
   background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);

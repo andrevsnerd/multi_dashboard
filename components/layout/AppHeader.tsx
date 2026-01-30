@@ -20,7 +20,6 @@ export default function AppHeader({ companyName }: AppHeaderProps) {
       </div>
 
       <nav className={styles.nav}>
-        <span className={styles.navPlaceholder}>Menus em desenvolvimento</span>
         {pathname !== "/" ? (
           <Link href="/" className={styles.backLink}>
             Voltar à seleção

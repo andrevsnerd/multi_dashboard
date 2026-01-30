@@ -1,8 +1,16 @@
-import Link from "next/link";
+"use client";
 
+import Link from "next/link";
+import { useAuth } from "@/components/auth/AuthContext";
+import { getFirstAllowedPath } from "@/lib/auth/permissions";
 import styles from "./page.module.css";
 
 export default function Home() {
+  const { user } = useAuth();
+
+  const nerdHref = user ? getFirstAllowedPath(user, "nerd") : "/nerd";
+  const scarfmeHref = user ? getFirstAllowedPath(user, "scarfme") : "/scarfme";
+
   return (
     <main className={styles.container}>
       <header className={styles.header}>
@@ -15,13 +23,13 @@ export default function Home() {
       </header>
 
       <div className={styles.actions}>
-        <Link href="/nerd" className={styles.companyCard}>
+        <Link href={nerdHref} className={styles.companyCard}>
           <span className={styles.companyLabel}>NERD</span>
           <strong className={styles.companyTitle}>Dashboard NERD</strong>
           <span className={styles.companyHint}>Filiais, KPIs e análises personalizadas</span>
         </Link>
 
-        <Link href="/scarfme" className={styles.companyCard}>
+        <Link href={scarfmeHref} className={styles.companyCard}>
           <span className={styles.companyLabel}>SCARF ME</span>
           <strong className={styles.companyTitle}>Dashboard Scarf Me</strong>
           <span className={styles.companyHint}>Indicadores estratégicos por operação</span>
