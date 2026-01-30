@@ -759,8 +759,9 @@ export default function ControleTransferenciasTable({
         const visible = visibleItemKeys;
         const filtered = stored.filter((k) => visible.has(k));
         setMarkedKeys(new Set(filtered));
-        // Limpar do banco as chaves que não estão mais visíveis
-        if (stored.length > filtered.length) {
+        // Só faz prune (POST) quando a lista já carregou (visible não vazio) e há chaves para remover.
+        // Se visible estiver vazio (refresh/carregando), NÃO postar [] senão apaga tudo no Redis.
+        if (stored.length > filtered.length && visible.size > 0) {
           await fetch("/api/transferencias-realizadas", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
