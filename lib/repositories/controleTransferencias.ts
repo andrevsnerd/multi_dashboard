@@ -319,7 +319,7 @@ export async function fetchControleTransferencias({
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
-      WHERE vp.DATA_VENDA >= @startDate
+      WHERE vp.DATA_VENDA >= @thirtyDaysAgo
         AND vp.DATA_VENDA < @endDate
         AND vp.QTDE > 0
         ${vendasFilialFilter}
@@ -665,15 +665,16 @@ export async function fetchControleTransferencias({
         ...ultimaEntradaPorFilial.keys(),
       ]);
 
+      // Reconhecimento de vendas sempre em últimos 30 dias (evita queda de transferências ao virar o mês)
       const filiais: FilialData[] = Array.from(todasFiliais).map(filial => ({
         filial,
         stock: estoquePorFilial.get(filial) || 0,
-        sales: vendasPorFilial.get(filial) || 0,
+        sales: vendasLast30DaysPorFilial.get(filial) || 0,
         salesLast30Days: vendasLast30DaysPorFilial.get(filial) || 0,
         ultimaEntrada: ultimaEntradaPorFilial.get(filial) || null,
       }));
 
-      const totalVendas = Array.from(vendasPorFilial.values()).reduce((sum, v) => sum + v, 0);
+      const totalVendas = Array.from(vendasLast30DaysPorFilial.values()).reduce((sum, v) => sum + v, 0);
       const totalEstoque = Array.from(estoquePorFilial.values()).reduce((sum, v) => sum + v, 0);
 
       // Formatar descrição do produto

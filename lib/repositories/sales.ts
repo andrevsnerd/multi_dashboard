@@ -677,13 +677,6 @@ export async function fetchSalesSummary({
     let scarfmeJoin = '';
     
     if (company === 'scarfme') {
-      // Garantir que temos o JOIN com PRODUTOS se não tiver sido adicionado pelo grupo, acimaDoTicket ou filterByRegistrationDate
-      if (!grupoJoin && !acimaDoTicket && !filterByRegistrationDate) {
-        scarfmeJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
-      } else if ((acimaDoTicket || filterByRegistrationDate) && !grupoJoin) {
-        grupoJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
-      }
-      
       const linhasList = linhas && linhas.length > 0 ? linhas : linha ? [linha] : [];
       if (linhasList.length > 0) {
         const linhasNormalizadas = linhasList.map(l => l.trim().toUpperCase());
@@ -761,6 +754,14 @@ export async function fetchSalesSummary({
           gradeFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) IN (${placeholders})`;
         }
       }
+      // JOIN com PRODUTOS só quando há filtro de linha/coleção/subgrupo/grade (dashboard sem filtros = mais rápido)
+      const scarfmeNeedsProduto = linhasList.length > 0 || colecoesList.length > 0 || subgruposList.length > 0 || gradesList.length > 0;
+      if (scarfmeNeedsProduto && !grupoJoin) {
+        scarfmeJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
+      }
+      if ((acimaDoTicket || filterByRegistrationDate) && !grupoJoin && !scarfmeJoin) {
+        grupoJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
+      }
     }
 
     // Filtro de produto
@@ -773,6 +774,10 @@ export async function fetchSalesSummary({
       request.input('produtoSearchTerm', sql.VarChar, searchPattern);
       produtoFilter = `AND vp.DESC_PRODUTO LIKE @produtoSearchTerm`;
     }
+
+    const needProdutoJoin = !!(grupoJoin || scarfmeJoin);
+    const hasProdutoFilter = !!(produtoId || (produtoSearchTerm && produtoSearchTerm.trim().length >= 2));
+    const useLightQuery = !needProdutoJoin && !acimaDoTicket && !filterByRegistrationDate && !hasProdutoFilter;
 
     // Se acimaDoTicket estiver ativo, filtrar apenas vendas onde PRECO_LIQUIDO > preço sugerido
     let acimaDoTicketFilter = '';
@@ -801,9 +806,128 @@ export async function fetchSalesSummary({
         AND p.DATA_CADASTRAMENTO IS NOT NULL`;
     }
 
-    // Query com cálculo de valores líquidos considerando trocas (mesma lógica do Python)
-    // Usar LOJA_VENDA_PRODUTO diretamente e calcular DESCONTO_VENDA como (QTDE * PRECO_LIQUIDO * FATOR_DESCONTO_VENDA)
-    const query = `
+    // Query com cálculo de valores líquidos considerando trocas.
+    // useLightQuery = true (dashboard sem filtros): sem JOIN PRODUTOS = muito mais rápido.
+    const lightQuery = `
+      WITH vendas_base AS (
+        SELECT 
+          vp.TICKET,
+          vp.CODIGO_FILIAL,
+          vp.DATA_VENDA,
+          vp.PRODUTO,
+          vp.COR_PRODUTO,
+          vp.TAMANHO,
+          vp.QTDE,
+          vp.PRECO_LIQUIDO,
+          CAST((vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) AS DECIMAL(38,6)) AS DESCONTO_VENDA
+        FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+          ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
+        LEFT JOIN FILIAIS f WITH (NOLOCK)
+          ON f.COD_FILIAL = vp.CODIGO_FILIAL
+        WHERE (
+            (vp.DATA_VENDA >= @startDate AND vp.DATA_VENDA < @endDate)
+            OR (vp.DATA_VENDA >= @prevStartDate AND vp.DATA_VENDA < @prevEndDate)
+          )
+          AND vp.QTDE > 0
+          AND (ISNULL(vp.QTDE_CANCELADA, 0) = 0)
+          ${filialFilter}
+      ),
+      trocas_item AS (
+        SELECT 
+          TICKET,
+          CODIGO_FILIAL,
+          PRODUTO,
+          COR_PRODUTO,
+          TAMANHO,
+          SUM(QTDE) AS QTDE_TROCA,
+          CAST(SUM(PRECO_LIQUIDO * QTDE) AS DECIMAL(38,6)) AS VALOR_TROCA
+        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
+        WHERE QTDE_CANCELADA = 0
+        GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
+      ),
+      TrocasPuras AS (
+        SELECT 
+          v.DATA_VENDA,
+          vt.TICKET,
+          vt.QTDE AS QTDE_TROCA_ITEM,
+          CAST((vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS VALOR_TROCA_ITEM,
+          CAST((0 - vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS VALOR_LIQUIDO_CALC,
+          (0 - vt.QTDE) AS QTDE_LIQUIDA_CALC
+        FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+          ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
+        LEFT JOIN FILIAIS f WITH (NOLOCK)
+          ON f.COD_FILIAL = vt.CODIGO_FILIAL
+        WHERE vt.QTDE_CANCELADA = 0
+          AND (
+            (v.DATA_VENDA >= @startDate AND v.DATA_VENDA < @endDate)
+            OR (v.DATA_VENDA >= @prevStartDate AND v.DATA_VENDA < @prevEndDate)
+          )
+          AND NOT EXISTS (
+            SELECT 1 
+            FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+            WHERE vp.TICKET = vt.TICKET
+              AND vp.CODIGO_FILIAL = vt.CODIGO_FILIAL
+              AND vp.PRODUTO = vt.PRODUTO
+              AND ISNULL(vp.COR_PRODUTO, '') = ISNULL(vt.COR_PRODUTO, '')
+              AND ISNULL(vp.TAMANHO, 0) = ISNULL(vt.TAMANHO, 0)
+          )
+          ${filialFilter.replace(/f\.FILIAL/g, 'f.FILIAL')}
+      ),
+      VendasComNumero AS (
+        SELECT 
+          vb.TICKET,
+          vb.CODIGO_FILIAL,
+          vb.DATA_VENDA,
+          vb.PRODUTO,
+          vb.COR_PRODUTO,
+          vb.TAMANHO,
+          vb.QTDE,
+          vb.PRECO_LIQUIDO,
+          vb.DESCONTO_VENDA,
+          ROW_NUMBER() OVER (
+            PARTITION BY vb.TICKET, vb.CODIGO_FILIAL, vb.PRODUTO, vb.COR_PRODUTO, vb.TAMANHO
+            ORDER BY vb.TICKET, vb.CODIGO_FILIAL, vb.PRODUTO, vb.COR_PRODUTO, vb.TAMANHO
+          ) AS RN
+        FROM vendas_base vb
+      ),
+      MovimentoUnificado AS (
+        SELECT 
+          vcn.DATA_VENDA,
+          vcn.TICKET,
+          CAST(CASE WHEN vcn.RN = 1 THEN ISNULL(ti.VALOR_TROCA, 0) ELSE 0 END AS DECIMAL(38,6)) AS VALOR_TROCA,
+          CASE WHEN vcn.RN = 1 THEN ISNULL(ti.QTDE_TROCA, 0) ELSE 0 END AS QTDE_TROCA,
+          CAST((CAST(vcn.PRECO_LIQUIDO * vcn.QTDE AS DECIMAL(38,6)) - CAST(vcn.DESCONTO_VENDA AS DECIMAL(38,6)) - CAST(CASE WHEN vcn.RN = 1 THEN ISNULL(ti.VALOR_TROCA, 0) ELSE 0 END AS DECIMAL(38,6))) AS DECIMAL(38,6)) AS VALOR_LIQUIDO_CALC,
+          (vcn.QTDE - CASE WHEN vcn.RN = 1 THEN ISNULL(ti.QTDE_TROCA, 0) ELSE 0 END) AS QTDE_LIQUIDA_CALC
+        FROM VendasComNumero vcn
+        LEFT JOIN trocas_item ti ON ti.TICKET = vcn.TICKET 
+          AND ti.CODIGO_FILIAL = vcn.CODIGO_FILIAL
+          AND ti.PRODUTO = vcn.PRODUTO
+          AND ISNULL(ti.COR_PRODUTO, '') = ISNULL(vcn.COR_PRODUTO, '')
+          AND ISNULL(ti.TAMANHO, 0) = ISNULL(vcn.TAMANHO, 0)
+        UNION ALL
+        SELECT 
+          tp.DATA_VENDA,
+          tp.TICKET,
+          tp.VALOR_TROCA_ITEM AS VALOR_TROCA,
+          tp.QTDE_TROCA_ITEM AS QTDE_TROCA,
+          tp.VALOR_LIQUIDO_CALC,
+          tp.QTDE_LIQUIDA_CALC
+        FROM TrocasPuras tp
+      )
+      SELECT
+        SUM(CASE WHEN DATA_VENDA >= @startDate AND DATA_VENDA < @endDate THEN VALOR_LIQUIDO_CALC ELSE 0 END) AS currentRevenue,
+        SUM(CASE WHEN DATA_VENDA >= @prevStartDate AND DATA_VENDA < @prevEndDate THEN VALOR_LIQUIDO_CALC ELSE 0 END) AS previousRevenue,
+        SUM(CASE WHEN DATA_VENDA >= @startDate AND DATA_VENDA < @endDate THEN QTDE_LIQUIDA_CALC ELSE 0 END) AS currentQuantity,
+        SUM(CASE WHEN DATA_VENDA >= @prevStartDate AND DATA_VENDA < @prevEndDate THEN QTDE_LIQUIDA_CALC ELSE 0 END) AS previousQuantity,
+        COUNT(DISTINCT CASE WHEN DATA_VENDA >= @startDate AND DATA_VENDA < @endDate AND QTDE_LIQUIDA_CALC > 0 THEN TICKET ELSE NULL END) AS currentTickets,
+        COUNT(DISTINCT CASE WHEN DATA_VENDA >= @prevStartDate AND DATA_VENDA < @prevEndDate AND QTDE_LIQUIDA_CALC > 0 THEN TICKET ELSE NULL END) AS previousTickets,
+        MAX(CASE WHEN DATA_VENDA >= @startDate AND DATA_VENDA < @endDate THEN DATA_VENDA ELSE NULL END) AS currentLastSaleDate
+      FROM MovimentoUnificado
+    `;
+
+    const fullQuery = `
       WITH vendas_base AS (
         SELECT 
           vp.TICKET,
@@ -827,12 +951,10 @@ export async function fetchSalesSummary({
           p.GRIFFE,
           p.GRADE,
           CAST((vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) AS DECIMAL(38,6)) AS DESCONTO_VENDA,
-          -- Calcular TOTAL_VENDA (antes de considerar trocas)
           CASE 
             WHEN vp.QTDE_CANCELADA > 0 THEN 0
             ELSE CAST((vp.PRECO_LIQUIDO * vp.QTDE) - (vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) AS DECIMAL(38,6))
           END AS TOTAL_VENDA,
-          -- Calcular TOTAL_QTDE_VENDA (antes de considerar trocas)
           CASE 
             WHEN vp.QTDE_CANCELADA > 0 THEN 0
             ELSE vp.QTDE
@@ -1002,15 +1124,36 @@ export async function fetchSalesSummary({
       FROM MovimentoUnificado
     `;
 
-    const result = await request.query<{
-      currentRevenue: number | null;
-      previousRevenue: number | null;
-      currentQuantity: number | null;
-      previousQuantity: number | null;
-      currentTickets: number | null;
-      previousTickets: number | null;
-      currentLastSaleDate: Date | null;
-    }>(query);
+    const query = useLightQuery ? lightQuery : fullQuery;
+    const [result, stockSummary] = await Promise.all([
+      request.query<{
+        currentRevenue: number | null;
+        previousRevenue: number | null;
+        currentQuantity: number | null;
+        previousQuantity: number | null;
+        currentTickets: number | null;
+        previousTickets: number | null;
+        currentLastSaleDate: Date | null;
+      }>(query),
+      fetchStockSummary({
+        company,
+        filial,
+        grupo,
+        grupos,
+        linha,
+        linhas,
+        colecao,
+        colecoes,
+        subgrupo,
+        subgrupos,
+        grade,
+        grades,
+        produtoId,
+        produtoSearchTerm,
+        filterByRegistrationDate,
+        registrationDateRange: filterByRegistrationDate ? currentRange : undefined,
+      }),
+    ]);
 
     const row = result.recordset[0] ?? {
       currentRevenue: 0,
@@ -1058,27 +1201,6 @@ export async function fetchSalesSummary({
         changePercentage,
       };
     };
-
-    // Buscar resumo de estoque
-    // IMPORTANTE: Passar TODOS os filtros (valores únicos E arrays) para garantir que o estoque seja filtrado corretamente
-    const stockSummary = await fetchStockSummary({
-      company,
-      filial,
-      grupo,
-      grupos,
-      linha,
-      linhas,
-      colecao,
-      colecoes,
-      subgrupo,
-      subgrupos,
-      grade,
-      grades,
-      produtoId,
-      produtoSearchTerm,
-      filterByRegistrationDate,
-      registrationDateRange: filterByRegistrationDate ? currentRange : undefined,
-    });
 
     const summary: SalesSummary = {
       totalRevenue: buildMetric(currentRevenue, previousRevenue),

@@ -26,6 +26,12 @@
   flex-wrap: wrap;
 }
 
+.periodLabel {
+  font-size: 14px;
+  color: #4b5563;
+  font-weight: 500;
+}
+
 .loading {
   color: #6b7280;
   font-size: 14px;

@@ -1,14 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
-import DateRangeFilter, {
-  type DateRangeValue,
-} from "@/components/filters/DateRangeFilter";
 import FilialFilter from "@/components/filters/FilialFilter";
 import ControleTransferenciasTable from "@/components/controle-transferencias/ControleTransferenciasTable";
 import type { ProdutoTransferencia } from "@/lib/repositories/controleTransferencias";
-import { getCurrentMonthRange } from "@/lib/utils/date";
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 
 import styles from "./ControleTransferenciasPage.module.css";
@@ -18,9 +16,20 @@ interface ControleTransferenciasPageProps {
   companyName: string;
 }
 
+/** Período fixo: últimos 30 dias (data fim = hoje). */
+function getLast30DaysRange() {
+  const end = new Date();
+  const start = new Date(end);
+  start.setDate(start.getDate() - 30);
+  return {
+    startDate: start,
+    endDate: end,
+  };
+}
+
 async function fetchControleTransferencias(
   company: string,
-  range: DateRangeValue,
+  range: { startDate: Date; endDate: Date },
   filial: string | null
 ): Promise<ProdutoTransferencia[]> {
   const searchParams = new URLSearchParams({
@@ -64,18 +73,11 @@ export default function ControleTransferenciasPage({
   companyKey,
   companyName,
 }: ControleTransferenciasPageProps) {
-  const initialRange = useMemo(() => {
-    const range = getCurrentMonthRange();
-    return {
-      startDate: range.start,
-      endDate: range.end,
-    };
-  }, []);
+  // Período fixo: sempre últimos 30 dias (recalculado a cada montagem para refletir "hoje")
+  const range = useMemo(() => getLast30DaysRange(), []);
 
-  // Filial padrão é a matriz
   const defaultMatriz = useMemo(() => getDefaultMatriz(companyKey), [companyKey]);
 
-  const [range, setRange] = useState<DateRangeValue>(initialRange);
   const [selectedFilial, setSelectedFilial] = useState<string | null>(defaultMatriz);
   const [data, setData] = useState<ProdutoTransferencia[]>([]);
   const [loading, setLoading] = useState(false);
@@ -87,8 +89,6 @@ export default function ControleTransferenciasPage({
     [range.startDate, range.endDate]
   );
 
-  // Carregar dados - sempre todas as filiais para calcular transferências corretamente
-  // Mas a visualização será filtrada pela filial selecionada
   useEffect(() => {
     let active = true;
 
@@ -96,21 +96,19 @@ export default function ControleTransferenciasPage({
       setLoading(true);
       setError(null);
       try {
-        // Sempre carregar todas as filiais para cálculo correto
         const transferenciasData = await fetchControleTransferencias(
           companyKey,
           range,
-          null // Sempre carregar todas as filiais
+          null
         );
         if (active) {
-          // Converter ultimaEntrada de string para Date (JSON serializa Date como string)
           const dataWithDates = transferenciasData.map(item => ({
             ...item,
             filiais: item.filiais.map(filial => ({
               ...filial,
-              ultimaEntrada: filial.ultimaEntrada 
-                ? (typeof filial.ultimaEntrada === 'string' 
-                    ? new Date(filial.ultimaEntrada) 
+              ultimaEntrada: filial.ultimaEntrada
+                ? (typeof filial.ultimaEntrada === "string"
+                    ? new Date(filial.ultimaEntrada)
                     : filial.ultimaEntrada)
                 : null,
             })),
@@ -141,6 +139,12 @@ export default function ControleTransferenciasPage({
 
   const company = resolveCompany(companyKey);
 
+  const periodLabel = useMemo(() => {
+    const start = format(range.startDate, "dd/MM/yyyy", { locale: ptBR });
+    const end = format(range.endDate, "dd/MM/yyyy", { locale: ptBR });
+    return `Últimos 30 dias (${start} a ${end})`;
+  }, [range.startDate, range.endDate]);
+
   return (
     <div className={styles.wrapper}>
       <div className={styles.header}>
@@ -153,7 +157,7 @@ export default function ControleTransferenciasPage({
             label="Filial de Origem"
             module="inventory"
           />
-          <DateRangeFilter value={range} onChange={setRange} />
+          <span className={styles.periodLabel}>{periodLabel}</span>
           {loading ? (
             <span className={styles.loading}>Carregando dados…</span>
           ) : null}
@@ -170,7 +174,8 @@ export default function ControleTransferenciasPage({
           </svg>
         </div>
         <div className={styles.infoText}>
-          <strong>Visualização por Filial:</strong> Selecione uma filial para ver apenas as transferências que devem ser feitas a partir dessa filial. 
+          <strong>Período analisado:</strong> {periodLabel}.{" "}
+          <strong>Visualização por Filial:</strong> Selecione uma filial para ver apenas as transferências que devem ser feitas a partir dessa filial.
           {selectedFilial && (
             <span className={styles.infoFilial}>
               {" "}Visualizando: <strong>{company?.filialDisplayNames?.[selectedFilial] || selectedFilial}</strong>
