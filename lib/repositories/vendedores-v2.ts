@@ -175,8 +175,8 @@ export async function fetchVendedoresList(
     if (produtoId) {
       request.input('produtoId', sql.VarChar, produtoId);
       produtoFilter = 'AND vp.PRODUTO = @produtoId';
-    } else if (produtoSearchTerm?.trim().length >= 2) {
-      request.input('produtoSearchTerm', sql.VarChar, `%${produtoSearchTerm.trim()}%`);
+    } else if ((produtoSearchTerm?.trim() ?? '').length >= 2) {
+      request.input('produtoSearchTerm', sql.VarChar, `%${(produtoSearchTerm ?? '').trim()}%`);
       produtoFilter = 'AND vp.DESC_PRODUTO LIKE @produtoSearchTerm';
     }
 
@@ -358,8 +358,8 @@ export async function fetchVendedorProdutosList(
     if (produtoId) {
       request.input('produtoId', sql.VarChar, produtoId);
       produtoFilter = 'AND vp.PRODUTO = @produtoId';
-    } else if (produtoSearchTerm?.trim().length >= 2) {
-      request.input('produtoSearchTerm', sql.VarChar, `%${produtoSearchTerm.trim()}%`);
+    } else if ((produtoSearchTerm?.trim() ?? '').length >= 2) {
+      request.input('produtoSearchTerm', sql.VarChar, `%${(produtoSearchTerm ?? '').trim()}%`);
       produtoFilter = 'AND vp.DESC_PRODUTO LIKE @produtoSearchTerm';
     }
 

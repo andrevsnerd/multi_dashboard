@@ -1,4 +1,4 @@
-export type RoleKey = "admin" | "logistica";
+export type RoleKey = "admin" | "gestor" | "logistica";
 
 /** Chaves de permissão = segmentos de rota (ex: controle-transferencias). Admin vê tudo. */
 export type PermissionKey =
@@ -47,5 +47,6 @@ export const ALL_PERMISSION_KEYS: { key: PermissionKey; label: string }[] = [
 
 export const ROLE_LABELS: Record<RoleKey, string> = {
   admin: "Administrador",
+  gestor: "Gestor",
   logistica: "Logística",
 };

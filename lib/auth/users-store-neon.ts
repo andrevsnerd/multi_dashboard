@@ -11,7 +11,7 @@ async function ensureTable(sql: ReturnType<typeof getNeonSql>) {
       id TEXT PRIMARY KEY,
       username TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
-      role TEXT NOT NULL CHECK (role IN ('admin', 'logistica')),
+      role TEXT NOT NULL CHECK (role IN ('admin', 'gestor', 'logistica')),
       permissions JSONB NOT NULL DEFAULT '[]'::jsonb
     )
   `;
@@ -106,7 +106,7 @@ export async function createUser(
     .digest("hex")
     .slice(0, 12);
   const passwordHash = hashPassword(password);
-  const perms = role === "admin" ? [] : permissions;
+  const perms = role === "admin" || role === "gestor" ? [] : permissions;
   await sql`
     INSERT INTO dashboard_users (id, username, password_hash, role, permissions)
     VALUES (${id}, ${normalized}, ${passwordHash}, ${role}, ${JSON.stringify(perms)}::jsonb)
@@ -154,9 +154,9 @@ export async function updateUser(
   }
   if (updates.role !== undefined) {
     role = updates.role;
-    permissions = role === "admin" ? [] : (updates.permissions ?? permissions);
+    permissions = role === "admin" || role === "gestor" ? [] : (updates.permissions ?? permissions);
   }
-  if (updates.permissions !== undefined && role !== "admin") {
+  if (updates.permissions !== undefined && role !== "admin" && role !== "gestor") {
     permissions = updates.permissions;
   }
   await sql`

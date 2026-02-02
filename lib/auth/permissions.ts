@@ -31,15 +31,15 @@ export function canAccessPath(user: UserSession | null, pathname: string | null)
   if (!user) return false;
   const perm = pathnameToPermission(pathname);
   if (perm === null) return true; // home, login
-  if (perm === "admin") return user.role === "admin";
-  if (user.role === "admin") return true;
+  if (perm === "admin") return user.role === "admin"; // só admin vê painel de usuários
+  if (user.role === "admin" || user.role === "gestor") return true; // gestor = mesmo que admin, exceto /admin
   return user.permissions.includes(perm as PermissionKey);
 }
 
 /** Primeira rota permitida para o usuário em uma empresa (ex: /nerd/controle-transferencias). */
 export function getFirstAllowedPath(user: UserSession | null, company: string): string {
   if (!user) return `/${company}`;
-  if (user.role === "admin") return `/${company}`;
+  if (user.role === "admin" || user.role === "gestor") return `/${company}`;
   if (user.permissions.includes("controle-transferencias"))
     return `/${company}/controle-transferencias`;
   if (user.permissions.includes("dashboard")) return `/${company}`;

@@ -92,7 +92,7 @@ export async function createUser(
     username: normalized,
     passwordHash: hashPassword(password),
     role,
-    permissions: role === "admin" ? [] : permissions,
+    permissions: role === "admin" || role === "gestor" ? [] : permissions,
   };
   users.push(record);
   writeUsersFile(users);
@@ -126,9 +126,9 @@ export async function updateUser(
   if (updates.role !== undefined) {
     current.role = updates.role;
     current.permissions =
-      updates.role === "admin" ? [] : (updates.permissions ?? current.permissions);
+      updates.role === "admin" || updates.role === "gestor" ? [] : (updates.permissions ?? current.permissions);
   }
-  if (updates.permissions !== undefined && current.role !== "admin") {
+  if (updates.permissions !== undefined && current.role !== "admin" && current.role !== "gestor") {
     current.permissions = updates.permissions;
   }
   writeUsersFile(users);

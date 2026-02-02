@@ -160,11 +160,13 @@ export default function Sidebar({ companyName }: SidebarProps) {
             ...allNavItems,
             { label: "Admin", href: "/admin", permission: "admin" as const },
           ]
-        : allNavItems.filter((item) => {
-            if (item.permission === "home") return true;
-            if (item.permission === "admin") return false;
-            return item.permission ? user.permissions.includes(item.permission) : false;
-          });
+        : user.role === "gestor"
+          ? allNavItems
+          : allNavItems.filter((item) => {
+              if (item.permission === "home") return true;
+              if (item.permission === "admin") return false;
+              return item.permission ? user.permissions.includes(item.permission) : false;
+            });
 
   const handleLinkClick = () => {
     // Fechar sidebar no mobile ao clicar em um link
