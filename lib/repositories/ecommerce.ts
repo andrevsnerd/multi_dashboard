@@ -143,24 +143,31 @@ export async function fetchTopProductsEcommerce({
 
     const result = await request.query<ProductRevenue>(query);
 
-    const products = result.recordset.map((row) => ({
-      ...row,
-      totalRevenue: Number(row.totalRevenue ?? 0),
-      totalQuantity: Number(row.totalQuantity ?? 0),
-      stock: 0, // Será preenchido abaixo
-    }));
+    const rowToProductId = (row: Record<string, unknown>) =>
+      String((row as { productId?: string; productid?: string; PRODUTO?: string }).productId ?? (row as { productId?: string; productid?: string; PRODUTO?: string }).productid ?? (row as { productId?: string; productid?: string; PRODUTO?: string }).PRODUTO ?? '').trim();
+
+    const products = result.recordset.map((row) => {
+      const r = row as Record<string, unknown>;
+      const productId = rowToProductId(r);
+      return {
+        productId,
+        productName: String((r as { productName?: string; productname?: string }).productName ?? (r as { productName?: string; productname?: string }).productname ?? ''),
+        totalRevenue: Number((r as { totalRevenue?: number; totalrevenue?: number }).totalRevenue ?? (r as { totalRevenue?: number; totalrevenue?: number }).totalrevenue ?? 0),
+        totalQuantity: Number((r as { totalQuantity?: number; totalquantity?: number }).totalQuantity ?? (r as { totalQuantity?: number; totalquantity?: number }).totalquantity ?? 0),
+        stock: 0, // Será preenchido abaixo
+      };
+    });
 
     // Buscar estoque para todos os produtos de uma vez
     // IMPORTANTE: Para e-commerce, quando filial é null, buscar estoque apenas das filiais de e-commerce
     if (products.length > 0) {
-      const productIds = products.map((p) => p.productId);
+      const productIds = products.map((p) => p.productId).filter(Boolean);
       const stockMap = await fetchMultipleProductsStock(productIds, {
         company,
-        filial,
-        ecommerceOnly: !filial, // Se filial é null, buscar apenas filiais de e-commerce
+        filial: null, // sempre estoque total (todas as filiais)
+        ecommerceOnly: false,
       });
 
-      // Adicionar estoque a cada produto
       products.forEach((product) => {
         product.stock = stockMap.get(product.productId) ?? 0;
       });

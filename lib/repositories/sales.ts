@@ -398,22 +398,28 @@ export async function fetchTopProducts({
 
     const result = await request.query<ProductRevenue>(query);
 
-    const products = result.recordset.map((row) => ({
-      ...row,
-      totalRevenue: Number(row.totalRevenue ?? 0),
-      totalQuantity: Number(row.totalQuantity ?? 0),
-      stock: 0, // Será preenchido abaixo
-    }));
+    const rowToProductId = (row: Record<string, unknown>) =>
+      String((row as { productId?: string; productid?: string; PRODUTO?: string }).productId ?? (row as { productId?: string; productid?: string; PRODUTO?: string }).productid ?? (row as { productId?: string; productid?: string; PRODUTO?: string }).PRODUTO ?? '').trim();
 
-    // Buscar estoque para todos os produtos de uma vez
+    const products = result.recordset.map((row) => {
+      const productId = rowToProductId(row as Record<string, unknown>);
+      return {
+        productId,
+        productName: String((row as { productName?: string; productname?: string; DESC_PRODUTO?: string }).productName ?? (row as { productName?: string; productname?: string; DESC_PRODUTO?: string }).productname ?? (row as { productName?: string; productname?: string; DESC_PRODUTO?: string }).DESC_PRODUTO ?? ''),
+        totalRevenue: Number((row as { totalRevenue?: number; totalrevenue?: number }).totalRevenue ?? (row as { totalRevenue?: number; totalrevenue?: number }).totalrevenue ?? 0),
+        totalQuantity: Number((row as { totalQuantity?: number; totalquantity?: number }).totalQuantity ?? (row as { totalQuantity?: number; totalquantity?: number }).totalquantity ?? 0),
+        stock: 0, // Será preenchido abaixo
+      };
+    });
+
+    // Buscar estoque total (todas as filiais) para cada produto
     if (products.length > 0) {
-      const productIds = products.map((p) => p.productId);
+      const productIds = products.map((p) => p.productId).filter(Boolean);
       const stockMap = await fetchMultipleProductsStock(productIds, {
         company,
-        filial,
+        filial: null, // sempre estoque total (todas as filiais)
       });
 
-      // Adicionar estoque a cada produto
       products.forEach((product) => {
         product.stock = stockMap.get(product.productId) ?? 0;
       });

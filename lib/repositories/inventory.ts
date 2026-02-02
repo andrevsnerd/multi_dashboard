@@ -225,22 +225,30 @@ export async function fetchMultipleProductsStock(
     }>(query);
 
     const stockMap = new Map<string, number>();
+    const rowToKey = (row: Record<string, unknown>) =>
+      String((row as { productId?: string; productid?: string; PRODUTO?: string }).productId ?? (row as { productId?: string; productid?: string; PRODUTO?: string }).productid ?? (row as { productId?: string; productid?: string; PRODUTO?: string }).PRODUTO ?? '').trim();
+
     result.recordset.forEach((row) => {
-      const positiveStock = Number(row.positiveStock ?? 0);
-      const negativeStock = Number(row.negativeStock ?? 0);
-      const positiveCount = Number(row.positiveCount ?? 0);
-      
-      // Se houver estoque positivo, usar apenas a soma dos positivos
-      // Caso contrário, usar a soma dos negativos
+      const dbKey = rowToKey(row as Record<string, unknown>);
+      const positiveStock = Number((row as { positiveStock?: number }).positiveStock ?? (row as { positivestock?: number }).positivestock ?? 0);
+      const negativeStock = Number((row as { negativeStock?: number }).negativeStock ?? (row as { negativestock?: number }).negativestock ?? 0);
+      const positiveCount = Number((row as { positiveCount?: number }).positiveCount ?? (row as { positivecount?: number }).positivecount ?? 0);
       const finalStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
-      
-      stockMap.set(row.productId, finalStock);
+      // Usar a chave do chamador (productIds) para garantir match na busca
+      const callerKey = productIds.find((id) => id != null && String(id).trim() === dbKey)
+        ?? productIds.find((id) => id != null && String(id).trim().toLowerCase() === dbKey.toLowerCase());
+      if (callerKey != null) {
+        stockMap.set(String(callerKey).trim(), finalStock);
+      } else {
+        stockMap.set(dbKey, finalStock);
+      }
     });
 
     // Garantir que todos os produtos tenham entrada no mapa (mesmo que com 0)
     productIds.forEach((id) => {
-      if (!stockMap.has(id)) {
-        stockMap.set(id, 0);
+      const key = id != null ? String(id).trim() : '';
+      if (key && !stockMap.has(key)) {
+        stockMap.set(key, 0);
       }
     });
 

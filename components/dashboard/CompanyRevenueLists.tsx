@@ -235,7 +235,9 @@ export default function CompanyRevenueLists({
                       </div>
                       <div className={styles.stockBadge}>
                         <span className={styles.stockNumber}>
-                          {item.stock.toLocaleString("pt-BR")}
+                          {typeof item.stock === "number"
+                            ? item.stock.toLocaleString("pt-BR")
+                            : "—"}
                         </span>
                       </div>
                     </div>
