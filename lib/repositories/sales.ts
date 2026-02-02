@@ -623,16 +623,12 @@ export async function fetchSalesSummary({
   return withRequest(async (request) => {
     const { start, end } = currentRange;
     const previousRange = shiftRangeByMonths(currentRange, -1);
-    
-    // Ajustar o fim do período anterior para 1 dia antes do fim do período atual
-    // Isso garante comparação justa, já que o dia atual ainda não está completo
-    const adjustedPreviousEnd = new Date(previousRange.end);
-    adjustedPreviousEnd.setTime(adjustedPreviousEnd.getTime() - 24 * 60 * 60 * 1000); // Subtrair 1 dia
+    // Período anterior = mesmos dias do período atual (ex.: 1 a 5 → 1 a 5 do mês anterior). End é exclusivo.
 
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
     request.input('prevStartDate', sql.DateTime, previousRange.start);
-    request.input('prevEndDate', sql.DateTime, adjustedPreviousEnd);
+    request.input('prevEndDate', sql.DateTime, previousRange.end);
 
     // Ajustar filtro de filial para usar f.FILIAL (da tabela FILIAIS) quando usar LOJA_VENDA_PRODUTO
     const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'f');
@@ -1668,15 +1664,12 @@ export async function fetchFilialPerformance({
     const currentRange = resolveRange(range);
     const { start, end } = currentRange;
     const previousRange = shiftRangeByMonths(currentRange, -1);
-    
-    // Ajustar o fim do período anterior para 1 dia antes do fim do período atual
-    const adjustedPreviousEnd = new Date(previousRange.end);
-    adjustedPreviousEnd.setTime(adjustedPreviousEnd.getTime() - 24 * 60 * 60 * 1000); // Subtrair 1 dia
+    // Período anterior = mesmos dias (ex.: 1 a 5 → 1 a 5 do mês anterior). End exclusivo.
 
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
     request.input('prevStartDate', sql.DateTime, previousRange.start);
-    request.input('prevEndDate', sql.DateTime, adjustedPreviousEnd);
+    request.input('prevEndDate', sql.DateTime, previousRange.end);
 
     const filiais = companyConfig.filialFilters['sales'] ?? [];
     const ecommerceFilials = companyConfig.ecommerceFilials ?? [];

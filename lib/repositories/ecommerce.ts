@@ -193,16 +193,12 @@ export async function fetchEcommerceSummary({
     const currentRange = resolveRange(range);
     const { start, end } = currentRange;
     const previousRange = shiftRangeByMonths(currentRange, -1);
-    
-    // Ajustar o fim do período anterior para 1 dia antes do fim do período atual
-    // Isso garante comparação justa, já que o dia atual ainda não está completo
-    const adjustedPreviousEnd = new Date(previousRange.end);
-    adjustedPreviousEnd.setTime(adjustedPreviousEnd.getTime() - 24 * 60 * 60 * 1000); // Subtrair 1 dia
+    // Período anterior = mesmos dias (ex.: 1 a 5 → 1 a 5 do mês anterior). End exclusivo.
 
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
     request.input('prevStartDate', sql.DateTime, previousRange.start);
-    request.input('prevEndDate', sql.DateTime, adjustedPreviousEnd);
+    request.input('prevEndDate', sql.DateTime, previousRange.end);
 
     const filialFilter = buildEcommerceFilialFilter(request, company, filial);
 
@@ -390,7 +386,7 @@ export async function fetchEcommerceSummary({
           ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
         ${produtoJoin}
         WHERE CAST(f.EMISSAO AS DATE) >= CAST(@prevStartDate AS DATE)
-          AND CAST(f.EMISSAO AS DATE) <= CAST(@prevEndDate AS DATE)
+          AND CAST(f.EMISSAO AS DATE) < CAST(@prevEndDate AS DATE)
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
           ${filialFilter}
@@ -1183,15 +1179,12 @@ export async function fetchEcommerceFilialPerformance({
     const currentRange = resolveRange(range);
     const { start, end } = currentRange;
     const previousRange = shiftRangeByMonths(currentRange, -1);
-    
-    // Ajustar o fim do período anterior para 1 dia antes do fim do período atual
-    const adjustedPreviousEnd = new Date(previousRange.end);
-    adjustedPreviousEnd.setTime(adjustedPreviousEnd.getTime() - 24 * 60 * 60 * 1000); // Subtrair 1 dia
+    // Período anterior = mesmos dias (ex.: 1 a 5 → 1 a 5 do mês anterior). End exclusivo.
 
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
     request.input('prevStartDate', sql.DateTime, previousRange.start);
-    request.input('prevEndDate', sql.DateTime, adjustedPreviousEnd);
+    request.input('prevEndDate', sql.DateTime, previousRange.end);
 
     const companyConfig = resolveCompany(company);
     if (!companyConfig) {
@@ -1219,7 +1212,7 @@ export async function fetchEcommerceFilialPerformance({
         JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
           ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
         WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-          AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+          AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
           AND f.FILIAL IN (${placeholders})
@@ -1235,7 +1228,7 @@ export async function fetchEcommerceFilialPerformance({
         JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
           ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       WHERE CAST(f.EMISSAO AS DATE) >= CAST(@prevStartDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@prevEndDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@prevEndDate AS DATE)
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
           AND f.FILIAL IN (${placeholders})

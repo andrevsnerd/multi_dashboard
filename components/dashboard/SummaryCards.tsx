@@ -152,6 +152,7 @@ export default function SummaryCards({
       label: string;
     };
     differenceValue?: number;
+    showPreviousPeriod?: boolean;
   }> = [
     {
       label: "Vendas Total",
@@ -184,6 +185,7 @@ export default function SummaryCards({
         format: formatCurrency,
         label: "Valor total",
       },
+      showPreviousPeriod: false,
     },
   ];
 
@@ -218,7 +220,7 @@ export default function SummaryCards({
               )}
             </div>
 
-            {acimaDoTicket && item.differenceValue !== undefined ? (
+            {item.showPreviousPeriod !== false && (acimaDoTicket && item.differenceValue !== undefined ? (
               <>
                 <div className={styles.divider} aria-hidden />
                 <div className={styles.comparison}>
@@ -230,7 +232,7 @@ export default function SummaryCards({
                   </div>
                 </div>
               </>
-            ) : item.metric.changePercentage !== null && (
+            ) : (
               <>
                 <div className={styles.divider} aria-hidden />
                 <div className={styles.comparison}>
@@ -247,7 +249,7 @@ export default function SummaryCards({
                   </span>
                 </div>
               </>
-            )}
+            ))}
           </article>
         );
       })}

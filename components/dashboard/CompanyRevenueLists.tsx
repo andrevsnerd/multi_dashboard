@@ -122,23 +122,22 @@ export default function CompanyRevenueLists({
     };
   }, [companyKey, rangeKey, startDate, endDate, filial]);
 
-  // Adicionar "VAREJO" como primeiro item apenas para SCARFME
+  // SCARFME: adicionar "VAREJO" agregado e agregar filiais com mesmo displayName (PAULISTA, E-COMMERCE)
   const filialPerformanceWithVarejo = useMemo(() => {
     if (companyKey !== "scarfme") {
       return state.filialPerformance;
     }
 
-    // Filtrar apenas filiais normais (não e-commerce)
+    // Filtrar apenas filiais normais (não e-commerce) para o total VAREJO
     const varejoFiliais = state.filialPerformance.filter(
       (item) => !isEcommerceFilial(companyKey, item.filial)
     );
 
-    // Se não houver filiais de varejo, retornar a lista original
     if (varejoFiliais.length === 0) {
       return state.filialPerformance;
     }
 
-    // Calcular agregação de VAREJO
+    // Agregação de VAREJO (soma de todas as lojas físicas)
     const varejoCurrentRevenue = varejoFiliais.reduce(
       (sum, item) => sum + item.currentRevenue,
       0
@@ -165,8 +164,38 @@ export default function CompanyRevenueLists({
       changePercentage: varejoChangePercentage,
     };
 
-    // Retornar VAREJO primeiro, depois as outras filiais
-    return [varejoItem, ...state.filialPerformance];
+    // Agregar por filialDisplayName (ex.: duas PAULISTA → uma linha PAULISTA; dois E-COMMERCE → uma linha E-COMMERCE)
+    const byDisplayName = new Map<string, FilialPerformance>();
+    for (const item of state.filialPerformance) {
+      const name = item.filialDisplayName;
+      const existing = byDisplayName.get(name);
+      if (!existing) {
+        byDisplayName.set(name, {
+          filial: item.filial,
+          filialDisplayName: name,
+          currentRevenue: item.currentRevenue,
+          previousRevenue: item.previousRevenue,
+          changePercentage: item.changePercentage,
+        });
+      } else {
+        existing.currentRevenue += item.currentRevenue;
+        existing.previousRevenue += item.previousRevenue;
+        // Recalcular VAR% com totais agregados
+        if (existing.previousRevenue > 0) {
+          existing.changePercentage = Number(
+            (((existing.currentRevenue - existing.previousRevenue) / existing.previousRevenue) * 100).toFixed(1)
+          );
+        } else if (existing.currentRevenue > 0) {
+          existing.changePercentage = null;
+        }
+      }
+    }
+
+    const aggregatedList = Array.from(byDisplayName.values()).sort(
+      (a, b) => b.currentRevenue - a.currentRevenue
+    );
+
+    return [varejoItem, ...aggregatedList];
   }, [state.filialPerformance, companyKey]);
 
   return (
