@@ -61,6 +61,7 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
         'SCARFME MATRIZ CMS',
         'SCARF ME - MATRIZ LLL',
         'VILLA LOBOS - LLL',
+        'MSC COMERCIO DE LENCOS LT',
       ],
       inventory: [
         'GUARULHOS - RSR',
@@ -75,6 +76,7 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
         'SCARFME MATRIZ CMS',
         'SCARF ME - MATRIZ LLL',
         'VILLA LOBOS - LLL',
+        'MSC COMERCIO DE LENCOS LT',
       ],
     },
     filialDisplayNames: {
@@ -90,8 +92,9 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
       'SCARFME MATRIZ CMS': 'E-COMMERCE',
       'SCARF ME - MATRIZ LLL': 'E-COMMERCE',
       'VILLA LOBOS - LLL': 'VILLA LOBOS',
+      'MSC COMERCIO DE LENCOS LT': 'E-COMMERCE',
     },
-    ecommerceFilials: ['SCARFME MATRIZ CMS', 'SCARF ME - MATRIZ LLL'],
+    ecommerceFilials: ['SCARFME MATRIZ CMS', 'SCARF ME - MATRIZ LLL', 'MSC COMERCIO DE LENCOS LT'],
     excludedLines: [
       'PRIVATE LABEL',
       'GASTRONOMICA',

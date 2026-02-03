@@ -364,6 +364,23 @@ function buildExclusionFilter(
   return `AND UPPER(LTRIM(RTRIM(ISNULL(${prefix}.LINHA, '')))) NOT IN (${placeholders})`;
 }
 
+/**
+ * Filtro fixo para NERD: contabilizar apenas a linha ELETRONICOS (campo LINHA).
+ * Não altera a visão de grupos; aplicado só no backend.
+ */
+function buildNerdOnlyLinhaEletronicosFilter(company: string | undefined, prefix: string): string {
+  if (company !== 'nerd') {
+    return '';
+  }
+  return `AND UPPER(LTRIM(RTRIM(ISNULL(${prefix}.LINHA, '')))) = 'ELETRONICOS'`;
+}
+
+/** Para NERD: exclui categorias BAG e ASSISTENCIA do controle de estoque */
+function buildCategoriaExcludeNerd(company: string | undefined, categoriaField: string): string {
+  if (company !== 'nerd') return '';
+  return `AND LTRIM(RTRIM(${categoriaField})) NOT IN ('BAG', 'ASSISTENCIA')`;
+}
+
 export interface ControleEstoqueParams {
   company?: string;
   filial?: string | null;
@@ -527,6 +544,7 @@ export async function fetchEstoqueKPIs({
     const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
     const gradeFilter = buildGradeFilter(request, company, grades, 'p');
     const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineKPI');
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
 
     // Estoque atual
     // Para categorias ativas, usar o campo correto baseado na empresa
@@ -549,10 +567,12 @@ export async function fetchEstoqueKPIs({
         ${subgrupoFilter}
         ${gradeFilter}
         ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
         AND e.ESTOQUE > 0
         AND ${categoriaFieldKPI} <> ''
         AND ${categoriaFieldKPI} <> 'SEM GRUPO'
         AND ${categoriaFieldKPI} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaFieldKPI)}
     `;
 
     const estoqueResult = await request.query<{
@@ -586,6 +606,7 @@ export async function fetchEstoqueKPIs({
         ${subgrupoFilter}
         ${gradeFilter}
         ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
     `;
 
     const vendasAtualResult = await request.query<{
@@ -630,6 +651,7 @@ export async function fetchEstoqueKPIs({
             ${subgrupoFilter}
             ${gradeFilter}
             ${exclusionFilter}
+            ${nerdOnlyEletronicosFilter}
         `;
 
         const ecommerceVendasResult = await request.query<{
@@ -659,6 +681,7 @@ export async function fetchEstoqueKPIs({
         ${subgrupoFilter}
         ${gradeFilter}
         ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
     `;
 
     const vendasAnteriorResult = await request.query<{
@@ -691,6 +714,7 @@ export async function fetchEstoqueKPIs({
             ${subgrupoFilter}
             ${gradeFilter}
             ${exclusionFilter}
+            ${nerdOnlyEletronicosFilter}
         `;
 
         const ecommerceVendasAnteriorResult = await request.query<{
@@ -755,6 +779,7 @@ export async function fetchEstoqueKPIs({
     const subgrupoFilterEntradasKPI = buildSubgrupoFilter(request, company, subgrupos, 'pr');
     const gradeFilterEntradasKPI = buildGradeFilter(request, company, grades, 'pr');
     const exclusionFilterEntradasKPI = buildExclusionFilter(request, company, 'pr', 'excludedLineKPIEntradas');
+    const nerdOnlyEletronicosFilterEntradasKPI = buildNerdOnlyLinhaEletronicosFilter(company, 'pr');
     const categoriaFieldEntradasKPI = company === 'nerd' 
       ? 'pr.GRUPO_PRODUTO'
       : 'pr.LINHA';
@@ -776,9 +801,11 @@ export async function fetchEstoqueKPIs({
         ${subgrupoFilterEntradasKPI}
         ${gradeFilterEntradasKPI}
         ${exclusionFilterEntradasKPI}
+        ${nerdOnlyEletronicosFilterEntradasKPI}
         AND ${categoriaFieldEntradasKPI} <> ''
         AND ${categoriaFieldEntradasKPI} <> 'SEM GRUPO'
         AND ${categoriaFieldEntradasKPI} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaFieldEntradasKPI)}
         -- EXCLUIR devoluções/transferências
         AND NOT EXISTS (
           SELECT 1
@@ -813,9 +840,11 @@ export async function fetchEstoqueKPIs({
         ${subgrupoFilter}
         ${gradeFilter}
         ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
         AND ${categoriaFieldKPI} <> ''
         AND ${categoriaFieldKPI} <> 'SEM GRUPO'
         AND ${categoriaFieldKPI} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaFieldKPI)}
     `;
 
     const vendasPeriodoResult = await request.query<{
@@ -883,6 +912,7 @@ export async function fetchEstoqueKPIs({
               AND ${categoriaFieldKPI} <> ''
               AND ${categoriaFieldKPI} <> 'SEM GRUPO'
               AND ${categoriaFieldKPI} <> 'SEM LINHA'
+              ${buildCategoriaExcludeNerd(company, categoriaFieldKPI)}
           `;
 
           const ecommercePeriodoResult = await request.query<{
@@ -967,6 +997,7 @@ export async function fetchEstoquePorCategoria({
     const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
     const gradeFilter = buildGradeFilter(request, company, grades, 'p');
     const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineCategoria');
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
 
     // RESOLVER PERÍODO: Usar o range selecionado pelo usuário em vez de forçar o mês atual
     const { start: periodoStart, end: periodoEnd } = resolveRange(range);
@@ -1030,10 +1061,12 @@ export async function fetchEstoquePorCategoria({
         ${subgrupoFilter}
         ${gradeFilter}
         ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
         AND e.ESTOQUE > 0
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
       GROUP BY ${categoriaField}${groupByAdicional}
       HAVING SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) > 0
     `;
@@ -1070,11 +1103,13 @@ export async function fetchEstoquePorCategoria({
         ${vendasGlobaisFilter} 
         ${grupoFilter}
         ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
         -- NÃO aplicar linhaFilter, colecaoFilter, subgrupoFilter, gradeFilter aqui
         -- para não perder vendas que pertencem à categoria
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
       GROUP BY ${categoriaField}${groupByVendasAdicional}, YEAR(vp.DATA_VENDA), MONTH(vp.DATA_VENDA)
     `;
 
@@ -1131,11 +1166,13 @@ export async function fetchEstoquePorCategoria({
           ${ecommercePeriodoFilialFilter}
           ${grupoFilter}
           ${exclusionFilter}
+          ${nerdOnlyEletronicosFilter}
           -- NÃO aplicar linhaFilter, colecaoFilter, subgrupoFilter, gradeFilter aqui
           -- para não perder vendas que pertencem à categoria
           AND ${categoriaField} <> ''
           AND ${categoriaField} <> 'SEM GRUPO'
           AND ${categoriaField} <> 'SEM LINHA'
+          ${buildCategoriaExcludeNerd(company, categoriaField)}
         GROUP BY ${categoriaField}${groupByVendasAdicional}, YEAR(f.EMISSAO), MONTH(f.EMISSAO)
       `;
 
@@ -1216,6 +1253,7 @@ export async function fetchEstoquePorCategoria({
     const gradeFilterEntradas = gradeFilter ? gradeFilter.replace(/p\./g, 'pr.') : '';
     // Criar novo filtro de exclusão para entradas com prefixo único
     const exclusionFilterEntradas = buildExclusionFilter(request, company, 'pr', 'excludedLineCategoriaEntradas');
+    const nerdOnlyEletronicosFilterEntradas = buildNerdOnlyLinhaEletronicosFilter(company, 'pr');
 
     // Campos adicionais para query de entradas (usar alias 'pr' ao invés de 'p')
     // SEMPRE incluir campos detalhados
@@ -1309,9 +1347,11 @@ export async function fetchEstoquePorCategoria({
         ${subgrupoFilterEntradas}
         ${gradeFilterEntradas}
         ${exclusionFilterEntradas}
+        ${nerdOnlyEletronicosFilterEntradas}
         AND ${categoriaFieldEntradas} <> ''
         AND ${categoriaFieldEntradas} <> 'SEM GRUPO'
         AND ${categoriaFieldEntradas} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaFieldEntradas)}
         -- EXCLUIR devoluções/transferências: se houve saída de LOJA (não matriz) no mesmo dia com mesmo produto+cor, é devolução
         AND NOT EXISTS (
           SELECT 1
@@ -1352,9 +1392,11 @@ export async function fetchEstoquePorCategoria({
         ${subgrupoFilter}
         ${gradeFilter}
         ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
       GROUP BY ${categoriaField}${groupByVendasAdicional}
     `;
 
@@ -1444,9 +1486,11 @@ export async function fetchEstoquePorCategoria({
           ${subgrupoFilter}
           ${gradeFilter}
           ${exclusionFilter}
+          ${nerdOnlyEletronicosFilter}
           AND ${categoriaField} <> ''
           AND ${categoriaField} <> 'SEM GRUPO'
           AND ${categoriaField} <> 'SEM LINHA'
+          ${buildCategoriaExcludeNerd(company, categoriaField)}
         GROUP BY ${categoriaField}${groupByVendasAdicional}
       `;
 
@@ -1517,6 +1561,7 @@ export async function fetchEstoquePorCategoria({
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
       GROUP BY ${categoriaField}${groupByVendasAdicional}
     `;
 
@@ -1558,9 +1603,11 @@ export async function fetchEstoquePorCategoria({
         ${subgrupoFilter}
         ${gradeFilter}
         ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
       GROUP BY ${categoriaField}${groupByVendasAdicional}
     `;
 
@@ -1605,6 +1652,7 @@ export async function fetchEstoquePorCategoria({
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
       GROUP BY ${categoriaField}${groupByVendasAdicional}
     `;
 
@@ -1860,6 +1908,7 @@ export async function fetchEvolucaoEstoque({
     const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
     const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
     const gradeFilter = buildGradeFilter(request, company, grades, 'p');
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
     const categoriaField = company === 'nerd' 
       ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
       : 'ISNULL(p.LINHA, \'SEM LINHA\')';
@@ -1883,10 +1932,12 @@ export async function fetchEvolucaoEstoque({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${nerdOnlyEletronicosFilter}
         AND e.ESTOQUE > 0
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
       GROUP BY ${categoriaField}
       HAVING SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) > 0
       ORDER BY estoqueTotal DESC
@@ -2012,6 +2063,7 @@ export async function fetchDetalhesEntradasSemana({
     const colecaoFilter = buildColecaoFilter(request, company, colecoes || (colecao ? [colecao] : []), 'prd');
     const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos || (subgrupo ? [subgrupo] : []), 'prd');
     const gradeFilter = buildGradeFilter(request, company, grades || (grade ? [grade] : []), 'prd');
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'prd');
 
     // Criar filtro para excluir devoluções (lojas normais, não matriz/ecommerce)
     let lojasFilterSaidas = '';
@@ -2065,6 +2117,7 @@ export async function fetchDetalhesEntradasSemana({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${nerdOnlyEletronicosFilter}
         -- EXCLUIR devoluções
         AND NOT EXISTS (
           SELECT 1
@@ -2235,6 +2288,7 @@ export async function fetchDetalhesVendasSemana({
     const colecaoFilter = buildColecaoFilter(request, company, colecoes || (colecao ? [colecao] : []), 'p');
     const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos || (subgrupo ? [subgrupo] : []), 'p');
     const gradeFilter = buildGradeFilter(request, company, grades || (grade ? [grade] : []), 'p');
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
     const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
 
     // Filtro de filial para e-commerce (apenas ScarfMe)
@@ -2304,9 +2358,11 @@ export async function fetchDetalhesVendasSemana({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${nerdOnlyEletronicosFilter}
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
       
       ${company === 'scarfme' ? `
       UNION ALL
@@ -2346,6 +2402,7 @@ export async function fetchDetalhesVendasSemana({
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
       ` : ''}
       
       ORDER BY data DESC, ticket, produto, cor
@@ -2515,6 +2572,7 @@ export async function fetchDetalhesEcommerceSemana({
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
       ORDER BY f.EMISSAO DESC, f.NF_SAIDA, fp.PRODUTO, fp.COR_PRODUTO
     `;
 
@@ -2579,6 +2637,7 @@ export async function fetchVendasPorCategoria({
     const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
     const gradeFilter = buildGradeFilter(request, company, grades, 'p');
     const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineVendasCat');
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
     const categoriaField = company === 'nerd' 
       ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
       : 'ISNULL(p.LINHA, \'SEM LINHA\')';
@@ -2602,9 +2661,11 @@ export async function fetchVendasPorCategoria({
         ${subgrupoFilter}
         ${gradeFilter}
         ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
       GROUP BY ${categoriaField}
       HAVING SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) > 0
       ORDER BY vendas DESC
@@ -2649,9 +2710,11 @@ export async function fetchVendasPorCategoria({
           ${subgrupoFilter}
           ${gradeFilter}
           ${exclusionFilter}
+          ${nerdOnlyEletronicosFilter}
           AND ${categoriaField} <> ''
           AND ${categoriaField} <> 'SEM GRUPO'
           AND ${categoriaField} <> 'SEM LINHA'
+          ${buildCategoriaExcludeNerd(company, categoriaField)}
         GROUP BY ${categoriaField}
       `;
       const ecommerceResult = await request.query<{ categoria: string; vendas: number | null }>(ecommerceQuery);
@@ -2701,6 +2764,7 @@ export async function fetchVendasPorCategoriaGiro({
     const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
     const gradeFilter = buildGradeFilter(request, company, grades, 'p');
     const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineGiro');
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
     const categoriaField = company === 'nerd' 
       ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
       : 'ISNULL(p.LINHA, \'SEM LINHA\')';
@@ -2790,6 +2854,7 @@ export async function fetchVendasPorCategoriaGiro({
           ${subgrupoFilter}
           ${gradeFilter}
           ${exclusionFilter}
+          ${nerdOnlyEletronicosFilter}
       ),
       TrocasItem AS (
         SELECT 
@@ -2833,6 +2898,8 @@ export async function fetchVendasPorCategoriaGiro({
       WHERE ${company === 'nerd' ? 'ISNULL(vct.GRUPO_PRODUTO, \'SEM GRUPO\')' : 'ISNULL(vct.LINHA, \'SEM LINHA\')'} <> ''
         AND ${company === 'nerd' ? 'ISNULL(vct.GRUPO_PRODUTO, \'SEM GRUPO\')' : 'ISNULL(vct.LINHA, \'SEM LINHA\')'} <> 'SEM GRUPO'
         AND ${company === 'nerd' ? 'ISNULL(vct.GRUPO_PRODUTO, \'SEM GRUPO\')' : 'ISNULL(vct.LINHA, \'SEM LINHA\')'} <> 'SEM LINHA'
+        ${company === 'nerd' ? `AND LTRIM(RTRIM(ISNULL(vct.GRUPO_PRODUTO, 'SEM GRUPO'))) NOT IN ('BAG', 'ASSISTENCIA')` : ''}
+        ${company === 'nerd' ? `AND UPPER(LTRIM(RTRIM(ISNULL(vct.LINHA, '')))) = 'ELETRONICOS'` : ''}
       GROUP BY ${company === 'nerd' ? 'ISNULL(vct.GRUPO_PRODUTO, \'SEM GRUPO\')' : 'ISNULL(vct.LINHA, \'SEM LINHA\')'}${groupByAdicional.replace(/p\./g, 'vct.')}
       HAVING SUM(CASE 
         WHEN vct.QTDE_CANCELADA = 0 THEN (vct.QTDE - vct.QTDE_TROCA)
@@ -2916,9 +2983,11 @@ export async function fetchVendasPorCategoriaGiro({
           ${subgrupoFilter}
           ${gradeFilter}
           ${exclusionFilter}
+          ${nerdOnlyEletronicosFilter}
           AND ${categoriaField} <> ''
           AND ${categoriaField} <> 'SEM GRUPO'
           AND ${categoriaField} <> 'SEM LINHA'
+          ${buildCategoriaExcludeNerd(company, categoriaField)}
         GROUP BY ${categoriaField}${groupByAdicional}
         HAVING SUM(CAST(fp.QTDE AS FLOAT)) > 0
       `;
@@ -3037,6 +3106,7 @@ export async function fetchPrevisoesEstoque({
     const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
     const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
     const gradeFilter = buildGradeFilter(request, company, grades, 'p');
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
     const categoriaField = company === 'nerd' 
       ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
       : 'ISNULL(p.LINHA, \'SEM LINHA\')';
@@ -3077,10 +3147,12 @@ export async function fetchPrevisoesEstoque({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${nerdOnlyEletronicosFilter}
         AND e.ESTOQUE > 0
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
       GROUP BY ${categoriaField}${groupByAdicional}
       HAVING SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) > 0
     `;
@@ -3114,9 +3186,11 @@ export async function fetchPrevisoesEstoque({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${nerdOnlyEletronicosFilter}
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
       GROUP BY ${categoriaField}${groupByVendasAdicional}
     `;
 
@@ -3179,9 +3253,11 @@ export async function fetchPrevisoesEstoque({
           ${colecaoFilter}
           ${subgrupoFilter}
           ${gradeFilter}
+          ${nerdOnlyEletronicosFilter}
           AND ${categoriaField} <> ''
           AND ${categoriaField} <> 'SEM GRUPO'
           AND ${categoriaField} <> 'SEM LINHA'
+          ${buildCategoriaExcludeNerd(company, categoriaField)}
         GROUP BY ${categoriaField}${groupByVendasAdicional}
       `;
 
@@ -3231,6 +3307,7 @@ export async function fetchPrevisoesEstoque({
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
       GROUP BY ${categoriaField}${groupByVendasAdicional}, YEAR(vp.DATA_VENDA), MONTH(vp.DATA_VENDA)
     `;
 
@@ -3461,6 +3538,8 @@ export async function fetchProdutoDetalhes({
       produtoFilterVendas += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupoFiltro`;
     }
 
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
+
     // Buscar todas as variações do produto com estoque
     const variacoesQuery = `
       SELECT 
@@ -3480,6 +3559,7 @@ export async function fetchProdutoDetalhes({
       WHERE 1=1
         ${estoqueFilialFilter}
         ${produtoFilterEstoque}
+        ${nerdOnlyEletronicosFilter}
         AND e.ESTOQUE > 0
         ${company === 'nerd' ? `AND ISNULL(p.GRUPO_PRODUTO, '') <> ''` : `AND ISNULL(p.LINHA, '') <> ''`}
       GROUP BY 
@@ -3522,6 +3602,7 @@ export async function fetchProdutoDetalhes({
         AND vp.QTDE > 0
         ${vendasFilialFilter}
         ${produtoFilterVendas}
+        ${nerdOnlyEletronicosFilter}
         ${company === 'nerd' ? `AND ISNULL(p.GRUPO_PRODUTO, '') <> ''` : `AND ISNULL(p.LINHA, '') <> ''`}
       GROUP BY 
         vp.PRODUTO,
@@ -3684,6 +3765,8 @@ export async function fetchProdutoDetalhesPorFilial({
       produtoFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao`;
     }
 
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
+
     // Filtro de cor (se fornecido)
     let corFilter = '';
     if (cor) {
@@ -3714,6 +3797,7 @@ export async function fetchProdutoDetalhesPorFilial({
         ${estoqueFilialFilter}
         ${produtoFilter}
         ${corFilter}
+        ${nerdOnlyEletronicosFilter}
         AND e.ESTOQUE > 0
         ${company === 'nerd' ? `AND ISNULL(p.GRUPO_PRODUTO, '') <> ''` : `AND ISNULL(p.LINHA, '') <> ''`}
       GROUP BY 
@@ -3969,6 +4053,7 @@ export async function fetchProjecaoMensal({
     const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
     const gradeFilter = buildGradeFilter(request, company, grades, 'p');
     const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineProjecao');
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
 
     // 1. Buscar estoque atual por categoria
     const estoqueQuery = `
@@ -3986,10 +4071,12 @@ export async function fetchProjecaoMensal({
         ${subgrupoFilter}
         ${gradeFilter}
         ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
         AND e.ESTOQUE > 0
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
       GROUP BY ${categoriaField}${groupByAdicional}
       HAVING SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) > 0
     `;
@@ -4024,6 +4111,7 @@ export async function fetchProjecaoMensal({
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
       GROUP BY ${categoriaField}${groupByAdicional}, MONTH(vp.DATA_VENDA)
     `;
 
@@ -4071,9 +4159,11 @@ export async function fetchProjecaoMensal({
               ${ecommerceAnoPassadoFilialFilter}
               ${grupoFilter}
               ${exclusionFilter}
+              ${nerdOnlyEletronicosFilter}
               AND ${categoriaField} <> ''
               AND ${categoriaField} <> 'SEM GRUPO'
               AND ${categoriaField} <> 'SEM LINHA'
+              ${buildCategoriaExcludeNerd(company, categoriaField)}
             GROUP BY ${categoriaField}${groupByAdicional}, MONTH(f.EMISSAO)
           `;
 
@@ -4116,9 +4206,11 @@ export async function fetchProjecaoMensal({
         ${subgrupoFilter}
         ${gradeFilter}
         ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
         AND ${categoriaField} <> ''
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
       GROUP BY ${categoriaField}${groupByAdicional}
     `;
 
@@ -4165,9 +4257,11 @@ export async function fetchProjecaoMensal({
               ${ecommerceMesAtualFilialFilter}
               ${grupoFilter}
               ${exclusionFilter}
+              ${nerdOnlyEletronicosFilter}
               AND ${categoriaField} <> ''
               AND ${categoriaField} <> 'SEM GRUPO'
               AND ${categoriaField} <> 'SEM LINHA'
+              ${buildCategoriaExcludeNerd(company, categoriaField)}
             GROUP BY ${categoriaField}${groupByAdicional}
           `;
 
