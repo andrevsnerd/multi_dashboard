@@ -1414,3 +1414,197 @@ export async function fetchProductSaleHistory({
   });
 }
 
+// --- Preços e custos editáveis (como no script alterar_custo_produto.py) ---
+
+export interface ProductPrecoItem {
+  codTabela: string;
+  descTabela: string;
+  valor: number;
+  origem: 'PRODUTOS_PRECOS';
+  campo: string;
+}
+
+export interface ProductCustoItem {
+  codTabela: string;
+  descTabela: string;
+  valor: number;
+  origem: 'PRODUTOS';
+  campo: string;
+}
+
+/**
+ * Busca todos os preços de venda do produto (PRODUTOS_PRECOS: PRECO1-4 por CODIGO_TAB_PRECO).
+ */
+export async function fetchProductPrecos(
+  productId: string,
+  _company?: string
+): Promise<ProductPrecoItem[]> {
+  const codigoLimpo = String(productId).trim();
+
+  return withRequest(async (request) => {
+    request.input('productId', sql.VarChar, codigoLimpo);
+
+    const query = `
+      SELECT pp.PRODUTO, CONCAT(pp.CODIGO_TAB_PRECO, '-P1') AS COD_TABELA,
+        CONCAT(ISNULL(tp.TABELA, ''), ' - PRECO1') AS DESC_TABELA,
+        ISNULL(pp.PRECO1, 0) AS VALOR, 'PRODUTOS_PRECOS' AS ORIGEM, 'PRECO1' AS CAMPO
+      FROM PRODUTOS_PRECOS pp WITH (NOLOCK)
+      LEFT JOIN TABELAS_PRECO tp WITH (NOLOCK) ON tp.CODIGO_TAB_PRECO = pp.CODIGO_TAB_PRECO
+      WHERE pp.PRODUTO = @productId
+      UNION ALL
+      SELECT pp.PRODUTO, CONCAT(pp.CODIGO_TAB_PRECO, '-P2'),
+        CONCAT(ISNULL(tp.TABELA, ''), ' - PRECO2'), ISNULL(pp.PRECO2, 0), 'PRODUTOS_PRECOS', 'PRECO2'
+      FROM PRODUTOS_PRECOS pp WITH (NOLOCK)
+      LEFT JOIN TABELAS_PRECO tp WITH (NOLOCK) ON tp.CODIGO_TAB_PRECO = pp.CODIGO_TAB_PRECO
+      WHERE pp.PRODUTO = @productId
+      UNION ALL
+      SELECT pp.PRODUTO, CONCAT(pp.CODIGO_TAB_PRECO, '-P3'),
+        CONCAT(ISNULL(tp.TABELA, ''), ' - PRECO3'), ISNULL(pp.PRECO3, 0), 'PRODUTOS_PRECOS', 'PRECO3'
+      FROM PRODUTOS_PRECOS pp WITH (NOLOCK)
+      LEFT JOIN TABELAS_PRECO tp WITH (NOLOCK) ON tp.CODIGO_TAB_PRECO = pp.CODIGO_TAB_PRECO
+      WHERE pp.PRODUTO = @productId
+      UNION ALL
+      SELECT pp.PRODUTO, CONCAT(pp.CODIGO_TAB_PRECO, '-P4'),
+        CONCAT(ISNULL(tp.TABELA, ''), ' - PRECO4'), ISNULL(pp.PRECO4, 0), 'PRODUTOS_PRECOS', 'PRECO4'
+      FROM PRODUTOS_PRECOS pp WITH (NOLOCK)
+      LEFT JOIN TABELAS_PRECO tp WITH (NOLOCK) ON tp.CODIGO_TAB_PRECO = pp.CODIGO_TAB_PRECO
+      WHERE pp.PRODUTO = @productId
+      ORDER BY COD_TABELA
+    `;
+
+    const result = await request.query<{
+      COD_TABELA: string;
+      DESC_TABELA: string;
+      VALOR: number;
+      ORIGEM: string;
+      CAMPO: string;
+    }>(query);
+
+    return result.recordset.map((row) => ({
+      codTabela: String(row.COD_TABELA ?? '').trim(),
+      descTabela: String(row.DESC_TABELA ?? '').trim(),
+      valor: Number(row.VALOR ?? 0),
+      origem: 'PRODUTOS_PRECOS' as const,
+      campo: String(row.CAMPO ?? 'PRECO1').trim(),
+    }));
+  });
+}
+
+/**
+ * Busca todos os custos do produto (PRODUTOS: CUSTO_REPOSICAO1-4).
+ */
+export async function fetchProductCustos(
+  productId: string,
+  _company?: string
+): Promise<ProductCustoItem[]> {
+  const codigoLimpo = String(productId).trim();
+
+  return withRequest(async (request) => {
+    request.input('productId', sql.VarChar, codigoLimpo);
+
+    const query = `
+      SELECT PRODUTO, '00' AS COD_TABELA, 'TABELA ORIGINAL' AS DESC_TABELA,
+        ISNULL(CUSTO_REPOSICAO1, 0) AS VALOR, 'PRODUTOS' AS ORIGEM, 'CUSTO_REPOSICAO1' AS CAMPO
+      FROM PRODUTOS WITH (NOLOCK) WHERE PRODUTO = @productId
+      UNION ALL
+      SELECT PRODUTO, '01', 'TABELA PADRAO', ISNULL(CUSTO_REPOSICAO2, 0), 'PRODUTOS', 'CUSTO_REPOSICAO2'
+      FROM PRODUTOS WITH (NOLOCK) WHERE PRODUTO = @productId
+      UNION ALL
+      SELECT PRODUTO, '02', 'TABELA ALTERNATIVA', ISNULL(CUSTO_REPOSICAO3, 0), 'PRODUTOS', 'CUSTO_REPOSICAO3'
+      FROM PRODUTOS WITH (NOLOCK) WHERE PRODUTO = @productId
+      UNION ALL
+      SELECT PRODUTO, '03', 'TABELA EXTRA', ISNULL(CUSTO_REPOSICAO4, 0), 'PRODUTOS', 'CUSTO_REPOSICAO4'
+      FROM PRODUTOS WITH (NOLOCK) WHERE PRODUTO = @productId
+      ORDER BY COD_TABELA
+    `;
+
+    const result = await request.query<{
+      COD_TABELA: string;
+      DESC_TABELA: string;
+      VALOR: number;
+      ORIGEM: string;
+      CAMPO: string;
+    }>(query);
+
+    return result.recordset.map((row) => ({
+      codTabela: String(row.COD_TABELA ?? '').trim(),
+      descTabela: String(row.DESC_TABELA ?? '').trim(),
+      valor: Number(row.VALOR ?? 0),
+      origem: 'PRODUTOS' as const,
+      campo: String(row.CAMPO ?? 'CUSTO_REPOSICAO1').trim(),
+    }));
+  });
+}
+
+export interface UpdatePrecoCustoParams {
+  productId: string;
+  codTabela: string;
+  origem: 'PRODUTOS' | 'PRODUTOS_PRECOS';
+  campo: string;
+  novoValor: number;
+}
+
+/**
+ * Atualiza um preço (PRODUTOS_PRECOS) ou custo (PRODUTOS). Lógica igual ao script alterar_custo_produto.py.
+ */
+export async function updateProductPrecoOrCusto(
+  params: UpdatePrecoCustoParams
+): Promise<{ success: boolean; rowsAffected: number; message: string }> {
+  const { productId, codTabela, origem, campo, novoValor } = params;
+  const produto = String(productId).trim();
+  const codTabelaTrim = codTabela?.trim() ?? '';
+
+  return withRequest(async (request) => {
+    try {
+      if (origem === 'PRODUTOS') {
+        const query = `
+          UPDATE PRODUTOS SET ${sanitizeColumnName(campo)} = @novoValor WHERE PRODUTO = @productId
+        `;
+        request.input('productId', sql.VarChar, produto);
+        request.input('novoValor', sql.Decimal(18, 4), novoValor);
+        const result = await request.query(query);
+        const rows = (result as { rowsAffected?: number[] }).rowsAffected ?? [];
+        const rowsAffected = Array.isArray(rows) ? (rows[0] ?? 0) : 0;
+        return {
+          success: true,
+          rowsAffected,
+          message: rowsAffected > 0 ? `${rowsAffected} registro(s) alterado(s) com sucesso.` : 'Nenhum registro alterado.',
+        };
+      }
+
+      if (origem === 'PRODUTOS_PRECOS') {
+        const codTabelaLimpo = codTabelaTrim.includes('-') ? codTabelaTrim.split('-')[0] : codTabelaTrim;
+        const query = `
+          UPDATE PRODUTOS_PRECOS SET ${sanitizeColumnName(campo)} = @novoValor
+          WHERE PRODUTO = @productId AND CODIGO_TAB_PRECO = @codTabela
+        `;
+        request.input('productId', sql.VarChar, produto);
+        request.input('novoValor', sql.Decimal(18, 4), novoValor);
+        request.input('codTabela', sql.VarChar, codTabelaLimpo);
+        const result = await request.query(query);
+        const rows = (result as { rowsAffected?: number[] }).rowsAffected ?? [];
+        const rowsAffected = Array.isArray(rows) ? (rows[0] ?? 0) : 0;
+        return {
+          success: true,
+          rowsAffected,
+          message: rowsAffected > 0 ? `${rowsAffected} registro(s) alterado(s) com sucesso.` : 'Nenhum registro alterado.',
+        };
+      }
+
+      return { success: false, rowsAffected: 0, message: 'Origem inválida.' };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { success: false, rowsAffected: 0, message: `Erro: ${message}` };
+    }
+  });
+}
+
+function sanitizeColumnName(name: string): string {
+  const allowed = [
+    'CUSTO_REPOSICAO1', 'CUSTO_REPOSICAO2', 'CUSTO_REPOSICAO3', 'CUSTO_REPOSICAO4',
+    'PRECO1', 'PRECO2', 'PRECO3', 'PRECO4',
+  ];
+  const n = name?.trim() ?? '';
+  if (allowed.includes(n)) return n;
+  return 'PRECO1';
+}

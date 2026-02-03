@@ -3420,6 +3420,7 @@ export interface ProdutoVariacaoDetalhes {
   colecao: string;
   cor: string;
   estoque: number;
+  preco: number;
   custoUnitario: number;
   custoTotal: number;
   vendasTotais: number;
@@ -3551,6 +3552,7 @@ export async function fetchProdutoDetalhes({
         ISNULL(p.COLECAO, '') AS colecao,
         ISNULL(COALESCE(c.DESC_COR, e.COR_PRODUTO), '') AS cor,
         SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoque,
+        ISNULL(COALESCE(p.PRECO_REPOSICAO_1, p.PRECO_A_VISTA_REPOSICAO_1, p.REVENDA), 0) AS preco,
         ISNULL(p.CUSTO_REPOSICAO1, 0) AS custoUnitario,
         SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0) ELSE 0 END) AS custoTotal
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
@@ -3570,7 +3572,10 @@ export async function fetchProdutoDetalhes({
         p.GRADE,
         p.COLECAO,
         COALESCE(c.DESC_COR, e.COR_PRODUTO),
-        p.CUSTO_REPOSICAO1
+        p.CUSTO_REPOSICAO1,
+        p.PRECO_REPOSICAO_1,
+        p.PRECO_A_VISTA_REPOSICAO_1,
+        p.REVENDA
       HAVING SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) > 0
       ORDER BY SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) DESC, e.PRODUTO, COALESCE(c.DESC_COR, e.COR_PRODUTO)
     `;
@@ -3584,6 +3589,7 @@ export async function fetchProdutoDetalhes({
       colecao: string;
       cor: string;
       estoque: number | null;
+      preco: number | null;
       custoUnitario: number | null;
       custoTotal: number | null;
     }>(variacoesQuery);
@@ -3635,6 +3641,7 @@ export async function fetchProdutoDetalhes({
         colecao: row.colecao?.trim() || '',
         cor: row.cor?.trim() || '',
         estoque: Math.round(Number(row.estoque ?? 0)),
+        preco: Number(row.preco ?? 0),
         custoUnitario: Number(row.custoUnitario ?? 0),
         custoTotal: Number(row.custoTotal ?? 0),
         vendasTotais: vendas,
@@ -3678,6 +3685,7 @@ export interface ProdutoVariacaoDetalhesPorFilial {
   cor: string;
   filial: string;
   estoque: number;
+  preco: number;
   custoUnitario: number;
   custoTotal: number;
   vendasTotais: number;
@@ -3788,6 +3796,7 @@ export async function fetchProdutoDetalhesPorFilial({
         ISNULL(COALESCE(c.DESC_COR, e.COR_PRODUTO), '') AS cor,
         e.FILIAL AS filial,
         SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoque,
+        ISNULL(COALESCE(p.PRECO_REPOSICAO_1, p.PRECO_A_VISTA_REPOSICAO_1, p.REVENDA), 0) AS preco,
         ISNULL(p.CUSTO_REPOSICAO1, 0) AS custoUnitario,
         SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0) ELSE 0 END) AS custoTotal
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
@@ -3809,6 +3818,9 @@ export async function fetchProdutoDetalhesPorFilial({
         p.COLECAO,
         COALESCE(c.DESC_COR, e.COR_PRODUTO),
         p.CUSTO_REPOSICAO1,
+        p.PRECO_REPOSICAO_1,
+        p.PRECO_A_VISTA_REPOSICAO_1,
+        p.REVENDA,
         e.FILIAL
       HAVING SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) > 0
       ORDER BY SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) DESC, e.PRODUTO, COALESCE(c.DESC_COR, e.COR_PRODUTO), e.FILIAL
@@ -3824,6 +3836,7 @@ export async function fetchProdutoDetalhesPorFilial({
       cor: string;
       filial: string;
       estoque: number | null;
+      preco: number | null;
       custoUnitario: number | null;
       custoTotal: number | null;
     }>(variacoesQuery);
@@ -3928,6 +3941,7 @@ export async function fetchProdutoDetalhesPorFilial({
         cor: row.cor?.trim() || '',
         filial: row.filial?.trim() || '',
         estoque: Math.round(Number(row.estoque ?? 0)),
+        preco: Number(row.preco ?? 0),
         custoUnitario: Number(row.custoUnitario ?? 0),
         custoTotal: Number(row.custoTotal ?? 0),
         vendasTotais: vendas,
@@ -3955,6 +3969,7 @@ export async function fetchProdutoDetalhesPorFilial({
           cor: row.cor?.trim() || '',
           filial: row.filial?.trim() || '',
           estoque: 0,
+          preco: primeiraVariacao ? Number(primeiraVariacao.preco ?? 0) : 0,
           custoUnitario: primeiraVariacao ? Number(primeiraVariacao.custoUnitario ?? 0) : 0,
           custoTotal: 0,
           vendasTotais: Math.round(Number(row.vendasTotais ?? 0)),

@@ -105,6 +105,8 @@ export default function ProductDetailPage({
   const [data, setData] = useState<ProductDetailData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const refetchDetail = useCallback(() => setRefreshTrigger((t) => t + 1), []);
 
   // Fechar dropdown ao clicar fora
   useEffect(() => {
@@ -224,7 +226,7 @@ export default function ProductDetailPage({
     return () => {
       active = false;
     };
-  }, [selectedProductId, companyKey, range]);
+  }, [selectedProductId, companyKey, range, refreshTrigger]);
 
   const handleProductSelect = useCallback((productId: string, productName: string) => {
     const trimmedName = productName.trim();
@@ -296,10 +298,13 @@ export default function ProductDetailPage({
 
       <ProductDetailKPIs
         detail={data.detail}
+        productId={data.detail.productId}
+        companyKey={companyKey}
         companyName={companyName}
         range={range}
         saleHistory={data.saleHistory}
         stockByFilial={data.stockByFilial}
+        onDetailUpdated={refetchDetail}
       />
 
       <ProductPerformanceTable

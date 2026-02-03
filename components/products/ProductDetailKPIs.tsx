@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, useCallback } from "react";
 import {
   LineChart,
   Line,
@@ -16,12 +16,16 @@ import type {
   ProductDetailInfo,
   ProductSaleHistory,
   ProductStockByFilial,
+  ProductPrecoItem,
+  ProductCustoItem,
 } from "@/lib/repositories/productDetail";
 
 import styles from "./ProductDetailKPIs.module.css";
 
-interface ProductDetailKPIsProps {
+export interface ProductDetailKPIsProps {
   detail: ProductDetailInfo;
+  productId: string;
+  companyKey: string;
   companyName: string;
   range: {
     startDate: Date;
@@ -29,6 +33,7 @@ interface ProductDetailKPIsProps {
   };
   saleHistory: ProductSaleHistory[];
   stockByFilial: ProductStockByFilial[];
+  onDetailUpdated?: () => void;
 }
 
 function formatCurrency(value: number): string {
@@ -47,10 +52,166 @@ function formatInteger(value: number): string {
 
 export default function ProductDetailKPIs({
   detail,
+  productId,
+  companyKey,
   range,
   saleHistory,
   stockByFilial,
+  onDetailUpdated,
 }: ProductDetailKPIsProps) {
+  const [modalPrecoOpen, setModalPrecoOpen] = useState(false);
+  const [modalCustoOpen, setModalCustoOpen] = useState(false);
+  const [precos, setPrecos] = useState<ProductPrecoItem[]>([]);
+  const [custos, setCustos] = useState<ProductCustoItem[]>([]);
+  const [editedPrecos, setEditedPrecos] = useState<Record<string, string>>({});
+  const [editedCustos, setEditedCustos] = useState<Record<string, string>>({});
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [confirmPayload, setConfirmPayload] = useState<{
+    type: 'preco' | 'custo';
+    codTabela: string;
+    origem: 'PRODUTOS' | 'PRODUTOS_PRECOS';
+    campo: string;
+    valorAnterior: number;
+    novoValor: number;
+  } | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const openPrecoModal = useCallback(() => {
+    setModalError(null);
+    setEditedPrecos({});
+    setConfirmPayload(null);
+    setModalPrecoOpen(true);
+    setModalLoading(true);
+    fetch(`/api/product-detail/precos?productId=${encodeURIComponent(productId)}&company=${encodeURIComponent(companyKey)}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.error) throw new Error(json.error);
+        setPrecos(json.data ?? []);
+      })
+      .catch((e) => setModalError(e instanceof Error ? e.message : 'Erro ao carregar preços'))
+      .finally(() => setModalLoading(false));
+  }, [productId, companyKey]);
+
+  const openCustoModal = useCallback(() => {
+    setModalError(null);
+    setEditedCustos({});
+    setConfirmPayload(null);
+    setModalCustoOpen(true);
+    setModalLoading(true);
+    fetch(`/api/product-detail/custos?productId=${encodeURIComponent(productId)}&company=${encodeURIComponent(companyKey)}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.error) throw new Error(json.error);
+        setCustos(json.data ?? []);
+      })
+      .catch((e) => setModalError(e instanceof Error ? e.message : 'Erro ao carregar custos'))
+      .finally(() => setModalLoading(false));
+  }, [productId, companyKey]);
+
+  const hasPrecoChange = precos.some((p) => {
+    const key = `${p.codTabela}-${p.campo}`;
+    const edited = editedPrecos[key];
+    if (edited === undefined) return false;
+    const raw = edited.replace(',', '.');
+    const num = parseFloat(raw);
+    return !Number.isNaN(num) && Math.abs(num - p.valor) > 1e-6;
+  });
+  const hasCustoChange = custos.some((c) => {
+    const key = `${c.codTabela}-${c.campo}`;
+    const edited = editedCustos[key];
+    if (edited === undefined) return false;
+    const raw = edited.replace(',', '.');
+    const num = parseFloat(raw);
+    return !Number.isNaN(num) && Math.abs(num - c.valor) > 1e-6;
+  });
+
+  const handleSavePreco = useCallback(() => {
+    setModalError(null);
+    const item = precos.find((p) => {
+      const key = `${p.codTabela}-${p.campo}`;
+      const edited = editedPrecos[key];
+      if (edited === undefined) return false;
+      const raw = edited.replace(',', '.');
+      const num = parseFloat(raw);
+      return !Number.isNaN(num) && Math.abs(num - p.valor) > 1e-6;
+    });
+    if (!item) return;
+    const key = `${item.codTabela}-${item.campo}`;
+    const raw = editedPrecos[key]?.replace(',', '.') ?? '';
+    const novoValor = parseFloat(raw);
+    if (Number.isNaN(novoValor) || novoValor < 0) {
+      setModalError('Valor inválido.');
+      return;
+    }
+    setConfirmPayload({
+      type: 'preco',
+      codTabela: item.codTabela,
+      origem: item.origem,
+      campo: item.campo,
+      valorAnterior: item.valor,
+      novoValor,
+    });
+  }, [editedPrecos, precos]);
+
+  const handleSaveCusto = useCallback(() => {
+    setModalError(null);
+    const item = custos.find((c) => {
+      const key = `${c.codTabela}-${c.campo}`;
+      const edited = editedCustos[key];
+      if (edited === undefined) return false;
+      const raw = edited.replace(',', '.');
+      const num = parseFloat(raw);
+      return !Number.isNaN(num) && Math.abs(num - c.valor) > 1e-6;
+    });
+    if (!item) return;
+    const key = `${item.codTabela}-${item.campo}`;
+    const raw = editedCustos[key]?.replace(',', '.') ?? '';
+    const novoValor = parseFloat(raw);
+    if (Number.isNaN(novoValor) || novoValor < 0) {
+      setModalError('Valor inválido.');
+      return;
+    }
+    setConfirmPayload({
+      type: 'custo',
+      codTabela: item.codTabela,
+      origem: item.origem,
+      campo: item.campo,
+      valorAnterior: item.valor,
+      novoValor,
+    });
+  }, [editedCustos, custos]);
+
+  const executeUpdate = useCallback(() => {
+    if (!confirmPayload) return;
+    setSaving(true);
+    setModalError(null);
+    fetch('/api/product-detail/update-price-or-cost', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        productId,
+        company: companyKey,
+        codTabela: confirmPayload.codTabela,
+        origem: confirmPayload.origem,
+        campo: confirmPayload.campo,
+        novoValor: confirmPayload.novoValor,
+      }),
+    })
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.error) throw new Error(json.error);
+        setConfirmPayload(null);
+        setModalPrecoOpen(false);
+        setModalCustoOpen(false);
+        setEditedPrecos({});
+        setEditedCustos({});
+        onDetailUpdated?.();
+      })
+      .catch((e) => setModalError(e instanceof Error ? e.message : 'Erro ao salvar'))
+      .finally(() => setSaving(false));
+  }, [confirmPayload, productId, companyKey, onDetailUpdated]);
+
   const start = new Date(range.startDate);
   const end = new Date(range.endDate);
   const currentMonth = new Date(start.getFullYear(), start.getMonth(), 1);
@@ -173,9 +334,17 @@ export default function ProductDetailKPIs({
         <article className={styles.card}>
           <header className={styles.cardHeader}>
             <span className={styles.cardLabel}>PREÇO DE VENDA</span>
-            <span className={styles.cardIconSvg} aria-hidden>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
-            </span>
+            <button
+              type="button"
+              className={styles.cardEditButton}
+              onClick={openPrecoModal}
+              aria-label="Editar preços de venda"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </button>
           </header>
           <div className={styles.cardValue}>{formatCurrency(detail.registeredPrice)}</div>
           <p className={styles.cardDescription}>Preço de venda cadastrado</p>
@@ -184,9 +353,17 @@ export default function ProductDetailKPIs({
         <article className={styles.card}>
           <header className={styles.cardHeader}>
             <span className={styles.cardLabel}>CUSTO UNITÁRIO</span>
-            <span className={styles.cardIconSvg} aria-hidden>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
-            </span>
+            <button
+              type="button"
+              className={styles.cardEditButton}
+              onClick={openCustoModal}
+              aria-label="Editar custos unitários"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </button>
           </header>
           <div className={styles.cardValue}>{formatCurrency(detail.registeredCost)}</div>
           <p className={styles.cardDescription}>Custo cadastrado</p>
@@ -345,6 +522,108 @@ export default function ProductDetailKPIs({
           )}
         </div>
       </div>
+
+      {/* Modal Preços de venda */}
+      {modalPrecoOpen && (
+        <div className={styles.modalOverlay} onClick={() => !confirmPayload && setModalPrecoOpen(false)} role="dialog" aria-modal="true" aria-labelledby="modal-preco-title">
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <h2 id="modal-preco-title" className={styles.modalTitle}>Editar preços de venda</h2>
+            {modalError && <div className={styles.modalError}>{modalError}</div>}
+            {modalLoading && <div className={styles.modalLoading}>Carregando…</div>}
+            {!modalLoading && precos.length === 0 && !modalError && <div className={styles.modalEmpty}>Nenhum preço de venda encontrado para este produto.</div>}
+            {!modalLoading && precos.length > 0 && (
+              <>
+                <div className={styles.modalList}>
+                  {precos.map((item) => {
+                    const key = `${item.codTabela}-${item.campo}`;
+                    return (
+                      <div key={key} className={styles.modalRow}>
+                        <span className={styles.modalRowLabel}>{item.descTabela || item.codTabela}</span>
+                        <input
+                          type="text"
+                          className={styles.modalInput}
+                          value={editedPrecos[key] ?? item.valor.toFixed(2).replace('.', ',')}
+                          onChange={(e) => setEditedPrecos((prev) => ({ ...prev, [key]: e.target.value }))}
+                          inputMode="decimal"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                {confirmPayload && confirmPayload.type === 'preco' && (
+                  <div className={styles.modalConfirmMessage}>
+                    Confirmar alteração: <strong>{formatCurrency(confirmPayload.valorAnterior)}</strong> → <strong>{formatCurrency(confirmPayload.novoValor)}</strong>?
+                  </div>
+                )}
+                <div className={styles.modalActions}>
+                  {confirmPayload && confirmPayload.type === 'preco' ? (
+                    <>
+                      <button type="button" className={`${styles.modalButton} ${styles.modalButtonSecondary}`} onClick={() => setConfirmPayload(null)} disabled={saving}>Cancelar</button>
+                      <button type="button" className={`${styles.modalButton} ${styles.modalButtonPrimary}`} onClick={executeUpdate} disabled={saving}>{saving ? 'Salvando…' : 'Confirmar'}</button>
+                    </>
+                  ) : (
+                    <>
+                      <button type="button" className={`${styles.modalButton} ${styles.modalButtonSecondary}`} onClick={() => setModalPrecoOpen(false)}>Fechar</button>
+                      <button type="button" className={`${styles.modalButton} ${styles.modalButtonPrimary}`} onClick={handleSavePreco} disabled={!hasPrecoChange}>Salvar</button>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Custos unitários */}
+      {modalCustoOpen && (
+        <div className={styles.modalOverlay} onClick={() => !confirmPayload && setModalCustoOpen(false)} role="dialog" aria-modal="true" aria-labelledby="modal-custo-title">
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <h2 id="modal-custo-title" className={styles.modalTitle}>Editar custos unitários</h2>
+            {modalError && <div className={styles.modalError}>{modalError}</div>}
+            {modalLoading && <div className={styles.modalLoading}>Carregando…</div>}
+            {!modalLoading && custos.length === 0 && !modalError && <div className={styles.modalEmpty}>Nenhum custo encontrado para este produto.</div>}
+            {!modalLoading && custos.length > 0 && (
+              <>
+                <div className={styles.modalList}>
+                  {custos.map((item) => {
+                    const key = `${item.codTabela}-${item.campo}`;
+                    return (
+                      <div key={key} className={styles.modalRow}>
+                        <span className={styles.modalRowLabel}>{item.descTabela || item.codTabela}</span>
+                        <input
+                          type="text"
+                          className={styles.modalInput}
+                          value={editedCustos[key] ?? item.valor.toFixed(2).replace('.', ',')}
+                          onChange={(e) => setEditedCustos((prev) => ({ ...prev, [key]: e.target.value }))}
+                          inputMode="decimal"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                {confirmPayload && confirmPayload.type === 'custo' && (
+                  <div className={styles.modalConfirmMessage}>
+                    Confirmar alteração: <strong>{formatCurrency(confirmPayload.valorAnterior)}</strong> → <strong>{formatCurrency(confirmPayload.novoValor)}</strong>?
+                  </div>
+                )}
+                <div className={styles.modalActions}>
+                  {confirmPayload && confirmPayload.type === 'custo' ? (
+                    <>
+                      <button type="button" className={`${styles.modalButton} ${styles.modalButtonSecondary}`} onClick={() => setConfirmPayload(null)} disabled={saving}>Cancelar</button>
+                      <button type="button" className={`${styles.modalButton} ${styles.modalButtonPrimary}`} onClick={executeUpdate} disabled={saving}>{saving ? 'Salvando…' : 'Confirmar'}</button>
+                    </>
+                  ) : (
+                    <>
+                      <button type="button" className={`${styles.modalButton} ${styles.modalButtonSecondary}`} onClick={() => setModalCustoOpen(false)}>Fechar</button>
+                      <button type="button" className={`${styles.modalButton} ${styles.modalButtonPrimary}`} onClick={handleSaveCusto} disabled={!hasCustoChange}>Salvar</button>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

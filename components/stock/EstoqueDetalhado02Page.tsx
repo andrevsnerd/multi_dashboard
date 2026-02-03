@@ -22,6 +22,7 @@ interface ProdutoVariacaoDetalhesPorFilial {
   cor: string;
   filial: string;
   estoque: number;
+  preco: number;
   custoUnitario: number;
   custoTotal: number;
   vendasTotais: number;
@@ -395,6 +396,7 @@ export default function EstoqueDetalhado02Page({
                   </span>
                 )}
               </th>
+              <th>PREÇO</th>
               <th>CUSTO UNIT.</th>
               <th>CUSTO TOTAL</th>
               <th 
@@ -417,6 +419,7 @@ export default function EstoqueDetalhado02Page({
                 <td>{variacao.cor}</td>
                 <td>{variacao.filial}</td>
                 <td>{formatNumber(variacao.estoque)}</td>
+                <td>{formatCurrency(variacao.preco ?? 0)}</td>
                 <td>{formatCurrency(variacao.custoUnitario)}</td>
                 <td>{formatCurrency(variacao.custoTotal)}</td>
                 <td>{formatNumber(variacao.vendasTotais)}</td>

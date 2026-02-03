@@ -747,6 +747,8 @@ export default function ControleTransferenciasTable({
   const [savingMarked, setSavingMarked] = useState(false);
 
   // Carregar marcações da API (mesmo Redis/KV das metas no Vercel)
+  // NOTA: Não fazemos prune aqui - quando visibleItemKeys muda (ex: troca de filial),
+  // as chaves salvas poderiam não estar no novo visible, e um POST com [] apagaria tudo no Redis.
   useEffect(() => {
     let active = true;
     (async () => {
@@ -759,15 +761,6 @@ export default function ControleTransferenciasTable({
         const visible = visibleItemKeys;
         const filtered = stored.filter((k) => visible.has(k));
         setMarkedKeys(new Set(filtered));
-        // Só faz prune (POST) quando a lista já carregou (visible não vazio) e há chaves para remover.
-        // Se visible estiver vazio (refresh/carregando), NÃO postar [] senão apaga tudo no Redis.
-        if (stored.length > filtered.length && visible.size > 0) {
-          await fetch("/api/transferencias-realizadas", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ companyKey, markedKeys: filtered }),
-          });
-        }
       } catch {
         if (active) setMarkedKeys(new Set());
       }
