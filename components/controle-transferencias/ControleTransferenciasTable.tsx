@@ -178,16 +178,25 @@ export function calculateTransfers(
 
     const productInfo = formatProductDescription(item.descricao, item.produto);
 
-    // Identificar filiais que precisam de estoque
-    // Critérios: Tem vendas no período (sales > 0) E Estoque < 1 (zero ou negativo)
-    // IMPORTANTE: Considerar apenas estoque positivo - estoque negativo é tratado como zero
-    // Ordenação de Prioridade:
-    // 1. Quem vendeu mais primeiro
-    // 2. Em caso de empate, quem tem menos estoque primeiro
+    // Estoque agregado do e-commerce (soma das filiais que compõem "E-COMMERCE" no modal)
+    // Se o canal e-commerce como um todo já tem estoque >= 1, não sugerir transferência para nenhuma filial de e-commerce
+    const ecommerceFilialsList = company.ecommerceFilials ?? [];
+    const estoqueAgregadoEcommerce = item.filiais
+      .filter(f => ecommerceFilialsList.some(ec => (ec || '').trim().toUpperCase() === (f.filial || '').trim().toUpperCase()))
+      .reduce((sum, f) => sum + Math.max(0, f.stock), 0);
+
+    // Identificar filiais que precisam de estoque (e portanto podem ser DESTINO de transferência)
+    // REGRA: Transferir APENAS para filial que VENDEU e está SEM ESTOQUE (estoque < 1).
+    // E-COMMERCE: usar estoque AGREGADO das filiais de e-commerce; se agregado >= 1, não sugerir transferência para nenhuma delas.
+    // Ordenação de Prioridade: 1) Quem vendeu mais primeiro  2) Em caso de empate, quem tem menos estoque primeiro
     const filiaisQuePrecisam = filiaisComVendas
       .filter(f => {
         const estoquePositivo = Math.max(0, f.stock);
-        return estoquePositivo < 1;
+        const isFilialEcommerce = ecommerceFilialsList.some(ec => (ec || '').trim().toUpperCase() === (f.filial || '').trim().toUpperCase());
+        if (isFilialEcommerce && estoqueAgregadoEcommerce >= 1) {
+          return false; // canal e-commerce já tem estoque; não sugerir transferência para nenhuma filial e-commerce
+        }
+        return estoquePositivo < 1; // somente sem estoque (0 ou negativo tratado como 0)
       })
       .map(f => {
         // IMPORTANTE: Usar apenas estoque positivo para ordenação
@@ -328,6 +337,13 @@ export function calculateTransfers(
     const usarDistribuicaoProporcional = temMultiplasLojas;
 
     filiaisQuePrecisam.forEach((filialDestino) => {
+      // Garantia: nunca transferir para filial que já tem estoque (rechecagem a partir dos dados atuais do item)
+      const dadosDestinoAtual = item.filiais.find(f => f.filial === filialDestino.filial);
+      const estoqueDestinoAtual = dadosDestinoAtual ? Math.max(0, dadosDestinoAtual.stock) : 0;
+      if (estoqueDestinoAtual >= 1) {
+        return; // filial destino já tem estoque deste item — não sugerir transferência
+      }
+
       const destinoKey = `${item.produto}|${item.cor}|${filialDestino.filial}`;
       const quantidadeJaTransferida = quantidadeTransferidaPorDestino.get(destinoKey) || 0;
 
