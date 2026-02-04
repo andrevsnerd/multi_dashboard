@@ -187,6 +187,11 @@
   text-align: center;
 }
 
+.quantidadeRealHeader {
+  width: 140px;
+  text-align: center;
+}
+
 .table tbody tr {
   border-bottom: 1px solid #f3f4f6;
   transition: background-color 0.15s;
@@ -451,6 +456,195 @@
   font-weight: 600;
   min-width: 40px;
   text-align: center;
+}
+
+/* Quando existe quantidade real, a quantidade original fica cinza e riscada */
+.quantidadeBadge.quantidadeOverridden {
+  background-color: #9ca3af;
+  color: #fff;
+  text-decoration: line-through;
+  opacity: 0.9;
+}
+
+/* Coluna quantidade real: sem fundo especial (igual às outras células) */
+.quantidadeRealCell {
+  text-align: center;
+  padding: 8px 16px;
+}
+
+/* Valor da quantidade real: fundo verde #10b981 */
+.quantidadeRealBadge {
+  display: inline-block;
+  padding: 4px 12px;
+  background-color: #10b981;
+  color: #fff;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: center;
+}
+
+/* Linha: valor centralizado, ícones no canto direito empilhados */
+.quantidadeRealRow {
+  position: relative;
+  width: 100%;
+  min-height: 32px;
+}
+
+.quantidadeRealRow .quantidadeRealBadge {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.quantidadeRealIcons {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.quantidadeRealIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.quantidadeRealIconBtn:hover {
+  color: #1f2937;
+  background-color: #e5e7eb;
+}
+
+.quantidadeRealIconBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.quantidadeRealIconBtn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Botão "inserir": só ícone, sem fundo e sem contorno */
+.quantidadeRealAddBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: #374151;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.quantidadeRealAddBtn:hover {
+  color: #1f2937;
+}
+
+.quantidadeRealAddBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.quantidadeRealAddBtn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Modo edição: input e botão salvar discretos */
+.quantidadeRealEditWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.quantidadeRealInput {
+  width: 56px;
+  padding: 4px 6px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.quantidadeRealInput:focus {
+  outline: none;
+  border-color: #9ca3af;
+  box-shadow: 0 0 0 1px #9ca3af;
+}
+
+.quantidadeRealSaveBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: #10b981;
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.quantidadeRealSaveBtn:hover:not(:disabled) {
+  background: #059669;
+}
+
+.quantidadeRealSaveBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.quantidadeRealSaveBtn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.quantidadeRealCancelBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.quantidadeRealCancelBtn:hover {
+  color: #374151;
+  background-color: #e5e7eb;
+}
+
+.quantidadeRealCancelBtn svg {
+  width: 12px;
+  height: 12px;
 }
 
 .destinationSection {
@@ -729,7 +923,8 @@
   .descricaoHeader,
   .corHeader,
   .destinoHeader,
-  .quantidadeHeader {
+  .quantidadeHeader,
+  .quantidadeRealHeader {
     font-size: 10px;
   }
 }

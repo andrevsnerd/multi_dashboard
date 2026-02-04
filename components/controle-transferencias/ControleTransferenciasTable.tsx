@@ -762,6 +762,12 @@ export default function ControleTransferenciasTable({
   const [markedKeys, setMarkedKeys] = useState<Set<string>>(new Set());
   const [savingMarked, setSavingMarked] = useState(false);
 
+  // Quantidades reais (Neon): item_key -> quantidade
+  const [quantidadesReais, setQuantidadesReais] = useState<Record<string, number>>({});
+  const [savingQuantidadeReal, setSavingQuantidadeReal] = useState(false);
+  const [editingQuantidadeRealKey, setEditingQuantidadeRealKey] = useState<string | null>(null);
+  const [inputQuantidadeReal, setInputQuantidadeReal] = useState("");
+
   // Carregar marcações da API (mesmo Redis/KV das metas no Vercel)
   // NOTA: Não fazemos prune aqui - quando visibleItemKeys muda (ex: troca de filial),
   // as chaves salvas poderiam não estar no novo visible, e um POST com [] apagaria tudo no Redis.
@@ -785,6 +791,45 @@ export default function ControleTransferenciasTable({
       active = false;
     };
   }, [companyKey, visibleItemKeys]);
+
+  // Carregar quantidades reais da API (Neon)
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/transferencias-quantidade-real?company=${encodeURIComponent(companyKey)}`);
+        if (!active) return;
+        if (!res.ok) return;
+        const json = await res.json();
+        const stored = json.quantidadesReais && typeof json.quantidadesReais === "object" ? json.quantidadesReais : {};
+        setQuantidadesReais(stored);
+      } catch {
+        if (active) setQuantidadesReais({});
+      }
+    })();
+    return () => { active = false; };
+  }, [companyKey]);
+
+  const saveQuantidadeReal = async (itemKey: string, value: number | null) => {
+    setSavingQuantidadeReal(true);
+    try {
+      await fetch("/api/transferencias-quantidade-real", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyKey, updates: { [itemKey]: value } }),
+      });
+      setQuantidadesReais((prev) => {
+        const next = { ...prev };
+        if (value === null) delete next[itemKey];
+        else next[itemKey] = value;
+        return next;
+      });
+      setEditingQuantidadeRealKey(null);
+      setInputQuantidadeReal("");
+    } finally {
+      setSavingQuantidadeReal(false);
+    }
+  };
 
   const toggleMarked = async (item: TransferItem) => {
     const key = getTransferItemKey(item);
@@ -872,7 +917,7 @@ export default function ControleTransferenciasTable({
       })),
     }));
 
-    exportTransfersToPDF(dataForExport, companyKey, dateRange, markedKeys);
+    exportTransfersToPDF(dataForExport, companyKey, dateRange, markedKeys, quantidadesReais);
   };
 
   return (
@@ -951,6 +996,7 @@ export default function ControleTransferenciasTable({
                     <th className={styles.corHeader}>Cor</th>
                     <th className={styles.destinoHeader}>Destino</th>
                     <th className={styles.quantidadeHeader}>Quantidade</th>
+                    <th className={styles.quantidadeRealHeader}>Quantidade real</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1110,7 +1156,119 @@ export default function ControleTransferenciasTable({
                     <span className={styles.destinoBadge}>{item.destino}</span>
                   </td>
                   <td className={styles.quantidadeCell}>
-                    <span className={styles.quantidadeBadge}>{item.quantidade}</span>
+                    <span
+                      className={
+                        quantidadesReais[itemKey] !== undefined
+                          ? `${styles.quantidadeBadge} ${styles.quantidadeOverridden}`
+                          : styles.quantidadeBadge
+                      }
+                    >
+                      {item.quantidade}
+                    </span>
+                  </td>
+                  <td className={styles.quantidadeRealCell}>
+                    {editingQuantidadeRealKey === itemKey ? (
+                      <div className={styles.quantidadeRealEditWrap}>
+                        <input
+                          type="number"
+                          min={0}
+                          className={styles.quantidadeRealInput}
+                          value={inputQuantidadeReal}
+                          onChange={(e) => setInputQuantidadeReal(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              const n = parseInt(inputQuantidadeReal, 10);
+                              if (!isNaN(n) && n >= 0) saveQuantidadeReal(itemKey, n);
+                            }
+                            if (e.key === "Escape") {
+                              setEditingQuantidadeRealKey(null);
+                              setInputQuantidadeReal("");
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          className={styles.quantidadeRealSaveBtn}
+                          disabled={savingQuantidadeReal}
+                          onClick={() => {
+                            const n = parseInt(inputQuantidadeReal, 10);
+                            if (!isNaN(n) && n >= 0) saveQuantidadeReal(itemKey, n);
+                          }}
+                          title="Salvar"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.quantidadeRealCancelBtn}
+                          disabled={savingQuantidadeReal}
+                          onClick={() => {
+                            setEditingQuantidadeRealKey(null);
+                            setInputQuantidadeReal("");
+                          }}
+                          title="Cancelar"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      </div>
+                    ) : quantidadesReais[itemKey] !== undefined ? (
+                      <div className={styles.quantidadeRealRow}>
+                        <span className={styles.quantidadeRealBadge}>{quantidadesReais[itemKey]}</span>
+                        <div className={styles.quantidadeRealIcons}>
+                          <button
+                            type="button"
+                            className={styles.quantidadeRealIconBtn}
+                            disabled={savingQuantidadeReal}
+                            onClick={() => {
+                              setEditingQuantidadeRealKey(itemKey);
+                              setInputQuantidadeReal(String(quantidadesReais[itemKey]));
+                            }}
+                            title="Editar quantidade real"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.quantidadeRealIconBtn}
+                            disabled={savingQuantidadeReal}
+                            onClick={() => saveQuantidadeReal(itemKey, null)}
+                            title="Remover quantidade real"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="3 6 5 6 21 6" />
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                              <line x1="10" y1="11" x2="10" y2="17" />
+                              <line x1="14" y1="11" x2="14" y2="17" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className={styles.quantidadeRealAddBtn}
+                        disabled={savingQuantidadeReal}
+                        onClick={() => {
+                          setEditingQuantidadeRealKey(itemKey);
+                          setInputQuantidadeReal(String(item.quantidade));
+                        }}
+                        title="Inserir quantidade real"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                      </button>
+                    )}
                   </td>
                 </tr>
                   );

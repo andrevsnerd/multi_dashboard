@@ -15,6 +15,7 @@ interface TransferItemExport {
   destino: string;
   quantidade: number;
   estoqueOrigem?: number;
+  quantidadeReal?: number;
 }
 
 interface TransferByOriginAndDestination {
@@ -36,7 +37,8 @@ export function exportTransfersToPDF(
   transfers: TransferByOriginAndDestination[],
   companyKey: CompanyKey,
   dateRange?: { startDate: Date; endDate: Date },
-  markedKeys?: Set<string>
+  markedKeys?: Set<string>,
+  quantidadesReais?: Record<string, number>
 ): void {
   const doc = new jsPDF({
     orientation: 'landscape',
@@ -151,9 +153,11 @@ export function exportTransfersToPDF(
         ? destGroup.items.map(item => markedKeys.has(getItemKey(item)))
         : [];
 
-      // Preparar dados da tabela (incluindo coluna Realizada)
+      // Preparar dados da tabela (incluindo Quantidade real e Realizada)
       const tableData = destGroup.items.map(item => {
         const estoqueOrigem = item.estoqueOrigem ?? 0;
+        const itemKey = getItemKey(item);
+        const qtdReal = quantidadesReais?.[itemKey];
         const row: any[] = [
           item.codigo,
           item.codigoBarra || '-',
@@ -171,13 +175,14 @@ export function exportTransfersToPDF(
           item.cor,
           item.destino,
           item.quantidade.toString(),
-          markedKeys?.has(getItemKey(item)) ? 'Sim' : '-'
+          qtdReal !== undefined ? qtdReal.toString() : '-',
+          markedKeys?.has(itemKey) ? 'Sim' : '-'
         );
 
         return row;
       });
 
-      // Cabeçalhos da tabela (incluindo Realizada)
+      // Cabeçalhos da tabela (incluindo Quantidade real e Realizada)
       const headers: string[] = [
         'Produto',
         'Código de Barras',
@@ -188,36 +193,41 @@ export function exportTransfersToPDF(
         headers.push('Subgrupo', 'Grade');
       }
 
-      headers.push('Descrição', 'Cor', 'Destino', 'Quantidade', 'Realizada');
+      headers.push('Descrição', 'Cor', 'Destino', 'Quantidade', 'Qtd. real', 'Realizada');
 
       const numCols = headers.length;
-      const quantidadeColIndex = numCols - 2;
+      const quantidadeColIndex = numCols - 3;
+      const quantidadeRealColIndex = numCols - 2;
       const realizadaColIndex = numCols - 1;
-      // Larguras fixas que somam contentWidth (277mm) – Descrição com boa largura para não espremer
+      // Larguras fixas que somam contentWidth (277mm)
       const colStylesScarfme: Record<number, { cellWidth: number; halign: string; overflow?: 'ellipsize' }> = {
         0: { cellWidth: 20, halign: 'left' },           // Produto
         1: { cellWidth: 26, halign: 'center' },         // Código de Barras
         2: { cellWidth: 18, halign: 'center' },         // Estoque
         3: { cellWidth: 18, halign: 'center' },         // Subgrupo
         4: { cellWidth: 16, halign: 'center' },         // Grade
-        5: { cellWidth: 92, halign: 'left', overflow: 'ellipsize' },  // Descrição (92 = 277 - resto)
+        5: { cellWidth: 82, halign: 'left', overflow: 'ellipsize' },  // Descrição
         6: { cellWidth: 20, halign: 'left' },          // Cor
-        7: { cellWidth: 32, halign: 'left' },          // Destino
-        [quantidadeColIndex]: { cellWidth: 20, halign: 'center' },
+        7: { cellWidth: 30, halign: 'left' },          // Destino
+        [quantidadeColIndex]: { cellWidth: 18, halign: 'center' },
+        [quantidadeRealColIndex]: { cellWidth: 18, halign: 'center' },
         [realizadaColIndex]: { cellWidth: 15, halign: 'center' },
       };
       const colStylesNerd: Record<number, { cellWidth: number; halign: string; overflow?: 'ellipsize' }> = {
         0: { cellWidth: 24, halign: 'left' },          // Produto
         1: { cellWidth: 28, halign: 'center' },         // Código de Barras
         2: { cellWidth: 22, halign: 'center' },         // Estoque
-        3: { cellWidth: 106, halign: 'left', overflow: 'ellipsize' }, // Descrição (106 = 277 - resto)
+        3: { cellWidth: 96, halign: 'left', overflow: 'ellipsize' }, // Descrição
         4: { cellWidth: 22, halign: 'left' },           // Cor
-        5: { cellWidth: 38, halign: 'left' },           // Destino
-        [quantidadeColIndex]: { cellWidth: 22, halign: 'center' },
+        5: { cellWidth: 36, halign: 'left' },           // Destino
+        [quantidadeColIndex]: { cellWidth: 20, halign: 'center' },
+        [quantidadeRealColIndex]: { cellWidth: 18, halign: 'center' },
         [realizadaColIndex]: { cellWidth: 15, halign: 'center' },
       };
       const columnStyles = companyKey === 'scarfme' ? colStylesScarfme : colStylesNerd;
       (columnStyles[quantidadeColIndex] as { cellWidth: number; halign: string; fontStyle?: string }).fontStyle = 'bold';
+      // Células com valor em "Qtd. real" terão fundo verde no didParseCell
+      const colorQuantidadeReal = [16, 185, 129]; // #10b981
 
       // Criar tabela
       autoTable(doc, {
@@ -246,8 +256,16 @@ export function exportTransfersToPDF(
         },
         columnStyles: columnStyles as any,
         didParseCell: (data: any) => {
-          if (data.section === 'body' && realizadaRows[data.row.index]) {
-            data.cell.styles.fillColor = colorRowRealizada as [number, number, number];
+          if (data.section === 'body') {
+            if (realizadaRows[data.row.index]) {
+              data.cell.styles.fillColor = colorRowRealizada as [number, number, number];
+            }
+            // Qtd. real: fundo verde só quando tem valor (não é '-')
+            if (data.column.index === quantidadeRealColIndex && data.cell.raw !== '-') {
+              data.cell.styles.fillColor = colorQuantidadeReal as [number, number, number];
+              data.cell.styles.textColor = [255, 255, 255] as [number, number, number];
+              data.cell.styles.fontStyle = 'bold';
+            }
           }
         },
         didDrawPage: (data: any) => {
