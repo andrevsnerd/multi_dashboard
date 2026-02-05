@@ -918,7 +918,7 @@ export default function ControleTransferenciasTable({
         const fn = (filialFromPerm.filial || "").trim().toUpperCase();
         return fn === canon || fn.includes(canon) || canon.includes(fn);
       }
-      return canon.includes(perm.toUpperCase()) || perm.toUpperCase().includes(canon);
+      return false;
     },
     [getCodFilial, filiais]
   );
@@ -927,7 +927,7 @@ export default function ControleTransferenciasTable({
     (item: TransferItem): boolean => {
       if (!permissoes) return true;
       if (permissoes.filiaisOrigem.length === 0 && permissoes.filiaisDestino.length === 0) return true;
-      if (filiais.length === 0) return true;
+      if (filiais.length === 0) return false;
       const origemOk =
         permissoes.filiaisOrigem.length === 0 ||
         permissoes.filiaisOrigem.some((p) => permissaoMatchFilial(p, item.origemCanonico));
