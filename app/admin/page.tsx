@@ -159,6 +159,23 @@ export default function AdminPage() {
           <p className={styles.subtitle}>
             Adicione, edite ou remova usuários e defina permissões por função.
           </p>
+          <div style={{ marginTop: "16px" }}>
+            <Link
+              href="/admin/transferencia-permissoes"
+              style={{
+                display: "inline-block",
+                padding: "8px 16px",
+                background: "#e0f2fe",
+                color: "#0369a1",
+                borderRadius: "8px",
+                textDecoration: "none",
+                fontSize: "14px",
+                fontWeight: "500",
+              }}
+            >
+              ⚙️ Gerenciar Permissões de Transferência
+            </Link>
+          </div>
         </div>
         <button type="button" className={styles.addButton} onClick={openAdd}>
           Adicionar usuário

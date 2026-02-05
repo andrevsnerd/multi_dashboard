@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
+import { useAuth } from "@/components/auth/AuthContext";
 
 import styles from "./TransferenciaProdutosPage.module.css";
 
@@ -61,6 +62,38 @@ interface LogDetalheItem {
 interface TransferenciaProdutosPageProps {
   companyKey: CompanyKey;
   companyName: string;
+}
+
+interface TransferenciaPermissao {
+  username: string;
+  filiaisOrigem: string[];
+  filiaisDestino: string[];
+  tiposRomaneioPermitidos: string[];
+  responsavelPadrao?: string;
+  tipoRomaneioPadrao?: string;
+  responsavelFixo: boolean;
+  tipoRomaneioFixo: boolean;
+}
+
+async function fetchPermissoes(username: string): Promise<TransferenciaPermissao | null> {
+  try {
+    const response = await fetch("/api/transferencia-produtos/permissoes", {
+      headers: {
+        "x-auth-username": username,
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const json = (await response.json()) as { data: TransferenciaPermissao | null };
+    return json.data || null;
+  } catch (error) {
+    console.error("Erro ao buscar permissões", error);
+    return null;
+  }
 }
 
 async function fetchFiliais(): Promise<Filial[]> {
@@ -242,7 +275,10 @@ export default function TransferenciaProdutosPage({
   companyKey,
   companyName,
 }: TransferenciaProdutosPageProps) {
+  const { user } = useAuth();
   const [filiais, setFiliais] = useState<Filial[]>([]);
+  const [filiaisDisponiveis, setFiliaisDisponiveis] = useState<Filial[]>([]);
+  const [filiaisDestinoDisponiveis, setFiliaisDestinoDisponiveis] = useState<Filial[]>([]);
   const [filialOrigem, setFilialOrigem] = useState<Filial | null>(null);
   const [filialDestino, setFilialDestino] = useState<Filial | null>(null);
   const [produtosSelecionados, setProdutosSelecionados] = useState<ProdutoSelecionado[]>([]);
@@ -258,12 +294,15 @@ export default function TransferenciaProdutosPage({
   const [loadingLogSaidas, setLoadingLogSaidas] = useState(false);
   const [loadingLogEntradas, setLoadingLogEntradas] = useState(false);
   const [tiposRomaneio, setTiposRomaneio] = useState<string[]>([]);
+  const [tiposRomaneioDisponiveis, setTiposRomaneioDisponiveis] = useState<string[]>([]);
   const [tipoRomaneioSelecionado, setTipoRomaneioSelecionado] = useState<string>("TRANSFERENCIA ENTRE LOJAS");
   const [responsaveis, setResponsaveis] = useState<Array<{ responsavel: string; qtd: number }>>([]);
   const [responsavelSelecionado, setResponsavelSelecionado] = useState<string>("LOGISTICA");
   const [responsavelFinal, setResponsavelFinal] = useState<string>("LOGISTICA");
   const [mostrarInputResponsavel, setMostrarInputResponsavel] = useState(false);
   const [inputResponsavelCustomizado, setInputResponsavelCustomizado] = useState("");
+  const [permissoes, setPermissoes] = useState<TransferenciaPermissao | null>(null);
+  const [permissoesCarregadas, setPermissoesCarregadas] = useState(false);
 
   const notificacaoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hoverRef = useRef<NodeJS.Timeout | null>(null);
@@ -272,48 +311,192 @@ export default function TransferenciaProdutosPage({
   const [detalhesCache, setDetalhesCache] = useState<Record<string, LogDetalheItem[]>>({});
   const [loadingDetalhesKey, setLoadingDetalhesKey] = useState<string | null>(null);
 
-  // Carregar filiais
+  // Carregar permissões do usuário PRIMEIRO (antes de tudo)
   useEffect(() => {
+    async function loadPermissoes() {
+      if (!user?.username) {
+        setPermissoesCarregadas(true);
+        return;
+      }
+      try {
+        const perms = await fetchPermissoes(user.username);
+        setPermissoes(perms);
+      } catch (error) {
+        console.error("Erro ao carregar permissões", error);
+      } finally {
+        setPermissoesCarregadas(true);
+      }
+    }
+    loadPermissoes();
+  }, [user?.username]);
+
+  // Carregar filiais e aplicar filtros de permissão (aguardar permissões carregarem)
+  useEffect(() => {
+    if (!permissoesCarregadas) return; // Aguardar permissões carregarem primeiro
+    
     async function loadFiliais() {
       try {
         const data = await fetchFiliais();
         setFiliais(data);
-        // Selecionar primeira filial como padrão
-        if (data.length > 0) {
-          setFilialOrigem(data[0]);
+
+        // Aplicar filtros de permissão se existirem
+        if (permissoes) {
+          // Filtrar filiais de origem
+          if (permissoes.filiaisOrigem.length > 0) {
+            const filiaisOrigemPermitidas = data.filter(f =>
+              permissoes.filiaisOrigem.some(cod => 
+                f.codFilial.trim() === cod.trim() || 
+                f.filial.toUpperCase().includes(cod.toUpperCase())
+              )
+            );
+            setFiliaisDisponiveis(filiaisOrigemPermitidas);
+            
+            // Selecionar primeira filial permitida
+            if (filiaisOrigemPermitidas.length > 0) {
+              setFilialOrigem(filiaisOrigemPermitidas[0]);
+            }
+          } else {
+            setFiliaisDisponiveis(data);
+            if (data.length > 0) {
+              setFilialOrigem(data[0]);
+            }
+          }
+
+          // Filtrar filiais de destino
+          if (permissoes.filiaisDestino.length > 0) {
+            const filiaisDestinoPermitidas = data.filter(f =>
+              permissoes.filiaisDestino.some(cod => 
+                f.codFilial.trim() === cod.trim() || 
+                f.filial.toUpperCase().includes(cod.toUpperCase())
+              )
+            );
+            setFiliaisDestinoDisponiveis(filiaisDestinoPermitidas);
+            
+            // Se houver apenas uma filial de destino permitida e já tiver origem selecionada, selecionar automaticamente
+            if (filiaisDestinoPermitidas.length === 1 && filialOrigem) {
+              setFilialDestino(filiaisDestinoPermitidas[0]);
+            }
+          } else {
+            setFiliaisDestinoDisponiveis(data);
+          }
+        } else {
+          // Sem permissões, mostrar todas
+          setFiliaisDisponiveis(data);
+          setFiliaisDestinoDisponiveis(data);
+          if (data.length > 0) {
+            setFilialOrigem(data[0]);
+          }
         }
       } catch (error) {
         console.error("Erro ao carregar filiais", error);
       }
     }
     loadFiliais();
-  }, []);
+  }, [permissoes, permissoesCarregadas]);
 
-  // Carregar tipos de romaneio
+  // Atualizar filiais de destino quando origem mudar (considerando permissões)
   useEffect(() => {
+    if (!filialOrigem) return;
+
+    // Se houver apenas uma filial de destino permitida, selecionar automaticamente
+    if (permissoes?.filiaisDestino.length === 1) {
+      const filialDestinoUnica = filiaisDestinoDisponiveis.find(f =>
+        permissoes.filiaisDestino.some(cod => 
+          f.codFilial.trim() === cod.trim() || 
+          f.filial.toUpperCase().includes(cod.toUpperCase())
+        )
+      );
+      if (filialDestinoUnica && filialDestinoUnica.codFilial !== filialOrigem.codFilial) {
+        setFilialDestino(filialDestinoUnica);
+      }
+    }
+  }, [filialOrigem, permissoes, filiaisDestinoDisponiveis]);
+
+  // Carregar tipos de romaneio e aplicar filtros de permissão (aguardar permissões carregarem)
+  useEffect(() => {
+    if (!permissoesCarregadas) return; // Aguardar permissões carregarem primeiro
+    
     async function loadTiposRomaneio() {
       try {
         const data = await fetchTiposRomaneio();
         setTiposRomaneio(data);
-        if (data.length > 0) {
-          // Sempre usar "TRANSFERENCIA ENTRE LOJAS" como padrão se existir, senão usar o primeiro
-          const tipoPadrao = data.find(tipo => tipo.toUpperCase() === 'TRANSFERENCIA ENTRE LOJAS') || data[0];
-          setTipoRomaneioSelecionado(tipoPadrao);
+        
+        // Aplicar filtros de permissão se existirem
+        if (permissoes && permissoes.tiposRomaneioPermitidos.length > 0) {
+          const tiposPermitidos = data.filter(tipo =>
+            permissoes.tiposRomaneioPermitidos.some(permitido =>
+              tipo.toUpperCase() === permitido.toUpperCase()
+            )
+          );
+          setTiposRomaneioDisponiveis(tiposPermitidos);
+          
+          // Se tiver permissão com tipo padrão, usar ele (se estiver na lista permitida)
+          if (permissoes.tipoRomaneioPadrao) {
+            const tipoPadraoPermitido = tiposPermitidos.find(tipo =>
+              tipo.toUpperCase() === permissoes.tipoRomaneioPadrao!.toUpperCase()
+            );
+            if (tipoPadraoPermitido) {
+              setTipoRomaneioSelecionado(tipoPadraoPermitido);
+            } else if (tiposPermitidos.length > 0) {
+              setTipoRomaneioSelecionado(tiposPermitidos[0]);
+            }
+          } else if (tiposPermitidos.length > 0) {
+            // Usar o primeiro tipo permitido como padrão
+            setTipoRomaneioSelecionado(tiposPermitidos[0]);
+          }
+        } else {
+          // Sem permissões, mostrar todos
+          setTiposRomaneioDisponiveis(data);
+          if (data.length > 0) {
+            // Se tiver permissão com tipo padrão, usar ele
+            if (permissoes?.tipoRomaneioPadrao) {
+              const tipoPermitido = data.find(tipo => 
+                tipo.toUpperCase() === permissoes.tipoRomaneioPadrao!.toUpperCase()
+              );
+              if (tipoPermitido) {
+                setTipoRomaneioSelecionado(tipoPermitido);
+              } else {
+                // Se não encontrar o tipo padrão, usar o padrão do sistema
+                const tipoPadrao = data.find(tipo => tipo.toUpperCase() === 'TRANSFERENCIA ENTRE LOJAS') || data[0];
+                setTipoRomaneioSelecionado(tipoPadrao);
+              }
+            } else {
+              // Sempre usar "TRANSFERENCIA ENTRE LOJAS" como padrão se existir, senão usar o primeiro
+              const tipoPadrao = data.find(tipo => tipo.toUpperCase() === 'TRANSFERENCIA ENTRE LOJAS') || data[0];
+              setTipoRomaneioSelecionado(tipoPadrao);
+            }
+          }
         }
       } catch (error) {
         console.error("Erro ao carregar tipos de romaneio", error);
       }
     }
     loadTiposRomaneio();
-  }, []);
+  }, [permissoes, permissoesCarregadas]);
 
-  // Carregar responsáveis
+  // Carregar responsáveis e aplicar padrão de permissão (aguardar permissões carregarem)
   useEffect(() => {
+    if (!permissoesCarregadas) return; // Aguardar permissões carregarem primeiro
+    
     async function loadResponsaveis() {
       try {
         const data = await fetchResponsaveis();
         setResponsaveis(data);
-        if (data.length > 0) {
+        
+        // Se tiver permissão com responsável padrão, validar se existe na lista
+        if (permissoes?.responsavelPadrao) {
+          const responsavelValido = data.find(r =>
+            r.responsavel.toUpperCase() === permissoes.responsavelPadrao!.toUpperCase()
+          );
+          if (responsavelValido) {
+            setResponsavelSelecionado(responsavelValido.responsavel);
+            setResponsavelFinal(responsavelValido.responsavel);
+          } else if (data.length > 0) {
+            // Se não encontrar, usar o primeiro disponível
+            setResponsavelSelecionado(data[0].responsavel);
+            setResponsavelFinal(data[0].responsavel);
+          }
+        } else if (data.length > 0) {
           setResponsavelSelecionado(data[0].responsavel);
           setResponsavelFinal(data[0].responsavel);
         }
@@ -322,16 +505,24 @@ export default function TransferenciaProdutosPage({
       }
     }
     loadResponsaveis();
-  }, []);
+  }, [permissoes, permissoesCarregadas]);
 
-  // Atualizar responsável final quando mudar
+  // Atualizar responsável final quando mudar (respeitando permissões)
   useEffect(() => {
+    // Se responsável está fixo, sempre usar o padrão da permissão
+    if (permissoes?.responsavelFixo && permissoes.responsavelPadrao) {
+      setResponsavelFinal(permissoes.responsavelPadrao);
+      setResponsavelSelecionado(permissoes.responsavelPadrao);
+      setMostrarInputResponsavel(false);
+      return;
+    }
+
     if (mostrarInputResponsavel && inputResponsavelCustomizado.trim()) {
       setResponsavelFinal(inputResponsavelCustomizado.trim().toUpperCase());
     } else {
       setResponsavelFinal(responsavelSelecionado);
     }
-  }, [mostrarInputResponsavel, inputResponsavelCustomizado, responsavelSelecionado]);
+  }, [mostrarInputResponsavel, inputResponsavelCustomizado, responsavelSelecionado, permissoes]);
 
   const mostrarNotificacao = useCallback((mensagem: string, tipo: "success" | "error" = "success") => {
     setNotificacao({ mensagem, tipo });
@@ -656,6 +847,23 @@ export default function TransferenciaProdutosPage({
   const totalItens = produtosSelecionados.reduce((sum, p) => sum + p.quantidade, 0);
   const totalProdutos = produtosSelecionados.length;
 
+  // Mostrar loading enquanto permissões não carregaram
+  if (!permissoesCarregadas) {
+    return (
+      <div className={styles.wrapper}>
+        <div style={{ 
+          display: "flex", 
+          alignItems: "center", 
+          justifyContent: "center", 
+          minHeight: "50vh",
+          color: "#6b7280"
+        }}>
+          Carregando permissões...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.wrapper}>
       {/* Header */}
@@ -675,26 +883,7 @@ export default function TransferenciaProdutosPage({
         <div className={styles.column}>
           <div className={styles.section}>
             <label className={styles.sectionLabel}>FILIAL ORIGEM</label>
-            <div className={styles.selectWrapper}>
-              <select
-                className={styles.select}
-                value={filialOrigem?.codFilial || ""}
-                onChange={(e) => {
-                  const filial = filiais.find(f => f.codFilial === e.target.value);
-                  setFilialOrigem(filial || null);
-                  // Limpar produtos selecionados ao mudar origem
-                  setProdutosSelecionados([]);
-                }}
-              >
-                <option value="">Selecione uma filial</option>
-                {filiais.map(f => (
-                  <option key={f.codFilial} value={f.codFilial}>
-                    {f.filial}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {filialOrigem && (
+            {filiaisDisponiveis.length === 1 && filialOrigem ? (
               <div className={styles.filialCard}>
                 <div className={styles.filialIcon}>🏢</div>
                 <div className={styles.filialInfo}>
@@ -703,6 +892,40 @@ export default function TransferenciaProdutosPage({
                 </div>
                 <div className={styles.checkmark}>✓</div>
               </div>
+            ) : (
+              <>
+                <div className={styles.selectWrapper}>
+                  <select
+                    className={styles.select}
+                    value={filialOrigem?.codFilial || ""}
+                    onChange={(e) => {
+                      const filial = filiaisDisponiveis.find(f => f.codFilial === e.target.value);
+                      setFilialOrigem(filial || null);
+                      // Limpar produtos selecionados ao mudar origem
+                      setProdutosSelecionados([]);
+                      // Limpar destino quando mudar origem
+                      setFilialDestino(null);
+                    }}
+                  >
+                    <option value="">Selecione uma filial</option>
+                    {filiaisDisponiveis.map(f => (
+                      <option key={f.codFilial} value={f.codFilial}>
+                        {f.filial}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {filialOrigem && (
+                  <div className={styles.filialCard}>
+                    <div className={styles.filialIcon}>🏢</div>
+                    <div className={styles.filialInfo}>
+                      <div className={styles.filialName}>{filialOrigem.filial}</div>
+                      <div className={styles.filialCode}>{filialOrigem.codFilial}</div>
+                    </div>
+                    <div className={styles.checkmark}>✓</div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -894,55 +1117,119 @@ export default function TransferenciaProdutosPage({
             {/* Tipo de Romaneio */}
             <div className={styles.configSection}>
               <label className={styles.configLabel}>Tipo de Romaneio</label>
-              <select
-                className={styles.configSelect}
-                value={tipoRomaneioSelecionado}
-                onChange={(e) => setTipoRomaneioSelecionado(e.target.value)}
-              >
-                {tiposRomaneio.map(tipo => (
-                  <option key={tipo} value={tipo}>{tipo}</option>
-                ))}
-              </select>
+              {tiposRomaneioDisponiveis.length === 1 ? (
+                <div style={{ 
+                  padding: "10px 14px", 
+                  border: "1px solid #e2e8f0", 
+                  borderRadius: "10px", 
+                  fontSize: "15px",
+                  background: "#f8fafc",
+                  color: "#334155"
+                }}>
+                  {tipoRomaneioSelecionado}
+                </div>
+              ) : (
+                <select
+                  className={styles.configSelect}
+                  value={tipoRomaneioSelecionado}
+                  onChange={(e) => setTipoRomaneioSelecionado(e.target.value)}
+                  disabled={permissoes?.tipoRomaneioFixo === true}
+                >
+                  {tiposRomaneioDisponiveis.map(tipo => (
+                    <option key={tipo} value={tipo}>{tipo}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {/* Responsável */}
             <div className={styles.configSection}>
               <label className={styles.configLabel}>Responsável</label>
-              {!mostrarInputResponsavel ? (
+              {permissoes?.responsavelFixo ? (
+                <div style={{ 
+                  padding: "10px 14px", 
+                  border: "1px solid #e2e8f0", 
+                  borderRadius: "10px", 
+                  fontSize: "15px",
+                  background: "#f8fafc",
+                  color: "#334155"
+                }}>
+                  {permissoes.responsavelPadrao || "LOGISTICA"}
+                </div>
+              ) : responsaveis.length === 1 ? (
+                <div style={{ 
+                  padding: "10px 14px", 
+                  border: "1px solid #e2e8f0", 
+                  borderRadius: "10px", 
+                  fontSize: "15px",
+                  background: "#f8fafc",
+                  color: "#334155"
+                }}>
+                  {responsaveis[0].responsavel}
+                </div>
+              ) : !mostrarInputResponsavel ? (
                 <>
-                  <select
+                  <input
+                    type="text"
+                    list="responsaveis-list"
                     className={styles.configSelect}
                     value={responsavelSelecionado}
                     onChange={(e) => {
-                      if (e.target.value === "__CUSTOM__") {
-                        setMostrarInputResponsavel(true);
-                      } else {
-                        setResponsavelSelecionado(e.target.value);
+                      const value = e.target.value.toUpperCase();
+                      setResponsavelSelecionado(value);
+                    }}
+                    onBlur={(e) => {
+                      const value = e.target.value.trim().toUpperCase();
+                      // Validar se o valor existe na lista
+                      if (value && !responsaveis.some(r => r.responsavel.toUpperCase() === value)) {
+                        mostrarNotificacao("Responsável deve existir na lista de responsáveis disponíveis", "error");
+                        // Reverter para o último valor válido
+                        if (responsaveis.length > 0) {
+                          setResponsavelSelecionado(responsaveis[0].responsavel);
+                        }
                       }
                     }}
-                  >
+                    placeholder="Selecione ou digite um responsável"
+                  />
+                  <datalist id="responsaveis-list">
                     {responsaveis.map((resp, idx) => (
                       <option key={idx} value={resp.responsavel}>
                         {resp.responsavel} ({resp.qtd} entradas)
                       </option>
                     ))}
-                    <option value="__CUSTOM__">+ Digitar outro responsável</option>
-                  </select>
+                  </datalist>
                 </>
               ) : (
                 <div className={styles.customInputWrapper}>
                   <input
                     type="text"
+                    list="responsaveis-list"
                     className={styles.customInput}
                     placeholder="Digite o login do responsável"
                     value={inputResponsavelCustomizado}
                     onChange={(e) => setInputResponsavelCustomizado(e.target.value)}
                     onBlur={() => {
                       if (inputResponsavelCustomizado.trim()) {
-                        setResponsavelSelecionado(inputResponsavelCustomizado.trim().toUpperCase());
+                        const value = inputResponsavelCustomizado.trim().toUpperCase();
+                        // Validar se o valor existe na lista
+                        if (responsaveis.some(r => r.responsavel.toUpperCase() === value)) {
+                          setResponsavelSelecionado(value);
+                          setMostrarInputResponsavel(false);
+                          setInputResponsavelCustomizado("");
+                        } else {
+                          mostrarNotificacao("Responsável deve existir na lista de responsáveis disponíveis", "error");
+                          setInputResponsavelCustomizado("");
+                        }
                       }
                     }}
                   />
+                  <datalist id="responsaveis-list">
+                    {responsaveis.map((resp, idx) => (
+                      <option key={idx} value={resp.responsavel}>
+                        {resp.responsavel} ({resp.qtd} entradas)
+                      </option>
+                    ))}
+                  </datalist>
                   <button
                     className={styles.cancelCustomButton}
                     onClick={() => {
@@ -976,27 +1263,7 @@ export default function TransferenciaProdutosPage({
         <div className={styles.column}>
           <div className={styles.section}>
             <label className={styles.sectionLabel}>FILIAL DESTINO</label>
-            <div className={styles.selectWrapper}>
-              <select
-                className={styles.select}
-                value={filialDestino?.codFilial || ""}
-                onChange={(e) => {
-                  const filial = filiais.find(f => f.codFilial === e.target.value);
-                  setFilialDestino(filial || null);
-                }}
-                disabled={!filialOrigem}
-              >
-                <option value="">Selecione uma filial</option>
-                {filiais
-                  .filter(f => f.codFilial !== filialOrigem?.codFilial)
-                  .map(f => (
-                    <option key={f.codFilial} value={f.codFilial}>
-                      {f.filial}
-                    </option>
-                  ))}
-              </select>
-            </div>
-            {filialDestino && (
+            {filiaisDestinoDisponiveis.filter(f => f.codFilial !== filialOrigem?.codFilial).length === 1 && filialDestino ? (
               <div className={styles.filialCard}>
                 <div className={styles.filialIcon}>🏢</div>
                 <div className={styles.filialInfo}>
@@ -1005,6 +1272,39 @@ export default function TransferenciaProdutosPage({
                 </div>
                 <div className={styles.checkmark}>✓</div>
               </div>
+            ) : (
+              <>
+                <div className={styles.selectWrapper}>
+                  <select
+                    className={styles.select}
+                    value={filialDestino?.codFilial || ""}
+                    onChange={(e) => {
+                      const filial = filiaisDestinoDisponiveis.find(f => f.codFilial === e.target.value);
+                      setFilialDestino(filial || null);
+                    }}
+                    disabled={!filialOrigem}
+                  >
+                    <option value="">Selecione uma filial</option>
+                    {filiaisDestinoDisponiveis
+                      .filter(f => f.codFilial !== filialOrigem?.codFilial)
+                      .map(f => (
+                        <option key={f.codFilial} value={f.codFilial}>
+                          {f.filial}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                {filialDestino && (
+                  <div className={styles.filialCard}>
+                    <div className={styles.filialIcon}>🏢</div>
+                    <div className={styles.filialInfo}>
+                      <div className={styles.filialName}>{filialDestino.filial}</div>
+                      <div className={styles.filialCode}>{filialDestino.codFilial}</div>
+                    </div>
+                    <div className={styles.checkmark}>✓</div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 

@@ -12,7 +12,8 @@
     "passwordHash": "d98addfa7d08fa5f15c4bb01f665c2d3:0a18ee80297b67328de923d0bd8517b5cc24d532f6fd6578d1b370985f0b8eaec09a509c709a5128d616b20710c43b05d63fdc4bc3c37495d502894b4cdf743b",
     "role": "logistica",
     "permissions": [
-      "controle-transferencias"
+      "controle-transferencias",
+      "transferencia-produtos"
     ]
   }
 ]

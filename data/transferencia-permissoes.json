@@ -1,0 +1,18 @@
+[
+  {
+    "username": "logistica",
+    "filiaisOrigem": [
+      "000069"
+    ],
+    "filiaisDestino": [
+      "000095",
+      "000099"
+    ],
+    "tiposRomaneioPermitidos": [
+      "TRANSFERENCIA ENTRE LOJAS"
+    ],
+    "responsavelPadrao": "LOGISTICA",
+    "responsavelFixo": true,
+    "tipoRomaneioFixo": true
+  }
+]
