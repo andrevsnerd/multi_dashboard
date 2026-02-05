@@ -5,7 +5,7 @@ import {
   findUserById,
   findUserByUsername,
 } from "@/lib/auth/users-store";
-import type { RoleKey, PermissionKey } from "@/types/auth";
+import type { CompanyKey, RoleKey, PermissionKey } from "@/types/auth";
 
 async function isAdmin(username: string): Promise<boolean> {
   const user = await findUserByUsername(username);
@@ -31,6 +31,7 @@ export async function GET(
       username: user.username,
       role: user.role,
       permissions: user.permissions,
+      allowedCompanies: user.allowedCompanies ?? undefined,
     });
   } catch (e) {
     console.error("Get user error:", e);
@@ -52,23 +53,31 @@ export async function PATCH(
     }
     const { id } = await params;
     const body = await request.json();
-    const { username: newUsername, password, role, permissions } = body;
+    const { username: newUsername, password, role, permissions, allowedCompanies } = body;
     const updates: {
       username?: string;
       password?: string;
       role?: RoleKey;
       permissions?: PermissionKey[];
+      allowedCompanies?: CompanyKey[] | null;
     } = {};
     if (newUsername !== undefined) updates.username = String(newUsername).trim();
     if (password !== undefined) updates.password = String(password);
     if (role !== undefined) updates.role = role as RoleKey;
     if (permissions !== undefined) updates.permissions = permissions as PermissionKey[];
+    if (allowedCompanies !== undefined) {
+      updates.allowedCompanies =
+        Array.isArray(allowedCompanies) && allowedCompanies.length > 0
+          ? (allowedCompanies as CompanyKey[])
+          : null;
+    }
     const user = await updateUser(id, updates);
     return NextResponse.json({
       id: user.id,
       username: user.username,
       role: user.role,
       permissions: user.permissions,
+      allowedCompanies: user.allowedCompanies ?? undefined,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro ao atualizar usuário";

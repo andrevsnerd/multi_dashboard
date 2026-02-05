@@ -53,6 +53,7 @@ async function setupLogisticaPermissoes() {
       username: 'logistica',
       filiaisOrigem: [filialOrigem.codFilial],
       filiaisDestino: [filialDestino.codFilial],
+      tiposRomaneioPermitidos: [], // vazio = todos permitidos
       responsavelPadrao: 'LOGISTICA',
       tipoRomaneioPadrao: 'TRANSFERENCIA ENTRE LOJAS',
       responsavelFixo: true,

@@ -69,11 +69,13 @@ export interface TransferenciaPermissao {
 
 /**
  * Busca as permissões de um usuário específico
+ * Em desenvolvimento, se Postgres não tiver registro, tenta o arquivo local (data/transferencia-permissoes.json)
  */
 export async function getPermissaoByUsername(username: string): Promise<TransferenciaPermissao | null> {
+  const normalized = username.toLowerCase().trim();
+
   if (!hasPostgres()) {
     const permissoes = readPermissoesFile();
-    const normalized = username.toLowerCase().trim();
     return permissoes.find((p) => p.username.toLowerCase() === normalized) ?? null;
   }
 
@@ -91,11 +93,16 @@ export async function getPermissaoByUsername(username: string): Promise<Transfer
       responsavel_fixo,
       tipo_romaneio_fixo
     FROM transferencia_permissoes
-    WHERE username = ${username.toLowerCase().trim()}
+    WHERE username = ${normalized}
     LIMIT 1
   `;
 
   if (result.length === 0) {
+    // Em dev local: se a tabela estiver vazia (ex.: permissões só no JSON), usa o arquivo
+    if (process.env.NODE_ENV === 'development') {
+      const fromFile = readPermissoesFile();
+      return fromFile.find((p) => p.username.toLowerCase() === normalized) ?? null;
+    }
     return null;
   }
 

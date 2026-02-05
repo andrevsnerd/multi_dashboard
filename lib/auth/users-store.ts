@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { hasPostgres } from "@/lib/db/neon";
 import * as neonStore from "./users-store-neon";
-import type { PermissionKey, RoleKey, UserRecord } from "@/types/auth";
+import type { CompanyKey, PermissionKey, RoleKey, UserRecord } from "@/types/auth";
 
 const USERS_FILE = path.join(process.cwd(), "data", "users.json");
 
@@ -75,9 +75,11 @@ export async function createUser(
   username: string,
   password: string,
   role: RoleKey,
-  permissions: PermissionKey[]
+  permissions: PermissionKey[],
+  allowedCompanies?: CompanyKey[]
 ): Promise<UserRecord> {
-  if (hasPostgres()) return neonStore.createUser(username, password, role, permissions);
+  if (hasPostgres())
+    return neonStore.createUser(username, password, role, permissions, allowedCompanies);
   const users = readUsersFile();
   const normalized = username.trim().toLowerCase();
   if (users.some((u) => u.username.toLowerCase() === normalized)) {
@@ -93,6 +95,8 @@ export async function createUser(
     passwordHash: hashPassword(password),
     role,
     permissions: role === "admin" || role === "gestor" ? [] : permissions,
+    allowedCompanies:
+      allowedCompanies?.length ? allowedCompanies : undefined,
   };
   users.push(record);
   writeUsersFile(users);
@@ -106,6 +110,7 @@ export async function updateUser(
     password?: string;
     role?: RoleKey;
     permissions?: PermissionKey[];
+    allowedCompanies?: CompanyKey[] | null;
   }
 ): Promise<UserRecord> {
   if (hasPostgres()) return neonStore.updateUser(id, updates);
@@ -130,6 +135,10 @@ export async function updateUser(
   }
   if (updates.permissions !== undefined && current.role !== "admin" && current.role !== "gestor") {
     current.permissions = updates.permissions;
+  }
+  if (updates.allowedCompanies !== undefined) {
+    current.allowedCompanies =
+      updates.allowedCompanies?.length ? updates.allowedCompanies : undefined;
   }
   writeUsersFile(users);
   return { ...current };

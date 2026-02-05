@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthContext";
-import { getFirstAllowedPath } from "@/lib/auth/permissions";
+import { getFirstAllowedPath, getVisibleCompanies } from "@/lib/auth/permissions";
 import styles from "./page.module.css";
 
 export default function Home() {
   const { user } = useAuth();
-
+  const visible = user ? getVisibleCompanies(user) : ["nerd", "scarfme"];
   const nerdHref = user ? getFirstAllowedPath(user, "nerd") : "/nerd";
   const scarfmeHref = user ? getFirstAllowedPath(user, "scarfme") : "/scarfme";
 
@@ -23,17 +23,20 @@ export default function Home() {
       </header>
 
       <div className={styles.actions}>
-        <Link href={nerdHref} className={styles.companyCard}>
-          <span className={styles.companyLabel}>NERD</span>
-          <strong className={styles.companyTitle}>Dashboard NERD</strong>
-          <span className={styles.companyHint}>Filiais, KPIs e análises personalizadas</span>
-        </Link>
-
-        <Link href={scarfmeHref} className={styles.companyCard}>
-          <span className={styles.companyLabel}>SCARF ME</span>
-          <strong className={styles.companyTitle}>Dashboard Scarf Me</strong>
-          <span className={styles.companyHint}>Indicadores estratégicos por operação</span>
-        </Link>
+        {visible.includes("nerd") && (
+          <Link href={nerdHref} className={styles.companyCard}>
+            <span className={styles.companyLabel}>NERD</span>
+            <strong className={styles.companyTitle}>Dashboard NERD</strong>
+            <span className={styles.companyHint}>Filiais, KPIs e análises personalizadas</span>
+          </Link>
+        )}
+        {visible.includes("scarfme") && (
+          <Link href={scarfmeHref} className={styles.companyCard}>
+            <span className={styles.companyLabel}>SCARF ME</span>
+            <strong className={styles.companyTitle}>Dashboard Scarf Me</strong>
+            <span className={styles.companyHint}>Indicadores estratégicos por operação</span>
+          </Link>
+        )}
       </div>
     </main>
   );

@@ -6,6 +6,7 @@ import { useAuth } from "./AuthContext";
 import { UserHeaderBar } from "./UserHeaderBar";
 import {
   canAccessPath,
+  canAccessCompany,
   getFirstAllowedPath,
   pathnameToPermission,
 } from "@/lib/auth/permissions";
@@ -39,6 +40,11 @@ export function AuthGuard({ children }: { children: ReactNode }) {
         return;
       }
       const company = pathname.split("/")[1];
+      // Empresa restrita: usuário não pode ver esta empresa → volta à seleção
+      if (company && !canAccessCompany(user, company)) {
+        router.replace("/");
+        return;
+      }
       if (company) {
         router.replace(getFirstAllowedPath(user, company));
       } else {

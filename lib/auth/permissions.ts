@@ -1,4 +1,21 @@
-import type { PermissionKey, UserSession } from "@/types/auth";
+import type { CompanyKey, PermissionKey, UserSession } from "@/types/auth";
+
+const ALL_COMPANIES: CompanyKey[] = ["nerd", "scarfme"];
+
+/** Empresas que o usuário pode ver. Se allowedCompanies não definido ou vazio = as duas. */
+export function getVisibleCompanies(user: UserSession | null): CompanyKey[] {
+  if (!user) return [];
+  const list = user.allowedCompanies;
+  if (!list || list.length === 0) return ALL_COMPANIES;
+  return list;
+}
+
+/** True se o usuário pode acessar essa empresa. */
+export function canAccessCompany(user: UserSession | null, companyKey: string): boolean {
+  if (!user) return false;
+  const visible = getVisibleCompanies(user);
+  return visible.includes(companyKey as CompanyKey);
+}
 
 /** Segmento de rota (ex: controle-transferencias) a partir do pathname. */
 export function pathnameToPermission(pathname: string | null): PermissionKey | "admin" | null {
@@ -32,6 +49,12 @@ export function canAccessPath(user: UserSession | null, pathname: string | null)
   const perm = pathnameToPermission(pathname);
   if (perm === null) return true; // home, login
   if (perm === "admin") return user.role === "admin"; // só admin vê painel de usuários
+  // Rota sob uma empresa (ex: /nerd/dashboard): exige permissão da empresa
+  const parts = pathname?.split("/").filter(Boolean) ?? [];
+  const companySegment = parts[0];
+  if (companySegment && (companySegment === "nerd" || companySegment === "scarfme")) {
+    if (!canAccessCompany(user, companySegment)) return false;
+  }
   if (user.role === "admin" || user.role === "gestor") return true; // gestor = mesmo que admin, exceto /admin
   return user.permissions.includes(perm as PermissionKey);
 }

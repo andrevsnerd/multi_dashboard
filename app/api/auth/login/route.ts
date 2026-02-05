@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
       username: user.username,
       role: user.role,
       permissions: user.permissions,
+      allowedCompanies: user.allowedCompanies,
     };
     return NextResponse.json({ user: session });
   } catch (e) {

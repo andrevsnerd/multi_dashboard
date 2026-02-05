@@ -1,3 +1,5 @@
+import type { CompanyKey } from "@/lib/config/company";
+
 export type RoleKey = "admin" | "gestor" | "logistica";
 
 /** Chaves de permissão = segmentos de rota (ex: controle-transferencias). Admin vê tudo. */
@@ -14,6 +16,8 @@ export type PermissionKey =
   | "estoque-por-filial"
   | "transferencia-produtos";
 
+export type { CompanyKey };
+
 export interface UserRecord {
   id: string;
   username: string;
@@ -21,6 +25,8 @@ export interface UserRecord {
   role: RoleKey;
   /** Apenas para role !== admin. Páginas que a função pode acessar. */
   permissions: PermissionKey[];
+  /** Se definido e não vazio: apenas essas empresas. Se undefined/[]: vê as duas. */
+  allowedCompanies?: CompanyKey[];
 }
 
 export interface UserSession {
@@ -28,6 +34,8 @@ export interface UserSession {
   username: string;
   role: RoleKey;
   permissions: PermissionKey[];
+  /** Se definido e não vazio: apenas essas empresas. Se undefined/[]: vê as duas. */
+  allowedCompanies?: CompanyKey[];
 }
 
 /** Lista de todas as permissões para o painel admin. */

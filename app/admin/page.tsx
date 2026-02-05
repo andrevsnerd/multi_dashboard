@@ -6,6 +6,7 @@ import { useAuth } from "@/components/auth/AuthContext";
 import {
   ALL_PERMISSION_KEYS,
   ROLE_LABELS,
+  type CompanyKey,
   type RoleKey,
   type PermissionKey,
 } from "@/types/auth";
@@ -16,6 +17,7 @@ interface UserRow {
   username: string;
   role: RoleKey;
   permissions: PermissionKey[];
+  allowedCompanies?: CompanyKey[];
 }
 
 export default function AdminPage() {
@@ -29,6 +31,7 @@ export default function AdminPage() {
   const [formPassword, setFormPassword] = useState("");
   const [formRole, setFormRole] = useState<RoleKey>("logistica");
   const [formPermissions, setFormPermissions] = useState<PermissionKey[]>([]);
+  const [formAllowedCompanies, setFormAllowedCompanies] = useState<"" | CompanyKey>("");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -63,6 +66,7 @@ export default function AdminPage() {
     setFormPassword("");
     setFormRole("logistica");
     setFormPermissions(["controle-transferencias"]);
+    setFormAllowedCompanies("");
     setFormError("");
     setModal("add");
   }
@@ -73,6 +77,10 @@ export default function AdminPage() {
     setFormPassword("");
     setFormRole(u.role);
     setFormPermissions(u.permissions);
+    const ac = u.allowedCompanies;
+    setFormAllowedCompanies(
+      !ac?.length || ac.length === 2 ? "" : (ac[0] as "" | CompanyKey)
+    );
     setFormError("");
     setModal("edit");
   }
@@ -102,6 +110,10 @@ export default function AdminPage() {
             password: formPassword,
             role: formRole,
             permissions: formRole === "admin" ? [] : formPermissions,
+            allowedCompanies:
+              formAllowedCompanies === ""
+                ? []
+                : [formAllowedCompanies],
           }),
         });
         const data = await res.json();
@@ -117,6 +129,10 @@ export default function AdminPage() {
             ...(formPassword ? { password: formPassword } : {}),
             role: formRole,
             permissions: formRole === "admin" ? [] : formPermissions,
+            allowedCompanies:
+              formAllowedCompanies === ""
+                ? []
+                : [formAllowedCompanies],
           }),
         });
         const data = await res.json();
@@ -193,6 +209,7 @@ export default function AdminPage() {
                 <th>Usuário</th>
                 <th>Função</th>
                 <th>Permissões</th>
+                <th>Empresas</th>
                 <th className={styles.actionsCol}>Ações</th>
               </tr>
             </thead>
@@ -207,6 +224,13 @@ export default function AdminPage() {
                       : u.permissions.length === 0
                         ? "Nenhuma"
                         : u.permissions.join(", ")}
+                  </td>
+                  <td>
+                    {!u.allowedCompanies?.length || u.allowedCompanies.length === 2
+                      ? "Ambas"
+                      : u.allowedCompanies[0] === "nerd"
+                        ? "Só NERD"
+                        : "Só SCARF ME"}
                   </td>
                   <td className={styles.actionsCol}>
                     <button
@@ -283,6 +307,23 @@ export default function AdminPage() {
                       {ROLE_LABELS[r]}
                     </option>
                   ))}
+                </select>
+              </label>
+              <label className={styles.label}>
+                Empresas que pode ver
+                <select
+                  value={formAllowedCompanies}
+                  onChange={(e) =>
+                    setFormAllowedCompanies(
+                      e.target.value as "" | CompanyKey
+                    )
+                  }
+                  className={styles.select}
+                  disabled={saving}
+                >
+                  <option value="">Ambas (NERD e SCARF ME)</option>
+                  <option value="nerd">Só NERD</option>
+                  <option value="scarfme">Só SCARF ME</option>
                 </select>
               </label>
               {formRole !== "admin" && (

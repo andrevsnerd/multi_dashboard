@@ -5,7 +5,7 @@ import {
   seedInitialUsersIfEmpty,
   findUserByUsername,
 } from "@/lib/auth/users-store";
-import type { RoleKey, PermissionKey } from "@/types/auth";
+import type { CompanyKey, RoleKey, PermissionKey } from "@/types/auth";
 
 async function isAdmin(username: string): Promise<boolean> {
   const user = await findUserByUsername(username);
@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
       username: u.username,
       role: u.role,
       permissions: u.permissions,
+      allowedCompanies: u.allowedCompanies ?? undefined,
     }));
     return NextResponse.json(users);
   } catch (e) {
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
     }
     await seedInitialUsersIfEmpty();
     const body = await request.json();
-    const { username: newUsername, password, role, permissions } = body;
+    const { username: newUsername, password, role, permissions, allowedCompanies } = body;
     if (!newUsername || !password || !role) {
       return NextResponse.json(
         { error: "Usuário, senha e função são obrigatórios" },
@@ -55,13 +56,17 @@ export async function POST(request: NextRequest) {
       String(newUsername).trim(),
       String(password),
       role as RoleKey,
-      (permissions ?? []) as PermissionKey[]
+      (permissions ?? []) as PermissionKey[],
+      Array.isArray(allowedCompanies) && allowedCompanies.length > 0
+        ? (allowedCompanies as CompanyKey[])
+        : undefined
     );
     return NextResponse.json({
       id: user.id,
       username: user.username,
       role: user.role,
       permissions: user.permissions,
+      allowedCompanies: user.allowedCompanies ?? undefined,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro ao criar usuário";

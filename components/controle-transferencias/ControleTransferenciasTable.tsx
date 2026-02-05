@@ -1,12 +1,82 @@
 "use client";
 
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 import type { ProdutoTransferencia } from "@/lib/repositories/controleTransferencias";
 import type { DateRangeValue } from "@/components/filters/DateRangeFilter";
+import { useAuth } from "@/components/auth/AuthContext";
 import { exportTransfersToPDF } from "./exportToPDF";
+import ConfirmarTransferenciaModal, { type TransferItemForModal } from "./ConfirmarTransferenciaModal";
 
 import styles from "./ControleTransferenciasTable.module.css";
+
+interface FilialApi {
+  codFilial: string;
+  filial: string;
+}
+
+interface TransferenciaPermissao {
+  username: string;
+  filiaisOrigem: string[];
+  filiaisDestino: string[];
+  tiposRomaneioPermitidos: string[];
+  responsavelPadrao?: string;
+  tipoRomaneioPadrao?: string;
+  responsavelFixo: boolean;
+  tipoRomaneioFixo: boolean;
+}
+
+async function fetchPermissoes(username: string): Promise<TransferenciaPermissao | null> {
+  try {
+    const response = await fetch("/api/transferencia-produtos/permissoes", {
+      headers: { "x-auth-username": username },
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    const json = (await response.json()) as { data: TransferenciaPermissao | null };
+    return json.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchFiliais(): Promise<FilialApi[]> {
+  const response = await fetch("/api/transferencia-produtos/filiais", { cache: "no-store" });
+  if (!response.ok) return [];
+  const json = (await response.json()) as { data: FilialApi[] };
+  return json.data ?? [];
+}
+
+async function executarTransferencia(
+  produto: string,
+  corProduto: string | null,
+  filialOrigem: string,
+  filialDestino: string,
+  qtdeSaida: number,
+  qtdeEntrada: number,
+  tipoRomaneio: string,
+  responsavel: string
+): Promise<{ success: boolean; message: string }> {
+  const response = await fetch("/api/transferencia-produtos/executar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      produto,
+      corProduto,
+      filialOrigem,
+      filialDestino,
+      qtdeSaida,
+      qtdeEntrada,
+      tipoRomaneio,
+      responsavel,
+    }),
+  });
+  if (!response.ok) {
+    const err = (await response.json()) as { error?: string };
+    throw new Error(err.error ?? "Erro ao executar transferência");
+  }
+  return response.json();
+}
 
 interface TransferByOrigin {
   origem: string;
@@ -33,6 +103,10 @@ interface TransferItem {
   cor: string;
   origem: string;
   destino: string;
+  /** Nome canônico da filial de origem (para API) */
+  origemCanonico: string;
+  /** Nome canônico da filial de destino (para API) */
+  destinoCanonico: string;
   quantidade: number;
   itemOriginal: ProdutoTransferencia;
 }
@@ -507,6 +581,8 @@ export function calculateTransfers(
           cor: item.cor,
           origem: origemDisplayName,
           destino: destinoDisplayName,
+          origemCanonico: melhorOrigem.filial,
+          destinoCanonico: filialDestino.filial,
           quantidade: Math.ceil(quantidade),
           itemOriginal: item,
         });
@@ -590,6 +666,8 @@ export function calculateTransfers(
               cor: item.cor,
               origem: origemDisplayNameCompletar,
               destino: destinoDisplayName,
+              origemCanonico: outraOrigem.filial,
+              destinoCanonico: filialDestino.filial,
               quantidade: Math.ceil(quantidadeCompletar),
               itemOriginal: item,
             });
@@ -769,6 +847,109 @@ export default function ControleTransferenciasTable({
   const [inputQuantidadeReal, setInputQuantidadeReal] = useState("");
   const [hoveredCorTooltip, setHoveredCorTooltip] = useState<{ itemKey: string; codigoCor: string } | null>(null);
 
+  const { user, isLoading: authLoading } = useAuth();
+  const [permissoes, setPermissoes] = useState<TransferenciaPermissao | null>(null);
+  const [filiais, setFiliais] = useState<FilialApi[]>([]);
+  const [modalTransferItem, setModalTransferItem] = useState<TransferItemForModal | null>(null);
+  const [onTransferSuccess, setOnTransferSuccess] = useState<(() => void) | null>(null);
+
+  const filialToCodMap = useMemo(() => {
+    const map = new Map<string, string>();
+    filiais.forEach((f) => {
+      const key = (f.filial || "").trim();
+      const cod = (f.codFilial || "").trim();
+      if (key && cod) {
+        map.set(key, cod);
+        map.set(key.toUpperCase(), cod);
+        map.set(cod, cod);
+        const keyLower = key.toLowerCase();
+        if (key !== keyLower) map.set(keyLower, cod);
+      }
+    });
+    if (company) {
+      const allCanonical = new Set<string>();
+      (company.filialFilters?.inventory ?? []).forEach((x) => allCanonical.add((x || "").trim()));
+      Object.entries(company.filialDisplayNames ?? {}).forEach(([k, v]) => {
+        allCanonical.add((k || "").trim());
+        if (v) allCanonical.add((v || "").trim());
+      });
+      allCanonical.forEach((canon) => {
+        if (!canon) return;
+        const found = filiais.find(
+          (fi) =>
+            (fi.filial || "").trim().toUpperCase() === canon.toUpperCase() ||
+            (fi.filial || "").toUpperCase().includes(canon.toUpperCase()) ||
+            canon.toUpperCase().includes((fi.filial || "").toUpperCase())
+        );
+        if (found?.codFilial) map.set(canon, found.codFilial.trim());
+      });
+    }
+    return map;
+  }, [filiais, company]);
+
+  // Só buscar permissões depois do auth ter carregado (evita request sem header em local)
+  useEffect(() => {
+    if (authLoading || !user?.username) return;
+    fetchPermissoes(user.username).then(setPermissoes);
+  }, [authLoading, user?.username]);
+
+  useEffect(() => {
+    fetchFiliais().then(setFiliais);
+  }, []);
+
+  const getCodFilial = useCallback(
+    (canonico: string): string | null => {
+      const k = canonico.trim();
+      return filialToCodMap.get(k) ?? filialToCodMap.get(k.toUpperCase()) ?? null;
+    },
+    [filialToCodMap]
+  );
+
+  const canTransfer = useCallback(
+    (item: TransferItem): boolean => {
+      if (!permissoes) return true;
+      if (permissoes.filiaisOrigem.length === 0 && permissoes.filiaisDestino.length === 0) return true;
+      const codOrigem = getCodFilial(item.origemCanonico);
+      const codDestino = getCodFilial(item.destinoCanonico);
+      const origemOk =
+        permissoes.filiaisOrigem.length === 0 ||
+        (codOrigem && permissoes.filiaisOrigem.some((c) => (c || "").trim() === codOrigem));
+      const destinoOk =
+        permissoes.filiaisDestino.length === 0 ||
+        (codDestino && permissoes.filiaisDestino.some((c) => (c || "").trim() === codDestino));
+      return Boolean(origemOk && destinoOk);
+    },
+    [permissoes, getCodFilial]
+  );
+
+  const handleConfirmTransfer = useCallback(
+    async (quantidade: number) => {
+      if (!modalTransferItem || !onTransferSuccess) return;
+      const codOrigem = getCodFilial(modalTransferItem.origemCanonico);
+      const codDestino = getCodFilial(modalTransferItem.destinoCanonico);
+      if (!codOrigem || !codDestino) {
+        throw new Error("Filial de origem ou destino não encontrada. Verifique se as filiais estão cadastradas.");
+      }
+      const tipoRomaneio = permissoes?.tipoRomaneioPadrao ?? "TRANSFERENCIA ENTRE LOJAS";
+      const responsavel = permissoes?.responsavelPadrao ?? "LOGISTICA";
+      await executarTransferencia(
+        modalTransferItem.produto,
+        modalTransferItem.codigoCor ?? null,
+        codOrigem,
+        codDestino,
+        quantidade,
+        quantidade,
+        tipoRomaneio,
+        responsavel
+      );
+      onTransferSuccess();
+    },
+    [modalTransferItem, onTransferSuccess, getCodFilial, permissoes]
+  );
+
+  const codFilialOrigem = modalTransferItem ? getCodFilial(modalTransferItem.origemCanonico) : null;
+  const codFilialDestino = modalTransferItem ? getCodFilial(modalTransferItem.destinoCanonico) : null;
+
   // Carregar marcações da API (Neon + Redis com migração automática)
   // IMPORTANTE: Carregamos TODOS os dados salvos, não apenas os visíveis.
   // Isso garante que dados não sejam perdidos quando itens saem da lista.
@@ -937,6 +1118,19 @@ export default function ControleTransferenciasTable({
 
   return (
     <div className={styles.wrapper}>
+      <ConfirmarTransferenciaModal
+        open={!!modalTransferItem}
+        item={modalTransferItem}
+        onClose={() => {
+          setModalTransferItem(null);
+          setOnTransferSuccess(null);
+        }}
+        onConfirm={handleConfirmTransfer}
+        codFilialOrigem={codFilialOrigem}
+        codFilialDestino={codFilialDestino}
+        tipoRomaneio={permissoes?.tipoRomaneioPadrao ?? "TRANSFERENCIA ENTRE LOJAS"}
+        responsavel={permissoes?.responsavelPadrao ?? "LOGISTICA"}
+      />
       {/* Botão de exportar PDF */}
       <div className={styles.exportButtonContainer}>
         <button onClick={handleExportPDF} className={styles.exportButton}>
@@ -1012,6 +1206,7 @@ export default function ControleTransferenciasTable({
                     <th className={styles.destinoHeader}>Destino</th>
                     <th className={styles.quantidadeHeader}>Quantidade</th>
                     <th className={styles.quantidadeRealHeader}>Quantidade real</th>
+                    <th className={styles.transferirHeader}>Ação</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1299,6 +1494,33 @@ export default function ControleTransferenciasTable({
                           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                         </svg>
                       </button>
+                    )}
+                  </td>
+                  <td className={styles.transferirCell}>
+                    {canTransfer(item) ? (
+                      <button
+                        type="button"
+                        className={styles.transferirBtn}
+                        onClick={() => {
+                          const qtySugerida = quantidadesReais[itemKey] ?? item.quantidade;
+                          setModalTransferItem({
+                            ...item,
+                            estoqueOrigem,
+                            quantidade: Math.min(qtySugerida, Math.max(0, estoqueOrigem)),
+                            codigoCor: item.itemOriginal.codigoCor,
+                          });
+                          setOnTransferSuccess(() => () => {
+                            toggleMarked(item);
+                            setModalTransferItem(null);
+                            setOnTransferSuccess(null);
+                          });
+                        }}
+                        title="Transferir este item"
+                      >
+                        TRANSFERIR
+                      </button>
+                    ) : (
+                      <span className={styles.transferirDisabled}>—</span>
                     )}
                   </td>
                 </tr>
