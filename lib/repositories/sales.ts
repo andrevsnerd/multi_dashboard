@@ -1032,7 +1032,7 @@ export async function fetchSalesSummary({
           ${colecaoFilter.replace(/p\.COLECAO/g, 'p.COLECAO')}
           ${subgrupoFilter.replace(/p\.SUBGRUPO_PRODUTO/g, 'p.SUBGRUPO_PRODUTO')}
           ${gradeFilter}
-          ${produtoFilter.replace(/p\.DESC_PRODUTO/g, 'p.DESC_PRODUTO')}
+          ${produtoFilter.replace(/vp\.DESC_PRODUTO/g, 'p.DESC_PRODUTO')}
       ),
       VendasComNumero AS (
         SELECT 

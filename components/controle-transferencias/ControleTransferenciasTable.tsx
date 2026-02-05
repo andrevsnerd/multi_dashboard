@@ -767,6 +767,7 @@ export default function ControleTransferenciasTable({
   const [savingQuantidadeReal, setSavingQuantidadeReal] = useState(false);
   const [editingQuantidadeRealKey, setEditingQuantidadeRealKey] = useState<string | null>(null);
   const [inputQuantidadeReal, setInputQuantidadeReal] = useState("");
+  const [hoveredCorTooltip, setHoveredCorTooltip] = useState<{ itemKey: string; codigoCor: string } | null>(null);
 
   // Carregar marcações da API (mesmo Redis/KV das metas no Vercel)
   // NOTA: Não fazemos prune aqui - quando visibleItemKeys muda (ex: troca de filial),
@@ -1150,7 +1151,23 @@ export default function ControleTransferenciasTable({
                     {item.descricao}
                   </td>
                   <td className={styles.corCell}>
-                    <span className={styles.corBadge}>{item.cor}</span>
+                    <span
+                      className={styles.corBadgeWrapper}
+                      onMouseEnter={() =>
+                        setHoveredCorTooltip({
+                          itemKey,
+                          codigoCor: item.itemOriginal.codigoCor ?? "—",
+                        })
+                      }
+                      onMouseLeave={() => setHoveredCorTooltip(null)}
+                    >
+                      <span className={styles.corBadge}>{item.cor}</span>
+                      {hoveredCorTooltip?.itemKey === itemKey && (
+                        <span className={styles.corCodigoTooltip}>
+                          Código: {item.itemOriginal.codigoCor ?? "—"}
+                        </span>
+                      )}
+                    </span>
                   </td>
                   <td className={styles.destinoCell}>
                     <span className={styles.destinoBadge}>{item.destino}</span>

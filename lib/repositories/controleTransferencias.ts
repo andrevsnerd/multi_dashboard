@@ -26,6 +26,8 @@ export interface FilialData {
 export interface ProdutoTransferencia {
   produto: string;
   cor: string;
+  /** Código da cor no sistema (ex.: código do banco) */
+  codigoCor?: string;
   descricao: string;
   codigo: string;
   codigoBarra?: string;
@@ -693,6 +695,7 @@ export async function fetchControleTransferencias({
       produtosMap.set(chave, {
         produto,
         cor: produtoInfo.cor,
+        codigoCor: corProduto || undefined,
         descricao: descricao || 'Sem descrição',
         codigo,
         codigoBarra,
@@ -745,6 +748,7 @@ export async function fetchControleTransferencias({
       });
       mergedByDisplayCor.set(key, {
         ...existente,
+        codigoCor: existente.codigoCor || item.codigoCor,
         descricao: existente.descricao || item.descricao,
         codigoBarra: existente.codigoBarra || item.codigoBarra,
         subgrupo: existente.subgrupo || item.subgrupo,
