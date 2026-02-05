@@ -35,17 +35,31 @@ export async function POST(request: Request) {
     const body = await request.json();
     const companyKey = typeof body.companyKey === 'string' ? body.companyKey.trim() : '';
     const markedKeys = Array.isArray(body.markedKeys) ? body.markedKeys : null;
-    console.log('[tr-realizadas] API POST: companyKey=', JSON.stringify(companyKey), 'markedKeys length=', markedKeys?.length);
+    const removeKeys = Array.isArray(body.removeKeys) ? body.removeKeys : [];
+    console.log('[tr-realizadas] API POST: companyKey=', JSON.stringify(companyKey), 'markedKeys length=', markedKeys?.length, 'removeKeys length=', removeKeys.length);
 
-    if (!companyKey || !Array.isArray(markedKeys)) {
-      console.log('[tr-realizadas] API POST: 400 bad request');
+    if (!companyKey) {
+      console.log('[tr-realizadas] API POST: 400 bad request - companyKey faltando');
       return NextResponse.json(
-        { error: 'Parâmetros companyKey e markedKeys (array) são obrigatórios' },
+        { error: 'Parâmetro companyKey é obrigatório' },
         { status: 400 }
       );
     }
 
-    await writeTransferenciasRealizadas(companyKey, markedKeys);
+    // Se markedKeys não foi fornecido, assume que é para remover apenas
+    if (markedKeys === null && removeKeys.length === 0) {
+      console.log('[tr-realizadas] API POST: 400 bad request - nenhuma operação');
+      return NextResponse.json(
+        { error: 'É necessário fornecer markedKeys (adicionar) ou removeKeys (remover)' },
+        { status: 400 }
+      );
+    }
+
+    await writeTransferenciasRealizadas(
+      companyKey, 
+      markedKeys || [], 
+      removeKeys
+    );
     console.log('[tr-realizadas] API POST ok: company=', companyKey, 'saved');
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -769,9 +769,10 @@ export default function ControleTransferenciasTable({
   const [inputQuantidadeReal, setInputQuantidadeReal] = useState("");
   const [hoveredCorTooltip, setHoveredCorTooltip] = useState<{ itemKey: string; codigoCor: string } | null>(null);
 
-  // Carregar marcações da API (mesmo Redis/KV das metas no Vercel)
-  // NOTA: Não fazemos prune aqui - quando visibleItemKeys muda (ex: troca de filial),
-  // as chaves salvas poderiam não estar no novo visible, e um POST com [] apagaria tudo no Redis.
+  // Carregar marcações da API (Neon + Redis com migração automática)
+  // IMPORTANTE: Carregamos TODOS os dados salvos, não apenas os visíveis.
+  // Isso garante que dados não sejam perdidos quando itens saem da lista.
+  // Apenas mostramos como marcados os itens que estão visíveis E salvos.
   useEffect(() => {
     let active = true;
     (async () => {
@@ -781,6 +782,7 @@ export default function ControleTransferenciasTable({
         if (!res.ok) return;
         const json = await res.json();
         const stored: string[] = Array.isArray(json.markedKeys) ? json.markedKeys : [];
+        // Filtrar apenas os visíveis para exibição, mas manter todos salvos no backend
         const visible = visibleItemKeys;
         const filtered = stored.filter((k) => visible.has(k));
         setMarkedKeys(new Set(filtered));
@@ -834,17 +836,29 @@ export default function ControleTransferenciasTable({
 
   const toggleMarked = async (item: TransferItem) => {
     const key = getTransferItemKey(item);
+    const isCurrentlyMarked = markedKeys.has(key);
     const next = new Set(markedKeys);
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
+    
+    // Atualizar estado local imediatamente
+    if (isCurrentlyMarked) {
+      next.delete(key);
+    } else {
+      next.add(key);
+    }
     setMarkedKeys(next);
-    const toSave = Array.from(next).filter((k) => visibleItemKeys.has(k));
+    
     setSavingMarked(true);
     try {
+      // Usar a nova API que faz merge - adiciona/remove apenas este item específico
+      // Isso preserva todos os outros dados, mesmo os que não estão visíveis
       await fetch("/api/transferencias-realizadas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyKey, markedKeys: toSave }),
+        body: JSON.stringify({ 
+          companyKey, 
+          markedKeys: isCurrentlyMarked ? [] : [key], // Adicionar apenas se não estava marcado
+          removeKeys: isCurrentlyMarked ? [key] : []  // Remover apenas se estava marcado
+        }),
       });
     } finally {
       setSavingMarked(false);
