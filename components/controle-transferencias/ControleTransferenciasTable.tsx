@@ -905,21 +905,38 @@ export default function ControleTransferenciasTable({
     [filialToCodMap]
   );
 
+  /** Verifica se um valor de permissão corresponde à filial (origem ou destino) */
+  const permissaoMatchFilial = useCallback(
+    (permValue: string, filialCanonico: string): boolean => {
+      const perm = (permValue || "").trim();
+      const canon = (filialCanonico || "").trim().toUpperCase();
+      if (!perm || !canon) return false;
+      const cod = getCodFilial(filialCanonico);
+      if (cod && perm === cod) return true;
+      const filialFromPerm = filiais.find((f) => (f.codFilial || "").trim() === perm);
+      if (filialFromPerm) {
+        const fn = (filialFromPerm.filial || "").trim().toUpperCase();
+        return fn === canon || fn.includes(canon) || canon.includes(fn);
+      }
+      return canon.includes(perm.toUpperCase()) || perm.toUpperCase().includes(canon);
+    },
+    [getCodFilial, filiais]
+  );
+
   const canTransfer = useCallback(
     (item: TransferItem): boolean => {
       if (!permissoes) return true;
       if (permissoes.filiaisOrigem.length === 0 && permissoes.filiaisDestino.length === 0) return true;
-      const codOrigem = getCodFilial(item.origemCanonico);
-      const codDestino = getCodFilial(item.destinoCanonico);
+      if (filiais.length === 0) return true;
       const origemOk =
         permissoes.filiaisOrigem.length === 0 ||
-        (codOrigem && permissoes.filiaisOrigem.some((c) => (c || "").trim() === codOrigem));
+        permissoes.filiaisOrigem.some((p) => permissaoMatchFilial(p, item.origemCanonico));
       const destinoOk =
         permissoes.filiaisDestino.length === 0 ||
-        (codDestino && permissoes.filiaisDestino.some((c) => (c || "").trim() === codDestino));
+        permissoes.filiaisDestino.some((p) => permissaoMatchFilial(p, item.destinoCanonico));
       return Boolean(origemOk && destinoOk);
     },
-    [permissoes, getCodFilial]
+    [permissoes, permissaoMatchFilial, filiais.length]
   );
 
   const handleConfirmTransfer = useCallback(
