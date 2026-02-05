@@ -905,18 +905,21 @@ export default function ControleTransferenciasTable({
     [filialToCodMap]
   );
 
-  /** Verifica se um valor de permissão corresponde à filial (origem ou destino) */
+  /** Verifica se um valor de permissão corresponde à filial (origem ou destino).
+   * permValue = codFilial (ex: "000001") armazenado nas permissões.
+   * filialCanonico = nome canônico da filial no item (ex: "NERD", "NERD CENTER NORTE").
+   */
   const permissaoMatchFilial = useCallback(
     (permValue: string, filialCanonico: string): boolean => {
       const perm = (permValue || "").trim();
-      const canon = (filialCanonico || "").trim().toUpperCase();
+      const canon = (filialCanonico || "").trim();
       if (!perm || !canon) return false;
       const cod = getCodFilial(filialCanonico);
       if (cod && perm === cod) return true;
       const filialFromPerm = filiais.find((f) => (f.codFilial || "").trim() === perm);
       if (filialFromPerm) {
-        const fn = (filialFromPerm.filial || "").trim().toUpperCase();
-        return fn === canon || fn.includes(canon) || canon.includes(fn);
+        const fn = (filialFromPerm.filial || "").trim();
+        return fn === canon || fn.toUpperCase() === canon.toUpperCase();
       }
       return false;
     },
