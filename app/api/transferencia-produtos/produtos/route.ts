@@ -23,6 +23,7 @@ export async function GET(request: Request) {
       if (corProduto) {
         // Quando tem cor (do código de barras), buscar direto por produto e cor (igual ao Python)
         // O Python mostra TODAS as filiais, não filtra por filial origem
+        // Usar RTRIM para evitar falha quando PRODUTO/COR são CHAR com espaços
         query = `
           SELECT 
             e.PRODUTO,
@@ -38,14 +39,15 @@ export async function GET(request: Request) {
           LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = e.COR_PRODUTO
           LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.FILIAL = e.FILIAL
           LEFT JOIN PRODUTOS_BARRA pb WITH (NOLOCK) ON pb.PRODUTO = e.PRODUTO AND pb.COR_PRODUTO = e.COR_PRODUTO
-          WHERE e.PRODUTO = @searchTerm
-            AND e.COR_PRODUTO = @corProduto
+          WHERE RTRIM(LTRIM(CAST(e.PRODUTO AS VARCHAR(50)))) = RTRIM(LTRIM(@searchTerm))
+            AND RTRIM(LTRIM(ISNULL(CAST(e.COR_PRODUTO AS VARCHAR(20)), ''))) = RTRIM(LTRIM(ISNULL(@corProduto, '')))
         `;
         req.input('searchTerm', sql.VarChar, searchTermTrimmed);
         req.input('corProduto', sql.VarChar, corProduto);
         // NÃO filtrar por filial quando tem corProduto - mostrar TODAS as filiais (igual ao Python)
       } else {
         // Buscar por código de barras OU nome/código do produto
+        // Usar RTRIM/LTRIM e CAST para garantir match com campos CHAR ou numéricos no banco
         const searchPattern = `%${searchTermTrimmed}%`;
         query = `
           SELECT DISTINCT TOP 50
@@ -64,8 +66,8 @@ export async function GET(request: Request) {
           LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.FILIAL = e.FILIAL
           WHERE (
             p.DESC_PRODUTO LIKE @searchPattern
-            OR e.PRODUTO LIKE @searchPattern
-            OR RTRIM(pb.CODIGO_BARRA) = @searchTermExato
+            OR RTRIM(LTRIM(CAST(e.PRODUTO AS VARCHAR(50)))) LIKE @searchPattern
+            OR LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) = LTRIM(RTRIM(@searchTermExato))
           )
           AND e.ESTOQUE > 0
         `;
@@ -73,13 +75,13 @@ export async function GET(request: Request) {
         req.input('searchTermExato', sql.VarChar, searchTermTrimmed);
         
         if (filialOrigem) {
-          // Filtrar por código da filial usando o JOIN com FILIAIS
-          query += ` AND f.COD_FILIAL = @filialOrigem`;
-          req.input('filialOrigem', sql.VarChar, filialOrigem);
+          // Filtrar por código da filial (RTRIM/LTRIM para evitar falha por espaços)
+          query += ` AND RTRIM(LTRIM(CAST(f.COD_FILIAL AS VARCHAR(20)))) = RTRIM(LTRIM(@filialOrigem))`;
+          req.input('filialOrigem', sql.VarChar, filialOrigem.trim());
         }
       }
 
-      query += ` ORDER BY e.FILIAL, e.COR_PRODUTO`;
+      query += ` ORDER BY FILIAL, COR_PRODUTO`;
 
       console.log(`[PRODUTOS DEBUG] Query completa:`, query);
       console.log(`[PRODUTOS DEBUG] Params:`, { 

@@ -17,8 +17,7 @@ export async function GET(request: Request) {
       // Log para debug
       console.log(`[CÓDIGO BARRAS] Buscando: "${codigoLimpo}" (len=${codigoLimpo.length}, original="${codigoBarras}")`);
       
-      // Buscar igual ao script Python: WHERE pb.CODIGO_BARRA = ? com codigo_limpo = str(codigo_barras).strip()
-      // IMPORTANTE: O código no banco tem espaços à direita, então usar RTRIM para comparar
+      // Normalizar comparação: código no banco pode ser CHAR com espaços ou numérico
       const query = `
         SELECT DISTINCT
           pb.PRODUTO,
@@ -31,11 +30,10 @@ export async function GET(request: Request) {
           pb.CODIGO_BARRA
         FROM PRODUTOS_BARRA pb WITH (NOLOCK)
         INNER JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = pb.PRODUTO
-        WHERE RTRIM(pb.CODIGO_BARRA) = @codigoBarras
-           OR pb.CODIGO_BARRA = @codigoBarras
+        WHERE LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) = LTRIM(RTRIM(@codigoBarras))
       `;
 
-      req.input('codigoBarras', sql.VarChar, codigoLimpo);
+      req.input('codigoBarras', sql.VarChar, codigoLimpo.trim());
 
       const result = await req.query<{
         PRODUTO: string;

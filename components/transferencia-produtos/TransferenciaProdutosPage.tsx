@@ -109,14 +109,16 @@ async function fetchFiliais(): Promise<Filial[]> {
   return json.data;
 }
 
-async function buscarProdutoPorCodigoBarras(codigoBarras: string): Promise<{
+async function buscarProdutoPorCodigoBarras(codigoBarras: string, companyKey?: string): Promise<{
   produto: string;
   descProduto: string;
   corProduto: string | null;
   produtosEncontrados: number;
   todosProdutos: Array<{ produto: string; cor: string; tamanho: string }>;
 } | null> {
-  const response = await fetch(`/api/transferencia-produtos/produto-por-codigo-barras?codigoBarras=${encodeURIComponent(codigoBarras)}`, {
+  const params = new URLSearchParams({ codigoBarras: codigoBarras.trim() });
+  if (companyKey) params.set("company", companyKey);
+  const response = await fetch(`/api/transferencia-produtos/produto-por-codigo-barras?${params.toString()}`, {
     cache: "no-store",
   });
 
@@ -128,7 +130,7 @@ async function buscarProdutoPorCodigoBarras(codigoBarras: string): Promise<{
   return json.data || null;
 }
 
-async function searchProdutos(searchTerm: string, filialOrigem?: string, corProduto?: string | null): Promise<Produto[]> {
+async function searchProdutos(searchTerm: string, filialOrigem?: string, corProduto?: string | null, companyKey?: string): Promise<Produto[]> {
   if (!searchTerm || searchTerm.trim().length < 2) {
     return [];
   }
@@ -138,11 +140,15 @@ async function searchProdutos(searchTerm: string, filialOrigem?: string, corProd
   });
 
   if (filialOrigem) {
-    params.set("filialOrigem", filialOrigem);
+    params.set("filialOrigem", filialOrigem.trim());
   }
 
-  if (corProduto) {
-    params.set("corProduto", corProduto);
+  if (corProduto != null && corProduto !== '') {
+    params.set("corProduto", String(corProduto).trim());
+  }
+
+  if (companyKey) {
+    params.set("company", companyKey);
   }
 
   const response = await fetch(`/api/transferencia-produtos/produtos?${params.toString()}`, {
@@ -577,7 +583,7 @@ export default function TransferenciaProdutosPage({
         
         // Tentar buscar por código de barras se tiver pelo menos 3 caracteres
         if (searchTermTrimmed.length >= 3) {
-          const produtoCodigoBarras = await buscarProdutoPorCodigoBarras(searchTermTrimmed);
+          const produtoCodigoBarras = await buscarProdutoPorCodigoBarras(searchTermTrimmed, companyKey);
           
           if (produtoCodigoBarras) {
             // Se encontrou por código de barras, usar a cor específica se houver
@@ -587,7 +593,8 @@ export default function TransferenciaProdutosPage({
             results = await searchProdutos(
               produtoCodigoBarras.produto,
               filialOrigem?.codFilial,
-              corProdutoCodigoBarras
+              corProdutoCodigoBarras,
+              companyKey
             );
             
             // Se encontrou múltiplos produtos com mesmo código de barras, avisar
@@ -603,7 +610,8 @@ export default function TransferenciaProdutosPage({
               results = await searchProdutos(
                 produtoCodigoBarras.produto,
                 filialOrigem?.codFilial,
-                null
+                null,
+                companyKey
               );
             }
           }
@@ -611,7 +619,7 @@ export default function TransferenciaProdutosPage({
         
         // Se não encontrou por código de barras ou não é só números, buscar normalmente
         if (results.length === 0) {
-          results = await searchProdutos(searchTermTrimmed, filialOrigem?.codFilial, null);
+          results = await searchProdutos(searchTermTrimmed, filialOrigem?.codFilial, null, companyKey);
         }
         
         if (active) {
@@ -632,7 +640,7 @@ export default function TransferenciaProdutosPage({
       active = false;
       clearTimeout(timeoutId);
     };
-  }, [searchTerm, filialOrigem, mostrarNotificacao]);
+  }, [searchTerm, filialOrigem, companyKey, mostrarNotificacao]);
 
   const adicionarProduto = useCallback((produto: Produto) => {
     if (!filialOrigem) {
