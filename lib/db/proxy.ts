@@ -294,6 +294,39 @@ export class ProxyRequest implements RequestLike {
 }
 
 /**
+ * Encaminha requisição de transferência para o proxy (quando Vercel usa proxy)
+ */
+export async function forwardTransferToProxy(
+  body: Record<string, unknown>,
+  headers: Headers
+): Promise<Response> {
+  if (!PROXY_URL) {
+    throw new Error('PROXY_URL não configurada');
+  }
+  if (!PROXY_SECRET) {
+    throw new Error('PROXY_SECRET não configurada');
+  }
+
+  const forwardHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Proxy-Token': PROXY_SECRET,
+    'ngrok-skip-browser-warning': 'true',
+    'Ngrok-Skip-Browser-Warning': 'true',
+    'User-Agent': 'curl/7.68.0',
+    'Accept': 'application/json',
+  };
+  const xAuth = headers.get('x-auth-username');
+  if (xAuth) forwardHeaders['x-auth-username'] = xAuth;
+
+  const response = await fetch(`${PROXY_URL}/transfer`, {
+    method: 'POST',
+    headers: forwardHeaders,
+    body: JSON.stringify(body),
+  });
+  return response;
+}
+
+/**
  * Testa a conexão com o proxy
  */
 export async function testProxyConnection(): Promise<boolean> {

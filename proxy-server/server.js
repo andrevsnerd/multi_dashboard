@@ -179,6 +179,53 @@ app.post('/with-request', authenticate, async (req, res) => {
   }
 });
 
+// Endpoint para executar transferência (usado pelo Vercel quando via proxy)
+app.post('/transfer', authenticate, async (req, res) => {
+  try {
+    const body = req.body;
+    const {
+      produto,
+      corProduto,
+      filialOrigem,
+      filialDestino,
+      qtdeSaida,
+      qtdeEntrada,
+      tipoRomaneio = 'TRANSFERENCIA',
+      responsavel = 'LOGISTICA',
+    } = body;
+
+    if (!produto || !filialOrigem || !filialDestino || qtdeSaida <= 0 || qtdeEntrada <= 0) {
+      return res.status(400).json({ success: false, error: 'Dados inválidos para transferência' });
+    }
+
+    const pool = await getPool();
+    const { executeTransfer } = require('../lib/transfer-executor');
+    const result = await executeTransfer(pool, {
+      produto,
+      corProduto: corProduto || null,
+      filialOrigem,
+      filialDestino,
+      qtdeSaida,
+      qtdeEntrada,
+      tipoRomaneio,
+      responsavel,
+    });
+
+    res.json({
+      success: true,
+      romaneioSaida: result.romaneioSaida,
+      romaneioEntrada: result.romaneioEntrada,
+      message: result.message,
+    });
+  } catch (error) {
+    console.error('[Transfer] Erro:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Erro ao executar transferência',
+    });
+  }
+});
+
 // Endpoints específicos para as rotas da API
 app.get('/api/sales-summary', authenticate, async (req, res) => {
   try {
