@@ -829,17 +829,6 @@ export default function ControleTransferenciasTable({
     });
   }, [data, companyKey, dateRange, selectedFilial, company]);
 
-  // Chaves dos itens atualmente visíveis na lista (para persistir só marcações visíveis)
-  const visibleItemKeys = useMemo(() => {
-    const set = new Set<string>();
-    transfersByOriginAndDestination.forEach((group) => {
-      group.destinationGroups.forEach((dg) => {
-        dg.items.forEach((item) => set.add(getTransferItemKey(item)));
-      });
-    });
-    return set;
-  }, [transfersByOriginAndDestination]);
-
   const [markedKeys, setMarkedKeys] = useState<Set<string>>(new Set());
   const [savingMarked, setSavingMarked] = useState(false);
 
@@ -879,10 +868,7 @@ export default function ControleTransferenciasTable({
       allCanonical.forEach((canon) => {
         if (!canon) return;
         const found = filiais.find(
-          (fi) =>
-            (fi.filial || "").trim().toUpperCase() === canon.toUpperCase() ||
-            (fi.filial || "").toUpperCase().includes(canon.toUpperCase()) ||
-            canon.toUpperCase().includes((fi.filial || "").toUpperCase())
+          (fi) => (fi.filial || "").trim().toUpperCase() === canon.toUpperCase()
         );
         if (found?.codFilial) map.set(canon, found.codFilial.trim());
       });
@@ -944,6 +930,46 @@ export default function ControleTransferenciasTable({
     },
     [user?.role, permissoes, permissaoMatchFilial, filiais.length]
   );
+
+  const filteredTransfersByOriginAndDestination = useMemo(() => {
+    if (user?.role === "admin") return transfersByOriginAndDestination;
+    if (!permissoes || filiais.length === 0) return [];
+    return transfersByOriginAndDestination
+      .filter((group) => {
+        const origemCanonico = group.items[0]?.origemCanonico ?? group.origem;
+        const origemOk =
+          permissoes.filiaisOrigem.length === 0 ||
+          permissoes.filiaisOrigem.some((p) => permissaoMatchFilial(p, origemCanonico));
+        return origemOk;
+      })
+      .map((group) => ({
+        ...group,
+        destinationGroups: group.destinationGroups.filter((dg) => {
+          const destinoCanonico = dg.items[0]?.destinoCanonico ?? dg.destino;
+          const destinoOk =
+            permissoes.filiaisDestino.length === 0 ||
+            permissoes.filiaisDestino.some((p) => permissaoMatchFilial(p, destinoCanonico));
+          return destinoOk;
+        }),
+      }))
+      .filter((group) => group.destinationGroups.length > 0);
+  }, [
+    transfersByOriginAndDestination,
+    user?.role,
+    permissoes,
+    permissaoMatchFilial,
+    filiais.length,
+  ]);
+
+  const visibleItemKeys = useMemo(() => {
+    const set = new Set<string>();
+    filteredTransfersByOriginAndDestination.forEach((group) => {
+      group.destinationGroups.forEach((dg) => {
+        dg.items.forEach((item) => set.add(getTransferItemKey(item)));
+      });
+    });
+    return set;
+  }, [filteredTransfersByOriginAndDestination]);
 
   const handleConfirmTransfer = useCallback(
     async (quantidade: number) => {
@@ -1091,7 +1117,7 @@ export default function ControleTransferenciasTable({
     );
   }
 
-  if (transfersByOriginAndDestination.length === 0) {
+  if (filteredTransfersByOriginAndDestination.length === 0) {
     return (
       <div className={styles.wrapper}>
         <div className={styles.empty}>
@@ -1106,7 +1132,7 @@ export default function ControleTransferenciasTable({
   // Função para exportar PDF
   const handleExportPDF = () => {
     // Preparar dados para exportação incluindo estoqueOrigem
-    const dataForExport = transfersByOriginAndDestination.map((group) => ({
+    const dataForExport = filteredTransfersByOriginAndDestination.map((group) => ({
       origem: group.origem,
       totalQuantidade: group.totalQuantidade,
       destinationGroups: group.destinationGroups.map((destGroup) => ({
@@ -1167,7 +1193,7 @@ export default function ControleTransferenciasTable({
         </button>
       </div>
 
-      {transfersByOriginAndDestination.map((group) => (
+      {filteredTransfersByOriginAndDestination.map((group) => (
         <div key={group.origem} className={styles.transferGroup}>
           {/* Header principal: Filial de origem */}
           <div className={styles.header}>

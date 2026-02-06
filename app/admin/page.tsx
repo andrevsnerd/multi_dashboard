@@ -329,7 +329,7 @@ export default function AdminPage() {
               {formRole !== "admin" && (
                 <div className={styles.permissions}>
                   <span className={styles.permissionsLabel}>
-                    O que esta função pode ver
+                    O que esse usuário pode ver
                   </span>
                   <div className={styles.checkboxList}>
                     {ALL_PERMISSION_KEYS.map(({ key, label }) => (

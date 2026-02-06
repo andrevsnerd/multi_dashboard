@@ -348,13 +348,10 @@ export default function TransferenciaProdutosPage({
 
         // Aplicar filtros de permissão se existirem
         if (permissoes) {
-          // Filtrar filiais de origem
+          // Filtrar filiais de origem (correspondência exata por codFilial)
           if (permissoes.filiaisOrigem.length > 0) {
             const filiaisOrigemPermitidas = data.filter(f =>
-              permissoes.filiaisOrigem.some(cod => 
-                f.codFilial.trim() === cod.trim() || 
-                f.filial.toUpperCase().includes(cod.toUpperCase())
-              )
+              permissoes.filiaisOrigem.some(cod => f.codFilial.trim() === (cod || "").trim())
             );
             setFiliaisDisponiveis(filiaisOrigemPermitidas);
             
@@ -369,13 +366,10 @@ export default function TransferenciaProdutosPage({
             }
           }
 
-          // Filtrar filiais de destino
+          // Filtrar filiais de destino (correspondência exata por codFilial)
           if (permissoes.filiaisDestino.length > 0) {
             const filiaisDestinoPermitidas = data.filter(f =>
-              permissoes.filiaisDestino.some(cod => 
-                f.codFilial.trim() === cod.trim() || 
-                f.filial.toUpperCase().includes(cod.toUpperCase())
-              )
+              permissoes.filiaisDestino.some(cod => f.codFilial.trim() === (cod || "").trim())
             );
             setFiliaisDestinoDisponiveis(filiaisDestinoPermitidas);
             
@@ -408,10 +402,7 @@ export default function TransferenciaProdutosPage({
     // Se houver apenas uma filial de destino permitida, selecionar automaticamente
     if (permissoes?.filiaisDestino.length === 1) {
       const filialDestinoUnica = filiaisDestinoDisponiveis.find(f =>
-        permissoes.filiaisDestino.some(cod => 
-          f.codFilial.trim() === cod.trim() || 
-          f.filial.toUpperCase().includes(cod.toUpperCase())
-        )
+        permissoes.filiaisDestino.some(cod => f.codFilial.trim() === (cod || "").trim())
       );
       if (filialDestinoUnica && filialDestinoUnica.codFilial !== filialOrigem.codFilial) {
         setFilialDestino(filialDestinoUnica);
