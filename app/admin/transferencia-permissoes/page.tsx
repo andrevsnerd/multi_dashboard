@@ -110,6 +110,7 @@ export default function TransferenciaPermissoesAdminPage() {
     try {
       const res = await fetch("/api/admin/transferencia-permissoes", {
         headers: authHeader(),
+        cache: "no-store",
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

@@ -160,12 +160,12 @@ export default function Sidebar({ companyName }: SidebarProps) {
             ...allNavItems,
             { label: "Admin", href: "/admin", permission: "admin" as const },
           ]
-        : user.role === "gestor"
+        : user.role === "gestor" && (!user.permissions?.length)
           ? allNavItems
           : allNavItems.filter((item) => {
               if (item.permission === "home") return true;
               if (item.permission === "admin") return false;
-              return item.permission ? user.permissions.includes(item.permission) : false;
+              return item.permission ? user.permissions?.includes(item.permission) : false;
             });
 
   const handleLinkClick = () => {

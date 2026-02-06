@@ -24,7 +24,10 @@ export async function GET(request: NextRequest) {
     }
 
     const permissoes = await listAllPermissoes();
-    return NextResponse.json({ data: permissoes });
+    return NextResponse.json(
+      { data: permissoes },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    );
   } catch (error) {
     console.error('Erro ao listar permissões', error);
     return NextResponse.json(

@@ -94,7 +94,7 @@ export async function createUser(
     username: normalized,
     passwordHash: hashPassword(password),
     role,
-    permissions: role === "admin" || role === "gestor" ? [] : permissions,
+    permissions: role === "admin" ? [] : (permissions ?? []),
     allowedCompanies:
       allowedCompanies?.length ? allowedCompanies : undefined,
   };
@@ -131,9 +131,9 @@ export async function updateUser(
   if (updates.role !== undefined) {
     current.role = updates.role;
     current.permissions =
-      updates.role === "admin" || updates.role === "gestor" ? [] : (updates.permissions ?? current.permissions);
+      updates.role === "admin" ? [] : (updates.permissions ?? current.permissions);
   }
-  if (updates.permissions !== undefined && current.role !== "admin" && current.role !== "gestor") {
+  if (updates.permissions !== undefined && current.role !== "admin") {
     current.permissions = updates.permissions;
   }
   if (updates.allowedCompanies !== undefined) {

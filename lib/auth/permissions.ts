@@ -55,14 +55,20 @@ export function canAccessPath(user: UserSession | null, pathname: string | null)
   if (companySegment && (companySegment === "nerd" || companySegment === "scarfme")) {
     if (!canAccessCompany(user, companySegment)) return false;
   }
-  if (user.role === "admin" || user.role === "gestor") return true; // gestor = mesmo que admin, exceto /admin
+  if (user.role === "admin") return true;
+  if (user.role === "gestor") {
+    // gestor com permissions vazias = acesso total (exceto /admin); com permissions = só o que está na lista
+    if (!user.permissions?.length) return true;
+    return user.permissions.includes(perm as PermissionKey);
+  }
   return user.permissions.includes(perm as PermissionKey);
 }
 
 /** Primeira rota permitida para o usuário em uma empresa (ex: /nerd/controle-transferencias). */
 export function getFirstAllowedPath(user: UserSession | null, company: string): string {
   if (!user) return `/${company}`;
-  if (user.role === "admin" || user.role === "gestor") return `/${company}`;
+  if (user.role === "admin") return `/${company}`;
+  if (user.role === "gestor" && (!user.permissions?.length)) return `/${company}`;
   if (user.permissions.includes("controle-transferencias"))
     return `/${company}/controle-transferencias`;
   if (user.permissions.includes("dashboard")) return `/${company}`;

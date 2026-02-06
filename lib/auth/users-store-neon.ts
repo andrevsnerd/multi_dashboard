@@ -118,7 +118,7 @@ export async function createUser(
     .digest("hex")
     .slice(0, 12);
   const passwordHash = hashPassword(password);
-  const perms = role === "admin" || role === "gestor" ? [] : permissions;
+  const perms = role === "admin" ? [] : (permissions ?? []);
   const allowedJson =
     allowedCompanies?.length ? JSON.stringify(allowedCompanies) : null;
   await sql`
@@ -171,9 +171,9 @@ export async function updateUser(
   }
   if (updates.role !== undefined) {
     role = updates.role;
-    permissions = role === "admin" || role === "gestor" ? [] : (updates.permissions ?? permissions);
+    permissions = role === "admin" ? [] : (updates.permissions ?? permissions);
   }
-  if (updates.permissions !== undefined && role !== "admin" && role !== "gestor") {
+  if (updates.permissions !== undefined && role !== "admin") {
     permissions = updates.permissions;
   }
   if (updates.allowedCompanies !== undefined) {
