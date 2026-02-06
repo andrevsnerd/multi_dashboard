@@ -873,6 +873,13 @@ export default function ControleTransferenciasTable({
         );
         if (found?.codFilial) map.set(canon, found.codFilial.trim());
       });
+      Object.entries(company.filialDisplayNames ?? {}).forEach(([displayName, actualName]) => {
+        const dn = (displayName || "").trim();
+        const an = (actualName || "").trim();
+        if (!dn || !an) return;
+        const codForActual = map.get(an) ?? map.get(an.toUpperCase());
+        if (codForActual) map.set(dn, codForActual);
+      });
     }
     return map;
   }, [filiais, company]);
@@ -983,18 +990,39 @@ export default function ControleTransferenciasTable({
       }
       const tipoRomaneio = permissoes?.tipoRomaneioPadrao ?? "TRANSFERENCIA ENTRE LOJAS";
       const responsavel = permissoes?.responsavelPadrao ?? "LOGISTICA";
-      await executarTransferencia(
-        modalTransferItem.produto,
-        modalTransferItem.codigoCor ?? null,
-        codOrigem,
-        codDestino,
-        quantidade,
-        quantidade,
-        tipoRomaneio,
-        responsavel,
-        user?.username
-      );
-      onTransferSuccess();
+      let tentativas = 0;
+      const maxTentativas = 5;
+      while (tentativas < maxTentativas) {
+        try {
+          await executarTransferencia(
+            modalTransferItem.produto,
+            modalTransferItem.codigoCor ?? null,
+            codOrigem,
+            codDestino,
+            quantidade,
+            quantidade,
+            tipoRomaneio,
+            responsavel,
+            user?.username
+          );
+          onTransferSuccess();
+          return;
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          const isRomaneioDuplicado =
+            msg.includes("PRIMARY KEY") ||
+            msg.toLowerCase().includes("duplicate key") ||
+            msg.includes("ROMANEIO_DUPLICADO") ||
+            (msg.toLowerCase().includes("ja existe") && msg.toLowerCase().includes("saida")) ||
+            (msg.toLowerCase().includes("já existe") && msg.toLowerCase().includes("saida"));
+          if (isRomaneioDuplicado && tentativas < maxTentativas - 1) {
+            tentativas++;
+            await new Promise((r) => setTimeout(r, 500));
+            continue;
+          }
+          throw err;
+        }
+      }
     },
     [modalTransferItem, onTransferSuccess, getCodFilial, permissoes, user?.username]
   );
