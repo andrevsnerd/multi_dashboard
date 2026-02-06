@@ -24,6 +24,7 @@ interface TransferenciaPermissao {
   tipoRomaneioPadrao?: string;
   responsavelFixo: boolean;
   tipoRomaneioFixo: boolean;
+  podeVerOutrasFiliais?: boolean;
 }
 
 async function fetchPermissoes(username: string): Promise<TransferenciaPermissao | null> {
@@ -934,6 +935,7 @@ export default function ControleTransferenciasTable({
   const filteredTransfersByOriginAndDestination = useMemo(() => {
     if (user?.role === "admin") return transfersByOriginAndDestination;
     if (!permissoes || filiais.length === 0) return [];
+    if (permissoes.podeVerOutrasFiliais) return transfersByOriginAndDestination;
     return transfersByOriginAndDestination
       .filter((group) => {
         const origemCanonico = group.items[0]?.origemCanonico ?? group.origem;

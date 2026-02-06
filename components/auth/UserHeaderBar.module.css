@@ -17,6 +17,28 @@
   max-width: 100%;
 }
 
+.adminLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  text-decoration: none;
+  border-radius: 8px;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.adminLink:hover {
+  color: #0f172a;
+  background-color: #f1f5f9;
+}
+
+.adminLink svg {
+  flex-shrink: 0;
+}
+
 .userName {
   font-size: 14px;
   font-weight: 500;

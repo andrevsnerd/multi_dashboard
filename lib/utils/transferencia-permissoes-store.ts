@@ -49,10 +49,12 @@ async function ensureTable(sql: ReturnType<typeof getNeonSql>) {
       tipo_romaneio_padrao TEXT,
       responsavel_fixo BOOLEAN NOT NULL DEFAULT false,
       tipo_romaneio_fixo BOOLEAN NOT NULL DEFAULT false,
+      pode_ver_outras_filiais BOOLEAN NOT NULL DEFAULT false,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW()
     )
   `;
+  await sql`ALTER TABLE transferencia_permissoes ADD COLUMN IF NOT EXISTS pode_ver_outras_filiais BOOLEAN NOT NULL DEFAULT false`;
   tableChecked = true;
 }
 
@@ -65,6 +67,8 @@ export interface TransferenciaPermissao {
   tipoRomaneioPadrao?: string; // Tipo de romaneio padrão (ex: "TRANSFERENCIA ENTRE LOJAS")
   responsavelFixo: boolean; // Se true, não permite alterar o responsável
   tipoRomaneioFixo: boolean; // Se true, não permite alterar o tipo de romaneio
+  /** Se true, usuário vê todas as filiais (origem/destino), mas só pode transferir nas permitidas. */
+  podeVerOutrasFiliais?: boolean;
 }
 
 /**
@@ -91,7 +95,8 @@ export async function getPermissaoByUsername(username: string): Promise<Transfer
       responsavel_padrao,
       tipo_romaneio_padrao,
       responsavel_fixo,
-      tipo_romaneio_fixo
+      tipo_romaneio_fixo,
+      COALESCE(pode_ver_outras_filiais, false) as pode_ver_outras_filiais
     FROM transferencia_permissoes
     WHERE username = ${normalized}
     LIMIT 1
@@ -116,6 +121,7 @@ export async function getPermissaoByUsername(username: string): Promise<Transfer
     tipoRomaneioPadrao: row.tipo_romaneio_padrao || undefined,
     responsavelFixo: row.responsavel_fixo || false,
     tipoRomaneioFixo: row.tipo_romaneio_fixo || false,
+    podeVerOutrasFiliais: row.pode_ver_outras_filiais === true,
   };
 }
 
@@ -158,6 +164,7 @@ export async function savePermissao(permissao: TransferenciaPermissao): Promise<
       tipo_romaneio_padrao,
       responsavel_fixo,
       tipo_romaneio_fixo,
+      pode_ver_outras_filiais,
       updated_at
     )
     VALUES (
@@ -169,6 +176,7 @@ export async function savePermissao(permissao: TransferenciaPermissao): Promise<
       ${permissao.tipoRomaneioPadrao || null},
       ${permissao.responsavelFixo || false},
       ${permissao.tipoRomaneioFixo || false},
+      ${permissao.podeVerOutrasFiliais === true},
       NOW()
     )
     ON CONFLICT (username) DO UPDATE SET
@@ -179,6 +187,7 @@ export async function savePermissao(permissao: TransferenciaPermissao): Promise<
       tipo_romaneio_padrao = EXCLUDED.tipo_romaneio_padrao,
       responsavel_fixo = EXCLUDED.responsavel_fixo,
       tipo_romaneio_fixo = EXCLUDED.tipo_romaneio_fixo,
+      pode_ver_outras_filiais = EXCLUDED.pode_ver_outras_filiais,
       updated_at = NOW()
   `;
 }
@@ -203,7 +212,8 @@ export async function listAllPermissoes(): Promise<TransferenciaPermissao[]> {
       responsavel_padrao,
       tipo_romaneio_padrao,
       responsavel_fixo,
-      tipo_romaneio_fixo
+      tipo_romaneio_fixo,
+      COALESCE(pode_ver_outras_filiais, false) as pode_ver_outras_filiais
     FROM transferencia_permissoes
     ORDER BY username
   `;
@@ -217,6 +227,7 @@ export async function listAllPermissoes(): Promise<TransferenciaPermissao[]> {
     tipoRomaneioPadrao: row.tipo_romaneio_padrao || undefined,
     responsavelFixo: row.responsavel_fixo || false,
     tipoRomaneioFixo: row.tipo_romaneio_fixo || false,
+    podeVerOutrasFiliais: row.pode_ver_outras_filiais === true,
   }));
 }
 

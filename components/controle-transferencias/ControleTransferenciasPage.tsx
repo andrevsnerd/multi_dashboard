@@ -8,8 +8,39 @@ import FilialFilter from "@/components/filters/FilialFilter";
 import ControleTransferenciasTable from "@/components/controle-transferencias/ControleTransferenciasTable";
 import type { ProdutoTransferencia } from "@/lib/repositories/controleTransferencias";
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
+import { useAuth } from "@/components/auth/AuthContext";
 
 import styles from "./ControleTransferenciasPage.module.css";
+
+interface TransferenciaPermissao {
+  filiaisOrigem: string[];
+  podeVerOutrasFiliais?: boolean;
+}
+
+async function fetchPermissoes(username: string): Promise<TransferenciaPermissao | null> {
+  try {
+    const res = await fetch("/api/transferencia-produtos/permissoes", {
+      headers: { "x-auth-username": username },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { data: TransferenciaPermissao | null };
+    return json.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchFiliais(): Promise<Array<{ codFilial: string; filial: string }>> {
+  try {
+    const res = await fetch("/api/transferencia-produtos/filiais", { cache: "no-store" });
+    if (!res.ok) return [];
+    const json = (await res.json()) as { data: Array<{ codFilial: string; filial: string }> };
+    return json.data ?? [];
+  } catch {
+    return [];
+  }
+}
 
 interface ControleTransferenciasPageProps {
   companyKey: CompanyKey;
@@ -73,12 +104,16 @@ export default function ControleTransferenciasPage({
   companyKey,
   companyName,
 }: ControleTransferenciasPageProps) {
+  const { user } = useAuth();
+
   // Período fixo: sempre últimos 30 dias (recalculado a cada montagem para refletir "hoje")
   const range = useMemo(() => getLast30DaysRange(), []);
 
   const defaultMatriz = useMemo(() => getDefaultMatriz(companyKey), [companyKey]);
 
   const [selectedFilial, setSelectedFilial] = useState<string | null>(defaultMatriz);
+  const [permissoes, setPermissoes] = useState<TransferenciaPermissao | null>(null);
+  const [filiais, setFiliais] = useState<Array<{ codFilial: string; filial: string }>>([]);
   const [data, setData] = useState<ProdutoTransferencia[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -137,6 +172,29 @@ export default function ControleTransferenciasPage({
     };
   }, [companyKey, range, rangeKey]);
 
+  useEffect(() => {
+    if (!user?.username) return;
+    Promise.all([fetchPermissoes(user.username), fetchFiliais()]).then(([perms, filiaisData]) => {
+      setPermissoes(perms);
+      setFiliais(filiaisData);
+    });
+  }, [user?.username]);
+
+  const allowedFiliaisOrigem = useMemo(() => {
+    if (user?.role === "admin" || !permissoes || permissoes.filiaisOrigem.length === 0 || permissoes.podeVerOutrasFiliais) return null;
+    return permissoes.filiaisOrigem
+      .map((cod) => filiais.find((f) => f.codFilial.trim() === cod.trim())?.filial)
+      .filter((f): f is string => !!f);
+  }, [user?.role, permissoes, filiais]);
+
+  useEffect(() => {
+    if (!allowedFiliaisOrigem || allowedFiliaisOrigem.length === 0) return;
+    const allowedSet = new Set(allowedFiliaisOrigem.map((a) => a.trim().toUpperCase()));
+    if (selectedFilial && !allowedSet.has(selectedFilial.trim().toUpperCase())) {
+      setSelectedFilial(allowedFiliaisOrigem[0] ?? null);
+    }
+  }, [allowedFiliaisOrigem]);
+
   const company = resolveCompany(companyKey);
 
   const periodLabel = useMemo(() => {
@@ -156,6 +214,7 @@ export default function ControleTransferenciasPage({
             onChange={setSelectedFilial}
             label="Filial de Origem"
             module="inventory"
+            allowedFiliais={allowedFiliaisOrigem}
           />
           <span className={styles.periodLabel}>{periodLabel}</span>
           {loading ? (

@@ -14,6 +14,7 @@ interface TransferenciaPermissao {
   tipoRomaneioPadrao?: string;
   responsavelFixo: boolean;
   tipoRomaneioFixo: boolean;
+  podeVerOutrasFiliais?: boolean;
 }
 
 interface Filial {
@@ -40,6 +41,7 @@ export default function TransferenciaPermissoesAdminPage() {
   const [formTipoRomaneioPadrao, setFormTipoRomaneioPadrao] = useState("");
   const [formResponsavelFixo, setFormResponsavelFixo] = useState(false);
   const [formTipoRomaneioFixo, setFormTipoRomaneioFixo] = useState(false);
+  const [formPodeVerOutrasFiliais, setFormPodeVerOutrasFiliais] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -145,6 +147,7 @@ export default function TransferenciaPermissoesAdminPage() {
     setFormTipoRomaneioPadrao("");
     setFormResponsavelFixo(false);
     setFormTipoRomaneioFixo(false);
+    setFormPodeVerOutrasFiliais(false);
     setFormError("");
     setModal("add");
   }
@@ -159,6 +162,7 @@ export default function TransferenciaPermissoesAdminPage() {
     setFormTipoRomaneioPadrao(perm.tipoRomaneioPadrao || "");
     setFormResponsavelFixo(perm.responsavelFixo);
     setFormTipoRomaneioFixo(perm.tipoRomaneioFixo);
+    setFormPodeVerOutrasFiliais(perm.podeVerOutrasFiliais ?? false);
     setFormError("");
     setModal("edit");
   }
@@ -212,6 +216,7 @@ export default function TransferenciaPermissoesAdminPage() {
           tipoRomaneioPadrao: formTipoRomaneioPadrao || undefined,
           responsavelFixo: formResponsavelFixo,
           tipoRomaneioFixo: formTipoRomaneioFixo,
+          podeVerOutrasFiliais: formPodeVerOutrasFiliais,
         }),
       });
       const data = await res.json();
@@ -278,13 +283,14 @@ export default function TransferenciaPermissoesAdminPage() {
                 <th>Responsável Padrão</th>
                 <th>Tipo Romaneio Padrão</th>
                 <th>Fixo</th>
+                <th>Ver outras</th>
                 <th className={styles.actionsCol}>Ações</th>
               </tr>
             </thead>
             <tbody>
               {permissoes.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: "center", padding: "32px" }}>
+                  <td colSpan={9} style={{ textAlign: "center", padding: "32px" }}>
                     Nenhuma permissão configurada
                   </td>
                 </tr>
@@ -325,6 +331,7 @@ export default function TransferenciaPermissoesAdminPage() {
                       {perm.tipoRomaneioFixo && "Tipo"}
                       {!perm.responsavelFixo && !perm.tipoRomaneioFixo && "—"}
                     </td>
+                    <td>{perm.podeVerOutrasFiliais ? "Sim" : "—"}</td>
                     <td className={styles.actionsCol}>
                       <button
                         className={styles.editBtn}
@@ -542,6 +549,20 @@ export default function TransferenciaPermissoesAdminPage() {
                   />
                   <span>Tipo de romaneio fixo (não permite alterar)</span>
                 </label>
+              </div>
+
+              <div className={styles.label}>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={formPodeVerOutrasFiliais}
+                    onChange={(e) => setFormPodeVerOutrasFiliais(e.target.checked)}
+                  />
+                  <span>Permitir ver outras filiais (sem poder transferir)</span>
+                </label>
+                <p style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>
+                  Se marcado, o usuário vê todas as origens e destinos, mas só pode executar transferências nas filiais permitidas acima.
+                </p>
               </div>
 
               {formError && <p className={styles.formError}>{formError}</p>}

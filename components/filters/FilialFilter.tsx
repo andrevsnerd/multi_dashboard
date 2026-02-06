@@ -12,6 +12,8 @@ interface FilialFilterProps {
   onChange: (value: string | null) => void;
   label?: string;
   module?: CompanyModule; // Permite escolher entre 'sales' ou 'inventory'
+  /** Se informado, mostra apenas essas filiais no select (nomes canônicos). Admin vê todas. */
+  allowedFiliais?: string[] | null;
 }
 
 export default function FilialFilter({
@@ -20,6 +22,7 @@ export default function FilialFilter({
   onChange,
   label = "Filial",
   module = "sales",
+  allowedFiliais,
 }: FilialFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -30,10 +33,22 @@ export default function FilialFilter({
   const ecommerceFilials = company?.ecommerceFilials ?? [];
   
   // Filtrar filiais normais (sem ecommerce) para mostrar na lista
-  const normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
+  let normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
+  if (allowedFiliais && allowedFiliais.length > 0) {
+    const allowedSet = new Set(allowedFiliais.map((a) => a.trim().toUpperCase()));
+    normalFiliais = normalFiliais.filter((f) =>
+      allowedSet.has((f || "").trim().toUpperCase())
+    );
+  }
 
-  // Obter a primeira filial de ecommerce (se houver)
-  const ecommerceFilial = ecommerceFilials.length > 0 ? ecommerceFilials[0] : null;
+  // Obter a primeira filial de ecommerce (se houver e se permitida)
+  let ecommerceFilial = ecommerceFilials.length > 0 ? ecommerceFilials[0] : null;
+  if (allowedFiliais && allowedFiliais.length > 0 && ecommerceFilial) {
+    const allowedSet = new Set(allowedFiliais.map((a) => a.trim().toUpperCase()));
+    if (!allowedSet.has((ecommerceFilial || "").trim().toUpperCase())) {
+      ecommerceFilial = null;
+    }
+  }
   const ecommerceDisplayName = ecommerceFilial ? (displayNames[ecommerceFilial] ?? ecommerceFilial) : null;
 
   const displayValue = value === VAREJO_VALUE
