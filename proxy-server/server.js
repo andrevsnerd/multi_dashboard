@@ -117,21 +117,10 @@ app.post('/query', authenticate, async (req, res) => {
     const pool = await getPool();
     const request = pool.request();
 
-    // Adicionar parâmetros se fornecidos
+    // Adicionar parâmetros - usar input(key, value) para mssql inferir tipo (evita parameter.type.validate)
     Object.keys(params).forEach(key => {
       const value = params[key];
-      // Determinar tipo SQL
-      if (typeof value === 'string') {
-        request.input(key, sql.VarChar, value);
-      } else if (typeof value === 'number') {
-        request.input(key, sql.Int, value);
-      } else if (value instanceof Date || (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value))) {
-        request.input(key, sql.DateTime, value);
-      } else if (typeof value === 'boolean') {
-        request.input(key, sql.Bit, value);
-      } else {
-        request.input(key, sql.VarChar, String(value));
-      }
+      request.input(key, value);
     });
 
     const result = await request.query(queryText);
