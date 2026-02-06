@@ -197,13 +197,14 @@ async function executarTransferencia(
   qtdeSaida: number,
   qtdeEntrada: number,
   tipoRomaneio: string,
-  responsavel: string
+  responsavel: string,
+  username?: string
 ): Promise<{ success: boolean; message: string; romaneioSaida?: string; romaneioEntrada?: string }> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (username) headers["x-auth-username"] = username;
   const response = await fetch("/api/transferencia-produtos/executar", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers,
     body: JSON.stringify({
       produto,
       corProduto,
@@ -739,7 +740,8 @@ export default function TransferenciaProdutosPage({
           produto.quantidade,
           produto.quantidade,
           tipoRomaneioSelecionado,
-          responsavelFinal || 'LOGISTICA'
+          responsavelFinal || 'LOGISTICA',
+          user?.username
         );
 
         sucesso = true;
@@ -795,7 +797,7 @@ export default function TransferenciaProdutosPage({
     }
 
     setProcessandoTransferencia(false);
-  }, [filaTransferencias, processandoTransferencia, filialDestino, mostrarNotificacao, tipoRomaneioSelecionado, responsavelFinal]);
+  }, [filaTransferencias, processandoTransferencia, filialDestino, mostrarNotificacao, tipoRomaneioSelecionado, responsavelFinal, user?.username]);
 
   // Processar próximo item da fila quando terminar o anterior
   useEffect(() => {

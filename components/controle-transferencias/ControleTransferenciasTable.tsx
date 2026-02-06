@@ -55,11 +55,14 @@ async function executarTransferencia(
   qtdeSaida: number,
   qtdeEntrada: number,
   tipoRomaneio: string,
-  responsavel: string
+  responsavel: string,
+  username?: string
 ): Promise<{ success: boolean; message: string }> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (username) headers["x-auth-username"] = username;
   const response = await fetch("/api/transferencia-produtos/executar", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({
       produto,
       corProduto,
@@ -928,8 +931,8 @@ export default function ControleTransferenciasTable({
 
   const canTransfer = useCallback(
     (item: TransferItem): boolean => {
-      if (!permissoes) return true;
-      if (permissoes.filiaisOrigem.length === 0 && permissoes.filiaisDestino.length === 0) return true;
+      if (user?.role === "admin") return true;
+      if (!permissoes) return false;
       if (filiais.length === 0) return false;
       const origemOk =
         permissoes.filiaisOrigem.length === 0 ||
@@ -939,7 +942,7 @@ export default function ControleTransferenciasTable({
         permissoes.filiaisDestino.some((p) => permissaoMatchFilial(p, item.destinoCanonico));
       return Boolean(origemOk && destinoOk);
     },
-    [permissoes, permissaoMatchFilial, filiais.length]
+    [user?.role, permissoes, permissaoMatchFilial, filiais.length]
   );
 
   const handleConfirmTransfer = useCallback(
@@ -960,11 +963,12 @@ export default function ControleTransferenciasTable({
         quantidade,
         quantidade,
         tipoRomaneio,
-        responsavel
+        responsavel,
+        user?.username
       );
       onTransferSuccess();
     },
-    [modalTransferItem, onTransferSuccess, getCodFilial, permissoes]
+    [modalTransferItem, onTransferSuccess, getCodFilial, permissoes, user?.username]
   );
 
   const codFilialOrigem = modalTransferItem ? getCodFilial(modalTransferItem.origemCanonico) : null;

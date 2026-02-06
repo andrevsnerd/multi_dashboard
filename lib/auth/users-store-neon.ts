@@ -11,7 +11,7 @@ async function ensureTable(sql: ReturnType<typeof getNeonSql>) {
       id TEXT PRIMARY KEY,
       username TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
-      role TEXT NOT NULL CHECK (role IN ('admin', 'gestor', 'logistica')),
+      role TEXT NOT NULL CHECK (role IN ('admin', 'gestor')),
       permissions JSONB NOT NULL DEFAULT '[]'::jsonb,
       allowed_companies JSONB
     )
@@ -220,6 +220,6 @@ export async function seedInitialUsersIfEmpty(): Promise<void> {
     INSERT INTO dashboard_users (id, username, password_hash, role, permissions)
     VALUES
       (${adminId}, 'andre.sabetta', ${hashPassword("asabetta")}, 'admin', '[]'::jsonb),
-      (${logisticaId}, 'logistica', ${hashPassword("logistica123")}, 'logistica', ${JSON.stringify(["controle-transferencias"])}::jsonb)
+      (${logisticaId}, 'logistica', ${hashPassword("logistica123")}, 'gestor', ${JSON.stringify(["controle-transferencias"])}::jsonb)
   `;
 }

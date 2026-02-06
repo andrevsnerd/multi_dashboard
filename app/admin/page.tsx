@@ -29,7 +29,7 @@ export default function AdminPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formUsername, setFormUsername] = useState("");
   const [formPassword, setFormPassword] = useState("");
-  const [formRole, setFormRole] = useState<RoleKey>("logistica");
+  const [formRole, setFormRole] = useState<RoleKey>("gestor");
   const [formPermissions, setFormPermissions] = useState<PermissionKey[]>([]);
   const [formAllowedCompanies, setFormAllowedCompanies] = useState<"" | CompanyKey>("");
   const [saving, setSaving] = useState(false);
@@ -64,7 +64,7 @@ export default function AdminPage() {
     setEditingId(null);
     setFormUsername("");
     setFormPassword("");
-    setFormRole("logistica");
+    setFormRole("gestor");
     setFormPermissions(["controle-transferencias"]);
     setFormAllowedCompanies("");
     setFormError("");

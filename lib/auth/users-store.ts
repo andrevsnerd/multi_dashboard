@@ -172,7 +172,7 @@ export async function seedInitialUsersIfEmpty(): Promise<void> {
     id: "logistica-initial",
     username: "logistica",
     passwordHash: hashPassword("logistica123"),
-    role: "logistica",
+    role: "gestor",
     permissions: ["controle-transferencias"],
   };
   writeUsersFile([admin, logistica]);

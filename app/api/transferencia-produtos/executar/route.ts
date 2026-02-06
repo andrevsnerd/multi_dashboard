@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getConnectionPool } from '@/lib/db/connection';
 import { shouldUseProxy } from '@/lib/db/proxy';
+import { findUserByUsername } from '@/lib/auth/users-store';
+import { getPermissaoByUsername } from '@/lib/utils/transferencia-permissoes-store';
 import sql from 'mssql';
 
 interface TransferenciaRequest {
@@ -24,6 +26,7 @@ export async function POST(request: Request) {
   }
 
   try {
+    const username = request.headers.get('x-auth-username')?.trim();
     const body = (await request.json()) as TransferenciaRequest;
     const {
       produto,
@@ -42,6 +45,45 @@ export async function POST(request: Request) {
         { error: 'Dados inválidos para transferência' },
         { status: 400 }
       );
+    }
+
+    const fo = filialOrigem.trim();
+    const fd = filialDestino.trim();
+
+    if (!username) {
+      return NextResponse.json(
+        { error: 'Usuário não identificado. Faça login novamente.' },
+        { status: 401 }
+      );
+    }
+
+    {
+      const user = await findUserByUsername(username);
+      if (!user) {
+        return NextResponse.json(
+          { error: 'Usuário não encontrado' },
+          { status: 403 }
+        );
+      }
+      if (user.role !== 'admin') {
+        const permissao = await getPermissaoByUsername(user.username);
+        if (!permissao) {
+          return NextResponse.json(
+            { error: 'Sem permissão para transferir. Configure o perfil em Admin.' },
+            { status: 403 }
+          );
+        }
+        const origemOk = permissao.filiaisOrigem.length === 0 ||
+          permissao.filiaisOrigem.some((p) => (p || '').trim() === fo);
+        const destinoOk = permissao.filiaisDestino.length === 0 ||
+          permissao.filiaisDestino.some((p) => (p || '').trim() === fd);
+        if (!origemOk || !destinoOk) {
+          return NextResponse.json(
+            { error: 'Sem permissão para esta origem ou destino.' },
+            { status: 403 }
+          );
+        }
+      }
     }
 
     const pool = await getConnectionPool();
