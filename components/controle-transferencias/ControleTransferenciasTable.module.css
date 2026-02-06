@@ -531,7 +531,7 @@
   text-align: center;
 }
 
-/* Quando existe quantidade real, a quantidade original fica cinza e riscada */
+/* Quando existe estoque real, a quantidade original fica cinza e riscada */
 .quantidadeBadge.quantidadeOverridden {
   background-color: #9ca3af;
   color: #fff;
@@ -539,13 +539,32 @@
   opacity: 0.9;
 }
 
-/* Coluna quantidade real: sem fundo especial (igual às outras células) */
+/* Quando a quantidade foi ajustada pelo estoque real */
+.quantidadeBadge.quantidadeAjustada {
+  background-color: #3b82f6;
+  color: white;
+}
+
+/* Quando a quantidade foi ajustada para 0 pelo estoque real */
+.quantidadeBadge.quantidadeZero {
+  background-color: #9ca3af;
+  color: #fff;
+  opacity: 0.7;
+}
+
+/* Quando o estoque foi ignorado (há estoque real) */
+.estoqueBadge.estoqueIgnorado {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+/* Coluna estoque real: sem fundo especial (igual às outras células) */
 .quantidadeRealCell {
   text-align: center;
   padding: 8px 16px;
 }
 
-/* Valor da quantidade real: fundo verde #10b981 */
+/* Valor do estoque real: fundo verde #10b981 */
 .quantidadeRealBadge {
   display: inline-block;
   padding: 4px 12px;

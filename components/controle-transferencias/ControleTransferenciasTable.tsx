@@ -1275,6 +1275,7 @@ export default function ControleTransferenciasTable({
                     <th className={styles.produtoHeader}>Produto</th>
                     <th className={styles.codigoBarraHeader}>Código de Barras</th>
                     <th className={styles.estoqueHeader}>Estoque {group.origem}</th>
+                    <th className={styles.quantidadeRealHeader}>Estoque real</th>
                     {companyKey === 'scarfme' && (
                       <>
                         <th className={styles.subgrupoHeader}>Subgrupo</th>
@@ -1285,7 +1286,6 @@ export default function ControleTransferenciasTable({
                     <th className={styles.corHeader}>Cor</th>
                     <th className={styles.destinoHeader}>Destino</th>
                     <th className={styles.quantidadeHeader}>Quantidade</th>
-                    <th className={styles.quantidadeRealHeader}>Quantidade real</th>
                     <th className={styles.transferirHeader}>Ação</th>
                   </tr>
                 </thead>
@@ -1319,6 +1319,64 @@ export default function ControleTransferenciasTable({
                     const tooltipHeightEstimate = Math.min(700, 100 + (numFiliais * 28));
                     const itemKey = getTransferItemKey(item);
                     const isMarkedRealizada = markedKeys.has(itemKey);
+                    
+                    // Calcular quantidade ajustada baseada no estoque real
+                    const estoqueReal = quantidadesReais[itemKey];
+                    const temEstoqueReal = estoqueReal !== undefined && estoqueReal !== null;
+                    
+                    // Determinar se é matriz
+                    const matriz = companyKey === "nerd" ? "NERD" : companyKey === "scarfme" ? "SCARF ME - MATRIZ" : null;
+                    const isMatriz = item.origemCanonico === matriz || filialOrigemData?.filial === matriz || item.origem === matriz;
+                    
+                    // Verificar se está parada há 14+ dias
+                    let isParada = false;
+                    if (filialOrigemData) {
+                      const estoquePositivo = Math.max(0, filialOrigemData.stock);
+                      if (estoquePositivo >= 1 && filialOrigemData.sales === 0 && filialOrigemData.salesLast30Days === 0) {
+                        if (filialOrigemData.ultimaEntrada) {
+                          const hoje = new Date();
+                          const dataUltimaEntrada = new Date(filialOrigemData.ultimaEntrada);
+                          const diasDesdeUltimaEntrada = Math.floor((hoje.getTime() - dataUltimaEntrada.getTime()) / (1000 * 60 * 60 * 24));
+                          if (diasDesdeUltimaEntrada >= 14) {
+                            isParada = true;
+                          }
+                        } else {
+                          // Se não há data de entrada, considerar parada (comportamento antigo)
+                          isParada = true;
+                        }
+                      }
+                    }
+                    
+                    // Verificar se pode enviar tudo (matriz ou loja parada há 14+ dias sem vendas)
+                    const podeEnviarTudo = isMatriz || (isParada && filialOrigemData?.sales === 0);
+                    
+                    // Calcular quantidade ajustada baseada no estoque real
+                    let quantidadeAjustada = item.quantidade;
+                    let quantidadeAfetada = false;
+                    
+                    if (temEstoqueReal) {
+                      if (estoqueReal === 0) {
+                        // Se estoque real = 0: quantidade = 0
+                        quantidadeAjustada = 0;
+                        quantidadeAfetada = true;
+                      } else if (estoqueReal === 1) {
+                        // Se estoque real = 1
+                        if (!podeEnviarTudo) {
+                          // Loja não pode enviar tudo: quantidade = 0
+                          quantidadeAjustada = 0;
+                          quantidadeAfetada = true;
+                        } else {
+                          // Se pode enviar tudo, quantidade = 1 (sempre limita ao estoque real disponível)
+                          quantidadeAjustada = 1;
+                          quantidadeAfetada = true; // Sempre afetada quando há estoque real
+                        }
+                      } else if (estoqueReal < item.quantidade) {
+                        // Se estoque real < quantidade original: quantidade = estoque real
+                        quantidadeAjustada = estoqueReal;
+                        quantidadeAfetada = true;
+                      }
+                      // Se estoque real >= quantidade original, quantidade mantém igual (não afetada)
+                    }
                     
                     return (
                 <tr
@@ -1356,7 +1414,119 @@ export default function ControleTransferenciasTable({
                     )}
                   </td>
                   <td className={styles.estoqueCell}>
-                    <span className={styles.estoqueBadge}>{estoqueOrigem}</span>
+                    <span 
+                      className={
+                        temEstoqueReal 
+                          ? `${styles.estoqueBadge} ${styles.estoqueIgnorado}` 
+                          : styles.estoqueBadge
+                      }
+                    >
+                      {estoqueOrigem}
+                    </span>
+                  </td>
+                  <td className={styles.quantidadeRealCell}>
+                    {editingQuantidadeRealKey === itemKey ? (
+                      <div className={styles.quantidadeRealEditWrap}>
+                        <input
+                          type="number"
+                          min={0}
+                          className={styles.quantidadeRealInput}
+                          value={inputQuantidadeReal}
+                          onChange={(e) => setInputQuantidadeReal(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              const n = parseInt(inputQuantidadeReal, 10);
+                              if (!isNaN(n) && n >= 0) saveQuantidadeReal(itemKey, n);
+                            }
+                            if (e.key === "Escape") {
+                              setEditingQuantidadeRealKey(null);
+                              setInputQuantidadeReal("");
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          className={styles.quantidadeRealSaveBtn}
+                          disabled={savingQuantidadeReal}
+                          onClick={() => {
+                            const n = parseInt(inputQuantidadeReal, 10);
+                            if (!isNaN(n) && n >= 0) saveQuantidadeReal(itemKey, n);
+                          }}
+                          title="Salvar"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.quantidadeRealCancelBtn}
+                          disabled={savingQuantidadeReal}
+                          onClick={() => {
+                            setEditingQuantidadeRealKey(null);
+                            setInputQuantidadeReal("");
+                          }}
+                          title="Cancelar"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      </div>
+                    ) : quantidadesReais[itemKey] !== undefined ? (
+                      <div className={styles.quantidadeRealRow}>
+                        <span className={styles.quantidadeRealBadge}>{quantidadesReais[itemKey]}</span>
+                        <div className={styles.quantidadeRealIcons}>
+                          <button
+                            type="button"
+                            className={styles.quantidadeRealIconBtn}
+                            disabled={savingQuantidadeReal}
+                            onClick={() => {
+                              setEditingQuantidadeRealKey(itemKey);
+                              setInputQuantidadeReal(String(quantidadesReais[itemKey]));
+                            }}
+                            title="Editar estoque real"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.quantidadeRealIconBtn}
+                            disabled={savingQuantidadeReal}
+                            onClick={() => saveQuantidadeReal(itemKey, null)}
+                            title="Remover estoque real"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="3 6 5 6 21 6" />
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                              <line x1="10" y1="11" x2="10" y2="17" />
+                              <line x1="14" y1="11" x2="14" y2="17" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className={styles.quantidadeRealAddBtn}
+                        disabled={savingQuantidadeReal}
+                        onClick={() => {
+                          setEditingQuantidadeRealKey(itemKey);
+                          setInputQuantidadeReal(String(item.quantidade));
+                        }}
+                        title="Inserir estoque real"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                      </button>
+                    )}
                   </td>
                   {companyKey === 'scarfme' && (
                     <>
@@ -1464,129 +1634,27 @@ export default function ControleTransferenciasTable({
                   <td className={styles.quantidadeCell}>
                     <span
                       className={
-                        quantidadesReais[itemKey] !== undefined
-                          ? `${styles.quantidadeBadge} ${styles.quantidadeOverridden}`
+                        quantidadeAfetada && quantidadeAjustada === 0
+                          ? `${styles.quantidadeBadge} ${styles.quantidadeZero}`
+                          : quantidadeAfetada
+                          ? `${styles.quantidadeBadge} ${styles.quantidadeAjustada}`
                           : styles.quantidadeBadge
                       }
                     >
-                      {item.quantidade}
+                      {quantidadeAjustada}
                     </span>
                   </td>
-                  <td className={styles.quantidadeRealCell}>
-                    {editingQuantidadeRealKey === itemKey ? (
-                      <div className={styles.quantidadeRealEditWrap}>
-                        <input
-                          type="number"
-                          min={0}
-                          className={styles.quantidadeRealInput}
-                          value={inputQuantidadeReal}
-                          onChange={(e) => setInputQuantidadeReal(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              const n = parseInt(inputQuantidadeReal, 10);
-                              if (!isNaN(n) && n >= 0) saveQuantidadeReal(itemKey, n);
-                            }
-                            if (e.key === "Escape") {
-                              setEditingQuantidadeRealKey(null);
-                              setInputQuantidadeReal("");
-                            }
-                          }}
-                          autoFocus
-                        />
-                        <button
-                          type="button"
-                          className={styles.quantidadeRealSaveBtn}
-                          disabled={savingQuantidadeReal}
-                          onClick={() => {
-                            const n = parseInt(inputQuantidadeReal, 10);
-                            if (!isNaN(n) && n >= 0) saveQuantidadeReal(itemKey, n);
-                          }}
-                          title="Salvar"
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.quantidadeRealCancelBtn}
-                          disabled={savingQuantidadeReal}
-                          onClick={() => {
-                            setEditingQuantidadeRealKey(null);
-                            setInputQuantidadeReal("");
-                          }}
-                          title="Cancelar"
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                          </svg>
-                        </button>
-                      </div>
-                    ) : quantidadesReais[itemKey] !== undefined ? (
-                      <div className={styles.quantidadeRealRow}>
-                        <span className={styles.quantidadeRealBadge}>{quantidadesReais[itemKey]}</span>
-                        <div className={styles.quantidadeRealIcons}>
-                          <button
-                            type="button"
-                            className={styles.quantidadeRealIconBtn}
-                            disabled={savingQuantidadeReal}
-                            onClick={() => {
-                              setEditingQuantidadeRealKey(itemKey);
-                              setInputQuantidadeReal(String(quantidadesReais[itemKey]));
-                            }}
-                            title="Editar quantidade real"
-                          >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.quantidadeRealIconBtn}
-                            disabled={savingQuantidadeReal}
-                            onClick={() => saveQuantidadeReal(itemKey, null)}
-                            title="Remover quantidade real"
-                          >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="3 6 5 6 21 6" />
-                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                              <line x1="10" y1="11" x2="10" y2="17" />
-                              <line x1="14" y1="11" x2="14" y2="17" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        className={styles.quantidadeRealAddBtn}
-                        disabled={savingQuantidadeReal}
-                        onClick={() => {
-                          setEditingQuantidadeRealKey(itemKey);
-                          setInputQuantidadeReal(String(item.quantidade));
-                        }}
-                        title="Inserir quantidade real"
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                        </svg>
-                      </button>
-                    )}
-                  </td>
                   <td className={styles.transferirCell}>
-                    {canTransfer(item) ? (
+                    {canTransfer(item) && quantidadeAjustada > 0 ? (
                       <button
                         type="button"
                         className={styles.transferirBtn}
                         onClick={() => {
-                          const qtySugerida = quantidadesReais[itemKey] ?? item.quantidade;
+                          const qtySugerida = estoqueReal !== undefined ? quantidadeAjustada : item.quantidade;
                           setModalTransferItem({
                             ...item,
-                            estoqueOrigem,
-                            quantidade: Math.min(qtySugerida, Math.max(0, estoqueOrigem)),
+                            estoqueOrigem: estoqueReal !== undefined ? estoqueReal : estoqueOrigem,
+                            quantidade: Math.min(qtySugerida, Math.max(0, estoqueReal !== undefined ? estoqueReal : estoqueOrigem)),
                             codigoCor: item.itemOriginal.codigoCor,
                           });
                           setOnTransferSuccess(() => () => {
