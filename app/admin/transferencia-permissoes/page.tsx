@@ -434,6 +434,19 @@ export default function TransferenciaPermissoesAdminPage() {
                 <p style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>
                   Deixe vazio para permitir todas. Selecione múltiplas filiais.
                 </p>
+                <button
+                  type="button"
+                  className={styles.editBtn}
+                  style={{ marginBottom: "8px", fontSize: "12px" }}
+                  onClick={() => {
+                    const allSelected = filiais.length > 0 && formFiliaisOrigem.length === filiais.length;
+                    setFormFiliaisOrigem(allSelected ? [] : filiais.map((f) => f.codFilial));
+                  }}
+                >
+                  {filiais.length > 0 && formFiliaisOrigem.length === filiais.length
+                    ? "Desmarcar tudo"
+                    : "Selecionar tudo"}
+                </button>
                 <div
                   className={styles.checkboxList}
                   style={{ maxHeight: "150px", overflowY: "auto" }}

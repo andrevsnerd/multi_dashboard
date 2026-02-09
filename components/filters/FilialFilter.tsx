@@ -14,6 +14,8 @@ interface FilialFilterProps {
   module?: CompanyModule; // Permite escolher entre 'sales' ou 'inventory'
   /** Se informado, mostra apenas essas filiais no select (nomes canônicos). Admin vê todas. */
   allowedFiliais?: string[] | null;
+  /** Esconde a opção VAREJO (ex.: controle de transferências em scarfme). */
+  hideVarejo?: boolean;
 }
 
 export default function FilialFilter({
@@ -23,6 +25,7 @@ export default function FilialFilter({
   label = "Filial",
   module = "sales",
   allowedFiliais,
+  hideVarejo = false,
 }: FilialFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -77,17 +80,20 @@ export default function FilialFilter({
         <>
           <div className={styles.backdrop} onClick={() => setIsOpen(false)} />
           <div className={styles.dropdown}>
-            <button
-              type="button"
-              className={`${styles.option} ${value === null ? styles.optionActive : ""}`}
-              onClick={() => {
-                onChange(null);
-                setIsOpen(false);
-              }}
-            >
-              Todas as filiais
-            </button>
-            {isScarfme && (
+            {/* Quando permissão é apenas uma filial, não mostrar "Todas as filiais" */}
+            {(!allowedFiliais || allowedFiliais.length !== 1) && (
+              <button
+                type="button"
+                className={`${styles.option} ${value === null ? styles.optionActive : ""}`}
+                onClick={() => {
+                  onChange(null);
+                  setIsOpen(false);
+                }}
+              >
+                Todas as filiais
+              </button>
+            )}
+            {isScarfme && !hideVarejo && (
               <button
                 type="button"
                 className={`${styles.option} ${value === VAREJO_VALUE ? styles.optionActive : ""}`}

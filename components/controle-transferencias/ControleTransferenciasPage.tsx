@@ -190,6 +190,11 @@ export default function ControleTransferenciasPage({
   useEffect(() => {
     if (!allowedFiliaisOrigem || allowedFiliaisOrigem.length === 0) return;
     const allowedSet = new Set(allowedFiliaisOrigem.map((a) => a.trim().toUpperCase()));
+    // Quando permissão é apenas uma filial, fixar a origem nela (e não mostrar "Todas as filiais")
+    if (allowedFiliaisOrigem.length === 1) {
+      setSelectedFilial(allowedFiliaisOrigem[0]);
+      return;
+    }
     if (selectedFilial && !allowedSet.has(selectedFilial.trim().toUpperCase())) {
       setSelectedFilial(allowedFiliaisOrigem[0] ?? null);
     }
@@ -215,6 +220,7 @@ export default function ControleTransferenciasPage({
             label="Filial de Origem"
             module="inventory"
             allowedFiliais={allowedFiliaisOrigem}
+            hideVarejo={companyKey === "scarfme"}
           />
           <span className={styles.periodLabel}>{periodLabel}</span>
           {loading ? (
