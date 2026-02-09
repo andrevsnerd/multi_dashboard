@@ -181,6 +181,7 @@ app.post('/transfer', authenticate, async (req, res) => {
       qtdeEntrada,
       tipoRomaneio = 'TRANSFERENCIA',
       responsavel = 'LOGISTICA',
+      observacao = null,
     } = body;
 
     if (!produto || !filialOrigem || !filialDestino || qtdeSaida <= 0 || qtdeEntrada <= 0) {
@@ -198,6 +199,7 @@ app.post('/transfer', authenticate, async (req, res) => {
       qtdeEntrada,
       tipoRomaneio,
       responsavel,
+      observacao: observacao || null,
     });
 
     res.json({

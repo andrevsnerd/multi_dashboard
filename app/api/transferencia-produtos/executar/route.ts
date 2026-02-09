@@ -14,6 +14,7 @@ interface TransferenciaRequest {
   qtdeEntrada: number;
   tipoRomaneio?: string;
   responsavel?: string;
+  observacao?: string | null;
 }
 
 export async function POST(request: Request) {
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
       qtdeEntrada,
       tipoRomaneio = 'TRANSFERENCIA',
       responsavel = 'LOGISTICA',
+      observacao = null,
     } = body;
 
     // Validar dados
@@ -89,6 +91,7 @@ export async function POST(request: Request) {
           qtdeEntrada,
           tipoRomaneio,
           responsavel,
+          observacao,
         },
         request.headers
       );
@@ -109,6 +112,7 @@ export async function POST(request: Request) {
       qtdeEntrada,
       tipoRomaneio,
       responsavel,
+      observacao,
     });
 
     return NextResponse.json({

@@ -6,7 +6,7 @@
 }
 
 .header {
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .title {
@@ -30,9 +30,49 @@
   margin: 0;
 }
 
+.tipoOperacaoSelector {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.tipoOperacaoButton {
+  flex: 1;
+  padding: 12px 24px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  background: white;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.tipoOperacaoButton:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: #f0f9ff;
+}
+
+.tipoOperacaoButtonActive {
+  border-color: #3b82f6;
+  background: #3b82f6;
+  color: white;
+}
+
+.tipoOperacaoButtonActive:hover {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
 .layout {
   display: grid;
-  grid-template-columns: 1fr 2fr 1fr;
+  grid-template-columns: 1fr 2fr;
   gap: 24px;
   margin-bottom: 32px;
 }
@@ -307,39 +347,31 @@
 .resumo {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   margin-bottom: 20px;
   padding: 16px;
   background: #f9fafb;
   border-radius: 8px;
 }
 
-.resumoOrigem,
-.resumoDestino {
+.resumoFilial {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  text-align: center;
 }
 
-.resumoOrigem span,
-.resumoDestino span {
+.resumoFilial span {
   font-size: 12px;
   color: #6b7280;
   text-transform: uppercase;
   font-weight: 600;
 }
 
-.resumoOrigem strong,
-.resumoDestino strong {
-  font-size: 16px;
+.resumoFilial strong {
+  font-size: 18px;
   color: #111827;
   font-weight: 600;
-}
-
-.resumoArrow {
-  font-size: 24px;
-  color: #6b7280;
-  margin: 0 16px;
 }
 
 .resumoCards {

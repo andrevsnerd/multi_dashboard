@@ -53,6 +53,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
       .replace(/\/controle-giro.*$/, "") // Remove /controle-giro e qualquer coisa depois
       .replace(/\/controle-transferencias.*$/, "") // Remove /controle-transferencias e qualquer coisa depois
       .replace(/\/transferencia-produtos.*$/, "") // Remove /transferencia-produtos e qualquer coisa depois
+      .replace(/\/saidas-entradas-produtos.*$/, "") // Remove /saidas-entradas-produtos e qualquer coisa depois
       .replace(/\/produto-detalhado$/, "")
       .replace(/\/produtos-recentes$/, "")
       .replace(/\/produtos$/, "")
@@ -116,6 +117,11 @@ export default function Sidebar({ companyName }: SidebarProps) {
     ? `${basePath}/transferencia-produtos`
     : "/transferencia-produtos";
 
+  // Construir o link para saídas e entradas de produtos baseado no caminho base
+  const saidasEntradasProdutosHref = basePath && basePath !== "/" 
+    ? `${basePath}/saidas-entradas-produtos`
+    : "/saidas-entradas-produtos";
+
   // Verificar se está em alguma página relacionada a produtos
   const isProdutosSubItemActive = pathname?.includes("/produto-detalhado") || pathname?.includes("/produtos-recentes") || (pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado"));
   const isProdutosPageActive = pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado");
@@ -155,6 +161,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     { label: "Controle de Giro", href: controleGiroHref, permission: "controle-giro" },
     { label: "Controle de Transferências", href: controleTransferenciasHref, permission: "controle-transferencias" },
     { label: "Transferência de Produtos", href: transferenciaProdutosHref, permission: "transferencia-produtos" },
+    { label: "Saídas e Entradas de Produtos", href: saidasEntradasProdutosHref, permission: "transferencia-produtos" },
     { label: "Exportar Relatórios", href: exportarRelatoriosHref, permission: "exportar-relatorios" },
   ];
 
@@ -240,6 +247,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
                 !pathname.includes("/controle-giro") &&
                 !pathname.includes("/controle-transferencias") &&
                 !pathname.includes("/transferencia-produtos") &&
+                !pathname.includes("/saidas-entradas-produtos") &&
                 !pathname.includes("/produtos") &&
                 !pathname.includes("/produtos-recentes") &&
                 !pathname.includes("/produto-detalhado") &&
@@ -277,6 +285,9 @@ export default function Sidebar({ companyName }: SidebarProps) {
             } else if (item.label === "Transferência de Produtos") {
               // Transferência de Produtos está ativo quando o pathname inclui /transferencia-produtos
               isActive = pathname?.includes("/transferencia-produtos") || pathname === item.href;
+            } else if (item.label === "Saídas e Entradas de Produtos") {
+              // Saídas e Entradas de Produtos está ativo quando o pathname inclui /saidas-entradas-produtos
+              isActive = pathname?.includes("/saidas-entradas-produtos") || pathname === item.href;
             } else if (item.label === "Exportar Relatórios") {
               // Exportar Relatórios está ativo quando o pathname inclui /exportar-relatorios
               isActive = pathname?.includes("/exportar-relatorios") || pathname === item.href;
