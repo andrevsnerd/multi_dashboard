@@ -10,11 +10,13 @@ export type PermissionKey =
   | "clientes"
   | "controle-estoque"
   | "controle-giro"
+  | "controle-movimento"
   | "controle-transferencias"
   | "exportar-relatorios"
   | "blackfriday"
   | "estoque-por-filial"
-  | "transferencia-produtos";
+  | "transferencia-produtos"
+  | "saidas-entradas-produtos";
 
 export type { CompanyKey };
 
@@ -46,11 +48,13 @@ export const ALL_PERMISSION_KEYS: { key: PermissionKey; label: string }[] = [
   { key: "clientes", label: "Clientes" },
   { key: "controle-estoque", label: "Controle de Estoque" },
   { key: "controle-giro", label: "Controle de Giro" },
+  { key: "controle-movimento", label: "Controle de Movimento" },
   { key: "controle-transferencias", label: "Controle de Transferências" },
   { key: "exportar-relatorios", label: "Exportar Relatórios" },
   { key: "blackfriday", label: "Black Friday" },
   { key: "estoque-por-filial", label: "Estoque por Filial" },
   { key: "transferencia-produtos", label: "Transferência de Produtos" },
+  { key: "saidas-entradas-produtos", label: "Saídas e Entradas de Produtos" },
 ];
 
 export const ROLE_LABELS: Record<RoleKey, string> = {

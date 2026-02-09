@@ -34,11 +34,13 @@ export function pathnameToPermission(pathname: string | null): PermissionKey | "
     clientes: "clientes",
     "controle-estoque": "controle-estoque",
     "controle-giro": "controle-giro",
+    "controle-movimento": "controle-movimento",
     "controle-transferencias": "controle-transferencias",
     "exportar-relatorios": "exportar-relatorios",
     blackfriday: "blackfriday",
     "estoque-por-filial": "estoque-por-filial",
     "transferencia-produtos": "transferencia-produtos",
+    "saidas-entradas-produtos": "saidas-entradas-produtos",
     admin: "admin",
   };
   return mapping[segment] ?? null;
