@@ -14,6 +14,7 @@ export async function GET(request: Request) {
           s.FILIAL_DESTINO,
           s.EMISSAO,
           s.RESPONSAVEL,
+          s.OBS,
           -- Contar produtos: primeiro tenta LOJA_SAIDAS_PRODUTO, se não houver usa ESTOQUE_PROD1_SAI
           ISNULL((
             SELECT COUNT(DISTINCT sp.PRODUTO)
@@ -53,6 +54,7 @@ export async function GET(request: Request) {
         FILIAL_DESTINO: string | null;
         EMISSAO: Date;
         RESPONSAVEL: string | null;
+        OBS: string | null;
         QTD_PRODUTOS: number;
         QTD_ITENS: number;
       }>(query);
@@ -63,6 +65,7 @@ export async function GET(request: Request) {
         filialDestino: row.FILIAL_DESTINO?.toString().trim() || '—', // Mostrar '—' para saídas isoladas
         dataEmissao: row.EMISSAO ? new Date(row.EMISSAO).toISOString() : '',
         responsavel: row.RESPONSAVEL?.toString().trim() || '',
+        observacao: row.OBS?.toString().trim() || '',
         qtdProdutos: row.QTD_PRODUTOS || 0,
         qtdItens: row.QTD_ITENS || 0,
         status: 'Concluída',

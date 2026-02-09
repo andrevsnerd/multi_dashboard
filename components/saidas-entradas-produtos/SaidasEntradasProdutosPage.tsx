@@ -41,6 +41,7 @@ interface TransferenciaLog {
   filialDestino: string;
   dataEmissao: string;
   responsavel?: string;
+  observacao?: string;
   qtdProdutos: number;
   qtdItens: number;
   status: string;
@@ -318,6 +319,10 @@ export default function SaidasEntradasProdutosPage({
   const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
   const [detalhesCache, setDetalhesCache] = useState<Record<string, LogDetalheItem[]>>({});
   const [loadingDetalhesKey, setLoadingDetalhesKey] = useState<string | null>(null);
+  const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
+  const [logEditando, setLogEditando] = useState<TransferenciaLog | null>(null);
+  const [observacaoEditando, setObservacaoEditando] = useState("");
+  const [processandoEdicao, setProcessandoEdicao] = useState(false);
 
   // Carregar permissões do usuário PRIMEIRO (antes de tudo)
   useEffect(() => {
@@ -754,6 +759,115 @@ export default function SaidasEntradasProdutosPage({
     leaveRef.current = setTimeout(() => setHoveredLogKey(null), 80);
   }, []);
 
+  const abrirModalEdicao = useCallback((log: TransferenciaLog) => {
+    setLogEditando(log);
+    setObservacaoEditando(log.observacao || "");
+    setModalEdicaoAberto(true);
+  }, []);
+
+  const fecharModalEdicao = useCallback(() => {
+    setModalEdicaoAberto(false);
+    setLogEditando(null);
+    setObservacaoEditando("");
+  }, []);
+
+  const salvarEdicao = useCallback(async () => {
+    if (!logEditando || !user?.username) return;
+    
+    setProcessandoEdicao(true);
+    try {
+      // Para saídas isoladas, filialDestino pode ser '—', usar filialOrigem
+      // Para entradas isoladas, filialOrigem pode ser '—', usar filialDestino
+      const filial = tipoOperacao === "saida" 
+        ? (logEditando.filialDestino === '—' ? logEditando.filialOrigem : logEditando.filialOrigem)
+        : (logEditando.filialOrigem === '—' || !logEditando.filialOrigem ? logEditando.filialDestino : logEditando.filialDestino);
+      
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      headers["x-auth-username"] = user.username;
+
+      const response = await fetch(
+        `/api/saidas-entradas-produtos/log/${tipoOperacao}/${logEditando.romaneio}/${encodeURIComponent(filial)}`,
+        {
+          method: "PUT",
+          headers,
+          body: JSON.stringify({ observacao: observacaoEditando }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = (await response.json()) as { error: string };
+        throw new Error(error.error || "Erro ao salvar edição");
+      }
+
+      mostrarNotificacao("Log atualizado com sucesso", "success");
+      fecharModalEdicao();
+      
+      // Recarregar logs
+      if (tipoOperacao === "saida") {
+        const logs = await fetchLogSaidas();
+        setLogSaidas(logs);
+      } else {
+        const logs = await fetchLogEntradas();
+        setLogEntradas(logs);
+      }
+    } catch (error) {
+      mostrarNotificacao(error instanceof Error ? error.message : "Erro ao salvar edição", "error");
+    } finally {
+      setProcessandoEdicao(false);
+    }
+  }, [logEditando, observacaoEditando, tipoOperacao, user?.username, mostrarNotificacao, fecharModalEdicao]);
+
+  const removerLog = useCallback(async () => {
+    if (!logEditando || !user?.username) return;
+    
+    if (!confirm(`Tem certeza que deseja remover completamente o log #${logEditando.romaneio}?\n\nEsta ação não pode ser desfeita. O estoque NÃO será revertido.`)) {
+      return;
+    }
+
+    setProcessandoEdicao(true);
+    try {
+      // Para saídas isoladas, filialDestino pode ser '—', usar filialOrigem
+      // Para entradas isoladas, filialOrigem pode ser '—', usar filialDestino
+      const filial = tipoOperacao === "saida" 
+        ? (logEditando.filialDestino === '—' ? logEditando.filialOrigem : logEditando.filialOrigem)
+        : (logEditando.filialOrigem === '—' || !logEditando.filialOrigem ? logEditando.filialDestino : logEditando.filialDestino);
+      
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      headers["x-auth-username"] = user.username;
+
+      const response = await fetch(
+        `/api/saidas-entradas-produtos/log/${tipoOperacao}/${logEditando.romaneio}/${encodeURIComponent(filial)}`,
+        {
+          method: "DELETE",
+          headers,
+        }
+      );
+
+      if (!response.ok) {
+        const error = (await response.json()) as { error: string };
+        throw new Error(error.error || "Erro ao remover log");
+      }
+
+      mostrarNotificacao("Log removido com sucesso", "success");
+      fecharModalEdicao();
+      
+      // Recarregar logs
+      if (tipoOperacao === "saida") {
+        const logs = await fetchLogSaidas();
+        setLogSaidas(logs);
+      } else {
+        const logs = await fetchLogEntradas();
+        setLogEntradas(logs);
+      }
+    } catch (error) {
+      mostrarNotificacao(error instanceof Error ? error.message : "Erro ao remover log", "error");
+    } finally {
+      setProcessandoEdicao(false);
+    }
+  }, [logEditando, tipoOperacao, user?.username, mostrarNotificacao, fecharModalEdicao]);
+
+  const isAdmin = user?.role === "admin";
+
   const iniciarOperacao = useCallback(() => {
     if (!filialSelecionada) {
       mostrarNotificacao(`Selecione uma filial`, "error");
@@ -906,7 +1020,21 @@ export default function SaidasEntradasProdutosPage({
                       <div className={styles.logItem}>
                         <div className={styles.logHeader}>
                           <span className={styles.logRomaneio}>#{log.romaneio}</span>
-                          <span className={styles.logStatus}>{log.status}</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            {isAdmin && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  abrirModalEdicao(log);
+                                }}
+                                className={styles.logEditButton}
+                                title="Editar log"
+                              >
+                                ✏️
+                              </button>
+                            )}
+                            <span className={styles.logStatus}>{log.status}</span>
+                          </div>
                         </div>
                         <div className={styles.logDetails}>
                           {tipoOperacao === "saida" 
@@ -1297,6 +1425,73 @@ export default function SaidasEntradasProdutosPage({
             {notificacao.tipo === "success" ? "✓" : "✗"}
           </span>
           <span className={styles.notificationMessage}>{notificacao.mensagem}</span>
+        </div>
+      )}
+
+      {/* Modal de Edição/Remoção de Log */}
+      {modalEdicaoAberto && logEditando && (
+        <div className={styles.modalOverlay} onClick={fecharModalEdicao}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>
+                Editar Log #{logEditando.romaneio}
+              </h2>
+              <button className={styles.modalCloseButton} onClick={fecharModalEdicao}>
+                ×
+              </button>
+            </div>
+            
+            <div className={styles.modalBody}>
+              <div className={styles.modalInfo}>
+                <div><strong>Tipo:</strong> {tipoOperacao === "saida" ? "Saída" : "Entrada"}</div>
+                <div><strong>Filial:</strong> {tipoOperacao === "saida" ? logEditando.filialOrigem : logEditando.filialDestino}</div>
+                <div><strong>Data:</strong> {new Date(logEditando.dataEmissao).toLocaleString("pt-BR")}</div>
+                <div><strong>Produtos:</strong> {logEditando.qtdProdutos} • <strong>Itens:</strong> {logEditando.qtdItens}</div>
+              </div>
+
+              <div className={styles.modalField}>
+                <label className={styles.modalLabel}>Observação</label>
+                <textarea
+                  className={styles.modalTextarea}
+                  value={observacaoEditando}
+                  onChange={(e) => setObservacaoEditando(e.target.value)}
+                  placeholder="Adicione uma observação..."
+                  rows={4}
+                  maxLength={2000}
+                  disabled={processandoEdicao}
+                />
+                <div className={styles.modalCharCount}>
+                  {observacaoEditando.length}/2000
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.modalFooter}>
+              <button
+                className={styles.modalButtonDanger}
+                onClick={removerLog}
+                disabled={processandoEdicao}
+              >
+                {processandoEdicao ? "Removendo..." : "🗑️ Remover Log"}
+              </button>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  className={styles.modalButtonSecondary}
+                  onClick={fecharModalEdicao}
+                  disabled={processandoEdicao}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className={styles.modalButtonPrimary}
+                  onClick={salvarEdicao}
+                  disabled={processandoEdicao}
+                >
+                  {processandoEdicao ? "Salvando..." : "Salvar"}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

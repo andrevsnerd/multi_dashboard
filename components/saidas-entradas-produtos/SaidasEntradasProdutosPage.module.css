@@ -578,6 +578,22 @@
   color: #111827;
 }
 
+.logEditButton {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  opacity: 0.7;
+}
+
+.logEditButton:hover {
+  background: rgba(0, 0, 0, 0.05);
+  opacity: 1;
+}
+
 .logStatus {
   padding: 4px 12px;
   background: #d1fae5;
@@ -904,6 +920,222 @@
 .notificationMessage {
   font-size: 14px;
   font-weight: 500;
+}
+
+.logEditButton {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  opacity: 0.7;
+}
+
+.logEditButton:hover {
+  background: rgba(0, 0, 0, 0.05);
+  opacity: 1;
+}
+
+/* Modal de Edição */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  padding: 20px;
+}
+
+.modalContent {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modalTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.modalCloseButton {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.modalCloseButton:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.modalBody {
+  padding: 24px;
+  flex: 1;
+}
+
+.modalInfo {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.8;
+}
+
+.modalInfo > div {
+  margin-bottom: 8px;
+}
+
+.modalInfo > div:last-child {
+  margin-bottom: 0;
+}
+
+.modalField {
+  margin-bottom: 20px;
+}
+
+.modalLabel {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.modalTextarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 100px;
+  transition: border-color 0.2s;
+}
+
+.modalTextarea:focus {
+  outline: none;
+  border-color: #111827;
+}
+
+.modalTextarea:disabled {
+  background: #f3f4f6;
+  cursor: not-allowed;
+}
+
+.modalCharCount {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+  text-align: right;
+}
+
+.modalFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-top: 1px solid #e5e7eb;
+  gap: 12px;
+}
+
+.modalButtonPrimary {
+  padding: 10px 20px;
+  background: #111827;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.modalButtonPrimary:hover:not(:disabled) {
+  background: #1f2937;
+}
+
+.modalButtonPrimary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.modalButtonSecondary {
+  padding: 10px 20px;
+  background: white;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.modalButtonSecondary:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.modalButtonSecondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.modalButtonDanger {
+  padding: 10px 20px;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.modalButtonDanger:hover:not(:disabled) {
+  background: #dc2626;
+}
+
+.modalButtonDanger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Responsive */
