@@ -14,21 +14,36 @@ export async function GET(request: Request) {
           s.FILIAL_DESTINO,
           s.EMISSAO,
           s.RESPONSAVEL,
-          (
+          -- Contar produtos: primeiro tenta LOJA_SAIDAS_PRODUTO, se não houver usa ESTOQUE_PROD1_SAI
+          ISNULL((
             SELECT COUNT(DISTINCT sp.PRODUTO)
             FROM LOJA_SAIDAS_PRODUTO sp WITH (NOLOCK)
             WHERE sp.ROMANEIO_PRODUTO = s.ROMANEIO_PRODUTO AND sp.FILIAL = s.FILIAL
-          ) AS QTD_PRODUTOS,
-          (
+          ), (
+            SELECT COUNT(DISTINCT ep.PRODUTO)
+            FROM ESTOQUE_PROD1_SAI ep WITH (NOLOCK)
+            WHERE ep.ROMANEIO_PRODUTO = s.ROMANEIO_PRODUTO AND ep.FILIAL = s.FILIAL
+          )) AS QTD_PRODUTOS,
+          -- Contar itens: primeiro tenta LOJA_SAIDAS_PRODUTO, se não houver usa ESTOQUE_PROD1_SAI
+          ISNULL((
             SELECT ISNULL(SUM(sp.QTDE_SAIDA), 0)
             FROM LOJA_SAIDAS_PRODUTO sp WITH (NOLOCK)
             WHERE sp.ROMANEIO_PRODUTO = s.ROMANEIO_PRODUTO AND sp.FILIAL = s.FILIAL
-          ) AS QTD_ITENS
+          ), (
+            SELECT ISNULL(SUM(ep.QTDE), 0)
+            FROM ESTOQUE_PROD1_SAI ep WITH (NOLOCK)
+            WHERE ep.ROMANEIO_PRODUTO = s.ROMANEIO_PRODUTO AND ep.FILIAL = s.FILIAL
+          )) AS QTD_ITENS
         FROM LOJA_SAIDAS s WITH (NOLOCK)
-        WHERE s.FILIAL_DESTINO IS NOT NULL
-          AND LTRIM(RTRIM(ISNULL(s.FILIAL_DESTINO, ''))) != ''
-          AND (s.SAIDA_CANCELADA = 0 OR s.SAIDA_CANCELADA IS NULL)
-          AND s.EMISSAO >= DATEADD(DAY, -30, GETDATE())
+        WHERE (
+          -- Incluir transferências (com FILIAL_DESTINO preenchido)
+          (s.FILIAL_DESTINO IS NOT NULL AND LTRIM(RTRIM(ISNULL(s.FILIAL_DESTINO, ''))) != '')
+          OR
+          -- Incluir saídas isoladas (FILIAL_DESTINO vazio ou NULL)
+          (s.FILIAL_DESTINO IS NULL OR LTRIM(RTRIM(ISNULL(s.FILIAL_DESTINO, ''))) = '')
+        )
+        AND (s.SAIDA_CANCELADA = 0 OR s.SAIDA_CANCELADA IS NULL)
+        AND s.EMISSAO >= DATEADD(DAY, -30, GETDATE())
         ORDER BY s.EMISSAO DESC
       `;
 
@@ -45,7 +60,7 @@ export async function GET(request: Request) {
       return result.recordset.map(row => ({
         romaneio: row.ROMANEIO_PRODUTO?.toString().trim() || '',
         filialOrigem: row.FILIAL_ORIGEM?.toString().trim() || '',
-        filialDestino: row.FILIAL_DESTINO?.toString().trim() || '',
+        filialDestino: row.FILIAL_DESTINO?.toString().trim() || '—', // Mostrar '—' para saídas isoladas
         dataEmissao: row.EMISSAO ? new Date(row.EMISSAO).toISOString() : '',
         responsavel: row.RESPONSAVEL?.toString().trim() || '',
         qtdProdutos: row.QTD_PRODUTOS || 0,

@@ -22,9 +22,28 @@ export async function GET(request: Request) {
   const filialOrigem = searchParams.get('filialOrigem')?.trim();
   const filialDestino = searchParams.get('filialDestino')?.trim();
 
-  if (!tipo || !romaneio || !filialOrigem || !filialDestino) {
+  if (!tipo || !romaneio) {
     return NextResponse.json(
-      { error: 'Parâmetros obrigatórios: tipo, romaneio, filialOrigem, filialDestino' },
+      { error: 'Parâmetros obrigatórios: tipo, romaneio' },
+      { status: 400 }
+    );
+  }
+  
+  // Para entradas isoladas, filialOrigem pode estar vazio
+  // Para saídas isoladas, filialDestino pode estar vazio (representado como '—')
+  const isEntradaIsolada = tipo === 'entrada' && (!filialOrigem || filialOrigem.trim() === '' || filialOrigem === '—');
+  const isSaidaIsolada = tipo === 'saida' && (!filialDestino || filialDestino.trim() === '' || filialDestino === '—');
+  
+  // Validação: para entradas, filialDestino é obrigatório; para saídas, filialOrigem é obrigatório
+  if (tipo === 'entrada' && !filialDestino) {
+    return NextResponse.json(
+      { error: 'Parâmetro obrigatório para entrada: filialDestino' },
+      { status: 400 }
+    );
+  }
+  if (tipo === 'saida' && !filialOrigem) {
+    return NextResponse.json(
+      { error: 'Parâmetro obrigatório para saída: filialOrigem' },
       { status: 400 }
     );
   }
@@ -34,18 +53,41 @@ export async function GET(request: Request) {
   }
 
   try {
-    const fo = filialOrigem.trim();
-    const fd = filialDestino.trim();
+    // Para entradas isoladas, filialOrigem pode estar vazio
+    // Para saídas isoladas, filialDestino pode estar vazio (representado como '—')
+    const fo = (filialOrigem || '').trim();
+    const fd = (filialDestino || '').trim();
 
     const filiaisMap = await withRequest(async (reqF) => {
-      const q = `
-        SELECT LTRIM(RTRIM(COD_FILIAL)) AS COD_FILIAL, LTRIM(RTRIM(FILIAL)) AS FILIAL
-        FROM FILIAIS WITH (NOLOCK)
-        WHERE LTRIM(RTRIM(COD_FILIAL)) IN (@fo, @fd)
-           OR LTRIM(RTRIM(FILIAL)) IN (@fo, @fd)
-      `;
-      reqF.input('fo', sql.VarChar, fo);
-      reqF.input('fd', sql.VarChar, fd);
+      // Para entradas isoladas, só buscar filialDestino
+      // Para saídas isoladas, só buscar filialOrigem
+      let q: string;
+      if (isEntradaIsolada) {
+        q = `
+          SELECT LTRIM(RTRIM(COD_FILIAL)) AS COD_FILIAL, LTRIM(RTRIM(FILIAL)) AS FILIAL
+          FROM FILIAIS WITH (NOLOCK)
+          WHERE LTRIM(RTRIM(COD_FILIAL)) = @fd
+             OR LTRIM(RTRIM(FILIAL)) = @fd
+        `;
+        reqF.input('fd', sql.VarChar, fd);
+      } else if (isSaidaIsolada) {
+        q = `
+          SELECT LTRIM(RTRIM(COD_FILIAL)) AS COD_FILIAL, LTRIM(RTRIM(FILIAL)) AS FILIAL
+          FROM FILIAIS WITH (NOLOCK)
+          WHERE LTRIM(RTRIM(COD_FILIAL)) = @fo
+             OR LTRIM(RTRIM(FILIAL)) = @fo
+        `;
+        reqF.input('fo', sql.VarChar, fo);
+      } else {
+        q = `
+          SELECT LTRIM(RTRIM(COD_FILIAL)) AS COD_FILIAL, LTRIM(RTRIM(FILIAL)) AS FILIAL
+          FROM FILIAIS WITH (NOLOCK)
+          WHERE LTRIM(RTRIM(COD_FILIAL)) IN (@fo, @fd)
+             OR LTRIM(RTRIM(FILIAL)) IN (@fo, @fd)
+        `;
+        reqF.input('fo', sql.VarChar, fo);
+        reqF.input('fd', sql.VarChar, fd);
+      }
       const res = await reqF.query<{ COD_FILIAL: string; FILIAL: string }>(q);
       const m = new Map<string, string>();
       for (const r of res.recordset) {
@@ -57,12 +99,15 @@ export async function GET(request: Request) {
       return m;
     });
 
-    const nomeOrigem = filiaisMap.get(fo) ?? fo;
-    const nomeDestino = filiaisMap.get(fd) ?? fd;
+    // Para entradas isoladas, não há filialOrigem
+    // Para saídas isoladas, não há filialDestino
+    const nomeOrigem = isEntradaIsolada ? '—' : (filiaisMap.get(fo) ?? fo);
+    const nomeDestino = isSaidaIsolada ? '—' : (filiaisMap.get(fd) ?? fd);
 
     const items = await withRequest(async (req) => {
       let itemsQuery: string;
       if (tipo === 'saida') {
+        // Para saídas, usar UNION para buscar de LOJA_SAIDAS_PRODUTO ou ESTOQUE_PROD1_SAI
         itemsQuery = `
           SELECT
             sp.PRODUTO,
@@ -76,8 +121,30 @@ export async function GET(request: Request) {
           LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = sp.PRODUTO
           LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = sp.COR_PRODUTO
           WHERE sp.ROMANEIO_PRODUTO = @romaneio AND sp.FILIAL = @filialOrigem
+          UNION ALL
+          SELECT
+            ep.PRODUTO,
+            ep.COR_PRODUTO,
+            ep.QTDE AS QTDE,
+            ISNULL(p2.DESC_PRODUTO, '') AS DESC_PRODUTO,
+            ISNULL(c2.DESC_COR, '') AS DESC_COR,
+            (SELECT TOP 1 pb3.CODIGO_BARRA FROM PRODUTOS_BARRA pb3 WITH (NOLOCK)
+             WHERE pb3.PRODUTO = ep.PRODUTO AND (ISNULL(pb3.COR_PRODUTO,'') = ISNULL(ep.COR_PRODUTO,''))) AS CODIGO_BARRA
+          FROM ESTOQUE_PROD1_SAI ep WITH (NOLOCK)
+          LEFT JOIN PRODUTOS p2 WITH (NOLOCK) ON p2.PRODUTO = ep.PRODUTO
+          LEFT JOIN CORES_BASICAS c2 WITH (NOLOCK) ON c2.COR = ep.COR_PRODUTO
+          WHERE ep.ROMANEIO_PRODUTO = @romaneio AND ep.FILIAL = @filialOrigem
+            AND NOT EXISTS (
+              SELECT 1 FROM LOJA_SAIDAS_PRODUTO sp2 WITH (NOLOCK)
+              WHERE sp2.ROMANEIO_PRODUTO = ep.ROMANEIO_PRODUTO 
+                AND sp2.FILIAL = ep.FILIAL
+                AND sp2.PRODUTO = ep.PRODUTO
+                AND ISNULL(sp2.COR_PRODUTO, '') = ISNULL(ep.COR_PRODUTO, '')
+            )
         `;
       } else {
+        // Para entradas, buscar de ESTOQUE_PROD1_ENT
+        // Se for entrada isolada, usar filialDestino diretamente (que é a filial de destino)
         itemsQuery = `
           SELECT
             ep.PRODUTO,
@@ -111,22 +178,59 @@ export async function GET(request: Request) {
     });
 
     const stockData = await withRequest(async (reqStock) => {
-      reqStock.input('fo', sql.VarChar, fo);
-      reqStock.input('fd', sql.VarChar, fd);
-      const q = `
-        SELECT
-          ep.PRODUTO,
-          LTRIM(RTRIM(ISNULL(ep.COR_PRODUTO, ''))) AS COR_PRODUTO,
-          LTRIM(RTRIM(f.FILIAL)) AS FILIAL,
-          LTRIM(RTRIM(f.COD_FILIAL)) AS COD_FILIAL,
-          SUM(ISNULL(ep.ESTOQUE, 0)) AS ESTOQUE
-        FROM ESTOQUE_PRODUTOS ep WITH (NOLOCK)
-        INNER JOIN FILIAIS f WITH (NOLOCK)
-          ON LTRIM(RTRIM(ep.FILIAL)) = LTRIM(RTRIM(f.FILIAL))
-        WHERE LTRIM(RTRIM(f.COD_FILIAL)) IN (@fo, @fd)
-           OR LTRIM(RTRIM(f.FILIAL)) IN (@fo, @fd)
-        GROUP BY ep.PRODUTO, ep.COR_PRODUTO, f.FILIAL, f.COD_FILIAL
-      `;
+      // Para entradas isoladas, só buscar estoque da filialDestino
+      // Para saídas isoladas, só buscar estoque da filialOrigem
+      let q: string;
+      if (isEntradaIsolada) {
+        q = `
+          SELECT
+            ep.PRODUTO,
+            LTRIM(RTRIM(ISNULL(ep.COR_PRODUTO, ''))) AS COR_PRODUTO,
+            LTRIM(RTRIM(f.FILIAL)) AS FILIAL,
+            LTRIM(RTRIM(f.COD_FILIAL)) AS COD_FILIAL,
+            SUM(ISNULL(ep.ESTOQUE, 0)) AS ESTOQUE
+          FROM ESTOQUE_PRODUTOS ep WITH (NOLOCK)
+          INNER JOIN FILIAIS f WITH (NOLOCK)
+            ON LTRIM(RTRIM(ep.FILIAL)) = LTRIM(RTRIM(f.FILIAL))
+          WHERE LTRIM(RTRIM(f.COD_FILIAL)) = @fd
+             OR LTRIM(RTRIM(f.FILIAL)) = @fd
+          GROUP BY ep.PRODUTO, ep.COR_PRODUTO, f.FILIAL, f.COD_FILIAL
+        `;
+        reqStock.input('fd', sql.VarChar, fd);
+      } else if (isSaidaIsolada) {
+        q = `
+          SELECT
+            ep.PRODUTO,
+            LTRIM(RTRIM(ISNULL(ep.COR_PRODUTO, ''))) AS COR_PRODUTO,
+            LTRIM(RTRIM(f.FILIAL)) AS FILIAL,
+            LTRIM(RTRIM(f.COD_FILIAL)) AS COD_FILIAL,
+            SUM(ISNULL(ep.ESTOQUE, 0)) AS ESTOQUE
+          FROM ESTOQUE_PRODUTOS ep WITH (NOLOCK)
+          INNER JOIN FILIAIS f WITH (NOLOCK)
+            ON LTRIM(RTRIM(ep.FILIAL)) = LTRIM(RTRIM(f.FILIAL))
+          WHERE LTRIM(RTRIM(f.COD_FILIAL)) = @fo
+             OR LTRIM(RTRIM(f.FILIAL)) = @fo
+          GROUP BY ep.PRODUTO, ep.COR_PRODUTO, f.FILIAL, f.COD_FILIAL
+        `;
+        reqStock.input('fo', sql.VarChar, fo);
+      } else {
+        q = `
+          SELECT
+            ep.PRODUTO,
+            LTRIM(RTRIM(ISNULL(ep.COR_PRODUTO, ''))) AS COR_PRODUTO,
+            LTRIM(RTRIM(f.FILIAL)) AS FILIAL,
+            LTRIM(RTRIM(f.COD_FILIAL)) AS COD_FILIAL,
+            SUM(ISNULL(ep.ESTOQUE, 0)) AS ESTOQUE
+          FROM ESTOQUE_PRODUTOS ep WITH (NOLOCK)
+          INNER JOIN FILIAIS f WITH (NOLOCK)
+            ON LTRIM(RTRIM(ep.FILIAL)) = LTRIM(RTRIM(f.FILIAL))
+          WHERE LTRIM(RTRIM(f.COD_FILIAL)) IN (@fo, @fd)
+             OR LTRIM(RTRIM(f.FILIAL)) IN (@fo, @fd)
+          GROUP BY ep.PRODUTO, ep.COR_PRODUTO, f.FILIAL, f.COD_FILIAL
+        `;
+        reqStock.input('fo', sql.VarChar, fo);
+        reqStock.input('fd', sql.VarChar, fd);
+      }
       const res = await reqStock.query<{ PRODUTO: string; COR_PRODUTO: string; FILIAL: string; COD_FILIAL: string; ESTOQUE: number }>(q);
       return res.recordset;
     });
@@ -161,12 +265,14 @@ export async function GET(request: Request) {
       const produto = row.PRODUTO?.toString().trim() ?? '';
       const corRaw = row.COR_PRODUTO?.toString().trim();
       const cor = corRaw || '';
-      const keyOrigemNome = `${produto}|${cor}|${nomeOrigem}`;
-      const keyDestinoNome = `${produto}|${cor}|${nomeDestino}`;
-      const keyOrigemCod = `${produto}|${cor}|${fo}`;
-      const keyDestinoCod = `${produto}|${cor}|${fd}`;
-      const estoqueOrigem = stockMap.get(keyOrigemNome) ?? stockMap.get(keyOrigemCod) ?? 0;
-      const estoqueDestino = stockMap.get(keyDestinoNome) ?? stockMap.get(keyDestinoCod) ?? 0;
+      // Para entradas isoladas, não há filialOrigem, então estoqueOrigem = 0
+      // Para saídas isoladas, não há filialDestino, então estoqueDestino = 0
+      const keyOrigemNome = isEntradaIsolada ? '' : `${produto}|${cor}|${nomeOrigem}`;
+      const keyDestinoNome = isSaidaIsolada ? '' : `${produto}|${cor}|${nomeDestino}`;
+      const keyOrigemCod = isEntradaIsolada ? '' : `${produto}|${cor}|${fo}`;
+      const keyDestinoCod = isSaidaIsolada ? '' : `${produto}|${cor}|${fd}`;
+      const estoqueOrigem = isEntradaIsolada ? 0 : (stockMap.get(keyOrigemNome) ?? stockMap.get(keyOrigemCod) ?? 0);
+      const estoqueDestino = isSaidaIsolada ? 0 : (stockMap.get(keyDestinoNome) ?? stockMap.get(keyDestinoCod) ?? 0);
       return {
         produto,
         corProduto: cor || null,

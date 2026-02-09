@@ -14,5 +14,15 @@
     "responsavelPadrao": "LOGISTICA",
     "responsavelFixo": true,
     "tipoRomaneioFixo": true
+  },
+  {
+    "username": "andre.sabetta",
+    "filiaisOrigem": [],
+    "filiaisDestino": [],
+    "tiposRomaneioPermitidos": [],
+    "responsavelPadrao": "ANDRE.SABETTA",
+    "responsavelFixo": true,
+    "tipoRomaneioFixo": false,
+    "podeVerOutrasFiliais": false
   }
 ]

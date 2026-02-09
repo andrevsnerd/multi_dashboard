@@ -15,6 +15,7 @@ export async function GET(request: Request) {
           e.EMISSAO,
           e.TIPO_ROMANEIO,
           e.RESPONSAVEL,
+          e.OBS,
           (
             SELECT COUNT(DISTINCT ep.PRODUTO)
             FROM ESTOQUE_PROD1_ENT ep WITH (NOLOCK)
@@ -26,7 +27,13 @@ export async function GET(request: Request) {
             WHERE ep.ROMANEIO_PRODUTO = e.ROMANEIO_PRODUTO
           ) AS QTD_ITENS
         FROM ESTOQUE_PROD_ENT e WITH (NOLOCK)
-        WHERE e.TIPO_ROMANEIO LIKE '%TRANSFERENCIA%'
+        WHERE (
+          -- Incluir transferências (com FILIAL_ORIGEM preenchido)
+          (e.FILIAL_ORIGEM IS NOT NULL AND LTRIM(RTRIM(ISNULL(e.FILIAL_ORIGEM, ''))) != '')
+          OR
+          -- Incluir entradas isoladas (FILIAL_ORIGEM vazio ou NULL)
+          (e.FILIAL_ORIGEM IS NULL OR LTRIM(RTRIM(ISNULL(e.FILIAL_ORIGEM, ''))) = '')
+        )
           AND e.EMISSAO >= DATEADD(DAY, -30, GETDATE())
         ORDER BY e.EMISSAO DESC
       `;
@@ -38,6 +45,7 @@ export async function GET(request: Request) {
         EMISSAO: Date;
         TIPO_ROMANEIO: string | null;
         RESPONSAVEL: string | null;
+        OBS: string | null;
         QTD_PRODUTOS: number;
         QTD_ITENS: number | null;
       }>(query);
@@ -49,6 +57,7 @@ export async function GET(request: Request) {
         dataEmissao: row.EMISSAO ? new Date(row.EMISSAO).toISOString() : '',
         tipoRomaneio: row.TIPO_ROMANEIO?.toString().trim() || '',
         responsavel: row.RESPONSAVEL?.toString().trim() || '',
+        observacao: row.OBS?.toString().trim() || '',
         qtdProdutos: row.QTD_PRODUTOS || 0,
         qtdItens: row.QTD_ITENS || 0,
         status: 'Concluída',
