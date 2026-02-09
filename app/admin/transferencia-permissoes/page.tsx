@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthContext";
+import { resolveCompany } from "@/lib/config/company";
 import styles from "../page.module.css";
+
+type PerfilPreset = "" | "nerd" | "scarfme";
 
 interface TransferenciaPermissao {
   username: string;
@@ -42,6 +45,7 @@ export default function TransferenciaPermissoesAdminPage() {
   const [formResponsavelFixo, setFormResponsavelFixo] = useState(false);
   const [formTipoRomaneioFixo, setFormTipoRomaneioFixo] = useState(false);
   const [formPodeVerOutrasFiliais, setFormPodeVerOutrasFiliais] = useState(false);
+  const [perfilPreset, setPerfilPreset] = useState<PerfilPreset>("");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -137,8 +141,26 @@ export default function TransferenciaPermissoesAdminPage() {
     }
   }, [currentUser?.username]);
 
+  function aplicarPerfilPreset(perfil: PerfilPreset) {
+    setPerfilPreset(perfil);
+    if (!perfil) {
+      setFormFiliaisOrigem([]);
+      setFormFiliaisDestino([]);
+      return;
+    }
+    const company = resolveCompany(perfil);
+    if (!company) return;
+    const filiaisPermitidas = company.filialFilters.inventory ?? [];
+    const cods = filiais
+      .filter((f) => filiaisPermitidas.includes(f.filial))
+      .map((f) => f.codFilial);
+    setFormFiliaisOrigem(cods);
+    setFormFiliaisDestino(cods);
+  }
+
   function openAdd() {
     setEditingUsername(null);
+    setPerfilPreset("");
     setFormUsername("");
     setFormFiliaisOrigem([]);
     setFormFiliaisDestino([]);
@@ -154,6 +176,7 @@ export default function TransferenciaPermissoesAdminPage() {
 
   function openEdit(perm: TransferenciaPermissao) {
     setEditingUsername(perm.username);
+    setPerfilPreset("");
     setFormUsername(perm.username);
     setFormFiliaisOrigem(perm.filiaisOrigem);
     setFormFiliaisDestino(perm.filiaisDestino);
@@ -387,6 +410,23 @@ export default function TransferenciaPermissoesAdminPage() {
                     disabled
                   />
                 )}
+              </div>
+
+              <div className={styles.label}>
+                <label>Perfil (pré-seleção rápida)</label>
+                <p style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>
+                  Ao selecionar NERD ou SCARF ME, marca todas as filiais habilitadas no dashboard (incluindo matriz e e-commerce).
+                  Você pode editar depois.
+                </p>
+                <select
+                  className={styles.select}
+                  value={perfilPreset}
+                  onChange={(e) => aplicarPerfilPreset(e.target.value as PerfilPreset)}
+                >
+                  <option value="">Nenhum perfil</option>
+                  <option value="nerd">NERD — todas as filiais</option>
+                  <option value="scarfme">SCARF ME — todas as filiais</option>
+                </select>
               </div>
 
               <div className={styles.label}>
