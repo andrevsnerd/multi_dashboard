@@ -502,7 +502,7 @@ export default function TransferenciaPermissoesAdminPage() {
               <div className={styles.label}>
                 <label>Responsável Padrão</label>
                 <p style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>
-                  Selecione ou digite um responsável existente
+                  Selecione um usuário cadastrado no banco (tabela USERS)
                 </p>
                 <input
                   type="text"
@@ -528,7 +528,7 @@ export default function TransferenciaPermissoesAdminPage() {
                 <datalist id="responsaveis-list">
                   {responsaveis.map((resp) => (
                     <option key={resp.responsavel} value={resp.responsavel}>
-                      {resp.responsavel} ({resp.qtd} entradas)
+                      {resp.responsavel}
                     </option>
                   ))}
                 </datalist>

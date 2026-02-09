@@ -1199,7 +1199,7 @@ export default function TransferenciaProdutosPage({
                   <datalist id="responsaveis-list">
                     {responsaveis.map((resp, idx) => (
                       <option key={idx} value={resp.responsavel}>
-                        {resp.responsavel} ({resp.qtd} entradas)
+                        {resp.responsavel}{resp.qtd > 0 ? ` (${resp.qtd} entradas)` : ''}
                       </option>
                     ))}
                   </datalist>
@@ -1231,7 +1231,7 @@ export default function TransferenciaProdutosPage({
                   <datalist id="responsaveis-list">
                     {responsaveis.map((resp, idx) => (
                       <option key={idx} value={resp.responsavel}>
-                        {resp.responsavel} ({resp.qtd} entradas)
+                        {resp.responsavel}{resp.qtd > 0 ? ` (${resp.qtd} entradas)` : ''}
                       </option>
                     ))}
                   </datalist>
