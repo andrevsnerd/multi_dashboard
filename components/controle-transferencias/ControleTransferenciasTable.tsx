@@ -120,6 +120,14 @@ function getTransferItemKey(item: TransferItem): string {
   return `${item.produto}|${item.cor}|${item.origem}|${item.destino}`;
 }
 
+/** Verifica se a loja destino tem estoque negativo para este produto (impede transferir até regularizar). */
+function destinoTemEstoqueNegativo(item: TransferItem): boolean {
+  const filialDestino = item.itemOriginal.filiais.find(
+    (f) => (f.filial || "").trim().toUpperCase() === (item.destinoCanonico || "").trim().toUpperCase()
+  );
+  return filialDestino != null && filialDestino.stock < 0;
+}
+
 /**
  * Formata a descrição do produto com código
  */
@@ -1646,27 +1654,38 @@ export default function ControleTransferenciasTable({
                   </td>
                   <td className={styles.transferirCell}>
                     {canTransfer(item) && quantidadeAjustada > 0 ? (
-                      <button
-                        type="button"
-                        className={styles.transferirBtn}
-                        onClick={() => {
-                          const qtySugerida = estoqueReal !== undefined ? quantidadeAjustada : item.quantidade;
-                          setModalTransferItem({
-                            ...item,
-                            estoqueOrigem: estoqueReal !== undefined ? estoqueReal : estoqueOrigem,
-                            quantidade: Math.min(qtySugerida, Math.max(0, estoqueReal !== undefined ? estoqueReal : estoqueOrigem)),
-                            codigoCor: item.itemOriginal.codigoCor,
-                          });
-                          setOnTransferSuccess(() => () => {
-                            toggleMarked(item);
-                            setModalTransferItem(null);
-                            setOnTransferSuccess(null);
-                          });
-                        }}
-                        title="Transferir este item"
-                      >
-                        TRANSFERIR
-                      </button>
+                      destinoTemEstoqueNegativo(item) ? (
+                        <button
+                          type="button"
+                          className={`${styles.transferirBtn} ${styles.transferirBtnDestinoNegativo}`}
+                          disabled
+                          title="Loja com saldo negativo, faça ajuste antes de transferir"
+                        >
+                          TRANSFERIR
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className={styles.transferirBtn}
+                          onClick={() => {
+                            const qtySugerida = estoqueReal !== undefined ? quantidadeAjustada : item.quantidade;
+                            setModalTransferItem({
+                              ...item,
+                              estoqueOrigem: estoqueReal !== undefined ? estoqueReal : estoqueOrigem,
+                              quantidade: Math.min(qtySugerida, Math.max(0, estoqueReal !== undefined ? estoqueReal : estoqueOrigem)),
+                              codigoCor: item.itemOriginal.codigoCor,
+                            });
+                            setOnTransferSuccess(() => () => {
+                              toggleMarked(item);
+                              setModalTransferItem(null);
+                              setOnTransferSuccess(null);
+                            });
+                          }}
+                          title="Transferir este item"
+                        >
+                          TRANSFERIR
+                        </button>
+                      )
                     ) : (
                       <span className={styles.transferirDisabled}>—</span>
                     )}
