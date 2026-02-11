@@ -143,8 +143,7 @@ export async function GET(request: Request) {
             )
         `;
       } else {
-        // Para entradas, buscar de ESTOQUE_PROD1_ENT
-        // Se for entrada isolada, usar filialDestino diretamente (que é a filial de destino)
+        // Para entradas: ESTOQUE_PROD1_ENT + itens que existem só em LOJA_ENTRADAS_PRODUTO
         itemsQuery = `
           SELECT
             ep.PRODUTO,
@@ -158,6 +157,24 @@ export async function GET(request: Request) {
           LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = ep.PRODUTO
           LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = ep.COR_PRODUTO
           WHERE ep.ROMANEIO_PRODUTO = @romaneio AND ep.FILIAL = @filialDestino
+          UNION ALL
+          SELECT
+            lep.PRODUTO,
+            lep.COR_PRODUTO,
+            ISNULL(lep.QTDE_ENTRADA, 0) AS QTDE,
+            ISNULL(p2.DESC_PRODUTO, '') AS DESC_PRODUTO,
+            ISNULL(c2.DESC_COR, '') AS DESC_COR,
+            (SELECT TOP 1 pb3.CODIGO_BARRA FROM PRODUTOS_BARRA pb3 WITH (NOLOCK)
+             WHERE pb3.PRODUTO = lep.PRODUTO AND (ISNULL(pb3.COR_PRODUTO,'') = ISNULL(lep.COR_PRODUTO,''))) AS CODIGO_BARRA
+          FROM LOJA_ENTRADAS_PRODUTO lep WITH (NOLOCK)
+          LEFT JOIN PRODUTOS p2 WITH (NOLOCK) ON p2.PRODUTO = lep.PRODUTO
+          LEFT JOIN CORES_BASICAS c2 WITH (NOLOCK) ON c2.COR = lep.COR_PRODUTO
+          WHERE lep.ROMANEIO_PRODUTO = @romaneio AND lep.FILIAL = @filialDestino
+            AND NOT EXISTS (
+              SELECT 1 FROM ESTOQUE_PROD1_ENT ep2 WITH (NOLOCK)
+              WHERE ep2.ROMANEIO_PRODUTO = lep.ROMANEIO_PRODUTO AND ep2.FILIAL = lep.FILIAL
+                AND ep2.PRODUTO = lep.PRODUTO AND ISNULL(ep2.COR_PRODUTO, '') = ISNULL(lep.COR_PRODUTO, '')
+            )
         `;
       }
 

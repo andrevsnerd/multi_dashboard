@@ -7,6 +7,7 @@ import type { DateRangeValue } from "@/components/filters/DateRangeFilter";
 import DateRangeFilter from "@/components/filters/DateRangeFilter";
 import { getCurrentMonthRange } from "@/lib/utils/date";
 import type { CompanyKey } from "@/lib/config/company";
+import { exportVendedorProdutosToExcel } from "@/lib/utils/exportVendedores";
 
 import styles from "./VendedorDetalhePage.module.css";
 
@@ -115,6 +116,30 @@ export default function VendedorDetalhePage({
         </div>
         <div className={styles.headerRight}>
           <DateRangeFilter value={range} onChange={setRange} />
+          <button
+            type="button"
+            className={styles.exportButton}
+            onClick={() => exportVendedorProdutosToExcel(data, companyKey, vendedorNome, range)}
+            disabled={loading || data.length === 0}
+            title="Exportar produtos para Excel"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M8 2V11M8 11L5 8M8 11L11 8M2 14H14"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Exportar XLSX
+          </button>
         </div>
       </div>
 

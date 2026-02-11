@@ -10,6 +10,7 @@ import VendedoresTable from "@/components/vendedores/VendedoresTable";
 import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
 import type { VendedorItem } from "@/lib/repositories/vendedores-v2";
 import type { CompanyKey } from "@/lib/config/company";
+import { exportVendedoresToExcel } from "@/lib/utils/exportVendedores";
 
 import styles from "./VendedoresPage.module.css";
 
@@ -545,6 +546,30 @@ export default function VendedoresPage({
               </div>
             )}
           </div>
+          <button
+            type="button"
+            className={styles.exportButton}
+            onClick={() => exportVendedoresToExcel(data, companyKey, range)}
+            disabled={loading || data.length === 0}
+            title="Exportar vendedores para Excel"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M8 2V11M8 11L5 8M8 11L11 8M2 14H14"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Exportar XLSX
+          </button>
           {error ? <span className={styles.error}>{error}</span> : null}
         </div>
       </div>

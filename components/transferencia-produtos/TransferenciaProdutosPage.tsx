@@ -235,7 +235,7 @@ async function executarTransferencia(
 }
 
 async function fetchLogSaidas(): Promise<TransferenciaLog[]> {
-  const response = await fetch("/api/transferencia-produtos/log-saidas?limit=50", {
+  const response = await fetch("/api/transferencia-produtos/log-saidas?limit=200", {
     cache: "no-store",
   });
 
@@ -248,7 +248,7 @@ async function fetchLogSaidas(): Promise<TransferenciaLog[]> {
 }
 
 async function fetchLogEntradas(): Promise<TransferenciaLog[]> {
-  const response = await fetch("/api/transferencia-produtos/log?limit=50", {
+  const response = await fetch("/api/transferencia-produtos/log?limit=200", {
     cache: "no-store",
   });
 
