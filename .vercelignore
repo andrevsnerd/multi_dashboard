@@ -1,0 +1,32 @@
+# Evitar upload de arquivos que não fazem parte do build Next.js
+# Reduz tamanho do deploy e evita que entrem no trace das Serverless Functions (limite 250 MB)
+
+# Dados e relatórios (em produção permissões vêm do Neon; xlsx/csv não são usados no build)
+data/*.xlsx
+data/*.csv
+data/investigacao*.xlsx
+data/log_*.xlsx
+data/estoque_*.xlsx
+relatorios/
+
+# Documentação e scripts locais
+docs/
+*.py
+*.bat
+*.ps1
+*.sh
+
+# Outros projetos no mesmo repo (não são parte do app Next)
+proxy-server/
+vm-setup/
+
+# Planilhas e CSVs na raiz (uso local)
+*.xlsx
+*.csv
+
+# Evitar duplicar o que já está no .gitignore
+.git
+.env*
+node_modules
+.next
+*.tsbuildinfo
