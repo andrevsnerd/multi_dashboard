@@ -2,23 +2,24 @@
 # Reduz tamanho do deploy e evita que entrem no trace das Serverless Functions (limite 250 MB)
 
 # Dados e relatórios (em produção permissões vêm do Neon; xlsx/csv não são usados no build)
+# Usar / no início = só na raiz do projeto (não ignora components/relatorios/)
 data/*.xlsx
 data/*.csv
 data/investigacao*.xlsx
 data/log_*.xlsx
 data/estoque_*.xlsx
-relatorios/
+/relatorios/
 
-# Documentação e scripts locais
-docs/
+# Documentação e scripts locais (só pastas na raiz)
+/docs/
 *.py
 *.bat
 *.ps1
 *.sh
 
-# Outros projetos no mesmo repo (não são parte do app Next)
-proxy-server/
-vm-setup/
+# Outros projetos no mesmo repo (só na raiz)
+/proxy-server/
+/vm-setup/
 
 # Planilhas e CSVs na raiz (uso local)
 *.xlsx
