@@ -4,20 +4,19 @@ const nextConfig: NextConfig = {
   transpilePackages: ["recharts"],
   // Reduzir tamanho das Serverless Functions (limite 250 MB descomprimido na Vercel)
   // Ver: https://vercel.com/docs/functions/troubleshooting/serverless-function-size
-  experimental: {
-    outputFileTracingExcludes: {
-      "*": [
-        "data/**",
-        "docs/**",
-        "relatorios/**",
-        "proxy-server/**",
-        "vm-setup/**",
-        "**/*.py",
-        "*.xlsx",
-        "*.csv",
-        "*.md",
-      ],
-    },
+  // Next.js 16+: outputFileTracingExcludes é de nível superior (não mais em experimental)
+  outputFileTracingExcludes: {
+    "*": [
+      "data/**",
+      "docs/**",
+      "relatorios/**",
+      "proxy-server/**",
+      "vm-setup/**",
+      "**/*.py",
+      "*.xlsx",
+      "*.csv",
+      "*.md",
+    ],
   },
   // Configuração do Turbopack (Next.js 16+)
   // Define o diretório raiz do workspace para evitar avisos sobre múltiplos lockfiles
