@@ -229,7 +229,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
       
       <aside className={`${styles.sidebar} ${isOpen ? styles.sidebarOpen : styles.sidebarClosed}`}>
         <div className={styles.logo}>
-          <strong className={styles.logoText}>{companyName}</strong>
+          <strong className={`${styles.logoText} ${companyName === "SCARF ME" ? styles.logoTextScarfme : ""}`}>{companyName}</strong>
         </div>
         <nav className={styles.nav}>
           {navItems.map((item) => {
