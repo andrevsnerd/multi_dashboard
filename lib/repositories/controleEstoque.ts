@@ -393,6 +393,8 @@ export interface ControleEstoqueParams {
   grades?: string[] | null;
   /** Quando true, estoque e custo do card consideram só produtos que venderam no período (range) */
   filtrarEstoquePorGiro?: boolean;
+  /** Faixa de giro em dias (30, 60, 90, …). Quando > 30, exclui produtos que venderam em [0, diasInicio] (faixas disjuntas). */
+  giroDias?: number;
 }
 
 /** Faixas de giro em dias; cada uma é uma janela exclusiva (não sobrepõe a outra). */
@@ -441,12 +443,14 @@ export async function fetchCategoriasComGiro({
 
     request.input('giroDiasInicio', sql.Int, diasInicio);
     request.input('giroDiasFim', sql.Int, diasFim);
+    request.input('giroDiasInicioMenos1', sql.Int, Math.max(0, diasInicio - 1));
 
-    // Janela exclusiva: só vendas entre (hoje - diasFim) e (hoje - diasInicio)
+    // Janela exclusiva: 30 = [0,30] dias atrás, 60 = [30,60], 90 = [60,90] etc (inclusive).
+    // 30: >= hoje-30 e < amanhã 00:00. Demais: >= hoje-diasFim e < hoje-(diasInicio-1) 00:00 (inclui o dia "diasInicio atrás").
     const condicaoDataVenda =
       diasInicio === 0
-        ? `AND vg.DATA_VENDA >= DATEADD(DAY, -@giroDiasFim, CAST(GETDATE() AS DATE))`
-        : `AND vg.DATA_VENDA >= DATEADD(DAY, -@giroDiasFim, CAST(GETDATE() AS DATE)) AND vg.DATA_VENDA < DATEADD(DAY, -@giroDiasInicio, CAST(GETDATE() AS DATE))`;
+        ? `AND vg.DATA_VENDA >= DATEADD(DAY, -@giroDiasFim, CAST(GETDATE() AS DATE)) AND vg.DATA_VENDA < DATEADD(DAY, 1, CAST(GETDATE() AS DATE))`
+        : `AND vg.DATA_VENDA >= DATEADD(DAY, -@giroDiasFim, CAST(GETDATE() AS DATE)) AND vg.DATA_VENDA < DATEADD(DAY, -@giroDiasInicioMenos1, CAST(GETDATE() AS DATE))`;
 
     const giroQuery = `
       SELECT DISTINCT
@@ -478,6 +482,16 @@ export async function fetchCategoriasComGiro({
             ${condicaoDataVenda}
             ${vendasFilialFilter}
         )
+        ${diasInicio > 0 ? `
+        AND NOT EXISTS (
+          SELECT 1
+          FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vgExcl WITH (NOLOCK)
+          WHERE vgExcl.PRODUTO = e.PRODUTO
+            AND vgExcl.QTDE > 0
+            AND vgExcl.DATA_VENDA >= DATEADD(DAY, -@giroDiasInicio, CAST(GETDATE() AS DATE))
+            AND vgExcl.DATA_VENDA < DATEADD(DAY, 1, CAST(GETDATE() AS DATE))
+            ${vendasFilialFilter.replace(/vg\./g, 'vgExcl.')}
+        )` : ''}
     `;
 
     const result = await request.query<{
@@ -492,17 +506,6 @@ export async function fetchCategoriasComGiro({
     result.recordset.forEach(row => {
       const chave = `${row.categoria?.trim() || ''}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
       chaves.add(chave);
-    });
-
-    // Debug giro: janela e quantidade retornada (remover em prod se incomodar)
-    const amostra = Array.from(chaves).slice(0, 3);
-    console.log('[DEBUG GIRO backend]', {
-      diasGiro,
-      diasInicio,
-      diasFim,
-      janela: diasInicio === 0 ? `0-${diasFim} dias atrás` : `${diasInicio}-${diasFim} dias atrás`,
-      chavesCount: chaves.size,
-      amostraChaves: amostra,
     });
 
     return chaves;
@@ -1096,9 +1099,12 @@ export async function fetchEstoquePorCategoria({
   subgrupos,
   grades,
   filtrarEstoquePorGiro = false,
+  giroDias,
 }: ControleEstoqueParams): Promise<CategoriaEstoque[]> {
   return withRequest(async (request) => {
     const now = new Date();
+    const idxGiro = typeof giroDias === 'number' ? GIRO_BUCKETS.indexOf(giroDias as (typeof GIRO_BUCKETS)[number]) : -1;
+    const diasInicioGiro = idxGiro > 0 ? GIRO_BUCKETS[idxGiro - 1] : 0;
     const currentYear = now.getFullYear();
     const currentMonthNum = now.getMonth() + 1; // 1-12
     const currentMonth = {
@@ -1162,7 +1168,11 @@ export async function fetchEstoquePorCategoria({
     const camposVendasAdicionais = camposAdicionais;
     const groupByVendasAdicional = groupByAdicional;
 
-    // Quando giro ativo: só somar estoque de produtos que venderam no período (card = resultado final)
+    // Quando giro ativo: só somar estoque de produtos que venderam no período (card = resultado final).
+    // Faixas disjuntas: se giroDias > 30 (ex.: 60), excluir produtos que venderam em [0, diasInicio] para não duplicar.
+    if (filtrarEstoquePorGiro && diasInicioGiro > 0) {
+      request.input('giroExcluirDias', sql.Int, diasInicioGiro);
+    }
     const filtroGiroEstoque =
       filtrarEstoquePorGiro && vendasGlobaisFilter
         ? ` AND EXISTS (
@@ -1172,7 +1182,16 @@ export async function fetchEstoquePorCategoria({
               AND vp.DATA_VENDA < @periodoEnd
               AND vp.QTDE > 0
               ${vendasGlobaisFilter}
-          )`
+          )
+          ${diasInicioGiro > 0 ? `
+          AND NOT EXISTS (
+            SELECT 1 FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vpExcl WITH (NOLOCK)
+            WHERE vpExcl.PRODUTO = e.PRODUTO
+              AND vpExcl.QTDE > 0
+              AND vpExcl.DATA_VENDA >= DATEADD(DAY, -@giroExcluirDias, CAST(GETDATE() AS DATE))
+              AND vpExcl.DATA_VENDA < DATEADD(DAY, 1, CAST(GETDATE() AS DATE))
+              ${vendasGlobaisFilter.replace(/vp\./g, 'vpExcl.')}
+          )` : ''}`
         : '';
 
     const estoqueQuery = `
@@ -3592,6 +3611,8 @@ export interface ProdutoDetalhesParams {
   startDate?: Date;
   endDate?: Date;
   filtrarApenasComVendas?: boolean;
+  /** Faixa de giro em dias (30, 60, 90, …). Quando > 30, exclui produtos que venderam em [0, diasInicio] (faixas disjuntas). */
+  giroDias?: number;
 }
 
 /**
@@ -3609,9 +3630,12 @@ export async function fetchProdutoDetalhes({
   startDate: startDateParam,
   endDate: endDateParam,
   filtrarApenasComVendas = false,
+  giroDias: giroDiasParam,
 }: ProdutoDetalhesParams): Promise<ProdutoDetalhesCompleto> {
   return withRequest(async (request) => {
     const now = new Date();
+    const idxGiroDetalhe = typeof giroDiasParam === 'number' ? GIRO_BUCKETS.indexOf(giroDiasParam as (typeof GIRO_BUCKETS)[number]) : -1;
+    const diasInicioGiroDetalhe = idxGiroDetalhe > 0 ? GIRO_BUCKETS[idxGiroDetalhe - 1] : 0;
     const currentMonth = {
       start: new Date(now.getFullYear(), now.getMonth(), 1),
       end: new Date(now.getFullYear(), now.getMonth() + 1, 1),
@@ -3680,7 +3704,8 @@ export async function fetchProdutoDetalhes({
 
     const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
 
-    // Detalhe por categoria + giro: usar a MESMA regra do card (EXISTS na query de estoque). Uma única lógica.
+    // Detalhe por categoria + giro: MESMA regra do card (EXISTS no período + NOT EXISTS no período mais recente = faixas disjuntas).
+    // Janela de exclusão em parâmetros (periodoExcluirStart/End) para plano de execução estável.
     const detalheCategoriaComGiro = (filtrarApenasComVendas || (startDateParam != null && endDateParam != null)) && company === 'nerd' && grupo && !subgrupo && !grade && !colecao;
     let filtroGiroNaQueryDetalhe = '';
     if (detalheCategoriaComGiro && company) {
@@ -3694,6 +3719,16 @@ export async function fetchProdutoDetalhes({
           const arr = Array.from(todasFiliaisVenda);
           arr.forEach((f, i) => request.input(`varGiroFilial${i}`, sql.VarChar, f));
           const ph = arr.map((_, i) => `@varGiroFilial${i}`).join(', ');
+          if (diasInicioGiroDetalhe > 0) {
+            const periodoExcluirStart = new Date(now);
+            periodoExcluirStart.setUTCDate(periodoExcluirStart.getUTCDate() - diasInicioGiroDetalhe);
+            periodoExcluirStart.setUTCHours(0, 0, 0, 0);
+            const periodoExcluirEnd = new Date(now);
+            periodoExcluirEnd.setUTCDate(periodoExcluirEnd.getUTCDate() + 1);
+            periodoExcluirEnd.setUTCHours(0, 0, 0, 0);
+            request.input('periodoExcluirStartDetalhe', sql.DateTime, periodoExcluirStart);
+            request.input('periodoExcluirEndDetalhe', sql.DateTime, periodoExcluirEnd);
+          }
           filtroGiroNaQueryDetalhe = ` AND EXISTS (
             SELECT 1 FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
             WHERE vp.PRODUTO = e.PRODUTO
@@ -3701,7 +3736,16 @@ export async function fetchProdutoDetalhes({
               AND vp.DATA_VENDA < @endDate
               AND vp.QTDE > 0
               AND vp.FILIAL IN (${ph})
-          )`;
+          )
+          ${diasInicioGiroDetalhe > 0 ? `
+          AND NOT EXISTS (
+            SELECT 1 FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vpExcl WITH (NOLOCK)
+            WHERE vpExcl.PRODUTO = e.PRODUTO
+              AND vpExcl.QTDE > 0
+              AND vpExcl.DATA_VENDA >= @periodoExcluirStartDetalhe
+              AND vpExcl.DATA_VENDA < @periodoExcluirEndDetalhe
+              AND vpExcl.FILIAL IN (${ph})
+          )` : ''}`;
         }
       }
     }

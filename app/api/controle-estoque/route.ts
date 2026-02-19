@@ -50,6 +50,8 @@ export async function GET(request: Request) {
       }
       case 'categorias': {
         const filtrarEstoquePorGiro = searchParams.get('filtrarEstoquePorGiro') === '1' || searchParams.get('filtrarEstoquePorGiro') === 'true';
+        const giroDiasParam = searchParams.get('giroDias');
+        const giroDias = giroDiasParam ? parseInt(giroDiasParam, 10) : undefined;
         const categorias = await fetchEstoquePorCategoria({
           company,
           filial,
@@ -57,6 +59,7 @@ export async function GET(request: Request) {
           periodType,
           ...filters,
           filtrarEstoquePorGiro,
+          giroDias: Number.isFinite(giroDias) ? giroDias : undefined,
         });
         return NextResponse.json({ data: categorias });
       }

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 
 import PageLayout from "@/components/layout/PageLayout";
@@ -18,7 +19,9 @@ export default async function EstoqueDetalhado01PageRoute({ params }: CompanyPag
 
   return (
     <PageLayout companyName={company.name}>
-      <EstoqueDetalhado01Page companyKey={company.key} companyName={company.name} />
+      <Suspense fallback={<div style={{ padding: "1rem", textAlign: "center" }}>Carregando...</div>}>
+        <EstoqueDetalhado01Page companyKey={company.key} companyName={company.name} />
+      </Suspense>
     </PageLayout>
   );
 }

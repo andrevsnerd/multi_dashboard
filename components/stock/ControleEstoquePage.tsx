@@ -129,7 +129,8 @@ async function fetchCategorias(
   colecoes: string[],
   subgrupos: string[],
   grades: string[],
-  filtrarEstoquePorGiro?: boolean
+  filtrarEstoquePorGiro?: boolean,
+  giroDias?: number
 ): Promise<CategoriaEstoque[]> {
   const searchParams = new URLSearchParams({
     company,
@@ -144,6 +145,9 @@ async function fetchCategorias(
   }
   if (filtrarEstoquePorGiro) {
     searchParams.set("filtrarEstoquePorGiro", "1");
+  }
+  if (typeof giroDias === "number" && Number.isFinite(giroDias)) {
+    searchParams.set("giroDias", String(giroDias));
   }
   grupos.forEach(g => searchParams.append("grupos", g));
   linhas.forEach(l => searchParams.append("linhas", l));
@@ -378,9 +382,9 @@ export default function ControleEstoquePage({
 
     rangeBeforeGiroRef.current = range;
     const hoje = new Date();
-    const startDate = new Date(hoje);
+    const startDate = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
     startDate.setDate(startDate.getDate() - diasFim);
-    const endDate = new Date(hoje);
+    const endDate = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
     endDate.setDate(endDate.getDate() - diasInicio);
     setRange({ startDate, endDate });
   }, [selectedGiro]); // eslint-disable-line react-hooks/exhaustive-deps -- só reagir à mudança de giro, não ao range
@@ -1174,7 +1178,7 @@ export default function ControleEstoquePage({
       try {
         const [kpisData, categoriasData, evolucaoData, vendasData, previsoesData] = await Promise.all([
           fetchKPIs(companyKey, selectedFilial, range, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades),
-          fetchCategorias(companyKey, selectedFilial, range, periodType, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, selectedGiro != null),
+          fetchCategorias(companyKey, selectedFilial, range, periodType, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, selectedGiro != null, selectedGiro != null ? parseInt(selectedGiro, 10) : undefined),
           fetchEvolucao(companyKey, selectedFilial, range, periodType, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades),
           fetchVendas(companyKey, selectedFilial, range, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades),
           fetchPrevisoes(companyKey, selectedFilial, range, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades),

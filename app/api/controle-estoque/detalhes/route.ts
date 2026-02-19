@@ -31,6 +31,8 @@ export async function GET(request: Request) {
     }
   }
 
+  const giroDiasNum = giroDias ? parseInt(giroDias, 10) : undefined;
+
   try {
     const detalhes = await fetchProdutoDetalhes({
       company,
@@ -44,13 +46,15 @@ export async function GET(request: Request) {
       startDate,
       endDate,
       filtrarApenasComVendas,
+      giroDias: Number.isFinite(giroDiasNum) ? giroDiasNum : undefined,
     });
 
     return NextResponse.json({ data: detalhes });
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Erro ao carregar detalhes do produto';
     console.error('Erro ao carregar detalhes do produto:', error);
     return NextResponse.json(
-      { error: 'Erro ao carregar detalhes do produto' },
+      { error: message },
       { status: 500 }
     );
   }
