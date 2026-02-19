@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { CompanyKey } from "@/lib/config/company";
+import { exportDetalhadoToXlsx } from "@/lib/utils/exportDetalhadoXlsx";
 
 import styles from "./EstoqueDetalhado02Page.module.css";
 
@@ -336,6 +337,28 @@ export default function EstoqueDetalhado02Page({
           ← Voltar
         </button>
         <h1 className={styles.title}>Detalhes: {detalhes.nomeProduto}</h1>
+        <button
+          type="button"
+          onClick={() => {
+            const columns = ["DESCRIÇÃO", "COR", "FILIAL", "ESTOQUE", "PREÇO", "CUSTO UNIT.", "CUSTO TOTAL", "VENDAS TOTAIS"];
+            const rows = sortedVariacoes.map((v) => [
+              v.descricao,
+              v.cor,
+              v.filial,
+              v.estoque,
+              v.preco ?? 0,
+              v.custoUnitario,
+              v.custoTotal,
+              v.vendasTotais,
+            ]);
+            const safeName = (detalhes.nomeProduto || "por-filial").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
+            exportDetalhadoToXlsx(columns, rows, `detalhado-por-filial-${safeName}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+          }}
+          className={styles.backButton}
+          style={{ marginLeft: "auto" }}
+        >
+          Exportar XLSX
+        </button>
       </div>
 
       {/* Cabeçalho com informações do produto */}
