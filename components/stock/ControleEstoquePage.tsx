@@ -292,7 +292,7 @@ async function fetchGiroCategories(
   colecoes: string[],
   subgrupos: string[],
   grades: string[]
-): Promise<string[]> {
+): Promise<{ chaves: string[]; produtosPorChave: Record<string, string[]> }> {
   const searchParams = new URLSearchParams({
     company,
     dataType: "giro",
@@ -316,8 +316,11 @@ async function fetchGiroCategories(
     throw new Error("Erro ao carregar filtro de giro");
   }
 
-  const json = (await response.json()) as { data: string[] };
-  return json.data;
+  const json = (await response.json()) as { data: string[]; produtosPorChave?: Record<string, string[]> };
+  return {
+    chaves: json.data ?? [],
+    produtosPorChave: json.produtosPorChave ?? {},
+  };
 }
 
 function formatCurrency(value: number): string {
@@ -361,6 +364,7 @@ export default function ControleEstoquePage({
   const [periodType, setPeriodType] = useState<"semanal" | "mensal">("semanal");
   const [selectedGiro, setSelectedGiro] = useState<string | null>(null);
   const [giroCategoriasPermitidas, setGiroCategoriasPermitidas] = useState<Set<string> | null>(null);
+  const [giroProdutosPorChave, setGiroProdutosPorChave] = useState<Record<string, string[]> | null>(null);
   const [loadingGiro, setLoadingGiro] = useState(false);
 
   // Faixas de giro (mesma ordem do backend): cada uma = janela exclusiva em dias atrás
@@ -1176,18 +1180,19 @@ export default function ControleEstoquePage({
   useEffect(() => {
     if (!selectedGiro) {
       setGiroCategoriasPermitidas(null);
+      setGiroProdutosPorChave(null);
       return;
     }
 
-    // Limpar set antigo ao trocar de faixa (30 → 300 etc.) para não filtrar com dados errados
     setGiroCategoriasPermitidas(null);
+    setGiroProdutosPorChave(null);
     let active = true;
     setLoadingGiro(true);
 
     async function loadGiro() {
       try {
         const diasGiro = parseInt(selectedGiro!, 10);
-        const chaves = await fetchGiroCategories(
+        const { chaves, produtosPorChave } = await fetchGiroCategories(
           companyKey,
           selectedFilial,
           diasGiro,
@@ -1199,10 +1204,20 @@ export default function ControleEstoquePage({
         );
         if (active) {
           setGiroCategoriasPermitidas(new Set(chaves));
+          setGiroProdutosPorChave(produtosPorChave);
+          try {
+            sessionStorage.setItem(
+              `giroProdutosPorChave_${companyKey}_${selectedGiro}`,
+              JSON.stringify(produtosPorChave)
+            );
+          } catch {
+            // sessionStorage pode falhar (privado, quota)
+          }
         }
       } catch (err) {
         if (active) {
           setGiroCategoriasPermitidas(null);
+          setGiroProdutosPorChave(null);
         }
       } finally {
         if (active) {

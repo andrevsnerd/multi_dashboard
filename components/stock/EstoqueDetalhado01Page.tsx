@@ -122,6 +122,56 @@ async function fetchDetalhes(
   return json.data;
 }
 
+/** POST com produtosPermitidos (do sessionStorage do giro) → resposta rápida. */
+async function fetchDetalhesPost(
+  company: string,
+  filial: string | null,
+  produtosPermitidos: string[],
+  params: {
+    grupo?: string;
+    linha?: string;
+    subgrupo?: string;
+    grade?: string;
+    colecao?: string;
+    start?: string;
+    end?: string;
+    giroDias?: string;
+  }
+): Promise<ProdutoDetalhesCompleto> {
+  const body: Record<string, unknown> = {
+    company,
+    filial,
+    produtosPermitidos,
+    grupo: params.grupo,
+    linha: params.linha,
+    subgrupo: params.subgrupo,
+    grade: params.grade,
+    colecao: params.colecao,
+    start: params.start,
+    end: params.end,
+    giroDias: params.giroDias,
+  };
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  const response = await fetch("/api/controle-estoque/detalhes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timeoutId));
+
+  if (!response.ok) {
+    const resBody = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(resBody?.error || `Erro ao carregar detalhes (${response.status})`);
+  }
+
+  const json = (await response.json()) as { data: ProdutoDetalhesCompleto };
+  return json.data;
+}
+
 export default function EstoqueDetalhado01Page({
   companyKey,
   companyName,
@@ -179,19 +229,86 @@ export default function EstoqueDetalhado01Page({
       setError(null);
 
       try {
-        const data = await fetchDetalhes(
-          companyKey,
-          filial,
-          produtoNome,
-          linha,
-          grupo,
-          subgrupo,
-          grade,
-          colecao,
-          start,
-          end,
-          giroDias
-        );
+        let data: ProdutoDetalhesCompleto;
+
+        const useGiroPost =
+          giroDias &&
+          start &&
+          end &&
+          grupo &&
+          !produtoNome &&
+          (companyKey === "nerd" ? true : !!linha);
+
+        if (useGiroPost) {
+          try {
+            const raw = sessionStorage.getItem(`giroProdutosPorChave_${companyKey}_${giroDias}`);
+            const produtosPorChave = raw ? (JSON.parse(raw) as Record<string, string[]>) : null;
+            const chave = [
+              grupo ?? "",
+              companyKey === "nerd" ? "" : (linha ?? ""),
+              subgrupo ?? "",
+              grade ?? "",
+              colecao ?? "",
+            ]
+              .map((s) => String(s).trim())
+              .join("|");
+            const produtosPermitidos = produtosPorChave?.[chave];
+            if (Array.isArray(produtosPermitidos) && produtosPermitidos.length > 0) {
+              data = await fetchDetalhesPost(companyKey, filial, produtosPermitidos, {
+                grupo,
+                linha,
+                subgrupo,
+                grade,
+                colecao,
+                start,
+                end,
+                giroDias,
+              });
+            } else {
+              data = await fetchDetalhes(
+                companyKey,
+                filial,
+                produtoNome,
+                linha,
+                grupo,
+                subgrupo,
+                grade,
+                colecao,
+                start,
+                end,
+                giroDias
+              );
+            }
+          } catch {
+            data = await fetchDetalhes(
+              companyKey,
+              filial,
+              produtoNome,
+              linha,
+              grupo,
+              subgrupo,
+              grade,
+              colecao,
+              start,
+              end,
+              giroDias
+            );
+          }
+        } else {
+          data = await fetchDetalhes(
+            companyKey,
+            filial,
+            produtoNome,
+            linha,
+            grupo,
+            subgrupo,
+            grade,
+            colecao,
+            start,
+            end,
+            giroDias
+          );
+        }
 
         if (active) {
           setDetalhes(data);

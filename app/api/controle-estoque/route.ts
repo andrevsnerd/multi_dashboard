@@ -185,13 +185,21 @@ export async function GET(request: Request) {
             { status: 400 }
           );
         }
-        const chaves = await fetchCategoriasComGiro({
+        const { chaves, produtosPorChave } = await fetchCategoriasComGiro({
           company,
           filial,
           ...filters,
           diasGiro,
         });
-        return NextResponse.json({ data: Array.from(chaves) });
+        // Converter Map para objeto JSON serializável
+        const produtosPorChaveObj: Record<string, string[]> = {};
+        produtosPorChave.forEach((produtos, chave) => {
+          produtosPorChaveObj[chave] = produtos;
+        });
+        return NextResponse.json({
+          data: Array.from(chaves),
+          produtosPorChave: produtosPorChaveObj,
+        });
       }
       default:
         return NextResponse.json(

@@ -36,3 +36,41 @@ export async function GET(request: Request) {
     );
   }
 }
+
+/** POST: recebe produtosPermitidos no body (do cache do giro) → resposta rápida com WHERE IN. */
+export async function POST(request: Request) {
+  try {
+    const body = await request.json().catch(() => ({}));
+    const company = body.company ?? undefined;
+    const filial = body.filial ?? null;
+    const produtoNome = body.produtoNome ?? undefined;
+    const linha = body.linha ?? undefined;
+    const grupo = body.grupo ?? undefined;
+    const subgrupo = body.subgrupo ?? undefined;
+    const grade = body.grade ?? undefined;
+    const colecao = body.colecao ?? undefined;
+    const cor = body.cor ?? undefined;
+    const produtosPermitidos = Array.isArray(body.produtosPermitidos) ? body.produtosPermitidos : undefined;
+
+    const detalhes = await fetchProdutoDetalhesPorFilial({
+      company,
+      filial,
+      produtoNome,
+      linha,
+      grupo,
+      subgrupo,
+      grade,
+      colecao,
+      cor,
+      produtosPermitidos,
+    });
+
+    return NextResponse.json({ data: detalhes });
+  } catch (error) {
+    console.error('Erro ao carregar detalhes do produto por filial (POST):', error);
+    return NextResponse.json(
+      { error: 'Erro ao carregar detalhes do produto por filial' },
+      { status: 500 }
+    );
+  }
+}

@@ -403,16 +403,18 @@ const GIRO_BUCKETS = [30, 60, 90, 120, 150, 300] as const;
 /** Dias para considerar "obsoleto": sem venda nos últimos 300 dias. */
 const GIRO_OBSOLETO_DIAS = 300;
 
+export interface FetchCategoriasComGiroResult {
+  chaves: Set<string>;
+  produtosPorChave: Map<string, string[]>;
+  todosProdutos: Set<string>;
+}
+
 /**
  * Busca categorias com produtos em estoque que venderam na faixa de giro selecionada.
  * diasGiro = 0 → faixa OBSOLETO: produtos que NÃO venderam nos últimos 300 dias.
  * Caso contrário, janelas EXCLUSIVAS: 30, 60, 90, 120, 150, 300 dias.
- * Retorna Set de chaves "categoria|linha|subgrupo|grade|colecao".
- *
- * OTIMIZAÇÃO: Em vez de EXISTS/NOT EXISTS correlacionados (1 seek por produto × N produtos),
- * usa CTE que pré-calcula MAX(DATA_VENDA) por PRODUTO uma única vez, e depois faz JOIN.
- * Isso reduz de O(N × seek) para O(1 scan + 1 hash join), especialmente eficaz
- * para faixas largas (90d, 120d, 300d, OBSOLETO) onde o range scan era muito grande.
+ * Retorna chaves, produtosPorChave (chave -> códigos de produto) e todosProdutos (para detalhado rápido).
+ * Usa cache em memória (TTL 5min) para evitar re-executar a CTE com os mesmos parâmetros.
  */
 export async function fetchCategoriasComGiro({
   company,
@@ -423,7 +425,26 @@ export async function fetchCategoriasComGiro({
   subgrupos,
   grades,
   diasGiro,
-}: ControleEstoqueParams & { diasGiro: number }): Promise<Set<string>> {
+}: ControleEstoqueParams & { diasGiro: number }): Promise<FetchCategoriasComGiroResult> {
+  const { getGiroCache, setGiroCache } = await import('@/lib/repositories/giroCache');
+  const cached = getGiroCache({
+    company,
+    filial,
+    grupos: grupos ?? undefined,
+    linhas: linhas ?? undefined,
+    colecoes: colecoes ?? undefined,
+    subgrupos: subgrupos ?? undefined,
+    grades: grades ?? undefined,
+    diasGiro,
+  });
+  if (cached) {
+    return {
+      chaves: cached.chaves,
+      produtosPorChave: cached.produtosPorChave,
+      todosProdutos: cached.todosProdutos,
+    };
+  }
+
   return withRequest(async (request) => {
     const isObsoleto = diasGiro === 0;
 
@@ -461,6 +482,7 @@ export async function fetchCategoriasComGiro({
         GROUP BY vg.PRODUTO
       )
       SELECT DISTINCT
+        e.PRODUTO AS produto,
         ${categoriaField} AS categoria,
         ISNULL(p.LINHA, '') AS linha,
         ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
@@ -510,6 +532,7 @@ export async function fetchCategoriasComGiro({
         GROUP BY vg.PRODUTO
       )
       SELECT DISTINCT
+        e.PRODUTO AS produto,
         ${categoriaField} AS categoria,
         ISNULL(p.LINHA, '') AS linha,
         ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
@@ -541,6 +564,7 @@ export async function fetchCategoriasComGiro({
     }
 
     const result = await request.query<{
+      produto: string;
       categoria: string;
       linha: string;
       subgrupo: string;
@@ -549,12 +573,27 @@ export async function fetchCategoriasComGiro({
     }>(giroQuery);
 
     const chaves = new Set<string>();
+    const produtosPorChave = new Map<string, string[]>();
+    const todosProdutos = new Set<string>();
+
     result.recordset.forEach(row => {
       const chave = `${row.categoria?.trim() || ''}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
       chaves.add(chave);
+      const produto = (row.produto ?? '').toString().trim();
+      if (produto) {
+        todosProdutos.add(produto);
+        const list = produtosPorChave.get(chave) ?? [];
+        if (!list.includes(produto)) list.push(produto);
+        produtosPorChave.set(chave, list);
+      }
     });
 
-    return chaves;
+    setGiroCache(
+      { company, filial, grupos, linhas, colecoes, subgrupos, grades, diasGiro },
+      { chaves, produtosPorChave, todosProdutos }
+    );
+
+    return { chaves, produtosPorChave, todosProdutos };
   });
 }
 
@@ -3590,6 +3629,8 @@ export interface ProdutoDetalhesParams {
   filtrarApenasComVendas?: boolean;
   /** Faixa de giro em dias (30, 60, 90, …). Quando > 30, exclui produtos que venderam em [0, diasInicio] (faixas disjuntas). */
   giroDias?: number;
+  /** Quando presente (ex: do cache/sessionStorage do giro), filtra por estes códigos e pula toda a lógica de giro (CTE/EXISTS/NOT EXISTS). */
+  produtosPermitidos?: string[];
 }
 
 /**
@@ -3608,8 +3649,10 @@ export async function fetchProdutoDetalhes({
   endDate: endDateParam,
   filtrarApenasComVendas = false,
   giroDias: giroDiasParam,
+  produtosPermitidos: produtosPermitidosParam,
 }: ProdutoDetalhesParams): Promise<ProdutoDetalhesCompleto> {
   return withRequest(async (request) => {
+    const useProdutosPermitidos = Array.isArray(produtosPermitidosParam) && produtosPermitidosParam.length > 0;
     const now = new Date();
     const idxGiroDetalhe = typeof giroDiasParam === 'number' ? GIRO_BUCKETS.indexOf(giroDiasParam as (typeof GIRO_BUCKETS)[number]) : -1;
     const diasInicioGiroDetalhe = idxGiroDetalhe > 0 ? GIRO_BUCKETS[idxGiroDetalhe - 1] : 0;
@@ -3681,10 +3724,27 @@ export async function fetchProdutoDetalhes({
 
     const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
 
+    // Quando produtosPermitidos vem do cache/sessionStorage do giro: filtra por IN (...) e pula toda a lógica de giro.
+    let produtoFilterPermitidos = '';
+    if (useProdutosPermitidos && produtosPermitidosParam) {
+      const list = produtosPermitidosParam.slice(0, 2000).map((p, i) => {
+        request.input(`perm${i}`, sql.VarChar, String(p).trim());
+        return `@perm${i}`;
+      });
+      if (list.length > 0) {
+        produtoFilterPermitidos = ` AND e.PRODUTO IN (${list.join(', ')})`;
+      }
+    }
+
     // Detalhe por categoria + giro: MESMA regra do card. Obsoleto (giroDiasParam=0): só NOT EXISTS nos últimos 300 dias.
-    const detalheCategoriaComGiro = (filtrarApenasComVendas || (startDateParam != null && endDateParam != null)) && company === 'nerd' && grupo && !subgrupo && !grade && !colecao;
+    // Para faixas 60–300d: CTE "produtos que venderam na faixa" + INNER JOIN evita EXISTS por linha (muito mais rápido).
+    // Ignorado quando useProdutosPermitidos (detalhado usa lista do cache).
+    const detalheCategoriaComGiro = !useProdutosPermitidos && (filtrarApenasComVendas || (startDateParam != null && endDateParam != null)) && company === 'nerd' && grupo && !subgrupo && !grade && !colecao;
     const detalheGiroObsoleto = detalheCategoriaComGiro && giroDiasParam === 0;
     let filtroGiroNaQueryDetalhe = '';
+    let useCteGiroDetalhe = false;
+    let cteGiroDetalheSql = '';
+    let filtroGiroApenasNotExistsDetalhe = '';
     if (detalheCategoriaComGiro && company) {
       const companyConfig = resolveCompany(company);
       if (companyConfig) {
@@ -3717,6 +3777,33 @@ export async function fetchProdutoDetalhes({
               request.input('periodoExcluirStartDetalhe', sql.DateTime, periodoExcluirStart);
               request.input('periodoExcluirEndDetalhe', sql.DateTime, periodoExcluirEnd);
             }
+            useCteGiroDetalhe = true;
+            // Duas CTEs: (1) produtos que venderam na faixa [startDate,endDate]; (2) produtos que venderam no período a excluir [0, diasInicio].
+            // Anti-join com (2) em vez de NOT EXISTS por linha — uma varredura em vendas por período, sem subquery correlacionada.
+            const cteExcluir =
+              diasInicioGiroDetalhe > 0
+                ? `,
+      ProdutosVenderamPeriodoExcluir AS (
+        SELECT DISTINCT vp.PRODUTO
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        WHERE vp.QTDE > 0
+          AND vp.DATA_VENDA >= @periodoExcluirStartDetalhe
+          AND vp.DATA_VENDA < @periodoExcluirEndDetalhe
+          AND vp.FILIAL IN (${ph})
+      )`
+                : '';
+            cteGiroDetalheSql = `WITH ProdutosNaFaixaGiro AS (
+        SELECT DISTINCT vp.PRODUTO
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        WHERE vp.DATA_VENDA >= @startDate
+          AND vp.DATA_VENDA < @endDate
+          AND vp.QTDE > 0
+          AND vp.FILIAL IN (${ph})
+      )${cteExcluir}
+      `;
+            // Anti-join via LEFT JOIN ... WHERE ex.PRODUTO IS NULL (uma vez), em vez de NOT EXISTS por linha.
+            filtroGiroApenasNotExistsDetalhe =
+              diasInicioGiroDetalhe > 0 ? ` AND ex.PRODUTO IS NULL` : '';
             filtroGiroNaQueryDetalhe = ` AND EXISTS (
               SELECT 1 FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
               WHERE vp.PRODUTO = e.PRODUTO
@@ -3742,9 +3829,20 @@ export async function fetchProdutoDetalhes({
     const categoriaFieldDetalhe = company === 'nerd' ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')' : '';
     const excludeNerdDetalhe = company === 'nerd' ? buildCategoriaExcludeNerd(company, categoriaFieldDetalhe) : '';
 
-    // Buscar variações: quando detalhe por categoria + giro, a query já traz só itens com giro (mesmo EXISTS do card).
+    // Buscar variações: quando detalhe por categoria + giro, CTE(s) + JOIN. Faixas 60–300d: segunda CTE materializa
+    // "produtos que venderam no período a excluir" e anti-join (LEFT JOIN ex WHERE ex.PRODUTO IS NULL) — uma varredura, sem NOT EXISTS por linha.
+    const variacoesFromJoin = useCteGiroDetalhe
+      ? `FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      INNER JOIN ProdutosNaFaixaGiro g ON g.PRODUTO = e.PRODUTO
+      ${diasInicioGiroDetalhe > 0 ? 'LEFT JOIN ProdutosVenderamPeriodoExcluir ex ON ex.PRODUTO = e.PRODUTO' : ''}
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR`
+      : `FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR`;
+    const variacoesGiroFilter = useCteGiroDetalhe ? filtroGiroApenasNotExistsDetalhe : filtroGiroNaQueryDetalhe;
     const variacoesQuery = `
-      SELECT 
+      ${useCteGiroDetalhe ? cteGiroDetalheSql : ''}SELECT 
         e.PRODUTO AS produto,
         ISNULL(p.DESC_PRODUTO, '') AS descricao,
         ${company === 'nerd' ? 'ISNULL(p.GRUPO_PRODUTO, \'\') AS linha,' : 'ISNULL(p.LINHA, \'\') AS linha,'}
@@ -3756,17 +3854,15 @@ export async function fetchProdutoDetalhes({
         ISNULL(COALESCE(p.PRECO_REPOSICAO_1, p.PRECO_A_VISTA_REPOSICAO_1, p.REVENDA), 0) AS preco,
         ISNULL(p.CUSTO_REPOSICAO1, 0) AS custoUnitario,
         SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0) ELSE 0 END) AS custoTotal
-      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
-      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
-      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
+      ${variacoesFromJoin}
       WHERE 1=1
         ${estoqueFilialFilter}
-        ${produtoFilterEstoque}
+        ${useProdutosPermitidos ? produtoFilterPermitidos : produtoFilterEstoque}
         ${nerdOnlyEletronicosFilter}
         AND e.ESTOQUE > 0
         ${company === 'nerd' ? `AND ISNULL(p.GRUPO_PRODUTO, '') <> ''` : `AND ISNULL(p.LINHA, '') <> ''`}
         ${excludeNerdDetalhe}
-        ${filtroGiroNaQueryDetalhe}
+        ${variacoesGiroFilter}
       GROUP BY 
         e.PRODUTO,
         p.DESC_PRODUTO,
@@ -3936,8 +4032,10 @@ export async function fetchProdutoDetalhesPorFilial({
   grade,
   colecao,
   cor,
+  produtosPermitidos: produtosPermitidosParam,
 }: ProdutoDetalhesParams): Promise<ProdutoDetalhesCompletoPorFilial> {
   return withRequest(async (request) => {
+    const useProdutosPermitidos = Array.isArray(produtosPermitidosParam) && produtosPermitidosParam.length > 0;
     const now = new Date();
     const currentMonth = {
       start: new Date(now.getFullYear(), now.getMonth(), 1),
@@ -3988,6 +4086,17 @@ export async function fetchProdutoDetalhesPorFilial({
 
     const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
 
+    let produtoFilterPermitidosPorFilial = '';
+    if (useProdutosPermitidos && produtosPermitidosParam) {
+      const list = produtosPermitidosParam.slice(0, 2000).map((p, i) => {
+        request.input(`permFilial${i}`, sql.VarChar, String(p).trim());
+        return `@permFilial${i}`;
+      });
+      if (list.length > 0) {
+        produtoFilterPermitidosPorFilial = ` AND e.PRODUTO IN (${list.join(', ')})`;
+      }
+    }
+
     // Filtro de cor (se fornecido)
     let corFilter = '';
     if (cor) {
@@ -4017,7 +4126,7 @@ export async function fetchProdutoDetalhesPorFilial({
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
       WHERE 1=1
         ${estoqueFilialFilter}
-        ${produtoFilter}
+        ${useProdutosPermitidos ? produtoFilterPermitidosPorFilial : produtoFilter}
         ${corFilter}
         ${nerdOnlyEletronicosFilter}
         AND e.ESTOQUE > 0
