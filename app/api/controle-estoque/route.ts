@@ -10,6 +10,7 @@ import {
   fetchDetalhesVendasSemana,
   fetchDetalhesEcommerceSemana,
   fetchProjecaoMensal,
+  fetchCategoriasComGiro,
 } from '@/lib/repositories/controleEstoque';
 
 export async function GET(request: Request) {
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
   const company = searchParams.get('company') ?? undefined;
   const filial = searchParams.get('filial') || null;
   const periodType = (searchParams.get('periodType') as 'semanal' | 'mensal') || 'semanal';
-  const dataType = searchParams.get('dataType'); // 'kpis', 'categorias', 'evolucao', 'vendas', 'previsoes', 'detalhes-entradas'
+  const dataType = searchParams.get('dataType'); // 'kpis', 'categorias', 'evolucao', 'vendas', 'previsoes', 'detalhes-entradas', 'giro'
 
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
@@ -48,7 +49,15 @@ export async function GET(request: Request) {
         return NextResponse.json({ data: kpis });
       }
       case 'categorias': {
-        const categorias = await fetchEstoquePorCategoria({ company, filial, range, periodType, ...filters });
+        const filtrarEstoquePorGiro = searchParams.get('filtrarEstoquePorGiro') === '1' || searchParams.get('filtrarEstoquePorGiro') === 'true';
+        const categorias = await fetchEstoquePorCategoria({
+          company,
+          filial,
+          range,
+          periodType,
+          ...filters,
+          filtrarEstoquePorGiro,
+        });
         return NextResponse.json({ data: categorias });
       }
       case 'evolucao': {
@@ -164,9 +173,26 @@ export async function GET(request: Request) {
         });
         return NextResponse.json({ data: projecao });
       }
+      case 'giro': {
+        const diasGiroParam = searchParams.get('diasGiro');
+        const diasGiro = diasGiroParam ? parseInt(diasGiroParam, 10) : NaN;
+        if (!Number.isFinite(diasGiro) || diasGiro <= 0) {
+          return NextResponse.json(
+            { error: 'diasGiro é obrigatório e deve ser um número positivo' },
+            { status: 400 }
+          );
+        }
+        const chaves = await fetchCategoriasComGiro({
+          company,
+          filial,
+          ...filters,
+          diasGiro,
+        });
+        return NextResponse.json({ data: Array.from(chaves) });
+      }
       default:
         return NextResponse.json(
-          { error: 'Tipo de dados inválido. Use: kpis, categorias, evolucao, vendas, previsoes, detalhes-entradas, detalhes-vendas, detalhes-ecommerce ou projecao-mensal' },
+          { error: 'Tipo de dados inválido. Use: kpis, categorias, evolucao, vendas, previsoes, detalhes-entradas, detalhes-vendas, detalhes-ecommerce, projecao-mensal ou giro' },
           { status: 400 }
         );
     }

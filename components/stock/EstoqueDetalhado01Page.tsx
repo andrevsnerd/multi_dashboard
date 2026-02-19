@@ -62,7 +62,10 @@ async function fetchDetalhes(
   grupo?: string,
   subgrupo?: string,
   grade?: string,
-  colecao?: string
+  colecao?: string,
+  start?: string,
+  end?: string,
+  giroDias?: string
 ): Promise<ProdutoDetalhesCompleto> {
   const searchParams = new URLSearchParams({
     company,
@@ -96,6 +99,12 @@ async function fetchDetalhes(
     searchParams.set("colecao", colecao);
   }
 
+  if (giroDias && start && end) {
+    searchParams.set("giroDias", giroDias);
+    searchParams.set("start", start);
+    searchParams.set("end", end);
+  }
+
   const response = await fetch(`/api/controle-estoque/detalhes?${searchParams.toString()}`, {
     cache: "no-store",
   });
@@ -126,6 +135,7 @@ export default function EstoqueDetalhado01Page({
   }>({});
   const [sortColumn, setSortColumn] = useState<'estoque' | 'vendasTotais' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [giroAtivo, setGiroAtivo] = useState<string | null>(null);
 
   // Scroll para o topo quando o componente montar
   useEffect(() => {
@@ -137,20 +147,23 @@ export default function EstoqueDetalhado01Page({
     const params = new URLSearchParams(window.location.search);
     const produtoNome = params.get("produtoNome") || undefined;
     const linha = params.get("linha") || undefined;
-    const grupo = params.get("grupo") || undefined; // Para NERD
+    const grupo = params.get("grupo") || undefined;
     const subgrupo = params.get("subgrupo") || undefined;
     const grade = params.get("grade") || undefined;
     const colecao = params.get("colecao") || undefined;
     const filial = params.get("filial") || null;
+    const giroDias = params.get("giroDias") || undefined;
+    const start = params.get("start") || undefined;
+    const end = params.get("end") || undefined;
 
+    setGiroAtivo(giroDias && start && end ? giroDias : null);
     setSelectedFilial(filial);
-    // Para NERD, usar grupo; para SCARFME, usar linha
-    setFiltros({ 
-      linha: companyKey === 'nerd' ? undefined : linha, 
+    setFiltros({
+      linha: companyKey === 'nerd' ? undefined : linha,
       grupo: companyKey === 'nerd' ? grupo : undefined,
-      subgrupo, 
-      grade, 
-      colecao 
+      subgrupo,
+      grade,
+      colecao,
     });
 
     let active = true;
@@ -165,10 +178,13 @@ export default function EstoqueDetalhado01Page({
           filial,
           produtoNome,
           linha,
-          grupo, // Para NERD
+          grupo,
           subgrupo,
           grade,
-          colecao
+          colecao,
+          start,
+          end,
+          giroDias
         );
 
         if (active) {
@@ -375,6 +391,20 @@ export default function EstoqueDetalhado01Page({
         </button>
         <h1 className={styles.title}>Detalhes: {detalhes.nomeProduto}</h1>
       </div>
+
+      {giroAtivo && (
+        <div
+          style={{
+            padding: "8px 12px",
+            background: "var(--color-info-bg, #e8f4fd)",
+            borderRadius: "6px",
+            marginBottom: "12px",
+            fontSize: "0.85rem",
+          }}
+        >
+          Mostrando itens das combinações com vendas no período do giro ({giroAtivo} dias). Total igual ao card.
+        </div>
+      )}
 
       {/* Cabeçalho com informações do produto */}
       <div className={styles.infoHeader}>

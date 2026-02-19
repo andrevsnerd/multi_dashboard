@@ -391,6 +391,122 @@ export interface ControleEstoqueParams {
   colecoes?: string[] | null;
   subgrupos?: string[] | null;
   grades?: string[] | null;
+  /** Quando true, estoque e custo do card consideram só produtos que venderam no período (range) */
+  filtrarEstoquePorGiro?: boolean;
+}
+
+/** Faixas de giro em dias; cada uma é uma janela exclusiva (não sobrepõe a outra). */
+const GIRO_BUCKETS = [30, 60, 90, 120, 150, 300] as const;
+
+/**
+ * Busca categorias com produtos em estoque que venderam na faixa de giro selecionada.
+ * Cada opção é uma janela EXCLUSIVA (filtrativa):
+ * - 30 dias  → vendeu entre 0 e 30 dias atrás (ativos)
+ * - 60 dias  → vendeu entre 30 e 60 dias atrás (exclui últimos 30)
+ * - 90 dias  → vendeu entre 60 e 90 dias atrás
+ * - 120 dias → vendeu entre 90 e 120 dias atrás
+ * - 150 dias → vendeu entre 120 e 150 dias atrás
+ * - 300 dias → vendeu entre 150 e 300 dias atrás
+ * Quem levou 120 dias não aparece em 60; cada faixa é independente.
+ * Retorna Set de chaves "categoria|linha|subgrupo|grade|colecao".
+ */
+export async function fetchCategoriasComGiro({
+  company,
+  filial,
+  grupos,
+  linhas,
+  colecoes,
+  subgrupos,
+  grades,
+  diasGiro,
+}: ControleEstoqueParams & { diasGiro: number }): Promise<Set<string>> {
+  return withRequest(async (request) => {
+    const idx = GIRO_BUCKETS.indexOf(diasGiro as (typeof GIRO_BUCKETS)[number]);
+    const diasInicio = idx > 0 ? GIRO_BUCKETS[idx - 1] : 0;
+    const diasFim = idx >= 0 ? diasGiro : 30;
+
+    const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
+    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vg');
+    const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
+    const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
+    const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
+    const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
+    const gradeFilter = buildGradeFilter(request, company, grades, 'p');
+    const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineGiro');
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
+
+    const categoriaField = company === 'nerd'
+      ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
+      : 'ISNULL(p.LINHA, \'SEM LINHA\')';
+
+    request.input('giroDiasInicio', sql.Int, diasInicio);
+    request.input('giroDiasFim', sql.Int, diasFim);
+
+    // Janela exclusiva: só vendas entre (hoje - diasFim) e (hoje - diasInicio)
+    const condicaoDataVenda =
+      diasInicio === 0
+        ? `AND vg.DATA_VENDA >= DATEADD(DAY, -@giroDiasFim, CAST(GETDATE() AS DATE))`
+        : `AND vg.DATA_VENDA >= DATEADD(DAY, -@giroDiasFim, CAST(GETDATE() AS DATE)) AND vg.DATA_VENDA < DATEADD(DAY, -@giroDiasInicio, CAST(GETDATE() AS DATE))`;
+
+    const giroQuery = `
+      SELECT DISTINCT
+        ${categoriaField} AS categoria,
+        ISNULL(p.LINHA, '') AS linha,
+        ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
+        ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
+        ISNULL(p.COLECAO, '') AS colecao
+      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+      WHERE e.ESTOQUE > 0
+        ${estoqueFilialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
+        AND ${categoriaField} <> ''
+        AND ${categoriaField} <> 'SEM GRUPO'
+        AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
+        AND EXISTS (
+          SELECT 1
+          FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vg WITH (NOLOCK)
+          WHERE vg.PRODUTO = e.PRODUTO
+            AND vg.QTDE > 0
+            ${condicaoDataVenda}
+            ${vendasFilialFilter}
+        )
+    `;
+
+    const result = await request.query<{
+      categoria: string;
+      linha: string;
+      subgrupo: string;
+      grade: string;
+      colecao: string;
+    }>(giroQuery);
+
+    const chaves = new Set<string>();
+    result.recordset.forEach(row => {
+      const chave = `${row.categoria?.trim() || ''}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
+      chaves.add(chave);
+    });
+
+    // Debug giro: janela e quantidade retornada (remover em prod se incomodar)
+    const amostra = Array.from(chaves).slice(0, 3);
+    console.log('[DEBUG GIRO backend]', {
+      diasGiro,
+      diasInicio,
+      diasFim,
+      janela: diasInicio === 0 ? `0-${diasFim} dias atrás` : `${diasInicio}-${diasFim} dias atrás`,
+      chavesCount: chaves.size,
+      amostraChaves: amostra,
+    });
+
+    return chaves;
+  });
 }
 
 export interface EstoqueKPI {
@@ -979,6 +1095,7 @@ export async function fetchEstoquePorCategoria({
   colecoes,
   subgrupos,
   grades,
+  filtrarEstoquePorGiro = false,
 }: ControleEstoqueParams): Promise<CategoriaEstoque[]> {
   return withRequest(async (request) => {
     const now = new Date();
@@ -988,7 +1105,11 @@ export async function fetchEstoquePorCategoria({
       start: new Date(now.getFullYear(), now.getMonth(), 1),
       end: new Date(now.getFullYear(), now.getMonth() + 1, 1), // Início do próximo mês (exclusivo)
     };
-    
+
+    const { start: periodoStart, end: periodoEnd } = resolveRange(range);
+    request.input('periodoStart', sql.DateTime, periodoStart);
+    request.input('periodoEnd', sql.DateTime, periodoEnd);
+
     const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
     const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
     const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
@@ -998,9 +1119,6 @@ export async function fetchEstoquePorCategoria({
     const gradeFilter = buildGradeFilter(request, company, grades, 'p');
     const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineCategoria');
     const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
-
-    // RESOLVER PERÍODO: Usar o range selecionado pelo usuário em vez de forçar o mês atual
-    const { start: periodoStart, end: periodoEnd } = resolveRange(range);
 
     // ============================================
     // MUDANÇA CRÍTICA 2: Vendas SEM filtro de filial
@@ -1044,7 +1162,19 @@ export async function fetchEstoquePorCategoria({
     const camposVendasAdicionais = camposAdicionais;
     const groupByVendasAdicional = groupByAdicional;
 
-    // Estoque por categoria (com detalhes se necessário)
+    // Quando giro ativo: só somar estoque de produtos que venderam no período (card = resultado final)
+    const filtroGiroEstoque =
+      filtrarEstoquePorGiro && vendasGlobaisFilter
+        ? ` AND EXISTS (
+            SELECT 1 FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+            WHERE vp.PRODUTO = e.PRODUTO
+              AND vp.DATA_VENDA >= @periodoStart
+              AND vp.DATA_VENDA < @periodoEnd
+              AND vp.QTDE > 0
+              ${vendasGlobaisFilter}
+          )`
+        : '';
+
     const estoqueQuery = `
       SELECT 
         ${categoriaField} AS categoria
@@ -1067,6 +1197,7 @@ export async function fetchEstoquePorCategoria({
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
         ${buildCategoriaExcludeNerd(company, categoriaField)}
+        ${filtroGiroEstoque}
       GROUP BY ${categoriaField}${groupByAdicional}
       HAVING SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) > 0
     `;
@@ -1113,8 +1244,7 @@ export async function fetchEstoquePorCategoria({
       GROUP BY ${categoriaField}${groupByVendasAdicional}, YEAR(vp.DATA_VENDA), MONTH(vp.DATA_VENDA)
     `;
 
-    request.input('periodoStart', sql.DateTime, periodoStart);
-    request.input('periodoEnd', sql.DateTime, periodoEnd);
+    // periodoStart e periodoEnd já declarados no início da função
     request.input('currentMonthStart', sql.DateTime, currentMonth.start);
     request.input('hoje', sql.DateTime, hoje);
 
@@ -3451,13 +3581,17 @@ export interface ProdutoDetalhesCompleto {
 export interface ProdutoDetalhesParams {
   company?: string;
   filial?: string | null;
-  produtoNome?: string; // Nome do produto/linha (ex: "PASHMINA")
-  linha?: string; // Linha específica (SCARFME)
-  grupo?: string; // Grupo específico (NERD)
-  subgrupo?: string; // Subgrupo específico
-  grade?: string; // Grade específica
-  colecao?: string; // Coleção específica
-  cor?: string; // Cor específica
+  produtoNome?: string;
+  linha?: string;
+  grupo?: string;
+  subgrupo?: string;
+  grade?: string;
+  colecao?: string;
+  cor?: string;
+  /** Quando informado (ex: giro ativo), usa este período para vendas e retorna só variações que venderam no período */
+  startDate?: Date;
+  endDate?: Date;
+  filtrarApenasComVendas?: boolean;
 }
 
 /**
@@ -3472,6 +3606,9 @@ export async function fetchProdutoDetalhes({
   subgrupo,
   grade,
   colecao,
+  startDate: startDateParam,
+  endDate: endDateParam,
+  filtrarApenasComVendas = false,
 }: ProdutoDetalhesParams): Promise<ProdutoDetalhesCompleto> {
   return withRequest(async (request) => {
     const now = new Date();
@@ -3479,9 +3616,11 @@ export async function fetchProdutoDetalhes({
       start: new Date(now.getFullYear(), now.getMonth(), 1),
       end: new Date(now.getFullYear(), now.getMonth() + 1, 1),
     };
+    const startDate = startDateParam ?? currentMonth.start;
+    const endDate = endDateParam ?? currentMonth.end;
 
-    request.input('startDate', sql.DateTime, currentMonth.start);
-    request.input('endDate', sql.DateTime, currentMonth.end);
+    request.input('startDate', sql.DateTime, startDate);
+    request.input('endDate', sql.DateTime, endDate);
 
     const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
     const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
@@ -3541,7 +3680,36 @@ export async function fetchProdutoDetalhes({
 
     const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
 
-    // Buscar todas as variações do produto com estoque
+    // Detalhe por categoria + giro: usar a MESMA regra do card (EXISTS na query de estoque). Uma única lógica.
+    const detalheCategoriaComGiro = (filtrarApenasComVendas || (startDateParam != null && endDateParam != null)) && company === 'nerd' && grupo && !subgrupo && !grade && !colecao;
+    let filtroGiroNaQueryDetalhe = '';
+    if (detalheCategoriaComGiro && company) {
+      const companyConfig = resolveCompany(company);
+      if (companyConfig) {
+        const todasFiliaisVenda = new Set([
+          ...(companyConfig.filialFilters['sales'] ?? []),
+          ...(companyConfig.ecommerceFilials ?? []),
+        ]);
+        if (todasFiliaisVenda.size > 0) {
+          const arr = Array.from(todasFiliaisVenda);
+          arr.forEach((f, i) => request.input(`varGiroFilial${i}`, sql.VarChar, f));
+          const ph = arr.map((_, i) => `@varGiroFilial${i}`).join(', ');
+          filtroGiroNaQueryDetalhe = ` AND EXISTS (
+            SELECT 1 FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+            WHERE vp.PRODUTO = e.PRODUTO
+              AND vp.DATA_VENDA >= @startDate
+              AND vp.DATA_VENDA < @endDate
+              AND vp.QTDE > 0
+              AND vp.FILIAL IN (${ph})
+          )`;
+        }
+      }
+    }
+
+    const categoriaFieldDetalhe = company === 'nerd' ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')' : '';
+    const excludeNerdDetalhe = company === 'nerd' ? buildCategoriaExcludeNerd(company, categoriaFieldDetalhe) : '';
+
+    // Buscar variações: quando detalhe por categoria + giro, a query já traz só itens com giro (mesmo EXISTS do card).
     const variacoesQuery = `
       SELECT 
         e.PRODUTO AS produto,
@@ -3564,6 +3732,8 @@ export async function fetchProdutoDetalhes({
         ${nerdOnlyEletronicosFilter}
         AND e.ESTOQUE > 0
         ${company === 'nerd' ? `AND ISNULL(p.GRUPO_PRODUTO, '') <> ''` : `AND ISNULL(p.LINHA, '') <> ''`}
+        ${excludeNerdDetalhe}
+        ${filtroGiroNaQueryDetalhe}
       GROUP BY 
         e.PRODUTO,
         p.DESC_PRODUTO,
@@ -3628,7 +3798,7 @@ export async function fetchProdutoDetalhes({
       vendasMap.set(key, Math.round(Number(row.vendasTotais ?? 0)));
     });
 
-    const variacoes: ProdutoVariacaoDetalhes[] = variacoesResult.recordset.map((row) => {
+    let variacoes: ProdutoVariacaoDetalhes[] = variacoesResult.recordset.map((row) => {
       const key = `${row.produto?.trim() || ''}|${row.cor?.trim() || ''}`;
       const vendas = vendasMap.get(key) || 0;
 
@@ -3648,7 +3818,17 @@ export async function fetchProdutoDetalhes({
       };
     });
 
-    // Calcular resumo
+    // Giro ativo e NÃO é detalhe por categoria: filtrar em JS (só itens que venderam). Quando é detalhe por categoria, a query já aplicou o EXISTS.
+    if ((filtrarApenasComVendas || (startDateParam != null && endDateParam != null)) && !detalheCategoriaComGiro) {
+      const produtosComVenda = new Set<string>();
+      vendasResult.recordset.forEach((row) => {
+        const p = row.produto?.trim();
+        if (p) produtosComVenda.add(p);
+      });
+      variacoes = variacoes.filter((v) => produtosComVenda.has(v.produto));
+    }
+
+    // Resumo: sempre soma das variações (quando detalhe categoria+giro, a query já é a mesma do card, então o total bate).
     const totalItens = variacoes.length;
     const estoqueTotal = variacoes.reduce((sum, v) => sum + v.estoque, 0);
     const custoTotal = variacoes.reduce((sum, v) => sum + v.custoTotal, 0);

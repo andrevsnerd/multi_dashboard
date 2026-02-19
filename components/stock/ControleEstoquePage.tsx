@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -128,7 +128,8 @@ async function fetchCategorias(
   linhas: string[],
   colecoes: string[],
   subgrupos: string[],
-  grades: string[]
+  grades: string[],
+  filtrarEstoquePorGiro?: boolean
 ): Promise<CategoriaEstoque[]> {
   const searchParams = new URLSearchParams({
     company,
@@ -140,6 +141,9 @@ async function fetchCategorias(
 
   if (filial) {
     searchParams.set("filial", filial);
+  }
+  if (filtrarEstoquePorGiro) {
+    searchParams.set("filtrarEstoquePorGiro", "1");
   }
   grupos.forEach(g => searchParams.append("grupos", g));
   linhas.forEach(l => searchParams.append("linhas", l));
@@ -275,6 +279,43 @@ async function fetchPrevisoes(
   return json.data;
 }
 
+async function fetchGiroCategories(
+  company: string,
+  filial: string | null,
+  diasGiro: number,
+  grupos: string[],
+  linhas: string[],
+  colecoes: string[],
+  subgrupos: string[],
+  grades: string[]
+): Promise<string[]> {
+  const searchParams = new URLSearchParams({
+    company,
+    dataType: "giro",
+    diasGiro: String(diasGiro),
+  });
+
+  if (filial) {
+    searchParams.set("filial", filial);
+  }
+  grupos.forEach(g => searchParams.append("grupos", g));
+  linhas.forEach(l => searchParams.append("linhas", l));
+  colecoes.forEach(c => searchParams.append("colecoes", c));
+  subgrupos.forEach(s => searchParams.append("subgrupos", s));
+  grades.forEach(g => searchParams.append("grades", g));
+
+  const response = await fetch(`/api/controle-estoque?${searchParams.toString()}`, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("Erro ao carregar filtro de giro");
+  }
+
+  const json = (await response.json()) as { data: string[] };
+  return json.data;
+}
+
 function formatCurrency(value: number): string {
   return value.toLocaleString("pt-BR", {
     style: "currency",
@@ -306,6 +347,7 @@ export default function ControleEstoquePage({
   }, []);
 
   const [range, setRange] = useState<DateRangeValue>(initialRange);
+  const rangeBeforeGiroRef = useRef<DateRangeValue | null>(null);
   const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
   const [selectedGrupos, setSelectedGrupos] = useState<string[]>([]);
   const [selectedLinhas, setSelectedLinhas] = useState<string[]>([]);
@@ -313,6 +355,35 @@ export default function ControleEstoquePage({
   const [selectedSubgrupos, setSelectedSubgrupos] = useState<string[]>([]);
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
   const [periodType, setPeriodType] = useState<"semanal" | "mensal">("semanal");
+  const [selectedGiro, setSelectedGiro] = useState<string | null>(null);
+  const [giroCategoriasPermitidas, setGiroCategoriasPermitidas] = useState<Set<string> | null>(null);
+  const [loadingGiro, setLoadingGiro] = useState(false);
+
+  // Faixas de giro (mesma ordem do backend): cada uma = janela exclusiva em dias atrás
+  const GIRO_BUCKETS = useMemo(() => [30, 60, 90, 120, 150, 300] as const, []);
+
+  // Quando o giro é ativado: período do dashboard = janela do giro (só aparecem dados desse range)
+  useEffect(() => {
+    if (!selectedGiro) {
+      if (rangeBeforeGiroRef.current) {
+        setRange(rangeBeforeGiroRef.current);
+        rangeBeforeGiroRef.current = null;
+      }
+      return;
+    }
+    const diasGiro = parseInt(selectedGiro, 10);
+    const idx = GIRO_BUCKETS.indexOf(diasGiro as (typeof GIRO_BUCKETS)[number]);
+    const diasInicio = idx > 0 ? GIRO_BUCKETS[idx - 1] : 0;
+    const diasFim = idx >= 0 ? diasGiro : 30;
+
+    rangeBeforeGiroRef.current = range;
+    const hoje = new Date();
+    const startDate = new Date(hoje);
+    startDate.setDate(startDate.getDate() - diasFim);
+    const endDate = new Date(hoje);
+    endDate.setDate(endDate.getDate() - diasInicio);
+    setRange({ startDate, endDate });
+  }, [selectedGiro]); // eslint-disable-line react-hooks/exhaustive-deps -- só reagir à mudança de giro, não ao range
   const [selectedCategorias, setSelectedCategorias] = useState<Set<string>>(new Set());
   // Estado para controlar expansão: Map<categoria, { nivel: number, subgrupoSelecionado?: string, gradeSelecionado?: string }>
   // nível 0 = categoria, 1 = subgrupos, 2 = grades do subgrupo selecionado
@@ -332,8 +403,9 @@ export default function ControleEstoquePage({
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filtrarPorVendas, setFiltrarPorVendas] = useState(false);
-  
+  const [debugGiroAberto, setDebugGiroAberto] = useState(false);
+  const [debugGiroApi, setDebugGiroApi] = useState<{ diasGiro: number; chavesCount: number; sampleChaves: string[] } | null>(null);
+
   // Estado para modal de detalhes das entradas/vendas
   const [modalEntradasAberto, setModalEntradasAberto] = useState(false);
   const [categoriaModal, setCategoriaModal] = useState<CategoriaEstoque | null>(null);
@@ -592,6 +664,33 @@ export default function ControleEstoquePage({
       filtradas = filtradas.filter(c => c.colecao && selectedColecoes.includes(c.colecao));
     }
 
+    // Filtro de giro: só mostrar linhas cuja chave está no set da faixa selecionada
+    const filtradasAntesGiro = filtradas.length;
+    if (selectedGiro) {
+      if (!giroCategoriasPermitidas || giroCategoriasPermitidas.size === 0) {
+        filtradas = [];
+      } else {
+        const trim = (s: string | number | undefined) => String(s ?? '').trim();
+        const chavesQueBateram: string[] = [];
+        const chavesQueNaoBateram: string[] = [];
+        filtradas = filtradas.filter(cat => {
+          const chave = `${trim(cat.categoria)}|${trim(cat.linha)}|${trim(cat.subgrupo)}|${trim(cat.grade)}|${trim(cat.colecao)}`;
+          const passou = giroCategoriasPermitidas.has(chave);
+          if (passou && chavesQueBateram.length < 3) chavesQueBateram.push(chave);
+          if (!passou && chavesQueNaoBateram.length < 2) chavesQueNaoBateram.push(chave);
+          return passou;
+        });
+        console.log('[DEBUG GIRO] Filtro aplicado:', {
+          selectedGiro,
+          setSize: giroCategoriasPermitidas.size,
+          antes: filtradasAntesGiro,
+          depois: filtradas.length,
+          amostraBateram: chavesQueBateram,
+          amostraNaoBateram: chavesQueNaoBateram,
+        });
+      }
+    }
+
     // Agrupar por categoria e aplicar expansão
     const categoriasAgrupadas = new Map<string, CategoriaEstoque[]>();
     
@@ -654,17 +753,38 @@ export default function ControleEstoquePage({
       });
     }
 
-    // Filtrar por vendas se o toggle estiver ativo
-    let resultadoComFiltroVendas = resultadoFiltrado;
-    if (filtrarPorVendas) {
-      resultadoComFiltroVendas = resultadoFiltrado.filter(cat => cat.vendasPeriodo > 0);
-    }
-
     // Ordenar por quantidade de estoque (do maior para o menor)
-    resultadoComFiltroVendas.sort((a, b) => b.estoqueAtual - a.estoqueAtual);
+    resultadoFiltrado.sort((a, b) => b.estoqueAtual - a.estoqueAtual);
 
-    return resultadoComFiltroVendas;
-  }, [categorias, selectedCategorias, linhasExcluidas, categoriaExpansao, reagruparPorNivel, companyKey, filtrarPorVendas, selectedLinhas, selectedSubgrupos, selectedGrades, selectedColecoes]);
+    return resultadoFiltrado;
+  }, [categorias, selectedCategorias, linhasExcluidas, categoriaExpansao, reagruparPorNivel, companyKey, selectedLinhas, selectedSubgrupos, selectedGrades, selectedColecoes, selectedGiro, giroCategoriasPermitidas]);
+
+  // Debug giro: quantos cards têm vendas 0 (não deveriam aparecer quando giro = "vendeu no período")
+  const debugGiroInfo = useMemo(() => {
+    if (!selectedGiro || !categoriasFiltradas.length) return null;
+    const comVendasZero = categoriasFiltradas.filter((c) => (c.vendasPeriodo ?? 0) === 0);
+    return {
+      totalCards: categoriasFiltradas.length,
+      comVendasZero: comVendasZero.length,
+      amostraVendasZero: comVendasZero.slice(0, 8).map((c) => ({
+        chave: `${c.categoria}|${c.linha ?? ""}|${c.subgrupo ?? ""}|${c.grade ?? ""}|${c.colecao ?? ""}`,
+        vendasPeriodo: c.vendasPeriodo,
+        estoqueAtual: c.estoqueAtual,
+      })),
+    };
+  }, [selectedGiro, categoriasFiltradas]);
+
+  useEffect(() => {
+    if (!debugGiroInfo) return;
+    console.log("[DEBUG GIRO] Lista após filtro:", {
+      totalCards: debugGiroInfo.totalCards,
+      comVendasZero: debugGiroInfo.comVendasZero,
+      amostraVendasZero: debugGiroInfo.amostraVendasZero,
+    });
+    if (debugGiroInfo.comVendasZero > 0) {
+      console.warn("[DEBUG GIRO] Itens com vendas 0 que passaram no filtro (não deveriam):", debugGiroInfo.amostraVendasZero);
+    }
+  }, [debugGiroInfo]);
 
   // Recalcular KPIs baseado nas categorias filtradas
   const kpisFiltrados = useMemo(() => {
@@ -1054,7 +1174,7 @@ export default function ControleEstoquePage({
       try {
         const [kpisData, categoriasData, evolucaoData, vendasData, previsoesData] = await Promise.all([
           fetchKPIs(companyKey, selectedFilial, range, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades),
-          fetchCategorias(companyKey, selectedFilial, range, periodType, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades),
+          fetchCategorias(companyKey, selectedFilial, range, periodType, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, selectedGiro != null),
           fetchEvolucao(companyKey, selectedFilial, range, periodType, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades),
           fetchVendas(companyKey, selectedFilial, range, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades),
           fetchPrevisoes(companyKey, selectedFilial, range, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades),
@@ -1083,7 +1203,66 @@ export default function ControleEstoquePage({
     return () => {
       active = false;
     };
-  }, [companyKey, selectedFilial, range, periodType, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades]);
+  }, [companyKey, selectedFilial, range, periodType, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, selectedGiro]);
+
+  // Buscar categorias com giro quando filtro de giro é selecionado
+  useEffect(() => {
+    if (!selectedGiro) {
+      setGiroCategoriasPermitidas(null);
+      setDebugGiroApi(null);
+      return;
+    }
+
+    // Limpar set antigo ao trocar de faixa (30 → 300 etc.) para não filtrar com dados errados
+    setGiroCategoriasPermitidas(null);
+    let active = true;
+    setLoadingGiro(true);
+
+    async function loadGiro() {
+      try {
+        const diasGiro = parseInt(selectedGiro!, 10);
+        const chaves = await fetchGiroCategories(
+          companyKey,
+          selectedFilial,
+          diasGiro,
+          selectedGrupos,
+          selectedLinhas,
+          selectedColecoes,
+          selectedSubgrupos,
+          selectedGrades
+        );
+        if (active) {
+          setGiroCategoriasPermitidas(new Set(chaves));
+          setDebugGiroApi({
+            diasGiro,
+            chavesCount: chaves.length,
+            sampleChaves: chaves.slice(0, 10),
+          });
+          console.log("[DEBUG GIRO] API retornou:", {
+            diasGiro,
+            chavesCount: chaves.length,
+            sampleChaves: chaves.slice(0, 5),
+          });
+        }
+      } catch (err) {
+        if (active) {
+          setGiroCategoriasPermitidas(null);
+          setDebugGiroApi(null);
+          console.error("[DEBUG GIRO] Erro ao carregar giro:", err);
+        }
+      } finally {
+        if (active) {
+          setLoadingGiro(false);
+        }
+      }
+    }
+
+    void loadGiro();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedGiro, companyKey, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades]);
 
   const evolucaoFiltrada = useMemo(() => {
     if (evolucao.length === 0) return [];
@@ -1290,7 +1469,18 @@ export default function ControleEstoquePage({
 
       {/* Filtros */}
       <div className={styles.filtersRow}>
-        <DateRangeFilter value={range} onChange={setRange} />
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <DateRangeFilter
+            value={range}
+            onChange={setRange}
+            disabled={!!selectedGiro}
+          />
+          {selectedGiro && (
+            <span style={{ fontSize: "0.75rem", color: "var(--text-secondary, #888)" }} title="Período fixado pela faixa de giro selecionada">
+              (período = faixa do giro)
+            </span>
+          )}
+        </div>
         <FilialFilter
           companyKey={companyKey}
           value={selectedFilial}
@@ -1541,18 +1731,89 @@ export default function ControleEstoquePage({
         </button>
       </div>
 
-      {/* Toggle de Vendas */}
+      {/* Giro: faixas exclusivas — 30 = 0–30 dias, 60 = 30–60, 90 = 60–90, 120 = 90–120, 150 = 120–150, 300 = 150–300 */}
       <div className={styles.filterRow}>
-        <button
-          className={`${styles.toggleButton} ${filtrarPorVendas ? styles.toggleButtonActive : ''}`}
-          onClick={() => setFiltrarPorVendas(!filtrarPorVendas)}
+        <span
+          style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #888)', marginRight: '8px', alignSelf: 'center' }}
+          title="Cada faixa é exclusiva: 30 = vendeu há 0–30 dias, 60 = 30–60 dias, 120 = 90–120 dias, etc. Quem levou 120 dias não aparece em 60."
         >
-          <span className={styles.toggleSwitch}>
-            <span className={styles.toggleSlider}></span>
+          Giro (faixa):
+        </span>
+        {[
+          { label: '30 dias', value: '30', title: 'Vendeu entre 0 e 30 dias atrás (ativos)' },
+          { label: '60 dias', value: '60', title: 'Vendeu entre 30 e 60 dias atrás' },
+          { label: '90 dias', value: '90', title: 'Vendeu entre 60 e 90 dias atrás' },
+          { label: '120 dias', value: '120', title: 'Vendeu entre 90 e 120 dias atrás' },
+          { label: '150 dias', value: '150', title: 'Vendeu entre 120 e 150 dias atrás' },
+          { label: '300 dias', value: '300', title: 'Vendeu entre 150 e 300 dias atrás' },
+        ].map(({ label, value, title }) => (
+          <button
+            key={value}
+            className={`${styles.toggleButton} ${selectedGiro === value ? styles.toggleButtonActive : ''}`}
+            style={{ marginRight: '6px' }}
+            onClick={() => setSelectedGiro(selectedGiro === value ? null : value)}
+            disabled={loadingGiro}
+            title={title}
+          >
+            <span className={styles.toggleLabel}>{label}</span>
+          </button>
+        ))}
+        {loadingGiro && (
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #888)', alignSelf: 'center' }}>
+            carregando...
           </span>
-          <span className={styles.toggleLabel}>Vendas</span>
-        </button>
+        )}
+        {selectedGiro && (
+          <button
+            type="button"
+            onClick={() => setDebugGiroAberto((b) => !b)}
+            style={{ fontSize: '0.7rem', marginLeft: '8px', padding: '2px 6px', opacity: 0.8 }}
+          >
+            {debugGiroAberto ? '▼ esconder debug' : '▶ debug giro'}
+          </button>
+        )}
       </div>
+
+      {selectedGiro && debugGiroAberto && (
+        <div
+          style={{
+            marginTop: '8px',
+            padding: '10px',
+            background: '#f5f5f5',
+            borderRadius: '6px',
+            fontSize: '0.75rem',
+            fontFamily: 'monospace',
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: '6px' }}>Debug Giro (faixa {selectedGiro} dias)</div>
+          {debugGiroApi && (
+            <div style={{ marginBottom: '8px' }}>
+              <div>API giro: {debugGiroApi.chavesCount} chaves retornadas (combinações que venderam na faixa)</div>
+              <div style={{ marginTop: '4px', wordBreak: 'break-all' }}>
+                Amostra chaves: {debugGiroApi.sampleChaves.slice(0, 3).join(' | ')}
+              </div>
+            </div>
+          )}
+          {debugGiroInfo && (
+            <div>
+              <div>Cards na tela: {debugGiroInfo.totalCards}</div>
+              <div style={{ color: debugGiroInfo.comVendasZero > 0 ? 'crimson' : 'green' }}>
+                Com vendas = 0: {debugGiroInfo.comVendasZero} {debugGiroInfo.comVendasZero > 0 && '← não deveria aparecer'}
+              </div>
+              {debugGiroInfo.comVendasZero > 0 && (
+                <div style={{ marginTop: '6px' }}>
+                  Amostra (vendas 0):{' '}
+                  {debugGiroInfo.amostraVendasZero.map((a, i) => (
+                    <span key={i} style={{ display: 'block', marginTop: '2px' }}>
+                      {a.chave} → vendas={a.vendasPeriodo} estoque={a.estoqueAtual}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Por Categoria */}
       <div className={styles.section} id="categorias-section">
@@ -1788,8 +2049,13 @@ export default function ControleEstoquePage({
                     }
                     
                     if (selectedFilial) params.set("filial", selectedFilial);
+                    // Quando giro está ativo: passar período para a página de detalhes filtrar só itens que venderam
+                    if (selectedGiro) {
+                      params.set("giroDias", selectedGiro);
+                      params.set("start", range.startDate.toISOString());
+                      params.set("end", range.endDate.toISOString());
+                    }
                     
-                    // Scroll para o topo antes de navegar
                     window.scrollTo({ top: 0, behavior: 'instant' });
                     router.push(`/${companyKey}/controle-estoque/estoquedetalhado01?${params.toString()}`);
                   }}

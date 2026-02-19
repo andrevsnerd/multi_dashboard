@@ -23,6 +23,7 @@ interface DateRangeFilterProps {
   label?: string;
   maxSelectableDate?: Date;
   availableRange?: DateRangeValue;
+  disabled?: boolean;
 }
 
 function formatDisplay(range: DateRangeValue): { primary: string; secondary: string } {
@@ -46,8 +47,12 @@ export default function DateRangeFilter({
   label = "Período",
   maxSelectableDate,
   availableRange,
+  disabled = false,
 }: DateRangeFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
+  useEffect(() => {
+    if (disabled) setIsOpen(false);
+  }, [disabled]);
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
@@ -372,7 +377,9 @@ export default function DateRangeFilter({
       <button
         type="button"
         className={`${styles.button} ${isOpen ? styles.buttonActive : ""}`}
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={() => !disabled && setIsOpen((prev) => !prev)}
+        disabled={disabled}
+        aria-disabled={disabled}
       >
         <span className={styles.buttonValue}>
           <span className={styles.valuePrimary}>{display.primary}</span>
