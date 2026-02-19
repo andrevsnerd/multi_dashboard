@@ -400,17 +400,19 @@ export interface ControleEstoqueParams {
 /** Faixas de giro em dias; cada uma é uma janela exclusiva (não sobrepõe a outra). */
 const GIRO_BUCKETS = [30, 60, 90, 120, 150, 300] as const;
 
+/** Dias para considerar "obsoleto": sem venda nos últimos 300 dias. */
+const GIRO_OBSOLETO_DIAS = 300;
+
 /**
  * Busca categorias com produtos em estoque que venderam na faixa de giro selecionada.
- * Cada opção é uma janela EXCLUSIVA (filtrativa):
- * - 30 dias  → vendeu entre 0 e 30 dias atrás (ativos)
- * - 60 dias  → vendeu entre 30 e 60 dias atrás (exclui últimos 30)
- * - 90 dias  → vendeu entre 60 e 90 dias atrás
- * - 120 dias → vendeu entre 90 e 120 dias atrás
- * - 150 dias → vendeu entre 120 e 150 dias atrás
- * - 300 dias → vendeu entre 150 e 300 dias atrás
- * Quem levou 120 dias não aparece em 60; cada faixa é independente.
+ * diasGiro = 0 → faixa OBSOLETO: produtos que NÃO venderam nos últimos 300 dias.
+ * Caso contrário, janelas EXCLUSIVAS: 30, 60, 90, 120, 150, 300 dias.
  * Retorna Set de chaves "categoria|linha|subgrupo|grade|colecao".
+ *
+ * OTIMIZAÇÃO: Em vez de EXISTS/NOT EXISTS correlacionados (1 seek por produto × N produtos),
+ * usa CTE que pré-calcula MAX(DATA_VENDA) por PRODUTO uma única vez, e depois faz JOIN.
+ * Isso reduz de O(N × seek) para O(1 scan + 1 hash join), especialmente eficaz
+ * para faixas largas (90d, 120d, 300d, OBSOLETO) onde o range scan era muito grande.
  */
 export async function fetchCategoriasComGiro({
   company,
@@ -423,9 +425,7 @@ export async function fetchCategoriasComGiro({
   diasGiro,
 }: ControleEstoqueParams & { diasGiro: number }): Promise<Set<string>> {
   return withRequest(async (request) => {
-    const idx = GIRO_BUCKETS.indexOf(diasGiro as (typeof GIRO_BUCKETS)[number]);
-    const diasInicio = idx > 0 ? GIRO_BUCKETS[idx - 1] : 0;
-    const diasFim = idx >= 0 ? diasGiro : 30;
+    const isObsoleto = diasGiro === 0;
 
     const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
     const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vg');
@@ -441,18 +441,25 @@ export async function fetchCategoriasComGiro({
       ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
       : 'ISNULL(p.LINHA, \'SEM LINHA\')';
 
-    request.input('giroDiasInicio', sql.Int, diasInicio);
-    request.input('giroDiasFim', sql.Int, diasFim);
-    request.input('giroDiasInicioMenos1', sql.Int, Math.max(0, diasInicio - 1));
+    // Pré-calcula a última data de venda (com QTDE > 0) por PRODUTO em uma CTE.
+    // O otimizador do SQL Server usa um único scan/seek agrupado sobre o índice
+    // de W_CTB_LOJA_VENDA_PEDIDO_PRODUTO (PRODUTO, DATA_VENDA) e depois faz
+    // hash join com ESTOQUE_PRODUTOS — muito mais rápido que N subqueries correlacionadas.
+    let giroQuery: string;
 
-    // Janela exclusiva: 30 = [0,30] dias atrás, 60 = [30,60], 90 = [60,90] etc (inclusive).
-    // 30: >= hoje-30 e < amanhã 00:00. Demais: >= hoje-diasFim e < hoje-(diasInicio-1) 00:00 (inclui o dia "diasInicio atrás").
-    const condicaoDataVenda =
-      diasInicio === 0
-        ? `AND vg.DATA_VENDA >= DATEADD(DAY, -@giroDiasFim, CAST(GETDATE() AS DATE)) AND vg.DATA_VENDA < DATEADD(DAY, 1, CAST(GETDATE() AS DATE))`
-        : `AND vg.DATA_VENDA >= DATEADD(DAY, -@giroDiasFim, CAST(GETDATE() AS DATE)) AND vg.DATA_VENDA < DATEADD(DAY, -@giroDiasInicioMenos1, CAST(GETDATE() AS DATE))`;
+    if (isObsoleto) {
+      request.input('giroObsoletoDias', sql.Int, GIRO_OBSOLETO_DIAS);
 
-    const giroQuery = `
+      giroQuery = `
+      ;WITH UltimaVenda AS (
+        SELECT
+          vg.PRODUTO,
+          MAX(vg.DATA_VENDA) AS ultimaVenda
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vg WITH (NOLOCK)
+        WHERE vg.QTDE > 0
+          ${vendasFilialFilter}
+        GROUP BY vg.PRODUTO
+      )
       SELECT DISTINCT
         ${categoriaField} AS categoria,
         ISNULL(p.LINHA, '') AS linha,
@@ -461,6 +468,7 @@ export async function fetchCategoriasComGiro({
         ISNULL(p.COLECAO, '') AS colecao
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+      LEFT JOIN UltimaVenda uv ON uv.PRODUTO = e.PRODUTO
       WHERE e.ESTOQUE > 0
         ${estoqueFilialFilter}
         ${grupoFilter}
@@ -474,25 +482,63 @@ export async function fetchCategoriasComGiro({
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
         ${buildCategoriaExcludeNerd(company, categoriaField)}
-        AND EXISTS (
-          SELECT 1
-          FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vg WITH (NOLOCK)
-          WHERE vg.PRODUTO = e.PRODUTO
-            AND vg.QTDE > 0
-            ${condicaoDataVenda}
-            ${vendasFilialFilter}
+        AND (
+          uv.ultimaVenda IS NULL
+          OR uv.ultimaVenda < DATEADD(DAY, -@giroObsoletoDias, CAST(GETDATE() AS DATE))
         )
-        ${diasInicio > 0 ? `
-        AND NOT EXISTS (
-          SELECT 1
-          FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vgExcl WITH (NOLOCK)
-          WHERE vgExcl.PRODUTO = e.PRODUTO
-            AND vgExcl.QTDE > 0
-            AND vgExcl.DATA_VENDA >= DATEADD(DAY, -@giroDiasInicio, CAST(GETDATE() AS DATE))
-            AND vgExcl.DATA_VENDA < DATEADD(DAY, 1, CAST(GETDATE() AS DATE))
-            ${vendasFilialFilter.replace(/vg\./g, 'vgExcl.')}
-        )` : ''}
     `;
+    } else {
+      const idx = GIRO_BUCKETS.indexOf(diasGiro as (typeof GIRO_BUCKETS)[number]);
+      const diasInicio = idx > 0 ? GIRO_BUCKETS[idx - 1] : 0;
+      const diasFim = idx >= 0 ? diasGiro : 30;
+
+      request.input('giroDiasInicio', sql.Int, diasInicio);
+      request.input('giroDiasFim', sql.Int, diasFim);
+
+      // CTE com a data da última venda por produto.
+      // Para faixas exclusivas (ex.: 60d), a condição é:
+      //   ultimaVenda entre [hoje - diasFim, hoje - diasInicio)
+      // Isso substitui o EXISTS + NOT EXISTS por uma simples comparação de range no JOIN.
+      giroQuery = `
+      ;WITH UltimaVenda AS (
+        SELECT
+          vg.PRODUTO,
+          MAX(vg.DATA_VENDA) AS ultimaVenda
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vg WITH (NOLOCK)
+        WHERE vg.QTDE > 0
+          ${vendasFilialFilter}
+        GROUP BY vg.PRODUTO
+      )
+      SELECT DISTINCT
+        ${categoriaField} AS categoria,
+        ISNULL(p.LINHA, '') AS linha,
+        ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
+        ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
+        ISNULL(p.COLECAO, '') AS colecao
+      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+      INNER JOIN UltimaVenda uv ON uv.PRODUTO = e.PRODUTO
+      WHERE e.ESTOQUE > 0
+        ${estoqueFilialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
+        AND ${categoriaField} <> ''
+        AND ${categoriaField} <> 'SEM GRUPO'
+        AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
+        ${diasInicio > 0
+          ? `AND uv.ultimaVenda >= DATEADD(DAY, -@giroDiasFim, CAST(GETDATE() AS DATE))
+             AND uv.ultimaVenda < DATEADD(DAY, -@giroDiasInicio, CAST(GETDATE() AS DATE))`
+          : `AND uv.ultimaVenda >= DATEADD(DAY, -@giroDiasFim, CAST(GETDATE() AS DATE))
+             AND uv.ultimaVenda < DATEADD(DAY, 1, CAST(GETDATE() AS DATE))`
+        }
+    `;
+    }
 
     const result = await request.query<{
       categoria: string;
@@ -1103,7 +1149,8 @@ export async function fetchEstoquePorCategoria({
 }: ControleEstoqueParams): Promise<CategoriaEstoque[]> {
   return withRequest(async (request) => {
     const now = new Date();
-    const idxGiro = typeof giroDias === 'number' ? GIRO_BUCKETS.indexOf(giroDias as (typeof GIRO_BUCKETS)[number]) : -1;
+    const isGiroObsoleto = filtrarEstoquePorGiro && giroDias === 0;
+    const idxGiro = typeof giroDias === 'number' && giroDias > 0 ? GIRO_BUCKETS.indexOf(giroDias as (typeof GIRO_BUCKETS)[number]) : -1;
     const diasInicioGiro = idxGiro > 0 ? GIRO_BUCKETS[idxGiro - 1] : 0;
     const currentYear = now.getFullYear();
     const currentMonthNum = now.getMonth() + 1; // 1-12
@@ -1169,32 +1216,60 @@ export async function fetchEstoquePorCategoria({
     const groupByVendasAdicional = groupByAdicional;
 
     // Quando giro ativo: só somar estoque de produtos que venderam no período (card = resultado final).
+    // Faixa Obsoleto (giroDias=0): só NOT EXISTS (venda nos últimos 300 dias).
     // Faixas disjuntas: se giroDias > 30 (ex.: 60), excluir produtos que venderam em [0, diasInicio] para não duplicar.
+    //
+    // OTIMIZAÇÃO: Em vez de EXISTS/NOT EXISTS correlacionados inline (O(N) seeks),
+    // usamos um CTE pre-materializado com MAX(DATA_VENDA) por PRODUTO + JOIN.
+    // O filtroGiroEstoque agora é uma condição simples no WHERE sobre o campo uv.ultimaVenda.
+    // O CTE (giroCtePreamble) é injetado antes do SELECT principal.
     if (filtrarEstoquePorGiro && diasInicioGiro > 0) {
       request.input('giroExcluirDias', sql.Int, diasInicioGiro);
     }
-    const filtroGiroEstoque =
-      filtrarEstoquePorGiro && vendasGlobaisFilter
-        ? ` AND EXISTS (
-            SELECT 1 FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-            WHERE vp.PRODUTO = e.PRODUTO
-              AND vp.DATA_VENDA >= @periodoStart
-              AND vp.DATA_VENDA < @periodoEnd
-              AND vp.QTDE > 0
-              ${vendasGlobaisFilter}
-          )
-          ${diasInicioGiro > 0 ? `
-          AND NOT EXISTS (
-            SELECT 1 FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vpExcl WITH (NOLOCK)
-            WHERE vpExcl.PRODUTO = e.PRODUTO
-              AND vpExcl.QTDE > 0
-              AND vpExcl.DATA_VENDA >= DATEADD(DAY, -@giroExcluirDias, CAST(GETDATE() AS DATE))
-              AND vpExcl.DATA_VENDA < DATEADD(DAY, 1, CAST(GETDATE() AS DATE))
-              ${vendasGlobaisFilter.replace(/vp\./g, 'vpExcl.')}
-          )` : ''}`
-        : '';
+    if (isGiroObsoleto) {
+      request.input('giroObsoletoDiasCat', sql.Int, GIRO_OBSOLETO_DIAS);
+    }
+
+    // Determinar se precisamos do CTE de giro
+    const needsGiroCte = filtrarEstoquePorGiro && vendasGlobaisFilter;
+
+    // Preamble CTE: calcula MAX(DATA_VENDA) por produto uma única vez
+    const giroCtePreamble = needsGiroCte
+      ? `;WITH GiroUltimaVenda AS (
+          SELECT
+            vp.PRODUTO,
+            MAX(vp.DATA_VENDA) AS ultimaVenda
+          FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+          WHERE vp.QTDE > 0
+            ${vendasGlobaisFilter}
+          GROUP BY vp.PRODUTO
+        )`
+      : '';
+
+    // JOIN adicional para trazer a última venda
+    const giroJoinClause = needsGiroCte
+      ? isGiroObsoleto
+        ? `LEFT JOIN GiroUltimaVenda guv ON guv.PRODUTO = e.PRODUTO`
+        : `INNER JOIN GiroUltimaVenda guv ON guv.PRODUTO = e.PRODUTO`
+      : '';
+
+    // Condição WHERE simples em vez de subqueries correlacionadas
+    const filtroGiroEstoque = needsGiroCte
+      ? isGiroObsoleto
+        ? ` AND (
+              guv.ultimaVenda IS NULL
+              OR guv.ultimaVenda < DATEADD(DAY, -@giroObsoletoDiasCat, CAST(GETDATE() AS DATE))
+            )`
+        : diasInicioGiro > 0
+          ? ` AND guv.ultimaVenda >= @periodoStart
+              AND guv.ultimaVenda < @periodoEnd
+              AND guv.ultimaVenda < DATEADD(DAY, -@giroExcluirDias, CAST(GETDATE() AS DATE))`
+          : ` AND guv.ultimaVenda >= @periodoStart
+              AND guv.ultimaVenda < @periodoEnd`
+      : '';
 
     const estoqueQuery = `
+      ${giroCtePreamble}
       SELECT 
         ${categoriaField} AS categoria
         ${camposAdicionais},
@@ -1202,6 +1277,7 @@ export async function fetchEstoquePorCategoria({
         SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0) ELSE 0 END) AS custoTotal
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+      ${giroJoinClause}
       WHERE 1=1
         ${estoqueFilialFilter}
         ${grupoFilter}
@@ -1235,8 +1311,6 @@ export async function fetchEstoquePorCategoria({
     // - Usa o período selecionado (periodoStart/End)
     // - Usa o filtro inclusivo (vendasTotalFilter) para incluir todas as filiais (físicas + ecommerce)
     // - Agrupa por ano/mês também para permitir cálculos de projeção se necessário
-    const hoje = new Date(now.getTime());
-    hoje.setHours(23, 59, 59, 999); // Fim do dia de hoje
 
     const vendasMensaisQuery = `
       SELECT 
@@ -1262,10 +1336,6 @@ export async function fetchEstoquePorCategoria({
         ${buildCategoriaExcludeNerd(company, categoriaField)}
       GROUP BY ${categoriaField}${groupByVendasAdicional}, YEAR(vp.DATA_VENDA), MONTH(vp.DATA_VENDA)
     `;
-
-    // periodoStart e periodoEnd já declarados no início da função
-    request.input('currentMonthStart', sql.DateTime, currentMonth.start);
-    request.input('hoje', sql.DateTime, hoje);
 
     const vendasMensaisResult = await request.query<{
       categoria: string;
@@ -1387,6 +1457,12 @@ export async function fetchEstoquePorCategoria({
     const duracaoPeriodo = periodoEnd.getTime() - periodoStart.getTime();
     const periodoAnteriorEnd = new Date(periodoStart.getTime() - 1); // Um dia antes do início do período atual
     const periodoAnteriorStart = new Date(periodoAnteriorEnd.getTime() - duracaoPeriodo);
+    
+    // Pré-calcular datas necessárias para a query consolidada de vendas
+    const ultimos30DiasStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const hoje = new Date(now.getTime());
+    hoje.setHours(23, 59, 59, 999);
+    const previousMonth = shiftRangeByMonths(currentMonth, -1);
     
     // Declarar apenas os parâmetros do período anterior (periodoStart e periodoEnd já foram declarados acima)
     request.input('periodoAnteriorStart', sql.DateTime, periodoAnteriorStart);
@@ -1524,15 +1600,42 @@ export async function fetchEstoquePorCategoria({
     }>(entradasSemanaQuery);
 
     // Buscar vendas do período selecionado (já usa vendasFilialFilter que foi criado anteriormente)
-    const vendasSemanaQuery = `
+    // ============================================
+    // OTIMIZAÇÃO: CONSOLIDAR 4 queries de vendas em 1 única query
+    // ============================================
+    // Antes: 4 queries sequenciais (vendasSemana, vendasPeriodoAnterior, vendasMesAnterior, vendasUltimos30Dias)
+    // Agora: 1 query com CASE WHEN que classifica cada venda nos buckets corretos.
+    // Usa o range mais amplo possível e filtra internamente via CASE WHEN.
+    // Reduz de 4 roundtrips para 1, cortando ~75% da latência de rede + compilação SQL.
+    
+    // Calcular o range mais amplo que cobre todos os períodos
+    const allDates = [periodoStart, periodoEnd, periodoAnteriorStart, periodoAnteriorEnd, previousMonth.start, previousMonth.end, ultimos30DiasStart, now];
+    const minDate = new Date(Math.min(...allDates.map(d => d.getTime())));
+    const maxDate = new Date(Math.max(...allDates.map(d => d.getTime())));
+    
+    request.input('vendasConsolidadaMin', sql.DateTime, minDate);
+    request.input('vendasConsolidadaMax', sql.DateTime, maxDate);
+    request.input('vcPeriodoStart', sql.DateTime, periodoStart);
+    request.input('vcPeriodoEnd', sql.DateTime, periodoEnd);
+    request.input('vcAnteriorStart', sql.DateTime, periodoAnteriorStart);
+    request.input('vcAnteriorEnd', sql.DateTime, periodoAnteriorEnd);
+    request.input('vcPrevMonthStart', sql.DateTime, previousMonth.start);
+    request.input('vcPrevMonthEnd', sql.DateTime, previousMonth.end);
+    request.input('vcUlt30Start', sql.DateTime, ultimos30DiasStart);
+    request.input('vcUlt30End', sql.DateTime, now);
+    
+    const vendasConsolidadaQuery = `
       SELECT 
         ${categoriaField} AS categoria
         ${camposVendasAdicionais},
-        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
+        SUM(CASE WHEN vp.DATA_VENDA >= @vcPeriodoStart AND vp.DATA_VENDA < @vcPeriodoEnd AND vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendasPeriodo,
+        SUM(CASE WHEN vp.DATA_VENDA >= @vcAnteriorStart AND vp.DATA_VENDA < @vcAnteriorEnd AND vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendasAnterior,
+        SUM(CASE WHEN vp.DATA_VENDA >= @vcPrevMonthStart AND vp.DATA_VENDA < @vcPrevMonthEnd AND vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendasMesAnterior,
+        SUM(CASE WHEN vp.DATA_VENDA >= @vcUlt30Start AND vp.DATA_VENDA < @vcUlt30End AND vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas30Dias
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-      WHERE vp.DATA_VENDA >= @periodoStart
-        AND vp.DATA_VENDA < @periodoEnd
+      WHERE vp.DATA_VENDA >= @vendasConsolidadaMin
+        AND vp.DATA_VENDA < @vendasConsolidadaMax
         AND vp.QTDE > 0
         ${vendasFilialFilter}
         ${grupoFilter}
@@ -1549,14 +1652,38 @@ export async function fetchEstoquePorCategoria({
       GROUP BY ${categoriaField}${groupByVendasAdicional}
     `;
 
-    const vendasSemanaResult = await request.query<{
+    const vendasConsolidadaResult = await request.query<{
       categoria: string;
       linha?: string;
       subgrupo?: string;
       grade?: string;
       colecao?: string;
-      vendas: number | null;
-    }>(vendasSemanaQuery);
+      vendasPeriodo: number | null;
+      vendasAnterior: number | null;
+      vendasMesAnterior: number | null;
+      vendas30Dias: number | null;
+    }>(vendasConsolidadaQuery);
+
+    // Desempacotar resultados consolidados nos 4 maps que o restante do código espera
+    const vendasSemanaMap = new Map<string, number>();
+    const vendasPeriodoAnteriorMap = new Map<string, number>();
+    const vendasMesAnteriorMap = new Map<string, number>();
+    const vendasUltimos30DiasMap = new Map<string, number>();
+
+    vendasConsolidadaResult.recordset.forEach(row => {
+      const categoria = row.categoria?.trim() || '';
+      const chaveCategoria = `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
+      
+      const vp = Number(row.vendasPeriodo ?? 0);
+      const va = Number(row.vendasAnterior ?? 0);
+      const vma = Number(row.vendasMesAnterior ?? 0);
+      const v30 = Number(row.vendas30Dias ?? 0);
+      
+      if (vp > 0) vendasSemanaMap.set(chaveCategoria, vp);
+      if (va > 0) vendasPeriodoAnteriorMap.set(chaveCategoria, va);
+      if (vma > 0) vendasMesAnteriorMap.set(chaveCategoria, vma);
+      if (v30 > 0) vendasUltimos30DiasMap.set(chaveCategoria, v30);
+    });
 
     // Criar filtro de filial para e-commerce com a mesma lógica do buildFilialFilter
     // Mas com nomes de parâmetros únicos para evitar conflitos (EDUPEPARAM)
@@ -1662,164 +1789,14 @@ export async function fetchEstoquePorCategoria({
       entradasSemanaMap.set(chaveCategoria, Number(row.entradas ?? 0));
     });
 
-    const vendasSemanaMap = new Map<string, number>();
-    vendasSemanaResult.recordset.forEach(row => {
-      const categoria = row.categoria?.trim() || '';
-      // SEMPRE usar chave detalhada
-      const chaveCategoria = `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
-      vendasSemanaMap.set(chaveCategoria, Number(row.vendas ?? 0));
-    });
+    // vendasSemanaMap, vendasPeriodoAnteriorMap, vendasMesAnteriorMap, vendasUltimos30DiasMap
+    // já foram preenchidos pela query consolidada acima
 
     const ecommerceSemanaMap = new Map<string, number>();
     ecommerceSemanaResult.recordset.forEach(row => {
       const categoria = row.categoria?.trim() || '';
-      // SEMPRE usar chave detalhada
       const chaveCategoria = `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
       ecommerceSemanaMap.set(chaveCategoria, Number(row.ecommerce ?? 0));
-    });
-
-    // Vendas do período anterior para calcular tendência
-    // Calcular período anterior com a mesma duração do período atual
-    // Nota: duracaoPeriodo, periodoAnteriorEnd e periodoAnteriorStart já foram calculados acima
-    const periodStart = periodoAnteriorStart;
-    const periodEnd = periodoAnteriorEnd;
-    
-    // Manter previousMonth para uso no fallback de projeção
-    const previousMonth = shiftRangeByMonths(currentMonth, -1);
-
-    request.input('periodStart', sql.DateTime, periodStart);
-    request.input('periodEnd', sql.DateTime, periodEnd);
-    
-    const vendasPeriodoAnteriorQuery = `
-      SELECT 
-        ${categoriaField} AS categoria
-        ${camposVendasAdicionais},
-        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendasPeriodo
-      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-      WHERE vp.DATA_VENDA >= @periodStart
-        AND vp.DATA_VENDA < @periodEnd
-        AND vp.QTDE > 0
-        ${vendasFilialFilter}
-        ${grupoFilter}
-        ${linhaFilter}
-        ${colecaoFilter}
-        ${subgrupoFilter}
-        ${gradeFilter}
-        ${exclusionFilter}
-        AND ${categoriaField} <> ''
-        AND ${categoriaField} <> 'SEM GRUPO'
-        AND ${categoriaField} <> 'SEM LINHA'
-        ${buildCategoriaExcludeNerd(company, categoriaField)}
-      GROUP BY ${categoriaField}${groupByVendasAdicional}
-    `;
-
-    const vendasPeriodoAnteriorResult = await request.query<{
-      categoria: string;
-      linha?: string;
-      subgrupo?: string;
-      grade?: string;
-      colecao?: string;
-      vendasPeriodo: number | null;
-    }>(vendasPeriodoAnteriorQuery);
-
-    const vendasPeriodoAnteriorMap = new Map<string, number>();
-    vendasPeriodoAnteriorResult.recordset.forEach(row => {
-      const categoria = row.categoria?.trim() || '';
-      // SEMPRE usar chave detalhada
-      const chaveCategoria = `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
-      vendasPeriodoAnteriorMap.set(chaveCategoria, Number(row.vendasPeriodo ?? 0));
-    });
-
-    // Buscar vendas do mês anterior completo para usar como fallback nos primeiros dias do mês
-    request.input('previousMonthStart', sql.DateTime, previousMonth.start);
-    request.input('previousMonthEnd', sql.DateTime, previousMonth.end);
-    
-    const vendasMesAnteriorQuery = `
-      SELECT 
-        ${categoriaField} AS categoria
-        ${camposVendasAdicionais},
-        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendasMes
-      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-      WHERE vp.DATA_VENDA >= @previousMonthStart
-        AND vp.DATA_VENDA < @previousMonthEnd
-        AND vp.QTDE > 0
-        ${vendasFilialFilter}
-        ${grupoFilter}
-        ${linhaFilter}
-        ${colecaoFilter}
-        ${subgrupoFilter}
-        ${gradeFilter}
-        ${exclusionFilter}
-        ${nerdOnlyEletronicosFilter}
-        AND ${categoriaField} <> ''
-        AND ${categoriaField} <> 'SEM GRUPO'
-        AND ${categoriaField} <> 'SEM LINHA'
-        ${buildCategoriaExcludeNerd(company, categoriaField)}
-      GROUP BY ${categoriaField}${groupByVendasAdicional}
-    `;
-
-    const vendasMesAnteriorResult = await request.query<{
-      categoria: string;
-      linha?: string;
-      subgrupo?: string;
-      grade?: string;
-      colecao?: string;
-      vendasMes: number | null;
-    }>(vendasMesAnteriorQuery);
-
-    const vendasMesAnteriorMap = new Map<string, number>();
-    vendasMesAnteriorResult.recordset.forEach(row => {
-      const categoria = row.categoria?.trim() || '';
-      // SEMPRE usar chave detalhada
-      const chaveCategoria = `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
-      vendasMesAnteriorMap.set(chaveCategoria, Number(row.vendasMes ?? 0));
-    });
-
-    // Buscar também vendas dos últimos 30 dias como alternativa ao mês anterior
-    const ultimos30DiasStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    request.input('ultimos30DiasStart', sql.DateTime, ultimos30DiasStart);
-    request.input('ultimos30DiasEnd', sql.DateTime, now);
-    
-    const vendasUltimos30DiasQuery = `
-      SELECT 
-        ${categoriaField} AS categoria
-        ${camposVendasAdicionais},
-        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas30Dias
-      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-      WHERE vp.DATA_VENDA >= @ultimos30DiasStart
-        AND vp.DATA_VENDA < @ultimos30DiasEnd
-        AND vp.QTDE > 0
-        ${vendasFilialFilter}
-        ${grupoFilter}
-        ${linhaFilter}
-        ${colecaoFilter}
-        ${subgrupoFilter}
-        ${gradeFilter}
-        AND ${categoriaField} <> ''
-        AND ${categoriaField} <> 'SEM GRUPO'
-        AND ${categoriaField} <> 'SEM LINHA'
-        ${buildCategoriaExcludeNerd(company, categoriaField)}
-      GROUP BY ${categoriaField}${groupByVendasAdicional}
-    `;
-
-    const vendasUltimos30DiasResult = await request.query<{
-      categoria: string;
-      linha?: string;
-      subgrupo?: string;
-      grade?: string;
-      colecao?: string;
-      vendas30Dias: number | null;
-    }>(vendasUltimos30DiasQuery);
-
-    const vendasUltimos30DiasMap = new Map<string, number>();
-    vendasUltimos30DiasResult.recordset.forEach(row => {
-      const categoria = row.categoria?.trim() || '';
-      // SEMPRE usar chave detalhada
-      const chaveCategoria = `${categoria}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
-      vendasUltimos30DiasMap.set(chaveCategoria, Number(row.vendas30Dias ?? 0));
     });
 
     // ============================================
@@ -3704,9 +3681,9 @@ export async function fetchProdutoDetalhes({
 
     const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
 
-    // Detalhe por categoria + giro: MESMA regra do card (EXISTS no período + NOT EXISTS no período mais recente = faixas disjuntas).
-    // Janela de exclusão em parâmetros (periodoExcluirStart/End) para plano de execução estável.
+    // Detalhe por categoria + giro: MESMA regra do card. Obsoleto (giroDiasParam=0): só NOT EXISTS nos últimos 300 dias.
     const detalheCategoriaComGiro = (filtrarApenasComVendas || (startDateParam != null && endDateParam != null)) && company === 'nerd' && grupo && !subgrupo && !grade && !colecao;
+    const detalheGiroObsoleto = detalheCategoriaComGiro && giroDiasParam === 0;
     let filtroGiroNaQueryDetalhe = '';
     if (detalheCategoriaComGiro && company) {
       const companyConfig = resolveCompany(company);
@@ -3719,33 +3696,45 @@ export async function fetchProdutoDetalhes({
           const arr = Array.from(todasFiliaisVenda);
           arr.forEach((f, i) => request.input(`varGiroFilial${i}`, sql.VarChar, f));
           const ph = arr.map((_, i) => `@varGiroFilial${i}`).join(', ');
-          if (diasInicioGiroDetalhe > 0) {
-            const periodoExcluirStart = new Date(now);
-            periodoExcluirStart.setUTCDate(periodoExcluirStart.getUTCDate() - diasInicioGiroDetalhe);
-            periodoExcluirStart.setUTCHours(0, 0, 0, 0);
-            const periodoExcluirEnd = new Date(now);
-            periodoExcluirEnd.setUTCDate(periodoExcluirEnd.getUTCDate() + 1);
-            periodoExcluirEnd.setUTCHours(0, 0, 0, 0);
-            request.input('periodoExcluirStartDetalhe', sql.DateTime, periodoExcluirStart);
-            request.input('periodoExcluirEndDetalhe', sql.DateTime, periodoExcluirEnd);
+          if (detalheGiroObsoleto) {
+            request.input('giroObsoletoDiasDetalhe', sql.Int, GIRO_OBSOLETO_DIAS);
+            filtroGiroNaQueryDetalhe = ` AND NOT EXISTS (
+              SELECT 1 FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+              WHERE vp.PRODUTO = e.PRODUTO
+                AND vp.QTDE > 0
+                AND vp.DATA_VENDA >= DATEADD(DAY, -@giroObsoletoDiasDetalhe, CAST(GETDATE() AS DATE))
+                AND vp.DATA_VENDA < DATEADD(DAY, 1, CAST(GETDATE() AS DATE))
+                AND vp.FILIAL IN (${ph})
+            )`;
+          } else {
+            if (diasInicioGiroDetalhe > 0) {
+              const periodoExcluirStart = new Date(now);
+              periodoExcluirStart.setUTCDate(periodoExcluirStart.getUTCDate() - diasInicioGiroDetalhe);
+              periodoExcluirStart.setUTCHours(0, 0, 0, 0);
+              const periodoExcluirEnd = new Date(now);
+              periodoExcluirEnd.setUTCDate(periodoExcluirEnd.getUTCDate() + 1);
+              periodoExcluirEnd.setUTCHours(0, 0, 0, 0);
+              request.input('periodoExcluirStartDetalhe', sql.DateTime, periodoExcluirStart);
+              request.input('periodoExcluirEndDetalhe', sql.DateTime, periodoExcluirEnd);
+            }
+            filtroGiroNaQueryDetalhe = ` AND EXISTS (
+              SELECT 1 FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+              WHERE vp.PRODUTO = e.PRODUTO
+                AND vp.DATA_VENDA >= @startDate
+                AND vp.DATA_VENDA < @endDate
+                AND vp.QTDE > 0
+                AND vp.FILIAL IN (${ph})
+            )
+            ${diasInicioGiroDetalhe > 0 ? `
+            AND NOT EXISTS (
+              SELECT 1 FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vpExcl WITH (NOLOCK)
+              WHERE vpExcl.PRODUTO = e.PRODUTO
+                AND vpExcl.QTDE > 0
+                AND vpExcl.DATA_VENDA >= @periodoExcluirStartDetalhe
+                AND vpExcl.DATA_VENDA < @periodoExcluirEndDetalhe
+                AND vpExcl.FILIAL IN (${ph})
+            )` : ''}`;
           }
-          filtroGiroNaQueryDetalhe = ` AND EXISTS (
-            SELECT 1 FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-            WHERE vp.PRODUTO = e.PRODUTO
-              AND vp.DATA_VENDA >= @startDate
-              AND vp.DATA_VENDA < @endDate
-              AND vp.QTDE > 0
-              AND vp.FILIAL IN (${ph})
-          )
-          ${diasInicioGiroDetalhe > 0 ? `
-          AND NOT EXISTS (
-            SELECT 1 FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vpExcl WITH (NOLOCK)
-            WHERE vpExcl.PRODUTO = e.PRODUTO
-              AND vpExcl.QTDE > 0
-              AND vpExcl.DATA_VENDA >= @periodoExcluirStartDetalhe
-              AND vpExcl.DATA_VENDA < @periodoExcluirEndDetalhe
-              AND vpExcl.FILIAL IN (${ph})
-          )` : ''}`;
         }
       }
     }

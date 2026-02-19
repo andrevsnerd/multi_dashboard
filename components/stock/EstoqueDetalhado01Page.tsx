@@ -273,26 +273,6 @@ export default function EstoqueDetalhado01Page({
     };
   }, [detalhes?.variacoes]);
 
-  // Divergência entre resumo da API e soma das linhas (debug)
-  const divergencia = useMemo(() => {
-    if (!detalhes) return null;
-    const r = detalhes.resumo;
-    const t = totaisFromLinhas;
-    const diffEstoque = r.estoqueTotal !== t.estoqueTotal;
-    const diffCusto = Math.abs(r.custoTotal - t.custoTotal) > 0.01;
-    const diffVendas = r.vendasTotais !== t.vendasTotais;
-    const diffItens = r.totalItens !== t.totalItens;
-    if (!diffEstoque && !diffCusto && !diffVendas && !diffItens) return null;
-    return {
-      resumo: r,
-      somaLinhas: t,
-      diffEstoque,
-      diffCusto,
-      diffVendas,
-      diffItens,
-    };
-  }, [detalhes, totaisFromLinhas]);
-
   if (loading) {
     return (
       <div className={styles.wrapper}>
@@ -494,33 +474,6 @@ export default function EstoqueDetalhado01Page({
         </div>
       </div>
 
-      {/* Verificação: totais = soma das linhas; alerta se API enviou valores diferentes */}
-      <div className={styles.verificacao}>
-        <div className={styles.verificacaoLabel}>Verificação</div>
-        <div className={styles.verificacaoText}>
-          Totais exibidos = soma das <strong>{totaisFromLinhas.totalItens}</strong> linhas da tabela abaixo.
-        </div>
-        {divergencia && (
-          <div className={styles.verificacaoAlerta} role="alert">
-            <strong>Divergência com resumo da API:</strong>
-            <ul style={{ margin: "4px 0 0 0", paddingLeft: "20px" }}>
-              {divergencia.diffItens && (
-                <li>Itens: API {divergencia.resumo.totalItens} vs soma linhas {divergencia.somaLinhas.totalItens}</li>
-              )}
-              {divergencia.diffEstoque && (
-                <li>Estoque: API {divergencia.resumo.estoqueTotal} vs soma linhas {divergencia.somaLinhas.estoqueTotal}</li>
-              )}
-              {divergencia.diffCusto && (
-                <li>Custo: API {divergencia.resumo.custoTotal.toFixed(2)} vs soma linhas {divergencia.somaLinhas.custoTotal.toFixed(2)}</li>
-              )}
-              {divergencia.diffVendas && (
-                <li>Vendas: API {divergencia.resumo.vendasTotais} vs soma linhas {divergencia.somaLinhas.vendasTotais}</li>
-              )}
-            </ul>
-          </div>
-        )}
-      </div>
-
       {/* Tabela de Variações */}
       <div className={styles.tableWrapper}>
         <table className={styles.detailsTable}>
@@ -622,7 +575,7 @@ export default function EstoqueDetalhado01Page({
           </tbody>
           <tfoot>
             <tr className={styles.footerRow}>
-              <td colSpan={3} className={styles.footerLabel}><strong>Soma ({totaisFromLinhas.totalItens} linhas)</strong></td>
+              <td colSpan={3} className={styles.footerLabel}><strong>{totaisFromLinhas.totalItens} linhas</strong></td>
               <td className={styles.footerValue}>{formatNumber(totaisFromLinhas.estoqueTotal)}</td>
               <td>—</td>
               <td>—</td>

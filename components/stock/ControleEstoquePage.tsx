@@ -366,7 +366,7 @@ export default function ControleEstoquePage({
   // Faixas de giro (mesma ordem do backend): cada uma = janela exclusiva em dias atrás
   const GIRO_BUCKETS = useMemo(() => [30, 60, 90, 120, 150, 300] as const, []);
 
-  // Quando o giro é ativado: período do dashboard = janela do giro (só aparecem dados desse range)
+  // Quando o giro é ativado: período do dashboard = janela do giro (Obsoleto = últimos 300 dias para contexto)
   useEffect(() => {
     if (!selectedGiro) {
       if (rangeBeforeGiroRef.current) {
@@ -375,17 +375,23 @@ export default function ControleEstoquePage({
       }
       return;
     }
-    const diasGiro = parseInt(selectedGiro, 10);
-    const idx = GIRO_BUCKETS.indexOf(diasGiro as (typeof GIRO_BUCKETS)[number]);
-    const diasInicio = idx > 0 ? GIRO_BUCKETS[idx - 1] : 0;
-    const diasFim = idx >= 0 ? diasGiro : 30;
-
     rangeBeforeGiroRef.current = range;
     const hoje = new Date();
     const startDate = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
-    startDate.setDate(startDate.getDate() - diasFim);
     const endDate = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
-    endDate.setDate(endDate.getDate() - diasInicio);
+
+    if (selectedGiro === "0") {
+      // Obsoleto: sem venda nos últimos 300 dias; range de contexto = 300 dias
+      startDate.setDate(startDate.getDate() - 300);
+      endDate.setDate(endDate.getDate() + 1);
+    } else {
+      const diasGiro = parseInt(selectedGiro, 10);
+      const idx = GIRO_BUCKETS.indexOf(diasGiro as (typeof GIRO_BUCKETS)[number]);
+      const diasInicio = idx > 0 ? GIRO_BUCKETS[idx - 1] : 0;
+      const diasFim = idx >= 0 ? diasGiro : 30;
+      startDate.setDate(startDate.getDate() - diasFim);
+      endDate.setDate(endDate.getDate() - diasInicio);
+    }
     setRange({ startDate, endDate });
   }, [selectedGiro]); // eslint-disable-line react-hooks/exhaustive-deps -- só reagir à mudança de giro, não ao range
   const [selectedCategorias, setSelectedCategorias] = useState<Set<string>>(new Set());
@@ -407,8 +413,6 @@ export default function ControleEstoquePage({
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [debugGiroAberto, setDebugGiroAberto] = useState(false);
-  const [debugGiroApi, setDebugGiroApi] = useState<{ diasGiro: number; chavesCount: number; sampleChaves: string[] } | null>(null);
 
   // Estado para modal de detalhes das entradas/vendas
   const [modalEntradasAberto, setModalEntradasAberto] = useState(false);
@@ -669,28 +673,14 @@ export default function ControleEstoquePage({
     }
 
     // Filtro de giro: só mostrar linhas cuja chave está no set da faixa selecionada
-    const filtradasAntesGiro = filtradas.length;
     if (selectedGiro) {
       if (!giroCategoriasPermitidas || giroCategoriasPermitidas.size === 0) {
         filtradas = [];
       } else {
         const trim = (s: string | number | undefined) => String(s ?? '').trim();
-        const chavesQueBateram: string[] = [];
-        const chavesQueNaoBateram: string[] = [];
         filtradas = filtradas.filter(cat => {
           const chave = `${trim(cat.categoria)}|${trim(cat.linha)}|${trim(cat.subgrupo)}|${trim(cat.grade)}|${trim(cat.colecao)}`;
-          const passou = giroCategoriasPermitidas.has(chave);
-          if (passou && chavesQueBateram.length < 3) chavesQueBateram.push(chave);
-          if (!passou && chavesQueNaoBateram.length < 2) chavesQueNaoBateram.push(chave);
-          return passou;
-        });
-        console.log('[DEBUG GIRO] Filtro aplicado:', {
-          selectedGiro,
-          setSize: giroCategoriasPermitidas.size,
-          antes: filtradasAntesGiro,
-          depois: filtradas.length,
-          amostraBateram: chavesQueBateram,
-          amostraNaoBateram: chavesQueNaoBateram,
+          return giroCategoriasPermitidas.has(chave);
         });
       }
     }
@@ -762,33 +752,6 @@ export default function ControleEstoquePage({
 
     return resultadoFiltrado;
   }, [categorias, selectedCategorias, linhasExcluidas, categoriaExpansao, reagruparPorNivel, companyKey, selectedLinhas, selectedSubgrupos, selectedGrades, selectedColecoes, selectedGiro, giroCategoriasPermitidas]);
-
-  // Debug giro: quantos cards têm vendas 0 (não deveriam aparecer quando giro = "vendeu no período")
-  const debugGiroInfo = useMemo(() => {
-    if (!selectedGiro || !categoriasFiltradas.length) return null;
-    const comVendasZero = categoriasFiltradas.filter((c) => (c.vendasPeriodo ?? 0) === 0);
-    return {
-      totalCards: categoriasFiltradas.length,
-      comVendasZero: comVendasZero.length,
-      amostraVendasZero: comVendasZero.slice(0, 8).map((c) => ({
-        chave: `${c.categoria}|${c.linha ?? ""}|${c.subgrupo ?? ""}|${c.grade ?? ""}|${c.colecao ?? ""}`,
-        vendasPeriodo: c.vendasPeriodo,
-        estoqueAtual: c.estoqueAtual,
-      })),
-    };
-  }, [selectedGiro, categoriasFiltradas]);
-
-  useEffect(() => {
-    if (!debugGiroInfo) return;
-    console.log("[DEBUG GIRO] Lista após filtro:", {
-      totalCards: debugGiroInfo.totalCards,
-      comVendasZero: debugGiroInfo.comVendasZero,
-      amostraVendasZero: debugGiroInfo.amostraVendasZero,
-    });
-    if (debugGiroInfo.comVendasZero > 0) {
-      console.warn("[DEBUG GIRO] Itens com vendas 0 que passaram no filtro (não deveriam):", debugGiroInfo.amostraVendasZero);
-    }
-  }, [debugGiroInfo]);
 
   // Recalcular KPIs baseado nas categorias filtradas
   const kpisFiltrados = useMemo(() => {
@@ -1213,7 +1176,6 @@ export default function ControleEstoquePage({
   useEffect(() => {
     if (!selectedGiro) {
       setGiroCategoriasPermitidas(null);
-      setDebugGiroApi(null);
       return;
     }
 
@@ -1237,22 +1199,10 @@ export default function ControleEstoquePage({
         );
         if (active) {
           setGiroCategoriasPermitidas(new Set(chaves));
-          setDebugGiroApi({
-            diasGiro,
-            chavesCount: chaves.length,
-            sampleChaves: chaves.slice(0, 10),
-          });
-          console.log("[DEBUG GIRO] API retornou:", {
-            diasGiro,
-            chavesCount: chaves.length,
-            sampleChaves: chaves.slice(0, 5),
-          });
         }
       } catch (err) {
         if (active) {
           setGiroCategoriasPermitidas(null);
-          setDebugGiroApi(null);
-          console.error("[DEBUG GIRO] Erro ao carregar giro:", err);
         }
       } finally {
         if (active) {
@@ -1750,6 +1700,7 @@ export default function ControleEstoquePage({
           { label: '120 dias', value: '120', title: 'Vendeu entre 90 e 120 dias atrás' },
           { label: '150 dias', value: '150', title: 'Vendeu entre 120 e 150 dias atrás' },
           { label: '300 dias', value: '300', title: 'Vendeu entre 150 e 300 dias atrás' },
+          { label: 'Obsoleto', value: '0', title: 'Sem venda nos últimos 300 dias' },
         ].map(({ label, value, title }) => (
           <button
             key={value}
@@ -1767,57 +1718,7 @@ export default function ControleEstoquePage({
             carregando...
           </span>
         )}
-        {selectedGiro && (
-          <button
-            type="button"
-            onClick={() => setDebugGiroAberto((b) => !b)}
-            style={{ fontSize: '0.7rem', marginLeft: '8px', padding: '2px 6px', opacity: 0.8 }}
-          >
-            {debugGiroAberto ? '▼ esconder debug' : '▶ debug giro'}
-          </button>
-        )}
       </div>
-
-      {selectedGiro && debugGiroAberto && (
-        <div
-          style={{
-            marginTop: '8px',
-            padding: '10px',
-            background: '#f5f5f5',
-            borderRadius: '6px',
-            fontSize: '0.75rem',
-            fontFamily: 'monospace',
-          }}
-        >
-          <div style={{ fontWeight: 600, marginBottom: '6px' }}>Debug Giro (faixa {selectedGiro} dias)</div>
-          {debugGiroApi && (
-            <div style={{ marginBottom: '8px' }}>
-              <div>API giro: {debugGiroApi.chavesCount} chaves retornadas (combinações que venderam na faixa)</div>
-              <div style={{ marginTop: '4px', wordBreak: 'break-all' }}>
-                Amostra chaves: {debugGiroApi.sampleChaves.slice(0, 3).join(' | ')}
-              </div>
-            </div>
-          )}
-          {debugGiroInfo && (
-            <div>
-              <div>Cards na tela: {debugGiroInfo.totalCards}</div>
-              <div style={{ color: debugGiroInfo.comVendasZero > 0 ? 'crimson' : 'green' }}>
-                Com vendas = 0: {debugGiroInfo.comVendasZero} {debugGiroInfo.comVendasZero > 0 && '← não deveria aparecer'}
-              </div>
-              {debugGiroInfo.comVendasZero > 0 && (
-                <div style={{ marginTop: '6px' }}>
-                  Amostra (vendas 0):{' '}
-                  {debugGiroInfo.amostraVendasZero.map((a, i) => (
-                    <span key={i} style={{ display: 'block', marginTop: '2px' }}>
-                      {a.chave} → vendas={a.vendasPeriodo} estoque={a.estoqueAtual}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Por Categoria */}
       <div className={styles.section} id="categorias-section">

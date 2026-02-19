@@ -303,6 +303,19 @@ export default function EstoqueDetalhado01ProdutoPage({
     return sorted;
   }, [detalhes, sortColumn, sortDirection]);
 
+  const totaisFromLinhas = useMemo(() => {
+    if (!detalhes?.variacoes?.length) {
+      return { totalItens: 0, estoqueTotal: 0, custoTotal: 0, vendasTotais: 0 };
+    }
+    const v = detalhes.variacoes;
+    return {
+      totalItens: v.length,
+      estoqueTotal: v.reduce((s, x) => s + x.estoque, 0),
+      custoTotal: v.reduce((s, x) => s + x.custoTotal, 0),
+      vendasTotais: v.reduce((s, x) => s + x.vendasTotais, 0),
+    };
+  }, [detalhes?.variacoes]);
+
   if (loading) {
     return (
       <div className={styles.wrapper}>
@@ -462,6 +475,16 @@ export default function EstoqueDetalhado01ProdutoPage({
               );
             })}
           </tbody>
+          <tfoot>
+            <tr className={styles.footerRow}>
+              <td colSpan={3} className={styles.footerLabel}><strong>{totaisFromLinhas.totalItens} linhas</strong></td>
+              <td className={styles.footerValue}>{formatNumber(totaisFromLinhas.estoqueTotal)}</td>
+              <td>—</td>
+              <td>—</td>
+              <td className={styles.footerValue}>{formatCurrency(totaisFromLinhas.custoTotal)}</td>
+              <td className={styles.footerValue}>{formatNumber(totaisFromLinhas.vendasTotais)}</td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>

@@ -179,9 +179,9 @@ export async function GET(request: Request) {
       case 'giro': {
         const diasGiroParam = searchParams.get('diasGiro');
         const diasGiro = diasGiroParam ? parseInt(diasGiroParam, 10) : NaN;
-        if (!Number.isFinite(diasGiro) || diasGiro <= 0) {
+        if (!Number.isFinite(diasGiro) || diasGiro < 0) {
           return NextResponse.json(
-            { error: 'diasGiro é obrigatório e deve ser um número positivo' },
+            { error: 'diasGiro é obrigatório e deve ser 0 (obsoleto) ou um número positivo' },
             { status: 400 }
           );
         }
