@@ -462,10 +462,8 @@ export async function fetchCategoriasComGiro({
       ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
       : 'ISNULL(p.LINHA, \'SEM LINHA\')';
 
-    // Pré-calcula a última data de venda (com QTDE > 0) por PRODUTO em uma CTE.
-    // O otimizador do SQL Server usa um único scan/seek agrupado sobre o índice
-    // de W_CTB_LOJA_VENDA_PEDIDO_PRODUTO (PRODUTO, DATA_VENDA) e depois faz
-    // hash join com ESTOQUE_PRODUTOS — muito mais rápido que N subqueries correlacionadas.
+    // Pré-calcula a última data de venda (com QTDE > 0) por PRODUTO+COR em uma CTE.
+    // Giro por cor: só consideramos estoque da cor que vendeu; cores sem venda no período não entram.
     let giroQuery: string;
 
     if (isObsoleto) {
@@ -475,14 +473,16 @@ export async function fetchCategoriasComGiro({
       ;WITH UltimaVenda AS (
         SELECT
           vg.PRODUTO,
+          ISNULL(vg.COR_PRODUTO, '') AS COR_PRODUTO,
           MAX(vg.DATA_VENDA) AS ultimaVenda
         FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vg WITH (NOLOCK)
         WHERE vg.QTDE > 0
           ${vendasFilialFilter}
-        GROUP BY vg.PRODUTO
+        GROUP BY vg.PRODUTO, ISNULL(vg.COR_PRODUTO, '')
       )
       SELECT DISTINCT
         e.PRODUTO AS produto,
+        ISNULL(e.COR_PRODUTO, '') AS cor,
         ${categoriaField} AS categoria,
         ISNULL(p.LINHA, '') AS linha,
         ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
@@ -490,7 +490,7 @@ export async function fetchCategoriasComGiro({
         ISNULL(p.COLECAO, '') AS colecao
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
-      LEFT JOIN UltimaVenda uv ON uv.PRODUTO = e.PRODUTO
+      LEFT JOIN UltimaVenda uv ON uv.PRODUTO = e.PRODUTO AND ISNULL(uv.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')
       WHERE e.ESTOQUE > 0
         ${estoqueFilialFilter}
         ${grupoFilter}
@@ -517,22 +517,23 @@ export async function fetchCategoriasComGiro({
       request.input('giroDiasInicio', sql.Int, diasInicio);
       request.input('giroDiasFim', sql.Int, diasFim);
 
-      // CTE com a data da última venda por produto.
+      // CTE com a data da última venda por produto+cor.
       // Para faixas exclusivas (ex.: 60d), a condição é:
       //   ultimaVenda entre [hoje - diasFim, hoje - diasInicio)
-      // Isso substitui o EXISTS + NOT EXISTS por uma simples comparação de range no JOIN.
       giroQuery = `
       ;WITH UltimaVenda AS (
         SELECT
           vg.PRODUTO,
+          ISNULL(vg.COR_PRODUTO, '') AS COR_PRODUTO,
           MAX(vg.DATA_VENDA) AS ultimaVenda
         FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vg WITH (NOLOCK)
         WHERE vg.QTDE > 0
           ${vendasFilialFilter}
-        GROUP BY vg.PRODUTO
+        GROUP BY vg.PRODUTO, ISNULL(vg.COR_PRODUTO, '')
       )
       SELECT DISTINCT
         e.PRODUTO AS produto,
+        ISNULL(e.COR_PRODUTO, '') AS cor,
         ${categoriaField} AS categoria,
         ISNULL(p.LINHA, '') AS linha,
         ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
@@ -540,7 +541,7 @@ export async function fetchCategoriasComGiro({
         ISNULL(p.COLECAO, '') AS colecao
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
-      INNER JOIN UltimaVenda uv ON uv.PRODUTO = e.PRODUTO
+      INNER JOIN UltimaVenda uv ON uv.PRODUTO = e.PRODUTO AND ISNULL(uv.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')
       WHERE e.ESTOQUE > 0
         ${estoqueFilialFilter}
         ${grupoFilter}
@@ -565,6 +566,7 @@ export async function fetchCategoriasComGiro({
 
     const result = await request.query<{
       produto: string;
+      cor?: string;
       categoria: string;
       linha: string;
       subgrupo: string;
@@ -580,10 +582,12 @@ export async function fetchCategoriasComGiro({
       const chave = `${row.categoria?.trim() || ''}|${row.linha?.trim() || ''}|${row.subgrupo?.trim() || ''}|${row.grade?.trim() || ''}|${row.colecao?.trim() || ''}`;
       chaves.add(chave);
       const produto = (row.produto ?? '').toString().trim();
+      const cor = (row.cor ?? '').toString().trim();
       if (produto) {
-        todosProdutos.add(produto);
+        const idVariacao = cor ? `${produto}|${cor}` : produto;
+        todosProdutos.add(idVariacao);
         const list = produtosPorChave.get(chave) ?? [];
-        if (!list.includes(produto)) list.push(produto);
+        if (!list.includes(idVariacao)) list.push(idVariacao);
         produtosPorChave.set(chave, list);
       }
     });
@@ -1272,24 +1276,25 @@ export async function fetchEstoquePorCategoria({
     // Determinar se precisamos do CTE de giro
     const needsGiroCte = filtrarEstoquePorGiro && vendasGlobaisFilter;
 
-    // Preamble CTE: calcula MAX(DATA_VENDA) por produto uma única vez
+    // Preamble CTE: calcula MAX(DATA_VENDA) por produto+cor (giro por cor: só entra estoque da cor que vendeu)
     const giroCtePreamble = needsGiroCte
       ? `;WITH GiroUltimaVenda AS (
           SELECT
             vp.PRODUTO,
+            ISNULL(vp.COR_PRODUTO, '') AS COR_PRODUTO,
             MAX(vp.DATA_VENDA) AS ultimaVenda
           FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
           WHERE vp.QTDE > 0
             ${vendasGlobaisFilter}
-          GROUP BY vp.PRODUTO
+          GROUP BY vp.PRODUTO, ISNULL(vp.COR_PRODUTO, '')
         )`
       : '';
 
-    // JOIN adicional para trazer a última venda
+    // JOIN adicional: por produto e cor
     const giroJoinClause = needsGiroCte
       ? isGiroObsoleto
-        ? `LEFT JOIN GiroUltimaVenda guv ON guv.PRODUTO = e.PRODUTO`
-        : `INNER JOIN GiroUltimaVenda guv ON guv.PRODUTO = e.PRODUTO`
+        ? `LEFT JOIN GiroUltimaVenda guv ON guv.PRODUTO = e.PRODUTO AND ISNULL(guv.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')`
+        : `INNER JOIN GiroUltimaVenda guv ON guv.PRODUTO = e.PRODUTO AND ISNULL(guv.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')`
       : '';
 
     // Condição WHERE simples em vez de subqueries correlacionadas
@@ -3724,15 +3729,21 @@ export async function fetchProdutoDetalhes({
 
     const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
 
-    // Quando produtosPermitidos vem do cache/sessionStorage do giro: filtra por IN (...) e pula toda a lógica de giro.
+    // Quando produtosPermitidos vem do cache/sessionStorage do giro: filtra por (PRODUTO, COR) — formato "produto|cor" ou só "produto".
     let produtoFilterPermitidos = '';
     if (useProdutosPermitidos && produtosPermitidosParam) {
-      const list = produtosPermitidosParam.slice(0, 2000).map((p, i) => {
-        request.input(`perm${i}`, sql.VarChar, String(p).trim());
-        return `@perm${i}`;
+      const pares = produtosPermitidosParam.slice(0, 2000).map((s) => {
+        const t = String(s).trim();
+        const i = t.indexOf('|');
+        return i >= 0 ? [t.slice(0, i), t.slice(i + 1)] as [string, string] : [t, ''] as [string, string];
       });
-      if (list.length > 0) {
-        produtoFilterPermitidos = ` AND e.PRODUTO IN (${list.join(', ')})`;
+      const orClauses = pares.map(([prod, cor], i) => {
+        request.input(`permP${i}`, sql.VarChar, prod);
+        request.input(`permC${i}`, sql.VarChar, cor);
+        return `(LTRIM(RTRIM(e.PRODUTO)) = @permP${i} AND ISNULL(LTRIM(RTRIM(e.COR_PRODUTO)), '') = @permC${i})`;
+      });
+      if (orClauses.length > 0) {
+        produtoFilterPermitidos = ` AND (${orClauses.join(' OR ')})`;
       }
     }
 
@@ -3761,6 +3772,7 @@ export async function fetchProdutoDetalhes({
             filtroGiroNaQueryDetalhe = ` AND NOT EXISTS (
               SELECT 1 FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
               WHERE vp.PRODUTO = e.PRODUTO
+                AND ISNULL(vp.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')
                 AND vp.QTDE > 0
                 AND vp.DATA_VENDA >= DATEADD(DAY, -@giroObsoletoDiasDetalhe, CAST(GETDATE() AS DATE))
                 AND vp.DATA_VENDA < DATEADD(DAY, 1, CAST(GETDATE() AS DATE))
@@ -3784,7 +3796,7 @@ export async function fetchProdutoDetalhes({
               diasInicioGiroDetalhe > 0
                 ? `,
       ProdutosVenderamPeriodoExcluir AS (
-        SELECT DISTINCT vp.PRODUTO
+        SELECT DISTINCT vp.PRODUTO, ISNULL(vp.COR_PRODUTO, '') AS COR_PRODUTO
         FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
         WHERE vp.QTDE > 0
           AND vp.DATA_VENDA >= @periodoExcluirStartDetalhe
@@ -3793,7 +3805,7 @@ export async function fetchProdutoDetalhes({
       )`
                 : '';
             cteGiroDetalheSql = `WITH ProdutosNaFaixaGiro AS (
-        SELECT DISTINCT vp.PRODUTO
+        SELECT DISTINCT vp.PRODUTO, ISNULL(vp.COR_PRODUTO, '') AS COR_PRODUTO
         FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
         WHERE vp.DATA_VENDA >= @startDate
           AND vp.DATA_VENDA < @endDate
@@ -3801,12 +3813,13 @@ export async function fetchProdutoDetalhes({
           AND vp.FILIAL IN (${ph})
       )${cteExcluir}
       `;
-            // Anti-join via LEFT JOIN ... WHERE ex.PRODUTO IS NULL (uma vez), em vez de NOT EXISTS por linha.
+            // Anti-join por produto+cor
             filtroGiroApenasNotExistsDetalhe =
               diasInicioGiroDetalhe > 0 ? ` AND ex.PRODUTO IS NULL` : '';
             filtroGiroNaQueryDetalhe = ` AND EXISTS (
               SELECT 1 FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
               WHERE vp.PRODUTO = e.PRODUTO
+                AND ISNULL(vp.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')
                 AND vp.DATA_VENDA >= @startDate
                 AND vp.DATA_VENDA < @endDate
                 AND vp.QTDE > 0
@@ -3816,6 +3829,7 @@ export async function fetchProdutoDetalhes({
             AND NOT EXISTS (
               SELECT 1 FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vpExcl WITH (NOLOCK)
               WHERE vpExcl.PRODUTO = e.PRODUTO
+                AND ISNULL(vpExcl.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')
                 AND vpExcl.QTDE > 0
                 AND vpExcl.DATA_VENDA >= @periodoExcluirStartDetalhe
                 AND vpExcl.DATA_VENDA < @periodoExcluirEndDetalhe
@@ -3833,8 +3847,8 @@ export async function fetchProdutoDetalhes({
     // "produtos que venderam no período a excluir" e anti-join (LEFT JOIN ex WHERE ex.PRODUTO IS NULL) — uma varredura, sem NOT EXISTS por linha.
     const variacoesFromJoin = useCteGiroDetalhe
       ? `FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
-      INNER JOIN ProdutosNaFaixaGiro g ON g.PRODUTO = e.PRODUTO
-      ${diasInicioGiroDetalhe > 0 ? 'LEFT JOIN ProdutosVenderamPeriodoExcluir ex ON ex.PRODUTO = e.PRODUTO' : ''}
+      INNER JOIN ProdutosNaFaixaGiro g ON g.PRODUTO = e.PRODUTO AND ISNULL(g.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')
+      ${diasInicioGiroDetalhe > 0 ? "LEFT JOIN ProdutosVenderamPeriodoExcluir ex ON ex.PRODUTO = e.PRODUTO AND ISNULL(ex.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')" : ''}
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR`
       : `FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
@@ -4086,14 +4100,21 @@ export async function fetchProdutoDetalhesPorFilial({
 
     const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
 
+    // produtosPermitidos no formato "produto|cor" (giro por cor)
     let produtoFilterPermitidosPorFilial = '';
     if (useProdutosPermitidos && produtosPermitidosParam) {
-      const list = produtosPermitidosParam.slice(0, 2000).map((p, i) => {
-        request.input(`permFilial${i}`, sql.VarChar, String(p).trim());
-        return `@permFilial${i}`;
+      const pares = produtosPermitidosParam.slice(0, 2000).map((s) => {
+        const t = String(s).trim();
+        const i = t.indexOf('|');
+        return i >= 0 ? [t.slice(0, i), t.slice(i + 1)] as [string, string] : [t, ''] as [string, string];
       });
-      if (list.length > 0) {
-        produtoFilterPermitidosPorFilial = ` AND e.PRODUTO IN (${list.join(', ')})`;
+      const orClauses = pares.map(([prod, corVal], i) => {
+        request.input(`permFilialP${i}`, sql.VarChar, prod);
+        request.input(`permFilialC${i}`, sql.VarChar, corVal);
+        return `(LTRIM(RTRIM(e.PRODUTO)) = @permFilialP${i} AND ISNULL(LTRIM(RTRIM(e.COR_PRODUTO)), '') = @permFilialC${i})`;
+      });
+      if (orClauses.length > 0) {
+        produtoFilterPermitidosPorFilial = ` AND (${orClauses.join(' OR ')})`;
       }
     }
 
