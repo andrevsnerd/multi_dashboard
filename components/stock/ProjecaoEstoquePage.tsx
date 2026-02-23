@@ -16,6 +16,7 @@ import { ptBR } from "date-fns/locale";
 import FilialFilter from "@/components/filters/FilialFilter";
 import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
 import type { CompanyKey } from "@/lib/config/company";
+import { resolveCompany } from "@/lib/config/company";
 
 import styles from "./ProjecaoEstoquePage.module.css";
 
@@ -38,6 +39,8 @@ interface ProjecaoMensal {
   duracao: number; // dias
   isMesAtual: boolean;
   isMesPassado: boolean;
+  /** Vendas reais no mês (só no mês atual), para tooltip */
+  vendasReais?: number;
 }
 
 interface ProjecaoCategoria {
@@ -112,6 +115,29 @@ export default function ProjecaoEstoquePage({
   const [selectedColecoes, setSelectedColecoes] = useState<string[]>([]);
   const [selectedSubgrupos, setSelectedSubgrupos] = useState<string[]>([]);
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
+
+  // Estado para controlar expansão (mesmas regras do Controle de Estoque)
+  // Nível 0 = categoria, 1 = subgrupos, 2 = grades do subgrupo selecionado
+  const [categoriaExpansao, setCategoriaExpansao] = useState<
+    Map<string, { nivel: number; subgrupoSelecionado?: string }>
+  >(new Map());
+
+  // Linhas excluídas (ScarfMe) — mesma config do controle de estoque
+  const linhasExcluidas = useMemo(() => {
+    const companyConfig = resolveCompany(companyKey);
+    if (companyConfig?.excludedLines?.length) {
+      return new Set(companyConfig.excludedLines.map((l) => l.toUpperCase().trim()));
+    }
+    return new Set<string>([
+      "PRIVATE LABEL",
+      "GASTRONOMICA",
+      "PERFUMARIA",
+      "CASHMERE",
+      "ELETRONICOS",
+      "EMBALAGENS",
+      "CAPAS E ACESSORIOS P/ CEL",
+    ]);
+  }, [companyKey]);
 
   // Ler parâmetros da URL ao montar o componente
   useEffect(() => {
@@ -411,25 +437,27 @@ export default function ProjecaoEstoquePage({
       setError(null);
 
       try {
-        // Ler parâmetros da URL diretamente para garantir que estão atualizados
-        const filial = searchParams.get("filial");
+        // Ler parâmetros da URL para manter estados em sync
+        const filialFromUrl = searchParams.get("filial");
         const grupos = searchParams.getAll("grupos");
         const linhas = searchParams.getAll("linhas");
         const colecoes = searchParams.getAll("colecoes");
         const subgrupos = searchParams.getAll("subgrupos");
         const grades = searchParams.getAll("grades");
 
-        // Atualizar estados se necessário
-        if (filial !== selectedFilial) setSelectedFilial(filial);
+        // Atualizar estados a partir da URL (exceto filial: manter seleção do usuário para não sobrescrever ao trocar filial)
         if (grupos.length > 0 && JSON.stringify(grupos) !== JSON.stringify(selectedGrupos)) setSelectedGrupos(grupos);
         if (linhas.length > 0 && JSON.stringify(linhas) !== JSON.stringify(selectedLinhas)) setSelectedLinhas(linhas);
         if (colecoes.length > 0 && JSON.stringify(colecoes) !== JSON.stringify(selectedColecoes)) setSelectedColecoes(colecoes);
         if (subgrupos.length > 0 && JSON.stringify(subgrupos) !== JSON.stringify(selectedSubgrupos)) setSelectedSubgrupos(subgrupos);
         if (grades.length > 0 && JSON.stringify(grades) !== JSON.stringify(selectedGrades)) setSelectedGrades(grades);
 
+        // Usar selectedFilial para o request (reflete a seleção atual; URL pode não ter sido atualizada ainda)
+        const filialParaRequest = selectedFilial ?? filialFromUrl ?? null;
+
         const data = await fetchProjecaoMensal(
           companyKey,
-          filial,
+          filialParaRequest,
           grupos,
           linhas,
           colecoes,
@@ -457,6 +485,135 @@ export default function ProjecaoEstoquePage({
       active = false;
     };
   }, [companyKey, searchParams, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades]);
+
+  // Reagrupar projeções por nível de expansão (mesma lógica do Controle de Estoque)
+  const reagruparPorNivel = useMemo(() => {
+    return (
+      cats: ProjecaoCategoria[],
+      categoria: string,
+      nivel: number,
+      subgrupoSelecionado?: string
+    ): ProjecaoCategoria[] => {
+      const catsCategoria = cats.filter((c) => c.categoria === categoria);
+
+      const mergeMeses = (items: ProjecaoCategoria[]): ProjecaoMensal[] => {
+        if (items.length === 0) return [];
+        const base = items[0].meses;
+        return base.map((mes, i) => {
+          let vendas = 0;
+          let estoque = 0;
+          let vendasReais: number | undefined;
+          items.forEach((it) => {
+            const m = it.meses[i];
+            if (m) {
+              vendas += m.vendas;
+              estoque += m.estoque;
+              if (m.vendasReais != null) vendasReais = (vendasReais ?? 0) + m.vendasReais;
+            }
+          });
+          const diasNoMes = new Date(mes.ano, mes.mesNumero, 0).getDate();
+          const duracao = vendas > 0 ? Math.round((estoque / vendas) * diasNoMes) : 999;
+          return {
+            ...mes,
+            vendas,
+            estoque,
+            duracao,
+            ...(vendasReais !== undefined && { vendasReais }),
+          };
+        });
+      };
+
+      if (nivel === 0) {
+        const merged = mergeMeses(catsCategoria);
+        return [
+          {
+            categoria,
+            meses: merged,
+          },
+        ];
+      }
+
+      if (nivel === 1) {
+        const bySub = new Map<string, ProjecaoCategoria[]>();
+        catsCategoria.forEach((cat) => {
+          const key = `${cat.categoria}|${cat.subgrupo || ""}`;
+          if (!bySub.has(key)) bySub.set(key, []);
+          bySub.get(key)!.push(cat);
+        });
+        return Array.from(bySub.entries()).map(([key, items]) => {
+          const parts = key.split("|");
+          const subgrupo = parts[1] || undefined;
+          return {
+            categoria,
+            subgrupo,
+            linha: items[0]?.linha,
+            meses: mergeMeses(items),
+          };
+        });
+      }
+
+      // Nível 2: grades do subgrupo selecionado
+      if (subgrupoSelecionado) {
+        const filtradas = catsCategoria.filter((c) => c.subgrupo === subgrupoSelecionado);
+        const byGrade = new Map<string, ProjecaoCategoria[]>();
+        filtradas.forEach((cat) => {
+          const key = `${cat.categoria}|${cat.subgrupo || ""}|${cat.grade || ""}`;
+          if (!byGrade.has(key)) byGrade.set(key, []);
+          byGrade.get(key)!.push(cat);
+        });
+        return Array.from(byGrade.entries()).map(([, items]) => ({
+          categoria,
+          subgrupo: subgrupoSelecionado,
+          grade: items[0]?.grade,
+          linha: items[0]?.linha,
+          colecao: items[0]?.colecao,
+          meses: mergeMeses(items),
+        }));
+      }
+      return [];
+    };
+  }, []);
+
+  // Filtrar por linhas excluídas (ScarfMe) e filtros; aplicar expansão
+  const projecoesFiltradas = useMemo(() => {
+    let lista = projecoes.filter((p) => {
+      const catUpper = p.categoria.toUpperCase().trim();
+      if (companyKey === "scarfme" && linhasExcluidas.has(catUpper)) return false;
+      if (companyKey === "nerd" && selectedGrupos.length > 0 && !selectedGrupos.includes(p.categoria)) return false;
+      if (companyKey === "scarfme" && selectedLinhas.length > 0 && !selectedLinhas.includes(p.categoria)) return false;
+      return true;
+    });
+
+    const categoriasUnicas = Array.from(new Set(lista.map((p) => p.categoria)));
+    const categoriasExpandidas = new Set(
+      Array.from(categoriaExpansao.keys()).filter((c) => (categoriaExpansao.get(c)?.nivel ?? 0) > 0)
+    );
+
+    const resultado: ProjecaoCategoria[] = [];
+    categoriasUnicas.forEach((cat) => {
+      const expansao = categoriaExpansao.get(cat);
+      const nivel = expansao?.nivel ?? 0;
+      const subgrupoSelecionado = expansao?.subgrupoSelecionado;
+      const reagrupadas = reagruparPorNivel(lista, cat, nivel, subgrupoSelecionado);
+      resultado.push(...reagrupadas);
+    });
+
+    if (categoriasExpandidas.size > 0) {
+      return resultado.filter((p) => {
+        const nivel = categoriaExpansao.get(p.categoria)?.nivel ?? 0;
+        if (nivel === 0) return false;
+        if (nivel === 2 && categoriaExpansao.get(p.categoria)?.subgrupoSelecionado) {
+          return p.subgrupo === categoriaExpansao.get(p.categoria)?.subgrupoSelecionado;
+        }
+        return true;
+      });
+    }
+    return resultado.filter((p) => {
+      const expansao = categoriaExpansao.get(p.categoria);
+      const nivel = expansao?.nivel ?? 0;
+      return nivel === 0;
+    });
+  }, [projecoes, companyKey, linhasExcluidas, selectedGrupos, selectedLinhas, categoriaExpansao, reagruparPorNivel]);
 
   // Gerar meses para exibição (12 meses a partir do mês atual)
   const mesesExibicao = useMemo(() => {
@@ -599,6 +756,19 @@ export default function ProjecaoEstoquePage({
         )}
       </div>
 
+      {/* Botão Voltar quando há categoria expandida */}
+      {Array.from(categoriaExpansao.entries()).some(([, ex]) => ex.nivel > 0) && (
+        <div className={styles.expandActions}>
+          <button
+            type="button"
+            className={styles.voltarExpansaoButton}
+            onClick={() => setCategoriaExpansao(new Map())}
+          >
+            ← Voltar para todas as categorias
+          </button>
+        </div>
+      )}
+
       {/* Tabela de Projeção */}
       <div className={styles.tableWrapper}>
         <table className={styles.projecaoTable}>
@@ -617,15 +787,53 @@ export default function ProjecaoEstoquePage({
             </tr>
           </thead>
           <tbody>
-            {projecoes.map((proj, idx) => {
-              const isLastCategory = idx === projecoes.length - 1;
+            {projecoesFiltradas.map((proj, idx) => {
+              const isLastCategory = idx === projecoesFiltradas.length - 1;
+              const expansao = categoriaExpansao.get(proj.categoria);
+              const nivelAtual = expansao?.nivel ?? 0;
+              const podeExpandirNivel1 = nivelAtual === 0 && projecoes.some((p) => p.categoria === proj.categoria && p.subgrupo);
+              const podeExpandirNivel2 = nivelAtual === 1 && Boolean(proj.subgrupo) && projecoes.some((p) => p.categoria === proj.categoria && p.subgrupo === proj.subgrupo && p.grade);
+              const handleClickCategoria = () => {
+                if (nivelAtual === 0) {
+                  setCategoriaExpansao((prev) => {
+                    const novo = new Map(prev);
+                    novo.set(proj.categoria, { nivel: 1 });
+                    return novo;
+                  });
+                } else if (nivelAtual === 1 && proj.subgrupo) {
+                  setCategoriaExpansao((prev) => {
+                    const novo = new Map(prev);
+                    novo.set(proj.categoria, { nivel: 2, subgrupoSelecionado: proj.subgrupo });
+                    return novo;
+                  });
+                }
+              };
+              const chaveLinha = proj.subgrupo
+                ? `${proj.categoria}-${proj.subgrupo}-${proj.grade ?? ""}-${idx}`
+                : `${proj.categoria}-${idx}`;
               return (
-                <React.Fragment key={`${proj.categoria}-${idx}`}>
+                <React.Fragment key={chaveLinha}>
                   <tr className={styles.categoriaRow}>
-                    <td rowSpan={3} className={styles.categoriaCell}>
-                      {proj.categoria.toUpperCase()}
-                      {proj.subgrupo && <div className={styles.detailInfo}>Subgrupo: {proj.subgrupo}</div>}
-                      {proj.grade && <div className={styles.detailInfo}>Grade: {proj.grade}</div>}
+                    <td
+                      rowSpan={3}
+                      className={`${styles.categoriaCell} ${(podeExpandirNivel1 || (nivelAtual === 1 && podeExpandirNivel2)) ? styles.categoriaCellClickable : ""}`}
+                      role={(podeExpandirNivel1 || (nivelAtual === 1 && podeExpandirNivel2)) ? "button" : undefined}
+                      tabIndex={(podeExpandirNivel1 || (nivelAtual === 1 && podeExpandirNivel2)) ? 0 : undefined}
+                      onClick={(podeExpandirNivel1 || (nivelAtual === 1 && podeExpandirNivel2)) ? handleClickCategoria : undefined}
+                      onKeyDown={(e) => {
+                        if ((podeExpandirNivel1 || (nivelAtual === 1 && podeExpandirNivel2)) && (e.key === "Enter" || e.key === " ")) {
+                          e.preventDefault();
+                          handleClickCategoria();
+                        }
+                      }}
+                    >
+                      <div className={styles.categoriaCellContent}>
+                        <span className={styles.categoriaLabel}>
+                          {proj.categoria.toUpperCase()}
+                          {proj.subgrupo && <div className={styles.detailInfo}>Subgrupo: {proj.subgrupo}</div>}
+                          {proj.grade && <div className={styles.detailInfo}>Grade: {proj.grade}</div>}
+                        </span>
+                      </div>
                     </td>
                     <td className={styles.labelCell}>VENDA</td>
                     {mesesExibicao.map((m) => {
@@ -636,6 +844,7 @@ export default function ProjecaoEstoquePage({
                         <td
                           key={`${proj.categoria}-vendas-${m.ano}-${m.mesNumero}`}
                           className={styles.vendasCell}
+                          title={mesData?.isMesAtual && mesData.vendasReais != null ? `Vendas reais (até hoje): ${formatNumber(mesData.vendasReais)} un` : undefined}
                         >
                           {mesData ? formatNumber(mesData.vendas) : "-"}
                         </td>

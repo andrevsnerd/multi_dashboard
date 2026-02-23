@@ -1,0 +1,44 @@
+2026-02-20 09:58:05 | INFO | Início do relatório entradas/vendas/estoque
+2026-02-20 09:58:05 | INFO | Empresa: nerd
+2026-02-20 09:58:05 | INFO | Período: 01/01/2026 a 31/01/2026
+2026-02-20 09:58:05 | DEBUG | Log gravado em: C:\Users\NERD TIJUCA\Documents\NERD - ANDRE\Dashboard NERD\multi-dashboard\relatorios\logs\relatorio_entradas_vendas_estoque.log
+2026-02-20 09:58:05 | DEBUG | Carregando CSV: vendas, ecommerce, estoque
+2026-02-20 09:58:51 | INFO | Início do relatório entradas/vendas/estoque
+2026-02-20 09:58:51 | INFO | Empresa: nerd
+2026-02-20 09:58:51 | INFO | Período: 01/01/2026 a 31/01/2026
+2026-02-20 09:58:51 | DEBUG | Log gravado em: C:\Users\NERD TIJUCA\Documents\NERD - ANDRE\Dashboard NERD\multi-dashboard\relatorios\logs\relatorio_entradas_vendas_estoque.log
+2026-02-20 09:58:51 | DEBUG | Carregando CSV: vendas, ecommerce, estoque
+2026-02-20 09:58:55 | INFO | Conexão com banco OK (servidor: principal)
+2026-02-20 09:58:57 | DEBUG | Fonte ESTOQUE_PROD_ENT: 2830 linhas
+2026-02-20 09:58:57 | DEBUG | Fonte LOJA_ENTRADAS: 0 linhas
+2026-02-20 09:58:57 | INFO | Entradas totais (banco): 2830 linhas (ESTOQUE_PROD_ENT=2830 + LOJA_ENTRADAS=0)
+2026-02-20 09:58:57 | DEBUG | Agregando produtos com entrada no período
+2026-02-20 09:58:57 | INFO | Produtos (PRODUTO+COR) com entrada no período: 1022
+2026-02-20 09:59:03 | INFO | Arquivo salvo: C:\Users\NERD TIJUCA\Documents\NERD - ANDRE\Dashboard NERD\multi-dashboard\relatorios\entradas_vendas_estoque_nerd_202601_202601.xlsx
+2026-02-20 09:59:03 | INFO | Resumo: entradas_periodo=1022 | venderam=806 | venderam_estoque_zero=43 | nao_venderam=216
+2026-02-20 10:04:39 | INFO | Início do relatório entradas/vendas/estoque
+2026-02-20 10:04:39 | INFO | Empresa: nerd
+2026-02-20 10:04:39 | INFO | Período: 01/01/2026 a 31/01/2026
+2026-02-20 10:04:39 | DEBUG | Log gravado em: C:\Users\NERD TIJUCA\Documents\NERD - ANDRE\Dashboard NERD\multi-dashboard\relatorios\logs\relatorio_entradas_vendas_estoque.log
+2026-02-20 10:04:39 | DEBUG | Carregando CSV: vendas, ecommerce, estoque
+2026-02-20 10:04:43 | INFO | Conexão com banco OK (servidor: principal)
+2026-02-20 10:04:45 | DEBUG | Fonte ESTOQUE_PROD_ENT: 2830 linhas
+2026-02-20 10:04:45 | DEBUG | Fonte LOJA_ENTRADAS: 0 linhas
+2026-02-20 10:04:45 | INFO | Entradas totais (banco): 2830 linhas (ESTOQUE_PROD_ENT=2830 + LOJA_ENTRADAS=0)
+2026-02-20 10:04:45 | DEBUG | Agregando produtos com entrada no período
+2026-02-20 10:04:45 | INFO | Produtos (PRODUTO+COR) com entrada no período: 1022
+2026-02-20 10:04:50 | INFO | Arquivo salvo: C:\Users\NERD TIJUCA\Documents\NERD - ANDRE\Dashboard NERD\multi-dashboard\relatorios\entradas_vendas_estoque_nerd_202601_202601.xlsx
+2026-02-20 10:04:50 | INFO | Resumo: entradas_periodo=1022 | venderam=806 | venderam_estoque_zero=43 | nao_venderam=216
+2026-02-20 10:12:06 | INFO | Início do relatório entradas/vendas/estoque
+2026-02-20 10:12:06 | INFO | Empresa: nerd
+2026-02-20 10:12:06 | INFO | Período: 01/01/2026 a 31/01/2026
+2026-02-20 10:12:06 | DEBUG | Log gravado em: C:\Users\NERD TIJUCA\Documents\NERD - ANDRE\Dashboard NERD\multi-dashboard\relatorios\logs\relatorio_entradas_vendas_estoque.log
+2026-02-20 10:12:06 | DEBUG | Carregando CSV: vendas, ecommerce, estoque
+2026-02-20 10:12:09 | INFO | Conexão com banco OK (servidor: principal)
+2026-02-20 10:12:09 | DEBUG | Fonte ESTOQUE_PROD_ENT: 626 linhas
+2026-02-20 10:12:09 | DEBUG | Fonte LOJA_ENTRADAS: 0 linhas
+2026-02-20 10:12:09 | INFO | Entradas totais (banco): 626 linhas (ESTOQUE_PROD_ENT=626 + LOJA_ENTRADAS=0)
+2026-02-20 10:12:09 | DEBUG | Agregando produtos com entrada no período (entradas já só da matriz)
+2026-02-20 10:12:09 | INFO | Produtos (PRODUTO+COR) com entrada no período: 589
+2026-02-20 10:12:12 | INFO | Arquivo salvo: C:\Users\NERD TIJUCA\Documents\NERD - ANDRE\Dashboard NERD\multi-dashboard\relatorios\entradas_vendas_estoque_nerd_202601_202601.xlsx
+2026-02-20 10:12:12 | INFO | Resumo: entradas_periodo=589 | venderam=454 | venderam_estoque_zero=35 | nao_venderam=135

@@ -3,7 +3,7 @@ import sql from 'mssql';
 import { resolveCompany, VAREJO_VALUE } from '@/lib/config/company';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
-import { normalizeRangeForQuery, shiftRangeByMonths } from '@/lib/utils/date';
+import { getCurrentMonthRange, normalizeRangeForQuery, shiftRangeByMonths } from '@/lib/utils/date';
 import { getColorDescription } from '@/lib/utils/colorMapping';
 import type { DateRangeInput } from '@/types/dashboard';
 
@@ -4359,6 +4359,8 @@ export interface ProjecaoMensal {
   duracao: number; // dias
   isMesAtual: boolean;
   isMesPassado: boolean;
+  /** Vendas reais no mês (só no mês atual): varejo + e-commerce até hoje, para tooltip */
+  vendasReais?: number;
 }
 
 export interface ProjecaoCategoria {
@@ -4412,6 +4414,25 @@ export async function fetchProjecaoMensal({
     const gradeFilter = buildGradeFilter(request, company, grades, 'p');
     const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineProjecao');
     const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
+
+    // Vendas do mês atual: usar TODAS as filiais (igual ao Controle de Estoque "Venda Total (período)")
+    // para que o valor real e a projeção batam com o card quando o período for mês corrente
+    let vendasMesAtualFilialFilter = '';
+    if (company) {
+      const companyConfig = resolveCompany(company);
+      if (companyConfig) {
+        const todasFiliais = new Set([
+          ...(companyConfig.filialFilters['sales'] ?? []),
+          ...(companyConfig.ecommerceFilials ?? []),
+        ]);
+        if (todasFiliais.size > 0) {
+          const filiaisArray = Array.from(todasFiliais);
+          filiaisArray.forEach((f, i) => request.input(`vendasMesAtualFilial${i}`, sql.VarChar, f));
+          const placeholders = filiaisArray.map((_, i) => `@vendasMesAtualFilial${i}`).join(', ');
+          vendasMesAtualFilialFilter = `AND vp.FILIAL IN (${placeholders})`;
+        }
+      }
+    }
 
     // 1. Buscar estoque atual por categoria
     const estoqueQuery = `
@@ -4539,14 +4560,18 @@ export async function fetchProjecaoMensal({
     }
 
     // 3. Buscar vendas do mês atual (até hoje) - varejo
+    // Usar EXATAMENTE o mesmo período do Controle de Estoque (getCurrentMonthRange + normalizeRangeForQuery)
+    // e mesmo operador (end exclusivo: < periodoEnd) para o total bater com "Venda Total (período)"
     const hoje = new Date();
-    const inicioMesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const { start: periodoStartMesAtual, end: periodoEndMesAtual } = normalizeRangeForQuery(getCurrentMonthRange());
     const diasNoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
     const diasCorridos = hoje.getDate();
 
-    request.input('inicioMesAtual', sql.DateTime, inicioMesAtual);
-    request.input('fimMesAtual', sql.DateTime, hoje);
+    request.input('periodoStartMesAtual', sql.DateTime, periodoStartMesAtual);
+    request.input('periodoEndMesAtual', sql.DateTime, periodoEndMesAtual);
 
+    // Mesma regra do Controle de Estoque: não aplicar linha/subgrupo/grade/coleção nas vendas,
+    // só grupo e exclusion, para o total bater com "Venda Total (período)"
     const vendasMesAtualQuery = `
       SELECT 
         ${categoriaField} AS categoria
@@ -4554,15 +4579,11 @@ export async function fetchProjecaoMensal({
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-      WHERE vp.DATA_VENDA >= @inicioMesAtual
-        AND vp.DATA_VENDA <= @fimMesAtual
+      WHERE vp.DATA_VENDA >= @periodoStartMesAtual
+        AND vp.DATA_VENDA < @periodoEndMesAtual
         AND vp.QTDE > 0
-        ${vendasFilialFilter}
+        ${vendasMesAtualFilialFilter}
         ${grupoFilter}
-        ${linhaFilter}
-        ${colecaoFilter}
-        ${subgrupoFilter}
-        ${gradeFilter}
         ${exclusionFilter}
         ${nerdOnlyEletronicosFilter}
         AND ${categoriaField} <> ''
@@ -4607,8 +4628,8 @@ export async function fetchProjecaoMensal({
             JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) 
               ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
             LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
-            WHERE f.EMISSAO >= @inicioMesAtual
-              AND f.EMISSAO <= @fimMesAtual
+            WHERE f.EMISSAO >= @periodoStartMesAtual
+              AND f.EMISSAO < @periodoEndMesAtual
               AND f.NOTA_CANCELADA = 0
               AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
               AND CAST(fp.QTDE AS FLOAT) > 0
@@ -4638,47 +4659,23 @@ export async function fetchProjecaoMensal({
     // Processar dados
     const mesesNomes = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
     
-    // Determinar nível de agrupamento baseado nos filtros
-    // Nível 0: apenas categoria (sem subgrupo/grade)
-    // Nível 1: categoria + subgrupo (sem grade)
-    // Nível 2: categoria + subgrupo + grade (tudo detalhado)
-    const temSubgrupos = subgrupos && subgrupos.length > 0;
-    const temGrades = grades && grades.length > 0;
-    const nivelAgrupamento = temGrades ? 2 : (temSubgrupos ? 1 : 0);
+    // Sempre usar nível máximo de detalhe (categoria + linha + subgrupo + grade + coleção),
+    // para permitir expansão no frontend (mesma regra do fetchEstoquePorCategoria).
+    // Os filtros (grupos, linhas, subgrupos, grades) continuam aplicados no WHERE das queries.
+    const nivelAgrupamento = 2;
     
-    // Mapear estoque atual
+    // Mapear estoque atual (chave sempre no nível máximo)
     const estoqueMap = new Map<string, number>();
     estoqueResult.recordset.forEach(row => {
-      // Criar chave baseada no nível de agrupamento
-      let key: string;
-      if (nivelAgrupamento === 0) {
-        // Nível 0: apenas categoria
-        key = row.categoria;
-      } else if (nivelAgrupamento === 1) {
-        // Nível 1: categoria + subgrupo
-        key = `${row.categoria}|${row.subgrupo || ''}`;
-      } else {
-        // Nível 2: tudo detalhado
-        key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
-      }
-      
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
       const estoqueAtual = Number(row.estoqueAtual ?? 0);
       estoqueMap.set(key, (estoqueMap.get(key) || 0) + estoqueAtual);
     });
 
-    // Mapear vendas do ano passado por mês (varejo)
+    // Mapear vendas do ano passado por mês (varejo) — chave sempre nível máximo
     const vendasAnoPassadoMap = new Map<string, Map<number, number>>();
     vendasAnoPassadoResult.recordset.forEach(row => {
-      // Criar chave baseada no nível de agrupamento
-      let key: string;
-      if (nivelAgrupamento === 0) {
-        key = row.categoria;
-      } else if (nivelAgrupamento === 1) {
-        key = `${row.categoria}|${row.subgrupo || ''}`;
-      } else {
-        key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
-      }
-      
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
       if (!vendasAnoPassadoMap.has(key)) {
         vendasAnoPassadoMap.set(key, new Map());
       }
@@ -4690,16 +4687,7 @@ export async function fetchProjecaoMensal({
 
     // Somar vendas de e-commerce do ano passado
     ecommerceAnoPassadoResult.recordset.forEach(row => {
-      // Criar chave baseada no nível de agrupamento
-      let key: string;
-      if (nivelAgrupamento === 0) {
-        key = row.categoria;
-      } else if (nivelAgrupamento === 1) {
-        key = `${row.categoria}|${row.subgrupo || ''}`;
-      } else {
-        key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
-      }
-      
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
       if (!vendasAnoPassadoMap.has(key)) {
         vendasAnoPassadoMap.set(key, new Map());
       }
@@ -4709,35 +4697,17 @@ export async function fetchProjecaoMensal({
       mesMap.set(mesNumero, (mesMap.get(mesNumero) || 0) + vendasEcommerce);
     });
 
-    // Mapear vendas do mês atual (varejo)
+    // Mapear vendas do mês atual (varejo) — chave sempre nível máximo
     const vendasMesAtualMap = new Map<string, number>();
     vendasMesAtualResult.recordset.forEach(row => {
-      // Criar chave baseada no nível de agrupamento
-      let key: string;
-      if (nivelAgrupamento === 0) {
-        key = row.categoria;
-      } else if (nivelAgrupamento === 1) {
-        key = `${row.categoria}|${row.subgrupo || ''}`;
-      } else {
-        key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
-      }
-      
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
       const vendasAtual = Number(row.vendas ?? 0);
       vendasMesAtualMap.set(key, (vendasMesAtualMap.get(key) || 0) + vendasAtual);
     });
 
     // Somar vendas de e-commerce do mês atual
     ecommerceMesAtualResult.recordset.forEach(row => {
-      // Criar chave baseada no nível de agrupamento
-      let key: string;
-      if (nivelAgrupamento === 0) {
-        key = row.categoria;
-      } else if (nivelAgrupamento === 1) {
-        key = `${row.categoria}|${row.subgrupo || ''}`;
-      } else {
-        key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
-      }
-      
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
       const vendasEcommerce = Number(row.vendas ?? 0);
       vendasMesAtualMap.set(key, (vendasMesAtualMap.get(key) || 0) + vendasEcommerce);
     });
@@ -4746,34 +4716,13 @@ export async function fetchProjecaoMensal({
     const categoriasMap = new Map<string, ProjecaoCategoria>();
 
     estoqueMap.forEach((estoqueInicial, key) => {
-      // Extrair informações baseado no nível de agrupamento
-      let categoria: string;
-      let linha: string | undefined;
-      let subgrupo: string | undefined;
-      let grade: string | undefined;
-      let colecao: string | undefined;
-      
-      if (nivelAgrupamento === 0) {
-        categoria = key;
-        linha = undefined;
-        subgrupo = undefined;
-        grade = undefined;
-        colecao = undefined;
-      } else if (nivelAgrupamento === 1) {
-        const parts = key.split('|');
-        categoria = parts[0];
-        subgrupo = parts[1] || undefined;
-        linha = undefined;
-        grade = undefined;
-        colecao = undefined;
-      } else {
-        const parts = key.split('|');
-        categoria = parts[0];
-        linha = parts[1] || undefined;
-        subgrupo = parts[2] || undefined;
-        grade = parts[3] || undefined;
-        colecao = parts[4] || undefined;
-      }
+      // Chave sempre no formato categoria|linha|subgrupo|grade|colecao
+      const parts = key.split('|');
+      const categoria = parts[0];
+      const linha = parts[1] || undefined;
+      const subgrupo = parts[2] || undefined;
+      const grade = parts[3] || undefined;
+      const colecao = parts[4] || undefined;
       
       if (!categoriasMap.has(key)) {
         categoriasMap.set(key, {
@@ -4796,6 +4745,9 @@ export async function fetchProjecaoMensal({
       vendasAnoPassadoPorMes.forEach(v => totalVendasAnoPassado += v);
       const projecaoMensalMedia = totalVendasAnoPassado > 0 ? (totalVendasAnoPassado / 12) * 1.1 : 0;
 
+      const diasNoMesAtual = new Date(anoAtual, mesAtual, 0).getDate();
+      const diasCorridos = now.getDate();
+
       for (let i = 0; i < 12; i++) {
         const mesIndex = (mesAtual - 1 + i) % 12;
         const ano = anoAtual + Math.floor((mesAtual - 1 + i) / 12);
@@ -4804,30 +4756,32 @@ export async function fetchProjecaoMensal({
 
         let vendas: number;
         let estoqueProjecao: number;
+        let vendasReais: number | undefined;
         
         if (isMesAtual) {
-          // Mês atual: mostrar vendas atuais (até hoje) e estoque atual
-          vendas = Math.round(vendasMesAtual);
+          // Mês atual: exibir PROJEÇÃO do mês (igual aos cards); valor real fica em vendasReais para tooltip
+          // Projeção = (vendas reais até hoje / dias corridos) × total dias do mês (run rate)
+          if (diasCorridos > 0 && diasNoMesAtual > 0) {
+            vendas = Math.round((vendasMesAtual / diasCorridos) * diasNoMesAtual);
+          } else {
+            const vendasMesAnoPassado = vendasAnoPassadoPorMes.get(mesNumero) || 0;
+            vendas = vendasMesAnoPassado > 0 ? Math.round(vendasMesAnoPassado * 1.1) : Math.round(projecaoMensalMedia);
+          }
+          vendasReais = Math.round(vendasMesAtual); // varejo + e-commerce até hoje (mesma regra dos cards)
           estoqueProjecao = estoqueAtual; // Estoque atual (não muda)
         } else {
           // Próximos meses: buscar vendas do mesmo mês do ano passado e adicionar 10%
           const vendasMesAnoPassado = vendasAnoPassadoPorMes.get(mesNumero) || 0;
           if (vendasMesAnoPassado > 0) {
-            // Usar vendas do mesmo mês do ano passado + 10%
             vendas = Math.round(vendasMesAnoPassado * 1.1);
           } else {
-            // Se não houver dados do mês específico, usar média mensal + 10%
             vendas = Math.round(projecaoMensalMedia);
           }
           
-          // Calcular estoque futuro: estoque do mês anterior - vendas projetadas deste mês
           estoqueProjecao = Math.max(0, estoqueAtual - vendas);
-          
-          // Atualizar estoque atual para o próximo mês (acumulativo)
           estoqueAtual = estoqueProjecao;
         }
 
-        // Calcular duração (dias que o estoque durará)
         const diasNoMesProjecao = new Date(ano, mesIndex + 1, 0).getDate();
         const duracao = vendas > 0 ? Math.round((estoqueProjecao / vendas) * diasNoMesProjecao) : 999;
 
@@ -4845,6 +4799,7 @@ export async function fetchProjecaoMensal({
           duracao,
           isMesAtual,
           isMesPassado: false,
+          ...(vendasReais !== undefined && { vendasReais }),
         });
       }
     });
