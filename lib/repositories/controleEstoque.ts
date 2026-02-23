@@ -4563,12 +4563,20 @@ export async function fetchProjecaoMensal({
     // Usar EXATAMENTE o mesmo período do Controle de Estoque (getCurrentMonthRange + normalizeRangeForQuery)
     // e mesmo operador (end exclusivo: < periodoEnd) para o total bater com "Venda Total (período)"
     const hoje = new Date();
-    const { start: periodoStartMesAtual, end: periodoEndMesAtual } = normalizeRangeForQuery(getCurrentMonthRange());
+    const currentMonthRange = getCurrentMonthRange();
+    const { start: periodoStartMesAtual, end: periodoEndMesAtual } = normalizeRangeForQuery(currentMonthRange);
+    const previousMonth = shiftRangeByMonths(currentMonthRange, -1);
+    const { start: prevMonthStart, end: prevMonthEnd } = normalizeRangeForQuery(previousMonth);
+    const ultimos30DiasStart = new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000);
     const diasNoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
     const diasCorridos = hoje.getDate();
 
     request.input('periodoStartMesAtual', sql.DateTime, periodoStartMesAtual);
     request.input('periodoEndMesAtual', sql.DateTime, periodoEndMesAtual);
+    request.input('prevMonthStart', sql.DateTime, prevMonthStart);
+    request.input('prevMonthEnd', sql.DateTime, prevMonthEnd);
+    request.input('ultimos30Start', sql.DateTime, ultimos30DiasStart);
+    request.input('ultimos30End', sql.DateTime, periodoEndMesAtual);
 
     // Mesma regra do Controle de Estoque: não aplicar linha/subgrupo/grade/coleção nas vendas,
     // só grupo e exclusion, para o total bater com "Venda Total (período)"
@@ -4601,6 +4609,42 @@ export async function fetchProjecaoMensal({
       colecao?: string;
       vendas: number | null;
     }>(vendasMesAtualQuery);
+
+    // 3.0. Vendas mês anterior e últimos 30 dias (para regra dos primeiros 5 dias = Controle de Estoque)
+    const vendasMesAnterior30DiasQuery = `
+      SELECT 
+        ${categoriaField} AS categoria
+        ${camposAdicionais},
+        SUM(CASE WHEN vp.DATA_VENDA >= @prevMonthStart AND vp.DATA_VENDA < @prevMonthEnd AND vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendasMesAnterior,
+        SUM(CASE WHEN vp.DATA_VENDA >= @ultimos30Start AND vp.DATA_VENDA < @ultimos30End AND vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas30Dias
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      WHERE vp.DATA_VENDA >= @prevMonthStart
+        AND vp.DATA_VENDA < @ultimos30End
+        AND vp.QTDE > 0
+        ${vendasFilialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
+        AND ${categoriaField} <> ''
+        AND ${categoriaField} <> 'SEM GRUPO'
+        AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
+      GROUP BY ${categoriaField}${groupByAdicional}
+    `;
+    const vendasMesAnterior30DiasResult = await request.query<{
+      categoria: string;
+      linha?: string;
+      subgrupo?: string;
+      grade?: string;
+      colecao?: string;
+      vendasMesAnterior: number | null;
+      vendas30Dias: number | null;
+    }>(vendasMesAnterior30DiasQuery);
 
     // 3.1. Buscar vendas de e-commerce do mês atual (até hoje) - apenas ScarfMe
     let ecommerceMesAtualResult: { recordset: Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; vendas: number | null }> } = { recordset: [] };
@@ -4712,6 +4756,17 @@ export async function fetchProjecaoMensal({
       vendasMesAtualMap.set(key, (vendasMesAtualMap.get(key) || 0) + vendasEcommerce);
     });
 
+    // Mapear vendas mês anterior e últimos 30 dias (regra dos primeiros 5 dias)
+    const vendasMesAnteriorMap = new Map<string, number>();
+    const vendasUltimos30DiasMap = new Map<string, number>();
+    vendasMesAnterior30DiasResult.recordset.forEach(row => {
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
+      const vma = Number(row.vendasMesAnterior ?? 0);
+      const v30 = Number(row.vendas30Dias ?? 0);
+      if (vma > 0) vendasMesAnteriorMap.set(key, vma);
+      if (v30 > 0) vendasUltimos30DiasMap.set(key, v30);
+    });
+
     // Gerar projeções para 12 meses a partir do mês atual
     const categoriasMap = new Map<string, ProjecaoCategoria>();
 
@@ -4761,8 +4816,40 @@ export async function fetchProjecaoMensal({
         let vendasReais: number | undefined;
         
         if (isMesAtual) {
-          if (diasCorridos > 0 && diasNoMesAtual > 0) {
-            vendas = Math.round((vendasMesAtual / diasCorridos) * diasNoMesAtual);
+          // Mesma regra do Controle de Estoque: primeiros 5 dias usam mês anterior / últimos 30 dias ou média ponderada
+          const currentDay = diasCorridos;
+          let vendasParaProjecao = vendasMesAtual;
+          let diasParaProjecao = currentDay;
+
+          if (currentDay <= 5 && vendasMesAtual === 0) {
+            const vendasMesAnterior = vendasMesAnteriorMap.get(key) || 0;
+            const daysInPreviousMonth = new Date(prevMonthEnd.getTime() - 1).getDate();
+            if (vendasMesAnterior > 0) {
+              const mediaDiariaMesAnterior = vendasMesAnterior / daysInPreviousMonth;
+              vendasParaProjecao = mediaDiariaMesAnterior * currentDay;
+              diasParaProjecao = currentDay;
+            } else {
+              const vendas30Dias = vendasUltimos30DiasMap.get(key) || 0;
+              if (vendas30Dias > 0) {
+                const mediaDiaria30Dias = vendas30Dias / 30;
+                vendasParaProjecao = mediaDiaria30Dias * currentDay;
+                diasParaProjecao = currentDay;
+              }
+            }
+          } else if (currentDay <= 5 && vendasMesAtual > 0) {
+            const vendasMesAnterior = vendasMesAnteriorMap.get(key) || 0;
+            const daysInPreviousMonth = new Date(prevMonthEnd.getTime() - 1).getDate();
+            if (vendasMesAnterior > 0) {
+              const mediaDiariaMesAnterior = vendasMesAnterior / daysInPreviousMonth;
+              const mediaDiariaMesAtual = vendasMesAtual / currentDay;
+              const mediaPonderada = (mediaDiariaMesAnterior * 0.7) + (mediaDiariaMesAtual * 0.3);
+              vendasParaProjecao = mediaPonderada * currentDay;
+              diasParaProjecao = currentDay;
+            }
+          }
+
+          if (diasParaProjecao > 0 && diasNoMesAtual > 0) {
+            vendas = Math.round((vendasParaProjecao / diasParaProjecao) * diasNoMesAtual);
           } else {
             const vendasMesAnoPassado = vendasAnoPassadoPorMes.get(mesNumero) || 0;
             vendas = vendasMesAnoPassado > 0 ? Math.round(vendasMesAnoPassado * 1.1) : Math.round(projecaoMensalMedia);

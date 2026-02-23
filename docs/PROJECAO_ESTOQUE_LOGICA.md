@@ -25,14 +25,15 @@ Este documento descreve como a **Projeção de Estoque** funciona hoje (backend 
 | **Vendas ano passado** | `W_CTB_LOJA_VENDA_PEDIDO_PRODUTO` (varejo) +, se ScarfMe, `FATURAMENTO`/`W_FATURAMENTO_PROD_02` (e-commerce) | Ano = ano passado. Filial conforme `buildVendasFilialFilter`. Agrupado por mês e pela mesma chave detalhada. |
 | **Vendas mês atual** | Mesma tabela de vendas (varejo + e-commerce ScarfMe) | Período = **1º do mês até “hoje”** com o **mesmo critério do Controle de Estoque**: `getCurrentMonthRange()` + `normalizeRangeForQuery()`, então `DATA_VENDA >= periodoStart AND DATA_VENDA < periodoEnd`. **Todas as filiais** (`vendasMesAtualFilialFilter` = sales + e-commerce). **Sem** filtro de linha/subgrupo/grade/coleção na query (só grupo e exclusões), para bater com “Venda Total (período)” do card. |
 
-Ou seja: estoque respeita filial (e filtros de produto); vendas do mês atual são “todas as filiais” e mesmo período do card, para o número real e a projeção do mês baterem.
+Ou seja: estoque respeita filial (e filtros de produto); vendas do mês atual são “todas as filiais” e mesmo período do card, para o número real e a projeção do mês baterem. Dados de mês anterior e últimos 30 dias (varejo, filial selecionada) alimentam a regra dos primeiros 5 dias.
 
 ### 2.2 Projeção de vendas por mês
 
 - **Mês atual (primeira coluna):**
-  - **Projeção do mês (valor exibido):**  
-    `projeção = (vendas reais do mês até hoje / dias corridos) × dias do mês`  
-    (run rate do mês esticado para o mês inteiro.)
+  - **Projeção do mês (valor exibido):** mesma regra do **Controle de Estoque**:
+    - **Primeiros 5 dias do mês e zero vendas no mês:** usa média diária do **mês anterior** × dias corridos (ou, se não houver vendas no mês anterior, média diária dos **últimos 30 dias** × dias corridos); depois projeção = (vendasParaProjecao / diasParaProjecao) × dias do mês.
+    - **Primeiros 5 dias do mês e já tem vendas no mês:** **média ponderada** 70% mês anterior + 30% mês atual (média diária de cada), depois projeção = (vendasParaProjecao / diasParaProjecao) × dias do mês.
+    - **A partir do 6º dia (ou se não houver mês anterior/30 dias):** run rate puro: `(vendas reais do mês / dias corridos) × dias do mês`.
   - **Vendas reais (tooltip):** soma real varejo + e-commerce no período (1º do mês até hoje), mesma regra do card; fica em `vendasReais` só no mês atual.
 
 - **Meses seguintes (até dezembro):**
