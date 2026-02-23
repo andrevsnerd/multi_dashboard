@@ -4748,9 +4748,11 @@ export async function fetchProjecaoMensal({
       const diasNoMesAtual = new Date(anoAtual, mesAtual, 0).getDate();
       const diasCorridos = now.getDate();
 
-      for (let i = 0; i < 12; i++) {
-        const mesIndex = (mesAtual - 1 + i) % 12;
-        const ano = anoAtual + Math.floor((mesAtual - 1 + i) / 12);
+      // Apenas do mês atual até dezembro do ano corrente
+      const quantidadeMeses = 13 - mesAtual; // ex.: fev=2 → 11 meses (fev a dez)
+      for (let i = 0; i < quantidadeMeses; i++) {
+        const mesIndex = mesAtual - 1 + i; // 0-11, mesmo ano
+        const ano = anoAtual;
         const mesNumero = mesIndex + 1;
         const isMesAtual = i === 0;
 
@@ -4759,31 +4761,30 @@ export async function fetchProjecaoMensal({
         let vendasReais: number | undefined;
         
         if (isMesAtual) {
-          // Mês atual: exibir PROJEÇÃO do mês (igual aos cards); valor real fica em vendasReais para tooltip
-          // Projeção = (vendas reais até hoje / dias corridos) × total dias do mês (run rate)
           if (diasCorridos > 0 && diasNoMesAtual > 0) {
             vendas = Math.round((vendasMesAtual / diasCorridos) * diasNoMesAtual);
           } else {
             const vendasMesAnoPassado = vendasAnoPassadoPorMes.get(mesNumero) || 0;
             vendas = vendasMesAnoPassado > 0 ? Math.round(vendasMesAnoPassado * 1.1) : Math.round(projecaoMensalMedia);
           }
-          vendasReais = Math.round(vendasMesAtual); // varejo + e-commerce até hoje (mesma regra dos cards)
-          estoqueProjecao = estoqueAtual; // Estoque atual (não muda)
+          vendasReais = Math.round(vendasMesAtual);
+          estoqueProjecao = estoqueAtual; // estoque no início do mês (exibido)
         } else {
-          // Próximos meses: buscar vendas do mesmo mês do ano passado e adicionar 10%
           const vendasMesAnoPassado = vendasAnoPassadoPorMes.get(mesNumero) || 0;
           if (vendasMesAnoPassado > 0) {
             vendas = Math.round(vendasMesAnoPassado * 1.1);
           } else {
             vendas = Math.round(projecaoMensalMedia);
           }
-          
-          estoqueProjecao = Math.max(0, estoqueAtual - vendas);
-          estoqueAtual = estoqueProjecao;
+          // Exibir estoque no INÍCIO do mês (já é estoqueAtual); depois subtrair vendas para o próximo
+          estoqueProjecao = estoqueAtual;
         }
-
-        const diasNoMesProjecao = new Date(ano, mesIndex + 1, 0).getDate();
-        const duracao = vendas > 0 ? Math.round((estoqueProjecao / vendas) * diasNoMesProjecao) : 999;
+        // Próximo mês: estoque inicial = este estoque − vendas a considerar deste mês
+        // No mês atual o estoque já reflete as vendas reais; subtrair só a diferença projetada (projeção − vendas reais)
+        const vendasADescontar = isMesAtual && vendasReais != null
+          ? Math.max(0, vendas - vendasReais)
+          : vendas;
+        estoqueAtual = Math.max(0, estoqueAtual - vendasADescontar);
 
         projecao.meses.push({
           categoria,
@@ -4796,11 +4797,36 @@ export async function fetchProjecaoMensal({
           ano,
           vendas,
           estoque: estoqueProjecao,
-          duracao,
+          duracao: 0, // preenchido abaixo
           isMesAtual,
           isMesPassado: false,
           ...(vendasReais !== undefined && { vendasReais }),
         });
+      }
+
+      // Duração real: "A partir do fim deste mês, mantendo a projeção dos meses seguintes, o estoque acabaria em X dias"
+      for (let i = 0; i < projecao.meses.length; i++) {
+        // No mês atual usar estoque ao fim do mês (já descontada a diferença projetada) = estoque início do próximo
+        const estoqueParaDuracao = i === 0 && projecao.meses[1]
+          ? projecao.meses[1].estoque
+          : projecao.meses[i].estoque;
+        let remaining = estoqueParaDuracao;
+        let totalDias = 0;
+        for (let j = i + 1; j < projecao.meses.length; j++) {
+          const vendasMes = projecao.meses[j].vendas;
+          const diasNoMes = new Date(projecao.meses[j].ano, projecao.meses[j].mesNumero, 0).getDate();
+          if (diasNoMes <= 0 || vendasMes <= 0) continue;
+          const consumoDiario = vendasMes / diasNoMes;
+          const diasParaEsvaziar = remaining / consumoDiario;
+          if (diasParaEsvaziar >= diasNoMes) {
+            totalDias += diasNoMes;
+            remaining -= vendasMes;
+          } else {
+            totalDias += Math.round(diasParaEsvaziar);
+            break;
+          }
+        }
+        projecao.meses[i].duracao = totalDias > 0 ? totalDias : (estoqueParaDuracao > 0 ? 999 : 0);
       }
     });
 

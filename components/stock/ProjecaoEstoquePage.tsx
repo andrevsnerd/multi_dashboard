@@ -496,31 +496,69 @@ export default function ProjecaoEstoquePage({
     ): ProjecaoCategoria[] => {
       const catsCategoria = cats.filter((c) => c.categoria === categoria);
 
+      // "A partir do fim deste mês, mantendo a projeção dos meses seguintes, o estoque acabaria em X dias"
+      const diasAteAcabarEstoque = (meses: ProjecaoMensal[], startIndex: number): number => {
+        // Mês atual: usar estoque ao fim do mês (já descontada a diferença projetada) = estoque início do próximo
+        const estoqueInicio = meses[startIndex].estoque;
+        const estoqueParaDuracao = startIndex === 0 && meses[1] ? meses[1].estoque : estoqueInicio;
+        let remaining = estoqueParaDuracao;
+        let totalDias = 0;
+        for (let j = startIndex + 1; j < meses.length; j++) {
+          const vendasMes = meses[j].vendas;
+          const diasNoMes = new Date(meses[j].ano, meses[j].mesNumero, 0).getDate();
+          if (diasNoMes <= 0 || vendasMes <= 0) continue;
+          const consumoDiario = vendasMes / diasNoMes;
+          const diasParaEsvaziar = remaining / consumoDiario;
+          if (diasParaEsvaziar >= diasNoMes) {
+            totalDias += diasNoMes;
+            remaining -= vendasMes;
+          } else {
+            totalDias += Math.round(diasParaEsvaziar);
+            return totalDias;
+          }
+        }
+        return totalDias > 0 ? totalDias : (estoqueParaDuracao > 0 ? 999 : 0);
+      };
+
       const mergeMeses = (items: ProjecaoCategoria[]): ProjecaoMensal[] => {
         if (items.length === 0) return [];
         const base = items[0].meses;
-        return base.map((mes, i) => {
+        const merged = base.map((mes, i) => {
           let vendas = 0;
-          let estoque = 0;
           let vendasReais: number | undefined;
           items.forEach((it) => {
             const m = it.meses[i];
             if (m) {
               vendas += m.vendas;
-              estoque += m.estoque;
               if (m.vendasReais != null) vendasReais = (vendasReais ?? 0) + m.vendasReais;
             }
           });
-          const diasNoMes = new Date(mes.ano, mes.mesNumero, 0).getDate();
-          const duracao = vendas > 0 ? Math.round((estoque / vendas) * diasNoMes) : 999;
           return {
             ...mes,
             vendas,
-            estoque,
-            duracao,
+            estoque: 0, // preenchido abaixo com a cadeia correta
+            duracao: 0,
             ...(vendasReais !== undefined && { vendasReais }),
           };
         });
+        // Estoque é uma única cadeia: início do mês 0 = soma dos estoques iniciais; depois estoque[i] = estoque[i-1] - vendas a descontar[i-1]
+        // No mês atual: descontar só a diferença projetada (projeção − vendas reais), pois o estoque já reflete as vendas reais
+        let estoqueAcum = 0;
+        items.forEach((it) => {
+          const m0 = it.meses[0];
+          if (m0) estoqueAcum += m0.estoque;
+        });
+        for (let i = 0; i < merged.length; i++) {
+          merged[i].estoque = estoqueAcum;
+          const vendasADescontar = i === 0 && merged[i].vendasReais != null
+            ? Math.max(0, merged[i].vendas - merged[i].vendasReais!)
+            : merged[i].vendas;
+          estoqueAcum = Math.max(0, estoqueAcum - vendasADescontar);
+        }
+        for (let i = 0; i < merged.length; i++) {
+          merged[i].duracao = diasAteAcabarEstoque(merged, i);
+        }
+        return merged;
       };
 
       if (nivel === 0) {
@@ -615,20 +653,20 @@ export default function ProjecaoEstoquePage({
     });
   }, [projecoes, companyKey, linhasExcluidas, selectedGrupos, selectedLinhas, categoriaExpansao, reagruparPorNivel]);
 
-  // Gerar meses para exibição (12 meses a partir do mês atual)
+  // Gerar meses para exibição: apenas do mês atual até dezembro do ano
   const mesesExibicao = useMemo(() => {
     const hoje = new Date();
-    const mesAtual = getMonth(hoje);
+    const mesAtual = getMonth(hoje); // 0-11
     const anoAtual = getYear(hoje);
     const meses: Array<{ mes: string; mesNumero: number; ano: number; isMesAtual: boolean }> = [];
+    const quantidadeMeses = 12 - mesAtual; // ex.: fev (1) → 11 meses
 
-    for (let i = 0; i < 12; i++) {
-      const mesIndex = (mesAtual + i) % 12;
-      const ano = anoAtual + Math.floor((mesAtual + i) / 12);
+    for (let i = 0; i < quantidadeMeses; i++) {
+      const mesIndex = mesAtual + i;
       meses.push({
         mes: mesesNomes[mesIndex],
         mesNumero: mesIndex + 1,
-        ano,
+        ano: anoAtual,
         isMesAtual: i === 0,
       });
     }
