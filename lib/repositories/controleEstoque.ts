@@ -4899,11 +4899,13 @@ export async function fetchProjecaoMensal({
           : projecao.meses[i].estoque;
         let remaining = estoqueParaDuracao;
         let totalDias = 0;
+        let ultimoConsumoDiario = 0;
         for (let j = i + 1; j < projecao.meses.length; j++) {
           const vendasMes = projecao.meses[j].vendas;
           const diasNoMes = new Date(projecao.meses[j].ano, projecao.meses[j].mesNumero, 0).getDate();
           if (diasNoMes <= 0 || vendasMes <= 0) continue;
           const consumoDiario = vendasMes / diasNoMes;
+          ultimoConsumoDiario = consumoDiario;
           const diasParaEsvaziar = remaining / consumoDiario;
           if (diasParaEsvaziar >= diasNoMes) {
             totalDias += diasNoMes;
@@ -4913,7 +4915,19 @@ export async function fetchProjecaoMensal({
             break;
           }
         }
-        projecao.meses[i].duracao = totalDias > 0 ? totalDias : (estoqueParaDuracao > 0 ? 999 : 0);
+        // Se ainda sobrou estoque (ex.: dezembro é o último mês), mesma lógica: consumo diário do último mês
+        if (remaining > 0 && ultimoConsumoDiario > 0) {
+          totalDias += Math.round(remaining / ultimoConsumoDiario);
+        } else if (remaining > 0) {
+          // Sem meses seguintes (ex.: duração em dezembro): usar consumo do próprio último mês da janela
+          const ultimoMes = projecao.meses[projecao.meses.length - 1];
+          const diasNoUltimoMes = new Date(ultimoMes.ano, ultimoMes.mesNumero, 0).getDate();
+          if (diasNoUltimoMes > 0 && ultimoMes.vendas > 0) {
+            const consumoDiario = ultimoMes.vendas / diasNoUltimoMes;
+            totalDias += Math.round(remaining / consumoDiario);
+          }
+        }
+        projecao.meses[i].duracao = estoqueParaDuracao > 0 ? totalDias : 0;
       }
     });
 

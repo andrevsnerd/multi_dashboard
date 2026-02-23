@@ -96,8 +96,15 @@
   border-radius: 4px;
   padding: 20px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  overflow-x: auto;
   border: 1px solid #d1d1d1;
+}
+
+/* Container de rolagem: cabeçalho sticky funciona em relação a este scroll */
+.tableScrollContainer {
+  max-height: min(calc(100vh - 260px), 800px);
+  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
 }
 
 .projecaoTable {
@@ -107,7 +114,7 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', 'Helvetica Neue', Arial, sans-serif;
 }
 
-/* Cabeçalho - meses */
+/* Cabeçalho - meses (fixo no topo ao rolar a página) */
 .projecaoTable thead th {
   background: #fff;
   padding: 16px 14px;
@@ -120,9 +127,13 @@
   text-transform: uppercase;
   letter-spacing: 0.3px;
   white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 1px 0 0 #d1d1d1;
 }
 
-/* Cabeçalho lateral - Categoria */
+/* Cabeçalho lateral - Categoria (fixo à esquerda e no topo) */
 .categoriaHeader {
   background: #e8e8e8 !important;
   color: #212121 !important;
@@ -134,12 +145,14 @@
   border-bottom: 1px solid #d1d1d1 !important;
   position: sticky;
   left: 0;
-  z-index: 10;
+  top: 0;
+  z-index: 20;
   text-transform: uppercase;
   letter-spacing: 0.3px;
+  box-shadow: 1px 1px 0 0 #d1d1d1;
 }
 
-/* Cabeçalho lateral - Tipo */
+/* Cabeçalho lateral - Tipo (fixo no topo) */
 .labelHeader {
   background: #e8e8e8 !important;
   color: #555555 !important;
@@ -151,6 +164,10 @@
   font-size: 11px !important;
   text-transform: uppercase;
   letter-spacing: 0.3px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 1px 0 0 #d1d1d1;
 }
 
 /* Células do corpo */

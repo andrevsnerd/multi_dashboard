@@ -503,11 +503,13 @@ export default function ProjecaoEstoquePage({
         const estoqueParaDuracao = startIndex === 0 && meses[1] ? meses[1].estoque : estoqueInicio;
         let remaining = estoqueParaDuracao;
         let totalDias = 0;
+        let ultimoConsumoDiario = 0;
         for (let j = startIndex + 1; j < meses.length; j++) {
           const vendasMes = meses[j].vendas;
           const diasNoMes = new Date(meses[j].ano, meses[j].mesNumero, 0).getDate();
           if (diasNoMes <= 0 || vendasMes <= 0) continue;
           const consumoDiario = vendasMes / diasNoMes;
+          ultimoConsumoDiario = consumoDiario;
           const diasParaEsvaziar = remaining / consumoDiario;
           if (diasParaEsvaziar >= diasNoMes) {
             totalDias += diasNoMes;
@@ -517,7 +519,20 @@ export default function ProjecaoEstoquePage({
             return totalDias;
           }
         }
-        return totalDias > 0 ? totalDias : (estoqueParaDuracao > 0 ? 999 : 0);
+        // Se ainda sobrou estoque (ex.: dezembro é o último mês), mesma lógica: consumo diário do último mês
+        if (remaining > 0) {
+          if (ultimoConsumoDiario > 0) {
+            totalDias += Math.round(remaining / ultimoConsumoDiario);
+          } else {
+            const ultimoMes = meses[meses.length - 1];
+            const diasNoUltimoMes = new Date(ultimoMes.ano, ultimoMes.mesNumero, 0).getDate();
+            if (diasNoUltimoMes > 0 && ultimoMes.vendas > 0) {
+              const consumoDiario = ultimoMes.vendas / diasNoUltimoMes;
+              totalDias += Math.round(remaining / consumoDiario);
+            }
+          }
+        }
+        return estoqueParaDuracao > 0 ? totalDias : 0;
       };
 
       const mergeMeses = (items: ProjecaoCategoria[]): ProjecaoMensal[] => {
@@ -809,7 +824,8 @@ export default function ProjecaoEstoquePage({
 
       {/* Tabela de Projeção */}
       <div className={styles.tableWrapper}>
-        <table className={styles.projecaoTable}>
+        <div className={styles.tableScrollContainer}>
+          <table className={styles.projecaoTable}>
           <thead>
             <tr>
               <th rowSpan={2} className={styles.categoriaHeader}>Categoria</th>
@@ -926,6 +942,7 @@ export default function ProjecaoEstoquePage({
             })}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
