@@ -1027,12 +1027,12 @@ export async function fetchSalesSummary({
               AND ISNULL(vp.TAMANHO, 0) = ISNULL(vt.TAMANHO, 0)
           )
           ${filialFilter.replace(/f\.FILIAL/g, 'f.FILIAL')}
-          ${grupoFilter.replace(/p\.GRUPO_PRODUTO/g, 'p.GRUPO_PRODUTO')}
-          ${linhaFilter.replace(/p\.LINHA/g, 'p.LINHA')}
-          ${colecaoFilter.replace(/p\.COLECAO/g, 'p.COLECAO')}
-          ${subgrupoFilter.replace(/p\.SUBGRUPO_PRODUTO/g, 'p.SUBGRUPO_PRODUTO')}
+          ${grupoFilter.replace(/vp\.GRUPO_PRODUTO/g, 'p.GRUPO_PRODUTO')}
+          ${linhaFilter.replace(/vp\.LINHA/g, 'p.LINHA')}
+          ${colecaoFilter.replace(/vp\.COLECAO/g, 'p.COLECAO')}
+          ${subgrupoFilter.replace(/vp\.SUBGRUPO_PRODUTO/g, 'p.SUBGRUPO_PRODUTO')}
           ${gradeFilter}
-          ${produtoFilter.replace(/vp\.DESC_PRODUTO/g, 'p.DESC_PRODUTO')}
+          ${produtoFilter.replace(/vp\.DESC_PRODUTO/g, 'p.DESC_PRODUTO').replace(/vp\.PRODUTO/g, 'vt.PRODUTO')}
       ),
       VendasComNumero AS (
         SELECT 
