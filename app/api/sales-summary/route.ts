@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 
 import { fetchSalesSummary } from '@/lib/repositories/sales';
 
-// Aumentar timeout para queries que podem demorar mais (sales-summary pode levar 65s+)
-export const maxDuration = 120; // 120 segundos
+// Pro: até 300s. Evita "context canceled" no túnel quando vendas+estoque demoram.
+export const maxDuration = 300;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

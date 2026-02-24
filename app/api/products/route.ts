@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 
 import { fetchProductsWithDetails, type ProductDetail } from '@/lib/repositories/products';
 
+// Evita timeout em produção (proxy/túnel); padrão seria 10s no Hobby.
+export const maxDuration = 300;
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const company = searchParams.get('company') ?? undefined;
