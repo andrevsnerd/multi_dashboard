@@ -1127,35 +1127,34 @@ export async function fetchSalesSummary({
     `;
 
     const query = useLightQuery ? lightQuery : fullQuery;
-    const [result, stockSummary] = await Promise.all([
-      request.query<{
-        currentRevenue: number | null;
-        previousRevenue: number | null;
-        currentQuantity: number | null;
-        previousQuantity: number | null;
-        currentTickets: number | null;
-        previousTickets: number | null;
-        currentLastSaleDate: Date | null;
-      }>(query),
-      fetchStockSummary({
-        company,
-        filial,
-        grupo,
-        grupos,
-        linha,
-        linhas,
-        colecao,
-        colecoes,
-        subgrupo,
-        subgrupos,
-        grade,
-        grades,
-        produtoId,
-        produtoSearchTerm,
-        filterByRegistrationDate,
-        registrationDateRange: filterByRegistrationDate ? currentRange : undefined,
-      }),
-    ]);
+    // Sequencial para evitar timeout no proxy/túnel (duas queries pesadas em paralelo estouravam)
+    const result = await request.query<{
+      currentRevenue: number | null;
+      previousRevenue: number | null;
+      currentQuantity: number | null;
+      previousQuantity: number | null;
+      currentTickets: number | null;
+      previousTickets: number | null;
+      currentLastSaleDate: Date | null;
+    }>(query);
+    const stockSummary = await fetchStockSummary({
+      company,
+      filial,
+      grupo,
+      grupos,
+      linha,
+      linhas,
+      colecao,
+      colecoes,
+      subgrupo,
+      subgrupos,
+      grade,
+      grades,
+      produtoId,
+      produtoSearchTerm,
+      filterByRegistrationDate,
+      registrationDateRange: filterByRegistrationDate ? currentRange : undefined,
+    });
 
     const row = result.recordset[0] ?? {
       currentRevenue: 0,
