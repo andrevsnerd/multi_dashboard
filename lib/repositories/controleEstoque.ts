@@ -4361,6 +4361,9 @@ export interface ProjecaoMensal {
   isMesPassado: boolean;
   /** Vendas reais no mês (só no mês atual): varejo + e-commerce até hoje, para tooltip */
   vendasReais?: number;
+  /** Projeção por canal (apenas nos próximos meses): total varejo e e-commerce para tooltip */
+  vendasVarejo?: number;
+  vendasEcommerce?: number;
 }
 
 export interface ProjecaoCategoria {
@@ -4514,24 +4517,26 @@ export async function fetchProjecaoMensal({
         
         if (ecommerceFilials.length > 0) {
           ecommerceFilials.forEach((f, index) => {
-            request.input(`ecommerceAnoPassadoFilial${index}`, sql.VarChar, f);
+            request.input(`ecommerceAnoPassadoFilial${index}`, sql.VarChar, f.trim());
           });
           const placeholders = ecommerceFilials.map((_, i) => `@ecommerceAnoPassadoFilial${i}`).join(', ');
-          ecommerceAnoPassadoFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+          ecommerceAnoPassadoFilialFilter = `AND REPLACE(REPLACE(LTRIM(RTRIM(f.FILIAL)), NCHAR(0x00A0), ' '), CHAR(9), ' ') IN (${placeholders})`;
         }
 
         if (ecommerceAnoPassadoFilialFilter) {
+          // Usar data de entrega (fp.ENTREGA) quando existir, senao emissao - para bater com vendas por mes de entrega
+          const dataEcommerce = `COALESCE(CAST(fp.ENTREGA AS DATE), CAST(f.EMISSAO AS DATE))`;
           const ecommerceAnoPassadoQuery = `
             SELECT 
               ${categoriaField} AS categoria
               ${camposAdicionais},
-              MONTH(f.EMISSAO) AS mes,
+              MONTH(${dataEcommerce}) AS mes,
               SUM(CAST(fp.QTDE AS FLOAT)) AS vendas
             FROM FATURAMENTO f WITH (NOLOCK)
             JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) 
               ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
             LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
-            WHERE YEAR(f.EMISSAO) = ${anoPassado}
+            WHERE YEAR(${dataEcommerce}) = ${anoPassado}
               AND f.NOTA_CANCELADA = 0
               AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
               AND CAST(fp.QTDE AS FLOAT) > 0
@@ -4543,7 +4548,7 @@ export async function fetchProjecaoMensal({
               AND ${categoriaField} <> 'SEM GRUPO'
               AND ${categoriaField} <> 'SEM LINHA'
               ${buildCategoriaExcludeNerd(company, categoriaField)}
-            GROUP BY ${categoriaField}${groupByAdicional}, MONTH(f.EMISSAO)
+            GROUP BY ${categoriaField}${groupByAdicional}, MONTH(${dataEcommerce})
           `;
 
           ecommerceAnoPassadoResult = await request.query<{
@@ -4646,6 +4651,43 @@ export async function fetchProjecaoMensal({
       vendas30Dias: number | null;
     }>(vendasMesAnterior30DiasQuery);
 
+    // 2.9. E-commerce mês anterior e últimos 30 dias (ScarfMe) - para regra dos primeiros 5 dias incluir canal
+    let ecommerceMesAnterior30DiasResult: { recordset: Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; vendasMesAnterior: number | null; vendas30Dias: number | null }> } = { recordset: [] };
+    if (company === 'scarfme') {
+      const companyConfig = resolveCompany(company);
+      if (companyConfig?.ecommerceFilials?.length) {
+        const ecommerceFilials = companyConfig.ecommerceFilials;
+        ecommerceFilials.forEach((f, idx) => request.input(`ecommercePrev30Filial${idx}`, sql.VarChar, f.trim()));
+        const placeholders = ecommerceFilials.map((_, i) => `@ecommercePrev30Filial${i}`).join(', ');
+        const ecommercePrev30FilialFilter = `AND REPLACE(REPLACE(LTRIM(RTRIM(f.FILIAL)), NCHAR(0x00A0), ' '), CHAR(9), ' ') IN (${placeholders})`;
+        const ecommercePrev30Query = `
+          SELECT
+            ${categoriaField} AS categoria
+            ${camposAdicionais},
+            SUM(CASE WHEN f.EMISSAO >= @prevMonthStart AND f.EMISSAO < @prevMonthEnd AND f.NOTA_CANCELADA = 0 THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS vendasMesAnterior,
+            SUM(CASE WHEN f.EMISSAO >= @ultimos30Start AND f.EMISSAO < @ultimos30End AND f.NOTA_CANCELADA = 0 THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS vendas30Dias
+          FROM FATURAMENTO f WITH (NOLOCK)
+          JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+          LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
+          WHERE f.EMISSAO >= @prevMonthStart AND f.EMISSAO < @ultimos30End
+            AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+            AND CAST(fp.QTDE AS FLOAT) > 0
+            ${ecommercePrev30FilialFilter}
+            ${grupoFilter}
+            ${linhaFilter}
+            ${colecaoFilter}
+            ${subgrupoFilter}
+            ${gradeFilter}
+            ${exclusionFilter}
+            ${nerdOnlyEletronicosFilter}
+            AND ${categoriaField} <> '' AND ${categoriaField} <> 'SEM GRUPO' AND ${categoriaField} <> 'SEM LINHA'
+            ${buildCategoriaExcludeNerd(company, categoriaField)}
+          GROUP BY ${categoriaField}${groupByAdicional}
+        `;
+        ecommerceMesAnterior30DiasResult = await request.query(ecommercePrev30Query);
+      }
+    }
+
     // 3.1. Buscar vendas de e-commerce do mês atual (até hoje) - apenas ScarfMe
     let ecommerceMesAtualResult: { recordset: Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; vendas: number | null }> } = { recordset: [] };
     if (company === 'scarfme') {
@@ -4656,10 +4698,10 @@ export async function fetchProjecaoMensal({
         
         if (ecommerceFilials.length > 0) {
           ecommerceFilials.forEach((f, index) => {
-            request.input(`ecommerceMesAtualFilial${index}`, sql.VarChar, f);
+            request.input(`ecommerceMesAtualFilial${index}`, sql.VarChar, f.trim());
           });
           const placeholders = ecommerceFilials.map((_, i) => `@ecommerceMesAtualFilial${i}`).join(', ');
-          ecommerceMesAtualFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+          ecommerceMesAtualFilialFilter = `AND REPLACE(REPLACE(LTRIM(RTRIM(f.FILIAL)), NCHAR(0x00A0), ' '), CHAR(9), ' ') IN (${placeholders})`;
         }
 
         if (ecommerceMesAtualFilialFilter) {
@@ -4718,27 +4760,39 @@ export async function fetchProjecaoMensal({
 
     // Mapear vendas do ano passado por mês (varejo) — chave sempre nível máximo
     const vendasAnoPassadoMap = new Map<string, Map<number, number>>();
+    const vendasAnoPassadoVarejoMap = new Map<string, Map<number, number>>();
+    const vendasAnoPassadoEcommerceMap = new Map<string, Map<number, number>>();
     vendasAnoPassadoResult.recordset.forEach(row => {
       const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
       if (!vendasAnoPassadoMap.has(key)) {
         vendasAnoPassadoMap.set(key, new Map());
       }
+      if (!vendasAnoPassadoVarejoMap.has(key)) {
+        vendasAnoPassadoVarejoMap.set(key, new Map());
+      }
       const mesMap = vendasAnoPassadoMap.get(key)!;
+      const mesMapVarejo = vendasAnoPassadoVarejoMap.get(key)!;
       const mesNumero = row.mes;
       const vendasAtual = Number(row.vendas ?? 0);
       mesMap.set(mesNumero, (mesMap.get(mesNumero) || 0) + vendasAtual);
+      mesMapVarejo.set(mesNumero, (mesMapVarejo.get(mesNumero) || 0) + vendasAtual);
     });
 
-    // Somar vendas de e-commerce do ano passado
+    // Somar vendas de e-commerce do ano passado (e no map combinado e no map só e-commerce)
     ecommerceAnoPassadoResult.recordset.forEach(row => {
       const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
       if (!vendasAnoPassadoMap.has(key)) {
         vendasAnoPassadoMap.set(key, new Map());
       }
+      if (!vendasAnoPassadoEcommerceMap.has(key)) {
+        vendasAnoPassadoEcommerceMap.set(key, new Map());
+      }
       const mesMap = vendasAnoPassadoMap.get(key)!;
+      const mesMapEcommerce = vendasAnoPassadoEcommerceMap.get(key)!;
       const mesNumero = row.mes;
       const vendasEcommerce = Number(row.vendas ?? 0);
       mesMap.set(mesNumero, (mesMap.get(mesNumero) || 0) + vendasEcommerce);
+      mesMapEcommerce.set(mesNumero, (mesMapEcommerce.get(mesNumero) || 0) + vendasEcommerce);
     });
 
     // Mapear vendas do mês atual (varejo) — chave sempre nível máximo
@@ -4765,6 +4819,13 @@ export async function fetchProjecaoMensal({
       const v30 = Number(row.vendas30Dias ?? 0);
       if (vma > 0) vendasMesAnteriorMap.set(key, vma);
       if (v30 > 0) vendasUltimos30DiasMap.set(key, v30);
+    });
+    ecommerceMesAnterior30DiasResult.recordset.forEach(row => {
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
+      const vma = Number(row.vendasMesAnterior ?? 0);
+      const v30 = Number(row.vendas30Dias ?? 0);
+      if (vma > 0) vendasMesAnteriorMap.set(key, (vendasMesAnteriorMap.get(key) || 0) + vma);
+      if (v30 > 0) vendasUltimos30DiasMap.set(key, (vendasUltimos30DiasMap.get(key) || 0) + v30);
     });
 
     // Gerar projeções para 12 meses a partir do mês atual
@@ -4793,6 +4854,8 @@ export async function fetchProjecaoMensal({
       const projecao = categoriasMap.get(key)!;
       let estoqueAtual = estoqueInicial;
       const vendasAnoPassadoPorMes = vendasAnoPassadoMap.get(key) || new Map();
+      const vendasAnoPassadoVarejoPorMes = vendasAnoPassadoVarejoMap.get(key) || new Map();
+      const vendasAnoPassadoEcommercePorMes = vendasAnoPassadoEcommerceMap.get(key) || new Map();
       const vendasMesAtual = vendasMesAtualMap.get(key) || 0;
 
       // Calcular total de vendas do ano passado (para usar como fallback se não houver dados do mês específico)
@@ -4814,7 +4877,8 @@ export async function fetchProjecaoMensal({
         let vendas: number;
         let estoqueProjecao: number;
         let vendasReais: number | undefined;
-        
+        let vendasVarejoProj: number | undefined;
+        let vendasEcommerceProj: number | undefined;
         if (isMesAtual) {
           // Mesma regra do Controle de Estoque: primeiros 5 dias usam mês anterior / últimos 30 dias ou média ponderada
           const currentDay = diasCorridos;
@@ -4858,6 +4922,8 @@ export async function fetchProjecaoMensal({
           estoqueProjecao = estoqueAtual; // estoque no início do mês (exibido)
         } else {
           const vendasMesAnoPassado = vendasAnoPassadoPorMes.get(mesNumero) || 0;
+          const varejoMesAnoPassado = vendasAnoPassadoVarejoPorMes.get(mesNumero) || 0;
+          const ecommerceMesAnoPassado = vendasAnoPassadoEcommercePorMes.get(mesNumero) || 0;
           if (vendasMesAnoPassado > 0) {
             vendas = Math.round(vendasMesAnoPassado * 1.1);
           } else {
@@ -4865,6 +4931,9 @@ export async function fetchProjecaoMensal({
           }
           // Exibir estoque no INÍCIO do mês (já é estoqueAtual); depois subtrair vendas para o próximo
           estoqueProjecao = estoqueAtual;
+          // Projeção por canal para tooltip (próximos meses)
+          vendasVarejoProj = Math.round(varejoMesAnoPassado * 1.1);
+          vendasEcommerceProj = Math.round(ecommerceMesAnoPassado * 1.1);
         }
         // Próximo mês: estoque inicial = este estoque − vendas a considerar deste mês
         // No mês atual o estoque já reflete as vendas reais; subtrair só a diferença projetada (projeção − vendas reais)
@@ -4888,6 +4957,8 @@ export async function fetchProjecaoMensal({
           isMesAtual,
           isMesPassado: false,
           ...(vendasReais !== undefined && { vendasReais }),
+          ...(vendasVarejoProj !== undefined && { vendasVarejo: vendasVarejoProj }),
+          ...(vendasEcommerceProj !== undefined && { vendasEcommerce: vendasEcommerceProj }),
         });
       }
 
