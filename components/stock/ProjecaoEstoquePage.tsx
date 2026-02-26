@@ -486,6 +486,7 @@ export default function ProjecaoEstoquePage({
                             {isFuturo ? (
                               <span className={styles.vendasCellWrapper}>
                                 <span className={styles.vendasInfocard}>
+                                  <span className={styles.vendasInfocardLine}>Total real: {fmt((md!.vendasVarejo ?? 0) + (md!.vendasEcommerce ?? 0))}</span>
                                   <span className={styles.vendasInfocardLine}>Total varejo: {fmt(md!.vendasVarejo ?? 0)}</span>
                                   <span className={styles.vendasInfocardLine}>Total e-commerce: {fmt(md!.vendasEcommerce ?? 0)}</span>
                                 </span>

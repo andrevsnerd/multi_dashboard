@@ -4931,9 +4931,9 @@ export async function fetchProjecaoMensal({
           }
           // Exibir estoque no INÍCIO do mês (já é estoqueAtual); depois subtrair vendas para o próximo
           estoqueProjecao = estoqueAtual;
-          // Projeção por canal para tooltip (próximos meses)
-          vendasVarejoProj = Math.round(varejoMesAnoPassado * 1.1);
-          vendasEcommerceProj = Math.round(ecommerceMesAnoPassado * 1.1);
+          // Valores reais (ano passado) para o infocard; a projeção (+10%) segue no total da célula
+          vendasVarejoProj = Math.round(varejoMesAnoPassado);
+          vendasEcommerceProj = Math.round(ecommerceMesAnoPassado);
         }
         // Próximo mês: estoque inicial = este estoque − vendas a considerar deste mês
         // No mês atual o estoque já reflete as vendas reais; subtrair só a diferença projetada (projeção − vendas reais)
