@@ -388,6 +388,23 @@ export default function ProjecaoEstoquePage({
     }
   }, [expansao, projecoes]);
 
+  // Dados reais (por categoria): estoque atual já tem venda real descontada; duração só com ritmo real
+  const getReaisPorMes = useCallback((proj: ProjecaoCategoria) => {
+    const meses = proj.meses;
+    if (meses.length === 0) return { estoqueAtualReal: 0, duracaoRealMesAtual: 0 };
+    // Estoque atual já está descontado das vendas reais (não descontar de novo)
+    const estoqueAtualReal = meses[0].estoque;
+    const vendasReaisMesAtual = meses[0].vendasReais ?? 0;
+    const diasCorridos = new Date().getDate();
+    // Duração real: com o estoque atual, ritmo = vendasReais/diasCorridos → dias até zerar
+    let duracaoRealMesAtual = 0;
+    if (estoqueAtualReal > 0 && vendasReaisMesAtual > 0 && diasCorridos > 0) {
+      const consumoDiario = vendasReaisMesAtual / diasCorridos;
+      duracaoRealMesAtual = Math.round(estoqueAtualReal / consumoDiario);
+    }
+    return { estoqueAtualReal, duracaoRealMesAtual };
+  }, []);
+
   if (loading) return <div className={styles.wrapper}><div className={styles.loading}>Carregando...</div></div>;
   if (error) return <div className={styles.wrapper}><div className={styles.error}>{error}</div></div>;
 
@@ -395,22 +412,23 @@ export default function ProjecaoEstoquePage({
 
   return (
     <div className={styles.wrapper}>
-      <div className={styles.header}>
-        <div className={styles.headerLeft}>
-          <div className={styles.iconWrapper}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 6H16L14 4H10L8 6H4C2.9 6 2 6.9 2 8V19C2 20.1 2.9 21 4 21H20C21.1 21 22 20.1 22 19V8C22 6.9 21.1 6 20 6Z" />
-            </svg>
+      <div className={styles.headerCard}>
+        <div className={styles.header}>
+          <div className={styles.headerLeft}>
+            <div className={styles.iconWrapper}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6H16L14 4H10L8 6H4C2.9 6 2 6.9 2 8V19C2 20.1 2.9 21 4 21H20C21.1 21 22 20.1 22 19V8C22 6.9 21.1 6 20 6Z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className={styles.title}>Projecao de Estoque</h1>
+              <p className={styles.subtitle}>Evolucao mensal de vendas, estoque e duracao (varejo + e-commerce)</p>
+            </div>
           </div>
-          <div>
-            <h1 className={styles.title}>Projecao de Estoque</h1>
-            <p className={styles.subtitle}>Evolucao mensal de vendas, estoque e duracao (varejo + e-commerce)</p>
-          </div>
+          <button type="button" className={styles.backButton} onClick={() => router.back()}>Voltar</button>
         </div>
-        <button type="button" className={styles.backButton} onClick={() => router.back()}>Voltar</button>
-      </div>
 
-      <div className={styles.filtersRow}>
+        <div className={styles.filtersRow}>
         <FilialFilter companyKey={companyKey} value={filial} onChange={setFilial} />
         {companyKey === "nerd" && (
           <MultiSelectFilter
@@ -439,6 +457,7 @@ export default function ProjecaoEstoquePage({
             )}
           </>
         )}
+      </div>
       </div>
 
       {temExpansao && (
@@ -470,12 +489,14 @@ export default function ProjecaoEstoquePage({
                 const clickable = podeNivel1 || (nivel === 1 && podeNivel2);
                 const isLast = idx === listaExibida.length - 1;
 
+                const { estoqueAtualReal, duracaoRealMesAtual } = getReaisPorMes(proj);
+
                 return (
                   <React.Fragment key={`${proj.categoria}-${proj.subgrupo ?? ""}-${proj.grade ?? ""}-${idx}`}>
-                    <tr className={styles.categoriaRow}>
+                    <tr className={`${styles.categoriaRow} ${idx > 0 ? styles.categoryBlockStart : ""}`}>
                       <td
-                        rowSpan={3}
-                        className={`${styles.categoriaCell} ${clickable ? styles.categoriaCellClickable : ""}`}
+                        rowSpan={6}
+                        className={`${styles.categoriaCell} ${clickable ? styles.categoriaCellClickable : ""} ${!isLast ? styles.categoriaCellBlockEnd : ""}`}
                         role={clickable ? "button" : undefined}
                         tabIndex={clickable ? 0 : undefined}
                         onClick={clickable ? () => handleClickCategoria(proj) : undefined}
@@ -518,11 +539,35 @@ export default function ProjecaoEstoquePage({
                         return <td key={`e-${m.ano}-${m.mesNumero}`} className={styles.estoqueCell}>{md ? fmt(md.estoque) : "-"}</td>;
                       })}
                     </tr>
-                    <tr className={`${styles.duracaoRow} ${!isLast ? styles.categorySeparator : ""}`}>
+                    <tr className={styles.duracaoRow}>
                       <td className={styles.labelCell}>DURACAO</td>
                       {mesesExibicao.map((m) => {
                         const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
                         return <td key={`d-${m.ano}-${m.mesNumero}`} className={styles.duracaoCell}>{md ? `${md.duracao} dias` : "-"}</td>;
+                      })}
+                    </tr>
+                    {/* Bloco números reais — mesmo cinza nas 3 linhas, como na imagem */}
+                    <tr className={`${styles.realRow} ${styles.realRowFirst}`}>
+                      <td className={styles.realLabelCell}>VENDA (real)</td>
+                      {mesesExibicao.map((m, mi) => {
+                        const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
+                        const valor = md?.isMesAtual && md.vendasReais != null ? fmt(md.vendasReais) : "-";
+                        return <td key={`vr-${m.ano}-${m.mesNumero}`} className={styles.realVendasCell}>{valor}</td>;
+                      })}
+                    </tr>
+                    <tr className={styles.realRow}>
+                      <td className={styles.realLabelCell}>ESTOQUE (real)</td>
+                      {mesesExibicao.map((m, mi) => {
+                        const valor = mi === 0 ? fmt(estoqueAtualReal) : "-";
+                        return <td key={`er-${m.ano}-${m.mesNumero}`} className={styles.realEstoqueCell}>{valor}</td>;
+                      })}
+                    </tr>
+                    <tr className={`${styles.realRow} ${!isLast ? styles.categoryBlockEnd : ""}`}>
+                      <td className={styles.realLabelCell}>DURACAO (real)</td>
+                      {mesesExibicao.map((m, mi) => {
+                        const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
+                        const valor = md?.isMesAtual && duracaoRealMesAtual > 0 ? `${duracaoRealMesAtual} dias` : "-";
+                        return <td key={`dr-${m.ano}-${m.mesNumero}`} className={styles.realDuracaoCell}>{valor}</td>;
                       })}
                     </tr>
                   </React.Fragment>

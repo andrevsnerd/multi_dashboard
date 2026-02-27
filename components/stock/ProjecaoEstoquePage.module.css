@@ -1,14 +1,26 @@
 .wrapper {
   padding: 24px;
-  background: #f7f7f7;
+  background: #ffffff;
   min-height: 100vh;
+}
+
+/* Card do topo: título + filtros — sem borda */
+.headerCard {
+  background: #ffffff;
+  border: none;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 32px;
+  margin-bottom: 0;
+  padding: 20px 24px;
+  background: #ffffff;
 }
 
 .headerLeft {
@@ -23,7 +35,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
+  background: #f2f2f2;
   border-radius: 8px;
   color: #212121;
 }
@@ -46,8 +58,8 @@
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  background: #fff;
-  border: 1px solid #d1d1d1;
+  background: #ffffff;
+  border: 1px solid #d9d9d9;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
@@ -57,27 +69,32 @@
 }
 
 .backButton:hover {
-  background: #f9f9f9;
-  border-color: #cccccc;
+  background: #f8f8f8;
+  border-color: #cfcfcf;
   color: #212121;
 }
 
+/* Filtros (Filial, Grupo, etc.) — cinza muito sutil como na imagem */
 .filtersRow {
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 0;
+  padding: 16px 24px;
+  background: #f8f8f8;
+  border-top: 1px solid #eeeeee;
   flex-wrap: wrap;
 }
 
 .expandActions {
   margin-bottom: 16px;
+  padding-top: 16px;
 }
 
 .voltarExpansaoButton {
   padding: 8px 16px;
-  background: #fff;
-  border: 1px solid #d1d1d1;
+  background: #ffffff;
+  border: 1px solid #d9d9d9;
   border-radius: 8px;
   font-size: 14px;
   color: #555555;
@@ -86,17 +103,19 @@
 }
 
 .voltarExpansaoButton:hover {
-  background: #f9f9f9;
-  border-color: #cccccc;
+  background: #f8f8f8;
+  border-color: #cfcfcf;
   color: #212121;
 }
 
+/* Tabela em card separado — borda forte para delimitar do card de cima */
 .tableWrapper {
   background: #fff;
-  border-radius: 4px;
+  border-radius: 8px;
   padding: 20px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  border: 1px solid #d1d1d1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e1e1e1;
+  margin-top: 20px;
 }
 
 /* Container de rolagem: cabeçalho sticky funciona em relação a este scroll */
@@ -116,58 +135,58 @@
 
 /* Cabeçalho - meses (fixo no topo ao rolar a página) */
 .projecaoTable thead th {
-  background: #fff;
+  background: #ffffff;
   padding: 16px 14px;
   text-align: center;
   font-weight: 500;
   font-size: 11px;
   color: #555555;
   border: none;
-  border-bottom: 1px solid #d1d1d1;
+  border-bottom: 1px solid #e5e5e5;
   text-transform: uppercase;
   letter-spacing: 0.3px;
   white-space: nowrap;
   position: sticky;
   top: 0;
   z-index: 10;
-  box-shadow: 0 1px 0 0 #d1d1d1;
+  box-shadow: 0 1px 0 0 #e5e5e5;
 }
 
 /* Cabeçalho lateral - Categoria (fixo à esquerda e no topo) */
 .categoriaHeader {
-  background: #e8e8e8 !important;
+  background: #ffffff !important;
   color: #212121 !important;
   font-weight: 500 !important;
   text-align: left !important;
   padding: 16px 14px !important;
   font-size: 12px !important;
   border: none !important;
-  border-bottom: 1px solid #d1d1d1 !important;
+  border-bottom: 1px solid #e5e5e5 !important;
   position: sticky;
   left: 0;
   top: 0;
   z-index: 20;
   text-transform: uppercase;
   letter-spacing: 0.3px;
-  box-shadow: 1px 1px 0 0 #d1d1d1;
+  box-shadow: 1px 1px 0 0 #e5e5e5;
 }
 
 /* Cabeçalho lateral - Tipo (fixo no topo) */
 .labelHeader {
-  background: #e8e8e8 !important;
+  background: #ffffff !important;
   color: #555555 !important;
   font-weight: 500 !important;
   text-align: center !important;
   padding: 16px 14px !important;
   border: none !important;
-  border-bottom: 1px solid #d1d1d1 !important;
+  border-bottom: 1px solid #e5e5e5 !important;
   font-size: 11px !important;
   text-transform: uppercase;
   letter-spacing: 0.3px;
   position: sticky;
   top: 0;
   z-index: 10;
-  box-shadow: 0 1px 0 0 #d1d1d1;
+  box-shadow: 0 1px 0 0 #e5e5e5;
 }
 
 /* Células do corpo */
@@ -177,6 +196,7 @@
   border: none;
   font-size: 13px;
   vertical-align: middle;
+  border-bottom: 1px solid #ededed;
 }
 
 .projecaoTable tbody tr {
@@ -188,9 +208,9 @@
   background: #ffffff;
 }
 
-/* Célula de Categoria - Cinza Névoa */
+/* Célula de Categoria — fundo branco (projeção) */
 .categoriaCell {
-  background: #ededed;
+  background: #ffffff;
   font-weight: 500;
   color: #212121;
   text-align: left;
@@ -216,7 +236,7 @@
 }
 
 .categoriaCellClickable:hover {
-  background: #e0e0e0 !important;
+  background: #f5f5f5 !important;
 }
 
 .expandButton {
@@ -243,11 +263,11 @@
 }
 
 
-/* Label (VENDA, ESTOQUE, DURAÇÃO) - Cinza Médio */
+/* Label (VENDA, ESTOQUE, DURAÇÃO) — fundo branco na projeção */
 .labelCell {
-  background: #ededed;
+  background: #ffffff;
   font-weight: 400;
-  color: #808080;
+  color: #555555;
   text-align: left;
   padding: 16px 14px;
   border: none;
@@ -317,16 +337,16 @@
   margin-top: 2px;
 }
 
-/* Linha de ESTOQUE - Cinza Claríssimo */
+/* Linha de ESTOQUE — fundo branco (projeção) */
 .estoqueRow {
-  background: #f9f9f9;
+  background: #ffffff;
 }
 
-/* Células de ESTOQUE - Cinza Chumbo, Regular */
+/* Células de ESTOQUE — fundo branco */
 .estoqueCell {
   color: #555555;
   font-weight: 400;
-  background: #f9f9f9;
+  background: #ffffff;
   padding: 16px 14px;
   font-size: 13px;
 }
@@ -337,9 +357,27 @@
   border-bottom: none;
 }
 
-/* Borda horizontal apenas entre grupos de categorias */
-.duracaoRow.categorySeparator {
-  border-bottom: 1px solid #d1d1d1;
+/* Delimitação entre blocos de categorias: borda superior no início de cada bloco (exceto o primeiro) */
+.categoryBlockStart {
+  border-top: 1px solid #d6d6d6;
+}
+
+.categoryBlockStart td {
+  border-top: 1px solid #d6d6d6;
+}
+
+/* Borda inferior mais visível no fim de cada bloco (projeção + números reais) */
+.categoryBlockEnd {
+  border-bottom: 1px solid #d6d6d6;
+}
+
+.categoryBlockEnd td {
+  border-bottom: 1px solid #d6d6d6;
+}
+
+/* Célula de categoria também recebe borda inferior quando há bloco seguinte (linha contínua) */
+.categoriaCell.categoriaCellBlockEnd {
+  border-bottom: 1px solid #d6d6d6;
 }
 
 /* Células de DURAÇÃO - Cinza Chumbo, Regular */
@@ -347,6 +385,57 @@
   color: #555555;
   font-weight: 400;
   background: #ffffff;
+  padding: 16px 14px;
+  font-size: 13px;
+}
+
+/* --- Bloco Números reais — tudo #efefef (linhas e títulos) --- */
+.realRow {
+  background: #efefef;
+}
+
+.realRow.realRowFirst {
+  border-top: 1px solid #e0e0e0;
+}
+
+.realRowFirst td {
+  border-top: 1px solid #e0e0e0;
+}
+
+.realLabelCell {
+  background: #efefef;
+  font-weight: 400;
+  color: #555555;
+  text-align: left;
+  padding: 16px 14px;
+  border: none;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.realVendasCell {
+  color: #1a1a1a;
+  font-weight: 700;
+  background: #efefef;
+  font-size: 13px;
+  padding: 16px 14px;
+}
+
+.realEstoqueCell {
+  color: #555555;
+  font-weight: 400;
+  background: #efefef;
+  padding: 16px 14px;
+  font-size: 13px;
+}
+
+.realDuracaoCell {
+  color: #555555;
+  font-weight: 400;
+  background: #efefef;
   padding: 16px 14px;
   font-size: 13px;
 }
