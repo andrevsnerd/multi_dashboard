@@ -61,15 +61,16 @@ Assim, a regra é: **estoque no início do mês − vendas a descontar = estoque
 
 Para cada mês `i`:
 
-- **Significado:** “A partir do **fim** do mês `i`, mantendo a projeção dos meses seguintes, o estoque acabaria em **X dias**.”
-- **Cálculo:**
-  - Para o **mês atual** (i = 0): `remaining = estoque no início do mês seguinte` (já descontada a diferença projetada do mês atual). Para os **demais meses**: `remaining = estoque[i]` (início do mês `i`).
-  - Para cada mês futuro `j` (j = i+1, i+2, … até dezembro):
+- **Significado:** “A partir do **início** do mês `i`, com o estoque no início desse mês, consumindo deste mês em diante, o estoque acabaria em **X dias**.”
+- **Cálculo:** Para **todos** os meses, a duração é “a partir do **início** do mês”:
+  - Para cada mês `i`: `remaining = estoque no início do mês i`; consumir a partir do mês `i` (j = i, i+1, … até dezembro).
+  - Para cada mês `j` no consumo:
     - `consumoDiario = vendas[j] / diasDoMes(j)`
     - `diasParaEsvaziar = remaining / consumoDiario`
     - Se `diasParaEsvaziar >= diasDoMes(j)`: consome o mês inteiro: `totalDias += diasDoMes(j)`, `remaining -= vendas[j]`, segue para o próximo mês.
-    - Senão: estoque acaba no meio do mês: `totalDias += round(diasParaEsvaziar)` e para.
-  - Se após todos os meses ainda sobrar estoque (ex.: dezembro): `mesma lógica: consumoDiario = vendas do último mês / dias do mês, totalDias += round(remaining / consumoDiario) — sempre dias exatos` (convenção “acaba em mais de 1 ano”). Se estoque no início já for 0: `duracao = 0`. Não se usa mais 999; sempre dias calculados com a mesma lógica.
+    - Senão: estoque acaba no meio do mês: `totalDias += round(diasParaEsvaziar)`, `remaining = 0` (para não somar de novo no bloco abaixo) e para.
+  - Se após todos os meses ainda sobrou estoque (ex.: consumiu todos os meses inteiros e ainda há saldo): usa-se o consumo diário do **último mês da janela** para estender: `totalDias += round(remaining / consumoDiario)`. Não se usa consumo de “mês seguinte” fora da janela; só os meses até dezembro entram no cálculo.
+  - Se estoque no início do mês já for 0: `duracao = 0`. Ex.: estoque 351, venda 682, 30 dias no mês → 351/(682/30) ≈ 15 dias.
 
 Ou seja: a duração usa o **mesmo** estoque e as **mesmas** vendas projetadas já calculadas; só simula “em quantos dias esse estoque some” com as vendas futuras.
 
@@ -117,6 +118,6 @@ Assim, a regra continua: **estoque no início do mês − vendas (agregadas) des
 | **VENDA mês atual** | Projeção: `(vendas reais até hoje / dias corridos) × dias do mês`. Tooltip: vendas reais (mesmo critério do card). |
 | **VENDA outros meses** | Mesmo mês ano passado × 1,1; se faltar mês, média anual × 1,1. |
 | **ESTOQUE** | Sempre **início do mês**. Cadeia: `estoque[0] = estoque atual`; no mês atual descontar só `max(0, projeção − vendas reais)`; nos outros `estoque[i] = estoque[i-1] - vendas[i-1]`. No merge: mesma regra, uma única cadeia. |
-| **DURAÇÃO** | A partir do estoque no início daquele mês (tratado como “fim do mês” para a frase), simula consumo com as vendas projetadas dos meses seguintes e retorna o total de dias até zerar (extrapolando se sobrar estoque). |
+| **DURAÇÃO** | A partir do estoque no início daquele mês (tratado como “início do mês” para a frase), simula consumo com as vendas projetadas dos meses seguintes e retorna o total de dias até zerar (extrapolando se sobrar estoque). |
 
 Com isso, a subtração é consistente em todo o fluxo: **estoque atual e ritmo de vendas projetadas → estoque no início de cada mês → duração em dias até acabar**.

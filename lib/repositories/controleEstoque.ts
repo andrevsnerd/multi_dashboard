@@ -4962,18 +4962,26 @@ export async function fetchProjecaoMensal({
         });
       }
 
-      // Duração real: "A partir do fim deste mês, mantendo a projeção dos meses seguintes, o estoque acabaria em X dias"
+      // Duração: "A partir do INÍCIO do mês i, com o estoque deste mês, quanto tempo dura?"
+      // IMPORTANTE: remaining = estoque do mês i (não i+1); consumir a partir do mês i (j = i), não do i+1.
+      // No mês atual (j=0): consumir apenas a DIFERENÇA (projeção − vendas reais), nos dias restantes do mês.
+      const diasRestantesMesAtual = diasNoMesAtual - diasCorridos;
       for (let i = 0; i < projecao.meses.length; i++) {
-        // No mês atual usar estoque ao fim do mês (já descontada a diferença projetada) = estoque início do próximo
-        const estoqueParaDuracao = i === 0 && projecao.meses[1]
-          ? projecao.meses[1].estoque
-          : projecao.meses[i].estoque;
-        let remaining = estoqueParaDuracao;
+        let remaining = projecao.meses[i].estoque;
         let totalDias = 0;
         let ultimoConsumoDiario = 0;
-        for (let j = i + 1; j < projecao.meses.length; j++) {
-          const vendasMes = projecao.meses[j].vendas;
-          const diasNoMes = new Date(projecao.meses[j].ano, projecao.meses[j].mesNumero, 0).getDate();
+        const startJ = i; // consumir a partir do próprio mês i
+
+        for (let j = startJ; j < projecao.meses.length; j++) {
+          const mesJ = projecao.meses[j];
+          const isMesAtualJ = j === 0;
+          // Mês atual: apenas a diferença (projeção − vendas reais) e apenas dias restantes no mês
+          const vendasMes = isMesAtualJ && mesJ.vendasReais != null
+            ? Math.max(0, mesJ.vendas - mesJ.vendasReais)
+            : mesJ.vendas;
+          const diasNoMes = isMesAtualJ && diasRestantesMesAtual > 0
+            ? diasRestantesMesAtual
+            : new Date(mesJ.ano, mesJ.mesNumero, 0).getDate();
           if (diasNoMes <= 0 || vendasMes <= 0) continue;
           const consumoDiario = vendasMes / diasNoMes;
           ultimoConsumoDiario = consumoDiario;
@@ -4983,10 +4991,11 @@ export async function fetchProjecaoMensal({
             remaining -= vendasMes;
           } else {
             totalDias += Math.round(diasParaEsvaziar);
+            remaining = 0; // já contabilizado nos dias acima; evita somar de novo no bloco "remaining > 0"
             break;
           }
         }
-        // Se ainda sobrou estoque (ex.: dezembro é o último mês), mesma lógica: consumo diário do último mês
+        // Só estender com consumo do último mês se sobrou estoque após consumir meses INTEIROS (ex.: além de dezembro)
         if (remaining > 0 && ultimoConsumoDiario > 0) {
           totalDias += Math.round(remaining / ultimoConsumoDiario);
         } else if (remaining > 0) {
@@ -4998,7 +5007,8 @@ export async function fetchProjecaoMensal({
             totalDias += Math.round(remaining / consumoDiario);
           }
         }
-        projecao.meses[i].duracao = estoqueParaDuracao > 0 ? totalDias : 0;
+        const estoqueUsado = projecao.meses[i].estoque;
+        projecao.meses[i].duracao = estoqueUsado > 0 ? totalDias : 0;
       }
     });
 

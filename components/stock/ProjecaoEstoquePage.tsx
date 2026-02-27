@@ -249,7 +249,8 @@ export default function ProjecaoEstoquePage({
         ...mes,
         vendas,
         estoque: 0,
-        duracao: 0,
+        // Quando é um único item, manter a duração do backend; em merge será recalculada
+        duracao: items.length === 1 ? (mes?.duracao ?? 0) : 0,
         ...(vendasReais !== undefined && { vendasReais }),
         ...(vendasVarejo !== undefined && { vendasVarejo }),
         ...(vendasEcommerce !== undefined && { vendasEcommerce }),
@@ -266,13 +267,20 @@ export default function ProjecaoEstoquePage({
       estoqueAcum = Math.max(0, estoqueAcum - descontar);
     }
     const diasAteAcabar = (meses: ProjecaoMensal[], startIndex: number): number => {
-      const estoqueInicio = startIndex === 0 && meses[1] ? meses[1].estoque : meses[startIndex].estoque;
+      // "A partir do início do mês i, com o estoque deste mês, quanto tempo dura?" — estoque do mês i, consumir a partir do mês i (não i+1)
+      // No mês atual: consumir apenas a diferença (projeção − vendas reais), nos dias restantes do mês
+      const hoje = new Date();
+      const diasNoMesAtual = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
+      const diasRestantesMesAtual = Math.max(0, diasNoMesAtual - hoje.getDate());
+      const estoqueInicio = meses[startIndex].estoque;
       let remaining = estoqueInicio;
       let totalDias = 0;
       let ultimoConsumo = 0;
-      for (let j = startIndex + 1; j < meses.length; j++) {
-        const v = meses[j].vendas;
-        const diasMes = new Date(meses[j].ano, meses[j].mesNumero, 0).getDate();
+      for (let j = startIndex; j < meses.length; j++) {
+        const mesJ = meses[j];
+        const isMesAtualJ = j === 0 && mesJ.isMesAtual;
+        const v = isMesAtualJ && mesJ.vendasReais != null ? Math.max(0, mesJ.vendas - mesJ.vendasReais) : mesJ.vendas;
+        const diasMes = isMesAtualJ && diasRestantesMesAtual > 0 ? diasRestantesMesAtual : new Date(mesJ.ano, mesJ.mesNumero, 0).getDate();
         if (diasMes <= 0 || v <= 0) continue;
         const consumo = v / diasMes;
         ultimoConsumo = consumo;
@@ -282,7 +290,8 @@ export default function ProjecaoEstoquePage({
           remaining -= v;
         } else {
           totalDias += Math.round(dias);
-          return estoqueInicio > 0 ? totalDias : 0;
+          remaining = 0;
+          break;
         }
       }
       if (remaining > 0 && ultimoConsumo > 0) totalDias += Math.round(remaining / ultimoConsumo);
@@ -293,7 +302,10 @@ export default function ProjecaoEstoquePage({
       }
       return estoqueInicio > 0 ? totalDias : 0;
     };
-    merged.forEach((_, i) => { merged[i].duracao = diasAteAcabar(merged, i); });
+    // Só recalcular duração quando há merge de vários itens; item único mantém a duração do backend
+    if (items.length > 1) {
+      merged.forEach((_, i) => { merged[i].duracao = diasAteAcabar(merged, i); });
+    }
     return [{ ...items[0], meses: merged }];
   }, []);
 
