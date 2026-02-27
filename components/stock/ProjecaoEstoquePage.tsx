@@ -472,8 +472,8 @@ export default function ProjecaoEstoquePage({
                         <div className={styles.categoriaCellContent}>
                           <span className={styles.categoriaLabel}>
                             {proj.categoria.toUpperCase()}
-                            {proj.subgrupo && <span className={styles.detailInfo}>Subgrupo: {proj.subgrupo}</span>}
-                            {proj.grade && <span className={styles.detailInfo}>Grade: {proj.grade}</span>}
+                            {nivel > 0 && proj.subgrupo && <span className={styles.detailInfo}>Subgrupo: {proj.subgrupo}</span>}
+                            {nivel > 0 && proj.grade && <span className={styles.detailInfo}>Grade: {proj.grade}</span>}
                           </span>
                         </div>
                       </td>
