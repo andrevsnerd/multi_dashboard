@@ -4359,11 +4359,14 @@ export interface ProjecaoMensal {
   duracao: number; // dias
   isMesAtual: boolean;
   isMesPassado: boolean;
-  /** Vendas reais no mês (só no mês atual): varejo + e-commerce até hoje, para tooltip */
+  /** Vendas reais no mês (só no mês atual): varejo + e-commerce até hoje */
   vendasReais?: number;
-  /** Projeção por canal (apenas nos próximos meses): total varejo e e-commerce para tooltip */
+  /** Projeção por canal (ano passado): varejo e e-commerce para tooltip da linha de projeção */
   vendasVarejo?: number;
   vendasEcommerce?: number;
+  /** Vendas reais por canal (só no mês atual): para tooltip da linha VENDA (real) */
+  vendasVarejoReal?: number;
+  vendasEcommerceReal?: number;
 }
 
 export interface ProjecaoCategoria {
@@ -4742,6 +4745,72 @@ export async function fetchProjecaoMensal({
       }
     }
 
+    // 3.2. Vendas do ano atual por mês (para preencher real nos meses passados) — varejo
+    const vendasAnoAtualPorMesQuery = `
+      SELECT 
+        ${categoriaField} AS categoria
+        ${camposAdicionais},
+        MONTH(vp.DATA_VENDA) AS mes,
+        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      WHERE YEAR(vp.DATA_VENDA) = ${anoAtual}
+        AND vp.QTDE > 0
+        ${vendasMesAtualFilialFilter}
+        ${grupoFilter}
+        ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
+        AND ${categoriaField} <> ''
+        AND ${categoriaField} <> 'SEM GRUPO'
+        AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
+      GROUP BY ${categoriaField}${groupByAdicional}, MONTH(vp.DATA_VENDA)
+    `;
+    const vendasAnoAtualPorMesResult = await request.query<{
+      categoria: string;
+      linha?: string;
+      subgrupo?: string;
+      grade?: string;
+      colecao?: string;
+      mes: number;
+      vendas: number | null;
+    }>(vendasAnoAtualPorMesQuery);
+
+    // 3.3. E-commerce ano atual por mês (ScarfMe)
+    let ecommerceAnoAtualPorMesResult: { recordset: Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; mes: number; vendas: number | null }> } = { recordset: [] };
+    if (company === 'scarfme') {
+      const companyConfig = resolveCompany(company);
+      if (companyConfig?.ecommerceFilials?.length) {
+        const ecommerceFilials = companyConfig.ecommerceFilials;
+        ecommerceFilials.forEach((f, index) => request.input(`ecommerceAnoAtualFilial${index}`, sql.VarChar, f.trim()));
+        const placeholders = ecommerceFilials.map((_, i) => `@ecommerceAnoAtualFilial${i}`).join(', ');
+        const ecommerceAnoAtualFilialFilter = `AND REPLACE(REPLACE(LTRIM(RTRIM(f.FILIAL)), NCHAR(0x00A0), ' '), CHAR(9), ' ') IN (${placeholders})`;
+        const dataEcommerce = `COALESCE(CAST(fp.ENTREGA AS DATE), CAST(f.EMISSAO AS DATE))`;
+        const ecommerceAnoAtualPorMesQuery = `
+          SELECT 
+            ${categoriaField} AS categoria
+            ${camposAdicionais},
+            MONTH(${dataEcommerce}) AS mes,
+            SUM(CAST(fp.QTDE AS FLOAT)) AS vendas
+          FROM FATURAMENTO f WITH (NOLOCK)
+          JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+          LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
+          WHERE YEAR(${dataEcommerce}) = ${anoAtual}
+            AND f.NOTA_CANCELADA = 0
+            AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+            AND CAST(fp.QTDE AS FLOAT) > 0
+            ${ecommerceAnoAtualFilialFilter}
+            ${grupoFilter}
+            ${exclusionFilter}
+            ${nerdOnlyEletronicosFilter}
+            AND ${categoriaField} <> '' AND ${categoriaField} <> 'SEM GRUPO' AND ${categoriaField} <> 'SEM LINHA'
+            ${buildCategoriaExcludeNerd(company, categoriaField)}
+          GROUP BY ${categoriaField}${groupByAdicional}, MONTH(${dataEcommerce})
+        `;
+        ecommerceAnoAtualPorMesResult = await request.query(ecommerceAnoAtualPorMesQuery);
+      }
+    }
+
     // Processar dados
     const mesesNomes = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
     
@@ -4795,12 +4864,15 @@ export async function fetchProjecaoMensal({
       mesMapEcommerce.set(mesNumero, (mesMapEcommerce.get(mesNumero) || 0) + vendasEcommerce);
     });
 
-    // Mapear vendas do mês atual (varejo) — chave sempre nível máximo
+    // Mapear vendas do mês atual (varejo e e-commerce separados para tooltip na linha "venda real")
     const vendasMesAtualMap = new Map<string, number>();
+    const vendasVarejoMesAtualMap = new Map<string, number>();
+    const vendasEcommerceMesAtualMap = new Map<string, number>();
     vendasMesAtualResult.recordset.forEach(row => {
       const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
       const vendasAtual = Number(row.vendas ?? 0);
       vendasMesAtualMap.set(key, (vendasMesAtualMap.get(key) || 0) + vendasAtual);
+      vendasVarejoMesAtualMap.set(key, (vendasVarejoMesAtualMap.get(key) || 0) + vendasAtual);
     });
 
     // Somar vendas de e-commerce do mês atual
@@ -4808,6 +4880,24 @@ export async function fetchProjecaoMensal({
       const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
       const vendasEcommerce = Number(row.vendas ?? 0);
       vendasMesAtualMap.set(key, (vendasMesAtualMap.get(key) || 0) + vendasEcommerce);
+      vendasEcommerceMesAtualMap.set(key, (vendasEcommerceMesAtualMap.get(key) || 0) + vendasEcommerce);
+    });
+
+    // Vendas reais por mês (ano atual): para meses passados = mês fechado; mês atual = vendasMesAtualMap
+    const vendasReaisPorMesMap = new Map<string, Map<number, number>>();
+    vendasAnoAtualPorMesResult.recordset.forEach(row => {
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
+      if (!vendasReaisPorMesMap.has(key)) vendasReaisPorMesMap.set(key, new Map());
+      const mesMap = vendasReaisPorMesMap.get(key)!;
+      const mesNumero = row.mes;
+      mesMap.set(mesNumero, (mesMap.get(mesNumero) || 0) + Number(row.vendas ?? 0));
+    });
+    ecommerceAnoAtualPorMesResult.recordset.forEach(row => {
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
+      if (!vendasReaisPorMesMap.has(key)) vendasReaisPorMesMap.set(key, new Map());
+      const mesMap = vendasReaisPorMesMap.get(key)!;
+      const mesNumero = row.mes;
+      mesMap.set(mesNumero, (mesMap.get(mesNumero) || 0) + Number(row.vendas ?? 0));
     });
 
     // Mapear vendas mês anterior e últimos 30 dias (regra dos primeiros 5 dias)
@@ -4857,6 +4947,7 @@ export async function fetchProjecaoMensal({
       const vendasAnoPassadoVarejoPorMes = vendasAnoPassadoVarejoMap.get(key) || new Map();
       const vendasAnoPassadoEcommercePorMes = vendasAnoPassadoEcommerceMap.get(key) || new Map();
       const vendasMesAtual = vendasMesAtualMap.get(key) || 0;
+      const vendasReaisPorMes = vendasReaisPorMesMap.get(key) || new Map();
 
       // Calcular total de vendas do ano passado (para usar como fallback se não houver dados do mês específico)
       let totalVendasAnoPassado = 0;
@@ -4866,82 +4957,71 @@ export async function fetchProjecaoMensal({
       const diasNoMesAtual = new Date(anoAtual, mesAtual, 0).getDate();
       const diasCorridos = now.getDate();
 
-      // Apenas do mês atual até dezembro do ano corrente
-      const quantidadeMeses = 13 - mesAtual; // ex.: fev=2 → 11 meses (fev a dez)
-      for (let i = 0; i < quantidadeMeses; i++) {
-        const mesIndex = mesAtual - 1 + i; // 0-11, mesmo ano
+      // Todos os 12 meses do ano (JAN a DEZ) para comparativo anual
+      for (let i = 0; i < 12; i++) {
+        const mesIndex = i;
         const ano = anoAtual;
         const mesNumero = mesIndex + 1;
-        const isMesAtual = i === 0;
+        const isMesAtual = mesNumero === mesAtual;
+        const isMesPassado = mesNumero < mesAtual;
 
         let vendas: number;
         let estoqueProjecao: number;
         let vendasReais: number | undefined;
         let vendasVarejoProj: number | undefined;
         let vendasEcommerceProj: number | undefined;
-        if (isMesAtual) {
-          // Mesma regra do Controle de Estoque: primeiros 5 dias usam mês anterior / últimos 30 dias ou média ponderada
-          const currentDay = diasCorridos;
-          let vendasParaProjecao = vendasMesAtual;
-          let diasParaProjecao = currentDay;
 
-          if (currentDay <= 5 && vendasMesAtual === 0) {
-            const vendasMesAnterior = vendasMesAnteriorMap.get(key) || 0;
-            const daysInPreviousMonth = new Date(prevMonthEnd.getTime() - 1).getDate();
-            if (vendasMesAnterior > 0) {
-              const mediaDiariaMesAnterior = vendasMesAnterior / daysInPreviousMonth;
-              vendasParaProjecao = mediaDiariaMesAnterior * currentDay;
-              diasParaProjecao = currentDay;
-            } else {
-              const vendas30Dias = vendasUltimos30DiasMap.get(key) || 0;
-              if (vendas30Dias > 0) {
-                const mediaDiaria30Dias = vendas30Dias / 30;
-                vendasParaProjecao = mediaDiaria30Dias * currentDay;
-                diasParaProjecao = currentDay;
-              }
-            }
-          } else if (currentDay <= 5 && vendasMesAtual > 0) {
-            const vendasMesAnterior = vendasMesAnteriorMap.get(key) || 0;
-            const daysInPreviousMonth = new Date(prevMonthEnd.getTime() - 1).getDate();
-            if (vendasMesAnterior > 0) {
-              const mediaDiariaMesAnterior = vendasMesAnterior / daysInPreviousMonth;
-              const mediaDiariaMesAtual = vendasMesAtual / currentDay;
-              const mediaPonderada = (mediaDiariaMesAnterior * 0.7) + (mediaDiariaMesAtual * 0.3);
-              vendasParaProjecao = mediaPonderada * currentDay;
-              diasParaProjecao = currentDay;
-            }
+        const varejoMesAnoPassado = vendasAnoPassadoVarejoPorMes.get(mesNumero) || 0;
+        const ecommerceMesAnoPassado = vendasAnoPassadoEcommercePorMes.get(mesNumero) || 0;
+        const totalLy = varejoMesAnoPassado + ecommerceMesAnoPassado;
+
+        if (isMesPassado) {
+          // Mês já passado: tooltip = valores reais ano passado; projeção = soma do tooltip + 10%
+          if (totalLy > 0) {
+            vendas = Math.round(totalLy * 1.1);
+          } else {
+            const vendasMesAnoPassado = vendasAnoPassadoPorMes.get(mesNumero) || 0;
+            vendas = vendasMesAnoPassado > 0 ? Math.round(vendasMesAnoPassado * 1.1) : Math.round(projecaoMensalMedia);
           }
-
-          if (diasParaProjecao > 0 && diasNoMesAtual > 0) {
-            vendas = Math.round((vendasParaProjecao / diasParaProjecao) * diasNoMesAtual);
+          estoqueProjecao = 0; // frontend exibe "-"
+          const realDoMes = vendasReaisPorMes.get(mesNumero);
+          if (realDoMes != null) vendasReais = Math.round(realDoMes);
+          vendasVarejoProj = Math.round(varejoMesAnoPassado);
+          vendasEcommerceProj = Math.round(ecommerceMesAnoPassado);
+        } else if (isMesAtual) {
+          // Mesmo critério dos demais meses: tooltip = ano passado; projeção = soma do tooltip + 10%
+          if (totalLy > 0) {
+            vendas = Math.round(totalLy * 1.1);
           } else {
             const vendasMesAnoPassado = vendasAnoPassadoPorMes.get(mesNumero) || 0;
             vendas = vendasMesAnoPassado > 0 ? Math.round(vendasMesAnoPassado * 1.1) : Math.round(projecaoMensalMedia);
           }
           vendasReais = Math.round(vendasMesAtual);
+          vendasVarejoProj = Math.round(varejoMesAnoPassado);
+          vendasEcommerceProj = Math.round(ecommerceMesAnoPassado);
           estoqueProjecao = estoqueAtual; // estoque no início do mês (exibido)
         } else {
-          const vendasMesAnoPassado = vendasAnoPassadoPorMes.get(mesNumero) || 0;
-          const varejoMesAnoPassado = vendasAnoPassadoVarejoPorMes.get(mesNumero) || 0;
-          const ecommerceMesAnoPassado = vendasAnoPassadoEcommercePorMes.get(mesNumero) || 0;
-          if (vendasMesAnoPassado > 0) {
-            vendas = Math.round(vendasMesAnoPassado * 1.1);
+          // Mês futuro: tooltip = valores reais ano passado; projeção = soma do tooltip + 10%
+          if (totalLy > 0) {
+            vendas = Math.round(totalLy * 1.1);
           } else {
-            vendas = Math.round(projecaoMensalMedia);
+            const vendasMesAnoPassado = vendasAnoPassadoPorMes.get(mesNumero) || 0;
+            vendas = vendasMesAnoPassado > 0 ? Math.round(vendasMesAnoPassado * 1.1) : Math.round(projecaoMensalMedia);
           }
-          // Exibir estoque no INÍCIO do mês (já é estoqueAtual); depois subtrair vendas para o próximo
           estoqueProjecao = estoqueAtual;
-          // Valores reais (ano passado) para o infocard; a projeção (+10%) segue no total da célula
           vendasVarejoProj = Math.round(varejoMesAnoPassado);
           vendasEcommerceProj = Math.round(ecommerceMesAnoPassado);
         }
-        // Próximo mês: estoque inicial = este estoque − vendas a considerar deste mês
-        // No mês atual o estoque já reflete as vendas reais; subtrair só a diferença projetada (projeção − vendas reais)
-        const vendasADescontar = isMesAtual && vendasReais != null
-          ? Math.max(0, vendas - vendasReais)
-          : vendas;
-        estoqueAtual = Math.max(0, estoqueAtual - vendasADescontar);
+        // Atualizar estoque apenas para mês atual e futuros (não para passados)
+        if (!isMesPassado) {
+          const vendasADescontar = isMesAtual && vendasReais != null
+            ? Math.max(0, vendas - vendasReais)
+            : vendas;
+          estoqueAtual = Math.max(0, estoqueAtual - vendasADescontar);
+        }
 
+        const varejoReal = isMesAtual ? Math.round(vendasVarejoMesAtualMap.get(key) || 0) : undefined;
+        const ecommerceReal = isMesAtual ? Math.round(vendasEcommerceMesAtualMap.get(key) || 0) : undefined;
         projecao.meses.push({
           categoria,
           linha,
@@ -4955,26 +5035,28 @@ export async function fetchProjecaoMensal({
           estoque: estoqueProjecao,
           duracao: 0, // preenchido abaixo
           isMesAtual,
-          isMesPassado: false,
+          isMesPassado,
           ...(vendasReais !== undefined && { vendasReais }),
           ...(vendasVarejoProj !== undefined && { vendasVarejo: vendasVarejoProj }),
           ...(vendasEcommerceProj !== undefined && { vendasEcommerce: vendasEcommerceProj }),
+          ...(varejoReal !== undefined && { vendasVarejoReal: varejoReal }),
+          ...(ecommerceReal !== undefined && { vendasEcommerceReal: ecommerceReal }),
         });
       }
 
-      // Duração: "A partir do INÍCIO do mês i, com o estoque deste mês, quanto tempo dura?"
-      // IMPORTANTE: remaining = estoque do mês i (não i+1); consumir a partir do mês i (j = i), não do i+1.
-      // No mês atual (j=0): consumir apenas a DIFERENÇA (projeção − vendas reais), nos dias restantes do mês.
+      // Duração: só para meses com estoque (mês atual e futuros); passados ficam 0
       const diasRestantesMesAtual = diasNoMesAtual - diasCorridos;
       for (let i = 0; i < projecao.meses.length; i++) {
-        let remaining = projecao.meses[i].estoque;
+        const mesI = projecao.meses[i];
+        if (mesI.estoque <= 0) continue; // mês passado ou sem estoque
+        let remaining = mesI.estoque;
         let totalDias = 0;
         let ultimoConsumoDiario = 0;
-        const startJ = i; // consumir a partir do próprio mês i
+        const startJ = i;
 
         for (let j = startJ; j < projecao.meses.length; j++) {
           const mesJ = projecao.meses[j];
-          const isMesAtualJ = j === 0;
+          const isMesAtualJ = mesJ.isMesAtual;
           // Mês atual: apenas a diferença (projeção − vendas reais) e apenas dias restantes no mês
           const vendasMes = isMesAtualJ && mesJ.vendasReais != null
             ? Math.max(0, mesJ.vendas - mesJ.vendasReais)

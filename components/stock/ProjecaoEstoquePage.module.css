@@ -86,6 +86,43 @@
   flex-wrap: wrap;
 }
 
+.salvarSnapshotButton {
+  padding: 8px 16px;
+  background: #333;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.salvarSnapshotButton:hover:not(:disabled) {
+  background: #555;
+}
+
+.salvarSnapshotButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.snapshotSuccess {
+  padding: 10px 24px;
+  background: #e8f5e9;
+  color: #2e7d32;
+  font-size: 13px;
+  border-top: 1px solid #c8e6c9;
+}
+
+.snapshotError {
+  padding: 10px 24px;
+  background: #ffebee;
+  color: #c62828;
+  font-size: 13px;
+  border-top: 1px solid #ffcdd2;
+}
+
 .expandActions {
   margin-bottom: 16px;
   padding-top: 16px;
@@ -295,11 +332,14 @@
   background: #ffffff;
   font-size: 13px;
   padding: 16px 14px;
+  overflow: visible;
 }
 
 .vendasCellWrapper {
   position: relative;
   cursor: default;
+  display: inline-block;
+  overflow: visible;
 }
 
 .vendasInfocard {
@@ -316,7 +356,7 @@
   white-space: nowrap;
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  z-index: 10;
+  z-index: 100;
   pointer-events: none;
   opacity: 0;
   visibility: hidden;
@@ -328,12 +368,42 @@
   visibility: visible;
 }
 
+/* Na primeira linha da tabela o tooltip aparece abaixo para não ser cortado pelo overflow do scroll */
+.firstDataRow .vendasInfocard {
+  bottom: auto;
+  top: 100%;
+  margin-top: 6px;
+  margin-bottom: 0;
+}
+
 .vendasInfocardLine {
   display: block;
   line-height: 1.5;
 }
 
 .vendasInfocardLine + .vendasInfocardLine {
+  margin-top: 2px;
+}
+
+/* Tooltip flutuante (portal) — não é cortado pelo scroll nem pela coluna do mês atual */
+.vendasInfocardFloating {
+  position: fixed;
+  padding: 10px 12px;
+  background: #2d2d2d;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 400;
+  white-space: nowrap;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 9999;
+  pointer-events: none;
+}
+.vendasInfocardFloating .vendasInfocardLine {
+  display: block;
+  line-height: 1.5;
+}
+.vendasInfocardFloating .vendasInfocardLine + .vendasInfocardLine {
   margin-top: 2px;
 }
 
@@ -443,6 +513,17 @@
 /* Remover qualquer destaque de mês atual */
 .mesAtual {
   /* Sem destaque visual - design monocromático neutro */
+}
+
+/* Coluna do mês atual: borda escura que envolve projeção e real */
+.columnMesAtual {
+  box-shadow: inset -1px 0 0 #b3b3b3, inset 1px 0 0 #b3b3b3;
+  position: relative;
+  z-index: 1;
+}
+
+.projecaoTable thead th.columnMesAtual {
+  box-shadow: inset -1px 0 0 #b3b3b3, inset 1px 0 0 #b3b3b3, 0 1px 0 0 #e5e5e5;
 }
 
 .loading,

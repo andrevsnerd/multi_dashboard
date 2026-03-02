@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getMonth, getYear } from "date-fns";
 
@@ -10,6 +11,8 @@ import type { CompanyKey } from "@/lib/config/company";
 import { resolveCompany } from "@/lib/config/company";
 
 import styles from "./ProjecaoEstoquePage.module.css";
+
+const TOOLTIP_OFFSET = 8;
 
 const MESES_NOMES = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
 
@@ -31,6 +34,8 @@ interface ProjecaoMensal {
   vendasReais?: number;
   vendasVarejo?: number;
   vendasEcommerce?: number;
+  vendasVarejoReal?: number;
+  vendasEcommerceReal?: number;
 }
 
 interface ProjecaoCategoria {
@@ -101,6 +106,16 @@ export default function ProjecaoEstoquePage({
   const [projecoes, setProjecoes] = useState<ProjecaoCategoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [savingSnapshot, setSavingSnapshot] = useState(false);
+  const [snapshotMessage, setSnapshotMessage] = useState<string | null>(null);
+  const [floatingTooltip, setFloatingTooltip] = useState<{
+    varejo: string;
+    ecommerce: string;
+    x: number;
+    y: number;
+    above: boolean;
+    projecaoReal?: string;
+  } | null>(null);
 
   const [opcoesGrupos, setOpcoesGrupos] = useState<string[]>([]);
   const [opcoesLinhas, setOpcoesLinhas] = useState<string[]>([]);
@@ -212,73 +227,79 @@ export default function ProjecaoEstoquePage({
     return () => { cancelled = true; };
   }, [companyKey, filial, grupos, linhas, colecoes, subgrupos, grades, searchParams]);
 
-  // Meses: atual ate dezembro
+  // Meses: todos os 12 (JAN a DEZ) para comparativo anual
   const mesesExibicao = useMemo(() => {
     const hoje = new Date();
-    const mes0 = getMonth(hoje);
     const ano = getYear(hoje);
+    const mesAtualNum = getMonth(hoje) + 1; // 1-12
     const out: Array<{ mes: string; mesNumero: number; ano: number; isMesAtual: boolean }> = [];
-    for (let i = 0; i < 12 - mes0; i++) {
-      const idx = mes0 + i;
+    for (let i = 0; i < 12; i++) {
       out.push({
-        mes: MESES_NOMES[idx],
-        mesNumero: idx + 1,
+        mes: MESES_NOMES[i],
+        mesNumero: i + 1,
         ano,
-        isMesAtual: i === 0,
+        isMesAtual: i + 1 === mesAtualNum,
       });
     }
     return out;
   }, []);
 
-  // Merge de meses (soma vendas; uma unica cadeia de estoque; duracao ao final)
+  const mesAtualIndex = getMonth(new Date()); // 0-11, índice do mês atual na lista de 12
+
+  // Merge de meses (soma vendas; uma unica cadeia de estoque a partir do mês atual)
   const reagrupar = useCallback((items: ProjecaoCategoria[]): ProjecaoCategoria[] => {
     if (items.length === 0) return [];
     const base = items[0].meses;
+    const mesAtualIdx = getMonth(new Date());
     const merged = base.map((mes, i) => {
-      let vendas = 0, vendasReais: number | undefined, vendasVarejo: number | undefined, vendasEcommerce: number | undefined;
+      let vendasReais: number | undefined, vendasVarejo = 0, vendasEcommerce = 0, vendasVarejoReal: number | undefined, vendasEcommerceReal: number | undefined;
       items.forEach((it) => {
         const m = it.meses[i];
         if (m) {
-          vendas += m.vendas;
+          vendasVarejo += m.vendasVarejo ?? 0;
+          vendasEcommerce += m.vendasEcommerce ?? 0;
           if (m.vendasReais != null) vendasReais = (vendasReais ?? 0) + m.vendasReais;
-          if (m.vendasVarejo != null) vendasVarejo = (vendasVarejo ?? 0) + m.vendasVarejo;
-          if (m.vendasEcommerce != null) vendasEcommerce = (vendasEcommerce ?? 0) + m.vendasEcommerce;
+          if (m.vendasVarejoReal != null) vendasVarejoReal = (vendasVarejoReal ?? 0) + m.vendasVarejoReal;
+          if (m.vendasEcommerceReal != null) vendasEcommerceReal = (vendasEcommerceReal ?? 0) + m.vendasEcommerceReal;
         }
       });
+      const totalBase = vendasVarejo + vendasEcommerce;
+      const vendas = totalBase > 0 ? Math.round(totalBase * 1.1) : items.reduce((s, it) => s + (it.meses[i]?.vendas ?? 0), 0);
       return {
         ...mes,
         vendas,
-        estoque: 0,
+        estoque: base[i]?.estoque ?? 0,
         // Quando é um único item, manter a duração do backend; em merge será recalculada
         duracao: items.length === 1 ? (mes?.duracao ?? 0) : 0,
         ...(vendasReais !== undefined && { vendasReais }),
-        ...(vendasVarejo !== undefined && { vendasVarejo }),
-        ...(vendasEcommerce !== undefined && { vendasEcommerce }),
+        ...(totalBase > 0 && { vendasVarejo: Math.round(vendasVarejo), vendasEcommerce: Math.round(vendasEcommerce) }),
+        ...(vendasVarejoReal !== undefined && { vendasVarejoReal }),
+        ...(vendasEcommerceReal !== undefined && { vendasEcommerceReal }),
       };
     });
+    // Cadeia de estoque a partir do mês atual (meses passados ficam com 0)
     let estoqueAcum = 0;
-    items.forEach((it) => { const m0 = it.meses[0]; if (m0) estoqueAcum += m0.estoque; });
-    for (let i = 0; i < merged.length; i++) {
+    items.forEach((it) => { const m = it.meses[mesAtualIdx]; if (m) estoqueAcum += m.estoque; });
+    for (let i = mesAtualIdx; i < merged.length; i++) {
       merged[i].estoque = estoqueAcum;
       const v = merged[i];
-      const descontar = i === 0 && v.vendasReais != null
+      const descontar = v.isMesAtual && v.vendasReais != null
         ? Math.max(0, v.vendas - v.vendasReais)
         : v.vendas;
       estoqueAcum = Math.max(0, estoqueAcum - descontar);
     }
     const diasAteAcabar = (meses: ProjecaoMensal[], startIndex: number): number => {
-      // "A partir do início do mês i, com o estoque deste mês, quanto tempo dura?" — estoque do mês i, consumir a partir do mês i (não i+1)
-      // No mês atual: consumir apenas a diferença (projeção − vendas reais), nos dias restantes do mês
       const hoje = new Date();
       const diasNoMesAtual = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
       const diasRestantesMesAtual = Math.max(0, diasNoMesAtual - hoje.getDate());
       const estoqueInicio = meses[startIndex].estoque;
+      if (estoqueInicio <= 0) return 0;
       let remaining = estoqueInicio;
       let totalDias = 0;
       let ultimoConsumo = 0;
       for (let j = startIndex; j < meses.length; j++) {
         const mesJ = meses[j];
-        const isMesAtualJ = j === 0 && mesJ.isMesAtual;
+        const isMesAtualJ = mesJ.isMesAtual;
         const v = isMesAtualJ && mesJ.vendasReais != null ? Math.max(0, mesJ.vendas - mesJ.vendasReais) : mesJ.vendas;
         const diasMes = isMesAtualJ && diasRestantesMesAtual > 0 ? diasRestantesMesAtual : new Date(mesJ.ano, mesJ.mesNumero, 0).getDate();
         if (diasMes <= 0 || v <= 0) continue;
@@ -300,9 +321,8 @@ export default function ProjecaoEstoquePage({
         const d = new Date(last.ano, last.mesNumero, 0).getDate();
         if (d > 0 && last.vendas > 0) totalDias += Math.round(remaining / (last.vendas / d));
       }
-      return estoqueInicio > 0 ? totalDias : 0;
+      return totalDias;
     };
-    // Só recalcular duração quando há merge de vários itens; item único mantém a duração do backend
     if (items.length > 1) {
       merged.forEach((_, i) => { merged[i].duracao = diasAteAcabar(merged, i); });
     }
@@ -375,6 +395,48 @@ export default function ProjecaoEstoquePage({
     return out.filter((p) => (expansao.get(p.categoria)?.nivel ?? 0) === 0);
   }, [projecoes, companyKey, excludedLines, grupos, linhas, expansao, reagrupar]);
 
+  const handleSalvarSnapshot = useCallback(async () => {
+    setSavingSnapshot(true);
+    setSnapshotMessage(null);
+    try {
+      const res = await fetch("/api/controle-estoque/projecao-historico", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company: companyKey,
+          filial,
+          grupos,
+          linhas,
+          colecoes,
+          subgrupos,
+          grades,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Erro ao salvar");
+      setSnapshotMessage(`Snapshot salvo: ${json.saved} registros (${json.snapshot_date}).`);
+      setTimeout(() => setSnapshotMessage(null), 5000);
+    } catch (e) {
+      setSnapshotMessage(e instanceof Error ? e.message : "Erro ao salvar snapshot");
+    } finally {
+      setSavingSnapshot(false);
+    }
+  }, [companyKey, filial, grupos, linhas, colecoes, subgrupos, grades]);
+
+  const showFloatingTooltip = useCallback((
+    e: React.MouseEvent<HTMLElement>,
+    varejo: string,
+    ecommerce: string,
+    showBelow: boolean,
+    projecaoReal?: string
+  ) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = showBelow ? rect.bottom + TOOLTIP_OFFSET : rect.top - TOOLTIP_OFFSET;
+    setFloatingTooltip({ varejo, ecommerce, x, y, above: !showBelow, ...(projecaoReal != null && projecaoReal !== "" && { projecaoReal }) });
+  }, []);
+  const hideFloatingTooltip = useCallback(() => setFloatingTooltip(null), []);
+
   const handleClickCategoria = useCallback((proj: ProjecaoCategoria) => {
     const n = expansao.get(proj.categoria)?.nivel ?? 0;
     const temSubgrupos = projecoes.some((p) => p.categoria === proj.categoria && p.subgrupo);
@@ -392,9 +454,12 @@ export default function ProjecaoEstoquePage({
   const getReaisPorMes = useCallback((proj: ProjecaoCategoria) => {
     const meses = proj.meses;
     if (meses.length === 0) return { estoqueAtualReal: 0, duracaoRealMesAtual: 0 };
+    const mesAtualIdx = getMonth(new Date()); // 0-11
+    const mesAtual = meses[mesAtualIdx];
+    if (!mesAtual) return { estoqueAtualReal: 0, duracaoRealMesAtual: 0 };
     // Estoque atual já está descontado das vendas reais (não descontar de novo)
-    const estoqueAtualReal = meses[0].estoque;
-    const vendasReaisMesAtual = meses[0].vendasReais ?? 0;
+    const estoqueAtualReal = mesAtual.estoque;
+    const vendasReaisMesAtual = mesAtual.vendasReais ?? 0;
     const diasCorridos = new Date().getDate();
     // Duração real: com o estoque atual, ritmo = vendasReais/diasCorridos → dias até zerar
     let duracaoRealMesAtual = 0;
@@ -457,7 +522,20 @@ export default function ProjecaoEstoquePage({
             )}
           </>
         )}
+        <button
+          type="button"
+          className={styles.salvarSnapshotButton}
+          onClick={handleSalvarSnapshot}
+          disabled={savingSnapshot || loading}
+        >
+          {savingSnapshot ? "Salvando..." : "Salvar snapshot no histórico"}
+        </button>
       </div>
+      {snapshotMessage && (
+        <div className={snapshotMessage.startsWith("Snapshot salvo") ? styles.snapshotSuccess : styles.snapshotError}>
+          {snapshotMessage}
+        </div>
+      )}
       </div>
 
       {temExpansao && (
@@ -476,7 +554,7 @@ export default function ProjecaoEstoquePage({
                 <th rowSpan={2} className={styles.categoriaHeader}>Categoria</th>
                 <th rowSpan={2} className={styles.labelHeader}>Tipo</th>
                 {mesesExibicao.map((m) => (
-                  <th key={`${m.ano}-${m.mesNumero}`}>{m.mes}</th>
+                  <th key={`${m.ano}-${m.mesNumero}`} className={m.isMesAtual ? styles.columnMesAtual : undefined}>{m.mes}</th>
                 ))}
               </tr>
             </thead>
@@ -493,7 +571,7 @@ export default function ProjecaoEstoquePage({
 
                 return (
                   <React.Fragment key={`${proj.categoria}-${proj.subgrupo ?? ""}-${proj.grade ?? ""}-${idx}`}>
-                    <tr className={`${styles.categoriaRow} ${idx > 0 ? styles.categoryBlockStart : ""}`}>
+                    <tr className={`${styles.categoriaRow} ${idx > 0 ? styles.categoryBlockStart : ""} ${idx === 0 ? styles.firstDataRow : ""}`}>
                       <td
                         rowSpan={6}
                         className={`${styles.categoriaCell} ${clickable ? styles.categoriaCellClickable : ""} ${!isLast ? styles.categoriaCellBlockEnd : ""}`}
@@ -514,15 +592,19 @@ export default function ProjecaoEstoquePage({
                       {mesesExibicao.map((m) => {
                         const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
                         const isFuturo = md && !md.isMesAtual && (md.vendasVarejo != null || md.vendasEcommerce != null);
+                        const temInfocard = isFuturo || (md?.isMesAtual && (md.vendasReais != null || md.vendasVarejo != null || md.vendasEcommerce != null));
+                        const showBelow = idx === 0;
                         return (
-                          <td key={`v-${m.ano}-${m.mesNumero}`} className={styles.vendasCell} title={md?.isMesAtual && md.vendasReais != null ? `Vendas reais (ate hoje): ${fmt(md.vendasReais)} un` : undefined}>
-                            {isFuturo ? (
+                          <td
+                            key={`v-${m.ano}-${m.mesNumero}`}
+                            className={`${styles.vendasCell} ${m.isMesAtual ? styles.columnMesAtual : ""}`}
+                            {...(temInfocard ? {
+                              onMouseEnter: (e: React.MouseEvent<HTMLElement>) => showFloatingTooltip(e, fmt(md!.vendasVarejo ?? 0), fmt(md!.vendasEcommerce ?? 0), showBelow),
+                              onMouseLeave: hideFloatingTooltip,
+                            } : {})}
+                          >
+                            {temInfocard ? (
                               <span className={styles.vendasCellWrapper}>
-                                <span className={styles.vendasInfocard}>
-                                  <span className={styles.vendasInfocardLine}>Total real: {fmt((md!.vendasVarejo ?? 0) + (md!.vendasEcommerce ?? 0))}</span>
-                                  <span className={styles.vendasInfocardLine}>Total varejo: {fmt(md!.vendasVarejo ?? 0)}</span>
-                                  <span className={styles.vendasInfocardLine}>Total e-commerce: {fmt(md!.vendasEcommerce ?? 0)}</span>
-                                </span>
                                 {md ? fmt(md.vendas) : "-"}
                               </span>
                             ) : (
@@ -536,14 +618,16 @@ export default function ProjecaoEstoquePage({
                       <td className={styles.labelCell}>ESTOQUE</td>
                       {mesesExibicao.map((m) => {
                         const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
-                        return <td key={`e-${m.ano}-${m.mesNumero}`} className={styles.estoqueCell}>{md ? fmt(md.estoque) : "-"}</td>;
+                        const valor = md == null ? "-" : (md.isMesPassado && md.estoque === 0 ? "-" : fmt(md.estoque));
+                        return <td key={`e-${m.ano}-${m.mesNumero}`} className={`${styles.estoqueCell} ${m.isMesAtual ? styles.columnMesAtual : ""}`}>{valor}</td>;
                       })}
                     </tr>
                     <tr className={styles.duracaoRow}>
                       <td className={styles.labelCell}>DURACAO</td>
                       {mesesExibicao.map((m) => {
                         const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
-                        return <td key={`d-${m.ano}-${m.mesNumero}`} className={styles.duracaoCell}>{md ? `${md.duracao} dias` : "-"}</td>;
+                        const valor = md && md.duracao > 0 ? `${md.duracao} dias` : "-";
+                        return <td key={`d-${m.ano}-${m.mesNumero}`} className={`${styles.duracaoCell} ${m.isMesAtual ? styles.columnMesAtual : ""}`}>{valor}</td>;
                       })}
                     </tr>
                     {/* Bloco números reais — mesmo cinza nas 3 linhas, como na imagem */}
@@ -551,23 +635,46 @@ export default function ProjecaoEstoquePage({
                       <td className={styles.realLabelCell}>VENDA (real)</td>
                       {mesesExibicao.map((m, mi) => {
                         const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
-                        const valor = md?.isMesAtual && md.vendasReais != null ? fmt(md.vendasReais) : "-";
-                        return <td key={`vr-${m.ano}-${m.mesNumero}`} className={styles.realVendasCell}>{valor}</td>;
+                        const valor = md?.vendasReais != null ? fmt(md.vendasReais) : "-";
+                        const temTooltip = m.isMesAtual && md && (md.vendasReais != null || md.vendasVarejoReal != null || md.vendasEcommerceReal != null);
+                        const varejo = md?.vendasVarejoReal ?? md?.vendasVarejo ?? 0;
+                        const ecommerce = md?.vendasEcommerceReal ?? md?.vendasEcommerce ?? 0;
+                        const totalReal = md?.vendasReais ?? varejo + ecommerce;
+                        const showBelow = idx === 0;
+                        const now = new Date();
+                        const diasCorridos = now.getDate();
+                        const diasNoMes = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                        const projecaoRealVal = totalReal > 0 && diasCorridos > 0
+                          ? Math.round((totalReal / diasCorridos) * diasNoMes)
+                          : undefined;
+                        const projecaoRealStr = projecaoRealVal != null ? fmt(projecaoRealVal) : undefined;
+                        return (
+                          <td
+                            key={`vr-${m.ano}-${m.mesNumero}`}
+                            className={`${styles.realVendasCell} ${m.isMesAtual ? styles.columnMesAtual : ""}`}
+                            {...(temTooltip ? {
+                              onMouseEnter: (e: React.MouseEvent<HTMLElement>) => showFloatingTooltip(e, fmt(varejo), fmt(ecommerce), showBelow, projecaoRealStr),
+                              onMouseLeave: hideFloatingTooltip,
+                            } : {})}
+                          >
+                            {temTooltip ? <span className={styles.vendasCellWrapper}>{valor}</span> : valor}
+                          </td>
+                        );
                       })}
                     </tr>
                     <tr className={styles.realRow}>
                       <td className={styles.realLabelCell}>ESTOQUE (real)</td>
                       {mesesExibicao.map((m, mi) => {
-                        const valor = mi === 0 ? fmt(estoqueAtualReal) : "-";
-                        return <td key={`er-${m.ano}-${m.mesNumero}`} className={styles.realEstoqueCell}>{valor}</td>;
+                        const valor = mi === mesAtualIndex ? fmt(estoqueAtualReal) : "-";
+                        return <td key={`er-${m.ano}-${m.mesNumero}`} className={`${styles.realEstoqueCell} ${m.isMesAtual ? styles.columnMesAtual : ""}`}>{valor}</td>;
                       })}
                     </tr>
                     <tr className={`${styles.realRow} ${!isLast ? styles.categoryBlockEnd : ""}`}>
                       <td className={styles.realLabelCell}>DURACAO (real)</td>
                       {mesesExibicao.map((m, mi) => {
                         const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
-                        const valor = md?.isMesAtual && duracaoRealMesAtual > 0 ? `${duracaoRealMesAtual} dias` : "-";
-                        return <td key={`dr-${m.ano}-${m.mesNumero}`} className={styles.realDuracaoCell}>{valor}</td>;
+                        const valor = m.isMesAtual && duracaoRealMesAtual > 0 ? `${duracaoRealMesAtual} dias` : "-";
+                        return <td key={`dr-${m.ano}-${m.mesNumero}`} className={`${styles.realDuracaoCell} ${m.isMesAtual ? styles.columnMesAtual : ""}`}>{valor}</td>;
                       })}
                     </tr>
                   </React.Fragment>
@@ -577,6 +684,26 @@ export default function ProjecaoEstoquePage({
           </table>
         </div>
       </div>
+      {typeof document !== "undefined" &&
+        floatingTooltip &&
+        createPortal(
+          <div
+            className={styles.vendasInfocardFloating}
+            style={{
+              left: floatingTooltip.x,
+              top: floatingTooltip.y,
+              transform: floatingTooltip.above ? "translate(-50%, -100%)" : "translate(-50%, 0)",
+            }}
+            role="tooltip"
+          >
+            <span className={styles.vendasInfocardLine}>Total varejo: {floatingTooltip.varejo}</span>
+            <span className={styles.vendasInfocardLine}>Total e-commerce: {floatingTooltip.ecommerce}</span>
+            {floatingTooltip.projecaoReal != null && (
+              <span className={styles.vendasInfocardLine}>Projeção real: {floatingTooltip.projecaoReal}</span>
+            )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

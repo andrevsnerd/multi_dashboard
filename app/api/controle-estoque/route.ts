@@ -12,6 +12,8 @@ import {
   fetchProjecaoMensal,
   fetchCategoriasComGiro,
 } from '@/lib/repositories/controleEstoque';
+import { hasPostgres } from '@/lib/db/neon';
+import { saveProjecaoSnapshot, fetchSnapshotDates } from '@/lib/repositories/projecaoEstoqueHistorico';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -174,6 +176,25 @@ export async function GET(request: Request) {
           filial,
           ...filters,
         });
+        // Auto-save histórico: apenas 1x por mês — na primeira carga da projeção no mês (ex.: dia 1 ou primeiro dia que abrir)
+        // Assim o mês anterior fica fixo no histórico e o atual só grava quando “fechar” no próximo mês.
+        if (company && hasPostgres() && projecao.length > 0) {
+          try {
+            const dates = await fetchSnapshotDates(company, filial);
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const currentMonthPrefix = `${year}-${month}`;
+            const alreadySavedThisMonth = dates.some((x) =>
+              String(x.snapshot_date).startsWith(currentMonthPrefix)
+            );
+            if (!alreadySavedThisMonth) {
+              await saveProjecaoSnapshot(new Date(), company, filial, projecao);
+            }
+          } catch (autoErr) {
+            console.error('Auto-save projeção histórico:', autoErr);
+          }
+        }
         return NextResponse.json({ data: projecao });
       }
       case 'giro': {
