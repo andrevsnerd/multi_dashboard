@@ -12,6 +12,7 @@
     "@neondatabase/serverless": "^1.0.2",
     "@types/mssql": "^9.1.8",
     "@types/react-date-range": "^1.4.10",
+    "@types/react-dom": "^19",
     "@upstash/redis": "^1.36.1",
     "date-fns": "^4.1.0",
     "jspdf": "^3.0.4",
@@ -28,7 +29,6 @@
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^19",
-    "@types/react-dom": "^19",
     "@types/xlsx": "^0.0.35",
     "baseline-browser-mapping": "^2.9.6",
     "eslint": "^9",

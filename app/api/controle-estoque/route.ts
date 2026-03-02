@@ -176,6 +176,8 @@ export async function GET(request: Request) {
           filial,
           ...filters,
         });
+        let snapshotOk = false;
+        let snapshotDate: string | null = null;
         // Auto-save histórico: apenas 1x por mês — na primeira carga da projeção no mês (ex.: dia 1 ou primeiro dia que abrir)
         // Assim o mês anterior fica fixo no histórico e o atual só grava quando “fechar” no próximo mês.
         if (company && hasPostgres() && projecao.length > 0) {
@@ -186,11 +188,15 @@ export async function GET(request: Request) {
             const mesAtual = now.getMonth() + 1;
             const month = String(mesAtual).padStart(2, '0');
             const currentMonthPrefix = `${year}-${month}`;
-            const alreadySavedThisMonth = dates.some((x) =>
-              String(x.snapshot_date).startsWith(currentMonthPrefix)
-            );
-            if (!alreadySavedThisMonth) {
-              await saveProjecaoSnapshot(new Date(), company, filial, projecao);
+            const existingThisMonth =
+              dates.find((x) => String(x.snapshot_date).startsWith(currentMonthPrefix))?.snapshot_date ?? null;
+            if (existingThisMonth) {
+              snapshotOk = true;
+              snapshotDate = existingThisMonth;
+            } else {
+              await saveProjecaoSnapshot(now, company, filial, projecao);
+              snapshotOk = true;
+              snapshotDate = now.toISOString().slice(0, 10);
             }
           } catch (autoErr) {
             console.error('Auto-save projeção histórico:', autoErr);
@@ -216,7 +222,7 @@ export async function GET(request: Request) {
             console.error('Carregar snapshot real por mês:', snapErr);
           }
         }
-        return NextResponse.json({ data: projecao });
+        return NextResponse.json({ data: projecao, snapshot: { ok: snapshotOk, snapshot_date: snapshotDate } });
       }
       case 'giro': {
         const diasGiroParam = searchParams.get('diasGiro');

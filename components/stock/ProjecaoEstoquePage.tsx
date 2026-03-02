@@ -59,7 +59,7 @@ async function fetchProjecao(
   colecoes: string[],
   subgrupos: string[],
   grades: string[]
-): Promise<ProjecaoCategoria[]> {
+): Promise<{ data: ProjecaoCategoria[]; snapshotOk: boolean }> {
   const params = new URLSearchParams({ company, dataType: "projecao-mensal" });
   if (filial) params.set("filial", filial);
   grupos.forEach((g) => params.append("grupos", g));
@@ -70,8 +70,11 @@ async function fetchProjecao(
 
   const res = await fetch(`/api/controle-estoque?${params.toString()}`, { cache: "no-store" });
   if (!res.ok) throw new Error("Erro ao carregar projecao");
-  const json = (await res.json()) as { data: ProjecaoCategoria[] };
-  return json.data;
+  const json = (await res.json()) as {
+    data: ProjecaoCategoria[];
+    snapshot?: { ok?: boolean; snapshot_date?: string | null };
+  };
+  return { data: json.data, snapshotOk: Boolean(json.snapshot?.ok) };
 }
 
 function fmt(value: number): string {
@@ -109,8 +112,7 @@ export default function ProjecaoEstoquePage({
   const [projecoes, setProjecoes] = useState<ProjecaoCategoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [savingSnapshot, setSavingSnapshot] = useState(false);
-  const [snapshotMessage, setSnapshotMessage] = useState<string | null>(null);
+  const [snapshotOk, setSnapshotOk] = useState(false);
   const [floatingTooltip, setFloatingTooltip] = useState<{
     varejo: string;
     ecommerce: string;
@@ -219,7 +221,9 @@ export default function ProjecaoEstoquePage({
     setError(null);
     fetchProjecao(companyKey, filialReq, grupos, linhas, colecoes, subgrupos, grades)
       .then((data) => {
-        if (!cancelled) setProjecoes(data);
+        if (cancelled) return;
+        setProjecoes(data.data);
+        setSnapshotOk(data.snapshotOk);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Erro ao carregar");
@@ -404,34 +408,6 @@ export default function ProjecaoEstoquePage({
     return out.filter((p) => (expansao.get(p.categoria)?.nivel ?? 0) === 0);
   }, [projecoes, companyKey, excludedLines, grupos, linhas, expansao, reagrupar]);
 
-  const handleSalvarSnapshot = useCallback(async () => {
-    setSavingSnapshot(true);
-    setSnapshotMessage(null);
-    try {
-      const res = await fetch("/api/controle-estoque/projecao-historico", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          company: companyKey,
-          filial,
-          grupos,
-          linhas,
-          colecoes,
-          subgrupos,
-          grades,
-        }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "Erro ao salvar");
-      setSnapshotMessage(`Snapshot salvo: ${json.saved} registros (${json.snapshot_date}).`);
-      setTimeout(() => setSnapshotMessage(null), 5000);
-    } catch (e) {
-      setSnapshotMessage(e instanceof Error ? e.message : "Erro ao salvar snapshot");
-    } finally {
-      setSavingSnapshot(false);
-    }
-  }, [companyKey, filial, grupos, linhas, colecoes, subgrupos, grades]);
-
   const showFloatingTooltip = useCallback((
     e: React.MouseEvent<HTMLElement>,
     varejo: string,
@@ -497,6 +473,7 @@ export default function ProjecaoEstoquePage({
             <div>
               <h1 className={styles.title}>Projecao de Estoque</h1>
               <p className={styles.subtitle}>Evolucao mensal de vendas, estoque e duracao (varejo + e-commerce)</p>
+              {snapshotOk && <p className={styles.snapshotSaved}>Snapshot salvo.</p>}
             </div>
           </div>
           <button type="button" className={styles.backButton} onClick={() => router.back()}>Voltar</button>
@@ -531,20 +508,7 @@ export default function ProjecaoEstoquePage({
             )}
           </>
         )}
-        <button
-          type="button"
-          className={styles.salvarSnapshotButton}
-          onClick={handleSalvarSnapshot}
-          disabled={savingSnapshot || loading}
-        >
-          {savingSnapshot ? "Salvando..." : "Salvar snapshot no histórico"}
-        </button>
       </div>
-      {snapshotMessage && (
-        <div className={snapshotMessage.startsWith("Snapshot salvo") ? styles.snapshotSuccess : styles.snapshotError}>
-          {snapshotMessage}
-        </div>
-      )}
       </div>
 
       {temExpansao && (
