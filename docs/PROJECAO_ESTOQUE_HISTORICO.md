@@ -12,6 +12,12 @@ O histórico é gravado **automaticamente** para manter um **histórico real do 
 - **Mês anterior não é alterado:** o primeiro dia do mês passado (ou o snapshot já salvo do mês passado) não afeta a coluna do mês passado — cada snapshot é do “mês atual” na hora em que foi salvo; depois vira histórico.
 - Assim o estoque mais antigo possível fica salvo no mês anterior para comparação com os atuais que continuam se modificando.
 
+## Exibição: estoque real vs snapshot
+
+- **Enquanto estamos no mês:** na coluna do mês atual, o **estoque real** e a **duração real** são sempre os valores **ao vivo** (atualizados a cada carga). O snapshot desse mês é gravado em background na primeira abertura do mês, mas **não é exibido** na coluna atual — a coluna atual mostra só o dado mais recente.
+- **Ao virar o mês:** nas colunas dos **meses já fechados**, o sistema passa a exibir o **estoque real** e a **duração real** que estavam no snapshot daquele mês (ex.: estoque do dia do snapshot em janeiro). Assim dá para comparar quanto evoluiu: o valor “congelado” do mês passado vs o valor atual do mês corrente.
+- Resumo: snapshot do mês atual fica guardado e só aparece quando o mês virar; durante o mês, o real segue atualizando.
+
 O botão **"Salvar snapshot no histórico"** continua disponível como **opcional** para gravar em outro momento se quiser.
 
 ## Tabela (Neon/Postgres)

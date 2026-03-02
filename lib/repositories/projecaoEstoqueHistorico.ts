@@ -152,6 +152,49 @@ export async function fetchHistoricoBySnapshot(
 }
 
 /**
+ * Busca estoque/duração real do snapshot de um mês (para exibir na coluna do mês passado).
+ * Retorna Map<key, { estoque_real, duracao_real }> onde key = categoria|linha|subgrupo|grade|colecao.
+ * Usado para preencher "estoque real" e "duração real" das colunas de meses já fechados.
+ */
+export async function fetchSnapshotRealPorMes(
+  company: string,
+  filial: string | null,
+  year: number,
+  month: number
+): Promise<Map<string, { estoque_real: number | null; duracao_real: number | null }>> {
+  await ensureTable();
+  const sql = getNeonSql();
+  const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+  const snapshotRows = await sql`
+    SELECT DISTINCT snapshot_date
+    FROM projecao_estoque_historico
+    WHERE company = ${company}
+      AND (${filial ?? ''} = '' OR filial = ${filial} OR (filial IS NULL AND ${filial ?? ''} = ''))
+      AND snapshot_date >= ${monthStr + '-01'}::date
+      AND snapshot_date < (${monthStr + '-01'}::date + INTERVAL '1 month')
+    ORDER BY snapshot_date DESC
+    LIMIT 1
+  ` as { snapshot_date: string }[];
+  const rawDate = snapshotRows[0]?.snapshot_date;
+  if (rawDate == null) return new Map();
+  const snapshotDate = typeof rawDate === 'string' ? rawDate : (rawDate as Date).toISOString().slice(0, 10);
+  const rows = await sql`
+    SELECT categoria, linha, subgrupo, grade, colecao, estoque_real, duracao_real
+    FROM projecao_estoque_historico
+    WHERE company = ${company}
+      AND snapshot_date = ${snapshotDate}
+      AND (${filial ?? ''} = '' OR filial = ${filial} OR (filial IS NULL AND ${filial ?? ''} = ''))
+      AND mes = ${month}
+  ` as { categoria: string; linha: string | null; subgrupo: string | null; grade: string | null; colecao: string | null; estoque_real: number | null; duracao_real: number | null }[];
+  const map = new Map<string, { estoque_real: number | null; duracao_real: number | null }>();
+  for (const r of rows) {
+    const key = `${r.categoria}|${r.linha ?? ''}|${r.subgrupo ?? ''}|${r.grade ?? ''}|${r.colecao ?? ''}`;
+    map.set(key, { estoque_real: r.estoque_real, duracao_real: r.duracao_real });
+  }
+  return map;
+}
+
+/**
  * Busca histórico de uma categoria ao longo do tempo.
  */
 export async function fetchHistoricoByCategoria(

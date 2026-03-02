@@ -4367,6 +4367,9 @@ export interface ProjecaoMensal {
   /** Vendas reais por canal (só no mês atual): para tooltip da linha VENDA (real) */
   vendasVarejoReal?: number;
   vendasEcommerceReal?: number;
+  /** Preenchido só em meses passados: estoque/duração do snapshot daquele mês (aparece ao virar o mês) */
+  estoqueRealSnapshot?: number;
+  duracaoRealSnapshot?: number;
 }
 
 export interface ProjecaoCategoria {
@@ -4745,7 +4748,7 @@ export async function fetchProjecaoMensal({
       }
     }
 
-    // 3.2. Vendas do ano atual por mês (para preencher real nos meses passados) — varejo
+    // 3.2. Vendas do ano atual por mês (mesma estrutura do ano passado, só ano = atual) — varejo
     const vendasAnoAtualPorMesQuery = `
       SELECT 
         ${categoriaField} AS categoria
@@ -4758,6 +4761,10 @@ export async function fetchProjecaoMensal({
         AND vp.QTDE > 0
         ${vendasMesAtualFilialFilter}
         ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
         ${exclusionFilter}
         ${nerdOnlyEletronicosFilter}
         AND ${categoriaField} <> ''
@@ -4801,6 +4808,10 @@ export async function fetchProjecaoMensal({
             AND CAST(fp.QTDE AS FLOAT) > 0
             ${ecommerceAnoAtualFilialFilter}
             ${grupoFilter}
+            ${linhaFilter}
+            ${colecaoFilter}
+            ${subgrupoFilter}
+            ${gradeFilter}
             ${exclusionFilter}
             ${nerdOnlyEletronicosFilter}
             AND ${categoriaField} <> '' AND ${categoriaField} <> 'SEM GRUPO' AND ${categoriaField} <> 'SEM LINHA'
@@ -4883,21 +4894,36 @@ export async function fetchProjecaoMensal({
       vendasEcommerceMesAtualMap.set(key, (vendasEcommerceMesAtualMap.get(key) || 0) + vendasEcommerce);
     });
 
-    // Vendas reais por mês (ano atual): para meses passados = mês fechado; mês atual = vendasMesAtualMap
+    // Vendas reais por mês (ano atual): total e breakdown varejo/e-commerce para tooltip em todos os meses
     const vendasReaisPorMesMap = new Map<string, Map<number, number>>();
+    const vendasReaisVarejoPorMesMap = new Map<string, Map<number, number>>();
+    const vendasReaisEcommercePorMesMap = new Map<string, Map<number, number>>();
     vendasAnoAtualPorMesResult.recordset.forEach(row => {
       const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
-      if (!vendasReaisPorMesMap.has(key)) vendasReaisPorMesMap.set(key, new Map());
+      if (!vendasReaisPorMesMap.has(key)) {
+        vendasReaisPorMesMap.set(key, new Map());
+        vendasReaisVarejoPorMesMap.set(key, new Map());
+      }
       const mesMap = vendasReaisPorMesMap.get(key)!;
+      const mesMapVarejo = vendasReaisVarejoPorMesMap.get(key)!;
       const mesNumero = row.mes;
-      mesMap.set(mesNumero, (mesMap.get(mesNumero) || 0) + Number(row.vendas ?? 0));
+      const v = Number(row.vendas ?? 0);
+      mesMap.set(mesNumero, (mesMap.get(mesNumero) || 0) + v);
+      mesMapVarejo.set(mesNumero, (mesMapVarejo.get(mesNumero) || 0) + v);
     });
     ecommerceAnoAtualPorMesResult.recordset.forEach(row => {
       const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
-      if (!vendasReaisPorMesMap.has(key)) vendasReaisPorMesMap.set(key, new Map());
+      if (!vendasReaisPorMesMap.has(key)) {
+        vendasReaisPorMesMap.set(key, new Map());
+        vendasReaisEcommercePorMesMap.set(key, new Map());
+      }
       const mesMap = vendasReaisPorMesMap.get(key)!;
+      if (!vendasReaisEcommercePorMesMap.has(key)) vendasReaisEcommercePorMesMap.set(key, new Map());
+      const mesMapEcommerce = vendasReaisEcommercePorMesMap.get(key)!;
       const mesNumero = row.mes;
-      mesMap.set(mesNumero, (mesMap.get(mesNumero) || 0) + Number(row.vendas ?? 0));
+      const v = Number(row.vendas ?? 0);
+      mesMap.set(mesNumero, (mesMap.get(mesNumero) || 0) + v);
+      mesMapEcommerce.set(mesNumero, (mesMapEcommerce.get(mesNumero) || 0) + v);
     });
 
     // Mapear vendas mês anterior e últimos 30 dias (regra dos primeiros 5 dias)
@@ -4948,6 +4974,8 @@ export async function fetchProjecaoMensal({
       const vendasAnoPassadoEcommercePorMes = vendasAnoPassadoEcommerceMap.get(key) || new Map();
       const vendasMesAtual = vendasMesAtualMap.get(key) || 0;
       const vendasReaisPorMes = vendasReaisPorMesMap.get(key) || new Map();
+      const vendasReaisVarejoPorMes = vendasReaisVarejoPorMesMap.get(key) || new Map();
+      const vendasReaisEcommercePorMes = vendasReaisEcommercePorMesMap.get(key) || new Map();
 
       // Calcular total de vendas do ano passado (para usar como fallback se não houver dados do mês específico)
       let totalVendasAnoPassado = 0;
@@ -5020,8 +5048,13 @@ export async function fetchProjecaoMensal({
           estoqueAtual = Math.max(0, estoqueAtual - vendasADescontar);
         }
 
-        const varejoReal = isMesAtual ? Math.round(vendasVarejoMesAtualMap.get(key) || 0) : undefined;
-        const ecommerceReal = isMesAtual ? Math.round(vendasEcommerceMesAtualMap.get(key) || 0) : undefined;
+        const varejoReal = isMesAtual
+          ? Math.round(vendasVarejoMesAtualMap.get(key) || 0)
+          : Math.round(vendasReaisVarejoPorMes.get(mesNumero) || 0);
+        const ecommerceReal = isMesAtual
+          ? Math.round(vendasEcommerceMesAtualMap.get(key) || 0)
+          : Math.round(vendasReaisEcommercePorMes.get(mesNumero) || 0);
+        const temReal = vendasReais != null || varejoReal > 0 || ecommerceReal > 0;
         projecao.meses.push({
           categoria,
           linha,
@@ -5039,8 +5072,7 @@ export async function fetchProjecaoMensal({
           ...(vendasReais !== undefined && { vendasReais }),
           ...(vendasVarejoProj !== undefined && { vendasVarejo: vendasVarejoProj }),
           ...(vendasEcommerceProj !== undefined && { vendasEcommerce: vendasEcommerceProj }),
-          ...(varejoReal !== undefined && { vendasVarejoReal: varejoReal }),
-          ...(ecommerceReal !== undefined && { vendasEcommerceReal: ecommerceReal }),
+          ...(temReal && { vendasVarejoReal: varejoReal, vendasEcommerceReal: ecommerceReal }),
         });
       }
 

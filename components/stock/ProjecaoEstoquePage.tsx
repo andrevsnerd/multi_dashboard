@@ -36,6 +36,9 @@ interface ProjecaoMensal {
   vendasEcommerce?: number;
   vendasVarejoReal?: number;
   vendasEcommerceReal?: number;
+  /** Estoque/duração do snapshot daquele mês (preenchido ao virar o mês) */
+  estoqueRealSnapshot?: number;
+  duracaoRealSnapshot?: number;
 }
 
 interface ProjecaoCategoria {
@@ -275,6 +278,12 @@ export default function ProjecaoEstoquePage({
         ...(totalBase > 0 && { vendasVarejo: Math.round(vendasVarejo), vendasEcommerce: Math.round(vendasEcommerce) }),
         ...(vendasVarejoReal !== undefined && { vendasVarejoReal }),
         ...(vendasEcommerceReal !== undefined && { vendasEcommerceReal }),
+        ...(items.some((it) => it.meses[i]?.estoqueRealSnapshot != null) && {
+          estoqueRealSnapshot: items.reduce((s, it) => s + (it.meses[i]?.estoqueRealSnapshot ?? 0), 0),
+        }),
+        ...(items.some((it) => it.meses[i]?.duracaoRealSnapshot != null) && {
+          duracaoRealSnapshot: items.reduce((s, it) => s + (it.meses[i]?.duracaoRealSnapshot ?? 0), 0),
+        }),
       };
     });
     // Cadeia de estoque a partir do mês atual (meses passados ficam com 0)
@@ -636,15 +645,15 @@ export default function ProjecaoEstoquePage({
                       {mesesExibicao.map((m, mi) => {
                         const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
                         const valor = md?.vendasReais != null ? fmt(md.vendasReais) : "-";
-                        const temTooltip = m.isMesAtual && md && (md.vendasReais != null || md.vendasVarejoReal != null || md.vendasEcommerceReal != null);
-                        const varejo = md?.vendasVarejoReal ?? md?.vendasVarejo ?? 0;
-                        const ecommerce = md?.vendasEcommerceReal ?? md?.vendasEcommerce ?? 0;
-                        const totalReal = md?.vendasReais ?? varejo + ecommerce;
+                        const temTooltip = md && (md.vendasReais != null || md.vendasVarejoReal != null || md.vendasEcommerceReal != null);
+                        const varejo = md?.vendasVarejoReal ?? 0;
+                        const ecommerce = md?.vendasEcommerceReal ?? 0;
+                        const totalReal = md?.vendasReais ?? (varejo + ecommerce);
                         const showBelow = idx === 0;
                         const now = new Date();
                         const diasCorridos = now.getDate();
                         const diasNoMes = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-                        const projecaoRealVal = totalReal > 0 && diasCorridos > 0
+                        const projecaoRealVal = m.isMesAtual && totalReal > 0 && diasCorridos > 0
                           ? Math.round((totalReal / diasCorridos) * diasNoMes)
                           : undefined;
                         const projecaoRealStr = projecaoRealVal != null ? fmt(projecaoRealVal) : undefined;
@@ -665,7 +674,8 @@ export default function ProjecaoEstoquePage({
                     <tr className={styles.realRow}>
                       <td className={styles.realLabelCell}>ESTOQUE (real)</td>
                       {mesesExibicao.map((m, mi) => {
-                        const valor = mi === mesAtualIndex ? fmt(estoqueAtualReal) : "-";
+                        const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
+                        const valor = m.isMesAtual ? fmt(estoqueAtualReal) : (md?.estoqueRealSnapshot != null ? fmt(md.estoqueRealSnapshot) : "-");
                         return <td key={`er-${m.ano}-${m.mesNumero}`} className={`${styles.realEstoqueCell} ${m.isMesAtual ? styles.columnMesAtual : ""}`}>{valor}</td>;
                       })}
                     </tr>
@@ -673,7 +683,9 @@ export default function ProjecaoEstoquePage({
                       <td className={styles.realLabelCell}>DURACAO (real)</td>
                       {mesesExibicao.map((m, mi) => {
                         const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
-                        const valor = m.isMesAtual && duracaoRealMesAtual > 0 ? `${duracaoRealMesAtual} dias` : "-";
+                        const valor = m.isMesAtual
+                          ? (duracaoRealMesAtual > 0 ? `${duracaoRealMesAtual} dias` : "-")
+                          : (md?.duracaoRealSnapshot != null ? `${md.duracaoRealSnapshot} dias` : "-");
                         return <td key={`dr-${m.ano}-${m.mesNumero}`} className={`${styles.realDuracaoCell} ${m.isMesAtual ? styles.columnMesAtual : ""}`}>{valor}</td>;
                       })}
                     </tr>

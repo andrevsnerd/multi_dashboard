@@ -13,7 +13,7 @@ import {
   fetchCategoriasComGiro,
 } from '@/lib/repositories/controleEstoque';
 import { hasPostgres } from '@/lib/db/neon';
-import { saveProjecaoSnapshot, fetchSnapshotDates } from '@/lib/repositories/projecaoEstoqueHistorico';
+import { saveProjecaoSnapshot, fetchSnapshotDates, fetchSnapshotRealPorMes } from '@/lib/repositories/projecaoEstoqueHistorico';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -183,7 +183,8 @@ export async function GET(request: Request) {
             const dates = await fetchSnapshotDates(company, filial);
             const now = new Date();
             const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const mesAtual = now.getMonth() + 1;
+            const month = String(mesAtual).padStart(2, '0');
             const currentMonthPrefix = `${year}-${month}`;
             const alreadySavedThisMonth = dates.some((x) =>
               String(x.snapshot_date).startsWith(currentMonthPrefix)
@@ -193,6 +194,26 @@ export async function GET(request: Request) {
             }
           } catch (autoErr) {
             console.error('Auto-save projeção histórico:', autoErr);
+          }
+          // Preencher estoque/duração real de meses passados a partir do snapshot (aparece ao virar o mês)
+          try {
+            const now = new Date();
+            const year = now.getFullYear();
+            const mesAtual = now.getMonth() + 1;
+            for (let mesNumero = 1; mesNumero < mesAtual; mesNumero++) {
+              const snapshotMap = await fetchSnapshotRealPorMes(company, filial, year, mesNumero);
+              for (const cat of projecao) {
+                const key = `${cat.categoria}|${cat.linha ?? ''}|${cat.subgrupo ?? ''}|${cat.grade ?? ''}|${cat.colecao ?? ''}`;
+                const snap = snapshotMap.get(key);
+                const mesEntry = cat.meses.find((m) => m.mesNumero === mesNumero && m.ano === year);
+                if (mesEntry && snap) {
+                  if (snap.estoque_real != null) mesEntry.estoqueRealSnapshot = snap.estoque_real;
+                  if (snap.duracao_real != null) mesEntry.duracaoRealSnapshot = snap.duracao_real;
+                }
+              }
+            }
+          } catch (snapErr) {
+            console.error('Carregar snapshot real por mês:', snapErr);
           }
         }
         return NextResponse.json({ data: projecao });
