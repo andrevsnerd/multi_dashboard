@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { DateRange, RangeKeyDict } from "react-date-range";
 import { endOfMonth, endOfWeek, startOfMonth, startOfWeek, startOfYear, subDays, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -41,6 +41,23 @@ function formatDisplay(range: DateRangeValue): { primary: string; secondary: str
   };
 }
 
+function parseYmdToLocalDate(value: string): Date | null {
+  // Espera "yyyy-MM-dd" vindo do <input type="date">
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parts = trimmed.split("-");
+  if (parts.length !== 3) return null;
+  const year = Number(parts[0]);
+  const month = Number(parts[1]);
+  const day = Number(parts[2]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > 31) return null;
+  const d = new Date(year, month - 1, day);
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+}
+
 export default function DateRangeFilter({
   value,
   onChange,
@@ -57,6 +74,7 @@ export default function DateRangeFilter({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const [isMobile, setIsMobile] = useState(false);
+  const [draft, setDraft] = useState<DateRangeValue | null>(null);
   
   const normalized = useMemo(
     () => normalizeRange(value.startDate, value.endDate),
@@ -77,6 +95,20 @@ export default function DateRangeFilter({
     base.setHours(23, 59, 59, 999);
     return base;
   }, [maxSelectableDate]);
+
+  const clampDate = useCallback(
+    (date: Date) => {
+      let clamped =
+        date.getTime() > effectiveMaxDate.getTime()
+          ? new Date(effectiveMaxDate.getTime())
+          : new Date(date.getTime());
+      if (availableNormalized && clamped.getTime() < availableNormalized.start.getTime()) {
+        clamped = new Date(availableNormalized.start.getTime());
+      }
+      return clamped;
+    },
+    [effectiveMaxDate, availableNormalized],
+  );
 
   const clampedRange = useMemo(() => {
     const maxTime = effectiveMaxDate.getTime();
@@ -107,14 +139,6 @@ export default function DateRangeFilter({
   }, [normalized.end, normalized.start, effectiveMaxDate, availableNormalized]);
 
   const presets = useMemo(() => {
-    const clampDate = (date: Date) => {
-      let clamped = new Date(Math.min(date.getTime(), effectiveMaxDate.getTime()));
-      if (availableNormalized && clamped.getTime() < availableNormalized.start.getTime()) {
-        clamped = new Date(availableNormalized.start.getTime());
-      }
-      return clamped;
-    };
-
     return [
       {
         label: "Hoje",
@@ -215,7 +239,7 @@ export default function DateRangeFilter({
           const threeMonthsAgo = subMonths(today, 3);
           let startDate = startOfMonth(threeMonthsAgo);
           // Terminar no dia atual (ou no maxSelectableDate se for menor)
-          let endDate = clampDate(new Date());
+          const endDate = clampDate(new Date());
           
           // Respeitar o availableRange se existir
           if (availableNormalized && startDate.getTime() < availableNormalized.start.getTime()) {
@@ -239,7 +263,7 @@ export default function DateRangeFilter({
           // Começar no primeiro dia do ano atual
           let startDate = startOfYear(today);
           // Terminar no dia atual (ou no maxSelectableDate se for menor)
-          let endDate = clampDate(new Date());
+          const endDate = clampDate(new Date());
           
           // Respeitar o availableRange se existir
           if (availableNormalized && startDate.getTime() < availableNormalized.start.getTime()) {
@@ -257,7 +281,7 @@ export default function DateRangeFilter({
         },
       },
     ];
-  }, [effectiveMaxDate, availableNormalized]);
+  }, [clampDate, availableNormalized]);
 
   // Detectar mobile
   useEffect(() => {
@@ -332,9 +356,20 @@ export default function DateRangeFilter({
     endDate: clampedRange.end,
   });
 
+  const draftClamped = useMemo(() => {
+    const base = draft ?? { startDate: clampedRange.start, endDate: clampedRange.end };
+    const norm = normalizeRange(base.startDate, base.endDate);
+    const start = clampDate(norm.start);
+    const end = clampDate(norm.end);
+    if (start.getTime() > end.getTime()) {
+      return { startDate: new Date(end.getTime()), endDate: new Date(end.getTime()) };
+    }
+    return { startDate: start, endDate: end };
+  }, [draft, clampedRange.start, clampedRange.end, clampDate]);
+
   const selectionRange = {
-    startDate: clampedRange.start,
-    endDate: clampedRange.end,
+    startDate: draftClamped.startDate,
+    endDate: draftClamped.endDate,
     key: "selection",
   };
 
@@ -343,32 +378,35 @@ export default function DateRangeFilter({
     if (!selected?.startDate || !selected?.endDate) {
       return;
     }
-
-    const clampValue = (date: Date) => {
-      let clamped =
-        date.getTime() > effectiveMaxDate.getTime()
-          ? new Date(effectiveMaxDate.getTime())
-          : date;
-      if (availableNormalized && clamped.getTime() < availableNormalized.start.getTime()) {
-        clamped = new Date(availableNormalized.start.getTime());
-      }
-      return clamped;
-    };
-
-    const endDate = clampValue(selected.endDate);
+    const startCandidate = clampDate(selected.startDate);
+    const endCandidate = clampDate(selected.endDate);
     const startDate =
-      selected.startDate.getTime() > endDate.getTime()
-        ? new Date(endDate.getTime())
-        : selected.startDate;
-    const boundedStart =
-      availableNormalized && startDate.getTime() < availableNormalized.start.getTime()
-        ? new Date(availableNormalized.start.getTime())
-        : startDate;
-
-    onChange({
-      startDate: boundedStart,
-      endDate,
+      startCandidate.getTime() > endCandidate.getTime()
+        ? new Date(endCandidate.getTime())
+        : startCandidate;
+    setDraft({
+      startDate,
+      endDate: endCandidate,
     });
+  };
+
+  const minSelectable = availableNormalized?.start ?? undefined;
+  const maxSelectable = effectiveMaxDate;
+
+  const handleCancel = () => {
+    setIsOpen(false);
+    setDraft(null);
+  };
+
+  const handleApply = () => {
+    const norm = normalizeRange(draftClamped.startDate, draftClamped.endDate);
+    const nextStart = clampDate(norm.start);
+    const nextEnd = clampDate(norm.end);
+    const startDate =
+      nextStart.getTime() > nextEnd.getTime() ? new Date(nextEnd.getTime()) : nextStart;
+    onChange({ startDate, endDate: nextEnd });
+    setIsOpen(false);
+    setDraft(null);
   };
 
   return (
@@ -377,7 +415,19 @@ export default function DateRangeFilter({
       <button
         type="button"
         className={`${styles.button} ${isOpen ? styles.buttonActive : ""}`}
-        onClick={() => !disabled && setIsOpen((prev) => !prev)}
+        onClick={() => {
+          if (disabled) return;
+          if (isOpen) {
+            setIsOpen(false);
+            setDraft(null);
+            return;
+          }
+          setDraft({
+            startDate: new Date(clampedRange.start.getTime()),
+            endDate: new Date(clampedRange.end.getTime()),
+          });
+          setIsOpen(true);
+        }}
         disabled={disabled}
         aria-disabled={disabled}
       >
@@ -389,7 +439,7 @@ export default function DateRangeFilter({
 
       {isOpen ? (
         <>
-          <div className={styles.backdrop} onClick={() => setIsOpen(false)} />
+          <div className={styles.backdrop} onClick={handleCancel} />
           <div 
             className={styles.dropdown} 
             ref={dropdownRef} 
@@ -403,6 +453,8 @@ export default function DateRangeFilter({
                   onClick={() => {
                     const resolved = preset.resolve();
                     onChange(resolved);
+                    setIsOpen(false);
+                    setDraft(null);
                   }}
                   className={styles.presetButton}
                 >
@@ -410,16 +462,75 @@ export default function DateRangeFilter({
                 </button>
               ))}
             </div>
-            <DateRange
-              ranges={[selectionRange]}
-              onChange={handleSelect}
-              direction="horizontal"
-              showMonthArrow
-              showDateDisplay={false}
-              locale={ptBR}
-              rangeColors={["#64748b"]}
-              maxDate={effectiveMaxDate}
-            />
+            <div className={styles.calendarArea}>
+              <div className={styles.inputsRow}>
+                <label className={styles.field}>
+                  <span className={styles.fieldLabel}>Data inicial</span>
+                  <input
+                    type="date"
+                    className={styles.dateInput}
+                    value={formatDateForQuery(draftClamped.startDate)}
+                    min={minSelectable ? formatDateForQuery(minSelectable) : undefined}
+                    max={formatDateForQuery(maxSelectable)}
+                    onChange={(e) => {
+                      const next = parseYmdToLocalDate(e.target.value);
+                      if (!next) return;
+                      const start = clampDate(next);
+                      let end = clampDate(draftClamped.endDate);
+                      if (start.getTime() > end.getTime()) {
+                        end = new Date(start.getTime());
+                      }
+                      setDraft({ startDate: start, endDate: end });
+                    }}
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span className={styles.fieldLabel}>Data final</span>
+                  <input
+                    type="date"
+                    className={styles.dateInput}
+                    value={formatDateForQuery(draftClamped.endDate)}
+                    min={minSelectable ? formatDateForQuery(minSelectable) : undefined}
+                    max={formatDateForQuery(maxSelectable)}
+                    onChange={(e) => {
+                      const next = parseYmdToLocalDate(e.target.value);
+                      if (!next) return;
+                      const end = clampDate(next);
+                      let start = clampDate(draftClamped.startDate);
+                      if (end.getTime() < start.getTime()) {
+                        start = new Date(end.getTime());
+                      }
+                      setDraft({ startDate: start, endDate: end });
+                    }}
+                  />
+                </label>
+              </div>
+              <div className={styles.actionsRow}>
+                <button type="button" className={styles.actionButton} onClick={handleCancel}>
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.actionButton} ${styles.actionPrimary}`}
+                  onClick={handleApply}
+                >
+                  Aplicar
+                </button>
+              </div>
+              <DateRange
+                ranges={[selectionRange]}
+                onChange={handleSelect}
+                direction="horizontal"
+                showMonthArrow
+                showDateDisplay={false}
+                locale={ptBR}
+                rangeColors={["#64748b"]}
+                maxDate={effectiveMaxDate}
+                minDate={minSelectable}
+                moveRangeOnFirstSelection={false}
+                retainEndDateOnFirstSelection
+              />
+            </div>
           </div>
         </>
       ) : null}

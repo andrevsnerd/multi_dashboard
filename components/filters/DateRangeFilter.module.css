@@ -67,6 +67,80 @@
   opacity: 1;
 }
 
+.calendarArea {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inputsRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  color: #475569;
+  font-weight: 600;
+}
+
+.dateInput {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  background: #ffffff;
+  font-size: 13px;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dateInput:focus {
+  border-color: rgba(14, 165, 233, 0.55);
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.15);
+}
+
+.actionsRow {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.actionButton {
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  background: #ffffff;
+  color: #0f172a;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.actionButton:hover {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+.actionPrimary {
+  background: #0ea5e9;
+  border-color: #0ea5e9;
+  color: #ffffff;
+}
+
+.actionPrimary:hover {
+  background: #0284c7;
+  border-color: #0284c7;
+}
+
 .presets {
   display: flex;
   flex-direction: column;
@@ -140,6 +214,18 @@
   .backdrop {
     background: rgba(0, 0, 0, 0.5);
     z-index: 1000;
+  }
+
+  .inputsRow {
+    grid-template-columns: 1fr;
+  }
+
+  .actionsRow {
+    justify-content: stretch;
+  }
+
+  .actionButton {
+    flex: 1;
   }
 
   .presets {
