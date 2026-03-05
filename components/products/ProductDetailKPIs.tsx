@@ -260,20 +260,28 @@ export default function ProductDetailKPIs({
     });
     
     let cumulative = 0;
+    let cumulativeQuantity = 0;
     const averageDaily = daysPassed > 0 && detail.totalRevenue > 0
       ? detail.totalRevenue / daysPassed
+      : 0;
+    const averageQuantityDaily = daysPassed > 0 && detail.totalQuantity > 0
+      ? detail.totalQuantity / daysPassed
       : 0;
     return days.map((day) => {
       const key = format(day, "yyyy-MM-dd");
       const dayRevenue = revenueByDay.get(key) ?? 0;
+      const dayQuantity = salesByDay.get(key)?.reduce((sum, s) => sum + s.quantity, 0) ?? 0;
       cumulative += dayRevenue;
+      cumulativeQuantity += dayQuantity;
       const dayIndex = day.getDate();
       const projection = averageDaily * dayIndex;
+      const quantityProjection = Math.round(averageQuantityDaily * dayIndex);
       const daySales = salesByDay.get(key) ?? [];
       return {
         day: format(day, "dd", { locale: ptBR }),
         vendasReais: Math.round(cumulative * 100) / 100,
         projecao: Math.round(projection * 100) / 100,
+        quantityProjection,
         hasSales: daySales.length > 0,
         salesByFilial: daySales,
       };
@@ -441,22 +449,30 @@ export default function ProductDetailKPIs({
                         fontSize: "12px",
                       }}>
                         <p style={{ margin: "0 0 8px 0", color: "#64748b", fontWeight: 600 }}>Dia {label}</p>
-                        <p style={{ margin: "0 0 4px 0", color: "#2563eb", fontWeight: 600 }}>
-                          Vendas Reais: {formatCurrency(data.vendasReais)}
-                        </p>
-                        <p style={{ margin: "0 0 8px 0", color: "#94a3b8" }}>
-                          Projeção: {formatCurrency(data.projecao)}
-                        </p>
-                        {data.salesByFilial && data.salesByFilial.length > 0 && (
-                          <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "8px" }}>
-                            <p style={{ margin: "0 0 4px 0", fontWeight: 600 }}>Filiais:</p>
-                            {data.salesByFilial.map((s: { filialDisplayName: string; quantity: number; revenue: number }, idx: number) => (
-                              <div key={idx} style={{ display: "flex", justifyContent: "space-between", gap: "16px", marginBottom: "2px" }}>
-                                <span style={{ color: "#475569" }}>{s.filialDisplayName}</span>
-                                <span style={{ color: "#475569", fontWeight: 500 }}>{s.quantity} un.</span>
+                        {data.hasSales ? (
+                          <>
+                            <p style={{ margin: "0 0 8px 0", color: "#2563eb", fontWeight: 600 }}>
+                              Vendas: {formatCurrency(data.vendasReais)} ({data.salesByFilial?.reduce((sum: number, s: { quantity: number }) => sum + s.quantity, 0) ?? 0} un.)
+                            </p>
+                            <p style={{ margin: "0 0 8px 0", color: "#94a3b8" }}>
+                              Projeção: {formatCurrency(data.projecao)} ({data.quantityProjection} un.)
+                            </p>
+                            {data.salesByFilial && data.salesByFilial.length > 0 && (
+                              <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "8px" }}>
+                                <p style={{ margin: "0 0 4px 0", fontWeight: 600 }}>Filiais:</p>
+                                {data.salesByFilial.map((s: { filialDisplayName: string; quantity: number; revenue: number }, idx: number) => (
+                                  <div key={idx} style={{ display: "flex", justifyContent: "space-between", gap: "16px", marginBottom: "2px" }}>
+                                    <span style={{ color: "#475569" }}>{s.filialDisplayName}</span>
+                                    <span style={{ color: "#475569", fontWeight: 500 }}>{s.quantity} un. ({formatCurrency(s.revenue)})</span>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
+                            )}
+                          </>
+                        ) : (
+                          <p style={{ margin: "0 0 8px 0", color: "#94a3b8" }}>
+                            Projeção: {formatCurrency(data.projecao)} ({data.quantityProjection} un.)
+                          </p>
                         )}
                       </div>
                     );
