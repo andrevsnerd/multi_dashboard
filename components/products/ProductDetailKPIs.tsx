@@ -19,6 +19,7 @@ import type {
   ProductPrecoItem,
   ProductCustoItem,
 } from "@/lib/repositories/productDetail";
+import { resolveCompany } from "@/lib/config/company";
 
 import styles from "./ProductDetailKPIs.module.css";
 
@@ -222,20 +223,11 @@ export default function ProductDetailKPIs({
     totalDaysInMonth
   );
 
-  const stockProjectionEndMonth = (() => {
-    if (daysPassed <= 0 || detail.totalQuantity === 0) return detail.totalStock;
-    const averageDailyQuantity = detail.totalQuantity / daysPassed;
-    const monthlyProjectionQuantity = averageDailyQuantity * totalDaysInMonth;
-    return Math.max(0, Math.round(detail.totalStock - monthlyProjectionQuantity));
+  const monthlyProjection = (() => {
+    if (daysPassed <= 0 || detail.totalRevenue === 0) return 0;
+    const averageDaily = detail.totalRevenue / daysPassed;
+    return averageDaily * totalDaysInMonth;
   })();
-
-  const consumptionProjected = daysPassed > 0 && detail.totalQuantity > 0
-    ? Math.round((detail.totalQuantity / daysPassed) * 30)
-    : 0;
-
-  const daysUntilStockOut = detail.totalQuantity > 0 && consumptionProjected > 0
-    ? Math.floor((detail.totalStock / consumptionProjected) * 30)
-    : null;
 
   const chartData = (() => {
     const monthStart = startOfMonth(start);
@@ -269,18 +261,6 @@ export default function ProductDetailKPIs({
     ? detail.revenueVariance
     : null;
 
-  const topFilialSalesCount = saleHistory
-    .filter((s) => (s.filialDisplayName || s.filial) === (detail.topFilialDisplayName || detail.topFilial))
-    .length;
-
-  const topFilialStock = detail.topFilial
-    ? stockByFilial.find((f) => f.filial === detail.topFilial || f.filialDisplayName === detail.topFilialDisplayName)?.stock ?? 0
-    : 0;
-
-  const topColorPct = detail.totalQuantity > 0 && detail.topColorQuantity > 0
-    ? Math.round((detail.topColorQuantity / detail.totalQuantity) * 100)
-    : 0;
-
   return (
     <div className={styles.section}>
       {/* Primeira linha: 5 KPIs */}
@@ -305,7 +285,9 @@ export default function ProductDetailKPIs({
               </span>
             )}
           </div>
-          <p className={styles.cardDescription}>Receita bruta do período</p>
+          <p className={styles.cardDescription}>
+            Projeção Mês: {formatCurrency(monthlyProjection)}
+          </p>
         </article>
 
         <article className={styles.card}>
@@ -370,55 +352,31 @@ export default function ProductDetailKPIs({
         </article>
       </div>
 
-      {/* Segunda linha: Loja + Cor */}
-      <div className={styles.kpiRowTwo}>
-        <article className={styles.card}>
-          <header className={styles.cardHeader}>
-            <span className={styles.cardIconSvgLeft} aria-hidden>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-            </span>
-            <span className={styles.cardLabel}>LOJA QUE MAIS VENDEU</span>
-          </header>
-          <div className={styles.cardValue}>
-            {detail.topFilialDisplayName || detail.topFilial || "--"}
-          </div>
-          <p className={styles.cardDescription}>
-            {detail.topFilial ? (
-              <>
-                <span className={styles.topFilialRevenue}>{formatCurrency(detail.topFilialRevenue)}</span>
-                <span> {topFilialSalesCount} vendas</span>
-                <span>
-                  {" · "}
-                  <span className={topFilialStock <= 0 ? styles.stockLow : ""}>
-                    {formatInteger(topFilialStock)} estoque
-                  </span>
-                </span>
-              </>
-            ) : (
-              "Nenhuma venda registrada"
-            )}
-          </p>
-        </article>
-
-        <article className={styles.card}>
-          <header className={styles.cardHeader}>
-            <span className={styles.cardIconSvgLeft} aria-hidden>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-            </span>
-            <span className={styles.cardLabel}>COR MAIS VENDIDA</span>
-          </header>
-          <div className={styles.cardValue}>
-            {detail.topColorDisplayName || detail.topColor || "--"}
-          </div>
-          <p className={styles.cardDescriptionHighlight}>
-            {detail.topColor && detail.topColorQuantity > 0
-              ? `${detail.topColorQuantity} unidades · ${topColorPct}% do total`
-              : "Nenhuma cor registrada"}
-          </p>
-        </article>
+      {/* Estoque por Filial - ordem fixa por empresa */}
+      <div className={styles.estoqueSection}>
+        <h3 className={styles.estoqueSectionTitle}>Estoque por Filial</h3>
+        <div className={styles.estoqueCards}>
+          {(() => {
+            const order = resolveCompany(companyKey)?.estoqueFilialOrder ?? [];
+            const orderMap = new Map(order.map((name, i) => [name.toUpperCase().trim(), i]));
+            const sorted = [...stockByFilial].sort((a, b) => {
+              const nameA = (a.filialDisplayName || a.filial || "").toUpperCase().trim();
+              const nameB = (b.filialDisplayName || b.filial || "").toUpperCase().trim();
+              const idxA = orderMap.get(nameA) ?? order.length;
+              const idxB = orderMap.get(nameB) ?? order.length;
+              return idxA - idxB;
+            });
+            return sorted.map((filial) => (
+            <div key={filial.filial} className={styles.estoqueCard}>
+              <span className={styles.estoqueCardName}>{filial.filialDisplayName || filial.filial}</span>
+              <span className={styles.estoqueCardValue}>{filial.stock}</span>
+            </div>
+          ));
+          })()}
+        </div>
       </div>
 
-      {/* Performance de Vendas + Projeção de Estoque */}
+      {/* Performance de Vendas */}
       <div className={styles.chartRow}>
         <div className={styles.chartCard}>
           <h3 className={styles.chartTitle}>Performance de Vendas</h3>
@@ -479,47 +437,6 @@ export default function ProductDetailKPIs({
               </LineChart>
             </ResponsiveContainer>
           </div>
-        </div>
-
-        <div className={styles.stockProjectionCard}>
-          <h3 className={styles.stockProjectionTitle}>
-            <span className={styles.stockProjectionIcon} aria-hidden>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-            </span>
-            Projeção de Estoque
-          </h3>
-          <div className={styles.stockProjectionGrid}>
-            <div className={styles.stockProjectionItem}>
-              <span className={styles.stockProjectionLabel}>ESTOQUE ATUAL</span>
-              <span className={styles.stockProjectionValue}>{detail.totalStock} unidades</span>
-            </div>
-            <div className={styles.stockProjectionItem}>
-              <span className={styles.stockProjectionLabel}>PROJEÇÃO FIM DO MÊS</span>
-              <span className={styles.stockProjectionValue}>{stockProjectionEndMonth} unidades</span>
-            </div>
-          </div>
-          <div className={styles.consumoProjected}>
-            <span className={styles.consumoLabel}>Consumo projetado</span>
-            <div className={styles.progressBarWrapper}>
-              <div className={styles.progressBar}>
-                <div
-                  className={styles.progressBarFill}
-                  style={{
-                    width: `${consumptionProjected > 0 && detail.totalStock > 0
-                      ? Math.min(100, (consumptionProjected / Math.max(consumptionProjected, detail.totalStock * 2)) * 100)
-                      : 0}%`,
-                  }}
-                />
-              </div>
-              <span className={styles.consumoValue}>{consumptionProjected} un/mês</span>
-            </div>
-          </div>
-          {daysUntilStockOut != null && daysUntilStockOut > 0 && (
-            <p className={styles.depletionEstimate}>
-              <span className={styles.depletionIcon} aria-hidden>~</span>
-              Estimativa de {daysUntilStockOut} dias até esgotar estoque
-            </p>
-          )}
         </div>
       </div>
 

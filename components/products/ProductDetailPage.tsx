@@ -14,8 +14,6 @@ import type {
 
 import styles from "./ProductDetailPage.module.css";
 import ProductDetailKPIs from "./ProductDetailKPIs";
-import ProductPerformanceTable from "./ProductPerformanceTable";
-import ProductSaleHistoryTable from "./ProductSaleHistoryTable";
 
 interface ProductDetailPageProps {
   companyKey: CompanyKey;
@@ -261,38 +259,9 @@ export default function ProductDetailPage({
           </div>
         </div>
 
-        <div className={styles.markupCard}>
-          <span className={styles.markupCardLabel}>MARKUP</span>
-          <span className={styles.markupCardValue}>
-            {data.detail.totalMarkup > 0 ? `${data.detail.totalMarkup.toFixed(2)}x` : "--"}
-          </span>
-        </div>
-        <div className={styles.projectionCard}>
-          <span className={styles.projectionCardLabel}>PROJEÇÃO DO MÊS</span>
-          <span className={styles.projectionCardValue}>
-            {(() => {
-              const start = new Date(range.startDate);
-              const end = new Date(range.endDate);
-              const currentMonth = new Date(start.getFullYear(), start.getMonth(), 1);
-              const lastDayOfMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0);
-              const totalDaysInMonth = lastDayOfMonth.getDate();
-              const daysPassed = Math.min(
-                Math.ceil((end.getTime() - currentMonth.getTime()) / (1000 * 60 * 60 * 24)),
-                totalDaysInMonth
-              );
-              if (daysPassed <= 0 || data.detail.totalRevenue === 0) {
-                return "R$ 0,00";
-              }
-              const averageDaily = data.detail.totalRevenue / daysPassed;
-              const projection = averageDaily * totalDaysInMonth;
-              return projection.toLocaleString("pt-BR", {
-                style: "currency",
-                currency: "BRL",
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              });
-            })()}
-          </span>
+        <div className={styles.stockTotalCard}>
+          <span className={styles.stockTotalCardLabel}>ESTOQUE TOTAL</span>
+          <span className={styles.stockTotalCardValue}>{data.detail.totalStock}</span>
         </div>
       </div>
 
@@ -305,17 +274,6 @@ export default function ProductDetailPage({
         saleHistory={data.saleHistory}
         stockByFilial={data.stockByFilial}
         onDetailUpdated={refetchDetail}
-      />
-
-      <ProductPerformanceTable
-        data={data.stockByFilial}
-        loading={loading}
-      />
-
-      <ProductSaleHistoryTable
-        data={data.saleHistory}
-        loading={loading}
-        totalRevenue={data.detail.totalRevenue}
       />
     </>
   ) : null;
@@ -335,7 +293,7 @@ export default function ProductDetailPage({
     <div className={styles.header}>
       <div className={styles.headerRow}>
         <h1 className={styles.title}>Produto Detalhado</h1>
-        <DateRangeFilter value={range} onChange={setRange} />
+        <DateRangeFilter value={range} onChange={setRange} label="PERIODO" />
       </div>
       <div className={styles.searchContainer} ref={searchContainerRef}>
         <div className={styles.searchInputWrapper}>

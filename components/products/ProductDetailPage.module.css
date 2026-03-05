@@ -178,7 +178,7 @@
 
 .productHeaderContainer {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto;
   gap: 24px;
   align-items: stretch;
   margin-bottom: 24px;
@@ -192,8 +192,7 @@
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
 }
 
-.markupCard,
-.projectionCard {
+.stockTotalCard {
   background: #ffffff;
   border-radius: 20px;
   border: 1px solid rgba(15, 23, 42, 0.08);
@@ -206,8 +205,7 @@
   min-width: 180px;
 }
 
-.markupCardLabel,
-.projectionCardLabel {
+.stockTotalCardLabel {
   font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -215,16 +213,10 @@
   font-weight: 600;
 }
 
-.markupCardValue {
+.stockTotalCardValue {
   font-size: 24px;
   font-weight: 700;
   color: #0f172a;
-}
-
-.projectionCardValue {
-  font-size: 24px;
-  font-weight: 700;
-  color: #2563eb;
 }
 
 .productName {
@@ -332,8 +324,7 @@
     gap: 12px;
   }
 
-  .markupCard,
-  .projectionCard {
+  .stockTotalCard {
     min-width: 100%;
   }
 
@@ -341,8 +332,7 @@
     padding: 16px;
   }
 
-  .markupCard,
-  .projectionCard {
+  .stockTotalCard {
     padding: 16px;
   }
 
@@ -356,8 +346,7 @@
     gap: 8px;
   }
 
-  .markupCardValue,
-  .projectionCardValue {
+  .stockTotalCardValue {
     font-size: 20px;
   }
 }

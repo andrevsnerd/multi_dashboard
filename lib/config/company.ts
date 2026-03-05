@@ -11,6 +11,8 @@ export interface CompanyConfig {
   name: string;
   filialFilters: Record<CompanyModule, string[]>;
   filialDisplayNames?: Record<string, string>;
+  /** Ordem fixa dos cards "Estoque por Filial" (por nome de exibição) */
+  estoqueFilialOrder?: string[];
   ecommerceFilials?: string[];
   excludedLines?: string[]; // Linhas excluídas de cálculos de estoque e vendas
 }
@@ -42,7 +44,9 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
       'NERD LEBLON': 'LEBLON',
       'NERD MORUMBI RDRRRJ': 'MORUMBI',
       'NERD VILLA LOBOS': 'VILLA LOBOS',
+      'NERD': 'MATRIZ',
     },
+    estoqueFilialOrder: ['MATRIZ', 'MORUMBI', 'VILLA LOBOS', 'HIGIENOPOLIS', 'LEBLON', 'CENTER NORTE'],
   },
   scarfme: {
     key: 'scarfme',
@@ -97,6 +101,7 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
       'VILLA LOBOS - LLL': 'VILLA LOBOS',
       'MSC COMERCIO DE LENCOS LT': 'E-COMMERCE',
     },
+    estoqueFilialOrder: ['MATRIZ', 'E-COMMERCE', 'GUARULHOS', 'MORUMBI', 'OSCAR FREIRE', 'VILLA LOBOS'],
     ecommerceFilials: ['SCARFME MATRIZ CMS', 'SCARF ME - MATRIZ LLL', 'SCARF ME MATRIZ - FFF', 'MSC COMERCIO DE LENCOS LT'],
     excludedLines: [
       'PRIVATE LABEL',
