@@ -59,9 +59,16 @@ export async function GET(request: Request) {
       }),
     ]);
 
+    // Garantir que o estoque total do card seja a soma do estoque por filial (fonte única de verdade)
+    const totalStockFromFilials = stockByFilial.reduce((sum, row) => sum + row.stock, 0);
+    const detailWithConsistentStock: ProductDetailInfo = {
+      ...detail,
+      totalStock: totalStockFromFilials,
+    };
+
     return NextResponse.json({
       data: {
-        detail,
+        detail: detailWithConsistentStock,
         stockByFilial,
         saleHistory,
       },
