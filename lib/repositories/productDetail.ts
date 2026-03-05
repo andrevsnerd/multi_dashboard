@@ -153,6 +153,8 @@ function buildFilialFilter(
 export interface ProductDetailInfo {
   productId: string;
   productName: string;
+  /** Grade do produto (scarfme); ex.: P, M, G */
+  grade?: string | null;
   lastEntryDate: Date | null;
   lastEntryFilial: string | null;
   totalRevenue: number;
@@ -203,6 +205,126 @@ export interface ProductDetailParams {
     end?: string | Date;
   };
   filial?: string | null;
+  /** Filtro por códigos de cor (COR_PRODUTO). Quando informado, restringe detalhe, estoque e vendas a essas cores. */
+  colors?: string[];
+}
+
+export interface ProductAvailableColor {
+  code: string;
+  displayName: string;
+}
+
+/**
+ * Retorna as cores disponíveis para o produto que tenham estoque positivo nas filiais da empresa.
+ */
+export async function fetchProductAvailableColors(
+  productId: string,
+  company?: string
+): Promise<ProductAvailableColor[]> {
+  const companyConfig = resolveCompany(company);
+  const filiais = companyConfig?.filialFilters?.inventory ?? [];
+
+  return withRequest(async (request) => {
+    request.input('productId', sql.VarChar, productId);
+    if (filiais.length === 0) {
+      const query = `
+        SELECT DISTINCT ISNULL(e.COR_PRODUTO, '') AS COR, ISNULL(c.DESC_COR, '') AS DESC_COR
+        FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+        LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
+        WHERE e.PRODUTO = @productId
+          AND EXISTS (SELECT 1 FROM ESTOQUE_PRODUTOS e2 WITH (NOLOCK) WHERE e2.PRODUTO = e.PRODUTO AND ISNULL(e2.COR_PRODUTO,'') = ISNULL(e.COR_PRODUTO,'') AND e2.ESTOQUE > 0)
+      `;
+      const result = await request.query<{ COR: string; DESC_COR: string }>(query);
+      return buildColorList(result.recordset);
+    }
+    filiais.forEach((f, i) => {
+      request.input(`filialInv${i}`, sql.VarChar, f);
+    });
+    const placeholders = filiais.map((_, i) => `@filialInv${i}`).join(', ');
+    const query = `
+      SELECT DISTINCT ISNULL(e.COR_PRODUTO, '') AS COR, ISNULL(c.DESC_COR, '') AS DESC_COR
+      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
+      WHERE e.PRODUTO = @productId
+        AND e.FILIAL IN (${placeholders})
+        AND e.ESTOQUE > 0
+    `;
+    const result = await request.query<{ COR: string; DESC_COR: string }>(query);
+    return buildColorList(result.recordset);
+  });
+}
+
+/** Ordem das cores principais (primeiras na lista). Comparação case-insensitive. */
+const PRINCIPAL_COLORS_ORDER = [
+  'preto',
+  'branco',
+  'off white',
+  'marinho',
+  'cinza',
+  'nude',
+  'bege',
+  'camel',
+  'creme',
+  'natural',
+  'azul marinho',
+  'vermelho',
+  'azul',
+  'rosa',
+  'verde',
+  'amarelo',
+  'laranja',
+  'marrom',
+  'dourado',
+  'prata',
+];
+
+function buildColorList(recordset: { COR: string; DESC_COR: string }[]): ProductAvailableColor[] {
+  const seen = new Set<string>();
+  const list: ProductAvailableColor[] = [];
+  for (const row of recordset) {
+    const code = (row.COR ?? '').trim();
+    if (seen.has(code)) continue;
+    seen.add(code);
+    const displayName = getColorDescription(code || undefined, row.DESC_COR ?? '') || (code || 'Sem cor');
+    list.push({ code: code || '', displayName });
+  }
+  const norm = (s: string) => (s || '').toLowerCase().trim().replace(/-/g, ' ');
+  return list.sort((a, b) => {
+    const nameA = norm(a.displayName);
+    const nameB = norm(b.displayName);
+    const idxA = PRINCIPAL_COLORS_ORDER.findIndex((p) => nameA === p || nameA.startsWith(p + ' '));
+    const idxB = PRINCIPAL_COLORS_ORDER.findIndex((p) => nameB === p || nameB.startsWith(p + ' '));
+    if (idxA >= 0 && idxB >= 0) return idxA - idxB;
+    if (idxA >= 0) return -1;
+    if (idxB >= 0) return 1;
+    return a.displayName.localeCompare(b.displayName);
+  });
+}
+
+/** Adiciona parâmetros de cor ao request uma vez; retorna função que gera o fragmento SQL por alias. */
+function buildColorFilter(
+  request: sql.Request | RequestLike,
+  colors: string[] | undefined
+): (tableAlias: string) => string {
+  if (!colors || colors.length === 0) return () => '';
+  const hasEmpty = colors.some((c) => c === '' || c === null || c === undefined);
+  const normalized = colors.filter((c) => c != null && c !== '').map((c) => String(c).trim());
+  const allCodes = [...new Set(normalized)];
+  allCodes.forEach((c, i) => {
+    request.input(`colorFilter${i}`, sql.VarChar, c);
+  });
+  const placeholders = allCodes.map((_, i) => `@colorFilter${i}`).join(', ');
+  return (tableAlias: string) => {
+    if (allCodes.length === 0 && hasEmpty) {
+      return `AND (${tableAlias}.COR_PRODUTO IS NULL OR ${tableAlias}.COR_PRODUTO = '')`;
+    }
+    if (allCodes.length === 0) return '';
+    const inClause = `(${tableAlias}.COR_PRODUTO IN (${placeholders})`;
+    if (hasEmpty) {
+      return `AND (${inClause} OR ${tableAlias}.COR_PRODUTO IS NULL OR ${tableAlias}.COR_PRODUTO = '')`;
+    }
+    return `AND ${inClause})`;
+  };
 }
 
 function resolveRange(range?: { start?: string | Date; end?: string | Date }) {
@@ -220,6 +342,7 @@ async function fetchProductDetailEcommerce({
   company,
   range,
   filial,
+  colors,
 }: ProductDetailParams): Promise<{
   totalRevenue: number;
   totalQuantity: number;
@@ -240,8 +363,9 @@ async function fetchProductDetailEcommerce({
     request.input('previousEndDate', sql.DateTime, previousRange.end);
 
     const filialFilter = buildEcommerceFilialFilter(request, company, filial, 'f');
+    const colorFilterFp = buildColorFilter(request, colors)('fp');
 
-    // Buscar vendas do período atual
+    // Buscar vendas do período atual (com filtro de cor)
     const currentSalesQuery = `
       SELECT 
         SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue,
@@ -258,10 +382,11 @@ async function fetchProductDetailEcommerce({
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         AND fp.QTDE > 0
         ${filialFilter}
+        ${colorFilterFp}
       GROUP BY f.FILIAL, fp.COR_PRODUTO
     `;
 
-    // Buscar vendas do período anterior
+    // Buscar vendas do período anterior (com filtro de cor)
     const previousSalesQuery = `
       SELECT 
         SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue
@@ -275,6 +400,7 @@ async function fetchProductDetailEcommerce({
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         AND fp.QTDE > 0
         ${filialFilter}
+        ${colorFilterFp}
       GROUP BY f.FILIAL
     `;
 
@@ -338,12 +464,13 @@ export async function fetchProductDetail({
   company,
   range,
   filial,
+  colors,
 }: ProductDetailParams): Promise<ProductDetailInfo> {
   // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
   if (shouldAggregateEcommerce(company, filial)) {
     const [salesResult, ecommerceResult] = await Promise.all([
-      fetchProductDetail({ productId, company, range, filial: VAREJO_VALUE }),
-      fetchProductDetailEcommerce({ productId, company, range, filial: null }),
+      fetchProductDetail({ productId, company, range, filial: VAREJO_VALUE, colors }),
+      fetchProductDetailEcommerce({ productId, company, range, filial: null, colors }),
     ]);
 
     // Calcular previousRevenue do salesResult
@@ -419,12 +546,16 @@ export async function fetchProductDetail({
     request.input('previousEndDate', sql.DateTime, previousRange.end);
 
     const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+    const colorFilter = buildColorFilter(request, colors);
+    const colorFilterVp = colorFilter('vp');
+    const colorFilterE = colorFilter('e');
 
     // Buscar dados básicos do produto, última entrada e preço/custo cadastrados
     const productQuery = `
       SELECT TOP 1
         p.PRODUTO AS productId,
         p.DESC_PRODUTO AS productName,
+        ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
         ISNULL(p.CUSTO_REPOSICAO1, 0) AS registeredCost,
         ISNULL(p.PRECO_REPOSICAO_1, 0) AS registeredPrice,
         (
@@ -452,6 +583,7 @@ export async function fetchProductDetail({
     const productResult = await request.query<{
       productId: string;
       productName: string | null;
+      grade: string | null;
       registeredCost: number;
       registeredPrice: number;
       lastEntryDate: Date | null;
@@ -461,6 +593,7 @@ export async function fetchProductDetail({
     const productRow = productResult.recordset[0] ?? {
       productId,
       productName: null,
+      grade: null,
       registeredCost: 0,
       registeredPrice: 0,
       lastEntryDate: null,
@@ -491,6 +624,7 @@ export async function fetchProductDetail({
           AND vp.DATA_VENDA < @endDate
           AND vp.QTDE > 0
           ${filialFilter}
+          ${colorFilterVp}
       ),
       trocas_item AS (
         SELECT 
@@ -555,6 +689,7 @@ export async function fetchProductDetail({
           AND vp.DATA_VENDA < @previousEndDate
           AND vp.QTDE > 0
           ${filialFilter}
+          ${colorFilterVp}
       ),
       trocas_item AS (
         SELECT 
@@ -600,6 +735,7 @@ export async function fetchProductDetail({
         COUNT(CASE WHEN e.ESTOQUE > 0 THEN 1 END) AS positiveCount
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       WHERE e.PRODUTO = @productId
+      ${colorFilterE}
       GROUP BY e.FILIAL
     `;
 
@@ -747,6 +883,7 @@ export async function fetchProductDetail({
     return {
       productId: productRow.productId,
       productName: productRow.productName || 'Produto não encontrado',
+      grade: (productRow.grade ?? '').trim() || null,
       lastEntryDate,
       lastEntryFilial: lastEntryFilialDisplayName,
       totalRevenue,
@@ -778,6 +915,7 @@ async function fetchProductStockByFilialEcommerce({
   company,
   range,
   filial,
+  colors,
 }: ProductDetailParams): Promise<ProductStockByFilial[]> {
   const { start, end } = resolveRange(range);
   const previousRange = shiftRangeByMonths({ start, end }, -1);
@@ -794,6 +932,10 @@ async function fetchProductStockByFilialEcommerce({
       return [];
     }
 
+    const colorFilter = buildColorFilter(request, colors);
+    const colorFilterE = colorFilter('e');
+    const colorFilterFp = colorFilter('fp');
+
     // Construir o filtro de filiais de ecommerce uma vez e reutilizar
     const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
     let estoqueFilialFilter = '';
@@ -804,7 +946,6 @@ async function fetchProductStockByFilialEcommerce({
       estoqueFilialFilter = `AND e.FILIAL = @ecommerceFilial`;
       vendasFilialFilter = `AND f.FILIAL = @ecommerceFilial`;
     } else if (ecommerceFilials.length > 0) {
-      // Criar parâmetros uma única vez
       ecommerceFilials.forEach((filialName, index) => {
         request.input(`ecommerceFilial${index}`, sql.VarChar, filialName);
       });
@@ -815,7 +956,7 @@ async function fetchProductStockByFilialEcommerce({
       vendasFilialFilter = `AND f.FILIAL IN (${placeholders})`;
     }
 
-    // Buscar estoque por filial
+    // Buscar estoque por filial (com filtro de cor)
     const stockQuery = `
       SELECT 
         e.FILIAL,
@@ -825,10 +966,11 @@ async function fetchProductStockByFilialEcommerce({
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       WHERE e.PRODUTO = @productId
         ${estoqueFilialFilter}
+        ${colorFilterE}
       GROUP BY e.FILIAL
     `;
 
-    // Buscar vendas por filial - período atual
+    // Buscar vendas por filial - período atual (com filtro de cor)
     const currentSalesQuery = `
       SELECT 
         f.FILIAL,
@@ -844,10 +986,11 @@ async function fetchProductStockByFilialEcommerce({
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         AND fp.QTDE > 0
         ${vendasFilialFilter}
+        ${colorFilterFp}
       GROUP BY f.FILIAL
     `;
 
-    // Buscar vendas por filial - período anterior
+    // Buscar vendas por filial - período anterior (com filtro de cor)
     const previousSalesQuery = `
       SELECT 
         f.FILIAL,
@@ -862,6 +1005,7 @@ async function fetchProductStockByFilialEcommerce({
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         AND fp.QTDE > 0
         ${vendasFilialFilter}
+        ${colorFilterFp}
       GROUP BY f.FILIAL
     `;
 
@@ -911,29 +1055,31 @@ async function fetchProductStockByFilialEcommerce({
     currentRevenueMap.forEach((_, filial) => allFiliais.add(filial));
 
     const displayNames = companyConfig.filialDisplayNames ?? {};
-    const result: ProductStockByFilial[] = [];
+    const aggByDisplayName = new Map<string, { stock: number; revenue: number; quantity: number; previousRevenue: number }>();
 
     allFiliais.forEach((filial) => {
-      const stock = stockMap.get(filial) ?? 0;
-      const revenue = currentRevenueMap.get(filial) ?? 0;
-      const quantity = currentQuantityMap.get(filial) ?? 0;
-      const previousRevenue = previousRevenueMap.get(filial) ?? 0;
-
-      const revenueVariance =
-        previousRevenue === 0
-          ? (revenue > 0 ? null : 0)
-          : Number((((revenue - previousRevenue) / previousRevenue) * 100).toFixed(1));
-
-      // Normalizar o nome da filial (trim) e aplicar mapeamento
       const normalizedFilial = filial.trim();
       const filialDisplayName = displayNames[normalizedFilial] ?? displayNames[filial] ?? filial;
+      const existing = aggByDisplayName.get(filialDisplayName) ?? { stock: 0, revenue: 0, quantity: 0, previousRevenue: 0 };
+      existing.stock += stockMap.get(filial) ?? 0;
+      existing.revenue += currentRevenueMap.get(filial) ?? 0;
+      existing.quantity += currentQuantityMap.get(filial) ?? 0;
+      existing.previousRevenue += previousRevenueMap.get(filial) ?? 0;
+      aggByDisplayName.set(filialDisplayName, existing);
+    });
 
+    const result: ProductStockByFilial[] = [];
+    aggByDisplayName.forEach((agg, filialDisplayName) => {
+      const revenueVariance =
+        agg.previousRevenue === 0
+          ? (agg.revenue > 0 ? null : 0)
+          : Number((((agg.revenue - agg.previousRevenue) / agg.previousRevenue) * 100).toFixed(1));
       result.push({
-        filial,
+        filial: filialDisplayName,
         filialDisplayName,
-        stock,
-        revenue,
-        quantity,
+        stock: agg.stock,
+        revenue: agg.revenue,
+        quantity: agg.quantity,
         revenueVariance,
       });
     });
@@ -950,12 +1096,13 @@ export async function fetchProductStockByFilial({
   company,
   range,
   filial,
+  colors,
 }: ProductDetailParams): Promise<ProductStockByFilial[]> {
   // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
   if (shouldAggregateEcommerce(company, filial)) {
     const [salesResult, ecommerceResult] = await Promise.all([
-      fetchProductStockByFilial({ productId, company, range, filial: VAREJO_VALUE }),
-      fetchProductStockByFilialEcommerce({ productId, company, range, filial: null }),
+      fetchProductStockByFilial({ productId, company, range, filial: VAREJO_VALUE, colors }),
+      fetchProductStockByFilialEcommerce({ productId, company, range, filial: null, colors }),
     ]);
 
     const companyConfig = resolveCompany(company);
@@ -1019,6 +1166,10 @@ export async function fetchProductStockByFilial({
       return [];
     }
 
+    const colorFilter = buildColorFilter(request, colors);
+    const colorFilterVp = colorFilter('vp');
+    const colorFilterE = colorFilter('e');
+
     // Buscar estoque por filial - buscar de todas as filiais e filtrar depois
     // Isso garante que encontramos estoque mesmo se o nome da filial no banco não corresponder exatamente
     const stockQuery = `
@@ -1029,6 +1180,7 @@ export async function fetchProductStockByFilial({
         COUNT(CASE WHEN e.ESTOQUE > 0 THEN 1 END) AS positiveCount
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       WHERE e.PRODUTO = @productId
+      ${colorFilterE}
       GROUP BY e.FILIAL
     `;
 
@@ -1052,6 +1204,7 @@ export async function fetchProductStockByFilial({
           AND vp.DATA_VENDA < @endDate
           AND vp.QTDE > 0
           ${filialFilter}
+          ${colorFilterVp}
       ),
       trocas_item AS (
         SELECT 
@@ -1108,6 +1261,7 @@ export async function fetchProductStockByFilial({
           AND vp.DATA_VENDA < @previousEndDate
           AND vp.QTDE > 0
           ${filialFilter}
+          ${colorFilterVp}
       ),
       trocas_item AS (
         SELECT 
@@ -1196,46 +1350,38 @@ export async function fetchProductStockByFilial({
     const displayNames = companyConfig.filialDisplayNames ?? {};
     // Usar filiais de inventory para incluir todas as filiais da empresa (incluindo matriz)
     const filiais = companyConfig.filialFilters['inventory'] ?? [];
-    // Normalizar também as filiais da configuração para comparação
     const normalizedFiliais = filiais.map(f => f.trim());
-    // Obter filiais de e-commerce normalizadas
     const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
     const normalizedEcommerceFilials = ecommerceFilials.map(f => f.trim());
 
-    // Criar resultado
-    const result: ProductStockByFilial[] = [];
+    // Agregar por filialDisplayName para não repetir a mesma filial (ex.: vários códigos → "E-COMMERCE")
+    const aggByDisplayName = new Map<string, { stock: number; revenue: number; quantity: number; previousRevenue: number }>();
 
     allFiliais.forEach((filialName) => {
-      // Apenas incluir filiais da empresa (usando inventory para incluir todas as filiais)
-      // Comparar com nomes normalizados
-      if (!normalizedFiliais.includes(filialName)) {
-        return;
-      }
+      if (!normalizedFiliais.includes(filialName)) return;
+      if (filial === VAREJO_VALUE && normalizedEcommerceFilials.includes(filialName)) return;
 
-      // Se estamos buscando apenas VAREJO, excluir filiais de e-commerce
-      if (filial === VAREJO_VALUE && normalizedEcommerceFilials.includes(filialName)) {
-        return;
-      }
-
-      const stock = stockMap.get(filialName) ?? 0;
-      const revenue = currentRevenueMap.get(filialName) ?? 0;
-      const quantity = currentQuantityMap.get(filialName) ?? 0;
-      const previousRevenue = previousRevenueMap.get(filialName) ?? 0;
-
-      const revenueVariance =
-        previousRevenue === 0
-          ? (revenue > 0 ? null : 0)
-          : Number((((revenue - previousRevenue) / previousRevenue) * 100).toFixed(1));
-
-      // Aplicar mapeamento (filial já está normalizada)
       const filialDisplayName = displayNames[filialName] ?? filialName;
+      const existing = aggByDisplayName.get(filialDisplayName) ?? { stock: 0, revenue: 0, quantity: 0, previousRevenue: 0 };
+      existing.stock += stockMap.get(filialName) ?? 0;
+      existing.revenue += currentRevenueMap.get(filialName) ?? 0;
+      existing.quantity += currentQuantityMap.get(filialName) ?? 0;
+      existing.previousRevenue += previousRevenueMap.get(filialName) ?? 0;
+      aggByDisplayName.set(filialDisplayName, existing);
+    });
 
+    const result: ProductStockByFilial[] = [];
+    aggByDisplayName.forEach((agg, filialDisplayName) => {
+      const revenueVariance =
+        agg.previousRevenue === 0
+          ? (agg.revenue > 0 ? null : 0)
+          : Number((((agg.revenue - agg.previousRevenue) / agg.previousRevenue) * 100).toFixed(1));
       result.push({
-        filial: filialName,
+        filial: filialDisplayName,
         filialDisplayName,
-        stock,
-        revenue,
-        quantity,
+        stock: agg.stock,
+        revenue: agg.revenue,
+        quantity: agg.quantity,
         revenueVariance,
       });
     });
@@ -1253,6 +1399,7 @@ async function fetchProductSaleHistoryEcommerce({
   company,
   range,
   filial,
+  colors,
 }: ProductDetailParams): Promise<ProductSaleHistory[]> {
   const { start, end } = resolveRange(range);
 
@@ -1267,6 +1414,7 @@ async function fetchProductSaleHistoryEcommerce({
     }
 
     const filialFilter = buildEcommerceFilialFilter(request, company, filial, 'f');
+    const colorFilterFp = buildColorFilter(request, colors)('fp');
 
     const query = `
       SELECT 
@@ -1287,6 +1435,7 @@ async function fetchProductSaleHistoryEcommerce({
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         AND fp.QTDE > 0
         ${filialFilter}
+        ${colorFilterFp}
       ORDER BY f.EMISSAO DESC, f.FILIAL
     `;
 
@@ -1331,12 +1480,13 @@ export async function fetchProductSaleHistory({
   company,
   range,
   filial,
+  colors,
 }: ProductDetailParams): Promise<ProductSaleHistory[]> {
   // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
   if (shouldAggregateEcommerce(company, filial)) {
     const [salesResult, ecommerceResult] = await Promise.all([
-      fetchProductSaleHistory({ productId, company, range, filial: VAREJO_VALUE }),
-      fetchProductSaleHistoryEcommerce({ productId, company, range, filial: null }),
+      fetchProductSaleHistory({ productId, company, range, filial: VAREJO_VALUE, colors }),
+      fetchProductSaleHistoryEcommerce({ productId, company, range, filial: null, colors }),
     ]);
 
     // Combinar e ordenar por data
@@ -1357,6 +1507,7 @@ export async function fetchProductSaleHistory({
     }
 
     const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+    const colorFilterVp = buildColorFilter(request, colors)('vp');
 
     const query = `
       SELECT 
@@ -1378,6 +1529,7 @@ export async function fetchProductSaleHistory({
         AND vp.DATA_VENDA < @endDate
         AND vp.QTDE > 0
         ${filialFilter}
+        ${colorFilterVp}
       ORDER BY vp.DATA_VENDA DESC, vp.FILIAL
     `;
 

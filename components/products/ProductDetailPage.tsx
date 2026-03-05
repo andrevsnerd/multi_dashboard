@@ -10,6 +10,7 @@ import type {
   ProductDetailInfo,
   ProductStockByFilial,
   ProductSaleHistory,
+  ProductAvailableColor,
 } from "@/lib/repositories/productDetail";
 
 import styles from "./ProductDetailPage.module.css";
@@ -24,6 +25,7 @@ interface ProductDetailData {
   detail: ProductDetailInfo;
   stockByFilial: ProductStockByFilial[];
   saleHistory: ProductSaleHistory[];
+  availableColors: ProductAvailableColor[];
 }
 
 async function searchProducts(
@@ -55,7 +57,8 @@ async function searchProducts(
 async function fetchProductDetail(
   productId: string,
   company: string,
-  range: DateRangeValue
+  range: DateRangeValue,
+  selectedColors: string[]
 ): Promise<ProductDetailData | null> {
   const searchParams = new URLSearchParams({
     productId,
@@ -63,6 +66,9 @@ async function fetchProductDetail(
     start: range.startDate.toISOString(),
     end: range.endDate.toISOString(),
   });
+  if (selectedColors.length > 0) {
+    searchParams.set("colors", selectedColors.join(","));
+  }
 
   const response = await fetch(`/api/product-detail?${searchParams.toString()}`, {
     cache: "no-store",
@@ -104,7 +110,14 @@ export default function ProductDetailPage({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const refetchDetail = useCallback(() => setRefreshTrigger((t) => t + 1), []);
+
+  const toggleColor = useCallback((code: string) => {
+    setSelectedColors((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
+    );
+  }, []);
 
   // Fechar dropdown ao clicar fora
   useEffect(() => {
@@ -180,7 +193,7 @@ export default function ProductDetailPage({
         if (!selectedProductId) {
           return;
         }
-        const productData = await fetchProductDetail(selectedProductId, companyKey, range);
+        const productData = await fetchProductDetail(selectedProductId, companyKey, range, selectedColors);
         if (active) {
           // Converter datas de strings para Date objects se necessário
           if (productData) {
@@ -224,7 +237,7 @@ export default function ProductDetailPage({
     return () => {
       active = false;
     };
-  }, [selectedProductId, companyKey, range, refreshTrigger]);
+  }, [selectedProductId, companyKey, range, refreshTrigger, selectedColors]);
 
   const handleProductSelect = useCallback((productId: string, productName: string) => {
     const trimmedName = productName.trim();
@@ -233,6 +246,7 @@ export default function ProductDetailPage({
     setSearchTerm(trimmedName);
     setShowSearchResults(false);
     setSearchResults([]);
+    setSelectedColors([]);
   }, []);
 
   const productContent = data ? (
@@ -240,10 +254,33 @@ export default function ProductDetailPage({
       <div className={styles.productHeaderContainer}>
         <div className={styles.productHeader}>
           <div>
-            <h2 className={styles.productName}>{data.detail.productName}</h2>
-            <div className={styles.productInfo}>
+            <h2 className={styles.productName}>
+              {data.detail.productName}
+              {companyKey === "scarfme" && "grade" in data.detail && data.detail.grade && (
+                <span className={styles.productGrade}> · {data.detail.grade}</span>
+              )}
+            </h2>
+            <div className={`${styles.productInfo} ${(data.availableColors ?? []).length > 0 ? styles.productInfoAboveColors : ""}`}>
               <span className={styles.productId}>{data.detail.productId}</span>
             </div>
+            {(data.availableColors ?? []).length > 0 && (
+              <div className={styles.colorBadges}>
+                {(data.availableColors ?? []).map(({ code, displayName }) => {
+                  const isSelected = selectedColors.includes(code);
+                  return (
+                    <button
+                      key={code || "sem-cor"}
+                      type="button"
+                      className={`${styles.colorBadge} ${isSelected ? styles.colorBadgeSelected : ""}`}
+                      onClick={() => toggleColor(code)}
+                      title={isSelected ? `Remover filtro ${displayName}` : `Filtrar por ${displayName}`}
+                    >
+                      {displayName}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             {data.detail.lastEntryDate && data.detail.lastEntryFilial && (
               <div className={styles.lastEntryContainer}>
                 <span className={styles.lastEntry}>
