@@ -234,11 +234,31 @@ export default function ProductDetailKPIs({
     const monthEnd = endOfMonth(start);
     const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
     const revenueByDay = new Map<string, number>();
+    const salesByDay = new Map<string, { filial: string; filialDisplayName: string; quantity: number; revenue: number }[]>();
+    
     saleHistory.forEach((sale) => {
       const d = sale.date instanceof Date ? sale.date : new Date(sale.date);
       const key = format(d, "yyyy-MM-dd");
       revenueByDay.set(key, (revenueByDay.get(key) ?? 0) + sale.revenue);
+      
+      if (!salesByDay.has(key)) {
+        salesByDay.set(key, []);
+      }
+      const existing = salesByDay.get(key)!;
+      const existingFilial = existing.find(s => s.filial === sale.filial);
+      if (existingFilial) {
+        existingFilial.quantity += sale.quantity;
+        existingFilial.revenue += sale.revenue;
+      } else {
+        existing.push({
+          filial: sale.filial,
+          filialDisplayName: sale.filialDisplayName,
+          quantity: sale.quantity,
+          revenue: sale.revenue,
+        });
+      }
     });
+    
     let cumulative = 0;
     const averageDaily = daysPassed > 0 && detail.totalRevenue > 0
       ? detail.totalRevenue / daysPassed
@@ -249,10 +269,13 @@ export default function ProductDetailKPIs({
       cumulative += dayRevenue;
       const dayIndex = day.getDate();
       const projection = averageDaily * dayIndex;
+      const daySales = salesByDay.get(key) ?? [];
       return {
         day: format(day, "dd", { locale: ptBR }),
         vendasReais: Math.round(cumulative * 100) / 100,
         projecao: Math.round(projection * 100) / 100,
+        hasSales: daySales.length > 0,
+        salesByFilial: daySales,
       };
     });
   })();
@@ -406,14 +429,38 @@ export default function ProductDetailKPIs({
                   tickFormatter={(v) => (v >= 1000 ? `R$ ${(v / 1000).toFixed(0)}k` : `R$ ${v}`)}
                 />
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#fff",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "8px",
-                    padding: "8px 12px",
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload || payload.length === 0) return null;
+                    const data = payload[0]?.payload;
+                    return (
+                      <div style={{
+                        backgroundColor: "#fff",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "8px",
+                        padding: "8px 12px",
+                        fontSize: "12px",
+                      }}>
+                        <p style={{ margin: "0 0 8px 0", color: "#64748b", fontWeight: 600 }}>Dia {label}</p>
+                        <p style={{ margin: "0 0 4px 0", color: "#2563eb", fontWeight: 600 }}>
+                          Vendas Reais: {formatCurrency(data.vendasReais)}
+                        </p>
+                        <p style={{ margin: "0 0 8px 0", color: "#94a3b8" }}>
+                          Projeção: {formatCurrency(data.projecao)}
+                        </p>
+                        {data.salesByFilial && data.salesByFilial.length > 0 && (
+                          <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "8px" }}>
+                            <p style={{ margin: "0 0 4px 0", fontWeight: 600 }}>Filiais:</p>
+                            {data.salesByFilial.map((s: { filialDisplayName: string; quantity: number; revenue: number }, idx: number) => (
+                              <div key={idx} style={{ display: "flex", justifyContent: "space-between", gap: "16px", marginBottom: "2px" }}>
+                                <span style={{ color: "#475569" }}>{s.filialDisplayName}</span>
+                                <span style={{ color: "#475569", fontWeight: 500 }}>{s.quantity} un.</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
                   }}
-                  formatter={(value: number) => formatCurrency(value)}
-                  labelStyle={{ color: "#64748b", fontSize: "12px" }}
                 />
                 <Line
                   type="monotone"
@@ -421,7 +468,11 @@ export default function ProductDetailKPIs({
                   name="Vendas Reais"
                   stroke="#2563eb"
                   strokeWidth={2}
-                  dot={{ fill: "#2563eb", r: 3 }}
+                  dot={(props) => {
+                    const { cx, cy, payload } = props;
+                    if (!payload.hasSales || cy == null) return null;
+                    return <circle cx={cx} cy={cy} r={3} fill="#2563eb" />;
+                  }}
                   connectNulls
                 />
                 <Line
