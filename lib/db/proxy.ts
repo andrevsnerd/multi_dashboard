@@ -82,7 +82,7 @@ function getErrorMessage(error: unknown, proxyUrl: string): string {
       errorMessage.includes('socket disconnected') ||
       (cause && (cause.code === 'ECONNRESET' || cause.code === 'ECONNREFUSED'))
     ) {
-      return `Erro de conexão com o proxy: O servidor proxy não está acessível. Verifique se o túnel ngrok está rodando e se a URL ${proxyUrl} está correta no Vercel. O túnel pode ter caído ou a URL pode ter mudado.`;
+      return `Erro de conexão com o proxy: O servidor proxy não está acessível. Verifique se o proxy está rodando e se PROXY_URL (${proxyUrl}) está correta no Vercel.`;
     }
 
     // Erro de timeout
@@ -92,7 +92,7 @@ function getErrorMessage(error: unknown, proxyUrl: string): string {
 
     // Erro de rede genérico
     if (errorMessage.includes('fetch failed') || errorMessage.includes('network')) {
-      return `Erro de rede ao conectar com o proxy: Não foi possível estabelecer conexão com ${proxyUrl}. Verifique se o túnel está ativo.`;
+      return `Erro de rede ao conectar com o proxy: Não foi possível estabelecer conexão com ${proxyUrl}. Verifique se o proxy está ativo e acessível.`;
     }
 
     return error.message;

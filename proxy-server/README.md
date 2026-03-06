@@ -27,7 +27,19 @@ Servidor proxy que atua como ponte entre o Vercel (internet) e seu SQL Server (r
 
 ## 🌐 Expor na Internet
 
-Use um túnel para expor o servidor:
+### Opção 1: Direto na VM/EC2 (ex.: AWS) — sem túnel
+
+Se o proxy rodar em uma instância com IP público (ex.: AWS EC2), o Vercel pode acessá-lo diretamente.
+
+1. Na VM/EC2: libere a porta **3001** no firewall (Security Group na AWS).
+2. Siga o guia: **`docs/AWS_PROXY_SETUP.md`** ou use o script **`aws-setup/install-aws.sh`**.
+3. No Vercel: `PROXY_URL=http://<IP_PUBLICO>:3001` (ex.: `http://54.207.0.241:3001`).
+
+Não é necessário ngrok nem Cloudflare Tunnel.
+
+### Opção 2: Túnel (máquina local)
+
+Use um túnel para expor o servidor quando ele roda na sua máquina:
 
 ### Cloudflare Tunnel (Recomendado - Sem Warning Page)
 

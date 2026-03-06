@@ -1,10 +1,9 @@
 /**
  * Servidor Proxy Local
  * 
- * Este servidor roda na sua máquina local e atua como ponte entre
- * o Vercel (na internet) e seu SQL Server (na rede local).
- * 
- * Use um túnel (ngrok/Cloudflare) para expor este servidor na internet.
+ * Ponte entre o Vercel e o SQL Server.
+ * Pode rodar na máquina local + túnel (ngrok/Cloudflare) ou
+ * diretamente em VM/EC2 (ex.: AWS) com IP público — sem túnel.
  */
 
 const path = require('path');
@@ -242,14 +241,12 @@ async function start() {
     await getPool();
     console.log('✅ Conectado ao banco de dados!');
     
-    app.listen(PORT, () => {
-      console.log(`🚀 Servidor Proxy rodando na porta ${PORT}`);
+    // Escutar em 0.0.0.0 para aceitar conexões externas (ex.: Vercel → EC2)
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Servidor Proxy rodando na porta ${PORT} (0.0.0.0)`);
       console.log(`📡 Aguardando requisições...`);
-      console.log(`\n⚠️  IMPORTANTE: Use um túnel (ngrok/Cloudflare) para expor este servidor na internet`);
-      console.log(`\n💡 Para usar ngrok:`);
-      console.log(`   npx ngrok http ${PORT}`);
-      console.log(`\n🔑 Token de autenticação: ${PROXY_SECRET}`);
-      console.log(`   Configure a variável PROXY_SECRET no Vercel com este valor`);
+      console.log(`\n🔑 Token: ${PROXY_SECRET}`);
+      console.log(`   No Vercel: PROXY_URL=http://<IP_DESTA_MAQUINA>:${PORT} e PROXY_SECRET com o valor acima`);
     });
   } catch (error) {
     console.error('❌ Erro ao iniciar servidor:', error);
