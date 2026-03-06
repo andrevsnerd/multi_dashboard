@@ -561,7 +561,7 @@ export default function ProjecaoEstoquePage({
                           </span>
                         </div>
                       </td>
-                      <td className={styles.labelCell}>VENDA</td>
+                      <td className={styles.labelCell}>VENDA (projeção)</td>
                       {mesesExibicao.map((m) => {
                         const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
                         const isFuturo = md && !md.isMesAtual && (md.vendasVarejo != null || md.vendasEcommerce != null);
@@ -588,7 +588,7 @@ export default function ProjecaoEstoquePage({
                       })}
                     </tr>
                     <tr className={styles.estoqueRow}>
-                      <td className={styles.labelCell}>ESTOQUE</td>
+                      <td className={styles.labelCell}>ESTOQUE (projeção)</td>
                       {mesesExibicao.map((m) => {
                         const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
                         const valor = md == null ? "-" : (md.isMesPassado && md.estoque === 0 ? "-" : fmt(md.estoque));
@@ -596,7 +596,7 @@ export default function ProjecaoEstoquePage({
                       })}
                     </tr>
                     <tr className={styles.duracaoRow}>
-                      <td className={styles.labelCell}>DURACAO</td>
+                      <td className={styles.labelCell}>DURACAO (projeção)</td>
                       {mesesExibicao.map((m) => {
                         const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
                         const valor = md && md.duracao > 0 ? `${md.duracao} dias` : "-";
