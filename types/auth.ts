@@ -16,7 +16,8 @@ export type PermissionKey =
   | "blackfriday"
   | "estoque-por-filial"
   | "transferencia-produtos"
-  | "saidas-entradas-produtos";
+  | "saidas-entradas-produtos"
+  | "destino-romaneio";
 
 export type { CompanyKey };
 
@@ -55,6 +56,7 @@ export const ALL_PERMISSION_KEYS: { key: PermissionKey; label: string }[] = [
   { key: "estoque-por-filial", label: "Estoque por Filial" },
   { key: "transferencia-produtos", label: "Transferência de Produtos" },
   { key: "saidas-entradas-produtos", label: "Saídas e Entradas de Produtos" },
+  { key: "destino-romaneio", label: "Destino Romaneio" },
 ];
 
 export const ROLE_LABELS: Record<RoleKey, string> = {

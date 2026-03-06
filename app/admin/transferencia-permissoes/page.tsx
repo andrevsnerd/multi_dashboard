@@ -18,6 +18,8 @@ interface TransferenciaPermissao {
   responsavelFixo: boolean;
   tipoRomaneioFixo: boolean;
   podeVerOutrasFiliais?: boolean;
+  /** Filial atribuída: "Todas" = vê todos os romaneios; senão vê apenas romaneios cujo destino = esta filial. */
+  filialAtribuida?: string | null;
 }
 
 interface Filial {
@@ -45,6 +47,7 @@ export default function TransferenciaPermissoesAdminPage() {
   const [formResponsavelFixo, setFormResponsavelFixo] = useState(false);
   const [formTipoRomaneioFixo, setFormTipoRomaneioFixo] = useState(false);
   const [formPodeVerOutrasFiliais, setFormPodeVerOutrasFiliais] = useState(false);
+  const [formFilialAtribuida, setFormFilialAtribuida] = useState("");
   const [perfilPreset, setPerfilPreset] = useState<PerfilPreset>("");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
@@ -170,6 +173,7 @@ export default function TransferenciaPermissoesAdminPage() {
     setFormResponsavelFixo(false);
     setFormTipoRomaneioFixo(false);
     setFormPodeVerOutrasFiliais(false);
+    setFormFilialAtribuida("");
     setFormError("");
     setModal("add");
   }
@@ -186,6 +190,7 @@ export default function TransferenciaPermissoesAdminPage() {
     setFormResponsavelFixo(perm.responsavelFixo);
     setFormTipoRomaneioFixo(perm.tipoRomaneioFixo);
     setFormPodeVerOutrasFiliais(perm.podeVerOutrasFiliais ?? false);
+    setFormFilialAtribuida(perm.filialAtribuida ?? "");
     setFormError("");
     setModal("edit");
   }
@@ -240,6 +245,7 @@ export default function TransferenciaPermissoesAdminPage() {
           responsavelFixo: formResponsavelFixo,
           tipoRomaneioFixo: formTipoRomaneioFixo,
           podeVerOutrasFiliais: formPodeVerOutrasFiliais,
+          filialAtribuida: formFilialAtribuida.trim() || null,
         }),
       });
       const data = await res.json();
@@ -302,6 +308,7 @@ export default function TransferenciaPermissoesAdminPage() {
                 <th>Usuário</th>
                 <th>Filiais Origem</th>
                 <th>Filiais Destino</th>
+                <th>Atribuir Filial</th>
                 <th>Tipos Romaneio</th>
                 <th>Responsável Padrão</th>
                 <th>Tipo Romaneio Padrão</th>
@@ -313,7 +320,7 @@ export default function TransferenciaPermissoesAdminPage() {
             <tbody>
               {permissoes.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: "center", padding: "32px" }}>
+                  <td colSpan={10} style={{ textAlign: "center", padding: "32px" }}>
                     Nenhuma permissão configurada
                   </td>
                 </tr>
@@ -340,6 +347,12 @@ export default function TransferenciaPermissoesAdminPage() {
                                 filiais.find((f) => f.codFilial === cod)?.filial || cod
                             )
                             .join(", ")}
+                    </td>
+                    <td>
+                      {!perm.filialAtribuida || perm.filialAtribuida === "TODAS"
+                        ? "Todas"
+                        : filiais.find((f) => f.codFilial === perm.filialAtribuida)?.filial ||
+                          perm.filialAtribuida}
                     </td>
                     <td>
                       {perm.tiposRomaneioPermitidos?.length === 0
@@ -488,6 +501,25 @@ export default function TransferenciaPermissoesAdminPage() {
                     </label>
                   ))}
                 </div>
+              </div>
+
+              <div className={styles.label}>
+                <label>Atribuir Filial</label>
+                <p style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>
+                  Padrão: Todas. Ao atribuir uma filial, o usuário verá apenas romaneios de saída cujo destino for igual a essa filial.
+                </p>
+                <select
+                  className={styles.select}
+                  value={formFilialAtribuida}
+                  onChange={(e) => setFormFilialAtribuida(e.target.value)}
+                >
+                  <option value="">Todas</option>
+                  {filiais.map((f) => (
+                    <option key={f.codFilial} value={f.codFilial}>
+                      {f.filial} ({f.codFilial})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className={styles.label}>

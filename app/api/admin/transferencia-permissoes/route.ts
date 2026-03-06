@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
       responsavelFixo,
       tipoRomaneioFixo,
       podeVerOutrasFiliais,
+      filialAtribuida,
     } = body;
 
     if (!targetUsername) {
@@ -87,6 +88,10 @@ export async function POST(request: NextRequest) {
       responsavelFixo: responsavelFixo === true,
       tipoRomaneioFixo: tipoRomaneioFixo === true,
       podeVerOutrasFiliais: podeVerOutrasFiliais === true,
+      filialAtribuida:
+        typeof filialAtribuida === "string" && filialAtribuida.trim()
+          ? filialAtribuida.trim()
+          : null,
     };
 
     await savePermissao(permissao);

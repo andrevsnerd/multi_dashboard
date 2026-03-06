@@ -8,11 +8,14 @@ interface LogDetalheItem {
   descProduto: string;
   descCor: string;
   codigoBarra: string | null;
+  subgrupo: string;
+  grade: string;
   qtde: number;
   estoqueOrigem: number;
   estoqueDestino: number;
   filialOrigem?: string;
   filialDestino?: string;
+  destino?: string;
 }
 
 export async function GET(request: Request) {
@@ -116,7 +119,9 @@ export async function GET(request: Request) {
             ISNULL(p.DESC_PRODUTO, '') AS DESC_PRODUTO,
             ISNULL(c.DESC_COR, '') AS DESC_COR,
             (SELECT TOP 1 pb2.CODIGO_BARRA FROM PRODUTOS_BARRA pb2 WITH (NOLOCK)
-             WHERE pb2.PRODUTO = sp.PRODUTO AND (ISNULL(pb2.COR_PRODUTO,'') = ISNULL(sp.COR_PRODUTO,''))) AS CODIGO_BARRA
+             WHERE pb2.PRODUTO = sp.PRODUTO AND (ISNULL(pb2.COR_PRODUTO,'') = ISNULL(sp.COR_PRODUTO,''))) AS CODIGO_BARRA,
+            ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
+            ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS GRADE
           FROM LOJA_SAIDAS_PRODUTO sp WITH (NOLOCK)
           LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = sp.PRODUTO
           LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = sp.COR_PRODUTO
@@ -129,7 +134,9 @@ export async function GET(request: Request) {
             ISNULL(p2.DESC_PRODUTO, '') AS DESC_PRODUTO,
             ISNULL(c2.DESC_COR, '') AS DESC_COR,
             (SELECT TOP 1 pb3.CODIGO_BARRA FROM PRODUTOS_BARRA pb3 WITH (NOLOCK)
-             WHERE pb3.PRODUTO = ep.PRODUTO AND (ISNULL(pb3.COR_PRODUTO,'') = ISNULL(ep.COR_PRODUTO,''))) AS CODIGO_BARRA
+             WHERE pb3.PRODUTO = ep.PRODUTO AND (ISNULL(pb3.COR_PRODUTO,'') = ISNULL(ep.COR_PRODUTO,''))) AS CODIGO_BARRA,
+            ISNULL(p2.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
+            ISNULL(CONVERT(VARCHAR, p2.GRADE), '') AS GRADE
           FROM ESTOQUE_PROD1_SAI ep WITH (NOLOCK)
           LEFT JOIN PRODUTOS p2 WITH (NOLOCK) ON p2.PRODUTO = ep.PRODUTO
           LEFT JOIN CORES_BASICAS c2 WITH (NOLOCK) ON c2.COR = ep.COR_PRODUTO
@@ -152,7 +159,9 @@ export async function GET(request: Request) {
             ISNULL(p.DESC_PRODUTO, '') AS DESC_PRODUTO,
             ISNULL(c.DESC_COR, '') AS DESC_COR,
             (SELECT TOP 1 pb2.CODIGO_BARRA FROM PRODUTOS_BARRA pb2 WITH (NOLOCK)
-             WHERE pb2.PRODUTO = ep.PRODUTO AND (ISNULL(pb2.COR_PRODUTO,'') = ISNULL(ep.COR_PRODUTO,''))) AS CODIGO_BARRA
+             WHERE pb2.PRODUTO = ep.PRODUTO AND (ISNULL(pb2.COR_PRODUTO,'') = ISNULL(ep.COR_PRODUTO,''))) AS CODIGO_BARRA,
+            ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
+            ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS GRADE
           FROM ESTOQUE_PROD1_ENT ep WITH (NOLOCK)
           LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = ep.PRODUTO
           LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = ep.COR_PRODUTO
@@ -165,7 +174,9 @@ export async function GET(request: Request) {
             ISNULL(p2.DESC_PRODUTO, '') AS DESC_PRODUTO,
             ISNULL(c2.DESC_COR, '') AS DESC_COR,
             (SELECT TOP 1 pb3.CODIGO_BARRA FROM PRODUTOS_BARRA pb3 WITH (NOLOCK)
-             WHERE pb3.PRODUTO = lep.PRODUTO AND (ISNULL(pb3.COR_PRODUTO,'') = ISNULL(lep.COR_PRODUTO,''))) AS CODIGO_BARRA
+             WHERE pb3.PRODUTO = lep.PRODUTO AND (ISNULL(pb3.COR_PRODUTO,'') = ISNULL(lep.COR_PRODUTO,''))) AS CODIGO_BARRA,
+            ISNULL(p2.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
+            ISNULL(CONVERT(VARCHAR, p2.GRADE), '') AS GRADE
           FROM LOJA_ENTRADAS_PRODUTO lep WITH (NOLOCK)
           LEFT JOIN PRODUTOS p2 WITH (NOLOCK) ON p2.PRODUTO = lep.PRODUTO
           LEFT JOIN CORES_BASICAS c2 WITH (NOLOCK) ON c2.COR = lep.COR_PRODUTO
@@ -189,6 +200,8 @@ export async function GET(request: Request) {
         DESC_PRODUTO: string;
         DESC_COR: string;
         CODIGO_BARRA: string | null;
+        SUBGRUPO: string;
+        GRADE: string;
       }>(itemsQuery);
 
       return itemsResult.recordset;
@@ -272,6 +285,8 @@ export async function GET(request: Request) {
       DESC_PRODUTO?: string;
       DESC_COR?: string;
       CODIGO_BARRA?: string | null;
+      SUBGRUPO?: string;
+      GRADE?: string;
     }>;
 
     if (rows.length === 0) {
@@ -290,17 +305,21 @@ export async function GET(request: Request) {
       const keyDestinoCod = isSaidaIsolada ? '' : `${produto}|${cor}|${fd}`;
       const estoqueOrigem = isEntradaIsolada ? 0 : (stockMap.get(keyOrigemNome) ?? stockMap.get(keyOrigemCod) ?? 0);
       const estoqueDestino = isSaidaIsolada ? 0 : (stockMap.get(keyDestinoNome) ?? stockMap.get(keyDestinoCod) ?? 0);
+      const destinoDisplay = nomeDestino && nomeDestino !== '—' ? nomeDestino : '';
       return {
         produto,
         corProduto: cor || null,
         descProduto: row.DESC_PRODUTO?.toString().trim() ?? '',
         descCor: row.DESC_COR?.toString().trim() ?? '',
         codigoBarra: row.CODIGO_BARRA?.toString().trim() || null,
+        subgrupo: row.SUBGRUPO?.toString().trim() ?? '',
+        grade: row.GRADE?.toString().trim() ?? '',
         qtde: Number(row.QTDE) || 0,
         estoqueOrigem,
         estoqueDestino,
         filialOrigem: nomeOrigem,
         filialDestino: nomeDestino,
+        destino: destinoDisplay,
       };
     });
 

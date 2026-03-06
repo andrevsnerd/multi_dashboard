@@ -1,0 +1,182 @@
+.wrapper {
+  width: 100%;
+  padding: 24px;
+  min-height: 100vh;
+  background: #f9fafb;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 12px 0;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.tab {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.tab:hover {
+  background: #f9fafb;
+  color: #374151;
+}
+
+.tabActive {
+  background: #111827;
+  color: #fff;
+  border-color: #111827;
+}
+
+.tabActive:hover {
+  background: #1f2937;
+  color: #fff;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px 16px 20px;
+  padding-right: 48px;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  text-decoration: none;
+  color: inherit;
+  transition: background-color 0.2s, box-shadow 0.2s;
+  position: relative;
+}
+
+.card:hover {
+  background: #f9fafb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.romaneioId {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.statusConcluida {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.statusPendente {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.statusEmAndamento {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.statusVazio {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.cardDetails {
+  font-size: 14px;
+  color: #4b5563;
+  width: 100%;
+}
+
+.cardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.counts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.countIcon {
+  opacity: 0.8;
+}
+
+.date {
+  color: #9ca3af;
+}
+
+.chevron {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 24px;
+  font-weight: 300;
+  color: #9ca3af;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 48px 24px;
+  color: #9ca3af;
+  font-size: 14px;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.emptyIcon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
