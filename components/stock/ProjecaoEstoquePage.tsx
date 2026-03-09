@@ -634,18 +634,30 @@ export default function ProjecaoEstoquePage({
                       >
                         <div className={styles.categoriaCellContent}>
                           <span className={styles.categoriaLabel}>
-                            {nivel === 4 ? (proj.cor?.toUpperCase() || 'SEM COR') : nivel === 3 ? (proj.descricao?.toUpperCase() ?? proj.produto?.toUpperCase() ?? proj.categoria.toUpperCase()) : proj.categoria.toUpperCase()}
-                            {nivel === 4 && proj.produto && <span className={styles.detailInfo}>{proj.produto}</span>}
-                            {nivel === 4 && proj.descricao && <span className={styles.detailInfo}>{proj.descricao}</span>}
-                            {nivel === 4 && <span className={styles.detailInfo}>Linha: {proj.linha ?? proj.categoria}</span>}
-                            {nivel === 4 && proj.subgrupo && <span className={styles.detailInfo}>Subgrupo: {proj.subgrupo}</span>}
-                            {nivel === 4 && proj.grade && <span className={styles.detailInfo}>Grade: {proj.grade}</span>}
-                            {nivel === 4 && proj.colecao && <span className={styles.detailInfo}>Coleção: {proj.colecao}</span>}
-                            {nivel === 3 && proj.produto && <span className={styles.detailInfo}>{proj.produto}</span>}
-                            {nivel === 3 && <span className={styles.detailInfo}>Linha: {proj.linha ?? proj.categoria}</span>}
-                            {nivel === 3 && proj.subgrupo && <span className={styles.detailInfo}>Subgrupo: {proj.subgrupo}</span>}
-                            {nivel === 3 && proj.grade && <span className={styles.detailInfo}>Grade: {proj.grade}</span>}
-                            {nivel === 3 && proj.colecao && <span className={styles.detailInfo}>Coleção: {proj.colecao}</span>}
+                            {nivel === 4 ? (
+                              <>
+                                <span className={styles.categoryRowWithBadge}>
+                                  <span className={styles.productNameBold}>{proj.descricao?.toUpperCase() ?? proj.produto?.toUpperCase() ?? proj.categoria.toUpperCase()}</span>
+                                  <span className={styles.colorBadge}>{proj.cor?.toUpperCase() || "SEM COR"}</span>
+                                </span>
+                                {proj.produto && proj.produto !== proj.descricao && <span className={styles.detailInfo}>{proj.produto}</span>}
+                                <span className={styles.detailInfo}>Linha: {proj.linha ?? proj.categoria}</span>
+                                {proj.subgrupo && <span className={styles.detailInfo}>Subgrupo: {proj.subgrupo}</span>}
+                                {proj.grade && <span className={styles.detailInfo}>Grade: {proj.grade}</span>}
+                                {proj.colecao && <span className={styles.detailInfo}>Coleção: {proj.colecao}</span>}
+                              </>
+                            ) : nivel === 3 ? (
+                              <>
+                                <span className={styles.productNameBold}>{proj.descricao?.toUpperCase() ?? proj.produto?.toUpperCase() ?? proj.categoria.toUpperCase()}</span>
+                                {proj.produto && <span className={styles.detailInfo}>{proj.produto}</span>}
+                                <span className={styles.detailInfo}>Linha: {proj.linha ?? proj.categoria}</span>
+                                {proj.subgrupo && <span className={styles.detailInfo}>Subgrupo: {proj.subgrupo}</span>}
+                                {proj.grade && <span className={styles.detailInfo}>Grade: {proj.grade}</span>}
+                                {proj.colecao && <span className={styles.detailInfo}>Coleção: {proj.colecao}</span>}
+                              </>
+                            ) : (
+                              proj.categoria.toUpperCase()
+                            )}
                             {nivel > 0 && nivel < 3 && proj.subgrupo && <span className={styles.detailInfo}>Subgrupo: {proj.subgrupo}</span>}
                             {nivel > 0 && nivel < 3 && proj.grade && <span className={styles.detailInfo}>Grade: {proj.grade}</span>}
                           </span>
