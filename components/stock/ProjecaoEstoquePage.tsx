@@ -541,6 +541,8 @@ export default function ProjecaoEstoquePage({
                 const isLast = idx === listaExibida.length - 1;
 
                 const { estoqueAtualReal, duracaoRealMesAtual } = getReaisPorMes(proj);
+                const isLençosLine = proj.categoria === "LENÇOS" || proj.categoria === "APROVEITAMENTO LENÇOS";
+                const limiteDiasAlerta = isLençosLine ? 120 : 90;
 
                 return (
                   <React.Fragment key={`${proj.categoria}-${proj.subgrupo ?? ""}-${proj.grade ?? ""}-${idx}`}>
@@ -600,7 +602,8 @@ export default function ProjecaoEstoquePage({
                       {mesesExibicao.map((m) => {
                         const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
                         const valor = md && md.duracao > 0 ? `${md.duracao} dias` : "-";
-                        return <td key={`d-${m.ano}-${m.mesNumero}`} className={`${styles.duracaoCell} ${m.isMesAtual ? styles.columnMesAtual : ""}`}>{valor}</td>;
+                        const alerta = md && md.duracao > 0 && md.duracao <= limiteDiasAlerta;
+                        return <td key={`d-${m.ano}-${m.mesNumero}`} className={`${styles.duracaoCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${alerta ? styles.duracaoAlerta : ""}`}>{valor}</td>;
                       })}
                     </tr>
                     {/* Bloco números reais — mesmo cinza nas 3 linhas, como na imagem */}
@@ -647,10 +650,12 @@ export default function ProjecaoEstoquePage({
                       <td className={styles.realLabelCell}>DURACAO (real)</td>
                       {mesesExibicao.map((m, mi) => {
                         const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
+                        const valorNum = m.isMesAtual ? duracaoRealMesAtual : (md?.duracaoRealSnapshot ?? 0);
                         const valor = m.isMesAtual
                           ? (duracaoRealMesAtual > 0 ? `${duracaoRealMesAtual} dias` : "-")
                           : (md?.duracaoRealSnapshot != null ? `${md.duracaoRealSnapshot} dias` : "-");
-                        return <td key={`dr-${m.ano}-${m.mesNumero}`} className={`${styles.realDuracaoCell} ${m.isMesAtual ? styles.columnMesAtual : ""}`}>{valor}</td>;
+                        const alerta = valorNum > 0 && valorNum <= limiteDiasAlerta;
+                        return <td key={`dr-${m.ano}-${m.mesNumero}`} className={`${styles.realDuracaoCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${alerta ? styles.duracaoAlerta : ""}`}>{valor}</td>;
                       })}
                     </tr>
                   </React.Fragment>

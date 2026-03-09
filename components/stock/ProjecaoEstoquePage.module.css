@@ -1,17 +1,19 @@
 .wrapper {
   padding: 24px;
-  background: #ffffff;
+  background: #f8f9fb;
   min-height: 100vh;
 }
 
-/* Card do topo: título + filtros — sem borda */
+/* ═══════════════════════════════════════════
+   CARD DO TOPO: título + filtros
+   ═══════════════════════════════════════════ */
 .headerCard {
   background: #ffffff;
-  border: none;
-  border-radius: 8px;
+  border: 1px solid #e8eaed;
+  border-radius: 12px;
   overflow: hidden;
   margin-bottom: 20px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .header {
@@ -35,28 +37,29 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f2f2f2;
-  border-radius: 8px;
-  color: #212121;
+  background: #f1f5f9;
+  border-radius: 10px;
+  color: #334155;
 }
 
 .title {
   font-size: 28px;
   font-weight: 700;
-  color: #212121;
+  color: #0f172a;
   margin: 0 0 4px 0;
 }
 
 .subtitle {
   font-size: 14px;
-  color: #555555;
+  color: #64748b;
   margin: 0;
 }
 
 .snapshotSaved {
   font-size: 12px;
-  color: #2e7d32;
+  color: #16a34a;
   margin: 6px 0 0 0;
+  font-weight: 500;
 }
 
 .backButton {
@@ -65,30 +68,30 @@
   gap: 8px;
   padding: 8px 16px;
   background: #ffffff;
-  border: 1px solid #d9d9d9;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
-  color: #555555;
+  color: #64748b;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .backButton:hover {
-  background: #f8f8f8;
-  border-color: #cfcfcf;
-  color: #212121;
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #334155;
 }
 
-/* Filtros (Filial, Grupo, etc.) — cinza muito sutil como na imagem */
+/* Filtros */
 .filtersRow {
   display: flex;
   align-items: center;
   gap: 16px;
   margin-bottom: 0;
-  padding: 16px 24px;
-  background: #f8f8f8;
-  border-top: 1px solid #eeeeee;
+  padding: 14px 24px;
+  background: #f8fafc;
+  border-top: 1px solid #e8eaed;
   flex-wrap: wrap;
 }
 
@@ -100,135 +103,146 @@
 .voltarExpansaoButton {
   padding: 8px 16px;
   background: #ffffff;
-  border: 1px solid #d9d9d9;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   font-size: 14px;
-  color: #555555;
+  color: #64748b;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .voltarExpansaoButton:hover {
-  background: #f8f8f8;
-  border-color: #cfcfcf;
-  color: #212121;
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #334155;
 }
 
-/* Tabela em card separado — borda forte para delimitar do card de cima */
+/* ═══════════════════════════════════════════
+   TABELA — card separado
+   ═══════════════════════════════════════════ */
 .tableWrapper {
   background: #fff;
-  border-radius: 8px;
-  padding: 20px;
+  border-radius: 12px;
+  padding: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-  border: 1px solid #e1e1e1;
+  border: 1px solid #e2e8f0;
   margin-top: 20px;
+  overflow: hidden;
 }
 
-/* Container de rolagem: cabeçalho sticky funciona em relação a este scroll */
 .tableScrollContainer {
   max-height: min(calc(100vh - 260px), 800px);
   overflow: auto;
-  overflow-x: auto;
-  overflow-y: auto;
 }
 
 .projecaoTable {
   width: 100%;
   border-collapse: collapse;
   min-width: 1200px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
 }
 
-/* Cabeçalho - meses (fundo preto, texto branco) */
+/* ═══════════════════════════════════════════
+   CABEÇALHO — Slate escuro (não preto puro)
+   Mais moderno e menos agressivo visualmente
+   ═══════════════════════════════════════════ */
 .projecaoTable thead th {
-  background: #000000;
-  padding: 16px 14px;
+  background: #1e293b;
+  padding: 14px 16px;
   text-align: center;
-  font-weight: 500;
+  font-weight: 600;
   font-size: 11px;
-  color: #ffffff;
+  color: #e2e8f0;
   border: none;
-  border-bottom: 1px solid #333333;
+  border-bottom: 1px solid #334155;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
   white-space: nowrap;
   position: sticky;
   top: 0;
   z-index: 10;
-  box-shadow: 0 1px 0 0 #333333;
+  box-shadow: 0 1px 0 0 #334155;
 }
 
-/* Cabeçalho lateral - Categoria (fundo preto, texto branco) */
+/* Cabeçalho — Categoria (sticky left + top) */
 .categoriaHeader {
-  background: #000000 !important;
-  color: #ffffff !important;
-  font-weight: 500 !important;
+  background: #1e293b !important;
+  color: #e2e8f0 !important;
+  font-weight: 600 !important;
   text-align: left !important;
-  padding: 16px 14px !important;
-  font-size: 12px !important;
+  padding: 14px 16px !important;
+  font-size: 11px !important;
   border: none !important;
-  border-bottom: 1px solid #333333 !important;
+  border-bottom: 1px solid #334155 !important;
   position: sticky;
   left: 0;
   top: 0;
   z-index: 20;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-  box-shadow: 1px 1px 0 0 #333333;
+  letter-spacing: 0.5px;
+  box-shadow: 1px 1px 0 0 #334155;
 }
 
-/* Cabeçalho lateral - Tipo (fundo preto, texto branco) */
+/* Cabeçalho — Tipo */
 .labelHeader {
-  background: #000000 !important;
-  color: #ffffff !important;
-  font-weight: 500 !important;
+  background: #1e293b !important;
+  color: #e2e8f0 !important;
+  font-weight: 600 !important;
   text-align: center !important;
-  padding: 16px 14px !important;
+  padding: 14px 16px !important;
   border: none !important;
-  border-bottom: 1px solid #333333 !important;
+  border-bottom: 1px solid #334155 !important;
   font-size: 11px !important;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
   position: sticky;
   top: 0;
   z-index: 10;
-  box-shadow: 0 1px 0 0 #333333;
+  box-shadow: 0 1px 0 0 #334155;
 }
 
-/* Células do corpo */
+/* ═══════════════════════════════════════════
+   CORPO — Células genéricas
+   Números alinhados à direita (tabular-nums)
+   ═══════════════════════════════════════════ */
 .projecaoTable tbody td {
-  padding: 16px 14px;
-  text-align: center;
+  padding: 12px 16px;
+  text-align: right;
   border: none;
   font-size: 13px;
   vertical-align: middle;
-  border-bottom: 1px solid #ededed;
+  border-bottom: 1px solid #f1f5f9;
+  font-variant-numeric: tabular-nums;
 }
 
 .projecaoTable tbody tr {
   border-bottom: none;
 }
 
-/* Linha de VENDA - Branco puro */
+/* ═══════════════════════════════════════════
+   LINHAS DE PROJEÇÃO
+   Branco limpo com alternância sutil
+   ═══════════════════════════════════════════ */
+
+/* Linha de VENDA (projeção) */
 .categoriaRow {
   background: #ffffff;
 }
 
-/* Célula de Categoria — fundo branco (projeção) */
+/* Célula de Categoria — sticky left */
 .categoriaCell {
   background: #ffffff;
-  font-weight: 500;
-  color: #212121;
-  text-align: left;
+  font-weight: 600;
+  color: #1e293b;
+  text-align: left !important;
   vertical-align: middle;
   border: none;
-  padding: 16px 14px;
+  padding: 12px 16px;
   font-size: 13px;
   position: sticky;
   left: 0;
   z-index: 5;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
 }
 
 .categoriaCellContent {
@@ -242,7 +256,7 @@
 }
 
 .categoriaCellClickable:hover {
-  background: #f5f5f5 !important;
+  background: #f8fafc !important;
 }
 
 .expandButton {
@@ -252,14 +266,14 @@
   width: 24px;
   height: 24px;
   padding: 0;
-  color: #555555;
+  color: #94a3b8;
   font-size: 10px;
   flex-shrink: 0;
 }
 
 .expandIcon {
   font-size: 10px;
-  color: #555555;
+  color: #94a3b8;
   flex-shrink: 0;
 }
 
@@ -268,40 +282,45 @@
   min-width: 0;
 }
 
-
-/* Label (VENDA, ESTOQUE, DURAÇÃO) — fundo branco na projeção */
+/* Label (VENDA, ESTOQUE, DURAÇÃO) — projeção */
 .labelCell {
   background: #ffffff;
-  font-weight: 400;
-  color: #555555;
-  text-align: left;
-  padding: 16px 14px;
+  font-weight: 500;
+  color: #94a3b8;
+  text-align: left !important;
+  padding: 12px 16px;
   border: none;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.4px;
   white-space: nowrap;
   vertical-align: middle;
+  border-bottom: 1px solid #f1f5f9;
 }
 
-/* Informações detalhadas */
+/* Informações detalhadas (subgrupo, grade) */
 .detailInfo {
   font-size: 10px;
   font-weight: 400;
-  color: #808080;
-  margin-top: 6px;
+  color: #94a3b8;
+  margin-top: 4px;
   display: block;
   text-transform: none;
 }
 
-/* Células de VENDA (projeção) - regular, sem bold */
+/* ═══════════════════════════════════════════
+   CÉLULAS DE PROJEÇÃO — valores numéricos
+   ═══════════════════════════════════════════ */
+
+/* VENDA (projeção) */
 .vendasCell {
-  color: #1a1a1a;
+  color: #334155;
   font-weight: 400;
   background: #ffffff;
   font-size: 13px;
-  padding: 16px 14px;
+  padding: 12px 16px;
   overflow: visible;
+  border-bottom: 1px solid #f1f5f9;
 }
 
 .vendasCellWrapper {
@@ -311,20 +330,21 @@
   overflow: visible;
 }
 
+/* Tooltip (posicionado via CSS — fallback) */
 .vendasInfocard {
   position: absolute;
   left: 50%;
   bottom: 100%;
   transform: translateX(-50%);
   margin-bottom: 6px;
-  padding: 10px 12px;
-  background: #2d2d2d;
-  color: #fff;
+  padding: 10px 14px;
+  background: #1e293b;
+  color: #f1f5f9;
   font-size: 11px;
   font-weight: 400;
   white-space: nowrap;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   z-index: 100;
   pointer-events: none;
   opacity: 0;
@@ -337,7 +357,7 @@
   visibility: visible;
 }
 
-/* Na primeira linha da tabela o tooltip aparece abaixo para não ser cortado pelo overflow do scroll */
+/* Na primeira linha o tooltip aparece abaixo */
 .firstDataRow .vendasInfocard {
   bottom: auto;
   top: 100%;
@@ -347,179 +367,238 @@
 
 .vendasInfocardLine {
   display: block;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 .vendasInfocardLine + .vendasInfocardLine {
   margin-top: 2px;
 }
 
-/* Tooltip flutuante (portal) — não é cortado pelo scroll nem pela coluna do mês atual */
+/* Tooltip flutuante (portal) */
 .vendasInfocardFloating {
   position: fixed;
-  padding: 10px 12px;
-  background: #2d2d2d;
-  color: #fff;
+  padding: 10px 14px;
+  background: #1e293b;
+  color: #f1f5f9;
   font-size: 11px;
   font-weight: 400;
   white-space: nowrap;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
   z-index: 9999;
   pointer-events: none;
 }
 .vendasInfocardFloating .vendasInfocardLine {
   display: block;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 .vendasInfocardFloating .vendasInfocardLine + .vendasInfocardLine {
   margin-top: 2px;
 }
 
-/* Linha de ESTOQUE — fundo branco (projeção) */
+/* ESTOQUE (projeção) — alternância sutil */
 .estoqueRow {
-  background: #ffffff;
+  background: #fafbfd;
 }
 
-/* Células de ESTOQUE — fundo branco */
 .estoqueCell {
-  color: #555555;
+  color: #475569;
   font-weight: 400;
-  background: #ffffff;
-  padding: 16px 14px;
+  background: #fafbfd;
+  padding: 12px 16px;
   font-size: 13px;
+  border-bottom: 1px solid #f1f5f9;
 }
 
-/* Linha de DURAÇÃO - Branco puro */
+/* DURAÇÃO (projeção) */
 .duracaoRow {
   background: #ffffff;
   border-bottom: none;
 }
 
-/* Delimitação entre blocos de categorias: borda superior no início de cada bloco (exceto o primeiro) */
+.duracaoCell {
+  color: #475569;
+  font-weight: 400;
+  background: #ffffff;
+  padding: 12px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+/* ═══════════════════════════════════════════
+   SEPARADORES ENTRE CATEGORIAS
+   Clean — sem a barra pesada de 20px
+   ═══════════════════════════════════════════ */
 .categoryBlockStart {
-  border-top: 1px solid #d6d6d6;
+  border-top: 1px solid #e2e8f0;
 }
 
 .categoryBlockStart td {
-  border-top: 1px solid #d6d6d6;
+  border-top: 1px solid #e2e8f0;
 }
 
-/* Linha inteira preta e bem grossa debaixo de cada categoria (separador) */
+/* Separador inferior — sutil e profissional */
 .categoryBlockEnd {
-  border-bottom: 6px solid #000000;
+  border-bottom: 18px solid #cbd5e1;
 }
 
 .categoryBlockEnd td {
-  border-bottom: 6px solid #000000 !important;
+  border-bottom: 18px solid #cbd5e1 !important;
 }
 
-/* Célula de categoria (rowSpan) também recebe a mesma borda na base do bloco */
 .categoriaCell.categoriaCellBlockEnd {
-  border-bottom: 6px solid #000000 !important;
+  border-bottom: 18px solid #cbd5e1 !important;
 }
 
-/* Células de DURAÇÃO - Cinza Chumbo, Regular */
-.duracaoCell {
-  color: #555555;
-  font-weight: 400;
-  background: #ffffff;
-  padding: 16px 14px;
-  font-size: 13px;
-}
-
-/* --- Bloco Números reais — fundo azul claro #D2E3FF, valores em bold --- */
+/* ═══════════════════════════════════════════
+   BLOCO NÚMEROS REAIS
+   Azul suave — mais leve que o antigo #D2E3FF
+   ═══════════════════════════════════════════ */
 .realRow {
-  background: #D2E3FF;
+  background: #f0f4ff;
 }
 
 .realRow.realRowFirst {
-  border-top: 1px solid #b8d4f5;
+  border-top: 1px solid #dce4f5;
 }
 
 .realRowFirst td {
-  border-top: 1px solid #b8d4f5;
+  border-top: 1px solid #dce4f5;
 }
 
 .realLabelCell {
-  background: #D2E3FF;
-  font-weight: 400;
-  color: #555555;
-  text-align: left;
-  padding: 16px 14px;
+  background: #f0f4ff;
+  font-weight: 500;
+  color: #6b7fa3;
+  text-align: left !important;
+  padding: 12px 16px;
   border: none;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.4px;
   white-space: nowrap;
   vertical-align: middle;
+  border-bottom: 1px solid #e4ecf7;
 }
 
 .realVendasCell {
-  color: #1a1a1a;
-  font-weight: 700;
-  background: #D2E3FF;
+  color: #1e3a5f;
+  font-weight: 600;
+  background: #f0f4ff;
   font-size: 13px;
-  padding: 16px 14px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e4ecf7;
 }
 
 .realEstoqueCell {
-  color: #1a1a1a;
-  font-weight: 700;
-  background: #D2E3FF;
-  padding: 16px 14px;
+  color: #1e3a5f;
+  font-weight: 600;
+  background: #eaeffb;
+  padding: 12px 16px;
   font-size: 13px;
+  border-bottom: 1px solid #e4ecf7;
 }
 
 .realDuracaoCell {
-  color: #1a1a1a;
-  font-weight: 700;
-  background: #D2E3FF;
-  padding: 16px 14px;
+  color: #1e3a5f;
+  font-weight: 600;
+  background: #f0f4ff;
+  padding: 12px 16px;
   font-size: 13px;
+  border-bottom: 1px solid #e4ecf7;
 }
 
-/* Remover qualquer destaque de mês atual */
-.mesAtual {
-  /* Sem destaque visual - design monocromático neutro */
-}
 
-/* Coluna do mês atual: borda escura que envolve projeção e real */
+
+/* Coluna mês atual — bordas laterais azul */
 .columnMesAtual {
-  box-shadow: inset -1px 0 0 #b3b3b3, inset 1px 0 0 #b3b3b3;
+  box-shadow: inset -1px 0 0 #7dd3fc, inset 1px 0 0 #7dd3fc;
   position: relative;
   z-index: 1;
 }
 
+/* Header do mês atual — azul escuro */
 .projecaoTable thead th.columnMesAtual {
-  box-shadow: inset -1px 0 0 #444444, inset 1px 0 0 #444444, 0 1px 0 0 #333333;
+  background: #0c4a6e !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  box-shadow: inset -1px 0 0 #0369a1, inset 1px 0 0 #0369a1, 0 1px 0 0 #334155;
 }
 
-/* Células do mês atual (apenas linhas REAIS): tons azul-cinza e texto branco */
-.realVendasCell.columnMesAtual {
-  background: #3A404C !important;
+/* ─── Projeção: mês atual — azul claro (como na imagem) ─── */
+.vendasCell.columnMesAtual {
+  background: #e0f2f7;
+  box-shadow: inset -1px 0 0 #b3e0ed, inset 1px 0 0 #b3e0ed;
+}
+
+.estoqueCell.columnMesAtual {
+  background: #e0f2f7;
+  box-shadow: inset -1px 0 0 #b3e0ed, inset 1px 0 0 #b3e0ed;
+}
+
+.duracaoCell.columnMesAtual {
+  background: #e0f2f7;
+  box-shadow: inset -1px 0 0 #b3e0ed, inset 1px 0 0 #b3e0ed;
+}
+
+/* Alerta: duração em dias ≤ limite (120 para LENÇOS/APROVEITAMENTO LENÇOS, 90 para demais) */
+/* Projeção: sempre fundo vermelho claro */
+.duracaoCell.duracaoAlerta,
+.duracaoCell.duracaoAlerta.columnMesAtual {
+  background: #fef2f2 !important;
+  color: #b91c1c;
+  font-weight: 600;
+  box-shadow: inset -1px 0 0 #fecaca, inset 1px 0 0 #fecaca;
+}
+
+/* Real: vermelho claro fora do mês atual */
+.realDuracaoCell.duracaoAlerta {
+  background: #fef2f2 !important;
+  color: #b91c1c;
+  font-weight: 600;
+  box-shadow: inset -1px 0 0 #fecaca, inset 1px 0 0 #fecaca;
+}
+
+/* Real no mês atual: fundo vermelho forte */
+.realDuracaoCell.duracaoAlerta.columnMesAtual {
+  background: #dc2626 !important;
   color: #ffffff !important;
+  box-shadow: inset -1px 0 0 #b91c1c, inset 1px 0 0 #b91c1c;
+}
+
+/* ─── Real: mês atual — azul escuro (como na imagem) ─── */
+.realVendasCell.columnMesAtual {
+  background: #0c4a6e !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  box-shadow: inset -1px 0 0 #0369a1, inset 1px 0 0 #0369a1;
 }
 
 .realEstoqueCell.columnMesAtual {
-  background: #5D85A8 !important;
+  background: #075985 !important;
   color: #ffffff !important;
   font-weight: 700;
+  box-shadow: inset -1px 0 0 #0369a1, inset 1px 0 0 #0369a1;
 }
 
 .realDuracaoCell.columnMesAtual {
-  background: #7AA0BF !important;
+  background: #0369a1 !important;
   color: #ffffff !important;
+  font-weight: 700;
+  box-shadow: inset -1px 0 0 #0284c7, inset 1px 0 0 #0284c7;
 }
 
+/* ═══════════════════════════════════════════
+   ESTADOS: loading, error
+   ═══════════════════════════════════════════ */
 .loading,
 .error {
   text-align: center;
   padding: 48px;
   font-size: 16px;
-  color: #555555;
+  color: #64748b;
 }
 
 .error {
-  color: #808080;
+  color: #94a3b8;
 }
