@@ -4380,6 +4380,7 @@ export interface ProjecaoCategoria {
   colecao?: string;
   produto?: string;
   descricao?: string;
+  cor?: string;
   meses: ProjecaoMensal[];
 }
 
@@ -4416,6 +4417,19 @@ export async function fetchProjecaoMensal({
       ? ', UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, \'\')))), UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, \'\')))), UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), \'\')))), UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, \'\')))), ISNULL(p.PRODUTO, \'\'), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, \'\'))))'
       : ', UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, \'\')))), UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), \'\')))), UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, \'\')))), ISNULL(p.PRODUTO, \'\'), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, \'\'))))';
 
+    // Cor do produto: ScarfMe não tem tabela CORES; NERD usa JOIN em CORES para DESC_COR
+    const useCoresTable = company !== 'scarfme';
+    const corCampoEstoque = useCoresTable
+      ? `, ISNULL(e.COR_PRODUTO, '') AS cor, ISNULL(c.DESC_COR, '') AS corDesc`
+      : `, ISNULL(e.COR_PRODUTO, '') AS cor, '' AS corDesc`;
+    const corGroupEstoque = useCoresTable
+      ? `, ISNULL(e.COR_PRODUTO, ''), ISNULL(c.DESC_COR, '')`
+      : `, ISNULL(e.COR_PRODUTO, '')`;
+    const corCampoVendas = `, ISNULL(vp.COR_PRODUTO, '') AS cor`;
+    const corGroupVendas = `, ISNULL(vp.COR_PRODUTO, '')`;
+    const corCampoEcommerce = `, '' AS cor`;
+    const corGroupEcommerce = ``; // constante '' não pode ir no GROUP BY do SQL Server
+
     const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
     const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
     const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
@@ -4445,14 +4459,16 @@ export async function fetchProjecaoMensal({
       }
     }
 
-    // 1. Buscar estoque atual por categoria
+    // 1. Buscar estoque atual por categoria (ScarfMe não tem tabela CORES)
+    const coresJoinEstoque = useCoresTable ? `LEFT JOIN CORES c WITH (NOLOCK) ON c.COR_PRODUTO = e.COR_PRODUTO` : '';
     const estoqueQuery = `
-      SELECT 
+      SELECT
         ${categoriaField} AS categoria
-        ${camposAdicionais},
+        ${camposAdicionais}${corCampoEstoque},
         SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoqueAtual
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+      ${coresJoinEstoque}
       WHERE 1=1
         ${estoqueFilialFilter}
         ${grupoFilter}
@@ -4467,7 +4483,7 @@ export async function fetchProjecaoMensal({
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
         ${buildCategoriaExcludeNerd(company, categoriaField)}
-      GROUP BY ${categoriaField}${groupByAdicional}
+      GROUP BY ${categoriaField}${groupByAdicional}${corGroupEstoque}
       HAVING SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) > 0
     `;
 
@@ -4479,14 +4495,16 @@ export async function fetchProjecaoMensal({
       colecao?: string;
       produto?: string;
       descricao?: string;
+      cor?: string;
+      corDesc?: string;
       estoqueAtual: number | null;
     }>(estoqueQuery);
 
     // 2. Buscar vendas do ano passado por categoria e mês (varejo)
     const vendasAnoPassadoQuery = `
-      SELECT 
+      SELECT
         ${categoriaField} AS categoria
-        ${camposAdicionais},
+        ${camposAdicionais}${corCampoVendas},
         MONTH(vp.DATA_VENDA) AS mes,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
@@ -4504,7 +4522,7 @@ export async function fetchProjecaoMensal({
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
         ${buildCategoriaExcludeNerd(company, categoriaField)}
-      GROUP BY ${categoriaField}${groupByAdicional}, MONTH(vp.DATA_VENDA)
+      GROUP BY ${categoriaField}${groupByAdicional}${corGroupVendas}, MONTH(vp.DATA_VENDA)
     `;
 
     const vendasAnoPassadoResult = await request.query<{
@@ -4537,13 +4555,13 @@ export async function fetchProjecaoMensal({
           // Usar data de entrega (fp.ENTREGA) quando existir, senao emissao - para bater com vendas por mes de entrega
           const dataEcommerce = `COALESCE(CAST(fp.ENTREGA AS DATE), CAST(f.EMISSAO AS DATE))`;
           const ecommerceAnoPassadoQuery = `
-            SELECT 
+            SELECT
               ${categoriaField} AS categoria
-              ${camposAdicionais},
+              ${camposAdicionais}${corCampoEcommerce},
               MONTH(${dataEcommerce}) AS mes,
               SUM(CAST(fp.QTDE AS FLOAT)) AS vendas
             FROM FATURAMENTO f WITH (NOLOCK)
-            JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) 
+            JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
               ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
             LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
             WHERE YEAR(${dataEcommerce}) = ${anoPassado}
@@ -4558,7 +4576,7 @@ export async function fetchProjecaoMensal({
               AND ${categoriaField} <> 'SEM GRUPO'
               AND ${categoriaField} <> 'SEM LINHA'
               ${buildCategoriaExcludeNerd(company, categoriaField)}
-            GROUP BY ${categoriaField}${groupByAdicional}, MONTH(${dataEcommerce})
+            GROUP BY ${categoriaField}${groupByAdicional}${corGroupEcommerce}, MONTH(${dataEcommerce})
           `;
 
           ecommerceAnoPassadoResult = await request.query<{
@@ -4596,9 +4614,9 @@ export async function fetchProjecaoMensal({
     // Mesma regra do Controle de Estoque: não aplicar linha/subgrupo/grade/coleção nas vendas,
     // só grupo e exclusion, para o total bater com "Venda Total (período)"
     const vendasMesAtualQuery = `
-      SELECT 
+      SELECT
         ${categoriaField} AS categoria
-        ${camposAdicionais},
+        ${camposAdicionais}${corCampoVendas},
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
@@ -4613,7 +4631,7 @@ export async function fetchProjecaoMensal({
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
         ${buildCategoriaExcludeNerd(company, categoriaField)}
-      GROUP BY ${categoriaField}${groupByAdicional}
+      GROUP BY ${categoriaField}${groupByAdicional}${corGroupVendas}
     `;
 
     const vendasMesAtualResult = await request.query<{
@@ -4627,9 +4645,9 @@ export async function fetchProjecaoMensal({
 
     // 3.0. Vendas mês anterior e últimos 30 dias (para regra dos primeiros 5 dias = Controle de Estoque)
     const vendasMesAnterior30DiasQuery = `
-      SELECT 
+      SELECT
         ${categoriaField} AS categoria
-        ${camposAdicionais},
+        ${camposAdicionais}${corCampoVendas},
         SUM(CASE WHEN vp.DATA_VENDA >= @prevMonthStart AND vp.DATA_VENDA < @prevMonthEnd AND vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendasMesAnterior,
         SUM(CASE WHEN vp.DATA_VENDA >= @ultimos30Start AND vp.DATA_VENDA < @ultimos30End AND vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas30Dias
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
@@ -4649,7 +4667,7 @@ export async function fetchProjecaoMensal({
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
         ${buildCategoriaExcludeNerd(company, categoriaField)}
-      GROUP BY ${categoriaField}${groupByAdicional}
+      GROUP BY ${categoriaField}${groupByAdicional}${corGroupVendas}
     `;
     const vendasMesAnterior30DiasResult = await request.query<{
       categoria: string;
@@ -4673,7 +4691,7 @@ export async function fetchProjecaoMensal({
         const ecommercePrev30Query = `
           SELECT
             ${categoriaField} AS categoria
-            ${camposAdicionais},
+            ${camposAdicionais}${corCampoEcommerce},
             SUM(CASE WHEN f.EMISSAO >= @prevMonthStart AND f.EMISSAO < @prevMonthEnd AND f.NOTA_CANCELADA = 0 THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS vendasMesAnterior,
             SUM(CASE WHEN f.EMISSAO >= @ultimos30Start AND f.EMISSAO < @ultimos30End AND f.NOTA_CANCELADA = 0 THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS vendas30Dias
           FROM FATURAMENTO f WITH (NOLOCK)
@@ -4692,7 +4710,7 @@ export async function fetchProjecaoMensal({
             ${nerdOnlyEletronicosFilter}
             AND ${categoriaField} <> '' AND ${categoriaField} <> 'SEM GRUPO' AND ${categoriaField} <> 'SEM LINHA'
             ${buildCategoriaExcludeNerd(company, categoriaField)}
-          GROUP BY ${categoriaField}${groupByAdicional}
+          GROUP BY ${categoriaField}${groupByAdicional}${corGroupEcommerce}
         `;
         ecommerceMesAnterior30DiasResult = await request.query(ecommercePrev30Query);
       }
@@ -4716,12 +4734,12 @@ export async function fetchProjecaoMensal({
 
         if (ecommerceMesAtualFilialFilter) {
           const ecommerceMesAtualQuery = `
-            SELECT 
+            SELECT
               ${categoriaField} AS categoria
-              ${camposAdicionais},
+              ${camposAdicionais}${corCampoEcommerce},
               SUM(CAST(fp.QTDE AS FLOAT)) AS vendas
             FROM FATURAMENTO f WITH (NOLOCK)
-            JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) 
+            JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
               ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
             LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
             WHERE f.EMISSAO >= @periodoStartMesAtual
@@ -4737,7 +4755,7 @@ export async function fetchProjecaoMensal({
               AND ${categoriaField} <> 'SEM GRUPO'
               AND ${categoriaField} <> 'SEM LINHA'
               ${buildCategoriaExcludeNerd(company, categoriaField)}
-            GROUP BY ${categoriaField}${groupByAdicional}
+            GROUP BY ${categoriaField}${groupByAdicional}${corGroupEcommerce}
           `;
 
           ecommerceMesAtualResult = await request.query<{
@@ -4754,9 +4772,9 @@ export async function fetchProjecaoMensal({
 
     // 3.2. Vendas do ano atual por mês (mesma estrutura do ano passado, só ano = atual) — varejo
     const vendasAnoAtualPorMesQuery = `
-      SELECT 
+      SELECT
         ${categoriaField} AS categoria
-        ${camposAdicionais},
+        ${camposAdicionais}${corCampoVendas},
         MONTH(vp.DATA_VENDA) AS mes,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
@@ -4775,7 +4793,7 @@ export async function fetchProjecaoMensal({
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
         ${buildCategoriaExcludeNerd(company, categoriaField)}
-      GROUP BY ${categoriaField}${groupByAdicional}, MONTH(vp.DATA_VENDA)
+      GROUP BY ${categoriaField}${groupByAdicional}${corGroupVendas}, MONTH(vp.DATA_VENDA)
     `;
     const vendasAnoAtualPorMesResult = await request.query<{
       categoria: string;
@@ -4798,9 +4816,9 @@ export async function fetchProjecaoMensal({
         const ecommerceAnoAtualFilialFilter = `AND REPLACE(REPLACE(LTRIM(RTRIM(f.FILIAL)), NCHAR(0x00A0), ' '), CHAR(9), ' ') IN (${placeholders})`;
         const dataEcommerce = `COALESCE(CAST(fp.ENTREGA AS DATE), CAST(f.EMISSAO AS DATE))`;
         const ecommerceAnoAtualPorMesQuery = `
-          SELECT 
+          SELECT
             ${categoriaField} AS categoria
-            ${camposAdicionais},
+            ${camposAdicionais}${corCampoEcommerce},
             MONTH(${dataEcommerce}) AS mes,
             SUM(CAST(fp.QTDE AS FLOAT)) AS vendas
           FROM FATURAMENTO f WITH (NOLOCK)
@@ -4820,7 +4838,7 @@ export async function fetchProjecaoMensal({
             ${nerdOnlyEletronicosFilter}
             AND ${categoriaField} <> '' AND ${categoriaField} <> 'SEM GRUPO' AND ${categoriaField} <> 'SEM LINHA'
             ${buildCategoriaExcludeNerd(company, categoriaField)}
-          GROUP BY ${categoriaField}${groupByAdicional}, MONTH(${dataEcommerce})
+          GROUP BY ${categoriaField}${groupByAdicional}${corGroupEcommerce}, MONTH(${dataEcommerce})
         `;
         ecommerceAnoAtualPorMesResult = await request.query(ecommerceAnoAtualPorMesQuery);
       }
@@ -4836,12 +4854,14 @@ export async function fetchProjecaoMensal({
     
     // Mapear estoque atual (chave sempre no nível máximo)
     const descricaoMap = new Map<string, string>();
+    const corDisplayMap = new Map<string, string>(); // cor display (descrição legível)
     const estoqueMap = new Map<string, number>();
     estoqueResult.recordset.forEach(row => {
-      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${row.produto || ''}`;
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${row.produto || ''}|${row.cor || ''}`;
       const estoqueAtual = Number(row.estoqueAtual ?? 0);
       estoqueMap.set(key, (estoqueMap.get(key) || 0) + estoqueAtual);
       if (row.descricao && !descricaoMap.has(key)) descricaoMap.set(key, row.descricao);
+      if (!corDisplayMap.has(key)) corDisplayMap.set(key, getColorDescription(row.cor, row.corDesc));
     });
 
     // Mapear vendas do ano passado por mês (varejo) — chave sempre nível máximo
@@ -4849,7 +4869,7 @@ export async function fetchProjecaoMensal({
     const vendasAnoPassadoVarejoMap = new Map<string, Map<number, number>>();
     const vendasAnoPassadoEcommerceMap = new Map<string, Map<number, number>>();
     vendasAnoPassadoResult.recordset.forEach(row => {
-      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}`;
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}|${(row as any).cor || ''}`;
       if (!vendasAnoPassadoMap.has(key)) {
         vendasAnoPassadoMap.set(key, new Map());
       }
@@ -4866,7 +4886,7 @@ export async function fetchProjecaoMensal({
 
     // Somar vendas de e-commerce do ano passado (e no map combinado e no map só e-commerce)
     ecommerceAnoPassadoResult.recordset.forEach(row => {
-      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}`;
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}|${(row as any).cor || ''}`;
       if (!vendasAnoPassadoMap.has(key)) {
         vendasAnoPassadoMap.set(key, new Map());
       }
@@ -4886,7 +4906,7 @@ export async function fetchProjecaoMensal({
     const vendasVarejoMesAtualMap = new Map<string, number>();
     const vendasEcommerceMesAtualMap = new Map<string, number>();
     vendasMesAtualResult.recordset.forEach(row => {
-      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}`;
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}|${(row as any).cor || ''}`;
       const vendasAtual = Number(row.vendas ?? 0);
       vendasMesAtualMap.set(key, (vendasMesAtualMap.get(key) || 0) + vendasAtual);
       vendasVarejoMesAtualMap.set(key, (vendasVarejoMesAtualMap.get(key) || 0) + vendasAtual);
@@ -4894,7 +4914,7 @@ export async function fetchProjecaoMensal({
 
     // Somar vendas de e-commerce do mês atual
     ecommerceMesAtualResult.recordset.forEach(row => {
-      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}`;
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}|${(row as any).cor || ''}`;
       const vendasEcommerce = Number(row.vendas ?? 0);
       vendasMesAtualMap.set(key, (vendasMesAtualMap.get(key) || 0) + vendasEcommerce);
       vendasEcommerceMesAtualMap.set(key, (vendasEcommerceMesAtualMap.get(key) || 0) + vendasEcommerce);
@@ -4905,7 +4925,7 @@ export async function fetchProjecaoMensal({
     const vendasReaisVarejoPorMesMap = new Map<string, Map<number, number>>();
     const vendasReaisEcommercePorMesMap = new Map<string, Map<number, number>>();
     vendasAnoAtualPorMesResult.recordset.forEach(row => {
-      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}`;
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}|${(row as any).cor || ''}`;
       if (!vendasReaisPorMesMap.has(key)) {
         vendasReaisPorMesMap.set(key, new Map());
         vendasReaisVarejoPorMesMap.set(key, new Map());
@@ -4918,7 +4938,7 @@ export async function fetchProjecaoMensal({
       mesMapVarejo.set(mesNumero, (mesMapVarejo.get(mesNumero) || 0) + v);
     });
     ecommerceAnoAtualPorMesResult.recordset.forEach(row => {
-      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}`;
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}|${(row as any).cor || ''}`;
       if (!vendasReaisPorMesMap.has(key)) {
         vendasReaisPorMesMap.set(key, new Map());
         vendasReaisEcommercePorMesMap.set(key, new Map());
@@ -4936,14 +4956,14 @@ export async function fetchProjecaoMensal({
     const vendasMesAnteriorMap = new Map<string, number>();
     const vendasUltimos30DiasMap = new Map<string, number>();
     vendasMesAnterior30DiasResult.recordset.forEach(row => {
-      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}`;
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}|${(row as any).cor || ''}`;
       const vma = Number(row.vendasMesAnterior ?? 0);
       const v30 = Number(row.vendas30Dias ?? 0);
       if (vma > 0) vendasMesAnteriorMap.set(key, vma);
       if (v30 > 0) vendasUltimos30DiasMap.set(key, v30);
     });
     ecommerceMesAnterior30DiasResult.recordset.forEach(row => {
-      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}`;
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}|${(row as any).cor || ''}`;
       const vma = Number(row.vendasMesAnterior ?? 0);
       const v30 = Number(row.vendas30Dias ?? 0);
       if (vma > 0) vendasMesAnteriorMap.set(key, (vendasMesAnteriorMap.get(key) || 0) + vma);
@@ -4954,7 +4974,7 @@ export async function fetchProjecaoMensal({
     const categoriasMap = new Map<string, ProjecaoCategoria>();
 
     estoqueMap.forEach((estoqueInicial, key) => {
-      // Chave no formato categoria|linha|subgrupo|grade|colecao|produto
+      // Chave no formato categoria|linha|subgrupo|grade|colecao|produto|cor
       const parts = key.split('|');
       const categoria = parts[0];
       const linha = parts[1] || undefined;
@@ -4962,6 +4982,7 @@ export async function fetchProjecaoMensal({
       const grade = parts[3] || undefined;
       const colecao = parts[4] || undefined;
       const produto = parts[5] || undefined;
+      const cor = corDisplayMap.get(key) || undefined; // descrição legível (ex: "BRANCO", "PRETO")
       const descricao = descricaoMap.get(key) || undefined;
 
       if (!categoriasMap.has(key)) {
@@ -4973,6 +4994,7 @@ export async function fetchProjecaoMensal({
           colecao,
           produto,
           descricao,
+          cor,
           meses: [],
         });
       }

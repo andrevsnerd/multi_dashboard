@@ -49,6 +49,7 @@ interface ProjecaoCategoria {
   colecao?: string;
   produto?: string;
   descricao?: string;
+  cor?: string;
   meses: ProjecaoMensal[];
 }
 
@@ -71,12 +72,16 @@ async function fetchProjecao(
   grades.forEach((g) => params.append("grades", g));
 
   const res = await fetch(`/api/controle-estoque?${params.toString()}`, { cache: "no-store" });
-  if (!res.ok) throw new Error("Erro ao carregar projecao");
   const json = (await res.json()) as {
-    data: ProjecaoCategoria[];
+    error?: string;
+    data?: ProjecaoCategoria[];
     snapshot?: { ok?: boolean; snapshot_date?: string | null };
   };
-  return { data: json.data, snapshotOk: Boolean(json.snapshot?.ok) };
+  if (!res.ok) {
+    const msg = typeof json?.error === "string" ? json.error : "Erro ao carregar projecao";
+    throw new Error(msg);
+  }
+  return { data: json.data ?? [], snapshotOk: Boolean(json.snapshot?.ok) };
 }
 
 function fmt(value: number): string {
@@ -110,7 +115,7 @@ export default function ProjecaoEstoquePage({
   const [colecoes, setColecoes] = useState<string[]>([]);
   const [subgrupos, setSubgrupos] = useState<string[]>([]);
   const [grades, setGrades] = useState<string[]>([]);
-  const [expansao, setExpansao] = useState<Map<string, { nivel: number; subgrupoSelecionado?: string; gradeSelecionado?: string }>>(new Map());
+  const [expansao, setExpansao] = useState<Map<string, { nivel: number; subgrupoSelecionado?: string; gradeSelecionado?: string; produtoSelecionado?: string }>>(new Map());
   const [projecoes, setProjecoes] = useState<ProjecaoCategoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -401,8 +406,40 @@ export default function ProjecaoEstoquePage({
       if (nivel === 3 && subSel && ex?.gradeSelecionado) {
         const gradeSel = ex.gradeSelecionado;
         const mesAtualIdx = getMonth(new Date());
+        const allItems = cats.filter((c) => c.subgrupo === subSel && c.grade === gradeSel);
+        // Group by produto to aggregate across colors
+        const byProduto = new Map<string, ProjecaoCategoria[]>();
+        allItems.forEach((c) => {
+          const k = c.produto || '';
+          if (!byProduto.has(k)) byProduto.set(k, []);
+          byProduto.get(k)!.push(c);
+        });
+        // Sort by total stock descending
+        const sortedProdutos = Array.from(byProduto.entries()).sort((a, b) => {
+          const sa = a[1].reduce((sum, i) => sum + (i.meses[mesAtualIdx]?.estoque ?? 0), 0);
+          const sb = b[1].reduce((sum, i) => sum + (i.meses[mesAtualIdx]?.estoque ?? 0), 0);
+          return sb - sa;
+        });
+        sortedProdutos.forEach(([, group]) => {
+          const merged = reagrupar(group)[0];
+          out.push({
+            categoria: cat,
+            subgrupo: subSel,
+            grade: gradeSel,
+            colecao: group[0].colecao,
+            produto: group[0].produto,
+            descricao: group[0].descricao,
+            linha: group[0].linha,
+            meses: merged.meses,
+          });
+        });
+      }
+      if (nivel === 4 && subSel && ex?.gradeSelecionado && ex?.produtoSelecionado) {
+        const gradeSel = ex.gradeSelecionado;
+        const produtoSel = ex.produtoSelecionado;
+        const mesAtualIdx = getMonth(new Date());
         const items = cats
-          .filter((c) => c.subgrupo === subSel && c.grade === gradeSel)
+          .filter((c) => c.subgrupo === subSel && c.grade === gradeSel && c.produto === produtoSel)
           .sort((a, b) => (b.meses[mesAtualIdx]?.estoque ?? 0) - (a.meses[mesAtualIdx]?.estoque ?? 0));
         items.forEach((item) => {
           out.push({
@@ -413,6 +450,7 @@ export default function ProjecaoEstoquePage({
             produto: item.produto,
             descricao: item.descricao,
             linha: item.linha,
+            cor: item.cor,
             meses: reagrupar([item])[0].meses,
           });
         });
@@ -427,6 +465,8 @@ export default function ProjecaoEstoquePage({
           return p.subgrupo === ex.subgrupoSelecionado;
         if (n === 3 && ex?.subgrupoSelecionado && ex?.gradeSelecionado)
           return p.subgrupo === ex.subgrupoSelecionado && p.grade === ex.gradeSelecionado;
+        if (n === 4 && ex?.subgrupoSelecionado && ex?.gradeSelecionado && ex?.produtoSelecionado)
+          return p.subgrupo === ex.subgrupoSelecionado && p.grade === ex.gradeSelecionado && p.produto === ex.produtoSelecionado;
         return true;
       });
     }
@@ -452,6 +492,7 @@ export default function ProjecaoEstoquePage({
     const temSubgrupos = projecoes.some((p) => p.categoria === proj.categoria && p.subgrupo);
     const temGrades = proj.subgrupo && projecoes.some((p) => p.categoria === proj.categoria && p.subgrupo === proj.subgrupo && p.grade);
     const temProdutos = proj.grade && projecoes.some((p) => p.categoria === proj.categoria && p.subgrupo === proj.subgrupo && p.grade === proj.grade && p.produto);
+    const temCores = proj.produto && projecoes.some((p) => p.categoria === proj.categoria && p.subgrupo === proj.subgrupo && p.grade === proj.grade && p.produto === proj.produto && p.cor);
     if (n === 0 && temSubgrupos) {
       setExpansao((prev) => new Map(prev).set(proj.categoria, { nivel: 1 }));
       return;
@@ -462,6 +503,10 @@ export default function ProjecaoEstoquePage({
     }
     if (n === 2 && proj.grade && temProdutos) {
       setExpansao((prev) => new Map(prev).set(proj.categoria, { nivel: 3, subgrupoSelecionado: proj.subgrupo, gradeSelecionado: proj.grade }));
+      return;
+    }
+    if (n === 3 && proj.produto && temCores) {
+      setExpansao((prev) => new Map(prev).set(proj.categoria, { nivel: 4, subgrupoSelecionado: proj.subgrupo, gradeSelecionado: proj.grade, produtoSelecionado: proj.produto }));
     }
   }, [expansao, projecoes]);
 
@@ -568,7 +613,8 @@ export default function ProjecaoEstoquePage({
                 const podeNivel1 = nivel === 0 && projecoes.some((p) => p.categoria === proj.categoria && p.subgrupo);
                 const podeNivel2 = nivel === 1 && proj.subgrupo && projecoes.some((p) => p.categoria === proj.categoria && p.subgrupo === proj.subgrupo && p.grade);
                 const podeNivel3 = nivel === 2 && proj.grade && projecoes.some((p) => p.categoria === proj.categoria && p.subgrupo === proj.subgrupo && p.grade === proj.grade && p.produto);
-                const clickable = podeNivel1 || (nivel === 1 && podeNivel2) || (nivel === 2 && podeNivel3);
+                const podeNivel4 = nivel === 3 && proj.produto && projecoes.some((p) => p.categoria === proj.categoria && p.subgrupo === proj.subgrupo && p.grade === proj.grade && p.produto === proj.produto && p.cor);
+                const clickable = podeNivel1 || (nivel === 1 && podeNivel2) || (nivel === 2 && podeNivel3) || (nivel === 3 && podeNivel4);
                 const isLast = idx === listaExibida.length - 1;
 
                 const { estoqueAtualReal, duracaoRealMesAtual } = getReaisPorMes(proj);
@@ -576,7 +622,7 @@ export default function ProjecaoEstoquePage({
                 const limiteDiasAlerta = isLençosLine ? 120 : 90;
 
                 return (
-                  <React.Fragment key={`${proj.categoria}-${proj.subgrupo ?? ""}-${proj.grade ?? ""}-${proj.colecao ?? ""}-${idx}`}>
+                  <React.Fragment key={`${proj.categoria}-${proj.subgrupo ?? ""}-${proj.grade ?? ""}-${proj.colecao ?? ""}-${proj.produto ?? ""}-${proj.cor ?? ""}-${idx}`}>
                     <tr className={`${styles.categoriaRow} ${idx > 0 ? styles.categoryBlockStart : ""} ${idx === 0 ? styles.firstDataRow : ""}`}>
                       <td
                         rowSpan={6}
@@ -588,7 +634,13 @@ export default function ProjecaoEstoquePage({
                       >
                         <div className={styles.categoriaCellContent}>
                           <span className={styles.categoriaLabel}>
-                            {nivel === 3 ? (proj.descricao?.toUpperCase() ?? proj.produto?.toUpperCase() ?? proj.categoria.toUpperCase()) : proj.categoria.toUpperCase()}
+                            {nivel === 4 ? (proj.cor?.toUpperCase() || 'SEM COR') : nivel === 3 ? (proj.descricao?.toUpperCase() ?? proj.produto?.toUpperCase() ?? proj.categoria.toUpperCase()) : proj.categoria.toUpperCase()}
+                            {nivel === 4 && proj.produto && <span className={styles.detailInfo}>{proj.produto}</span>}
+                            {nivel === 4 && proj.descricao && <span className={styles.detailInfo}>{proj.descricao}</span>}
+                            {nivel === 4 && <span className={styles.detailInfo}>Linha: {proj.linha ?? proj.categoria}</span>}
+                            {nivel === 4 && proj.subgrupo && <span className={styles.detailInfo}>Subgrupo: {proj.subgrupo}</span>}
+                            {nivel === 4 && proj.grade && <span className={styles.detailInfo}>Grade: {proj.grade}</span>}
+                            {nivel === 4 && proj.colecao && <span className={styles.detailInfo}>Coleção: {proj.colecao}</span>}
                             {nivel === 3 && proj.produto && <span className={styles.detailInfo}>{proj.produto}</span>}
                             {nivel === 3 && <span className={styles.detailInfo}>Linha: {proj.linha ?? proj.categoria}</span>}
                             {nivel === 3 && proj.subgrupo && <span className={styles.detailInfo}>Subgrupo: {proj.subgrupo}</span>}

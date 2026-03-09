@@ -257,8 +257,9 @@ export async function GET(request: Request) {
     }
   } catch (error) {
     console.error('Erro ao carregar dados de controle de estoque:', error);
+    const message = error instanceof Error ? error.message : 'Erro ao carregar dados de controle de estoque';
     return NextResponse.json(
-      { error: 'Erro ao carregar dados de controle de estoque' },
+      { error: process.env.NODE_ENV === 'development' ? message : 'Erro ao carregar dados de controle de estoque' },
       { status: 500 }
     );
   }
