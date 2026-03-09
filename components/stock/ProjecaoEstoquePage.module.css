@@ -11,9 +11,11 @@
   background: #ffffff;
   border: 1px solid #e8eaed;
   border-radius: 12px;
-  overflow: hidden;
+  overflow: visible;
   margin-bottom: 20px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  position: relative;
+  z-index: 30;
 }
 
 .header {
@@ -83,7 +85,7 @@
   color: #334155;
 }
 
-/* Filtros */
+/* Filtros — acima da tabela na ordem de visualização (dropdowns não cortados) */
 .filtersRow {
   display: flex;
   align-items: center;
@@ -93,6 +95,8 @@
   background: #f8fafc;
   border-top: 1px solid #e8eaed;
   flex-wrap: wrap;
+  position: relative;
+  z-index: 31;
 }
 
 .expandActions {
@@ -128,6 +132,8 @@
   border: 1px solid #e2e8f0;
   margin-top: 20px;
   overflow: hidden;
+  position: relative;
+  z-index: 1;
 }
 
 .tableScrollContainer {
