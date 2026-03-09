@@ -4431,7 +4431,24 @@ export async function fetchProjecaoMensal({
     const corCampoEcommerce = `, UPPER(LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, '')))) AS cor`;
     const corGroupEcommerce = `, UPPER(LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))))`;
 
-    const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
+    // Canal: se filial varejo específica (ou VAREJO) → sem e-commerce; se filial e-commerce → sem varejo
+    const isEcommerceSelected = isEcommerceFilial(company, filial ?? '');
+    const includeEcommerce = company === 'scarfme' && (filial === null || isEcommerceSelected);
+    const includeVarejo = !isEcommerceSelected;
+
+    // Quando filial de e-commerce selecionada, estoque deve incluir TODAS as filiais de e-commerce
+    // (não apenas a filial "representante" que o buildFilialFilter filtraria para uma só)
+    let estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
+    if (isEcommerceSelected && company === 'scarfme') {
+      const companyConfig = resolveCompany(company);
+      const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
+      if (ecommerceFilials.length > 0) {
+        ecommerceFilials.forEach((f, i) => request.input(`estoqueEcommerceFilial${i}`, sql.VarChar, f.trim()));
+        const placeholders = ecommerceFilials.map((_, i) => `@estoqueEcommerceFilial${i}`).join(', ');
+        estoqueFilialFilter = `AND e.FILIAL IN (${placeholders})`;
+      }
+    }
+
     const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
     const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
@@ -4440,11 +4457,6 @@ export async function fetchProjecaoMensal({
     const gradeFilter = buildGradeFilter(request, company, grades, 'p');
     const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineProjecao');
     const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
-
-    // Canal: se filial varejo específica (ou VAREJO) → sem e-commerce; se filial e-commerce → sem varejo
-    const isEcommerceSelected = isEcommerceFilial(company, filial ?? '');
-    const includeEcommerce = company === 'scarfme' && (filial === null || isEcommerceSelected);
-    const includeVarejo = !isEcommerceSelected;
 
     // Vendas do mês atual: usar TODAS as filiais (igual ao Controle de Estoque "Venda Total (período)")
     // para que o valor real e a projeção batam com o card quando o período for mês corrente
