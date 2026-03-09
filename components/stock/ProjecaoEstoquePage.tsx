@@ -510,6 +510,22 @@ export default function ProjecaoEstoquePage({
     }
   }, [expansao, projecoes]);
 
+  const voltarAoInicio = useCallback(() => setExpansao(new Map()), []);
+  const voltarUmNivel = useCallback(() => {
+    setExpansao((prev) => {
+      const next = new Map(prev);
+      prev.forEach((ex, cat) => {
+        const n = ex.nivel ?? 0;
+        if (n <= 0) return;
+        if (n === 4) next.set(cat, { nivel: 3, subgrupoSelecionado: ex.subgrupoSelecionado, gradeSelecionado: ex.gradeSelecionado });
+        else if (n === 3) next.set(cat, { nivel: 2, subgrupoSelecionado: ex.subgrupoSelecionado });
+        else if (n === 2) next.set(cat, { nivel: 1 });
+        else next.set(cat, { nivel: 0 });
+      });
+      return next;
+    });
+  }, []);
+
   // Dados reais (por categoria): estoque atual já tem venda real descontada; duração só com ritmo real
   const getReaisPorMes = useCallback((proj: ProjecaoCategoria) => {
     const meses = proj.meses;
@@ -546,8 +562,12 @@ export default function ProjecaoEstoquePage({
               </svg>
             </div>
             <div>
-              <h1 className={styles.title}>Projecao de Estoque</h1>
-              <p className={styles.subtitle}>Evolucao mensal de vendas, estoque e duracao (varejo + e-commerce)</p>
+              <h1 className={styles.title}>
+                <button type="button" className={styles.titleLink} onClick={voltarAoInicio} title="Voltar ao início">
+                  Projeção de Estoque
+                </button>
+              </h1>
+              <p className={styles.subtitle}>Evolução mensal de vendas, estoque e duração (varejo + e-commerce)</p>
               {snapshotOk && <p className={styles.snapshotSaved}>Snapshot salvo.</p>}
             </div>
           </div>
@@ -588,8 +608,8 @@ export default function ProjecaoEstoquePage({
 
       {temExpansao && (
         <div className={styles.expandActions}>
-          <button type="button" className={styles.voltarExpansaoButton} onClick={() => setExpansao(new Map())}>
-            Voltar para todas as categorias
+          <button type="button" className={styles.voltarExpansaoButton} onClick={voltarUmNivel} title="Voltar um nível na hierarquia">
+            Voltar um nível
           </button>
         </div>
       )}
