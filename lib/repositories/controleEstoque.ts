@@ -1,6 +1,6 @@
 import sql from 'mssql';
 
-import { resolveCompany, VAREJO_VALUE } from '@/lib/config/company';
+import { resolveCompany, VAREJO_VALUE, isEcommerceFilial } from '@/lib/config/company';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import { getCurrentMonthRange, normalizeRangeForQuery, shiftRangeByMonths } from '@/lib/utils/date';
@@ -4441,6 +4441,11 @@ export async function fetchProjecaoMensal({
     const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineProjecao');
     const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
 
+    // Canal: se filial varejo específica (ou VAREJO) → sem e-commerce; se filial e-commerce → sem varejo
+    const isEcommerceSelected = isEcommerceFilial(company, filial ?? '');
+    const includeEcommerce = company === 'scarfme' && (filial === null || isEcommerceSelected);
+    const includeVarejo = !isEcommerceSelected;
+
     // Vendas do mês atual: usar TODAS as filiais (igual ao Controle de Estoque "Venda Total (período)")
     // para que o valor real e a projeção batam com o card quando o período for mês corrente
     let vendasMesAtualFilialFilter = '';
@@ -4526,19 +4531,21 @@ export async function fetchProjecaoMensal({
       GROUP BY ${categoriaField}${groupByAdicional}${corGroupVendas}, MONTH(vp.DATA_VENDA)
     `;
 
-    const vendasAnoPassadoResult = await request.query<{
-      categoria: string;
-      linha?: string;
-      subgrupo?: string;
-      grade?: string;
-      colecao?: string;
-      mes: number;
-      vendas: number | null;
-    }>(vendasAnoPassadoQuery);
+    const vendasAnoPassadoResult = includeVarejo
+      ? await request.query<{
+          categoria: string;
+          linha?: string;
+          subgrupo?: string;
+          grade?: string;
+          colecao?: string;
+          mes: number;
+          vendas: number | null;
+        }>(vendasAnoPassadoQuery)
+      : { recordset: [] as Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; mes: number; vendas: number | null }> };
 
     // 2.1. Buscar vendas de e-commerce do ano passado por categoria e mês (apenas ScarfMe)
     let ecommerceAnoPassadoResult: { recordset: Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; mes: number; vendas: number | null }> } = { recordset: [] };
-    if (company === 'scarfme') {
+    if (includeEcommerce) {
       const companyConfig = resolveCompany(company);
       if (companyConfig) {
         const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
@@ -4635,14 +4642,16 @@ export async function fetchProjecaoMensal({
       GROUP BY ${categoriaField}${groupByAdicional}${corGroupVendas}
     `;
 
-    const vendasMesAtualResult = await request.query<{
-      categoria: string;
-      linha?: string;
-      subgrupo?: string;
-      grade?: string;
-      colecao?: string;
-      vendas: number | null;
-    }>(vendasMesAtualQuery);
+    const vendasMesAtualResult = includeVarejo
+      ? await request.query<{
+          categoria: string;
+          linha?: string;
+          subgrupo?: string;
+          grade?: string;
+          colecao?: string;
+          vendas: number | null;
+        }>(vendasMesAtualQuery)
+      : { recordset: [] as Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; vendas: number | null }> };
 
     // 3.0. Vendas mês anterior e últimos 30 dias (para regra dos primeiros 5 dias = Controle de Estoque)
     const vendasMesAnterior30DiasQuery = `
@@ -4670,19 +4679,21 @@ export async function fetchProjecaoMensal({
         ${buildCategoriaExcludeNerd(company, categoriaField)}
       GROUP BY ${categoriaField}${groupByAdicional}${corGroupVendas}
     `;
-    const vendasMesAnterior30DiasResult = await request.query<{
-      categoria: string;
-      linha?: string;
-      subgrupo?: string;
-      grade?: string;
-      colecao?: string;
-      vendasMesAnterior: number | null;
-      vendas30Dias: number | null;
-    }>(vendasMesAnterior30DiasQuery);
+    const vendasMesAnterior30DiasResult = includeVarejo
+      ? await request.query<{
+          categoria: string;
+          linha?: string;
+          subgrupo?: string;
+          grade?: string;
+          colecao?: string;
+          vendasMesAnterior: number | null;
+          vendas30Dias: number | null;
+        }>(vendasMesAnterior30DiasQuery)
+      : { recordset: [] as Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; vendasMesAnterior: number | null; vendas30Dias: number | null }> };
 
     // 2.9. E-commerce mês anterior e últimos 30 dias (ScarfMe) - para regra dos primeiros 5 dias incluir canal
     let ecommerceMesAnterior30DiasResult: { recordset: Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; vendasMesAnterior: number | null; vendas30Dias: number | null }> } = { recordset: [] };
-    if (company === 'scarfme') {
+    if (includeEcommerce) {
       const companyConfig = resolveCompany(company);
       if (companyConfig?.ecommerceFilials?.length) {
         const ecommerceFilials = companyConfig.ecommerceFilials;
@@ -4719,7 +4730,7 @@ export async function fetchProjecaoMensal({
 
     // 3.1. Buscar vendas de e-commerce do mês atual (até hoje) - apenas ScarfMe
     let ecommerceMesAtualResult: { recordset: Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; vendas: number | null }> } = { recordset: [] };
-    if (company === 'scarfme') {
+    if (includeEcommerce) {
       const companyConfig = resolveCompany(company);
       if (companyConfig) {
         const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
@@ -4796,19 +4807,21 @@ export async function fetchProjecaoMensal({
         ${buildCategoriaExcludeNerd(company, categoriaField)}
       GROUP BY ${categoriaField}${groupByAdicional}${corGroupVendas}, MONTH(vp.DATA_VENDA)
     `;
-    const vendasAnoAtualPorMesResult = await request.query<{
-      categoria: string;
-      linha?: string;
-      subgrupo?: string;
-      grade?: string;
-      colecao?: string;
-      mes: number;
-      vendas: number | null;
-    }>(vendasAnoAtualPorMesQuery);
+    const vendasAnoAtualPorMesResult = includeVarejo
+      ? await request.query<{
+          categoria: string;
+          linha?: string;
+          subgrupo?: string;
+          grade?: string;
+          colecao?: string;
+          mes: number;
+          vendas: number | null;
+        }>(vendasAnoAtualPorMesQuery)
+      : { recordset: [] as Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; mes: number; vendas: number | null }> };
 
     // 3.3. E-commerce ano atual por mês (ScarfMe)
     let ecommerceAnoAtualPorMesResult: { recordset: Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; mes: number; vendas: number | null }> } = { recordset: [] };
-    if (company === 'scarfme') {
+    if (includeEcommerce) {
       const companyConfig = resolveCompany(company);
       if (companyConfig?.ecommerceFilials?.length) {
         const ecommerceFilials = companyConfig.ecommerceFilials;
