@@ -4378,6 +4378,8 @@ export interface ProjecaoCategoria {
   subgrupo?: string;
   grade?: string;
   colecao?: string;
+  produto?: string;
+  descricao?: string;
   meses: ProjecaoMensal[];
 }
 
@@ -4407,12 +4409,12 @@ export async function fetchProjecaoMensal({
 
     // Campos adicionais para detalhamento
     const camposAdicionais = company === 'scarfme'
-      ? ', UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, \'\')))) AS linha, UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, \'\')))) AS subgrupo, UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), \'\')))) AS grade, UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, \'\')))) AS colecao'
-      : ', UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, \'\')))) AS subgrupo, UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), \'\')))) AS grade, UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, \'\')))) AS colecao';
+      ? ', UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, \'\')))) AS linha, UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, \'\')))) AS subgrupo, UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), \'\')))) AS grade, UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, \'\')))) AS colecao, ISNULL(p.PRODUTO, \'\') AS produto, UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, \'\')))) AS descricao'
+      : ', UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, \'\')))) AS subgrupo, UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), \'\')))) AS grade, UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, \'\')))) AS colecao, ISNULL(p.PRODUTO, \'\') AS produto, UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, \'\')))) AS descricao';
 
     const groupByAdicional = company === 'scarfme'
-      ? ', UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, \'\')))), UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, \'\')))), UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), \'\')))), UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, \'\'))))'
-      : ', UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, \'\')))), UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), \'\')))), UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, \'\'))))';
+      ? ', UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, \'\')))), UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, \'\')))), UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), \'\')))), UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, \'\')))), ISNULL(p.PRODUTO, \'\'), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, \'\'))))'
+      : ', UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, \'\')))), UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), \'\')))), UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, \'\')))), ISNULL(p.PRODUTO, \'\'), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, \'\'))))';
 
     const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
     const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
@@ -4475,6 +4477,8 @@ export async function fetchProjecaoMensal({
       subgrupo?: string;
       grade?: string;
       colecao?: string;
+      produto?: string;
+      descricao?: string;
       estoqueAtual: number | null;
     }>(estoqueQuery);
 
@@ -4831,11 +4835,13 @@ export async function fetchProjecaoMensal({
     const nivelAgrupamento = 2;
     
     // Mapear estoque atual (chave sempre no nível máximo)
+    const descricaoMap = new Map<string, string>();
     const estoqueMap = new Map<string, number>();
     estoqueResult.recordset.forEach(row => {
-      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${row.produto || ''}`;
       const estoqueAtual = Number(row.estoqueAtual ?? 0);
       estoqueMap.set(key, (estoqueMap.get(key) || 0) + estoqueAtual);
+      if (row.descricao && !descricaoMap.has(key)) descricaoMap.set(key, row.descricao);
     });
 
     // Mapear vendas do ano passado por mês (varejo) — chave sempre nível máximo
@@ -4843,7 +4849,7 @@ export async function fetchProjecaoMensal({
     const vendasAnoPassadoVarejoMap = new Map<string, Map<number, number>>();
     const vendasAnoPassadoEcommerceMap = new Map<string, Map<number, number>>();
     vendasAnoPassadoResult.recordset.forEach(row => {
-      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}`;
       if (!vendasAnoPassadoMap.has(key)) {
         vendasAnoPassadoMap.set(key, new Map());
       }
@@ -4860,7 +4866,7 @@ export async function fetchProjecaoMensal({
 
     // Somar vendas de e-commerce do ano passado (e no map combinado e no map só e-commerce)
     ecommerceAnoPassadoResult.recordset.forEach(row => {
-      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}`;
       if (!vendasAnoPassadoMap.has(key)) {
         vendasAnoPassadoMap.set(key, new Map());
       }
@@ -4880,7 +4886,7 @@ export async function fetchProjecaoMensal({
     const vendasVarejoMesAtualMap = new Map<string, number>();
     const vendasEcommerceMesAtualMap = new Map<string, number>();
     vendasMesAtualResult.recordset.forEach(row => {
-      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}`;
       const vendasAtual = Number(row.vendas ?? 0);
       vendasMesAtualMap.set(key, (vendasMesAtualMap.get(key) || 0) + vendasAtual);
       vendasVarejoMesAtualMap.set(key, (vendasVarejoMesAtualMap.get(key) || 0) + vendasAtual);
@@ -4888,7 +4894,7 @@ export async function fetchProjecaoMensal({
 
     // Somar vendas de e-commerce do mês atual
     ecommerceMesAtualResult.recordset.forEach(row => {
-      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}`;
       const vendasEcommerce = Number(row.vendas ?? 0);
       vendasMesAtualMap.set(key, (vendasMesAtualMap.get(key) || 0) + vendasEcommerce);
       vendasEcommerceMesAtualMap.set(key, (vendasEcommerceMesAtualMap.get(key) || 0) + vendasEcommerce);
@@ -4899,7 +4905,7 @@ export async function fetchProjecaoMensal({
     const vendasReaisVarejoPorMesMap = new Map<string, Map<number, number>>();
     const vendasReaisEcommercePorMesMap = new Map<string, Map<number, number>>();
     vendasAnoAtualPorMesResult.recordset.forEach(row => {
-      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}`;
       if (!vendasReaisPorMesMap.has(key)) {
         vendasReaisPorMesMap.set(key, new Map());
         vendasReaisVarejoPorMesMap.set(key, new Map());
@@ -4912,7 +4918,7 @@ export async function fetchProjecaoMensal({
       mesMapVarejo.set(mesNumero, (mesMapVarejo.get(mesNumero) || 0) + v);
     });
     ecommerceAnoAtualPorMesResult.recordset.forEach(row => {
-      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}`;
       if (!vendasReaisPorMesMap.has(key)) {
         vendasReaisPorMesMap.set(key, new Map());
         vendasReaisEcommercePorMesMap.set(key, new Map());
@@ -4930,14 +4936,14 @@ export async function fetchProjecaoMensal({
     const vendasMesAnteriorMap = new Map<string, number>();
     const vendasUltimos30DiasMap = new Map<string, number>();
     vendasMesAnterior30DiasResult.recordset.forEach(row => {
-      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}`;
       const vma = Number(row.vendasMesAnterior ?? 0);
       const v30 = Number(row.vendas30Dias ?? 0);
       if (vma > 0) vendasMesAnteriorMap.set(key, vma);
       if (v30 > 0) vendasUltimos30DiasMap.set(key, v30);
     });
     ecommerceMesAnterior30DiasResult.recordset.forEach(row => {
-      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}`;
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}`;
       const vma = Number(row.vendasMesAnterior ?? 0);
       const v30 = Number(row.vendas30Dias ?? 0);
       if (vma > 0) vendasMesAnteriorMap.set(key, (vendasMesAnteriorMap.get(key) || 0) + vma);
@@ -4948,14 +4954,16 @@ export async function fetchProjecaoMensal({
     const categoriasMap = new Map<string, ProjecaoCategoria>();
 
     estoqueMap.forEach((estoqueInicial, key) => {
-      // Chave sempre no formato categoria|linha|subgrupo|grade|colecao
+      // Chave no formato categoria|linha|subgrupo|grade|colecao|produto
       const parts = key.split('|');
       const categoria = parts[0];
       const linha = parts[1] || undefined;
       const subgrupo = parts[2] || undefined;
       const grade = parts[3] || undefined;
       const colecao = parts[4] || undefined;
-      
+      const produto = parts[5] || undefined;
+      const descricao = descricaoMap.get(key) || undefined;
+
       if (!categoriasMap.has(key)) {
         categoriasMap.set(key, {
           categoria,
@@ -4963,6 +4971,8 @@ export async function fetchProjecaoMensal({
           subgrupo,
           grade,
           colecao,
+          produto,
+          descricao,
           meses: [],
         });
       }

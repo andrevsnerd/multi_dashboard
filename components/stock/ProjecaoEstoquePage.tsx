@@ -47,6 +47,8 @@ interface ProjecaoCategoria {
   subgrupo?: string;
   grade?: string;
   colecao?: string;
+  produto?: string;
+  descricao?: string;
   meses: ProjecaoMensal[];
 }
 
@@ -108,7 +110,7 @@ export default function ProjecaoEstoquePage({
   const [colecoes, setColecoes] = useState<string[]>([]);
   const [subgrupos, setSubgrupos] = useState<string[]>([]);
   const [grades, setGrades] = useState<string[]>([]);
-  const [expansao, setExpansao] = useState<Map<string, { nivel: number; subgrupoSelecionado?: string }>>(new Map());
+  const [expansao, setExpansao] = useState<Map<string, { nivel: number; subgrupoSelecionado?: string; gradeSelecionado?: string }>>(new Map());
   const [projecoes, setProjecoes] = useState<ProjecaoCategoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -394,14 +396,37 @@ export default function ProjecaoEstoquePage({
             meses: reagrupar(items)[0].meses,
           });
         });
+        return;
+      }
+      if (nivel === 3 && subSel && ex?.gradeSelecionado) {
+        const gradeSel = ex.gradeSelecionado;
+        const mesAtualIdx = getMonth(new Date());
+        const items = cats
+          .filter((c) => c.subgrupo === subSel && c.grade === gradeSel)
+          .sort((a, b) => (b.meses[mesAtualIdx]?.estoque ?? 0) - (a.meses[mesAtualIdx]?.estoque ?? 0));
+        items.forEach((item) => {
+          out.push({
+            categoria: cat,
+            subgrupo: subSel,
+            grade: gradeSel,
+            colecao: item.colecao,
+            produto: item.produto,
+            descricao: item.descricao,
+            linha: item.linha,
+            meses: reagrupar([item])[0].meses,
+          });
+        });
       }
     });
     if (expandidas.length > 0) {
       return out.filter((p) => {
-        const n = expansao.get(p.categoria)?.nivel ?? 0;
+        const ex = expansao.get(p.categoria);
+        const n = ex?.nivel ?? 0;
         if (n === 0) return false;
-        if (n === 2 && expansao.get(p.categoria)?.subgrupoSelecionado)
-          return p.subgrupo === expansao.get(p.categoria)?.subgrupoSelecionado;
+        if (n === 2 && ex?.subgrupoSelecionado)
+          return p.subgrupo === ex.subgrupoSelecionado;
+        if (n === 3 && ex?.subgrupoSelecionado && ex?.gradeSelecionado)
+          return p.subgrupo === ex.subgrupoSelecionado && p.grade === ex.gradeSelecionado;
         return true;
       });
     }
@@ -426,12 +451,17 @@ export default function ProjecaoEstoquePage({
     const n = expansao.get(proj.categoria)?.nivel ?? 0;
     const temSubgrupos = projecoes.some((p) => p.categoria === proj.categoria && p.subgrupo);
     const temGrades = proj.subgrupo && projecoes.some((p) => p.categoria === proj.categoria && p.subgrupo === proj.subgrupo && p.grade);
+    const temProdutos = proj.grade && projecoes.some((p) => p.categoria === proj.categoria && p.subgrupo === proj.subgrupo && p.grade === proj.grade && p.produto);
     if (n === 0 && temSubgrupos) {
       setExpansao((prev) => new Map(prev).set(proj.categoria, { nivel: 1 }));
       return;
     }
     if (n === 1 && proj.subgrupo && temGrades) {
       setExpansao((prev) => new Map(prev).set(proj.categoria, { nivel: 2, subgrupoSelecionado: proj.subgrupo }));
+      return;
+    }
+    if (n === 2 && proj.grade && temProdutos) {
+      setExpansao((prev) => new Map(prev).set(proj.categoria, { nivel: 3, subgrupoSelecionado: proj.subgrupo, gradeSelecionado: proj.grade }));
     }
   }, [expansao, projecoes]);
 
@@ -537,7 +567,8 @@ export default function ProjecaoEstoquePage({
                 const nivel = ex?.nivel ?? 0;
                 const podeNivel1 = nivel === 0 && projecoes.some((p) => p.categoria === proj.categoria && p.subgrupo);
                 const podeNivel2 = nivel === 1 && proj.subgrupo && projecoes.some((p) => p.categoria === proj.categoria && p.subgrupo === proj.subgrupo && p.grade);
-                const clickable = podeNivel1 || (nivel === 1 && podeNivel2);
+                const podeNivel3 = nivel === 2 && proj.grade && projecoes.some((p) => p.categoria === proj.categoria && p.subgrupo === proj.subgrupo && p.grade === proj.grade && p.produto);
+                const clickable = podeNivel1 || (nivel === 1 && podeNivel2) || (nivel === 2 && podeNivel3);
                 const isLast = idx === listaExibida.length - 1;
 
                 const { estoqueAtualReal, duracaoRealMesAtual } = getReaisPorMes(proj);
@@ -545,7 +576,7 @@ export default function ProjecaoEstoquePage({
                 const limiteDiasAlerta = isLençosLine ? 120 : 90;
 
                 return (
-                  <React.Fragment key={`${proj.categoria}-${proj.subgrupo ?? ""}-${proj.grade ?? ""}-${idx}`}>
+                  <React.Fragment key={`${proj.categoria}-${proj.subgrupo ?? ""}-${proj.grade ?? ""}-${proj.colecao ?? ""}-${idx}`}>
                     <tr className={`${styles.categoriaRow} ${idx > 0 ? styles.categoryBlockStart : ""} ${idx === 0 ? styles.firstDataRow : ""}`}>
                       <td
                         rowSpan={6}
@@ -557,9 +588,14 @@ export default function ProjecaoEstoquePage({
                       >
                         <div className={styles.categoriaCellContent}>
                           <span className={styles.categoriaLabel}>
-                            {proj.categoria.toUpperCase()}
-                            {nivel > 0 && proj.subgrupo && <span className={styles.detailInfo}>Subgrupo: {proj.subgrupo}</span>}
-                            {nivel > 0 && proj.grade && <span className={styles.detailInfo}>Grade: {proj.grade}</span>}
+                            {nivel === 3 ? (proj.descricao?.toUpperCase() ?? proj.produto?.toUpperCase() ?? proj.categoria.toUpperCase()) : proj.categoria.toUpperCase()}
+                            {nivel === 3 && proj.produto && <span className={styles.detailInfo}>{proj.produto}</span>}
+                            {nivel === 3 && <span className={styles.detailInfo}>Linha: {proj.linha ?? proj.categoria}</span>}
+                            {nivel === 3 && proj.subgrupo && <span className={styles.detailInfo}>Subgrupo: {proj.subgrupo}</span>}
+                            {nivel === 3 && proj.grade && <span className={styles.detailInfo}>Grade: {proj.grade}</span>}
+                            {nivel === 3 && proj.colecao && <span className={styles.detailInfo}>Coleção: {proj.colecao}</span>}
+                            {nivel > 0 && nivel < 3 && proj.subgrupo && <span className={styles.detailInfo}>Subgrupo: {proj.subgrupo}</span>}
+                            {nivel > 0 && nivel < 3 && proj.grade && <span className={styles.detailInfo}>Grade: {proj.grade}</span>}
                           </span>
                         </div>
                       </td>
