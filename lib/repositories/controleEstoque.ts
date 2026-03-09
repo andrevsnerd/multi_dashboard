@@ -4418,17 +4418,18 @@ export async function fetchProjecaoMensal({
       : ', UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, \'\')))), UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), \'\')))), UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, \'\')))), ISNULL(p.PRODUTO, \'\'), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, \'\'))))';
 
     // Cor do produto: ScarfMe não tem tabela CORES; NERD usa JOIN em CORES para DESC_COR
+    // RTRIM/LTRIM em todas as colunas de cor para evitar mismatch por espaços (colunas CHAR)
     const useCoresTable = company !== 'scarfme';
     const corCampoEstoque = useCoresTable
-      ? `, ISNULL(e.COR_PRODUTO, '') AS cor, ISNULL(c.DESC_COR, '') AS corDesc`
-      : `, ISNULL(e.COR_PRODUTO, '') AS cor, '' AS corDesc`;
+      ? `, UPPER(LTRIM(RTRIM(ISNULL(e.COR_PRODUTO, '')))) AS cor, ISNULL(c.DESC_COR, '') AS corDesc`
+      : `, UPPER(LTRIM(RTRIM(ISNULL(e.COR_PRODUTO, '')))) AS cor, '' AS corDesc`;
     const corGroupEstoque = useCoresTable
-      ? `, ISNULL(e.COR_PRODUTO, ''), ISNULL(c.DESC_COR, '')`
-      : `, ISNULL(e.COR_PRODUTO, '')`;
-    const corCampoVendas = `, ISNULL(vp.COR_PRODUTO, '') AS cor`;
-    const corGroupVendas = `, ISNULL(vp.COR_PRODUTO, '')`;
-    const corCampoEcommerce = `, '' AS cor`;
-    const corGroupEcommerce = ``; // constante '' não pode ir no GROUP BY do SQL Server
+      ? `, UPPER(LTRIM(RTRIM(ISNULL(e.COR_PRODUTO, '')))), ISNULL(c.DESC_COR, '')`
+      : `, UPPER(LTRIM(RTRIM(ISNULL(e.COR_PRODUTO, ''))))`;
+    const corCampoVendas = `, UPPER(LTRIM(RTRIM(ISNULL(vp.COR_PRODUTO, '')))) AS cor`;
+    const corGroupVendas = `, UPPER(LTRIM(RTRIM(ISNULL(vp.COR_PRODUTO, ''))))`;
+    const corCampoEcommerce = `, UPPER(LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, '')))) AS cor`;
+    const corGroupEcommerce = `, UPPER(LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))))`;
 
     const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
     const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
