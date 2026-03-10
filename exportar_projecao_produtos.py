@@ -264,7 +264,7 @@ def buscar_estoque_por_produto_cor(conn, produtos: list[str]) -> pd.DataFrame:
     params = list(SCARFME_FILIAIS_ESTOQUE) + list(produtos)
     sql = f"""
     SELECT
-        p.PRODUTO,
+        LTRIM(RTRIM(ISNULL(p.PRODUTO, ''))) AS PRODUTO,
         UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS descricao,
         UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) AS linha,
         UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) AS subgrupo,
@@ -278,10 +278,25 @@ def buscar_estoque_por_produto_cor(conn, produtos: list[str]) -> pd.DataFrame:
       AND e.PRODUTO IN ({ph})
       AND e.ESTOQUE > 0
       AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) NOT IN ({','.join(['?']*len(SCARFME_EXCLUDED_LINES))})
-    GROUP BY p.PRODUTO, p.DESC_PRODUTO, p.LINHA, p.SUBGRUPO_PRODUTO, p.GRADE, p.COLECAO, e.COR_PRODUTO
+    GROUP BY LTRIM(RTRIM(ISNULL(p.PRODUTO, ''))), p.DESC_PRODUTO, p.LINHA, p.SUBGRUPO_PRODUTO, p.GRADE, p.COLECAO, e.COR_PRODUTO
     """
     params.extend(SCARFME_EXCLUDED_LINES)
-    return pd.read_sql(sql, conn, params=params)
+    df = pd.read_sql(sql, conn, params=params)
+    if not df.empty:
+        df["PRODUTO"] = df["PRODUTO"].astype(str).str.strip()
+        df["cor"] = df["cor"].astype(str).str.strip()
+    return df
+
+
+def _normalizar_produto_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Normaliza PRODUTO e cor em um DataFrame de vendas (remove espaços de CHAR fixo do SQL Server)."""
+    if df.empty:
+        return df
+    if "PRODUTO" in df.columns:
+        df["PRODUTO"] = df["PRODUTO"].astype(str).str.strip()
+    if "cor" in df.columns:
+        df["cor"] = df["cor"].astype(str).str.strip()
+    return df
 
 
 def buscar_vendas_ano_por_mes(conn, produtos: list[str], ano: int) -> pd.DataFrame:
@@ -293,7 +308,7 @@ def buscar_vendas_ano_por_mes(conn, produtos: list[str], ano: int) -> pd.DataFra
     params = [ano] + list(SCARFME_FILIAIS_VAREJO) + list(produtos)
     sql = f"""
     SELECT
-        vp.PRODUTO,
+        LTRIM(RTRIM(ISNULL(vp.PRODUTO, ''))) AS PRODUTO,
         UPPER(LTRIM(RTRIM(ISNULL(vp.COR_PRODUTO, '')))) AS cor,
         MONTH(vp.DATA_VENDA) AS mes,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
@@ -302,17 +317,17 @@ def buscar_vendas_ano_por_mes(conn, produtos: list[str], ano: int) -> pd.DataFra
       AND vp.FILIAL IN ({ph_fil})
       AND vp.PRODUTO IN ({ph})
       AND vp.QTDE > 0
-    GROUP BY vp.PRODUTO, vp.COR_PRODUTO, MONTH(vp.DATA_VENDA)
+    GROUP BY LTRIM(RTRIM(ISNULL(vp.PRODUTO, ''))), vp.COR_PRODUTO, MONTH(vp.DATA_VENDA)
     """
     try:
         df = pd.read_sql(sql, conn, params=params)
         if not df.empty:
-            return df
+            return _normalizar_produto_df(df)
     except Exception:
         pass
     sql_join = f"""
     SELECT
-        vp.PRODUTO,
+        LTRIM(RTRIM(ISNULL(vp.PRODUTO, ''))) AS PRODUTO,
         UPPER(LTRIM(RTRIM(ISNULL(vp.COR_PRODUTO, '')))) AS cor,
         MONTH(vp.DATA_VENDA) AS mes,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
@@ -322,9 +337,9 @@ def buscar_vendas_ano_por_mes(conn, produtos: list[str], ano: int) -> pd.DataFra
       AND LTRIM(RTRIM(f.FILIAL)) IN ({ph_fil})
       AND vp.PRODUTO IN ({ph})
       AND vp.QTDE > 0
-    GROUP BY vp.PRODUTO, vp.COR_PRODUTO, MONTH(vp.DATA_VENDA)
+    GROUP BY LTRIM(RTRIM(ISNULL(vp.PRODUTO, ''))), vp.COR_PRODUTO, MONTH(vp.DATA_VENDA)
     """
-    return pd.read_sql(sql_join, conn, params=params)
+    return _normalizar_produto_df(pd.read_sql(sql_join, conn, params=params))
 
 
 def buscar_vendas_ecommerce_ano_por_mes(conn, produtos: list[str], ano: int) -> pd.DataFrame:
@@ -337,7 +352,7 @@ def buscar_vendas_ecommerce_ano_por_mes(conn, produtos: list[str], ano: int) -> 
     data_ec = "COALESCE(CAST(fp.ENTREGA AS DATE), CAST(f.EMISSAO AS DATE))"
     sql = f"""
     SELECT
-        fp.PRODUTO,
+        LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) AS PRODUTO,
         UPPER(LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, '')))) AS cor,
         MONTH({data_ec}) AS mes,
         SUM(CAST(fp.QTDE AS FLOAT)) AS vendas
@@ -350,9 +365,9 @@ def buscar_vendas_ecommerce_ano_por_mes(conn, produtos: list[str], ano: int) -> 
       AND CAST(fp.QTDE AS FLOAT) > 0
       AND REPLACE(REPLACE(LTRIM(RTRIM(f.FILIAL)), NCHAR(0x00A0), ' '), CHAR(9), ' ') IN ({ph_fil})
       AND fp.PRODUTO IN ({ph})
-    GROUP BY fp.PRODUTO, fp.COR_PRODUTO, MONTH({data_ec})
+    GROUP BY LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))), fp.COR_PRODUTO, MONTH({data_ec})
     """
-    return pd.read_sql(sql, conn, params=params)
+    return _normalizar_produto_df(pd.read_sql(sql, conn, params=params))
 
 
 def buscar_vendas_mes_atual(conn, produtos: list[str], inicio_mes, fim_mes) -> pd.DataFrame:
@@ -364,7 +379,7 @@ def buscar_vendas_mes_atual(conn, produtos: list[str], inicio_mes, fim_mes) -> p
     params = [inicio_mes, fim_mes] + list(SCARFME_FILIAIS_VAREJO) + list(produtos)
     sql = f"""
     SELECT
-        vp.PRODUTO,
+        LTRIM(RTRIM(ISNULL(vp.PRODUTO, ''))) AS PRODUTO,
         UPPER(LTRIM(RTRIM(ISNULL(vp.COR_PRODUTO, '')))) AS cor,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
     FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
@@ -372,16 +387,15 @@ def buscar_vendas_mes_atual(conn, produtos: list[str], inicio_mes, fim_mes) -> p
       AND vp.FILIAL IN ({ph_fil})
       AND vp.PRODUTO IN ({ph})
       AND vp.QTDE > 0
-    GROUP BY vp.PRODUTO, vp.COR_PRODUTO
+    GROUP BY LTRIM(RTRIM(ISNULL(vp.PRODUTO, ''))), vp.COR_PRODUTO
     """
     try:
-        df_v = pd.read_sql(sql, conn, params=params)
+        df_v = _normalizar_produto_df(pd.read_sql(sql, conn, params=params))
     except Exception:
-        ph_fil = ", ".join(["?"] * len(SCARFME_FILIAIS_VAREJO))
         params = [inicio_mes, fim_mes] + list(SCARFME_FILIAIS_VAREJO) + list(produtos)
         sql = f"""
     SELECT
-        vp.PRODUTO,
+        LTRIM(RTRIM(ISNULL(vp.PRODUTO, ''))) AS PRODUTO,
         UPPER(LTRIM(RTRIM(ISNULL(vp.COR_PRODUTO, '')))) AS cor,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
     FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
@@ -390,14 +404,14 @@ def buscar_vendas_mes_atual(conn, produtos: list[str], inicio_mes, fim_mes) -> p
       AND LTRIM(RTRIM(f.FILIAL)) IN ({ph_fil})
       AND vp.PRODUTO IN ({ph})
       AND vp.QTDE > 0
-    GROUP BY vp.PRODUTO, vp.COR_PRODUTO
+    GROUP BY LTRIM(RTRIM(ISNULL(vp.PRODUTO, ''))), vp.COR_PRODUTO
     """
-        df_v = pd.read_sql(sql, conn, params=params)
+        df_v = _normalizar_produto_df(pd.read_sql(sql, conn, params=params))
     ph_fil_ec = ", ".join(["?"] * len(SCARFME_ECOM_FILIAIS))
     params_ec = [inicio_mes, fim_mes] + list(SCARFME_ECOM_FILIAIS) + list(produtos)
     sql_ec = f"""
     SELECT
-        fp.PRODUTO,
+        LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) AS PRODUTO,
         UPPER(LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, '')))) AS cor,
         SUM(CAST(fp.QTDE AS FLOAT)) AS vendas
     FROM FATURAMENTO f WITH (NOLOCK)
@@ -409,9 +423,9 @@ def buscar_vendas_mes_atual(conn, produtos: list[str], inicio_mes, fim_mes) -> p
       AND CAST(fp.QTDE AS FLOAT) > 0
       AND REPLACE(REPLACE(LTRIM(RTRIM(f.FILIAL)), NCHAR(0x00A0), ' '), CHAR(9), ' ') IN ({ph_fil_ec})
       AND fp.PRODUTO IN ({ph})
-    GROUP BY fp.PRODUTO, fp.COR_PRODUTO
+    GROUP BY LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))), fp.COR_PRODUTO
     """
-    df_ec = pd.read_sql(sql_ec, conn, params=params_ec)
+    df_ec = _normalizar_produto_df(pd.read_sql(sql_ec, conn, params=params_ec))
     if df_ec.empty:
         return df_v
     if df_v.empty:
@@ -443,26 +457,38 @@ def build_projecao_mensal(
     dias_restantes_mes_atual = max(0, dias_no_mes_atual - dias_corridos)
     resultados = []
 
+    # Normalizar PRODUTO e cor nos DataFrames de vendas (garante match mesmo com CHAR fixo do SQL Server)
+    for df_ref in [vendas_ano_passado_df, vendas_ano_atual_df]:
+        if not df_ref.empty:
+            df_ref["PRODUTO"] = df_ref["PRODUTO"].astype(str).str.strip()
+            df_ref["cor"] = df_ref["cor"].astype(str).str.strip()
+
     for _, row in estoque_df.iterrows():
         produto = str(row["PRODUTO"]).strip()
         cor = normalizar(row["cor"])
         key = (produto, cor)
         estoque_inicial = int(row["estoque"] or 0)
 
-        vendas_ap = vendas_ano_passado_df[
-            (vendas_ano_passado_df["PRODUTO"] == produto)
-            & (vendas_ano_passado_df["cor"].astype(str).str.strip().str.upper() == cor)
-        ]
+        mask_ap = (
+            vendas_ano_passado_df["PRODUTO"].astype(str).str.strip() == produto
+        ) & (
+            vendas_ano_passado_df["cor"].astype(str).str.strip().str.upper() == cor
+        )
+        vendas_ap = vendas_ano_passado_df[mask_ap]
         vendas_por_mes_ap = vendas_ap.set_index("mes")["vendas"].to_dict() if not vendas_ap.empty else {}
         total_ap = sum(vendas_por_mes_ap.values()) or 0
         projecao_mensal_media = (total_ap / 12 * FATOR_PROJECAO) if total_ap > 0 else 0
 
-        vendas_atual = vendas_ano_atual_df[
-            (vendas_ano_atual_df["PRODUTO"] == produto)
-            & (vendas_ano_atual_df["cor"].astype(str).str.strip().str.upper() == cor)
-        ]
+        mask_atual = (
+            vendas_ano_atual_df["PRODUTO"].astype(str).str.strip() == produto
+        ) & (
+            vendas_ano_atual_df["cor"].astype(str).str.strip().str.upper() == cor
+        )
+        vendas_atual = vendas_ano_atual_df[mask_atual]
         vendas_real_por_mes = vendas_atual.set_index("mes")["vendas"].to_dict() if not vendas_atual.empty else {}
         vendas_mes_atual_val = int(vendas_mes_atual_series.get(key, 0) or 0)
+        if total_ap == 0:
+            print(f"  [AVISO] {produto} | {cor or 'SEM COR'}: sem vendas ano passado → projeção será 0")
 
         vendas_proj = [0] * 12
         estoque_proj = [None] * 12
@@ -694,7 +720,7 @@ def exportar_xlsx(resultados: list[dict], caminho: str) -> None:
 def exportar_txt(resultados: List[Dict], caminho_txt: str, mes_atual: int, ano_atual: int) -> None:
     """
     Gera um TXT com: período (mês atual), para cada produto código, descrição,
-    total vendas (mês atual), duração real ou (se vendas 0) duração projetada.
+    total vendas (mês atual), estoque atual, duração real ou (se vendas 0) duração projetada.
     """
     idx_mes = mes_atual - 1
     periodo_nome = MESES_NOMES_PT[idx_mes] if 0 <= idx_mes < len(MESES_NOMES_PT) else str(mes_atual)
@@ -713,11 +739,14 @@ def exportar_txt(resultados: List[Dict], caminho_txt: str, mes_atual: int, ano_a
         duracao_proj_list = r.get("duracao_proj") or [None] * 12
         duracao_real = duracao_real_list[idx_mes] if idx_mes < len(duracao_real_list) else None
         duracao_proj = duracao_proj_list[idx_mes] if idx_mes < len(duracao_proj_list) else None
+        estoque_real_list = r.get("estoque_real") or [None] * 12
+        estoque_real = estoque_real_list[idx_mes] if idx_mes < len(estoque_real_list) else None
+        estoque_exibir = str(int(estoque_real)) if estoque_real is not None else "-"
         if total_vendas > 0 and duracao_real is not None:
             duracao_exibir = f"{int(duracao_real)} dias (real)"
         else:
             duracao_exibir = f"{int(duracao_proj)} dias (projetada)" if duracao_proj is not None else "-"
-        linhas.extend([codigo, descricao, str(total_vendas), duracao_exibir, ""])
+        linhas.extend([codigo, descricao, str(total_vendas), estoque_exibir, duracao_exibir, ""])
     with open(caminho_txt, "w", encoding="utf-8") as f:
         f.write("\n".join(linhas))
     print(f"Resumo TXT salvo: {caminho_txt}")
@@ -842,6 +871,7 @@ def main():
             print("Buscando vendas ano passado...")
             vendas_ap = buscar_vendas_ano_por_mes(conn, produtos, ano_atual - 1)
             vendas_ap_ec = buscar_vendas_ecommerce_ano_por_mes(conn, produtos, ano_atual - 1)
+            print(f"  Varejo ano passado: {len(vendas_ap)} linhas | E-commerce ano passado: {len(vendas_ap_ec)} linhas")
             if not vendas_ap_ec.empty:
                 if vendas_ap.empty:
                     vendas_ap = vendas_ap_ec.copy()
@@ -852,6 +882,7 @@ def main():
                     ]).groupby(["PRODUTO", "cor", "mes"], as_index=False).agg({"vendas": "sum"})
             if "cor" not in vendas_ap.columns:
                 vendas_ap["cor"] = ""
+            print(f"  Vendas ano passado (combinado): {len(vendas_ap)} linhas, total={int(vendas_ap['vendas'].sum()) if not vendas_ap.empty else 0}")
 
             print("Buscando vendas mês atual...")
             vendas_mes_atual_df = buscar_vendas_mes_atual(conn, produtos, inicio_mes, fim_mes)
@@ -859,10 +890,12 @@ def main():
             if not vendas_mes_atual_df.empty:
                 for _, r in vendas_mes_atual_df.iterrows():
                     vendas_mes_atual_series[(str(r["PRODUTO"]).strip(), normalizar(r["cor"]))] = int(r["vendas"] or 0)
+            print(f"  Vendas mês atual: {len(vendas_mes_atual_series)} pares (produto, cor)")
 
             print("Buscando vendas ano atual (real)...")
             vendas_atual = buscar_vendas_ano_por_mes(conn, produtos, ano_atual)
             vendas_atual_ec = buscar_vendas_ecommerce_ano_por_mes(conn, produtos, ano_atual)
+            print(f"  Varejo ano atual: {len(vendas_atual)} linhas | E-commerce ano atual: {len(vendas_atual_ec)} linhas")
             if not vendas_atual_ec.empty:
                 if vendas_atual.empty:
                     vendas_atual = vendas_atual_ec.copy()

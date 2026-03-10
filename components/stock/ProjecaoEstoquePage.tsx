@@ -147,6 +147,11 @@ export default function ProjecaoEstoquePage({
   const [opcoesSubgrupos, setOpcoesSubgrupos] = useState<string[]>([]);
   const [opcoesGrades, setOpcoesGrades] = useState<string[]>([]);
 
+  // Consulta por produto
+  const [consultaOpen, setConsultaOpen] = useState(false);
+  const [consultaInput, setConsultaInput] = useState("");
+  const [consultaTermos, setConsultaTermos] = useState<string[]>([]);
+
   const excludedLines = useMemo(() => getExcludedLines(companyKey), [companyKey]);
 
   // Sync from URL once
@@ -361,8 +366,58 @@ export default function ProjecaoEstoquePage({
     return [{ ...items[0], meses: merged }];
   }, []);
 
-  // Filtrar por linha exclu?da e por filtros; aplicar n?veis de expans?o
+  const handleConsultaBuscar = useCallback(() => {
+    const termos = consultaInput
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    setConsultaTermos(termos);
+    if (termos.length > 0) setConsultaOpen(false);
+  }, [consultaInput]);
+
+  const handleConsultaLimpar = useCallback(() => {
+    setConsultaTermos([]);
+    setConsultaInput("");
+  }, []);
+
+  // Filtrar por linha excluída e por filtros; aplicar níveis de expansão
   const listaExibida = useMemo(() => {
+    // Modo consulta: exibe produtos individuais filtrados por código/descrição
+    if (consultaTermos.length > 0) {
+      const matching = projecoes.filter((p) => {
+        const cat = p.categoria.toUpperCase().trim();
+        if (companyKey === "scarfme" && excludedLines.has(cat)) return false;
+        return consultaTermos.some((termo) => {
+          const t = termo.trim().toUpperCase();
+          if (!t) return false;
+          // Código: apenas dígitos e pontos → match exato no produto
+          if (/^[\d.\s]+$/.test(t)) return p.produto?.toUpperCase().trim() === t;
+          // Nome: busca parcial em produto, descrição e categoria
+          return (
+            p.produto?.toUpperCase().includes(t) ||
+            p.descricao?.toUpperCase().includes(t) ||
+            p.categoria.toUpperCase().includes(t)
+          );
+        });
+      });
+      // Agrupa por produto (soma cores)
+      const mesAtualIdx = getMonth(new Date());
+      const byProduto = new Map<string, ProjecaoCategoria[]>();
+      matching.forEach((p) => {
+        const k = p.produto || p.categoria;
+        if (!byProduto.has(k)) byProduto.set(k, []);
+        byProduto.get(k)!.push(p);
+      });
+      const result: ProjecaoCategoria[] = [];
+      byProduto.forEach((group) => {
+        const merged = reagrupar(group)[0];
+        result.push({ ...group[0], meses: merged.meses });
+      });
+      // Ordena por estoque do mês atual desc
+      result.sort((a, b) => (b.meses[mesAtualIdx]?.estoque ?? 0) - (a.meses[mesAtualIdx]?.estoque ?? 0));
+      return result;
+    }
+
     let base = projecoes.filter((p) => {
       const cat = p.categoria.toUpperCase().trim();
       if (companyKey === "scarfme" && excludedLines.has(cat)) return false;
@@ -483,7 +538,7 @@ export default function ProjecaoEstoquePage({
       });
     }
     return out.filter((p) => (expansao.get(p.categoria)?.nivel ?? 0) === 0);
-  }, [projecoes, companyKey, excludedLines, grupos, linhas, expansao, reagrupar]);
+  }, [projecoes, companyKey, excludedLines, grupos, linhas, expansao, reagrupar, consultaTermos]);
 
   const showFloatingTooltip = useCallback((
     e: React.MouseEvent<HTMLElement>,
@@ -598,38 +653,107 @@ export default function ProjecaoEstoquePage({
         </div>
 
         <div className={styles.filtersRow}>
-        <FilialFilter companyKey={companyKey} value={filial} onChange={setFilial} />
-        {companyKey === "nerd" && (
-          <MultiSelectFilter
-            label="Grupo"
-            value={grupos}
-            options={opcoesGrupos}
-            onChange={(g) => { setGrupos(g); if (g.length === 0) { setSubgrupos([]); setGrades([]); setColecoes([]); } }}
-          />
-        )}
-        {companyKey === "scarfme" && (
-          <>
+          <FilialFilter companyKey={companyKey} value={filial} onChange={setFilial} />
+          {companyKey === "nerd" && (
             <MultiSelectFilter
-              label="Linha"
-              value={linhas}
-              options={opcoesLinhas}
-              onChange={(l) => { setLinhas(l); if (l.length === 0) { setSubgrupos([]); setGrades([]); setColecoes([]); } }}
+              label="Grupo"
+              value={grupos}
+              options={opcoesGrupos}
+              onChange={(g) => { setGrupos(g); if (g.length === 0) { setSubgrupos([]); setGrades([]); setColecoes([]); } }}
             />
-            {linhas.length > 0 && (
-              <>
-                <MultiSelectFilter label="Subgrupo" value={subgrupos} options={opcoesSubgrupos} onChange={(s) => { setSubgrupos(s); if (s.length === 0) setGrades([]); }} />
-                <MultiSelectFilter label="Colecao" value={colecoes} options={opcoesColecoes} onChange={setColecoes} />
-              </>
+          )}
+          {companyKey === "scarfme" && (
+            <>
+              <MultiSelectFilter
+                label="Linha"
+                value={linhas}
+                options={opcoesLinhas}
+                onChange={(l) => { setLinhas(l); if (l.length === 0) { setSubgrupos([]); setGrades([]); setColecoes([]); } }}
+              />
+              {linhas.length > 0 && (
+                <>
+                  <MultiSelectFilter label="Subgrupo" value={subgrupos} options={opcoesSubgrupos} onChange={(s) => { setSubgrupos(s); if (s.length === 0) setGrades([]); }} />
+                  <MultiSelectFilter label="Colecao" value={colecoes} options={opcoesColecoes} onChange={setColecoes} />
+                </>
+              )}
+              {linhas.length > 0 && subgrupos.length > 0 && (
+                <MultiSelectFilter label="Grade" value={grades} options={opcoesGrades} onChange={setGrades} />
+              )}
+            </>
+          )}
+          <button
+            type="button"
+            className={`${styles.consultaBtn} ${consultaTermos.length > 0 ? styles.consultaBtnAtivo : ""}`}
+            onClick={() => setConsultaOpen((v) => !v)}
+            title="Consultar produtos por código ou nome"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            Consulta Produtos
+            {consultaTermos.length > 0 && (
+              <span className={styles.consultaBadge}>{consultaTermos.length}</span>
             )}
-            {linhas.length > 0 && subgrupos.length > 0 && (
-              <MultiSelectFilter label="Grade" value={grades} options={opcoesGrades} onChange={setGrades} />
+          </button>
+        </div>
+
+        {consultaOpen && (
+          <div className={styles.consultaPanel}>
+            <div className={styles.consultaPanelHeader}>
+              <span className={styles.consultaPanelTitulo}>Consulta por produto</span>
+              <span className={styles.consultaPanelDica}>
+                Informe códigos (ex: 45.14.0035) ou nomes parciais, separados por vírgula
+              </span>
+            </div>
+            <div className={styles.consultaPanelBody}>
+              <textarea
+                className={styles.consultaTextarea}
+                placeholder="Ex: 45.14.0035, BRASIL TROPICAL, LENÇOS BASICOS"
+                value={consultaInput}
+                onChange={(e) => setConsultaInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleConsultaBuscar(); } }}
+                rows={2}
+                autoFocus
+              />
+              <div className={styles.consultaPanelActions}>
+                <button type="button" className={styles.consultaBuscarBtn} onClick={handleConsultaBuscar}>
+                  Buscar
+                </button>
+                {consultaTermos.length > 0 && (
+                  <button type="button" className={styles.consultaLimparBtn} onClick={handleConsultaLimpar}>
+                    Limpar filtro
+                  </button>
+                )}
+                <button type="button" className={styles.consultaFecharBtn} onClick={() => setConsultaOpen(false)}>
+                  Fechar
+                </button>
+              </div>
+            </div>
+            {consultaTermos.length > 0 && (
+              <div className={styles.consultaTermosAtivos}>
+                Filtrando por: {consultaTermos.map((t, i) => (
+                  <span key={i} className={styles.consultaTermoTag}>{t}</span>
+                ))}
+                <span className={styles.consultaResultCount}>— {listaExibida.length} resultado(s)</span>
+              </div>
             )}
-          </>
+          </div>
         )}
-      </div>
       </div>
 
-      {temExpansao && (
+      {consultaTermos.length > 0 && !consultaOpen && (
+        <div className={styles.consultaBanner}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          Consulta ativa:&nbsp;
+          {consultaTermos.map((t, i) => <span key={i} className={styles.consultaTermoTag}>{t}</span>)}
+          &nbsp;—&nbsp;<strong>{listaExibida.length}</strong> resultado(s)
+          <button type="button" className={styles.consultaLimparBtn} onClick={handleConsultaLimpar}>✕ Limpar</button>
+        </div>
+      )}
+
+      {temExpansao && !consultaTermos.length && (
         <div className={styles.expandActions}>
           <button type="button" className={styles.voltarExpansaoButton} onClick={voltarUmNivel} title="Voltar um nível na hierarquia">
             Voltar um nível
@@ -736,7 +860,7 @@ export default function ProjecaoEstoquePage({
                                 {proj.grade && <span className={styles.detailInfo}>Grade: {proj.grade}</span>}
                                 {proj.colecao && <span className={styles.detailInfo}>Coleção: {proj.colecao}</span>}
                               </>
-                            ) : nivel === 3 ? (
+                            ) : nivel === 3 || (consultaTermos.length > 0 && proj.produto) ? (
                               <>
                                 <span className={styles.productNameBold}>{proj.descricao?.toUpperCase() ?? proj.produto?.toUpperCase() ?? proj.categoria.toUpperCase()}</span>
                                 {proj.produto && <span className={styles.detailInfo}>{proj.produto}</span>}
