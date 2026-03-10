@@ -642,11 +642,39 @@ export default function ProjecaoEstoquePage({
                 const isLençosLine = proj.categoria === "LENÇOS" || proj.categoria === "APROVEITAMENTO LENÇOS";
                 const limiteDiasAlerta = isLençosLine ? 120 : 90;
 
+                // Calcular DATA COMPRA e QTD COMPRA: primeiro mês real com duração vermelha
+                let compraInfo: { dataCompra: string; qtdCompra: number; redMesNumero: number; redAno: number } | null = null;
+                for (const mes of proj.meses) {
+                  let duracaoReal = 0;
+                  let estoqueReal = 0;
+                  if (mes.isMesAtual) {
+                    duracaoReal = duracaoRealMesAtual;
+                    estoqueReal = estoqueAtualReal;
+                  } else if (mes.isMesPassado) {
+                    duracaoReal = mes.duracaoRealSnapshot ?? 0;
+                    estoqueReal = mes.estoqueRealSnapshot ?? 0;
+                  } else {
+                    continue;
+                  }
+                  if (duracaoReal > 0 && duracaoReal <= limiteDiasAlerta && estoqueReal > 0) {
+                    const dailySale = estoqueReal / duracaoReal;
+                    const totalNeed = dailySale * (30 + limiteDiasAlerta);
+                    const qtdCompra = Math.max(0, Math.round(totalNeed - estoqueReal));
+                    compraInfo = {
+                      dataCompra: `25/${String(mes.mesNumero).padStart(2, "0")}/${mes.ano}`,
+                      qtdCompra,
+                      redMesNumero: mes.mesNumero,
+                      redAno: mes.ano,
+                    };
+                    break;
+                  }
+                }
+
                 return (
                   <React.Fragment key={`${proj.categoria}-${proj.subgrupo ?? ""}-${proj.grade ?? ""}-${proj.colecao ?? ""}-${proj.produto ?? ""}-${proj.cor ?? ""}-${idx}`}>
                     <tr className={`${styles.categoriaRow} ${idx > 0 ? styles.categoryBlockStart : ""} ${idx === 0 ? styles.firstDataRow : ""}`}>
                       <td
-                        rowSpan={6}
+                        rowSpan={8}
                         className={`${styles.categoriaCell} ${clickable ? styles.categoriaCellClickable : ""} ${!isLast ? styles.categoriaCellBlockEnd : ""}`}
                         role={clickable ? "button" : undefined}
                         tabIndex={clickable ? 0 : undefined}
@@ -767,7 +795,7 @@ export default function ProjecaoEstoquePage({
                         return <td key={`er-${m.ano}-${m.mesNumero}`} className={`${styles.realEstoqueCell} ${m.isMesAtual ? styles.columnMesAtual : ""}`}>{valor}</td>;
                       })}
                     </tr>
-                    <tr className={`${styles.realRow} ${!isLast ? styles.categoryBlockEnd : ""}`}>
+                    <tr className={styles.realRow}>
                       <td className={styles.realLabelCell}>DURACAO (real)</td>
                       {mesesExibicao.map((m, mi) => {
                         const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
@@ -777,6 +805,28 @@ export default function ProjecaoEstoquePage({
                           : (md?.duracaoRealSnapshot != null ? `${md.duracaoRealSnapshot} dias` : "-");
                         const alerta = valorNum > 0 && valorNum <= limiteDiasAlerta;
                         return <td key={`dr-${m.ano}-${m.mesNumero}`} className={`${styles.realDuracaoCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${alerta ? styles.duracaoAlerta : ""}`}>{valor}</td>;
+                      })}
+                    </tr>
+                    <tr className={styles.compraRow}>
+                      <td className={styles.compraLabelCell}>DATA COMPRA</td>
+                      {mesesExibicao.map((m) => {
+                        const isRedMonth = compraInfo && m.mesNumero === compraInfo.redMesNumero && m.ano === compraInfo.redAno;
+                        return (
+                          <td key={`dc-${m.ano}-${m.mesNumero}`} className={`${styles.compraDataCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${!isRedMonth ? styles.compraCellEmpty : ""}`}>
+                            {isRedMonth ? compraInfo!.dataCompra : "-"}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    <tr className={`${styles.compraRow} ${!isLast ? styles.categoryBlockEnd : ""}`}>
+                      <td className={styles.compraLabelCell}>QTD COMPRA</td>
+                      {mesesExibicao.map((m) => {
+                        const isRedMonth = compraInfo && m.mesNumero === compraInfo.redMesNumero && m.ano === compraInfo.redAno;
+                        return (
+                          <td key={`qc-${m.ano}-${m.mesNumero}`} className={`${styles.compraQtdCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${!isRedMonth ? styles.compraCellEmpty : ""}`}>
+                            {isRedMonth ? fmt(compraInfo!.qtdCompra) : "-"}
+                          </td>
+                        );
                       })}
                     </tr>
                   </React.Fragment>
