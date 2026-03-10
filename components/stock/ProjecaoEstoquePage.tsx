@@ -638,6 +638,7 @@ export default function ProjecaoEstoquePage({
                 const isLast = idx === listaExibida.length - 1;
 
                 const { estoqueAtualReal, duracaoRealMesAtual } = getReaisPorMes(proj);
+                // Regra de alerta (vermelho): LENÇOS e APROVEITAMENTO LENÇOS ≤ 120 dias; demais linhas ≤ 90 dias
                 const isLençosLine = proj.categoria === "LENÇOS" || proj.categoria === "APROVEITAMENTO LENÇOS";
                 const limiteDiasAlerta = isLençosLine ? 120 : 90;
 
