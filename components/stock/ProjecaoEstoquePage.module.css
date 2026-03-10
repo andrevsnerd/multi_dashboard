@@ -709,6 +709,45 @@
   box-shadow: inset -1px 0 0 #4ade80, inset 1px 0 0 #4ade80;
 }
 
+/* Wrapper para célula QTD COMPRA com tooltip (cursor) */
+.compraQtdCellWrapper {
+  cursor: help;
+  display: inline-block;
+}
+
+/* Tooltip didático do cálculo da Qtd Compra */
+.compraDebugTooltip {
+  position: fixed;
+  padding: 12px 16px;
+  background: #1e293b;
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: normal;
+  max-width: 320px;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.compraDebugTitle {
+  font-weight: 600;
+  color: #f1f5f9;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.compraDebugLine {
+  display: block;
+  margin-top: 4px;
+}
+
+.compraDebugLine:first-of-type {
+  margin-top: 0;
+}
+
 /* Compra vazia na coluna do mês atual: mantém como estava (azul claro) */
 .compraRow .compraDataCell.compraCellEmpty.columnMesAtual {
   background: #e0f2f7 !important;

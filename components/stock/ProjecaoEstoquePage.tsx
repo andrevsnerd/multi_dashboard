@@ -128,6 +128,18 @@ export default function ProjecaoEstoquePage({
     above: boolean;
     projecaoReal?: string;
   } | null>(null);
+  const [compraDebugTooltip, setCompraDebugTooltip] = useState<{
+    x: number;
+    y: number;
+    above: boolean;
+    estoqueReal: number;
+    duracaoReal: number;
+    consumoDiario: number;
+    diasCobertura: number;
+    necessidadeTotal: number;
+    qtdCompra: number;
+    limiteDias: number;
+  } | null>(null);
 
   const [opcoesGrupos, setOpcoesGrupos] = useState<string[]>([]);
   const [opcoesLinhas, setOpcoesLinhas] = useState<string[]>([]);
@@ -486,6 +498,17 @@ export default function ProjecaoEstoquePage({
     setFloatingTooltip({ varejo, ecommerce, x, y, above: !showBelow, ...(projecaoReal != null && projecaoReal !== "" && { projecaoReal }) });
   }, []);
   const hideFloatingTooltip = useCallback(() => setFloatingTooltip(null), []);
+  const showCompraDebugTooltip = useCallback((
+    e: React.MouseEvent<HTMLElement>,
+    debug: { estoqueReal: number; duracaoReal: number; consumoDiario: number; diasCobertura: number; necessidadeTotal: number; qtdCompra: number; limiteDias: number },
+    showBelow: boolean
+  ) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = showBelow ? rect.bottom + TOOLTIP_OFFSET : rect.top - TOOLTIP_OFFSET;
+    setCompraDebugTooltip({ ...debug, x, y, above: !showBelow });
+  }, []);
+  const hideCompraDebugTooltip = useCallback(() => setCompraDebugTooltip(null), []);
 
   const handleClickCategoria = useCallback((proj: ProjecaoCategoria) => {
     const n = expansao.get(proj.categoria)?.nivel ?? 0;
@@ -643,7 +666,18 @@ export default function ProjecaoEstoquePage({
                 const limiteDiasAlerta = isLençosLine ? 120 : 90;
 
                 // Calcular DATA COMPRA e QTD COMPRA: primeiro mês real com duração vermelha
-                let compraInfo: { dataCompra: string; qtdCompra: number; redMesNumero: number; redAno: number } | null = null;
+                let compraInfo: {
+                  dataCompra: string;
+                  qtdCompra: number;
+                  redMesNumero: number;
+                  redAno: number;
+                  estoqueReal: number;
+                  duracaoReal: number;
+                  consumoDiario: number;
+                  diasCobertura: number;
+                  necessidadeTotal: number;
+                  limiteDias: number;
+                } | null = null;
                 for (const mes of proj.meses) {
                   let duracaoReal = 0;
                   let estoqueReal = 0;
@@ -658,13 +692,20 @@ export default function ProjecaoEstoquePage({
                   }
                   if (duracaoReal > 0 && duracaoReal <= limiteDiasAlerta && estoqueReal > 0) {
                     const dailySale = estoqueReal / duracaoReal;
-                    const totalNeed = dailySale * (30 + limiteDiasAlerta);
+                    const diasCobertura = 30 + limiteDiasAlerta;
+                    const totalNeed = dailySale * diasCobertura;
                     const qtdCompra = Math.max(0, Math.round(totalNeed - estoqueReal));
                     compraInfo = {
                       dataCompra: `25/${String(mes.mesNumero).padStart(2, "0")}/${mes.ano}`,
                       qtdCompra,
                       redMesNumero: mes.mesNumero,
                       redAno: mes.ano,
+                      estoqueReal,
+                      duracaoReal,
+                      consumoDiario: dailySale,
+                      diasCobertura,
+                      necessidadeTotal: totalNeed,
+                      limiteDias: limiteDiasAlerta,
                     };
                     break;
                   }
@@ -822,9 +863,29 @@ export default function ProjecaoEstoquePage({
                       <td className={styles.compraLabelCell}>QTD COMPRA</td>
                       {mesesExibicao.map((m) => {
                         const isRedMonth = compraInfo && m.mesNumero === compraInfo.redMesNumero && m.ano === compraInfo.redAno;
+                        const showBelow = idx === 0;
                         return (
-                          <td key={`qc-${m.ano}-${m.mesNumero}`} className={`${styles.compraQtdCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${!isRedMonth ? styles.compraCellEmpty : ""}`}>
-                            {isRedMonth ? fmt(compraInfo!.qtdCompra) : "-"}
+                          <td
+                            key={`qc-${m.ano}-${m.mesNumero}`}
+                            className={`${styles.compraQtdCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${!isRedMonth ? styles.compraCellEmpty : ""}`}
+                            {...(isRedMonth && compraInfo ? {
+                              onMouseEnter: (e: React.MouseEvent<HTMLElement>) => showCompraDebugTooltip(e, {
+                                estoqueReal: compraInfo.estoqueReal,
+                                duracaoReal: compraInfo.duracaoReal,
+                                consumoDiario: compraInfo.consumoDiario,
+                                diasCobertura: compraInfo.diasCobertura,
+                                necessidadeTotal: compraInfo.necessidadeTotal,
+                                qtdCompra: compraInfo.qtdCompra,
+                                limiteDias: compraInfo.limiteDias,
+                              }, showBelow),
+                              onMouseLeave: hideCompraDebugTooltip,
+                            } : {})}
+                          >
+                            {isRedMonth ? (
+                              <span className={styles.compraQtdCellWrapper}>{fmt(compraInfo!.qtdCompra)}</span>
+                            ) : (
+                              "-"
+                            )}
                           </td>
                         );
                       })}
@@ -853,6 +914,28 @@ export default function ProjecaoEstoquePage({
             {floatingTooltip.projecaoReal != null && (
               <span className={styles.vendasInfocardLine}>Projeção real: {floatingTooltip.projecaoReal}</span>
             )}
+          </div>,
+          document.body
+        )}
+      {typeof document !== "undefined" &&
+        compraDebugTooltip &&
+        createPortal(
+          <div
+            className={styles.compraDebugTooltip}
+            style={{
+              left: compraDebugTooltip.x,
+              top: compraDebugTooltip.y,
+              transform: compraDebugTooltip.above ? "translate(-50%, -100%)" : "translate(-50%, 0)",
+            }}
+            role="tooltip"
+          >
+            <div className={styles.compraDebugTitle}>Cálculo Qtd Compra</div>
+            <span className={styles.compraDebugLine}>Estoque real = {fmt(compraDebugTooltip.estoqueReal)}</span>
+            <span className={styles.compraDebugLine}>Duração real = {compraDebugTooltip.duracaoReal} dias</span>
+            <span className={styles.compraDebugLine}>Consumo/dia = Estoque ÷ Duração = {compraDebugTooltip.consumoDiario.toFixed(2)}</span>
+            <span className={styles.compraDebugLine}>Meta cobertura = 30 + {compraDebugTooltip.limiteDias} = {compraDebugTooltip.diasCobertura} dias</span>
+            <span className={styles.compraDebugLine}>Necessidade total = Consumo × Meta = {fmt(Math.round(compraDebugTooltip.necessidadeTotal))}</span>
+            <span className={styles.compraDebugLine}>Qtd compra = Necessidade − Estoque = {fmt(compraDebugTooltip.qtdCompra)}</span>
           </div>,
           document.body
         )}
