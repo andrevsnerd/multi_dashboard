@@ -151,14 +151,13 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   border: 1px solid #e2e8f0;
   margin-top: 20px;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
   z-index: 1;
 }
 
 .tableScrollContainer {
-  max-height: min(calc(100vh - 260px), 800px);
-  overflow: auto;
+  /* Sem scroll interno: tabela expande na página e usa apenas o scroll da própria página */
 }
 
 .projecaoTable {
