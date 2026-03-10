@@ -864,10 +864,23 @@ export default function ProjecaoEstoquePage({
                       {mesesExibicao.map((m) => {
                         const isRedMonth = compraInfo && m.mesNumero === compraInfo.redMesNumero && m.ano === compraInfo.redAno;
                         const showBelow = idx === 0;
+                        const handleClickQtdCompra = () => {
+                          if (!compraInfo) return;
+                          const params = new URLSearchParams();
+                          params.set("categoria", proj.categoria);
+                          params.set("qtdCompra", String(compraInfo.qtdCompra));
+                          if (filial) params.set("filial", filial);
+                          grupos.forEach((g) => params.append("grupos", g));
+                          linhas.forEach((l) => params.append("linhas", l));
+                          colecoes.forEach((c) => params.append("colecoes", c));
+                          subgrupos.forEach((s) => params.append("subgrupos", s));
+                          grades.forEach((g) => params.append("grades", g));
+                          router.push(`/${companyKey}/controle-estoque/projecao/lista-compra?${params.toString()}`);
+                        };
                         return (
                           <td
                             key={`qc-${m.ano}-${m.mesNumero}`}
-                            className={`${styles.compraQtdCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${!isRedMonth ? styles.compraCellEmpty : ""}`}
+                            className={`${styles.compraQtdCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${!isRedMonth ? styles.compraCellEmpty : ""} ${isRedMonth ? styles.compraQtdClickable : ""}`}
                             {...(isRedMonth && compraInfo ? {
                               onMouseEnter: (e: React.MouseEvent<HTMLElement>) => showCompraDebugTooltip(e, {
                                 estoqueReal: compraInfo.estoqueReal,
@@ -879,10 +892,14 @@ export default function ProjecaoEstoquePage({
                                 limiteDias: compraInfo.limiteDias,
                               }, showBelow),
                               onMouseLeave: hideCompraDebugTooltip,
+                              onClick: handleClickQtdCompra,
                             } : {})}
                           >
                             {isRedMonth ? (
-                              <span className={styles.compraQtdCellWrapper}>{fmt(compraInfo!.qtdCompra)}</span>
+                              <span className={styles.compraQtdCellWrapper}>
+                                {fmt(compraInfo!.qtdCompra)}
+                                <span className={styles.compraQtdArrow}>→</span>
+                              </span>
                             ) : (
                               "-"
                             )}

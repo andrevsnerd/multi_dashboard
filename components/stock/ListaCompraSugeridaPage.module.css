@@ -1,0 +1,274 @@
+.wrapper {
+  padding: 24px;
+  background: #f8f9fb;
+  min-height: 100vh;
+}
+
+/* ── Header card ── */
+.headerCard {
+  background: #ffffff;
+  border: 1px solid #e8eaed;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 20px 24px;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.iconWrapper {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0fdf4;
+  border-radius: 10px;
+  color: #15803d;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 4px 0;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0;
+}
+
+.backButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.backButton:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+/* ── Summary card ── */
+.summaryCard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.summaryItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.summaryLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+}
+
+.summaryValue {
+  font-size: 20px;
+  font-weight: 700;
+  color: #15803d;
+}
+
+.summaryValueNeutral {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.summaryDivider {
+  width: 1px;
+  height: 36px;
+  background: #e2e8f0;
+}
+
+/* ── Table card ── */
+.tableCard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+}
+
+.table thead th {
+  background: #1e293b;
+  padding: 14px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  color: #e2e8f0;
+  border: none;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.table thead th.right {
+  text-align: right;
+}
+
+.table tbody td {
+  padding: 13px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+  color: #334155;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table tbody tr:hover td {
+  background: #f8fafc;
+}
+
+/* Rank badge */
+.rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.rank.top {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+/* Product name */
+.productName {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.productCode {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+/* Numbers */
+.numRight {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.vendas {
+  color: #475569;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Participação bar */
+.percCell {
+  text-align: right;
+  min-width: 120px;
+}
+
+.percBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.percBarTrack {
+  width: 80px;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.percBarFill {
+  height: 100%;
+  background: #22c55e;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.percText {
+  font-size: 12px;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+  min-width: 36px;
+  text-align: right;
+}
+
+/* QTD Sugerida — destaque verde */
+.qtdSugerida {
+  text-align: right;
+  font-weight: 700;
+  font-size: 14px;
+  color: #15803d;
+  font-variant-numeric: tabular-nums;
+}
+
+.qtdSugeridaZero {
+  text-align: right;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+/* States */
+.loading,
+.error,
+.empty {
+  text-align: center;
+  padding: 48px;
+  font-size: 15px;
+  color: #64748b;
+}
+
+.error {
+  color: #dc2626;
+}

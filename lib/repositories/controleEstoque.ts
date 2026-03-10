@@ -5187,3 +5187,139 @@ export async function fetchProjecaoMensal({
     return Array.from(categoriasMap.values());
   });
 }
+
+// ─── Lista de Compra Sugerida ────────────────────────────────────────────────
+
+export interface ProdutoVendaUltimos3Meses {
+  produto: string;
+  descricao: string;
+  vendas3meses: number;
+  percParticipacao: number;
+  qtdSugerida: number;
+}
+
+export async function fetchTopProdutosUltimos3Meses({
+  company,
+  filial,
+  categoria,
+  grupos,
+  linhas,
+  colecoes,
+  subgrupos,
+  grades,
+  qtdCompra,
+  limit = 50,
+}: {
+  company?: string;
+  filial?: string | null;
+  categoria?: string | null;
+  grupos?: string[] | null;
+  linhas?: string[] | null;
+  colecoes?: string[] | null;
+  subgrupos?: string[] | null;
+  grades?: string[] | null;
+  qtdCompra: number;
+  limit?: number;
+}): Promise<ProdutoVendaUltimos3Meses[]> {
+  return withRequest(async (request) => {
+    const now = new Date();
+    // Últimos 3 meses completos (do primeiro dia de 3 meses atrás até hoje)
+    const inicio3Meses = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+    request.input('inicio3m', sql.DateTime, inicio3Meses);
+    request.input('fim3m', sql.DateTime, now);
+    request.input('lc_limit', sql.Int, limit);
+
+    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
+    const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
+    const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
+    const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
+    const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
+    const gradeFilter = buildGradeFilter(request, company, grades, 'p');
+    const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineLc');
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
+
+    // Filtro de categoria específica (se informado)
+    let categoriaFilter = '';
+    if (categoria) {
+      const categoriaField = company === 'nerd'
+        ? 'UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, \'\'))))'
+        : 'UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, \'\'))))';
+      request.input('lcCategoria', sql.VarChar, categoria.trim().toUpperCase());
+      categoriaFilter = `AND ${categoriaField} = @lcCategoria`;
+    }
+
+    const query = `
+      SELECT TOP (@lc_limit)
+        ISNULL(vp.PRODUTO, '') AS produto,
+        UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS descricao,
+        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas3meses
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      WHERE vp.DATA_VENDA >= @inicio3m
+        AND vp.DATA_VENDA < @fim3m
+        AND vp.QTDE > 0
+        ${vendasFilialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
+        ${categoriaFilter}
+      GROUP BY ISNULL(vp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, ''))))
+      HAVING SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) > 0
+      ORDER BY vendas3meses DESC
+    `;
+
+    const result = await request.query<{
+      produto: string;
+      descricao: string;
+      vendas3meses: number;
+    }>(query);
+
+    const rows = result.recordset.map(r => ({
+      produto: r.produto?.trim() ?? '',
+      descricao: r.descricao?.trim() ?? '',
+      vendas3meses: Math.round(Number(r.vendas3meses ?? 0)),
+    })).filter(r => r.produto !== '' && r.vendas3meses > 0);
+
+    const totalVendas = rows.reduce((s, r) => s + r.vendas3meses, 0);
+    if (totalVendas === 0 || qtdCompra <= 0) {
+      return rows.map(r => ({ ...r, percParticipacao: 0, qtdSugerida: 0 }));
+    }
+
+    // Distribuição proporcional — método da maior sobra (Hamilton/Largest Remainder)
+    // Garante que o arredondamento não acumule saldo no último item (menos vendido)
+    const withExact = rows.map(r => {
+      const perc = r.vendas3meses / totalVendas;
+      const exato = perc * qtdCompra;
+      const floor = Math.floor(exato);
+      const frac = exato - floor;
+      return { ...r, perc, floor, frac };
+    });
+
+    const totalFloor = withExact.reduce((s, r) => s + r.floor, 0);
+    const remainder = qtdCompra - totalFloor;
+
+    // Ordena por fração decrescente para saber quem recebe +1
+    const sortedByFrac = [...withExact]
+      .map((r, idx) => ({ idx, frac: r.frac }))
+      .sort((a, b) => b.frac - a.frac);
+
+    const boostSet = new Set(sortedByFrac.slice(0, remainder).map(r => r.idx));
+
+    const comSugestao = withExact
+      .map((r, i) => ({
+        produto: r.produto,
+        descricao: r.descricao,
+        vendas3meses: r.vendas3meses,
+        percParticipacao: Math.round(r.perc * 1000) / 10,
+        qtdSugerida: r.floor + (boostSet.has(i) ? 1 : 0),
+      }))
+      // Retorna apenas produtos que recebem pelo menos 1 unidade
+      .filter(r => r.qtdSugerida > 0);
+
+    return comSugestao;
+  });
+}

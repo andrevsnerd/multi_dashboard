@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls \"c:\\\\Users\\\\NERD TIJUCA\\\\Documents\\\\NERD - ANDRE\\\\Dashboard NERD\\\\multi-dashboard\\\\app\\\\\\(companies\\)\\\\[company]\\\\controle-estoque\\\\projecao\"\")",
+      "Bash(ls \"c:/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/app/\\(companies\\)/[company]/controle-estoque/projecao/\")"
+    ]
+  }
+}

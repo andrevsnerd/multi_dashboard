@@ -712,7 +712,26 @@
 /* Wrapper para célula QTD COMPRA com tooltip (cursor) */
 .compraQtdCellWrapper {
   cursor: help;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* QTD COMPRA clicável */
+.compraQtdClickable {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.compraQtdClickable:hover {
+  background: #4ade80 !important;
+  color: #14532d !important;
+}
+
+.compraQtdArrow {
+  font-size: 11px;
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 /* Tooltip didático do cálculo da Qtd Compra */
