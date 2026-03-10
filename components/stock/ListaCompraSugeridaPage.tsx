@@ -10,12 +10,17 @@ interface ProdutoSugestao {
   produto: string;
   descricao: string;
   vendas3meses: number;
+  valor3meses: number;
   percParticipacao: number;
   qtdSugerida: number;
 }
 
 function fmt(n: number) {
   return n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+}
+
+function fmtBRL(n: number) {
+  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 }
 
 async function fetchListaCompra(params: URLSearchParams): Promise<ProdutoSugestao[]> {
@@ -78,7 +83,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
               <h1 className={styles.title}>Lista de Compra Sugerida</h1>
               <p className={styles.subtitle}>
                 {categoria ? `Categoria: ${categoria} · ` : ""}
-                Produtos mais vendidos nos últimos 3 meses — distribuição proporcional
+                Produtos mais vendidos nos últimos 60 dias — distribuição proporcional
               </p>
             </div>
           </div>
@@ -108,7 +113,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
           <div className={styles.summaryDivider} />
           <div className={styles.summaryItem}>
             <span className={styles.summaryLabel}>Período Base</span>
-            <span className={styles.summaryValueNeutral}>Últimos 3 meses</span>
+            <span className={styles.summaryValueNeutral}>Últimos 60 dias</span>
           </div>
         </div>
       )}
@@ -126,7 +131,8 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
               <tr>
                 <th style={{ width: 48 }}>#</th>
                 <th>Produto</th>
-                <th className={styles.right}>Vendas 3 meses</th>
+                <th className={styles.right}>Faturamento 60 dias</th>
+                <th className={styles.right}>Qtd vendida</th>
                 <th className={styles.right}>Participação</th>
                 <th className={styles.right}>Qtd Sugerida</th>
               </tr>
@@ -145,6 +151,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                       <div className={styles.productCode}>{p.produto}</div>
                     )}
                   </td>
+                  <td className={styles.vendas}>{fmtBRL(p.valor3meses)}</td>
                   <td className={styles.vendas}>{fmt(p.vendas3meses)}</td>
                   <td className={styles.percCell}>
                     <div className={styles.percBar}>

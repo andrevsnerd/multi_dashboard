@@ -5194,6 +5194,7 @@ export interface ProdutoVendaUltimos3Meses {
   produto: string;
   descricao: string;
   vendas3meses: number;
+  valor3meses: number;
   percParticipacao: number;
   qtdSugerida: number;
 }
@@ -5223,9 +5224,9 @@ export async function fetchTopProdutosUltimos3Meses({
 }): Promise<ProdutoVendaUltimos3Meses[]> {
   return withRequest(async (request) => {
     const now = new Date();
-    // Últimos 3 meses completos (do primeiro dia de 3 meses atrás até hoje)
-    const inicio3Meses = new Date(now.getFullYear(), now.getMonth() - 3, 1);
-    request.input('inicio3m', sql.DateTime, inicio3Meses);
+    // Últimos 60 dias
+    const inicio60Dias = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    request.input('inicio3m', sql.DateTime, inicio60Dias);
     request.input('fim3m', sql.DateTime, now);
     request.input('lc_limit', sql.Int, limit);
 
@@ -5252,7 +5253,8 @@ export async function fetchTopProdutosUltimos3Meses({
       SELECT TOP (@lc_limit)
         ISNULL(vp.PRODUTO, '') AS produto,
         UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS descricao,
-        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas3meses
+        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS qtde3meses,
+        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) AS valor3meses
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       WHERE vp.DATA_VENDA >= @inicio3m
@@ -5268,31 +5270,32 @@ export async function fetchTopProdutosUltimos3Meses({
         ${nerdOnlyEletronicosFilter}
         ${categoriaFilter}
       GROUP BY ISNULL(vp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, ''))))
-      HAVING SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) > 0
-      ORDER BY vendas3meses DESC
+      HAVING SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) > 0
+      ORDER BY valor3meses DESC
     `;
 
     const result = await request.query<{
       produto: string;
       descricao: string;
-      vendas3meses: number;
+      qtde3meses: number;
+      valor3meses: number;
     }>(query);
 
     const rows = result.recordset.map(r => ({
       produto: r.produto?.trim() ?? '',
       descricao: r.descricao?.trim() ?? '',
-      vendas3meses: Math.round(Number(r.vendas3meses ?? 0)),
-    })).filter(r => r.produto !== '' && r.vendas3meses > 0);
+      vendas3meses: Math.round(Number(r.qtde3meses ?? 0)),
+      valor3meses: Math.round(Number(r.valor3meses ?? 0)),
+    })).filter(r => r.produto !== '' && r.valor3meses > 0);
 
-    const totalVendas = rows.reduce((s, r) => s + r.vendas3meses, 0);
-    if (totalVendas === 0 || qtdCompra <= 0) {
+    const totalValor = rows.reduce((s, r) => s + r.valor3meses, 0);
+    if (totalValor === 0 || qtdCompra <= 0) {
       return rows.map(r => ({ ...r, percParticipacao: 0, qtdSugerida: 0 }));
     }
 
-    // Distribuição proporcional — método da maior sobra (Hamilton/Largest Remainder)
-    // Garante que o arredondamento não acumule saldo no último item (menos vendido)
+    // Distribuição proporcional por VALOR de venda — método da maior sobra (Hamilton)
     const withExact = rows.map(r => {
-      const perc = r.vendas3meses / totalVendas;
+      const perc = r.valor3meses / totalValor;
       const exato = perc * qtdCompra;
       const floor = Math.floor(exato);
       const frac = exato - floor;
@@ -5302,7 +5305,6 @@ export async function fetchTopProdutosUltimos3Meses({
     const totalFloor = withExact.reduce((s, r) => s + r.floor, 0);
     const remainder = qtdCompra - totalFloor;
 
-    // Ordena por fração decrescente para saber quem recebe +1
     const sortedByFrac = [...withExact]
       .map((r, idx) => ({ idx, frac: r.frac }))
       .sort((a, b) => b.frac - a.frac);
@@ -5314,10 +5316,10 @@ export async function fetchTopProdutosUltimos3Meses({
         produto: r.produto,
         descricao: r.descricao,
         vendas3meses: r.vendas3meses,
+        valor3meses: r.valor3meses,
         percParticipacao: Math.round(r.perc * 1000) / 10,
         qtdSugerida: r.floor + (boostSet.has(i) ? 1 : 0),
       }))
-      // Retorna apenas produtos que recebem pelo menos 1 unidade
       .filter(r => r.qtdSugerida > 0);
 
     return comSugestao;
