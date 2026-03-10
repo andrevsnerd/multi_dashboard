@@ -711,7 +711,6 @@
 
 /* Wrapper para célula QTD COMPRA com tooltip (cursor) */
 .compraQtdCellWrapper {
-  cursor: help;
   display: inline-flex;
   align-items: center;
   gap: 6px;

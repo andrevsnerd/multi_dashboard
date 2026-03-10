@@ -111,6 +111,15 @@
   color: #1e293b;
 }
 
+.summaryValueSmall {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.textA { color: #15803d; }
+.textB { color: #92400e; }
+.textC { color: #991b1b; }
+
 .summaryDivider {
   width: 1px;
   height: 36px;
@@ -150,7 +159,7 @@
 }
 
 .table tbody td {
-  padding: 13px 16px;
+  padding: 12px 16px;
   font-size: 13px;
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
@@ -163,6 +172,68 @@
 
 .table tbody tr:hover td {
   background: #f8fafc;
+}
+
+/* ── Curva section separator row ── */
+.sectionRow td {
+  padding: 10px 16px !important;
+  border-bottom: none !important;
+}
+
+.sectionRowA td { background: #f0fdf4; border-top: 2px solid #86efac; }
+.sectionRowB td { background: #fefce8; border-top: 2px solid #fde047; }
+.sectionRowC td { background: #fff1f2; border-top: 2px solid #fca5a5; }
+
+.sectionLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.curvaBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+  flex-shrink: 0;
+}
+
+.badgeA { background: #16a34a; color: #ffffff; }
+.badgeB { background: #ca8a04; color: #ffffff; }
+.badgeC { background: #dc2626; color: #ffffff; }
+
+.sectionTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: #374151;
+}
+
+.sectionCount {
+  font-size: 12px;
+  color: #6b7280;
+  background: #ffffff;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+}
+
+.sectionNote {
+  font-size: 11px;
+  font-weight: 600;
+  color: #15803d;
+  background: #dcfce7;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+/* Linhas de curva B e C levemente esmaecidas */
+.rowDimmed td {
+  opacity: 0.7;
 }
 
 /* Rank badge */
@@ -211,7 +282,7 @@
 /* Participação bar */
 .percCell {
   text-align: right;
-  min-width: 120px;
+  min-width: 140px;
 }
 
 .percBar {
@@ -231,10 +302,13 @@
 
 .percBarFill {
   height: 100%;
-  background: #22c55e;
   border-radius: 3px;
   transition: width 0.3s ease;
 }
+
+.percBarFillA { background: #22c55e; }
+.percBarFillB { background: #eab308; }
+.percBarFillC { background: #ef4444; }
 
 .percText {
   font-size: 12px;
@@ -257,6 +331,10 @@
   text-align: right;
   font-size: 13px;
   color: #94a3b8;
+}
+
+.right {
+  text-align: right;
 }
 
 /* States */

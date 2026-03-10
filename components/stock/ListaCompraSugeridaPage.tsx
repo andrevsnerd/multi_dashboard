@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import type { CompanyKey } from "@/lib/config/company";
@@ -13,6 +13,14 @@ interface ProdutoSugestao {
   valor3meses: number;
   percParticipacao: number;
   qtdSugerida: number;
+}
+
+type Curva = "A" | "B" | "C";
+
+interface ProdutoComCurva extends ProdutoSugestao {
+  curva: Curva;
+  qtdFinal: number;
+  percCumulativa: number;
 }
 
 function fmt(n: number) {
@@ -29,6 +37,64 @@ async function fetchListaCompra(params: URLSearchParams): Promise<ProdutoSugesta
   if (!res.ok) throw new Error(json.error ?? "Erro ao carregar");
   return json.data ?? [];
 }
+
+/** Hamilton/Largest Remainder distribution */
+function hamiltonDistribute(items: { valor: number }[], total: number): number[] {
+  const totalValor = items.reduce((s, r) => s + r.valor, 0);
+  if (totalValor === 0 || total === 0) return items.map(() => 0);
+
+  const exatos = items.map(r => (r.valor / totalValor) * total);
+  const floors = exatos.map(Math.floor);
+  const totalFloor = floors.reduce((s, v) => s + v, 0);
+  const remainder = total - totalFloor;
+
+  const fracs = exatos.map((e, i) => ({ i, frac: e - floors[i] }));
+  fracs.sort((a, b) => b.frac - a.frac);
+  const boost = new Set(fracs.slice(0, remainder).map(r => r.i));
+
+  return floors.map((f, i) => f + (boost.has(i) ? 1 : 0));
+}
+
+/** Calcula curva ABC por faturamento acumulado */
+function calcularCurvas(produtos: ProdutoSugestao[], qtdCompra: number): ProdutoComCurva[] {
+  const totalGeral = produtos.reduce((s, p) => s + p.valor3meses, 0);
+  let cumulative = 0;
+
+  const comCurva = produtos.map((p): ProdutoComCurva => {
+    cumulative += p.valor3meses;
+    const percCum = totalGeral > 0 ? cumulative / totalGeral : 1;
+    const curva: Curva = percCum <= 0.80 ? "A" : percCum <= 0.95 ? "B" : "C";
+    return { ...p, curva, qtdFinal: 0, percCumulativa: percCum };
+  });
+
+  // Redistribuir qtdCompra apenas entre curva A usando Hamilton
+  const curvaA = comCurva.filter(p => p.curva === "A");
+  const qtds = hamiltonDistribute(curvaA.map(p => ({ valor: p.valor3meses })), qtdCompra);
+  const qtdMap = new Map(curvaA.map((p, i) => [p.produto, qtds[i]]));
+
+  return comCurva.map(p => ({
+    ...p,
+    qtdFinal: p.curva === "A" ? (qtdMap.get(p.produto) ?? 0) : 0,
+  }));
+}
+
+const CURVA_LABEL: Record<Curva, string> = {
+  A: "Curva A — 80% do faturamento",
+  B: "Curva B — 15% do faturamento",
+  C: "Curva C — 5% do faturamento",
+};
+
+const CURVA_BADGE_CLASS: Record<Curva, string> = {
+  A: styles.badgeA,
+  B: styles.badgeB,
+  C: styles.badgeC,
+};
+
+const CURVA_BAR_CLASS: Record<Curva, string> = {
+  A: styles.percBarFillA,
+  B: styles.percBarFillB,
+  C: styles.percBarFillC,
+};
 
 export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: CompanyKey }) {
   const router = useRouter();
@@ -63,8 +129,19 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
       .finally(() => setLoading(false));
   }, [companyKey, searchParams, categoria, qtdCompra, filial]);
 
-  const maxPerc = produtos.length > 0 ? produtos[0].percParticipacao : 1;
-  const totalSugerido = produtos.reduce((s, p) => s + p.qtdSugerida, 0);
+  const produtosComCurva = useMemo(
+    () => (produtos.length > 0 ? calcularCurvas(produtos, qtdCompra) : []),
+    [produtos, qtdCompra]
+  );
+
+  const totalSugerido = produtosComCurva.reduce((s, p) => s + p.qtdFinal, 0);
+  const maxPerc = produtosComCurva.length > 0 ? produtosComCurva[0].percParticipacao : 1;
+
+  const countA = produtosComCurva.filter(p => p.curva === "A").length;
+  const countB = produtosComCurva.filter(p => p.curva === "B").length;
+  const countC = produtosComCurva.filter(p => p.curva === "C").length;
+
+  const groups: Curva[] = ["A", "B", "C"];
 
   return (
     <div className={styles.wrapper}>
@@ -83,7 +160,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
               <h1 className={styles.title}>Lista de Compra Sugerida</h1>
               <p className={styles.subtitle}>
                 {categoria ? `Categoria: ${categoria} · ` : ""}
-                Produtos mais vendidos nos últimos 60 dias — distribuição proporcional
+                Produtos mais vendidos nos últimos 60 dias — distribuição proporcional (curva A)
               </p>
             </div>
           </div>
@@ -107,13 +184,21 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
           </div>
           <div className={styles.summaryDivider} />
           <div className={styles.summaryItem}>
-            <span className={styles.summaryLabel}>Produtos Listados</span>
-            <span className={styles.summaryValueNeutral}>{produtos.length}</span>
+            <span className={styles.summaryLabel}>Período Base</span>
+            <span className={styles.summaryValueNeutral}>Últimos 60 dias</span>
           </div>
           <div className={styles.summaryDivider} />
           <div className={styles.summaryItem}>
-            <span className={styles.summaryLabel}>Período Base</span>
-            <span className={styles.summaryValueNeutral}>Últimos 60 dias</span>
+            <span className={styles.summaryLabel}>Curva A</span>
+            <span className={`${styles.summaryValueSmall} ${styles.textA}`}>{countA} produtos</span>
+          </div>
+          <div className={styles.summaryItem}>
+            <span className={styles.summaryLabel}>Curva B</span>
+            <span className={`${styles.summaryValueSmall} ${styles.textB}`}>{countB} produtos</span>
+          </div>
+          <div className={styles.summaryItem}>
+            <span className={styles.summaryLabel}>Curva C</span>
+            <span className={`${styles.summaryValueSmall} ${styles.textC}`}>{countC} produtos</span>
           </div>
         </div>
       )}
@@ -122,10 +207,10 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
       <div className={styles.tableCard}>
         {loading && <div className={styles.loading}>Calculando lista de compra...</div>}
         {error && <div className={styles.error}>{error}</div>}
-        {!loading && !error && produtos.length === 0 && (
+        {!loading && !error && produtosComCurva.length === 0 && (
           <div className={styles.empty}>Nenhum produto encontrado para este filtro.</div>
         )}
-        {!loading && !error && produtos.length > 0 && (
+        {!loading && !error && produtosComCurva.length > 0 && (
           <table className={styles.table}>
             <thead>
               <tr>
@@ -138,37 +223,61 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
               </tr>
             </thead>
             <tbody>
-              {produtos.map((p, i) => (
-                <tr key={p.produto}>
-                  <td>
-                    <span className={`${styles.rank} ${i < 3 ? styles.top : ""}`}>
-                      {i + 1}
-                    </span>
-                  </td>
-                  <td>
-                    <div className={styles.productName}>{p.descricao || p.produto}</div>
-                    {p.descricao && p.produto !== p.descricao && (
-                      <div className={styles.productCode}>{p.produto}</div>
-                    )}
-                  </td>
-                  <td className={styles.vendas}>{fmtBRL(p.valor3meses)}</td>
-                  <td className={styles.vendas}>{fmt(p.vendas3meses)}</td>
-                  <td className={styles.percCell}>
-                    <div className={styles.percBar}>
-                      <div className={styles.percBarTrack}>
-                        <div
-                          className={styles.percBarFill}
-                          style={{ width: `${Math.min(100, (p.percParticipacao / maxPerc) * 100)}%` }}
-                        />
-                      </div>
-                      <span className={styles.percText}>{p.percParticipacao.toFixed(1)}%</span>
-                    </div>
-                  </td>
-                  <td className={p.qtdSugerida > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}>
-                    {p.qtdSugerida > 0 ? fmt(p.qtdSugerida) : "-"}
-                  </td>
-                </tr>
-              ))}
+              {groups.map(curva => {
+                const grupo = produtosComCurva.filter(p => p.curva === curva);
+                if (grupo.length === 0) return null;
+                return (
+                  <React.Fragment key={curva}>
+                    {/* Separador de seção */}
+                    <tr className={`${styles.sectionRow} ${styles[`sectionRow${curva}`]}`}>
+                      <td colSpan={6}>
+                        <div className={styles.sectionLabel}>
+                          <span className={`${styles.curvaBadge} ${CURVA_BADGE_CLASS[curva]}`}>{curva}</span>
+                          <span className={styles.sectionTitle}>{CURVA_LABEL[curva]}</span>
+                          <span className={styles.sectionCount}>{grupo.length} produtos</span>
+                          {curva === "A" && (
+                            <span className={styles.sectionNote}>← compra distribuída aqui</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {grupo.map((p, i) => {
+                      const rankGlobal = produtosComCurva.indexOf(p) + 1;
+                      return (
+                        <tr key={p.produto} className={curva !== "A" ? styles.rowDimmed : ""}>
+                          <td>
+                            <span className={`${styles.rank} ${i < 3 && curva === "A" ? styles.top : ""}`}>
+                              {rankGlobal}
+                            </span>
+                          </td>
+                          <td>
+                            <div className={styles.productName}>{p.descricao || p.produto}</div>
+                            {p.descricao && p.produto !== p.descricao && (
+                              <div className={styles.productCode}>{p.produto}</div>
+                            )}
+                          </td>
+                          <td className={styles.vendas}>{fmtBRL(p.valor3meses)}</td>
+                          <td className={styles.vendas}>{fmt(p.vendas3meses)}</td>
+                          <td className={styles.percCell}>
+                            <div className={styles.percBar}>
+                              <div className={styles.percBarTrack}>
+                                <div
+                                  className={`${styles.percBarFill} ${CURVA_BAR_CLASS[curva]}`}
+                                  style={{ width: `${Math.min(100, (p.percParticipacao / maxPerc) * 100)}%` }}
+                                />
+                              </div>
+                              <span className={styles.percText}>{p.percParticipacao.toFixed(1)}%</span>
+                            </div>
+                          </td>
+                          <td className={p.qtdFinal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}>
+                            {p.qtdFinal > 0 ? fmt(p.qtdFinal) : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         )}
