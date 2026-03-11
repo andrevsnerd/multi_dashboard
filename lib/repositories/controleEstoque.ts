@@ -4415,6 +4415,16 @@ export async function fetchProjecaoMensal({
     const mesAtual = now.getMonth() + 1; // 1-12
     const anoPassado = anoAtual - 1;
 
+    // Sargable year ranges: register early so all queries can use them
+    const anoPassadoStart = new Date(anoPassado, 0, 1);
+    const anoPassadoEnd = new Date(anoAtual, 0, 1);
+    const anoAtualStart = new Date(anoAtual, 0, 1);
+    const anoAtualEnd = new Date(anoAtual + 1, 0, 1);
+    request.input('anoPassadoStart', sql.DateTime, anoPassadoStart);
+    request.input('anoPassadoEnd', sql.DateTime, anoPassadoEnd);
+    request.input('anoAtualStart', sql.DateTime, anoAtualStart);
+    request.input('anoAtualEnd', sql.DateTime, anoAtualEnd);
+
     // Determinar campo de categoria baseado na empresa
     const categoriaField = company === 'nerd' 
       ? 'UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, \'\'))))'
@@ -4550,7 +4560,7 @@ export async function fetchProjecaoMensal({
         SUM(vp.QTDE - ISNULL(vp.QTDE_CANCELADA, 0)) AS vendas
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-      WHERE YEAR(vp.DATA_VENDA) = ${anoPassado}
+      WHERE vp.DATA_VENDA >= @anoPassadoStart AND vp.DATA_VENDA < @anoPassadoEnd
         AND vp.QTDE > 0
         ${vendasFilialFilter}
         ${grupoFilter}
@@ -4607,7 +4617,8 @@ export async function fetchProjecaoMensal({
             JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
               ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
             LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
-            WHERE YEAR(${dataEcommerce}) = ${anoPassado}
+            WHERE f.EMISSAO >= @anoPassadoStart AND f.EMISSAO < @anoPassadoEnd
+              AND YEAR(${dataEcommerce}) = ${anoPassado}
               AND f.NOTA_CANCELADA = 0
               AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
               AND CAST(fp.QTDE AS FLOAT) > 0
@@ -4826,7 +4837,7 @@ export async function fetchProjecaoMensal({
         SUM(vp.QTDE - ISNULL(vp.QTDE_CANCELADA, 0)) AS vendas
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-      WHERE YEAR(vp.DATA_VENDA) = ${anoAtual}
+      WHERE vp.DATA_VENDA >= @anoAtualStart AND vp.DATA_VENDA < @anoAtualEnd
         AND vp.QTDE > 0
         ${vendasMesAtualFilialFilter}
         ${grupoFilter}
@@ -4873,7 +4884,8 @@ export async function fetchProjecaoMensal({
           FROM FATURAMENTO f WITH (NOLOCK)
           JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
           LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
-          WHERE YEAR(${dataEcommerce}) = ${anoAtual}
+          WHERE f.EMISSAO >= @anoAtualStart AND f.EMISSAO < @anoAtualEnd
+            AND YEAR(${dataEcommerce}) = ${anoAtual}
             AND f.NOTA_CANCELADA = 0
             AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
             AND CAST(fp.QTDE AS FLOAT) > 0
