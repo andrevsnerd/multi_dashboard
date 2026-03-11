@@ -93,6 +93,48 @@ function fmt(value: number): string {
   return value.toLocaleString("pt-BR", { maximumFractionDigits: 0, minimumFractionDigits: 0 });
 }
 
+function fmtBRL(value: number): string {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+}
+
+interface ProdutoSugestaoMin {
+  valor3meses: number;
+  vendas3meses: number;
+}
+
+function calcCustoCompra(produtos: ProdutoSugestaoMin[], qtdCompra: number): number {
+  const totalGeral = produtos.reduce((s, p) => s + p.valor3meses, 0);
+  if (totalGeral === 0 || qtdCompra === 0) return 0;
+
+  let cumulative = 0;
+  const curvaA: ProdutoSugestaoMin[] = [];
+  for (const p of produtos) {
+    cumulative += p.valor3meses;
+    if (cumulative / totalGeral <= 0.80) {
+      curvaA.push(p);
+    } else {
+      break;
+    }
+  }
+  if (curvaA.length === 0) return 0;
+
+  const totalCurvaA = curvaA.reduce((s, p) => s + p.valor3meses, 0);
+  if (totalCurvaA === 0) return 0;
+
+  const exatos = curvaA.map(p => (p.valor3meses / totalCurvaA) * qtdCompra);
+  const floors = exatos.map(Math.floor);
+  const remainder = qtdCompra - floors.reduce((s, v) => s + v, 0);
+  const fracs = exatos.map((e, i) => ({ i, frac: e - floors[i] }));
+  fracs.sort((a, b) => b.frac - a.frac);
+  const boost = new Set(fracs.slice(0, remainder).map(r => r.i));
+  const qtds = floors.map((f, i) => f + (boost.has(i) ? 1 : 0));
+
+  return curvaA.reduce((sum, p, i) => {
+    const unitPrice = p.vendas3meses > 0 ? p.valor3meses / p.vendas3meses : 0;
+    return sum + qtds[i] * unitPrice;
+  }, 0);
+}
+
 // --- Default excluded lines (ScarfMe) ---
 function getExcludedLines(companyKey: CompanyKey): Set<string> {
   const config = resolveCompany(companyKey);
@@ -146,6 +188,8 @@ export default function ProjecaoEstoquePage({
     qtdCompra: number;
     limiteDias: number;
   } | null>(null);
+  const [custosCompra, setCustosCompra] = useState<Record<string, number>>({});
+  const fetchedCustosRef = useRef(new Set<string>());
 
   const [opcoesGrupos, setOpcoesGrupos] = useState<string[]>([]);
   const [opcoesLinhas, setOpcoesLinhas] = useState<string[]>([]);
@@ -611,6 +655,56 @@ export default function ProjecaoEstoquePage({
     }
     return { estoqueAtualReal, duracaoRealMesAtual };
   }, []);
+
+  // Pré-computa compraInfo para todos os itens da lista para buscar custos
+  const compraInfoMap = useMemo(() => {
+    const map = new Map<string, { qtdCompra: number; categoria: string }>();
+    listaExibida.forEach((proj, idx) => {
+      const { estoqueAtualReal, duracaoRealMesAtual } = getReaisPorMes(proj);
+      const isLençosLine = proj.categoria === "LENÇOS" || proj.categoria === "APROVEITAMENTO LENÇOS";
+      const limiteDiasAlerta = isLençosLine ? 120 : 90;
+      for (const mes of proj.meses) {
+        let duracaoReal = 0, estoqueReal = 0;
+        if (mes.isMesAtual) { duracaoReal = duracaoRealMesAtual; estoqueReal = estoqueAtualReal; }
+        else if (mes.isMesPassado) { duracaoReal = mes.duracaoRealSnapshot ?? 0; estoqueReal = mes.estoqueRealSnapshot ?? 0; }
+        else continue;
+        if (duracaoReal > 0 && duracaoReal <= limiteDiasAlerta && estoqueReal > 0) {
+          const qtdCompra = Math.max(0, Math.round((estoqueReal / duracaoReal) * (30 + limiteDiasAlerta) - estoqueReal));
+          const rowKey = `${proj.categoria}|${proj.subgrupo ?? ""}|${proj.grade ?? ""}|${proj.colecao ?? ""}|${proj.produto ?? ""}|${proj.cor ?? ""}|${idx}`;
+          map.set(rowKey, { qtdCompra, categoria: proj.categoria });
+          break;
+        }
+      }
+    });
+    return map;
+  }, [listaExibida, getReaisPorMes]);
+
+  // Busca custos para rows com compraInfo
+  useEffect(() => {
+    if (compraInfoMap.size === 0) return;
+    compraInfoMap.forEach(({ qtdCompra, categoria }) => {
+      const custoKey = `${categoria}|${qtdCompra}`;
+      if (fetchedCustosRef.current.has(custoKey)) return;
+      fetchedCustosRef.current.add(custoKey);
+      const params = new URLSearchParams();
+      params.set("company", companyKey);
+      if (filial) params.set("filial", filial);
+      params.set("categoria", categoria);
+      params.set("qtdCompra", String(qtdCompra));
+      grupos.forEach(g => params.append("grupos", g));
+      linhas.forEach(l => params.append("linhas", l));
+      colecoes.forEach(c => params.append("colecoes", c));
+      subgrupos.forEach(s => params.append("subgrupos", s));
+      grades.forEach(g => params.append("grades", g));
+      fetch(`/api/controle-estoque/lista-compra-sugerida?${params}`, { cache: "no-store" })
+        .then(r => r.json())
+        .then((json: { data?: ProdutoSugestaoMin[] }) => {
+          const custo = calcCustoCompra(json.data ?? [], qtdCompra);
+          setCustosCompra(prev => ({ ...prev, [custoKey]: custo }));
+        })
+        .catch(() => { /* silenciosamente ignora */ });
+    });
+  }, [compraInfoMap, companyKey, filial, grupos, linhas, colecoes, subgrupos, grades]);
 
   const [exportandoPDF, setExportandoPDF] = useState(false);
 
@@ -1115,7 +1209,7 @@ export default function ProjecaoEstoquePage({
                   <React.Fragment key={`${proj.categoria}-${proj.subgrupo ?? ""}-${proj.grade ?? ""}-${proj.colecao ?? ""}-${proj.produto ?? ""}-${proj.cor ?? ""}-${idx}`}>
                     <tr className={`${styles.categoriaRow} ${idx > 0 ? styles.categoryBlockStart : ""} ${idx === 0 ? styles.firstDataRow : ""}`}>
                       <td
-                        rowSpan={8}
+                        rowSpan={9}
                         className={`${styles.categoriaCell} ${clickable ? styles.categoriaCellClickable : ""} ${!isLast ? styles.categoriaCellBlockEnd : ""}`}
                         role={clickable ? "button" : undefined}
                         tabIndex={clickable ? 0 : undefined}
@@ -1259,7 +1353,7 @@ export default function ProjecaoEstoquePage({
                         );
                       })}
                     </tr>
-                    <tr className={`${styles.compraRow} ${!isLast ? styles.categoryBlockEnd : ""}`}>
+                    <tr className={styles.compraRow}>
                       <td className={styles.compraLabelCell}>QTD COMPRA</td>
                       {mesesExibicao.map((m) => {
                         const isRedMonth = compraInfo && m.mesNumero === compraInfo.redMesNumero && m.ano === compraInfo.redAno;
@@ -1307,6 +1401,28 @@ export default function ProjecaoEstoquePage({
                         );
                       })}
                     </tr>
+                    {(() => {
+                      const rowKey = `${proj.categoria}|${proj.subgrupo ?? ""}|${proj.grade ?? ""}|${proj.colecao ?? ""}|${proj.produto ?? ""}|${proj.cor ?? ""}|${idx}`;
+                      const custoInfo = compraInfoMap.get(rowKey);
+                      const custoKey = custoInfo ? `${custoInfo.categoria}|${custoInfo.qtdCompra}` : null;
+                      const custoValor = custoKey != null ? custosCompra[custoKey] : undefined;
+                      return (
+                        <tr className={`${styles.compraRow} ${!isLast ? styles.categoryBlockEnd : ""}`}>
+                          <td className={styles.compraLabelCell}>CUSTO</td>
+                          {mesesExibicao.map((m) => {
+                            const isRedMonth = compraInfo && m.mesNumero === compraInfo.redMesNumero && m.ano === compraInfo.redAno;
+                            return (
+                              <td
+                                key={`cu-${m.ano}-${m.mesNumero}`}
+                                className={`${styles.compraQtdCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${!isRedMonth ? styles.compraCellEmpty : ""}`}
+                              >
+                                {isRedMonth ? (custoValor != null ? fmtBRL(custoValor) : "...") : "-"}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })()}
                   </React.Fragment>
                 );
               })}

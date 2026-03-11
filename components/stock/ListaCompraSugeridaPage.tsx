@@ -31,6 +31,10 @@ function fmtBRL(n: number) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 }
 
+function fmtBRL2(n: number) {
+  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 async function fetchListaCompra(params: URLSearchParams): Promise<ProdutoSugestao[]> {
   const res = await fetch(`/api/controle-estoque/lista-compra-sugerida?${params}`, { cache: "no-store" });
   const json = await res.json() as { data?: ProdutoSugestao[]; error?: string };
@@ -134,7 +138,10 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
     [produtos, qtdCompra]
   );
 
-  const totalSugerido = produtosComCurva.reduce((s, p) => s + p.qtdFinal, 0);
+  const totalCusto = produtosComCurva.reduce((s, p) => {
+    if (p.qtdFinal <= 0 || p.vendas3meses <= 0) return s;
+    return s + p.qtdFinal * (p.valor3meses / p.vendas3meses);
+  }, 0);
   const maxPerc = produtosComCurva.length > 0 ? produtosComCurva[0].percParticipacao : 1;
 
   const countA = produtosComCurva.filter(p => p.curva === "A").length;
@@ -179,8 +186,8 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
           </div>
           <div className={styles.summaryDivider} />
           <div className={styles.summaryItem}>
-            <span className={styles.summaryLabel}>Total Distribuído</span>
-            <span className={styles.summaryValue}>{fmt(totalSugerido)}</span>
+            <span className={styles.summaryLabel}>Custo Total</span>
+            <span className={styles.summaryValue}>{fmtBRL(totalCusto)}</span>
           </div>
           <div className={styles.summaryDivider} />
           <div className={styles.summaryItem}>
@@ -220,6 +227,8 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                 <th className={styles.right}>Qtd vendida</th>
                 <th className={styles.right}>Participação</th>
                 <th className={styles.right}>Qtd Sugerida</th>
+                <th className={styles.right}>Custo Unit.</th>
+                <th className={styles.right}>Custo Total</th>
               </tr>
             </thead>
             <tbody>
@@ -230,7 +239,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                   <React.Fragment key={curva}>
                     {/* Separador de seção */}
                     <tr className={`${styles.sectionRow} ${styles[`sectionRow${curva}`]}`}>
-                      <td colSpan={6}>
+                      <td colSpan={8}>
                         <div className={styles.sectionLabel}>
                           <span className={`${styles.curvaBadge} ${CURVA_BADGE_CLASS[curva]}`}>{curva}</span>
                           <span className={styles.sectionTitle}>{CURVA_LABEL[curva]}</span>
@@ -271,6 +280,12 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                           </td>
                           <td className={p.qtdFinal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}>
                             {p.qtdFinal > 0 ? fmt(p.qtdFinal) : "—"}
+                          </td>
+                          <td className={`${styles.right} ${p.qtdFinal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
+                            {p.qtdFinal > 0 && p.vendas3meses > 0 ? fmtBRL2(p.valor3meses / p.vendas3meses) : "—"}
+                          </td>
+                          <td className={`${styles.right} ${p.qtdFinal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
+                            {p.qtdFinal > 0 && p.vendas3meses > 0 ? fmtBRL(p.qtdFinal * (p.valor3meses / p.vendas3meses)) : "—"}
                           </td>
                         </tr>
                       );
