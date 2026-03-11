@@ -4959,6 +4959,8 @@ export async function fetchProjecaoMensal({
       const vendasAtual = Number(row.vendas ?? 0);
       vendasMesAtualMap.set(key, (vendasMesAtualMap.get(key) || 0) + vendasAtual);
       vendasVarejoMesAtualMap.set(key, (vendasVarejoMesAtualMap.get(key) || 0) + vendasAtual);
+      // Capturar descrição para produtos que podem não ter estoque (segunda passagem)
+      if ((row as any).descricao && !descricaoMap.has(key)) descricaoMap.set(key, (row as any).descricao);
     });
 
     // Somar vendas de e-commerce do mês atual
@@ -4985,6 +4987,8 @@ export async function fetchProjecaoMensal({
       const v = Number(row.vendas ?? 0);
       mesMap.set(mesNumero, (mesMap.get(mesNumero) || 0) + v);
       mesMapVarejo.set(mesNumero, (mesMapVarejo.get(mesNumero) || 0) + v);
+      // Capturar descrição para produtos que podem não ter estoque (segunda passagem)
+      if ((row as any).descricao && !descricaoMap.has(key)) descricaoMap.set(key, (row as any).descricao);
     });
     ecommerceAnoAtualPorMesResult.recordset.forEach(row => {
       const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${(row as any).produto || ''}|${(row as any).cor || ''}`;
@@ -5229,11 +5233,14 @@ export async function fetchProjecaoMensal({
       const grade = parts[3] || undefined;
       const colecao = parts[4] || undefined;
       const produto = parts[5] || undefined;
-      // cor: extraída da chave (código bruto, ex: "03"). Para ScarfMe não há tabela CORES,
-      // então o código já é suficiente. Para NERD, o corDisplayMap estaria disponível se
-      // o produto estivesse no estoque — como não está, usamos o código direto.
+      // cor: extraída da chave (código bruto, ex: "03").
+      // Tenta corDisplayMap primeiro, depois o mapeamento estático colorMapping.json
+      // (mesmo caminho dos produtos com estoque via getColorDescription), e por último
+      // usa o código bruto como fallback para nunca exibir apenas o número.
       const corRaw = parts[6] || undefined;
-      const cor = corRaw ? (corDisplayMap.get(key) || corRaw) : undefined;
+      const cor = corRaw
+        ? (corDisplayMap.get(key) || getColorDescription(corRaw, '') || corRaw)
+        : undefined;
 
       const vendasMesAtual = vendasMesAtualMap.get(key) || 0;
       const vendasReaisPorMes = vendasReaisPorMesMap.get(key) || new Map();
@@ -5252,7 +5259,7 @@ export async function fetchProjecaoMensal({
         grade,
         colecao,
         produto,
-        descricao: undefined,
+        descricao: descricaoMap.get(key),
         cor,   // preserva cor para que expansão produto+cor funcione no frontend
         meses: [],
       };
