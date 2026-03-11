@@ -190,6 +190,7 @@ export default function ProjecaoEstoquePage({
   } | null>(null);
   const [custosCompra, setCustosCompra] = useState<Record<string, number>>({});
   const fetchedCustosRef = useRef(new Set<string>());
+  const expansaoRestoredRef = useRef(false);
 
   const [opcoesGrupos, setOpcoesGrupos] = useState<string[]>([]);
   const [opcoesLinhas, setOpcoesLinhas] = useState<string[]>([]);
@@ -218,6 +219,16 @@ export default function ProjecaoEstoquePage({
     if (s.length) setSubgrupos(s);
     const gr = searchParams.getAll("grades");
     if (gr.length) setGrades(gr);
+    if (!expansaoRestoredRef.current) {
+      expansaoRestoredRef.current = true;
+      const expParam = searchParams.get("expansao");
+      if (expParam) {
+        try {
+          const arr = JSON.parse(expParam) as Array<[string, { nivel: number; subgrupoSelecionado?: string; gradeSelecionado?: string; produtoSelecionado?: string }]>;
+          setExpansao(new Map(arr));
+        } catch {}
+      }
+    }
   }, [searchParams]);
 
   // Load filter options
@@ -1369,6 +1380,9 @@ export default function ProjecaoEstoquePage({
                           colecoes.forEach((c) => params.append("colecoes", c));
                           subgrupos.forEach((s) => params.append("subgrupos", s));
                           grades.forEach((g) => params.append("grades", g));
+                          if (expansao.size > 0) {
+                            params.set("expansao", JSON.stringify(Array.from(expansao.entries())));
+                          }
                           router.push(`/${companyKey}/controle-estoque/projecao/lista-compra?${params.toString()}`);
                         };
                         return (

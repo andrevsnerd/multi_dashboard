@@ -171,7 +171,18 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
               </p>
             </div>
           </div>
-          <button type="button" className={styles.backButton} onClick={() => router.back()}>
+          <button type="button" className={styles.backButton} onClick={() => {
+            const projecaoParams = new URLSearchParams();
+            if (filial) projecaoParams.set("filial", filial);
+            searchParams.getAll("grupos").forEach((g) => projecaoParams.append("grupos", g));
+            searchParams.getAll("linhas").forEach((l) => projecaoParams.append("linhas", l));
+            searchParams.getAll("colecoes").forEach((c) => projecaoParams.append("colecoes", c));
+            searchParams.getAll("subgrupos").forEach((s) => projecaoParams.append("subgrupos", s));
+            searchParams.getAll("grades").forEach((g) => projecaoParams.append("grades", g));
+            const expansao = searchParams.get("expansao");
+            if (expansao) projecaoParams.set("expansao", expansao);
+            router.push(`/${companyKey}/controle-estoque/projecao?${projecaoParams.toString()}`);
+          }}>
             ← Voltar
           </button>
         </div>
