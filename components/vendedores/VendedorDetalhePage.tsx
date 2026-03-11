@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import type { VendedorProdutoItem } from "@/lib/repositories/vendedores-v2";
 import type { DateRangeValue } from "@/components/filters/DateRangeFilter";
@@ -98,6 +98,22 @@ export default function VendedorDetalhePage({
 
   const totalFaturamento = data.reduce((acc, p) => acc + p.faturamento, 0);
   const totalQuantidade = data.reduce((acc, p) => acc + p.quantidade, 0);
+
+  const buildProdutoUrl = useCallback(
+    (p: (typeof data)[0]) => {
+      if (!p.codigo) return null;
+      const params = new URLSearchParams({
+        vendedor: vendedorNome,
+        filial,
+        produto: p.codigo,
+        descricao: p.descricao,
+        start: range.startDate.toISOString(),
+        end: range.endDate.toISOString(),
+      });
+      return `/${companyKey}/vendedores/detalhe/produto?${params.toString()}`;
+    },
+    [companyKey, vendedorNome, filial, range]
+  );
 
   return (
     <div className={styles.wrapper}>
@@ -199,7 +215,16 @@ export default function VendedorDetalhePage({
                     <>
                       <td className={styles.td}>{p.linha || "–"}</td>
                       <td className={styles.td}>
-                        <div>{p.descricao}</div>
+                        {(() => {
+                          const url = buildProdutoUrl(p);
+                          return url ? (
+                            <Link href={url} className={styles.produtoLink}>
+                              {p.descricao}
+                            </Link>
+                          ) : (
+                            <div>{p.descricao}</div>
+                          );
+                        })()}
                         {p.codigo && <div className={styles.codigo}>{p.codigo}</div>}
                       </td>
                       <td className={styles.td}>{p.cor || "–"}</td>
@@ -211,7 +236,16 @@ export default function VendedorDetalhePage({
                     <>
                       <td className={styles.td}>{p.grupo || "–"}</td>
                       <td className={styles.td}>
-                        <div>{p.descricao}</div>
+                        {(() => {
+                          const url = buildProdutoUrl(p);
+                          return url ? (
+                            <Link href={url} className={styles.produtoLink}>
+                              {p.descricao}
+                            </Link>
+                          ) : (
+                            <div>{p.descricao}</div>
+                          );
+                        })()}
                         {p.codigo && <div className={styles.codigo}>{p.codigo}</div>}
                       </td>
                       <td className={styles.td}>{p.cor || "–"}</td>

@@ -195,3 +195,13 @@
   color: #64748b;
   margin-top: 2px;
 }
+
+.produtoLink {
+  color: #3b82f6;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.produtoLink:hover {
+  text-decoration: underline;
+}

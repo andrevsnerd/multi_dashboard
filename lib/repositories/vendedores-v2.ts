@@ -296,6 +296,83 @@ export interface VendedorProdutosListParams {
   produtoSearchTerm?: string;
 }
 
+export interface VendedorProdutoVendaItem {
+  data: string; // ISO date string (YYYY-MM-DD)
+  cor?: string;
+  faturamento: number;
+  quantidade: number;
+}
+
+export interface VendedorProdutoVendasParams {
+  company?: string;
+  vendedor: string;
+  filial: string;
+  produto: string;
+  range?: { start?: Date | string; end?: Date | string };
+}
+
+/**
+ * Vendas por data de um produto específico de um vendedor.
+ */
+export async function fetchVendedorProdutoVendas(
+  params: VendedorProdutoVendasParams
+): Promise<VendedorProdutoVendaItem[]> {
+  return withRequest(async (request) => {
+    const { vendedor, filial, produto, range } = params;
+
+    const { start, end } = normalizeRangeForQuery(range);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+    request.input('filial', sql.VarChar, filial);
+    request.input('produto', sql.VarChar, produto);
+
+    // Resolve vendedor code(s) from LOJA_VENDEDORES (small table, fast)
+    request.input('vendedorApelido', sql.VarChar, vendedor);
+    const codigoResult = await request.query<{ codigo: string }>(`
+      SELECT LTRIM(RTRIM(CAST(VENDEDOR AS VARCHAR))) AS codigo
+      FROM LOJA_VENDEDORES WITH (NOLOCK)
+      WHERE LTRIM(RTRIM(ISNULL(VENDEDOR_APELIDO, ISNULL(NOME_VENDEDOR, CAST(VENDEDOR AS VARCHAR))))) = @vendedorApelido
+    `);
+    const codigos = (codigoResult.recordset ?? []).map((r) => r.codigo).filter(Boolean);
+    if (codigos.length === 0) codigos.push(vendedor);
+    codigos.forEach((c, i) => request.input(`vcode${i}`, sql.VarChar, c));
+    const vendedorFilter = `AND vp.VENDEDOR IN (${codigos.map((_, i) => `@vcode${i}`).join(', ')})`;
+
+    const query = `
+      SELECT
+        CONVERT(VARCHAR(10), vp.DATA_VENDA, 23) AS data,
+        MAX(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO, '')) AS cor,
+        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) END) AS faturamento,
+        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.QTDE END) AS quantidade
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
+      WHERE vp.DATA_VENDA >= @startDate
+        AND vp.DATA_VENDA < @endDate
+        AND vp.QTDE > 0
+        AND vp.FILIAL = @filial
+        AND vp.PRODUTO = @produto
+        ${vendedorFilter}
+      GROUP BY CONVERT(VARCHAR(10), vp.DATA_VENDA, 23), vp.COR_PRODUTO
+      HAVING SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) END) > 0
+      ORDER BY data ASC, cor ASC
+    `;
+
+    const result = await request.query<{
+      data: string;
+      cor: string;
+      faturamento: number;
+      quantidade: number;
+    }>(query);
+
+    return result.recordset.map((row) => ({
+      data: row.data,
+      cor: row.cor?.trim() || undefined,
+      faturamento: row.faturamento ?? 0,
+      quantidade: row.quantidade ?? 0,
+    }));
+  });
+}
+
 /**
  * Produtos do vendedor: query enxuta, só campos usados na tela.
  */
@@ -320,8 +397,20 @@ export async function fetchVendedorProdutosList(
     const { start, end } = normalizeRangeForQuery(range);
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
-    request.input('vendedor', sql.VarChar, vendedor);
     request.input('filial', sql.VarChar, filial);
+
+    // Resolve vendedor code(s) from LOJA_VENDEDORES (small table, fast)
+    request.input('vendedorApelido', sql.VarChar, vendedor);
+    const codigoResult = await request.query<{ codigo: string }>(`
+      SELECT LTRIM(RTRIM(CAST(VENDEDOR AS VARCHAR))) AS codigo
+      FROM LOJA_VENDEDORES WITH (NOLOCK)
+      WHERE LTRIM(RTRIM(ISNULL(VENDEDOR_APELIDO, ISNULL(NOME_VENDEDOR, CAST(VENDEDOR AS VARCHAR))))) = @vendedorApelido
+    `);
+    const codigos = (codigoResult.recordset ?? []).map((r) => r.codigo).filter(Boolean);
+    // Fallback: try matching by raw code if apelido not found
+    if (codigos.length === 0) codigos.push(vendedor);
+    codigos.forEach((c, i) => request.input(`vcode${i}`, sql.VarChar, c));
+    const vendedorFilter = `AND vp.VENDEDOR IN (${codigos.map((_, i) => `@vcode${i}`).join(', ')})`;
 
     const grupoFilter = buildListFilter(
       request,
@@ -376,15 +465,13 @@ export async function fetchVendedorProdutosList(
         SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) END) AS faturamento,
         SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.QTDE END) AS quantidade
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      LEFT JOIN W_CTB_LOJA_VENDA_PEDIDO v WITH (NOLOCK)
-        ON v.FILIAL = vp.FILIAL AND v.PEDIDO = vp.PEDIDO AND v.TICKET = vp.TICKET
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
       WHERE vp.DATA_VENDA >= @startDate
         AND vp.DATA_VENDA < @endDate
         AND vp.QTDE > 0
         AND vp.FILIAL = @filial
-        AND (ISNULL(v.VENDEDOR_APELIDO, vp.VENDEDOR) = @vendedor OR vp.VENDEDOR = @vendedor)
+        ${vendedorFilter}
         ${grupoFilter}
         ${linhaFilter}
         ${colecaoFilter}
