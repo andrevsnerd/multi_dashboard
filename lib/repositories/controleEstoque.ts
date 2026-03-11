@@ -1,6 +1,6 @@
 import sql from 'mssql';
 
-import { resolveCompany, VAREJO_VALUE, isEcommerceFilial } from '@/lib/config/company';
+import { resolveCompany, VAREJO_VALUE, isEcommerceFilial, getFilialGroupMembers } from '@/lib/config/company';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import { getCurrentMonthRange, normalizeRangeForQuery, shiftRangeByMonths } from '@/lib/utils/date';
@@ -34,8 +34,14 @@ function buildFilialFilter(
   const filiais = company.filialFilters['inventory'] ?? [];
   const ecommerceFilials = company.ecommerceFilials ?? [];
 
-  // Se uma filial específica foi selecionada, usar apenas ela
+  // Se uma filial específica foi selecionada, usar ela ou o grupo que ela representa
   if (specificFilial && specificFilial !== VAREJO_VALUE) {
+    const members = getFilialGroupMembers(company, specificFilial);
+    if (members.length > 1) {
+      members.forEach((f, i) => request.input(`estoqueFilialGroup${i}`, sql.VarChar, f));
+      const placeholders = members.map((_, i) => `@estoqueFilialGroup${i}`).join(', ');
+      return `AND ${prefix}.FILIAL IN (${placeholders})`;
+    }
     const filialParam = `estoqueFilial`;
     request.input(filialParam, sql.VarChar, specificFilial);
     return `AND ${prefix}.FILIAL = @${filialParam}`;
@@ -121,6 +127,12 @@ function buildVendasFilialFilter(
   const ecommerceFilials = company.ecommerceFilials ?? [];
 
   if (specificFilial && specificFilial !== VAREJO_VALUE) {
+    const members = getFilialGroupMembers(company, specificFilial);
+    if (members.length > 1) {
+      members.forEach((f, i) => request.input(`vendasFilialGroup${i}`, sql.VarChar, f));
+      const placeholders = members.map((_, i) => `@vendasFilialGroup${i}`).join(', ');
+      return `AND ${prefix}.FILIAL IN (${placeholders})`;
+    }
     request.input('vendasFilial', sql.VarChar, specificFilial);
     return `AND ${prefix}.FILIAL = @vendasFilial`;
   }
@@ -4458,20 +4470,31 @@ export async function fetchProjecaoMensal({
     const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineProjecao');
     const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
 
-    // Vendas do mês atual: usar TODAS as filiais (igual ao Controle de Estoque "Venda Total (período)")
-    // para que o valor real e a projeção batam com o card quando o período for mês corrente
+    // Vendas do mês atual (vendasReais): filtrar pela mesma filial/grupo selecionado.
+    // Quando filial = null e scarfme, inclui ecommerce de varejo junto (para bater com o card total).
     let vendasMesAtualFilialFilter = '';
     if (company) {
       const companyConfig = resolveCompany(company);
       if (companyConfig) {
-        const todasFiliais = new Set([
-          ...(companyConfig.filialFilters['sales'] ?? []),
-          ...(companyConfig.ecommerceFilials ?? []),
-        ]);
-        if (todasFiliais.size > 0) {
-          const filiaisArray = Array.from(todasFiliais);
-          filiaisArray.forEach((f, i) => request.input(`vendasMesAtualFilial${i}`, sql.VarChar, f));
-          const placeholders = filiaisArray.map((_, i) => `@vendasMesAtualFilial${i}`).join(', ');
+        let filiaisParaMesAtual: string[];
+        if (filial && filial !== VAREJO_VALUE && !isEcommerceSelected) {
+          // Filial específica: usar o grupo dela (ex: ambas as Paulistas)
+          filiaisParaMesAtual = getFilialGroupMembers(companyConfig, filial);
+        } else if (filial === VAREJO_VALUE) {
+          // Varejo: apenas filiais normais (sem e-commerce)
+          filiaisParaMesAtual = (companyConfig.filialFilters['sales'] ?? []).filter(
+            f => !(companyConfig.ecommerceFilials ?? []).includes(f)
+          );
+        } else {
+          // Todas as filiais (filial = null): inclui varejo + e-commerce para bater com o card total
+          filiaisParaMesAtual = Array.from(new Set([
+            ...(companyConfig.filialFilters['sales'] ?? []),
+            ...(companyConfig.ecommerceFilials ?? []),
+          ]));
+        }
+        if (filiaisParaMesAtual.length > 0) {
+          filiaisParaMesAtual.forEach((f, i) => request.input(`vendasMesAtualFilial${i}`, sql.VarChar, f));
+          const placeholders = filiaisParaMesAtual.map((_, i) => `@vendasMesAtualFilial${i}`).join(', ');
           vendasMesAtualFilialFilter = `AND vp.FILIAL IN (${placeholders})`;
         }
       }
@@ -4524,7 +4547,7 @@ export async function fetchProjecaoMensal({
         ${categoriaField} AS categoria
         ${camposAdicionais}${corCampoVendas},
         MONTH(vp.DATA_VENDA) AS mes,
-        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
+        SUM(vp.QTDE - ISNULL(vp.QTDE_CANCELADA, 0)) AS vendas
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       WHERE YEAR(vp.DATA_VENDA) = ${anoPassado}
@@ -4637,7 +4660,7 @@ export async function fetchProjecaoMensal({
       SELECT
         ${categoriaField} AS categoria
         ${camposAdicionais}${corCampoVendas},
-        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
+        SUM(vp.QTDE - ISNULL(vp.QTDE_CANCELADA, 0)) AS vendas
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       WHERE vp.DATA_VENDA >= @periodoStartMesAtual
@@ -4670,8 +4693,8 @@ export async function fetchProjecaoMensal({
       SELECT
         ${categoriaField} AS categoria
         ${camposAdicionais}${corCampoVendas},
-        SUM(CASE WHEN vp.DATA_VENDA >= @prevMonthStart AND vp.DATA_VENDA < @prevMonthEnd AND vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendasMesAnterior,
-        SUM(CASE WHEN vp.DATA_VENDA >= @ultimos30Start AND vp.DATA_VENDA < @ultimos30End AND vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas30Dias
+        SUM(CASE WHEN vp.DATA_VENDA >= @prevMonthStart AND vp.DATA_VENDA < @prevMonthEnd THEN vp.QTDE - ISNULL(vp.QTDE_CANCELADA, 0) ELSE 0 END) AS vendasMesAnterior,
+        SUM(CASE WHEN vp.DATA_VENDA >= @ultimos30Start AND vp.DATA_VENDA < @ultimos30End THEN vp.QTDE - ISNULL(vp.QTDE_CANCELADA, 0) ELSE 0 END) AS vendas30Dias
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       WHERE vp.DATA_VENDA >= @prevMonthStart
@@ -4800,7 +4823,7 @@ export async function fetchProjecaoMensal({
         ${categoriaField} AS categoria
         ${camposAdicionais}${corCampoVendas},
         MONTH(vp.DATA_VENDA) AS mes,
-        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS vendas
+        SUM(vp.QTDE - ISNULL(vp.QTDE_CANCELADA, 0)) AS vendas
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       WHERE YEAR(vp.DATA_VENDA) = ${anoAtual}
@@ -5182,6 +5205,116 @@ export async function fetchProjecaoMensal({
         const estoqueUsado = projecao.meses[i].estoque;
         projecao.meses[i].duracao = estoqueUsado > 0 ? totalDias : 0;
       }
+    });
+
+    // Segunda passagem: capturar vendas de produtos SEM estoque que venderam no ANO ATUAL.
+    // Esses produtos não entram no estoqueMap, logo ficam ausentes do categoriasMap e suas
+    // vendasReais seriam perdidas na agregação por linha no frontend.
+    // Fonte: apenas vendasMesAtualMap (mês corrente) e vendasReaisPorMesMap (ano atual por mês)
+    // → nunca inclui produtos que só venderam no ano passado.
+    const todasChavesVendas = new Set([
+      ...vendasMesAtualMap.keys(),      // vendas do mês atual (ano corrente)
+      ...vendasReaisPorMesMap.keys(),   // vendas mensais do ano corrente
+    ]);
+
+    todasChavesVendas.forEach((key) => {
+      if (categoriasMap.has(key)) return; // já processado pelo loop do estoque
+
+      const parts = key.split('|');
+      const categoria = parts[0];
+      if (!categoria || categoria === '' || categoria === 'SEM LINHA' || categoria === 'SEM GRUPO') return;
+
+      const linha = parts[1] || undefined;
+      const subgrupo = parts[2] || undefined;
+      const grade = parts[3] || undefined;
+      const colecao = parts[4] || undefined;
+      const produto = parts[5] || undefined;
+      // cor: extraída da chave (código bruto, ex: "03"). Para ScarfMe não há tabela CORES,
+      // então o código já é suficiente. Para NERD, o corDisplayMap estaria disponível se
+      // o produto estivesse no estoque — como não está, usamos o código direto.
+      const corRaw = parts[6] || undefined;
+      const cor = corRaw ? (corDisplayMap.get(key) || corRaw) : undefined;
+
+      const vendasMesAtual = vendasMesAtualMap.get(key) || 0;
+      const vendasReaisPorMes = vendasReaisPorMesMap.get(key) || new Map();
+      const vendasAnoPassadoPorMes = vendasAnoPassadoMap.get(key) || new Map();
+      const vendasAnoPassadoVarejoPorMes = vendasAnoPassadoVarejoMap.get(key) || new Map();
+      const vendasAnoPassadoEcommercePorMes = vendasAnoPassadoEcommerceMap.get(key) || new Map();
+
+      // Só adicionar se houver vendas reais nesse mês ou no ano atual
+      const temVendasReaisAnoAtual = vendasMesAtual > 0 || [...vendasReaisPorMes.values()].some(v => v > 0);
+      if (!temVendasReaisAnoAtual) return;
+
+      const projecao: ProjecaoCategoria = {
+        categoria,
+        linha,
+        subgrupo,
+        grade,
+        colecao,
+        produto,
+        descricao: undefined,
+        cor,   // preserva cor para que expansão produto+cor funcione no frontend
+        meses: [],
+      };
+
+      const diasNoMesAtual = new Date(anoAtual, mesAtual, 0).getDate();
+      const diasCorridos = now.getDate();
+
+      for (let i = 0; i < 12; i++) {
+        const mesNumero = i + 1;
+        const isMesAtual = mesNumero === mesAtual;
+        const isMesPassado = mesNumero < mesAtual;
+
+        const varejoMesAnoPassado = vendasAnoPassadoVarejoPorMes.get(mesNumero) || 0;
+        const ecommerceMesAnoPassado = vendasAnoPassadoEcommercePorMes.get(mesNumero) || 0;
+        const totalLy = varejoMesAnoPassado + ecommerceMesAnoPassado;
+
+        let vendas: number;
+        if (totalLy > 0) {
+          vendas = Math.round(totalLy * 1.1);
+        } else {
+          const vendasMesAnoPassado = vendasAnoPassadoPorMes.get(mesNumero) || 0;
+          vendas = vendasMesAnoPassado > 0 ? Math.round(vendasMesAnoPassado * 1.1) : 0;
+        }
+
+        let vendasReais: number | undefined;
+        if (isMesAtual) {
+          vendasReais = Math.round(vendasMesAtual);
+        } else {
+          const realDoMes = vendasReaisPorMes.get(mesNumero);
+          if (realDoMes != null) vendasReais = Math.round(realDoMes);
+        }
+
+        const varejoReal = isMesAtual
+          ? Math.round(vendasVarejoMesAtualMap.get(key) || 0)
+          : Math.round(vendasReaisVarejoPorMesMap.get(key)?.get(mesNumero) || 0);
+        const ecommerceReal = isMesAtual
+          ? Math.round(vendasEcommerceMesAtualMap.get(key) || 0)
+          : Math.round(vendasReaisEcommercePorMesMap.get(key)?.get(mesNumero) || 0);
+        const temReal = vendasReais != null || varejoReal > 0 || ecommerceReal > 0;
+
+        projecao.meses.push({
+          categoria,
+          linha,
+          subgrupo,
+          grade,
+          colecao,
+          mes: mesesNomes[i],
+          mesNumero,
+          ano: anoAtual,
+          vendas,
+          estoque: 0,   // sem estoque — apenas vendasReais importa
+          duracao: 0,
+          isMesAtual,
+          isMesPassado,
+          ...(vendasReais !== undefined && { vendasReais }),
+          ...(varejoMesAnoPassado > 0 && { vendasVarejo: Math.round(varejoMesAnoPassado) }),
+          ...(ecommerceMesAnoPassado > 0 && { vendasEcommerce: Math.round(ecommerceMesAnoPassado) }),
+          ...(temReal && { vendasVarejoReal: varejoReal, vendasEcommerceReal: ecommerceReal }),
+        });
+      }
+
+      categoriasMap.set(key, projecao);
     });
 
     return Array.from(categoriasMap.values());

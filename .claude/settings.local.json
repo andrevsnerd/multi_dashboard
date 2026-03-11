@@ -3,7 +3,16 @@
     "allow": [
       "Bash(ls \"c:\\\\Users\\\\NERD TIJUCA\\\\Documents\\\\NERD - ANDRE\\\\Dashboard NERD\\\\multi-dashboard\\\\app\\\\\\(companies\\)\\\\[company]\\\\controle-estoque\\\\projecao\"\")",
       "Bash(ls \"c:/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/app/\\(companies\\)/[company]/controle-estoque/projecao/\")",
-      "Bash(\"c:\\\\Users\\\\NERD TIJUCA\\\\Documents\\\\NERD - ANDRE\\\\Dashboard NERD\\\\multi-dashboard\\\\components\\\\stock\\\\ProjecaoEstoquePage.module.css\")"
+      "Bash(\"c:\\\\Users\\\\NERD TIJUCA\\\\Documents\\\\NERD - ANDRE\\\\Dashboard NERD\\\\multi-dashboard\\\\components\\\\stock\\\\ProjecaoEstoquePage.module.css\")",
+      "Bash(npx tsc --noEmit --strict false)",
+      "Bash(npm install html2canvas --save)",
+      "Bash(npx tsc --noEmit --skipLibCheck)",
+      "Bash(npm install exceljs)",
+      "Bash(node -e \"require\\(''exceljs''\\); console.log\\(''ok''\\)\")",
+      "Bash(python -c \":*)",
+      "Bash(python debug_guarulhos_acessorios.py)",
+      "Bash(python -X utf8 debug_guarulhos_acessorios.py)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

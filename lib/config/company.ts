@@ -15,6 +15,13 @@ export interface CompanyConfig {
   estoqueFilialOrder?: string[];
   ecommerceFilials?: string[];
   excludedLines?: string[]; // Linhas excluídas de cálculos de estoque e vendas
+  /**
+   * Grupos de filiais que devem ser tratados como uma só filial lógica.
+   * Chave = filial canônica (representante, usada como valor do filtro).
+   * Valor = todas as filiais do grupo (incluindo a canônica).
+   * Quando a filial canônica é selecionada, todas do grupo são incluídas nas consultas.
+   */
+  filialGroups?: Record<string, string[]>;
 }
 
 const companyConfigs: Record<CompanyKey, CompanyConfig> = {
@@ -103,6 +110,10 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
     },
     estoqueFilialOrder: ['MATRIZ', 'E-COMMERCE', 'GUARULHOS', 'MORUMBI', 'OSCAR FREIRE', 'VILLA LOBOS'],
     ecommerceFilials: ['SCARFME MATRIZ CMS', 'SCARF ME - MATRIZ LLL', 'SCARF ME MATRIZ - FFF', 'MSC COMERCIO DE LENCOS LT'],
+    filialGroups: {
+      // PAULISTA possui dois CNPJs/entidades no sistema mas é tratada como uma só loja
+      'SCARFME ME - PAULISTA FFF': ['SCARFME ME - PAULISTA FFF', 'SCARF ME - PAULISTA RSR'],
+    },
     excludedLines: [
       'PRIVATE LABEL',
       'GASTRONOMICA',
@@ -122,6 +133,21 @@ export function resolveCompany(company?: string): CompanyConfig | null {
 
   const normalized = company.toLowerCase() as CompanyKey;
   return companyConfigs[normalized] ?? null;
+}
+
+/**
+ * Retorna todas as filiais do banco que compõem a filial lógica selecionada.
+ * Se a filial não pertencer a nenhum grupo, retorna [filial].
+ */
+export function getFilialGroupMembers(company: CompanyConfig, filial: string): string[] {
+  const groups = company.filialGroups ?? {};
+  // É a filial canônica de um grupo?
+  if (filial in groups) return groups[filial];
+  // É membro não-canônico de algum grupo?
+  for (const members of Object.values(groups)) {
+    if (members.includes(filial)) return members;
+  }
+  return [filial];
 }
 
 export function isEcommerceFilial(

@@ -80,6 +80,13 @@
   font-weight: 500;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .backButton {
   display: flex;
   align-items: center;
@@ -99,6 +106,56 @@
   background: #f8fafc;
   border-color: #cbd5e1;
   color: #334155;
+}
+
+.pdfButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #dc2626;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background 0.18s;
+  white-space: nowrap;
+}
+
+.pdfButton:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.pdfButton:disabled {
+  background: #fca5a5;
+  cursor: not-allowed;
+}
+
+.xlsxButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #16a34a;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background 0.18s;
+  white-space: nowrap;
+}
+
+.xlsxButton:hover:not(:disabled) {
+  background: #15803d;
+}
+
+.xlsxButton:disabled {
+  background: #86efac;
+  cursor: not-allowed;
 }
 
 /* Filtros — acima da tabela na ordem de visualização (dropdowns não cortados) */

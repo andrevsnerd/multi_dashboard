@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getMonth, getYear } from "date-fns";
@@ -9,10 +9,15 @@ import FilialFilter from "@/components/filters/FilialFilter";
 import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
 import type { CompanyKey } from "@/lib/config/company";
 import { resolveCompany } from "@/lib/config/company";
+import { useAuth } from "@/components/auth/AuthContext";
 
 import styles from "./ProjecaoEstoquePage.module.css";
 
 const TOOLTIP_OFFSET = 8;
+
+// Tipo mínimo para callbacks do ExcelJS (evita any implícito)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ExcelJSCell = any;
 
 const MESES_NOMES = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
 
@@ -101,13 +106,14 @@ function getExcludedLines(companyKey: CompanyKey): Set<string> {
 
 export default function ProjecaoEstoquePage({
   companyKey,
-  companyName,
 }: {
   companyKey: CompanyKey;
-  companyName: string;
+  companyName?: string;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   const [filial, setFilial] = useState<string | null>(searchParams.get("filial") || null);
   const [grupos, setGrupos] = useState<string[]>([]);
@@ -274,8 +280,6 @@ export default function ProjecaoEstoquePage({
     }
     return out;
   }, []);
-
-  const mesAtualIndex = getMonth(new Date()); // 0-11, índice do mês atual na lista de 12
 
   // Merge de meses (soma vendas; uma unica cadeia de estoque a partir do mês atual)
   const reagrupar = useCallback((items: ProjecaoCategoria[]): ProjecaoCategoria[] => {
@@ -589,6 +593,259 @@ export default function ProjecaoEstoquePage({
   }, [expansao, projecoes]);
 
   const voltarAoInicio = useCallback(() => setExpansao(new Map()), []);
+
+  // Dados reais (por categoria): estoque atual já tem venda real descontada; duração só com ritmo real
+  const getReaisPorMes = useCallback((proj: ProjecaoCategoria) => {
+    const meses = proj.meses;
+    if (meses.length === 0) return { estoqueAtualReal: 0, duracaoRealMesAtual: 0 };
+    const mesAtualIdx = getMonth(new Date()); // 0-11
+    const mesAtual = meses[mesAtualIdx];
+    if (!mesAtual) return { estoqueAtualReal: 0, duracaoRealMesAtual: 0 };
+    const estoqueAtualReal = mesAtual.estoque;
+    const vendasReaisMesAtual = mesAtual.vendasReais ?? 0;
+    const diasCorridos = new Date().getDate();
+    let duracaoRealMesAtual = 0;
+    if (estoqueAtualReal > 0 && vendasReaisMesAtual > 0 && diasCorridos > 0) {
+      const consumoDiario = vendasReaisMesAtual / diasCorridos;
+      duracaoRealMesAtual = Math.round(estoqueAtualReal / consumoDiario);
+    }
+    return { estoqueAtualReal, duracaoRealMesAtual };
+  }, []);
+
+  const [exportandoPDF, setExportandoPDF] = useState(false);
+
+  // Ref para captura do conteúdo visual (PDF)
+  const captureRef = useRef<HTMLDivElement>(null);
+
+  // ── Exportar PDF: captura visual da página com html2canvas ─────────────────
+  const gerarPDF = useCallback(async () => {
+    const el = captureRef.current;
+    if (!el) return;
+    setExportandoPDF(true);
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+
+      // Expande scroll horizontal temporariamente para capturar toda a tabela
+      const scrollEl = el.querySelector<HTMLElement>("[data-scroll-container]");
+      const prevOverflow = scrollEl?.style.overflowX ?? "";
+      const prevWidth = scrollEl?.style.width ?? "";
+      if (scrollEl) {
+        scrollEl.style.overflowX = "visible";
+        scrollEl.style.width = `${scrollEl.scrollWidth}px`;
+      }
+
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#f8f9fb",
+        scrollX: 0,
+        scrollY: -window.scrollY,
+        windowWidth: el.scrollWidth,
+      });
+
+      // Restaura estilos
+      if (scrollEl) {
+        scrollEl.style.overflowX = prevOverflow;
+        scrollEl.style.width = prevWidth;
+      }
+
+      const pdfW = 297; // A4 landscape largura em mm
+      const pdfH = 210; // A4 landscape altura em mm
+      const margin = 6;
+      const usableW = pdfW - margin * 2;
+      const usableH = pdfH - margin * 2;
+
+      // Proporção da imagem capturada
+      const imgW = canvas.width;
+      const imgH = canvas.height;
+
+      // Pode ser necessário mais de uma página se a tabela for muito longa
+      const sliceHeightPx = Math.floor(imgW / (usableW / usableH)); // pixels por página
+      const totalPages = Math.ceil(imgH / sliceHeightPx);
+
+      const doc = new jsPDF({ orientation: "landscape", format: "a4", unit: "mm" });
+
+      for (let page = 0; page < totalPages; page++) {
+        if (page > 0) doc.addPage();
+        // Posição vertical no canvas para esta página
+        const srcY = page * sliceHeightPx;
+        const srcH = Math.min(sliceHeightPx, imgH - srcY);
+
+        // Cria canvas de fatia
+        const slice = document.createElement("canvas");
+        slice.width = imgW;
+        slice.height = srcH;
+        const ctx = slice.getContext("2d")!;
+        ctx.drawImage(canvas, 0, srcY, imgW, srcH, 0, 0, imgW, srcH);
+        const sliceData = slice.toDataURL("image/png");
+
+        const sliceRatio = imgW / srcH;
+        const drawH = usableW / sliceRatio;
+        doc.addImage(sliceData, "PNG", margin, margin, usableW, Math.min(drawH, usableH));
+      }
+
+      const dateStr = new Date().toISOString().split("T")[0];
+      const suffix = consultaTermos.length > 0 ? "-consulta" : "";
+      doc.save(`projecao-estoque${suffix}-${dateStr}.pdf`);
+    } finally {
+      setExportandoPDF(false);
+    }
+  }, [consultaTermos]);
+
+  // ── Exportar XLSX: tabela estilizada com ExcelJS ──────────────────────────
+  const [exportandoXLSX, setExportandoXLSX] = useState(false);
+
+  const gerarXLSX = useCallback(async () => {
+    if (listaExibida.length === 0) return;
+    setExportandoXLSX(true);
+    try {
+      const excelJsMod = await import("exceljs");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ExcelJS = (excelJsMod as any).default ?? excelJsMod;
+
+      const workbook = new ExcelJS.Workbook();
+      const ws = workbook.addWorksheet("Projeção", {
+        views: [{ state: "frozen", ySplit: 1 }],
+      });
+
+      const mesesNomes = mesesExibicao.map((m) => m.mes);
+      const totalCols = 7 + mesesNomes.length;
+
+      ws.columns = [
+        { width: 30 },
+        { width: 14 },
+        { width: 14 },
+        { width: 14 },
+        { width: 8  },
+        { width: 14 },
+        { width: 22 },
+        ...mesesNomes.map(() => ({ width: 10 })),
+      ];
+
+      // ── Cabeçalho ──
+      const headerRow = ws.addRow([
+        "Categoria", "Código", "Linha", "Subgrupo", "Grade", "Coleção", "Tipo", ...mesesNomes,
+      ]);
+      headerRow.height = 22;
+      headerRow.eachCell({ includeEmpty: true }, (cell: ExcelJSCell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } };
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10, name: "Calibri" };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.border = {
+          top: { style: "thin" }, left: { style: "thin" },
+          bottom: { style: "thin" }, right: { style: "thin" },
+        };
+      });
+      // Categoria header: alinhado à esquerda
+      headerRow.getCell(1).alignment = { horizontal: "left", vertical: "middle" };
+
+      // ── Paleta de cores por bloco ──
+      const PROJ_BG = "FFE8F0FE"; // azul claro — projeção
+      const REAL_BG = "FFF0F0F0"; // cinza claro — real
+      const TIPOS: { label: string; bg: string }[] = [
+        { label: "VENDA (projeção)",   bg: PROJ_BG },
+        { label: "ESTOQUE (projeção)", bg: PROJ_BG },
+        { label: "DURAÇÃO (projeção)", bg: PROJ_BG },
+        { label: "VENDA (real)",       bg: REAL_BG },
+        { label: "ESTOQUE (real)",     bg: REAL_BG },
+        { label: "DURAÇÃO (real)",     bg: REAL_BG },
+      ];
+
+      listaExibida.forEach((proj, projIdx) => {
+        const { estoqueAtualReal, duracaoRealMesAtual } = getReaisPorMes(proj);
+        const catLabel = proj.descricao || proj.categoria;
+        const mDados = mesesExibicao.map((m) => proj.meses.find((pm) => pm.mesNumero === m.mesNumero) ?? null);
+
+        const rowsData: (number | null)[][] = [
+          mDados.map((md) => (md && !md.isMesPassado ? md.vendas : null)),
+          mDados.map((md) => (md && !md.isMesPassado ? md.estoque : null)),
+          mDados.map((md) => { const d = md && !md.isMesPassado ? md.duracao : null; return d != null && d > 0 ? d : null; }),
+          mDados.map((md) => md?.vendasReais ?? null),
+          mDados.map((md) => { if (md?.isMesAtual) return estoqueAtualReal > 0 ? estoqueAtualReal : null; return md?.estoqueRealSnapshot ?? null; }),
+          mDados.map((md) => { const d = md?.isMesAtual ? duracaoRealMesAtual : (md?.duracaoRealSnapshot ?? null); return d != null && d > 0 ? d : null; }),
+        ];
+
+        const prefixo = [
+          catLabel,
+          proj.produto ?? "",
+          proj.linha ?? proj.categoria,
+          proj.subgrupo ?? "",
+          proj.grade ?? "",
+          proj.colecao ?? "",
+        ];
+
+        const startRowNum: number = ws.rowCount + 1;
+
+        TIPOS.forEach(({ label, bg }, i) => {
+          const row = ws.addRow([...prefixo, label, ...rowsData[i].map((v) => v ?? "")]);
+          row.height = 16;
+          row.eachCell({ includeEmpty: true }, (cell: ExcelJSCell, colNum: number) => {
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bg } };
+            cell.font = { size: 10, name: "Calibri" };
+            cell.alignment = { horizontal: colNum <= 2 ? "left" : "center", vertical: "middle" };
+            cell.border = {
+              top: { style: "hair" }, left: { style: "hair" },
+              bottom: { style: "hair" }, right: { style: "hair" },
+            };
+          });
+          // Tipo: itálico discreto
+          const tipoCell = row.getCell(7);
+          tipoCell.font = { size: 9, name: "Calibri", italic: true, color: { argb: "FF444444" } };
+          // Células numéricas: direita + formato milhar
+          for (let c = 8; c <= totalCols; c++) {
+            const cell = row.getCell(c);
+            if (typeof cell.value === "number") {
+              cell.alignment = { horizontal: "right", vertical: "middle" };
+              cell.numFmt = "#,##0";
+            }
+          }
+        });
+
+        // Mescla coluna Categoria (col 1) pelas 6 linhas do produto
+        ws.mergeCells(startRowNum, 1, startRowNum + 5, 1);
+        const catCell = ws.getCell(startRowNum, 1);
+        catCell.value = catLabel + (proj.produto ? `\n${proj.produto}` : "");
+        catCell.font = { bold: true, size: 10, name: "Calibri" };
+        catCell.alignment = { horizontal: "left", vertical: "middle", wrapText: true };
+        catCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: projIdx % 2 === 0 ? PROJ_BG : REAL_BG } };
+        catCell.border = {
+          top: { style: "thin" }, left: { style: "thin" },
+          bottom: { style: "thin" }, right: { style: "thin" },
+        };
+
+        // Separador entre blocos de produto (borda inferior grossa)
+        if (projIdx < listaExibida.length - 1) {
+          const lastRow = ws.getRow(startRowNum + 5);
+          for (let col = 1; col <= totalCols; col++) {
+            const cell = lastRow.getCell(col);
+            const b = cell.border ?? {};
+            cell.border = { ...b, bottom: { style: "medium", color: { argb: "FF999999" } } };
+          }
+        }
+      });
+
+      // Gera e baixa o arquivo
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer as ArrayBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const dateStr = new Date().toISOString().split("T")[0];
+      const suffix = consultaTermos.length > 0 ? "-consulta" : "";
+      a.download = `projecao-estoque${suffix}-${dateStr}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setExportandoXLSX(false);
+    }
+  }, [listaExibida, mesesExibicao, consultaTermos, getReaisPorMes]);
   const voltarUmNivel = useCallback(() => {
     setExpansao((prev) => {
       const next = new Map(prev);
@@ -604,25 +861,6 @@ export default function ProjecaoEstoquePage({
     });
   }, []);
 
-  // Dados reais (por categoria): estoque atual já tem venda real descontada; duração só com ritmo real
-  const getReaisPorMes = useCallback((proj: ProjecaoCategoria) => {
-    const meses = proj.meses;
-    if (meses.length === 0) return { estoqueAtualReal: 0, duracaoRealMesAtual: 0 };
-    const mesAtualIdx = getMonth(new Date()); // 0-11
-    const mesAtual = meses[mesAtualIdx];
-    if (!mesAtual) return { estoqueAtualReal: 0, duracaoRealMesAtual: 0 };
-    // Estoque atual já está descontado das vendas reais (não descontar de novo)
-    const estoqueAtualReal = mesAtual.estoque;
-    const vendasReaisMesAtual = mesAtual.vendasReais ?? 0;
-    const diasCorridos = new Date().getDate();
-    // Duração real: com o estoque atual, ritmo = vendasReais/diasCorridos → dias até zerar
-    let duracaoRealMesAtual = 0;
-    if (estoqueAtualReal > 0 && vendasReaisMesAtual > 0 && diasCorridos > 0) {
-      const consumoDiario = vendasReaisMesAtual / diasCorridos;
-      duracaoRealMesAtual = Math.round(estoqueAtualReal / consumoDiario);
-    }
-    return { estoqueAtualReal, duracaoRealMesAtual };
-  }, []);
 
   if (loading) return <div className={styles.wrapper}><div className={styles.loading}>Carregando...</div></div>;
   if (error) return <div className={styles.wrapper}><div className={styles.error}>{error}</div></div>;
@@ -630,7 +868,7 @@ export default function ProjecaoEstoquePage({
   const temExpansao = Array.from(expansao.values()).some((e) => e.nivel > 0);
 
   return (
-    <div className={styles.wrapper}>
+    <div ref={captureRef} className={styles.wrapper}>
       <div className={styles.headerCard}>
         <div className={styles.header}>
           <div className={styles.headerLeft}>
@@ -649,11 +887,49 @@ export default function ProjecaoEstoquePage({
               {snapshotOk && <p className={styles.snapshotSaved}>Snapshot salvo.</p>}
             </div>
           </div>
-          <button type="button" className={styles.backButton} onClick={() => router.back()}>Voltar</button>
+          <div className={styles.headerActions}>
+            {isAdmin && (
+              <>
+                <button
+                  type="button"
+                  className={styles.pdfButton}
+                  onClick={gerarPDF}
+                  disabled={exportandoPDF || listaExibida.length === 0}
+                  title={`Exportar ${listaExibida.length} item(ns) para PDF`}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                    <polyline points="10 9 9 9 8 9" />
+                  </svg>
+                  {exportandoPDF ? "Gerando..." : "Exportar PDF"}
+                </button>
+                <button
+                  type="button"
+                  className={styles.xlsxButton}
+                  onClick={gerarXLSX}
+                  disabled={exportandoXLSX || listaExibida.length === 0}
+                  title={`Exportar ${listaExibida.length} item(ns) para XLSX`}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="8" y1="13" x2="16" y2="13" />
+                    <line x1="8" y1="17" x2="16" y2="17" />
+                    <line x1="10" y1="9" x2="14" y2="9" />
+                  </svg>
+                  {exportandoXLSX ? "Gerando..." : "Exportar XLSX"}
+                </button>
+              </>
+            )}
+            <button type="button" className={styles.backButton} onClick={() => router.back()}>Voltar</button>
+          </div>
         </div>
 
         <div className={styles.filtersRow}>
-          <FilialFilter companyKey={companyKey} value={filial} onChange={setFilial} />
+          <FilialFilter companyKey={companyKey} value={filial} onChange={setFilial} module="inventory" />
           {companyKey === "nerd" && (
             <MultiSelectFilter
               label="Grupo"
@@ -762,7 +1038,7 @@ export default function ProjecaoEstoquePage({
       )}
 
       <div className={styles.tableWrapper}>
-        <div className={styles.tableScrollContainer}>
+        <div className={styles.tableScrollContainer} data-scroll-container>
           <table className={styles.projecaoTable}>
             <thead>
               <tr>
@@ -923,7 +1199,7 @@ export default function ProjecaoEstoquePage({
                     {/* Bloco números reais — mesmo cinza nas 3 linhas, como na imagem */}
                     <tr className={`${styles.realRow} ${styles.realRowFirst}`}>
                       <td className={styles.realLabelCell}>VENDA (real)</td>
-                      {mesesExibicao.map((m, mi) => {
+                      {mesesExibicao.map((m) => {
                         const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
                         const valor = md?.vendasReais != null ? fmt(md.vendasReais) : "-";
                         const temTooltip = md && (md.vendasReais != null || md.vendasVarejoReal != null || md.vendasEcommerceReal != null);
@@ -954,7 +1230,7 @@ export default function ProjecaoEstoquePage({
                     </tr>
                     <tr className={styles.realRow}>
                       <td className={styles.realLabelCell}>ESTOQUE (real)</td>
-                      {mesesExibicao.map((m, mi) => {
+                      {mesesExibicao.map((m) => {
                         const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
                         const valor = m.isMesAtual ? fmt(estoqueAtualReal) : (md?.estoqueRealSnapshot != null ? fmt(md.estoqueRealSnapshot) : "-");
                         return <td key={`er-${m.ano}-${m.mesNumero}`} className={`${styles.realEstoqueCell} ${m.isMesAtual ? styles.columnMesAtual : ""}`}>{valor}</td>;
@@ -962,7 +1238,7 @@ export default function ProjecaoEstoquePage({
                     </tr>
                     <tr className={styles.realRow}>
                       <td className={styles.realLabelCell}>DURACAO (real)</td>
-                      {mesesExibicao.map((m, mi) => {
+                      {mesesExibicao.map((m) => {
                         const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
                         const valorNum = m.isMesAtual ? duracaoRealMesAtual : (md?.duracaoRealSnapshot ?? 0);
                         const valor = m.isMesAtual

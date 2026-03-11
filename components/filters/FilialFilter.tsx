@@ -34,13 +34,36 @@ export default function FilialFilter({
   const displayNames = company?.filialDisplayNames ?? {};
   const isScarfme = companyKey === 'scarfme';
   const ecommerceFilials = company?.ecommerceFilials ?? [];
-  
-  // Filtrar filiais normais (sem ecommerce) para mostrar na lista
-  let normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
+
+  // Membros não-canônicos de grupos (ex: 'SCARF ME - PAULISTA RSR') → não mostrar no dropdown;
+  // apenas a filial canônica do grupo aparece (ex: 'SCARFME ME - PAULISTA FFF' → "PAULISTA")
+  const nonCanonicalGroupMembers = new Set<string>();
+  if (company?.filialGroups) {
+    const canonicals = new Set(Object.keys(company.filialGroups));
+    for (const members of Object.values(company.filialGroups)) {
+      for (const m of members) {
+        if (!canonicals.has(m)) nonCanonicalGroupMembers.add(m);
+      }
+    }
+  }
+
+  // Filtrar filiais normais (sem ecommerce, sem membros não-canônicos de grupos)
+  let normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f) && !nonCanonicalGroupMembers.has(f));
   if (allowedFiliais && allowedFiliais.length > 0) {
-    const allowedSet = new Set(allowedFiliais.map((a) => a.trim().toUpperCase()));
+    // Expandir allowedFiliais: se um membro de grupo está permitido, a filial canônica também fica visível
+    const expandedAllowed = new Set<string>();
+    allowedFiliais.forEach((a) => {
+      expandedAllowed.add(a.trim().toUpperCase());
+      // Se é membro de grupo, adicionar a filial canônica à lista expandida
+      if (company) {
+        const canonical = Object.entries(company.filialGroups ?? {}).find(([, members]) =>
+          members.map(m => m.trim().toUpperCase()).includes(a.trim().toUpperCase())
+        )?.[0];
+        if (canonical) expandedAllowed.add(canonical.trim().toUpperCase());
+      }
+    });
     normalFiliais = normalFiliais.filter((f) =>
-      allowedSet.has((f || "").trim().toUpperCase())
+      expandedAllowed.has((f || "").trim().toUpperCase())
     );
   }
 

@@ -746,7 +746,14 @@ def exportar_txt(resultados: List[Dict], caminho_txt: str, mes_atual: int, ano_a
             duracao_exibir = f"{int(duracao_real)} dias (real)"
         else:
             duracao_exibir = f"{int(duracao_proj)} dias (projetada)" if duracao_proj is not None else "-"
-        linhas.extend([codigo, descricao, str(total_vendas), estoque_exibir, duracao_exibir, ""])
+        linhas.extend([
+            f"Código: {codigo}",
+            f"Descrição: {descricao}",
+            f"Vendas: {total_vendas}",
+            f"Estoque: {estoque_exibir}",
+            f"Duração: {duracao_exibir}",
+            "",
+        ])
     with open(caminho_txt, "w", encoding="utf-8") as f:
         f.write("\n".join(linhas))
     print(f"Resumo TXT salvo: {caminho_txt}")
