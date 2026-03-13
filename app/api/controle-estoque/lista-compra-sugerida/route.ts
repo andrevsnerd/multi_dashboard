@@ -15,6 +15,7 @@ export async function GET(request: Request) {
   const colecoes = searchParams.getAll('colecoes').filter(Boolean);
   const subgrupos = searchParams.getAll('subgrupos').filter(Boolean);
   const grades = searchParams.getAll('grades').filter(Boolean);
+  const produtos = searchParams.getAll('produtos').filter(Boolean);
 
   try {
     const data = await fetchTopProdutosUltimos3Meses({
@@ -26,6 +27,7 @@ export async function GET(request: Request) {
       colecoes: colecoes.length > 0 ? colecoes : null,
       subgrupos: subgrupos.length > 0 ? subgrupos : null,
       grades: grades.length > 0 ? grades : null,
+      produtos: produtos.length > 0 ? produtos : null,
       qtdCompra,
       limit: Number.isFinite(limit) && limit > 0 ? limit : 50,
     });

@@ -98,41 +98,90 @@ function fmtBRL(value: number): string {
 }
 
 interface ProdutoSugestaoMin {
+  produto: string;
   valor3meses: number;
   vendas3meses: number;
 }
 
-function calcCustoCompra(produtos: ProdutoSugestaoMin[], qtdCompra: number): number {
-  const totalGeral = produtos.reduce((s, p) => s + p.valor3meses, 0);
-  if (totalGeral === 0 || qtdCompra === 0) return 0;
+/** Item individual com necessidade de reposição */
+interface ReposicaoItem {
+  produto: string;
+  descricao: string;
+  cor?: string;
+  subgrupo?: string;
+  grade?: string;
+  colecao?: string;
+  linha?: string;
+  qtdCompra: number;
+  estoqueReal: number;
+  duracaoReal: number;
+  consumoDiario: number;
+  diasCobertura: number;
+  necessidadeTotal: number;
+}
 
-  let cumulative = 0;
-  const curvaA: ProdutoSugestaoMin[] = [];
-  for (const p of produtos) {
-    cumulative += p.valor3meses;
-    if (cumulative / totalGeral <= 0.80) {
-      curvaA.push(p);
-    } else {
-      break;
+/**
+ * Varre `projecoes` para encontrar itens individuais dentro do escopo de `proj`
+ * que precisam de reposição, retornando cada um com sua própria qty calculada.
+ */
+function computeReposicaoScope(
+  proj: ProjecaoCategoria,
+  projecoes: ProjecaoCategoria[],
+  getReaisPorMesFn: (p: ProjecaoCategoria) => { estoqueAtualReal: number; duracaoRealMesAtual: number }
+): ReposicaoItem[] {
+  const isLençosLine = proj.categoria === "LENÇOS" || proj.categoria === "APROVEITAMENTO LENÇOS";
+  const limiteDiasAlerta = isLençosLine ? 120 : 90;
+
+  // Filtra projecoes ao escopo do proj clicado
+  const inScope = projecoes.filter(p => {
+    if (p.categoria !== proj.categoria) return false;
+    if (proj.subgrupo && p.subgrupo !== proj.subgrupo) return false;
+    if (proj.grade && p.grade !== proj.grade) return false;
+    if (proj.produto && p.produto !== proj.produto) return false;
+    if (proj.cor && p.cor !== proj.cor) return false;
+    return true;
+  });
+
+  const result: ReposicaoItem[] = [];
+  for (const item of inScope) {
+    const { estoqueAtualReal, duracaoRealMesAtual } = getReaisPorMesFn(item);
+    for (const mes of item.meses) {
+      let duracaoReal = 0, estoqueReal = 0;
+      if (mes.isMesAtual) {
+        duracaoReal = duracaoRealMesAtual;
+        estoqueReal = estoqueAtualReal;
+      } else if (mes.isMesPassado) {
+        duracaoReal = mes.duracaoRealSnapshot ?? 0;
+        estoqueReal = mes.estoqueRealSnapshot ?? 0;
+      } else continue;
+
+      if (duracaoReal > 0 && duracaoReal <= limiteDiasAlerta && estoqueReal > 0) {
+        const consumoDiario = estoqueReal / duracaoReal;
+        const diasCobertura = 30 + limiteDiasAlerta;
+        const necessidadeTotal = consumoDiario * diasCobertura;
+        const qtdCompra = Math.max(0, Math.round(necessidadeTotal - estoqueReal));
+        if (qtdCompra > 0) {
+          result.push({
+            produto: item.produto ?? '',
+            descricao: item.descricao ?? item.produto ?? item.categoria,
+            cor: item.cor,
+            subgrupo: item.subgrupo,
+            grade: item.grade,
+            colecao: item.colecao,
+            linha: item.linha,
+            qtdCompra,
+            estoqueReal,
+            duracaoReal,
+            consumoDiario,
+            diasCobertura,
+            necessidadeTotal,
+          });
+        }
+        break;
+      }
     }
   }
-  if (curvaA.length === 0) return 0;
-
-  const totalCurvaA = curvaA.reduce((s, p) => s + p.valor3meses, 0);
-  if (totalCurvaA === 0) return 0;
-
-  const exatos = curvaA.map(p => (p.valor3meses / totalCurvaA) * qtdCompra);
-  const floors = exatos.map(Math.floor);
-  const remainder = qtdCompra - floors.reduce((s, v) => s + v, 0);
-  const fracs = exatos.map((e, i) => ({ i, frac: e - floors[i] }));
-  fracs.sort((a, b) => b.frac - a.frac);
-  const boost = new Set(fracs.slice(0, remainder).map(r => r.i));
-  const qtds = floors.map((f, i) => f + (boost.has(i) ? 1 : 0));
-
-  return curvaA.reduce((sum, p, i) => {
-    const unitPrice = p.vendas3meses > 0 ? p.valor3meses / p.vendas3meses : 0;
-    return sum + qtds[i] * unitPrice;
-  }, 0);
+  return result;
 }
 
 // --- Default excluded lines (ScarfMe) ---
@@ -188,8 +237,6 @@ export default function ProjecaoEstoquePage({
     qtdCompra: number;
     limiteDias: number;
   } | null>(null);
-  const [custosCompra, setCustosCompra] = useState<Record<string, number>>({});
-  const fetchedCustosRef = useRef(new Set<string>());
   const expansaoRestoredRef = useRef(false);
 
   const [opcoesGrupos, setOpcoesGrupos] = useState<string[]>([]);
@@ -667,9 +714,22 @@ export default function ProjecaoEstoquePage({
     return { estoqueAtualReal, duracaoRealMesAtual };
   }, []);
 
-  // Pré-computa compraInfo para todos os itens da lista para buscar custos
+  // Pré-computa compraInfo completo (inclui reposicaoItems individuais por produto/cor)
   const compraInfoMap = useMemo(() => {
-    const map = new Map<string, { qtdCompra: number; categoria: string }>();
+    const map = new Map<string, {
+      qtdCompra: number;
+      dataCompra: string;
+      redMesNumero: number;
+      redAno: number;
+      reposicaoItems: ReposicaoItem[];
+      estoqueReal: number;
+      duracaoReal: number;
+      consumoDiario: number;
+      diasCobertura: number;
+      necessidadeTotal: number;
+      limiteDias: number;
+      categoria: string;
+    }>();
     listaExibida.forEach((proj, idx) => {
       const { estoqueAtualReal, duracaoRealMesAtual } = getReaisPorMes(proj);
       const isLençosLine = proj.categoria === "LENÇOS" || proj.categoria === "APROVEITAMENTO LENÇOS";
@@ -680,42 +740,79 @@ export default function ProjecaoEstoquePage({
         else if (mes.isMesPassado) { duracaoReal = mes.duracaoRealSnapshot ?? 0; estoqueReal = mes.estoqueRealSnapshot ?? 0; }
         else continue;
         if (duracaoReal > 0 && duracaoReal <= limiteDiasAlerta && estoqueReal > 0) {
-          const qtdCompra = Math.max(0, Math.round((estoqueReal / duracaoReal) * (30 + limiteDiasAlerta) - estoqueReal));
+          const consumoDiario = estoqueReal / duracaoReal;
+          const diasCobertura = 30 + limiteDiasAlerta;
+          const necessidadeTotal = consumoDiario * diasCobertura;
+          // Computa reposição individual para todos os itens no escopo
+          const reposicaoItems = computeReposicaoScope(proj, projecoes, getReaisPorMes);
+          const qtdCompra = reposicaoItems.length > 0
+            ? reposicaoItems.reduce((s, i) => s + i.qtdCompra, 0)
+            : Math.max(0, Math.round(necessidadeTotal - estoqueReal));
           const rowKey = `${proj.categoria}|${proj.subgrupo ?? ""}|${proj.grade ?? ""}|${proj.colecao ?? ""}|${proj.produto ?? ""}|${proj.cor ?? ""}|${idx}`;
-          map.set(rowKey, { qtdCompra, categoria: proj.categoria });
+          map.set(rowKey, {
+            qtdCompra,
+            dataCompra: `25/${String(mes.mesNumero).padStart(2, "0")}/${mes.ano}`,
+            redMesNumero: mes.mesNumero,
+            redAno: mes.ano,
+            reposicaoItems,
+            estoqueReal,
+            duracaoReal,
+            consumoDiario,
+            diasCobertura,
+            necessidadeTotal,
+            limiteDias: limiteDiasAlerta,
+            categoria: proj.categoria,
+          });
           break;
         }
       }
     });
     return map;
-  }, [listaExibida, getReaisPorMes]);
+  }, [listaExibida, getReaisPorMes, projecoes]);
 
-  // Busca custos para rows com compraInfo
-  useEffect(() => {
-    if (compraInfoMap.size === 0) return;
-    compraInfoMap.forEach(({ qtdCompra, categoria }) => {
-      const custoKey = `${categoria}|${qtdCompra}`;
-      if (fetchedCustosRef.current.has(custoKey)) return;
-      fetchedCustosRef.current.add(custoKey);
-      const params = new URLSearchParams();
-      params.set("company", companyKey);
-      if (filial) params.set("filial", filial);
-      params.set("categoria", categoria);
-      params.set("qtdCompra", String(qtdCompra));
-      grupos.forEach(g => params.append("grupos", g));
-      linhas.forEach(l => params.append("linhas", l));
-      colecoes.forEach(c => params.append("colecoes", c));
-      subgrupos.forEach(s => params.append("subgrupos", s));
-      grades.forEach(g => params.append("grades", g));
-      fetch(`/api/controle-estoque/lista-compra-sugerida?${params}`, { cache: "no-store" })
-        .then(r => r.json())
-        .then((json: { data?: ProdutoSugestaoMin[] }) => {
-          const custo = calcCustoCompra(json.data ?? [], qtdCompra);
-          setCustosCompra(prev => ({ ...prev, [custoKey]: custo }));
-        })
-        .catch(() => { /* silenciosamente ignora */ });
+  // Coleta todos os códigos de produto que precisam de reposição (para buscar preço unitário em lote)
+  const allProdutosReposicao = useMemo(() => {
+    const codes = new Set<string>();
+    compraInfoMap.forEach(({ reposicaoItems }) => {
+      reposicaoItems.forEach(item => { if (item.produto) codes.add(item.produto); });
     });
-  }, [compraInfoMap, companyKey, filial, grupos, linhas, colecoes, subgrupos, grades]);
+    return Array.from(codes);
+  }, [compraInfoMap]);
+
+  // Busca preços unitários (valor60dias / vendas60dias) por produto específico
+  const [unitPrices, setUnitPrices] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (allProdutosReposicao.length === 0) return;
+    const params = new URLSearchParams();
+    params.set("company", companyKey);
+    if (filial) params.set("filial", filial);
+    params.set("qtdCompra", "0");
+    allProdutosReposicao.forEach(p => params.append("produtos", p));
+    fetch(`/api/controle-estoque/lista-compra-sugerida?${params}`, { cache: "no-store" })
+      .then(r => r.json())
+      .then((json: { data?: ProdutoSugestaoMin[] }) => {
+        const prices: Record<string, number> = {};
+        (json.data ?? []).forEach(p => {
+          if (p.vendas3meses > 0) prices[p.produto] = p.valor3meses / p.vendas3meses;
+        });
+        setUnitPrices(prices);
+      })
+      .catch(() => {});
+  }, [allProdutosReposicao, companyKey, filial]);
+
+  // Custo por row = soma dos custos individuais de cada produto em reposição
+  const custosCompra = useMemo(() => {
+    const costs: Record<string, number> = {};
+    compraInfoMap.forEach(({ reposicaoItems }, rowKey) => {
+      let total = 0;
+      reposicaoItems.forEach(item => {
+        const unitPrice = unitPrices[item.produto] ?? 0;
+        total += item.qtdCompra * unitPrice;
+      });
+      if (total > 0) costs[rowKey] = total;
+    });
+    return costs;
+  }, [compraInfoMap, unitPrices]);
 
   const [exportandoPDF, setExportandoPDF] = useState(false);
 
@@ -1156,6 +1253,12 @@ export default function ProjecaoEstoquePage({
             </thead>
             <tbody>
               {listaExibida.map((proj, idx) => {
+                const rowKey = `${proj.categoria}|${proj.subgrupo ?? ""}|${proj.grade ?? ""}|${proj.colecao ?? ""}|${proj.produto ?? ""}|${proj.cor ?? ""}|${idx}`;
+                const compraInfo = compraInfoMap.get(rowKey) ?? null;
+                const { estoqueAtualReal, duracaoRealMesAtual } = getReaisPorMes(proj);
+                const isLençosLine = proj.categoria === "LENÇOS" || proj.categoria === "APROVEITAMENTO LENÇOS";
+                const limiteDiasAlerta = isLençosLine ? 120 : 90;
+
                 const ex = expansao.get(proj.categoria);
                 const nivel = ex?.nivel ?? 0;
                 const podeNivel1 = nivel === 0 && projecoes.some((p) => p.categoria === proj.categoria && p.subgrupo);
@@ -1164,57 +1267,6 @@ export default function ProjecaoEstoquePage({
                 const podeNivel4 = nivel === 3 && proj.produto && projecoes.some((p) => p.categoria === proj.categoria && p.subgrupo === proj.subgrupo && p.grade === proj.grade && p.produto === proj.produto && p.cor);
                 const clickable = podeNivel1 || (nivel === 1 && podeNivel2) || (nivel === 2 && podeNivel3) || (nivel === 3 && podeNivel4);
                 const isLast = idx === listaExibida.length - 1;
-
-                const { estoqueAtualReal, duracaoRealMesAtual } = getReaisPorMes(proj);
-                // Regra de alerta (vermelho): LENÇOS e APROVEITAMENTO LENÇOS ≤ 120 dias; demais linhas ≤ 90 dias
-                const isLençosLine = proj.categoria === "LENÇOS" || proj.categoria === "APROVEITAMENTO LENÇOS";
-                const limiteDiasAlerta = isLençosLine ? 120 : 90;
-
-                // Calcular DATA COMPRA e QTD COMPRA: primeiro mês real com duração vermelha
-                let compraInfo: {
-                  dataCompra: string;
-                  qtdCompra: number;
-                  redMesNumero: number;
-                  redAno: number;
-                  estoqueReal: number;
-                  duracaoReal: number;
-                  consumoDiario: number;
-                  diasCobertura: number;
-                  necessidadeTotal: number;
-                  limiteDias: number;
-                } | null = null;
-                for (const mes of proj.meses) {
-                  let duracaoReal = 0;
-                  let estoqueReal = 0;
-                  if (mes.isMesAtual) {
-                    duracaoReal = duracaoRealMesAtual;
-                    estoqueReal = estoqueAtualReal;
-                  } else if (mes.isMesPassado) {
-                    duracaoReal = mes.duracaoRealSnapshot ?? 0;
-                    estoqueReal = mes.estoqueRealSnapshot ?? 0;
-                  } else {
-                    continue;
-                  }
-                  if (duracaoReal > 0 && duracaoReal <= limiteDiasAlerta && estoqueReal > 0) {
-                    const dailySale = estoqueReal / duracaoReal;
-                    const diasCobertura = 30 + limiteDiasAlerta;
-                    const totalNeed = dailySale * diasCobertura;
-                    const qtdCompra = Math.max(0, Math.round(totalNeed - estoqueReal));
-                    compraInfo = {
-                      dataCompra: `25/${String(mes.mesNumero).padStart(2, "0")}/${mes.ano}`,
-                      qtdCompra,
-                      redMesNumero: mes.mesNumero,
-                      redAno: mes.ano,
-                      estoqueReal,
-                      duracaoReal,
-                      consumoDiario: dailySale,
-                      diasCobertura,
-                      necessidadeTotal: totalNeed,
-                      limiteDias: limiteDiasAlerta,
-                    };
-                    break;
-                  }
-                }
 
                 return (
                   <React.Fragment key={`${proj.categoria}-${proj.subgrupo ?? ""}-${proj.grade ?? ""}-${proj.colecao ?? ""}-${proj.produto ?? ""}-${proj.cor ?? ""}-${idx}`}>
@@ -1371,9 +1423,19 @@ export default function ProjecaoEstoquePage({
                         const showBelow = idx === 0;
                         const handleClickQtdCompra = () => {
                           if (!compraInfo) return;
+                          // Salva dados de reposição individual no sessionStorage para a página de lista
+                          try {
+                            sessionStorage.setItem("lista_compra_reposicao", JSON.stringify({
+                              categoria: proj.categoria,
+                              totalQtd: compraInfo.qtdCompra,
+                              itens: compraInfo.reposicaoItems,
+                              timestamp: Date.now(),
+                            }));
+                          } catch (_) { /* ignora se sessionStorage não disponível */ }
                           const params = new URLSearchParams();
                           params.set("categoria", proj.categoria);
                           params.set("qtdCompra", String(compraInfo.qtdCompra));
+                          params.set("mode", "reposicao");
                           if (filial) params.set("filial", filial);
                           grupos.forEach((g) => params.append("grupos", g));
                           linhas.forEach((l) => params.append("linhas", l));
@@ -1416,10 +1478,7 @@ export default function ProjecaoEstoquePage({
                       })}
                     </tr>
                     {(() => {
-                      const rowKey = `${proj.categoria}|${proj.subgrupo ?? ""}|${proj.grade ?? ""}|${proj.colecao ?? ""}|${proj.produto ?? ""}|${proj.cor ?? ""}|${idx}`;
-                      const custoInfo = compraInfoMap.get(rowKey);
-                      const custoKey = custoInfo ? `${custoInfo.categoria}|${custoInfo.qtdCompra}` : null;
-                      const custoValor = custoKey != null ? custosCompra[custoKey] : undefined;
+                      const custoValor = compraInfo != null ? custosCompra[rowKey] : undefined;
                       return (
                         <tr className={`${styles.compraRow} ${!isLast ? styles.categoryBlockEnd : ""}`}>
                           <td className={styles.compraLabelCell}>CUSTO</td>

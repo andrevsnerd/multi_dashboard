@@ -1,0 +1,142 @@
+Período (mês atual): Março/2026
+-----------------------------------------------
+
+Código: 13.46.0060
+Descrição: ARARA RIO 08/22
+Cor: VERDE
+Vendas: 3
+Estoque: 9
+Duração: 33 dias (real)
+
+Código: 13.46.0067
+Descrição: BRASIL ANIMAL PRINT 22
+Cor: AZUL/AMARELO
+Vendas: 2
+Estoque: 11
+Duração: 60 dias (real)
+
+Código: 13.46.0147
+Descrição: RAMOS DE PURPURA 06/23
+Cor: AZUL
+Vendas: 0
+Estoque: 1
+Duração: 30 dias (projetada)
+
+Código: 13.46.0147
+Descrição: RAMOS DE PURPURA 06/23
+Cor: PRETO
+Vendas: 0
+Estoque: 6
+Duração: 81 dias (projetada)
+
+Código: 13.46.0147
+Descrição: RAMOS DE PURPURA 06/23
+Cor: ROXO
+Vendas: 0
+Estoque: 7
+Duração: 203 dias (projetada)
+
+Código: 13.46.0147
+Descrição: RAMOS DE PURPURA 06/23
+Cor: PINK
+Vendas: 0
+Estoque: 4
+Duração: 92 dias (projetada)
+
+Código: 13.46.0147
+Descrição: RAMOS DE PURPURA 06/23
+Cor: PINK/ROXO
+Vendas: 1
+Estoque: 5
+Duração: 55 dias (real)
+
+Código: 13.46.0176
+Descrição: ARARA AZUL 07/23
+Cor: MULTICOLOR
+Vendas: 0
+Estoque: 8
+Duração: 203 dias (projetada)
+
+Código: 13.46.0235
+Descrição: FAUNA BRASILEIRA 03/24
+Cor: VERDE/OFF
+Vendas: 0
+Estoque: 1
+Duração: 7 dias (projetada)
+
+Código: 13.46.0246
+Descrição: GUARDIA DOS PORTAIS 04/24
+Cor: TURQUESA
+Vendas: 0
+Estoque: 2
+Duração: 10 dias (projetada)
+
+Código: 13.46.0343
+Descrição: ENCANTO CARIOCA 02/25
+Cor: AZUL
+Vendas: 0
+Estoque: 5
+Duração: 11 dias (projetada)
+
+Código: 13.46.0347
+Descrição: PASSAPORTES DA ALEGRIA 02/25
+Cor: CREME
+Vendas: 0
+Estoque: 2
+Duração: 5 dias (projetada)
+
+Código: 13.67.0092
+Descrição: ARARA AZUL 07/23
+Cor: MULTICOLOR
+Vendas: 0
+Estoque: 12
+Duração: 243 dias (projetada)
+
+Código: 45.14.0035
+Descrição: BRASIL TROPICAL 12/22
+Cor: AZUL/AMARELO
+Vendas: 0
+Estoque: 16
+Duração: 63 dias (projetada)
+
+Código: 45.14.0036
+Descrição: BRASIL ANIMAL PRINT 12/22
+Cor: AZUL/AMARELO
+Vendas: 5
+Estoque: 3
+Duração: 7 dias (real)
+
+Código: 45.14.0052
+Descrição: AMAZONIA INDÍGENA 05/23
+Cor: MARINHO
+Vendas: 1
+Estoque: 1
+Duração: 11 dias (real)
+
+Código: 45.14.0055
+Descrição: PANTANAL 05/23
+Cor: MULTICOLOR
+Vendas: 4
+Estoque: 6
+Duração: 16 dias (real)
+
+Código: 45.14.0058
+Descrição: RAMOS DE PURPURA PINK PURPLE 06/23
+Cor: ROXO
+Vendas: 1
+Estoque: 6
+Duração: 66 dias (real)
+
+Código: 45.14.0058
+Descrição: RAMOS DE PURPURA PINK PURPLE 06/23
+Cor: PINK
+Vendas: 0
+Estoque: 5
+Duração: 150 dias (projetada)
+
+Código: 45.14.0058
+Descrição: RAMOS DE PURPURA PINK PURPLE 06/23
+Cor: PINK/ROXO
+Vendas: 2
+Estoque: 4
+Duração: 22 dias (real)

@@ -5360,6 +5360,7 @@ export async function fetchTopProdutosUltimos3Meses({
   colecoes,
   subgrupos,
   grades,
+  produtos,
   qtdCompra,
   limit = 50,
 }: {
@@ -5371,6 +5372,7 @@ export async function fetchTopProdutosUltimos3Meses({
   colecoes?: string[] | null;
   subgrupos?: string[] | null;
   grades?: string[] | null;
+  produtos?: string[] | null;
   qtdCompra: number;
   limit?: number;
 }): Promise<ProdutoVendaUltimos3Meses[]> {
@@ -5401,6 +5403,20 @@ export async function fetchTopProdutosUltimos3Meses({
       categoriaFilter = `AND ${categoriaField} = @lcCategoria`;
     }
 
+    // Filtro de produtos específicos (para busca de preço unitário)
+    let produtosFilter = '';
+    if (produtos && produtos.length > 0) {
+      const produtosNorm = produtos.map(p => p.trim()).filter(p => p !== '');
+      if (produtosNorm.length === 1) {
+        request.input('lcProduto0', sql.VarChar, produtosNorm[0]);
+        produtosFilter = `AND LTRIM(RTRIM(ISNULL(vp.PRODUTO, ''))) = @lcProduto0`;
+      } else if (produtosNorm.length > 1) {
+        produtosNorm.forEach((p, i) => request.input(`lcProduto${i}`, sql.VarChar, p));
+        const placeholders = produtosNorm.map((_, i) => `@lcProduto${i}`).join(', ');
+        produtosFilter = `AND LTRIM(RTRIM(ISNULL(vp.PRODUTO, ''))) IN (${placeholders})`;
+      }
+    }
+
     const query = `
       SELECT TOP (@lc_limit)
         ISNULL(vp.PRODUTO, '') AS produto,
@@ -5421,6 +5437,7 @@ export async function fetchTopProdutosUltimos3Meses({
         ${exclusionFilter}
         ${nerdOnlyEletronicosFilter}
         ${categoriaFilter}
+        ${produtosFilter}
       GROUP BY ISNULL(vp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, ''))))
       HAVING SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) > 0
       ORDER BY valor3meses DESC

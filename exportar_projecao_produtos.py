@@ -172,6 +172,7 @@ def fetch_projecao_via_api(base_url: str, company: str, produtos_set: set, filia
             "grade": (cat.get("grade") or "").strip(),
             "colecao": (cat.get("colecao") or "").strip(),
             "cor": (cat.get("cor") or "").strip() or "SEM COR",
+            "descricao_cor": (cat.get("corDescricao") or cat.get("descricao_cor") or "").strip(),
             "vendas_proj": vendas_proj,
             "estoque_proj": estoque_proj,
             "duracao_proj": duracao_proj,
@@ -255,13 +256,16 @@ def resolver_produtos(conn, termos: list[str]) -> list[str]:
     return df["PRODUTO"].astype(str).str.strip().unique().tolist()
 
 
-def buscar_estoque_por_produto_cor(conn, produtos: list[str]) -> pd.DataFrame:
-    """Estoque atual por PRODUTO + COR (agregado nas filiais ScarfMe)."""
+def buscar_estoque_por_produto_cor(conn, produtos: list[str], filiais: Optional[List[str]] = None) -> pd.DataFrame:
+    """Estoque atual por PRODUTO + COR (agregado nas filiais ScarfMe). Se filiais for None, usa SCARFME_FILIAIS_ESTOQUE."""
     if not produtos:
         return pd.DataFrame()
+    filiais_use = filiais if filiais is not None else SCARFME_FILIAIS_ESTOQUE
+    if not filiais_use:
+        return pd.DataFrame()
     ph = ", ".join(["?"] * len(produtos))
-    ph_fil = ", ".join(["?"] * len(SCARFME_FILIAIS_ESTOQUE))
-    params = list(SCARFME_FILIAIS_ESTOQUE) + list(produtos)
+    ph_fil = ", ".join(["?"] * len(filiais_use))
+    params = list(filiais_use) + list(produtos)
     sql = f"""
     SELECT
         LTRIM(RTRIM(ISNULL(p.PRODUTO, ''))) AS PRODUTO,
@@ -271,20 +275,24 @@ def buscar_estoque_por_produto_cor(conn, produtos: list[str]) -> pd.DataFrame:
         UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) AS grade,
         UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) AS colecao,
         UPPER(LTRIM(RTRIM(ISNULL(e.COR_PRODUTO, '')))) AS cor,
+        UPPER(LTRIM(RTRIM(ISNULL(c.DESC_COR, ISNULL(e.COR_PRODUTO, ''))))) AS descricao_cor,
         SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoque
     FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
     LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+    LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = e.COR_PRODUTO
     WHERE e.FILIAL IN ({ph_fil})
       AND e.PRODUTO IN ({ph})
       AND e.ESTOQUE > 0
       AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) NOT IN ({','.join(['?']*len(SCARFME_EXCLUDED_LINES))})
-    GROUP BY LTRIM(RTRIM(ISNULL(p.PRODUTO, ''))), p.DESC_PRODUTO, p.LINHA, p.SUBGRUPO_PRODUTO, p.GRADE, p.COLECAO, e.COR_PRODUTO
+    GROUP BY LTRIM(RTRIM(ISNULL(p.PRODUTO, ''))), p.DESC_PRODUTO, p.LINHA, p.SUBGRUPO_PRODUTO, p.GRADE, p.COLECAO, e.COR_PRODUTO, c.DESC_COR
     """
     params.extend(SCARFME_EXCLUDED_LINES)
     df = pd.read_sql(sql, conn, params=params)
     if not df.empty:
         df["PRODUTO"] = df["PRODUTO"].astype(str).str.strip()
         df["cor"] = df["cor"].astype(str).str.strip()
+        if "descricao_cor" in df.columns:
+            df["descricao_cor"] = df["descricao_cor"].astype(str).str.strip()
     return df
 
 
@@ -299,13 +307,16 @@ def _normalizar_produto_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def buscar_vendas_ano_por_mes(conn, produtos: list[str], ano: int) -> pd.DataFrame:
+def buscar_vendas_ano_por_mes(conn, produtos: list[str], ano: int, filiais_varejo: Optional[List[str]] = None) -> pd.DataFrame:
     """Vendas varejo por PRODUTO, COR e mês. Backend usa vp.FILIAL IN (...). Tenta FILIAL; se falhar, usa JOIN em FILIAIS."""
     if not produtos:
         return pd.DataFrame()
+    filiais_use = filiais_varejo if filiais_varejo is not None else SCARFME_FILIAIS_VAREJO
+    if not filiais_use:
+        return pd.DataFrame(columns=["PRODUTO", "cor", "mes", "vendas"])
     ph = ", ".join(["?"] * len(produtos))
-    ph_fil = ", ".join(["?"] * len(SCARFME_FILIAIS_VAREJO))
-    params = [ano] + list(SCARFME_FILIAIS_VAREJO) + list(produtos)
+    ph_fil = ", ".join(["?"] * len(filiais_use))
+    params = [ano] + list(filiais_use) + list(produtos)
     sql = f"""
     SELECT
         LTRIM(RTRIM(ISNULL(vp.PRODUTO, ''))) AS PRODUTO,
@@ -342,13 +353,16 @@ def buscar_vendas_ano_por_mes(conn, produtos: list[str], ano: int) -> pd.DataFra
     return _normalizar_produto_df(pd.read_sql(sql_join, conn, params=params))
 
 
-def buscar_vendas_ecommerce_ano_por_mes(conn, produtos: list[str], ano: int) -> pd.DataFrame:
+def buscar_vendas_ecommerce_ano_por_mes(conn, produtos: list[str], ano: int, filiais_ecom: Optional[List[str]] = None) -> pd.DataFrame:
     """Vendas e-commerce por PRODUTO, COR e mês (ano dado)."""
     if not produtos:
         return pd.DataFrame()
+    filiais_use = filiais_ecom if filiais_ecom is not None else SCARFME_ECOM_FILIAIS
+    if not filiais_use:
+        return pd.DataFrame(columns=["PRODUTO", "cor", "mes", "vendas"])
     ph = ", ".join(["?"] * len(produtos))
-    ph_fil = ", ".join(["?"] * len(SCARFME_ECOM_FILIAIS))
-    params = [ano] + list(SCARFME_ECOM_FILIAIS) + list(produtos)
+    ph_fil = ", ".join(["?"] * len(filiais_use))
+    params = [ano] + list(filiais_use) + list(produtos)
     data_ec = "COALESCE(CAST(fp.ENTREGA AS DATE), CAST(f.EMISSAO AS DATE))"
     sql = f"""
     SELECT
@@ -370,13 +384,15 @@ def buscar_vendas_ecommerce_ano_por_mes(conn, produtos: list[str], ano: int) -> 
     return _normalizar_produto_df(pd.read_sql(sql, conn, params=params))
 
 
-def buscar_vendas_mes_atual(conn, produtos: list[str], inicio_mes, fim_mes) -> pd.DataFrame:
+def buscar_vendas_mes_atual(conn, produtos: list[str], inicio_mes, fim_mes, filiais_varejo: Optional[List[str]] = None, filiais_ecom: Optional[List[str]] = None) -> pd.DataFrame:
     """Vendas (varejo + e-commerce) do mês atual até hoje. Varejo: vp.FILIAL IN (filiais varejo)."""
     if not produtos:
         return pd.DataFrame()
+    filiais_v = filiais_varejo if filiais_varejo is not None else SCARFME_FILIAIS_VAREJO
+    filiais_ec = filiais_ecom if filiais_ecom is not None else SCARFME_ECOM_FILIAIS
     ph = ", ".join(["?"] * len(produtos))
-    ph_fil = ", ".join(["?"] * len(SCARFME_FILIAIS_VAREJO))
-    params = [inicio_mes, fim_mes] + list(SCARFME_FILIAIS_VAREJO) + list(produtos)
+    ph_fil = ", ".join(["?"] * len(filiais_v))
+    params = [inicio_mes, fim_mes] + list(filiais_v) + list(produtos)
     sql = f"""
     SELECT
         LTRIM(RTRIM(ISNULL(vp.PRODUTO, ''))) AS PRODUTO,
@@ -392,7 +408,7 @@ def buscar_vendas_mes_atual(conn, produtos: list[str], inicio_mes, fim_mes) -> p
     try:
         df_v = _normalizar_produto_df(pd.read_sql(sql, conn, params=params))
     except Exception:
-        params = [inicio_mes, fim_mes] + list(SCARFME_FILIAIS_VAREJO) + list(produtos)
+        params = [inicio_mes, fim_mes] + list(filiais_v) + list(produtos)
         sql = f"""
     SELECT
         LTRIM(RTRIM(ISNULL(vp.PRODUTO, ''))) AS PRODUTO,
@@ -407,8 +423,10 @@ def buscar_vendas_mes_atual(conn, produtos: list[str], inicio_mes, fim_mes) -> p
     GROUP BY LTRIM(RTRIM(ISNULL(vp.PRODUTO, ''))), vp.COR_PRODUTO
     """
         df_v = _normalizar_produto_df(pd.read_sql(sql, conn, params=params))
-    ph_fil_ec = ", ".join(["?"] * len(SCARFME_ECOM_FILIAIS))
-    params_ec = [inicio_mes, fim_mes] + list(SCARFME_ECOM_FILIAIS) + list(produtos)
+    if not filiais_ec:
+        return df_v
+    ph_fil_ec = ", ".join(["?"] * len(filiais_ec))
+    params_ec = [inicio_mes, fim_mes] + list(filiais_ec) + list(produtos)
     sql_ec = f"""
     SELECT
         LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) AS PRODUTO,
@@ -572,6 +590,7 @@ def build_projecao_mensal(
             "grade": row.get("grade", ""),
             "colecao": row.get("colecao", ""),
             "cor": cor,
+            "descricao_cor": str(row.get("descricao_cor", "") or "").strip() or cor,
             "vendas_proj": vendas_proj,
             "estoque_proj": estoque_proj,
             "duracao_proj": duracao_proj,
@@ -594,7 +613,7 @@ def exportar_xlsx(resultados: list[dict], caminho: str) -> None:
     if openpyxl is None:
         linhas = []
         for r in resultados:
-            cat = f"{r['descricao']} | {r['produto']} | {r['linha']} | {r['subgrupo']} | {r['grade']} | {r['colecao']} | {r['cor']}"
+            cat = f"{r['descricao']} | {r['produto']} | {r['linha']} | {r['subgrupo']} | {r['grade']} | {r['colecao']} | Cor: {r.get('descricao_cor') or r['cor'] or 'SEM COR'}"
             for tipo, vals in [
                 ("VENDA (PROJEÇÃO)", r["vendas_proj"]),
                 ("ESTOQUE (PROJEÇÃO)", r["estoque_proj"]),
@@ -662,7 +681,7 @@ def exportar_xlsx(resultados: list[dict], caminho: str) -> None:
         cat_label = (
             f"{r['descricao'] or r['produto']}  |  Cód: {r['produto']}  |  "
             f"Linha: {r['linha']}  |  Subgrupo: {r['subgrupo']}  |  Grade: {r['grade']}  |  "
-            f"Coleção: {r['colecao']}  |  {r['cor'] or 'SEM COR'}"
+            f"Coleção: {r['colecao']}  |  Cor: {r.get('descricao_cor') or r['cor'] or 'SEM COR'}"
         )
         blocos = [
             ("VENDA (PROJEÇÃO)", r["vendas_proj"], "proj", False),
@@ -749,6 +768,7 @@ def exportar_txt(resultados: List[Dict], caminho_txt: str, mes_atual: int, ano_a
         linhas.extend([
             f"Código: {codigo}",
             f"Descrição: {descricao}",
+            f"Cor: {r.get('descricao_cor') or r.get('cor') or '-'}",
             f"Vendas: {total_vendas}",
             f"Estoque: {estoque_exibir}",
             f"Duração: {duracao_exibir}",
@@ -841,12 +861,33 @@ def main():
         print("Nenhum produto informado. Exemplo: python exportar_projecao_produtos.py \"45.14.0035\"")
         sys.exit(1)
 
+    # Lista numerada de filiais: usuário escolhe uma ou Enter para todas
+    filiais_disponiveis = SCARFME_FILIAIS_ESTOQUE
+    print("\nFiliais disponíveis:")
+    for i, nome in enumerate(filiais_disponiveis, 1):
+        print(f"  {i}. {nome}")
+    try:
+        resp_filial = input("\nDigite o número da filial (ou Enter para todas): ").strip()
+    except EOFError:
+        resp_filial = ""
+    filial_escolhida = None
+    if resp_filial:
+        try:
+            idx = int(resp_filial)
+            if 1 <= idx <= len(filiais_disponiveis):
+                filial_escolhida = filiais_disponiveis[idx - 1]
+                print(f"Filtro: filial = {filial_escolhida}")
+            else:
+                print(f"Número inválido. Usando todas as filiais.")
+        except ValueError:
+            print("Entrada inválida. Usando todas as filiais.")
+
     produtos_set = {t.upper() for t in termos}
     base_url = args.api or os.environ.get("DASHBOARD_URL")
     resultados = None
     if base_url:
         print(f"Buscando projeção via API do dashboard ({base_url})...")
-        resultados = fetch_projecao_via_api(base_url.strip(), "scarfme", produtos_set)
+        resultados = fetch_projecao_via_api(base_url.strip(), "scarfme", produtos_set, filial=filial_escolhida)
         if resultados:
             print(f"Encontrados {len(resultados)} item(ns) na projeção (API).")
 
@@ -857,6 +898,16 @@ def main():
         mes_atual = hoje.month
         inicio_mes = hoje.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         fim_mes = hoje + timedelta(days=1)  # exclusivo: inclui todo o dia de hoje
+
+        # Filiais para filtro (uma filial ou todas)
+        if filial_escolhida:
+            filiais_estoque = [filial_escolhida]
+            filiais_varejo = [filial_escolhida] if filial_escolhida in SCARFME_FILIAIS_VAREJO else []
+            filiais_ecom = [filial_escolhida] if filial_escolhida in SCARFME_ECOM_FILIAIS else []
+        else:
+            filiais_estoque = None
+            filiais_varejo = None
+            filiais_ecom = None
 
         print("Conectando ao banco...")
         conn = conectar_banco()
@@ -869,15 +920,15 @@ def main():
             print(f"Encontrados {len(produtos)} produto(s): {', '.join(produtos[:10])}{'...' if len(produtos) > 10 else ''}")
 
             print("Buscando estoque por produto/cor...")
-            estoque_df = buscar_estoque_por_produto_cor(conn, produtos)
+            estoque_df = buscar_estoque_por_produto_cor(conn, produtos, filiais=filiais_estoque)
             if estoque_df.empty:
                 print("Nenhum estoque encontrado para esses produtos.")
                 sys.exit(1)
             print(f"Linhas (produto+cor) com estoque: {len(estoque_df)}")
 
             print("Buscando vendas ano passado...")
-            vendas_ap = buscar_vendas_ano_por_mes(conn, produtos, ano_atual - 1)
-            vendas_ap_ec = buscar_vendas_ecommerce_ano_por_mes(conn, produtos, ano_atual - 1)
+            vendas_ap = buscar_vendas_ano_por_mes(conn, produtos, ano_atual - 1, filiais_varejo=filiais_varejo)
+            vendas_ap_ec = buscar_vendas_ecommerce_ano_por_mes(conn, produtos, ano_atual - 1, filiais_ecom=filiais_ecom)
             print(f"  Varejo ano passado: {len(vendas_ap)} linhas | E-commerce ano passado: {len(vendas_ap_ec)} linhas")
             if not vendas_ap_ec.empty:
                 if vendas_ap.empty:
@@ -892,7 +943,7 @@ def main():
             print(f"  Vendas ano passado (combinado): {len(vendas_ap)} linhas, total={int(vendas_ap['vendas'].sum()) if not vendas_ap.empty else 0}")
 
             print("Buscando vendas mês atual...")
-            vendas_mes_atual_df = buscar_vendas_mes_atual(conn, produtos, inicio_mes, fim_mes)
+            vendas_mes_atual_df = buscar_vendas_mes_atual(conn, produtos, inicio_mes, fim_mes, filiais_varejo=filiais_varejo, filiais_ecom=filiais_ecom)
             vendas_mes_atual_series = {}
             if not vendas_mes_atual_df.empty:
                 for _, r in vendas_mes_atual_df.iterrows():
@@ -900,8 +951,8 @@ def main():
             print(f"  Vendas mês atual: {len(vendas_mes_atual_series)} pares (produto, cor)")
 
             print("Buscando vendas ano atual (real)...")
-            vendas_atual = buscar_vendas_ano_por_mes(conn, produtos, ano_atual)
-            vendas_atual_ec = buscar_vendas_ecommerce_ano_por_mes(conn, produtos, ano_atual)
+            vendas_atual = buscar_vendas_ano_por_mes(conn, produtos, ano_atual, filiais_varejo=filiais_varejo)
+            vendas_atual_ec = buscar_vendas_ecommerce_ano_por_mes(conn, produtos, ano_atual, filiais_ecom=filiais_ecom)
             print(f"  Varejo ano atual: {len(vendas_atual)} linhas | E-commerce ano atual: {len(vendas_atual_ec)} linhas")
             if not vendas_atual_ec.empty:
                 if vendas_atual.empty:
