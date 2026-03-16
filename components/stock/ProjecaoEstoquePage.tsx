@@ -163,7 +163,7 @@ function computeReposicaoScope(
         const qtdCompra = Math.max(0, Math.round(necessidadeTotal - estoqueReal));
         if (qtdCompra > 0) {
           result.push({
-            produto: item.produto ?? '',
+            produto: item.produto?.trim() ?? '',
             descricao: item.descricao ?? item.produto ?? item.categoria,
             cor: item.cor,
             subgrupo: item.subgrupo,
@@ -416,9 +416,16 @@ export default function ProjecaoEstoquePage({
         ...(items.some((it) => it.meses[i]?.estoqueRealSnapshot != null) && {
           estoqueRealSnapshot: items.reduce((s, it) => s + (it.meses[i]?.estoqueRealSnapshot ?? 0), 0),
         }),
-        ...(items.some((it) => it.meses[i]?.duracaoRealSnapshot != null) && {
-          duracaoRealSnapshot: items.reduce((s, it) => s + (it.meses[i]?.duracaoRealSnapshot ?? 0), 0),
-        }),
+        ...(items.some((it) => it.meses[i]?.duracaoRealSnapshot != null) && (() => {
+          // duração não é aditiva: calcula consumo agregado → duração = estoque_agg / consumo_agg
+          const estoqueAgg = items.reduce((s, it) => s + (it.meses[i]?.estoqueRealSnapshot ?? 0), 0);
+          const consumoAgg = items.reduce((s, it) => {
+            const e = it.meses[i]?.estoqueRealSnapshot ?? 0;
+            const d = it.meses[i]?.duracaoRealSnapshot ?? 0;
+            return s + (d > 0 ? e / d : 0);
+          }, 0);
+          return { duracaoRealSnapshot: consumoAgg > 0 ? Math.round(estoqueAgg / consumoAgg) : 0 };
+        })()),
       };
     });
     // Cadeia de estoque a partir do mês atual (meses passados ficam com 0)
@@ -735,6 +742,7 @@ export default function ProjecaoEstoquePage({
       const { estoqueAtualReal, duracaoRealMesAtual } = getReaisPorMes(proj);
       const isLençosLine = proj.categoria === "LENÇOS" || proj.categoria === "APROVEITAMENTO LENÇOS";
       const limiteDiasAlerta = isLençosLine ? 120 : 90;
+      // Gate: a PRÓPRIA linha deve ter duração em alerta (regra de negativo)
       for (const mes of proj.meses) {
         let duracaoReal = 0, estoqueReal = 0;
         if (mes.isMesAtual) { duracaoReal = duracaoRealMesAtual; estoqueReal = estoqueAtualReal; }
@@ -744,7 +752,7 @@ export default function ProjecaoEstoquePage({
           const consumoDiario = estoqueReal / duracaoReal;
           const diasCobertura = 30 + limiteDiasAlerta;
           const necessidadeTotal = consumoDiario * diasCobertura;
-          // Computa reposição individual para todos os itens no escopo
+          // Quantidade = soma dos produtos individuais com alerta dentro do escopo
           const reposicaoItems = computeReposicaoScope(proj, projecoes, getReaisPorMes);
           const qtdCompra = reposicaoItems.length > 0
             ? reposicaoItems.reduce((s, i) => s + i.qtdCompra, 0)
@@ -775,7 +783,7 @@ export default function ProjecaoEstoquePage({
   const allProdutosReposicao = useMemo(() => {
     const codes = new Set<string>();
     compraInfoMap.forEach(({ reposicaoItems }) => {
-      reposicaoItems.forEach(item => { if (item.produto) codes.add(item.produto); });
+      reposicaoItems.forEach(item => { const p = item.produto?.trim(); if (p) codes.add(p); });
     });
     return Array.from(codes);
   }, [compraInfoMap]);
@@ -786,8 +794,9 @@ export default function ProjecaoEstoquePage({
     if (allProdutosReposicao.length === 0) return;
     const params = new URLSearchParams();
     params.set("company", companyKey);
-    if (filial) params.set("filial", filial);
+    // Não passa filial: preço unitário deve considerar todas as filiais + ecommerce
     params.set("qtdCompra", "0");
+    params.set("limit", String(allProdutosReposicao.length + 20));
     allProdutosReposicao.forEach(p => params.append("produtos", p));
     fetch(`/api/controle-estoque/lista-compra-sugerida?${params}`, { cache: "no-store" })
       .then(r => r.json())
@@ -807,7 +816,7 @@ export default function ProjecaoEstoquePage({
     compraInfoMap.forEach(({ reposicaoItems }, rowKey) => {
       let total = 0;
       reposicaoItems.forEach(item => {
-        const unitPrice = unitPrices[item.produto] ?? 0;
+        const unitPrice = unitPrices[item.produto?.trim() ?? ''] ?? 0;
         total += item.qtdCompra * unitPrice;
       });
       if (total > 0) costs[rowKey] = total;

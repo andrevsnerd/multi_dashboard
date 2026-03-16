@@ -5384,14 +5384,19 @@ export async function fetchTopProdutosUltimos3Meses({
     request.input('fim3m', sql.DateTime, now);
     request.input('lc_limit', sql.Int, limit);
 
-    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
-    const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
-    const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
-    const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
-    const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
-    const gradeFilter = buildGradeFilter(request, company, grades, 'p');
-    const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineLc');
-    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
+    // Quando se busca por código de produto específico (lookup de preço unitário),
+    // os filtros de empresa/exclusão/filial são irrelevantes — o código já identifica o produto.
+    // Além disso, inclui todas as filiais (varejo + e-commerce) para preço real.
+    const isProdutoLookup = produtos != null && produtos.length > 0;
+
+    const vendasFilialFilter = isProdutoLookup ? '' : buildVendasFilialFilter(request, company, filial, 'vp');
+    const grupoFilter = isProdutoLookup ? '' : buildGrupoFilter(request, company, grupos, 'p');
+    const linhaFilter = isProdutoLookup ? '' : buildLinhaFilter(request, company, linhas, 'p');
+    const colecaoFilter = isProdutoLookup ? '' : buildColecaoFilter(request, company, colecoes, 'p');
+    const subgrupoFilter = isProdutoLookup ? '' : buildSubgrupoFilter(request, company, subgrupos, 'p');
+    const gradeFilter = isProdutoLookup ? '' : buildGradeFilter(request, company, grades, 'p');
+    const exclusionFilter = isProdutoLookup ? '' : buildExclusionFilter(request, company, 'p', 'excludedLineLc');
+    const nerdOnlyEletronicosFilter = isProdutoLookup ? '' : buildNerdOnlyLinhaEletronicosFilter(company, 'p');
 
     // Filtro de categoria específica (se informado)
     let categoriaFilter = '';
