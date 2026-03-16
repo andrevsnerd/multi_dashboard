@@ -118,6 +118,7 @@ interface ReposicaoItem {
   consumoDiario: number;
   diasCobertura: number;
   necessidadeTotal: number;
+  custoUnit?: number;
 }
 
 /**
@@ -1428,7 +1429,10 @@ export default function ProjecaoEstoquePage({
                             sessionStorage.setItem("lista_compra_reposicao", JSON.stringify({
                               categoria: proj.categoria,
                               totalQtd: compraInfo.qtdCompra,
-                              itens: compraInfo.reposicaoItems,
+                              itens: compraInfo.reposicaoItems.map(item => ({
+                                ...item,
+                                custoUnit: unitPrices[item.produto] ?? 0,
+                              })),
                               timestamp: Date.now(),
                             }));
                           } catch (_) { /* ignora se sessionStorage não disponível */ }

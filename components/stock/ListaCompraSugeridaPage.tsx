@@ -22,6 +22,7 @@ interface ReposicaoItem {
   consumoDiario: number;
   diasCobertura: number;
   necessidadeTotal: number;
+  custoUnit?: number;
 }
 
 interface ReposicaoData {
@@ -69,26 +70,6 @@ async function fetchListaCompra(params: URLSearchParams): Promise<ProdutoSugesta
   const json = await res.json() as { data?: ProdutoSugestao[]; error?: string };
   if (!res.ok) throw new Error(json.error ?? "Erro ao carregar");
   return json.data ?? [];
-}
-
-async function fetchUnitPrices(
-  produtoCodes: string[],
-  companyKey: string,
-  filial: string
-): Promise<Record<string, number>> {
-  if (produtoCodes.length === 0) return {};
-  const params = new URLSearchParams();
-  params.set("company", companyKey);
-  if (filial) params.set("filial", filial);
-  params.set("qtdCompra", "0");
-  produtoCodes.forEach(p => params.append("produtos", p));
-  const res = await fetch(`/api/controle-estoque/lista-compra-sugerida?${params}`, { cache: "no-store" });
-  const json = await res.json() as { data?: Array<{ produto: string; valor3meses: number; vendas3meses: number }> };
-  const prices: Record<string, number> = {};
-  (json.data ?? []).forEach(p => {
-    if (p.vendas3meses > 0) prices[p.produto] = p.valor3meses / p.vendas3meses;
-  });
-  return prices;
 }
 
 /** Hamilton/Largest Remainder distribution */
@@ -157,8 +138,6 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
 
   // ── Aba Reposição ──────────────────────────────────────────────────────────
   const [reposicaoData, setReposicaoData] = useState<ReposicaoData | null>(null);
-  const [unitPrices, setUnitPrices] = useState<Record<string, number>>({});
-  const [loadingPrices, setLoadingPrices] = useState(false);
 
   useEffect(() => {
     try {
@@ -173,25 +152,14 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
     } catch (_) { /* ignora */ }
   }, []);
 
-  useEffect(() => {
-    if (!reposicaoData || reposicaoData.itens.length === 0) return;
-    const codes = [...new Set(reposicaoData.itens.map(i => i.produto).filter(Boolean))];
-    if (codes.length === 0) return;
-    setLoadingPrices(true);
-    fetchUnitPrices(codes, companyKey, filial)
-      .then(setUnitPrices)
-      .catch(() => {})
-      .finally(() => setLoadingPrices(false));
-  }, [reposicaoData, companyKey, filial]);
-
   const reposicaoComCusto = useMemo(() => {
     if (!reposicaoData) return [];
     return reposicaoData.itens.map(item => ({
       ...item,
-      custoUnit: unitPrices[item.produto] ?? 0,
-      custoTotal: item.qtdCompra * (unitPrices[item.produto] ?? 0),
+      custoUnit: item.custoUnit ?? 0,
+      custoTotal: item.qtdCompra * (item.custoUnit ?? 0),
     }));
-  }, [reposicaoData, unitPrices]);
+  }, [reposicaoData]);
 
   const totalCustoReposicao = reposicaoComCusto.reduce((s, i) => s + i.custoTotal, 0);
   const totalQtdReposicao = reposicaoComCusto.reduce((s, i) => s + i.qtdCompra, 0);
@@ -317,7 +285,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
                 <span className={styles.summaryLabel}>Custo Total</span>
-                <span className={styles.summaryValue}>{loadingPrices ? "..." : fmtBRL(totalCustoReposicao)}</span>
+                <span className={styles.summaryValue}>{fmtBRL(totalCustoReposicao)}</span>
               </div>
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
@@ -390,10 +358,10 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                       <td className={styles.vendas}>{item.consumoDiario.toFixed(1)}/dia</td>
                       <td className={styles.qtdSugerida}>{fmt(item.qtdCompra)}</td>
                       <td className={`${styles.right} ${item.custoUnit > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
-                        {loadingPrices ? "..." : item.custoUnit > 0 ? fmtBRL2(item.custoUnit) : "—"}
+                        {item.custoUnit > 0 ? fmtBRL2(item.custoUnit) : "—"}
                       </td>
                       <td className={`${styles.right} ${item.custoTotal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
-                        {loadingPrices ? "..." : item.custoTotal > 0 ? fmtBRL(item.custoTotal) : "—"}
+                        {item.custoTotal > 0 ? fmtBRL(item.custoTotal) : "—"}
                       </td>
                     </tr>
                   ))}
@@ -404,7 +372,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                       <td className={styles.qtdSugerida}>{fmt(totalQtdReposicao)}</td>
                       <td />
                       <td className={`${styles.right} ${styles.qtdSugerida}`}>
-                        {loadingPrices ? "..." : fmtBRL(totalCustoReposicao)}
+                        {fmtBRL(totalCustoReposicao)}
                       </td>
                     </tr>
                   )}
