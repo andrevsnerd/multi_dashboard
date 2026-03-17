@@ -26,7 +26,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  font-size: 16px;
+  font-size: 18px;
 }
 
 /* ─── Top bar: título + toggle ──────────────────────────────────── */
@@ -58,7 +58,7 @@
 .headerIcon svg { width: 18px; height: 18px; }
 
 .title {
-  font-size: 22px;
+  font-size: 25px;
   font-weight: 700;
   margin: 0 0 2px;
   line-height: 1.2;
@@ -66,7 +66,7 @@
 }
 
 .subtitle {
-  font-size: 15px;
+  font-size: 17px;
   color: var(--text-3);
   margin: 0;
 }
@@ -86,7 +86,7 @@
   padding: 6px 14px;
   border: none;
   border-radius: 8px;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   cursor: pointer;
   background: transparent;
@@ -194,7 +194,7 @@
 }
 
 .configBarLabel {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text-3);
   text-transform: uppercase;
@@ -205,7 +205,7 @@
   width: 100%;
   border: 1px solid var(--border);
   background: #fff;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text);
   cursor: pointer;
@@ -220,7 +220,7 @@
 .configBarSelect:disabled { color: var(--text-2); cursor: default; }
 
 .configBarText {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text);
   white-space: nowrap;
@@ -232,7 +232,7 @@
   width: 100%;
   border: 1px solid var(--border);
   background: #fff;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text);
   padding: 8px 34px 8px 10px;
@@ -282,7 +282,7 @@
   border: none;
   background: none;
   color: var(--text-3);
-  font-size: 16px;
+  font-size: 18px;
   cursor: pointer;
   padding: 0 2px;
   line-height: 1;
@@ -329,7 +329,7 @@
 }
 
 .cardLabel {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--text-3);
   text-transform: uppercase;
@@ -340,7 +340,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--text);
 }
@@ -360,7 +360,7 @@
 .cardHeaderIcon svg { width: 14px; height: 14px; }
 
 .badgeMuted {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-3);
   background: #f1f5f9;
@@ -369,7 +369,7 @@
 }
 
 .badge {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   color: #fff;
   padding: 2px 7px;
@@ -417,7 +417,7 @@
 }
 
 .logRomaneio {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--text-2);
   font-family: monospace;
@@ -432,7 +432,7 @@
 .logEditBtn {
   background: none;
   border: none;
-  font-size: 12px;
+  font-size: 14px;
   cursor: pointer;
   padding: 2px 4px;
   border-radius: 4px;
@@ -442,7 +442,7 @@
 .logEditBtn:hover { background: rgba(0,0,0,.07); opacity: 1; }
 
 .logStatusPill {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   padding: 2px 7px;
   border-radius: 20px;
@@ -451,7 +451,7 @@
 }
 
 .logRoute {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-2);
   margin-bottom: 2px;
   white-space: nowrap;
@@ -460,7 +460,7 @@
 }
 
 .logResponsavel {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-3);
   margin-bottom: 3px;
 }
@@ -470,8 +470,8 @@
   justify-content: space-between;
   align-items: center;
 }
-.logMeta { font-size: 11px; color: var(--text-3); }
-.logDate { font-size: 11px; color: var(--text-3); }
+.logMeta { font-size: 13px; color: var(--text-3); }
+.logDate { font-size: 13px; color: var(--text-3); }
 
 /* popover inline */
 .logPopover {
@@ -486,7 +486,7 @@
 }
 
 .logPopoverTitle {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text-3);
   text-transform: uppercase;
@@ -495,7 +495,7 @@
 }
 
 .logPopoverLoad {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-3);
   text-align: center;
   padding: 6px 0;
@@ -515,7 +515,7 @@
 }
 
 .logPopoverNome {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text);
   margin-bottom: 2px;
@@ -525,7 +525,7 @@
 }
 
 .logPopoverMeta {
-  font-size: 12px;
+  font-size: 14px;
   color: #64748b;
   margin-bottom: 4px;
   white-space: nowrap;
@@ -540,7 +540,7 @@
 }
 
 .logPopoverEstoqueItem {
-  font-size: 12px;
+  font-size: 14px;
   color: #475569;
   background: #e2e8f0;
   padding: 2px 6px;
@@ -553,9 +553,9 @@
   padding: 32px 16px;
   text-align: center;
   color: var(--text-3);
-  font-size: 14px;
+  font-size: 16px;
 }
-.emptyLogIcon { font-size: 28px; margin-bottom: 7px; opacity: .3; }
+.emptyLogIcon { font-size: 32px; margin-bottom: 7px; opacity: .3; }
 
 /* ─── Produtos no painel direito ────────────────────────────────── */
 .produtosArea {
@@ -600,7 +600,7 @@
 
 .produtoInfo { flex: 1; min-width: 0; }
 .produtoName {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--text);
   white-space: nowrap;
@@ -608,7 +608,7 @@
   text-overflow: ellipsis;
   margin-bottom: 1px;
 }
-.produtoSku { font-size: 13px; color: var(--text-3); }
+.produtoSku { font-size: 15px; color: var(--text-3); }
 
 .produtoControls {
   display: flex;
@@ -631,7 +631,7 @@
   border: none;
   background: transparent;
   color: var(--text-2);
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -649,7 +649,7 @@
   border-left: 1px solid var(--border);
   border-right: 1px solid var(--border);
   text-align: center;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text);
   background: #fff;
@@ -657,7 +657,7 @@
 .qtyInput:focus { outline: none; }
 
 .stockPill {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-3);
   background: #f1f5f9;
   padding: 2px 6px;
@@ -675,7 +675,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-3);
   transition: background 120ms, color 120ms;
 }
@@ -686,7 +686,7 @@
   padding: 12px 14px;
   text-align: center;
   color: var(--text-3);
-  font-size: 14px;
+  font-size: 16px;
 }
 .emptyProductsIcon {
   width: 44px;
@@ -702,14 +702,14 @@
 }
 .emptyProductsIcon svg { width: 20px; height: 20px; }
 .emptyProductsTitle { font-weight: 700; color: var(--text); margin-bottom: 2px; }
-.emptyProductsSub { font-size: 13px; color: var(--text-3); margin-top: 0; }
+.emptyProductsSub { font-size: 15px; color: var(--text-3); margin-top: 0; }
 
 /* botão adicionar produto */
 .addProductBtn {
   width: 100%;
   padding: 9px 14px;
   border-radius: 8px;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   cursor: pointer;
   display: flex;
@@ -718,6 +718,32 @@
   gap: 6px;
   transition: background 150ms, border-color 150ms;
   border: 1.5px dashed;
+}
+
+.produtosActionsRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.clearProductsBtn {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text-2);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.clearProductsBtn:hover:not(:disabled) {
+  background: #f8fafc;
+}
+.clearProductsBtn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
 }
 
 .addProductBtnIcon {
@@ -779,7 +805,7 @@
 }
 
 .obsLabel {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-2);
 }
@@ -789,7 +815,7 @@
   padding: 8px 11px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 15px;
+  font-size: 17px;
   font-family: inherit;
   background: #f8fafc;
   color: var(--text);
@@ -806,7 +832,7 @@
 .obsTextarea:disabled { color: var(--text-3); cursor: not-allowed; }
 
 .obsCounter {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-3);
   text-align: right;
   margin-top: -6px;
@@ -836,15 +862,15 @@
   border: none;
 }
 .submitCountItem + .submitCountItem { border-left: 1px solid var(--border); }
-.submitCountValue { font-size: 18px; font-weight: 700; color: var(--text); line-height: 1; }
-.submitCountLabel { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.submitCountValue { font-size: 21px; font-weight: 700; color: var(--text); line-height: 1; }
+.submitCountLabel { font-size: 13px; color: var(--text-3); margin-top: 2px; }
 
 .submitBtn {
   flex: 1;
   padding: 11px 16px;
   border: none;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   cursor: pointer;
   color: #fff;
@@ -931,14 +957,14 @@
   padding: 18px 22px 14px;
   border-bottom: 1px solid #f1f5f9;
 }
-.modalTitle { font-size: 18px; font-weight: 700; color: var(--text); margin: 0; }
+.modalTitle { font-size: 21px; font-weight: 700; color: var(--text); margin: 0; }
 
 .modalCloseBtn {
   width: 30px;
   height: 30px;
   border: none;
   background: transparent;
-  font-size: 20px;
+  font-size: 23px;
   color: var(--text-3);
   cursor: pointer;
   border-radius: 6px;
@@ -971,7 +997,7 @@
 }
 
 .modalCartMeta {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-3);
   white-space: nowrap;
 }
@@ -994,7 +1020,7 @@
   left: 10px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 14px;
+  font-size: 16px;
   color: var(--text-3);
   pointer-events: none;
 }
@@ -1003,14 +1029,14 @@
   padding: 9px 10px 9px 32px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 15px;
+  font-size: 17px;
   color: var(--text);
   transition: border-color 150ms;
   box-sizing: border-box;
 }
 .searchInput:focus { outline: none; border-color: #94a3b8; box-shadow: 0 0 0 3px rgba(148,163,184,.15); }
 
-.loadingText { text-align: center; padding: 20px; color: var(--text-3); font-size: 15px; }
+.loadingText { text-align: center; padding: 20px; color: var(--text-3); font-size: 17px; }
 
 .produtosModalList {
   display: flex;
@@ -1031,17 +1057,17 @@
   transition: border-color 120ms, background 120ms;
 }
 .produtoModalItem:hover { border-color: #cbd5e1; background: #f1f5f9; }
-.produtoModalIcon { font-size: 18px; flex-shrink: 0; }
+.produtoModalIcon { font-size: 21px; flex-shrink: 0; }
 .produtoModalInfo { flex: 1; min-width: 0; }
-.produtoModalName { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.produtoModalDetails { font-size: 12px; color: var(--text-3); }
+.produtoModalName { font-size: 17px; font-weight: 600; color: var(--text); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.produtoModalDetails { font-size: 14px; color: var(--text-3); }
 
 .addModalBtn {
   width: 30px;
   height: 30px;
   border: none;
   border-radius: 6px;
-  font-size: 20px;
+  font-size: 23px;
   font-weight: 700;
   cursor: pointer;
   display: flex;
@@ -1065,19 +1091,19 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px 14px;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-2);
   line-height: 1.8;
   margin-bottom: 14px;
 }
 .modalField { margin-bottom: 12px; }
-.modalFieldLabel { display: block; font-size: 14px; font-weight: 600; color: var(--text-2); margin-bottom: 6px; }
+.modalFieldLabel { display: block; font-size: 16px; font-weight: 600; color: var(--text-2); margin-bottom: 6px; }
 .modalTextarea {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 15px;
+  font-size: 17px;
   font-family: inherit;
   resize: vertical;
   min-height: 88px;
@@ -1086,7 +1112,7 @@
 }
 .modalTextarea:focus { outline: none; border-color: #94a3b8; box-shadow: 0 0 0 3px rgba(148,163,184,.15); }
 .modalTextarea:disabled { background: #f8fafc; cursor: not-allowed; }
-.modalCharCount { font-size: 12px; color: var(--text-3); text-align: right; margin-top: 3px; }
+.modalCharCount { font-size: 14px; color: var(--text-3); text-align: right; margin-top: 3px; }
 
 .modalFooter {
   display: flex;
@@ -1102,7 +1128,7 @@
   color: var(--saida);
   border: 1px solid #fca5a5;
   border-radius: 7px;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   transition: background 120ms;
@@ -1115,7 +1141,7 @@
   color: var(--text-2);
   border: 1px solid var(--border);
   border-radius: 7px;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   transition: background 120ms;
@@ -1128,7 +1154,7 @@
   color: #fff;
   border: none;
   border-radius: 7px;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   transition: background 120ms;
@@ -1138,7 +1164,7 @@
 
 .confirmacaoTexto {
   margin: 0;
-  font-size: 15px;
+  font-size: 17px;
   color: var(--text-2);
   line-height: 1.5;
 }
@@ -1148,7 +1174,7 @@
   color: #fff;
   border: none;
   border-radius: 7px;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -1159,7 +1185,7 @@
   color: #fff;
   border: none;
   border-radius: 7px;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -1178,12 +1204,12 @@
   gap: 9px;
   z-index: 5000;
   max-width: 340px;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 500;
 }
 .toastSuccess { background: #0f172a; color: #fff; }
 .toastError   { background: var(--saida); color: #fff; }
-.toastIcon    { font-size: 16px; flex-shrink: 0; }
+.toastIcon    { font-size: 18px; flex-shrink: 0; }
 
 /* ─── Responsive ────────────────────────────────────────────────── */
 @media (max-width: 1024px) {

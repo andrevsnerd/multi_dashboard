@@ -127,6 +127,63 @@ function formatLogRoute(filialOrigem?: string, filialDestino?: string): string {
   return "";
 }
 
+function normalizeFilialValue(v: string | null | undefined): string {
+  return (v || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, " ");
+}
+
+function normalizeDigits(v: string): string {
+  const digits = v.replace(/\D/g, "");
+  return digits.replace(/^0+/, "") || "0";
+}
+
+function matchFilial(logValue: string | null | undefined, filial: Filial | null): boolean {
+  if (!filial) return true;
+  const lv = normalizeFilialValue(logValue);
+  if (!lv) return false;
+
+  const cod = normalizeFilialValue(filial.codFilial);
+  const nome = normalizeFilialValue(filial.filial);
+
+  // quebra apenas por separadores comuns (não por espaço, para não confundir "NERD" com "NERD LEBLON")
+  const parts = lv
+    .split(/\s*[-–—|]\s*/g)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  // match por nome: precisa ser exato (ou em uma das partes)
+  if (nome && (lv === nome || parts.includes(nome))) return true;
+
+  // match por código: aceita equivalência numérica (ignorando zeros à esquerda) e também partes
+  if (cod) {
+    const codDigits = normalizeDigits(cod);
+    const lvDigits = normalizeDigits(lv);
+    if (codDigits !== "0" && lvDigits !== "0" && codDigits === lvDigits) return true;
+
+    if (lv === cod || parts.includes(cod)) return true;
+
+    // alguns retornos vêm como "COD - NOME" com código colado em prefixo
+    if (parts.some((p) => normalizeDigits(p) !== "0" && normalizeDigits(p) === codDigits)) return true;
+  }
+
+  return false;
+}
+
+function sameModalCart(a: ProdutoSelecionado[], b: ProdutoSelecionado[]): boolean {
+  if (a.length !== b.length) return false;
+  const key = (p: ProdutoSelecionado) => `${p.filial}|${p.produto}|${p.corProduto ?? ""}`;
+  const mapA = new Map<string, number>();
+  for (const p of a) mapA.set(key(p), p.quantidade);
+  for (const p of b) {
+    const k = key(p);
+    if (!mapA.has(k)) return false;
+    if (mapA.get(k) !== p.quantidade) return false;
+  }
+  return true;
+}
+
 async function fetchPermissoes(username: string): Promise<TransferenciaPermissao | null> {
   try {
     const response = await fetch("/api/transferencia-produtos/permissoes", {
@@ -341,6 +398,7 @@ export default function SaidasEntradasProdutosPage({
   const [produtosSelecionados, setProdutosSelecionados] = useState<ProdutoSelecionado[]>([]);
   const [produtosSelecionadosModal, setProdutosSelecionadosModal] = useState<ProdutoSelecionado[]>([]);
   const [modalAberto, setModalAberto] = useState(false);
+  const [modalConfirmarFecharAberto, setModalConfirmarFecharAberto] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [loadingProdutos, setLoadingProdutos] = useState(false);
@@ -572,6 +630,27 @@ export default function SaidasEntradasProdutosPage({
     setModalAberto(true);
   }, [produtosSelecionados]);
 
+  const solicitarFecharModalAdicionarProduto = useCallback(() => {
+    const mudou = !sameModalCart(produtosSelecionadosModal, produtosSelecionados);
+    if (mudou) {
+      setModalConfirmarFecharAberto(true);
+      return;
+    }
+    setModalAberto(false);
+  }, [produtosSelecionadosModal, produtosSelecionados]);
+
+  const descartarProdutosDoModal = useCallback(() => {
+    setModalConfirmarFecharAberto(false);
+    setProdutosSelecionadosModal(produtosSelecionados); // volta ao estado confirmado
+    setSearchTerm("");
+    setProdutos([]);
+    setModalAberto(false);
+  }, [produtosSelecionados]);
+
+  const continuarNoModal = useCallback(() => {
+    setModalConfirmarFecharAberto(false);
+  }, []);
+
   const confirmarProdutosDoModal = useCallback(() => {
     setProdutosSelecionados(produtosSelecionadosModal);
     setModalAberto(false);
@@ -737,6 +816,10 @@ export default function SaidasEntradasProdutosPage({
 
   const removerProduto = useCallback((index: number) => {
     setProdutosSelecionados(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const limparProdutosSelecionados = useCallback(() => {
+    setProdutosSelecionados([]);
   }, []);
 
   const atualizarQuantidade = useCallback((index: number, quantidade: number) => {
@@ -1046,6 +1129,13 @@ export default function SaidasEntradasProdutosPage({
   const logsAtivos = tipoOperacao === "saida" ? logSaidas : logEntradas;
   const loadingLogsAtivos = tipoOperacao === "saida" ? loadingLogSaidas : loadingLogEntradas;
 
+  const logsFiltrados = (() => {
+    return logsAtivos.filter((log) => {
+      if (tipoOperacao === "saida") return matchFilial(log.filialOrigem, filialSelecionada);
+      return matchFilial(log.filialDestino, filialSelecionada);
+    });
+  })();
+
   if (!permissoesCarregadas) {
     return (
       <div className={styles.wrapper}>
@@ -1301,14 +1391,14 @@ export default function SaidasEntradasProdutosPage({
                 </span>
                 Histórico de {tipoOperacao === "saida" ? "Saídas" : "Entradas"}
               </span>
-              {logsAtivos.length > 0 && (
-                <span className={styles.badgeMuted}>{logsAtivos.length}</span>
+              {logsFiltrados.length > 0 && (
+                <span className={styles.badgeMuted}>{logsFiltrados.length}</span>
               )}
             </div>
 
             {loadingLogsAtivos ? (
               <div className={styles.emptyLog}>Carregando...</div>
-            ) : logsAtivos.length === 0 ? (
+            ) : logsFiltrados.length === 0 ? (
               <div className={styles.emptyLog}>
                 <div className={styles.emptyLogIcon}>📋</div>
                 <div>Nenhum registro ainda</div>
@@ -1316,7 +1406,7 @@ export default function SaidasEntradasProdutosPage({
             ) : (
               <div className={styles.logScrollContainer}>
                 <div className={styles.logList}>
-                  {logsAtivos.map((log, index) => {
+                  {logsFiltrados.map((log, index) => {
                     const logKey = `${tipoOperacao}|${log.romaneio}|${log.filialOrigem}|${log.filialDestino}`;
                     const show = hoveredLogKey === logKey;
                     const detalhes = show ? detalhesCache[logKey] : undefined;
@@ -1497,19 +1587,31 @@ export default function SaidasEntradasProdutosPage({
                 </div>
               )}
 
-              <button
-                type="button"
-                className={`${styles.addProductBtn} ${tipoOperacao === "saida" ? styles.addProductBtnSaida : styles.addProductBtnEntrada}`}
-                onClick={abrirModalAdicionarProduto}
-                disabled={!filialSelecionada || isBusy}
-              >
-                <span className={styles.addProductBtnIcon} aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none">
-                    <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                </span>
-                Adicionar Produto
-              </button>
+              <div className={styles.produtosActionsRow}>
+                <button
+                  type="button"
+                  className={`${styles.addProductBtn} ${tipoOperacao === "saida" ? styles.addProductBtnSaida : styles.addProductBtnEntrada}`}
+                  onClick={abrirModalAdicionarProduto}
+                  disabled={!filialSelecionada || isBusy}
+                >
+                  <span className={styles.addProductBtnIcon} aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  </span>
+                  Adicionar Produto
+                </button>
+                {produtosSelecionados.length > 0 && (
+                  <button
+                    type="button"
+                    className={styles.clearProductsBtn}
+                    onClick={limparProdutosSelecionados}
+                    disabled={isBusy}
+                  >
+                    Limpar lista
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Obs + Submit */}
@@ -1602,11 +1704,11 @@ export default function SaidasEntradasProdutosPage({
 
       {/* Modal – Adicionar Produto */}
       {modalAberto && (
-        <div className={styles.modalOverlay} onClick={() => setModalAberto(false)}>
+        <div className={styles.modalOverlay} onClick={solicitarFecharModalAdicionarProduto}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
               <h2 className={styles.modalTitle}>Adicionar Produto</h2>
-              <button className={styles.modalCloseBtn} onClick={() => setModalAberto(false)}>×</button>
+              <button className={styles.modalCloseBtn} onClick={solicitarFecharModalAdicionarProduto}>×</button>
             </div>
             <div className={styles.modalContent}>
               <div className={styles.searchBox}>
@@ -1722,6 +1824,31 @@ export default function SaidasEntradasProdutosPage({
                 disabled={produtosSelecionadosModal.length === 0}
               >
                 Confirmar ({produtosSelecionadosModal.length})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal – Confirmar fechar carrinho do modal */}
+      {modalConfirmarFecharAberto && (
+        <div className={styles.modalOverlay} onClick={continuarNoModal}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Descartar itens?</h2>
+              <button className={styles.modalCloseBtn} onClick={continuarNoModal}>×</button>
+            </div>
+            <div className={styles.modalBody}>
+              <p className={styles.confirmacaoTexto}>
+                Você adicionou/alterou produtos no modal, mas ainda não confirmou. Deseja descartar essas alterações?
+              </p>
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.btnSecondary} onClick={continuarNoModal}>
+                Continuar no modal
+              </button>
+              <button className={styles.btnDanger} onClick={descartarProdutosDoModal}>
+                Descartar
               </button>
             </div>
           </div>
