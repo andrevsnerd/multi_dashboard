@@ -78,6 +78,55 @@ interface TransferenciaPermissao {
 
 type TipoOperacao = "saida" | "entrada";
 
+function parseBackendDateTime(value: string): Date {
+  // Normaliza datas que vêm sem timezone (ex: "2026-03-17 16:29:00" ou "2026-03-17T16:29:00")
+  // para serem interpretadas no fuso local do usuário (ao invés de UTC implícito / parse inconsistente).
+  const v = (value || "").trim();
+  if (!v) return new Date(NaN);
+
+  // ISO com timezone explícito (Z ou ±HH:MM) → Date nativo ok
+  if (/[zZ]|[+-]\d{2}:\d{2}$/.test(v)) return new Date(v);
+
+  // "YYYY-MM-DD HH:mm:ss" → transforma em "YYYY-MM-DDTHH:mm:ss"
+  if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(v)) {
+    const isoLike = v.replace(/\s+/, "T");
+    const d = new Date(isoLike);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+
+  // "YYYY-MM-DDTHH:mm:ss" sem timezone → manter como local
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(v)) {
+    const d = new Date(v);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+
+  // fallback
+  return new Date(v);
+}
+
+function formatLogDateTime(value: string): string {
+  const d = parseBackendDateTime(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatLogRoute(filialOrigem?: string, filialDestino?: string): string {
+  const o = (filialOrigem || "").trim();
+  const d = (filialDestino || "").trim();
+  const hasO = Boolean(o && o !== "—");
+  const hasD = Boolean(d && d !== "—");
+  if (hasO && hasD) return `${o} → ${d}`;
+  if (hasO) return o;
+  if (hasD) return d;
+  return "";
+}
+
 async function fetchPermissoes(username: string): Promise<TransferenciaPermissao | null> {
   try {
     const response = await fetch("/api/transferencia-produtos/permissoes", {
@@ -290,6 +339,7 @@ export default function SaidasEntradasProdutosPage({
   const [filiaisDisponiveis, setFiliaisDisponiveis] = useState<Filial[]>([]);
   const [filialSelecionada, setFilialSelecionada] = useState<Filial | null>(null);
   const [produtosSelecionados, setProdutosSelecionados] = useState<ProdutoSelecionado[]>([]);
+  const [produtosSelecionadosModal, setProdutosSelecionadosModal] = useState<ProdutoSelecionado[]>([]);
   const [modalAberto, setModalAberto] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [produtos, setProdutos] = useState<Produto[]>([]);
@@ -309,11 +359,13 @@ export default function SaidasEntradasProdutosPage({
   const [responsavelFinal, setResponsavelFinal] = useState<string>("LOGISTICA");
   const [mostrarInputResponsavel, setMostrarInputResponsavel] = useState(false);
   const [inputResponsavelCustomizado, setInputResponsavelCustomizado] = useState("");
-  const [observacao, setObservacao] = useState("");
+  const [observacaoSaida, setObservacaoSaida] = useState("");
+  const [observacaoEntrada, setObservacaoEntrada] = useState("");
   const [permissoes, setPermissoes] = useState<TransferenciaPermissao | null>(null);
   const [permissoesCarregadas, setPermissoesCarregadas] = useState(false);
 
   const notificacaoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const observacaoRegistroRef = useRef<string>("");
   const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
   const [detalhesCache, setDetalhesCache] = useState<Record<string, LogDetalheItem[]>>({});
   const [loadingDetalhesKey, setLoadingDetalhesKey] = useState<string | null>(null);
@@ -500,11 +552,32 @@ export default function SaidasEntradasProdutosPage({
     setHoveredLogKey(null);
     setLoadingDetalhesKey(null);
     setProdutosSelecionados([]);
+    setProdutosSelecionadosModal([]);
     setFilaOperacoes([]);
     setSearchTerm("");
     setProdutos([]);
     setModalAberto(false);
   }, []);
+
+  const observacaoAtual = tipoOperacao === "saida" ? observacaoSaida : observacaoEntrada;
+  const setObservacaoAtual = useCallback((value: string) => {
+    if (tipoOperacao === "saida") setObservacaoSaida(value);
+    else setObservacaoEntrada(value);
+  }, [tipoOperacao]);
+
+  const abrirModalAdicionarProduto = useCallback(() => {
+    setProdutosSelecionadosModal(produtosSelecionados);
+    setSearchTerm("");
+    setProdutos([]);
+    setModalAberto(true);
+  }, [produtosSelecionados]);
+
+  const confirmarProdutosDoModal = useCallback(() => {
+    setProdutosSelecionados(produtosSelecionadosModal);
+    setModalAberto(false);
+    setSearchTerm("");
+    setProdutos([]);
+  }, [produtosSelecionadosModal]);
 
   // Carregar logs de saídas e entradas
   useEffect(() => {
@@ -599,10 +672,10 @@ export default function SaidasEntradasProdutosPage({
     };
   }, [searchTerm, filialSelecionada, companyKey, mostrarNotificacao]);
 
-  const adicionarProduto = useCallback((produto: Produto) => {
+  const criarProdutoSelecionado = useCallback((produto: Produto): ProdutoSelecionado | null => {
     if (!filialSelecionada) {
       mostrarNotificacao("Selecione uma filial primeiro", "error");
-      return;
+      return null;
     }
 
     const estoque = produto.estoques.find(e => {
@@ -616,10 +689,10 @@ export default function SaidasEntradasProdutosPage({
     
     if (!estoque) {
       mostrarNotificacao(`Produto não possui estoque na filial ${filialSelecionada.filial}`, "error");
-      return;
+      return null;
     }
 
-    const produtoSelecionado: ProdutoSelecionado = {
+    return {
       produto: produto.produto,
       descProduto: produto.descProduto,
       corProduto: produto.corProduto,
@@ -629,13 +702,38 @@ export default function SaidasEntradasProdutosPage({
       estoque: estoque.estoque,
       quantidade: 1,
     };
-
-    setProdutosSelecionados(prev => [...prev, produtoSelecionado]);
-    mostrarNotificacao(`${produto.descProduto} adicionado`);
-    
-    setSearchTerm("");
-    setProdutos([]);
   }, [filialSelecionada, mostrarNotificacao]);
+
+  const adicionarProdutoModal = useCallback((produto: Produto) => {
+    const novoItem = criarProdutoSelecionado(produto);
+    if (!novoItem) return;
+
+    setProdutosSelecionadosModal((prev) => {
+      const idx = prev.findIndex(
+        (p) =>
+          p.produto === novoItem.produto &&
+          p.corProduto === novoItem.corProduto &&
+          p.filial === novoItem.filial
+      );
+      if (idx === -1) {
+        mostrarNotificacao(`${novoItem.descProduto} adicionado`);
+        return [...prev, novoItem];
+      }
+
+      const atual = prev[idx];
+      const proxQtd = Math.min(atual.estoque, atual.quantidade + 1);
+      const next = [...prev];
+      next[idx] = { ...atual, quantidade: proxQtd };
+
+      if (proxQtd === atual.estoque) {
+        mostrarNotificacao(`Quantidade máxima atingida (estoque ${atual.estoque})`, "error");
+      } else {
+        mostrarNotificacao(`${novoItem.descProduto} adicionado`);
+      }
+
+      return next;
+    });
+  }, [criarProdutoSelecionado, mostrarNotificacao]);
 
   const removerProduto = useCallback((index: number) => {
     setProdutosSelecionados(prev => prev.filter((_, i) => i !== index));
@@ -655,6 +753,26 @@ export default function SaidasEntradasProdutosPage({
       return novo;
     });
   }, [mostrarNotificacao]);
+
+  const atualizarQuantidadeModal = useCallback((index: number, quantidade: number) => {
+    if (quantidade < 1) return;
+    
+    setProdutosSelecionadosModal(prev => {
+      const novo = [...prev];
+      const produto = novo[index];
+      if (!produto) return prev;
+      if (quantidade > produto.estoque) {
+        mostrarNotificacao(`Quantidade não pode ser maior que o estoque disponível (${produto.estoque})`, "error");
+        return prev;
+      }
+      novo[index] = { ...produto, quantidade };
+      return novo;
+    });
+  }, [mostrarNotificacao]);
+
+  const removerProdutoModal = useCallback((index: number) => {
+    setProdutosSelecionadosModal(prev => prev.filter((_, i) => i !== index));
+  }, []);
 
   const processarFilaOperacoes = useCallback(async () => {
     if (filaOperacoes.length === 0 || processandoOperacao || !filialSelecionada) {
@@ -679,7 +797,7 @@ export default function SaidasEntradasProdutosPage({
           tipoRomaneioSelecionado,
           responsavelFinal || 'LOGISTICA',
           user?.username,
-          observacao.trim() || undefined
+          observacaoRegistroRef.current.trim() || undefined
         );
 
         sucesso = true;
@@ -729,7 +847,14 @@ export default function SaidasEntradasProdutosPage({
     }
 
     setProcessandoOperacao(false);
-  }, [filaOperacoes, processandoOperacao, filialSelecionada, mostrarNotificacao, tipoOperacao, tipoRomaneioSelecionado, responsavelFinal, user?.username, observacao]);
+  }, [filaOperacoes, processandoOperacao, filialSelecionada, mostrarNotificacao, tipoOperacao, tipoRomaneioSelecionado, responsavelFinal, user?.username]);
+
+  // Quando terminar a fila, limpar snapshot da observação
+  useEffect(() => {
+    if (!processandoOperacao && filaOperacoes.length === 0) {
+      observacaoRegistroRef.current = "";
+    }
+  }, [processandoOperacao, filaOperacoes.length]);
 
   useEffect(() => {
     if (!processandoOperacao && filaOperacoes.length > 0) {
@@ -904,8 +1029,11 @@ export default function SaidasEntradasProdutosPage({
 
   const confirmarRegistro = useCallback(() => {
     setMostrarConfirmacaoRegistro(false);
+    // captura observação atual para o registro e limpa o campo imediatamente
+    observacaoRegistroRef.current = observacaoAtual;
+    setObservacaoAtual("");
     iniciarOperacao();
-  }, [iniciarOperacao]);
+  }, [iniciarOperacao, observacaoAtual, setObservacaoAtual]);
 
   // Limpar produtos selecionados quando mudar filial
   useEffect(() => {
@@ -1215,7 +1343,7 @@ export default function SaidasEntradasProdutosPage({
                             </div>
                           </div>
                           <div className={styles.logRoute}>
-                            {log.filialOrigem || "—"} → {log.filialDestino || "—"}
+                            {formatLogRoute(log.filialOrigem, log.filialDestino)}
                           </div>
                           {log.responsavel && (
                             <div className={styles.logResponsavel}>{log.responsavel}</div>
@@ -1225,10 +1353,7 @@ export default function SaidasEntradasProdutosPage({
                               {log.qtdProdutos} prod · {log.qtdItens} itens
                             </span>
                             <span className={styles.logDate}>
-                              {new Date(log.dataEmissao).toLocaleString("pt-BR", {
-                                day: "2-digit", month: "2-digit", year: "2-digit",
-                                hour: "2-digit", minute: "2-digit"
-                              })}
+                              {formatLogDateTime(log.dataEmissao)}
                             </span>
                           </div>
                         </div>
@@ -1243,6 +1368,8 @@ export default function SaidasEntradasProdutosPage({
                                 {detalhes.map((it, i) => {
                                   const lojaO = it.filialOrigem ?? log.filialOrigem;
                                   const lojaD = it.filialDestino ?? log.filialDestino;
+                                  const hasLojaO = Boolean(lojaO && lojaO !== "—");
+                                  const hasLojaD = Boolean(lojaD && lojaD !== "—");
                                   return (
                                     <div key={i} className={styles.logPopoverRow}>
                                       <div className={styles.logPopoverNome}>{it.descProduto || it.produto}</div>
@@ -1253,12 +1380,16 @@ export default function SaidasEntradasProdutosPage({
                                         <span className={styles.logPopoverEstoqueItem}>
                                           Qtd: <strong>{it.qtde}</strong>
                                         </span>
-                                        <span className={styles.logPopoverEstoqueItem}>
-                                          <strong>{lojaO || "—"}</strong>: {it.estoqueOrigem}
-                                        </span>
-                                        <span className={styles.logPopoverEstoqueItem}>
-                                          <strong>{lojaD || "—"}</strong>: {it.estoqueDestino}
-                                        </span>
+                                        {hasLojaO && (
+                                          <span className={styles.logPopoverEstoqueItem}>
+                                            <strong>{lojaO}</strong>: {it.estoqueOrigem}
+                                          </span>
+                                        )}
+                                        {hasLojaD && (
+                                          <span className={styles.logPopoverEstoqueItem}>
+                                            <strong>{lojaD}</strong>: {it.estoqueDestino}
+                                          </span>
+                                        )}
                                       </div>
                                     </div>
                                   );
@@ -1369,7 +1500,7 @@ export default function SaidasEntradasProdutosPage({
               <button
                 type="button"
                 className={`${styles.addProductBtn} ${tipoOperacao === "saida" ? styles.addProductBtnSaida : styles.addProductBtnEntrada}`}
-                onClick={() => { setSearchTerm(""); setModalAberto(true); }}
+                onClick={abrirModalAdicionarProduto}
                 disabled={!filialSelecionada || isBusy}
               >
                 <span className={styles.addProductBtnIcon} aria-hidden="true">
@@ -1386,14 +1517,14 @@ export default function SaidasEntradasProdutosPage({
               <div className={styles.obsLabel}>Observação (opcional)</div>
               <textarea
                 className={styles.obsTextarea}
-                value={observacao}
-                onChange={(e) => setObservacao(e.target.value)}
+                value={observacaoAtual}
+                onChange={(e) => setObservacaoAtual(e.target.value)}
                 placeholder="Adicione uma observação sobre esta movimentação..."
                 rows={3}
                 maxLength={2000}
                 disabled={isBusy}
               />
-              <div className={styles.obsCounter}>{observacao.length}/2000</div>
+              <div className={styles.obsCounter}>{observacaoAtual.length}/2000</div>
               <div className={styles.submitRow}>
                 <div className={styles.submitCounts}>
                   <div className={styles.submitCountItem}>
@@ -1495,7 +1626,17 @@ export default function SaidasEntradasProdutosPage({
                 <div className={styles.emptyLog}>Nenhum produto encontrado</div>
               ) : (
                 <div className={styles.produtosModalList}>
-                  {produtos.map((produto, index) => {
+                  {produtos
+                    .filter((produto) => {
+                      const noCarrinho = produtosSelecionadosModal.some(
+                        (p) =>
+                          p.produto === produto.produto &&
+                          p.corProduto === produto.corProduto &&
+                          p.filial === filialSelecionada?.codFilial
+                      );
+                      return !noCarrinho;
+                    })
+                    .map((produto, index) => {
                     const estoque = produto.estoques.find(e =>
                       e.filial.trim() === filialSelecionada?.codFilial?.trim() ||
                       e.filial === filialSelecionada?.codFilial
@@ -1513,7 +1654,7 @@ export default function SaidasEntradasProdutosPage({
                         </div>
                         <button
                           className={`${styles.addModalBtn} ${tipoOperacao === "saida" ? styles.addModalBtnSaida : styles.addModalBtnEntrada}`}
-                          onClick={() => adicionarProduto(produto)}
+                          onClick={() => adicionarProdutoModal(produto)}
                           disabled={!estoque}
                           title={estoque
                             ? `Estoque: ${estoque.estoque}`
@@ -1524,6 +1665,64 @@ export default function SaidasEntradasProdutosPage({
                   })}
                 </div>
               )}
+
+              {produtosSelecionadosModal.length > 0 && (
+                <div className={styles.modalCartBlock}>
+                  <div className={styles.modalCartHeader}>
+                    <span className={styles.modalCartTitle}>Selecionados</span>
+                    <span className={styles.modalCartMeta}>
+                      {produtosSelecionadosModal.length} prod ·{" "}
+                      {produtosSelecionadosModal.reduce((s, p) => s + p.quantidade, 0)} itens
+                    </span>
+                  </div>
+                  <div className={styles.modalCartList}>
+                    {produtosSelecionadosModal.map((p, idx) => (
+                      <div key={`${p.produto}-${p.corProduto ?? ""}-${p.filial}-${idx}`} className={styles.produtoItem}>
+                        <div className={styles.produtoInfo}>
+                          <div className={styles.produtoName}>{p.descProduto}</div>
+                          <div className={styles.produtoSku}>
+                            {p.produto}
+                            {p.corProduto && ` · ${p.descCor || p.corProduto}`}
+                          </div>
+                        </div>
+                        <div className={styles.produtoControls}>
+                          <div className={styles.qtyControl}>
+                            <button
+                              className={styles.qtyBtn}
+                              onClick={() => atualizarQuantidadeModal(idx, p.quantidade - 1)}
+                              disabled={p.quantidade <= 1}
+                            >−</button>
+                            <input
+                              type="number"
+                              className={styles.qtyInput}
+                              value={p.quantidade}
+                              onChange={(e) => atualizarQuantidadeModal(idx, parseInt(e.target.value) || 1)}
+                              min={1}
+                              max={p.estoque}
+                            />
+                            <button
+                              className={styles.qtyBtn}
+                              onClick={() => atualizarQuantidadeModal(idx, p.quantidade + 1)}
+                              disabled={p.quantidade >= p.estoque}
+                            >+</button>
+                          </div>
+                          <div className={styles.stockPill}>{p.quantidade}/{p.estoque}</div>
+                          <button className={styles.removeBtn} onClick={() => removerProdutoModal(idx)} title="Remover">🗑</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className={styles.modalFooter}>
+              <button
+                className={styles.btnPrimary}
+                onClick={confirmarProdutosDoModal}
+                disabled={produtosSelecionadosModal.length === 0}
+              >
+                Confirmar ({produtosSelecionadosModal.length})
+              </button>
             </div>
           </div>
         </div>
@@ -1549,7 +1748,7 @@ export default function SaidasEntradasProdutosPage({
               <div className={styles.modalInfoBox}>
                 <div><strong>Tipo:</strong> {tipoOperacao === "saida" ? "Saída" : "Entrada"}</div>
                 <div><strong>Filial:</strong> {tipoOperacao === "saida" ? logEditando.filialOrigem : logEditando.filialDestino}</div>
-                <div><strong>Data:</strong> {new Date(logEditando.dataEmissao).toLocaleString("pt-BR")}</div>
+                <div><strong>Data:</strong> {formatLogDateTime(logEditando.dataEmissao)}</div>
                 <div><strong>Produtos:</strong> {logEditando.qtdProdutos} · <strong>Itens:</strong> {logEditando.qtdItens}</div>
               </div>
               <div className={styles.modalField}>

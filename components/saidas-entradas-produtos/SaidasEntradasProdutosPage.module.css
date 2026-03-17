@@ -26,7 +26,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  font-size: 15px;
+  font-size: 16px;
 }
 
 /* ─── Top bar: título + toggle ──────────────────────────────────── */
@@ -58,7 +58,7 @@
 .headerIcon svg { width: 18px; height: 18px; }
 
 .title {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   margin: 0 0 2px;
   line-height: 1.2;
@@ -66,7 +66,7 @@
 }
 
 .subtitle {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-3);
   margin: 0;
 }
@@ -86,7 +86,7 @@
   padding: 6px 14px;
   border: none;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   background: transparent;
@@ -205,7 +205,7 @@
   width: 100%;
   border: 1px solid var(--border);
   background: #fff;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text);
   cursor: pointer;
@@ -220,7 +220,7 @@
 .configBarSelect:disabled { color: var(--text-2); cursor: default; }
 
 .configBarText {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text);
   white-space: nowrap;
@@ -232,7 +232,7 @@
   width: 100%;
   border: 1px solid var(--border);
   background: #fff;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text);
   padding: 8px 34px 8px 10px;
@@ -340,7 +340,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text);
 }
@@ -600,7 +600,7 @@
 
 .produtoInfo { flex: 1; min-width: 0; }
 .produtoName {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text);
   white-space: nowrap;
@@ -608,7 +608,7 @@
   text-overflow: ellipsis;
   margin-bottom: 1px;
 }
-.produtoSku { font-size: 12px; color: var(--text-3); }
+.produtoSku { font-size: 13px; color: var(--text-3); }
 
 .produtoControls {
   display: flex;
@@ -709,7 +709,7 @@
   width: 100%;
   padding: 9px 14px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
   display: flex;
@@ -779,7 +779,7 @@
 }
 
 .obsLabel {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--text-2);
 }
@@ -789,7 +789,7 @@
   padding: 8px 11px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 15px;
   font-family: inherit;
   background: #f8fafc;
   color: var(--text);
@@ -844,7 +844,7 @@
   padding: 11px 16px;
   border: none;
   border-radius: 8px;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   cursor: pointer;
   color: #fff;
@@ -951,6 +951,43 @@
 
 .modalContent { padding: 16px 22px; overflow-y: auto; flex: 1; }
 
+.modalCartBlock {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.modalCartHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.modalCartTitle {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.modalCartMeta {
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.modalCartList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 240px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.modalCartList::-webkit-scrollbar { width: 3px; }
+.modalCartList::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
 .searchBox { position: relative; margin-bottom: 12px; }
 .searchIcon {
   position: absolute;
@@ -1054,7 +1091,7 @@
 .modalFooter {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: 12px 22px 18px;
   border-top: 1px solid #f1f5f9;
   gap: 10px;
