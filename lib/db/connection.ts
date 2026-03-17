@@ -18,10 +18,14 @@ if (!shouldUseProxy()) {
   }
 }
 
-const config: sql.config = {
+const DB_SERVERS = [
+  DB_SERVER,
+  process.env.DB_SERVER_FALLBACK || '189.126.197.82',
+].filter(Boolean) as string[];
+
+const baseConfig = {
   user: DB_USERNAME!,
   password: DB_PASSWORD!,
-  server: DB_SERVER!,
   database: DB_DATABASE!,
   port: DB_PORT ? Number(DB_PORT) : 1433,
   options: {
@@ -30,14 +34,20 @@ const config: sql.config = {
   },
   pool: {
     max: 10,
-    min: 1,
-    idleTimeoutMillis: 30000,
+    min: 2,
+    idleTimeoutMillis: 600000,
+    acquireTimeoutMillis: 60000,
+    createTimeoutMillis: 30000,
+    destroyTimeoutMillis: 5000,
+    reapIntervalMillis: 1000,
+    createRetryIntervalMillis: 200,
   },
-  requestTimeout: 300000, // 5 min (vendedores/sales-summary podem levar 2min+)
-  connectionTimeout: 30000, // 30 segundos para estabelecer conexão
+  requestTimeout: 300000,
+  connectionTimeout: 30000,
 };
 
-let poolPromise: Promise<sql.ConnectionPool> | null = null;
+let pool: sql.ConnectionPool | null = null;
+let activeServer: string = DB_SERVER!;
 
 export async function getConnectionPool(): Promise<sql.ConnectionPool> {
   // Se estiver usando proxy, não tenta conectar diretamente
@@ -47,14 +57,27 @@ export async function getConnectionPool(): Promise<sql.ConnectionPool> {
     );
   }
 
-  if (!poolPromise) {
-    poolPromise = sql.connect(config);
-  }
+  if (!pool || !pool.connected) {
+    if (pool) {
+      try { await pool.close(); } catch (_) {}
+      pool = null;
+    }
 
-  const pool = await poolPromise;
-
-  if (!pool.connected) {
-    await pool.connect();
+    const ordered = [activeServer, ...DB_SERVERS.filter(s => s !== activeServer)];
+    let lastError: Error | undefined;
+    for (const server of ordered) {
+      try {
+        console.log(`🔌 Tentando conectar em ${server}...`);
+        pool = await sql.connect({ ...baseConfig, server });
+        activeServer = server;
+        console.log(`✅ Conectado em ${server}`);
+        return pool;
+      } catch (err) {
+        console.error(`❌ Falhou em ${server}: ${(err as Error).message}`);
+        lastError = err as Error;
+      }
+    }
+    throw lastError;
   }
 
   return pool;

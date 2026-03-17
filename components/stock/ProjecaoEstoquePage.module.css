@@ -723,7 +723,7 @@
 }
 
 .compraDataCell {
-  color: #15803d;
+  color: #15803d !important;
   font-weight: 600;
   background: #f0fdf4;
   font-size: 12px;
@@ -732,7 +732,7 @@
 }
 
 .compraQtdCell {
-  color: #15803d;
+  color: #15803d !important;
   font-weight: 700;
   background: #dcfce7;
   font-size: 13px;
@@ -743,7 +743,7 @@
 /* Células vazias: mesmo padrão zebra das linhas VENDA/ESTOQUE/DURAÇÃO real (outros meses = azul suave; mês atual = azul escuro) */
 .compraRow .compraDataCell.compraCellEmpty {
   background: #f0f4ff !important;
-  color: #1e3a5f !important;
+  color: #15803d !important;
   font-weight: 400 !important;
   border-bottom-color: #e4ecf7 !important;
   box-shadow: none !important;
@@ -751,7 +751,7 @@
 
 .compraRow .compraQtdCell.compraCellEmpty {
   background: #eaeffb !important;
-  color: #1e3a5f !important;
+  color: #15803d !important;
   font-weight: 400 !important;
   box-shadow: none !important;
 }
@@ -781,7 +781,7 @@
 
 .compraQtdClickable:hover {
   background: #4ade80 !important;
-  color: #14532d !important;
+  color: #15803d !important;
 }
 
 .compraQtdArrow {
@@ -836,6 +836,14 @@
   color: #94a3b8 !important;
   font-weight: 400 !important;
   box-shadow: inset -1px 0 0 #b3e0ed, inset 1px 0 0 #b3e0ed !important;
+}
+
+/* Sub-nível: produto sem alerta macro mas com sub-itens com necessidade de compra */
+.compraSubNivelCell {
+  background: #ffedd5 !important;
+  color: #15803d !important;
+  font-weight: 600 !important;
+  box-shadow: inset -1px 0 0 #fed7aa, inset 1px 0 0 #fed7aa !important;
 }
 
 /* ═══════════════════════════════════════════

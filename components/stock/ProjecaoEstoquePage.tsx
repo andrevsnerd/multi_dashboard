@@ -779,14 +779,45 @@ export default function ProjecaoEstoquePage({
     return map;
   }, [listaExibida, getReaisPorMes, projecoes]);
 
+  // Sub-nível: computa itens com necessidade de compra dentro do escopo de linhas macro sem alerta próprio
+  const rawSubCompraItems = useMemo(() => {
+    const map = new Map<string, ReposicaoItem[]>();
+    listaExibida.forEach((proj, idx) => {
+      const rowKey = `${proj.categoria}|${proj.subgrupo ?? ""}|${proj.grade ?? ""}|${proj.colecao ?? ""}|${proj.produto ?? ""}|${proj.cor ?? ""}|${idx}`;
+      if (compraInfoMap.has(rowKey)) return; // já tem alerta próprio
+      const ex = expansao.get(proj.categoria);
+      const nivel = ex?.nivel ?? 0;
+      const hasSubLevels = projecoes.some((p) => {
+        if (p.categoria !== proj.categoria) return false;
+        if (nivel === 0) return !!p.subgrupo;
+        if (nivel === 1) return p.subgrupo === proj.subgrupo && !!p.grade;
+        if (nivel === 2) return p.subgrupo === proj.subgrupo && p.grade === proj.grade && !!p.produto;
+        if (nivel === 3) return p.subgrupo === proj.subgrupo && p.grade === proj.grade && p.produto === proj.produto && !!p.cor;
+        return false;
+      });
+      if (!hasSubLevels) return;
+      // nivel 0: reagrupar() espalha campos do cats[0] (subgrupo, grade, etc.) na linha agregada,
+      // então precisamos limpar esses campos para que o scope cubra toda a categoria
+      const scopeProj: ProjecaoCategoria = nivel === 0
+        ? { categoria: proj.categoria, meses: proj.meses }
+        : proj;
+      const subItems = computeReposicaoScope(scopeProj, projecoes, getReaisPorMes);
+      if (subItems.length > 0) map.set(rowKey, subItems);
+    });
+    return map;
+  }, [listaExibida, compraInfoMap, expansao, projecoes, getReaisPorMes]);
+
   // Coleta todos os códigos de produto que precisam de reposição (para buscar preço unitário em lote)
   const allProdutosReposicao = useMemo(() => {
     const codes = new Set<string>();
     compraInfoMap.forEach(({ reposicaoItems }) => {
       reposicaoItems.forEach(item => { const p = item.produto?.trim(); if (p) codes.add(p); });
     });
+    rawSubCompraItems.forEach((items) => {
+      items.forEach(item => { const p = item.produto?.trim(); if (p) codes.add(p); });
+    });
     return Array.from(codes);
-  }, [compraInfoMap]);
+  }, [compraInfoMap, rawSubCompraItems]);
 
   // Busca preços unitários (valor60dias / vendas60dias) por produto específico
   const [unitPrices, setUnitPrices] = useState<Record<string, number>>({});
@@ -823,6 +854,20 @@ export default function ProjecaoEstoquePage({
     });
     return costs;
   }, [compraInfoMap, unitPrices]);
+
+  // Qtd e custo agregados dos sub-níveis (para linhas macro sem alerta próprio)
+  const subCompraMap = useMemo(() => {
+    const map = new Map<string, { qtdTotal: number; custoTotal: number; reposicaoItems: ReposicaoItem[] }>();
+    rawSubCompraItems.forEach((subItems, rowKey) => {
+      const qtdTotal = subItems.reduce((s, i) => s + i.qtdCompra, 0);
+      const custoTotal = subItems.reduce((s, i) => {
+        const unitPrice = unitPrices[i.produto?.trim() ?? ''] ?? 0;
+        return s + i.qtdCompra * unitPrice;
+      }, 0);
+      if (qtdTotal > 0) map.set(rowKey, { qtdTotal, custoTotal, reposicaoItems: subItems });
+    });
+    return map;
+  }, [rawSubCompraItems, unitPrices]);
 
   const [exportandoPDF, setExportandoPDF] = useState(false);
 
@@ -1265,6 +1310,7 @@ export default function ProjecaoEstoquePage({
               {listaExibida.map((proj, idx) => {
                 const rowKey = `${proj.categoria}|${proj.subgrupo ?? ""}|${proj.grade ?? ""}|${proj.colecao ?? ""}|${proj.produto ?? ""}|${proj.cor ?? ""}|${idx}`;
                 const compraInfo = compraInfoMap.get(rowKey) ?? null;
+                const subCompraInfo = !compraInfo ? (subCompraMap.get(rowKey) ?? null) : null;
                 const { estoqueAtualReal, duracaoRealMesAtual } = getReaisPorMes(proj);
                 const isLençosLine = proj.categoria === "LENÇOS" || proj.categoria === "APROVEITAMENTO LENÇOS";
                 const limiteDiasAlerta = isLençosLine ? 120 : 90;
@@ -1419,9 +1465,10 @@ export default function ProjecaoEstoquePage({
                       <td className={styles.compraLabelCell}>DATA COMPRA</td>
                       {mesesExibicao.map((m) => {
                         const isRedMonth = compraInfo && m.mesNumero === compraInfo.redMesNumero && m.ano === compraInfo.redAno;
+                        const isSubNivelMonth = !compraInfo && subCompraInfo != null && m.isMesAtual;
                         return (
-                          <td key={`dc-${m.ano}-${m.mesNumero}`} className={`${styles.compraDataCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${!isRedMonth ? styles.compraCellEmpty : ""}`}>
-                            {isRedMonth ? compraInfo!.dataCompra : "-"}
+                          <td key={`dc-${m.ano}-${m.mesNumero}`} className={`${styles.compraDataCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${!isRedMonth && !isSubNivelMonth ? styles.compraCellEmpty : ""} ${isSubNivelMonth ? styles.compraSubNivelCell : ""}`}>
+                            {isRedMonth ? compraInfo!.dataCompra : isSubNivelMonth ? "Sub-itens" : "-"}
                           </td>
                         );
                       })}
@@ -1430,15 +1477,18 @@ export default function ProjecaoEstoquePage({
                       <td className={styles.compraLabelCell}>QTD COMPRA</td>
                       {mesesExibicao.map((m) => {
                         const isRedMonth = compraInfo && m.mesNumero === compraInfo.redMesNumero && m.ano === compraInfo.redAno;
+                        const isSubNivelMonth = !compraInfo && subCompraInfo != null && m.isMesAtual;
                         const showBelow = idx === 0;
                         const handleClickQtdCompra = () => {
-                          if (!compraInfo) return;
-                          // Salva dados de reposição individual no sessionStorage para a página de lista
+                          const info = compraInfo ?? (isSubNivelMonth ? subCompraInfo : null);
+                          if (!info) return;
+                          const qtd = compraInfo ? compraInfo.qtdCompra : subCompraInfo!.qtdTotal;
+                          const items = compraInfo ? compraInfo.reposicaoItems : subCompraInfo!.reposicaoItems;
                           try {
                             sessionStorage.setItem("lista_compra_reposicao", JSON.stringify({
                               categoria: proj.categoria,
-                              totalQtd: compraInfo.qtdCompra,
-                              itens: compraInfo.reposicaoItems.map(item => ({
+                              totalQtd: qtd,
+                              itens: items.map(item => ({
                                 ...item,
                                 custoUnit: unitPrices[item.produto] ?? 0,
                               })),
@@ -1447,7 +1497,7 @@ export default function ProjecaoEstoquePage({
                           } catch (_) { /* ignora se sessionStorage não disponível */ }
                           const params = new URLSearchParams();
                           params.set("categoria", proj.categoria);
-                          params.set("qtdCompra", String(compraInfo.qtdCompra));
+                          params.set("qtdCompra", String(qtd));
                           params.set("mode", "reposicao");
                           if (filial) params.set("filial", filial);
                           grupos.forEach((g) => params.append("grupos", g));
@@ -1463,7 +1513,7 @@ export default function ProjecaoEstoquePage({
                         return (
                           <td
                             key={`qc-${m.ano}-${m.mesNumero}`}
-                            className={`${styles.compraQtdCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${!isRedMonth ? styles.compraCellEmpty : ""} ${isRedMonth ? styles.compraQtdClickable : ""}`}
+                            className={`${styles.compraQtdCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${!isRedMonth && !isSubNivelMonth ? styles.compraCellEmpty : ""} ${isRedMonth ? styles.compraQtdClickable : ""} ${isSubNivelMonth ? styles.compraSubNivelCell : ""} ${isSubNivelMonth ? styles.compraQtdClickable : ""}`}
                             {...(isRedMonth && compraInfo ? {
                               onMouseEnter: (e: React.MouseEvent<HTMLElement>) => showCompraDebugTooltip(e, {
                                 estoqueReal: compraInfo.estoqueReal,
@@ -1476,11 +1526,16 @@ export default function ProjecaoEstoquePage({
                               }, showBelow),
                               onMouseLeave: hideCompraDebugTooltip,
                               onClick: handleClickQtdCompra,
-                            } : {})}
+                            } : isSubNivelMonth ? { onClick: handleClickQtdCompra } : {})}
                           >
                             {isRedMonth ? (
                               <span className={styles.compraQtdCellWrapper}>
                                 {fmt(compraInfo!.qtdCompra)}
+                                <span className={styles.compraQtdArrow}>→</span>
+                              </span>
+                            ) : isSubNivelMonth ? (
+                              <span className={styles.compraQtdCellWrapper}>
+                                {fmt(subCompraInfo!.qtdTotal)}
                                 <span className={styles.compraQtdArrow}>→</span>
                               </span>
                             ) : (
@@ -1497,12 +1552,13 @@ export default function ProjecaoEstoquePage({
                           <td className={styles.compraLabelCell}>CUSTO</td>
                           {mesesExibicao.map((m) => {
                             const isRedMonth = compraInfo && m.mesNumero === compraInfo.redMesNumero && m.ano === compraInfo.redAno;
+                            const isSubNivelMonth = !compraInfo && subCompraInfo != null && m.isMesAtual;
                             return (
                               <td
                                 key={`cu-${m.ano}-${m.mesNumero}`}
-                                className={`${styles.compraQtdCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${!isRedMonth ? styles.compraCellEmpty : ""}`}
+                                className={`${styles.compraQtdCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${!isRedMonth && !isSubNivelMonth ? styles.compraCellEmpty : ""} ${isSubNivelMonth ? styles.compraSubNivelCell : ""}`}
                               >
-                                {isRedMonth ? (custoValor != null ? fmtBRL(custoValor) : "...") : "-"}
+                                {isRedMonth ? (custoValor != null ? fmtBRL(custoValor) : "...") : isSubNivelMonth ? (subCompraInfo!.custoTotal > 0 ? fmtBRL(subCompraInfo!.custoTotal) : "...") : "-"}
                               </td>
                             );
                           })}

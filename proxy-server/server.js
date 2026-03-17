@@ -40,8 +40,13 @@ const dbConfig = {
   },
   pool: {
     max: 10,
-    min: 1,
-    idleTimeoutMillis: 30000,
+    min: 2,
+    idleTimeoutMillis: 600000,     // 10 min (era 30s — muito baixo, causava timeout ao recriar conexões)
+    acquireTimeoutMillis: 60000,   // 60s para adquirir conexão do pool
+    createTimeoutMillis: 30000,
+    destroyTimeoutMillis: 5000,
+    reapIntervalMillis: 1000,
+    createRetryIntervalMillis: 200,
   },
   requestTimeout: 300000, // 5 min (vendedores/sales-summary podem levar 2min+)
   connectionTimeout: 30000,
@@ -49,13 +54,41 @@ const dbConfig = {
 
 // Pool de conexão
 let pool = null;
+let activeServer = process.env.DB_SERVER;
+
+const DB_SERVERS = [
+  process.env.DB_SERVER,
+  process.env.DB_SERVER_FALLBACK || '189.126.197.82',
+].filter(Boolean);
+
+async function tryConnect(server) {
+  const config = { ...dbConfig, server };
+  console.log(`🔌 Tentando conectar em ${server}...`);
+  const p = await sql.connect(config);
+  activeServer = server;
+  console.log(`✅ Conectado em ${server}`);
+  return p;
+}
 
 async function getPool() {
-  if (!pool) {
-    pool = await sql.connect(dbConfig);
-  }
-  if (!pool.connected) {
-    await pool.connect();
+  if (!pool || !pool.connected) {
+    if (pool) {
+      try { await pool.close(); } catch (_) {}
+      pool = null;
+    }
+    // Tenta o servidor ativo primeiro, depois os demais
+    const ordered = [activeServer, ...DB_SERVERS.filter(s => s !== activeServer)];
+    let lastError;
+    for (const server of ordered) {
+      try {
+        pool = await tryConnect(server);
+        return pool;
+      } catch (err) {
+        console.error(`❌ Falhou em ${server}: ${err.message}`);
+        lastError = err;
+      }
+    }
+    throw lastError;
   }
   return pool;
 }
