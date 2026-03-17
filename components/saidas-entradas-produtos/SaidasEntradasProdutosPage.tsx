@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { resolveCompany, type CompanyKey } from "@/lib/config/company";
+import { type CompanyKey } from "@/lib/config/company";
 import { useAuth } from "@/components/auth/AuthContext";
 
 import styles from "./SaidasEntradasProdutosPage.module.css";
@@ -314,8 +314,6 @@ export default function SaidasEntradasProdutosPage({
   const [permissoesCarregadas, setPermissoesCarregadas] = useState(false);
 
   const notificacaoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const hoverRef = useRef<NodeJS.Timeout | null>(null);
-  const leaveRef = useRef<NodeJS.Timeout | null>(null);
   const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
   const [detalhesCache, setDetalhesCache] = useState<Record<string, LogDetalheItem[]>>({});
   const [loadingDetalhesKey, setLoadingDetalhesKey] = useState<string | null>(null);
@@ -323,6 +321,7 @@ export default function SaidasEntradasProdutosPage({
   const [logEditando, setLogEditando] = useState<TransferenciaLog | null>(null);
   const [observacaoEditando, setObservacaoEditando] = useState("");
   const [processandoEdicao, setProcessandoEdicao] = useState(false);
+  const [mostrarConfirmacaoRegistro, setMostrarConfirmacaoRegistro] = useState(false);
 
   // Carregar permissões do usuário PRIMEIRO (antes de tudo)
   useEffect(() => {
@@ -493,6 +492,18 @@ export default function SaidasEntradasProdutosPage({
     notificacaoTimeoutRef.current = setTimeout(() => {
       setNotificacao(null);
     }, 3000);
+  }, []);
+
+  const trocarTipoOperacao = useCallback((next: TipoOperacao) => {
+    setTipoOperacao(next);
+    // evitar "cadeia" de updates pós-clique
+    setHoveredLogKey(null);
+    setLoadingDetalhesKey(null);
+    setProdutosSelecionados([]);
+    setFilaOperacoes([]);
+    setSearchTerm("");
+    setProdutos([]);
+    setModalAberto(false);
   }, []);
 
   // Carregar logs de saídas e entradas
@@ -733,7 +744,7 @@ export default function SaidasEntradasProdutosPage({
     setLoadingDetalhesKey(hoveredLogKey);
     const parts = hoveredLogKey.split("|");
     const [tipo, romaneio, fo, fd] = parts;
-    if (tipo && romaneio && fo && fd) {
+    if (tipo && romaneio && (fo || fd)) {
       fetchLogDetalhes(tipo as "saida" | "entrada", romaneio, fo, fd).then((data) => {
         if (!cancelled) {
           setDetalhesCache((prev) => ({ ...prev, [hoveredLogKey]: data }));
@@ -749,14 +760,11 @@ export default function SaidasEntradasProdutosPage({
   }, [hoveredLogKey]);
 
   const onLogCardEnter = useCallback((key: string) => {
-    if (leaveRef.current) { clearTimeout(leaveRef.current); leaveRef.current = null; }
-    if (hoverRef.current) clearTimeout(hoverRef.current);
-    hoverRef.current = setTimeout(() => setHoveredLogKey(key), 80);
+    setHoveredLogKey(key);
   }, []);
 
   const onLogCardLeave = useCallback(() => {
-    if (hoverRef.current) { clearTimeout(hoverRef.current); hoverRef.current = null; }
-    leaveRef.current = setTimeout(() => setHoveredLogKey(null), 80);
+    setHoveredLogKey(null);
   }, []);
 
   const abrirModalEdicao = useCallback((log: TransferenciaLog) => {
@@ -882,10 +890,27 @@ export default function SaidasEntradasProdutosPage({
     setFilaOperacoes([...produtosSelecionados]);
   }, [filialSelecionada, produtosSelecionados, mostrarNotificacao]);
 
-  // Limpar produtos selecionados quando mudar tipo de operação ou filial
+  const abrirConfirmacaoRegistro = useCallback(() => {
+    if (!filialSelecionada) {
+      mostrarNotificacao("Selecione uma filial", "error");
+      return;
+    }
+    if (produtosSelecionados.length === 0) {
+      mostrarNotificacao("Adicione pelo menos um produto", "error");
+      return;
+    }
+    setMostrarConfirmacaoRegistro(true);
+  }, [filialSelecionada, produtosSelecionados.length, mostrarNotificacao]);
+
+  const confirmarRegistro = useCallback(() => {
+    setMostrarConfirmacaoRegistro(false);
+    iniciarOperacao();
+  }, [iniciarOperacao]);
+
+  // Limpar produtos selecionados quando mudar filial
   useEffect(() => {
     setProdutosSelecionados([]);
-  }, [tipoOperacao, filialSelecionada]);
+  }, [filialSelecionada]);
 
   const totalItens = produtosSelecionados.reduce((sum, p) => sum + p.quantidade, 0);
   const totalProdutos = produtosSelecionados.length;
@@ -909,379 +934,197 @@ export default function SaidasEntradasProdutosPage({
     );
   }
 
+  const isBusy = processandoOperacao || filaOperacoes.length > 0;
+
   return (
     <div className={styles.wrapper}>
-      {/* Header */}
-      <div className={styles.header}>
-        <div>
-          <h1 className={styles.title}>
-            <span className={styles.icon}>{tipoOperacao === "saida" ? "📤" : "📥"}</span>
-            Saídas e Entradas de Produtos
-          </h1>
-          <p className={styles.subtitle}>
-            {tipoOperacao === "saida" ? "Registre saídas de produtos" : "Registre entradas de produtos"}
-          </p>
-        </div>
-      </div>
-
-      {/* Seletor de Tipo de Operação */}
-      <div className={styles.tipoOperacaoSelector}>
-        <button
-          className={`${styles.tipoOperacaoButton} ${tipoOperacao === "saida" ? styles.tipoOperacaoButtonActive : ""}`}
-          onClick={() => setTipoOperacao("saida")}
-        >
-          📤 Saída
-        </button>
-        <button
-          className={`${styles.tipoOperacaoButton} ${tipoOperacao === "entrada" ? styles.tipoOperacaoButtonActive : ""}`}
-          onClick={() => setTipoOperacao("entrada")}
-        >
-          📥 Entrada
-        </button>
-      </div>
-
-      {/* Layout principal */}
-      <div className={styles.layout}>
-        {/* Coluna esquerda - Filial e Logs */}
-        <div className={styles.column}>
-          <div className={styles.section}>
-            <label className={styles.sectionLabel}>
-              {tipoOperacao === "saida" ? "FILIAL ORIGEM" : "FILIAL DESTINO"}
-            </label>
-            {filiaisDisponiveis.length === 1 && filialSelecionada ? (
-              <div className={styles.filialCard}>
-                <div className={styles.filialIcon}>🏢</div>
-                <div className={styles.filialInfo}>
-                  <div className={styles.filialName}>{filialSelecionada.filial}</div>
-                  <div className={styles.filialCode}>{filialSelecionada.codFilial}</div>
-                </div>
-                <div className={styles.checkmark}>✓</div>
-              </div>
-            ) : (
-              <>
-                <div className={styles.selectWrapper}>
-                  <select
-                    className={styles.select}
-                    value={filialSelecionada?.codFilial || ""}
-                    onChange={(e) => {
-                      const filial = filiaisDisponiveis.find(f => f.codFilial === e.target.value);
-                      setFilialSelecionada(filial || null);
-                      setProdutosSelecionados([]);
-                    }}
-                  >
-                    <option value="">Selecione uma filial</option>
-                    {filiaisDisponiveis.map(f => (
-                      <option key={f.codFilial} value={f.codFilial}>
-                        {f.filial}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {filialSelecionada && (
-                  <div className={styles.filialCard}>
-                    <div className={styles.filialIcon}>🏢</div>
-                    <div className={styles.filialInfo}>
-                      <div className={styles.filialName}>{filialSelecionada.filial}</div>
-                      <div className={styles.filialCode}>{filialSelecionada.codFilial}</div>
-                    </div>
-                    <div className={styles.checkmark}>✓</div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Log */}
-          <div className={styles.section}>
-            <label className={styles.sectionLabel}>
-              LOG DE {tipoOperacao === "saida" ? "SAÍDAS" : "ENTRADAS"}
-            </label>
-            {loadingLogsAtivos ? (
-              <div className={styles.emptyState}>Carregando...</div>
-            ) : logsAtivos.length === 0 ? (
-              <div className={styles.emptyState}>
-                <div className={styles.emptyIcon}>📄</div>
-                <div>Nenhuma {tipoOperacao === "saida" ? "saída" : "entrada"} realizada</div>
-              </div>
-            ) : (
-              <div className={styles.logList}>
-                {logsAtivos.map((log, index) => {
-                  const logKey = `${tipoOperacao}|${log.romaneio}|${log.filialOrigem}|${log.filialDestino}`;
-                  const show = hoveredLogKey === logKey;
-                  const detalhes = show ? detalhesCache[logKey] : undefined;
-                  const loading = loadingDetalhesKey === logKey;
-                  return (
-                    <div
-                      key={index}
-                      className={styles.logItemWrapper}
-                      onMouseEnter={() => onLogCardEnter(logKey)}
-                      onMouseLeave={onLogCardLeave}
-                    >
-                      <div className={styles.logItem}>
-                        <div className={styles.logHeader}>
-                          <span className={styles.logRomaneio}>#{log.romaneio}</span>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            {isAdmin && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  abrirModalEdicao(log);
-                                }}
-                                className={styles.logEditButton}
-                                title="Editar log"
-                              >
-                                ✏️
-                              </button>
-                            )}
-                            <span className={styles.logStatus}>{log.status}</span>
-                          </div>
-                        </div>
-                        <div className={styles.logDetails}>
-                          {tipoOperacao === "saida" 
-                            ? `${log.filialOrigem} → ${log.filialDestino}`
-                            : `${log.filialOrigem} → ${log.filialDestino}`
-                          }
-                        </div>
-                        {log.responsavel && (
-                          <div className={styles.logResponsavel}>Responsável: {log.responsavel}</div>
-                        )}
-                        <div className={styles.logFooter}>
-                          <span>👁 {log.qtdProdutos} produtos • {log.qtdItens} itens</span>
-                          <span className={styles.logDate}>
-                            {new Date(log.dataEmissao).toLocaleString("pt-BR")}
-                          </span>
-                        </div>
-                      </div>
-                      {show && (
-                        <div className={styles.logPopover}>
-                          {loading ? (
-                            <div className={styles.logPopoverLoad}>…</div>
-                          ) : detalhes?.length ? (
-                            <div className={styles.logPopoverList}>
-                              {detalhes.map((it, i) => {
-                                const lojaO = it.filialOrigem ?? log.filialOrigem;
-                                const lojaD = it.filialDestino ?? log.filialDestino;
-                                return (
-                                <div key={i} className={styles.logPopoverRow}>
-                                  <div className={styles.logPopoverNome}>{it.descProduto || it.produto}</div>
-                                  <div className={styles.logPopoverMeta}>
-                                    {it.produto}{it.descCor ? ` · ${it.descCor}` : ""}
-                                    {it.codigoBarra ? ` · ${it.codigoBarra}` : ""}
-                                  </div>
-                                  <div className={styles.logPopoverEstoque}>
-                                    <div>Qtd {tipoOperacao === "saida" ? "saída" : "entrada"}: {it.qtde}</div>
-                                    <div><strong>{lojaO}</strong>: {it.estoqueOrigem} un</div>
-                                    <div><strong>{lojaD}</strong>: {it.estoqueDestino} un</div>
-                                  </div>
-                                </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <div className={styles.logPopoverLoad}>—</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Coluna central - Produtos e Resumo */}
-        <div className={styles.column}>
-          {/* Produtos */}
-          <div className={styles.section}>
-            <div className={styles.sectionHeader}>
-              <label className={styles.sectionLabel}>
-                PRODUTOS PARA {tipoOperacao === "saida" ? "SAÍDA" : "ENTRADA"}
-              </label>
-              <span className={styles.itemCount}>{totalItens} itens</span>
-            </div>
-
-            {produtosSelecionados.length === 0 ? (
-              <div className={styles.emptyState}>
-                <div className={styles.emptyIcon}>📦</div>
-                <div>Nenhum produto adicionado</div>
-                <div className={styles.emptySubtext}>Adicione produtos para {tipoOperacao === "saida" ? "saída" : "entrada"}</div>
-              </div>
-            ) : (
-              <div className={styles.produtosList}>
-                {produtosSelecionados.map((produto, index) => (
-                  <div key={index} className={styles.produtoItem}>
-                    <div className={styles.produtoInfo}>
-                      <div className={styles.produtoName}>{produto.descProduto}</div>
-                      <div className={styles.produtoSku}>
-                        SKU: {produto.produto}
-                        {produto.corProduto && ` • Cor: ${produto.descCor || produto.corProduto}`}
-                      </div>
-                    </div>
-                    <div className={styles.produtoControls}>
-                      <div className={styles.quantityControls}>
-                        <button
-                          className={styles.quantityButton}
-                          onClick={() => atualizarQuantidade(index, produto.quantidade - 1)}
-                          disabled={produto.quantidade <= 1}
-                        >
-                          −
-                        </button>
-                        <input
-                          type="number"
-                          className={styles.quantityInput}
-                          value={produto.quantidade}
-                          onChange={(e) => {
-                            const qty = parseInt(e.target.value) || 1;
-                            atualizarQuantidade(index, qty);
-                          }}
-                          min={1}
-                          max={produto.estoque}
-                        />
-                        <button
-                          className={styles.quantityButton}
-                          onClick={() => atualizarQuantidade(index, produto.quantidade + 1)}
-                          disabled={produto.quantidade >= produto.estoque}
-                        >
-                          +
-                        </button>
-                      </div>
-                      <div className={styles.stockIndicator}>
-                        {produto.quantidade}/{produto.estoque}
-                      </div>
-                      <button
-                        className={styles.removeButton}
-                        onClick={() => removerProduto(index)}
-                        title="Remover produto"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
+      {/* Top bar: toggle + título */}
+      <div className={styles.topBar}>
+        <div className={styles.topBarLeft}>
+          <div className={styles.segControl} role="tablist" aria-label="Tipo de operação">
             <button
-              className={styles.addButton}
-              onClick={() => setModalAberto(true)}
-              disabled={!filialSelecionada}
+              type="button"
+              className={`${styles.segBtn} ${tipoOperacao === "saida" ? styles.segBtnSaidaActive : ""}`}
+              onClick={() => trocarTipoOperacao("saida")}
+              aria-selected={tipoOperacao === "saida"}
             >
-              <span className={styles.addIcon}>+</span>
-              Adicionar Produto
+              <span className={styles.segBtnIcon} aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M7 17 17 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <path d="M10 7h7v7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+              Saída
+            </button>
+            <button
+              type="button"
+              className={`${styles.segBtn} ${tipoOperacao === "entrada" ? styles.segBtnEntradaActive : ""}`}
+              onClick={() => trocarTipoOperacao("entrada")}
+              aria-selected={tipoOperacao === "entrada"}
+            >
+              <span className={styles.segBtnIcon} aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M7 7 17 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <path d="M10 17h7v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+              Entrada
             </button>
           </div>
 
-          {/* Resumo */}
-          <div className={styles.section}>
-            <label className={styles.sectionLabel}>RESUMO</label>
-            <div className={styles.resumo}>
-              <div className={styles.resumoFilial}>
-                <span>{tipoOperacao === "saida" ? "Filial Origem" : "Filial Destino"}</span>
-                <strong>{filialSelecionada?.filial || "—"}</strong>
-              </div>
-            </div>
-            <div className={styles.resumoCards}>
-              <div className={styles.resumoCard}>
-                <div className={styles.resumoCardValue}>{totalProdutos}</div>
-                <div className={styles.resumoCardLabel}>Produtos</div>
-              </div>
-              <div className={styles.resumoCard}>
-                <div className={styles.resumoCardValue}>{totalItens}</div>
-                <div className={styles.resumoCardLabel}>Itens Total</div>
-              </div>
-            </div>
+          <div className={styles.headerIcon} aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 2 20 6.5v11L12 22l-8-4.5v-11L12 2Z"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinejoin="round"
+              />
+              <path d="M12 22V12" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+              <path d="M20 6.5 12 12 4 6.5" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+            </svg>
+          </div>
 
-            {/* Tipo de Romaneio */}
-            <div className={styles.configSection}>
-              <label className={styles.configLabel}>Tipo de Romaneio</label>
-              {tiposRomaneioDisponiveis.length === 1 ? (
-                <div style={{ 
-                  padding: "10px 14px", 
-                  border: "1px solid #e2e8f0", 
-                  borderRadius: "10px", 
-                  fontSize: "15px",
-                  background: "#f8fafc",
-                  color: "#334155"
-                }}>
-                  {tipoRomaneioSelecionado}
-                </div>
+          <div>
+            <h1 className={styles.title}>{tipoOperacao === "saida" ? "Registrar Saída" : "Registrar Entrada"}</h1>
+            <p className={styles.subtitle}>
+              {tipoOperacao === "saida" ? "Saída de produtos do estoque" : "Entrada de produtos do estoque"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Config bar horizontal: filial | tipo romaneio | responsável */}
+      <div className={styles.configGrid}>
+        {/* Filial (alinha com Histórico) */}
+        <div className={styles.configCard}>
+          <div className={styles.configIcon} aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M4 20h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <path d="M6 20V7l6-3 6 3v13" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+              <path d="M10 20v-6h4v6" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <div className={styles.configBody}>
+          <span className={styles.configBarLabel}>
+            {tipoOperacao === "saida" ? "Filial de Saída" : "Filial de Entrada"}
+          </span>
+          {filiaisDisponiveis.length === 1 && filialSelecionada ? (
+            <span className={styles.configBarText}>{filialSelecionada.filial}</span>
+          ) : (
+            <div className={styles.selectWrap}>
+              <select
+                className={styles.configBarSelect}
+                value={filialSelecionada?.codFilial || ""}
+                onChange={(e) => {
+                  const filial = filiaisDisponiveis.find(f => f.codFilial === e.target.value);
+                  setFilialSelecionada(filial || null);
+                  setProdutosSelecionados([]);
+                }}
+              >
+                <option value="">Selecione...</option>
+                {filiaisDisponiveis.map(f => (
+                  <option key={f.codFilial} value={f.codFilial}>{f.filial}</option>
+                ))}
+              </select>
+              <span className={styles.selectChevron} aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+            </div>
+          )}
+          </div>
+        </div>
+
+        {/* Tipo Romaneio + Responsável (alinha com Produtos) */}
+        <div className={styles.configCardWide}>
+          {/* Tipo Romaneio */}
+          <div className={styles.configSegment}>
+            <div className={styles.configIcon} aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M7 7h10M7 12h10M7 17h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <path d="M5 4h14v16H5V4Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div className={styles.configBody}>
+              <span className={styles.configBarLabel}>Tipo de Romaneio</span>
+              {tiposRomaneioDisponiveis.length === 1 || permissoes?.tipoRomaneioFixo ? (
+                <span className={styles.configBarText}>{tipoRomaneioSelecionado}</span>
               ) : (
-                <select
-                  className={styles.configSelect}
-                  value={tipoRomaneioSelecionado}
-                  onChange={(e) => setTipoRomaneioSelecionado(e.target.value)}
-                  disabled={permissoes?.tipoRomaneioFixo === true}
-                >
-                  {tiposRomaneioDisponiveis.map(tipo => (
-                    <option key={tipo} value={tipo}>{tipo}</option>
-                  ))}
-                </select>
+                <div className={styles.selectWrap}>
+                  <select
+                    className={styles.configBarSelect}
+                    value={tipoRomaneioSelecionado}
+                    onChange={(e) => setTipoRomaneioSelecionado(e.target.value)}
+                  >
+                    {tiposRomaneioDisponiveis.map(tipo => (
+                      <option key={tipo} value={tipo}>{tipo}</option>
+                    ))}
+                  </select>
+                  <span className={styles.selectChevron} aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                </div>
               )}
             </div>
+          </div>
 
-            {/* Responsável */}
-            <div className={styles.configSection}>
-              <label className={styles.configLabel}>Responsável</label>
+          {/* Responsável */}
+          <div className={styles.configSegment}>
+            <div className={styles.configIcon} aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" stroke="currentColor" strokeWidth="2" />
+                <path d="M4 20a8 8 0 0 1 16 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </div>
+            <div className={styles.configBody}>
+              <span className={styles.configBarLabel}>Responsável</span>
               {permissoes?.responsavelFixo ? (
-                <div style={{ 
-                  padding: "10px 14px", 
-                  border: "1px solid #e2e8f0", 
-                  borderRadius: "10px", 
-                  fontSize: "15px",
-                  background: "#f8fafc",
-                  color: "#334155"
-                }}>
-                  {permissoes.responsavelPadrao || "LOGISTICA"}
-                </div>
+                <span className={styles.configBarText}>{permissoes.responsavelPadrao || "LOGISTICA"}</span>
               ) : responsaveis.length === 1 ? (
-                <div style={{ 
-                  padding: "10px 14px", 
-                  border: "1px solid #e2e8f0", 
-                  borderRadius: "10px", 
-                  fontSize: "15px",
-                  background: "#f8fafc",
-                  color: "#334155"
-                }}>
-                  {responsaveis[0].responsavel}
-                </div>
+                <span className={styles.configBarText}>{responsaveis[0].responsavel}</span>
               ) : !mostrarInputResponsavel ? (
                 <>
-                  <input
-                    type="text"
-                    list="responsaveis-list"
-                    className={styles.configSelect}
-                    value={responsavelSelecionado}
-                    onChange={(e) => {
-                      const value = e.target.value.toUpperCase();
-                      setResponsavelSelecionado(value);
-                    }}
-                    onBlur={(e) => {
-                      const value = e.target.value.trim().toUpperCase();
-                      if (value && !responsaveis.some(r => r.responsavel.toUpperCase() === value)) {
-                        mostrarNotificacao("Responsável deve existir na lista de responsáveis disponíveis", "error");
-                        if (responsaveis.length > 0) {
-                          setResponsavelSelecionado(responsaveis[0].responsavel);
+                  <div className={styles.selectWrap}>
+                    <input
+                      type="text"
+                      list="responsaveis-list"
+                      className={styles.configBarInput}
+                      value={responsavelSelecionado}
+                      onChange={(e) => setResponsavelSelecionado(e.target.value.toUpperCase())}
+                      onBlur={(e) => {
+                        const value = e.target.value.trim().toUpperCase();
+                        if (value && !responsaveis.some(r => r.responsavel.toUpperCase() === value)) {
+                          mostrarNotificacao("Responsável deve existir na lista de responsáveis disponíveis", "error");
+                          if (responsaveis.length > 0) setResponsavelSelecionado(responsaveis[0].responsavel);
                         }
-                      }
-                    }}
-                    placeholder="Selecione ou digite um responsável"
-                  />
+                      }}
+                      placeholder="Selecione ou digite"
+                    />
+                    <span className={styles.selectChevron} aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none">
+                        <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                  </div>
                   <datalist id="responsaveis-list">
                     {responsaveis.map((resp, idx) => (
                       <option key={idx} value={resp.responsavel}>
-                        {resp.responsavel}{resp.qtd > 0 ? ` (${resp.qtd} entradas)` : ''}
+                        {resp.responsavel}{resp.qtd > 0 ? ` (${resp.qtd})` : ""}
                       </option>
                     ))}
                   </datalist>
                 </>
               ) : (
-                <div className={styles.customInputWrapper}>
+                <div className={styles.customInputRow}>
                   <input
                     type="text"
                     list="responsaveis-list"
-                    className={styles.customInput}
-                    placeholder="Digite o login do responsável"
+                    className={styles.configBarInput}
+                    placeholder="Digite o responsável"
                     value={inputResponsavelCustomizado}
                     onChange={(e) => setInputResponsavelCustomizado(e.target.value)}
                     onBlur={() => {
@@ -1300,93 +1143,361 @@ export default function SaidasEntradasProdutosPage({
                   />
                   <datalist id="responsaveis-list">
                     {responsaveis.map((resp, idx) => (
-                      <option key={idx} value={resp.responsavel}>
-                        {resp.responsavel}{resp.qtd > 0 ? ` (${resp.qtd} entradas)` : ''}
-                      </option>
+                      <option key={idx} value={resp.responsavel} />
                     ))}
                   </datalist>
                   <button
-                    className={styles.cancelCustomButton}
-                    onClick={() => {
-                      setMostrarInputResponsavel(false);
-                      setInputResponsavelCustomizado("");
-                    }}
-                  >
-                    ×
-                  </button>
+                    className={styles.cancelCustomBtn}
+                    onClick={() => { setMostrarInputResponsavel(false); setInputResponsavelCustomizado(""); }}
+                  >×</button>
                 </div>
               )}
             </div>
-
-            {/* Observação */}
-            <div className={styles.configSection}>
-              <label className={styles.configLabel}>Observação (Opcional)</label>
-              <textarea
-                className={styles.observacaoTextarea}
-                value={observacao}
-                onChange={(e) => setObservacao(e.target.value)}
-                placeholder={`Adicione um comentário sobre esta ${tipoOperacao === "saida" ? "saída" : "entrada"}...`}
-                rows={3}
-                maxLength={2000}
-                disabled={processandoOperacao || filaOperacoes.length > 0}
-              />
-              <div className={styles.observacaoCounter}>
-                {observacao.length}/2000 caracteres
-              </div>
-            </div>
-
-            <button
-              className={`${styles.transferButton} ${
-                !filialSelecionada || produtosSelecionados.length === 0 || processandoOperacao || filaOperacoes.length > 0
-                  ? styles.transferButtonDisabled
-                  : ""
-              }`}
-              onClick={iniciarOperacao}
-              disabled={!filialSelecionada || produtosSelecionados.length === 0 || processandoOperacao || filaOperacoes.length > 0}
-            >
-              <span className={styles.transferIcon}>{tipoOperacao === "saida" ? "📤" : "📥"}</span>
-              {processandoOperacao || filaOperacoes.length > 0
-                ? `Processando... (${filaOperacoes.length} restantes)`
-                : tipoOperacao === "saida" ? "Registrar Saída" : "Registrar Entrada"}
-            </button>
           </div>
         </div>
       </div>
 
-      {/* Modal de Adicionar Produto */}
+      {/* Layout: logs | operação */}
+      <div className={styles.layout}>
+
+        {/* Coluna de logs (esquerda) */}
+        <div className={styles.logColumn}>
+          <div className={styles.card}>
+            <div className={styles.cardHeader}>
+              <span className={styles.cardLabelWithIcon}>
+                <span className={styles.cardHeaderIcon} aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M12 22a10 10 0 1 0-10-10 10 10 0 0 0 10 10Z" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                </span>
+                Histórico de {tipoOperacao === "saida" ? "Saídas" : "Entradas"}
+              </span>
+              {logsAtivos.length > 0 && (
+                <span className={styles.badgeMuted}>{logsAtivos.length}</span>
+              )}
+            </div>
+
+            {loadingLogsAtivos ? (
+              <div className={styles.emptyLog}>Carregando...</div>
+            ) : logsAtivos.length === 0 ? (
+              <div className={styles.emptyLog}>
+                <div className={styles.emptyLogIcon}>📋</div>
+                <div>Nenhum registro ainda</div>
+              </div>
+            ) : (
+              <div className={styles.logScrollContainer}>
+                <div className={styles.logList}>
+                  {logsAtivos.map((log, index) => {
+                    const logKey = `${tipoOperacao}|${log.romaneio}|${log.filialOrigem}|${log.filialDestino}`;
+                    const show = hoveredLogKey === logKey;
+                    const detalhes = show ? detalhesCache[logKey] : undefined;
+                    const loadingDet = loadingDetalhesKey === logKey;
+                    return (
+                      <div
+                        key={index}
+                        className={styles.logItemWrapper}
+                        onMouseEnter={() => onLogCardEnter(logKey)}
+                        onMouseLeave={onLogCardLeave}
+                      >
+                        <div className={styles.logItem}>
+                          <div className={styles.logHeader}>
+                            <span className={styles.logRomaneio}>#{log.romaneio}</span>
+                            <div className={styles.logActions}>
+                              {isAdmin && (
+                                <button
+                                  className={styles.logEditBtn}
+                                  onClick={(e) => { e.stopPropagation(); abrirModalEdicao(log); }}
+                                  title="Editar"
+                                >✏️</button>
+                              )}
+                              <span className={styles.logStatusPill}>{log.status}</span>
+                            </div>
+                          </div>
+                          <div className={styles.logRoute}>
+                            {log.filialOrigem || "—"} → {log.filialDestino || "—"}
+                          </div>
+                          {log.responsavel && (
+                            <div className={styles.logResponsavel}>{log.responsavel}</div>
+                          )}
+                          <div className={styles.logFooter}>
+                            <span className={styles.logMeta}>
+                              {log.qtdProdutos} prod · {log.qtdItens} itens
+                            </span>
+                            <span className={styles.logDate}>
+                              {new Date(log.dataEmissao).toLocaleString("pt-BR", {
+                                day: "2-digit", month: "2-digit", year: "2-digit",
+                                hour: "2-digit", minute: "2-digit"
+                              })}
+                            </span>
+                          </div>
+                        </div>
+
+                        {show && (
+                          <div className={styles.logPopover}>
+                            <div className={styles.logPopoverTitle}>Produtos deste romaneio</div>
+                            {loadingDet ? (
+                              <div className={styles.logPopoverLoad}>Carregando…</div>
+                            ) : detalhes?.length ? (
+                              <div className={styles.logPopoverList}>
+                                {detalhes.map((it, i) => {
+                                  const lojaO = it.filialOrigem ?? log.filialOrigem;
+                                  const lojaD = it.filialDestino ?? log.filialDestino;
+                                  return (
+                                    <div key={i} className={styles.logPopoverRow}>
+                                      <div className={styles.logPopoverNome}>{it.descProduto || it.produto}</div>
+                                      <div className={styles.logPopoverMeta}>
+                                        {it.produto}{it.descCor ? ` · ${it.descCor}` : ""}{it.codigoBarra ? ` · ${it.codigoBarra}` : ""}
+                                      </div>
+                                      <div className={styles.logPopoverEstoque}>
+                                        <span className={styles.logPopoverEstoqueItem}>
+                                          Qtd: <strong>{it.qtde}</strong>
+                                        </span>
+                                        <span className={styles.logPopoverEstoqueItem}>
+                                          <strong>{lojaO || "—"}</strong>: {it.estoqueOrigem}
+                                        </span>
+                                        <span className={styles.logPopoverEstoqueItem}>
+                                          <strong>{lojaD || "—"}</strong>: {it.estoqueDestino}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className={styles.logPopoverLoad}>Sem detalhes</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Coluna principal — operação (direita) */}
+        <div className={styles.mainColumn}>
+          <div className={styles.card}>
+            {/* Produtos */}
+            <div
+              className={`${styles.produtosArea} ${produtosSelecionados.length === 0 ? styles.produtosAreaEmpty : styles.produtosAreaHasItems}`}
+            >
+              <div className={styles.cardHeader}>
+                <span className={styles.cardLabelWithIcon}>
+                  <span className={styles.cardHeaderIcon} aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M12 2 20 6.5v11L12 22l-8-4.5v-11L12 2Z"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinejoin="round"
+                      />
+                      <path d="M20 6.5 12 12 4 6.5" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                      <path d="M12 12v10" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                  Produtos para {tipoOperacao === "saida" ? "Saída" : "Entrada"}
+                </span>
+                {totalProdutos > 0 && (
+                  <span className={`${styles.badge} ${tipoOperacao === "saida" ? styles.badgeSaida : styles.badgeEntrada}`}>
+                    {totalProdutos} prod · {totalItens} itens
+                  </span>
+                )}
+              </div>
+
+              {produtosSelecionados.length === 0 ? (
+                <div className={styles.emptyProducts}>
+                  <div className={styles.emptyProductsIcon} aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M12 2 20 6.5v11L12 22l-8-4.5v-11L12 2Z"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinejoin="round"
+                      />
+                      <path d="M20 6.5 12 12 4 6.5" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <div className={styles.emptyProductsTitle}>Nenhum produto adicionado</div>
+                  <div className={styles.emptyProductsSub}>
+                    Busque e adicione produtos à {tipoOperacao === "saida" ? "saída" : "entrada"}
+                  </div>
+                </div>
+              ) : (
+                <div className={styles.produtosList}>
+                  {produtosSelecionados.map((produto, index) => (
+                    <div key={index} className={styles.produtoItem}>
+                      <div className={styles.produtoInfo}>
+                        <div className={styles.produtoName}>{produto.descProduto}</div>
+                        <div className={styles.produtoSku}>
+                          {produto.produto}
+                          {produto.corProduto && ` · ${produto.descCor || produto.corProduto}`}
+                        </div>
+                      </div>
+                      <div className={styles.produtoControls}>
+                        <div className={styles.qtyControl}>
+                          <button
+                            className={styles.qtyBtn}
+                            onClick={() => atualizarQuantidade(index, produto.quantidade - 1)}
+                            disabled={produto.quantidade <= 1}
+                          >−</button>
+                          <input
+                            type="number"
+                            className={styles.qtyInput}
+                            value={produto.quantidade}
+                            onChange={(e) => atualizarQuantidade(index, parseInt(e.target.value) || 1)}
+                            min={1}
+                            max={produto.estoque}
+                          />
+                          <button
+                            className={styles.qtyBtn}
+                            onClick={() => atualizarQuantidade(index, produto.quantidade + 1)}
+                            disabled={produto.quantidade >= produto.estoque}
+                          >+</button>
+                        </div>
+                        <div className={styles.stockPill}>{produto.quantidade}/{produto.estoque}</div>
+                        <button className={styles.removeBtn} onClick={() => removerProduto(index)} title="Remover">🗑</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button
+                type="button"
+                className={`${styles.addProductBtn} ${tipoOperacao === "saida" ? styles.addProductBtnSaida : styles.addProductBtnEntrada}`}
+                onClick={() => { setSearchTerm(""); setModalAberto(true); }}
+                disabled={!filialSelecionada || isBusy}
+              >
+                <span className={styles.addProductBtnIcon} aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </span>
+                Adicionar Produto
+              </button>
+            </div>
+
+            {/* Obs + Submit */}
+            <div className={styles.bottomArea}>
+              <div className={styles.obsLabel}>Observação (opcional)</div>
+              <textarea
+                className={styles.obsTextarea}
+                value={observacao}
+                onChange={(e) => setObservacao(e.target.value)}
+                placeholder="Adicione uma observação sobre esta movimentação..."
+                rows={3}
+                maxLength={2000}
+                disabled={isBusy}
+              />
+              <div className={styles.obsCounter}>{observacao.length}/2000</div>
+              <div className={styles.submitRow}>
+                <div className={styles.submitCounts}>
+                  <div className={styles.submitCountItem}>
+                    <div className={styles.submitCountValue}>{totalProdutos}</div>
+                    <div className={styles.submitCountLabel}>Produtos</div>
+                  </div>
+                  <div className={styles.submitCountItem}>
+                    <div className={styles.submitCountValue}>{totalItens}</div>
+                    <div className={styles.submitCountLabel}>Itens</div>
+                  </div>
+                </div>
+                <button
+                  className={`${styles.submitBtn} ${isBusy || !filialSelecionada || produtosSelecionados.length === 0 ? "" : tipoOperacao === "saida" ? styles.submitBtnSaida : styles.submitBtnEntrada}`}
+                  onClick={abrirConfirmacaoRegistro}
+                  disabled={!filialSelecionada || produtosSelecionados.length === 0 || isBusy}
+                >
+                  <span className={styles.submitBtnIcon} aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M22 2 11 13"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M22 2 15 22l-4-9-9-4 20-7Z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                  {isBusy
+                    ? `⏳ Processando… (${filaOperacoes.length} restantes)`
+                    : tipoOperacao === "saida" ? "Registrar Saída" : "Registrar Entrada"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal – Confirmação Registrar Saída/Entrada */}
+      {mostrarConfirmacaoRegistro && (
+        <div className={styles.modalOverlay} onClick={() => setMostrarConfirmacaoRegistro(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>
+                {tipoOperacao === "saida" ? "Confirma a SAÍDA?" : "Confirma a ENTRADA?"}
+              </h2>
+              <button className={styles.modalCloseBtn} onClick={() => setMostrarConfirmacaoRegistro(false)}>×</button>
+            </div>
+            <div className={styles.modalBody}>
+              <p className={styles.confirmacaoTexto}>
+                {tipoOperacao === "saida"
+                  ? "Deseja registrar a saída dos produtos selecionados?"
+                  : "Deseja registrar a entrada dos produtos selecionados?"}
+              </p>
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.btnSecondary} onClick={() => setMostrarConfirmacaoRegistro(false)}>
+                Cancelar
+              </button>
+              <button
+                className={tipoOperacao === "saida" ? styles.btnConfirmarSaida : styles.btnConfirmarEntrada}
+                onClick={confirmarRegistro}
+              >
+                {tipoOperacao === "saida" ? "Confirmar Saída" : "Confirmar Entrada"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal – Adicionar Produto */}
       {modalAberto && (
         <div className={styles.modalOverlay} onClick={() => setModalAberto(false)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
               <h2 className={styles.modalTitle}>Adicionar Produto</h2>
-              <button
-                className={styles.modalClose}
-                onClick={() => setModalAberto(false)}
-              >
-                ×
-              </button>
+              <button className={styles.modalCloseBtn} onClick={() => setModalAberto(false)}>×</button>
             </div>
             <div className={styles.modalContent}>
-              <div className={styles.searchWrapper}>
+              <div className={styles.searchBox}>
                 <span className={styles.searchIcon}>🔍</span>
                 <input
                   type="text"
                   className={styles.searchInput}
-                  placeholder="Buscar por nome ou SKU..."
+                  placeholder="Buscar por nome, SKU ou código de barras..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   autoFocus
                 />
               </div>
               {loadingProdutos ? (
-                <div className={styles.loading}>Buscando produtos...</div>
+                <div className={styles.loadingText}>Buscando produtos...</div>
               ) : produtos.length === 0 && searchTerm.length >= 2 ? (
-                <div className={styles.emptyState}>Nenhum produto encontrado</div>
+                <div className={styles.emptyLog}>Nenhum produto encontrado</div>
               ) : (
                 <div className={styles.produtosModalList}>
                   {produtos.map((produto, index) => {
-                    const estoque = produto.estoques.find(e => 
-                      e.filial.trim() === filialSelecionada?.codFilial?.trim() || 
+                    const estoque = produto.estoques.find(e =>
+                      e.filial.trim() === filialSelecionada?.codFilial?.trim() ||
                       e.filial === filialSelecionada?.codFilial
                     );
                     return (
@@ -1395,19 +1506,19 @@ export default function SaidasEntradasProdutosPage({
                         <div className={styles.produtoModalInfo}>
                           <div className={styles.produtoModalName}>{produto.descProduto}</div>
                           <div className={styles.produtoModalDetails}>
-                            SKU: {produto.produto}
-                            {produto.corProduto && ` • Cor: ${produto.descCor || produto.corProduto}`}
-                            {estoque && ` • Estoque: ${estoque.estoque}`}
+                            {produto.produto}
+                            {produto.corProduto && ` · ${produto.descCor || produto.corProduto}`}
+                            {estoque && ` · Estoque: ${estoque.estoque}`}
                           </div>
                         </div>
                         <button
-                          className={styles.addProdutoButton}
+                          className={`${styles.addModalBtn} ${tipoOperacao === "saida" ? styles.addModalBtnSaida : styles.addModalBtnEntrada}`}
                           onClick={() => adicionarProduto(produto)}
                           disabled={!estoque}
-                          title={estoque ? `Adicionar produto (Estoque: ${estoque.estoque})` : `Produto não possui estoque na filial ${filialSelecionada?.filial}`}
-                        >
-                          +
-                        </button>
+                          title={estoque
+                            ? `Estoque: ${estoque.estoque}`
+                            : `Sem estoque em ${filialSelecionada?.filial}`}
+                        >+</button>
                       </div>
                     );
                   })}
@@ -1418,39 +1529,31 @@ export default function SaidasEntradasProdutosPage({
         </div>
       )}
 
-      {/* Notificação */}
+      {/* Toast */}
       {notificacao && (
-        <div className={`${styles.notification} ${styles[`notification${notificacao.tipo}`]}`}>
-          <span className={styles.notificationIcon}>
-            {notificacao.tipo === "success" ? "✓" : "✗"}
-          </span>
-          <span className={styles.notificationMessage}>{notificacao.mensagem}</span>
+        <div className={`${styles.toast} ${notificacao.tipo === "success" ? styles.toastSuccess : styles.toastError}`}>
+          <span className={styles.toastIcon}>{notificacao.tipo === "success" ? "✓" : "✕"}</span>
+          <span>{notificacao.mensagem}</span>
         </div>
       )}
 
-      {/* Modal de Edição/Remoção de Log */}
+      {/* Modal – Editar Log */}
       {modalEdicaoAberto && logEditando && (
-        <div className={styles.modalOverlay} onClick={fecharModalEdicao}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.modalOverlayEdit} onClick={fecharModalEdicao}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>
-                Editar Log #{logEditando.romaneio}
-              </h2>
-              <button className={styles.modalCloseButton} onClick={fecharModalEdicao}>
-                ×
-              </button>
+              <h2 className={styles.modalTitle}>Editar Log #{logEditando.romaneio}</h2>
+              <button className={styles.modalCloseBtn} onClick={fecharModalEdicao}>×</button>
             </div>
-            
             <div className={styles.modalBody}>
-              <div className={styles.modalInfo}>
+              <div className={styles.modalInfoBox}>
                 <div><strong>Tipo:</strong> {tipoOperacao === "saida" ? "Saída" : "Entrada"}</div>
                 <div><strong>Filial:</strong> {tipoOperacao === "saida" ? logEditando.filialOrigem : logEditando.filialDestino}</div>
                 <div><strong>Data:</strong> {new Date(logEditando.dataEmissao).toLocaleString("pt-BR")}</div>
-                <div><strong>Produtos:</strong> {logEditando.qtdProdutos} • <strong>Itens:</strong> {logEditando.qtdItens}</div>
+                <div><strong>Produtos:</strong> {logEditando.qtdProdutos} · <strong>Itens:</strong> {logEditando.qtdItens}</div>
               </div>
-
               <div className={styles.modalField}>
-                <label className={styles.modalLabel}>Observação</label>
+                <label className={styles.modalFieldLabel}>Observação</label>
                 <textarea
                   className={styles.modalTextarea}
                   value={observacaoEditando}
@@ -1460,33 +1563,16 @@ export default function SaidasEntradasProdutosPage({
                   maxLength={2000}
                   disabled={processandoEdicao}
                 />
-                <div className={styles.modalCharCount}>
-                  {observacaoEditando.length}/2000
-                </div>
+                <div className={styles.modalCharCount}>{observacaoEditando.length}/2000</div>
               </div>
             </div>
-
             <div className={styles.modalFooter}>
-              <button
-                className={styles.modalButtonDanger}
-                onClick={removerLog}
-                disabled={processandoEdicao}
-              >
-                {processandoEdicao ? "Removendo..." : "🗑️ Remover Log"}
+              <button className={styles.btnDanger} onClick={removerLog} disabled={processandoEdicao}>
+                {processandoEdicao ? "Removendo..." : "🗑 Remover Log"}
               </button>
               <div style={{ display: "flex", gap: "8px" }}>
-                <button
-                  className={styles.modalButtonSecondary}
-                  onClick={fecharModalEdicao}
-                  disabled={processandoEdicao}
-                >
-                  Cancelar
-                </button>
-                <button
-                  className={styles.modalButtonPrimary}
-                  onClick={salvarEdicao}
-                  disabled={processandoEdicao}
-                >
+                <button className={styles.btnSecondary} onClick={fecharModalEdicao} disabled={processandoEdicao}>Cancelar</button>
+                <button className={styles.btnPrimary} onClick={salvarEdicao} disabled={processandoEdicao}>
                   {processandoEdicao ? "Salvando..." : "Salvar"}
                 </button>
               </div>
