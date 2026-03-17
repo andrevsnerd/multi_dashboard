@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getConnectionPool } from '@/lib/db/connection';
-import { shouldUseProxy, forwardTransferToProxy } from '@/lib/db/proxy';
+import { shouldUseProxy, forwardTransferToProxy, ProxyPool } from '@/lib/db/proxy';
 import { findUserByUsername } from '@/lib/auth/users-store';
 import { getPermissaoByUsername } from '@/lib/utils/transferencia-permissoes-store';
 import { executeSaida, executeEntrada } from '@/lib/saida-entrada-executor';
@@ -86,13 +86,7 @@ export async function POST(request: Request) {
       }
     }
 
-    if (shouldUseProxy()) {
-      // Para proxy, precisaríamos adaptar o forwardTransferToProxy ou criar um novo método
-      // Por enquanto, vamos executar diretamente mesmo via proxy
-      // TODO: Implementar proxy específico para saida/entrada se necessário
-    }
-
-    const pool = await getConnectionPool();
+    const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
     const result = tipoOperacao === 'saida'
       ? await executeSaida(pool, {
           produto,

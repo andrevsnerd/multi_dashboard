@@ -282,14 +282,24 @@ export interface RequestLike {
 export class ProxyRequest implements RequestLike {
   private params: Record<string, any> = {};
 
-  input(name: string, type: any, value: any): ProxyRequest {
-    this.params[name] = value;
+  input(name: string, typeOrValue: any, value?: any): ProxyRequest {
+    // Handle both (name, value) and (name, type, value) signatures
+    this.params[name] = value !== undefined ? value : typeOrValue;
     return this;
   }
 
   async query<T = any>(queryText: string): Promise<{ recordset: T[] }> {
     const data = await queryViaProxy<T>(queryText, this.params);
     return { recordset: data };
+  }
+}
+
+/**
+ * Simula um sql.ConnectionPool para uso via proxy
+ */
+export class ProxyPool {
+  request(): ProxyRequest {
+    return new ProxyRequest();
   }
 }
 

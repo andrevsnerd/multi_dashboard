@@ -299,6 +299,13 @@ export default function ProjecaoEstoquePage({
     qtdCompra: number;
     limiteDias: number;
   } | null>(null);
+  const [simCompraTooltip, setSimCompraTooltip] = useState<{
+    x: number;
+    y: number;
+    above: boolean;
+    items: Array<{ label: string; qtd: number; estoque: number; consumoDiario: number; diasCobertura: number }>;
+    total: number;
+  } | null>(null);
   const expansaoRestoredRef = useRef(false);
 
   const [opcoesGrupos, setOpcoesGrupos] = useState<string[]>([]);
@@ -768,6 +775,7 @@ export default function ProjecaoEstoquePage({
     setCompraDebugTooltip({ ...debug, x, y, above: !showBelow });
   }, []);
   const hideCompraDebugTooltip = useCallback(() => setCompraDebugTooltip(null), []);
+  const hideSimCompraTooltip = useCallback(() => setSimCompraTooltip(null), []);
 
   const handleClickCategoria = useCallback((proj: ProjecaoCategoria) => {
     const n = expansao.get(proj.categoria)?.nivel ?? 0;
@@ -1784,7 +1792,59 @@ export default function ProjecaoEstoquePage({
                               }, showBelow),
                               onMouseLeave: hideCompraDebugTooltip,
                               onClick: handleClickQtdCompra,
-                            } : isSubNivelMonth ? { onClick: handleClickQtdCompra } : isSimMonth ? { onClick: handleClickSimCompra } : {})}
+                            } : isSubNivelMonth ? { onClick: handleClickQtdCompra } : isSimMonth ? {
+                              onClick: handleClickSimCompra,
+                              onMouseEnter: (e: React.MouseEvent<HTMLElement>) => {
+                                if (!simCompra) return;
+                                const ex2 = expansao.get(proj.categoria);
+                                const nivel2 = ex2?.nivel ?? 0;
+                                const isConsulta2 = consultaTermos.length > 0;
+                                const scopeLeaves = projecoes.filter(p => {
+                                  if (p.categoria !== proj.categoria) return false;
+                                  if (isConsulta2) return p.produto === proj.produto;
+                                  if (nivel2 >= 1 && proj.subgrupo && p.subgrupo !== proj.subgrupo) return false;
+                                  if (nivel2 >= 2 && proj.grade && p.grade !== proj.grade) return false;
+                                  if (nivel2 >= 3 && proj.produto && p.produto !== proj.produto) return false;
+                                  if (nivel2 >= 4 && proj.cor && p.cor !== proj.cor) return false;
+                                  return true;
+                                });
+                                // Agrupa apenas pelo próximo nível (não detalha até a folha)
+                                const nextKey = (p: ProjecaoCategoria): string => {
+                                  if (nivel2 === 0) return p.subgrupo ?? "—";
+                                  if (nivel2 === 1) return p.grade ?? "—";
+                                  if (nivel2 === 2) return p.descricao ?? p.produto ?? "—";
+                                  return p.cor ?? p.produto ?? "—";
+                                };
+                                const byNext = new Map<string, { qtd: number; estoque: number; consumoDiario: number; diasCobertura: number }>();
+                                scopeLeaves.forEach(p => {
+                                  const lk = `${p.categoria}|${p.subgrupo ?? ""}|${p.grade ?? ""}|${p.colecao ?? ""}|${p.produto ?? ""}|${p.cor ?? ""}`;
+                                  const sl = simulatedLeafMap.get(lk);
+                                  if (!sl) return;
+                                  const c = sl.compras.find(cc => cc.mesNumero === simCompra.mesNumero && cc.ano === simCompra.ano);
+                                  if (!c || c.qtd <= 0) return;
+                                  const estoqueAntes = Math.max(0, (sl.meses[c.mesIdx]?.estoque ?? 0) - c.qtd);
+                                  const isLencos2 = p.categoria === "LENÇOS" || p.categoria === "APROVEITAMENTO LENÇOS";
+                                  const lim2 = isLencos2 ? 120 : 90;
+                                  const cDia = estoqueAntes > 0 ? estoqueAntes / lim2 : 0;
+                                  const k = nextKey(p);
+                                  const prev = byNext.get(k);
+                                  if (prev) {
+                                    prev.qtd += c.qtd;
+                                    prev.estoque += estoqueAntes;
+                                    prev.consumoDiario += cDia;
+                                    prev.diasCobertura = 30 + lim2;
+                                  } else {
+                                    byNext.set(k, { qtd: c.qtd, estoque: estoqueAntes, consumoDiario: cDia, diasCobertura: 30 + lim2 });
+                                  }
+                                });
+                                const tooltipItems = Array.from(byNext.entries()).map(([label, v]) => ({ label, ...v }));
+                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                const x = rect.left + rect.width / 2;
+                                const y = showBelow ? rect.bottom + TOOLTIP_OFFSET : rect.top - TOOLTIP_OFFSET;
+                                setSimCompraTooltip({ x, y, above: !showBelow, items: tooltipItems, total: simCompra.qtd });
+                              },
+                              onMouseLeave: hideSimCompraTooltip,
+                            } : {})}
                           >
                             {isRedMonth ? (
                               <span className={styles.compraQtdCellWrapper}>
@@ -1876,6 +1936,33 @@ export default function ProjecaoEstoquePage({
             <span className={styles.compraDebugLine}>Meta cobertura = 30 + {compraDebugTooltip.limiteDias} = {compraDebugTooltip.diasCobertura} dias</span>
             <span className={styles.compraDebugLine}>Necessidade total = Consumo × Meta = {fmt(Math.round(compraDebugTooltip.necessidadeTotal))}</span>
             <span className={styles.compraDebugLine}>Qtd compra = Necessidade − Estoque = {fmt(compraDebugTooltip.qtdCompra)}</span>
+          </div>,
+          document.body
+        )}
+      {typeof document !== "undefined" &&
+        simCompraTooltip &&
+        createPortal(
+          <div
+            className={styles.simCompraTooltip}
+            style={{
+              left: simCompraTooltip.x,
+              top: simCompraTooltip.y,
+              transform: simCompraTooltip.above ? "translate(-50%, -100%)" : "translate(-50%, 0)",
+            }}
+            role="tooltip"
+          >
+            <div className={styles.compraDebugTitle}>Compra Simulada — sub-itens</div>
+            <span className={styles.simCompraFormula}>(C/dia × cob.) − est. = qtd</span>
+            {simCompraTooltip.items.map((item, i) => (
+              <span key={i} className={styles.simCompraItem}>
+                <span className={styles.simCompraLabel}>{item.label}</span>
+                <span className={styles.simCompraDetail}>est.{fmt(item.estoque)} | {item.consumoDiario.toFixed(1)}/dia × {item.diasCobertura}d − {fmt(item.estoque)} =</span>
+                <strong className={styles.simCompraQtd}>{fmt(item.qtd)}</strong>
+              </span>
+            ))}
+            {simCompraTooltip.items.length > 1 && (
+              <span className={styles.simCompraTotalLine}>Total: {fmt(simCompraTooltip.total)}</span>
+            )}
           </div>,
           document.body
         )}
