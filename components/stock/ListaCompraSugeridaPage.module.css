@@ -456,3 +456,20 @@
   color: #92400e;
   line-height: 1.5;
 }
+
+/* ═══════════════════════════════════════════
+   BANNER PROJEÇÃO SIMULADA
+   ═══════════════════════════════════════════ */
+.projecaoSimuladaBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #fef9c3;
+  border: 1.5px solid #fbbf24;
+  border-radius: 10px;
+  padding: 12px 18px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #78350f;
+  line-height: 1.55;
+}

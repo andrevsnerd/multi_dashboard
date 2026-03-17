@@ -30,6 +30,8 @@ interface ReposicaoData {
   totalQtd: number;
   itens: ReposicaoItem[];
   timestamp: number;
+  isProjecaoSimulada?: boolean;
+  mesCompra?: string;
 }
 
 interface ProdutoSugestao {
@@ -275,6 +277,20 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
       {/* ── ABA REPOSIÇÃO ─────────────────────────────────────────────────── */}
       {activeTab === "reposicao" && (
         <>
+          {/* Banner de projeção simulada */}
+          {reposicaoData?.isProjecaoSimulada && (
+            <div className={styles.projecaoSimuladaBanner}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+              <span>
+                <strong>PROJEÇÃO SIMULADA</strong> — Compra futura projetada com base em vendas do ano passado + 10%.
+                {reposicaoData.mesCompra && <> Compra prevista para <strong>{reposicaoData.mesCompra}</strong>.</>}
+                {" "}Os itens abaixo são sugestões para planejamento e não refletem necessidade real imediata.
+              </span>
+            </div>
+          )}
+
           {/* Summary */}
           {reposicaoData && (
             <div className={styles.summaryCard}>
@@ -295,7 +311,9 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
                 <span className={styles.summaryLabel}>Base do Cálculo</span>
-                <span className={styles.summaryValueNeutral} style={{ fontSize: 14 }}>Estoque e duração reais</span>
+                <span className={styles.summaryValueNeutral} style={{ fontSize: 14 }}>
+                  {reposicaoData.isProjecaoSimulada ? "Vendas ano passado + 10%" : "Estoque e duração reais"}
+                </span>
               </div>
             </div>
           )}

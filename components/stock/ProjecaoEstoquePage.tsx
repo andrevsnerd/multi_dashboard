@@ -19,6 +19,30 @@ const TOOLTIP_OFFSET = 8;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ExcelJSCell = any;
 
+// ── Tipos para simulação de compras futuras ───────────────────────────────────
+interface SimCompra {
+  mesIdx: number;
+  mesNumero: number;
+  ano: number;
+  qtd: number;
+  data: string;
+}
+interface SimLeafData {
+  meses: ProjecaoMensal[];
+  compras: SimCompra[];
+}
+interface SimRowCompra {
+  mesNumero: number;
+  ano: number;
+  qtd: number;
+  custo: number;
+  data: string;
+}
+interface SimRowData {
+  mesesSimByNum: Map<number, { estoque: number; duracao: number }>;
+  compras: SimRowCompra[];
+}
+
 const MESES_NOMES = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
 
 // --- Types (alinhados a API: varejo + e-commerce ja somados no backend) ---
@@ -185,6 +209,43 @@ function computeReposicaoScope(
   return result;
 }
 
+// ── Calcula dias até o estoque se esgotar a partir de startIndex ─────────────
+function calcDiasAteAcabar(meses: ProjecaoMensal[], startIndex: number): number {
+  const hoje = new Date();
+  const diasNoMesAtual = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
+  const diasRestantesMesAtual = Math.max(0, diasNoMesAtual - hoje.getDate());
+  const estoqueInicio = meses[startIndex]?.estoque ?? 0;
+  if (estoqueInicio <= 0) return 0;
+  let remaining = estoqueInicio;
+  let totalDias = 0;
+  let ultimoConsumo = 0;
+  for (let j = startIndex; j < meses.length; j++) {
+    const mesJ = meses[j];
+    const isMesAtualJ = mesJ.isMesAtual;
+    const v = isMesAtualJ && mesJ.vendasReais != null ? Math.max(0, mesJ.vendas - mesJ.vendasReais) : mesJ.vendas;
+    const diasMes = isMesAtualJ && diasRestantesMesAtual > 0 ? diasRestantesMesAtual : new Date(mesJ.ano, mesJ.mesNumero, 0).getDate();
+    if (diasMes <= 0 || v <= 0) continue;
+    const consumo = v / diasMes;
+    ultimoConsumo = consumo;
+    const dias = remaining / consumo;
+    if (dias >= diasMes) {
+      totalDias += diasMes;
+      remaining -= v;
+    } else {
+      totalDias += Math.round(dias);
+      remaining = 0;
+      break;
+    }
+  }
+  if (remaining > 0 && ultimoConsumo > 0) totalDias += Math.round(remaining / ultimoConsumo);
+  else if (remaining > 0) {
+    const last = meses[meses.length - 1];
+    const d = new Date(last.ano, last.mesNumero, 0).getDate();
+    if (d > 0 && last.vendas > 0) totalDias += Math.round(remaining / (last.vendas / d));
+  }
+  return totalDias;
+}
+
 // --- Default excluded lines (ScarfMe) ---
 function getExcludedLines(companyKey: CompanyKey): Set<string> {
   const config = resolveCompany(companyKey);
@@ -250,6 +311,9 @@ export default function ProjecaoEstoquePage({
   const [consultaOpen, setConsultaOpen] = useState(false);
   const [consultaInput, setConsultaInput] = useState("");
   const [consultaTermos, setConsultaTermos] = useState<string[]>([]);
+
+  // Projeção de compras simuladas
+  const [projetarComprasAtivo, setProjetarComprasAtivo] = useState(false);
 
   const excludedLines = useMemo(() => getExcludedLines(companyKey), [companyKey]);
 
@@ -439,43 +503,8 @@ export default function ProjecaoEstoquePage({
         : v.vendas;
       estoqueAcum = Math.max(0, estoqueAcum - descontar);
     }
-    const diasAteAcabar = (meses: ProjecaoMensal[], startIndex: number): number => {
-      const hoje = new Date();
-      const diasNoMesAtual = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
-      const diasRestantesMesAtual = Math.max(0, diasNoMesAtual - hoje.getDate());
-      const estoqueInicio = meses[startIndex].estoque;
-      if (estoqueInicio <= 0) return 0;
-      let remaining = estoqueInicio;
-      let totalDias = 0;
-      let ultimoConsumo = 0;
-      for (let j = startIndex; j < meses.length; j++) {
-        const mesJ = meses[j];
-        const isMesAtualJ = mesJ.isMesAtual;
-        const v = isMesAtualJ && mesJ.vendasReais != null ? Math.max(0, mesJ.vendas - mesJ.vendasReais) : mesJ.vendas;
-        const diasMes = isMesAtualJ && diasRestantesMesAtual > 0 ? diasRestantesMesAtual : new Date(mesJ.ano, mesJ.mesNumero, 0).getDate();
-        if (diasMes <= 0 || v <= 0) continue;
-        const consumo = v / diasMes;
-        ultimoConsumo = consumo;
-        const dias = remaining / consumo;
-        if (dias >= diasMes) {
-          totalDias += diasMes;
-          remaining -= v;
-        } else {
-          totalDias += Math.round(dias);
-          remaining = 0;
-          break;
-        }
-      }
-      if (remaining > 0 && ultimoConsumo > 0) totalDias += Math.round(remaining / ultimoConsumo);
-      else if (remaining > 0) {
-        const last = meses[meses.length - 1];
-        const d = new Date(last.ano, last.mesNumero, 0).getDate();
-        if (d > 0 && last.vendas > 0) totalDias += Math.round(remaining / (last.vendas / d));
-      }
-      return totalDias;
-    };
     if (items.length > 1) {
-      merged.forEach((_, i) => { merged[i].duracao = diasAteAcabar(merged, i); });
+      merged.forEach((_, i) => { merged[i].duracao = calcDiasAteAcabar(merged, i); });
     }
     return [{ ...items[0], meses: merged }];
   }, []);
@@ -653,6 +682,67 @@ export default function ProjecaoEstoquePage({
     }
     return out.filter((p) => (expansao.get(p.categoria)?.nivel ?? 0) === 0);
   }, [projecoes, companyKey, excludedLines, grupos, linhas, expansao, reagrupar, consultaTermos]);
+
+  // ── Simulação de compras futuras — nível folha ────────────────────────────
+  const simulatedLeafMap = useMemo((): Map<string, SimLeafData> => {
+    if (!projetarComprasAtivo || projecoes.length === 0) return new Map();
+    const mesAtualIdx = getMonth(new Date());
+    const map = new Map<string, SimLeafData>();
+
+    projecoes.forEach(p => {
+      const key = `${p.categoria}|${p.subgrupo ?? ""}|${p.grade ?? ""}|${p.colecao ?? ""}|${p.produto ?? ""}|${p.cor ?? ""}`;
+      if (map.has(key)) return; // evita duplicatas
+      const isLencos = p.categoria === "LENÇOS" || p.categoria === "APROVEITAMENTO LENÇOS";
+      const limitDias = isLencos ? 120 : 90;
+      const diasCobertura = 30 + limitDias;
+
+      const newMeses = p.meses.map(m => ({ ...m }));
+      const compras: SimCompra[] = [];
+
+      let estoqueAcum = newMeses[mesAtualIdx]?.estoque ?? 0;
+
+      for (let i = mesAtualIdx; i < newMeses.length; i++) {
+        newMeses[i].estoque = estoqueAcum;
+
+        // Só simula compra para meses FUTUROS (não o mês atual)
+        if (i > mesAtualIdx) {
+          const dur = calcDiasAteAcabar(newMeses, i);
+          newMeses[i].duracao = dur;
+
+          if (dur > 0 && dur <= limitDias) {
+            const consumoDiario = estoqueAcum > 0 && dur > 0 ? estoqueAcum / dur : 0;
+            const necessidadeTotal = consumoDiario * diasCobertura;
+            const qtd = Math.max(0, Math.round(necessidadeTotal - estoqueAcum));
+            if (qtd > 0) {
+              compras.push({
+                mesIdx: i,
+                mesNumero: newMeses[i].mesNumero,
+                ano: newMeses[i].ano,
+                qtd,
+                data: `25/${String(newMeses[i].mesNumero).padStart(2, "0")}/${newMeses[i].ano}`,
+              });
+              estoqueAcum += qtd;
+              newMeses[i].estoque = estoqueAcum;
+            }
+          }
+        }
+
+        const descontar = newMeses[i].isMesAtual && newMeses[i].vendasReais != null
+          ? Math.max(0, newMeses[i].vendas - (newMeses[i].vendasReais ?? 0))
+          : newMeses[i].vendas;
+        estoqueAcum = Math.max(0, estoqueAcum - descontar);
+      }
+
+      // Recalcula todas as durações com as compras simuladas incorporadas
+      for (let i = mesAtualIdx; i < newMeses.length; i++) {
+        newMeses[i].duracao = calcDiasAteAcabar(newMeses, i);
+      }
+
+      map.set(key, { meses: newMeses, compras });
+    });
+
+    return map;
+  }, [projetarComprasAtivo, projecoes]);
 
   const showFloatingTooltip = useCallback((
     e: React.MouseEvent<HTMLElement>,
@@ -868,6 +958,87 @@ export default function ProjecaoEstoquePage({
     });
     return map;
   }, [rawSubCompraItems, unitPrices]);
+
+  // ── Simulação de compras futuras — nível agregado por linha exibida ────────
+  const simRowDataMap = useMemo((): Map<string, SimRowData> => {
+    if (!projetarComprasAtivo || simulatedLeafMap.size === 0) return new Map();
+    const mesAtualIdx = getMonth(new Date());
+    const map = new Map<string, SimRowData>();
+
+    listaExibida.forEach((proj, idx) => {
+      const rowKey = `${proj.categoria}|${proj.subgrupo ?? ""}|${proj.grade ?? ""}|${proj.colecao ?? ""}|${proj.produto ?? ""}|${proj.cor ?? ""}|${idx}`;
+      const ex = expansao.get(proj.categoria);
+      const nivel = ex?.nivel ?? 0;
+      const isConsulta = consultaTermos.length > 0;
+
+      const inScope = projecoes.filter(p => {
+        if (p.categoria !== proj.categoria) return false;
+        if (isConsulta) return p.produto === proj.produto;
+        if (nivel >= 1 && proj.subgrupo && p.subgrupo !== proj.subgrupo) return false;
+        if (nivel >= 2 && proj.grade && p.grade !== proj.grade) return false;
+        if (nivel >= 3 && proj.produto && p.produto !== proj.produto) return false;
+        if (nivel >= 4 && proj.cor && p.cor !== proj.cor) return false;
+        return true;
+      });
+
+      if (inScope.length === 0) return;
+
+      const numMeses = proj.meses.length;
+      const aggEstoque = new Array<number>(numMeses).fill(0);
+      const aggVendas = new Array<number>(numMeses).fill(0);
+      const aggVendasReais = new Array<number | null>(numMeses).fill(null);
+
+      inScope.forEach(p => {
+        const leafKey = `${p.categoria}|${p.subgrupo ?? ""}|${p.grade ?? ""}|${p.colecao ?? ""}|${p.produto ?? ""}|${p.cor ?? ""}`;
+        const simLeaf = simulatedLeafMap.get(leafKey);
+        if (!simLeaf) return;
+        for (let i = 0; i < numMeses; i++) {
+          const sm = simLeaf.meses[i];
+          if (!sm) continue;
+          aggEstoque[i] += sm.estoque;
+          aggVendas[i] += sm.vendas;
+          if (sm.vendasReais != null) aggVendasReais[i] = (aggVendasReais[i] ?? 0) + sm.vendasReais;
+        }
+      });
+
+      const tempMeses: ProjecaoMensal[] = proj.meses.map((m, i) => ({
+        ...m,
+        estoque: aggEstoque[i],
+        vendas: aggVendas[i],
+        vendasReais: aggVendasReais[i] ?? undefined,
+      }));
+
+      const mesesSimByNum = new Map<number, { estoque: number; duracao: number }>();
+      for (let i = mesAtualIdx; i < tempMeses.length; i++) {
+        mesesSimByNum.set(tempMeses[i].mesNumero, {
+          estoque: aggEstoque[i],
+          duracao: calcDiasAteAcabar(tempMeses, i),
+        });
+      }
+
+      const comprasByMes = new Map<number, { qtd: number; custo: number; data: string; ano: number }>();
+      inScope.forEach(p => {
+        const leafKey = `${p.categoria}|${p.subgrupo ?? ""}|${p.grade ?? ""}|${p.colecao ?? ""}|${p.produto ?? ""}|${p.cor ?? ""}`;
+        const simLeaf = simulatedLeafMap.get(leafKey);
+        if (!simLeaf) return;
+        const unitPrice = unitPrices[p.produto?.trim() ?? ''] ?? 0;
+        simLeaf.compras.forEach(c => {
+          const existing = comprasByMes.get(c.mesNumero);
+          const custo = c.qtd * unitPrice;
+          if (existing) { existing.qtd += c.qtd; existing.custo += custo; }
+          else comprasByMes.set(c.mesNumero, { qtd: c.qtd, custo, data: c.data, ano: c.ano });
+        });
+      });
+
+      const compras: SimRowCompra[] = Array.from(comprasByMes.entries()).map(([mesNumero, v]) => ({
+        mesNumero, ano: v.ano, qtd: v.qtd, custo: v.custo, data: v.data,
+      }));
+
+      map.set(rowKey, { mesesSimByNum, compras });
+    });
+
+    return map;
+  }, [projetarComprasAtivo, simulatedLeafMap, listaExibida, projecoes, expansao, consultaTermos, unitPrices]);
 
   const [exportandoPDF, setExportandoPDF] = useState(false);
 
@@ -1145,6 +1316,19 @@ export default function ProjecaoEstoquePage({
             </div>
           </div>
           <div className={styles.headerActions}>
+            <button
+              type="button"
+              className={`${styles.projetarComprasBtn} ${projetarComprasAtivo ? styles.projetarComprasBtnAtivo : ""}`}
+              onClick={() => setProjetarComprasAtivo(v => !v)}
+              title={projetarComprasAtivo ? "Desativar projeção de compras simuladas" : "Ativar projeção de compras simuladas futuras"}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/>
+                <path d="M16 10a4 4 0 01-8 0"/>
+                <line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/>
+              </svg>
+              {projetarComprasAtivo ? "Projeção Ativa" : "Projetar Compras"}
+            </button>
             {isAdmin && (
               <>
                 <button
@@ -1311,6 +1495,7 @@ export default function ProjecaoEstoquePage({
                 const rowKey = `${proj.categoria}|${proj.subgrupo ?? ""}|${proj.grade ?? ""}|${proj.colecao ?? ""}|${proj.produto ?? ""}|${proj.cor ?? ""}|${idx}`;
                 const compraInfo = compraInfoMap.get(rowKey) ?? null;
                 const subCompraInfo = !compraInfo ? (subCompraMap.get(rowKey) ?? null) : null;
+                const simRowData = projetarComprasAtivo ? (simRowDataMap.get(rowKey) ?? null) : null;
                 const { estoqueAtualReal, duracaoRealMesAtual } = getReaisPorMes(proj);
                 const isLençosLine = proj.categoria === "LENÇOS" || proj.categoria === "APROVEITAMENTO LENÇOS";
                 const limiteDiasAlerta = isLençosLine ? 120 : 90;
@@ -1396,7 +1581,10 @@ export default function ProjecaoEstoquePage({
                       <td className={styles.labelCell}>ESTOQUE (projeção)</td>
                       {mesesExibicao.map((m) => {
                         const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
-                        const valor = md == null ? "-" : (md.isMesPassado && md.estoque === 0 ? "-" : fmt(md.estoque));
+                        const simMes = simRowData?.mesesSimByNum.get(m.mesNumero);
+                        const estoqueVal = simMes ? simMes.estoque : (md?.estoque ?? 0);
+                        const isMesPassado = md?.isMesPassado ?? false;
+                        const valor = isMesPassado && estoqueVal === 0 ? "-" : (md == null ? "-" : fmt(estoqueVal));
                         return <td key={`e-${m.ano}-${m.mesNumero}`} className={`${styles.estoqueCell} ${m.isMesAtual ? styles.columnMesAtual : ""}`}>{valor}</td>;
                       })}
                     </tr>
@@ -1404,8 +1592,10 @@ export default function ProjecaoEstoquePage({
                       <td className={styles.labelCell}>DURACAO (projeção)</td>
                       {mesesExibicao.map((m) => {
                         const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
-                        const valor = md && md.duracao > 0 ? `${md.duracao} dias` : "-";
-                        const alerta = md && md.duracao > 0 && md.duracao <= limiteDiasAlerta;
+                        const simMes = simRowData?.mesesSimByNum.get(m.mesNumero);
+                        const duracaoVal = simMes ? simMes.duracao : (md?.duracao ?? 0);
+                        const valor = duracaoVal > 0 ? `${duracaoVal} dias` : "-";
+                        const alerta = duracaoVal > 0 && duracaoVal <= limiteDiasAlerta;
                         return <td key={`d-${m.ano}-${m.mesNumero}`} className={`${styles.duracaoCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${alerta ? styles.duracaoAlerta : ""}`}>{valor}</td>;
                       })}
                     </tr>
@@ -1466,9 +1656,11 @@ export default function ProjecaoEstoquePage({
                       {mesesExibicao.map((m) => {
                         const isRedMonth = compraInfo && m.mesNumero === compraInfo.redMesNumero && m.ano === compraInfo.redAno;
                         const isSubNivelMonth = !compraInfo && subCompraInfo != null && m.isMesAtual;
+                        const simCompra = simRowData?.compras.find(c => c.mesNumero === m.mesNumero && c.ano === m.ano);
+                        const isSimMonth = !isRedMonth && !isSubNivelMonth && !!simCompra && !m.isMesAtual;
                         return (
-                          <td key={`dc-${m.ano}-${m.mesNumero}`} className={`${styles.compraDataCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${!isRedMonth && !isSubNivelMonth ? styles.compraCellEmpty : ""} ${isSubNivelMonth ? styles.compraSubNivelCell : ""}`}>
-                            {isRedMonth ? compraInfo!.dataCompra : isSubNivelMonth ? "Sub-itens" : "-"}
+                          <td key={`dc-${m.ano}-${m.mesNumero}`} className={`${styles.compraDataCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${isSimMonth ? styles.compraSimuladaDataCell : ""} ${!isRedMonth && !isSubNivelMonth && !isSimMonth ? styles.compraCellEmpty : ""} ${isSubNivelMonth ? styles.compraSubNivelCell : ""}`}>
+                            {isRedMonth ? compraInfo!.dataCompra : isSubNivelMonth ? "Sub-itens" : isSimMonth ? simCompra!.data : "-"}
                           </td>
                         );
                       })}
@@ -1478,6 +1670,8 @@ export default function ProjecaoEstoquePage({
                       {mesesExibicao.map((m) => {
                         const isRedMonth = compraInfo && m.mesNumero === compraInfo.redMesNumero && m.ano === compraInfo.redAno;
                         const isSubNivelMonth = !compraInfo && subCompraInfo != null && m.isMesAtual;
+                        const simCompra = simRowData?.compras.find(c => c.mesNumero === m.mesNumero && c.ano === m.ano);
+                        const isSimMonth = !isRedMonth && !isSubNivelMonth && !!simCompra && !m.isMesAtual;
                         const showBelow = idx === 0;
                         const handleClickQtdCompra = () => {
                           const info = compraInfo ?? (isSubNivelMonth ? subCompraInfo : null);
@@ -1510,10 +1704,74 @@ export default function ProjecaoEstoquePage({
                           }
                           router.push(`/${companyKey}/controle-estoque/projecao/lista-compra?${params.toString()}`);
                         };
+                        const handleClickSimCompra = () => {
+                          if (!simCompra) return;
+                          const ex2 = expansao.get(proj.categoria);
+                          const nivel2 = ex2?.nivel ?? 0;
+                          const isConsulta2 = consultaTermos.length > 0;
+                          const inScope = projecoes.filter(p => {
+                            if (p.categoria !== proj.categoria) return false;
+                            if (isConsulta2) return p.produto === proj.produto;
+                            if (nivel2 >= 1 && proj.subgrupo && p.subgrupo !== proj.subgrupo) return false;
+                            if (nivel2 >= 2 && proj.grade && p.grade !== proj.grade) return false;
+                            if (nivel2 >= 3 && proj.produto && p.produto !== proj.produto) return false;
+                            if (nivel2 >= 4 && proj.cor && p.cor !== proj.cor) return false;
+                            return true;
+                          });
+                          const simItems = inScope.flatMap(p => {
+                            const lk = `${p.categoria}|${p.subgrupo ?? ""}|${p.grade ?? ""}|${p.colecao ?? ""}|${p.produto ?? ""}|${p.cor ?? ""}`;
+                            const sl = simulatedLeafMap.get(lk);
+                            if (!sl) return [];
+                            const c = sl.compras.find(cc => cc.mesNumero === simCompra.mesNumero && cc.ano === simCompra.ano);
+                            if (!c || c.qtd <= 0) return [];
+                            const estoqueNoMes = sl.meses[c.mesIdx]?.estoque ?? 0;
+                            const isLencos2 = p.categoria === "LENÇOS" || p.categoria === "APROVEITAMENTO LENÇOS";
+                            const lim2 = isLencos2 ? 120 : 90;
+                            const consumoDiario = estoqueNoMes > 0 ? estoqueNoMes / lim2 : 0;
+                            return [{
+                              produto: p.produto?.trim() ?? '',
+                              descricao: p.descricao ?? p.produto ?? p.categoria,
+                              cor: p.cor,
+                              subgrupo: p.subgrupo,
+                              grade: p.grade,
+                              colecao: p.colecao,
+                              linha: p.linha,
+                              qtdCompra: c.qtd,
+                              estoqueReal: estoqueNoMes,
+                              duracaoReal: lim2,
+                              consumoDiario,
+                              diasCobertura: 30 + lim2,
+                              necessidadeTotal: consumoDiario * (30 + lim2),
+                              custoUnit: unitPrices[p.produto?.trim() ?? ''] ?? 0,
+                            }];
+                          });
+                          try {
+                            sessionStorage.setItem("lista_compra_reposicao", JSON.stringify({
+                              categoria: proj.categoria,
+                              totalQtd: simCompra.qtd,
+                              itens: simItems,
+                              timestamp: Date.now(),
+                              isProjecaoSimulada: true,
+                              mesCompra: simCompra.data,
+                            }));
+                          } catch (_) {}
+                          const params = new URLSearchParams();
+                          params.set("categoria", proj.categoria);
+                          params.set("qtdCompra", String(simCompra.qtd));
+                          params.set("mode", "projecao-simulada");
+                          if (filial) params.set("filial", filial);
+                          grupos.forEach((g) => params.append("grupos", g));
+                          linhas.forEach((l) => params.append("linhas", l));
+                          colecoes.forEach((c) => params.append("colecoes", c));
+                          subgrupos.forEach((s) => params.append("subgrupos", s));
+                          grades.forEach((g) => params.append("grades", g));
+                          if (expansao.size > 0) params.set("expansao", JSON.stringify(Array.from(expansao.entries())));
+                          router.push(`/${companyKey}/controle-estoque/projecao/lista-compra?${params.toString()}`);
+                        };
                         return (
                           <td
                             key={`qc-${m.ano}-${m.mesNumero}`}
-                            className={`${styles.compraQtdCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${!isRedMonth && !isSubNivelMonth ? styles.compraCellEmpty : ""} ${isRedMonth ? styles.compraQtdClickable : ""} ${isSubNivelMonth ? styles.compraSubNivelCell : ""} ${isSubNivelMonth ? styles.compraQtdClickable : ""}`}
+                            className={`${styles.compraQtdCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${isSimMonth ? styles.compraSimuladaQtdCell : ""} ${!isRedMonth && !isSubNivelMonth && !isSimMonth ? styles.compraCellEmpty : ""} ${isRedMonth ? styles.compraQtdClickable : ""} ${isSubNivelMonth ? styles.compraSubNivelCell : ""} ${isSubNivelMonth ? styles.compraQtdClickable : ""} ${isSimMonth ? styles.compraQtdClickable : ""}`}
                             {...(isRedMonth && compraInfo ? {
                               onMouseEnter: (e: React.MouseEvent<HTMLElement>) => showCompraDebugTooltip(e, {
                                 estoqueReal: compraInfo.estoqueReal,
@@ -1526,7 +1784,7 @@ export default function ProjecaoEstoquePage({
                               }, showBelow),
                               onMouseLeave: hideCompraDebugTooltip,
                               onClick: handleClickQtdCompra,
-                            } : isSubNivelMonth ? { onClick: handleClickQtdCompra } : {})}
+                            } : isSubNivelMonth ? { onClick: handleClickQtdCompra } : isSimMonth ? { onClick: handleClickSimCompra } : {})}
                           >
                             {isRedMonth ? (
                               <span className={styles.compraQtdCellWrapper}>
@@ -1536,6 +1794,11 @@ export default function ProjecaoEstoquePage({
                             ) : isSubNivelMonth ? (
                               <span className={styles.compraQtdCellWrapper}>
                                 {fmt(subCompraInfo!.qtdTotal)}
+                                <span className={styles.compraQtdArrow}>→</span>
+                              </span>
+                            ) : isSimMonth ? (
+                              <span className={styles.compraQtdCellWrapper}>
+                                {fmt(simCompra!.qtd)}
                                 <span className={styles.compraQtdArrow}>→</span>
                               </span>
                             ) : (
@@ -1553,12 +1816,14 @@ export default function ProjecaoEstoquePage({
                           {mesesExibicao.map((m) => {
                             const isRedMonth = compraInfo && m.mesNumero === compraInfo.redMesNumero && m.ano === compraInfo.redAno;
                             const isSubNivelMonth = !compraInfo && subCompraInfo != null && m.isMesAtual;
+                            const simCompra = simRowData?.compras.find(c => c.mesNumero === m.mesNumero && c.ano === m.ano);
+                            const isSimMonth = !isRedMonth && !isSubNivelMonth && !!simCompra && !m.isMesAtual;
                             return (
                               <td
                                 key={`cu-${m.ano}-${m.mesNumero}`}
-                                className={`${styles.compraQtdCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${!isRedMonth && !isSubNivelMonth ? styles.compraCellEmpty : ""} ${isSubNivelMonth ? styles.compraSubNivelCell : ""}`}
+                                className={`${styles.compraQtdCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${isSimMonth ? styles.compraSimuladaQtdCell : ""} ${!isRedMonth && !isSubNivelMonth && !isSimMonth ? styles.compraCellEmpty : ""} ${isSubNivelMonth ? styles.compraSubNivelCell : ""}`}
                               >
-                                {isRedMonth ? (custoValor != null ? fmtBRL(custoValor) : "...") : isSubNivelMonth ? (subCompraInfo!.custoTotal > 0 ? fmtBRL(subCompraInfo!.custoTotal) : "...") : "-"}
+                                {isRedMonth ? (custoValor != null ? fmtBRL(custoValor) : "...") : isSubNivelMonth ? (subCompraInfo!.custoTotal > 0 ? fmtBRL(subCompraInfo!.custoTotal) : "...") : isSimMonth ? (simCompra!.custo > 0 ? fmtBRL(simCompra!.custo) : "...") : "-"}
                               </td>
                             );
                           })}
