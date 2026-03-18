@@ -10,5 +10,11 @@
     "romaneio_id": "029218",
     "filial_origem": "NERD",
     "filial_destino": "000076"
+  },
+  {
+    "company_key": "nerd",
+    "romaneio_id": "029256",
+    "filial_origem": "NERD",
+    "filial_destino": "000069"
   }
 ]

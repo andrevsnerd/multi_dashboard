@@ -39,7 +39,7 @@ interface SimRowCompra {
   data: string;
 }
 interface SimRowData {
-  mesesSimByNum: Map<number, { estoque: number; duracao: number }>;
+  mesesSimByNum: Map<number, { estoque: number; estoqueAntes: number; estoqueFim: number; duracao: number }>;
   compras: SimRowCompra[];
 }
 
@@ -305,6 +305,31 @@ export default function ProjecaoEstoquePage({
     above: boolean;
     items: Array<{ label: string; qtd: number; estoque: number; consumoDiario: number; diasCobertura: number }>;
     total: number;
+  } | null>(null);
+  const [estoqueCalcTooltip, setEstoqueCalcTooltip] = useState<{
+    x: number;
+    y: number;
+    above: boolean;
+    mesLabel: string;
+    estoqueExibido: number;
+    estoqueComCompra: number;
+    compraSimulada: number;
+    estoqueAntesCompra: number;
+    vendasConsideradas: number;
+    projecaoRealMes: number;
+    vendasReaisMes: number;
+    estoqueProxMes: number;
+    isMesAtual: boolean;
+    isMesFuturoSimulado: boolean;
+    isProjecaoAtiva: boolean;
+    usaAjusteVendaMesAtual: boolean;
+  } | null>(null);
+  const [duracaoTooltip, setDuracaoTooltip] = useState<{
+    x: number; y: number; above: boolean;
+    mesLabel: string;
+    estoqueDisponivel: number;
+    consumoMes: number;
+    duracaoDias: number;
   } | null>(null);
   const expansaoRestoredRef = useRef(false);
 
@@ -776,6 +801,29 @@ export default function ProjecaoEstoquePage({
   }, []);
   const hideCompraDebugTooltip = useCallback(() => setCompraDebugTooltip(null), []);
   const hideSimCompraTooltip = useCallback(() => setSimCompraTooltip(null), []);
+  const hideEstoqueCalcTooltip = useCallback(() => setEstoqueCalcTooltip(null), []);
+  const hideDuracaoTooltip = useCallback(() => setDuracaoTooltip(null), []);
+  const showDuracaoTooltip = useCallback((
+    e: React.MouseEvent<HTMLElement>,
+    payload: Omit<NonNullable<typeof duracaoTooltip>, "x" | "y" | "above">,
+    showBelow: boolean
+  ) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = showBelow ? rect.bottom + TOOLTIP_OFFSET : rect.top - TOOLTIP_OFFSET;
+    setDuracaoTooltip({ ...payload, x, y, above: !showBelow });
+  }, []);
+
+  const showEstoqueCalcTooltip = useCallback((
+    e: React.MouseEvent<HTMLElement>,
+    payload: Omit<NonNullable<typeof estoqueCalcTooltip>, "x" | "y" | "above">,
+    showBelow: boolean
+  ) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = showBelow ? rect.bottom + TOOLTIP_OFFSET : rect.top - TOOLTIP_OFFSET;
+    setEstoqueCalcTooltip({ ...payload, x, y, above: !showBelow });
+  }, []);
 
   const handleClickCategoria = useCallback((proj: ProjecaoCategoria) => {
     const n = expansao.get(proj.categoria)?.nivel ?? 0;
@@ -1009,6 +1057,46 @@ export default function ProjecaoEstoquePage({
         }
       });
 
+      // ── Cadeia encadeada agregada ──────────────────────────────────────────
+      // Coleta compras por índice de mês (para recalcular a cadeia agregada)
+      const comprasPorIdx = new Map<number, number>();
+      inScope.forEach(p => {
+        const leafKey = `${p.categoria}|${p.subgrupo ?? ""}|${p.grade ?? ""}|${p.colecao ?? ""}|${p.produto ?? ""}|${p.cor ?? ""}`;
+        const simLeaf = simulatedLeafMap.get(leafKey);
+        if (!simLeaf) return;
+        simLeaf.compras.forEach(c => {
+          comprasPorIdx.set(c.mesIdx, (comprasPorIdx.get(c.mesIdx) ?? 0) + c.qtd);
+        });
+      });
+
+      // Recalcula estoque exibido dos meses futuros encadeando a partir do
+      // saldo final do mês atual (aggregate), garantindo que
+      //   estoqueAntes[M+1] === estoqueProxMes[M]
+      //
+      // Usa proj.meses para vendas/vendasReais para garantir que o ponto de
+      // partida seja idêntico ao que o tooltip exibe (react usa o mesmo md).
+      const aggEstoqueAntes = new Array<number>(numMeses).fill(0);
+      const aggEstoqueFim   = new Array<number>(numMeses).fill(0);
+      aggEstoqueAntes[mesAtualIdx] = aggEstoque[mesAtualIdx]; // mês atual: sem compra simulada
+      const mesMesAtualData = proj.meses[mesAtualIdx];
+      const _chainNow = new Date();
+      const _chainDiasCorridos = _chainNow.getDate();
+      const _chainDiasNoMes = new Date(_chainNow.getFullYear(), _chainNow.getMonth() + 1, 0).getDate();
+      const _chainProjecaoReal = mesMesAtualData?.vendasReais != null && _chainDiasCorridos > 0
+        ? Math.round((mesMesAtualData.vendasReais / _chainDiasCorridos) * _chainDiasNoMes)
+        : (mesMesAtualData?.vendas ?? aggVendas[mesAtualIdx]);
+      const vendasConsAtual = Math.max(0, _chainProjecaoReal - (mesMesAtualData?.vendasReais ?? 0));
+      let carryForward = Math.max(0, aggEstoque[mesAtualIdx] - vendasConsAtual);
+      aggEstoqueFim[mesAtualIdx] = carryForward; // saldo de saída do mês atual
+      for (let i = mesAtualIdx + 1; i < numMeses; i++) {
+        aggEstoqueAntes[i] = carryForward;
+        const compra = comprasPorIdx.get(i) ?? 0;
+        aggEstoque[i] = carryForward + compra; // estoque com compra, antes das vendas
+        const vendasMes = proj.meses[i]?.vendas ?? aggVendas[i];
+        carryForward = Math.max(0, aggEstoque[i] - vendasMes);
+        aggEstoqueFim[i] = carryForward; // saldo de saída do mês futuro
+      }
+
       const tempMeses: ProjecaoMensal[] = proj.meses.map((m, i) => ({
         ...m,
         estoque: aggEstoque[i],
@@ -1016,10 +1104,12 @@ export default function ProjecaoEstoquePage({
         vendasReais: aggVendasReais[i] ?? undefined,
       }));
 
-      const mesesSimByNum = new Map<number, { estoque: number; duracao: number }>();
+      const mesesSimByNum = new Map<number, { estoque: number; estoqueAntes: number; estoqueFim: number; duracao: number }>();
       for (let i = mesAtualIdx; i < tempMeses.length; i++) {
         mesesSimByNum.set(tempMeses[i].mesNumero, {
           estoque: aggEstoque[i],
+          estoqueAntes: aggEstoqueAntes[i],
+          estoqueFim: aggEstoqueFim[i],
           duracao: calcDiasAteAcabar(tempMeses, i),
         });
       }
@@ -1587,14 +1677,110 @@ export default function ProjecaoEstoquePage({
                     </tr>
                     <tr className={styles.estoqueRow}>
                       <td className={styles.labelCell}>ESTOQUE (projeção)</td>
-                      {mesesExibicao.map((m) => {
+                      {(() => {
+                        // Pré-computa cadeia carry-forward para path sem simulação
+                        const _nsNow = new Date();
+                        const _nsDiasCorridos = _nsNow.getDate();
+                        const _nsMesAtualData = proj.meses.find((pm) => pm.isMesAtual);
+                        const _nsProjecaoReal = _nsMesAtualData?.vendasReais != null && _nsDiasCorridos > 0
+                          ? Math.round((_nsMesAtualData.vendasReais / _nsDiasCorridos) * new Date(_nsNow.getFullYear(), _nsNow.getMonth() + 1, 0).getDate())
+                          : (_nsMesAtualData?.vendas ?? 0);
+                        const _nsRestante = Math.max(0, _nsProjecaoReal - (_nsMesAtualData?.vendasReais ?? 0));
+                        let _nsCarry = _nsMesAtualData != null
+                          ? Math.max(0, (_nsMesAtualData.estoque ?? 0) - _nsRestante)
+                          : 0;
+                        const _nsChain = new Map<number, { estoqueAntes: number; estoqueFim: number }>();
+                        for (const m of mesesExibicao) {
+                          const _nsMd = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
+                          if (_nsMd && !_nsMd.isMesAtual && !_nsMd.isMesPassado) {
+                            const _nsAntes = _nsCarry;
+                            const _nsFim = Math.max(0, _nsCarry - (_nsMd.vendas ?? 0));
+                            _nsChain.set(m.mesNumero, { estoqueAntes: _nsAntes, estoqueFim: _nsFim });
+                            _nsCarry = _nsFim;
+                          }
+                        }
+                        return mesesExibicao.map((m) => {
                         const md = proj.meses.find((pm) => pm.mesNumero === m.mesNumero && pm.ano === m.ano);
                         const simMes = simRowData?.mesesSimByNum.get(m.mesNumero);
-                        const estoqueVal = simMes ? simMes.estoque : (md?.estoque ?? 0);
+                        const _nsChainMes = _nsChain.get(m.mesNumero);
+                        const isMesFuturoSimulado = projetarComprasAtivo && simMes != null && !(md?.isMesAtual ?? true) && !(md?.isMesPassado ?? true);
+                        // Meses futuros sem simulação ativa: também exibe saldo fim do mês
+                        const isMesFuturoSemSim = !projetarComprasAtivo && md != null && !md.isMesAtual && !md.isMesPassado;
+                        // Mês atual: exibe saldo fim do mês = início − projeção real (ritmo atual × dias do mês)
+                        const isMesAtual = md?.isMesAtual ?? false;
+                        const estoqueInicioAtual = simMes?.estoque ?? md?.estoque ?? 0;
+                        const _now = new Date();
+                        const _diasCorridos = _now.getDate();
+                        const _diasNoMes = new Date(_now.getFullYear(), _now.getMonth() + 1, 0).getDate();
+                        const projecaoRealAtual = isMesAtual && md?.vendasReais != null && _diasCorridos > 0
+                          ? Math.round((md.vendasReais / _diasCorridos) * _diasNoMes)
+                          : (md?.vendas ?? 0);
+                        // Apenas o que ainda falta vender (projeção minus já vendido)
+                        const vendasConsidAtual = isMesAtual
+                          ? Math.max(0, projecaoRealAtual - (md?.vendasReais ?? 0))
+                          : 0;
+                        const estoqueVal = simMes
+                          ? (isMesFuturoSimulado ? simMes.estoqueFim : (isMesAtual ? Math.max(0, simMes.estoque - vendasConsidAtual) : simMes.estoque))
+                          : (isMesFuturoSemSim
+                              ? (_nsChainMes?.estoqueFim ?? Math.max(0, (md?.estoque ?? 0) - (md?.vendas ?? 0)))
+                              : (isMesAtual
+                                  ? Math.max(0, estoqueInicioAtual - vendasConsidAtual)
+                                  : (md?.estoque ?? 0)));
                         const isMesPassado = md?.isMesPassado ?? false;
                         const valor = isMesPassado && estoqueVal === 0 ? "-" : (md == null ? "-" : fmt(estoqueVal));
-                        return <td key={`e-${m.ano}-${m.mesNumero}`} className={`${styles.estoqueCell} ${m.isMesAtual ? styles.columnMesAtual : ""}`}>{valor}</td>;
-                      })}
+                        const temTooltipEstoque = md != null && !isMesPassado;
+                        const showBelow = idx === 0;
+
+                        const vendasConsideradas = md
+                          ? (md.isMesAtual
+                            ? vendasConsidAtual
+                            : (md.vendas ?? 0))
+                          : 0;
+
+                        const compraSimulada = projetarComprasAtivo
+                          ? (simRowData?.compras.find((c) => c.mesNumero === m.mesNumero && c.ano === m.ano)?.qtd ?? 0)
+                          : 0;
+
+                        // Para todos os meses de projeção: estoqueExibido = fim do mês; estoqueComCompra = início (antes das vendas)
+                        const estoqueComCompra = isMesFuturoSimulado && simMes != null
+                          ? simMes.estoque
+                          : (isMesFuturoSemSim || isMesAtual)
+                            ? (isMesAtual ? estoqueInicioAtual : (_nsChainMes?.estoqueAntes ?? (md?.estoque ?? 0)))
+                            : estoqueVal;
+                        const estoqueExibido = estoqueVal;
+                        const estoqueAntesCompra = compraSimulada > 0
+                          ? (simMes?.estoqueAntes ?? Math.max(0, estoqueComCompra - compraSimulada))
+                          : estoqueComCompra;
+                        const estoqueProxMes = Math.max(0, estoqueComCompra - vendasConsideradas);
+
+                        return (
+                          <td
+                            key={`e-${m.ano}-${m.mesNumero}`}
+                            className={`${styles.estoqueCell} ${m.isMesAtual ? styles.columnMesAtual : ""}`}
+                            {...(temTooltipEstoque ? {
+                              onMouseEnter: (e: React.MouseEvent<HTMLElement>) => showEstoqueCalcTooltip(e, {
+                                mesLabel: `${m.mes}/${m.ano}`,
+                                estoqueExibido,
+                                estoqueComCompra,
+                                compraSimulada,
+                                estoqueAntesCompra,
+                                vendasConsideradas,
+                                projecaoRealMes: projecaoRealAtual,
+                                vendasReaisMes: md?.vendasReais ?? 0,
+                                estoqueProxMes,
+                                isMesAtual: Boolean(md?.isMesAtual),
+                                isMesFuturoSimulado: isMesFuturoSimulado || isMesFuturoSemSim || isMesAtual,
+                                isProjecaoAtiva: Boolean(projetarComprasAtivo),
+                                usaAjusteVendaMesAtual: Boolean(md?.isMesAtual && md?.vendasReais != null),
+                              }, showBelow),
+                              onMouseLeave: hideEstoqueCalcTooltip,
+                            } : {})}
+                          >
+                            {temTooltipEstoque ? <span className={styles.vendasCellWrapper}>{valor}</span> : valor}
+                          </td>
+                        );
+                        });
+                      })()}
                     </tr>
                     <tr className={styles.duracaoRow}>
                       <td className={styles.labelCell}>DURACAO (projeção)</td>
@@ -1604,7 +1790,29 @@ export default function ProjecaoEstoquePage({
                         const duracaoVal = simMes ? simMes.duracao : (md?.duracao ?? 0);
                         const valor = duracaoVal > 0 ? `${duracaoVal} dias` : "-";
                         const alerta = duracaoVal > 0 && duracaoVal <= limiteDiasAlerta;
-                        return <td key={`d-${m.ano}-${m.mesNumero}`} className={`${styles.duracaoCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${alerta ? styles.duracaoAlerta : ""}`}>{valor}</td>;
+                        const temTooltipDuracao = duracaoVal > 0 && md != null;
+                        const showBelow = idx === 0;
+                        const estoqueDisponivel = simMes?.estoque ?? md?.estoque ?? 0;
+                        const consumoMes = md?.isMesAtual && md?.vendasReais != null
+                          ? Math.max(0, (md.vendas ?? 0) - (md.vendasReais ?? 0))
+                          : (md?.vendas ?? 0);
+                        return (
+                          <td
+                            key={`d-${m.ano}-${m.mesNumero}`}
+                            className={`${styles.duracaoCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${alerta ? styles.duracaoAlerta : ""}`}
+                            {...(temTooltipDuracao ? {
+                              onMouseEnter: (e: React.MouseEvent<HTMLElement>) => showDuracaoTooltip(e, {
+                                mesLabel: `${m.mes}/${m.ano}`,
+                                estoqueDisponivel,
+                                consumoMes,
+                                duracaoDias: duracaoVal,
+                              }, showBelow),
+                              onMouseLeave: hideDuracaoTooltip,
+                            } : {})}
+                          >
+                            {valor}
+                          </td>
+                        );
                       })}
                     </tr>
                     {/* Bloco números reais — mesmo cinza nas 3 linhas, como na imagem */}
@@ -1966,6 +2174,97 @@ export default function ProjecaoEstoquePage({
           </div>,
           document.body
         )}
+      {typeof document !== "undefined" &&
+        estoqueCalcTooltip &&
+        createPortal(
+          <div
+            className={styles.estoqueCalcTooltip}
+            style={{
+              left: estoqueCalcTooltip.x,
+              top: estoqueCalcTooltip.y,
+              transform: estoqueCalcTooltip.above ? "translate(-50%, -100%)" : "translate(-50%, 0)",
+            }}
+            role="tooltip"
+          >
+            <div className={styles.estoqueCalcTitle}>Cálculo do estoque projetado — {estoqueCalcTooltip.mesLabel}</div>
+            {estoqueCalcTooltip.isMesFuturoSimulado ? (
+              // ── Mês atual ou futuros com simulação: exibe saldo fim do mês ───
+              estoqueCalcTooltip.isMesAtual ? (
+                <>
+                  <span className={styles.estoqueCalcLine}>Estoque inicial = {fmt(estoqueCalcTooltip.estoqueAntesCompra)}</span>
+                  <span className={styles.estoqueCalcLine}>Vendas projetadas = {fmt(estoqueCalcTooltip.projecaoRealMes)}</span>
+                  <span className={styles.estoqueCalcLine}>Vendas reais = {fmt(estoqueCalcTooltip.vendasReaisMes)}</span>
+                  <span className={styles.estoqueCalcLine}>{`Vendas restantes = ${fmt(estoqueCalcTooltip.vendasConsideradas)} (${fmt(estoqueCalcTooltip.projecaoRealMes)} - ${fmt(estoqueCalcTooltip.vendasReaisMes)})`}</span>
+                  <span className={styles.estoqueCalcLine}>{`Conta do mes = ${fmt(estoqueCalcTooltip.estoqueAntesCompra)} - ${fmt(estoqueCalcTooltip.vendasConsideradas)} = ${fmt(estoqueCalcTooltip.estoqueExibido)}`}</span>
+                  <span className={styles.estoqueCalcLine}>Estoque fim do mês = max(0, ...) = {fmt(estoqueCalcTooltip.estoqueExibido)}</span>
+                </>
+              ) : (
+              <>
+                <span className={styles.estoqueCalcLine}>Estoque inicial (carry-forward) = {fmt(estoqueCalcTooltip.estoqueAntesCompra)}</span>
+                {estoqueCalcTooltip.compraSimulada > 0 && (
+                  <>
+                    <span className={styles.estoqueCalcLine}>Compra simulada no mês (+) = {fmt(estoqueCalcTooltip.compraSimulada)}</span>
+                    <span className={styles.estoqueCalcLine}>Estoque com compra = {fmt(estoqueCalcTooltip.estoqueComCompra)}</span>
+                  </>
+                )}
+                <span className={styles.estoqueCalcLine}>Vendas projetadas no mês (−) = {fmt(estoqueCalcTooltip.vendasConsideradas)}</span>
+                <span className={styles.estoqueCalcLine}>
+                  {estoqueCalcTooltip.compraSimulada > 0
+                    ? `Conta do mes = ${fmt(estoqueCalcTooltip.estoqueAntesCompra)} + ${fmt(estoqueCalcTooltip.compraSimulada)} - ${fmt(estoqueCalcTooltip.vendasConsideradas)} = ${fmt(estoqueCalcTooltip.estoqueExibido)}`
+                    : `Conta do mes = ${fmt(estoqueCalcTooltip.estoqueAntesCompra)} - ${fmt(estoqueCalcTooltip.vendasConsideradas)} = ${fmt(estoqueCalcTooltip.estoqueExibido)}`}
+                </span>
+                <span className={styles.estoqueCalcLine}>Estoque fim do mês = max(0, ...) = {fmt(estoqueCalcTooltip.estoqueExibido)}</span>
+              </>
+              )
+            ) : (
+              // ── Mês atual (comportamento original) ───────────────────────────
+              <>
+                <span className={styles.estoqueCalcLine}>Estoque exibido (início do mês) = {fmt(estoqueCalcTooltip.estoqueExibido)}</span>
+                {estoqueCalcTooltip.isProjecaoAtiva && estoqueCalcTooltip.compraSimulada > 0 && (
+                  <>
+                    <span className={styles.estoqueCalcLine}>Compra simulada no mês (+) = {fmt(estoqueCalcTooltip.compraSimulada)}</span>
+                    <span className={styles.estoqueCalcLine}>Estoque antes da compra = {fmt(estoqueCalcTooltip.estoqueAntesCompra)}</span>
+                  </>
+                )}
+                <span className={styles.estoqueCalcLine}>
+                  {estoqueCalcTooltip.usaAjusteVendaMesAtual
+                    ? `Vendas consideradas no mes (-) = ${fmt(estoqueCalcTooltip.vendasConsideradas)} (ajuste: projecao - venda real)`
+                    : `Vendas consideradas no mes (-) = ${fmt(estoqueCalcTooltip.vendasConsideradas)}`}
+                </span>
+                <span className={styles.estoqueCalcLine}>
+                  {estoqueCalcTooltip.isProjecaoAtiva && estoqueCalcTooltip.compraSimulada > 0
+                    ? `Conta do mes = ${fmt(estoqueCalcTooltip.estoqueAntesCompra)} + ${fmt(estoqueCalcTooltip.compraSimulada)} - ${fmt(estoqueCalcTooltip.vendasConsideradas)} = ${fmt(estoqueCalcTooltip.estoqueProxMes)}`
+                    : `Conta do mes = ${fmt(estoqueCalcTooltip.estoqueExibido)} - ${fmt(estoqueCalcTooltip.vendasConsideradas)} = ${fmt(estoqueCalcTooltip.estoqueProxMes)}`}
+                </span>
+                <span className={styles.estoqueCalcLine}>Estoque para o próximo mês = max(0, estoque − vendas) = {fmt(estoqueCalcTooltip.estoqueProxMes)}</span>
+                {estoqueCalcTooltip.isMesAtual && (
+                  <span className={styles.estoqueCalcHint}>Obs.: no mês atual, o consumo usa (projeção − venda real) para não &quot;descontar duas vezes&quot;.</span>
+                )}
+                {estoqueCalcTooltip.isProjecaoAtiva && estoqueCalcTooltip.compraSimulada > 0 && (
+                  <span className={styles.estoqueCalcHint}>Obs.: quando há compra simulada, o estoque exibido já reflete a compra adicionada antes do consumo do mês.</span>
+                )}
+              </>
+            )}
+          </div>,
+          document.body
+        )}
+      {typeof document !== "undefined" && duracaoTooltip && createPortal(
+        <div
+          className={styles.estoqueCalcTooltip}
+          style={{
+            left: duracaoTooltip.x,
+            top: duracaoTooltip.y,
+            transform: duracaoTooltip.above ? "translate(-50%, -100%)" : "translate(-50%, 0)",
+          }}
+          role="tooltip"
+        >
+          <div className={styles.estoqueCalcTitle}>Duração estimada — {duracaoTooltip.mesLabel}</div>
+          <span className={styles.estoqueCalcLine}>{`Estoque disponivel = ${fmt(duracaoTooltip.estoqueDisponivel)}`}</span>
+          <span className={styles.estoqueCalcLine}>{`Consumo projetado = ${fmt(duracaoTooltip.consumoMes)} / mes`}</span>
+          <span className={styles.estoqueCalcLine}>{`Duracao estimada = ${duracaoTooltip.duracaoDias} dias`}</span>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
