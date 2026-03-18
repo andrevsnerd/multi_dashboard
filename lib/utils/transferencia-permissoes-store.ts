@@ -56,13 +56,17 @@ async function ensureTable(sql: ReturnType<typeof getNeonSql>) {
   `;
   await sql`ALTER TABLE transferencia_permissoes ADD COLUMN IF NOT EXISTS pode_ver_outras_filiais BOOLEAN NOT NULL DEFAULT false`;
   await sql`ALTER TABLE transferencia_permissoes ADD COLUMN IF NOT EXISTS filial_atribuida TEXT`;
+  await sql`ALTER TABLE transferencia_permissoes ADD COLUMN IF NOT EXISTS filiais_destino_controle JSONB NOT NULL DEFAULT '[]'::jsonb`;
   tableChecked = true;
 }
 
 export interface TransferenciaPermissao {
   username: string;
-  filiaisOrigem: string[]; // Códigos das filiais de origem permitidas
-  filiaisDestino: string[]; // Códigos das filiais de destino permitidas
+  filiaisOrigem: string[]; // Códigos das filiais de origem permitidas (saída)
+  filiaisDestino: string[]; // Códigos das filiais de destino permitidas (entrada)
+  /** Filiais destino visíveis no controle de transferências (quais lojas aparecem como destino sugerido).
+   *  Separado de filiaisDestino (entrada). Vazio = todas as da empresa. */
+  filiaisDestinoControle?: string[];
   tiposRomaneioPermitidos: string[]; // Tipos de romaneio permitidos (vazio = todos)
   responsavelPadrao?: string; // Responsável padrão (ex: "LOGISTICA")
   tipoRomaneioPadrao?: string; // Tipo de romaneio padrão (ex: "TRANSFERENCIA ENTRE LOJAS")
@@ -90,10 +94,11 @@ export async function getPermissaoByUsername(username: string): Promise<Transfer
   await ensureTable(sql);
 
   const result = await sql`
-    SELECT 
+    SELECT
       username,
       filiais_origem,
       filiais_destino,
+      COALESCE(filiais_destino_controle, '[]'::jsonb) as filiais_destino_controle,
       tipos_romaneio_permitidos,
       responsavel_padrao,
       tipo_romaneio_padrao,
@@ -120,6 +125,7 @@ export async function getPermissaoByUsername(username: string): Promise<Transfer
     username: row.username,
     filiaisOrigem: row.filiais_origem || [],
     filiaisDestino: row.filiais_destino || [],
+    filiaisDestinoControle: row.filiais_destino_controle || [],
     tiposRomaneioPermitidos: row.tipos_romaneio_permitidos || [],
     responsavelPadrao: row.responsavel_padrao || undefined,
     tipoRomaneioPadrao: row.tipo_romaneio_padrao || undefined,
@@ -165,6 +171,7 @@ export async function savePermissao(permissao: TransferenciaPermissao): Promise<
       username,
       filiais_origem,
       filiais_destino,
+      filiais_destino_controle,
       tipos_romaneio_permitidos,
       responsavel_padrao,
       tipo_romaneio_padrao,
@@ -178,6 +185,7 @@ export async function savePermissao(permissao: TransferenciaPermissao): Promise<
       ${username},
       ${JSON.stringify(permissao.filiaisOrigem)}::jsonb,
       ${JSON.stringify(permissao.filiaisDestino)}::jsonb,
+      ${JSON.stringify(permissao.filiaisDestinoControle || [])}::jsonb,
       ${JSON.stringify(permissao.tiposRomaneioPermitidos || [])}::jsonb,
       ${permissao.responsavelPadrao || null},
       ${permissao.tipoRomaneioPadrao || null},
@@ -190,6 +198,7 @@ export async function savePermissao(permissao: TransferenciaPermissao): Promise<
     ON CONFLICT (username) DO UPDATE SET
       filiais_origem = EXCLUDED.filiais_origem,
       filiais_destino = EXCLUDED.filiais_destino,
+      filiais_destino_controle = EXCLUDED.filiais_destino_controle,
       tipos_romaneio_permitidos = EXCLUDED.tipos_romaneio_permitidos,
       responsavel_padrao = EXCLUDED.responsavel_padrao,
       tipo_romaneio_padrao = EXCLUDED.tipo_romaneio_padrao,
@@ -213,10 +222,11 @@ export async function listAllPermissoes(): Promise<TransferenciaPermissao[]> {
   await ensureTable(sql);
 
   const result = await sql`
-    SELECT 
+    SELECT
       username,
       filiais_origem,
       filiais_destino,
+      COALESCE(filiais_destino_controle, '[]'::jsonb) as filiais_destino_controle,
       tipos_romaneio_permitidos,
       responsavel_padrao,
       tipo_romaneio_padrao,
@@ -232,6 +242,7 @@ export async function listAllPermissoes(): Promise<TransferenciaPermissao[]> {
     username: row.username,
     filiaisOrigem: row.filiais_origem || [],
     filiaisDestino: row.filiais_destino || [],
+    filiaisDestinoControle: row.filiais_destino_controle || [],
     tiposRomaneioPermitidos: row.tipos_romaneio_permitidos || [],
     responsavelPadrao: row.responsavel_padrao || undefined,
     tipoRomaneioPadrao: row.tipo_romaneio_padrao || undefined,

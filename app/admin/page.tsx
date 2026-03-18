@@ -26,6 +26,7 @@ interface TransfPerm {
   username: string;
   filiaisOrigem: string[];
   filiaisDestino: string[];
+  filiaisDestinoControle?: string[];
   tiposRomaneioPermitidos: string[];
   responsavelPadrao?: string;
   tipoRomaneioPadrao?: string;
@@ -75,6 +76,7 @@ export default function AdminPage() {
   const [formAdvancedFiliais, setFormAdvancedFiliais] = useState(false);
   const [formFiliaisOrigem, setFormFiliaisOrigem] = useState<string[]>([]);
   const [formFiliaisDestino, setFormFiliaisDestino] = useState<string[]>([]);
+  const [formFiliaisDestinoControle, setFormFiliaisDestinoControle] = useState<string[]>([]);
   const [formTiposRomaneio, setFormTiposRomaneio] = useState<string[]>([]);
   const [formResponsavel, setFormResponsavel] = useState("");
   const [formTipoRomaneio, setFormTipoRomaneio] = useState("");
@@ -144,6 +146,7 @@ export default function AdminPage() {
     setFormAdvancedFiliais(false);
     setFormFiliaisOrigem([]);
     setFormFiliaisDestino([]);
+    setFormFiliaisDestinoControle([]);
     setFormTiposRomaneio([]);
     setFormResponsavel("");
     setFormTipoRomaneio("");
@@ -176,6 +179,7 @@ export default function AdminPage() {
       setFormFilialPrincipal(tp.filialAtribuida ?? "");
       setFormFiliaisOrigem(tp.filiaisOrigem ?? []);
       setFormFiliaisDestino(tp.filiaisDestino ?? []);
+      setFormFiliaisDestinoControle(tp.filiaisDestinoControle ?? []);
       setFormTiposRomaneio(tp.tiposRomaneioPermitidos ?? []);
       setFormResponsavel(tp.responsavelPadrao ?? "");
       setFormTipoRomaneio(tp.tipoRomaneioPadrao ?? "");
@@ -192,6 +196,7 @@ export default function AdminPage() {
       setFormFilialPrincipal("");
       setFormFiliaisOrigem([]);
       setFormFiliaisDestino([]);
+      setFormFiliaisDestinoControle([]);
       setFormTiposRomaneio([]);
       setFormResponsavel("");
       setFormTipoRomaneio("");
@@ -294,6 +299,7 @@ export default function AdminPage() {
           username: savedUsername,
           filiaisOrigem,
           filiaisDestino,
+          filiaisDestinoControle: formFiliaisDestinoControle,
           tiposRomaneioPermitidos: formTiposRomaneio,
           responsavelPadrao: formResponsavel || undefined,
           tipoRomaneioPadrao: formTipoRomaneio || undefined,
@@ -600,10 +606,13 @@ export default function AdminPage() {
 
                   {formAdvancedFiliais && (
                     <>
+                      {/* ── Bloco: Saídas e Entradas diretas ── */}
+                      <p className={styles.subSectionTitle}>Saídas / Entradas diretas</p>
+
                       <label className={styles.label}>
-                        Filiais de origem permitidas
+                        Filiais de saída permitidas
                         <span className={styles.hint}>
-                          Vazio = todas. Usuário só pode fazer saída dessas filiais.
+                          Vazio = todas. O usuário só pode lançar saída dessas filiais.
                         </span>
                         <button
                           type="button"
@@ -639,9 +648,9 @@ export default function AdminPage() {
                       </label>
 
                       <label className={styles.label}>
-                        Filiais de destino permitidas
+                        Filiais de entrada permitidas
                         <span className={styles.hint}>
-                          Vazio = todas. Usuário só pode fazer entrada nessas filiais.
+                          Vazio = todas. O usuário só pode lançar entrada nessas filiais.
                         </span>
                         <div className={styles.checkboxList}>
                           {filiais.map((f) => (
@@ -663,6 +672,61 @@ export default function AdminPage() {
                           ))}
                         </div>
                       </label>
+
+                      {/* ── Bloco: Controle de Transferências ── */}
+                      <p className={styles.subSectionTitle}>Controle de Transferências</p>
+
+                      <label className={styles.label}>
+                        Filiais destino visíveis
+                        <span className={styles.hint}>
+                          Quais outras filiais da mesma empresa aparecem como destino sugerido.
+                          Vazio = todas. Ex: Guarulhos vê todas as outras SCARF ME como destino possível.
+                        </span>
+                        <button
+                          type="button"
+                          className={styles.selectAll}
+                          onClick={() => {
+                            const all = filiais.length > 0 && formFiliaisDestinoControle.length === filiais.length;
+                            setFormFiliaisDestinoControle(all ? [] : filiais.map((f) => f.codFilial));
+                          }}
+                        >
+                          {filiais.length > 0 && formFiliaisDestinoControle.length === filiais.length
+                            ? "Desmarcar tudo"
+                            : "Selecionar tudo"}
+                        </button>
+                        <div className={styles.checkboxList}>
+                          {filiais.map((f) => (
+                            <label key={f.codFilial} className={styles.checkboxLabel}>
+                              <input
+                                type="checkbox"
+                                checked={formFiliaisDestinoControle.includes(f.codFilial)}
+                                onChange={() =>
+                                  setFormFiliaisDestinoControle((prev) =>
+                                    prev.includes(f.codFilial)
+                                      ? prev.filter((x) => x !== f.codFilial)
+                                      : [...prev, f.codFilial]
+                                  )
+                                }
+                                disabled={saving}
+                              />
+                              {f.filial}
+                            </label>
+                          ))}
+                        </div>
+                      </label>
+
+                      <label className={styles.checkboxLabel} style={{ marginBottom: 8 }}>
+                        <input
+                          type="checkbox"
+                          checked={formPodeVerOutras}
+                          onChange={(e) => setFormPodeVerOutras(e.target.checked)}
+                          disabled={saving}
+                        />
+                        Pode ver todas as filiais da empresa (ignora os filtros de visualização acima)
+                      </label>
+
+                      {/* ── Bloco: Romaneio ── */}
+                      <p className={styles.subSectionTitle}>Romaneio</p>
 
                       <label className={styles.label}>
                         Tipos de romaneio permitidos
@@ -743,15 +807,6 @@ export default function AdminPage() {
                             disabled={saving}
                           />
                           Tipo de romaneio fixo (não pode alterar)
-                        </label>
-                        <label className={styles.checkboxLabel}>
-                          <input
-                            type="checkbox"
-                            checked={formPodeVerOutras}
-                            onChange={(e) => setFormPodeVerOutras(e.target.checked)}
-                            disabled={saving}
-                          />
-                          Pode ver outras filiais (sem poder operar nelas)
                         </label>
                       </div>
                     </>

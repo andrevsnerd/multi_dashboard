@@ -19,6 +19,7 @@ interface TransferenciaPermissao {
   username: string;
   filiaisOrigem: string[];
   filiaisDestino: string[];
+  filiaisDestinoControle?: string[];
   tiposRomaneioPermitidos: string[];
   responsavelPadrao?: string;
   tipoRomaneioPadrao?: string;
@@ -951,6 +952,9 @@ export default function ControleTransferenciasTable({
     if (user?.role === "admin") return transfersByOriginAndDestination;
     if (!permissoes || filiais.length === 0) return [];
     if (permissoes.podeVerOutrasFiliais) return transfersByOriginAndDestination;
+    // Destinos visíveis: usa filiaisDestinoControle (visualização no controle de transferências).
+    // Vazio = todos os destinos visíveis.
+    const destinosVisiveis = permissoes.filiaisDestinoControle ?? [];
     return transfersByOriginAndDestination
       .filter((group) => {
         const origemCanonico = group.items[0]?.origemCanonico ?? group.origem;
@@ -964,8 +968,8 @@ export default function ControleTransferenciasTable({
         destinationGroups: group.destinationGroups.filter((dg) => {
           const destinoCanonico = dg.items[0]?.destinoCanonico ?? dg.destino;
           const destinoOk =
-            permissoes.filiaisDestino.length === 0 ||
-            permissoes.filiaisDestino.some((p) => permissaoMatchFilial(p, destinoCanonico));
+            destinosVisiveis.length === 0 ||
+            destinosVisiveis.some((p) => permissaoMatchFilial(p, destinoCanonico));
           return destinoOk;
         }),
       }))
