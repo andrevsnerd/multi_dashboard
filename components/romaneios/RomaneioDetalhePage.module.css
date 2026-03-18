@@ -457,6 +457,17 @@
   cursor: not-allowed;
 }
 
+/* Estoque destino */
+.estoqueValor {
+  font-weight: 600;
+  color: #111827;
+}
+
+.estoqueZero {
+  font-weight: 600;
+  color: #ef4444;
+}
+
 /* Botões +/− do spinner de quantidade */
 .qtdeSpinBtn {
   display: inline-flex;

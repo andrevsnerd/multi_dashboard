@@ -209,12 +209,14 @@ export default function RomaneioDetalhePage({
 
   useEffect(() => {
     let cancelled = false;
+    // Para saídas: usar destinoSelected como filialDestino (para popular estoqueDestino corretamente)
+    const fd = tipo === "saida" ? destinoSelected : filialDestino;
     setLoading(true);
-    fetchDetalhes(tipo, romaneioId, filialOrigem, filialDestino).then((data) => {
+    fetchDetalhes(tipo, romaneioId, filialOrigem, fd).then((data) => {
       if (!cancelled) { setItens(data); setLoading(false); }
     });
     return () => { cancelled = true; };
-  }, [tipo, romaneioId, filialOrigem, filialDestino]);
+  }, [tipo, romaneioId, filialOrigem, filialDestino, destinoSelected]);
 
   useEffect(() => {
     if (tipo === "saida") {
@@ -416,6 +418,7 @@ export default function RomaneioDetalhePage({
               <th>COR</th>
               <th>DESTINO</th>
               <th>QTD ROMANEIO</th>
+              {tipo === "saida" && <th>ESTOQUE DESTINO</th>}
               {tipo === "saida" && <th>CONFIRMAR ENTRADA</th>}
               {tipo === "entrada" && <th>RECEBIDO</th>}
             </tr>
@@ -455,6 +458,19 @@ export default function RomaneioDetalhePage({
                       <span className={styles.qtdValue}>{item.qtde}</span>
                     </div>
                   </td>
+
+                  {/* Coluna ESTOQUE DESTINO (saídas) */}
+                  {tipo === "saida" && (
+                    <td>
+                      <span className={
+                        item.estoqueDestino === 0
+                          ? styles.estoqueZero
+                          : styles.estoqueValor
+                      }>
+                        {destinoSelected ? item.estoqueDestino : "—"}
+                      </span>
+                    </td>
+                  )}
 
                   {/* Coluna CONFIRMAR ENTRADA (saídas) */}
                   {tipo === "saida" && (
@@ -525,6 +541,17 @@ export default function RomaneioDetalhePage({
                                 ? `▼ faltou ${item.qtde - qtdeConfirmada}`
                                 : `▲ excesso ${qtdeConfirmada - item.qtde}`}
                             </span>
+                          )}
+                          {user?.role === "admin" && (
+                            <div className={styles.confirmadoActions}>
+                              <button
+                                type="button"
+                                className={styles.desfazerBtn}
+                                onClick={() => handleDesconfirmar(item.produto, item.corProduto)}
+                              >
+                                Zerar confirmação
+                              </button>
+                            </div>
                           )}
                         </div>
                       ) : (
