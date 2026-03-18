@@ -44,11 +44,7 @@ export async function GET() {
       for (const f of fromDb) {
         if (filiaisCanonicas.includes(f.filial)) {
           matched.add(f.filial);
-          mapped.push(f);
-        } else if (f.codFilial && filiaisCanonicas.includes(f.codFilial)) {
-          // canonical name matches COD_FILIAL (e.g., SCARFME branches like "GUARULHOS - RSR")
-          matched.add(f.codFilial);
-          mapped.push(f);
+          mapped.push({ codFilial: f.filial, filial: f.filial });
         }
       }
 

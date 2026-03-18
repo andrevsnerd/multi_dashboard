@@ -25,19 +25,18 @@ export async function GET(request: Request) {
         // O Python mostra TODAS as filiais, não filtra por filial origem
         // Usar RTRIM para evitar falha quando PRODUTO/COR são CHAR com espaços
         query = `
-          SELECT 
+          SELECT
             e.PRODUTO,
             e.COR_PRODUTO,
-            ISNULL(f.COD_FILIAL, e.FILIAL) AS FILIAL,
+            e.FILIAL AS FILIAL,
             e.ESTOQUE,
             p.DESC_PRODUTO,
             ISNULL(c.DESC_COR, '') AS DESC_COR,
-            f.FILIAL AS NOME_FILIAL,
+            e.FILIAL AS NOME_FILIAL,
             pb.CODIGO_BARRA
           FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
           LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = e.PRODUTO
           LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = e.COR_PRODUTO
-          LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.FILIAL = e.FILIAL
           LEFT JOIN PRODUTOS_BARRA pb WITH (NOLOCK) ON pb.PRODUTO = e.PRODUTO AND pb.COR_PRODUTO = e.COR_PRODUTO
           WHERE RTRIM(LTRIM(CAST(e.PRODUTO AS VARCHAR(50)))) = RTRIM(LTRIM(@searchTerm))
             AND RTRIM(LTRIM(ISNULL(CAST(e.COR_PRODUTO AS VARCHAR(20)), ''))) = RTRIM(LTRIM(ISNULL(@corProduto, '')))
@@ -53,17 +52,16 @@ export async function GET(request: Request) {
           SELECT DISTINCT TOP 50
             e.PRODUTO,
             e.COR_PRODUTO,
-            ISNULL(f.COD_FILIAL, e.FILIAL) AS FILIAL,
+            e.FILIAL AS FILIAL,
             e.ESTOQUE,
             p.DESC_PRODUTO,
             ISNULL(c.DESC_COR, '') AS DESC_COR,
-            f.FILIAL AS NOME_FILIAL,
+            e.FILIAL AS NOME_FILIAL,
             pb.CODIGO_BARRA
           FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
           LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = e.PRODUTO
           LEFT JOIN PRODUTOS_BARRA pb WITH (NOLOCK) ON pb.PRODUTO = e.PRODUTO AND pb.COR_PRODUTO = e.COR_PRODUTO
           LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = e.COR_PRODUTO
-          LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.FILIAL = e.FILIAL
           WHERE (
             p.DESC_PRODUTO LIKE @searchPattern
             OR RTRIM(LTRIM(CAST(e.PRODUTO AS VARCHAR(50)))) LIKE @searchPattern
@@ -73,10 +71,9 @@ export async function GET(request: Request) {
         `;
         req.input('searchPattern', sql.VarChar, searchPattern);
         req.input('searchTermExato', sql.VarChar, searchTermTrimmed);
-        
+
         if (filialOrigem) {
-          // Filtrar por código da filial (RTRIM/LTRIM para evitar falha por espaços)
-          query += ` AND RTRIM(LTRIM(CAST(f.COD_FILIAL AS VARCHAR(20)))) = RTRIM(LTRIM(@filialOrigem))`;
+          query += ` AND RTRIM(LTRIM(CAST(e.FILIAL AS VARCHAR(100)))) = RTRIM(LTRIM(@filialOrigem))`;
           req.input('filialOrigem', sql.VarChar, filialOrigem.trim());
         }
       }
