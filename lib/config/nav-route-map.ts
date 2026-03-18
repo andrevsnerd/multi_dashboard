@@ -37,7 +37,7 @@ export const NAV_ROUTE_MAP: Record<string, PermissionKey | "admin"> = {
 
   // ── Transferências / Romaneios / Saídas-Entradas ───────────────
   "transferencia-produtos": "transferencia-produtos",
-  romaneios: "transferencia-produtos",         // ← mesma permissão que transferência
+  romaneios: "romaneios",
   "saidas-entradas-produtos": "saidas-entradas-produtos",
   "destino-romaneio": "destino-romaneio",
 

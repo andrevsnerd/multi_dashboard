@@ -16,6 +16,7 @@ export type PermissionKey =
   | "blackfriday"
   | "estoque-por-filial"
   | "transferencia-produtos"
+  | "romaneios"
   | "saidas-entradas-produtos"
   | "destino-romaneio";
 
@@ -59,6 +60,7 @@ export const ALL_PERMISSION_KEYS: { key: PermissionKey; label: string }[] = [
   { key: "blackfriday", label: "Black Friday" },
   { key: "estoque-por-filial", label: "Estoque por Filial" },
   { key: "transferencia-produtos", label: "Transferência de Produtos" },
+  { key: "romaneios", label: "Romaneios" },
   { key: "saidas-entradas-produtos", label: "Saídas e Entradas de Produtos" },
   { key: "destino-romaneio", label: "Destino Romaneio" },
 ];

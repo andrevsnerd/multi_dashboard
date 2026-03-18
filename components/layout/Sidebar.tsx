@@ -167,7 +167,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     { label: "Controle de Giro", href: controleGiroHref, permission: "controle-giro" },
     { label: "Controle de Transferências", href: controleTransferenciasHref, permission: "controle-transferencias" },
     { label: "Transferência de Produtos", href: transferenciaProdutosHref, permission: "transferencia-produtos" },
-    { label: "Romaneios", href: romaneiosHref, permission: "transferencia-produtos" },
+    { label: "Romaneios", href: romaneiosHref, permission: "romaneios" },
     { label: "Saídas e Entradas de Produtos", href: saidasEntradasProdutosHref, permission: "saidas-entradas-produtos" },
     { label: "Exportar Relatórios", href: exportarRelatoriosHref, permission: "exportar-relatorios" },
   ];
