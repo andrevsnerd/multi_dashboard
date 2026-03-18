@@ -6,6 +6,48 @@ import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthContext";
 import styles from "./RomaneioDetalhePage.module.css";
 
+// ---------- helpers de API ----------
+
+async function fetchConfirmados(
+  companyKey: string,
+  romaneioId: string,
+  filialDestino: string
+): Promise<Map<string, number>> {
+  const params = new URLSearchParams({ company: companyKey, romaneio: romaneioId, filialDestino });
+  const res = await fetch(`/api/romaneio-confirmar-entrada?${params.toString()}`, { cache: "no-store" });
+  if (!res.ok) return new Map();
+  const json = (await res.json()) as { data: Record<string, number> };
+  return new Map(Object.entries(json.data || {}));
+}
+
+async function postConfirmacao(
+  username: string,
+  companyKey: string,
+  romaneioId: string,
+  filialDestino: string,
+  produto: string,
+  corProduto: string,
+  qtdeConfirmada: number,
+  acao: "confirmar" | "desconfirmar"
+): Promise<boolean> {
+  const res = await fetch("/api/romaneio-confirmar-entrada", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-auth-username": username },
+    body: JSON.stringify({
+      companyKey,
+      romaneioId,
+      filialDestino,
+      produto,
+      corProduto: corProduto ?? "",
+      qtdeConfirmada,
+      acao,
+    }),
+  });
+  return res.ok;
+}
+
+// ---------- tipos ----------
+
 export interface RomaneioDetalheItem {
   produto: string;
   corProduto: string | null;
@@ -38,18 +80,15 @@ interface RomaneioDetalhePageProps {
   responsavel?: string;
 }
 
+// ---------- fetch helpers ----------
+
 async function fetchDetalhes(
   tipo: "saida" | "entrada",
   romaneio: string,
   filialOrigem: string,
   filialDestino: string
 ): Promise<RomaneioDetalheItem[]> {
-  const params = new URLSearchParams({
-    tipo,
-    romaneio,
-    filialOrigem,
-    filialDestino,
-  });
+  const params = new URLSearchParams({ tipo, romaneio, filialOrigem, filialDestino });
   const response = await fetch(`/api/transferencia-produtos/log-detalhes?${params.toString()}`, {
     cache: "no-store",
   });
@@ -89,15 +128,12 @@ async function saveDestinoRomaneio(
   const res = await fetch("/api/destino-romaneio", {
     method: "PUT",
     headers: { "Content-Type": "application/json", "x-auth-username": username },
-    body: JSON.stringify({
-      companyKey,
-      romaneioId,
-      filialOrigem,
-      filialDestino,
-    }),
+    body: JSON.stringify({ companyKey, romaneioId, filialOrigem, filialDestino }),
   });
   return res.ok;
 }
+
+// ---------- componente ----------
 
 export default function RomaneioDetalhePage({
   companySlug,
@@ -112,17 +148,16 @@ export default function RomaneioDetalhePage({
   const { user } = useAuth();
   const [itens, setItens] = useState<RomaneioDetalheItem[]>([]);
   const [loading, setLoading] = useState(true);
+
   const dataEmissao = dataEmissaoProp
     ? (() => {
-        try {
-          return new Date(dataEmissaoProp).toLocaleString("pt-BR");
-        } catch {
-          return dataEmissaoProp;
-        }
+        try { return new Date(dataEmissaoProp).toLocaleString("pt-BR"); }
+        catch { return dataEmissaoProp; }
       })()
     : "";
   const responsavel = responsavelProp || "";
 
+  // --- destino (apenas saídas) ---
   const [filiais, setFiliais] = useState<FilialOption[]>([]);
   const [destinoSelected, setDestinoSelected] = useState<string>("");
   const [loadingDestino, setLoadingDestino] = useState(false);
@@ -130,6 +165,17 @@ export default function RomaneioDetalhePage({
     !!user &&
     (user.role === "admin" || (user.permissions ?? []).includes("destino-romaneio"));
 
+  // --- confirmações (apenas entradas) ---
+  // Map: "produto|cor" → qtde_confirmada
+  const [confirmados, setConfirmados] = useState<Map<string, number>>(new Map());
+  // Key do item em processo de confirmação (loading)
+  const [confirmandoKey, setConfirmandoKey] = useState<string | null>(null);
+  // Key do item com input de qtde aberto
+  const [editandoKey, setEditandoKey] = useState<string | null>(null);
+  // Valor do input de qtde
+  const [editQtde, setEditQtde] = useState<number>(0);
+
+  // --- load destino ---
   const loadDestino = useCallback(() => {
     if (tipo !== "saida") return;
     setLoadingDestino(true);
@@ -142,14 +188,9 @@ export default function RomaneioDetalhePage({
     let cancelled = false;
     setLoading(true);
     fetchDetalhes(tipo, romaneioId, filialOrigem, filialDestino).then((data) => {
-      if (!cancelled) {
-        setItens(data);
-        setLoading(false);
-      }
+      if (!cancelled) { setItens(data); setLoading(false); }
     });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [tipo, romaneioId, filialOrigem, filialDestino]);
 
   useEffect(() => {
@@ -159,14 +200,67 @@ export default function RomaneioDetalhePage({
     }
   }, [tipo, loadDestino]);
 
-  const handleDestinoChange = useCallback(
-    async (codFilial: string) => {
-      setDestinoSelected(codFilial);
-      if (!user?.username) return;
-      await saveDestinoRomaneio(user.username, companySlug, romaneioId, filialOrigem, codFilial);
-    },
-    [user?.username, companySlug, romaneioId, filialOrigem]
-  );
+  useEffect(() => {
+    if (tipo === "entrada" && filialDestino) {
+      fetchConfirmados(companySlug, romaneioId, filialDestino).then(setConfirmados);
+    }
+  }, [tipo, companySlug, romaneioId, filialDestino]);
+
+  // Abre o input de quantidade para um item
+  const handleAbrirInput = useCallback((produto: string, corProduto: string | null, qtdeOriginal: number) => {
+    const chave = `${produto}|${corProduto ?? ""}`;
+    setEditandoKey(chave);
+    // Pré-preenche com a qtde já confirmada (se existir) ou a qtde original do romaneio
+    setEditQtde(confirmados.get(chave) ?? qtdeOriginal);
+  }, [confirmados]);
+
+  // Confirma com a qtde digitada
+  const handleConfirmar = useCallback(async (produto: string, corProduto: string | null) => {
+    if (!user?.username) return;
+    const cor = corProduto ?? "";
+    const chave = `${produto}|${cor}`;
+    if (editQtde <= 0) return;
+    setConfirmandoKey(chave);
+    setEditandoKey(null);
+    const ok = await postConfirmacao(
+      user.username, companySlug, romaneioId, filialDestino,
+      produto, cor, editQtde, "confirmar"
+    );
+    if (ok) {
+      setConfirmados((prev) => {
+        const next = new Map(prev);
+        next.set(chave, editQtde);
+        return next;
+      });
+    }
+    setConfirmandoKey(null);
+  }, [user?.username, companySlug, romaneioId, filialDestino, editQtde]);
+
+  // Desconfirma (remove marcação)
+  const handleDesconfirmar = useCallback(async (produto: string, corProduto: string | null) => {
+    if (!user?.username) return;
+    const cor = corProduto ?? "";
+    const chave = `${produto}|${cor}`;
+    setConfirmandoKey(chave);
+    const ok = await postConfirmacao(
+      user.username, companySlug, romaneioId, filialDestino,
+      produto, cor, 0, "desconfirmar"
+    );
+    if (ok) {
+      setConfirmados((prev) => {
+        const next = new Map(prev);
+        next.delete(chave);
+        return next;
+      });
+    }
+    setConfirmandoKey(null);
+  }, [user?.username, companySlug, romaneioId, filialDestino]);
+
+  const handleDestinoChange = useCallback(async (codFilial: string) => {
+    setDestinoSelected(codFilial);
+    if (!user?.username) return;
+    await saveDestinoRomaneio(user.username, companySlug, romaneioId, filialOrigem, codFilial);
+  }, [user?.username, companySlug, romaneioId, filialOrigem]);
 
   const destinoDisplay =
     destinoSelected && filiais.length > 0
@@ -189,13 +283,9 @@ export default function RomaneioDetalhePage({
   return (
     <div className={styles.wrapper}>
       <header className={styles.header}>
-        <Link href={backHref} className={styles.backLink}>
-          ← Voltar
-        </Link>
+        <Link href={backHref} className={styles.backLink}>← Voltar</Link>
         <h1 className={styles.title}>Romaneio #{romaneioId}</h1>
-        <p className={styles.meta}>
-          {responsavel || "—"} • {dataEmissao || "—"}
-        </p>
+        <p className={styles.meta}>{responsavel || "—"} • {dataEmissao || "—"}</p>
       </header>
 
       {tipo === "saida" && canSetDestino && (
@@ -252,8 +342,9 @@ export default function RomaneioDetalhePage({
               <th>DESCRIÇÃO</th>
               <th>COR</th>
               <th>DESTINO</th>
-              <th>QTD</th>
-              <th>AÇÃO</th>
+              <th>QTD ROMANEIO</th>
+              {tipo === "saida" && <th>AÇÃO</th>}
+              {tipo === "entrada" && <th>RECEBIDO</th>}
             </tr>
           </thead>
           <tbody>
@@ -262,8 +353,19 @@ export default function RomaneioDetalhePage({
                 tipo === "saida"
                   ? destinoDisplay || "—"
                   : (item.destino && item.destino.trim()) || "—";
+
+              const chave = `${item.produto}|${item.corProduto ?? ""}`;
+              const isConfirmado = tipo === "entrada" && confirmados.has(chave);
+              const qtdeConfirmada = confirmados.get(chave) ?? 0;
+              const isConfirmando = confirmandoKey === chave;
+              const isEditando = editandoKey === chave;
+              const temDivergencia = isConfirmado && qtdeConfirmada !== item.qtde;
+
               return (
-                <tr key={`${item.produto}-${item.corProduto ?? ""}-${idx}`}>
+                <tr
+                  key={`${item.produto}-${item.corProduto ?? ""}-${idx}`}
+                  className={isConfirmado ? styles.rowConfirmada : ""}
+                >
                   <td>{item.produto}</td>
                   <td>{item.codigoBarra ?? "—"}</td>
                   <td>{item.subgrupo || "—"}</td>
@@ -273,16 +375,114 @@ export default function RomaneioDetalhePage({
                   <td>
                     <span className={styles.destinoTag}>{destinoCell}</span>
                   </td>
+
+                  {/* Coluna QTD — sempre mostra o original do romaneio */}
                   <td>
                     <div className={styles.qtdCell}>
                       <span className={styles.qtdValue}>{item.qtde}</span>
                     </div>
                   </td>
-                  <td>
-                    <Link href={transferenciaHref} className={styles.transferirBtn}>
-                      DAR ENTRADA
-                    </Link>
-                  </td>
+
+                  {/* Coluna AÇÃO (saídas) */}
+                  {tipo === "saida" && (
+                    <td>
+                      <Link href={transferenciaHref} className={styles.transferirBtn}>
+                        DAR ENTRADA
+                      </Link>
+                    </td>
+                  )}
+
+                  {/* Coluna RECEBIDO (entradas) */}
+                  {tipo === "entrada" && (
+                    <td className={styles.recebidoCell}>
+                      {isConfirmando ? (
+                        <span className={styles.loadingDots}>...</span>
+                      ) : isEditando ? (
+                        /* Input de quantidade */
+                        <div className={styles.qtdeInputWrap}>
+                          <div className={styles.qtdeInputRow}>
+                            <span className={styles.qtdeInputLabel}>Qtde recebida:</span>
+                            <input
+                              type="number"
+                              min={0}
+                              className={styles.qtdeInput}
+                              value={editQtde}
+                              onChange={(e) => setEditQtde(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                              autoFocus
+                            />
+                          </div>
+                          {editQtde !== item.qtde && editQtde > 0 && (
+                            <div className={styles.divergenciaAviso}>
+                              {editQtde < item.qtde
+                                ? `⚠ Faltam ${item.qtde - editQtde} un. (romaneio: ${item.qtde})`
+                                : `⚠ Excesso de ${editQtde - item.qtde} un. (romaneio: ${item.qtde})`}
+                            </div>
+                          )}
+                          <div className={styles.qtdeInputActions}>
+                            <button
+                              type="button"
+                              className={styles.confirmarQtdeBtn}
+                              disabled={editQtde <= 0}
+                              onClick={() => handleConfirmar(item.produto, item.corProduto)}
+                            >
+                              Confirmar
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.cancelarQtdeBtn}
+                              onClick={() => setEditandoKey(null)}
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : isConfirmado ? (
+                        /* Item confirmado — mostra qtde recebida + alerta de divergência */
+                        <div className={styles.confirmadoWrap}>
+                          <span
+                            className={
+                              temDivergencia ? styles.confirmadoBadgeDivergente : styles.confirmadoBadge
+                            }
+                          >
+                            ✓ {qtdeConfirmada} recebido{qtdeConfirmada !== 1 ? "s" : ""}
+                          </span>
+                          {temDivergencia && (
+                            <span className={styles.originalBadge}>
+                              {qtdeConfirmada < item.qtde
+                                ? `▼ faltou ${item.qtde - qtdeConfirmada}`
+                                : `▲ excesso ${qtdeConfirmada - item.qtde}`}
+                            </span>
+                          )}
+                          <div className={styles.confirmadoActions}>
+                            <button
+                              type="button"
+                              className={styles.editarQtdeBtn}
+                              onClick={() => handleAbrirInput(item.produto, item.corProduto, item.qtde)}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.desfazerBtn}
+                              onClick={() => handleDesconfirmar(item.produto, item.corProduto)}
+                            >
+                              Desfazer
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Não confirmado */
+                        <button
+                          type="button"
+                          className={styles.receberBtn}
+                          disabled={!user}
+                          onClick={() => handleAbrirInput(item.produto, item.corProduto, item.qtde)}
+                        >
+                          DAR ENTRADA
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               );
             })}

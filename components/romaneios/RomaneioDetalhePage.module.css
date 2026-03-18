@@ -206,3 +206,242 @@
   border-radius: 12px;
   border: 1px solid #e5e7eb;
 }
+
+/* ---- Linha confirmada (recebida) ---- */
+.rowConfirmada td {
+  opacity: 0.55;
+  text-decoration: line-through;
+  text-decoration-color: #6b7280;
+}
+
+/* Remove linha-riscada na célula RECEBIDO */
+.rowConfirmada td:last-child {
+  text-decoration: none;
+  opacity: 1;
+}
+
+/* Célula RECEBIDO — container geral */
+.recebidoCell {
+  min-width: 160px;
+}
+
+/* Loading dots */
+.loadingDots {
+  color: #9ca3af;
+  font-size: 18px;
+  letter-spacing: 2px;
+}
+
+/* Botão "DAR ENTRADA" (não confirmado) */
+.receberBtn {
+  display: inline-block;
+  padding: 6px 14px;
+  background: #3b82f6;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.2s;
+}
+
+.receberBtn:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.receberBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---- Input de quantidade ---- */
+.qtdeInputWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.qtdeInputRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qtdeInputLabel {
+  font-size: 11px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.qtdeInput {
+  width: 70px;
+  padding: 5px 8px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 2px solid #3b82f6;
+  border-radius: 6px;
+  text-align: center;
+  color: #111827;
+  outline: none;
+}
+
+.qtdeInput:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* Aviso de divergência durante edição */
+.divergenciaAviso {
+  font-size: 11px;
+  font-weight: 600;
+  color: #d97706;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+
+.qtdeInputActions {
+  display: flex;
+  gap: 6px;
+}
+
+.confirmarQtdeBtn {
+  padding: 5px 12px;
+  background: #10b981;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.confirmarQtdeBtn:hover:not(:disabled) {
+  background: #059669;
+}
+
+.confirmarQtdeBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cancelarQtdeBtn {
+  padding: 5px 10px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid #e5e7eb;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.cancelarQtdeBtn:hover {
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+/* ---- Item confirmado ---- */
+.confirmadoWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+/* Badge verde — qtde igual ao romaneio */
+.confirmadoBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  width: fit-content;
+}
+
+/* Badge laranja — qtde diferente do romaneio */
+.confirmadoBadgeDivergente {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  width: fit-content;
+}
+
+/* Badge de diferença (faltou / excesso) */
+.originalBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  width: fit-content;
+}
+
+/* Botões pós-confirmação */
+.confirmadoActions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.editarQtdeBtn {
+  padding: 3px 10px;
+  background: transparent;
+  color: #3b82f6;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid #bfdbfe;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.editarQtdeBtn:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.desfazerBtn {
+  padding: 3px 10px;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid #e5e7eb;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.desfazerBtn:hover:not(:disabled) {
+  color: #ef4444;
+  border-color: #fca5a5;
+}
+
+.desfazerBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
