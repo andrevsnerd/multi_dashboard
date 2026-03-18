@@ -203,8 +203,10 @@ export default function RomaneioDetalhePage({
   useEffect(() => {
     if (tipo === "entrada" && filialDestino) {
       fetchConfirmados(companySlug, romaneioId, filialDestino).then(setConfirmados);
+    } else if (tipo === "saida" && filialOrigem) {
+      fetchConfirmados(companySlug, romaneioId, filialOrigem).then(setConfirmados);
     }
-  }, [tipo, companySlug, romaneioId, filialDestino]);
+  }, [tipo, companySlug, romaneioId, filialDestino, filialOrigem]);
 
   // Abre o input de quantidade para um item
   const handleAbrirInput = useCallback((produto: string, corProduto: string | null, qtdeOriginal: number) => {
@@ -222,8 +224,9 @@ export default function RomaneioDetalhePage({
     if (editQtde <= 0) return;
     setConfirmandoKey(chave);
     setEditandoKey(null);
+    const filialRef = tipo === "saida" ? filialOrigem : filialDestino;
     const ok = await postConfirmacao(
-      user.username, companySlug, romaneioId, filialDestino,
+      user.username, companySlug, romaneioId, filialRef,
       produto, cor, editQtde, "confirmar"
     );
     if (ok) {
@@ -234,7 +237,7 @@ export default function RomaneioDetalhePage({
       });
     }
     setConfirmandoKey(null);
-  }, [user?.username, companySlug, romaneioId, filialDestino, editQtde]);
+  }, [user?.username, companySlug, romaneioId, filialOrigem, filialDestino, tipo, editQtde]);
 
   // Desconfirma (remove marcação)
   const handleDesconfirmar = useCallback(async (produto: string, corProduto: string | null) => {
@@ -242,8 +245,9 @@ export default function RomaneioDetalhePage({
     const cor = corProduto ?? "";
     const chave = `${produto}|${cor}`;
     setConfirmandoKey(chave);
+    const filialRef = tipo === "saida" ? filialOrigem : filialDestino;
     const ok = await postConfirmacao(
-      user.username, companySlug, romaneioId, filialDestino,
+      user.username, companySlug, romaneioId, filialRef,
       produto, cor, 0, "desconfirmar"
     );
     if (ok) {
@@ -254,7 +258,7 @@ export default function RomaneioDetalhePage({
       });
     }
     setConfirmandoKey(null);
-  }, [user?.username, companySlug, romaneioId, filialDestino]);
+  }, [user?.username, companySlug, romaneioId, filialOrigem, filialDestino, tipo]);
 
   const handleDestinoChange = useCallback(async (codFilial: string) => {
     setDestinoSelected(codFilial);
@@ -270,7 +274,6 @@ export default function RomaneioDetalhePage({
   const qtdProdutos = itens.length;
   const qtdItens = itens.reduce((s, i) => s + i.qtde, 0);
   const backHref = `/${companySlug}/romaneios`;
-  const transferenciaHref = `/${companySlug}/transferencia-produtos`;
 
   if (loading) {
     return (
@@ -383,12 +386,101 @@ export default function RomaneioDetalhePage({
                     </div>
                   </td>
 
-                  {/* Coluna AÇÃO (saídas) */}
+                  {/* Coluna AÇÃO (saídas) — mesma lógica inline da entrada */}
                   {tipo === "saida" && (
-                    <td>
-                      <Link href={transferenciaHref} className={styles.transferirBtn}>
-                        DAR ENTRADA
-                      </Link>
+                    <td className={styles.recebidoCell}>
+                      {isConfirmando ? (
+                        <span className={styles.loadingDots}>...</span>
+                      ) : isEditando ? (
+                        <div className={styles.qtdeInputWrap}>
+                          <div className={styles.qtdeInputRow}>
+                            <span className={styles.qtdeInputLabel}>Qtde:</span>
+                            <button
+                              type="button"
+                              className={styles.qtdeSpinBtn}
+                              onClick={() => setEditQtde((v) => Math.max(0, v - 1))}
+                            >−</button>
+                            <input
+                              type="number"
+                              min={0}
+                              className={styles.qtdeInput}
+                              value={editQtde}
+                              onChange={(e) => setEditQtde(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                            />
+                            <button
+                              type="button"
+                              className={styles.qtdeSpinBtn}
+                              onClick={() => setEditQtde((v) => v + 1)}
+                            >+</button>
+                          </div>
+                          {editQtde !== item.qtde && editQtde > 0 && (
+                            <div className={styles.divergenciaAviso}>
+                              {editQtde < item.qtde
+                                ? `⚠ Faltam ${item.qtde - editQtde} un. (romaneio: ${item.qtde})`
+                                : `⚠ Excesso de ${editQtde - item.qtde} un. (romaneio: ${item.qtde})`}
+                            </div>
+                          )}
+                          <div className={styles.qtdeInputActions}>
+                            <button
+                              type="button"
+                              className={styles.confirmarQtdeBtn}
+                              disabled={editQtde <= 0}
+                              onClick={() => handleConfirmar(item.produto, item.corProduto)}
+                            >
+                              Confirmar
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.cancelarQtdeBtn}
+                              onClick={() => setEditandoKey(null)}
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : isConfirmado ? (
+                        <div className={styles.confirmadoWrap}>
+                          <span
+                            className={
+                              temDivergencia ? styles.confirmadoBadgeDivergente : styles.confirmadoBadge
+                            }
+                          >
+                            ✓ {qtdeConfirmada} enviado{qtdeConfirmada !== 1 ? "s" : ""}
+                          </span>
+                          {temDivergencia && (
+                            <span className={styles.originalBadge}>
+                              {qtdeConfirmada < item.qtde
+                                ? `▼ faltou ${item.qtde - qtdeConfirmada}`
+                                : `▲ excesso ${qtdeConfirmada - item.qtde}`}
+                            </span>
+                          )}
+                          <div className={styles.confirmadoActions}>
+                            <button
+                              type="button"
+                              className={styles.editarQtdeBtn}
+                              onClick={() => handleAbrirInput(item.produto, item.corProduto, item.qtde)}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.desfazerBtn}
+                              onClick={() => handleDesconfirmar(item.produto, item.corProduto)}
+                            >
+                              Desfazer
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className={styles.receberBtn}
+                          disabled={!user}
+                          onClick={() => handleAbrirInput(item.produto, item.corProduto, item.qtde)}
+                        >
+                          CONFIRMAR SAÍDA
+                        </button>
+                      )}
                     </td>
                   )}
 
@@ -402,6 +494,11 @@ export default function RomaneioDetalhePage({
                         <div className={styles.qtdeInputWrap}>
                           <div className={styles.qtdeInputRow}>
                             <span className={styles.qtdeInputLabel}>Qtde recebida:</span>
+                            <button
+                              type="button"
+                              className={styles.qtdeSpinBtn}
+                              onClick={() => setEditQtde((v) => Math.max(0, v - 1))}
+                            >−</button>
                             <input
                               type="number"
                               min={0}
@@ -410,6 +507,11 @@ export default function RomaneioDetalhePage({
                               onChange={(e) => setEditQtde(Math.max(0, parseInt(e.target.value, 10) || 0))}
                               autoFocus
                             />
+                            <button
+                              type="button"
+                              className={styles.qtdeSpinBtn}
+                              onClick={() => setEditQtde((v) => v + 1)}
+                            >+</button>
                           </div>
                           {editQtde !== item.qtde && editQtde > 0 && (
                             <div className={styles.divergenciaAviso}>

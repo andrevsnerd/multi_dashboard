@@ -15,6 +15,7 @@ import styles from "./ControleTransferenciasPage.module.css";
 interface TransferenciaPermissao {
   filiaisOrigem: string[];
   podeVerOutrasFiliais?: boolean;
+  filialAtribuida?: string | null;
 }
 
 async function fetchPermissoes(username: string): Promise<TransferenciaPermissao | null> {
@@ -181,10 +182,13 @@ export default function ControleTransferenciasPage({
   }, [user?.username]);
 
   const allowedFiliaisOrigem = useMemo(() => {
-    if (user?.role === "admin" || !permissoes || permissoes.filiaisOrigem.length === 0 || permissoes.podeVerOutrasFiliais) return null;
-    return permissoes.filiaisOrigem
-      .map((cod) => filiais.find((f) => f.codFilial.trim() === cod.trim())?.filial)
-      .filter((f): f is string => !!f);
+    if (user?.role === "admin" || !permissoes || permissoes.podeVerOutrasFiliais) return null;
+    // Origem no controle de transferências = apenas a filialAtribuida do usuário.
+    // filiaisOrigem é para permissão de execução de saídas, não para filtrar origens aqui.
+    const filialAtribuida = permissoes.filialAtribuida?.trim() || null;
+    if (!filialAtribuida) return null;
+    const filialNome = filiais.find((f) => f.codFilial.trim() === filialAtribuida)?.filial ?? filialAtribuida;
+    return [filialNome];
   }, [user?.role, permissoes, filiais]);
 
   useEffect(() => {

@@ -445,3 +445,31 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* Botões +/− do spinner de quantidade */
+.qtdeSpinBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 16px;
+  font-weight: 700;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.qtdeSpinBtn:hover {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+.qtdeSpinBtn:active {
+  background: #d1d5db;
+}

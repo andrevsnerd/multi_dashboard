@@ -26,6 +26,7 @@ interface TransferenciaPermissao {
   responsavelFixo: boolean;
   tipoRomaneioFixo: boolean;
   podeVerOutrasFiliais?: boolean;
+  filialAtribuida?: string | null;
 }
 
 async function fetchPermissoes(username: string): Promise<TransferenciaPermissao | null> {
@@ -955,12 +956,15 @@ export default function ControleTransferenciasTable({
     // Destinos visíveis: usa filiaisDestinoControle (visualização no controle de transferências).
     // Vazio = todos os destinos visíveis.
     const destinosVisiveis = permissoes.filiaisDestinoControle ?? [];
+    // Origem visível: apenas a filial atribuída ao usuário (filialAtribuida).
+    // filiaisOrigem é para permissão de execução de saídas, não para filtrar origens no controle.
+    const filialAtribuida = permissoes.filialAtribuida?.trim() || null;
     return transfersByOriginAndDestination
       .filter((group) => {
         const origemCanonico = group.items[0]?.origemCanonico ?? group.origem;
         const origemOk =
-          permissoes.filiaisOrigem.length === 0 ||
-          permissoes.filiaisOrigem.some((p) => permissaoMatchFilial(p, origemCanonico));
+          !filialAtribuida ||
+          permissaoMatchFilial(filialAtribuida, origemCanonico);
         return origemOk;
       })
       .map((group) => ({
