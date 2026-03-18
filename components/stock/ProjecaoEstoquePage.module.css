@@ -252,6 +252,8 @@
 
 .tableScrollContainer {
   /* Sem scroll interno: tabela expande na página e usa apenas o scroll da própria página */
+  width: 100%;
+  overflow: visible;
 }
 
 .projecaoTable {
