@@ -30,6 +30,8 @@ export interface UserRecord {
   permissions: PermissionKey[];
   /** Se definido e não vazio: apenas essas empresas. Se undefined/[]: vê as duas. */
   allowedCompanies?: CompanyKey[];
+  /** Nome de exibição opcional (ex: "Maria Logística"). Se vazio, usa o username. */
+  nomeExibicao?: string;
 }
 
 export interface UserSession {
@@ -39,6 +41,8 @@ export interface UserSession {
   permissions: PermissionKey[];
   /** Se definido e não vazio: apenas essas empresas. Se undefined/[]: vê as duas. */
   allowedCompanies?: CompanyKey[];
+  /** Nome de exibição opcional. Se vazio, usa o username. */
+  nomeExibicao?: string;
 }
 
 /** Lista de todas as permissões para o painel admin. */

@@ -76,10 +76,11 @@ export async function createUser(
   password: string,
   role: RoleKey,
   permissions: PermissionKey[],
-  allowedCompanies?: CompanyKey[]
+  allowedCompanies?: CompanyKey[],
+  nomeExibicao?: string
 ): Promise<UserRecord> {
   if (hasPostgres())
-    return neonStore.createUser(username, password, role, permissions, allowedCompanies);
+    return neonStore.createUser(username, password, role, permissions, allowedCompanies, nomeExibicao);
   const users = readUsersFile();
   const normalized = username.trim().toLowerCase();
   if (users.some((u) => u.username.toLowerCase() === normalized)) {
@@ -97,6 +98,7 @@ export async function createUser(
     permissions: role === "admin" ? [] : (permissions ?? []),
     allowedCompanies:
       allowedCompanies?.length ? allowedCompanies : undefined,
+    nomeExibicao: nomeExibicao?.trim() || undefined,
   };
   users.push(record);
   writeUsersFile(users);
@@ -111,6 +113,7 @@ export async function updateUser(
     role?: RoleKey;
     permissions?: PermissionKey[];
     allowedCompanies?: CompanyKey[] | null;
+    nomeExibicao?: string | null;
   }
 ): Promise<UserRecord> {
   if (hasPostgres()) return neonStore.updateUser(id, updates);
@@ -139,6 +142,9 @@ export async function updateUser(
   if (updates.allowedCompanies !== undefined) {
     current.allowedCompanies =
       updates.allowedCompanies?.length ? updates.allowedCompanies : undefined;
+  }
+  if (updates.nomeExibicao !== undefined) {
+    current.nomeExibicao = updates.nomeExibicao?.trim() || undefined;
   }
   writeUsersFile(users);
   return { ...current };

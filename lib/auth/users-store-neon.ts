@@ -16,9 +16,8 @@ async function ensureTable(sql: ReturnType<typeof getNeonSql>) {
       allowed_companies JSONB
     )
   `;
-  await sql`
-    ALTER TABLE dashboard_users ADD COLUMN IF NOT EXISTS allowed_companies JSONB
-  `;
+  await sql`ALTER TABLE dashboard_users ADD COLUMN IF NOT EXISTS allowed_companies JSONB`;
+  await sql`ALTER TABLE dashboard_users ADD COLUMN IF NOT EXISTS nome_exibicao TEXT`;
   tableChecked = true;
 }
 
@@ -46,6 +45,7 @@ function rowToUser(row: {
   role: string;
   permissions: string[] | unknown;
   allowed_companies?: string[] | null;
+  nome_exibicao?: string | null;
 }): UserRecord {
   const perms = Array.isArray(row.permissions) ? row.permissions : [];
   const raw = row.allowed_companies;
@@ -60,6 +60,7 @@ function rowToUser(row: {
     role: row.role as RoleKey,
     permissions: perms as PermissionKey[],
     allowedCompanies,
+    nomeExibicao: row.nome_exibicao ?? undefined,
   };
 }
 
@@ -68,7 +69,7 @@ export async function findUserByUsername(username: string): Promise<UserRecord |
   await ensureTable(sql);
   const normalized = username.trim().toLowerCase();
   const rows = await sql`
-    SELECT id, username, password_hash, role, permissions, allowed_companies
+    SELECT id, username, password_hash, role, permissions, allowed_companies, nome_exibicao
     FROM dashboard_users
     WHERE LOWER(username) = ${normalized}
     LIMIT 1
@@ -81,7 +82,7 @@ export async function findUserById(id: string): Promise<UserRecord | null> {
   const sql = getNeonSql();
   await ensureTable(sql);
   const rows = await sql`
-    SELECT id, username, password_hash, role, permissions, allowed_companies
+    SELECT id, username, password_hash, role, permissions, allowed_companies, nome_exibicao
     FROM dashboard_users
     WHERE id = ${id}
     LIMIT 1
@@ -104,7 +105,8 @@ export async function createUser(
   password: string,
   role: RoleKey,
   permissions: PermissionKey[],
-  allowedCompanies?: CompanyKey[]
+  allowedCompanies?: CompanyKey[],
+  nomeExibicao?: string
 ): Promise<UserRecord> {
   const sql = getNeonSql();
   await ensureTable(sql);
@@ -121,9 +123,10 @@ export async function createUser(
   const perms = role === "admin" ? [] : (permissions ?? []);
   const allowedJson =
     allowedCompanies?.length ? JSON.stringify(allowedCompanies) : null;
+  const nomeEx = nomeExibicao?.trim() || null;
   await sql`
-    INSERT INTO dashboard_users (id, username, password_hash, role, permissions, allowed_companies)
-    VALUES (${id}, ${normalized}, ${passwordHash}, ${role}, ${JSON.stringify(perms)}::jsonb, ${allowedJson}::jsonb)
+    INSERT INTO dashboard_users (id, username, password_hash, role, permissions, allowed_companies, nome_exibicao)
+    VALUES (${id}, ${normalized}, ${passwordHash}, ${role}, ${JSON.stringify(perms)}::jsonb, ${allowedJson}::jsonb, ${nomeEx})
   `;
   return {
     id,
@@ -132,6 +135,7 @@ export async function createUser(
     role,
     permissions: perms,
     allowedCompanies: allowedCompanies?.length ? allowedCompanies : undefined,
+    nomeExibicao: nomeEx ?? undefined,
   };
 }
 
@@ -143,12 +147,13 @@ export async function updateUser(
     role?: RoleKey;
     permissions?: PermissionKey[];
     allowedCompanies?: CompanyKey[] | null;
+    nomeExibicao?: string | null;
   }
 ): Promise<UserRecord> {
   const sql = getNeonSql();
   await ensureTable(sql);
   const rows = await sql`
-    SELECT id, username, password_hash, role, permissions, allowed_companies
+    SELECT id, username, password_hash, role, permissions, allowed_companies, nome_exibicao
     FROM dashboard_users WHERE id = ${id} LIMIT 1
   `;
   if (rows.length === 0) throw new Error("Usuário não encontrado");
@@ -158,6 +163,7 @@ export async function updateUser(
   let role = current.role;
   let permissions = current.permissions;
   let allowedCompanies = current.allowedCompanies;
+  let nomeExibicao = current.nomeExibicao;
   if (updates.username !== undefined) {
     const normalized = updates.username.trim().toLowerCase();
     const existing = await sql`
@@ -180,14 +186,21 @@ export async function updateUser(
     allowedCompanies =
       updates.allowedCompanies?.length ? updates.allowedCompanies : undefined;
   }
+  if (updates.nomeExibicao !== undefined) {
+    nomeExibicao = updates.nomeExibicao?.trim() || undefined;
+  }
   const allowedJson =
     allowedCompanies?.length ? JSON.stringify(allowedCompanies) : null;
+  const nomeEx = nomeExibicao?.trim() || null;
   await sql`
     UPDATE dashboard_users
-    SET username = ${username}, password_hash = ${passwordHash}, role = ${role}, permissions = ${JSON.stringify(permissions)}::jsonb, allowed_companies = ${allowedJson}::jsonb
+    SET username = ${username}, password_hash = ${passwordHash}, role = ${role},
+        permissions = ${JSON.stringify(permissions)}::jsonb,
+        allowed_companies = ${allowedJson}::jsonb,
+        nome_exibicao = ${nomeEx}
     WHERE id = ${id}
   `;
-  return { id: current.id, username, passwordHash, role, permissions, allowedCompanies };
+  return { id: current.id, username, passwordHash, role, permissions, allowedCompanies, nomeExibicao };
 }
 
 export async function deleteUser(id: string): Promise<void> {
@@ -202,7 +215,7 @@ export async function listUsers(): Promise<UserRecord[]> {
   const sql = getNeonSql();
   await ensureTable(sql);
   const rows = await sql`
-    SELECT id, username, password_hash, role, permissions, allowed_companies
+    SELECT id, username, password_hash, role, permissions, allowed_companies, nome_exibicao
     FROM dashboard_users
     ORDER BY username
   `;
