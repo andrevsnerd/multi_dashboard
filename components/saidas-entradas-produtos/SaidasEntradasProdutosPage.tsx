@@ -1774,10 +1774,12 @@ export default function SaidasEntradasProdutosPage({
                         <button
                           className={`${styles.addModalBtn} ${tipoOperacao === "saida" ? styles.addModalBtnSaida : styles.addModalBtnEntrada}`}
                           onClick={() => adicionarProdutoModal(produto)}
-                          disabled={!estoque}
+                          disabled={tipoOperacao === "saida" && !estoque}
                           title={estoque
                             ? `Estoque: ${estoque.estoque}`
-                            : `Sem estoque em ${filialSelecionada?.filial}`}
+                            : tipoOperacao === "saida"
+                              ? `Sem estoque em ${filialSelecionada?.filial}`
+                              : `Sem estoque cadastrado em ${filialSelecionada?.filial}`}
                         >+</button>
                       </div>
                     );
