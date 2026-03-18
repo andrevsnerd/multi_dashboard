@@ -1,4 +1,5 @@
 import type { CompanyKey, PermissionKey, UserSession } from "@/types/auth";
+import { NAV_ROUTE_MAP } from "@/lib/config/nav-route-map";
 
 const ALL_COMPANIES: CompanyKey[] = ["nerd", "scarfme"];
 
@@ -17,41 +18,26 @@ export function canAccessCompany(user: UserSession | null, companyKey: string): 
   return visible.includes(companyKey as CompanyKey);
 }
 
-/** Segmento de rota (ex: controle-transferencias) a partir do pathname. */
+/**
+ * Segmento de rota (ex: "romaneios") → permissão necessária.
+ * Usa NAV_ROUTE_MAP como fonte única de verdade.
+ */
 export function pathnameToPermission(pathname: string | null): PermissionKey | "admin" | null {
   if (!pathname || pathname === "/" || pathname === "/login") return null;
   if (pathname === "/admin") return "admin";
   const parts = pathname.split("/").filter(Boolean);
-  if (parts.length === 1) return "dashboard"; // /nerd -> dashboard
+  if (parts.length === 1) return "dashboard"; // /nerd → dashboard
   if (parts.length < 2) return null;
   const segment = parts[1];
-  const mapping: Record<string, PermissionKey | "admin"> = {
-    dashboard: "dashboard",
-    produtos: "produtos",
-    "produto-detalhado": "produtos",
-    "produtos-recentes": "produtos",
-    vendedores: "vendedores",
-    clientes: "clientes",
-    "controle-estoque": "controle-estoque",
-    "controle-giro": "controle-giro",
-    "controle-movimento": "controle-movimento",
-    "controle-transferencias": "controle-transferencias",
-    "exportar-relatorios": "exportar-relatorios",
-    blackfriday: "blackfriday",
-    "estoque-por-filial": "estoque-por-filial",
-    "transferencia-produtos": "transferencia-produtos",
-    "saidas-entradas-produtos": "saidas-entradas-produtos",
-    admin: "admin",
-  };
-  return mapping[segment] ?? null;
+  return NAV_ROUTE_MAP[segment] ?? null;
 }
 
 export function canAccessPath(user: UserSession | null, pathname: string | null): boolean {
   if (!user) return false;
   const perm = pathnameToPermission(pathname);
-  if (perm === null) return true; // home, login
-  if (perm === "admin") return user.role === "admin"; // só admin vê painel de usuários
-  // Rota sob uma empresa (ex: /nerd/dashboard): exige permissão da empresa
+  if (perm === null) return true; // home, login, rotas sem mapeamento
+  if (perm === "admin") return user.role === "admin";
+  // Rota sob uma empresa: exige permissão da empresa
   const parts = pathname?.split("/").filter(Boolean) ?? [];
   const companySegment = parts[0];
   if (companySegment && (companySegment === "nerd" || companySegment === "scarfme")) {
@@ -59,7 +45,7 @@ export function canAccessPath(user: UserSession | null, pathname: string | null)
   }
   if (user.role === "admin") return true;
   if (user.role === "gestor") {
-    // gestor com permissions vazias = acesso total (exceto /admin); com permissions = só o que está na lista
+    // gestor com permissions vazias = acesso total (exceto /admin)
     if (!user.permissions?.length) return true;
     return user.permissions.includes(perm as PermissionKey);
   }
@@ -70,9 +56,13 @@ export function canAccessPath(user: UserSession | null, pathname: string | null)
 export function getFirstAllowedPath(user: UserSession | null, company: string): string {
   if (!user) return `/${company}`;
   if (user.role === "admin") return `/${company}`;
-  if (user.role === "gestor" && (!user.permissions?.length)) return `/${company}`;
+  if (user.role === "gestor" && !user.permissions?.length) return `/${company}`;
   if (user.permissions.includes("controle-transferencias"))
     return `/${company}/controle-transferencias`;
+  if (user.permissions.includes("saidas-entradas-produtos"))
+    return `/${company}/saidas-entradas-produtos`;
+  if (user.permissions.includes("transferencia-produtos"))
+    return `/${company}/transferencia-produtos`;
   if (user.permissions.includes("dashboard")) return `/${company}`;
   const first = user.permissions[0];
   if (first) return `/${company}/${first}`;

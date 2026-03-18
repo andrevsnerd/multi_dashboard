@@ -74,6 +74,8 @@ interface TransferenciaPermissao {
   tipoRomaneioPadrao?: string;
   responsavelFixo: boolean;
   tipoRomaneioFixo: boolean;
+  /** Filial atribuída ao usuário — usada como fallback quando filiaisOrigem/filiaisDestino está vazio. */
+  filialAtribuida?: string | null;
 }
 
 type TipoOperacao = "saida" | "entrada";
@@ -463,14 +465,29 @@ export default function SaidasEntradasProdutosPage({
 
         // Aplicar filtros de permissão se existirem
         if (permissoes) {
-          // Para saída: usar filiaisOrigem, para entrada: usar filiaisDestino
-          const filiaisPermitidas = tipoOperacao === "saida" 
-            ? (permissoes.filiaisOrigem.length > 0 
-                ? data.filter(f => permissoes.filiaisOrigem.some(cod => f.codFilial.trim() === (cod || "").trim()))
-                : data)
-            : (permissoes.filiaisDestino.length > 0
-                ? data.filter(f => permissoes.filiaisDestino.some(cod => f.codFilial.trim() === (cod || "").trim()))
-                : data);
+          /**
+           * Resolve a lista de filiais visíveis para a operação:
+           * 1. Se há lista explícita (filiaisOrigem / filiaisDestino) → usa ela
+           * 2. Se não há lista mas há filialAtribuida → restringe a essa filial
+           * 3. Senão → todas as filiais
+           */
+          const resolveFiliais = (lista: string[]) => {
+            if (lista.length > 0) {
+              return data.filter(f =>
+                lista.some(cod => f.codFilial.trim() === (cod || "").trim())
+              );
+            }
+            if (permissoes.filialAtribuida) {
+              return data.filter(
+                f => f.codFilial.trim() === permissoes.filialAtribuida!.trim()
+              );
+            }
+            return data;
+          };
+
+          const filiaisPermitidas = tipoOperacao === "saida"
+            ? resolveFiliais(permissoes.filiaisOrigem)
+            : resolveFiliais(permissoes.filiaisDestino);
           
           setFiliaisDisponiveis(filiaisPermitidas);
           
