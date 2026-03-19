@@ -388,6 +388,22 @@ async function fetchLogDetalhes(
   return json.data || [];
 }
 
+async function salvarDestinoRomaneio(
+  companyKey: string,
+  romaneioId: string,
+  filialOrigem: string,
+  filialDestino: string,
+  username?: string
+): Promise<void> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (username) headers["x-auth-username"] = username;
+  await fetch("/api/destino-romaneio", {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({ companyKey, romaneioId, filialOrigem, filialDestino, setandoNaCriacao: true }),
+  });
+}
+
 export default function SaidasEntradasProdutosPage({
   companyKey,
   companyName,
@@ -434,6 +450,8 @@ export default function SaidasEntradasProdutosPage({
   const [observacaoEditando, setObservacaoEditando] = useState("");
   const [processandoEdicao, setProcessandoEdicao] = useState(false);
   const [mostrarConfirmacaoRegistro, setMostrarConfirmacaoRegistro] = useState(false);
+  const [filialDestinoSaida, setFilialDestinoSaida] = useState<Filial | null>(null);
+  const [filiaisDestinoDisponiveis, setFiliaisDestinoDisponiveis] = useState<Filial[]>([]);
 
   // Carregar permissões do usuário PRIMEIRO (antes de tudo)
   useEffect(() => {
@@ -488,17 +506,25 @@ export default function SaidasEntradasProdutosPage({
           const filiaisPermitidas = tipoOperacao === "saida"
             ? resolveFiliais(permissoes.filiaisOrigem)
             : resolveFiliais(permissoes.filiaisDestino);
-          
+
           setFiliaisDisponiveis(filiaisPermitidas);
-          
+
           if (filiaisPermitidas.length > 0) {
             setFilialSelecionada(filiaisPermitidas[0]);
           }
+
+          // Filiais destino disponíveis para o select de destino na saída
+          const destinos = permissoes.filiaisDestino.length > 0
+            ? data.filter(f => permissoes.filiaisDestino.some(cod => f.codFilial.trim() === (cod || "").trim()))
+            : data;
+          setFiliaisDestinoDisponiveis(destinos);
+          if (destinos.length === 1) setFilialDestinoSaida(destinos[0]);
         } else {
           setFiliaisDisponiveis(data);
           if (data.length > 0) {
             setFilialSelecionada(data[0]);
           }
+          setFiliaisDestinoDisponiveis(data);
         }
       } catch (error) {
         console.error("Erro ao carregar filiais", error);
@@ -632,6 +658,7 @@ export default function SaidasEntradasProdutosPage({
     setSearchTerm("");
     setProdutos([]);
     setModalAberto(false);
+    setFilialDestinoSaida(null);
   }, []);
 
   const observacaoAtual = tipoOperacao === "saida" ? observacaoSaida : observacaoEntrada;
@@ -888,7 +915,7 @@ export default function SaidasEntradasProdutosPage({
 
     while (!sucesso && tentativas < maxTentativas) {
       try {
-        await executarOperacao(
+        const resultado = await executarOperacao(
           tipoOperacao,
           produto.produto,
           produto.corProduto,
@@ -901,6 +928,21 @@ export default function SaidasEntradasProdutosPage({
         );
 
         sucesso = true;
+
+        // Salvar filial destino do romaneio gerado
+        if (tipoOperacao === "saida" && filialDestinoSaida && resultado.romaneio) {
+          try {
+            await salvarDestinoRomaneio(
+              companyKey,
+              resultado.romaneio,
+              produto.filial,
+              filialDestinoSaida.codFilial,
+              user?.username
+            );
+          } catch (err) {
+            console.error("Erro ao salvar filial destino do romaneio", err);
+          }
+        }
 
         setFilaOperacoes(prev => prev.slice(1));
         setProdutosSelecionados(prev => prev.filter(p => 
@@ -947,7 +989,7 @@ export default function SaidasEntradasProdutosPage({
     }
 
     setProcessandoOperacao(false);
-  }, [filaOperacoes, processandoOperacao, filialSelecionada, mostrarNotificacao, tipoOperacao, tipoRomaneioSelecionado, responsavelFinal, user?.username]);
+  }, [filaOperacoes, processandoOperacao, filialSelecionada, mostrarNotificacao, tipoOperacao, tipoRomaneioSelecionado, responsavelFinal, user?.username, filialDestinoSaida, companyKey]);
 
   // Quando terminar a fila, limpar snapshot da observação
   useEffect(() => {
@@ -1274,6 +1316,47 @@ export default function SaidasEntradasProdutosPage({
 
         {/* Tipo Romaneio + Responsável (alinha com Produtos) */}
         <div className={styles.configCardWide}>
+          {/* Filial Destino (apenas saída) */}
+          {tipoOperacao === "saida" && (
+            <div className={styles.configSegment}>
+              <div className={styles.configIcon} aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M4 20h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <path d="M6 20V7l6-3 6 3v13" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                  <path d="M10 20v-6h4v6" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                  <path d="M17 4l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div className={styles.configBody}>
+                <span className={styles.configBarLabel}>Filial Destino</span>
+                {filiaisDestinoDisponiveis.length === 1 ? (
+                  <span className={styles.configBarText}>{filiaisDestinoDisponiveis[0].filial}</span>
+                ) : (
+                  <div className={styles.selectWrap}>
+                    <select
+                      className={styles.configBarSelect}
+                      value={filialDestinoSaida?.codFilial || ""}
+                      onChange={(e) => {
+                        const filial = filiaisDestinoDisponiveis.find(f => f.codFilial === e.target.value);
+                        setFilialDestinoSaida(filial || null);
+                      }}
+                    >
+                      <option value="">Nenhum (definir depois)</option>
+                      {filiaisDestinoDisponiveis.map(f => (
+                        <option key={f.codFilial} value={f.codFilial}>{f.filial}</option>
+                      ))}
+                    </select>
+                    <span className={styles.selectChevron} aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none">
+                        <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Tipo Romaneio */}
           <div className={styles.configSegment}>
             <div className={styles.configIcon} aria-hidden="true">
@@ -1703,6 +1786,11 @@ export default function SaidasEntradasProdutosPage({
                   ? "Deseja registrar a saída dos produtos selecionados?"
                   : "Deseja registrar a entrada dos produtos selecionados?"}
               </p>
+              {tipoOperacao === "saida" && filialDestinoSaida && (
+                <p className={styles.confirmacaoTexto} style={{ marginTop: "8px" }}>
+                  Destino: <strong>{filialDestinoSaida.filial}</strong>
+                </p>
+              )}
             </div>
             <div className={styles.modalFooter}>
               <button className={styles.btnSecondary} onClick={() => setMostrarConfirmacaoRegistro(false)}>

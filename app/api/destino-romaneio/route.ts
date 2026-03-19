@@ -48,16 +48,20 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
     }
 
+    const body = await request.json();
+
+    // Permite se: admin, permissão destino-romaneio, OU se está sendo definido no momento da criação da saída
+    const setandoNaCriacao = body.setandoNaCriacao === true;
     const canSet =
-      user.role === "admin" || (user.permissions ?? []).includes("destino-romaneio");
+      user.role === "admin" ||
+      (user.permissions ?? []).includes("destino-romaneio") ||
+      setandoNaCriacao;
     if (!canSet) {
       return NextResponse.json(
         { error: "Sem permissão para definir destino de romaneio" },
         { status: 403 }
       );
     }
-
-    const body = await request.json();
     const companyKey = typeof body.companyKey === "string" ? body.companyKey.trim() : "";
     const romaneioId = typeof body.romaneioId === "string" ? body.romaneioId.trim() : "";
     const filialOrigem = typeof body.filialOrigem === "string" ? body.filialOrigem.trim() : "";
