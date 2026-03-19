@@ -358,14 +358,19 @@ export default function RomaneioDetalhePage({
   const qtdItens = itens.reduce((s, i) => s + i.qtde, 0);
   const backHref = `/${companySlug}/romaneios`;
 
-  // Itens que serão confirmados (qty > 0)
+  // Itens ainda não confirmados com qty > 0 (serão enviados no próximo "Confirmar Tudo")
   const itensParaConfirmar = itens.filter((item) => {
     const chave = `${item.produto}|${item.corProduto ?? ""}`;
-    return (quantidades.get(chave) ?? item.qtde) > 0;
+    return !confirmados.has(chave) && (quantidades.get(chave) ?? item.qtde) > 0;
   });
+
+  const todosConfirmados = itens.length > 0 && itens.every((item) =>
+    confirmados.has(`${item.produto}|${item.corProduto ?? ""}`)
+  );
 
   const podeConfirmar =
     !!user &&
+    !todosConfirmados &&
     itensParaConfirmar.length > 0 &&
     !confirmandoTudo &&
     (tipo !== "saida" || !!destinoSelected);
@@ -433,8 +438,8 @@ export default function RomaneioDetalhePage({
         </div>
       </div>
 
-      {/* Botão Confirmar Tudo */}
-      {(tipo === "saida" || tipo === "entrada") && user && (
+      {/* Botão Confirmar Tudo — some quando tudo já está confirmado */}
+      {user && !todosConfirmados && (
         <div className={styles.confirmarTudoBar}>
           <button
             type="button"
@@ -513,13 +518,34 @@ export default function RomaneioDetalhePage({
 
                   {/* Coluna de confirmação */}
                   <td className={styles.recebidoCell}>
-                    {isZerando ? (
+                    {isZerando || confirmandoTudo ? (
                       <span className={styles.loadingDots}>...</span>
-                    ) : confirmandoTudo ? (
-                      <span className={styles.loadingDots}>...</span>
+                    ) : isConfirmado ? (
+                      /* Item já confirmado: só exibe badge, sem inputs */
+                      <div className={styles.confirmadoWrap}>
+                        <span className={temDivergencia ? styles.confirmadoBadgeDivergente : styles.confirmadoBadge}>
+                          ✓ {qtdeConfirmada} confirmado{qtdeConfirmada !== 1 ? "s" : ""}
+                        </span>
+                        {temDivergencia && (
+                          <span className={styles.originalBadge}>
+                            {qtdeConfirmada < item.qtde
+                              ? `▼ faltou ${item.qtde - qtdeConfirmada}`
+                              : `▲ excesso ${qtdeConfirmada - item.qtde}`}
+                          </span>
+                        )}
+                        {user?.role === "admin" && (
+                          <button
+                            type="button"
+                            className={styles.desfazerBtn}
+                            onClick={() => handleDesconfirmar(item.produto, item.corProduto)}
+                          >
+                            Zerar
+                          </button>
+                        )}
+                      </div>
                     ) : (
+                      /* Item não confirmado: exibe input + divergência */
                       <div className={styles.qtdeInputWrap}>
-                        {/* Input de quantidade */}
                         <div className={styles.qtdeInputRow}>
                           <button
                             type="button"
@@ -539,8 +565,6 @@ export default function RomaneioDetalhePage({
                             onClick={() => updateQuantidade(chave, qtdeAtual + 1)}
                           >+</button>
                         </div>
-
-                        {/* Aviso de divergência */}
                         {temDivergenciaInput && qtdeAtual > 0 && (
                           <div className={styles.divergenciaAviso}>
                             {qtdeAtual < item.qtde
@@ -550,31 +574,6 @@ export default function RomaneioDetalhePage({
                         )}
                         {qtdeAtual === 0 && (
                           <div className={styles.divergenciaAviso}>⚠ Item será ignorado</div>
-                        )}
-
-                        {/* Badge de confirmado */}
-                        {isConfirmado && (
-                          <div className={styles.confirmadoWrap}>
-                            <span className={temDivergencia ? styles.confirmadoBadgeDivergente : styles.confirmadoBadge}>
-                              ✓ {qtdeConfirmada} confirmado{qtdeConfirmada !== 1 ? "s" : ""}
-                            </span>
-                            {temDivergencia && (
-                              <span className={styles.originalBadge}>
-                                {qtdeConfirmada < item.qtde
-                                  ? `▼ faltou ${item.qtde - qtdeConfirmada}`
-                                  : `▲ excesso ${qtdeConfirmada - item.qtde}`}
-                              </span>
-                            )}
-                            {user?.role === "admin" && (
-                              <button
-                                type="button"
-                                className={styles.desfazerBtn}
-                                onClick={() => handleDesconfirmar(item.produto, item.corProduto)}
-                              >
-                                Zerar
-                              </button>
-                            )}
-                          </div>
                         )}
                       </div>
                     )}

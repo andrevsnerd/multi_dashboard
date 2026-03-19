@@ -41,28 +41,13 @@ export default function Sidebar({ companyName }: SidebarProps) {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Extrair o caminho base da empresa (remover /estoque-por-filial, /produtos, /produtos-recentes, /produto-detalhado, /vendedores e /clientes se estiver presente)
+  // Extrair apenas o segmento da empresa do pathname (ex: /nerd/vendedores/detalhe → /nerd)
   const getBasePath = () => {
-    if (!pathname || pathname === "/") {
-      return "/";
-    }
-    // Remove sub-rotas e rotas principais. Para controle-estoque, remove tudo que vem depois também
-    let base = pathname
-      .replace(/\/estoque-por-filial.*$/, "")
-      .replace(/\/controle-estoque.*$/, "") // Remove /controle-estoque e qualquer coisa depois
-      .replace(/\/controle-giro.*$/, "") // Remove /controle-giro e qualquer coisa depois
-      .replace(/\/controle-transferencias.*$/, "") // Remove /controle-transferencias e qualquer coisa depois
-      .replace(/\/transferencia-produtos.*$/, "") // Remove /transferencia-produtos e qualquer coisa depois
-      .replace(/\/saidas-entradas-produtos.*$/, "") // Remove /saidas-entradas-produtos e qualquer coisa depois
-      .replace(/\/romaneios.*$/, "") // Remove /romaneios e qualquer coisa depois
-      .replace(/\/produto-detalhado$/, "")
-      .replace(/\/produtos-recentes$/, "")
-      .replace(/\/produtos$/, "")
-      .replace(/\/vendedores$/, "")
-      .replace(/\/clientes$/, "")
-      .replace(/\/exportar-relatorios$/, "");
-    
-    return base;
+    const parts = (pathname || "").split("/").filter(Boolean);
+    if (parts.length === 0) return "/";
+    const company = parts[0];
+    if (company === "nerd" || company === "scarfme") return `/${company}`;
+    return "/";
   };
 
   const basePath = getBasePath();
