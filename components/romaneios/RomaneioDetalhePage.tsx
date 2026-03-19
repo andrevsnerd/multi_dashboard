@@ -60,10 +60,8 @@ async function executarEntradaEstoque(
     headers: { "Content-Type": "application/json", "x-auth-username": username },
     body: JSON.stringify({
       tipoOperacao: "entrada",
-      produto,
-      corProduto: corProduto ?? null,
       filial: filialCod,
-      quantidade,
+      itens: [{ produto, corProduto: corProduto ?? null, quantidade }],
       tipoRomaneio: "TRANSFERENCIA ENTRE LOJAS",
       responsavel: responsavel || "LOGISTICA",
       observacao: null,
