@@ -514,9 +514,8 @@ export default function SaidasEntradasProdutosPage({
           }
 
           // Filiais destino disponíveis para o select de destino na saída
-          const destinos = permissoes.filiaisDestino.length > 0
-            ? data.filter(f => permissoes.filiaisDestino.some(cod => f.codFilial.trim() === (cod || "").trim()))
-            : data;
+          // Usa a mesma regra de visibilidade de filiaisDestino das permissões
+          const destinos = resolveFiliais(permissoes.filiaisDestino);
           setFiliaisDestinoDisponiveis(destinos);
           if (destinos.length === 1) setFilialDestinoSaida(destinos[0]);
         } else {
