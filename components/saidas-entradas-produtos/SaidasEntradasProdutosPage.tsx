@@ -69,6 +69,8 @@ interface TransferenciaPermissao {
   username: string;
   filiaisOrigem: string[];
   filiaisDestino: string[];
+  /** Filiais destino visíveis no controle de transferências (e no select de destino de saída). Vazio = todas visíveis. */
+  filiaisDestinoControle?: string[];
   tiposRomaneioPermitidos: string[];
   responsavelPadrao?: string;
   tipoRomaneioPadrao?: string;
@@ -513,9 +515,12 @@ export default function SaidasEntradasProdutosPage({
             setFilialSelecionada(filiaisPermitidas[0]);
           }
 
-          // Filiais destino disponíveis para o select de destino na saída
-          // Usa a mesma regra de visibilidade de filiaisDestino das permissões
-          const destinos = resolveFiliais(permissoes.filiaisDestino);
+          // Filiais destino visíveis no select de destino da saída
+          // Usa filiaisDestinoControle (filiais destino visíveis do admin) — vazio = todas visíveis
+          const controle = permissoes.filiaisDestinoControle ?? [];
+          const destinos = controle.length > 0
+            ? data.filter(f => controle.some(cod => f.codFilial.trim() === (cod || "").trim()))
+            : data;
           setFiliaisDestinoDisponiveis(destinos);
           if (destinos.length === 1) setFilialDestinoSaida(destinos[0]);
         } else {
