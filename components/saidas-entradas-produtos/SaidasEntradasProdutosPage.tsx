@@ -302,12 +302,10 @@ async function fetchResponsaveis(): Promise<Array<{ responsavel: string; qtd: nu
   return json.data || [];
 }
 
-async function executarOperacao(
+async function executarOperacaoLote(
   tipoOperacao: TipoOperacao,
-  produto: string,
-  corProduto: string | null,
+  itens: Array<{ produto: string; corProduto: string | null; quantidade: number }>,
   filial: string,
-  quantidade: number,
   tipoRomaneio: string,
   responsavel: string,
   username?: string,
@@ -320,10 +318,8 @@ async function executarOperacao(
     headers,
     body: JSON.stringify({
       tipoOperacao,
-      produto,
-      corProduto,
       filial,
-      quantidade,
+      itens,
       tipoRomaneio,
       responsavel,
       observacao: observacao || null,
@@ -424,7 +420,6 @@ export default function SaidasEntradasProdutosPage({
   const [loadingProdutos, setLoadingProdutos] = useState(false);
   const [notificacao, setNotificacao] = useState<{ mensagem: string; tipo: "success" | "error" } | null>(null);
   const [processandoOperacao, setProcessandoOperacao] = useState(false);
-  const [filaOperacoes, setFilaOperacoes] = useState<ProdutoSelecionado[]>([]);
   const [logSaidas, setLogSaidas] = useState<TransferenciaLog[]>([]);
   const [logEntradas, setLogEntradas] = useState<TransferenciaLog[]>([]);
   const [loadingLogSaidas, setLoadingLogSaidas] = useState(false);
@@ -443,8 +438,7 @@ export default function SaidasEntradasProdutosPage({
   const [permissoesCarregadas, setPermissoesCarregadas] = useState(false);
 
   const notificacaoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const observacaoRegistroRef = useRef<string>("");
-  const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
+const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
   const [detalhesCache, setDetalhesCache] = useState<Record<string, LogDetalheItem[]>>({});
   const [loadingDetalhesKey, setLoadingDetalhesKey] = useState<string | null>(null);
   const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
@@ -658,7 +652,6 @@ export default function SaidasEntradasProdutosPage({
     setLoadingDetalhesKey(null);
     setProdutosSelecionados([]);
     setProdutosSelecionadosModal([]);
-    setFilaOperacoes([]);
     setSearchTerm("");
     setProdutos([]);
     setModalAberto(false);
@@ -905,108 +898,56 @@ export default function SaidasEntradasProdutosPage({
     setProdutosSelecionadosModal(prev => prev.filter((_, i) => i !== index));
   }, []);
 
-  const processarFilaOperacoes = useCallback(async () => {
-    if (filaOperacoes.length === 0 || processandoOperacao || !filialSelecionada) {
-      return;
-    }
+  const executarLote = useCallback(async (produtos: ProdutoSelecionado[], observacao: string) => {
+    if (produtos.length === 0 || processandoOperacao || !filialSelecionada) return;
 
     setProcessandoOperacao(true);
-    const produto = filaOperacoes[0];
+    try {
+      const itens = produtos.map(p => ({
+        produto: p.produto,
+        corProduto: p.corProduto,
+        quantidade: p.quantidade,
+      }));
 
-    let tentativas = 0;
-    const maxTentativas = 5;
-    let sucesso = false;
+      const resultado = await executarOperacaoLote(
+        tipoOperacao,
+        itens,
+        filialSelecionada.codFilial,
+        tipoRomaneioSelecionado,
+        responsavelFinal || 'LOGISTICA',
+        user?.username,
+        observacao.trim() || undefined
+      );
 
-    while (!sucesso && tentativas < maxTentativas) {
-      try {
-        const resultado = await executarOperacao(
-          tipoOperacao,
-          produto.produto,
-          produto.corProduto,
-          produto.filial,
-          produto.quantidade,
-          tipoRomaneioSelecionado,
-          responsavelFinal || 'LOGISTICA',
-          user?.username,
-          observacaoRegistroRef.current.trim() || undefined
-        );
-
-        sucesso = true;
-
-        // Salvar filial destino do romaneio gerado
-        if (tipoOperacao === "saida" && filialDestinoSaida && resultado.romaneio) {
-          try {
-            await salvarDestinoRomaneio(
-              companyKey,
-              resultado.romaneio,
-              produto.filial,
-              filialDestinoSaida.codFilial,
-              user?.username
-            );
-          } catch (err) {
-            console.error("Erro ao salvar filial destino do romaneio", err);
-          }
-        }
-
-        setFilaOperacoes(prev => prev.slice(1));
-        setProdutosSelecionados(prev => prev.filter(p => 
-          p.produto !== produto.produto || 
-          p.corProduto !== produto.corProduto ||
-          p.filial !== produto.filial
-        ));
-
-        // Recarregar logs
-        const [novoSaidas, novoEntradas] = await Promise.all([
-          fetchLogSaidas(),
-          fetchLogEntradas(),
-        ]);
-        setLogSaidas(novoSaidas);
-        setLogEntradas(novoEntradas);
-
-        mostrarNotificacao(`${tipoOperacao === "saida" ? "Saída" : "Entrada"} de ${produto.descProduto} concluída com sucesso!`);
-      } catch (error: any) {
-        const errorMessage = error.message || "Erro ao processar operação";
-        
-        if (
-          errorMessage.includes('PRIMARY KEY') ||
-          errorMessage.toLowerCase().includes('duplicate key') ||
-          errorMessage.includes('ROMANEIO_DUPLICADO') ||
-          (errorMessage.toLowerCase().includes('ja existe') && errorMessage.toLowerCase().includes('saida')) ||
-          (errorMessage.toLowerCase().includes('já existe') && errorMessage.toLowerCase().includes('saida'))
-        ) {
-          tentativas++;
-          if (tentativas < maxTentativas) {
-            mostrarNotificacao(`Romaneio duplicado detectado. Tentando novamente... (${tentativas}/${maxTentativas})`, "success");
-            await new Promise(resolve => setTimeout(resolve, 500));
-            continue;
-          } else {
-            mostrarNotificacao(`Não foi possível gerar um romaneio único após ${maxTentativas} tentativas.`, "error");
-            setFilaOperacoes(prev => prev.slice(1));
-            break;
-          }
-        } else {
-          mostrarNotificacao(errorMessage, "error");
-          setFilaOperacoes(prev => prev.slice(1));
-          break;
+      // Salvar filial destino do romaneio gerado (saída)
+      if (tipoOperacao === "saida" && filialDestinoSaida && resultado.romaneio) {
+        try {
+          await salvarDestinoRomaneio(
+            companyKey,
+            resultado.romaneio,
+            filialSelecionada.codFilial,
+            filialDestinoSaida.codFilial,
+            user?.username
+          );
+        } catch (err) {
+          console.error("Erro ao salvar filial destino do romaneio", err);
         }
       }
-    }
 
-    setProcessandoOperacao(false);
-  }, [filaOperacoes, processandoOperacao, filialSelecionada, mostrarNotificacao, tipoOperacao, tipoRomaneioSelecionado, responsavelFinal, user?.username, filialDestinoSaida, companyKey]);
+      setProdutosSelecionados([]);
 
-  // Quando terminar a fila, limpar snapshot da observação
-  useEffect(() => {
-    if (!processandoOperacao && filaOperacoes.length === 0) {
-      observacaoRegistroRef.current = "";
-    }
-  }, [processandoOperacao, filaOperacoes.length]);
+      const [novoSaidas, novoEntradas] = await Promise.all([fetchLogSaidas(), fetchLogEntradas()]);
+      setLogSaidas(novoSaidas);
+      setLogEntradas(novoEntradas);
 
-  useEffect(() => {
-    if (!processandoOperacao && filaOperacoes.length > 0) {
-      processarFilaOperacoes();
+      const label = tipoOperacao === "saida" ? "Saída" : "Entrada";
+      mostrarNotificacao(`${label} registrada com sucesso! Romaneio: ${resultado.romaneio}`);
+    } catch (error: any) {
+      mostrarNotificacao(error.message || "Erro ao processar operação", "error");
+    } finally {
+      setProcessandoOperacao(false);
     }
-  }, [processandoOperacao, filaOperacoes.length, processarFilaOperacoes]);
+  }, [processandoOperacao, filialSelecionada, tipoOperacao, tipoRomaneioSelecionado, responsavelFinal, user?.username, filialDestinoSaida, companyKey, mostrarNotificacao]);
 
   useEffect(() => {
     if (!hoveredLogKey) return;
@@ -1147,20 +1088,6 @@ export default function SaidasEntradasProdutosPage({
 
   const isAdmin = user?.role === "admin";
 
-  const iniciarOperacao = useCallback(() => {
-    if (!filialSelecionada) {
-      mostrarNotificacao(`Selecione uma filial`, "error");
-      return;
-    }
-
-    if (produtosSelecionados.length === 0) {
-      mostrarNotificacao("Adicione pelo menos um produto", "error");
-      return;
-    }
-
-    setFilaOperacoes([...produtosSelecionados]);
-  }, [filialSelecionada, produtosSelecionados, mostrarNotificacao]);
-
   const abrirConfirmacaoRegistro = useCallback(() => {
     if (!filialSelecionada) {
       mostrarNotificacao("Selecione uma filial", "error");
@@ -1175,11 +1102,10 @@ export default function SaidasEntradasProdutosPage({
 
   const confirmarRegistro = useCallback(() => {
     setMostrarConfirmacaoRegistro(false);
-    // captura observação atual para o registro e limpa o campo imediatamente
-    observacaoRegistroRef.current = observacaoAtual;
+    const obs = observacaoAtual;
     setObservacaoAtual("");
-    iniciarOperacao();
-  }, [iniciarOperacao, observacaoAtual, setObservacaoAtual]);
+    executarLote(produtosSelecionados, obs);
+  }, [executarLote, produtosSelecionados, observacaoAtual, setObservacaoAtual]);
 
   // Limpar produtos selecionados quando mudar filial
   useEffect(() => {
@@ -1215,7 +1141,7 @@ export default function SaidasEntradasProdutosPage({
     );
   }
 
-  const isBusy = processandoOperacao || filaOperacoes.length > 0;
+  const isBusy = processandoOperacao;
 
   return (
     <div className={styles.wrapper}>
@@ -1765,7 +1691,7 @@ export default function SaidasEntradasProdutosPage({
                     </svg>
                   </span>
                   {isBusy
-                    ? `⏳ Processando… (${filaOperacoes.length} restantes)`
+                    ? "⏳ Processando…"
                     : tipoOperacao === "saida" ? "Registrar Saída" : "Registrar Entrada"}
                 </button>
               </div>

@@ -3,14 +3,18 @@ import { getConnectionPool } from '@/lib/db/connection';
 import { shouldUseProxy, forwardTransferToProxy, ProxyPool } from '@/lib/db/proxy';
 import { findUserByUsername } from '@/lib/auth/users-store';
 import { getPermissaoByUsername } from '@/lib/utils/transferencia-permissoes-store';
-import { executeSaida, executeEntrada } from '@/lib/saida-entrada-executor';
+import { executeSaidaLote, executeEntradaLote } from '@/lib/saida-entrada-executor';
+
+interface ItemOperacao {
+  produto: string;
+  corProduto: string | null;
+  quantidade: number;
+}
 
 interface SaidaEntradaRequest {
   tipoOperacao: 'saida' | 'entrada';
-  produto: string;
-  corProduto: string | null;
   filial: string;
-  quantidade: number;
+  itens: ItemOperacao[];
   tipoRomaneio?: string;
   responsavel?: string;
   observacao?: string | null;
@@ -22,21 +26,28 @@ export async function POST(request: Request) {
     const body = (await request.json()) as SaidaEntradaRequest;
     const {
       tipoOperacao,
-      produto,
-      corProduto,
       filial,
-      quantidade,
+      itens,
       tipoRomaneio = tipoOperacao === 'saida' ? 'TRANSFERENCIA' : 'ENTRADA AVULSA',
       responsavel = 'LOGISTICA',
       observacao = null,
     } = body;
 
     // Validar dados
-    if (!produto || !filial || quantidade <= 0 || !tipoOperacao) {
+    if (!filial || !tipoOperacao || !itens || itens.length === 0) {
       return NextResponse.json(
         { error: 'Dados inválidos para operação' },
         { status: 400 }
       );
+    }
+
+    for (const item of itens) {
+      if (!item.produto || item.quantidade <= 0) {
+        return NextResponse.json(
+          { error: 'Dados inválidos: cada item precisa de produto e quantidade > 0' },
+          { status: 400 }
+        );
+      }
     }
 
     if (tipoOperacao !== 'saida' && tipoOperacao !== 'entrada') {
@@ -71,7 +82,6 @@ export async function POST(request: Request) {
             { status: 403 }
           );
         }
-        // Para saída: verificar filiaisOrigem, para entrada: verificar filiaisDestino
         const filialOk = tipoOperacao === 'saida'
           ? (permissao.filiaisOrigem.length === 0 ||
              permissao.filiaisOrigem.some((p) => (p || '').trim() === filialTrim))
@@ -88,24 +98,8 @@ export async function POST(request: Request) {
 
     const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
     const result = tipoOperacao === 'saida'
-      ? await executeSaida(pool, {
-          produto,
-          corProduto,
-          filial,
-          quantidade,
-          tipoRomaneio,
-          responsavel,
-          observacao,
-        })
-      : await executeEntrada(pool, {
-          produto,
-          corProduto,
-          filial,
-          quantidade,
-          tipoRomaneio,
-          responsavel,
-          observacao,
-        });
+      ? await executeSaidaLote(pool, { itens, filial, tipoRomaneio, responsavel, observacao })
+      : await executeEntradaLote(pool, { itens, filial, tipoRomaneio, responsavel, observacao });
 
     return NextResponse.json({
       success: true,
