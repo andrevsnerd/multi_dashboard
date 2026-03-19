@@ -495,3 +495,34 @@
 .qtdeSpinBtn:active {
   background: #d1d5db;
 }
+
+/* ---- Confirmar Tudo ---- */
+.confirmarTudoBar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+
+.confirmarTudoBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  background: #16a34a;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s, opacity 0.15s;
+}
+
+.confirmarTudoBtn:hover:not(:disabled) {
+  background: #15803d;
+}
+
+.confirmarTudoBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

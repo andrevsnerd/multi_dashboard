@@ -46,13 +46,11 @@ async function postConfirmacao(
   return res.ok;
 }
 
-/** Registra efetivamente a entrada de estoque na filial destino (igual SaidasEntradasProdutosPage). */
-async function executarEntradaEstoque(
+/** Registra entrada de estoque em lote (todos os itens no mesmo romaneio). */
+async function executarEntradaEstoqueLote(
   username: string,
   filialCod: string,
-  produto: string,
-  corProduto: string | null,
-  quantidade: number,
+  itens: Array<{ produto: string; corProduto: string | null; quantidade: number }>,
   responsavel: string
 ): Promise<boolean> {
   const res = await fetch("/api/saidas-entradas-produtos/executar", {
@@ -61,7 +59,7 @@ async function executarEntradaEstoque(
     body: JSON.stringify({
       tipoOperacao: "entrada",
       filial: filialCod,
-      itens: [{ produto, corProduto: corProduto ?? null, quantidade }],
+      itens,
       tipoRomaneio: "TRANSFERENCIA ENTRE LOJAS",
       responsavel: responsavel || "LOGISTICA",
       observacao: null,
@@ -191,10 +189,34 @@ export default function RomaneioDetalhePage({
   // --- confirmações ---
   // Map: "produto|cor" → qtde_confirmada
   const [confirmados, setConfirmados] = useState<Map<string, number>>(new Map());
+  // Map: "produto|cor" → qtde editada pelo usuário (para confirmar tudo)
+  const [quantidades, setQuantidades] = useState<Map<string, number>>(new Map());
+  const [confirmandoTudo, setConfirmandoTudo] = useState(false);
   const [confirmandoKey, setConfirmandoKey] = useState<string | null>(null);
-  const [editandoKey, setEditandoKey] = useState<string | null>(null);
-  const [editQtde, setEditQtde] = useState<number>(0);
   const [erroConfirmacao, setErroConfirmacao] = useState<string | null>(null);
+
+  // Inicializa quantidades quando itens carregam
+  useEffect(() => {
+    if (itens.length === 0) return;
+    setQuantidades((prev) => {
+      const next = new Map(prev);
+      for (const item of itens) {
+        const chave = `${item.produto}|${item.corProduto ?? ""}`;
+        if (!next.has(chave)) {
+          next.set(chave, confirmados.get(chave) ?? item.qtde);
+        }
+      }
+      return next;
+    });
+  }, [itens, confirmados]);
+
+  const updateQuantidade = useCallback((chave: string, valor: number) => {
+    setQuantidades((prev) => {
+      const next = new Map(prev);
+      next.set(chave, Math.max(0, valor));
+      return next;
+    });
+  }, []);
 
   // --- load destino ---
   const loadDestino = useCallback(() => {
@@ -207,7 +229,6 @@ export default function RomaneioDetalhePage({
 
   useEffect(() => {
     let cancelled = false;
-    // Para saídas: usar destinoSelected como filialDestino (para popular estoqueDestino corretamente)
     const fd = tipo === "saida" ? destinoSelected : filialDestino;
     setLoading(true);
     fetchDetalhes(tipo, romaneioId, filialOrigem, fd).then((data) => {
@@ -223,89 +244,85 @@ export default function RomaneioDetalhePage({
     }
   }, [tipo, loadDestino]);
 
-  // Carrega confirmados para entradas (usando filialDestino)
   useEffect(() => {
     if (tipo === "entrada" && filialDestino) {
       fetchConfirmados(companySlug, romaneioId, filialDestino).then(setConfirmados);
     }
   }, [tipo, companySlug, romaneioId, filialDestino]);
 
-  // Carrega confirmados para saídas (usando destinoSelected — disponível após loadDestino)
   useEffect(() => {
     if (tipo === "saida" && destinoSelected) {
       fetchConfirmados(companySlug, romaneioId, destinoSelected).then(setConfirmados);
     }
   }, [tipo, companySlug, romaneioId, destinoSelected]);
 
-  // Abre o input de quantidade para um item
-  const handleAbrirInput = useCallback((produto: string, corProduto: string | null, qtdeOriginal: number) => {
-    const chave = `${produto}|${corProduto ?? ""}`;
-    setEditandoKey(chave);
-    setErroConfirmacao(null);
-    setEditQtde(confirmados.get(chave) ?? qtdeOriginal);
-  }, [confirmados]);
-
-  // Confirma com a qtde digitada
-  const handleConfirmar = useCallback(async (produto: string, corProduto: string | null) => {
+  // Confirmar tudo de uma vez
+  const handleConfirmarTudo = useCallback(async () => {
     if (!user?.username) return;
-    const cor = corProduto ?? "";
-    const chave = `${produto}|${cor}`;
-    if (editQtde <= 0) return;
-    setConfirmandoKey(chave);
-    setEditandoKey(null);
-    setErroConfirmacao(null);
 
-    if (tipo === "saida") {
-      // Saída: registra efetivamente a entrada de estoque na filial destino
-      if (!destinoSelected) {
-        setErroConfirmacao("Destino não definido. Peça ao administrador para definir a filial destino.");
-        setConfirmandoKey(null);
-        return;
-      }
-      const entradaOk = await executarEntradaEstoque(
-        user.username,
-        destinoSelected,
-        produto,
-        corProduto,
-        editQtde,
-        responsavel
-      );
-      if (!entradaOk) {
-        setErroConfirmacao(`Erro ao registrar entrada de ${produto}. Tente novamente.`);
-        setConfirmandoKey(null);
-        return;
-      }
-      // Registra confirmação no romaneio (usando destinoSelected como chave)
-      const ok = await postConfirmacao(
-        user.username, companySlug, romaneioId, destinoSelected,
-        produto, cor, editQtde, "confirmar"
-      );
-      if (ok) {
-        setConfirmados((prev) => {
-          const next = new Map(prev);
-          next.set(chave, editQtde);
-          return next;
-        });
-      }
-    } else {
-      // Entrada: só marca no romaneio (sem lançar estoque de novo)
-      const ok = await postConfirmacao(
-        user.username, companySlug, romaneioId, filialDestino,
-        produto, cor, editQtde, "confirmar"
-      );
-      if (ok) {
-        setConfirmados((prev) => {
-          const next = new Map(prev);
-          next.set(chave, editQtde);
-          return next;
-        });
-      }
+    const filialRef = tipo === "saida" ? destinoSelected : filialDestino;
+
+    if (tipo === "saida" && !destinoSelected) {
+      setErroConfirmacao("Destino não definido. Peça ao administrador para definir a filial destino.");
+      return;
     }
 
-    setConfirmandoKey(null);
-  }, [user?.username, companySlug, romaneioId, filialDestino, destinoSelected, tipo, responsavel, editQtde]);
+    const itensParaConfirmar = itens
+      .map((item) => {
+        const chave = `${item.produto}|${item.corProduto ?? ""}`;
+        const qtde = quantidades.get(chave) ?? item.qtde;
+        return { produto: item.produto, corProduto: item.corProduto, quantidade: qtde, chave };
+      })
+      .filter((i) => i.quantidade > 0);
 
-  // Desconfirma (remove marcação — sem reverter estoque)
+    if (itensParaConfirmar.length === 0) return;
+
+    setConfirmandoTudo(true);
+    setErroConfirmacao(null);
+
+    try {
+      if (tipo === "saida") {
+        // Registra entrada de estoque em lote (1 romaneio para todos)
+        const ok = await executarEntradaEstoqueLote(
+          user.username,
+          destinoSelected,
+          itensParaConfirmar.map((i) => ({
+            produto: i.produto,
+            corProduto: i.corProduto,
+            quantidade: i.quantidade,
+          })),
+          responsavel
+        );
+        if (!ok) {
+          setErroConfirmacao("Erro ao registrar entrada de estoque. Tente novamente.");
+          return;
+        }
+      }
+
+      // Marca confirmação no romaneio para cada item
+      for (const item of itensParaConfirmar) {
+        await postConfirmacao(
+          user.username, companySlug, romaneioId, filialRef,
+          item.produto, item.corProduto ?? "", item.quantidade, "confirmar"
+        );
+      }
+
+      // Atualiza estado local
+      setConfirmados((prev) => {
+        const next = new Map(prev);
+        for (const item of itensParaConfirmar) {
+          next.set(item.chave, item.quantidade);
+        }
+        return next;
+      });
+    } catch {
+      setErroConfirmacao("Erro inesperado. Tente novamente.");
+    } finally {
+      setConfirmandoTudo(false);
+    }
+  }, [user?.username, itens, quantidades, tipo, destinoSelected, filialDestino, companySlug, romaneioId, responsavel]);
+
+  // Desconfirma item individualmente (sem reverter estoque)
   const handleDesconfirmar = useCallback(async (produto: string, corProduto: string | null) => {
     if (!user?.username) return;
     const cor = corProduto ?? "";
@@ -340,6 +357,18 @@ export default function RomaneioDetalhePage({
   const qtdProdutos = itens.length;
   const qtdItens = itens.reduce((s, i) => s + i.qtde, 0);
   const backHref = `/${companySlug}/romaneios`;
+
+  // Itens que serão confirmados (qty > 0)
+  const itensParaConfirmar = itens.filter((item) => {
+    const chave = `${item.produto}|${item.corProduto ?? ""}`;
+    return (quantidades.get(chave) ?? item.qtde) > 0;
+  });
+
+  const podeConfirmar =
+    !!user &&
+    itensParaConfirmar.length > 0 &&
+    !confirmandoTudo &&
+    (tipo !== "saida" || !!destinoSelected);
 
   if (loading) {
     return (
@@ -404,6 +433,22 @@ export default function RomaneioDetalhePage({
         </div>
       </div>
 
+      {/* Botão Confirmar Tudo */}
+      {(tipo === "saida" || tipo === "entrada") && user && (
+        <div className={styles.confirmarTudoBar}>
+          <button
+            type="button"
+            className={styles.confirmarTudoBtn}
+            onClick={handleConfirmarTudo}
+            disabled={!podeConfirmar}
+          >
+            {confirmandoTudo
+              ? "Confirmando…"
+              : `Confirmar Tudo (${itensParaConfirmar.length} produto${itensParaConfirmar.length !== 1 ? "s" : ""})`}
+          </button>
+        </div>
+      )}
+
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead>
@@ -417,8 +462,7 @@ export default function RomaneioDetalhePage({
               <th>DESTINO</th>
               <th>QTD ROMANEIO</th>
               {tipo === "saida" && <th>ESTOQUE DESTINO</th>}
-              {tipo === "saida" && <th>CONFIRMAR ENTRADA</th>}
-              {tipo === "entrada" && <th>RECEBIDO</th>}
+              <th>{tipo === "saida" ? "CONFIRMAR ENTRADA" : "RECEBIDO"}</th>
             </tr>
           </thead>
           <tbody>
@@ -431,9 +475,10 @@ export default function RomaneioDetalhePage({
               const chave = `${item.produto}|${item.corProduto ?? ""}`;
               const isConfirmado = confirmados.has(chave);
               const qtdeConfirmada = confirmados.get(chave) ?? 0;
-              const isConfirmando = confirmandoKey === chave;
-              const isEditando = editandoKey === chave;
+              const isZerando = confirmandoKey === chave;
+              const qtdeAtual = quantidades.get(chave) ?? item.qtde;
               const temDivergencia = isConfirmado && qtdeConfirmada !== item.qtde;
+              const temDivergenciaInput = qtdeAtual !== item.qtde;
 
               return (
                 <tr
@@ -450,219 +495,90 @@ export default function RomaneioDetalhePage({
                     <span className={styles.destinoTag}>{destinoCell}</span>
                   </td>
 
-                  {/* Coluna QTD — sempre mostra o original do romaneio */}
+                  {/* QTD do romaneio original */}
                   <td>
                     <div className={styles.qtdCell}>
                       <span className={styles.qtdValue}>{item.qtde}</span>
                     </div>
                   </td>
 
-                  {/* Coluna ESTOQUE DESTINO (saídas) */}
+                  {/* Estoque destino (saídas) */}
                   {tipo === "saida" && (
                     <td>
-                      <span className={
-                        item.estoqueDestino === 0
-                          ? styles.estoqueZero
-                          : styles.estoqueValor
-                      }>
+                      <span className={item.estoqueDestino === 0 ? styles.estoqueZero : styles.estoqueValor}>
                         {destinoSelected ? item.estoqueDestino : "—"}
                       </span>
                     </td>
                   )}
 
-                  {/* Coluna CONFIRMAR ENTRADA (saídas) */}
-                  {tipo === "saida" && (
-                    <td className={styles.recebidoCell}>
-                      {isConfirmando ? (
-                        <span className={styles.loadingDots}>...</span>
-                      ) : isEditando ? (
-                        <div className={styles.qtdeInputWrap}>
-                          <div className={styles.qtdeInputRow}>
-                            <span className={styles.qtdeInputLabel}>Qtde recebida:</span>
-                            <button
-                              type="button"
-                              className={styles.qtdeSpinBtn}
-                              onClick={() => setEditQtde((v) => Math.max(0, v - 1))}
-                            >−</button>
-                            <input
-                              type="number"
-                              min={0}
-                              className={styles.qtdeInput}
-                              value={editQtde}
-                              onChange={(e) => setEditQtde(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                              autoFocus
-                            />
-                            <button
-                              type="button"
-                              className={styles.qtdeSpinBtn}
-                              onClick={() => setEditQtde((v) => v + 1)}
-                            >+</button>
-                          </div>
-                          {editQtde !== item.qtde && editQtde > 0 && (
-                            <div className={styles.divergenciaAviso}>
-                              {editQtde < item.qtde
-                                ? `⚠ Faltam ${item.qtde - editQtde} un. (romaneio: ${item.qtde})`
-                                : `⚠ Excesso de ${editQtde - item.qtde} un. (romaneio: ${item.qtde})`}
-                            </div>
-                          )}
-                          <div className={styles.qtdeInputActions}>
-                            <button
-                              type="button"
-                              className={styles.confirmarQtdeBtn}
-                              disabled={editQtde <= 0}
-                              onClick={() => handleConfirmar(item.produto, item.corProduto)}
-                            >
-                              Confirmar
-                            </button>
-                            <button
-                              type="button"
-                              className={styles.cancelarQtdeBtn}
-                              onClick={() => setEditandoKey(null)}
-                            >
-                              Cancelar
-                            </button>
-                          </div>
+                  {/* Coluna de confirmação */}
+                  <td className={styles.recebidoCell}>
+                    {isZerando ? (
+                      <span className={styles.loadingDots}>...</span>
+                    ) : confirmandoTudo ? (
+                      <span className={styles.loadingDots}>...</span>
+                    ) : (
+                      <div className={styles.qtdeInputWrap}>
+                        {/* Input de quantidade */}
+                        <div className={styles.qtdeInputRow}>
+                          <button
+                            type="button"
+                            className={styles.qtdeSpinBtn}
+                            onClick={() => updateQuantidade(chave, qtdeAtual - 1)}
+                          >−</button>
+                          <input
+                            type="number"
+                            min={0}
+                            className={styles.qtdeInput}
+                            value={qtdeAtual}
+                            onChange={(e) => updateQuantidade(chave, parseInt(e.target.value, 10) || 0)}
+                          />
+                          <button
+                            type="button"
+                            className={styles.qtdeSpinBtn}
+                            onClick={() => updateQuantidade(chave, qtdeAtual + 1)}
+                          >+</button>
                         </div>
-                      ) : isConfirmado ? (
-                        /* Saída confirmada — entrada de estoque já foi registrada */
-                        <div className={styles.confirmadoWrap}>
-                          <span
-                            className={
-                              temDivergencia ? styles.confirmadoBadgeDivergente : styles.confirmadoBadge
-                            }
-                          >
-                            ✓ {qtdeConfirmada} recebido{qtdeConfirmada !== 1 ? "s" : ""}
-                          </span>
-                          {temDivergencia && (
-                            <span className={styles.originalBadge}>
-                              {qtdeConfirmada < item.qtde
-                                ? `▼ faltou ${item.qtde - qtdeConfirmada}`
-                                : `▲ excesso ${qtdeConfirmada - item.qtde}`}
+
+                        {/* Aviso de divergência */}
+                        {temDivergenciaInput && qtdeAtual > 0 && (
+                          <div className={styles.divergenciaAviso}>
+                            {qtdeAtual < item.qtde
+                              ? `⚠ Faltam ${item.qtde - qtdeAtual} un. (romaneio: ${item.qtde})`
+                              : `⚠ Excesso de ${qtdeAtual - item.qtde} un. (romaneio: ${item.qtde})`}
+                          </div>
+                        )}
+                        {qtdeAtual === 0 && (
+                          <div className={styles.divergenciaAviso}>⚠ Item será ignorado</div>
+                        )}
+
+                        {/* Badge de confirmado */}
+                        {isConfirmado && (
+                          <div className={styles.confirmadoWrap}>
+                            <span className={temDivergencia ? styles.confirmadoBadgeDivergente : styles.confirmadoBadge}>
+                              ✓ {qtdeConfirmada} confirmado{qtdeConfirmada !== 1 ? "s" : ""}
                             </span>
-                          )}
-                          {user?.role === "admin" && (
-                            <div className={styles.confirmadoActions}>
+                            {temDivergencia && (
+                              <span className={styles.originalBadge}>
+                                {qtdeConfirmada < item.qtde
+                                  ? `▼ faltou ${item.qtde - qtdeConfirmada}`
+                                  : `▲ excesso ${qtdeConfirmada - item.qtde}`}
+                              </span>
+                            )}
+                            {user?.role === "admin" && (
                               <button
                                 type="button"
                                 className={styles.desfazerBtn}
                                 onClick={() => handleDesconfirmar(item.produto, item.corProduto)}
                               >
-                                Zerar confirmação
+                                Zerar
                               </button>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          className={styles.receberBtn}
-                          disabled={!user || (!destinoSelected && !canSetDestino)}
-                          onClick={() => handleAbrirInput(item.produto, item.corProduto, item.qtde)}
-                        >
-                          DAR ENTRADA
-                        </button>
-                      )}
-                    </td>
-                  )}
-
-                  {/* Coluna RECEBIDO (entradas) */}
-                  {tipo === "entrada" && (
-                    <td className={styles.recebidoCell}>
-                      {isConfirmando ? (
-                        <span className={styles.loadingDots}>...</span>
-                      ) : isEditando ? (
-                        <div className={styles.qtdeInputWrap}>
-                          <div className={styles.qtdeInputRow}>
-                            <span className={styles.qtdeInputLabel}>Qtde recebida:</span>
-                            <button
-                              type="button"
-                              className={styles.qtdeSpinBtn}
-                              onClick={() => setEditQtde((v) => Math.max(0, v - 1))}
-                            >−</button>
-                            <input
-                              type="number"
-                              min={0}
-                              className={styles.qtdeInput}
-                              value={editQtde}
-                              onChange={(e) => setEditQtde(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                              autoFocus
-                            />
-                            <button
-                              type="button"
-                              className={styles.qtdeSpinBtn}
-                              onClick={() => setEditQtde((v) => v + 1)}
-                            >+</button>
+                            )}
                           </div>
-                          {editQtde !== item.qtde && editQtde > 0 && (
-                            <div className={styles.divergenciaAviso}>
-                              {editQtde < item.qtde
-                                ? `⚠ Faltam ${item.qtde - editQtde} un. (romaneio: ${item.qtde})`
-                                : `⚠ Excesso de ${editQtde - item.qtde} un. (romaneio: ${item.qtde})`}
-                            </div>
-                          )}
-                          <div className={styles.qtdeInputActions}>
-                            <button
-                              type="button"
-                              className={styles.confirmarQtdeBtn}
-                              disabled={editQtde <= 0}
-                              onClick={() => handleConfirmar(item.produto, item.corProduto)}
-                            >
-                              Confirmar
-                            </button>
-                            <button
-                              type="button"
-                              className={styles.cancelarQtdeBtn}
-                              onClick={() => setEditandoKey(null)}
-                            >
-                              Cancelar
-                            </button>
-                          </div>
-                        </div>
-                      ) : isConfirmado ? (
-                        <div className={styles.confirmadoWrap}>
-                          <span
-                            className={
-                              temDivergencia ? styles.confirmadoBadgeDivergente : styles.confirmadoBadge
-                            }
-                          >
-                            ✓ {qtdeConfirmada} recebido{qtdeConfirmada !== 1 ? "s" : ""}
-                          </span>
-                          {temDivergencia && (
-                            <span className={styles.originalBadge}>
-                              {qtdeConfirmada < item.qtde
-                                ? `▼ faltou ${item.qtde - qtdeConfirmada}`
-                                : `▲ excesso ${qtdeConfirmada - item.qtde}`}
-                            </span>
-                          )}
-                          <div className={styles.confirmadoActions}>
-                            <button
-                              type="button"
-                              className={styles.editarQtdeBtn}
-                              onClick={() => handleAbrirInput(item.produto, item.corProduto, item.qtde)}
-                            >
-                              Editar
-                            </button>
-                            <button
-                              type="button"
-                              className={styles.desfazerBtn}
-                              onClick={() => handleDesconfirmar(item.produto, item.corProduto)}
-                            >
-                              Desfazer
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          className={styles.receberBtn}
-                          disabled={!user}
-                          onClick={() => handleAbrirInput(item.produto, item.corProduto, item.qtde)}
-                        >
-                          DAR ENTRADA
-                        </button>
-                      )}
-                    </td>
-                  )}
+                        )}
+                      </div>
+                    )}
+                  </td>
                 </tr>
               );
             })}
