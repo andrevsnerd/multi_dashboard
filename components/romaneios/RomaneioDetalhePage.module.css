@@ -500,6 +500,8 @@
 .confirmarTudoBar {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
   margin-bottom: 16px;
 }
 
@@ -524,5 +526,158 @@
 
 .confirmarTudoBtn:disabled {
   opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.darSaidaTodosBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  background: #111827;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.darSaidaTodosBtn:hover {
+  background: #1f2937;
+}
+
+/* ---- Modal Dar Saída ---- */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 28px 24px;
+  width: 100%;
+  max-width: 460px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modalTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.modalOrigem {
+  font-size: 14px;
+  color: #4b5563;
+  margin: 0;
+}
+
+.modalField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modalLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.modalSelect {
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  color: #111827;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.modalSelect:focus {
+  border-color: #111827;
+}
+
+.modalItensResumo {
+  font-size: 13px;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+
+.modalErro {
+  font-size: 13px;
+  color: #b91c1c;
+  background: #fee2e2;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin: 0;
+}
+
+.modalSucesso {
+  font-size: 13px;
+  color: #065f46;
+  background: #d1fae5;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin: 0;
+}
+
+.modalActions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.modalBtnCancelar {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.modalBtnCancelar:hover:not(:disabled) {
+  background: #e5e7eb;
+}
+
+.modalBtnConfirmar {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  background: #111827;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.modalBtnConfirmar:hover:not(:disabled) {
+  background: #1f2937;
+}
+
+.modalBtnConfirmar:disabled {
+  opacity: 0.4;
   cursor: not-allowed;
 }

@@ -186,6 +186,13 @@ export default function RomaneioDetalhePage({
     !!user &&
     (user.role === "admin" || (user.permissions ?? []).includes("destino-romaneio"));
 
+  // --- dar saída (apenas entradas) ---
+  const [darSaidaDestino, setDarSaidaDestino] = useState("");
+  const [darSaidaExecutando, setDarSaidaExecutando] = useState(false);
+  const [darSaidaErro, setDarSaidaErro] = useState<string | null>(null);
+  const [darSaidaSucesso, setDarSaidaSucesso] = useState<string | null>(null);
+  const [darSaidaModalAberto, setDarSaidaModalAberto] = useState(false);
+
   // --- confirmações ---
   // Map: "produto|cor" → qtde_confirmada
   const [confirmados, setConfirmados] = useState<Map<string, number>>(new Map());
@@ -241,6 +248,9 @@ export default function RomaneioDetalhePage({
     if (tipo === "saida") {
       fetchFiliais().then(setFiliais);
       loadDestino();
+    } else {
+      // Entradas também precisam das filiais (para o modal "Dar Saída")
+      fetchFiliais().then(setFiliais);
     }
   }, [tipo, loadDestino]);
 
@@ -375,6 +385,59 @@ export default function RomaneioDetalhePage({
     !confirmandoTudo &&
     (tipo !== "saida" || !!destinoSelected);
 
+  async function handleDarSaidaTodos() {
+    if (!darSaidaDestino || !user?.username) return;
+    setDarSaidaExecutando(true);
+    setDarSaidaErro(null);
+    try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "x-auth-username": user.username,
+      };
+      const res = await fetch("/api/saidas-entradas-produtos/executar", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          tipoOperacao: "saida",
+          filial: filialDestino,
+          itens: itens.map((item) => ({
+            produto: item.produto,
+            corProduto: item.corProduto,
+            quantidade: item.qtde,
+          })),
+          tipoRomaneio: "TRANSFERENCIA ENTRE LOJAS",
+          responsavel: responsavel || user.username || "LOGISTICA",
+        }),
+      });
+      const json = (await res.json()) as { success?: boolean; romaneio?: string; error?: string };
+      if (!res.ok) throw new Error(json.error || "Erro ao executar saída");
+
+      // Salva o destino no romaneio de saída gerado
+      if (json.romaneio) {
+        try {
+          await fetch("/api/destino-romaneio", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", "x-auth-username": user.username },
+            body: JSON.stringify({
+              companyKey: companySlug,
+              romaneioId: json.romaneio,
+              filialOrigem: filialDestino,
+              filialDestino: darSaidaDestino,
+            }),
+          });
+        } catch {
+          // não bloquear se falhar ao salvar destino
+        }
+      }
+
+      setDarSaidaSucesso(`Saída gerada! Romaneio: ${json.romaneio}`);
+    } catch (err: unknown) {
+      setDarSaidaErro(err instanceof Error ? err.message : "Erro ao executar saída");
+    } finally {
+      setDarSaidaExecutando(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className={styles.wrapper}>
@@ -438,19 +501,107 @@ export default function RomaneioDetalhePage({
         </div>
       </div>
 
-      {/* Botão Confirmar Tudo — some quando tudo já está confirmado */}
-      {user && !todosConfirmados && (
+      {/* Barra de ações */}
+      {user && (
         <div className={styles.confirmarTudoBar}>
-          <button
-            type="button"
-            className={styles.confirmarTudoBtn}
-            onClick={handleConfirmarTudo}
-            disabled={!podeConfirmar}
-          >
-            {confirmandoTudo
-              ? "Confirmando…"
-              : `Confirmar Tudo (${itensParaConfirmar.length} produto${itensParaConfirmar.length !== 1 ? "s" : ""})`}
-          </button>
+          {tipo === "saida" && !todosConfirmados && (
+            <button
+              type="button"
+              className={styles.confirmarTudoBtn}
+              onClick={handleConfirmarTudo}
+              disabled={!podeConfirmar}
+            >
+              {confirmandoTudo
+                ? "Confirmando…"
+                : `Confirmar Tudo (${itensParaConfirmar.length} produto${itensParaConfirmar.length !== 1 ? "s" : ""})`}
+            </button>
+          )}
+          {tipo === "entrada" && itens.length > 0 && (
+            <button
+              type="button"
+              className={styles.darSaidaTodosBtn}
+              onClick={() => {
+                setDarSaidaErro(null);
+                setDarSaidaSucesso(null);
+                setDarSaidaDestino("");
+                setDarSaidaModalAberto(true);
+              }}
+            >
+              Dar Saída Todos
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Modal Dar Saída Todos */}
+      {darSaidaModalAberto && (
+        <div
+          className={styles.modalOverlay}
+          onClick={() => { if (!darSaidaExecutando) setDarSaidaModalAberto(false); }}
+        >
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.modalTitle}>Dar Saída — Romaneio #{romaneioId}</h2>
+            <p className={styles.modalOrigem}>
+              Origem: <strong>{filialDestino}</strong>
+            </p>
+
+            <div className={styles.modalField}>
+              <label className={styles.modalLabel}>Destino</label>
+              <select
+                className={styles.modalSelect}
+                value={darSaidaDestino}
+                onChange={(e) => setDarSaidaDestino(e.target.value)}
+                disabled={darSaidaExecutando || !!darSaidaSucesso}
+              >
+                <option value="">Selecione o destino...</option>
+                {filiais
+                  .filter((f) => f.codFilial !== filialDestino && f.filial !== filialDestino)
+                  .map((f) => (
+                    <option key={f.codFilial} value={f.codFilial}>
+                      {f.filial}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div className={styles.modalItensResumo}>
+              {itens.length} produto(s) • {itens.reduce((s, i) => s + i.qtde, 0)} unidades no total
+            </div>
+
+            {darSaidaErro && <p className={styles.modalErro}>{darSaidaErro}</p>}
+            {darSaidaSucesso && <p className={styles.modalSucesso}>{darSaidaSucesso}</p>}
+
+            <div className={styles.modalActions}>
+              {!darSaidaSucesso ? (
+                <>
+                  <button
+                    type="button"
+                    className={styles.modalBtnCancelar}
+                    onClick={() => setDarSaidaModalAberto(false)}
+                    disabled={darSaidaExecutando}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.modalBtnConfirmar}
+                    onClick={handleDarSaidaTodos}
+                    disabled={!darSaidaDestino || darSaidaExecutando}
+                  >
+                    {darSaidaExecutando ? "Executando..." : "Confirmar Saída"}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.modalBtnCancelar}
+                  onClick={() => setDarSaidaModalAberto(false)}
+                >
+                  Fechar
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -467,7 +618,7 @@ export default function RomaneioDetalhePage({
               <th>DESTINO</th>
               <th>QTD ROMANEIO</th>
               {tipo === "saida" && <th>ESTOQUE DESTINO</th>}
-              <th>{tipo === "saida" ? "CONFIRMAR ENTRADA" : "RECEBIDO"}</th>
+              {tipo === "saida" && <th>CONFIRMAR ENTRADA</th>}
             </tr>
           </thead>
           <tbody>
@@ -516,68 +667,68 @@ export default function RomaneioDetalhePage({
                     </td>
                   )}
 
-                  {/* Coluna de confirmação */}
-                  <td className={styles.recebidoCell}>
-                    {isZerando || confirmandoTudo ? (
-                      <span className={styles.loadingDots}>...</span>
-                    ) : isConfirmado ? (
-                      /* Item já confirmado: só exibe badge, sem inputs */
-                      <div className={styles.confirmadoWrap}>
-                        <span className={temDivergencia ? styles.confirmadoBadgeDivergente : styles.confirmadoBadge}>
-                          ✓ {qtdeConfirmada} confirmado{qtdeConfirmada !== 1 ? "s" : ""}
-                        </span>
-                        {temDivergencia && (
-                          <span className={styles.originalBadge}>
-                            {qtdeConfirmada < item.qtde
-                              ? `▼ faltou ${item.qtde - qtdeConfirmada}`
-                              : `▲ excesso ${qtdeConfirmada - item.qtde}`}
+                  {/* Coluna de confirmação — apenas saídas */}
+                  {tipo === "saida" && (
+                    <td className={styles.recebidoCell}>
+                      {isZerando || confirmandoTudo ? (
+                        <span className={styles.loadingDots}>...</span>
+                      ) : isConfirmado ? (
+                        <div className={styles.confirmadoWrap}>
+                          <span className={temDivergencia ? styles.confirmadoBadgeDivergente : styles.confirmadoBadge}>
+                            ✓ {qtdeConfirmada} confirmado{qtdeConfirmada !== 1 ? "s" : ""}
                           </span>
-                        )}
-                        {user?.role === "admin" && (
-                          <button
-                            type="button"
-                            className={styles.desfazerBtn}
-                            onClick={() => handleDesconfirmar(item.produto, item.corProduto)}
-                          >
-                            Zerar
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      /* Item não confirmado: exibe input + divergência */
-                      <div className={styles.qtdeInputWrap}>
-                        <div className={styles.qtdeInputRow}>
-                          <button
-                            type="button"
-                            className={styles.qtdeSpinBtn}
-                            onClick={() => updateQuantidade(chave, qtdeAtual - 1)}
-                          >−</button>
-                          <input
-                            type="number"
-                            min={0}
-                            className={styles.qtdeInput}
-                            value={qtdeAtual}
-                            onChange={(e) => updateQuantidade(chave, parseInt(e.target.value, 10) || 0)}
-                          />
-                          <button
-                            type="button"
-                            className={styles.qtdeSpinBtn}
-                            onClick={() => updateQuantidade(chave, qtdeAtual + 1)}
-                          >+</button>
+                          {temDivergencia && (
+                            <span className={styles.originalBadge}>
+                              {qtdeConfirmada < item.qtde
+                                ? `▼ faltou ${item.qtde - qtdeConfirmada}`
+                                : `▲ excesso ${qtdeConfirmada - item.qtde}`}
+                            </span>
+                          )}
+                          {user?.role === "admin" && (
+                            <button
+                              type="button"
+                              className={styles.desfazerBtn}
+                              onClick={() => handleDesconfirmar(item.produto, item.corProduto)}
+                            >
+                              Zerar
+                            </button>
+                          )}
                         </div>
-                        {temDivergenciaInput && qtdeAtual > 0 && (
-                          <div className={styles.divergenciaAviso}>
-                            {qtdeAtual < item.qtde
-                              ? `⚠ Faltam ${item.qtde - qtdeAtual} un. (romaneio: ${item.qtde})`
-                              : `⚠ Excesso de ${qtdeAtual - item.qtde} un. (romaneio: ${item.qtde})`}
+                      ) : (
+                        <div className={styles.qtdeInputWrap}>
+                          <div className={styles.qtdeInputRow}>
+                            <button
+                              type="button"
+                              className={styles.qtdeSpinBtn}
+                              onClick={() => updateQuantidade(chave, qtdeAtual - 1)}
+                            >−</button>
+                            <input
+                              type="number"
+                              min={0}
+                              className={styles.qtdeInput}
+                              value={qtdeAtual}
+                              onChange={(e) => updateQuantidade(chave, parseInt(e.target.value, 10) || 0)}
+                            />
+                            <button
+                              type="button"
+                              className={styles.qtdeSpinBtn}
+                              onClick={() => updateQuantidade(chave, qtdeAtual + 1)}
+                            >+</button>
                           </div>
-                        )}
-                        {qtdeAtual === 0 && (
-                          <div className={styles.divergenciaAviso}>⚠ Item será ignorado</div>
-                        )}
-                      </div>
-                    )}
-                  </td>
+                          {temDivergenciaInput && qtdeAtual > 0 && (
+                            <div className={styles.divergenciaAviso}>
+                              {qtdeAtual < item.qtde
+                                ? `⚠ Faltam ${item.qtde - qtdeAtual} un. (romaneio: ${item.qtde})`
+                                : `⚠ Excesso de ${qtdeAtual - item.qtde} un. (romaneio: ${item.qtde})`}
+                            </div>
+                          )}
+                          {qtdeAtual === 0 && (
+                            <div className={styles.divergenciaAviso}>⚠ Item será ignorado</div>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                  )}
                 </tr>
               );
             })}
