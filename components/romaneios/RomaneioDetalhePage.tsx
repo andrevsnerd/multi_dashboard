@@ -400,6 +400,7 @@ export default function RomaneioDetalhePage({
         body: JSON.stringify({
           tipoOperacao: "saida",
           filial: filialDestino,
+          filialDestino: darSaidaDestino,
           itens: itens.map((item) => ({
             produto: item.produto,
             corProduto: item.corProduto,
@@ -411,24 +412,6 @@ export default function RomaneioDetalhePage({
       });
       const json = (await res.json()) as { success?: boolean; romaneio?: string; error?: string };
       if (!res.ok) throw new Error(json.error || "Erro ao executar saída");
-
-      // Salva o destino no romaneio de saída gerado
-      if (json.romaneio) {
-        try {
-          await fetch("/api/destino-romaneio", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json", "x-auth-username": user.username },
-            body: JSON.stringify({
-              companyKey: companySlug,
-              romaneioId: json.romaneio,
-              filialOrigem: filialDestino,
-              filialDestino: darSaidaDestino,
-            }),
-          });
-        } catch {
-          // não bloquear se falhar ao salvar destino
-        }
-      }
 
       setDarSaidaSucesso(`Saída gerada! Romaneio: ${json.romaneio}`);
     } catch (err: unknown) {

@@ -14,6 +14,7 @@ interface ItemOperacao {
 interface SaidaEntradaRequest {
   tipoOperacao: 'saida' | 'entrada';
   filial: string;
+  filialDestino?: string | null;
   itens: ItemOperacao[];
   tipoRomaneio?: string;
   responsavel?: string;
@@ -27,6 +28,7 @@ export async function POST(request: Request) {
     const {
       tipoOperacao,
       filial,
+      filialDestino = null,
       itens,
       tipoRomaneio = tipoOperacao === 'saida' ? 'TRANSFERENCIA' : 'ENTRADA AVULSA',
       responsavel = 'LOGISTICA',
@@ -98,7 +100,8 @@ export async function POST(request: Request) {
 
     const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
     const result = tipoOperacao === 'saida'
-      ? await executeSaidaLote(pool, { itens, filial, tipoRomaneio, responsavel, observacao })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? await executeSaidaLote(pool, { itens, filial, filialDestino, tipoRomaneio, responsavel, observacao } as any)
       : await executeEntradaLote(pool, { itens, filial, tipoRomaneio, responsavel, observacao });
 
     return NextResponse.json({
