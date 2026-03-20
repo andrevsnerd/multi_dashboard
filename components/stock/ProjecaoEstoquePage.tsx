@@ -331,6 +331,16 @@ export default function ProjecaoEstoquePage({
     consumoMes: number;
     duracaoDias: number;
   } | null>(null);
+  const [duracaoRealTooltip, setDuracaoRealTooltip] = useState<{
+    x: number; y: number; above: boolean;
+    mesLabel: string;
+    estoqueReal: number;
+    isMesAtual: boolean;
+    vendasReais?: number;
+    diasCorridos?: number;
+    consumoDiario?: number;
+    duracaoRealDias: number;
+  } | null>(null);
   const expansaoRestoredRef = useRef(false);
 
   const [opcoesGrupos, setOpcoesGrupos] = useState<string[]>([]);
@@ -812,6 +822,17 @@ export default function ProjecaoEstoquePage({
     const x = rect.left + rect.width / 2;
     const y = showBelow ? rect.bottom + TOOLTIP_OFFSET : rect.top - TOOLTIP_OFFSET;
     setDuracaoTooltip({ ...payload, x, y, above: !showBelow });
+  }, []);
+  const hideDuracaoRealTooltip = useCallback(() => setDuracaoRealTooltip(null), []);
+  const showDuracaoRealTooltip = useCallback((
+    e: React.MouseEvent<HTMLElement>,
+    payload: Omit<NonNullable<typeof duracaoRealTooltip>, "x" | "y" | "above">,
+    showBelow: boolean
+  ) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = showBelow ? rect.bottom + TOOLTIP_OFFSET : rect.top - TOOLTIP_OFFSET;
+    setDuracaoRealTooltip({ ...payload, x, y, above: !showBelow });
   }, []);
 
   const showEstoqueCalcTooltip = useCallback((
@@ -1864,7 +1885,29 @@ export default function ProjecaoEstoquePage({
                           ? (duracaoRealMesAtual > 0 ? `${duracaoRealMesAtual} dias` : "-")
                           : (md?.duracaoRealSnapshot != null ? `${md.duracaoRealSnapshot} dias` : "-");
                         const alerta = valorNum > 0 && valorNum <= limiteDiasAlerta;
-                        return <td key={`dr-${m.ano}-${m.mesNumero}`} className={`${styles.realDuracaoCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${alerta ? styles.duracaoAlerta : ""}`}>{valor}</td>;
+                        const showBelow = idx === 0;
+                        const temTooltipReal = valorNum > 0;
+                        const diasCorridos = new Date().getDate();
+                        const vendasReaisMes = md?.vendasReais ?? 0;
+                        const consumoDiarioReal = m.isMesAtual && vendasReaisMes > 0 && diasCorridos > 0 ? vendasReaisMes / diasCorridos : undefined;
+                        return (
+                          <td
+                            key={`dr-${m.ano}-${m.mesNumero}`}
+                            className={`${styles.realDuracaoCell} ${m.isMesAtual ? styles.columnMesAtual : ""} ${alerta ? styles.duracaoAlerta : ""}`}
+                            {...(temTooltipReal ? {
+                              onMouseEnter: (e: React.MouseEvent<HTMLElement>) => showDuracaoRealTooltip(e, {
+                                mesLabel: `${m.mes}/${m.ano}`,
+                                estoqueReal: m.isMesAtual ? estoqueAtualReal : (md?.estoqueRealSnapshot ?? 0),
+                                isMesAtual: m.isMesAtual,
+                                ...(m.isMesAtual && consumoDiarioReal != null ? { vendasReais: vendasReaisMes, diasCorridos, consumoDiario: consumoDiarioReal } : {}),
+                                duracaoRealDias: valorNum,
+                              }, showBelow),
+                              onMouseLeave: hideDuracaoRealTooltip,
+                            } : {})}
+                          >
+                            {valor}
+                          </td>
+                        );
                       })}
                     </tr>
                     <tr className={styles.compraRow}>
@@ -2262,6 +2305,29 @@ export default function ProjecaoEstoquePage({
           <span className={styles.estoqueCalcLine}>{`Estoque disponivel = ${fmt(duracaoTooltip.estoqueDisponivel)}`}</span>
           <span className={styles.estoqueCalcLine}>{`Consumo projetado = ${fmt(duracaoTooltip.consumoMes)} / mes`}</span>
           <span className={styles.estoqueCalcLine}>{`Duracao estimada = ${duracaoTooltip.duracaoDias} dias`}</span>
+        </div>,
+        document.body
+      )}
+      {typeof document !== "undefined" && duracaoRealTooltip && createPortal(
+        <div
+          className={styles.estoqueCalcTooltip}
+          style={{
+            left: duracaoRealTooltip.x,
+            top: duracaoRealTooltip.y,
+            transform: duracaoRealTooltip.above ? "translate(-50%, -100%)" : "translate(-50%, 0)",
+          }}
+          role="tooltip"
+        >
+          <div className={styles.estoqueCalcTitle}>Duração real — {duracaoRealTooltip.mesLabel}</div>
+          <span className={styles.estoqueCalcLine}>{`Estoque real = ${fmt(duracaoRealTooltip.estoqueReal)}`}</span>
+          {duracaoRealTooltip.isMesAtual && duracaoRealTooltip.vendasReais != null && (
+            <>
+              <span className={styles.estoqueCalcLine}>{`Vendas reais = ${fmt(duracaoRealTooltip.vendasReais)}`}</span>
+              <span className={styles.estoqueCalcLine}>{`Dias corridos = ${duracaoRealTooltip.diasCorridos}`}</span>
+              <span className={styles.estoqueCalcLine}>{`Consumo/dia = vendas ÷ dias = ${duracaoRealTooltip.consumoDiario!.toFixed(2)}`}</span>
+            </>
+          )}
+          <span className={styles.estoqueCalcLine}>{`Duração real = ${duracaoRealTooltip.duracaoRealDias} dias`}</span>
         </div>,
         document.body
       )}
