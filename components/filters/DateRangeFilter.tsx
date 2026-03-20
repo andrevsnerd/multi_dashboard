@@ -156,57 +156,25 @@ export default function DateRangeFilter({
         },
       },
       {
-        label: "Essa semana",
+        label: "Esta semana",
         resolve: () => {
           const today = clampDate(new Date());
           let startDate = startOfWeek(today, { weekStartsOn: 1 });
-          let endDate = endOfWeek(today, { weekStartsOn: 1 });
-          endDate = clampDate(endDate);
-
-          if (endDate.getTime() < startDate.getTime()) {
-            startDate = new Date(endDate.getTime());
-          }
-
-          return {
-            startDate,
-            endDate,
-          };
+          let endDate = clampDate(endOfWeek(today, { weekStartsOn: 1 }));
+          if (endDate.getTime() < startDate.getTime()) startDate = new Date(endDate.getTime());
+          return { startDate, endDate };
         },
       },
       {
-        label: "Esse mês",
+        label: "Este mês",
         resolve: () => {
           const today = clampDate(new Date());
           let startDate = startOfMonth(today);
-          let endDate = endOfMonth(today);
           if (availableNormalized && startDate.getTime() < availableNormalized.start.getTime()) {
             startDate = new Date(availableNormalized.start.getTime());
           }
-          endDate = clampDate(endDate);
-
-          if (endDate.getTime() < startDate.getTime()) {
-            startDate = new Date(endDate.getTime());
-          }
-
-          return {
-            startDate,
-            endDate,
-          };
-        },
-      },
-      {
-        label: "Semana passada",
-        resolve: () => {
-          const today = clampDate(new Date());
-          let startDate = subDays(startOfWeek(today, { weekStartsOn: 1 }), 7);
-          let endDate = subDays(endOfWeek(today, { weekStartsOn: 1 }), 7);
-          endDate = clampDate(endDate);
-          if (availableNormalized && startDate.getTime() < availableNormalized.start.getTime()) {
-            startDate = new Date(availableNormalized.start.getTime());
-          }
-          if (startDate.getTime() > endDate.getTime()) {
-            startDate = new Date(endDate.getTime());
-          }
+          let endDate = clampDate(endOfMonth(today));
+          if (endDate.getTime() < startDate.getTime()) startDate = new Date(endDate.getTime());
           return { startDate, endDate };
         },
       },
@@ -216,68 +184,25 @@ export default function DateRangeFilter({
           const today = clampDate(new Date());
           const lastMonth = subMonths(today, 1);
           let startDate = startOfMonth(lastMonth);
-          let endDate = endOfMonth(lastMonth);
-          endDate = clampDate(endDate);
+          let endDate = clampDate(endOfMonth(lastMonth));
           if (availableNormalized && startDate.getTime() < availableNormalized.start.getTime()) {
             startDate = new Date(availableNormalized.start.getTime());
           }
-          if (startDate.getTime() > endDate.getTime()) {
-            startDate = new Date(endDate.getTime());
-          }
-          return {
-            startDate,
-            endDate,
-          };
+          if (startDate.getTime() > endDate.getTime()) startDate = new Date(endDate.getTime());
+          return { startDate, endDate };
         },
       },
       {
-        label: "4 meses",
+        label: "Este ano",
         resolve: () => {
           const today = clampDate(new Date());
-          // Começar no início do mês de 3 meses atrás
-          // Ex: se estamos em novembro, começa em agosto (3 meses atrás)
-          const threeMonthsAgo = subMonths(today, 3);
-          let startDate = startOfMonth(threeMonthsAgo);
-          // Terminar no dia atual (ou no maxSelectableDate se for menor)
-          const endDate = clampDate(new Date());
-          
-          // Respeitar o availableRange se existir
-          if (availableNormalized && startDate.getTime() < availableNormalized.start.getTime()) {
-            startDate = new Date(availableNormalized.start.getTime());
-          }
-          
-          if (startDate.getTime() > endDate.getTime()) {
-            startDate = new Date(endDate.getTime());
-          }
-          
-          return {
-            startDate,
-            endDate,
-          };
-        },
-      },
-      {
-        label: "Esse Ano",
-        resolve: () => {
-          const today = clampDate(new Date());
-          // Começar no primeiro dia do ano atual
           let startDate = startOfYear(today);
-          // Terminar no dia atual (ou no maxSelectableDate se for menor)
           const endDate = clampDate(new Date());
-          
-          // Respeitar o availableRange se existir
           if (availableNormalized && startDate.getTime() < availableNormalized.start.getTime()) {
             startDate = new Date(availableNormalized.start.getTime());
           }
-          
-          if (startDate.getTime() > endDate.getTime()) {
-            startDate = new Date(endDate.getTime());
-          }
-          
-          return {
-            startDate,
-            endDate,
-          };
+          if (startDate.getTime() > endDate.getTime()) startDate = new Date(endDate.getTime());
+          return { startDate, endDate };
         },
       },
     ];
@@ -300,8 +225,6 @@ export default function DateRangeFilter({
       setDropdownStyle({});
       return;
     }
-    
-    // No mobile, o CSS já define posição fixa, não precisa calcular
     if (isMobile) {
       setDropdownStyle({});
       return;
@@ -312,35 +235,24 @@ export default function DateRangeFilter({
 
       const containerRect = containerRef.current.getBoundingClientRect();
       const viewportWidth = window.innerWidth;
-      const dropdownWidth = 600; // min-width do dropdown
+      const dropdownWidth = 580;
 
-      let left: number | undefined = 0;
-      let right: number | undefined = undefined;
+      // Por padrão alinhar à direita do container (dropdown abre para a esquerda).
+      // Só inverte para esquerda se não há espaço suficiente à esquerda.
+      const rightEdge = viewportWidth - containerRect.right;
+      const spaceOnLeft = containerRect.right; // quanto espaço há à esquerda do canto direito do container
 
-      // Verificar se há espaço à direita
-      const spaceOnRight = viewportWidth - containerRect.left;
-      const spaceOnLeft = containerRect.left;
-
-      // Se não há espaço suficiente à direita, alinhar à direita do container
-      if (spaceOnRight < dropdownWidth && spaceOnLeft >= dropdownWidth) {
-        right = 0;
-        left = undefined;
-      } else if (spaceOnRight < dropdownWidth) {
-        // Se não há espaço em nenhum lado, ajustar para caber na viewport
-        left = Math.max(8, viewportWidth - dropdownWidth - containerRect.left - 8);
+      if (spaceOnLeft >= dropdownWidth) {
+        // Alinha pelo lado direito do container
+        setDropdownStyle({ right: "0", left: "auto" });
+      } else {
+        // Alinha pelo lado esquerdo
+        setDropdownStyle({ left: "0", right: "auto" });
       }
-
-      setDropdownStyle({
-        left: left !== undefined ? `${left}px` : undefined,
-        right: right !== undefined ? `${right}px` : undefined,
-      });
+      void rightEdge; // evita warning de variável não usada
     };
 
-    // Usar requestAnimationFrame para garantir que o DOM foi atualizado
-    const rafId = requestAnimationFrame(() => {
-      updatePosition();
-    });
-    
+    const rafId = requestAnimationFrame(updatePosition);
     window.addEventListener('resize', updatePosition);
     window.addEventListener('scroll', updatePosition, true);
 
@@ -528,7 +440,6 @@ export default function DateRangeFilter({
                 maxDate={effectiveMaxDate}
                 minDate={minSelectable}
                 moveRangeOnFirstSelection={false}
-                retainEndDateOnFirstSelection
               />
             </div>
           </div>
