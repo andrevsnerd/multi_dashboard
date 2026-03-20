@@ -373,6 +373,89 @@ export async function fetchVendedorProdutoVendas(
   });
 }
 
+export interface VendedorClienteItem {
+  data: string; // YYYY-MM-DD (CADASTRAMENTO)
+  nome: string;
+  telefone: string;
+  cpf: string;
+  endereco: string;
+  cidade: string;
+}
+
+export interface VendedorClientesListParams {
+  company?: string;
+  vendedor: string;
+  filial: string;
+  range?: { start?: Date | string; end?: Date | string };
+}
+
+/**
+ * Clientes cadastrados pelo vendedor no período: busca direto em CLIENTES_VAREJO via CADASTRAMENTO.
+ * Não há FK entre W_CTB_LOJA_VENDA_PEDIDO e CLIENTES_VAREJO, portanto não é possível linkar vendas a clientes.
+ */
+export async function fetchVendedorClientesList(
+  params: VendedorClientesListParams
+): Promise<VendedorClienteItem[]> {
+  return withRequest(async (request) => {
+    const { vendedor, filial, range } = params;
+
+    const { start, end } = normalizeRangeForQuery(range);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+    request.input('filial', sql.VarChar, filial);
+
+    // Resolve vendedor code(s) from LOJA_VENDEDORES
+    request.input('vendedorApelido', sql.VarChar, vendedor);
+    const codigoResult = await request.query<{ codigo: string }>(`
+      SELECT LTRIM(RTRIM(CAST(VENDEDOR AS VARCHAR))) AS codigo
+      FROM LOJA_VENDEDORES WITH (NOLOCK)
+      WHERE LTRIM(RTRIM(ISNULL(VENDEDOR_APELIDO, ISNULL(NOME_VENDEDOR, CAST(VENDEDOR AS VARCHAR))))) = @vendedorApelido
+    `);
+    const codigos = (codigoResult.recordset ?? []).map((r) => r.codigo).filter(Boolean);
+    if (codigos.length === 0) codigos.push(vendedor);
+    codigos.forEach((c, i) => request.input(`vcode${i}`, sql.VarChar, c));
+    const vendedorFilter = `AND LTRIM(RTRIM(CAST(cv.VENDEDOR AS VARCHAR))) IN (${codigos.map((_, i) => `@vcode${i}`).join(', ')})`;
+
+    const query = `
+      SELECT
+        CONVERT(VARCHAR(10), cv.CADASTRAMENTO, 23) AS data,
+        ISNULL(LTRIM(RTRIM(cv.CLIENTE_VAREJO)), '') AS nome,
+        CASE
+          WHEN cv.DDD IS NOT NULL AND LTRIM(RTRIM(cv.DDD)) <> '' AND cv.TELEFONE IS NOT NULL
+          THEN LTRIM(RTRIM(cv.DDD)) + ' ' + LTRIM(RTRIM(cv.TELEFONE))
+          ELSE ISNULL(LTRIM(RTRIM(cv.TELEFONE)), '')
+        END AS telefone,
+        ISNULL(LTRIM(RTRIM(cv.CPF_CGC)), '') AS cpf,
+        ISNULL(LTRIM(RTRIM(cv.ENDERECO)), '') AS endereco,
+        ISNULL(LTRIM(RTRIM(cv.CIDADE)), '') AS cidade
+      FROM CLIENTES_VAREJO cv WITH (NOLOCK)
+      WHERE cv.CADASTRAMENTO >= @startDate
+        AND cv.CADASTRAMENTO < @endDate
+        AND LTRIM(RTRIM(cv.FILIAL)) = @filial
+        ${vendedorFilter}
+      ORDER BY cv.CADASTRAMENTO ASC, cv.CLIENTE_VAREJO ASC
+    `;
+
+    const result = await request.query<{
+      data: string;
+      nome: string;
+      telefone: string;
+      cpf: string;
+      endereco: string;
+      cidade: string;
+    }>(query);
+
+    return result.recordset.map((row) => ({
+      data: row.data,
+      nome: row.nome?.trim() || '',
+      telefone: row.telefone?.trim() || '',
+      cpf: row.cpf?.trim() || '',
+      endereco: row.endereco?.trim() || '',
+      cidade: row.cidade?.trim() || '',
+    }));
+  });
+}
+
 /**
  * Produtos do vendedor: query enxuta, só campos usados na tela.
  */

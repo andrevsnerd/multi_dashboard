@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
-import type { VendedorProdutoItem } from "@/lib/repositories/vendedores-v2";
+import type { VendedorProdutoItem, VendedorClienteItem } from "@/lib/repositories/vendedores-v2";
 import type { DateRangeValue } from "@/components/filters/DateRangeFilter";
 import DateRangeFilter from "@/components/filters/DateRangeFilter";
 import { getCurrentMonthRange } from "@/lib/utils/date";
@@ -27,12 +27,7 @@ async function fetchProdutos(
   start: string,
   end: string
 ): Promise<VendedorProdutoItem[]> {
-  const searchParams = new URLSearchParams({
-    company,
-    filial,
-    start,
-    end,
-  });
+  const searchParams = new URLSearchParams({ company, filial, start, end });
   const vendedorEncoded = encodeURIComponent(vendedor);
   const response = await fetch(
     `/api/vendedores/${vendedorEncoded}/produtos?${searchParams.toString()}`,
@@ -42,6 +37,25 @@ async function fetchProdutos(
   const json = (await response.json()) as { data: VendedorProdutoItem[] };
   return json.data ?? [];
 }
+
+async function fetchClientes(
+  vendedor: string,
+  filial: string,
+  start: string,
+  end: string
+): Promise<VendedorClienteItem[]> {
+  const searchParams = new URLSearchParams({ filial, start, end });
+  const vendedorEncoded = encodeURIComponent(vendedor);
+  const response = await fetch(
+    `/api/vendedores/${vendedorEncoded}/clientes?${searchParams.toString()}`,
+    { cache: "no-store" }
+  );
+  if (!response.ok) throw new Error("Erro ao carregar clientes");
+  const json = (await response.json()) as { data: VendedorClienteItem[] };
+  return json.data ?? [];
+}
+
+type TabKey = "produtos" | "clientes";
 
 export default function VendedorDetalhePage({
   companyKey,
@@ -64,14 +78,23 @@ export default function VendedorDetalhePage({
   }, [initialStart, initialEnd]);
 
   const [range, setRange] = useState<DateRangeValue>(initialRange);
-  const [data, setData] = useState<VendedorProdutoItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabKey>("produtos");
+
+  // Produtos tab state
+  const [produtos, setProdutos] = useState<VendedorProdutoItem[]>([]);
+  const [loadingProdutos, setLoadingProdutos] = useState(true);
+  const [errorProdutos, setErrorProdutos] = useState<string | null>(null);
+
+  // Clientes tab state
+  const [clientes, setClientes] = useState<VendedorClienteItem[]>([]);
+  const [loadingClientes, setLoadingClientes] = useState(false);
+  const [errorClientes, setErrorClientes] = useState<string | null>(null);
+  const [clientesFetched, setClientesFetched] = useState(false);
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError(null);
+    setLoadingProdutos(true);
+    setErrorProdutos(null);
     fetchProdutos(
       companyKey,
       vendedorNome,
@@ -79,28 +102,51 @@ export default function VendedorDetalhePage({
       range.startDate.toISOString(),
       range.endDate.toISOString()
     )
-      .then((list) => {
-        if (active) setData(list);
-      })
-      .catch((err) => {
-        if (active) setError(err instanceof Error ? err.message : "Erro ao carregar");
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+      .then((list) => { if (active) setProdutos(list); })
+      .catch((err) => { if (active) setErrorProdutos(err instanceof Error ? err.message : "Erro ao carregar"); })
+      .finally(() => { if (active) setLoadingProdutos(false); });
     return () => { active = false; };
   }, [companyKey, vendedorNome, filial, range.startDate, range.endDate]);
+
+  // Reset clientes fetch when range changes
+  useEffect(() => {
+    setClientesFetched(false);
+    setClientes([]);
+  }, [range.startDate, range.endDate]);
+
+  // Fetch clientes when tab is opened (lazy)
+  useEffect(() => {
+    if (activeTab !== "clientes" || clientesFetched) return;
+    let active = true;
+    setLoadingClientes(true);
+    setErrorClientes(null);
+    fetchClientes(
+      vendedorNome,
+      filial,
+      range.startDate.toISOString(),
+      range.endDate.toISOString()
+    )
+      .then((list) => { if (active) { setClientes(list); setClientesFetched(true); } })
+      .catch((err) => { if (active) setErrorClientes(err instanceof Error ? err.message : "Erro ao carregar"); })
+      .finally(() => { if (active) setLoadingClientes(false); });
+    return () => { active = false; };
+  }, [activeTab, clientesFetched, vendedorNome, filial, range.startDate, range.endDate]);
 
   const formatCurrency = (value: number) =>
     value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const formatNumber = (value: number) =>
     value.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return "–";
+    const [y, m, d] = dateStr.split("-");
+    return `${d}/${m}/${y}`;
+  };
 
-  const totalFaturamento = data.reduce((acc, p) => acc + p.faturamento, 0);
-  const totalQuantidade = data.reduce((acc, p) => acc + p.quantidade, 0);
+  const totalFaturamento = produtos.reduce((acc, p) => acc + p.faturamento, 0);
+  const totalQuantidade = produtos.reduce((acc, p) => acc + p.quantidade, 0);
 
   const buildProdutoUrl = useCallback(
-    (p: (typeof data)[0]) => {
+    (p: (typeof produtos)[0]) => {
       if (!p.codigo) return null;
       const params = new URLSearchParams({
         vendedor: vendedorNome,
@@ -132,132 +178,188 @@ export default function VendedorDetalhePage({
         </div>
         <div className={styles.headerRight}>
           <DateRangeFilter value={range} onChange={setRange} />
-          <button
-            type="button"
-            className={styles.exportButton}
-            onClick={() => exportVendedorProdutosToExcel(data, companyKey, vendedorNome, range)}
-            disabled={loading || data.length === 0}
-            title="Exportar produtos para Excel"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
+          {activeTab === "produtos" && (
+            <button
+              type="button"
+              className={styles.exportButton}
+              onClick={() => exportVendedorProdutosToExcel(produtos, companyKey, vendedorNome, range)}
+              disabled={loadingProdutos || produtos.length === 0}
+              title="Exportar produtos para Excel"
             >
-              <path
-                d="M8 2V11M8 11L5 8M8 11L11 8M2 14H14"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Exportar XLSX
-          </button>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8 2V11M8 11L5 8M8 11L11 8M2 14H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Exportar XLSX
+            </button>
+          )}
         </div>
       </div>
 
-      {error && <div className={styles.error}>{error}</div>}
+      {/* Tabs */}
+      <div className={styles.tabs}>
+        <button
+          type="button"
+          className={`${styles.tab} ${activeTab === "produtos" ? styles.tabActive : ""}`}
+          onClick={() => setActiveTab("produtos")}
+        >
+          Produtos
+        </button>
+        <button
+          type="button"
+          className={`${styles.tab} ${activeTab === "clientes" ? styles.tabActive : ""}`}
+          onClick={() => setActiveTab("clientes")}
+        >
+          Clientes
+        </button>
+      </div>
 
-      {loading && (
-        <div className={styles.loadingBanner}>
-          <span className={styles.loadingSpinner} />
-          <span>Carregando produtos…</span>
-        </div>
+      {/* ── PRODUTOS TAB ── */}
+      {activeTab === "produtos" && (
+        <>
+          {errorProdutos && <div className={styles.error}>{errorProdutos}</div>}
+          {loadingProdutos && (
+            <div className={styles.loadingBanner}>
+              <span className={styles.loadingSpinner} />
+              <span>Carregando produtos…</span>
+            </div>
+          )}
+          {!loadingProdutos && produtos.length === 0 && !errorProdutos && (
+            <div className={styles.empty}>Nenhum produto encontrado no período.</div>
+          )}
+          {!loadingProdutos && produtos.length > 0 && (
+            <div className={styles.summary}>
+              <span className={styles.summaryItem}>
+                <strong>Faturamento:</strong> {formatCurrency(totalFaturamento)}
+              </span>
+              <span className={styles.summaryItem}>
+                <strong>Quantidade:</strong> {formatNumber(totalQuantidade)}
+              </span>
+            </div>
+          )}
+          {!loadingProdutos && produtos.length > 0 && (
+            <div className={styles.tableWrapper}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    {companyKey === "scarfme" ? (
+                      <>
+                        <th className={styles.th}>LINHA</th>
+                        <th className={styles.th}>DESCRIÇÃO</th>
+                        <th className={styles.th}>COR</th>
+                        <th className={styles.th}>GRADE</th>
+                        <th className={styles.th}>SUBGRUPO</th>
+                        <th className={styles.th}>COLEÇÃO</th>
+                      </>
+                    ) : (
+                      <>
+                        <th className={styles.th}>GRUPO</th>
+                        <th className={styles.th}>DESCRIÇÃO</th>
+                        <th className={styles.th}>COR</th>
+                      </>
+                    )}
+                    <th className={styles.th}>FATURAMENTO</th>
+                    <th className={styles.th}>QTD</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {produtos.map((p, i) => (
+                    <tr key={`${p.descricao}-${i}`}>
+                      {companyKey === "scarfme" ? (
+                        <>
+                          <td className={styles.td}>{p.linha || "–"}</td>
+                          <td className={styles.td}>
+                            {(() => {
+                              const url = buildProdutoUrl(p);
+                              return url ? (
+                                <Link href={url} className={styles.produtoLink}>{p.descricao}</Link>
+                              ) : (
+                                <div>{p.descricao}</div>
+                              );
+                            })()}
+                            {p.codigo && <div className={styles.codigo}>{p.codigo}</div>}
+                          </td>
+                          <td className={styles.td}>{p.cor || "–"}</td>
+                          <td className={styles.td}>{p.grade || "–"}</td>
+                          <td className={styles.td}>{p.subgrupo || "–"}</td>
+                          <td className={styles.td}>{p.colecao || "–"}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td className={styles.td}>{p.grupo || "–"}</td>
+                          <td className={styles.td}>
+                            {(() => {
+                              const url = buildProdutoUrl(p);
+                              return url ? (
+                                <Link href={url} className={styles.produtoLink}>{p.descricao}</Link>
+                              ) : (
+                                <div>{p.descricao}</div>
+                              );
+                            })()}
+                            {p.codigo && <div className={styles.codigo}>{p.codigo}</div>}
+                          </td>
+                          <td className={styles.td}>{p.cor || "–"}</td>
+                        </>
+                      )}
+                      <td className={styles.td}>{formatCurrency(p.faturamento)}</td>
+                      <td className={styles.td}>{formatNumber(p.quantidade)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
 
-      {!loading && data.length === 0 && !error && (
-        <div className={styles.empty}>Nenhum produto encontrado no período.</div>
-      )}
-
-      {!loading && data.length > 0 && (
-        <div className={styles.summary}>
-          <span className={styles.summaryItem}>
-            <strong>Faturamento:</strong> {formatCurrency(totalFaturamento)}
-          </span>
-          <span className={styles.summaryItem}>
-            <strong>Quantidade:</strong> {formatNumber(totalQuantidade)}
-          </span>
-        </div>
-      )}
-
-      {!loading && data.length > 0 && (
-        <div className={styles.tableWrapper}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                {companyKey === "scarfme" ? (
-                  <>
-                    <th className={styles.th}>LINHA</th>
-                    <th className={styles.th}>DESCRIÇÃO</th>
-                    <th className={styles.th}>COR</th>
-                    <th className={styles.th}>GRADE</th>
-                    <th className={styles.th}>SUBGRUPO</th>
-                    <th className={styles.th}>COLEÇÃO</th>
-                  </>
-                ) : (
-                  <>
-                    <th className={styles.th}>GRUPO</th>
-                    <th className={styles.th}>DESCRIÇÃO</th>
-                    <th className={styles.th}>COR</th>
-                  </>
-                )}
-                <th className={styles.th}>FATURAMENTO</th>
-                <th className={styles.th}>QTD</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((p, i) => (
-                <tr key={`${p.descricao}-${i}`}>
-                  {companyKey === "scarfme" ? (
-                    <>
-                      <td className={styles.td}>{p.linha || "–"}</td>
-                      <td className={styles.td}>
-                        {(() => {
-                          const url = buildProdutoUrl(p);
-                          return url ? (
-                            <Link href={url} className={styles.produtoLink}>
-                              {p.descricao}
-                            </Link>
-                          ) : (
-                            <div>{p.descricao}</div>
-                          );
-                        })()}
-                        {p.codigo && <div className={styles.codigo}>{p.codigo}</div>}
-                      </td>
-                      <td className={styles.td}>{p.cor || "–"}</td>
-                      <td className={styles.td}>{p.grade || "–"}</td>
-                      <td className={styles.td}>{p.subgrupo || "–"}</td>
-                      <td className={styles.td}>{p.colecao || "–"}</td>
-                    </>
-                  ) : (
-                    <>
-                      <td className={styles.td}>{p.grupo || "–"}</td>
-                      <td className={styles.td}>
-                        {(() => {
-                          const url = buildProdutoUrl(p);
-                          return url ? (
-                            <Link href={url} className={styles.produtoLink}>
-                              {p.descricao}
-                            </Link>
-                          ) : (
-                            <div>{p.descricao}</div>
-                          );
-                        })()}
-                        {p.codigo && <div className={styles.codigo}>{p.codigo}</div>}
-                      </td>
-                      <td className={styles.td}>{p.cor || "–"}</td>
-                    </>
-                  )}
-                  <td className={styles.td}>{formatCurrency(p.faturamento)}</td>
-                  <td className={styles.td}>{formatNumber(p.quantidade)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* ── CLIENTES TAB ── */}
+      {activeTab === "clientes" && (
+        <>
+          {errorClientes && <div className={styles.error}>{errorClientes}</div>}
+          {loadingClientes && (
+            <div className={styles.loadingBanner}>
+              <span className={styles.loadingSpinner} />
+              <span>Carregando clientes…</span>
+            </div>
+          )}
+          {!loadingClientes && clientes.length === 0 && !errorClientes && clientesFetched && (
+            <div className={styles.empty}>Nenhum cliente encontrado no período.</div>
+          )}
+          {!loadingClientes && clientes.length > 0 && (
+            <div className={styles.summary}>
+              <span className={styles.summaryItem}>
+                <strong>Clientes cadastrados:</strong> {formatNumber(clientes.length)}
+              </span>
+            </div>
+          )}
+          {!loadingClientes && clientes.length > 0 && (
+            <div className={styles.tableWrapper}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th className={styles.th}>DATA</th>
+                    <th className={styles.th}>NOME</th>
+                    <th className={styles.th}>TELEFONE</th>
+                    <th className={styles.th}>CPF</th>
+                    <th className={styles.th}>ENDEREÇO</th>
+                    <th className={styles.th}>CIDADE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clientes.map((c, i) => (
+                    <tr key={i}>
+                      <td className={styles.td}>{formatDate(c.data)}</td>
+                      <td className={styles.td}>{c.nome || "–"}</td>
+                      <td className={styles.td}>{c.telefone || "–"}</td>
+                      <td className={styles.td}>{c.cpf || "–"}</td>
+                      <td className={styles.td}>{c.endereco || "–"}</td>
+                      <td className={styles.td}>{c.cidade || "–"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
