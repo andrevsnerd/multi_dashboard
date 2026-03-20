@@ -7,6 +7,7 @@ export async function GET(request: Request) {
   const searchTerm = searchParams.get('q') || '';
   const filialOrigem = searchParams.get('filialOrigem');
   const corProduto = searchParams.get('corProduto'); // Para filtrar quando encontrado por código de barras
+  const isEntrada = searchParams.get('entrada') === 'true';
 
   if (!searchTerm || searchTerm.trim().length < 2) {
     return NextResponse.json({ data: [] });
@@ -44,6 +45,36 @@ export async function GET(request: Request) {
         req.input('searchTerm', sql.VarChar, searchTermTrimmed);
         req.input('corProduto', sql.VarChar, corProduto);
         // NÃO filtrar por filial quando tem corProduto - mostrar TODAS as filiais (igual ao Python)
+      } else if (isEntrada) {
+        // Para entrada: buscar da tabela PRODUTOS (inclui produtos sem estoque ainda)
+        const searchPattern = `%${searchTermTrimmed}%`;
+        query = `
+          SELECT DISTINCT TOP 50
+            p.PRODUTO,
+            ISNULL(e.COR_PRODUTO, '') AS COR_PRODUTO,
+            ISNULL(e.FILIAL, @filialOrigemParam) AS FILIAL,
+            ISNULL(e.ESTOQUE, 0) AS ESTOQUE,
+            p.DESC_PRODUTO,
+            ISNULL(c.DESC_COR, '') AS DESC_COR,
+            ISNULL(e.FILIAL, @filialOrigemParam) AS NOME_FILIAL,
+            pb.CODIGO_BARRA
+          FROM PRODUTOS p WITH (NOLOCK)
+          LEFT JOIN ESTOQUE_PRODUTOS e WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+            ${filialOrigem ? `AND RTRIM(LTRIM(CAST(e.FILIAL AS VARCHAR(100)))) = RTRIM(LTRIM(@filialOrigem))` : ''}
+          LEFT JOIN PRODUTOS_BARRA pb WITH (NOLOCK) ON pb.PRODUTO = p.PRODUTO AND pb.COR_PRODUTO = e.COR_PRODUTO
+          LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = e.COR_PRODUTO
+          WHERE (
+            p.DESC_PRODUTO LIKE @searchPattern
+            OR RTRIM(LTRIM(CAST(p.PRODUTO AS VARCHAR(50)))) LIKE @searchPattern
+            OR LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) = LTRIM(RTRIM(@searchTermExato))
+          )
+        `;
+        req.input('searchPattern', sql.VarChar, searchPattern);
+        req.input('searchTermExato', sql.VarChar, searchTermTrimmed);
+        req.input('filialOrigemParam', sql.VarChar, filialOrigem?.trim() || '');
+        if (filialOrigem) {
+          req.input('filialOrigem', sql.VarChar, filialOrigem.trim());
+        }
       } else {
         // Buscar por código de barras OU nome/código do produto
         // Usar RTRIM/LTRIM e CAST para garantir match com campos CHAR ou numéricos no banco
@@ -151,11 +182,11 @@ export async function GET(request: Request) {
         }
 
         const produtoData = produtosMap.get(key)!;
-        // Quando tem corProduto (do código de barras), mostrar TODOS os estoques (incluindo 0), igual ao Python
-        // Quando não tem corProduto, só mostrar estoques > 0
+        // Quando tem corProduto (do código de barras) ou é entrada, mostrar TODOS os estoques (incluindo 0)
+        // Quando não tem corProduto e não é entrada, só mostrar estoques > 0
         if (row.FILIAL) {
           const estoque = row.ESTOQUE !== null ? row.ESTOQUE : 0;
-          if (corProduto || estoque > 0) {
+          if (corProduto || isEntrada || estoque > 0) {
             // Usar COD_FILIAL se disponível, senão usar FILIAL (que deve ser o código)
             const codFilial = row.FILIAL?.toString().trim() || '';
             produtoData.estoques.push({

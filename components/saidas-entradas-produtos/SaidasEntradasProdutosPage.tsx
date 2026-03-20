@@ -243,7 +243,7 @@ async function buscarProdutoPorCodigoBarras(codigoBarras: string, companyKey?: s
   return json.data || null;
 }
 
-async function searchProdutos(searchTerm: string, filial?: string, corProduto?: string | null, companyKey?: string): Promise<Produto[]> {
+async function searchProdutos(searchTerm: string, filial?: string, corProduto?: string | null, companyKey?: string, entrada?: boolean): Promise<Produto[]> {
   if (!searchTerm || searchTerm.trim().length < 2) {
     return [];
   }
@@ -262,6 +262,10 @@ async function searchProdutos(searchTerm: string, filial?: string, corProduto?: 
 
   if (companyKey) {
     params.set("company", companyKey);
+  }
+
+  if (entrada) {
+    params.set("entrada", "true");
   }
 
   const response = await fetch(`/api/transferencia-produtos/produtos?${params.toString()}`, {
@@ -747,29 +751,31 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
               produtoCodigoBarras.produto,
               filialSelecionada?.codFilial,
               corProdutoCodigoBarras,
-              companyKey
+              companyKey,
+              tipoOperacao === "entrada"
             );
-            
+
             if (produtoCodigoBarras.produtosEncontrados > 1 && active) {
               mostrarNotificacao(
                 `Código de barras encontrado em ${produtoCodigoBarras.produtosEncontrados} produto(s). Usando o primeiro.`,
                 "success"
               );
             }
-            
+
             if (results.length === 0 && corProdutoCodigoBarras) {
               results = await searchProdutos(
                 produtoCodigoBarras.produto,
                 filialSelecionada?.codFilial,
                 null,
-                companyKey
+                companyKey,
+                tipoOperacao === "entrada"
               );
             }
           }
         }
-        
+
         if (results.length === 0) {
-          results = await searchProdutos(searchTermTrimmed, filialSelecionada?.codFilial, null, companyKey);
+          results = await searchProdutos(searchTermTrimmed, filialSelecionada?.codFilial, null, companyKey, tipoOperacao === "entrada");
         }
         
         if (active) {
@@ -790,7 +796,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       active = false;
       clearTimeout(timeoutId);
     };
-  }, [searchTerm, filialSelecionada, companyKey, mostrarNotificacao]);
+  }, [searchTerm, filialSelecionada, companyKey, mostrarNotificacao, tipoOperacao]);
 
   const criarProdutoSelecionado = useCallback((produto: Produto): ProdutoSelecionado | null => {
     if (!filialSelecionada) {
@@ -808,6 +814,18 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
     });
     
     if (!estoque) {
+      if (tipoOperacao === "entrada") {
+        return {
+          produto: produto.produto,
+          descProduto: produto.descProduto,
+          corProduto: produto.corProduto,
+          descCor: produto.descCor,
+          filial: filialSelecionada.codFilial,
+          nomeFilial: filialSelecionada.filial,
+          estoque: 0,
+          quantidade: 1,
+        };
+      }
       mostrarNotificacao(`Produto não possui estoque na filial ${filialSelecionada.filial}`, "error");
       return null;
     }
@@ -822,7 +840,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       estoque: estoque.estoque,
       quantidade: 1,
     };
-  }, [filialSelecionada, mostrarNotificacao]);
+  }, [filialSelecionada, mostrarNotificacao, tipoOperacao]);
 
   const adicionarProdutoModal = useCallback((produto: Produto) => {
     const novoItem = criarProdutoSelecionado(produto);
