@@ -348,7 +348,28 @@ export default function VendedorDetalhePage({
                   {clientes.map((c, i) => (
                     <tr key={i}>
                       <td className={styles.td}>{formatDate(c.data)}</td>
-                      <td className={styles.td}>{c.nome || "–"}</td>
+                      <td className={styles.td}>
+                        {c.nome ? (
+                          (() => {
+                            const params = new URLSearchParams({
+                              vendedor: vendedorNome,
+                              filial,
+                              cliente: c.nome,
+                              start: range.startDate.toISOString(),
+                              end: range.endDate.toISOString(),
+                            });
+                            if (c.cpf) params.set('cpf', c.cpf);
+                            return (
+                              <Link
+                                href={`/${companyKey}/vendedores/detalhe/cliente?${params.toString()}`}
+                                className={styles.produtoLink}
+                              >
+                                {c.nome}
+                              </Link>
+                            );
+                          })()
+                        ) : "–"}
+                      </td>
                       <td className={styles.td}>{c.telefone || "–"}</td>
                       <td className={styles.td}>{c.cpf || "–"}</td>
                       <td className={styles.td}>{c.endereco || "–"}</td>

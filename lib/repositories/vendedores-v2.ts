@@ -456,6 +456,99 @@ export async function fetchVendedorClientesList(
   });
 }
 
+export interface ClienteProdutoItem {
+  codigo?: string;
+  grupo?: string;
+  linha?: string;
+  colecao?: string;
+  subgrupo?: string;
+  grade?: string;
+  cor?: string;
+  descricao: string;
+  faturamento: number;
+  quantidade: number;
+}
+
+export interface ClienteProdutosListParams {
+  company?: string;
+  clienteNome: string;
+  filial: string;
+  range?: { start?: Date | string; end?: Date | string };
+}
+
+/**
+ * Produtos comprados pelo cliente: tenta linkar via CPF (v.CPF_CGC) ou nome (v.NOME_CLIFOR).
+ * Usa W_CTB_LOJA_VENDA_PEDIDO como ponte entre vp (itens) e os dados do cliente.
+ */
+export async function fetchClienteProdutosList(
+  params: ClienteProdutosListParams
+): Promise<ClienteProdutoItem[]> {
+  return withRequest(async (request) => {
+    const { company, clienteNome, filial, range } = params;
+    void company;
+
+    const { start, end } = normalizeRangeForQuery(range);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+    request.input('filial', sql.VarChar, filial);
+    // W_CTB_LOJA_VENDA_PEDIDO.CLIENTE_VAREJO = nome do cliente (confirmado no script Python)
+    request.input('clienteNome', sql.VarChar, clienteNome);
+
+    const query = `
+      SELECT
+        MAX(vp.PRODUTO) AS codigo,
+        MAX(ISNULL(vp.GRUPO_PRODUTO, '')) AS grupo,
+        MAX(COALESCE(vp.LINHA, p.LINHA, '')) AS linha,
+        MAX(COALESCE(vp.COLECAO, p.COLECAO, '')) AS colecao,
+        MAX(COALESCE(vp.SUBGRUPO_PRODUTO, p.SUBGRUPO_PRODUTO, '')) AS subgrupo,
+        MAX(ISNULL(CONVERT(VARCHAR, p.GRADE), '')) AS grade,
+        MAX(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO, '')) AS cor,
+        MAX(vp.DESC_PRODUTO) AS descricao,
+        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) END) AS faturamento,
+        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.QTDE END) AS quantidade
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      INNER JOIN W_CTB_LOJA_VENDA_PEDIDO v WITH (NOLOCK)
+        ON v.FILIAL = vp.FILIAL AND v.PEDIDO = vp.PEDIDO AND v.TICKET = vp.TICKET
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
+      WHERE vp.DATA_VENDA >= @startDate
+        AND vp.DATA_VENDA < @endDate
+        AND vp.QTDE > 0
+        AND vp.FILIAL = @filial
+        AND v.CLIENTE_VAREJO = @clienteNome
+      GROUP BY vp.PRODUTO, vp.DESC_PRODUTO
+      HAVING SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) END) > 0
+      ORDER BY faturamento DESC
+    `;
+
+    const result = await request.query<{
+      codigo: string;
+      grupo: string;
+      linha: string;
+      colecao: string;
+      subgrupo: string;
+      grade: string;
+      cor: string;
+      descricao: string;
+      faturamento: number;
+      quantidade: number;
+    }>(query);
+
+    return result.recordset.map((row) => ({
+      codigo: row.codigo || undefined,
+      grupo: row.grupo?.trim() || undefined,
+      linha: row.linha?.trim() || undefined,
+      colecao: row.colecao?.trim() || undefined,
+      subgrupo: row.subgrupo?.trim() || undefined,
+      grade: row.grade?.trim() || undefined,
+      cor: row.cor?.trim() || undefined,
+      descricao: row.descricao || 'SEM DESCRIÇÃO',
+      faturamento: row.faturamento ?? 0,
+      quantidade: row.quantidade ?? 0,
+    }));
+  });
+}
+
 /**
  * Produtos do vendedor: query enxuta, só campos usados na tela.
  */

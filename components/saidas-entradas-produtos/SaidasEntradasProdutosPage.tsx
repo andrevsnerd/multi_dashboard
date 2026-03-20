@@ -841,11 +841,11 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       }
 
       const atual = prev[idx];
-      const proxQtd = Math.min(atual.estoque, atual.quantidade + 1);
+      const proxQtd = tipoOperacao === "entrada" ? atual.quantidade + 1 : Math.min(atual.estoque, atual.quantidade + 1);
       const next = [...prev];
       next[idx] = { ...atual, quantidade: proxQtd };
 
-      if (proxQtd === atual.estoque) {
+      if (tipoOperacao === "saida" && proxQtd === atual.estoque) {
         mostrarNotificacao(`Quantidade máxima atingida (estoque ${atual.estoque})`, "error");
       } else {
         mostrarNotificacao(`${novoItem.descProduto} adicionado`);
@@ -853,7 +853,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
 
       return next;
     });
-  }, [criarProdutoSelecionado, mostrarNotificacao]);
+  }, [criarProdutoSelecionado, mostrarNotificacao, tipoOperacao]);
 
   const removerProduto = useCallback((index: number) => {
     setProdutosSelecionados(prev => prev.filter((_, i) => i !== index));
@@ -869,14 +869,14 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
     setProdutosSelecionados(prev => {
       const novo = [...prev];
       const produto = novo[index];
-      if (quantidade > produto.estoque) {
+      if (tipoOperacao === "saida" && quantidade > produto.estoque) {
         mostrarNotificacao(`Quantidade não pode ser maior que o estoque disponível (${produto.estoque})`, "error");
         return prev;
       }
       novo[index] = { ...produto, quantidade };
       return novo;
     });
-  }, [mostrarNotificacao]);
+  }, [mostrarNotificacao, tipoOperacao]);
 
   const atualizarQuantidadeModal = useCallback((index: number, quantidade: number) => {
     if (quantidade < 1) return;
@@ -885,14 +885,14 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       const novo = [...prev];
       const produto = novo[index];
       if (!produto) return prev;
-      if (quantidade > produto.estoque) {
+      if (tipoOperacao === "saida" && quantidade > produto.estoque) {
         mostrarNotificacao(`Quantidade não pode ser maior que o estoque disponível (${produto.estoque})`, "error");
         return prev;
       }
       novo[index] = { ...produto, quantidade };
       return novo;
     });
-  }, [mostrarNotificacao]);
+  }, [mostrarNotificacao, tipoOperacao]);
 
   const removerProdutoModal = useCallback((index: number) => {
     setProdutosSelecionadosModal(prev => prev.filter((_, i) => i !== index));
@@ -1601,12 +1601,12 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                             value={produto.quantidade}
                             onChange={(e) => atualizarQuantidade(index, parseInt(e.target.value) || 1)}
                             min={1}
-                            max={produto.estoque}
+                            max={tipoOperacao === "saida" ? produto.estoque : undefined}
                           />
                           <button
                             className={styles.qtyBtn}
                             onClick={() => atualizarQuantidade(index, produto.quantidade + 1)}
-                            disabled={produto.quantidade >= produto.estoque}
+                            disabled={tipoOperacao === "saida" && produto.quantidade >= produto.estoque}
                           >+</button>
                         </div>
                         <div className={styles.stockPill}>{produto.quantidade}/{produto.estoque}</div>
@@ -1840,12 +1840,12 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                               value={p.quantidade}
                               onChange={(e) => atualizarQuantidadeModal(idx, parseInt(e.target.value) || 1)}
                               min={1}
-                              max={p.estoque}
+                              max={tipoOperacao === "saida" ? p.estoque : undefined}
                             />
                             <button
                               className={styles.qtyBtn}
                               onClick={() => atualizarQuantidadeModal(idx, p.quantidade + 1)}
-                              disabled={p.quantidade >= p.estoque}
+                              disabled={tipoOperacao === "saida" && p.quantidade >= p.estoque}
                             >+</button>
                           </div>
                           <div className={styles.stockPill}>{p.quantidade}/{p.estoque}</div>

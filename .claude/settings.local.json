@@ -20,7 +20,9 @@
       "Bash(ls -la \"/c/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/app/\\(companies\\)/[company]/controle-estoque/\")",
       "Bash(node -e \":*)",
       "Bash(ls -la \"c:\\\\Users\\\\NERD TIJUCA\\\\Documents\\\\NERD - ANDRE\\\\Dashboard NERD\\\\multi-dashboard/app/\\(companies\\)/[company]/clientes/\")",
-      "Bash(node -e \"console.log\\(require\\(''./node_modules/next/package.json''\\).version\\)\")"
+      "Bash(node -e \"console.log\\(require\\(''./node_modules/next/package.json''\\).version\\)\")",
+      "Bash(ls \"c:/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/app/\\(companies\\)/[company]/vendedores/detalhe/\")",
+      "Bash(cat \"c:\\\\Users\\\\NERD TIJUCA\\\\Documents\\\\NERD - ANDRE\\\\Dashboard NERD\\\\multi-dashboard\\\\app\\\\\\(companies\\)\\\\[company]\\\\vendedores\\\\detalhe\\\\cliente\\\\page.tsx\")"
     ]
   }
 }
