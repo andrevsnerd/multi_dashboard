@@ -8,6 +8,31 @@ import styles from "./RomaneioDetalhePage.module.css";
 
 // ---------- helpers de API ----------
 
+async function editarQtdRomaneio(
+  username: string,
+  tipo: "saida" | "entrada",
+  romaneio: string,
+  filialOrigem: string,
+  filialDestino: string,
+  produto: string,
+  corProduto: string | null,
+  qtdeAtual: number,
+  qtdeNova: number
+): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch("/api/romaneios/editar-qtd", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "x-auth-username": username },
+    body: JSON.stringify({
+      tipo, romaneio, filialOrigem, filialDestino,
+      produto, corProduto: corProduto ?? "",
+      qtdeAtual, qtdeNova,
+    }),
+  });
+  if (res.ok) return { ok: true };
+  const json = await res.json().catch(() => ({}));
+  return { ok: false, error: (json as { error?: string }).error || "Erro ao salvar" };
+}
+
 async function fetchConfirmados(
   companyKey: string,
   romaneioId: string,
@@ -206,6 +231,11 @@ export default function RomaneioDetalhePage({
   const [darSaidaSucesso, setDarSaidaSucesso] = useState<string | null>(null);
   const [darSaidaModalAberto, setDarSaidaModalAberto] = useState(false);
 
+  // --- editar qtd romaneio (admin) ---
+  const [editQtdModal, setEditQtdModal] = useState<{ item: RomaneioDetalheItem; novaQtd: number } | null>(null);
+  const [editQtdSaving, setEditQtdSaving] = useState(false);
+  const [editQtdErro, setEditQtdErro] = useState<string | null>(null);
+
   // --- confirmações ---
   // Map: "produto|cor" → qtde_confirmada
   const [confirmados, setConfirmados] = useState<Map<string, number>>(new Map());
@@ -365,6 +395,36 @@ export default function RomaneioDetalhePage({
     }
     setConfirmandoKey(null);
   }, [user?.username, companySlug, romaneioId, filialDestino, destinoSelected, tipo]);
+
+  const handleEditQtdSalvar = useCallback(async () => {
+    if (!editQtdModal || !user?.username) return;
+    const { item, novaQtd } = editQtdModal;
+    if (novaQtd === item.qtde) { setEditQtdModal(null); return; }
+    setEditQtdSaving(true);
+    setEditQtdErro(null);
+    const filialDestinoRef = tipo === "saida" ? destinoSelected : filialDestino;
+    const result = await editarQtdRomaneio(
+      user.username, tipo, romaneioId,
+      filialOrigem, filialDestinoRef,
+      item.produto, item.corProduto, item.qtde, novaQtd
+    );
+    if (result.ok) {
+      const diff = novaQtd - item.qtde;
+      setItens((prev) => prev.map((i) => {
+        if (i.produto !== item.produto || (i.corProduto ?? "") !== (item.corProduto ?? "")) return i;
+        return {
+          ...i,
+          qtde: novaQtd,
+          estoqueOrigem: tipo === "saida" ? i.estoqueOrigem - diff : i.estoqueOrigem,
+          estoqueDestino: tipo === "entrada" ? i.estoqueDestino + diff : i.estoqueDestino,
+        };
+      }));
+      setEditQtdModal(null);
+    } else {
+      setEditQtdErro(result.error ?? "Erro ao salvar");
+    }
+    setEditQtdSaving(false);
+  }, [editQtdModal, user?.username, tipo, romaneioId, filialOrigem, filialDestino, destinoSelected]);
 
   const handleDestinoChange = useCallback(async (codFilial: string) => {
     setDestinoSelected(codFilial);
@@ -601,6 +661,100 @@ export default function RomaneioDetalhePage({
         </div>
       )}
 
+      {/* Modal editar quantidade do romaneio (admin) */}
+      {editQtdModal && (() => {
+        const { item, novaQtd } = editQtdModal;
+        const diff = novaQtd - item.qtde;
+        const estoqueAfetadoAtual = tipo === "saida" ? item.estoqueOrigem : item.estoqueDestino;
+        const estoqueAfetadoNovo = tipo === "saida" ? estoqueAfetadoAtual - diff : estoqueAfetadoAtual + diff;
+        const filialAfetada = tipo === "saida"
+          ? (item.filialOrigem || filialOrigem)
+          : (item.filialDestino || filialDestino);
+        const labelEstoque = tipo === "saida" ? "Estoque origem" : "Estoque destino";
+        const semAlteracao = novaQtd === item.qtde;
+        return (
+          <div
+            className={styles.modalOverlay}
+            onClick={() => { if (!editQtdSaving) setEditQtdModal(null); }}
+          >
+            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+              <h2 className={styles.modalTitle}>Editar Quantidade — Romaneio #{romaneioId}</h2>
+              <p className={styles.modalOrigem}>
+                {item.descProduto} ({item.produto}){item.descCor ? ` — ${item.descCor}` : ""}
+              </p>
+
+              <div className={styles.modalField}>
+                <label className={styles.modalLabel}>Nova quantidade</label>
+                <div className={styles.qtdeInputRow}>
+                  <button
+                    type="button"
+                    className={styles.qtdeSpinBtn}
+                    onClick={() => setEditQtdModal((m) => m && { ...m, novaQtd: Math.max(0, m.novaQtd - 1) })}
+                    disabled={editQtdSaving}
+                  >−</button>
+                  <input
+                    type="number"
+                    min={0}
+                    className={styles.qtdeInput}
+                    value={novaQtd}
+                    onChange={(e) => setEditQtdModal((m) => m && { ...m, novaQtd: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                    disabled={editQtdSaving}
+                  />
+                  <button
+                    type="button"
+                    className={styles.qtdeSpinBtn}
+                    onClick={() => setEditQtdModal((m) => m && { ...m, novaQtd: m.novaQtd + 1 })}
+                    disabled={editQtdSaving}
+                  >+</button>
+                </div>
+              </div>
+
+              {!semAlteracao && (
+                <div className={styles.editQtdPreview}>
+                  <p className={styles.editQtdPreviewTitle}>Impacto da alteração</p>
+                  <div className={styles.editQtdPreviewRow}>
+                    <span className={styles.editQtdPreviewLabel}>Romaneio</span>
+                    <span className={styles.editQtdPreviewVal}>
+                      {item.qtde} <span className={styles.editQtdArrow}>→</span> <strong>{novaQtd}</strong>
+                    </span>
+                  </div>
+                  <div className={styles.editQtdPreviewRow}>
+                    <span className={styles.editQtdPreviewLabel}>{labelEstoque} ({filialAfetada})</span>
+                    <span className={styles.editQtdPreviewVal}>
+                      {estoqueAfetadoAtual} <span className={styles.editQtdArrow}>→</span>{" "}
+                      <strong className={estoqueAfetadoNovo > estoqueAfetadoAtual ? styles.estoqueUp : styles.estoqueDown}>
+                        {estoqueAfetadoNovo}
+                      </strong>
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {editQtdErro && <p className={styles.modalErro}>{editQtdErro}</p>}
+
+              <div className={styles.modalActions}>
+                <button
+                  type="button"
+                  className={styles.modalBtnCancelar}
+                  onClick={() => setEditQtdModal(null)}
+                  disabled={editQtdSaving}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className={styles.modalBtnConfirmar}
+                  onClick={handleEditQtdSalvar}
+                  disabled={editQtdSaving || semAlteracao}
+                >
+                  {editQtdSaving ? "Salvando..." : "Confirmar Alteração"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead>
@@ -613,7 +767,8 @@ export default function RomaneioDetalhePage({
               <th>COR</th>
               <th>DESTINO</th>
               <th>QTD ROMANEIO</th>
-              {tipo === "saida" && <th>ESTOQUE DESTINO</th>}
+              {tipo === "saida" && destinoSelected && <th>ESTOQUE ({destinoDisplay})</th>}
+              {tipo === "entrada" && <th>ESTOQUE ({itens[0]?.filialDestino || filialDestino})</th>}
               {tipo === "saida" && <th>CONFIRMAR ENTRADA</th>}
             </tr>
           </thead>
@@ -651,14 +806,36 @@ export default function RomaneioDetalhePage({
                   <td>
                     <div className={styles.qtdCell}>
                       <span className={styles.qtdValue}>{item.qtde}</span>
+                      {(user?.role === "admin" || user?.role === "logistica") && (
+                        <button
+                          type="button"
+                          className={styles.editQtdBtn}
+                          title="Editar quantidade do romaneio"
+                          onClick={() => { setEditQtdErro(null); setEditQtdModal({ item, novaQtd: item.qtde }); }}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   </td>
 
-                  {/* Estoque destino (saídas) */}
-                  {tipo === "saida" && (
+                  {/* Estoque da filial destino (saídas — só quando destino definido) */}
+                  {tipo === "saida" && destinoSelected && (
                     <td>
                       <span className={item.estoqueDestino === 0 ? styles.estoqueZero : styles.estoqueValor}>
-                        {destinoSelected ? item.estoqueDestino : "—"}
+                        {item.estoqueDestino}
+                      </span>
+                    </td>
+                  )}
+
+                  {/* Estoque da filial de entrada (entradas) */}
+                  {tipo === "entrada" && (
+                    <td>
+                      <span className={item.estoqueDestino === 0 ? styles.estoqueZero : styles.estoqueValor}>
+                        {item.estoqueDestino}
                       </span>
                     </td>
                   )}

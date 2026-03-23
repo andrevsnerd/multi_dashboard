@@ -457,6 +457,79 @@
   cursor: not-allowed;
 }
 
+/* ---- Botão lápis editar qtd (admin) ---- */
+.editQtdBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 5px;
+  background: transparent;
+  color: #9ca3af;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+  flex-shrink: 0;
+}
+
+.editQtdBtn:hover {
+  color: #3b82f6;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+/* ---- Preview de impacto no modal de edição ---- */
+.editQtdPreview {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.editQtdPreviewTitle {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 4px 0;
+}
+
+.editQtdPreviewRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.editQtdPreviewLabel {
+  font-size: 13px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.editQtdPreviewVal {
+  font-size: 14px;
+  color: #111827;
+  white-space: nowrap;
+}
+
+.editQtdArrow {
+  color: #9ca3af;
+  margin: 0 4px;
+}
+
+.estoqueUp {
+  color: #16a34a;
+}
+
+.estoqueDown {
+  color: #dc2626;
+}
+
 /* Estoque destino */
 .estoqueValor {
   font-weight: 600;

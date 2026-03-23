@@ -44,8 +44,8 @@ export function canAccessPath(user: UserSession | null, pathname: string | null)
     if (!canAccessCompany(user, companySegment)) return false;
   }
   if (user.role === "admin") return true;
-  if (user.role === "gestor") {
-    // gestor com permissions vazias = acesso total (exceto /admin)
+  if (user.role === "gestor" || user.role === "logistica") {
+    // gestor/logistica com permissions vazias = acesso total (exceto /admin)
     if (!user.permissions?.length) return true;
     return user.permissions.includes(perm as PermissionKey);
   }
@@ -56,7 +56,7 @@ export function canAccessPath(user: UserSession | null, pathname: string | null)
 export function getFirstAllowedPath(user: UserSession | null, company: string): string {
   if (!user) return `/${company}`;
   if (user.role === "admin") return `/${company}`;
-  if (user.role === "gestor" && !user.permissions?.length) return `/${company}`;
+  if ((user.role === "gestor" || user.role === "logistica") && !user.permissions?.length) return `/${company}`;
   if (user.permissions.includes("controle-transferencias"))
     return `/${company}/controle-transferencias`;
   if (user.permissions.includes("saidas-entradas-produtos"))

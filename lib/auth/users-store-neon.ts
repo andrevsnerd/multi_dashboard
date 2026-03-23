@@ -11,13 +11,23 @@ async function ensureTable(sql: ReturnType<typeof getNeonSql>) {
       id TEXT PRIMARY KEY,
       username TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
-      role TEXT NOT NULL CHECK (role IN ('admin', 'gestor')),
+      role TEXT NOT NULL CHECK (role IN ('admin', 'gestor', 'logistica')),
       permissions JSONB NOT NULL DEFAULT '[]'::jsonb,
       allowed_companies JSONB
     )
   `;
   await sql`ALTER TABLE dashboard_users ADD COLUMN IF NOT EXISTS allowed_companies JSONB`;
   await sql`ALTER TABLE dashboard_users ADD COLUMN IF NOT EXISTS nome_exibicao TEXT`;
+  // Atualiza o CHECK constraint para incluir o role 'logistica'
+  await sql`
+    DO $$
+    BEGIN
+      ALTER TABLE dashboard_users DROP CONSTRAINT IF EXISTS dashboard_users_role_check;
+      ALTER TABLE dashboard_users
+        ADD CONSTRAINT dashboard_users_role_check CHECK (role IN ('admin', 'gestor', 'logistica'));
+    EXCEPTION WHEN others THEN NULL;
+    END$$
+  `;
   tableChecked = true;
 }
 

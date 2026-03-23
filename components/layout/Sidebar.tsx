@@ -165,7 +165,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
             ...allNavItems,
             { label: "Admin", href: "/admin", permission: "admin" as const },
           ]
-        : user.role === "gestor" && (!user.permissions?.length)
+        : (user.role === "gestor" || user.role === "logistica") && (!user.permissions?.length)
           ? allNavItems
           : allNavItems.filter((item) => {
               if (item.permission === "home") return true;

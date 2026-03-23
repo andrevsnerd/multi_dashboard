@@ -16,5 +16,11 @@
     "romaneio_id": "029256",
     "filial_origem": "NERD",
     "filial_destino": "000069"
+  },
+  {
+    "company_key": "scarfme",
+    "romaneio_id": "029287",
+    "filial_origem": "NERD",
+    "filial_destino": "NERD LEBLON"
   }
 ]
