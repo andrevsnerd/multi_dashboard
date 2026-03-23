@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import {
   fetchVendasPorCategoriaGiro,
+  fetchParadosPorCategoriaGiro,
 } from '@/lib/repositories/controleEstoque';
 
 export async function GET(request: Request) {
@@ -52,6 +53,16 @@ export async function GET(request: Request) {
         // Buscar vendas por categoria com detalhes (linha, subgrupo, grade, coleção)
         const vendas = await fetchVendasPorCategoriaGiro({ company, filial, range, ...filters });
         return NextResponse.json({ data: vendas });
+      }
+      case 'parados-kpis': {
+        const parados = await fetchParadosPorCategoriaGiro({ company, filial, range, ...filters });
+        const totalEstoque = parados.reduce((sum, v) => sum + v.estoque, 0);
+        const totalProdutos = parados.reduce((sum, v) => sum + v.qtdProdutos, 0);
+        return NextResponse.json({ data: { totalEstoque, totalProdutos } });
+      }
+      case 'parados-categorias': {
+        const parados = await fetchParadosPorCategoriaGiro({ company, filial, range, ...filters });
+        return NextResponse.json({ data: parados });
       }
       default:
         return NextResponse.json(

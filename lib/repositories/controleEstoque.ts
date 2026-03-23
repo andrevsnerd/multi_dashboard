@@ -5499,3 +5499,133 @@ export async function fetchTopProdutosUltimos3Meses({
     return comSugestao;
   });
 }
+
+/**
+ * Busca produtos PARADOS por categoria: com estoque positivo nas filiais
+ * que NÃO venderam no período selecionado.
+ */
+export async function fetchParadosPorCategoriaGiro({
+  company,
+  filial,
+  range,
+  grupos,
+  linhas,
+  colecoes,
+  subgrupos,
+  grades,
+}: ControleEstoqueParams): Promise<Array<{
+  categoria: string;
+  estoque: number;
+  qtdProdutos: number;
+  linha?: string;
+  subgrupo?: string;
+  grade?: string;
+  colecao?: string;
+}>> {
+  return withRequest(async (request) => {
+    const { start: periodoStart, end: periodoEnd } = resolveRange(range);
+
+    const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
+    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp2');
+    const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
+    const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
+    const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
+    const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
+    const gradeFilter = buildGradeFilter(request, company, grades, 'p');
+    const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineGiro');
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
+
+    const categoriaField = company === 'nerd'
+      ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
+      : 'ISNULL(p.LINHA, \'SEM LINHA\')';
+
+    request.input('paradosStart', sql.DateTime, periodoStart);
+    request.input('paradosEnd', sql.DateTime, periodoEnd);
+
+    // Mesma lógica de expansão/detalhes que fetchVendasPorCategoriaGiro
+    const apenasExpansaoSubgrupo = company === 'scarfme' &&
+      (linhas && linhas.length > 0) &&
+      !(colecoes && colecoes.length > 0) &&
+      !(subgrupos && subgrupos.length > 0) &&
+      !(grades && grades.length > 0);
+
+    const mostrarDetalhes = (company === 'scarfme' && (
+      (linhas && linhas.length > 0) ||
+      (colecoes && colecoes.length > 0) ||
+      (subgrupos && subgrupos.length > 0) ||
+      (grades && grades.length > 0)
+    )) || (company === 'nerd' && (
+      (subgrupos && subgrupos.length > 0) ||
+      (grades && grades.length > 0) ||
+      (colecoes && colecoes.length > 0)
+    ));
+
+    const camposAdicionais = mostrarDetalhes
+      ? (apenasExpansaoSubgrupo
+          ? `, ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo`
+          : (company === 'scarfme'
+              ? `, ISNULL(p.LINHA, '') AS linha, ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo, ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade, ISNULL(p.COLECAO, '') AS colecao`
+              : `, ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo, ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade, ISNULL(p.COLECAO, '') AS colecao`))
+      : '';
+
+    const groupByAdicional = mostrarDetalhes
+      ? (apenasExpansaoSubgrupo
+          ? `, ISNULL(p.SUBGRUPO_PRODUTO, '')`
+          : (company === 'scarfme'
+              ? `, ISNULL(p.LINHA, ''), ISNULL(p.SUBGRUPO_PRODUTO, ''), ISNULL(CONVERT(VARCHAR, p.GRADE), ''), ISNULL(p.COLECAO, '')`
+              : `, ISNULL(p.SUBGRUPO_PRODUTO, ''), ISNULL(CONVERT(VARCHAR, p.GRADE), ''), ISNULL(p.COLECAO, '')`))
+      : '';
+
+    const query = `
+      SELECT
+        ${categoriaField} AS categoria${camposAdicionais},
+        SUM(e.ESTOQUE) AS estoque,
+        COUNT(DISTINCT e.PRODUTO) AS qtdProdutos
+      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+      WHERE e.ESTOQUE > 0
+        ${estoqueFilialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
+        AND ${categoriaField} <> ''
+        AND ${categoriaField} <> 'SEM GRUPO'
+        AND ${categoriaField} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaField)}
+        AND NOT EXISTS (
+          SELECT 1 FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp2 WITH (NOLOCK)
+          WHERE vp2.DATA_VENDA >= @paradosStart
+            AND vp2.DATA_VENDA < @paradosEnd
+            AND vp2.QTDE > 0
+            AND vp2.PRODUTO = e.PRODUTO
+            ${vendasFilialFilter}
+        )
+      GROUP BY ${categoriaField}${groupByAdicional}
+    `;
+
+    const result = await request.query<{
+      categoria: string;
+      estoque: number | null;
+      qtdProdutos: number | null;
+      linha?: string;
+      subgrupo?: string;
+      grade?: string;
+      colecao?: string;
+    }>(query);
+
+    return result.recordset.map(row => ({
+      categoria: row.categoria?.trim() || '',
+      estoque: Math.round(Number(row.estoque ?? 0)),
+      qtdProdutos: Math.round(Number(row.qtdProdutos ?? 0)),
+      linha: row.linha?.trim() || undefined,
+      subgrupo: row.subgrupo?.trim() || undefined,
+      grade: row.grade?.trim() || undefined,
+      colecao: row.colecao?.trim() || undefined,
+    })).filter(item => item.estoque > 0 && item.categoria !== '')
+      .sort((a, b) => b.estoque - a.estoque);
+  });
+}

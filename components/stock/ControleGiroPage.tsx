@@ -26,11 +26,26 @@ interface GiroKPI {
   totalVendasEcommerce: number;
 }
 
+interface ParadosKPI {
+  totalEstoque: number;
+  totalProdutos: number;
+}
+
 interface CategoriaGiro {
   categoria: string;
   vendas: number;
   vendasVarejo: number;
   vendasEcommerce: number;
+  linha?: string;
+  subgrupo?: string;
+  grade?: string;
+  colecao?: string;
+}
+
+interface CategoriaParados {
+  categoria: string;
+  estoque: number;
+  qtdProdutos: number;
   linha?: string;
   subgrupo?: string;
   grade?: string;
@@ -113,6 +128,64 @@ async function fetchCategorias(
   return json.data;
 }
 
+async function fetchParadosKPIs(
+  company: string,
+  filial: string | null,
+  range: DateRangeValue,
+  grupos: string[],
+  linhas: string[],
+  colecoes: string[],
+  subgrupos: string[],
+  grades: string[]
+): Promise<ParadosKPI> {
+  const searchParams = new URLSearchParams({
+    company,
+    dataType: "parados-kpis",
+    start: range.startDate.toISOString(),
+    end: range.endDate.toISOString(),
+  });
+  if (filial) searchParams.set("filial", filial);
+  grupos.forEach(g => searchParams.append("grupos", g));
+  linhas.forEach(l => searchParams.append("linhas", l));
+  colecoes.forEach(c => searchParams.append("colecoes", c));
+  subgrupos.forEach(s => searchParams.append("subgrupos", s));
+  grades.forEach(g => searchParams.append("grades", g));
+
+  const response = await fetch(`/api/controle-giro?${searchParams.toString()}`, { cache: "no-store" });
+  if (!response.ok) throw new Error("Erro ao carregar KPIs de parados");
+  const json = (await response.json()) as { data: ParadosKPI };
+  return json.data;
+}
+
+async function fetchParadosCategorias(
+  company: string,
+  filial: string | null,
+  range: DateRangeValue,
+  grupos: string[],
+  linhas: string[],
+  colecoes: string[],
+  subgrupos: string[],
+  grades: string[]
+): Promise<CategoriaParados[]> {
+  const searchParams = new URLSearchParams({
+    company,
+    dataType: "parados-categorias",
+    start: range.startDate.toISOString(),
+    end: range.endDate.toISOString(),
+  });
+  if (filial) searchParams.set("filial", filial);
+  grupos.forEach(g => searchParams.append("grupos", g));
+  linhas.forEach(l => searchParams.append("linhas", l));
+  colecoes.forEach(c => searchParams.append("colecoes", c));
+  subgrupos.forEach(s => searchParams.append("subgrupos", s));
+  grades.forEach(g => searchParams.append("grades", g));
+
+  const response = await fetch(`/api/controle-giro?${searchParams.toString()}`, { cache: "no-store" });
+  if (!response.ok) throw new Error("Erro ao carregar categorias de parados");
+  const json = (await response.json()) as { data: CategoriaParados[] };
+  return json.data;
+}
+
 function formatNumber(value: number): string {
   return value.toLocaleString("pt-BR", {
     maximumFractionDigits: 0,
@@ -151,6 +224,11 @@ export default function ControleGiroPage({
 
   const [kpis, setKpis] = useState<GiroKPI | null>(null);
   const [categorias, setCategorias] = useState<CategoriaGiro[]>([]);
+
+  const [modoParados, setModoParados] = useState(false);
+  const [paradosKpis, setParadosKpis] = useState<ParadosKPI | null>(null);
+  const [paradosCategorias, setParadosCategorias] = useState<CategoriaParados[]>([]);
+  const [loadingParados, setLoadingParados] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -233,6 +311,36 @@ export default function ControleGiroPage({
 
     return filtradas;
   }, [categorias, selectedCategorias, linhasExcluidas, companyKey, selectedGrupos, linhasExpandidas]);
+
+  // Filtrar parados com a mesma lógica de categoriasFiltradas
+  const paradosFiltrados = useMemo(() => {
+    if (companyKey === 'scarfme') {
+      const linhasExpandidasList = Array.from(linhasExpandidas);
+      if (linhasExpandidasList.length > 0) {
+        return paradosCategorias.filter(c => {
+          if (linhasExcluidas.has(c.categoria.toUpperCase())) return false;
+          return c.subgrupo && linhasExpandidas.has(c.categoria);
+        }).sort((a, b) => b.estoque - a.estoque);
+      } else {
+        return paradosCategorias.filter(c => {
+          if (linhasExcluidas.has(c.categoria.toUpperCase())) return false;
+          if (!selectedCategorias.has(c.categoria)) return false;
+          return !c.subgrupo;
+        }).sort((a, b) => b.estoque - a.estoque);
+      }
+    }
+
+    let filtradas = paradosCategorias.filter(c => {
+      if (linhasExcluidas.has(c.categoria.toUpperCase())) return false;
+      return selectedCategorias.size === 0 || selectedCategorias.has(c.categoria);
+    });
+
+    if (companyKey === 'nerd' && selectedGrupos.length > 0) {
+      filtradas = filtradas.filter(c => selectedGrupos.includes(c.categoria));
+    }
+
+    return filtradas.sort((a, b) => b.estoque - a.estoque);
+  }, [paradosCategorias, selectedCategorias, linhasExcluidas, companyKey, selectedGrupos, linhasExpandidas]);
 
   // Buscar grupos disponíveis para NERD
   useEffect(() => {
@@ -543,6 +651,41 @@ export default function ControleGiroPage({
     };
   }, [companyKey, selectedFilial, range, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, linhasExpandidas]);
 
+  // Carregar dados de parados quando modo estiver ativo
+  useEffect(() => {
+    if (!modoParados) return;
+
+    let active = true;
+
+    async function loadParados() {
+      setLoadingParados(true);
+
+      try {
+        const linhasParaBuscar = companyKey === 'scarfme' && linhasExpandidas.size > 0
+          ? Array.from(linhasExpandidas)
+          : selectedLinhas;
+
+        const [kpisData, categoriasData] = await Promise.all([
+          fetchParadosKPIs(companyKey, selectedFilial, range, selectedGrupos, linhasParaBuscar, selectedColecoes, selectedSubgrupos, selectedGrades),
+          fetchParadosCategorias(companyKey, selectedFilial, range, selectedGrupos, linhasParaBuscar, selectedColecoes, selectedSubgrupos, selectedGrades),
+        ]);
+
+        if (active) {
+          setParadosKpis(kpisData);
+          setParadosCategorias(categoriasData);
+        }
+      } catch (err) {
+        // Silenciosamente falhar - modo parados é opcional
+      } finally {
+        if (active) setLoadingParados(false);
+      }
+    }
+
+    void loadParados();
+
+    return () => { active = false; };
+  }, [modoParados, companyKey, selectedFilial, range, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, linhasExpandidas]);
+
   const currentDate = format(new Date(), "EEEE, d 'De' MMMM 'De' yyyy", { locale: ptBR });
 
   if (loading) {
@@ -602,27 +745,43 @@ export default function ControleGiroPage({
 
       {/* KPIs */}
       <div className={styles.kpisGrid}>
-        <div className={styles.kpiCard}>
-          <div className={styles.kpiLabel}>TOTAL VENDAS</div>
-          <div className={styles.kpiValue}>{formatNumber(kpis?.totalVendas ?? 0)} un</div>
-          {(kpis && (kpis.totalVendasVarejo > 0 || kpis.totalVendasEcommerce > 0)) && (
-            <div className={styles.vendasBreakdown}>
-              {kpis.totalVendasVarejo > 0 && (
-                <span className={styles.vendasDetail}>
-                  Varejo: {formatNumber(kpis.totalVendasVarejo)}
-                </span>
-              )}
-              {kpis.totalVendasVarejo > 0 && kpis.totalVendasEcommerce > 0 && (
-                <span className={styles.vendasSeparator}> • </span>
-              )}
-              {kpis.totalVendasEcommerce > 0 && (
-                <span className={styles.vendasDetail}>
-                  E-commerce: {formatNumber(kpis.totalVendasEcommerce)}
-                </span>
-              )}
+        {modoParados ? (
+          <div className={`${styles.kpiCard} ${styles.kpiCardParados}`}>
+            <div className={`${styles.kpiLabel} ${styles.kpiLabelParados}`}>TOTAL PARADOS</div>
+            <div className={styles.kpiValue}>
+              {loadingParados ? "..." : `${formatNumber(paradosKpis?.totalEstoque ?? 0)} un`}
             </div>
-          )}
-        </div>
+            {paradosKpis && paradosKpis.totalProdutos > 0 && (
+              <div className={styles.vendasBreakdown}>
+                <span className={styles.vendasDetail}>
+                  {formatNumber(paradosKpis.totalProdutos)} produto{paradosKpis.totalProdutos !== 1 ? 's' : ''} sem venda
+                </span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className={styles.kpiCard}>
+            <div className={styles.kpiLabel}>TOTAL VENDAS</div>
+            <div className={styles.kpiValue}>{formatNumber(kpis?.totalVendas ?? 0)} un</div>
+            {(kpis && (kpis.totalVendasVarejo > 0 || kpis.totalVendasEcommerce > 0)) && (
+              <div className={styles.vendasBreakdown}>
+                {kpis.totalVendasVarejo > 0 && (
+                  <span className={styles.vendasDetail}>
+                    Varejo: {formatNumber(kpis.totalVendasVarejo)}
+                  </span>
+                )}
+                {kpis.totalVendasVarejo > 0 && kpis.totalVendasEcommerce > 0 && (
+                  <span className={styles.vendasSeparator}> • </span>
+                )}
+                {kpis.totalVendasEcommerce > 0 && (
+                  <span className={styles.vendasDetail}>
+                    E-commerce: {formatNumber(kpis.totalVendasEcommerce)}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Filtros */}
@@ -690,6 +849,40 @@ export default function ControleGiroPage({
         )}
       </div>
 
+      {/* Botão Parados */}
+      <div className={styles.paradosRow}>
+        <button
+          onClick={() => setModoParados(prev => !prev)}
+          className={modoParados ? `${styles.paradosButton} ${styles.paradosButtonActive}` : styles.paradosButton}
+        >
+          PARADOS
+        </button>
+        {modoParados && (
+          <select
+            className={styles.paradosPeriodoSelect}
+            onChange={(e) => {
+              const dias = Number(e.target.value);
+              if (!dias) return;
+              const end = new Date();
+              end.setHours(23, 59, 59, 999);
+              const start = new Date();
+              start.setDate(start.getDate() - dias);
+              start.setHours(0, 0, 0, 0);
+              setRange({ startDate: start, endDate: end });
+            }}
+          >
+            <option value="">Período rápido...</option>
+            <option value="7">7 dias</option>
+            <option value="30">30 dias</option>
+            <option value="60">60 dias</option>
+            <option value="90">90 dias</option>
+            <option value="120">120 dias</option>
+            <option value="150">150 dias</option>
+            <option value="300">Obsoleto (300 dias)</option>
+          </select>
+        )}
+      </div>
+
       {/* Por Categoria */}
       <div className={styles.section} id="categorias-section">
         <div className={styles.sectionHeader}>
@@ -704,72 +897,128 @@ export default function ControleGiroPage({
               ← Voltar
             </button>
           )}
-          <h2 className={styles.sectionTitle}>Por Categoria</h2>
+          <h2 className={styles.sectionTitle}>
+            {modoParados ? 'Parados por Categoria' : 'Por Categoria'}
+          </h2>
         </div>
         <div className={styles.categoriasGrid}>
-          {categoriasFiltradas.map((cat, index) => {
-            // Para SCARFME: Se está no nível 0 (sem subgrupo), é uma linha clicável
-            // Se tem subgrupo, é um subgrupo expandido
-            const isLinhaNivel0 = companyKey === 'scarfme' && !cat.subgrupo && linhasExpandidas.size === 0;
-            const isSubgrupoExpandido = companyKey === 'scarfme' && cat.subgrupo && linhasExpandidas.has(cat.categoria);
-            
-            return (
-              <div key={`${cat.categoria}-${cat.subgrupo || ''}-${index}`} className={styles.categoriaCard}>
-                <div className={styles.categoriaHeader}>
-                  <div className={styles.categoriaNameWrapper}>
-                    {isLinhaNivel0 ? (
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setLinhasExpandidas(prev => {
-                            const novo = new Set(prev);
-                            novo.add(cat.categoria);
-                            return novo;
-                          });
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                        className={styles.categoriaName}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
-                      >
-                        {cat.categoria}
-                      </button>
-                    ) : (
-                      <div className={styles.categoriaName}>
-                        {cat.categoria}
+          {modoParados ? (
+            loadingParados ? (
+              <div className={styles.loading}>Carregando parados...</div>
+            ) : paradosFiltrados.length === 0 ? (
+              <div className={styles.loading}>Nenhum produto parado encontrado no período.</div>
+            ) : (
+              paradosFiltrados.map((cat, index) => {
+                const isLinhaNivel0 = companyKey === 'scarfme' && !cat.subgrupo && linhasExpandidas.size === 0;
+                const isSubgrupoExpandido = companyKey === 'scarfme' && cat.subgrupo && linhasExpandidas.has(cat.categoria);
+
+                return (
+                  <div key={`parados-${cat.categoria}-${cat.subgrupo || ''}-${index}`} className={`${styles.categoriaCard} ${styles.categoriaCardParados}`}>
+                    <div className={styles.categoriaHeader}>
+                      <div className={styles.categoriaNameWrapper}>
+                        {isLinhaNivel0 ? (
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setLinhasExpandidas(prev => {
+                                const novo = new Set(prev);
+                                novo.add(cat.categoria);
+                                return novo;
+                              });
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            className={styles.categoriaName}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
+                          >
+                            {cat.categoria}
+                          </button>
+                        ) : (
+                          <div className={styles.categoriaName}>{cat.categoria}</div>
+                        )}
+                        {isSubgrupoExpandido && cat.subgrupo && (
+                          <div className={styles.categoriaDetails}>
+                            <span className={styles.detailTag}>Subgrupo: {cat.subgrupo}</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {isSubgrupoExpandido && cat.subgrupo && (
-                      <div className={styles.categoriaDetails}>
-                        <span className={styles.detailTag}>Subgrupo: {cat.subgrupo}</span>
+                    </div>
+                    <div className={styles.categoriaContent}>
+                      <div className={`${styles.estoqueValue} ${styles.estoqueValueParados}`}>
+                        {formatNumber(cat.estoque)} <span className={styles.estoqueUnit}>un em estoque</span>
                       </div>
-                    )}
-                  </div>
-                </div>
-                <div className={styles.categoriaContent}>
-                  <div className={styles.estoqueValue}>
-                    {formatNumber(cat.vendas)} <span className={styles.estoqueUnit}>unidades</span>
-                  </div>
-                  {(cat.vendasVarejo > 0 || cat.vendasEcommerce > 0) && (
-                    <div className={styles.vendasBreakdown}>
-                      {cat.vendasVarejo > 0 && (
+                      <div className={styles.vendasBreakdown}>
                         <span className={styles.vendasDetail}>
-                          Varejo: {formatNumber(cat.vendasVarejo)}
+                          {formatNumber(cat.qtdProdutos)} produto{cat.qtdProdutos !== 1 ? 's' : ''} sem venda
                         </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )
+          ) : (
+            categoriasFiltradas.map((cat, index) => {
+              const isLinhaNivel0 = companyKey === 'scarfme' && !cat.subgrupo && linhasExpandidas.size === 0;
+              const isSubgrupoExpandido = companyKey === 'scarfme' && cat.subgrupo && linhasExpandidas.has(cat.categoria);
+
+              return (
+                <div key={`${cat.categoria}-${cat.subgrupo || ''}-${index}`} className={styles.categoriaCard}>
+                  <div className={styles.categoriaHeader}>
+                    <div className={styles.categoriaNameWrapper}>
+                      {isLinhaNivel0 ? (
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setLinhasExpandidas(prev => {
+                              const novo = new Set(prev);
+                              novo.add(cat.categoria);
+                              return novo;
+                            });
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          className={styles.categoriaName}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
+                        >
+                          {cat.categoria}
+                        </button>
+                      ) : (
+                        <div className={styles.categoriaName}>
+                          {cat.categoria}
+                        </div>
                       )}
-                      {cat.vendasVarejo > 0 && cat.vendasEcommerce > 0 && (
-                        <span className={styles.vendasSeparator}> • </span>
-                      )}
-                      {cat.vendasEcommerce > 0 && (
-                        <span className={styles.vendasDetail}>
-                          E-commerce: {formatNumber(cat.vendasEcommerce)}
-                        </span>
+                      {isSubgrupoExpandido && cat.subgrupo && (
+                        <div className={styles.categoriaDetails}>
+                          <span className={styles.detailTag}>Subgrupo: {cat.subgrupo}</span>
+                        </div>
                       )}
                     </div>
-                  )}
+                  </div>
+                  <div className={styles.categoriaContent}>
+                    <div className={styles.estoqueValue}>
+                      {formatNumber(cat.vendas)} <span className={styles.estoqueUnit}>unidades</span>
+                    </div>
+                    {(cat.vendasVarejo > 0 || cat.vendasEcommerce > 0) && (
+                      <div className={styles.vendasBreakdown}>
+                        {cat.vendasVarejo > 0 && (
+                          <span className={styles.vendasDetail}>
+                            Varejo: {formatNumber(cat.vendasVarejo)}
+                          </span>
+                        )}
+                        {cat.vendasVarejo > 0 && cat.vendasEcommerce > 0 && (
+                          <span className={styles.vendasSeparator}> • </span>
+                        )}
+                        {cat.vendasEcommerce > 0 && (
+                          <span className={styles.vendasDetail}>
+                            E-commerce: {formatNumber(cat.vendasEcommerce)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
     </div>
