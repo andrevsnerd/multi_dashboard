@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPermissaoByUsername } from "@/lib/utils/transferencia-permissoes-store";
 import { fetchLogEntradas } from "@/lib/repositories/logEntradas";
+import { findUserByUsername } from "@/lib/auth/users-store";
 
 /**
  * GET /api/romaneios/entradas?company=nerd
@@ -24,6 +25,12 @@ export async function GET(request: NextRequest) {
     const entradas = await fetchLogEntradas(200, 90);
 
     if (!username) {
+      return NextResponse.json({ data: entradas });
+    }
+
+    // Logística vê todos os romaneios da empresa sem restrição de filial
+    const userRecord = await findUserByUsername(username);
+    if (userRecord?.role === "logistica") {
       return NextResponse.json({ data: entradas });
     }
 

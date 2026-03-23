@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPermissaoByUsername } from "@/lib/utils/transferencia-permissoes-store";
 import { getAllDestinosByCompany } from "@/lib/utils/destino-romaneio-store";
 import { fetchLogSaidas } from "@/lib/repositories/logSaidas";
+import { findUserByUsername } from "@/lib/auth/users-store";
 
 /**
  * GET /api/romaneios/saidas?company=nerd
@@ -34,6 +35,12 @@ export async function GET(request: NextRequest) {
     });
 
     if (!username) {
+      return NextResponse.json({ data: saidasComDestino });
+    }
+
+    // Logística vê todos os romaneios da empresa sem restrição de filial
+    const userRecord = await findUserByUsername(username);
+    if (userRecord?.role === "logistica") {
       return NextResponse.json({ data: saidasComDestino });
     }
 
