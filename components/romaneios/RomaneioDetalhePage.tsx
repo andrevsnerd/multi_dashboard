@@ -169,6 +169,19 @@ export default function RomaneioDetalhePage({
   const { user } = useAuth();
   const [itens, setItens] = useState<RomaneioDetalheItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [responsavelPadrao, setResponsavelPadrao] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user?.username) return;
+    fetch("/api/transferencia-produtos/permissoes", {
+      headers: { "x-auth-username": user.username },
+    })
+      .then((r) => r.ok ? r.json() : null)
+      .then((json) => {
+        if (json?.responsavelPadrao) setResponsavelPadrao(json.responsavelPadrao);
+      })
+      .catch(() => {});
+  }, [user?.username]);
 
   const dataEmissao = dataEmissaoProp
     ? (() => {
@@ -301,7 +314,7 @@ export default function RomaneioDetalhePage({
             corProduto: i.corProduto,
             quantidade: i.quantidade,
           })),
-          responsavel
+          responsavelPadrao || user.username
         );
         if (!ok) {
           setErroConfirmacao("Erro ao registrar entrada de estoque. Tente novamente.");
@@ -330,7 +343,7 @@ export default function RomaneioDetalhePage({
     } finally {
       setConfirmandoTudo(false);
     }
-  }, [user?.username, itens, quantidades, tipo, destinoSelected, filialDestino, companySlug, romaneioId, responsavel]);
+  }, [user?.username, itens, quantidades, tipo, destinoSelected, filialDestino, companySlug, romaneioId, responsavel, responsavelPadrao]);
 
   // Desconfirma item individualmente (sem reverter estoque)
   const handleDesconfirmar = useCallback(async (produto: string, corProduto: string | null) => {
