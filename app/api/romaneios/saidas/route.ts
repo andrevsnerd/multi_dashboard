@@ -3,6 +3,7 @@ import { getPermissaoByUsername } from "@/lib/utils/transferencia-permissoes-sto
 import { getAllDestinosByCompany } from "@/lib/utils/destino-romaneio-store";
 import { fetchLogSaidas } from "@/lib/repositories/logSaidas";
 import { findUserByUsername } from "@/lib/auth/users-store";
+import { resolveCompany } from "@/lib/config/company";
 
 /**
  * GET /api/romaneios/saidas?company=nerd
@@ -38,10 +39,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: saidasComDestino });
     }
 
-    // Logística vê todos os romaneios da empresa sem restrição de filial
+    // Logística vê todos os romaneios da empresa, filtrado pelas filiais da empresa
     const userRecord = await findUserByUsername(username);
     if (userRecord?.role === "logistica") {
-      return NextResponse.json({ data: saidasComDestino });
+      const companyConfig = resolveCompany(companyKey);
+      if (!companyConfig) {
+        return NextResponse.json({ data: saidasComDestino });
+      }
+      const filiaisEmpresa = new Set(
+        companyConfig.filialFilters.inventory.map((f) => f.toUpperCase())
+      );
+      const filtered = saidasComDestino.filter((s) =>
+        filiaisEmpresa.has((s.filialOrigem ?? "").toUpperCase())
+      );
+      return NextResponse.json({ data: filtered });
     }
 
     const permissao = await getPermissaoByUsername(username);

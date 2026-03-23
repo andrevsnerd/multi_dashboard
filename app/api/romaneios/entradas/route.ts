@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPermissaoByUsername } from "@/lib/utils/transferencia-permissoes-store";
 import { fetchLogEntradas } from "@/lib/repositories/logEntradas";
 import { findUserByUsername } from "@/lib/auth/users-store";
+import { resolveCompany } from "@/lib/config/company";
 
 /**
  * GET /api/romaneios/entradas?company=nerd
@@ -28,10 +29,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: entradas });
     }
 
-    // Logística vê todos os romaneios da empresa sem restrição de filial
+    // Logística vê todos os romaneios da empresa, filtrado pelas filiais da empresa
     const userRecord = await findUserByUsername(username);
     if (userRecord?.role === "logistica") {
-      return NextResponse.json({ data: entradas });
+      const companyConfig = resolveCompany(companyKey);
+      if (!companyConfig) {
+        return NextResponse.json({ data: entradas });
+      }
+      const filiaisEmpresa = new Set(
+        companyConfig.filialFilters.inventory.map((f) => f.toUpperCase())
+      );
+      const filtered = entradas.filter((e) =>
+        filiaisEmpresa.has((e.filialDestino ?? "").toUpperCase())
+      );
+      return NextResponse.json({ data: filtered });
     }
 
     const permissao = await getPermissaoByUsername(username);
