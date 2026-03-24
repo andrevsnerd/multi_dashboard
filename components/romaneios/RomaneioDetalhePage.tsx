@@ -222,7 +222,7 @@ export default function RomaneioDetalhePage({
   const [loadingDestino, setLoadingDestino] = useState(false);
   const canSetDestino =
     !!user &&
-    (user.role === "admin" || (user.permissions ?? []).includes("destino-romaneio"));
+    (user.role === "admin" || user.role === "logistica" || (user.permissions ?? []).includes("destino-romaneio"));
 
   // --- dar saída (apenas entradas) ---
   const [darSaidaDestino, setDarSaidaDestino] = useState("");

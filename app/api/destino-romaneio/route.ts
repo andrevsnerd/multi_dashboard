@@ -54,6 +54,7 @@ export async function PUT(request: NextRequest) {
     const setandoNaCriacao = body.setandoNaCriacao === true;
     const canSet =
       user.role === "admin" ||
+      user.role === "logistica" ||
       (user.permissions ?? []).includes("destino-romaneio") ||
       setandoNaCriacao;
     if (!canSet) {
