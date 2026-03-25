@@ -125,15 +125,15 @@ export default function RomaneiosPage({ companySlug, companyName }: RomaneiosPag
     <div className={styles.wrapper}>
       <div className={styles.header}>
         <h1 className={styles.title}>Romaneios</h1>
-        <div className={styles.tabs}>
-          <button
-            type="button"
-            className={`${styles.tab} ${activeTab === "saida" ? styles.tabActive : ""}`}
-            onClick={() => setActiveTab("saida")}
-          >
-            Saída
-          </button>
-          {user?.role === "admin" && (
+        {user?.role === "admin" && (
+          <div className={styles.tabs}>
+            <button
+              type="button"
+              className={`${styles.tab} ${activeTab === "saida" ? styles.tabActive : ""}`}
+              onClick={() => setActiveTab("saida")}
+            >
+              Saída
+            </button>
             <button
               type="button"
               className={`${styles.tab} ${activeTab === "entrada" ? styles.tabActive : ""}`}
@@ -141,8 +141,8 @@ export default function RomaneiosPage({ companySlug, companyName }: RomaneiosPag
             >
               Entrada
             </button>
-          )}
-        </div>
+          </div>
+        )}
         <div className={styles.searchBox}>
           <svg viewBox="0 0 24 24" fill="none" className={styles.searchIcon} aria-hidden="true">
             <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
