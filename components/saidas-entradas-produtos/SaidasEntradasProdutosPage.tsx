@@ -1358,7 +1358,15 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                     value={tipoRomaneioSelecionado}
                     onChange={(e) => setTipoRomaneioSelecionado(e.target.value)}
                   >
-                    {tiposRomaneioDisponiveis.map(tipo => (
+                    {[...tiposRomaneioDisponiveis].sort((a, b) => {
+                      const ordem = (s: string) => {
+                        const u = s.toUpperCase();
+                        if (u === 'DEFEITO') return 1;
+                        if (u.includes(' ')) return 2;
+                        return 0;
+                      };
+                      return ordem(a) - ordem(b);
+                    }).map(tipo => (
                       <option key={tipo} value={tipo}>{tipo}</option>
                     ))}
                   </select>
