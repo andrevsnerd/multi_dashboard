@@ -1361,9 +1361,9 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                     {[...tiposRomaneioDisponiveis].sort((a, b) => {
                       const ordem = (s: string) => {
                         const u = s.toUpperCase();
+                        if (u === 'TRANSFERENCIA ENTRE LOJAS') return 0;
                         if (u === 'DEFEITO') return 1;
-                        if (u.includes(' ')) return 2;
-                        return 0;
+                        return 2;
                       };
                       return ordem(a) - ordem(b);
                     }).map(tipo => (
