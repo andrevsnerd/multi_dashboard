@@ -470,6 +470,8 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
     return filiaisDestinoDisponiveis;
   }, [tipoRomaneioSelecionado, filiaisDestinoDisponiveis, companyKey]);
 
+  const isSaidaMkt = tipoRomaneioSelecionado.toUpperCase().includes('MKT');
+
   // Resetar filial destino ao mudar tipo de romaneio; auto-selecionar se só há uma opção
   useEffect(() => {
     setFilialDestinoSaida(filiaisDestinoVisiveis.length === 1 ? filiaisDestinoVisiveis[0] : null);
@@ -967,8 +969,8 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
         observacao.trim() || undefined
       );
 
-      // Salvar filial destino do romaneio gerado (saída)
-      if (tipoOperacao === "saida" && filialDestinoSaida && resultado.romaneio) {
+      // Salvar filial destino do romaneio gerado (saída) — não aplicável para SAÍDA MKT
+      if (tipoOperacao === "saida" && filialDestinoSaida && resultado.romaneio && !tipoRomaneioSelecionado.toUpperCase().includes('MKT')) {
         try {
           await salvarDestinoRomaneio(
             companyKey,
@@ -1145,12 +1147,12 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       mostrarNotificacao("Adicione pelo menos um produto", "error");
       return;
     }
-    if (tipoOperacao === "saida" && filiaisDestinoVisiveis.length > 1 && !filialDestinoSaida) {
+    if (tipoOperacao === "saida" && filiaisDestinoVisiveis.length > 1 && !filialDestinoSaida && !tipoRomaneioSelecionado.toUpperCase().includes('MKT')) {
       mostrarNotificacao("Selecione uma filial de destino", "error");
       return;
     }
     setMostrarConfirmacaoRegistro(true);
-  }, [filialSelecionada, produtosSelecionados.length, tipoOperacao, filiaisDestinoVisiveis.length, filialDestinoSaida, mostrarNotificacao]);
+  }, [filialSelecionada, produtosSelecionados.length, tipoOperacao, filiaisDestinoVisiveis.length, filialDestinoSaida, tipoRomaneioSelecionado, mostrarNotificacao]);
 
   const confirmarRegistro = useCallback(() => {
     setMostrarConfirmacaoRegistro(false);
@@ -1311,7 +1313,9 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
               </div>
               <div className={styles.configBody}>
                 <span className={styles.configBarLabel}>Filial Destino</span>
-                {filiaisDestinoVisiveis.length === 1 ? (
+                {isSaidaMkt ? (
+                  <span className={styles.configBarText} style={{ opacity: 0.45 }}>— Não se aplica —</span>
+                ) : filiaisDestinoVisiveis.length === 1 ? (
                   <span className={styles.configBarText}>{filiaisDestinoVisiveis[0].filial}</span>
                 ) : (
                   <div className={styles.selectWrap}>
