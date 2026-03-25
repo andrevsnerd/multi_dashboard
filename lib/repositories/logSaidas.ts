@@ -46,7 +46,7 @@ export async function fetchLogSaidas(limit = 200, dias = 90): Promise<LogSaidaRo
           (CONVERT(VARCHAR(10), s.EMISSAO, 120) + 'T' + CONVERT(VARCHAR(8), s.EMISSAO, 108)) AS EMISSAO_STR,
           s.RESPONSAVEL,
           ISNULL(s.OBS, '') AS OBS,
-          ISNULL(s.TIPO_ROMANEIO, '') AS TIPO_ROMANEIO,
+          '' AS TIPO_ROMANEIO,
           ISNULL((
             SELECT COUNT(*) FROM LOJA_SAIDAS_PRODUTO sp WITH (NOLOCK)
             WHERE sp.ROMANEIO_PRODUTO = s.ROMANEIO_PRODUTO AND sp.FILIAL = s.FILIAL
