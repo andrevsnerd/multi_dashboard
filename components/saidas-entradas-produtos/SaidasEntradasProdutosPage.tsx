@@ -1115,8 +1115,12 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       mostrarNotificacao("Adicione pelo menos um produto", "error");
       return;
     }
+    if (tipoOperacao === "saida" && filiaisDestinoDisponiveis.length > 1 && !filialDestinoSaida) {
+      mostrarNotificacao("Selecione uma filial de destino", "error");
+      return;
+    }
     setMostrarConfirmacaoRegistro(true);
-  }, [filialSelecionada, produtosSelecionados.length, mostrarNotificacao]);
+  }, [filialSelecionada, produtosSelecionados.length, tipoOperacao, filiaisDestinoDisponiveis.length, filialDestinoSaida, mostrarNotificacao]);
 
   const confirmarRegistro = useCallback(() => {
     setMostrarConfirmacaoRegistro(false);
@@ -1289,7 +1293,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                         setFilialDestinoSaida(filial || null);
                       }}
                     >
-                      <option value="">Nenhum (definir depois)</option>
+                      <option value="" disabled>— Selecionar filial —</option>
                       {filiaisDestinoDisponiveis.map(f => (
                         <option key={f.codFilial} value={f.codFilial}>{f.filial}</option>
                       ))}
