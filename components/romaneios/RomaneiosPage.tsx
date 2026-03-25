@@ -73,6 +73,7 @@ export default function RomaneiosPage({ companySlug, companyName }: RomaneiosPag
   const [filiais, setFiliais] = useState<FilialOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("saida");
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -107,7 +108,18 @@ export default function RomaneiosPage({ companySlug, companyName }: RomaneiosPag
   }, [companySlug, user?.username]);
 
   const basePath = `/${companySlug}`;
-  const romaneios = activeTab === "saida" ? saidas : entradas;
+  const romaneiosBase = activeTab === "saida" ? saidas : entradas;
+  const romaneios = (() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return romaneiosBase;
+    return romaneiosBase.filter((r) =>
+      r.romaneio.toLowerCase().includes(q) ||
+      (r.responsavel || "").toLowerCase().includes(q) ||
+      (r.filialOrigem || "").toLowerCase().includes(q) ||
+      (r.filialDestino || "").toLowerCase().includes(q) ||
+      (r.tipoRomaneio || "").toLowerCase().includes(q)
+    );
+  })();
 
   return (
     <div className={styles.wrapper}>
@@ -128,6 +140,22 @@ export default function RomaneiosPage({ companySlug, companyName }: RomaneiosPag
           >
             Entrada
           </button>
+        </div>
+        <div className={styles.searchBox}>
+          <svg viewBox="0 0 24 24" fill="none" className={styles.searchIcon} aria-hidden="true">
+            <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+            <path d="M16.5 16.5 21 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <input
+            type="text"
+            className={styles.searchInput}
+            placeholder="Buscar por romaneio, responsável, filial, tipo..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          {searchTerm && (
+            <button className={styles.searchClear} onClick={() => setSearchTerm("")} aria-label="Limpar">×</button>
+          )}
         </div>
         <p className={styles.subtitle}>
           {loading ? "Carregando..." : `${romaneios.length} registros`}
