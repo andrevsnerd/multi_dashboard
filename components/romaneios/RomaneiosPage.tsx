@@ -133,13 +133,15 @@ export default function RomaneiosPage({ companySlug, companyName }: RomaneiosPag
           >
             Saída
           </button>
-          <button
-            type="button"
-            className={`${styles.tab} ${activeTab === "entrada" ? styles.tabActive : ""}`}
-            onClick={() => setActiveTab("entrada")}
-          >
-            Entrada
-          </button>
+          {user?.role === "admin" && (
+            <button
+              type="button"
+              className={`${styles.tab} ${activeTab === "entrada" ? styles.tabActive : ""}`}
+              onClick={() => setActiveTab("entrada")}
+            >
+              Entrada
+            </button>
+          )}
         </div>
         <div className={styles.searchBox}>
           <svg viewBox="0 0 24 24" fill="none" className={styles.searchIcon} aria-hidden="true">
