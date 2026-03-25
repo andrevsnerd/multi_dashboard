@@ -38,6 +38,7 @@ export default async function RomaneioDetalheRoute({
   const filialDestino = typeof sp.filialDestino === "string" ? sp.filialDestino : "";
   const dataEmissao = typeof sp.dataEmissao === "string" ? sp.dataEmissao : "";
   const responsavel = typeof sp.responsavel === "string" ? sp.responsavel : "";
+  const tipoRomaneio = typeof sp.tipoRomaneio === "string" ? sp.tipoRomaneio : "";
 
   if (!tipo || (tipo === "saida" && !filialOrigem) || (tipo === "entrada" && !filialDestino)) {
     notFound();
@@ -56,6 +57,7 @@ export default async function RomaneioDetalheRoute({
             filialDestino={filialDestino}
             dataEmissao={dataEmissao}
             responsavel={responsavel}
+            tipoRomaneio={tipoRomaneio}
           />
         </div>
       </div>

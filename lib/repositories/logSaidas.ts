@@ -10,6 +10,7 @@ export interface LogSaidaRow {
   qtdProdutos: number;
   qtdItens: number;
   status: string;
+  tipoRomaneio: string;
 }
 
 export async function fetchLogSaidas(limit = 200, dias = 90): Promise<LogSaidaRow[]> {
@@ -27,6 +28,7 @@ export async function fetchLogSaidas(limit = 200, dias = 90): Promise<LogSaidaRo
           (CONVERT(VARCHAR(10), es.EMISSAO, 120) + 'T' + CONVERT(VARCHAR(8), es.EMISSAO, 108)) AS EMISSAO_STR,
           es.RESPONSAVEL,
           ISNULL(es.OBS, '') AS OBS,
+          ISNULL(es.TIPO_ROMANEIO, '') AS TIPO_ROMANEIO,
           (SELECT COUNT(*) FROM ESTOQUE_PROD1_SAI ep WITH (NOLOCK)
            WHERE ep.ROMANEIO_PRODUTO = es.ROMANEIO_PRODUTO AND ep.FILIAL = es.FILIAL) AS QTD_PRODUTOS,
           (SELECT ISNULL(SUM(ep.QTDE), 0) FROM ESTOQUE_PROD1_SAI ep WITH (NOLOCK)
@@ -44,6 +46,7 @@ export async function fetchLogSaidas(limit = 200, dias = 90): Promise<LogSaidaRo
           (CONVERT(VARCHAR(10), s.EMISSAO, 120) + 'T' + CONVERT(VARCHAR(8), s.EMISSAO, 108)) AS EMISSAO_STR,
           s.RESPONSAVEL,
           ISNULL(s.OBS, '') AS OBS,
+          ISNULL(s.TIPO_ROMANEIO, '') AS TIPO_ROMANEIO,
           ISNULL((
             SELECT COUNT(*) FROM LOJA_SAIDAS_PRODUTO sp WITH (NOLOCK)
             WHERE sp.ROMANEIO_PRODUTO = s.ROMANEIO_PRODUTO AND sp.FILIAL = s.FILIAL
@@ -80,6 +83,7 @@ export async function fetchLogSaidas(limit = 200, dias = 90): Promise<LogSaidaRo
       OBS: string | null;
       QTD_PRODUTOS: number;
       QTD_ITENS: number;
+      TIPO_ROMANEIO: string | null;
     }>(query);
 
     const rows = result.recordset;
@@ -98,6 +102,7 @@ export async function fetchLogSaidas(limit = 200, dias = 90): Promise<LogSaidaRo
       qtdProdutos: row.QTD_PRODUTOS || 0,
       qtdItens: row.QTD_ITENS || 0,
       status: "Concluída",
+      tipoRomaneio: row.TIPO_ROMANEIO?.toString().trim() || "",
     }));
   });
 

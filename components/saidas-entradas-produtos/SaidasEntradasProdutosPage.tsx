@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { type CompanyKey } from "@/lib/config/company";
 import { useAuth } from "@/components/auth/AuthContext";
 
@@ -59,6 +59,11 @@ interface LogDetalheItem {
   filialOrigem?: string;
   filialDestino?: string;
 }
+
+const DEFEITO_FILIAL_SAIDA: Partial<Record<string, Filial>> = {
+  nerd: { codFilial: 'NERD DEFEITOS', filial: 'NERD DEFEITOS' },
+  scarfme: { codFilial: 'BAZAR SCARF ME', filial: 'BAZAR SCARF ME' },
+};
 
 interface SaidasEntradasProdutosPageProps {
   companyKey: CompanyKey;
@@ -453,6 +458,23 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
   const [filialDestinoSaida, setFilialDestinoSaida] = useState<Filial | null>(null);
   const [filiaisDestinoDisponiveis, setFiliaisDestinoDisponiveis] = useState<Filial[]>([]);
 
+  const filiaisDestinoVisiveis = useMemo<Filial[]>(() => {
+    const isDefeito = tipoRomaneioSelecionado.toUpperCase() === 'DEFEITO';
+    const defeitoFilial = DEFEITO_FILIAL_SAIDA[companyKey];
+    if (isDefeito && defeitoFilial) {
+      return [defeitoFilial];
+    }
+    if (defeitoFilial) {
+      return filiaisDestinoDisponiveis.filter(f => f.codFilial.trim() !== defeitoFilial.codFilial);
+    }
+    return filiaisDestinoDisponiveis;
+  }, [tipoRomaneioSelecionado, filiaisDestinoDisponiveis, companyKey]);
+
+  // Resetar filial destino ao mudar tipo de romaneio; auto-selecionar se só há uma opção
+  useEffect(() => {
+    setFilialDestinoSaida(filiaisDestinoVisiveis.length === 1 ? filiaisDestinoVisiveis[0] : null);
+  }, [tipoRomaneioSelecionado]);
+
   // Carregar permissões do usuário PRIMEIRO (antes de tudo)
   useEffect(() => {
     async function loadPermissoes() {
@@ -519,8 +541,16 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
           const destinos = controle.length > 0
             ? data.filter(f => controle.some(cod => f.codFilial.trim() === (cod || "").trim()))
             : data;
-          setFiliaisDestinoDisponiveis(destinos);
-          if (destinos.length === 1) setFilialDestinoSaida(destinos[0]);
+          const MATRIZ_EXCLUIDA: Partial<Record<string, string>> = {
+            nerd: 'NERD',
+            scarfme: 'SCARF ME - MATRIZ',
+          };
+          const matrizExcluida = MATRIZ_EXCLUIDA[companyKey];
+          const destinosFiltrados = matrizExcluida
+            ? destinos.filter(f => f.codFilial.trim() !== matrizExcluida)
+            : destinos;
+          setFiliaisDestinoDisponiveis(destinosFiltrados);
+          if (destinosFiltrados.length === 1) setFilialDestinoSaida(destinosFiltrados[0]);
         } else {
           setFiliaisDisponiveis(data);
           if (data.length > 0) {
@@ -1115,12 +1145,12 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       mostrarNotificacao("Adicione pelo menos um produto", "error");
       return;
     }
-    if (tipoOperacao === "saida" && filiaisDestinoDisponiveis.length > 1 && !filialDestinoSaida) {
+    if (tipoOperacao === "saida" && filiaisDestinoVisiveis.length > 1 && !filialDestinoSaida) {
       mostrarNotificacao("Selecione uma filial de destino", "error");
       return;
     }
     setMostrarConfirmacaoRegistro(true);
-  }, [filialSelecionada, produtosSelecionados.length, tipoOperacao, filiaisDestinoDisponiveis.length, filialDestinoSaida, mostrarNotificacao]);
+  }, [filialSelecionada, produtosSelecionados.length, tipoOperacao, filiaisDestinoVisiveis.length, filialDestinoSaida, mostrarNotificacao]);
 
   const confirmarRegistro = useCallback(() => {
     setMostrarConfirmacaoRegistro(false);
@@ -1281,20 +1311,20 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
               </div>
               <div className={styles.configBody}>
                 <span className={styles.configBarLabel}>Filial Destino</span>
-                {filiaisDestinoDisponiveis.length === 1 ? (
-                  <span className={styles.configBarText}>{filiaisDestinoDisponiveis[0].filial}</span>
+                {filiaisDestinoVisiveis.length === 1 ? (
+                  <span className={styles.configBarText}>{filiaisDestinoVisiveis[0].filial}</span>
                 ) : (
                   <div className={styles.selectWrap}>
                     <select
                       className={styles.configBarSelect}
                       value={filialDestinoSaida?.codFilial || ""}
                       onChange={(e) => {
-                        const filial = filiaisDestinoDisponiveis.find(f => f.codFilial === e.target.value);
+                        const filial = filiaisDestinoVisiveis.find(f => f.codFilial === e.target.value);
                         setFilialDestinoSaida(filial || null);
                       }}
                     >
                       <option value="" disabled>— Selecionar filial —</option>
-                      {filiaisDestinoDisponiveis.map(f => (
+                      {filiaisDestinoVisiveis.map(f => (
                         <option key={f.codFilial} value={f.codFilial}>{f.filial}</option>
                       ))}
                     </select>

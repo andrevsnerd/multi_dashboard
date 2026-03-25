@@ -18,6 +18,7 @@ export interface RomaneioListItem {
   status: string;
   /** Código da filial destino (apenas saídas, quando definido no detalhe). */
   destinoCodigo?: string | null;
+  tipoRomaneio?: string;
 }
 
 interface FilialOption {
@@ -146,7 +147,7 @@ export default function RomaneiosPage({ companySlug, companyName }: RomaneiosPag
       ) : (
         <div className={styles.list}>
           {romaneios.map((rom, index) => {
-            const detailUrl = `${basePath}/romaneios/${encodeURIComponent(rom.romaneio)}?tipo=${rom.tipo}&filialOrigem=${encodeURIComponent(rom.filialOrigem)}&filialDestino=${encodeURIComponent(rom.filialDestino)}&dataEmissao=${encodeURIComponent(rom.dataEmissao)}&responsavel=${encodeURIComponent(rom.responsavel || "")}`;
+            const detailUrl = `${basePath}/romaneios/${encodeURIComponent(rom.romaneio)}?tipo=${rom.tipo}&filialOrigem=${encodeURIComponent(rom.filialOrigem)}&filialDestino=${encodeURIComponent(rom.filialDestino)}&dataEmissao=${encodeURIComponent(rom.dataEmissao)}&responsavel=${encodeURIComponent(rom.responsavel || "")}&tipoRomaneio=${encodeURIComponent(rom.tipoRomaneio || "")}`;
             return (
               <Link key={`${rom.tipo}-${rom.romaneio}-${rom.filialOrigem}-${rom.filialDestino}-${index}`} href={detailUrl} className={styles.card}>
                 <div className={styles.cardHeader}>

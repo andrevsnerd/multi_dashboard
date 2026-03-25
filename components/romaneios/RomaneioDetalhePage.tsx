@@ -125,6 +125,7 @@ interface RomaneioDetalhePageProps {
   filialDestino: string;
   dataEmissao?: string;
   responsavel?: string;
+  tipoRomaneio?: string;
 }
 
 // ---------- fetch helpers ----------
@@ -182,6 +183,11 @@ async function saveDestinoRomaneio(
 
 // ---------- componente ----------
 
+const DEFEITO_FILIAL_DESTINO: Record<string, string> = {
+  nerd: 'NERD DEFEITOS',
+  scarfme: 'BAZAR SCARF ME',
+};
+
 export default function RomaneioDetalhePage({
   companySlug,
   romaneioId,
@@ -190,6 +196,7 @@ export default function RomaneioDetalhePage({
   filialDestino,
   dataEmissao: dataEmissaoProp = "",
   responsavel: responsavelProp = "",
+  tipoRomaneio = "",
 }: RomaneioDetalhePageProps) {
   const { user } = useAuth();
   const [itens, setItens] = useState<RomaneioDetalheItem[]>([]);
@@ -287,15 +294,37 @@ export default function RomaneioDetalhePage({
     return () => { cancelled = true; };
   }, [tipo, romaneioId, filialOrigem, filialDestino, destinoSelected]);
 
+  const MATRIZ_EXCLUIDA_DESTINO: Record<string, string> = {
+    nerd: 'NERD',
+    scarfme: 'SCARF ME - MATRIZ',
+  };
+
   useEffect(() => {
+    const matrizExcluida = MATRIZ_EXCLUIDA_DESTINO[companySlug];
+    const defeitoFilial = DEFEITO_FILIAL_DESTINO[companySlug];
+    const isDefeito = (tipoRomaneio || "").toUpperCase() === 'DEFEITO';
+
+    const applyFilter = (data: FilialOption[]): FilialOption[] => {
+      if (isDefeito && defeitoFilial) {
+        return [{ codFilial: defeitoFilial, filial: defeitoFilial }];
+      }
+      const filtered = matrizExcluida
+        ? data.filter(f => f.codFilial.trim() !== matrizExcluida)
+        : data;
+      if (defeitoFilial) {
+        return filtered.filter(f => f.codFilial.trim() !== defeitoFilial);
+      }
+      return filtered;
+    };
+
     if (tipo === "saida") {
-      fetchFiliais().then(setFiliais);
+      fetchFiliais().then(data => setFiliais(applyFilter(data)));
       loadDestino();
     } else {
       // Entradas também precisam das filiais (para o modal "Dar Saída")
-      fetchFiliais().then(setFiliais);
+      fetchFiliais().then(data => setFiliais(applyFilter(data)));
     }
-  }, [tipo, loadDestino]);
+  }, [tipo, tipoRomaneio, loadDestino]);
 
   useEffect(() => {
     if (tipo === "entrada" && filialDestino) {
