@@ -6,6 +6,8 @@ import {
   confirmarItem,
   desconfirmarItem,
 } from "@/lib/utils/romaneio-confirmacao-store";
+import { withRequest } from "@/lib/db/connection";
+import sql from "mssql";
 
 /**
  * GET /api/romaneio-confirmar-entrada?company=X&romaneio=Y&filialDestino=Z
@@ -102,7 +104,35 @@ export async function POST(request: Request) {
     }
 
     if (acao === "desconfirmar") {
+      // Busca a qtde confirmada antes de deletar para reverter o estoque
+      const confirmadosMap = await getConfirmados(companyKey, romaneioId, filialDestino);
+      const chave = `${produto}|${(corProduto ?? "").trim()}`;
+      const qtdeConfirmada = confirmadosMap.get(chave) ?? 0;
+
       await desconfirmarItem(companyKey, romaneioId, filialDestino, produto, corProduto ?? "");
+
+      // Reverte o estoque do destino se havia quantidade confirmada
+      if (qtdeConfirmada > 0) {
+        const fd = (filialDestino || "").trim();
+        const p = (produto || "").trim();
+        const cor = (corProduto ?? "").trim();
+        await withRequest(async (req) => {
+          req.input("qtde", sql.Int, qtdeConfirmada);
+          req.input("produto", sql.VarChar, p);
+          req.input("cor", sql.VarChar, cor);
+          req.input("filialDestino", sql.VarChar, fd);
+          await req.query(`
+            UPDATE ep
+            SET ep.ESTOQUE = ep.ESTOQUE - @qtde
+            FROM ESTOQUE_PRODUTOS ep
+            INNER JOIN FILIAIS f WITH (NOLOCK) ON LTRIM(RTRIM(ep.FILIAL)) = LTRIM(RTRIM(f.FILIAL))
+            WHERE ep.PRODUTO = @produto
+              AND ISNULL(ep.COR_PRODUTO, '') = @cor
+              AND (LTRIM(RTRIM(f.COD_FILIAL)) = LTRIM(RTRIM(@filialDestino))
+                   OR LTRIM(RTRIM(f.FILIAL)) = LTRIM(RTRIM(@filialDestino)))
+          `);
+        });
+      }
     } else {
       await confirmarItem(
         companyKey,
