@@ -830,14 +830,9 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       return null;
     }
 
-    const estoque = produto.estoques.find(e => {
-      const filialTrim = e.filial.trim();
-      const codFilialTrim = filialSelecionada.codFilial.trim();
-      return filialTrim === codFilialTrim || 
-             e.filial === filialSelecionada.codFilial ||
-             filialTrim.startsWith(codFilialTrim) ||
-             codFilialTrim.startsWith(filialTrim);
-    });
+    const estoque = produto.estoques.find(e =>
+      e.filial.trim() === filialSelecionada.codFilial.trim()
+    );
     
     if (!estoque) {
       if (tipoOperacao === "entrada") {
