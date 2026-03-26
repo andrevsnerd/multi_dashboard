@@ -397,12 +397,18 @@ export default function RomaneioDetalhePage({
         }
         return next;
       });
+
+      // Rebusca os itens para refletir o estoque atualizado após a entrada
+      const fd = tipo === "saida" ? destinoSelected : filialDestino;
+      fetchDetalhes(tipo, romaneioId, filialOrigem, fd).then((data) => {
+        if (data.length > 0) setItens(data);
+      });
     } catch {
       setErroConfirmacao("Erro inesperado. Tente novamente.");
     } finally {
       setConfirmandoTudo(false);
     }
-  }, [user?.username, itens, quantidades, tipo, destinoSelected, filialDestino, companySlug, romaneioId, responsavel, responsavelPadrao]);
+  }, [user?.username, itens, quantidades, tipo, destinoSelected, filialDestino, companySlug, romaneioId, responsavel, responsavelPadrao, filialOrigem]);
 
   // Desconfirma item individualmente (sem reverter estoque)
   const handleDesconfirmar = useCallback(async (produto: string, corProduto: string | null) => {

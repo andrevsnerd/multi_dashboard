@@ -987,6 +987,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       }
 
       setProdutosSelecionados([]);
+      setDetalhesCache({}); // Limpa cache de hover para refletir estoques atualizados
 
       const [novoSaidas, novoEntradas] = await Promise.all([fetchLogSaidas(), fetchLogEntradas()]);
       setLogSaidas(novoSaidas);
