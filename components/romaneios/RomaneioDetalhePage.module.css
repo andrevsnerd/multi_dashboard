@@ -34,6 +34,29 @@
   font-weight: 700;
   color: #111827;
   margin: 0 0 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.editRomaneioTitleBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 4px 6px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.editRomaneioTitleBtn:hover {
+  color: #111827;
+  border-color: #9ca3af;
+  background: #f3f4f6;
 }
 
 .meta {
@@ -753,4 +776,69 @@
 .modalBtnConfirmar:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.modalInput {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  outline: none;
+  box-sizing: border-box;
+  letter-spacing: 2px;
+  font-family: monospace;
+}
+
+.modalInput:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* ---- Banner romaneio gerado ---- */
+.romaneioGeradoBanner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #ecfdf5;
+  border: 1px solid #6ee7b7;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  color: #065f46;
+  margin-bottom: 16px;
+}
+
+.romaneioGeradoBanner span {
+  flex: 1;
+}
+
+.editRomaneioBtn {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #fff;
+  border: 1px solid #6ee7b7;
+  border-radius: 6px;
+  color: #065f46;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.editRomaneioBtn:hover {
+  background: #d1fae5;
+}
+
+.fecharBannerBtn {
+  background: none;
+  border: none;
+  color: #6b7280;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.fecharBannerBtn:hover {
+  color: #111827;
 }

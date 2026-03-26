@@ -77,7 +77,7 @@ async function executarEntradaEstoqueLote(
   filialCod: string,
   itens: Array<{ produto: string; corProduto: string | null; quantidade: number }>,
   responsavel: string
-): Promise<boolean> {
+): Promise<{ ok: boolean; romaneio?: string }> {
   const res = await fetch("/api/saidas-entradas-produtos/executar", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-auth-username": username },
@@ -90,7 +90,9 @@ async function executarEntradaEstoqueLote(
       observacao: null,
     }),
   });
-  return res.ok;
+  if (!res.ok) return { ok: false };
+  const json = await res.json().catch(() => ({})) as { romaneio?: string };
+  return { ok: true, romaneio: json.romaneio };
 }
 
 // ---------- tipos ----------
@@ -253,6 +255,15 @@ export default function RomaneioDetalhePage({
   const [confirmandoKey, setConfirmandoKey] = useState<string | null>(null);
   const [erroConfirmacao, setErroConfirmacao] = useState<string | null>(null);
 
+  // --- editar número do romaneio ---
+  const [romaneioGerado, setRomaneioGerado] = useState<string | null>(null);
+  const [editRomaneioAlvo, setEditRomaneioAlvo] = useState<string | null>(null); // romaneio sendo editado
+  const [editRomaneioModal, setEditRomaneioModal] = useState(false);
+  const [editRomaneioValor, setEditRomaneioValor] = useState("");
+  const [editRomaneioSaving, setEditRomaneioSaving] = useState(false);
+  const [editRomaneioErro, setEditRomaneioErro] = useState<string | null>(null);
+  const [editRomaneioSucesso, setEditRomaneioSucesso] = useState<string | null>(null);
+
   // Inicializa quantidades quando itens carregam
   useEffect(() => {
     if (itens.length === 0) return;
@@ -366,7 +377,7 @@ export default function RomaneioDetalhePage({
     try {
       if (tipo === "saida") {
         // Registra entrada de estoque em lote (1 romaneio para todos)
-        const ok = await executarEntradaEstoqueLote(
+        const result = await executarEntradaEstoqueLote(
           user.username,
           destinoSelected,
           itensParaConfirmar.map((i) => ({
@@ -376,10 +387,11 @@ export default function RomaneioDetalhePage({
           })),
           responsavelPadrao || user.username
         );
-        if (!ok) {
+        if (!result.ok) {
           setErroConfirmacao("Erro ao registrar entrada de estoque. Tente novamente.");
           return;
         }
+        if (result.romaneio) setRomaneioGerado(result.romaneio);
       }
 
       // Marca confirmação no romaneio para cada item
@@ -431,6 +443,39 @@ export default function RomaneioDetalhePage({
     }
     setConfirmandoKey(null);
   }, [user?.username, companySlug, romaneioId, filialDestino, destinoSelected, tipo]);
+
+  const handleEditRomaneio = useCallback(async () => {
+    if (!editRomaneioAlvo || !editRomaneioValor.trim() || !user?.username) return;
+    const novoRomaneio = editRomaneioValor.trim().padStart(6, "0");
+    if (!/^\d{6}$/.test(novoRomaneio)) {
+      setEditRomaneioErro("O número deve ter 6 dígitos numéricos.");
+      return;
+    }
+    setEditRomaneioSaving(true);
+    setEditRomaneioErro(null);
+    const res = await fetch("/api/romaneios/renomear-romaneio", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-auth-username": user.username },
+      body: JSON.stringify({ oldRomaneio: editRomaneioAlvo, newRomaneio: novoRomaneio, tipo }),
+    });
+    if (res.ok) {
+      setEditRomaneioSucesso(`Romaneio renomeado para ${novoRomaneio}`);
+      setEditRomaneioAlvo(novoRomaneio);
+      if (romaneioGerado === editRomaneioAlvo) setRomaneioGerado(novoRomaneio);
+    } else {
+      const json = await res.json().catch(() => ({})) as { error?: string };
+      setEditRomaneioErro(json.error || "Erro ao renomear romaneio.");
+    }
+    setEditRomaneioSaving(false);
+  }, [editRomaneioAlvo, editRomaneioValor, user?.username, tipo, romaneioGerado]);
+
+  const abrirEditRomaneio = useCallback((alvo: string) => {
+    setEditRomaneioAlvo(alvo);
+    setEditRomaneioValor(alvo);
+    setEditRomaneioErro(null);
+    setEditRomaneioSucesso(null);
+    setEditRomaneioModal(true);
+  }, []);
 
   const handleEditQtdSalvar = useCallback(async () => {
     if (!editQtdModal || !user?.username) return;
@@ -542,7 +587,22 @@ export default function RomaneioDetalhePage({
     <div className={styles.wrapper}>
       <header className={styles.header}>
         <Link href={backHref} className={styles.backLink}>← Voltar</Link>
-        <h1 className={styles.title}>Romaneio #{romaneioId}</h1>
+        <h1 className={styles.title}>
+          Romaneio #{romaneioId}
+          {user?.role === "admin" && (
+            <button
+              type="button"
+              className={styles.editRomaneioTitleBtn}
+              title="Editar número do romaneio"
+              onClick={() => abrirEditRomaneio(romaneioId)}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
+          )}
+        </h1>
         <p className={styles.meta}>{responsavel || "—"} • {dataEmissao || "—"}</p>
       </header>
 
@@ -622,6 +682,91 @@ export default function RomaneioDetalhePage({
               Dar Saída Todos
             </button>
           )}
+        </div>
+      )}
+
+      {/* Banner: romaneio de entrada gerado após Confirmar Tudo */}
+      {romaneioGerado && (
+        <div className={styles.romaneioGeradoBanner}>
+          <span>
+            Entrada registrada — Romaneio: <strong>{romaneioGerado}</strong>
+          </span>
+          {user?.role === "admin" && (
+            <button
+              type="button"
+              className={styles.editRomaneioBtn}
+              onClick={() => abrirEditRomaneio(romaneioGerado!)}
+            >
+              Editar nº
+            </button>
+          )}
+          <button
+            type="button"
+            className={styles.fecharBannerBtn}
+            onClick={() => setRomaneioGerado(null)}
+            title="Fechar"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Modal — Editar número do romaneio gerado */}
+      {editRomaneioModal && (
+        <div
+          className={styles.modalOverlay}
+          onClick={() => { if (!editRomaneioSaving) setEditRomaneioModal(false); }}
+        >
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.modalTitle}>Editar Número do Romaneio</h2>
+            <p className={styles.modalOrigem}>
+              Romaneio atual: <strong>{editRomaneioAlvo}</strong>
+            </p>
+            <div className={styles.modalField}>
+              <label className={styles.modalLabel}>Novo número (6 dígitos)</label>
+              <input
+                type="text"
+                className={styles.modalInput}
+                value={editRomaneioValor}
+                maxLength={6}
+                onChange={(e) => setEditRomaneioValor(e.target.value.replace(/\D/g, ""))}
+                disabled={editRomaneioSaving || !!editRomaneioSucesso}
+                placeholder="000000"
+              />
+            </div>
+            {editRomaneioErro && <p className={styles.modalErro}>{editRomaneioErro}</p>}
+            {editRomaneioSucesso && <p className={styles.modalSucesso}>{editRomaneioSucesso}</p>}
+            <div className={styles.modalActions}>
+              {!editRomaneioSucesso ? (
+                <>
+                  <button
+                    type="button"
+                    className={styles.modalBtnCancelar}
+                    onClick={() => setEditRomaneioModal(false)}
+                    disabled={editRomaneioSaving}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.modalBtnConfirmar}
+                    onClick={handleEditRomaneio}
+                    disabled={editRomaneioSaving || editRomaneioValor.trim().length < 1}
+                  >
+                    {editRomaneioSaving ? "Salvando..." : "Salvar"}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.modalBtnCancelar}
+                  onClick={() => setEditRomaneioModal(false)}
+                >
+                  Fechar
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
