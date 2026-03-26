@@ -10,6 +10,7 @@ export type PermissionKey =
   | "clientes"
   | "controle-estoque"
   | "controle-giro"
+  | "controle-performance"
   | "controle-movimento"
   | "controle-transferencias"
   | "exportar-relatorios"
@@ -54,6 +55,7 @@ export const ALL_PERMISSION_KEYS: { key: PermissionKey; label: string }[] = [
   { key: "clientes", label: "Clientes" },
   { key: "controle-estoque", label: "Controle de Estoque" },
   { key: "controle-giro", label: "Controle de Giro" },
+  { key: "controle-performance", label: "Controle de Performance" },
   { key: "controle-movimento", label: "Controle de Movimento" },
   { key: "controle-transferencias", label: "Controle de Transferências" },
   { key: "exportar-relatorios", label: "Exportar Relatórios" },

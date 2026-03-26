@@ -1,0 +1,335 @@
+.container {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.monthSelector {
+  display: flex;
+  gap: 8px;
+}
+
+.select {
+  padding: 8px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 14px;
+  color: #333;
+  cursor: pointer;
+}
+
+.select:focus {
+  outline: none;
+  border-color: #5b9bd5;
+}
+
+.goalsButton {
+  padding: 8px 16px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #555;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.goalsButton:hover {
+  background: #f5f5f5;
+  border-color: #ccc;
+}
+
+/* Summary Cards */
+.summaryCards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .summaryCards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cardLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #000;
+  text-transform: uppercase;
+}
+
+.cardValue {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+/* Loading / Error */
+.loadingMsg {
+  text-align: center;
+  color: #888;
+  padding: 40px;
+  font-size: 14px;
+}
+
+.errorMsg {
+  text-align: center;
+  color: #e53935;
+  padding: 20px;
+  font-size: 14px;
+}
+
+/* Table */
+.tableWrapper {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #e8e8e8;
+  background: #fff;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table thead tr {
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.table thead th {
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: #000;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: #fafafa;
+}
+
+.thFilial {
+  min-width: 120px;
+}
+
+.th {
+  min-width: 130px;
+  text-align: right !important;
+}
+
+.thQtde {
+  min-width: 80px;
+  text-align: right !important;
+}
+
+.thCat {
+  width: 112px;
+  min-width: 112px;
+  max-width: 112px;
+  text-align: center !important;
+}
+
+.bodyRow {
+  border-bottom: 1px solid #f0f0f0;
+  transition: background 0.1s;
+}
+
+.bodyRow:hover {
+  background: #dfe9f9;
+}
+
+.bodyRow:hover td {
+  box-shadow: inset 0 2px 0 #90a4ae, inset 0 -2px 0 #90a4ae;
+}
+
+.bodyRow:hover td:first-child {
+  box-shadow:
+    inset 2px 0 0 #90a4ae,
+    inset 0 2px 0 #90a4ae,
+    inset 0 -2px 0 #90a4ae;
+}
+
+.bodyRow:hover td:last-child {
+  box-shadow:
+    inset -2px 0 0 #90a4ae,
+    inset 0 2px 0 #90a4ae,
+    inset 0 -2px 0 #90a4ae;
+}
+
+.bodyRow td:hover {
+  position: relative;
+  z-index: 1;
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.18),
+    inset 0 0 0 4px #263238;
+  transform: translateY(-1px);
+  border-radius: 6px;
+}
+
+.bodyRow:last-child {
+  border-bottom: none;
+}
+
+.tdFilial {
+  padding: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+  white-space: nowrap;
+}
+
+.td {
+  padding: 14px;
+  text-align: right;
+  color: #333;
+  white-space: nowrap;
+}
+
+.tdQtde {
+  padding: 14px;
+  text-align: right;
+  color: #333;
+}
+
+.tdCat {
+  padding: 14px;
+  width: 112px;
+  min-width: 112px;
+  max-width: 112px;
+  text-align: center;
+  color: #333;
+  white-space: nowrap;
+  position: relative;
+  box-shadow: inset 0 0 0 1px #edf1f5;
+  box-sizing: border-box;
+}
+
+.tdCatMax {
+  background: #e8f5e9;
+  box-shadow: inset 0 0 0 1px #c8e6c9;
+}
+
+.tdCatMin {
+  background: #ffebee;
+  box-shadow: inset 0 0 0 1px #ffcdd2;
+}
+
+.tdCatSecondMin {
+  background: #fff8e1;
+  box-shadow: inset 0 0 0 1px #ffecb3;
+}
+
+/* Totals row hover */
+.totalsRow:hover {
+  background: #dfe9f9;
+}
+
+.totalsRow td:hover {
+  position: relative;
+  z-index: 1;
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.18),
+    inset 0 0 0 4px #263238;
+  transform: translateY(-1px);
+  border-radius: 6px;
+}
+
+/* Projection badge */
+.projecaoBadge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badgeGreen {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.badgeRed {
+  background: #fce4ec;
+  color: #c62828;
+}
+
+.noMeta {
+  color: #bbb;
+}
+
+/* Category cell */
+.catPct {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  display: inline-block;
+  margin-top: 8px;
+}
+
+.deltaUp {
+  font-size: 13px;
+  color: #2e7d32;
+  font-weight: 500;
+}
+
+.deltaDown {
+  font-size: 13px;
+  color: #c62828;
+  font-weight: 500;
+}
+
+.deltaCorner {
+  position: absolute;
+  top: 6px;
+  right: 4px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  border-radius: 10px;
+  min-width: 46px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Totals row */
+.totalsRow {
+  background: #f5f5f5;
+  border-top: 2px solid #e0e0e0;
+}
+
+.totalsRow td {
+  padding: 14px;
+  font-weight: 600;
+  color: #555;
+}
+
+.totalsRow .tdFilial {
+  color: #555;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}

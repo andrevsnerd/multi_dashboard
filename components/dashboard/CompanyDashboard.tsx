@@ -47,15 +47,98 @@ interface SalesSummaryResponse {
   };
 }
 
+type FilialPerformanceItem = {
+  filial: string;
+  filialDisplayName: string;
+  currentRevenue: number;
+  previousRevenue: number;
+  changePercentage: number | null;
+};
+
+function buildMetricFromTotals(current: number, previous: number): MetricSummary {
+  if (previous === 0 && current === 0) {
+    return { currentValue: current, previousValue: previous, changePercentage: 0 };
+  }
+
+  const changePercentage =
+    previous === 0 ? null : Number((((current - previous) / previous) * 100).toFixed(1));
+
+  return { currentValue: current, previousValue: previous, changePercentage };
+}
+
+async function fetchFilialPerformanceTotalRevenueKpi(
+  company: string,
+  range: DateRangeValue,
+  filial: string | null,
+): Promise<MetricSummary> {
+  const searchParams = new URLSearchParams({
+    company,
+    start: range.startDate.toISOString(),
+    end: range.endDate.toISOString(),
+  });
+
+  if (filial) {
+    searchParams.set("filial", filial);
+  }
+
+  const response = await fetch(`/api/filial-performance?${searchParams.toString()}`, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("Erro ao carregar performance por filial");
+  }
+
+  const json = (await response.json()) as { data: FilialPerformanceItem[] };
+  const rows = Array.isArray(json.data) ? json.data : [];
+
+  // KPI deve somar apenas o que aparece na lista "PERFORMANCE DETALHADA POR LOJA".
+  // Na prática, isso exclui linhas técnicas como MATRIZ/VAREJO (e itens zerados).
+  const filtered = rows.filter(
+    (item) =>
+      item.currentRevenue > 0 &&
+      item.filialDisplayName !== "MATRIZ" &&
+      item.filialDisplayName !== "VAREJO",
+  );
+
+  // Agregar por nome exibido (ex.: múltiplos E-COMMERCE / PAULISTA viram uma linha).
+  const byName = new Map<string, { current: number; previous: number }>();
+  for (const item of filtered) {
+    const key = item.filialDisplayName;
+    const existing = byName.get(key);
+    if (!existing) {
+      byName.set(key, {
+        current: Number(item.currentRevenue ?? 0),
+        previous: Number(item.previousRevenue ?? 0),
+      });
+    } else {
+      existing.current += Number(item.currentRevenue ?? 0);
+      existing.previous += Number(item.previousRevenue ?? 0);
+    }
+  }
+
+  const totalCurrent = Array.from(byName.values()).reduce((s, v) => s + v.current, 0);
+  const totalPrevious = Array.from(byName.values()).reduce((s, v) => s + v.previous, 0);
+  return buildMetricFromTotals(totalCurrent, totalPrevious);
+}
+
 async function fetchSummary(
   company: string,
   range: DateRangeValue,
   filial: string | null,
 ): Promise<SalesSummaryResponse> {
+  const isSameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  // "Mês até agora": quando o fim do range for hoje, usar "agora" para incluir vendas do dia.
+  const effectiveEndDate = isSameDay(range.endDate, new Date()) ? new Date() : range.endDate;
+
   const searchParams = new URLSearchParams({
     company,
     start: range.startDate.toISOString(),
-    end: range.endDate.toISOString(),
+    end: effectiveEndDate.toISOString(),
   });
   
   if (filial) {
@@ -276,8 +359,19 @@ export default function CompanyDashboard({
           lastAvailableDate: apiLastAvailableDate,
           availableRange,
         } = await fetchSummary(companyKey, range, selectedFilial);
+
+        // KPI "Vendas Total" deve ser a soma das lojas exibidas em "PERFORMANCE DETALHADA POR LOJA".
+        const filialKpi = await fetchFilialPerformanceTotalRevenueKpi(
+          companyKey,
+          range,
+          selectedFilial,
+        );
+
         if (active) {
-          setSummary(data);
+          setSummary({
+            ...data,
+            totalRevenue: filialKpi,
+          });
           setLastAvailableDate(apiLastAvailableDate);
           setAvailableSalesRange(availableRange);
         }

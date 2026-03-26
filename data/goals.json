@@ -32,6 +32,22 @@
         "SCARF ME - MATRIZ LLL": 0,
         "VILLA LOBOS - LLL": 70000
       }
+    },
+    "2026": {
+      "2": {
+        "SCARFME MATRIZ CMS": 87500,
+        "SCARF ME - MATRIZ LLL": 87500,
+        "SCARF ME MATRIZ - FFF": 87500,
+        "MSC COMERCIO DE LENCOS LT": 87500,
+        "GUARULHOS - RSR": 290000,
+        "IGUATEMI SP - JJJ": 130000,
+        "OSCAR FREIRE - FSZ": 180000,
+        "MORUMBI - JJJ": 120000,
+        "SCARF ME - HIGIENOPOLIS 2": 140000,
+        "SCARFME - IBIRAPUERA LLL": 60000,
+        "VILLA LOBOS - LLL": 70000,
+        "SCARF ME - PAULISTA RSR": 90000
+      }
     }
   }
 }

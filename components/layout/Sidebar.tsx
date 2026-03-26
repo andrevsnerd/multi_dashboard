@@ -89,9 +89,14 @@ export default function Sidebar({ companyName }: SidebarProps) {
     : "/controle-estoque";
 
   // Construir o link para controle de giro baseado no caminho base
-  const controleGiroHref = basePath && basePath !== "/" 
+  const controleGiroHref = basePath && basePath !== "/"
     ? `${basePath}/controle-giro`
     : "/controle-giro";
+
+  // Construir o link para controle de performance baseado no caminho base
+  const controlePerformanceHref = basePath && basePath !== "/"
+    ? `${basePath}/controle-performance`
+    : "/controle-performance";
 
   // Construir o link para controle de transferências baseado no caminho base
   const controleTransferenciasHref = basePath && basePath !== "/" 
@@ -150,6 +155,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     { label: "Clientes", href: clientesHref, permission: "clientes" },
     { label: "Controle de Estoque", href: controleEstoqueHref, permission: "controle-estoque" },
     { label: "Controle de Giro", href: controleGiroHref, permission: "controle-giro" },
+    { label: "Controle de Performance", href: controlePerformanceHref, permission: "controle-performance" },
     { label: "Controle de Transferências", href: controleTransferenciasHref, permission: "controle-transferencias" },
     { label: "Transferência de Produtos", href: transferenciaProdutosHref, permission: "transferencia-produtos" },
     { label: "Romaneios", href: romaneiosHref, permission: "romaneios" },
@@ -237,6 +243,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
                 !pathname.includes("/estoque-por-filial") && 
                 !pathname.includes("/controle-estoque") &&
                 !pathname.includes("/controle-giro") &&
+                !pathname.includes("/controle-performance") &&
                 !pathname.includes("/controle-transferencias") &&
                 !pathname.includes("/transferencia-produtos") &&
                 !pathname.includes("/romaneios") &&
@@ -272,6 +279,9 @@ export default function Sidebar({ companyName }: SidebarProps) {
             } else if (item.label === "Controle de Giro") {
               // Controle de Giro está ativo quando o pathname inclui /controle-giro
               isActive = pathname?.includes("/controle-giro") || pathname === item.href;
+            } else if (item.label === "Controle de Performance") {
+              // Controle de Performance está ativo quando o pathname inclui /controle-performance
+              isActive = pathname?.includes("/controle-performance") || pathname === item.href;
             } else if (item.label === "Controle de Transferências") {
               // Controle de Transferências está ativo quando o pathname inclui /controle-transferencias
               isActive = pathname?.includes("/controle-transferencias") || pathname === item.href;

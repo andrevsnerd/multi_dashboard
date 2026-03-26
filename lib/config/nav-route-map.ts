@@ -29,6 +29,7 @@ export const NAV_ROUTE_MAP: Record<string, PermissionKey | "admin"> = {
   // ── Controles ──────────────────────────────────────────────────
   "controle-estoque": "controle-estoque",
   "controle-giro": "controle-giro",
+  "controle-performance": "controle-performance",
   "controle-movimento": "controle-movimento",
   "controle-transferencias": "controle-transferencias",
 

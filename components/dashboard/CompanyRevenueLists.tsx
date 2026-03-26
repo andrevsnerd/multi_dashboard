@@ -198,6 +198,45 @@ export default function CompanyRevenueLists({
     return [varejoItem, ...aggregatedList];
   }, [state.filialPerformance, companyKey]);
 
+  const filialPerformanceTotals = useMemo(() => {
+    const list = filialPerformanceWithVarejo;
+    const sumAll = () => ({
+      currentRevenue: list.reduce((sum, item) => sum + (item.currentRevenue ?? 0), 0),
+      previousRevenue: list.reduce((sum, item) => sum + (item.previousRevenue ?? 0), 0),
+    });
+
+    const sumVarejoPlusEcommerce = () => {
+      const varejo = list.find((item) => item.filial === VAREJO_VALUE);
+      const varejoCurrent = varejo?.currentRevenue ?? 0;
+      const varejoPrevious = varejo?.previousRevenue ?? 0;
+
+      // E-COMMERCE pode aparecer mais de uma vez (ex.: duas filiais agregadas),
+      // então somamos por displayName e excluímos o próprio VAREJO.
+      const ecommerceItems = list.filter(
+        (item) => item.filial !== VAREJO_VALUE && item.filialDisplayName === "E-COMMERCE"
+      );
+      const ecommerceCurrent = ecommerceItems.reduce((s, item) => s + (item.currentRevenue ?? 0), 0);
+      const ecommercePrevious = ecommerceItems.reduce((s, item) => s + (item.previousRevenue ?? 0), 0);
+
+      return {
+        currentRevenue: varejoCurrent + ecommerceCurrent,
+        previousRevenue: varejoPrevious + ecommercePrevious,
+      };
+    };
+
+    const { currentRevenue, previousRevenue } =
+      companyKey === "scarfme" ? sumVarejoPlusEcommerce() : sumAll();
+
+    let changePercentage: number | null = null;
+    if (previousRevenue > 0) {
+      changePercentage = Number((((currentRevenue - previousRevenue) / previousRevenue) * 100).toFixed(1));
+    } else if (currentRevenue > 0) {
+      changePercentage = null;
+    }
+
+    return { currentRevenue, previousRevenue, changePercentage };
+  }, [filialPerformanceWithVarejo, companyKey]);
+
   return (
     <section className={styles.container}>
       {loading ? <div className={styles.loadingBar} /> : null}
@@ -352,6 +391,49 @@ export default function CompanyRevenueLists({
                   </li>
                 );
               })}
+
+              {filialPerformanceWithVarejo.length > 0 ? (
+                <li className={styles.listItem}>
+                  <div className={styles.itemNameContainer}>
+                    <strong className={styles.itemName}>TOTAL</strong>
+                  </div>
+                  <div className={styles.itemMetrics}>
+                    <div className={styles.metricRow}>
+                      <div className={styles.priceColumn}>
+                        <span className={styles.metricValue}>
+                          {filialPerformanceTotals.currentRevenue.toLocaleString("pt-BR", {
+                            style: "currency",
+                            currency: "BRL",
+                          })}
+                        </span>
+                      </div>
+                      <div className={`${styles.variationBadge} ${filialPerformanceTotals.changePercentage !== null && filialPerformanceTotals.changePercentage !== 0
+                        ? (filialPerformanceTotals.changePercentage > 0 ? styles.variationPositive : styles.variationNegative)
+                        : styles.variationNeutral
+                        }`}>
+                        {filialPerformanceTotals.changePercentage !== null ? (
+                          <>
+                            {filialPerformanceTotals.changePercentage > 0 ? (
+                              <span className={styles.variationArrow}>↑</span>
+                            ) : filialPerformanceTotals.changePercentage < 0 ? (
+                              <span className={styles.variationArrow}>↓</span>
+                            ) : null}
+                            <span className={styles.variationValue}>
+                              {Math.abs(filialPerformanceTotals.changePercentage).toLocaleString("pt-BR", {
+                                minimumFractionDigits: 1,
+                                maximumFractionDigits: 1,
+                              })}%
+                            </span>
+                          </>
+                        ) : (
+                          <span className={styles.variationValue}>--</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              ) : null}
+
               {filialPerformanceWithVarejo.length === 0 ? (
                 <li className={styles.state}>Nenhuma filial encontrada.</li>
               ) : null}
