@@ -121,7 +121,7 @@
 
 .table thead th {
   padding: 12px 14px;
-  text-align: left;
+  text-align: center;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.4px;
@@ -133,16 +133,24 @@
 
 .thFilial {
   min-width: 120px;
+  text-align: center !important;
 }
 
 .th {
   min-width: 130px;
-  text-align: right !important;
+  text-align: center !important;
 }
 
 .thQtde {
   min-width: 80px;
-  text-align: right !important;
+  text-align: center !important;
+}
+
+.thVendas {
+  background: #fafafa !important;
+  border-left: none;
+  border-right: none;
+  box-shadow: none;
 }
 
 .thCat {
@@ -158,25 +166,13 @@
 }
 
 .bodyRow:hover {
-  background: #dfe9f9;
+  background: #eceff3;
+  outline: 2px solid #90a4ae;
+  outline-offset: -2px;
 }
 
 .bodyRow:hover td {
-  box-shadow: inset 0 2px 0 #90a4ae, inset 0 -2px 0 #90a4ae;
-}
-
-.bodyRow:hover td:first-child {
-  box-shadow:
-    inset 2px 0 0 #90a4ae,
-    inset 0 2px 0 #90a4ae,
-    inset 0 -2px 0 #90a4ae;
-}
-
-.bodyRow:hover td:last-child {
-  box-shadow:
-    inset -2px 0 0 #90a4ae,
-    inset 0 2px 0 #90a4ae,
-    inset 0 -2px 0 #90a4ae;
+  box-shadow: none;
 }
 
 .bodyRow td:hover {
@@ -205,6 +201,25 @@
   text-align: right;
   color: #333;
   white-space: nowrap;
+}
+
+.tdVendas {
+  background: #e6f0ff;
+  border: 1px solid #c8d8f2;
+  font-weight: 700;
+}
+
+.vendasCell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.vendasCompareBadge {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .tdQtde {
@@ -243,7 +258,7 @@
 
 /* Totals row hover */
 .totalsRow:hover {
-  background: #dfe9f9;
+  background: #eceff3;
 }
 
 .totalsRow td:hover {

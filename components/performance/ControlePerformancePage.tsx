@@ -10,7 +10,7 @@ import styles from "./ControlePerformancePage.module.css";
 
 interface CategoryData {
   pct: number;
-  qtdeDelta: number;
+  deltaPct: number | null;
 }
 
 interface FilialRow {
@@ -18,6 +18,7 @@ interface FilialRow {
   displayName: string;
   meta: number;
   vendas: number;
+  vendasPrevious: number;
   qtde: number;
   projecao: number;
   projecaoPct: number | null;
@@ -33,6 +34,7 @@ interface PerformanceData {
   year: number;
   totals?: {
     vendas: number;
+    vendasPrevious: number;
     qtde: number;
   };
 }
@@ -67,6 +69,16 @@ function getCategoryHeaderLabel(category: string): string {
 
 function formatCurrency(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function getComparisonPct(current: number, previous: number): number | null {
+  if (!Number.isFinite(current) || !Number.isFinite(previous)) return null;
+  if (previous <= 0) return null;
+  return ((current - previous) / previous) * 100;
+}
+
+function formatSignedPct(value: number): string {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
 }
 
 export default function ControlePerformancePage({ companyKey, companyName: _companyName }: Props) {
@@ -151,21 +163,27 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
     if (!data) return null;
     const filiais = data.filiais;
     const totalVendas = data.totals?.vendas ?? filiais.reduce((s, f) => s + f.vendas, 0);
+    const totalVendasPrevious = data.totals?.vendasPrevious ?? filiais.reduce((s, f) => s + f.vendasPrevious, 0);
     const totalQtde = data.totals?.qtde ?? filiais.reduce((s, f) => s + f.qtde, 0);
     const totalMeta = filiais.reduce((s, f) => s + f.meta, 0);
     const totalProjecao = filiais.reduce((s, f) => s + f.projecao, 0);
     const totalProjecaoPct = totalMeta > 0 ? (totalProjecao / totalMeta) * 100 : null;
 
-    // Average % per category across filials, sum of deltas
-    const categoryAvg: Record<string, { pct: number; qtdeDelta: number }> = {};
+    // Average % per category across filials
+    const categoryAvg: Record<string, { pct: number; deltaPct: number | null }> = {};
     data.categories.forEach(cat => {
       const pcts = filiais.map(f => f.categories[cat]?.pct ?? 0);
       const avgPct = pcts.length > 0 ? pcts.reduce((s, p) => s + p, 0) / pcts.length : 0;
-      const totalDelta = filiais.reduce((s, f) => s + (f.categories[cat]?.qtdeDelta ?? 0), 0);
-      categoryAvg[cat] = { pct: avgPct, qtdeDelta: totalDelta / filiais.length };
+      const deltaPcts = filiais
+        .map(f => f.categories[cat]?.deltaPct)
+        .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+      const avgDeltaPct = deltaPcts.length > 0
+        ? deltaPcts.reduce((s, v) => s + v, 0) / deltaPcts.length
+        : null;
+      categoryAvg[cat] = { pct: avgPct, deltaPct: avgDeltaPct };
     });
 
-    return { totalVendas, totalQtde, totalMeta, totalProjecaoPct, categoryAvg };
+    return { totalVendas, totalVendasPrevious, totalQtde, totalMeta, totalProjecao, totalProjecaoPct, categoryAvg };
   }, [data]);
 
   const handleGoalsModalClose = () => {
@@ -232,8 +250,9 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
               <tr>
                 <th className={styles.thFilial}>FILIAL</th>
                 <th className={styles.th}>META</th>
-                <th className={styles.th}>PROJEÇÃO</th>
-                <th className={styles.th}>VENDAS</th>
+                <th className={styles.th}>PROJEÇÃO META</th>
+                <th className={styles.th}>PROJEÇÃO MÊS</th>
+                <th className={`${styles.th} ${styles.thVendas}`}>VENDAS</th>
                 <th className={styles.thQtde}>QTDE</th>
                 {displayedCategories.map(cat => (
                   <th
@@ -275,7 +294,25 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                       <span className={styles.noMeta}>—</span>
                     )}
                   </td>
-                  <td className={styles.td}>{formatCurrency(row.vendas)}</td>
+                  <td className={styles.td}>{formatCurrency(row.projecao)}</td>
+                  <td className={`${styles.td} ${styles.tdVendas}`}>
+                    <div className={styles.vendasCell}>
+                      <span>{formatCurrency(row.vendas)}</span>
+                      {(() => {
+                        const comparisonPct = getComparisonPct(row.vendas, row.vendasPrevious);
+                        if (comparisonPct === null) return null;
+                        const isPositive = comparisonPct >= 0;
+                        return (
+                          <span
+                            className={`${styles.projecaoBadge} ${isPositive ? styles.badgeGreen : styles.badgeRed} ${styles.vendasCompareBadge}`}
+                            title="Comparativo com o mesmo período do mês anterior"
+                          >
+                            {comparisonPct >= 0 ? "+" : ""}{comparisonPct.toFixed(1)}%
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  </td>
                   <td className={styles.tdQtde}>{row.qtde.toLocaleString("pt-BR")}</td>
                   {displayedCategories.map(cat => {
                     if (cat === OUTROS_LABEL) {
@@ -286,8 +323,13 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                         return <td key={cat} className={styles.tdCat}>—</td>;
                       }
                       const displayedPct = getDisplayedPct(OUTROS_LABEL);
-                      const qtdeDeltaSum = selected.reduce((s, v) => s + (v.qtdeDelta ?? 0), 0);
-                      const isPositive = qtdeDeltaSum >= 0;
+                      const selectedDeltaPcts = selected
+                        .map(v => v.deltaPct)
+                        .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+                      const deltaPct = selectedDeltaPcts.length > 0
+                        ? selectedDeltaPcts.reduce((s, v) => s + v, 0) / selectedDeltaPcts.length
+                        : null;
+                      const isPositive = (deltaPct ?? 0) >= 0;
                       const isMax = extremes.max !== null && displayedPct !== null && displayedPct === extremes.max;
                       const isMin = extremes.min !== null && displayedPct !== null && displayedPct === extremes.min;
                       const isSecondMin = extremes.secondMin !== null && displayedPct !== null && displayedPct === extremes.secondMin;
@@ -306,7 +348,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                           <span
                             className={`${styles.projecaoBadge} ${isPositive ? styles.badgeGreen : styles.badgeRed} ${styles.deltaCorner}`}
                           >
-                            {Math.abs(Math.round(qtdeDeltaSum))}%
+                            {deltaPct !== null ? formatSignedPct(deltaPct) : "—"}
                           </span>
                         </td>
                       );
@@ -316,7 +358,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                     if (!catData) {
                       return <td key={cat} className={styles.tdCat}>—</td>;
                     }
-                    const isPositive = catData.qtdeDelta >= 0;
+                    const isPositive = (catData.deltaPct ?? 0) >= 0;
                     const displayedPct = getDisplayedPct(cat);
                     const isMax = extremes.max !== null && displayedPct !== null && displayedPct === extremes.max;
                     const isMin = extremes.min !== null && displayedPct !== null && displayedPct === extremes.min;
@@ -332,7 +374,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                         <span
                           className={`${styles.projecaoBadge} ${isPositive ? styles.badgeGreen : styles.badgeRed} ${styles.deltaCorner}`}
                         >
-                          {Math.abs(Math.round(catData.qtdeDelta))}%
+                          {catData.deltaPct !== null ? formatSignedPct(catData.deltaPct) : "—"}
                         </span>
                       </td>
                     );
@@ -351,7 +393,25 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                     </span>
                   ) : '—'}
                 </td>
-                <td className={styles.td}>{formatCurrency(totals.totalVendas)}</td>
+                <td className={styles.td}>{formatCurrency(totals.totalProjecao)}</td>
+                <td className={`${styles.td} ${styles.tdVendas}`}>
+                  <div className={styles.vendasCell}>
+                    <span>{formatCurrency(totals.totalVendas)}</span>
+                    {(() => {
+                      const comparisonPct = getComparisonPct(totals.totalVendas, totals.totalVendasPrevious);
+                      if (comparisonPct === null) return null;
+                      const isPositive = comparisonPct >= 0;
+                      return (
+                        <span
+                          className={`${styles.projecaoBadge} ${isPositive ? styles.badgeGreen : styles.badgeRed} ${styles.vendasCompareBadge}`}
+                          title="Comparativo com o mesmo período do mês anterior"
+                        >
+                          {comparisonPct >= 0 ? "+" : ""}{comparisonPct.toFixed(1)}%
+                        </span>
+                      );
+                    })()}
+                  </div>
+                </td>
                 <td className={styles.tdQtde}>{totals.totalQtde.toLocaleString("pt-BR")}</td>
                 {(() => {
                   const getDisplayedPct = (cat: string): number | null => {
@@ -373,12 +433,17 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                     if (cat === OUTROS_LABEL) {
                       const selected = Array.from(OUTROS_CATEGORIES)
                         .map(c => totals.categoryAvg[c])
-                        .filter((v): v is { pct: number; qtdeDelta: number } => !!v);
+                        .filter((v): v is { pct: number; deltaPct: number | null } => !!v);
                       if (selected.length === 0) return <td key={cat} className={styles.tdCat}>—</td>;
 
                       const displayedPct = getDisplayedPct(OUTROS_LABEL);
-                      const qtdeDeltaSum = selected.reduce((s, v) => s + (v.qtdeDelta ?? 0), 0);
-                      const isPositive = qtdeDeltaSum >= 0;
+                      const selectedDeltaPcts = selected
+                        .map(v => v.deltaPct)
+                        .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+                      const deltaPct = selectedDeltaPcts.length > 0
+                        ? selectedDeltaPcts.reduce((s, v) => s + v, 0) / selectedDeltaPcts.length
+                        : null;
+                      const isPositive = (deltaPct ?? 0) >= 0;
                       const isMax = extremes.max !== null && displayedPct !== null && displayedPct === extremes.max;
                       const isMin = extremes.min !== null && displayedPct !== null && displayedPct === extremes.min;
                       const isSecondMin = extremes.secondMin !== null && displayedPct !== null && displayedPct === extremes.secondMin;
@@ -398,7 +463,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                           <span
                             className={`${styles.projecaoBadge} ${isPositive ? styles.badgeGreen : styles.badgeRed} ${styles.deltaCorner}`}
                           >
-                            {(Math.abs(qtdeDeltaSum) < 10 ? Math.abs(qtdeDeltaSum).toFixed(1) : Math.round(Math.abs(qtdeDeltaSum)))}%
+                            {deltaPct !== null ? formatSignedPct(deltaPct) : "—"}
                           </span>
                         </td>
                       );
@@ -406,7 +471,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
 
                     const catData = totals.categoryAvg[cat];
                     if (!catData) return <td key={cat} className={styles.tdCat}>—</td>;
-                    const isPositive = catData.qtdeDelta >= 0;
+                    const isPositive = (catData.deltaPct ?? 0) >= 0;
                     const displayedPct = getDisplayedPct(cat);
                     const isMax = extremes.max !== null && displayedPct !== null && displayedPct === extremes.max;
                     const isMin = extremes.min !== null && displayedPct !== null && displayedPct === extremes.min;
@@ -422,7 +487,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                         <span
                           className={`${styles.projecaoBadge} ${isPositive ? styles.badgeGreen : styles.badgeRed} ${styles.deltaCorner}`}
                         >
-                          {(Math.abs(catData.qtdeDelta) < 10 ? Math.abs(catData.qtdeDelta).toFixed(1) : Math.round(Math.abs(catData.qtdeDelta)))}%
+                          {catData.deltaPct !== null ? formatSignedPct(catData.deltaPct) : "—"}
                         </span>
                       </td>
                     );

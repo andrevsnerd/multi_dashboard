@@ -120,6 +120,7 @@ export async function GET(request: Request) {
       const previousData = previousByFilial.get(filial) ?? new Map();
 
       const vendas = Array.from(currentData.values()).reduce((s, d) => s + d.vendas, 0);
+      const vendasPrevious = Array.from(previousData.values()).reduce((s, d) => s + d.vendas, 0);
       const qtde = Array.from(currentData.values()).reduce((s, d) => s + d.qtde, 0);
 
       // Sum goals for all members of the group
@@ -129,13 +130,14 @@ export async function GET(request: Request) {
       const projecao = daysElapsed > 0 ? (vendas / daysElapsed) * totalDaysInMonth : vendas;
       const projecaoPct = meta > 0 ? (projecao / meta) * 100 : null;
 
-      const categoryData: Record<string, { pct: number; qtdeDelta: number }> = {};
+      const categoryData: Record<string, { pct: number; deltaPct: number | null }> = {};
       categories.forEach(cat => {
         const cur = currentData.get(cat) ?? { vendas: 0, qtde: 0 };
         const prev = previousData.get(cat) ?? { vendas: 0, qtde: 0 };
+        const deltaPct = prev.vendas > 0 ? ((cur.vendas - prev.vendas) / prev.vendas) * 100 : null;
         categoryData[cat] = {
           pct: vendas > 0 ? (cur.vendas / vendas) * 100 : 0,
-          qtdeDelta: cur.qtde - prev.qtde,
+          deltaPct,
         };
       });
 
@@ -144,6 +146,7 @@ export async function GET(request: Request) {
         displayName: company.filialDisplayNames?.[filial] ?? filial,
         meta,
         vendas,
+        vendasPrevious,
         qtde,
         projecao,
         projecaoPct,
@@ -152,6 +155,7 @@ export async function GET(request: Request) {
     });
 
     const totalVendas = filialRows.reduce((s, f) => s + f.vendas, 0);
+    const totalVendasPrevious = filialRows.reduce((s, f) => s + f.vendasPrevious, 0);
     const totalQtde = filialRows.reduce((s, f) => s + f.qtde, 0);
 
     return NextResponse.json({
@@ -163,6 +167,7 @@ export async function GET(request: Request) {
       year,
       totals: {
         vendas: totalVendas,
+        vendasPrevious: totalVendasPrevious,
         qtde: totalQtde,
       },
     }, { headers: { 'Cache-Control': 'no-store' } });
