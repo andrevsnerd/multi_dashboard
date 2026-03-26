@@ -1828,13 +1828,9 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                       return !noCarrinho;
                     })
                     .map((produto, index) => {
-                    const estoque = produto.estoques.find(e => {
-                      const filialTrim = e.filial.trim();
-                      const codFilialTrim = (filialSelecionada?.codFilial ?? '').trim();
-                      return filialTrim === codFilialTrim ||
-                             filialTrim.startsWith(codFilialTrim) ||
-                             codFilialTrim.startsWith(filialTrim);
-                    });
+                    const estoque = produto.estoques.find(e =>
+                      e.filial.trim() === (filialSelecionada?.codFilial ?? '').trim()
+                    );
                     return (
                       <div key={index} className={styles.produtoModalItem}>
                         <div className={styles.produtoModalIcon}>📦</div>
