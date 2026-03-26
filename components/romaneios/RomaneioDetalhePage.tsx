@@ -237,6 +237,7 @@ export default function RomaneioDetalhePage({
   const [darSaidaErro, setDarSaidaErro] = useState<string | null>(null);
   const [darSaidaSucesso, setDarSaidaSucesso] = useState<string | null>(null);
   const [darSaidaModalAberto, setDarSaidaModalAberto] = useState(false);
+  const [confirmarTudoModalAberto, setConfirmarTudoModalAberto] = useState(false);
 
   // --- editar qtd romaneio (admin) ---
   const [editQtdModal, setEditQtdModal] = useState<{ item: RomaneioDetalheItem; novaQtd: number } | null>(null);
@@ -599,7 +600,7 @@ export default function RomaneioDetalhePage({
             <button
               type="button"
               className={styles.confirmarTudoBtn}
-              onClick={handleConfirmarTudo}
+              onClick={() => setConfirmarTudoModalAberto(true)}
               disabled={!podeConfirmar}
             >
               {confirmandoTudo
@@ -621,6 +622,43 @@ export default function RomaneioDetalhePage({
               Dar Saída Todos
             </button>
           )}
+        </div>
+      )}
+
+      {/* Modal confirmação extra — Confirmar Tudo */}
+      {confirmarTudoModalAberto && (
+        <div
+          className={styles.modalOverlay}
+          onClick={() => { if (!confirmandoTudo) setConfirmarTudoModalAberto(false); }}
+        >
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.modalTitle}>Confirmar Tudo</h2>
+            <p className={styles.modalOrigem}>
+              Tem certeza que deseja confirmar todos os{" "}
+              <strong>{itensParaConfirmar.length} produto{itensParaConfirmar.length !== 1 ? "s" : ""}</strong>?
+            </p>
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.modalBtnCancelar}
+                onClick={() => setConfirmarTudoModalAberto(false)}
+                disabled={confirmandoTudo}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className={styles.modalBtnConfirmar}
+                disabled={confirmandoTudo}
+                onClick={() => {
+                  setConfirmarTudoModalAberto(false);
+                  handleConfirmarTudo();
+                }}
+              >
+                {confirmandoTudo ? "Confirmando…" : "Confirmar"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
