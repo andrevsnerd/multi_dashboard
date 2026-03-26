@@ -68,41 +68,45 @@ export async function POST(request: Request) {
       );
     }
 
-    {
-      const user = await findUserByUsername(username);
-      if (!user) {
+    const user = await findUserByUsername(username);
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Usuário não encontrado' },
+        { status: 403 }
+      );
+    }
+
+    const permissao = await getPermissaoByUsername(user.username);
+
+    if (user.role !== 'admin') {
+      if (!permissao) {
         return NextResponse.json(
-          { error: 'Usuário não encontrado' },
+          { error: 'Sem permissão para realizar esta operação. Configure o perfil em Admin.' },
           { status: 403 }
         );
       }
-      if (user.role !== 'admin') {
-        const permissao = await getPermissaoByUsername(user.username);
-        if (!permissao) {
-          return NextResponse.json(
-            { error: 'Sem permissão para realizar esta operação. Configure o perfil em Admin.' },
-            { status: 403 }
-          );
-        }
-        const filialOk = tipoOperacao === 'saida'
-          ? (permissao.filiaisOrigem.length === 0 ||
-             permissao.filiaisOrigem.some((p) => (p || '').trim() === filialTrim))
-          : (permissao.filiaisDestino.length === 0 ||
-             permissao.filiaisDestino.some((p) => (p || '').trim() === filialTrim));
-        if (!filialOk) {
-          return NextResponse.json(
-            { error: 'Sem permissão para esta filial.' },
-            { status: 403 }
-          );
-        }
+      const filialOk = tipoOperacao === 'saida'
+        ? (permissao.filiaisOrigem.length === 0 ||
+           permissao.filiaisOrigem.some((p) => (p || '').trim() === filialTrim))
+        : (permissao.filiaisDestino.length === 0 ||
+           permissao.filiaisDestino.some((p) => (p || '').trim() === filialTrim));
+      if (!filialOk) {
+        return NextResponse.json(
+          { error: 'Sem permissão para esta filial.' },
+          { status: 403 }
+        );
       }
     }
+
+    // Responsável: sempre usa o configurado pelo admin para aquele login.
+    // O valor enviado pelo cliente é completamente ignorado.
+    const responsavelFinal = permissao?.responsavelPadrao || 'LOGISTICA';
 
     const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
     const result = tipoOperacao === 'saida'
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ? await executeSaidaLote(pool, { itens, filial, filialDestino, tipoRomaneio, responsavel, observacao } as any)
-      : await executeEntradaLote(pool, { itens, filial, tipoRomaneio, responsavel, observacao });
+      ? await executeSaidaLote(pool, { itens, filial, filialDestino, tipoRomaneio, responsavel: responsavelFinal, observacao } as any)
+      : await executeEntradaLote(pool, { itens, filial, tipoRomaneio, responsavel: responsavelFinal, observacao });
 
     return NextResponse.json({
       success: true,

@@ -260,6 +260,7 @@ export default function RomaneioDetalhePage({
   const [editRomaneioAlvo, setEditRomaneioAlvo] = useState<string | null>(null); // romaneio sendo editado
   const [editRomaneioModal, setEditRomaneioModal] = useState(false);
   const [editRomaneioValor, setEditRomaneioValor] = useState("");
+  const [editRomaneioResponsavel, setEditRomaneioResponsavel] = useState("");
   const [editRomaneioSaving, setEditRomaneioSaving] = useState(false);
   const [editRomaneioErro, setEditRomaneioErro] = useState<string | null>(null);
   const [editRomaneioSucesso, setEditRomaneioSucesso] = useState<string | null>(null);
@@ -385,7 +386,7 @@ export default function RomaneioDetalhePage({
             corProduto: i.corProduto,
             quantidade: i.quantidade,
           })),
-          responsavelPadrao || user.username
+          responsavelPadrao || ""
         );
         if (!result.ok) {
           setErroConfirmacao("Erro ao registrar entrada de estoque. Tente novamente.");
@@ -456,26 +457,32 @@ export default function RomaneioDetalhePage({
     const res = await fetch("/api/romaneios/renomear-romaneio", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-auth-username": user.username },
-      body: JSON.stringify({ oldRomaneio: editRomaneioAlvo, newRomaneio: novoRomaneio, tipo }),
+      body: JSON.stringify({
+        oldRomaneio: editRomaneioAlvo,
+        newRomaneio: novoRomaneio,
+        tipo,
+        newResponsavel: editRomaneioResponsavel.trim() || undefined,
+      }),
     });
     if (res.ok) {
-      setEditRomaneioSucesso(`Romaneio renomeado para ${novoRomaneio}`);
+      setEditRomaneioSucesso(`Salvo com sucesso`);
       setEditRomaneioAlvo(novoRomaneio);
       if (romaneioGerado === editRomaneioAlvo) setRomaneioGerado(novoRomaneio);
     } else {
       const json = await res.json().catch(() => ({})) as { error?: string };
-      setEditRomaneioErro(json.error || "Erro ao renomear romaneio.");
+      setEditRomaneioErro(json.error || "Erro ao salvar.");
     }
     setEditRomaneioSaving(false);
-  }, [editRomaneioAlvo, editRomaneioValor, user?.username, tipo, romaneioGerado]);
+  }, [editRomaneioAlvo, editRomaneioValor, editRomaneioResponsavel, user?.username, tipo, romaneioGerado]);
 
   const abrirEditRomaneio = useCallback((alvo: string) => {
     setEditRomaneioAlvo(alvo);
     setEditRomaneioValor(alvo);
+    setEditRomaneioResponsavel(responsavel);
     setEditRomaneioErro(null);
     setEditRomaneioSucesso(null);
     setEditRomaneioModal(true);
-  }, []);
+  }, [responsavel]);
 
   const handleEditQtdSalvar = useCallback(async () => {
     if (!editQtdModal || !user?.username) return;
@@ -561,7 +568,7 @@ export default function RomaneioDetalhePage({
             quantidade: item.qtde,
           })),
           tipoRomaneio: "TRANSFERENCIA ENTRE LOJAS",
-          responsavel: responsavel || user.username || "LOGISTICA",
+          responsavel: responsavelPadrao || "",
         }),
       });
       const json = (await res.json()) as { success?: boolean; romaneio?: string; error?: string };
@@ -718,12 +725,12 @@ export default function RomaneioDetalhePage({
           onClick={() => { if (!editRomaneioSaving) setEditRomaneioModal(false); }}
         >
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 className={styles.modalTitle}>Editar Número do Romaneio</h2>
+            <h2 className={styles.modalTitle}>Editar Romaneio</h2>
             <p className={styles.modalOrigem}>
               Romaneio atual: <strong>{editRomaneioAlvo}</strong>
             </p>
             <div className={styles.modalField}>
-              <label className={styles.modalLabel}>Novo número (6 dígitos)</label>
+              <label className={styles.modalLabel}>Número (6 dígitos)</label>
               <input
                 type="text"
                 className={styles.modalInput}
@@ -732,6 +739,17 @@ export default function RomaneioDetalhePage({
                 onChange={(e) => setEditRomaneioValor(e.target.value.replace(/\D/g, ""))}
                 disabled={editRomaneioSaving || !!editRomaneioSucesso}
                 placeholder="000000"
+              />
+            </div>
+            <div className={styles.modalField}>
+              <label className={styles.modalLabel}>Responsável</label>
+              <input
+                type="text"
+                className={styles.modalInput}
+                value={editRomaneioResponsavel}
+                onChange={(e) => setEditRomaneioResponsavel(e.target.value.toUpperCase())}
+                disabled={editRomaneioSaving || !!editRomaneioSucesso}
+                placeholder="LOGISTICA"
               />
             </div>
             {editRomaneioErro && <p className={styles.modalErro}>{editRomaneioErro}</p>}

@@ -616,6 +616,13 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
     loadTiposRomaneio();
   }, [permissoes, permissoesCarregadas]);
 
+  // Aplicar responsável padrão imediatamente quando as permissões carregam
+  useEffect(() => {
+    if (!permissoesCarregadas || !permissoes?.responsavelPadrao) return;
+    setResponsavelFinal(permissoes.responsavelPadrao);
+    setResponsavelSelecionado(permissoes.responsavelPadrao);
+  }, [permissoesCarregadas, permissoes?.responsavelPadrao]);
+
   // Carregar responsáveis e aplicar padrão de permissão
   useEffect(() => {
     if (!permissoesCarregadas) return;
@@ -626,16 +633,9 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
         setResponsaveis(data);
         
         if (permissoes?.responsavelPadrao) {
-          const responsavelValido = data.find(r =>
-            r.responsavel.toUpperCase() === permissoes.responsavelPadrao!.toUpperCase()
-          );
-          if (responsavelValido) {
-            setResponsavelSelecionado(responsavelValido.responsavel);
-            setResponsavelFinal(responsavelValido.responsavel);
-          } else if (data.length > 0) {
-            setResponsavelSelecionado(data[0].responsavel);
-            setResponsavelFinal(data[0].responsavel);
-          }
+          // Usa o responsável padrão configurado diretamente, mesmo que não conste na lista
+          setResponsavelSelecionado(permissoes.responsavelPadrao);
+          setResponsavelFinal(permissoes.responsavelPadrao);
         } else if (data.length > 0) {
           setResponsavelSelecionado(data[0].responsavel);
           setResponsavelFinal(data[0].responsavel);

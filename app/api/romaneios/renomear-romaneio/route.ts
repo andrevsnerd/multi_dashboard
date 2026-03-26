@@ -11,9 +11,9 @@ async function podeChamar(username: string | null): Promise<boolean> {
 
 /**
  * POST /api/romaneios/renomear-romaneio
- * Renomeia o número de um romaneio em todas as tabelas relacionadas.
- * Suporta tipo "entrada" e "saida".
- * Permitido apenas para: admin.
+ * Renomeia o número de UM romaneio (apenas o primeiro encontrado) em todas as tabelas
+ * relacionadas, sem afetar eventuais duplicatas com o mesmo número.
+ * Suporta tipo "entrada" e "saida". Permitido apenas para: admin.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -26,10 +26,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { oldRomaneio, newRomaneio, tipo } = body as {
+    const { oldRomaneio, newRomaneio, tipo, newResponsavel } = body as {
       oldRomaneio?: string;
       newRomaneio?: string;
       tipo?: string;
+      newResponsavel?: string;
     };
 
     if (!oldRomaneio?.trim() || !newRomaneio?.trim()) {
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
     const tipoNorm = tipo === 'saida' ? 'saida' : 'entrada';
     const oldTrim = oldRomaneio.trim();
     const newTrim = newRomaneio.trim().padStart(6, '0');
+    const responsavelTrim = newResponsavel?.trim() || null;
 
     if (!/^\d{6}$/.test(newTrim)) {
       return NextResponse.json(
@@ -47,36 +49,81 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (oldTrim === newTrim) {
-      return NextResponse.json({ success: true, romaneio: newTrim });
-    }
+    const numeroMudou = oldTrim !== newTrim;
 
     await withRequest(async (req) => {
       req.input('old', sql.VarChar, oldTrim);
       req.input('new', sql.VarChar, newTrim);
+      if (responsavelTrim) req.input('responsavel', sql.VarChar, responsavelTrim);
 
       if (tipoNorm === 'entrada') {
-        const check = await req.query(`
-          SELECT COUNT(*) as TOTAL FROM ESTOQUE_PROD_ENT WITH (NOLOCK)
-          WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @new
-        `);
-        if (check.recordset[0]?.TOTAL > 0) {
-          throw Object.assign(new Error(`Romaneio ${newTrim} já existe nas entradas.`), { status: 409 });
+        if (numeroMudou) {
+          const check = await req.query(`
+            SELECT COUNT(*) AS TOTAL FROM ESTOQUE_PROD_ENT WITH (NOLOCK)
+            WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @new
+          `);
+          if (check.recordset[0]?.TOTAL > 0) {
+            throw Object.assign(new Error(`Romaneio ${newTrim} já existe nas entradas.`), { status: 409 });
+          }
         }
-        await req.query(`UPDATE ESTOQUE_PROD_ENT  SET ROMANEIO_PRODUTO = @new WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @old`);
-        await req.query(`UPDATE ESTOQUE_PROD1_ENT SET ROMANEIO_PRODUTO = @new WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @old`);
-        await req.query(`UPDATE LOJA_ENTRADAS     SET ROMANEIO_PRODUTO = @new WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @old`);
+
+        await req.query(`
+          DECLARE @headerCount INT
+          DECLARE @itemCount   INT
+          DECLARE @itemsParaDup INT
+
+          SELECT @headerCount = COUNT(*) FROM ESTOQUE_PROD_ENT  WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @old
+          SELECT @itemCount   = COUNT(*) FROM ESTOQUE_PROD1_ENT WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @old
+
+          SET @itemsParaDup = @itemCount / NULLIF(@headerCount, 1)
+          IF @itemsParaDup IS NULL OR @itemsParaDup < 1 SET @itemsParaDup = @itemCount
+
+          UPDATE TOP (1) ESTOQUE_PROD_ENT
+            SET ROMANEIO_PRODUTO = @new ${responsavelTrim ? ', RESPONSAVEL = @responsavel' : ''}
+            WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @old
+
+          UPDATE TOP (1) LOJA_ENTRADAS
+            SET ROMANEIO_PRODUTO = @new ${responsavelTrim ? ', RESPONSAVEL = @responsavel' : ''}
+            WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @old
+
+          UPDATE TOP (@itemsParaDup) ESTOQUE_PROD1_ENT
+            SET ROMANEIO_PRODUTO = @new
+            WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @old
+        `);
       } else {
-        const check = await req.query(`
-          SELECT COUNT(*) as TOTAL FROM ESTOQUE_PROD_SAI WITH (NOLOCK)
-          WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @new
-        `);
-        if (check.recordset[0]?.TOTAL > 0) {
-          throw Object.assign(new Error(`Romaneio ${newTrim} já existe nas saídas.`), { status: 409 });
+        if (numeroMudou) {
+          const check = await req.query(`
+            SELECT COUNT(*) AS TOTAL FROM ESTOQUE_PROD_SAI WITH (NOLOCK)
+            WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @new
+          `);
+          if (check.recordset[0]?.TOTAL > 0) {
+            throw Object.assign(new Error(`Romaneio ${newTrim} já existe nas saídas.`), { status: 409 });
+          }
         }
-        await req.query(`UPDATE ESTOQUE_PROD_SAI  SET ROMANEIO_PRODUTO = @new WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @old`);
-        await req.query(`UPDATE ESTOQUE_PROD1_SAI SET ROMANEIO_PRODUTO = @new WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @old`);
-        await req.query(`UPDATE LOJA_SAIDAS       SET ROMANEIO_PRODUTO = @new WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @old`);
+
+        await req.query(`
+          DECLARE @headerCount INT
+          DECLARE @itemCount   INT
+          DECLARE @itemsParaDup INT
+
+          SELECT @headerCount = COUNT(*) FROM ESTOQUE_PROD_SAI  WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @old
+          SELECT @itemCount   = COUNT(*) FROM ESTOQUE_PROD1_SAI WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @old
+
+          SET @itemsParaDup = @itemCount / NULLIF(@headerCount, 1)
+          IF @itemsParaDup IS NULL OR @itemsParaDup < 1 SET @itemsParaDup = @itemCount
+
+          UPDATE TOP (1) ESTOQUE_PROD_SAI
+            SET ROMANEIO_PRODUTO = @new ${responsavelTrim ? ', RESPONSAVEL = @responsavel' : ''}
+            WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @old
+
+          UPDATE TOP (1) LOJA_SAIDAS
+            SET ROMANEIO_PRODUTO = @new ${responsavelTrim ? ', RESPONSAVEL = @responsavel' : ''}
+            WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @old
+
+          UPDATE TOP (@itemsParaDup) ESTOQUE_PROD1_SAI
+            SET ROMANEIO_PRODUTO = @new
+            WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @old
+        `);
       }
     });
 
