@@ -67,7 +67,7 @@ function getStatusClass(status: string): string {
 type TabType = "saida" | "entrada";
 
 export default function RomaneiosPage({ companySlug, companyName }: RomaneiosPageProps) {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [saidas, setSaidas] = useState<RomaneioListItem[]>([]);
   const [entradas, setEntradas] = useState<RomaneioListItem[]>([]);
   const [filiais, setFiliais] = useState<FilialOption[]>([]);
@@ -76,6 +76,7 @@ export default function RomaneiosPage({ companySlug, companyName }: RomaneiosPag
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
+    if (authLoading) return; // Aguardar auth terminar antes de buscar dados do usuário
     let cancelled = false;
     setLoading(true);
     Promise.all([
@@ -105,7 +106,7 @@ export default function RomaneiosPage({ companySlug, companyName }: RomaneiosPag
     return () => {
       cancelled = true;
     };
-  }, [companySlug, user?.username]);
+  }, [companySlug, user?.username, authLoading]);
 
   const basePath = `/${companySlug}`;
   const romaneiosBase = activeTab === "saida" ? saidas : entradas;

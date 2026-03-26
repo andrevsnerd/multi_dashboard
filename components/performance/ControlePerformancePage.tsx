@@ -55,6 +55,19 @@ const OUTROS_CATEGORIES = new Set([
 const OUTROS_LABEL = "OUTROS";
 const OUTROS_TOOLTIP = `Composição do OUTROS:\n- ${Array.from(OUTROS_CATEGORIES).join("\n- ")}`;
 
+const CATEGORY_COLORS = [
+  "#1565c0",
+  "#e65100",
+  "#00695c",
+  "#4527a0",
+  "#ad1457",
+  "#37474f",
+  "#4e342e",
+  "#1b5e20",
+  "#00838f",
+  "#6d4c41",
+];
+
 function getCategoryHeaderLabel(category: string): string {
   const normalized = category
     .normalize("NFD")
@@ -63,8 +76,10 @@ function getCategoryHeaderLabel(category: string): string {
     .trim()
     .toUpperCase();
 
-  if (normalized.includes("APROVEITAMENTO") && normalized.includes("LENC")) return "AP. LENÇOS";
-  return category;
+  if (normalized.includes("APROVEITAMENTO") && normalized.includes("LENC")) return "Ap. Lenços";
+  return category
+    .toLowerCase()
+    .replace(/^\w/, c => c.toUpperCase());
 }
 
 function formatCurrency(value: number): string {
@@ -94,6 +109,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const selectedMonth = range.startDate.getMonth();
   const selectedYear = range.startDate.getFullYear();
 
@@ -207,13 +223,22 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
             }}
           />
         </div>
-        <button
-          type="button"
-          className={styles.goalsButton}
-          onClick={() => setIsGoalsModalOpen(true)}
-        >
-          Editar Metas
-        </button>
+        <div className={styles.headerActions}>
+          <button
+            type="button"
+            className={`${styles.viewToggleBtn} ${viewMode === "table" ? styles.viewToggleBtnActive : ""}`}
+            onClick={() => setViewMode(v => v === "cards" ? "table" : "cards")}
+          >
+            Tabela
+          </button>
+          <button
+            type="button"
+            className={styles.goalsButton}
+            onClick={() => setIsGoalsModalOpen(true)}
+          >
+            Editar Metas
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -242,8 +267,110 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
       {loading && <div className={styles.loadingMsg}>Carregando...</div>}
       {error && <div className={styles.errorMsg}>{error}</div>}
 
-      {/* Table */}
-      {!loading && data && totals && (
+      {/* Cards View */}
+      {!loading && data && totals && viewMode === "cards" && (
+        <div className={styles.cardsGrid}>
+          {data.filiais.map(row => {
+            const variationPct = getComparisonPct(row.vendas, row.vendasPrevious);
+            const salesPct = row.projecaoPct;
+            const barPct = salesPct !== null ? Math.min(salesPct, 100) : 0;
+            const barClass = salesPct !== null
+              ? (salesPct >= 100 ? styles.fillGreen : salesPct >= 75 ? styles.fillOrange : styles.fillRed)
+              : styles.fillRed;
+            const metaPctClass = salesPct !== null
+              ? (salesPct >= 100 ? styles.metaPctGreen : salesPct >= 75 ? styles.metaPctOrange : styles.metaPctRed)
+              : "";
+
+            const getCardCatPct = (cat: string): number | null => {
+              if (cat === OUTROS_LABEL) {
+                const entries = Array.from(OUTROS_CATEGORIES)
+                  .map(c => row.categories[c]?.pct)
+                  .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+                if (entries.length === 0) return null;
+                return Math.round(entries.reduce((s, v) => s + v, 0) / entries.length);
+              }
+              const v = row.categories[cat]?.pct;
+              return typeof v === "number" && Number.isFinite(v) ? Math.round(v) : null;
+            };
+
+            const getCardCatDelta = (cat: string): number | null => {
+              if (cat === OUTROS_LABEL) {
+                const deltas = Array.from(OUTROS_CATEGORIES)
+                  .map(c => row.categories[c]?.deltaPct)
+                  .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+                if (deltas.length === 0) return null;
+                return deltas.reduce((s, v) => s + v, 0) / deltas.length;
+              }
+              const d = row.categories[cat]?.deltaPct;
+              return typeof d === "number" && Number.isFinite(d) ? d : null;
+            };
+
+            return (
+              <div key={row.filial} className={styles.branchCard}>
+                {/* Left: filial name + variation */}
+                <div className={styles.cardLeft}>
+                  <span className={styles.cardFilialName}>{row.displayName}</span>
+                  {variationPct !== null && (
+                    <span className={`${styles.variationBadge} ${variationPct >= 0 ? styles.variationPos : styles.variationNeg}`}>
+                      {variationPct >= 0 ? "↗" : "↘"} {formatSignedPct(variationPct)}
+                    </span>
+                  )}
+                </div>
+
+                {/* Middle: revenue + progress bar */}
+                <div className={styles.cardMiddle}>
+                  <div className={styles.cardRevenue}>{formatCurrency(row.vendas)}</div>
+                  <div className={styles.cardQtde}>{row.qtde.toLocaleString("pt-BR")} itens</div>
+                  {row.meta > 0 && salesPct !== null && (
+                    <>
+                      <div className={styles.cardMetaRow}>
+                        <span className={styles.cardMetaValue}>@ {formatCurrency(row.meta)}</span>
+                        <span className={`${styles.cardMetaPct} ${metaPctClass}`}>{salesPct.toFixed(1)}%</span>
+                      </div>
+                      <div className={styles.progressBarTrack}>
+                        <div
+                          className={`${styles.progressBarFill} ${barClass}`}
+                          style={{ width: `${barPct}%` }}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Right: categories */}
+                <div className={styles.cardCategoriesSection}>
+                  {displayedCategories.map((cat, idx) => {
+                    const pct = getCardCatPct(cat);
+                    const delta = getCardCatDelta(cat);
+                    if (pct === null) return null;
+                    return (
+                      <span
+                        key={cat}
+                        className={styles.catPill}
+                        title={cat === OUTROS_LABEL ? OUTROS_TOOLTIP : undefined}
+                      >
+                        <span
+                          className={styles.catDot}
+                          style={{ backgroundColor: CATEGORY_COLORS[idx % CATEGORY_COLORS.length] }}
+                        />
+                        {getCategoryHeaderLabel(cat)} {pct}%
+                        {delta !== null && (
+                          <span className={delta >= 0 ? styles.catArrowUp : styles.catArrowDown}>
+                            {delta >= 0 ? " ↑" : " ↓"}
+                          </span>
+                        )}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Table View */}
+      {!loading && data && totals && viewMode === "table" && (
         <div className={styles.tableWrapper}>
           <table className={styles.table}>
             <thead>

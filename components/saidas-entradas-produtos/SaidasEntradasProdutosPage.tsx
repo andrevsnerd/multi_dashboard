@@ -415,7 +415,7 @@ export default function SaidasEntradasProdutosPage({
   companyKey,
   companyName,
 }: SaidasEntradasProdutosPageProps) {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [tipoOperacao, setTipoOperacao] = useState<TipoOperacao>("saida");
   const [filiais, setFiliais] = useState<Filial[]>([]);
   const [filiaisDisponiveis, setFiliaisDisponiveis] = useState<Filial[]>([]);
@@ -480,6 +480,8 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
   // Carregar permissões do usuário PRIMEIRO (antes de tudo)
   useEffect(() => {
     async function loadPermissoes() {
+      // Aguardar auth terminar de carregar antes de agir
+      if (authLoading) return;
       if (!user?.username) {
         setPermissoesCarregadas(true);
         return;
@@ -494,7 +496,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       }
     }
     loadPermissoes();
-  }, [user?.username]);
+  }, [user?.username, authLoading]);
 
   // Carregar filiais e aplicar filtros de permissão (aguardar permissões carregarem)
   useEffect(() => {

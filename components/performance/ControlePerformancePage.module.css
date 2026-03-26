@@ -348,3 +348,199 @@
   letter-spacing: 0.3px;
   text-transform: uppercase;
 }
+
+/* ── Header actions ── */
+.headerActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* View toggle button */
+.viewToggleBtn {
+  padding: 8px 16px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #555;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.viewToggleBtn:hover {
+  background: #f5f5f5;
+  border-color: #ccc;
+}
+
+.viewToggleBtnActive {
+  background: #263238;
+  color: #fff;
+  border-color: #263238;
+}
+
+.viewToggleBtnActive:hover {
+  background: #37474f;
+  border-color: #37474f;
+}
+
+/* ── Cards View ── */
+.cardsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.branchCard {
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  transition: box-shadow 0.15s;
+}
+
+.branchCard:hover {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Left section */
+.cardLeft {
+  min-width: 130px;
+  max-width: 130px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cardFilialName {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a1a1a;
+  line-height: 1.2;
+}
+
+.variationBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.variationPos {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.variationNeg {
+  background: #fce4ec;
+  color: #c62828;
+}
+
+/* Middle section */
+.cardMiddle {
+  min-width: 210px;
+  max-width: 210px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cardRevenue {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.cardQtde {
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 6px;
+}
+
+.cardMetaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cardMetaValue {
+  font-size: 12px;
+  color: #888;
+}
+
+.cardMetaPct {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.metaPctGreen { color: #2e7d32; }
+.metaPctOrange { color: #e65100; }
+.metaPctRed { color: #c62828; }
+
+.progressBarTrack {
+  height: 6px;
+  background: #f0f0f0;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 5px;
+  width: 100%;
+}
+
+.progressBarFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.fillGreen { background: #43a047; }
+.fillOrange { background: #fb8c00; }
+.fillRed { background: #e53935; }
+
+/* Right: categories section */
+.cardCategoriesSection {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  flex: 1;
+  align-items: center;
+}
+
+.catPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: #f5f7fa;
+  border: 1px solid #eaeef3;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #444;
+  white-space: nowrap;
+}
+
+.catDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.catArrowUp {
+  color: #2e7d32;
+  font-weight: 700;
+}
+
+.catArrowDown {
+  color: #c62828;
+  font-weight: 700;
+}
