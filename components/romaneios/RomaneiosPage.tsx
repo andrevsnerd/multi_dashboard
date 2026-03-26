@@ -126,7 +126,7 @@ export default function RomaneiosPage({ companySlug, companyName }: RomaneiosPag
     <div className={styles.wrapper}>
       <div className={styles.header}>
         <h1 className={styles.title}>Romaneios</h1>
-        {user?.role === "admin" && (
+        {(user?.role === "admin" || user?.username === "ed") && (
           <div className={styles.tabs}>
             <button
               type="button"

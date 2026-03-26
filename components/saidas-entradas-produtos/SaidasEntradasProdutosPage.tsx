@@ -545,16 +545,8 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
           const destinos = controle.length > 0
             ? data.filter(f => controle.some(cod => f.codFilial.trim() === (cod || "").trim()))
             : data;
-          const MATRIZ_EXCLUIDA: Partial<Record<string, string>> = {
-            nerd: 'NERD',
-            scarfme: 'SCARF ME - MATRIZ',
-          };
-          const matrizExcluida = MATRIZ_EXCLUIDA[companyKey];
-          const destinosFiltrados = matrizExcluida
-            ? destinos.filter(f => f.codFilial.trim() !== matrizExcluida)
-            : destinos;
-          setFiliaisDestinoDisponiveis(destinosFiltrados);
-          if (destinosFiltrados.length === 1) setFilialDestinoSaida(destinosFiltrados[0]);
+          setFiliaisDestinoDisponiveis(destinos);
+          if (destinos.length === 1) setFilialDestinoSaida(destinos[0]);
         } else {
           setFiliaisDisponiveis(data);
           if (data.length > 0) {
