@@ -12,14 +12,16 @@ export interface CompanyRevenueListsProps {
   startDate: Date;
   endDate: Date;
   filial?: string | null | undefined;
+  filialPerformance?: FilialPerformance[];
   title?: string;
   subtitle?: string;
+  initialProducts?: ProductRevenue[];
+  initialCategories?: CategoryRevenue[];
 }
 
 interface RevenueState {
   products: ProductRevenue[];
   categories: CategoryRevenue[];
-  filialPerformance: FilialPerformance[];
 }
 
 async function fetchRevenue(
@@ -33,17 +35,14 @@ async function fetchRevenue(
     start: startDate.toISOString(),
     end: endDate.toISOString(),
   });
-  
+
   if (filial) {
     searchParams.set('filial', filial);
   }
 
-  const [productsResponse, categoriesResponse, filialResponse] = await Promise.all([
+  const [productsResponse, categoriesResponse] = await Promise.all([
     fetch(`/api/top-products?${searchParams.toString()}`, { cache: "no-store" }),
     fetch(`/api/top-categories?${searchParams.toString()}`, {
-      cache: "no-store",
-    }),
-    fetch(`/api/filial-performance?${searchParams.toString()}`, {
       cache: "no-store",
     }),
   ]);
@@ -54,22 +53,15 @@ async function fetchRevenue(
   if (!categoriesResponse.ok) {
     throw new Error("Erro ao carregar top grupos");
   }
-  if (!filialResponse.ok) {
-    throw new Error("Erro ao carregar performance por filial");
-  }
 
   const productsJson = (await productsResponse.json()) as { data: ProductRevenue[] };
   const categoriesJson = (await categoriesResponse.json()) as {
     data: CategoryRevenue[];
   };
-  const filialJson = (await filialResponse.json()) as {
-    data: FilialPerformance[];
-  };
 
   return {
     products: productsJson.data,
     categories: categoriesJson.data,
-    filialPerformance: filialJson.data,
   };
 }
 
@@ -78,11 +70,17 @@ export default function CompanyRevenueLists({
   startDate,
   endDate,
   filial = null,
+  filialPerformance: filialPerformanceProp = [],
   title = "Top faturamento",
   subtitle = "Produtos e categorias com maior faturamento no período selecionado.",
+  initialProducts,
+  initialCategories,
 }: CompanyRevenueListsProps) {
-  const [state, setState] = useState<RevenueState>({ products: [], categories: [], filialPerformance: [] });
-  const [loading, setLoading] = useState(false);
+  const [state, setState] = useState<RevenueState>({
+    products: initialProducts ?? [],
+    categories: initialCategories ?? [],
+  });
+  const [loading, setLoading] = useState(initialProducts === undefined);
   const [error, setError] = useState<string | null>(null);
 
   const rangeKey = useMemo(
@@ -91,6 +89,8 @@ export default function CompanyRevenueLists({
   );
 
   useEffect(() => {
+    if (initialProducts !== undefined) return;
+
     let active = true;
 
     async function load() {
@@ -120,21 +120,21 @@ export default function CompanyRevenueLists({
     return () => {
       active = false;
     };
-  }, [companyKey, rangeKey, startDate, endDate, filial]);
+  }, [companyKey, rangeKey, startDate, endDate, filial, initialProducts]);
 
   // SCARFME: adicionar "VAREJO" agregado e agregar filiais com mesmo displayName (PAULISTA, E-COMMERCE)
   const filialPerformanceWithVarejo = useMemo(() => {
     if (companyKey !== "scarfme") {
-      return state.filialPerformance;
+      return filialPerformanceProp;
     }
 
     // Filtrar apenas filiais normais (não e-commerce) para o total VAREJO
-    const varejoFiliais = state.filialPerformance.filter(
+    const varejoFiliais = filialPerformanceProp.filter(
       (item) => !isEcommerceFilial(companyKey, item.filial)
     );
 
     if (varejoFiliais.length === 0) {
-      return state.filialPerformance;
+      return filialPerformanceProp;
     }
 
     // Agregação de VAREJO (soma de todas as lojas físicas)
@@ -166,7 +166,7 @@ export default function CompanyRevenueLists({
 
     // Agregar por filialDisplayName (ex.: duas PAULISTA → uma linha PAULISTA; dois E-COMMERCE → uma linha E-COMMERCE)
     const byDisplayName = new Map<string, FilialPerformance>();
-    for (const item of state.filialPerformance) {
+    for (const item of filialPerformanceProp) {
       const name = item.filialDisplayName;
       const existing = byDisplayName.get(name);
       if (!existing) {
@@ -196,7 +196,7 @@ export default function CompanyRevenueLists({
     );
 
     return [varejoItem, ...aggregatedList];
-  }, [state.filialPerformance, companyKey]);
+  }, [filialPerformanceProp, companyKey]);
 
   const filialPerformanceTotals = useMemo(() => {
     const list = filialPerformanceWithVarejo;

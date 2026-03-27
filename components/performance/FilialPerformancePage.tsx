@@ -4,6 +4,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { startOfMonth, endOfMonth } from "date-fns";
 import type { CompanyKey } from "@/lib/config/company";
+import {
+  OUTROS_LABEL,
+  filterOutrosKeys,
+  getOutrosTooltip,
+  isOutrosCategory,
+} from "@/lib/performance/outrosCategories";
 import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateRangeFilter";
 import styles from "./FilialPerformancePage.module.css";
 
@@ -16,6 +22,7 @@ interface ProdutoRow {
   grade?: string;
   vendas: number;
   qtde: number;
+  custo: number;
 }
 
 interface FilialData {
@@ -96,17 +103,6 @@ const CURVA_BAR_CLASS: Record<Curva, string> = {
 
 // ─── Category helpers ─────────────────────────────────────────────────────────
 
-const OUTROS_CATEGORIES = new Set([
-  "CAPAS E ACESSORIOS P/ CEL",
-  "HOME",
-  "PAPELARIA",
-  "ELETRONICOS",
-  "PERFUMARIA",
-  "SEDA PREMIUM",
-]);
-const OUTROS_LABEL = "OUTROS";
-const OUTROS_TOOLTIP = `Composição do OUTROS:\n- ${Array.from(OUTROS_CATEGORIES).join("\n- ")}`;
-
 const CATEGORY_COLORS = [
   "#1565c0", "#e65100", "#00695c", "#4527a0", "#ad1457",
   "#37474f", "#4e342e", "#1b5e20", "#00838f", "#6d4c41",
@@ -173,19 +169,28 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
       .finally(() => setLoading(false));
   }, [companyKey, filial, selectedMonth, selectedYear, comparisonMode]);
 
+  const outrosTooltip = useMemo(() => getOutrosTooltip(companyKey), [companyKey]);
+
+  const outrosKeys = useMemo(
+    () => (data ? filterOutrosKeys(data.categoryList, companyKey) : []),
+    [data, companyKey]
+  );
+
   const displayedCategories = useMemo(() => {
     if (!data) return [];
-    const outros = data.categoryList.filter(c => OUTROS_CATEGORIES.has(c));
-    const remaining = data.categoryList.filter(c => !OUTROS_CATEGORIES.has(c));
+    const outros = data.categoryList.filter(c => isOutrosCategory(companyKey, c));
+    const remaining = data.categoryList.filter(c => !isOutrosCategory(companyKey, c));
     return outros.length > 0 ? [...remaining, OUTROS_LABEL] : remaining;
-  }, [data]);
+  }, [data, companyKey]);
 
   // Resolve which raw categoria values match the selected display category
   const activeCategorias = useMemo((): Set<string> | null => {
     if (!selectedCategory || !data) return null;
-    if (selectedCategory === OUTROS_LABEL) return OUTROS_CATEGORIES;
+    if (selectedCategory === OUTROS_LABEL) {
+      return new Set(filterOutrosKeys(data.categoryList, companyKey));
+    }
     return new Set([selectedCategory]);
-  }, [selectedCategory, data]);
+  }, [selectedCategory, data, companyKey]);
 
   const produtosFiltrados = useMemo(() => {
     if (!data) return [];
@@ -211,6 +216,7 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
   const displayQtde = selectedCategory
     ? produtosFiltrados.reduce((s, p) => s + p.qtde, 0)
     : data?.qtde ?? 0;
+  const displayCMV = produtosFiltrados.reduce((s, p) => s + p.custo * p.qtde, 0);
 
   const variationPct = data && data.vendasPrevious > 0
     ? ((data.vendas - data.vendasPrevious) / data.vendasPrevious) * 100
@@ -238,7 +244,7 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
   const getCardCatPct = (cat: string): number | null => {
     if (!data) return null;
     if (cat === OUTROS_LABEL) {
-      const entries = Array.from(OUTROS_CATEGORIES)
+      const entries = outrosKeys
         .map(c => data.categories[c]?.pct)
         .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
       if (entries.length === 0) return null;
@@ -251,7 +257,7 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
   const getCardCatDelta = (cat: string): number | null => {
     if (!data) return null;
     if (cat === OUTROS_LABEL) {
-      const deltas = Array.from(OUTROS_CATEGORIES)
+      const deltas = outrosKeys
         .map(c => data.categories[c]?.deltaPct)
         .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
       if (deltas.length === 0) return null;
@@ -340,6 +346,10 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
                 <span className={styles.kpiLabel}>QTDE VENDAS</span>
                 <span className={styles.kpiValue}>{fmt(displayQtde)}</span>
               </div>
+              <div className={styles.kpiCard}>
+                <span className={styles.kpiLabel}>CMV</span>
+                <span className={styles.kpiValue}>{displayCMV > 0 ? fmtCurrency(displayCMV) : "—"}</span>
+              </div>
             </div>
           )}
 
@@ -387,7 +397,7 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
                     key={cat}
                     type="button"
                     className={`${styles.catPill} ${catPillTrendClass} ${isInactive ? styles.catPillInactive : ""}`}
-                    title={cat === OUTROS_LABEL ? OUTROS_TOOLTIP : `Filtrar ABC por ${cat}`}
+                    title={cat === OUTROS_LABEL ? outrosTooltip : `Filtrar ABC por ${cat}`}
                     onClick={() => handleBadgeClick(cat)}
                     style={!isActive ? {
                       backgroundColor: delta === null ? hexToRgba(color, 0.12) : undefined,
@@ -482,6 +492,7 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
                     <th className={styles.right}>Participação</th>
                     <th className={styles.right}>Faturamento no período</th>
                     <th className={styles.right}>Qtd vendida</th>
+                    <th className={styles.right}>Markup</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -491,19 +502,18 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
                     return (
                       <React.Fragment key={curva}>
                         <tr className={`${styles.sectionRow} ${styles[`sectionRow${curva}`]}`}>
-                          <td colSpan={5}>
+                          <td colSpan={6}>
                             <div className={styles.sectionLabel}>
                               <span className={`${styles.curvaBadge} ${CURVA_BADGE_CLASS[curva]}`}>{curva}</span>
                               <span className={styles.sectionTitle}>{CURVA_LABEL[curva]}</span>
                               <span className={styles.sectionCount}>{grupo.length} produtos</span>
-                              {curva === "A" && (
-                                <span className={styles.sectionNote}>← maior impacto em vendas</span>
-                              )}
                             </div>
                           </td>
                         </tr>
                         {grupo.map((p, i) => {
                           const rankGlobal = produtosComCurva.indexOf(p) + 1;
+                          const precoMedio = p.qtde > 0 ? p.vendas / p.qtde : 0;
+                          const markup = p.custo > 0 && precoMedio > 0 ? precoMedio / p.custo : null;
                           return (
                             <tr key={`${p.produto}-${p.categoria}`} className={curva !== "A" ? styles.rowDimmed : ""}>
                               <td>
@@ -513,15 +523,15 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
                               </td>
                               <td>
                                 <div className={styles.productName}>{p.descricao || p.produto}</div>
-                                {((p.descricao && p.produto !== p.descricao) || (!selectedCategory && p.categoria)) && (
+                                {((p.descricao && p.produto !== p.descricao) || p.categoria) && (
                                   <div className={styles.productMeta}>
                                     {p.descricao && p.produto !== p.descricao && (
                                       <span className={styles.productCode}>{p.produto}</span>
                                     )}
-                                    {p.descricao && p.produto !== p.descricao && !selectedCategory && p.categoria && (
+                                    {p.descricao && p.produto !== p.descricao && p.categoria && (
                                       <span className={styles.productMetaSeparator}>|</span>
                                     )}
-                                    {!selectedCategory && p.categoria && (
+                                    {p.categoria && (
                                       <span className={styles.productCategoria}>
                                         {getCategoryHeaderLabel(p.categoria)}
                                         {companyKey === "scarfme" && p.grade && (
@@ -548,6 +558,7 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
                               </td>
                               <td className={styles.vendas}>{fmtBRL(p.vendas)}</td>
                               <td className={styles.vendas}>{fmt(p.qtde)}</td>
+                              <td className={styles.vendas}>{markup !== null ? <span className={styles.markupBadge}>{markup.toFixed(2)}x</span> : <span className={styles.noData}>—</span>}</td>
                             </tr>
                           );
                         })}

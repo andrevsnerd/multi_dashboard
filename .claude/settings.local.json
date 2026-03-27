@@ -26,7 +26,9 @@
       "Bash(find 'c:/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/src' -type f -name *performance* -o -name *controle*)",
       "Bash(find \"c:/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/app/\\(companies\\)/[company]/controle-performance\" -type f)",
       "Bash(grep -r \"controle-performance\\\\|controle de performance\" 'c:/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/app' --include=*.tsx --include=*.ts)",
-      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")"
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(grep -v \"//\\\\|^\\\\s*//\")",
+      "Bash(awk 'NR>=1')"
     ]
   }
 }

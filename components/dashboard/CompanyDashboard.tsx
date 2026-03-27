@@ -12,9 +12,14 @@ import GoalCard from "@/components/dashboard/GoalCard";
 import GoalsModal from "@/components/dashboard/GoalsModal";
 import EngineButton from "@/components/layout/EngineButton";
 import CompanyRevenueLists from "@/components/dashboard/CompanyRevenueLists";
-import type { MetricSummary, SalesSummary } from "@/types/dashboard";
+import type {
+  MetricSummary,
+  SalesSummary,
+  FilialPerformance,
+  CategoryRevenue,
+  ProductRevenue,
+} from "@/types/dashboard";
 import { getCurrentMonthRange } from "@/lib/utils/date";
-import { resolveCompany } from "@/lib/config/company";
 
 import styles from "./CompanyDashboard.module.css";
 
@@ -38,62 +43,32 @@ const DEFAULT_SUMMARY: SalesSummary = {
   totalStockValue: { ...EMPTY_METRIC, changePercentage: null },
 };
 
-interface SalesSummaryResponse {
-  summary: SalesSummary;
-  lastAvailableDate: Date | null;
-  availableRange: {
-    start: Date | null;
-    end: Date | null;
-  };
+interface DailyRevenueData {
+  date: string;
+  revenue: number;
 }
 
-type FilialPerformanceItem = {
-  filial: string;
-  filialDisplayName: string;
-  currentRevenue: number;
-  previousRevenue: number;
-  changePercentage: number | null;
-};
+interface DashboardData {
+  filialPerformance: FilialPerformance[];
+  topProducts: ProductRevenue[];
+  topCategories: CategoryRevenue[];
+  dailyRevenue: DailyRevenueData[];
+  summary: SalesSummary;
+  lastAvailableDate: string | null;
+  availableRange: { start: string | null; end: string | null };
+  goals: Record<string, number>;
+}
 
 function buildMetricFromTotals(current: number, previous: number): MetricSummary {
   if (previous === 0 && current === 0) {
     return { currentValue: current, previousValue: previous, changePercentage: 0 };
   }
-
   const changePercentage =
     previous === 0 ? null : Number((((current - previous) / previous) * 100).toFixed(1));
-
   return { currentValue: current, previousValue: previous, changePercentage };
 }
 
-async function fetchFilialPerformanceTotalRevenueKpi(
-  company: string,
-  range: DateRangeValue,
-  filial: string | null,
-): Promise<MetricSummary> {
-  const searchParams = new URLSearchParams({
-    company,
-    start: range.startDate.toISOString(),
-    end: range.endDate.toISOString(),
-  });
-
-  if (filial) {
-    searchParams.set("filial", filial);
-  }
-
-  const response = await fetch(`/api/filial-performance?${searchParams.toString()}`, {
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw new Error("Erro ao carregar performance por filial");
-  }
-
-  const json = (await response.json()) as { data: FilialPerformanceItem[] };
-  const rows = Array.isArray(json.data) ? json.data : [];
-
-  // KPI deve somar apenas o que aparece na lista "PERFORMANCE DETALHADA POR LOJA".
-  // Na prática, isso exclui linhas técnicas como MATRIZ/VAREJO (e itens zerados).
+function computeFilialKpi(rows: FilialPerformance[]): MetricSummary {
   const filtered = rows.filter(
     (item) =>
       item.currentRevenue > 0 &&
@@ -101,7 +76,6 @@ async function fetchFilialPerformanceTotalRevenueKpi(
       item.filialDisplayName !== "VAREJO",
   );
 
-  // Agregar por nome exibido (ex.: múltiplos E-COMMERCE / PAULISTA viram uma linha).
   const byName = new Map<string, { current: number; previous: number }>();
   for (const item of filtered) {
     const key = item.filialDisplayName;
@@ -122,75 +96,48 @@ async function fetchFilialPerformanceTotalRevenueKpi(
   return buildMetricFromTotals(totalCurrent, totalPrevious);
 }
 
-async function fetchSummary(
+async function fetchDashboardData(
   company: string,
   range: DateRangeValue,
   filial: string | null,
-): Promise<SalesSummaryResponse> {
+  month: number,
+  year: number,
+): Promise<DashboardData> {
   const isSameDay = (a: Date, b: Date) =>
     a.getFullYear() === b.getFullYear() &&
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate();
 
-  // "Mês até agora": quando o fim do range for hoje, usar "agora" para incluir vendas do dia.
   const effectiveEndDate = isSameDay(range.endDate, new Date()) ? new Date() : range.endDate;
 
-  const searchParams = new URLSearchParams({
+  const params = new URLSearchParams({
     company,
     start: range.startDate.toISOString(),
     end: effectiveEndDate.toISOString(),
+    month: String(month),
+    year: String(year),
   });
-  
+
   if (filial) {
-    searchParams.set('filial', filial);
+    params.set("filial", filial);
   }
 
-  const response = await fetch(`/api/sales-summary?${searchParams.toString()}`, {
+  const response = await fetch(`/api/dashboard-data?${params.toString()}`, {
     cache: "no-store",
   });
 
   if (!response.ok) {
-    let message = "Erro ao carregar resumo de vendas";
+    let message = "Erro ao carregar dados do dashboard";
     try {
       const errJson = (await response.json()) as { error?: string; code?: string };
-      if (response.status === 504 || errJson.code === "ETIMEOUT") {
-        message =
-          errJson.error ||
-          "A consulta demorou muito. Os dados são pesados; tente novamente.";
-      } else if (errJson.error) {
-        message = errJson.error;
-      }
+      if (errJson.error) message = errJson.error;
     } catch {
-      if (response.status === 504) {
-        message =
-          "A consulta demorou muito. Os dados são pesados; tente novamente.";
-      }
+      // ignore
     }
     throw new Error(message);
   }
 
-  const json = (await response.json()) as {
-    data: SalesSummary;
-    lastAvailableDate?: string | null;
-    availableRange?: {
-      start: string | null;
-      end: string | null;
-    };
-  };
-
-  const lastAvailableDate = json.lastAvailableDate
-    ? new Date(json.lastAvailableDate)
-    : null;
-  const availableRange = {
-    start: json.availableRange?.start ? new Date(json.availableRange.start) : null,
-    end: json.availableRange?.end ? new Date(json.availableRange.end) : null,
-  };
-
-  return {
-    summary: json.data,
-    lastAvailableDate,
-    availableRange,
-  };
+  return response.json() as Promise<DashboardData>;
 }
 
 export default function CompanyDashboard({
@@ -199,153 +146,27 @@ export default function CompanyDashboard({
 }: CompanyDashboardProps) {
   const initialRange = useMemo(() => {
     const range = getCurrentMonthRange();
-    return {
-      startDate: range.start,
-      endDate: range.end,
-    };
+    return { startDate: range.start, endDate: range.end };
   }, []);
 
   const [range, setRange] = useState<DateRangeValue>(initialRange);
   const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
-  const [summary, setSummary] = useState<SalesSummary>(DEFAULT_SUMMARY);
-  const [lastAvailableDate, setLastAvailableDate] = useState<Date | null>(
-    initialRange.endDate,
-  );
-  const [availableSalesRange, setAvailableSalesRange] = useState<{
-    start: Date | null;
-    end: Date | null;
-  }>({
-    start: null,
-    end: initialRange.endDate,
-  });
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
-  const [projectionRevenue, setProjectionRevenue] = useState<number>(0);
 
-  const rangeKey = useMemo(
-    () => `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}`,
-    [range.startDate, range.endDate, selectedFilial],
-  );
-
-  // Obter mês/ano do período selecionado
   const monthYear = useMemo(() => {
     const date = range.startDate;
-    return {
-      month: date.getMonth(),
-      year: date.getFullYear(),
-    };
+    return { month: date.getMonth(), year: date.getFullYear() };
   }, [range.startDate]);
 
-  // Carregar metas da API para o mês específico
-  const [goals, setGoals] = useState<Record<string, number>>({});
-  const [goalsLoading, setGoalsLoading] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadGoals() {
-      setGoalsLoading(true);
-      try {
-        const response = await fetch(
-          `/api/goals?company=${companyKey}&month=${monthYear.month}&year=${monthYear.year}`,
-          { cache: "no-store" }
-        );
-        if (active) {
-          if (response.ok) {
-            const json = (await response.json()) as { data: Record<string, number> };
-            setGoals(json.data || {});
-          } else {
-            setGoals({});
-          }
-        }
-      } catch {
-        if (active) {
-          setGoals({});
-        }
-      } finally {
-        if (active) {
-          setGoalsLoading(false);
-        }
-      }
-    }
-
-    void loadGoals();
-
-    return () => {
-      active = false;
-    };
-  }, [companyKey, monthYear.month, monthYear.year, isGoalsModalOpen]);
-
-  // Calcular meta atual (filial específica ou soma de todas)
-  const currentGoal = useMemo(() => {
-    if (selectedFilial) {
-      return goals[selectedFilial] || 0;
-    }
-    // Soma de todas as filiais
-    return Object.values(goals).reduce((sum, goal) => sum + (goal as number), 0);
-  }, [goals, selectedFilial]);
-
-  const currentRevenue = summary.totalRevenue.currentValue;
-
-  // Buscar revenue para projeção (até o dia atual)
-  useEffect(() => {
-    let active = true;
-
-    async function loadProjectionRevenue() {
-      try {
-        // Usar o range atual (até o dia atual)
-        const { summary: projectionSummary } = await fetchSummary(
-          companyKey,
-          range,
-          selectedFilial,
-        );
-
-        if (active) {
-          setProjectionRevenue(projectionSummary.totalRevenue.currentValue);
-        }
-      } catch (err) {
-        // Em caso de erro, usar o revenue atual como fallback
-        if (active) {
-          setProjectionRevenue(summary.totalRevenue.currentValue);
-        }
-      }
-    }
-
-    void loadProjectionRevenue();
-
-    return () => {
-      active = false;
-    };
-  }, [companyKey, range.startDate, range.endDate, selectedFilial, summary.totalRevenue.currentValue]);
-
-  // Calcular projeção do mês
-  const monthProjection = useMemo(() => {
-    if (projectionRevenue === 0) return 0;
-
-    // Obter data de referência (endDate do range - dia atual)
-    const referenceDate = range.endDate;
-    
-    const monthStart = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
-    
-    // Calcular dias passados do mês (desde o início do mês até o dia atual)
-    const daysPassed = Math.floor((referenceDate.getTime() - monthStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    
-    // Evitar divisão por zero
-    if (daysPassed <= 0) return 0;
-    
-    // Calcular dias totais do mês
-    const lastDayOfMonth = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0);
-    const totalDaysInMonth = lastDayOfMonth.getDate();
-    
-    // Calcular média diária e projeção
-    // Projeção = (faturamento atual / dias já passados) * dias totais do mês
-    const averageDaily = projectionRevenue / daysPassed;
-    const projection = averageDaily * totalDaysInMonth;
-    
-    return projection;
-  }, [projectionRevenue, range.endDate]);
+  const rangeKey = useMemo(
+    () =>
+      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? "all"}`,
+    [range.startDate, range.endDate, selectedFilial],
+  );
 
   useEffect(() => {
     let active = true;
@@ -354,32 +175,19 @@ export default function CompanyDashboard({
       setLoading(true);
       setError(null);
       try {
-        const {
-          summary: data,
-          lastAvailableDate: apiLastAvailableDate,
-          availableRange,
-        } = await fetchSummary(companyKey, range, selectedFilial);
-
-        // KPI "Vendas Total" deve ser a soma das lojas exibidas em "PERFORMANCE DETALHADA POR LOJA".
-        const filialKpi = await fetchFilialPerformanceTotalRevenueKpi(
+        const data = await fetchDashboardData(
           companyKey,
           range,
           selectedFilial,
+          monthYear.month,
+          monthYear.year,
         );
-
         if (active) {
-          setSummary({
-            ...data,
-            totalRevenue: filialKpi,
-          });
-          setLastAvailableDate(apiLastAvailableDate);
-          setAvailableSalesRange(availableRange);
+          setDashboardData(data);
         }
       } catch (err) {
         if (active) {
-          setError(
-            err instanceof Error ? err.message : "Não foi possível carregar o resumo.",
-          );
+          setError(err instanceof Error ? err.message : "Não foi possível carregar o dashboard.");
         }
       } finally {
         if (active) {
@@ -393,12 +201,87 @@ export default function CompanyDashboard({
     return () => {
       active = false;
     };
-  }, [companyKey, range, rangeKey, retryKey]);
+  }, [companyKey, rangeKey, retryKey, range, selectedFilial, monthYear.month, monthYear.year]);
+
+  // Recarregar metas quando o modal fechar
+  useEffect(() => {
+    if (isGoalsModalOpen) return;
+    if (!dashboardData) return;
+    let active = true;
+    async function reloadGoals() {
+      const params = new URLSearchParams({
+        company: companyKey,
+        month: String(monthYear.month),
+        year: String(monthYear.year),
+      });
+      try {
+        const res = await fetch(`/api/goals?${params.toString()}`, { cache: "no-store" });
+        if (res.ok && active) {
+          const json = (await res.json()) as { data: Record<string, number> };
+          setDashboardData((prev) => prev ? { ...prev, goals: json.data ?? {} } : prev);
+        }
+      } catch {
+        // silencioso
+      }
+    }
+    void reloadGoals();
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGoalsModalOpen]);
+
+  const summary: SalesSummary = useMemo(() => {
+    if (!dashboardData) return DEFAULT_SUMMARY;
+    return {
+      ...dashboardData.summary,
+      totalRevenue: computeFilialKpi(dashboardData.filialPerformance),
+    };
+  }, [dashboardData]);
+
+  const currentGoal = useMemo(() => {
+    if (!dashboardData) return 0;
+    const goals = dashboardData.goals;
+    if (selectedFilial) return goals[selectedFilial] ?? 0;
+    return Object.values(goals).reduce((sum, v) => sum + (v as number), 0);
+  }, [dashboardData, selectedFilial]);
+
+  const monthProjection = useMemo(() => {
+    if (!dashboardData) return 0;
+    const rawRevenue = dashboardData.summary.totalRevenue.currentValue;
+    if (rawRevenue === 0) return 0;
+
+    const referenceDate = range.endDate;
+    const monthStart = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
+    const daysPassed =
+      Math.floor((referenceDate.getTime() - monthStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    if (daysPassed <= 0) return 0;
+
+    const lastDayOfMonth = new Date(
+      referenceDate.getFullYear(),
+      referenceDate.getMonth() + 1,
+      0,
+    );
+    const totalDaysInMonth = lastDayOfMonth.getDate();
+    return (rawRevenue / daysPassed) * totalDaysInMonth;
+  }, [dashboardData, range.endDate]);
+
+  const availableSalesRange = useMemo(() => {
+    if (!dashboardData) return { start: null, end: initialRange.endDate };
+    return {
+      start: dashboardData.availableRange.start
+        ? new Date(dashboardData.availableRange.start)
+        : null,
+      end: dashboardData.availableRange.end
+        ? new Date(dashboardData.availableRange.end)
+        : initialRange.endDate,
+    };
+  }, [dashboardData, initialRange.endDate]);
 
   const handleRetry = () => {
     setError(null);
     setRetryKey((k) => k + 1);
   };
+
+  const currentRevenue = summary.totalRevenue.currentValue;
 
   return (
     <>
@@ -446,7 +329,11 @@ export default function CompanyDashboard({
         )}
 
         <div className={loading ? styles.contentLoading : undefined}>
-          <SummaryCards summary={loading ? DEFAULT_SUMMARY : summary} companyName={companyName} dateRange={range} />
+          <SummaryCards
+            summary={loading ? DEFAULT_SUMMARY : summary}
+            companyName={companyName}
+            dateRange={range}
+          />
         </div>
 
         <div className={loading ? styles.contentLoading : undefined}>
@@ -463,6 +350,7 @@ export default function CompanyDashboard({
                 startDate={range.startDate}
                 endDate={range.endDate}
                 filial={selectedFilial}
+                initialData={dashboardData?.dailyRevenue}
               />
             </div>
           </div>
@@ -472,6 +360,9 @@ export default function CompanyDashboard({
             startDate={range.startDate}
             endDate={range.endDate}
             filial={selectedFilial}
+            filialPerformance={dashboardData?.filialPerformance ?? []}
+            initialProducts={dashboardData?.topProducts}
+            initialCategories={dashboardData?.topCategories}
           />
         </div>
       </div>
@@ -485,5 +376,3 @@ export default function CompanyDashboard({
     </>
   );
 }
-
-

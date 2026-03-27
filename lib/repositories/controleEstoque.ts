@@ -312,7 +312,8 @@ function buildGradeFilter(
   request: sql.Request | RequestLike,
   company: string | undefined,
   grades: string[] | null | undefined,
-  prefix: string = 'p'
+  prefix: string = 'p',
+  paramSuffix: string = ''
 ): string {
   if (company !== 'scarfme' || !grades || grades.length === 0) {
     return '';
@@ -324,15 +325,15 @@ function buildGradeFilter(
   }
 
   if (gradesNormalizadas.length === 1) {
-    request.input('grade', sql.VarChar, gradesNormalizadas[0]);
-    return `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, ${prefix}.GRADE), '')))) = @grade`;
+    request.input(`grade${paramSuffix}`, sql.VarChar, gradesNormalizadas[0]);
+    return `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, ${prefix}.GRADE), '')))) = @grade${paramSuffix}`;
   }
 
   gradesNormalizadas.forEach((g, index) => {
-    request.input(`grade${index}`, sql.VarChar, g);
+    request.input(`grade${paramSuffix}${index}`, sql.VarChar, g);
   });
 
-  const placeholders = gradesNormalizadas.map((_, index) => `@grade${index}`).join(', ');
+  const placeholders = gradesNormalizadas.map((_, index) => `@grade${paramSuffix}${index}`).join(', ');
   return `AND UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, ${prefix}.GRADE), '')))) IN (${placeholders})`;
 }
 
@@ -997,7 +998,7 @@ export async function fetchEstoqueKPIs({
     const linhaFilterEntradasKPI = buildLinhaFilter(request, company, linhas, 'pr');
     const colecaoFilterEntradasKPI = buildColecaoFilter(request, company, colecoes, 'pr');
     const subgrupoFilterEntradasKPI = buildSubgrupoFilter(request, company, subgrupos, 'pr');
-    const gradeFilterEntradasKPI = buildGradeFilter(request, company, grades, 'pr');
+    const gradeFilterEntradasKPI = buildGradeFilter(request, company, grades, 'pr', 'Entradas');
     const exclusionFilterEntradasKPI = buildExclusionFilter(request, company, 'pr', 'excludedLineKPIEntradas');
     const nerdOnlyEletronicosFilterEntradasKPI = buildNerdOnlyLinhaEletronicosFilter(company, 'pr');
     const categoriaFieldEntradasKPI = company === 'nerd' 
@@ -5347,6 +5348,8 @@ export interface ProdutoVendaUltimos3Meses {
   descricao: string;
   vendas3meses: number;
   valor3meses: number;
+  /** Custo unitário de reposição (PRODUTOS.CUSTO_REPOSICAO1), alinhado ao restante do estoque */
+  custoUnitario: number;
   percParticipacao: number;
   qtdSugerida: number;
 }
@@ -5427,7 +5430,8 @@ export async function fetchTopProdutosUltimos3Meses({
         ISNULL(vp.PRODUTO, '') AS produto,
         UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS descricao,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS qtde3meses,
-        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) AS valor3meses
+        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) AS valor3meses,
+        MAX(ISNULL(p.CUSTO_REPOSICAO1, 0)) AS custoUnitario
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       WHERE vp.DATA_VENDA >= @inicio3m
@@ -5453,6 +5457,7 @@ export async function fetchTopProdutosUltimos3Meses({
       descricao: string;
       qtde3meses: number;
       valor3meses: number;
+      custoUnitario: number;
     }>(query);
 
     const rows = result.recordset.map(r => ({
@@ -5460,6 +5465,7 @@ export async function fetchTopProdutosUltimos3Meses({
       descricao: r.descricao?.trim() ?? '',
       vendas3meses: Math.round(Number(r.qtde3meses ?? 0)),
       valor3meses: Math.round(Number(r.valor3meses ?? 0)),
+      custoUnitario: Number(r.custoUnitario ?? 0),
     })).filter(r => r.produto !== '' && r.valor3meses > 0);
 
     const totalValor = rows.reduce((s, r) => s + r.valor3meses, 0);
@@ -5491,6 +5497,7 @@ export async function fetchTopProdutosUltimos3Meses({
         descricao: r.descricao,
         vendas3meses: r.vendas3meses,
         valor3meses: r.valor3meses,
+        custoUnitario: r.custoUnitario,
         percParticipacao: Math.round(r.perc * 1000) / 10,
         qtdSugerida: r.floor + (boostSet.has(i) ? 1 : 0),
       }))

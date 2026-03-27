@@ -125,6 +125,7 @@ interface ProdutoSugestaoMin {
   produto: string;
   valor3meses: number;
   vendas3meses: number;
+  custoUnitario?: number;
 }
 
 /** Item individual com necessidade de reposição */
@@ -986,13 +987,13 @@ export default function ProjecaoEstoquePage({
     return Array.from(codes);
   }, [compraInfoMap, rawSubCompraItems]);
 
-  // Busca preços unitários (valor60dias / vendas60dias) por produto específico
+  // Custo unitário de reposição (PRODUTOS.CUSTO_REPOSICAO1) por código — não usar preço médio de venda
   const [unitPrices, setUnitPrices] = useState<Record<string, number>>({});
   useEffect(() => {
     if (allProdutosReposicao.length === 0) return;
     const params = new URLSearchParams();
     params.set("company", companyKey);
-    // Não passa filial: preço unitário deve considerar todas as filiais + ecommerce
+    // Não passa filial: custo vem do cadastro do produto
     params.set("qtdCompra", "0");
     params.set("limit", String(allProdutosReposicao.length + 20));
     allProdutosReposicao.forEach(p => params.append("produtos", p));
@@ -1001,7 +1002,7 @@ export default function ProjecaoEstoquePage({
       .then((json: { data?: ProdutoSugestaoMin[] }) => {
         const prices: Record<string, number> = {};
         (json.data ?? []).forEach(p => {
-          if (p.vendas3meses > 0) prices[p.produto] = p.valor3meses / p.vendas3meses;
+          prices[p.produto] = Number(p.custoUnitario ?? 0);
         });
         setUnitPrices(prices);
       })
@@ -1943,7 +1944,7 @@ export default function ProjecaoEstoquePage({
                               totalQtd: qtd,
                               itens: items.map(item => ({
                                 ...item,
-                                custoUnit: unitPrices[item.produto] ?? 0,
+                                custoUnit: unitPrices[item.produto?.trim() ?? ""] ?? 0,
                               })),
                               timestamp: Date.now(),
                             }));

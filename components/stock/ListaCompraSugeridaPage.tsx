@@ -39,6 +39,8 @@ interface ProdutoSugestao {
   descricao: string;
   vendas3meses: number;
   valor3meses: number;
+  /** Custo de reposição (cadastro), não preço médio de venda */
+  custoUnitario?: number;
   percParticipacao: number;
   qtdSugerida: number;
 }
@@ -199,8 +201,9 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
   );
 
   const totalCustoABC = produtosComCurva.reduce((s, p) => {
-    if (p.qtdFinal <= 0 || p.vendas3meses <= 0) return s;
-    return s + p.qtdFinal * (p.valor3meses / p.vendas3meses);
+    if (p.qtdFinal <= 0) return s;
+    const cu = p.custoUnitario ?? 0;
+    return cu > 0 ? s + p.qtdFinal * cu : s;
   }, 0);
   const maxPerc = produtosComCurva.length > 0 ? produtosComCurva[0].percParticipacao : 1;
   const countA = produtosComCurva.filter(p => p.curva === "A").length;
@@ -517,11 +520,11 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                               <td className={p.qtdFinal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}>
                                 {p.qtdFinal > 0 ? fmt(p.qtdFinal) : "—"}
                               </td>
-                              <td className={`${styles.right} ${p.qtdFinal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
-                                {p.qtdFinal > 0 && p.vendas3meses > 0 ? fmtBRL2(p.valor3meses / p.vendas3meses) : "—"}
+                              <td className={`${styles.right} ${p.qtdFinal > 0 && (p.custoUnitario ?? 0) > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
+                                {p.qtdFinal > 0 && (p.custoUnitario ?? 0) > 0 ? fmtBRL2(p.custoUnitario!) : "—"}
                               </td>
-                              <td className={`${styles.right} ${p.qtdFinal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
-                                {p.qtdFinal > 0 && p.vendas3meses > 0 ? fmtBRL(p.qtdFinal * (p.valor3meses / p.vendas3meses)) : "—"}
+                              <td className={`${styles.right} ${p.qtdFinal > 0 && (p.custoUnitario ?? 0) > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
+                                {p.qtdFinal > 0 && (p.custoUnitario ?? 0) > 0 ? fmtBRL(p.qtdFinal * p.custoUnitario!) : "—"}
                               </td>
                             </tr>
                           );

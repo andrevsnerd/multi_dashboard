@@ -103,16 +103,19 @@ export async function fetchPerformanceData(
         ),
         trocas_item AS (
           SELECT
-            TICKET,
-            CODIGO_FILIAL,
-            PRODUTO,
-            COR_PRODUTO,
-            TAMANHO,
-            SUM(QTDE) AS QTDE_TROCA,
-            CAST(SUM(PRECO_LIQUIDO * QTDE) AS DECIMAL(38,6)) AS VALOR_TROCA
-          FROM LOJA_VENDA_TROCA WITH (NOLOCK)
-          WHERE QTDE_CANCELADA = 0
-          GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
+            vt.TICKET,
+            vt.CODIGO_FILIAL,
+            vt.PRODUTO,
+            vt.COR_PRODUTO,
+            vt.TAMANHO,
+            SUM(vt.QTDE) AS QTDE_TROCA,
+            CAST(SUM(vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS VALOR_TROCA
+          FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+          INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+            ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
+          WHERE vt.QTDE_CANCELADA = 0
+            AND v.DATA_VENDA >= @${prefix}start AND v.DATA_VENDA < @${prefix}end
+          GROUP BY vt.TICKET, vt.CODIGO_FILIAL, vt.PRODUTO, vt.COR_PRODUTO, vt.TAMANHO
         ),
         TrocasPuras AS (
           SELECT
@@ -267,6 +270,7 @@ export interface FilialProdutoSalesRow {
   grade: string;
   vendas: number;
   qtde: number;
+  custo: number;
 }
 
 export async function fetchFilialProdutoSales(
@@ -299,6 +303,7 @@ export async function fetchFilialProdutoSales(
           UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
           ${categoriaExpr} AS CATEGORIA,
           ${gradeExpr} AS GRADE,
+          ISNULL(p.CUSTO_REPOSICAO1, 0) AS CUSTO_UNIT,
           SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS QTDE,
           SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) AS VENDAS
         FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
@@ -307,16 +312,17 @@ export async function fetchFilialProdutoSales(
           AND vp.DATA_VENDA < @fpEnd
           AND vp.QTDE > 0
           AND vp.FILIAL IN (${placeholders})
-        GROUP BY ISNULL(vp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}, ${gradeExpr}
+        GROUP BY ISNULL(vp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}, ${gradeExpr}, ISNULL(p.CUSTO_REPOSICAO1, 0)
         HAVING SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) > 0
         ORDER BY VENDAS DESC
       `;
-      const result = await request.query<{ PRODUTO: string; DESCRICAO: string; CATEGORIA: string; GRADE: string; QTDE: number; VENDAS: number }>(query);
+      const result = await request.query<{ PRODUTO: string; DESCRICAO: string; CATEGORIA: string; GRADE: string; CUSTO_UNIT: number; QTDE: number; VENDAS: number }>(query);
       return result.recordset.map(r => ({
         produto: r.PRODUTO?.trim() ?? '',
         descricao: r.DESCRICAO?.trim() ?? '',
         categoria: r.CATEGORIA?.trim() ?? '',
         grade: r.GRADE?.trim() ?? '',
+        custo: Number(r.CUSTO_UNIT ?? 0),
         vendas: Math.round(Number(r.VENDAS ?? 0)),
         qtde: Math.round(Number(r.QTDE ?? 0)),
       })).filter(r => r.produto !== '');
@@ -336,6 +342,7 @@ export async function fetchFilialProdutoSales(
           UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
           ${categoriaExpr} AS CATEGORIA,
           ${gradeExpr} AS GRADE,
+          ISNULL(p.CUSTO_REPOSICAO1, 0) AS CUSTO_UNIT,
           SUM(CASE WHEN fp.QTDE > 0 THEN fp.QTDE ELSE 0 END) AS QTDE,
           SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS VENDAS
         FROM FATURAMENTO f WITH (NOLOCK)
@@ -348,16 +355,17 @@ export async function fetchFilialProdutoSales(
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
           AND fp.QTDE > 0
           AND f.FILIAL IN (${placeholders})
-        GROUP BY ISNULL(fp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}, ${gradeExpr}
+        GROUP BY ISNULL(fp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}, ${gradeExpr}, ISNULL(p.CUSTO_REPOSICAO1, 0)
         HAVING SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) > 0
         ORDER BY VENDAS DESC
       `;
-      const result = await request.query<{ PRODUTO: string; DESCRICAO: string; CATEGORIA: string; GRADE: string; QTDE: number; VENDAS: number }>(query);
+      const result = await request.query<{ PRODUTO: string; DESCRICAO: string; CATEGORIA: string; GRADE: string; CUSTO_UNIT: number; QTDE: number; VENDAS: number }>(query);
       return result.recordset.map(r => ({
         produto: r.PRODUTO?.trim() ?? '',
         descricao: r.DESCRICAO?.trim() ?? '',
         categoria: r.CATEGORIA?.trim() ?? '',
         grade: r.GRADE?.trim() ?? '',
+        custo: Number(r.CUSTO_UNIT ?? 0),
         vendas: Math.round(Number(r.VENDAS ?? 0)),
         qtde: Math.round(Number(r.QTDE ?? 0)),
       })).filter(r => r.produto !== '');
@@ -374,6 +382,8 @@ export async function fetchFilialProdutoSales(
     if (existing) {
       existing.vendas += r.vendas;
       existing.qtde += r.qtde;
+      // custo vem de PRODUTOS, é o mesmo independente da origem — manter o primeiro não-zero
+      if (existing.custo === 0 && r.custo > 0) existing.custo = r.custo;
     } else {
       merged.set(key, { ...r });
     }

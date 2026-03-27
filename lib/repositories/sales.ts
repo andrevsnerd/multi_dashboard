@@ -273,20 +273,23 @@ export async function fetchTopProducts({
           ${filialFilter}
       ),
       trocas_item AS (
-        SELECT 
-          TICKET,
-          CODIGO_FILIAL,
-          PRODUTO,
-          COR_PRODUTO,
-          TAMANHO,
-          SUM(QTDE) AS QTDE_TROCA,
-          CAST(SUM(PRECO_LIQUIDO * QTDE) AS DECIMAL(38,6)) AS VALOR_TROCA
-        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
-        WHERE QTDE_CANCELADA = 0
-        GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
+        SELECT
+          vt.TICKET,
+          vt.CODIGO_FILIAL,
+          vt.PRODUTO,
+          vt.COR_PRODUTO,
+          vt.TAMANHO,
+          SUM(vt.QTDE) AS QTDE_TROCA,
+          CAST(SUM(vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS VALOR_TROCA
+        FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+          ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
+        WHERE vt.QTDE_CANCELADA = 0
+          AND v.DATA_VENDA >= @startDate AND v.DATA_VENDA < @endDate
+        GROUP BY vt.TICKET, vt.CODIGO_FILIAL, vt.PRODUTO, vt.COR_PRODUTO, vt.TAMANHO
       ),
       TrocasPuras AS (
-        SELECT 
+        SELECT
           vt.TICKET,
           vt.CODIGO_FILIAL,
           v.DATA_VENDA,
@@ -458,10 +461,29 @@ export async function fetchSalesSummary({
 
   // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
   if (shouldAggregateEcommerce(company, filial)) {
-    // Buscar vendas normais (varejo) e ecommerce em paralelo
-    const [salesResult, ecommerceResult] = await Promise.all([
+    // Buscar vendas normais (varejo), ecommerce e estoque em paralelo
+    const [salesResult, ecommerceResult, stockSummaryForAll] = await Promise.all([
       fetchSalesSummary({ company, range, filial: VAREJO_VALUE, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, produtoId, produtoSearchTerm, acimaDoTicket, filterByRegistrationDate }),
       fetchEcommerceSummary({ company, range, filial: null, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, produtoId, produtoSearchTerm, acimaDoTicket, filterByRegistrationDate }),
+      // IMPORTANTE: O estoque deve ser calculado para TODAS as filiais (varejo + ecommerce)
+      fetchStockSummary({
+        company,
+        filial: null, // Todas as filiais (varejo + ecommerce)
+        grupo,
+        grupos,
+        linha,
+        linhas,
+        colecao,
+        colecoes,
+        subgrupo,
+        subgrupos,
+        filterByRegistrationDate,
+        registrationDateRange: filterByRegistrationDate ? currentRange : undefined,
+        grade,
+        grades,
+        produtoId,
+        produtoSearchTerm,
+      }),
     ]);
 
     // Agregar os resultados
@@ -471,7 +493,7 @@ export async function fetchSalesSummary({
     ): MetricSummary => {
       const current = sales.currentValue + ecommerce.currentValue;
       const previous = sales.previousValue + ecommerce.previousValue;
-      
+
       if (previous === 0 && current === 0) {
         return {
           currentValue: current,
@@ -491,28 +513,6 @@ export async function fetchSalesSummary({
         changePercentage,
       };
     };
-
-    // IMPORTANTE: O estoque deve ser calculado para TODAS as filiais (varejo + ecommerce)
-    // Não podemos usar apenas o estoque do varejo, pois isso excluiria o estoque do e-commerce
-    // Por isso, buscamos o estoque separadamente com filial=null para incluir todas as filiais
-    const stockSummaryForAll = await fetchStockSummary({
-      company,
-      filial: null, // Todas as filiais (varejo + ecommerce)
-      grupo,
-      grupos,
-      linha,
-      linhas,
-      colecao,
-      colecoes,
-      subgrupo,
-      subgrupos,
-      filterByRegistrationDate,
-      registrationDateRange: filterByRegistrationDate ? currentRange : undefined,
-      grade,
-      grades,
-      produtoId,
-      produtoSearchTerm,
-    });
 
     const summary: SalesSummary = {
       totalRevenue: aggregateMetric(
@@ -836,20 +836,26 @@ export async function fetchSalesSummary({
           ${filialFilter}
       ),
       trocas_item AS (
-        SELECT 
-          TICKET,
-          CODIGO_FILIAL,
-          PRODUTO,
-          COR_PRODUTO,
-          TAMANHO,
-          SUM(QTDE) AS QTDE_TROCA,
-          CAST(SUM(PRECO_LIQUIDO * QTDE) AS DECIMAL(38,6)) AS VALOR_TROCA
-        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
-        WHERE QTDE_CANCELADA = 0
-        GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
+        SELECT
+          vt.TICKET,
+          vt.CODIGO_FILIAL,
+          vt.PRODUTO,
+          vt.COR_PRODUTO,
+          vt.TAMANHO,
+          SUM(vt.QTDE) AS QTDE_TROCA,
+          CAST(SUM(vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS VALOR_TROCA
+        FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+          ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
+        WHERE vt.QTDE_CANCELADA = 0
+          AND (
+            (v.DATA_VENDA >= @startDate AND v.DATA_VENDA < @endDate)
+            OR (v.DATA_VENDA >= @prevStartDate AND v.DATA_VENDA < @prevEndDate)
+          )
+        GROUP BY vt.TICKET, vt.CODIGO_FILIAL, vt.PRODUTO, vt.COR_PRODUTO, vt.TAMANHO
       ),
       TrocasPuras AS (
-        SELECT 
+        SELECT
           v.DATA_VENDA,
           vt.TICKET,
           vt.QTDE AS QTDE_TROCA_ITEM,
@@ -867,7 +873,7 @@ export async function fetchSalesSummary({
             OR (v.DATA_VENDA >= @prevStartDate AND v.DATA_VENDA < @prevEndDate)
           )
           AND NOT EXISTS (
-            SELECT 1 
+            SELECT 1
             FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
             WHERE vp.TICKET = vt.TICKET
               AND vp.CODIGO_FILIAL = vt.CODIGO_FILIAL
@@ -984,17 +990,23 @@ export async function fetchSalesSummary({
           ${registrationDateFilter}
       ),
       trocas_item AS (
-        SELECT 
-          TICKET,
-          CODIGO_FILIAL,
-          PRODUTO,
-          COR_PRODUTO,
-          TAMANHO,
-          SUM(QTDE) AS QTDE_TROCA,
-          CAST(SUM(PRECO_LIQUIDO * QTDE) AS DECIMAL(38,6)) AS VALOR_TROCA
-        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
-        WHERE QTDE_CANCELADA = 0
-        GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
+        SELECT
+          vt.TICKET,
+          vt.CODIGO_FILIAL,
+          vt.PRODUTO,
+          vt.COR_PRODUTO,
+          vt.TAMANHO,
+          SUM(vt.QTDE) AS QTDE_TROCA,
+          CAST(SUM(vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS VALOR_TROCA
+        FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+          ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
+        WHERE vt.QTDE_CANCELADA = 0
+          AND (
+            (v.DATA_VENDA >= @startDate AND v.DATA_VENDA < @endDate)
+            OR (v.DATA_VENDA >= @prevStartDate AND v.DATA_VENDA < @prevEndDate)
+          )
+        GROUP BY vt.TICKET, vt.CODIGO_FILIAL, vt.PRODUTO, vt.COR_PRODUTO, vt.TAMANHO
       ),
       TrocasPuras AS (
         SELECT 
@@ -1363,17 +1375,20 @@ export async function fetchTopCategories({
           ${filialFilter}
       ),
       trocas_item AS (
-        SELECT 
-          TICKET,
-          CODIGO_FILIAL,
-          PRODUTO,
-          COR_PRODUTO,
-          TAMANHO,
-          SUM(QTDE) AS QTDE_TROCA,
-          SUM(PRECO_LIQUIDO * QTDE) AS VALOR_TROCA
-        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
-        WHERE QTDE_CANCELADA = 0
-        GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
+        SELECT
+          vt.TICKET,
+          vt.CODIGO_FILIAL,
+          vt.PRODUTO,
+          vt.COR_PRODUTO,
+          vt.TAMANHO,
+          SUM(vt.QTDE) AS QTDE_TROCA,
+          SUM(vt.PRECO_LIQUIDO * vt.QTDE) AS VALOR_TROCA
+        FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+          ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
+        WHERE vt.QTDE_CANCELADA = 0
+          AND v.DATA_VENDA >= @startDate AND v.DATA_VENDA < @endDate
+        GROUP BY vt.TICKET, vt.CODIGO_FILIAL, vt.PRODUTO, vt.COR_PRODUTO, vt.TAMANHO
       ),
       TrocasPuras AS (
         SELECT 
@@ -1570,27 +1585,33 @@ export async function fetchDailyRevenue({
           ${filialFilter}
       ),
       trocas_item AS (
-        SELECT 
-          TICKET,
-          CODIGO_FILIAL,
-          PRODUTO,
-          COR_PRODUTO,
-          TAMANHO,
-          SUM(QTDE) AS QTDE_TROCA,
-          SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA
-        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
-        WHERE QTDE_CANCELADA = 0
-        GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
+        SELECT
+          vt.TICKET,
+          vt.CODIGO_FILIAL,
+          vt.PRODUTO,
+          vt.COR_PRODUTO,
+          vt.TAMANHO,
+          SUM(vt.QTDE) AS QTDE_TROCA,
+          SUM((vt.PRECO_LIQUIDO * vt.QTDE) - ISNULL(vt.DESCONTO_ITEM, 0)) AS VALOR_TROCA
+        FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+          ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
+        WHERE vt.QTDE_CANCELADA = 0
+          AND v.DATA_VENDA >= @startDate AND v.DATA_VENDA < @endDate
+        GROUP BY vt.TICKET, vt.CODIGO_FILIAL, vt.PRODUTO, vt.COR_PRODUTO, vt.TAMANHO
       ),
       trocas_ticket AS (
-        SELECT 
-          TICKET,
-          CODIGO_FILIAL,
-          SUM(QTDE) AS QTDE_TROCA_TICKET,
-          SUM((PRECO_LIQUIDO * QTDE) - ISNULL(DESCONTO_ITEM, 0)) AS VALOR_TROCA_TICKET
-        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
-        WHERE QTDE_CANCELADA = 0
-        GROUP BY TICKET, CODIGO_FILIAL
+        SELECT
+          vt.TICKET,
+          vt.CODIGO_FILIAL,
+          SUM(vt.QTDE) AS QTDE_TROCA_TICKET,
+          SUM((vt.PRECO_LIQUIDO * vt.QTDE) - ISNULL(vt.DESCONTO_ITEM, 0)) AS VALOR_TROCA_TICKET
+        FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+          ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
+        WHERE vt.QTDE_CANCELADA = 0
+          AND v.DATA_VENDA >= @startDate AND v.DATA_VENDA < @endDate
+        GROUP BY vt.TICKET, vt.CODIGO_FILIAL
       ),
       vendas_com_troca AS (
         SELECT 
@@ -1728,20 +1749,26 @@ export async function fetchFilialPerformance({
           AND f.FILIAL IN (${placeholders})
       ),
       trocas_item AS (
-        SELECT 
-          TICKET,
-          CODIGO_FILIAL,
-          PRODUTO,
-          COR_PRODUTO,
-          TAMANHO,
-          SUM(QTDE) AS QTDE_TROCA,
-          CAST(SUM(PRECO_LIQUIDO * QTDE) AS DECIMAL(38,6)) AS VALOR_TROCA
-        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
-        WHERE QTDE_CANCELADA = 0
-        GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
+        SELECT
+          vt.TICKET,
+          vt.CODIGO_FILIAL,
+          vt.PRODUTO,
+          vt.COR_PRODUTO,
+          vt.TAMANHO,
+          SUM(vt.QTDE) AS QTDE_TROCA,
+          CAST(SUM(vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS VALOR_TROCA
+        FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+          ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
+        WHERE vt.QTDE_CANCELADA = 0
+          AND (
+            (v.DATA_VENDA >= @startDate AND v.DATA_VENDA < @endDate)
+            OR (v.DATA_VENDA >= @prevStartDate AND v.DATA_VENDA < @prevEndDate)
+          )
+        GROUP BY vt.TICKET, vt.CODIGO_FILIAL, vt.PRODUTO, vt.COR_PRODUTO, vt.TAMANHO
       ),
       TrocasPuras AS (
-        SELECT 
+        SELECT
           vt.TICKET,
           vt.CODIGO_FILIAL,
           v.DATA_VENDA,

@@ -627,6 +627,21 @@
   text-align: right;
 }
 
+.noData {
+  color: #cbd5e1;
+}
+
+.markupBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  background: #f1f5f9;
+  color: #475569;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── States ── */
 .loading,
 .error,

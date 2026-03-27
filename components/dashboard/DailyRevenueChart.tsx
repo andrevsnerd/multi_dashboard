@@ -25,6 +25,7 @@ interface DailyRevenueChartProps {
   startDate: Date;
   endDate: Date;
   filial?: string | null;
+  initialData?: DailyRevenueData[];
 }
 
 async function fetchDailyRevenue(
@@ -78,9 +79,10 @@ export default function DailyRevenueChart({
   startDate,
   endDate,
   filial = null,
+  initialData,
 }: DailyRevenueChartProps) {
-  const [data, setData] = useState<DailyRevenueData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<DailyRevenueData[]>(initialData ?? []);
+  const [loading, setLoading] = useState(initialData === undefined);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -94,8 +96,9 @@ export default function DailyRevenueChart({
   }, []);
 
   useEffect(() => {
+    if (initialData !== undefined) return;
     if (!mounted) return;
-    
+
     let active = true;
 
     async function load() {
@@ -125,7 +128,7 @@ export default function DailyRevenueChart({
     return () => {
       active = false;
     };
-  }, [companyKey, rangeKey, startDate, endDate, filial, mounted]);
+  }, [companyKey, rangeKey, startDate, endDate, filial, mounted, initialData]);
 
   const maxRevenue = useMemo(() => {
     if (data.length === 0) return 0;

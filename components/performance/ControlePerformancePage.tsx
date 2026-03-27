@@ -7,6 +7,12 @@ import type { CompanyKey } from "@/lib/config/company";
 import GoalsModal from "@/components/dashboard/GoalsModal";
 import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateRangeFilter";
 import { getCurrentMonthRange } from "@/lib/utils/date";
+import {
+  OUTROS_LABEL,
+  filterOutrosKeys,
+  getOutrosTooltip,
+  isOutrosCategory,
+} from "@/lib/performance/outrosCategories";
 import styles from "./ControlePerformancePage.module.css";
 
 interface CategoryData {
@@ -44,17 +50,6 @@ interface Props {
   companyKey: CompanyKey;
   companyName: string;
 }
-
-const OUTROS_CATEGORIES = new Set([
-  "CAPAS E ACESSORIOS P/ CEL",
-  "HOME",
-  "PAPELARIA",
-  "ELETRONICOS",
-  "PERFUMARIA",
-  "SEDA PREMIUM",
-]);
-const OUTROS_LABEL = "OUTROS";
-const OUTROS_TOOLTIP = `Composição do OUTROS:\n- ${Array.from(OUTROS_CATEGORIES).join("\n- ")}`;
 
 const CATEGORY_COLORS = [
   "#1565c0",
@@ -126,6 +121,13 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
     ? "mês anterior"
     : "mesmo período do ano anterior";
 
+  const outrosTooltip = useMemo(() => getOutrosTooltip(companyKey), [companyKey]);
+
+  const outrosKeys = useMemo(
+    () => (data ? filterOutrosKeys(data.categories, companyKey) : []),
+    [data, companyKey]
+  );
+
   const navigateToFilial = (filial: string) => {
     const params = new URLSearchParams({
       filial,
@@ -170,10 +172,10 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
 
   const displayedCategories = useMemo(() => {
     if (!data) return [];
-    const outros = data.categories.filter(c => OUTROS_CATEGORIES.has(c));
-    const remaining = data.categories.filter(c => !OUTROS_CATEGORIES.has(c));
+    const outros = data.categories.filter(c => isOutrosCategory(companyKey, c));
+    const remaining = data.categories.filter(c => !isOutrosCategory(companyKey, c));
     return outros.length > 0 ? [...remaining, OUTROS_LABEL] : remaining;
-  }, [data]);
+  }, [data, companyKey]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -341,7 +343,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
 
             const getCardCatPct = (cat: string): number | null => {
               if (cat === OUTROS_LABEL) {
-                const entries = Array.from(OUTROS_CATEGORIES)
+                const entries = outrosKeys
                   .map(c => row.categories[c]?.pct)
                   .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
                 if (entries.length === 0) return null;
@@ -353,7 +355,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
 
             const getCardCatDelta = (cat: string): number | null => {
               if (cat === OUTROS_LABEL) {
-                const deltas = Array.from(OUTROS_CATEGORIES)
+                const deltas = outrosKeys
                   .map(c => row.categories[c]?.deltaPct)
                   .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
                 if (deltas.length === 0) return null;
@@ -416,7 +418,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                       <span
                         key={cat}
                         className={`${styles.catPill} ${catPillTrendClass}`}
-                        title={cat === OUTROS_LABEL ? OUTROS_TOOLTIP : undefined}
+                        title={cat === OUTROS_LABEL ? outrosTooltip : undefined}
                         style={{
                           backgroundColor: delta === null ? hexToRgba(color, 0.12) : undefined,
                           borderColor: delta === null ? hexToRgba(color, 0.35) : undefined,
@@ -457,7 +459,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                   <th
                     key={cat}
                     className={styles.thCat}
-                    title={cat === OUTROS_LABEL ? OUTROS_TOOLTIP : undefined}
+                    title={cat === OUTROS_LABEL ? outrosTooltip : undefined}
                   >
                     {getCategoryHeaderLabel(cat)}
                   </th>
@@ -468,7 +470,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
               {sortedFiliais.map(row => {
                 const getDisplayedPct = (cat: string): number | null => {
                   if (cat === OUTROS_LABEL) {
-                    const entries = Array.from(OUTROS_CATEGORIES)
+                    const entries = outrosKeys
                       .map(c => row.categories[c]?.pct)
                       .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
                     if (entries.length === 0) return null;
@@ -515,7 +517,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                   <td className={styles.tdQtde}>{row.qtde.toLocaleString("pt-BR")}</td>
                   {displayedCategories.map(cat => {
                     if (cat === OUTROS_LABEL) {
-                      const selected = Array.from(OUTROS_CATEGORIES)
+                      const selected = outrosKeys
                         .map(c => row.categories[c])
                         .filter((v): v is CategoryData => !!v);
                       if (selected.length === 0) {
@@ -541,7 +543,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                         <td
                           key={cat}
                           className={`${styles.tdCat} ${highlightClass}`}
-                          title={OUTROS_TOOLTIP}
+                          title={outrosTooltip}
                         >
                           <span className={styles.catPct}>{displayedPct !== null ? `${displayedPct}%` : "—"}</span>
                           <span
@@ -615,7 +617,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                 {(() => {
                   const getDisplayedPct = (cat: string): number | null => {
                     if (cat === OUTROS_LABEL) {
-                      const entries = Array.from(OUTROS_CATEGORIES)
+                      const entries = outrosKeys
                         .map(c => totals.categoryAvg[c]?.pct)
                         .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
                       if (entries.length === 0) return null;
@@ -630,7 +632,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
 
                   return displayedCategories.map(cat => {
                     if (cat === OUTROS_LABEL) {
-                      const selected = Array.from(OUTROS_CATEGORIES)
+                      const selected = outrosKeys
                         .map(c => totals.categoryAvg[c])
                         .filter((v): v is { pct: number; deltaPct: number | null } => !!v);
                       if (selected.length === 0) return <td key={cat} className={styles.tdCat}>—</td>;
@@ -656,7 +658,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                         <td
                           key={cat}
                           className={`${styles.tdCat} ${highlightClass}`}
-                          title={OUTROS_TOOLTIP}
+                          title={outrosTooltip}
                         >
                           <span className={styles.catPct}>{displayedPct !== null ? `${displayedPct}%` : "—"}</span>
                           <span
