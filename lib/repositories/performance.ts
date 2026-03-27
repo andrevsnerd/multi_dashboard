@@ -264,6 +264,7 @@ export interface FilialProdutoSalesRow {
   produto: string;
   descricao: string;
   categoria: string;
+  grade: string;
   vendas: number;
   qtde: number;
 }
@@ -281,6 +282,9 @@ export async function fetchFilialProdutoSales(
   const categoriaExpr = companyKey === 'nerd'
     ? `UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, ''))))`
     : `UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, ''))))`;
+  const gradeExpr = companyKey === 'scarfme'
+    ? `UPPER(LTRIM(RTRIM(ISNULL(p.GRADE, ''))))`
+    : `''`;
 
   const runPos = (): Promise<FilialProdutoSalesRow[]> => {
     if (posFilialNames.length === 0) return Promise.resolve([]);
@@ -294,6 +298,7 @@ export async function fetchFilialProdutoSales(
           ISNULL(vp.PRODUTO, '') AS PRODUTO,
           UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
           ${categoriaExpr} AS CATEGORIA,
+          ${gradeExpr} AS GRADE,
           SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS QTDE,
           SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) AS VENDAS
         FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
@@ -302,15 +307,16 @@ export async function fetchFilialProdutoSales(
           AND vp.DATA_VENDA < @fpEnd
           AND vp.QTDE > 0
           AND vp.FILIAL IN (${placeholders})
-        GROUP BY ISNULL(vp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}
+        GROUP BY ISNULL(vp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}, ${gradeExpr}
         HAVING SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) > 0
         ORDER BY VENDAS DESC
       `;
-      const result = await request.query<{ PRODUTO: string; DESCRICAO: string; CATEGORIA: string; QTDE: number; VENDAS: number }>(query);
+      const result = await request.query<{ PRODUTO: string; DESCRICAO: string; CATEGORIA: string; GRADE: string; QTDE: number; VENDAS: number }>(query);
       return result.recordset.map(r => ({
         produto: r.PRODUTO?.trim() ?? '',
         descricao: r.DESCRICAO?.trim() ?? '',
         categoria: r.CATEGORIA?.trim() ?? '',
+        grade: r.GRADE?.trim() ?? '',
         vendas: Math.round(Number(r.VENDAS ?? 0)),
         qtde: Math.round(Number(r.QTDE ?? 0)),
       })).filter(r => r.produto !== '');
@@ -329,6 +335,7 @@ export async function fetchFilialProdutoSales(
           ISNULL(fp.PRODUTO, '') AS PRODUTO,
           UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
           ${categoriaExpr} AS CATEGORIA,
+          ${gradeExpr} AS GRADE,
           SUM(CASE WHEN fp.QTDE > 0 THEN fp.QTDE ELSE 0 END) AS QTDE,
           SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS VENDAS
         FROM FATURAMENTO f WITH (NOLOCK)
@@ -341,15 +348,16 @@ export async function fetchFilialProdutoSales(
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
           AND fp.QTDE > 0
           AND f.FILIAL IN (${placeholders})
-        GROUP BY ISNULL(fp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}
+        GROUP BY ISNULL(fp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}, ${gradeExpr}
         HAVING SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) > 0
         ORDER BY VENDAS DESC
       `;
-      const result = await request.query<{ PRODUTO: string; DESCRICAO: string; CATEGORIA: string; QTDE: number; VENDAS: number }>(query);
+      const result = await request.query<{ PRODUTO: string; DESCRICAO: string; CATEGORIA: string; GRADE: string; QTDE: number; VENDAS: number }>(query);
       return result.recordset.map(r => ({
         produto: r.PRODUTO?.trim() ?? '',
         descricao: r.DESCRICAO?.trim() ?? '',
         categoria: r.CATEGORIA?.trim() ?? '',
+        grade: r.GRADE?.trim() ?? '',
         vendas: Math.round(Number(r.VENDAS ?? 0)),
         qtde: Math.round(Number(r.QTDE ?? 0)),
       })).filter(r => r.produto !== '');
@@ -358,10 +366,10 @@ export async function fetchFilialProdutoSales(
 
   const [pos, ecom] = await Promise.all([runPos(), runEcom()]);
 
-  // Merge pos + ecom by produto+categoria
+  // Merge pos + ecom by produto+categoria+grade
   const merged = new Map<string, FilialProdutoSalesRow>();
   [...pos, ...ecom].forEach(r => {
-    const key = `${r.produto}||${r.categoria}`;
+    const key = `${r.produto}||${r.categoria}||${r.grade}`;
     const existing = merged.get(key);
     if (existing) {
       existing.vendas += r.vendas;

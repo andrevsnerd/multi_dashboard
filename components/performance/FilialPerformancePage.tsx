@@ -2,7 +2,9 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { startOfMonth, endOfMonth } from "date-fns";
 import type { CompanyKey } from "@/lib/config/company";
+import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateRangeFilter";
 import styles from "./FilialPerformancePage.module.css";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -11,6 +13,7 @@ interface ProdutoRow {
   produto: string;
   descricao: string;
   categoria: string;
+  grade?: string;
   vendas: number;
   qtde: number;
 }
@@ -132,8 +135,18 @@ interface Props {
   compare: "month" | "year";
 }
 
-export default function FilialPerformancePage({ companyKey, filial, month, year, compare }: Props) {
+export default function FilialPerformancePage({ companyKey, filial, month, year, compare: initialCompare }: Props) {
   const router = useRouter();
+
+  const [range, setRange] = useState<DateRangeValue>(() => {
+    const base = new Date(year, month, 1);
+    return { startDate: startOfMonth(base), endDate: endOfMonth(base) };
+  });
+  const [comparisonMode, setComparisonMode] = useState<"month" | "year">(initialCompare);
+
+  const selectedMonth = range.startDate.getMonth();
+  const selectedYear = range.startDate.getFullYear();
+
   const [data, setData] = useState<FilialData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -146,9 +159,9 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
     const params = new URLSearchParams({
       company: companyKey,
       filial,
-      month: String(month),
-      year: String(year),
-      compare,
+      month: String(selectedMonth),
+      year: String(selectedYear),
+      compare: comparisonMode,
     });
     fetch(`/api/controle-performance/filial?${params}`, { cache: "no-store" })
       .then(res => res.json())
@@ -158,7 +171,7 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
       })
       .catch(e => setError(e instanceof Error ? e.message : "Erro desconhecido"))
       .finally(() => setLoading(false));
-  }, [companyKey, filial, month, year, compare]);
+  }, [companyKey, filial, selectedMonth, selectedYear, comparisonMode]);
 
   const displayedCategories = useMemo(() => {
     if (!data) return [];
@@ -191,11 +204,29 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
   const countC = produtosComCurva.filter(p => p.curva === "C").length;
   const groups: Curva[] = ["A", "B", "C"];
 
+  // Quando há filtro ativo, KPIs refletem apenas os produtos filtrados
+  const displayVendas = selectedCategory
+    ? produtosFiltrados.reduce((s, p) => s + p.vendas, 0)
+    : data?.vendas ?? 0;
+  const displayQtde = selectedCategory
+    ? produtosFiltrados.reduce((s, p) => s + p.qtde, 0)
+    : data?.qtde ?? 0;
+
   const variationPct = data && data.vendasPrevious > 0
     ? ((data.vendas - data.vendasPrevious) / data.vendasPrevious) * 100
     : null;
 
   const salesPct = data?.projecaoPct ?? null;
+
+  const realPct = data && data.meta > 0 ? (data.vendas / data.meta) * 100 : null;
+  const realBarPct = realPct !== null ? Math.min(realPct, 100) : 0;
+  const realBarClass = realPct !== null
+    ? (realPct >= 100 ? styles.fillGreen : realPct >= 75 ? styles.fillOrange : styles.fillRed)
+    : styles.fillRed;
+  const realMetaPctClass = realPct !== null
+    ? (realPct >= 100 ? styles.metaPctGreen : realPct >= 75 ? styles.metaPctOrange : styles.metaPctRed)
+    : "";
+
   const barPct = salesPct !== null ? Math.min(salesPct, 100) : 0;
   const barClass = salesPct !== null
     ? (salesPct >= 100 ? styles.fillGreen : salesPct >= 75 ? styles.fillOrange : styles.fillRed)
@@ -234,11 +265,10 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
     setSelectedCategory(prev => prev === cat ? null : cat);
   };
 
-  const comparisonLabel = compare === "month" ? "mês anterior" : "mesmo período do ano anterior";
+  const comparisonLabel = comparisonMode === "month" ? "mês anterior" : "mesmo período do ano anterior";
 
-  const monthName = data
-    ? new Date(data.year, data.month, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
-    : "";
+  const monthName = new Date(selectedYear, selectedMonth, 1)
+    .toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   const abcTitleSuffix = selectedCategory
     ? ` — ${getCategoryHeaderLabel(selectedCategory)}`
@@ -259,11 +289,60 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
             </div>
             <div>
               <h1 className={styles.title}>{data?.displayName ?? filial}</h1>
-              <p className={styles.subtitle}>
-                Performance de vendas · {monthName}
-              </p>
+              <p className={styles.subtitle}>Performance de vendas</p>
+              <div className={styles.periodFilter}>
+                <DateRangeFilter
+                  label=""
+                  value={range}
+                  onChange={(nextRange) => {
+                    const base = nextRange.startDate;
+                    setRange({ startDate: startOfMonth(base), endDate: endOfMonth(base) });
+                  }}
+                />
+              </div>
             </div>
           </div>
+
+          {/* KPI Cards inline */}
+          {data && (
+            <div className={styles.kpiCards}>
+              <div className={styles.kpiCard}>
+                <span className={styles.kpiLabel}>VENDAS</span>
+                <span className={styles.kpiValue}>{fmtCurrency(displayVendas)}</span>
+                {!selectedCategory && <span className={styles.kpiProjecao}>Projeção: {fmtCurrency(data.projecao)}</span>}
+                {variationPct !== null && (
+                  <span className={`${styles.variationBadge} ${variationPct >= 0 ? styles.variationPos : styles.variationNeg}`}>
+                    {variationPct >= 0 ? "↗" : "↘"} {formatSignedPct(variationPct)}
+                    <span className={styles.variationLabel}> vs {comparisonLabel}</span>
+                  </span>
+                )}
+              </div>
+              <div className={styles.kpiCard}>
+                <span className={styles.kpiLabel}>META</span>
+                <span className={styles.kpiValue}>{data.meta > 0 ? fmtCurrency(data.meta) : "—"}</span>
+                {data.meta > 0 && realPct !== null && (
+                  <>
+                    <div className={styles.metaBarRow}>
+                      <span className={`${styles.metaPct} ${realMetaPctClass}`}>{realPct.toFixed(1)}% atingido</span>
+                    </div>
+                    <div className={styles.progressBarTrack}>
+                      <div className={`${styles.progressBarFill} ${realBarClass}`} style={{ width: `${realBarPct}%` }} />
+                    </div>
+                    <span className={styles.metaFalta}>
+                      {realPct >= 100
+                        ? `✓ Meta atingida`
+                        : `Faltam ${fmtCurrency(data.meta - data.vendas)}`}
+                    </span>
+                  </>
+                )}
+              </div>
+              <div className={styles.kpiCard}>
+                <span className={styles.kpiLabel}>QTDE VENDAS</span>
+                <span className={styles.kpiValue}>{fmt(displayQtde)}</span>
+              </div>
+            </div>
+          )}
+
           <button type="button" className={styles.backButton} onClick={() => router.back()}>
             ← Voltar
           </button>
@@ -275,44 +354,6 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
 
       {!loading && data && (
         <>
-          {/* KPI Cards */}
-          <div className={styles.kpiCards}>
-            <div className={styles.kpiCard}>
-              <span className={styles.kpiLabel}>VENDAS</span>
-              <span className={styles.kpiValue}>{fmtCurrency(data.vendas)}</span>
-              {variationPct !== null && (
-                <span className={`${styles.variationBadge} ${variationPct >= 0 ? styles.variationPos : styles.variationNeg}`}>
-                  {variationPct >= 0 ? "↗" : "↘"} {formatSignedPct(variationPct)}
-                  <span className={styles.variationLabel}> vs {comparisonLabel}</span>
-                </span>
-              )}
-            </div>
-            <div className={styles.kpiCard}>
-              <span className={styles.kpiLabel}>META</span>
-              <span className={styles.kpiValue}>{data.meta > 0 ? fmtCurrency(data.meta) : "—"}</span>
-              {data.meta > 0 && salesPct !== null && (
-                <span className={`${styles.projecaoBadge} ${salesPct >= 100 ? styles.badgeGreen : styles.badgeRed}`}>
-                  {salesPct >= 100 ? "↗" : "↘"} {salesPct.toFixed(1)}% projetado
-                </span>
-              )}
-            </div>
-            <div className={styles.kpiCard}>
-              <span className={styles.kpiLabel}>PROJEÇÃO MÊS</span>
-              <span className={styles.kpiValue}>{fmtCurrency(data.projecao)}</span>
-              {data.meta > 0 && salesPct !== null && (
-                <div className={styles.progressBarTrack}>
-                  <div className={`${styles.progressBarFill} ${barClass}`} style={{ width: `${barPct}%` }} />
-                </div>
-              )}
-              {data.meta > 0 && salesPct !== null && (
-                <span className={`${styles.metaPct} ${metaPctClass}`}>{salesPct.toFixed(1)}% da meta</span>
-              )}
-            </div>
-            <div className={styles.kpiCard}>
-              <span className={styles.kpiLabel}>QTDE ITENS</span>
-              <span className={styles.kpiValue}>{fmt(data.qtde)}</span>
-            </div>
-          </div>
 
           {/* Category badges — clicáveis para filtrar ABC */}
           {displayedCategories.length > 0 && (
@@ -370,7 +411,7 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
           {produtosComCurva.length > 0 && (
             <div className={styles.summaryCard}>
               <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Total produtos</span>
+                <span className={styles.summaryLabel}>PRODUTOS ÚNICOS</span>
                 <span className={styles.summaryValueNeutral}>{produtosComCurva.length}</span>
               </div>
               <div className={styles.summaryDivider} />
@@ -386,11 +427,6 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
                 <span className={styles.summaryLabel}>Curva C</span>
                 <span className={`${styles.summaryValueSmall} ${styles.textC}`}>{countC} produtos</span>
               </div>
-              <div className={styles.summaryDivider} />
-              <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Período</span>
-                <span className={styles.summaryValueNeutral} style={{ fontSize: 14 }}>{monthName}</span>
-              </div>
               {selectedCategory && (
                 <>
                   <div className={styles.summaryDivider} />
@@ -402,6 +438,27 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
               )}
             </div>
           )}
+
+          {/* Comparação toggle */}
+          <div className={styles.comparisonRow}>
+            <span className={styles.comparisonLabel}>Comparação:</span>
+            <div className={styles.comparisonToggle}>
+              <button
+                type="button"
+                className={`${styles.toggleBtn} ${comparisonMode === "month" ? styles.toggleBtnActive : ""}`}
+                onClick={() => setComparisonMode("month")}
+              >
+                Mês
+              </button>
+              <button
+                type="button"
+                className={`${styles.toggleBtn} ${comparisonMode === "year" ? styles.toggleBtnActive : ""}`}
+                onClick={() => setComparisonMode("year")}
+              >
+                Ano
+              </button>
+            </div>
+          </div>
 
           {/* ABC Table */}
           <div className={styles.tableCard}>
@@ -422,9 +479,9 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
                       Produto
                       {abcTitleSuffix && <span className={styles.thFilterLabel}>{abcTitleSuffix}</span>}
                     </th>
+                    <th className={styles.right}>Participação</th>
                     <th className={styles.right}>Faturamento no período</th>
                     <th className={styles.right}>Qtd vendida</th>
-                    <th className={styles.right}>Participação</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -456,15 +513,28 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
                               </td>
                               <td>
                                 <div className={styles.productName}>{p.descricao || p.produto}</div>
-                                {p.descricao && p.produto !== p.descricao && (
-                                  <div className={styles.productCode}>{p.produto}</div>
-                                )}
-                                {!selectedCategory && p.categoria && (
-                                  <div className={styles.productCategoria}>{getCategoryHeaderLabel(p.categoria)}</div>
+                                {((p.descricao && p.produto !== p.descricao) || (!selectedCategory && p.categoria)) && (
+                                  <div className={styles.productMeta}>
+                                    {p.descricao && p.produto !== p.descricao && (
+                                      <span className={styles.productCode}>{p.produto}</span>
+                                    )}
+                                    {p.descricao && p.produto !== p.descricao && !selectedCategory && p.categoria && (
+                                      <span className={styles.productMetaSeparator}>|</span>
+                                    )}
+                                    {!selectedCategory && p.categoria && (
+                                      <span className={styles.productCategoria}>
+                                        {getCategoryHeaderLabel(p.categoria)}
+                                        {companyKey === "scarfme" && p.grade && (
+                                          <>
+                                            <span className={styles.productMetaSeparator}>•</span>
+                                            <span className={styles.productGrade}>{p.grade}</span>
+                                          </>
+                                        )}
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                               </td>
-                              <td className={styles.vendas}>{fmtBRL(p.vendas)}</td>
-                              <td className={styles.vendas}>{fmt(p.qtde)}</td>
                               <td className={styles.percCell}>
                                 <div className={styles.percBar}>
                                   <div className={styles.percBarTrack}>
@@ -476,6 +546,8 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
                                   <span className={styles.percText}>{p.percParticipacao.toFixed(1)}%</span>
                                 </div>
                               </td>
+                              <td className={styles.vendas}>{fmtBRL(p.vendas)}</td>
+                              <td className={styles.vendas}>{fmt(p.qtde)}</td>
                             </tr>
                           );
                         })}

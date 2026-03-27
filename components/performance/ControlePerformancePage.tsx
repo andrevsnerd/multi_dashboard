@@ -292,7 +292,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
             <span className={styles.cardValue}>{formatCurrency(totals.totalMeta)}</span>
           </div>
           <div className={styles.card}>
-            <span className={styles.cardLabel}>QTDE TOTAL</span>
+            <span className={styles.cardLabel}>PRODÚTOS ÚNICOS</span>
             <span className={styles.cardValue}>{totals.totalQtde.toLocaleString("pt-BR")}</span>
           </div>
         </div>
