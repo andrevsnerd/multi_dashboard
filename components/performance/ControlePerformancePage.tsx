@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { endOfMonth, startOfMonth } from "date-fns";
+import { useRouter } from "next/navigation";
 import type { CompanyKey } from "@/lib/config/company";
 import GoalsModal from "@/components/dashboard/GoalsModal";
 import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateRangeFilter";
@@ -82,6 +83,13 @@ function getCategoryHeaderLabel(category: string): string {
     .replace(/^\w/, c => c.toUpperCase());
 }
 
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 function formatCurrency(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
@@ -97,6 +105,7 @@ function formatSignedPct(value: number): string {
 }
 
 export default function ControlePerformancePage({ companyKey, companyName: _companyName }: Props) {
+  const router = useRouter();
   const initialRange = useMemo(() => {
     const currentMonth = getCurrentMonthRange();
     return {
@@ -110,8 +119,22 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
   const [error, setError] = useState<string | null>(null);
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
+  const [comparisonMode, setComparisonMode] = useState<"month" | "year">("month");
   const selectedMonth = range.startDate.getMonth();
   const selectedYear = range.startDate.getFullYear();
+  const comparisonLabel = comparisonMode === "month"
+    ? "mês anterior"
+    : "mesmo período do ano anterior";
+
+  const navigateToFilial = (filial: string) => {
+    const params = new URLSearchParams({
+      filial,
+      month: String(selectedMonth),
+      year: String(selectedYear),
+      compare: comparisonMode,
+    });
+    router.push(`/${companyKey}/controle-performance/filial?${params.toString()}`);
+  };
 
   const getRowPctExtremes = useCallback((categories: string[], getPct: (cat: string) => number | null) => {
     const pcts = categories
@@ -157,7 +180,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
     setError(null);
     try {
       const res = await fetch(
-        `/api/controle-performance?company=${companyKey}&month=${selectedMonth}&year=${selectedYear}`,
+        `/api/controle-performance?company=${companyKey}&month=${selectedMonth}&year=${selectedYear}&compare=${comparisonMode}`,
         { cache: "no-store" }
       );
       if (!res.ok) throw new Error("Erro ao carregar dados");
@@ -168,7 +191,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
     } finally {
       setLoading(false);
     }
-  }, [companyKey, selectedMonth, selectedYear]);
+  }, [companyKey, selectedMonth, selectedYear, comparisonMode]);
 
   useEffect(() => {
     fetchData();
@@ -200,6 +223,18 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
     });
 
     return { totalVendas, totalVendasPrevious, totalQtde, totalMeta, totalProjecao, totalProjecaoPct, categoryAvg };
+  }, [data]);
+
+  const sortedFiliais = useMemo(() => {
+    if (!data) return [];
+    return [...data.filiais].sort((a, b) => {
+      const aGrowth = getComparisonPct(a.vendas, a.vendasPrevious);
+      const bGrowth = getComparisonPct(b.vendas, b.vendasPrevious);
+      if (aGrowth === null && bGrowth === null) return a.displayName.localeCompare(b.displayName, "pt-BR");
+      if (aGrowth === null) return 1;
+      if (bGrowth === null) return -1;
+      return bGrowth - aGrowth;
+    });
   }, [data]);
 
   const handleGoalsModalClose = () => {
@@ -267,10 +302,33 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
       {loading && <div className={styles.loadingMsg}>Carregando...</div>}
       {error && <div className={styles.errorMsg}>{error}</div>}
 
+      {/* Comparison toggle */}
+      {!loading && data && (
+        <div className={styles.comparisonToggleRow}>
+          <span className={styles.comparisonToggleLabel}>Comparação:</span>
+          <div className={styles.comparisonToggleGroup}>
+            <button
+              type="button"
+              className={`${styles.viewToggleBtn} ${comparisonMode === "month" ? styles.viewToggleBtnActive : ""}`}
+              onClick={() => setComparisonMode("month")}
+            >
+              Mês
+            </button>
+            <button
+              type="button"
+              className={`${styles.viewToggleBtn} ${comparisonMode === "year" ? styles.viewToggleBtnActive : ""}`}
+              onClick={() => setComparisonMode("year")}
+            >
+              Ano
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Cards View */}
       {!loading && data && totals && viewMode === "cards" && (
         <div className={styles.cardsGrid}>
-          {data.filiais.map(row => {
+          {sortedFiliais.map(row => {
             const variationPct = getComparisonPct(row.vendas, row.vendasPrevious);
             const salesPct = row.projecaoPct;
             const barPct = salesPct !== null ? Math.min(salesPct, 100) : 0;
@@ -306,7 +364,14 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
             };
 
             return (
-              <div key={row.filial} className={styles.branchCard}>
+              <div
+                key={row.filial}
+                className={`${styles.branchCard} ${styles.branchCardClickable}`}
+                onClick={() => navigateToFilial(row.filial)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => e.key === "Enter" && navigateToFilial(row.filial)}
+              >
                 {/* Left: filial name + variation */}
                 <div className={styles.cardLeft}>
                   <span className={styles.cardFilialName}>{row.displayName}</span>
@@ -343,19 +408,26 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                     const pct = getCardCatPct(cat);
                     const delta = getCardCatDelta(cat);
                     if (pct === null) return null;
+                    const color = CATEGORY_COLORS[idx % CATEGORY_COLORS.length];
+                    const catPillTrendClass = delta === null
+                      ? ""
+                      : (delta >= 0 ? styles.catPillUp : styles.catPillDown);
                     return (
                       <span
                         key={cat}
-                        className={styles.catPill}
+                        className={`${styles.catPill} ${catPillTrendClass}`}
                         title={cat === OUTROS_LABEL ? OUTROS_TOOLTIP : undefined}
+                        style={{
+                          backgroundColor: delta === null ? hexToRgba(color, 0.12) : undefined,
+                          borderColor: delta === null ? hexToRgba(color, 0.35) : undefined,
+                          color: delta === null ? color : undefined,
+                        }}
                       >
-                        <span
-                          className={styles.catDot}
-                          style={{ backgroundColor: CATEGORY_COLORS[idx % CATEGORY_COLORS.length] }}
-                        />
                         {getCategoryHeaderLabel(cat)} {pct}%
                         {delta !== null && (
-                          <span className={delta >= 0 ? styles.catArrowUp : styles.catArrowDown}>
+                          <span
+                            className={delta >= 0 ? styles.catArrowUp : styles.catArrowDown}
+                          >
                             {delta >= 0 ? " ↑" : " ↓"}
                           </span>
                         )}
@@ -393,7 +465,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
               </tr>
             </thead>
             <tbody>
-              {data.filiais.map(row => {
+              {sortedFiliais.map(row => {
                 const getDisplayedPct = (cat: string): number | null => {
                   if (cat === OUTROS_LABEL) {
                     const entries = Array.from(OUTROS_CATEGORIES)
@@ -410,7 +482,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                 const extremes = getRowPctExtremes(displayedCategories, getDisplayedPct);
                 return (
                   <tr key={row.filial} className={styles.bodyRow}>
-                  <td className={styles.tdFilial}>{row.displayName}</td>
+                  <td className={`${styles.tdFilial} ${styles.tdFilialClickable}`} onClick={() => navigateToFilial(row.filial)}>{row.displayName}</td>
                   <td className={styles.td}>{formatCurrency(row.meta)}</td>
                   <td className={styles.td}>
                     {row.projecaoPct !== null ? (
@@ -432,7 +504,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                         return (
                           <span
                             className={`${styles.projecaoBadge} ${isPositive ? styles.badgeGreen : styles.badgeRed} ${styles.vendasCompareBadge}`}
-                            title="Comparativo com o mesmo período do mês anterior"
+                            title={`Comparativo com ${comparisonLabel}`}
                           >
                             {comparisonPct >= 0 ? "+" : ""}{comparisonPct.toFixed(1)}%
                           </span>
@@ -531,7 +603,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                       return (
                         <span
                           className={`${styles.projecaoBadge} ${isPositive ? styles.badgeGreen : styles.badgeRed} ${styles.vendasCompareBadge}`}
-                          title="Comparativo com o mesmo período do mês anterior"
+                          title={`Comparativo com ${comparisonLabel}`}
                         >
                           {comparisonPct >= 0 ? "+" : ""}{comparisonPct.toFixed(1)}%
                         </span>

@@ -196,6 +196,17 @@
   white-space: nowrap;
 }
 
+.tdFilialClickable {
+  cursor: pointer;
+  color: #1565c0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.tdFilialClickable:hover {
+  color: #0d47a1;
+}
+
 .td {
   padding: 14px;
   text-align: right;
@@ -385,6 +396,23 @@
   border-color: #37474f;
 }
 
+.comparisonToggleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.comparisonToggleLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+}
+
+.comparisonToggleGroup {
+  display: flex;
+  gap: 8px;
+}
+
 /* ── Cards View ── */
 .cardsGrid {
   display: flex;
@@ -407,17 +435,26 @@
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
+.branchCardClickable {
+  cursor: pointer;
+}
+
+.branchCardClickable:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  border-color: #90a4ae;
+}
+
 /* Left section */
 .cardLeft {
-  min-width: 130px;
-  max-width: 130px;
+  min-width: 180px;
+  max-width: 180px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
 .cardFilialName {
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 700;
   color: #1a1a1a;
   line-height: 1.2;
@@ -446,21 +483,21 @@
 
 /* Middle section */
 .cardMiddle {
-  min-width: 210px;
-  max-width: 210px;
+  min-width: 280px;
+  max-width: 280px;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
 .cardRevenue {
-  font-size: 17px;
+  font-size: 22px;
   font-weight: 700;
   color: #1a1a1a;
 }
 
 .cardQtde {
-  font-size: 11px;
+  font-size: 12px;
   color: #999;
   margin-bottom: 6px;
 }
@@ -473,12 +510,12 @@
 }
 
 .cardMetaValue {
-  font-size: 12px;
+  font-size: 14px;
   color: #888;
 }
 
 .cardMetaPct {
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -518,21 +555,25 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 10px;
-  background: #f5f7fa;
-  border: 1px solid #eaeef3;
+  padding: 5px 12px;
+  border: 1.5px solid;
   border-radius: 20px;
   font-size: 12px;
-  font-weight: 500;
-  color: #444;
+  font-weight: 700;
   white-space: nowrap;
+  letter-spacing: 0.2px;
 }
 
-.catDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
+.catPillUp {
+  background: #e8f5e9;
+  border-color: #c8e6c9;
+  color: #2e7d32;
+}
+
+.catPillDown {
+  background: #fce4ec;
+  border-color: #f8bbd0;
+  color: #c62828;
 }
 
 .catArrowUp {
