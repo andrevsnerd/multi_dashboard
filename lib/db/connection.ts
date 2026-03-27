@@ -18,10 +18,26 @@ if (!shouldUseProxy()) {
   }
 }
 
-const DB_SERVERS = [
-  DB_SERVER,
-  process.env.DB_SERVER_FALLBACK || '189.126.197.82',
-].filter(Boolean) as string[];
+/** Fallback padrão (mesmo IP do script Python / Linx) quando não há segundo host distinto. */
+const DEFAULT_DB_FALLBACK = '189.126.197.82';
+
+function buildDbServerList(): string[] {
+  const explicitFallback =
+    (process.env.DB_SERVER_FALLBACK || '').trim() || DEFAULT_DB_FALLBACK;
+  const primary = (DB_SERVER || '').trim();
+  const unique = new Set<string>();
+  if (primary) unique.add(primary);
+  if (explicitFallback) unique.add(explicitFallback);
+  // Se principal e fallback explícito forem o MESMO IP, o array virava [ip, ip] e o
+  // filter abaixo removia o segundo → só uma tentativa. Garante o IP padrão do projeto.
+  if (unique.size === 1) {
+    const only = [...unique][0];
+    if (only !== DEFAULT_DB_FALLBACK) unique.add(DEFAULT_DB_FALLBACK);
+  }
+  return [...unique];
+}
+
+const DB_SERVERS = buildDbServerList();
 
 const baseConfig = {
   user: DB_USERNAME!,
@@ -64,6 +80,7 @@ export async function getConnectionPool(): Promise<sql.ConnectionPool> {
     }
 
     const ordered = [activeServer, ...DB_SERVERS.filter(s => s !== activeServer)];
+    console.log(`[DB] Servidores na rotação: ${ordered.join(' → ')}`);
     let lastError: Error | undefined;
     for (const server of ordered) {
       try {

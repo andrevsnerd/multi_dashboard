@@ -56,10 +56,22 @@ const dbConfig = {
 let pool = null;
 let activeServer = process.env.DB_SERVER;
 
-const DB_SERVERS = [
-  process.env.DB_SERVER,
-  process.env.DB_SERVER_FALLBACK || '189.126.197.82',
-].filter(Boolean);
+const DEFAULT_DB_FALLBACK = '189.126.197.82';
+
+function buildDbServerList() {
+  const explicitFallback = (process.env.DB_SERVER_FALLBACK || '').trim() || DEFAULT_DB_FALLBACK;
+  const primary = (process.env.DB_SERVER || '').trim();
+  const unique = new Set();
+  if (primary) unique.add(primary);
+  if (explicitFallback) unique.add(explicitFallback);
+  if (unique.size === 1) {
+    const only = [...unique][0];
+    if (only !== DEFAULT_DB_FALLBACK) unique.add(DEFAULT_DB_FALLBACK);
+  }
+  return [...unique];
+}
+
+const DB_SERVERS = buildDbServerList();
 
 async function tryConnect(server) {
   const config = { ...dbConfig, server };
@@ -78,6 +90,7 @@ async function getPool() {
     }
     // Tenta o servidor ativo primeiro, depois os demais
     const ordered = [activeServer, ...DB_SERVERS.filter(s => s !== activeServer)];
+    console.log(`[DB] Servidores na rotação: ${ordered.join(' → ')}`);
     let lastError;
     for (const server of ordered) {
       try {
