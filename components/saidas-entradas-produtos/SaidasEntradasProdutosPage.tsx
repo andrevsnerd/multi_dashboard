@@ -65,6 +65,15 @@ const DEFEITO_FILIAL_SAIDA: Partial<Record<string, Filial>> = {
   scarfme: { codFilial: 'BAZAR SCARF ME', filial: 'BAZAR SCARF ME' },
 };
 
+// Tipos de romaneio que não possuem filial destino (igual a SAÍDA MKT)
+const TIPOS_SEM_FILIAL_DESTINO = [
+  'MKT', 'BRINDE', 'DOACAO', 'AJUSTE DE ESTOQUE', 'AMOSTRA', 'SOCIO', 'COMPRA FUNCIONARIO',
+];
+function isTipoSemDestino(tipo: string): boolean {
+  const norm = tipo.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return TIPOS_SEM_FILIAL_DESTINO.some(t => norm.includes(t));
+}
+
 interface SaidasEntradasProdutosPageProps {
   companyKey: CompanyKey;
   companyName: string;
@@ -464,13 +473,16 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
     if (isDefeito && defeitoFilial) {
       return [defeitoFilial];
     }
-    if (defeitoFilial) {
-      return filiaisDestinoDisponiveis.filter(f => f.codFilial.trim() !== defeitoFilial.codFilial);
+    let lista = defeitoFilial
+      ? filiaisDestinoDisponiveis.filter(f => f.codFilial.trim() !== defeitoFilial.codFilial)
+      : filiaisDestinoDisponiveis;
+    if (filialSelecionada) {
+      lista = lista.filter(f => f.codFilial.trim() !== filialSelecionada.codFilial.trim());
     }
-    return filiaisDestinoDisponiveis;
-  }, [tipoRomaneioSelecionado, filiaisDestinoDisponiveis, companyKey]);
+    return lista;
+  }, [tipoRomaneioSelecionado, filiaisDestinoDisponiveis, companyKey, filialSelecionada]);
 
-  const isSaidaMkt = tipoRomaneioSelecionado.toUpperCase().includes('MKT');
+  const isSaidaMkt = isTipoSemDestino(tipoRomaneioSelecionado);
 
   // Resetar filial destino ao mudar tipo de romaneio; auto-selecionar se só há uma opção
   useEffect(() => {
@@ -959,7 +971,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       );
 
       // Salvar filial destino do romaneio gerado (saída) — não aplicável para SAÍDA MKT
-      if (tipoOperacao === "saida" && filialDestinoSaida && resultado.romaneio && !tipoRomaneioSelecionado.toUpperCase().includes('MKT')) {
+      if (tipoOperacao === "saida" && filialDestinoSaida && resultado.romaneio && !isTipoSemDestino(tipoRomaneioSelecionado)) {
         try {
           await salvarDestinoRomaneio(
             companyKey,
@@ -1137,7 +1149,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       mostrarNotificacao("Adicione pelo menos um produto", "error");
       return;
     }
-    if (tipoOperacao === "saida" && filiaisDestinoVisiveis.length > 1 && !filialDestinoSaida && !tipoRomaneioSelecionado.toUpperCase().includes('MKT')) {
+    if (tipoOperacao === "saida" && filiaisDestinoVisiveis.length > 1 && !filialDestinoSaida && !isTipoSemDestino(tipoRomaneioSelecionado)) {
       mostrarNotificacao("Selecione uma filial de destino", "error");
       return;
     }
