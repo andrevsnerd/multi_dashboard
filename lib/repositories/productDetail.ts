@@ -193,6 +193,7 @@ export interface ProductSaleHistory {
   filialDisplayName: string;
   quantity: number;
   revenue: number;
+  vendedor: string | null;
   color: string | null;
   colorDisplayName: string | null;
 }
@@ -1422,6 +1423,7 @@ async function fetchProductSaleHistoryEcommerce({
         f.FILIAL,
         fp.QTDE AS quantity,
         ISNULL(fp.VALOR_LIQUIDO, 0) AS revenue,
+        NULL AS vendedor,
         fp.COR_PRODUTO AS color,
         ISNULL(c.DESC_COR, '') AS corBanco
       FROM FATURAMENTO f WITH (NOLOCK)
@@ -1444,6 +1446,7 @@ async function fetchProductSaleHistoryEcommerce({
       FILIAL: string;
       quantity: number;
       revenue: number;
+      vendedor: string | null;
       color: string | null;
       corBanco: string;
     }>(query);
@@ -1465,6 +1468,7 @@ async function fetchProductSaleHistoryEcommerce({
         })(),
         quantity: Number(row.quantity ?? 0),
         revenue: Number(row.revenue ?? 0),
+        vendedor: row.vendedor ?? null,
         color: row.color,
         colorDisplayName,
       };
@@ -1520,6 +1524,7 @@ export async function fetchProductSaleHistory({
             ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
           END
         ) AS revenue,
+        vp.VENDEDOR AS vendedor,
         vp.COR_PRODUTO AS color,
         ISNULL(c.DESC_COR, '') AS corBanco
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
@@ -1538,16 +1543,47 @@ export async function fetchProductSaleHistory({
       FILIAL: string;
       quantity: number;
       revenue: number;
+      vendedor: string | null;
       color: string | null;
       corBanco: string;
     }>(query);
 
     const displayNames = companyConfig.filialDisplayNames ?? {};
+    const codigosVendedor = [
+      ...new Set(
+        (result.recordset ?? [])
+          .map((r) => String(r.vendedor ?? '').trim())
+          .filter(Boolean)
+      ),
+    ];
+    const apelidoByCodigo = new Map<string, string>();
+
+    if (codigosVendedor.length > 0) {
+      codigosVendedor.forEach((cod, i) => request.input(`vend${i}`, sql.VarChar, cod));
+      const inList = codigosVendedor.map((_, i) => `@vend${i}`).join(', ');
+      const apelidoQuery = `
+        SELECT
+          LTRIM(RTRIM(CAST(VENDEDOR AS VARCHAR))) AS codigo,
+          LTRIM(RTRIM(ISNULL(VENDEDOR_APELIDO, ISNULL(NOME_VENDEDOR, VENDEDOR)))) AS apelido
+        FROM LOJA_VENDEDORES WITH (NOLOCK)
+        WHERE LTRIM(RTRIM(CAST(VENDEDOR AS VARCHAR))) IN (${inList})
+      `;
+      const apelidoResult = await request.query<{ codigo: string; apelido: string }>(apelidoQuery);
+      (apelidoResult.recordset ?? []).forEach((r) => {
+        const codigo = String(r.codigo ?? '').trim();
+        const apelido = String(r.apelido ?? r.codigo ?? '').trim();
+        if (codigo) apelidoByCodigo.set(codigo, apelido);
+      });
+    }
 
     return result.recordset.map((row) => {
       const date = row.date instanceof Date ? row.date : new Date(row.date);
       const colorDisplayName = row.color
         ? getColorDescription(row.color, row.corBanco)
+        : null;
+      const vendedorCodigo = String(row.vendedor ?? '').trim();
+      const vendedorNome = vendedorCodigo
+        ? (apelidoByCodigo.get(vendedorCodigo) ?? vendedorCodigo)
         : null;
 
       return {
@@ -1559,6 +1595,7 @@ export async function fetchProductSaleHistory({
         })(),
         quantity: Number(row.quantity ?? 0),
         revenue: Number(row.revenue ?? 0),
+        vendedor: vendedorNome,
         color: row.color,
         colorDisplayName,
       };

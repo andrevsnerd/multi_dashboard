@@ -8,7 +8,7 @@
 
 .filialCardsRow {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 24px;
   width: 100%;
   min-width: 0;
@@ -43,6 +43,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-height: 32px;
 }
 
 .cardLabel {
@@ -51,6 +52,7 @@
   text-transform: uppercase;
   color: #64748b;
   font-weight: 600;
+  line-height: 1.2;
 }
 
 .cardIconSvg,
@@ -59,6 +61,9 @@
   align-items: center;
   justify-content: center;
   color: #94a3b8;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
 }
 
 .cardIconSvgLeft {
@@ -77,6 +82,7 @@
   align-items: baseline;
   gap: 10px;
   flex-wrap: wrap;
+  min-height: 36px;
 }
 
 .variance {
@@ -101,6 +107,8 @@
   margin: 0;
   font-size: 14px;
   color: #64748b;
+  line-height: 1.25;
+  min-height: 18px;
 }
 
 .cardDescriptionHighlight {
@@ -234,6 +242,12 @@
 .salesByFilialBar {
   height: 100%;
   background: #16a34a;
+  border-radius: 9999px;
+}
+
+.vendorPerformanceBar {
+  height: 100%;
+  background: #7c3aed;
   border-radius: 9999px;
 }
 

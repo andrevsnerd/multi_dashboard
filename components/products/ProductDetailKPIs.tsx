@@ -362,7 +362,7 @@ export default function ProductDetailKPIs({
               </span>
             )}
           </div>
-          <p className={styles.cardDescription}>unidades no período</p>
+          <p className={styles.cardDescription}>Unidades no período</p>
         </article>
 
         <article className={styles.card}>
@@ -380,7 +380,9 @@ export default function ProductDetailKPIs({
               </svg>
             </button>
           </header>
-          <div className={styles.cardValue}>{formatCurrency(detail.registeredPrice)}</div>
+          <div className={styles.valueRow}>
+            <span className={styles.cardValue}>{formatCurrency(detail.registeredPrice)}</span>
+          </div>
           <p className={styles.cardDescription}>Preço de venda cadastrado</p>
         </article>
 
@@ -399,7 +401,9 @@ export default function ProductDetailKPIs({
               </svg>
             </button>
           </header>
-          <div className={styles.cardValue}>{formatCurrency(detail.registeredCost)}</div>
+          <div className={styles.valueRow}>
+            <span className={styles.cardValue}>{formatCurrency(detail.registeredCost)}</span>
+          </div>
           <p className={styles.cardDescription}>Custo cadastrado</p>
         </article>
       </div>
@@ -495,6 +499,60 @@ export default function ProductDetailKPIs({
                         </div>
                         <div className={styles.stockByFilialBarWrap} aria-hidden>
                           <div className={styles.salesByFilialBar} style={{ width: `${bar}%` }} />
+                        </div>
+                        <div className={styles.stockByFilialNumbers}>
+                          <span className={styles.stockByFilialQty}>{formatInteger(value)}</span>
+                          <span className={styles.stockByFilialPct}>{pct.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
+        </section>
+
+        {/* Performance por Vendedor (quantidade) */}
+        <section className={styles.stockByFilialCard}>
+          {(() => {
+            const byVendor = new Map<string, { vendor: string; quantity: number }>();
+            saleHistory.forEach((sale) => {
+              const vendor = (sale as { vendedor?: string | null }).vendedor ?? null;
+              // E-commerce não tem vendedor: ignorar essas vendas aqui
+              if (!vendor || !vendor.trim()) return;
+              const key = vendor.toUpperCase().trim();
+              const current = byVendor.get(key);
+              if (current) current.quantity += sale.quantity ?? 0;
+              else byVendor.set(key, { vendor: vendor.trim(), quantity: sale.quantity ?? 0 });
+            });
+
+            const rows = Array.from(byVendor.values())
+              .filter((r) => r.quantity > 0)
+              .sort((a, b) => b.quantity - a.quantity);
+
+            const total = rows.reduce((sum, r) => sum + (r.quantity ?? 0), 0);
+            const max = Math.max(1, ...rows.map((r) => r.quantity ?? 0));
+
+            return (
+              <>
+                <div className={styles.stockByFilialHeader}>
+                  <h3 className={styles.stockByFilialTitle}>Performance por Vendedor</h3>
+                  <p className={styles.stockByFilialSubtitle}>
+                    {rows.length} vendedor(es) · {formatInteger(total)} unidades
+                  </p>
+                </div>
+
+                <div className={styles.stockByFilialList}>
+                  {rows.map((row) => {
+                    const value = row.quantity ?? 0;
+                    const pct = total > 0 ? (value / total) * 100 : 0;
+                    const bar = (value / max) * 100;
+                    return (
+                      <div key={row.vendor} className={styles.stockByFilialRow}>
+                        <div className={styles.stockByFilialName}>{row.vendor.toUpperCase()}</div>
+                        <div className={styles.stockByFilialBarWrap} aria-hidden>
+                          <div className={styles.vendorPerformanceBar} style={{ width: `${bar}%` }} />
                         </div>
                         <div className={styles.stockByFilialNumbers}>
                           <span className={styles.stockByFilialQty}>{formatInteger(value)}</span>
