@@ -8,7 +8,7 @@
 
 .filialCardsRow {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 24px;
   width: 100%;
   min-width: 0;
@@ -242,6 +242,12 @@
 .salesByFilialBar {
   height: 100%;
   background: #16a34a;
+  border-radius: 9999px;
+}
+
+.salesByColorBar {
+  height: 100%;
+  background: #f97316;
   border-radius: 9999px;
 }
 

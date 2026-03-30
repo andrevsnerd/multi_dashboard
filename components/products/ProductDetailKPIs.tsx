@@ -313,6 +313,31 @@ export default function ProductDetailKPIs({
     [filialOrder, filialOrderMap]
   );
 
+  const salesByColorInfo = (() => {
+    const codes = new Set(
+      saleHistory
+        .map((s) => (s.color ?? "").trim())
+        .filter(Boolean)
+    );
+    const hasSpecificColorSelected = codes.size === 1;
+
+    const byColor = new Map<string, { label: string; quantity: number }>();
+    saleHistory.forEach((sale) => {
+      const label = (sale.colorDisplayName || sale.color || "Sem cor").trim() || "Sem cor";
+      const current = byColor.get(label);
+      if (current) current.quantity += sale.quantity ?? 0;
+      else byColor.set(label, { label, quantity: sale.quantity ?? 0 });
+    });
+
+    const rows = Array.from(byColor.values())
+      .filter((r) => r.quantity > 0)
+      .sort((a, b) => b.quantity - a.quantity);
+    const total = rows.reduce((sum, r) => sum + (r.quantity ?? 0), 0);
+    const max = Math.max(1, ...rows.map((r) => r.quantity ?? 0));
+
+    return { hasSpecificColorSelected, rows, total, max };
+  })();
+
   return (
     <div className={styles.section}>
       {/* Primeira linha: 5 KPIs */}
@@ -566,6 +591,38 @@ export default function ProductDetailKPIs({
             );
           })()}
         </section>
+
+        {/* Vendas por Cor (quantidade) */}
+        {!salesByColorInfo.hasSpecificColorSelected && (
+          <section className={styles.stockByFilialCard}>
+            <div className={styles.stockByFilialHeader}>
+              <h3 className={styles.stockByFilialTitle}>Vendas por Cor</h3>
+              <p className={styles.stockByFilialSubtitle}>
+                {salesByColorInfo.rows.length} cor(es) · {formatInteger(salesByColorInfo.total)} unidades
+              </p>
+            </div>
+
+            <div className={styles.stockByFilialList}>
+              {salesByColorInfo.rows.map((row) => {
+                const value = row.quantity ?? 0;
+                const pct = salesByColorInfo.total > 0 ? (value / salesByColorInfo.total) * 100 : 0;
+                const bar = (value / salesByColorInfo.max) * 100;
+                return (
+                  <div key={row.label} className={styles.stockByFilialRow}>
+                    <div className={styles.stockByFilialName}>{row.label.toUpperCase()}</div>
+                    <div className={styles.stockByFilialBarWrap} aria-hidden>
+                      <div className={styles.salesByColorBar} style={{ width: `${bar}%` }} />
+                    </div>
+                    <div className={styles.stockByFilialNumbers}>
+                      <span className={styles.stockByFilialQty}>{formatInteger(value)}</span>
+                      <span className={styles.stockByFilialPct}>{pct.toFixed(1)}%</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
       </div>
 
       {/* Performance de Vendas */}
