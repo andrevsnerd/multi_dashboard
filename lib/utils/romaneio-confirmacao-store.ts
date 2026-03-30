@@ -76,6 +76,43 @@ async function ensureTable(sql: ReturnType<typeof getNeonSql>) {
 }
 
 /**
+ * Retorna mapa de "romaneioId|filialDestino" → quantidade de itens confirmados,
+ * para todos os romaneios de uma empresa. Usado para indicador na listagem.
+ */
+export async function getContadorConfirmadosByCompany(
+  companyKey: string
+): Promise<Map<string, number>> {
+  const c = (companyKey || "").trim().toLowerCase();
+  const counter: Map<string, number> = new Map();
+
+  if (!hasPostgres()) {
+    const records = readFile();
+    for (const rec of records) {
+      if (rec.company_key.toLowerCase() !== c) continue;
+      const k = `${rec.romaneio_id}|${rec.filial_destino}`;
+      counter.set(k, (counter.get(k) ?? 0) + 1);
+    }
+    return counter;
+  }
+
+  const sql = getNeonSql();
+  await ensureTable(sql);
+
+  const rows = await sql`
+    SELECT romaneio_id, filial_destino, COUNT(*) AS cnt
+    FROM romaneio_item_confirmado
+    WHERE company_key = ${c}
+    GROUP BY romaneio_id, filial_destino
+  `;
+
+  for (const row of rows) {
+    const k = `${row.romaneio_id}|${row.filial_destino}`;
+    counter.set(k, Number(row.cnt));
+  }
+  return counter;
+}
+
+/**
  * Retorna mapa de "produto|cor" → qtde_confirmada para um romaneio+filialDestino.
  */
 export async function getConfirmados(

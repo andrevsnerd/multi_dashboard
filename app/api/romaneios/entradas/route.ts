@@ -3,6 +3,7 @@ import { getPermissaoByUsername } from "@/lib/utils/transferencia-permissoes-sto
 import { fetchLogEntradas } from "@/lib/repositories/logEntradas";
 import { findUserByUsername } from "@/lib/auth/users-store";
 import { resolveCompany } from "@/lib/config/company";
+import { getContadorConfirmadosByCompany } from "@/lib/utils/romaneio-confirmacao-store";
 
 /**
  * GET /api/romaneios/entradas?company=nerd
@@ -23,10 +24,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const entradas = await fetchLogEntradas(200, 90);
+    const [entradas, confirmadosCounter] = await Promise.all([
+      fetchLogEntradas(200, 90),
+      getContadorConfirmadosByCompany(companyKey),
+    ]);
+
+    const entradasComConfirmacao = entradas.map((e) => {
+      const qtdConfirmados = e.filialDestino
+        ? (confirmadosCounter.get(`${e.romaneio}|${e.filialDestino}`) ?? 0)
+        : 0;
+      return { ...e, qtdConfirmados };
+    });
 
     if (!username) {
-      return NextResponse.json({ data: entradas });
+      return NextResponse.json({ data: entradasComConfirmacao });
     }
 
     // Logística vê todos os romaneios da empresa, filtrado pelas filiais da empresa
@@ -34,12 +45,12 @@ export async function GET(request: NextRequest) {
     if (userRecord?.role === "logistica") {
       const companyConfig = resolveCompany(companyKey);
       if (!companyConfig) {
-        return NextResponse.json({ data: entradas });
+        return NextResponse.json({ data: entradasComConfirmacao });
       }
       const filiaisEmpresa = new Set(
         companyConfig.filialFilters.inventory.map((f) => f.toUpperCase())
       );
-      const filtered = entradas.filter((e) =>
+      const filtered = entradasComConfirmacao.filter((e) =>
         filiaisEmpresa.has((e.filialDestino ?? "").toUpperCase())
       );
       return NextResponse.json({ data: filtered });
@@ -51,10 +62,10 @@ export async function GET(request: NextRequest) {
       !filialAtribuida || filialAtribuida === "" || filialAtribuida === "TODAS";
 
     if (verTodas) {
-      return NextResponse.json({ data: entradas });
+      return NextResponse.json({ data: entradasComConfirmacao });
     }
 
-    const filtered = entradas.filter((e) => {
+    const filtered = entradasComConfirmacao.filter((e) => {
       const destino = (e.filialDestino ?? "").trim().toUpperCase();
       return destino === filialAtribuida;
     });

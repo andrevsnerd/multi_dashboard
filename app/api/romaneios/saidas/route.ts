@@ -4,6 +4,7 @@ import { getAllDestinosByCompany } from "@/lib/utils/destino-romaneio-store";
 import { fetchLogSaidas } from "@/lib/repositories/logSaidas";
 import { findUserByUsername } from "@/lib/auth/users-store";
 import { resolveCompany } from "@/lib/config/company";
+import { getContadorConfirmadosByCompany } from "@/lib/utils/romaneio-confirmacao-store";
 
 /**
  * GET /api/romaneios/saidas?company=nerd
@@ -24,15 +25,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const [saidas, destinosMap] = await Promise.all([
+    const [saidas, destinosMap, confirmadosCounter] = await Promise.all([
       fetchLogSaidas(200, 90),
       getAllDestinosByCompany(companyKey),
+      getContadorConfirmadosByCompany(companyKey),
     ]);
 
     const saidasComDestino = saidas.map((s) => {
       const key = `${s.romaneio}|${s.filialOrigem}`;
       const destinoCodigo = destinosMap.get(key)?.trim() || null;
-      return { ...s, destinoCodigo };
+      const qtdConfirmados = destinoCodigo
+        ? (confirmadosCounter.get(`${s.romaneio}|${destinoCodigo}`) ?? 0)
+        : 0;
+      return { ...s, destinoCodigo, qtdConfirmados };
     });
 
     if (!username) {

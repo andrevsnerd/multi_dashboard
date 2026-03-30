@@ -19,6 +19,8 @@ export interface RomaneioListItem {
   /** Código da filial destino (apenas saídas, quando definido no detalhe). */
   destinoCodigo?: string | null;
   tipoRomaneio?: string;
+  /** Número de itens já confirmados na filial destino. */
+  qtdConfirmados?: number;
 }
 
 interface FilialOption {
@@ -179,8 +181,10 @@ export default function RomaneiosPage({ companySlug, companyName }: RomaneiosPag
         <div className={styles.list}>
           {romaneios.map((rom, index) => {
             const detailUrl = `${basePath}/romaneios/${encodeURIComponent(rom.romaneio)}?tipo=${rom.tipo}&filialOrigem=${encodeURIComponent(rom.filialOrigem)}&filialDestino=${encodeURIComponent(rom.filialDestino)}&dataEmissao=${encodeURIComponent(rom.dataEmissao)}&responsavel=${encodeURIComponent(rom.responsavel || "")}&tipoRomaneio=${encodeURIComponent(rom.tipoRomaneio || "")}`;
+            const confirmados = rom.qtdConfirmados ?? 0;
+            const todosConfirmados = rom.qtdProdutos > 0 && confirmados >= rom.qtdProdutos;
             return (
-              <Link key={`${rom.tipo}-${rom.romaneio}-${rom.filialOrigem}-${rom.filialDestino}-${index}`} href={detailUrl} className={styles.card}>
+              <Link key={`${rom.tipo}-${rom.romaneio}-${rom.filialOrigem}-${rom.filialDestino}-${index}`} href={detailUrl} className={`${styles.card} ${todosConfirmados ? styles.cardConfirmado : ""}`}>
                 <div className={styles.cardHeader}>
                   <span className={styles.romaneioId}>#{rom.romaneio}</span>
                   {rom.tipo === "saida" ? (
@@ -202,6 +206,9 @@ export default function RomaneiosPage({ companySlug, companyName }: RomaneiosPag
                         : "—"}
                     </span>
                   )}
+                  {todosConfirmados && (
+                    <span className={styles.badgeConfirmado}>✓ Confirmado</span>
+                  )}
                 </div>
                 <div className={styles.cardDetails}>
                   Responsável: {rom.responsavel || "—"}
@@ -209,6 +216,9 @@ export default function RomaneiosPage({ companySlug, companyName }: RomaneiosPag
                 <div className={styles.cardFooter}>
                   <span className={styles.counts}>
                     <span className={styles.countIcon}>👁</span> {rom.qtdProdutos} produtos • {rom.qtdItens} itens
+                    {!todosConfirmados && confirmados > 0 && (
+                      <span className={styles.confirmadosParcial}>{confirmados}/{rom.qtdProdutos} confirmados</span>
+                    )}
                   </span>
                   <span className={styles.date}>
                     {new Date(rom.dataEmissao).toLocaleString("pt-BR")}
