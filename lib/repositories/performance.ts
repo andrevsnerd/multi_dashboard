@@ -289,6 +289,8 @@ export async function fetchFilialProdutoSales(
   const gradeExpr = companyKey === 'scarfme'
     ? `UPPER(LTRIM(RTRIM(ISNULL(p.GRADE, ''))))`
     : `''`;
+  // SQL Server rejects GROUP BY on a literal constant — only include gradeExpr if it references a column
+  const gradeGroupBy = gradeExpr === `''` ? '' : `, ${gradeExpr}`;
 
   const runPos = (): Promise<FilialProdutoSalesRow[]> => {
     if (posFilialNames.length === 0) return Promise.resolve([]);
@@ -312,7 +314,7 @@ export async function fetchFilialProdutoSales(
           AND vp.DATA_VENDA < @fpEnd
           AND vp.QTDE > 0
           AND vp.FILIAL IN (${placeholders})
-        GROUP BY ISNULL(vp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}, ${gradeExpr}, ISNULL(p.CUSTO_REPOSICAO1, 0)
+        GROUP BY ISNULL(vp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}${gradeGroupBy}, ISNULL(p.CUSTO_REPOSICAO1, 0)
         HAVING SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) > 0
         ORDER BY VENDAS DESC
       `;
@@ -355,7 +357,7 @@ export async function fetchFilialProdutoSales(
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
           AND fp.QTDE > 0
           AND f.FILIAL IN (${placeholders})
-        GROUP BY ISNULL(fp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}, ${gradeExpr}, ISNULL(p.CUSTO_REPOSICAO1, 0)
+        GROUP BY ISNULL(fp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}${gradeGroupBy}, ISNULL(p.CUSTO_REPOSICAO1, 0)
         HAVING SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) > 0
         ORDER BY VENDAS DESC
       `;

@@ -128,8 +128,13 @@ export async function GET(request: Request) {
       };
     });
 
-    // Fetch product-level sales for ABC
-    const produtos = await fetchFilialProdutoSales(companyKey, posMembers, ecomMembers, month, year);
+    // Fetch product-level sales for ABC (non-fatal: if this fails, return KPIs without products)
+    let produtos: Awaited<ReturnType<typeof fetchFilialProdutoSales>> = [];
+    try {
+      produtos = await fetchFilialProdutoSales(companyKey, posMembers, ecomMembers, month, year);
+    } catch (produtosError) {
+      console.error('Erro ao carregar produtos da filial (não-fatal):', produtosError);
+    }
 
     return NextResponse.json({
       filial: filialParam,
