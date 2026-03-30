@@ -68,6 +68,7 @@ const DEFEITO_FILIAL_SAIDA: Partial<Record<string, Filial>> = {
 // Tipos de romaneio que não possuem filial destino (igual a SAÍDA MKT)
 const TIPOS_SEM_FILIAL_DESTINO = [
   'MKT', 'BRINDE', 'DOACAO', 'AJUSTE DE ESTOQUE', 'AMOSTRA', 'SOCIO', 'COMPRA FUNCIONARIO',
+  'RETIRADA FUNCIONARIO', 'RETIRADA SOCIO',
 ];
 function isTipoSemDestino(tipo: string): boolean {
   const norm = tipo.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
