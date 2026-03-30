@@ -25,6 +25,9 @@ export async function GET(request: Request) {
 
   /** light=0 ou false = inclui grupo/subgrupo mais vendido (mais lento). Default = light. */
   const light = searchParams.get('light') !== '0' && searchParams.get('light') !== 'false';
+  const compareParam = searchParams.get('compare');
+  const comparisonMode: 'month' | 'year' | undefined =
+    compareParam === 'year' ? 'year' : compareParam === 'month' ? 'month' : undefined;
 
   try {
     const data = await fetchVendedoresList({
@@ -39,6 +42,7 @@ export async function GET(request: Request) {
       produtoId,
       produtoSearchTerm,
       light,
+      comparisonMode,
     });
     return NextResponse.json({ data });
   } catch (error) {

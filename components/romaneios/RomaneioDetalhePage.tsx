@@ -77,7 +77,7 @@ async function executarEntradaEstoqueLote(
   filialCod: string,
   itens: Array<{ produto: string; corProduto: string | null; quantidade: number }>,
   responsavel: string
-): Promise<{ ok: boolean; romaneio?: string }> {
+): Promise<{ ok: boolean; romaneio?: string; error?: string }> {
   const res = await fetch("/api/saidas-entradas-produtos/executar", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-auth-username": username },
@@ -90,7 +90,10 @@ async function executarEntradaEstoqueLote(
       observacao: null,
     }),
   });
-  if (!res.ok) return { ok: false };
+  if (!res.ok) {
+    const errJson = await res.json().catch(() => ({})) as { error?: string };
+    return { ok: false, error: errJson.error };
+  }
   const json = await res.json().catch(() => ({})) as { romaneio?: string };
   return { ok: true, romaneio: json.romaneio };
 }
@@ -389,7 +392,7 @@ export default function RomaneioDetalhePage({
           responsavelPadrao || ""
         );
         if (!result.ok) {
-          setErroConfirmacao("Erro ao registrar entrada de estoque. Tente novamente.");
+          setErroConfirmacao(result.error ? `Erro ao registrar entrada de estoque: ${result.error}` : "Erro ao registrar entrada de estoque. Tente novamente.");
           return;
         }
         if (result.romaneio) setRomaneioGerado(result.romaneio);
@@ -626,6 +629,11 @@ export default function RomaneioDetalhePage({
             disabled={loadingDestino}
           >
             <option value="">Nenhum destino definido</option>
+            {destinoSelected && !filiais.some((f) => f.codFilial === destinoSelected) && (
+              <option key={destinoSelected} value={destinoSelected}>
+                {destinoSelected}
+              </option>
+            )}
             {filiais.map((f) => (
               <option key={f.codFilial} value={f.codFilial}>
                 {f.filial} ({f.codFilial})

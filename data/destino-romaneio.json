@@ -28,5 +28,11 @@
     "romaneio_id": "029331",
     "filial_origem": "IGUATEMI SP - JJJ",
     "filial_destino": ""
+  },
+  {
+    "company_key": "nerd",
+    "romaneio_id": "029381",
+    "filial_origem": "NERD",
+    "filial_destino": "NERD"
   }
 ]

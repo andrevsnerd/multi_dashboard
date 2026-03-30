@@ -332,7 +332,7 @@ export default function ProductDetailKPIs({
                   detail.revenueVariance > 0 ? styles.variancePositive : detail.revenueVariance < 0 ? styles.varianceNegative : ""
                 }`}
               >
-                {detail.revenueVariance > 0 ? "↑" : detail.revenueVariance < 0 ? "↓" : ""}
+                {detail.revenueVariance > 0 ? "+" : detail.revenueVariance < 0 ? "-" : ""}
                 {Math.abs(detail.revenueVariance).toFixed(1)}%
               </span>
             )}
@@ -357,7 +357,7 @@ export default function ProductDetailKPIs({
                   quantityVariance > 0 ? styles.variancePositive : quantityVariance < 0 ? styles.varianceNegative : ""
                 }`}
               >
-                {quantityVariance > 0 ? "↑" : quantityVariance < 0 ? "↓" : ""}
+                {quantityVariance > 0 ? "+" : quantityVariance < 0 ? "-" : ""}
                 {Math.abs(quantityVariance).toFixed(1)}%
               </span>
             )}

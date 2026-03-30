@@ -21,6 +21,7 @@ interface VendedoresTableProps {
   selectedGrades: string[];
   selectedProductId?: string | null;
   produtoSearchTerm?: string | null;
+  comparisonMode?: "month" | "year";
 }
 
 function buildDetalheUrl(
@@ -52,6 +53,7 @@ export default function VendedoresTable({
   selectedGrades,
   selectedProductId,
   produtoSearchTerm,
+  comparisonMode,
 }: VendedoresTableProps) {
   const router = useRouter();
   const [sortColumn, setSortColumn] = useState<keyof VendedorItem>("faturamento");
@@ -282,6 +284,19 @@ export default function VendedoresTable({
                           {badgeText && (
                             <span className={styles.grupoBadge}>{badgeText}</span>
                           )}
+                          {comparisonMode && vendedor.faturamentoPrevious !== undefined && vendedor.faturamentoPrevious > 0 && (() => {
+                            const diffPct = ((vendedor.faturamento - vendedor.faturamentoPrevious) / vendedor.faturamentoPrevious) * 100;
+                            const isPos = diffPct >= 0;
+                            const compLabel = comparisonMode === "month" ? "mês anterior" : "mesmo período do ano anterior";
+                            return (
+                              <span
+                                className={`${styles.vendedorCompareBadge} ${isPos ? styles.compareBadgePos : styles.compareBadgeNeg}`}
+                                title={`Comparativo com ${compLabel}`}
+                              >
+                                {isPos ? "↑" : "↓"} {isPos ? "+" : ""}{diffPct.toFixed(1)}%
+                              </span>
+                            );
+                          })()}
                         </div>
                         <div className={styles.vendedorFilial}>
                           {getFilialDisplayName(vendedor.filial)}
@@ -346,6 +361,19 @@ export default function VendedoresTable({
                         {badgeText && (
                           <span className={styles.cardGrupoBadge}>{badgeText}</span>
                         )}
+                        {comparisonMode && vendedor.faturamentoPrevious !== undefined && vendedor.faturamentoPrevious > 0 && (() => {
+                          const diffPct = ((vendedor.faturamento - vendedor.faturamentoPrevious) / vendedor.faturamentoPrevious) * 100;
+                          const isPos = diffPct >= 0;
+                          const compLabel = comparisonMode === "month" ? "mês anterior" : "mesmo período do ano anterior";
+                          return (
+                            <span
+                              className={`${styles.vendedorCompareBadge} ${isPos ? styles.compareBadgePos : styles.compareBadgeNeg}`}
+                              title={`Comparativo com ${compLabel}`}
+                            >
+                              {isPos ? "↑" : "↓"} {isPos ? "+" : ""}{diffPct.toFixed(1)}%
+                            </span>
+                          );
+                        })()}
                       </div>
                       <div className={styles.cardVendedorFilial}>
                         {getFilialDisplayName(vendedor.filial)}

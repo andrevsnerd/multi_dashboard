@@ -6,6 +6,7 @@ import type { VendedorItem } from "@/lib/repositories/vendedores-v2";
 import type { CompanyKey } from "@/lib/config/company";
 import type { DateRangeValue } from "@/components/filters/DateRangeFilter";
 import styles from "@/components/vendedores/VendedoresPage.module.css";
+import tabStyles from "./FilialVendedoresTab.module.css";
 
 interface Props {
   companyKey: CompanyKey;
@@ -17,12 +18,14 @@ async function fetchVendedores(
   company: string,
   range: DateRangeValue,
   filial: string,
+  comparisonMode: "month" | "year",
 ): Promise<VendedorItem[]> {
   const searchParams = new URLSearchParams({
     company,
     start: range.startDate.toISOString(),
     end: range.endDate.toISOString(),
     filial,
+    compare: comparisonMode,
   });
   const response = await fetch(`/api/vendedores?${searchParams.toString()}`, { cache: "no-store" });
   if (!response.ok) throw new Error("Erro ao carregar vendedores");
@@ -34,6 +37,7 @@ export default function FilialVendedoresTab({ companyKey, filial, initialRange }
   const [data, setData] = useState<VendedorItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [comparisonMode, setComparisonMode] = useState<"month" | "year">("month");
 
   useEffect(() => {
     let active = true;
@@ -41,7 +45,7 @@ export default function FilialVendedoresTab({ companyKey, filial, initialRange }
       setLoading(true);
       setError(null);
       try {
-        const vendedoresData = await fetchVendedores(companyKey, initialRange, filial);
+        const vendedoresData = await fetchVendedores(companyKey, initialRange, filial, comparisonMode);
         if (active) setData(vendedoresData);
       } catch (err) {
         if (active) setError(err instanceof Error ? err.message : "Não foi possível carregar os dados.");
@@ -51,10 +55,30 @@ export default function FilialVendedoresTab({ companyKey, filial, initialRange }
     }
     void load();
     return () => { active = false; };
-  }, [companyKey, initialRange, filial]);
+  }, [companyKey, initialRange, filial, comparisonMode]);
 
   return (
     <div className={styles.wrapper}>
+      <div className={tabStyles.comparisonRow}>
+        <span className={tabStyles.comparisonLabel}>Comparação:</span>
+        <div className={tabStyles.comparisonToggle}>
+          <button
+            type="button"
+            className={`${tabStyles.toggleBtn} ${comparisonMode === "month" ? tabStyles.toggleBtnActive : ""}`}
+            onClick={() => setComparisonMode("month")}
+          >
+            Mês
+          </button>
+          <button
+            type="button"
+            className={`${tabStyles.toggleBtn} ${comparisonMode === "year" ? tabStyles.toggleBtnActive : ""}`}
+            onClick={() => setComparisonMode("year")}
+          >
+            Ano
+          </button>
+        </div>
+      </div>
+
       {error ? <span className={styles.error}>{error}</span> : null}
 
       {loading && (
@@ -76,6 +100,7 @@ export default function FilialVendedoresTab({ companyKey, filial, initialRange }
           selectedColecoes={[]}
           selectedSubgrupos={[]}
           selectedGrades={[]}
+          comparisonMode={comparisonMode}
         />
       </div>
     </div>

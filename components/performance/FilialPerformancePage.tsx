@@ -24,6 +24,7 @@ interface ProdutoRow {
   vendas: number;
   qtde: number;
   custo: number;
+  vendasPrevious: number;
 }
 
 interface FilialData {
@@ -552,7 +553,21 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
                                 </span>
                               </td>
                               <td>
-                                <div className={styles.productName}>{p.descricao || p.produto}</div>
+                                <div className={styles.productNameRow}>
+                                  <span className={styles.productName}>{p.descricao || p.produto}</span>
+                                  {p.vendasPrevious > 0 && (() => {
+                                    const diffPct = ((p.vendas - p.vendasPrevious) / p.vendasPrevious) * 100;
+                                    const isPos = diffPct >= 0;
+                                    return (
+                                      <span
+                                        className={`${styles.prodCompareBadge} ${isPos ? styles.badgeGreen : styles.badgeRed}`}
+                                        title={`Comparativo com ${comparisonLabel}`}
+                                      >
+                                        {isPos ? "↑" : "↓"} {isPos ? "+" : ""}{diffPct.toFixed(1)}%
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
                                 {((p.descricao && p.produto !== p.descricao) || p.categoria) && (
                                   <div className={styles.productMeta}>
                                     {p.descricao && p.produto !== p.descricao && (

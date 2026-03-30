@@ -1,0 +1,39 @@
+.comparisonRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0 4px;
+}
+
+.comparisonLabel {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.comparisonToggle {
+  display: flex;
+  gap: 4px;
+}
+
+.toggleBtn {
+  padding: 4px 14px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.toggleBtn:hover {
+  background: #f1f5f9;
+}
+
+.toggleBtnActive {
+  background: #1e293b;
+  color: #fff;
+  border-color: #1e293b;
+}

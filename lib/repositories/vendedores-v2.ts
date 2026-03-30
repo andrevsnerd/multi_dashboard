@@ -18,6 +18,7 @@ export interface VendedorItem {
   vendedor: string;
   filial: string;
   faturamento: number;
+  faturamentoPrevious?: number;
   quantidadeVendida: number;
   tickets: number;
   ticketMedio: number;
@@ -53,6 +54,7 @@ export interface VendedoresListParams {
   produtoSearchTerm?: string;
   /** false = inclui grupo/subgrupo mais vendido (mais lento). Default true = só métricas. */
   light?: boolean;
+  comparisonMode?: 'month' | 'year';
 }
 
 function buildFilialFilter(
@@ -112,7 +114,7 @@ function buildListFilter(
 export async function fetchVendedoresList(
   params: VendedoresListParams
 ): Promise<VendedorItem[]> {
-  return withRequest(async (request) => {
+  const mainData = await withRequest(async (request) => {
     const {
       company,
       filial,
@@ -255,6 +257,12 @@ export async function fetchVendedoresList(
       (apelidoResult.recordset ?? []).forEach((r) => apelidoByCodigo.set((r.codigo ?? '').trim(), (r.apelido ?? r.codigo ?? '').trim()));
     }
 
+    // Keep raw code→filial map for previous period matching
+    const rawRows = mainResult.recordset.map(row => ({
+      codigo: (row.vendedor ?? '').trim(),
+      filial: row.filial,
+    }));
+
     const items: VendedorItem[] = mainResult.recordset.map((row) => {
       const codigo = (row.vendedor ?? '').trim();
       const faturamento = row.faturamento ?? 0;
@@ -278,8 +286,59 @@ export async function fetchVendedoresList(
       };
     });
 
-    return items;
+    return { items, rawRows };
   });
+
+  const { items, rawRows } = mainData;
+
+  // Fetch previous period faturamento if comparisonMode is given
+  if (params.comparisonMode && params.range) {
+    try {
+      const { start: startRaw } = normalizeRangeForQuery(params.range);
+      const prevMonth = params.comparisonMode === 'year'
+        ? startRaw.getMonth()
+        : (startRaw.getMonth() === 0 ? 11 : startRaw.getMonth() - 1);
+      const prevYear = params.comparisonMode === 'year'
+        ? startRaw.getFullYear() - 1
+        : (startRaw.getMonth() === 0 ? startRaw.getFullYear() - 1 : startRaw.getFullYear());
+      const startPrev = new Date(Date.UTC(prevYear, prevMonth, 1));
+      const endPrev = new Date(Date.UTC(prevYear, prevMonth + 1, 1));
+
+      const prevMap = await withRequest(async (req) => {
+        req.input('startDate', sql.DateTime, startPrev);
+        req.input('endDate', sql.DateTime, endPrev);
+        const filialFilter = buildFilialFilter(req, params.company, 'sales', params.filial ?? null, 'vp');
+        const query = `
+          SELECT
+            vp.VENDEDOR AS vendedor,
+            vp.FILIAL AS filial,
+            SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) END) AS faturamento
+          FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+          WHERE vp.DATA_VENDA >= @startDate
+            AND vp.DATA_VENDA < @endDate
+            AND vp.QTDE > 0
+            ${filialFilter}
+          GROUP BY vp.VENDEDOR, vp.FILIAL
+          HAVING SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) END) > 0
+        `;
+        const result = await req.query<{ vendedor: string; filial: string; faturamento: number }>(query);
+        const map = new Map<string, number>();
+        result.recordset.forEach(r => {
+          map.set(`${(r.vendedor ?? '').trim()}|${r.filial}`, r.faturamento ?? 0);
+        });
+        return map;
+      });
+
+      rawRows.forEach((raw, i) => {
+        const prev = prevMap.get(`${raw.codigo}|${raw.filial}`);
+        if (prev !== undefined) items[i].faturamentoPrevious = prev;
+      });
+    } catch {
+      // non-fatal
+    }
+  }
+
+  return items;
 }
 
 export interface VendedorProdutosListParams {
