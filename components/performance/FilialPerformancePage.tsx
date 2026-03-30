@@ -11,6 +11,7 @@ import {
   isOutrosCategory,
 } from "@/lib/performance/outrosCategories";
 import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateRangeFilter";
+import FilialVendedoresTab from "./FilialVendedoresTab";
 import styles from "./FilialPerformancePage.module.css";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -147,6 +148,7 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"produtos" | "vendedores">("produtos");
 
   useEffect(() => {
     setLoading(true);
@@ -359,10 +361,38 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
         </div>
       </div>
 
-      {loading && <div className={styles.loading}>Carregando...</div>}
       {error && <div className={styles.error}>{error}</div>}
 
-      {!loading && data && (
+      {!error && (
+        <div className={styles.tabsRow}>
+          <button
+            type="button"
+            className={`${styles.tabBtn} ${activeTab === "produtos" ? styles.tabBtnActive : ""}`}
+            onClick={() => setActiveTab("produtos")}
+          >
+            Produtos
+          </button>
+          <button
+            type="button"
+            className={`${styles.tabBtn} ${activeTab === "vendedores" ? styles.tabBtnActive : ""}`}
+            onClick={() => setActiveTab("vendedores")}
+          >
+            Vendedores
+          </button>
+        </div>
+      )}
+
+      {activeTab === "produtos" && loading && <div className={styles.loading}>Carregando...</div>}
+
+      {activeTab === "vendedores" && (
+        <FilialVendedoresTab
+          companyKey={companyKey}
+          filial={filial}
+          initialRange={range}
+        />
+      )}
+
+      {activeTab === "produtos" && !loading && data && (
         <>
 
           {/* Category badges — clicáveis para filtrar ABC */}

@@ -113,11 +113,7 @@ export default function ProductDetailPage({
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const refetchDetail = useCallback(() => setRefreshTrigger((t) => t + 1), []);
 
-  const toggleColor = useCallback((code: string) => {
-    setSelectedColors((prev) =>
-      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
-    );
-  }, []);
+  const selectedColorValue = selectedColors[0] ?? "";
 
   // Fechar dropdown ao clicar fora
   useEffect(() => {
@@ -251,54 +247,58 @@ export default function ProductDetailPage({
 
   const productContent = data ? (
     <>
-      <div className={styles.productHeaderContainer}>
-        <div className={styles.productHeader}>
-          <div>
+      <div className={styles.productCard}>
+        <div className={styles.productCardLeft}>
+          <div className={styles.productTitleRow}>
             <h2 className={styles.productName}>
               {data.detail.productName}
               {companyKey === "scarfme" && "grade" in data.detail && data.detail.grade && (
-                <span className={styles.productGrade}> · {data.detail.grade}</span>
+                <span className={styles.productGrade}> {data.detail.grade}</span>
               )}
             </h2>
-            <div className={`${styles.productInfo} ${(data.availableColors ?? []).length > 0 ? styles.productInfoAboveColors : ""}`}>
-              <span className={styles.productId}>{data.detail.productId}</span>
-            </div>
+          </div>
+          <div className={styles.productCodeRow}>
+            <span className={styles.productCodeLabel}>COD</span>
+            <span className={styles.productCodeValue}>{data.detail.productId}</span>
+          </div>
+
+          <div className={styles.productMetaRow}>
             {(data.availableColors ?? []).length > 0 && (
-              <div className={styles.colorBadges}>
-                {(data.availableColors ?? []).map(({ code, displayName }) => {
-                  const isSelected = selectedColors.includes(code);
-                  return (
-                    <button
-                      key={code || "sem-cor"}
-                      type="button"
-                      className={`${styles.colorBadge} ${isSelected ? styles.colorBadgeSelected : ""}`}
-                      onClick={() => toggleColor(code)}
-                      title={isSelected ? `Remover filtro ${displayName}` : `Filtrar por ${displayName}`}
-                    >
-                      {displayName}
-                    </button>
-                  );
-                })}
-              </div>
+              <select
+                className={styles.colorSelectNative}
+                value={selectedColorValue}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setSelectedColors(value ? [value] : []);
+                }}
+                aria-label="Filtrar por cor"
+                title="Filtrar por cor"
+              >
+                <option value="">Todas as cores</option>
+                {(data.availableColors ?? []).map(({ code, displayName }) => (
+                  <option key={code || "sem-cor"} value={code}>
+                    {displayName}
+                  </option>
+                ))}
+              </select>
             )}
-            {data.detail.lastEntryDate && data.detail.lastEntryFilial && (
-              <div className={styles.lastEntryContainer}>
-                <span className={styles.lastEntry}>
-                  Última entrada:{" "}
-                  {(data.detail.lastEntryDate instanceof Date
-                    ? data.detail.lastEntryDate
-                    : new Date(data.detail.lastEntryDate)
-                  ).toLocaleDateString("pt-BR")}{" "}
-                  em {data.detail.lastEntryFilial}
-                </span>
-              </div>
+
+            {data.detail.lastEntryDate && (
+              <span className={styles.lastEntryInline}>
+                Última entrada:{" "}
+                {(data.detail.lastEntryDate instanceof Date
+                  ? data.detail.lastEntryDate
+                  : new Date(data.detail.lastEntryDate)
+                ).toLocaleDateString("pt-BR")}
+              </span>
             )}
           </div>
         </div>
 
-        <div className={styles.stockTotalCard}>
+        <div className={styles.productCardRight}>
           <span className={styles.stockTotalCardLabel}>ESTOQUE TOTAL</span>
           <span className={styles.stockTotalCardValue}>{data.detail.totalStock}</span>
+          <span className={styles.stockTotalCardUnit}>unidades</span>
         </div>
       </div>
 
@@ -328,81 +328,90 @@ export default function ProductDetailPage({
 
   const headerSection = (
     <div className={styles.header}>
-      <div className={styles.headerRow}>
-        <h1 className={styles.title}>Produto Detalhado</h1>
-        <DateRangeFilter value={range} onChange={setRange} label="PERIODO" />
+      <div className={styles.headerTopRow}>
+        <div className={styles.headerTitles}>
+          <h1 className={styles.title}>Produto Detalhado</h1>
+          <p className={styles.subtitle}>Análise completa do produto selecionado</p>
+        </div>
       </div>
-      <div className={styles.searchContainer} ref={searchContainerRef}>
-        <div className={styles.searchInputWrapper}>
-          <span className={styles.searchIcon} aria-hidden>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.35-4.35" />
-            </svg>
-          </span>
-          <input
-            type="text"
-            className={styles.searchInput}
-            placeholder="Q NEIVA 12/20"
-            value={searchTerm}
-            onChange={(e) => {
-              const value = e.target.value;
-              setSearchTerm(value);
-              if (selectedProductId && selectedProductName && value.trim() !== selectedProductName.trim()) {
-                setSelectedProductId(null);
-                setSelectedProductName(null);
-                setData(null);
-              }
-              if (!value) {
-                setSelectedProductId(null);
-                setSelectedProductName(null);
-                setData(null);
-                setShowSearchResults(false);
-              } else {
-                setShowSearchResults(value.trim().length >= 2);
-              }
-            }}
-            onFocus={() => {
-              if (searchTerm.trim().length >= 2 && (!selectedProductId || (selectedProductName && searchTerm.trim() !== selectedProductName.trim()))) {
-                setShowSearchResults(true);
-              }
-            }}
-          />
-          {searchTerm && (
-            <button
-              type="button"
-              className={styles.clearButton}
-              onClick={() => {
-                setSearchTerm("");
-                setSelectedProductId(null);
-                setSelectedProductName(null);
-                setData(null);
-                setShowSearchResults(false);
-                setSearchResults([]);
-              }}
-              aria-label="Limpar busca"
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+
+      <div className={styles.controlsRow}>
+        <div className={styles.searchContainer} ref={searchContainerRef}>
+          <div className={styles.searchInputWrapper}>
+            <span className={styles.searchIcon} aria-hidden>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
               </svg>
-            </button>
+            </span>
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="PASHMINA LISA VISCOSE"
+              value={searchTerm}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSearchTerm(value);
+                if (selectedProductId && selectedProductName && value.trim() !== selectedProductName.trim()) {
+                  setSelectedProductId(null);
+                  setSelectedProductName(null);
+                  setData(null);
+                }
+                if (!value) {
+                  setSelectedProductId(null);
+                  setSelectedProductName(null);
+                  setData(null);
+                  setShowSearchResults(false);
+                } else {
+                  setShowSearchResults(value.trim().length >= 2);
+                }
+              }}
+              onFocus={() => {
+                if (searchTerm.trim().length >= 2 && (!selectedProductId || (selectedProductName && searchTerm.trim() !== selectedProductName.trim()))) {
+                  setShowSearchResults(true);
+                }
+              }}
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                className={styles.clearButton}
+                onClick={() => {
+                  setSearchTerm("");
+                  setSelectedProductId(null);
+                  setSelectedProductName(null);
+                  setData(null);
+                  setShowSearchResults(false);
+                  setSearchResults([]);
+                }}
+                aria-label="Limpar busca"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
+          </div>
+          {showSearchResults && searchResults.length > 0 && (
+            <div className={styles.searchResults}>
+              {searchResults.slice(0, 10).map((product) => (
+                <button
+                  key={product.productId}
+                  type="button"
+                  className={styles.searchResultItem}
+                  onClick={() => handleProductSelect(product.productId, product.productName)}
+                >
+                  <div className={styles.searchResultName}>{product.productName}</div>
+                  <div className={styles.searchResultId}>{product.productId}</div>
+                </button>
+              ))}
+            </div>
           )}
         </div>
-        {showSearchResults && searchResults.length > 0 && (
-          <div className={styles.searchResults}>
-            {searchResults.slice(0, 10).map((product) => (
-              <button
-                key={product.productId}
-                type="button"
-                className={styles.searchResultItem}
-                onClick={() => handleProductSelect(product.productId, product.productName)}
-              >
-                <div className={styles.searchResultName}>{product.productName}</div>
-                <div className={styles.searchResultId}>{product.productId}</div>
-              </button>
-            ))}
-          </div>
-        )}
+
+        <div className={styles.rangeWrapper}>
+          <DateRangeFilter value={range} onChange={setRange} label="" />
+        </div>
       </div>
       {(loading || error) && (
         <div className={styles.controlsStatus}>

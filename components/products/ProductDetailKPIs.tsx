@@ -292,6 +292,27 @@ export default function ProductDetailKPIs({
     ? detail.revenueVariance
     : null;
 
+  const filialOrder = resolveCompany(companyKey)?.estoqueFilialOrder ?? [];
+  const filialOrderMap = new Map(
+    filialOrder.map((name, i) => [name.toUpperCase().trim(), i])
+  );
+
+  const sortedFiliaisByOrder = useCallback(
+    <T extends { filial?: string; filialDisplayName?: string }>(items: T[]) => {
+      return [...items].sort((a, b) => {
+        const nameA = (a.filialDisplayName || a.filial || "").toUpperCase().trim();
+        const nameB = (b.filialDisplayName || b.filial || "").toUpperCase().trim();
+        const isMatrizA = nameA === "MATRIZ";
+        const isMatrizB = nameB === "MATRIZ";
+        if (isMatrizA !== isMatrizB) return isMatrizA ? 1 : -1;
+        const idxA = filialOrderMap.get(nameA) ?? filialOrder.length;
+        const idxB = filialOrderMap.get(nameB) ?? filialOrder.length;
+        return idxA - idxB;
+      });
+    },
+    [filialOrder, filialOrderMap]
+  );
+
   return (
     <div className={styles.section}>
       {/* Primeira linha: 5 KPIs */}
@@ -383,28 +404,110 @@ export default function ProductDetailKPIs({
         </article>
       </div>
 
-      {/* Estoque por Filial - ordem fixa por empresa */}
-      <div className={styles.estoqueSection}>
-        <h3 className={styles.estoqueSectionTitle}>Estoque por Filial</h3>
-        <div className={styles.estoqueCards}>
+      <div className={styles.filialCardsRow}>
+        {/* Estoque por Filial - ordem fixa por empresa */}
+        <section className={styles.stockByFilialCard}>
           {(() => {
-            const order = resolveCompany(companyKey)?.estoqueFilialOrder ?? [];
-            const orderMap = new Map(order.map((name, i) => [name.toUpperCase().trim(), i]));
-            const sorted = [...stockByFilial].sort((a, b) => {
-              const nameA = (a.filialDisplayName || a.filial || "").toUpperCase().trim();
-              const nameB = (b.filialDisplayName || b.filial || "").toUpperCase().trim();
-              const idxA = orderMap.get(nameA) ?? order.length;
-              const idxB = orderMap.get(nameB) ?? order.length;
-              return idxA - idxB;
-            });
-            return sorted.map((filial) => (
-            <div key={filial.filial} className={styles.estoqueCard}>
-              <span className={styles.estoqueCardName}>{filial.filialDisplayName || filial.filial}</span>
-              <span className={styles.estoqueCardValue}>{filial.stock}</span>
-            </div>
-          ));
+            const sorted = sortedFiliaisByOrder(stockByFilial);
+            const total = sorted.reduce((sum, f) => sum + (f.stock ?? 0), 0);
+            const max = Math.max(1, ...sorted.map((f) => f.stock ?? 0));
+
+            return (
+              <>
+                <div className={styles.stockByFilialHeader}>
+                  <h3 className={styles.stockByFilialTitle}>Estoque por Filial</h3>
+                  <p className={styles.stockByFilialSubtitle}>
+                    {sorted.length} filiais · {formatInteger(total)} unidades
+                  </p>
+                </div>
+
+                <div className={styles.stockByFilialList}>
+                  {sorted.map((filial) => {
+                    const value = filial.stock ?? 0;
+                    const pct = total > 0 ? (value / total) * 100 : 0;
+                    const bar = (value / max) * 100;
+                    return (
+                      <div key={filial.filial} className={styles.stockByFilialRow}>
+                        <div className={styles.stockByFilialName}>
+                          {(filial.filialDisplayName || filial.filial || "").toUpperCase()}
+                        </div>
+                        <div className={styles.stockByFilialBarWrap} aria-hidden>
+                          <div className={styles.stockByFilialBar} style={{ width: `${bar}%` }} />
+                        </div>
+                        <div className={styles.stockByFilialNumbers}>
+                          <span className={styles.stockByFilialQty}>{formatInteger(value)}</span>
+                          <span className={styles.stockByFilialPct}>{pct.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            );
           })()}
-        </div>
+        </section>
+
+        {/* Vendas por Filial (quantidade) */}
+        <section className={styles.stockByFilialCard}>
+          {(() => {
+            const byFilial = new Map<
+              string,
+              { filial: string; filialDisplayName: string; quantity: number }
+            >();
+
+            saleHistory.forEach((sale) => {
+              const key = (sale.filialDisplayName || sale.filial || "").toUpperCase().trim();
+              if (!key) return;
+              const current = byFilial.get(key);
+              if (current) {
+                current.quantity += sale.quantity ?? 0;
+              } else {
+                byFilial.set(key, {
+                  filial: sale.filial,
+                  filialDisplayName: sale.filialDisplayName || sale.filial,
+                  quantity: sale.quantity ?? 0,
+                });
+              }
+            });
+
+            const rows = sortedFiliaisByOrder(Array.from(byFilial.values()));
+            const total = rows.reduce((sum, f) => sum + (f.quantity ?? 0), 0);
+            const max = Math.max(1, ...rows.map((f) => f.quantity ?? 0));
+
+            return (
+              <>
+                <div className={styles.stockByFilialHeader}>
+                  <h3 className={styles.stockByFilialTitle}>Vendas por Filial</h3>
+                  <p className={styles.stockByFilialSubtitle}>
+                    {rows.length} filiais · {formatInteger(total)} unidades
+                  </p>
+                </div>
+
+                <div className={styles.stockByFilialList}>
+                  {rows.map((filial) => {
+                    const value = filial.quantity ?? 0;
+                    const pct = total > 0 ? (value / total) * 100 : 0;
+                    const bar = (value / max) * 100;
+                    return (
+                      <div key={filial.filialDisplayName} className={styles.stockByFilialRow}>
+                        <div className={styles.stockByFilialName}>
+                          {(filial.filialDisplayName || filial.filial || "").toUpperCase()}
+                        </div>
+                        <div className={styles.stockByFilialBarWrap} aria-hidden>
+                          <div className={styles.salesByFilialBar} style={{ width: `${bar}%` }} />
+                        </div>
+                        <div className={styles.stockByFilialNumbers}>
+                          <span className={styles.stockByFilialQty}>{formatInteger(value)}</span>
+                          <span className={styles.stockByFilialPct}>{pct.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
+        </section>
       </div>
 
       {/* Performance de Vendas */}
