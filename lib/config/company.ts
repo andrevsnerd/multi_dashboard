@@ -68,6 +68,7 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
         'SCARFME - IBIRAPUERA LLL',
         'SCARFME ME - PAULISTA FFF',
         'SCARF ME - PAULISTA RSR',
+        'SCARF ME - PAULISTA FFFR',
         'SCARF ME - MATRIZ',
         'SCARFME MATRIZ CMS',
         'SCARF ME - MATRIZ LLL',
@@ -84,6 +85,7 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
         'SCARFME - IBIRAPUERA LLL',
         'SCARFME ME - PAULISTA FFF',
         'SCARF ME - PAULISTA RSR',
+        'SCARF ME - PAULISTA FFFR',
         'SCARF ME - MATRIZ',
         'SCARFME MATRIZ CMS',
         'SCARF ME - MATRIZ LLL',
@@ -101,6 +103,7 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
       'SCARFME - IBIRAPUERA LLL': 'IBIRAPUERA',
       'SCARFME ME - PAULISTA FFF': 'PAULISTA',
       'SCARF ME - PAULISTA RSR': 'PAULISTA',
+      'SCARF ME - PAULISTA FFFR': 'PAULISTA',
       'SCARF ME - MATRIZ': 'MATRIZ',
       'SCARFME MATRIZ CMS': 'E-COMMERCE',
       'SCARF ME - MATRIZ LLL': 'E-COMMERCE',
@@ -111,8 +114,12 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
     estoqueFilialOrder: ['MATRIZ', 'E-COMMERCE', 'GUARULHOS', 'MORUMBI', 'OSCAR FREIRE', 'VILLA LOBOS'],
     ecommerceFilials: ['SCARFME MATRIZ CMS', 'SCARF ME - MATRIZ LLL', 'SCARF ME MATRIZ - FFF', 'MSC COMERCIO DE LENCOS LT'],
     filialGroups: {
-      // PAULISTA possui dois CNPJs/entidades no sistema mas é tratada como uma só loja
-      'SCARFME ME - PAULISTA FFF': ['SCARFME ME - PAULISTA FFF', 'SCARF ME - PAULISTA RSR'],
+      // PAULISTA: várias entidades/CNPJs no sistema, tratadas como uma loja lógica
+      'SCARFME ME - PAULISTA FFF': [
+        'SCARFME ME - PAULISTA FFF',
+        'SCARF ME - PAULISTA RSR',
+        'SCARF ME - PAULISTA FFFR',
+      ],
     },
     excludedLines: [
       'PRIVATE LABEL',
