@@ -28,7 +28,11 @@
       "Bash(grep -r \"controle-performance\\\\|controle de performance\" 'c:/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/app' --include=*.tsx --include=*.ts)",
       "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
       "Bash(grep -v \"//\\\\|^\\\\s*//\")",
-      "Bash(awk 'NR>=1')"
+      "Bash(awk 'NR>=1')",
+      "Bash(ls -la '/c/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/app/\\(companies\\)/\\\\[company\\\\]')",
+      "Bash(find \"/c/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/app/\\(companies\\)\" -name \"page.tsx\" -type f)",
+      "Bash(npm install:*)",
+      "Bash(ls \"c:\\\\Users\\\\NERD TIJUCA\\\\Documents\\\\NERD - ANDRE\\\\Dashboard NERD\\\\multi-dashboard\\\\app\\\\\\(companies\\)\\\\[company]\\\\mapa-clientes\")"
     ]
   }
 }

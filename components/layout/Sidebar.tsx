@@ -114,9 +114,17 @@ export default function Sidebar({ companyName }: SidebarProps) {
     : "/saidas-entradas-produtos";
 
   // Construir o link para romaneios baseado no caminho base
-  const romaneiosHref = basePath && basePath !== "/" 
+  const romaneiosHref = basePath && basePath !== "/"
     ? `${basePath}/romaneios`
     : "/romaneios";
+
+  // Construir o link para mapa de clientes baseado no caminho base
+  const mapaClientesHref = basePath && basePath !== "/"
+    ? `${basePath}/mapa-clientes`
+    : "/mapa-clientes";
+
+  // Verificar se é scarfme (apenas scarfme tem e-commerce)
+  const isScarfme = basePath === "/scarfme";
 
   // Verificar se está em alguma página relacionada a produtos
   const isProdutosSubItemActive = pathname?.includes("/produto-detalhado") || pathname?.includes("/produtos-recentes") || (pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado"));
@@ -161,6 +169,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     { label: "Romaneios", href: romaneiosHref, permission: "romaneios" },
     { label: "Saídas e Entradas de Produtos", href: saidasEntradasProdutosHref, permission: "saidas-entradas-produtos" },
     { label: "Exportar Relatórios", href: exportarRelatoriosHref, permission: "exportar-relatorios" },
+    ...(isScarfme ? [{ label: "Mapa de Clientes", href: mapaClientesHref, permission: "mapa-clientes" as const }] : []),
   ];
 
   const navItems =
@@ -253,7 +262,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
                 !pathname.includes("/produto-detalhado") &&
                 !pathname.includes("/vendedores") &&
                 !pathname.includes("/clientes") &&
-                !pathname.includes("/exportar-relatorios");
+                !pathname.includes("/exportar-relatorios") &&
+                !pathname.includes("/mapa-clientes");
             } else if (item.label === "Produtos") {
               // Produtos não tem href próprio, apenas expande/recolhe o submenu
               isActive = false;
@@ -297,6 +307,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
             } else if (item.label === "Exportar Relatórios") {
               // Exportar Relatórios está ativo quando o pathname inclui /exportar-relatorios
               isActive = pathname?.includes("/exportar-relatorios") || pathname === item.href;
+            } else if (item.label === "Mapa de Clientes") {
+              isActive = pathname?.includes("/mapa-clientes") || pathname === item.href;
             }
             // TODO: Descomentar quando estoque por filial estiver pronto
             // else if (item.label === "Estoque por Filial") {
