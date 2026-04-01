@@ -902,8 +902,8 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
           produto: produto.produto,
           descProduto: produto.descProduto,
           codigoBarra: produto.codigoBarra ?? null,
-          corProduto: produto.corProduto,
-          descCor: produto.descCor,
+          corProduto: produto.corProduto ? produto.corProduto.trim() : null,
+          descCor: (produto.descCor || "").trim(),
           filial: filialSelecionada.codFilial,
           nomeFilial: filialSelecionada.filial,
           estoque: 0,
@@ -918,8 +918,8 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       produto: produto.produto,
       descProduto: produto.descProduto,
       codigoBarra: produto.codigoBarra ?? null,
-      corProduto: produto.corProduto,
-      descCor: produto.descCor,
+      corProduto: produto.corProduto ? produto.corProduto.trim() : null,
+      descCor: (produto.descCor || "").trim(),
       filial: filialSelecionada.codFilial,
       nomeFilial: filialSelecionada.filial,
       estoque: estoque.estoque,
@@ -934,7 +934,14 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
     if (!filialSelecionada) return;
     try {
       const result = await searchProdutos(sku, filialSelecionada.codFilial, null, companyKey, true);
-      const options = result.filter(p => p.produto.trim() === sku && p.corProduto !== null);
+      const options = result
+        .map((p) => ({
+          ...p,
+          corProduto: p.corProduto ? p.corProduto.trim() : null,
+          descCor: (p.descCor || "").trim(),
+          codigoBarra: p.codigoBarra ? p.codigoBarra.trim() : null,
+        }))
+        .filter(p => p.produto.trim() === sku && p.corProduto !== null);
       setColorOptionsByProduto(prev => ({ ...prev, [sku]: options }));
     } catch {
       // silencioso: mantém apenas a cor atual
@@ -946,6 +953,29 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
     const cor = (novaCorProduto || "").trim();
     if (!cor) return;
     setProdutosSelecionados(prev => {
+      const atual = prev[index];
+      if (!atual) return prev;
+      const options = colorOptionsByProduto[atual.produto]?.filter(o => o.corProduto) ?? [];
+      const escolhido = options.find(o => (o.corProduto || "").trim() === cor);
+      if (!escolhido) return prev;
+      const estoqueFilial = escolhido.estoques.find(e => e.filial.trim() === atual.filial.trim());
+      const next = [...prev];
+      next[index] = {
+        ...atual,
+        corProduto: escolhido.corProduto,
+        descCor: escolhido.descCor,
+        codigoBarra: escolhido.codigoBarra ?? null,
+        estoque: estoqueFilial ? estoqueFilial.estoque : atual.estoque,
+      };
+      return next;
+    });
+  }, [tipoOperacao, colorOptionsByProduto]);
+
+  const trocarCorProdutoSelecionadoModal = useCallback((index: number, novaCorProduto: string) => {
+    if (tipoOperacao !== "entrada") return;
+    const cor = (novaCorProduto || "").trim();
+    if (!cor) return;
+    setProdutosSelecionadosModal(prev => {
       const atual = prev[index];
       if (!atual) return prev;
       const options = colorOptionsByProduto[atual.produto]?.filter(o => o.corProduto) ?? [];
@@ -1783,29 +1813,6 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                         </div>
                       </div>
                       <div className={styles.produtoControls}>
-                        {tipoOperacao === "entrada" && produto.corProduto && (
-                          <div className={styles.inlineColorSelectWrap}>
-                            <select
-                              className={styles.inlineColorSelect}
-                              value={produto.corProduto}
-                              onFocus={() => ensureColorOptionsLoaded(produto.produto)}
-                              onChange={(e) => trocarCorProdutoSelecionado(index, e.target.value)}
-                              title="Trocar cor"
-                            >
-                              {colorOptionsByProduto[produto.produto]?.length ? (
-                                colorOptionsByProduto[produto.produto].map((op) => (
-                                  <option key={`${op.produto}-${op.corProduto}`} value={op.corProduto || ""}>
-                                    {op.descCor || op.corProduto}
-                                  </option>
-                                ))
-                              ) : (
-                                <option value={produto.corProduto}>
-                                  {produto.descCor || produto.corProduto}
-                                </option>
-                              )}
-                            </select>
-                          </div>
-                        )}
                         <div className={styles.qtyControl}>
                           <button
                             className={styles.qtyBtn}
@@ -2079,9 +2086,33 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                           <div className={styles.produtoSku}>
                             {p.produto}
                             {p.corProduto && ` · ${p.descCor || p.corProduto}`}
+                            {p.codigoBarra && ` · ${p.codigoBarra}`}
                           </div>
                         </div>
                         <div className={styles.produtoControls}>
+                          {tipoOperacao === "entrada" && p.corProduto && (
+                            <div className={styles.inlineColorSelectWrap}>
+                              <select
+                                className={styles.inlineColorSelect}
+                                value={(p.corProduto || "").trim()}
+                                onFocus={() => ensureColorOptionsLoaded(p.produto)}
+                                onChange={(e) => trocarCorProdutoSelecionadoModal(idx, e.target.value)}
+                                title="Trocar cor"
+                              >
+                                {colorOptionsByProduto[p.produto]?.length ? (
+                                  colorOptionsByProduto[p.produto].map((op) => (
+                                    <option key={`${op.produto}-${op.corProduto}`} value={(op.corProduto || "").trim()}>
+                                      {op.descCor || op.corProduto}
+                                    </option>
+                                  ))
+                                ) : (
+                                  <option value={(p.corProduto || "").trim()}>
+                                    {p.descCor || p.corProduto}
+                                  </option>
+                                )}
+                              </select>
+                            </div>
+                          )}
                           <div className={styles.qtyControl}>
                             <button
                               className={styles.qtyBtn}
