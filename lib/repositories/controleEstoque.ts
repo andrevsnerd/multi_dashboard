@@ -4512,7 +4512,7 @@ export async function fetchProjecaoMensal({
     }
 
     // 1. Buscar estoque atual por categoria (ScarfMe não tem tabela CORES)
-    const coresJoinEstoque = useCoresTable ? `LEFT JOIN CORES c WITH (NOLOCK) ON c.COR_PRODUTO = e.COR_PRODUTO` : '';
+    const coresJoinEstoque = useCoresTable ? `LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = e.COR_PRODUTO` : '';
     const estoqueQuery = `
       SELECT
         ${categoriaField} AS categoria

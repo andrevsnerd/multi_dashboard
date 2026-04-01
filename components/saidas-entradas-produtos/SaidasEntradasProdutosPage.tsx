@@ -27,6 +27,7 @@ interface Produto {
 interface ProdutoSelecionado {
   produto: string;
   descProduto: string;
+  codigoBarra: string | null;
   corProduto: string | null;
   descCor: string;
   filial: string;
@@ -467,6 +468,10 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
   const [mostrarConfirmacaoRegistro, setMostrarConfirmacaoRegistro] = useState(false);
   const [filialDestinoSaida, setFilialDestinoSaida] = useState<Filial | null>(null);
   const [filiaisDestinoDisponiveis, setFiliaisDestinoDisponiveis] = useState<Filial[]>([]);
+  const [colorPickerProduto, setColorPickerProduto] = useState<Produto | null>(null);
+  const [colorPickerOpcoes, setColorPickerOpcoes] = useState<Produto[]>([]);
+  const [loadingColorPicker, setLoadingColorPicker] = useState(false);
+  const [colorOptionsByProduto, setColorOptionsByProduto] = useState<Record<string, Produto[]>>({});
 
   const filiaisDestinoVisiveis = useMemo<Filial[]>(() => {
     const isDefeito = tipoRomaneioSelecionado.toUpperCase() === 'DEFEITO';
@@ -729,6 +734,8 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
     setSearchTerm("");
     setProdutos([]);
     setModalAberto(false);
+    setColorPickerProduto(null);
+    setColorPickerOpcoes([]);
   }, [produtosSelecionados]);
 
   const continuarNoModal = useCallback(() => {
@@ -740,6 +747,8 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
     setModalAberto(false);
     setSearchTerm("");
     setProdutos([]);
+    setColorPickerProduto(null);
+    setColorPickerOpcoes([]);
   }, [produtosSelecionadosModal]);
 
   // Carregar logs de saídas e entradas
@@ -837,6 +846,46 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
     };
   }, [searchTerm, filialSelecionada, companyKey, mostrarNotificacao, tipoOperacao]);
 
+  // Fecha color picker quando o termo de busca muda
+  useEffect(() => {
+    setColorPickerProduto(null);
+    setColorPickerOpcoes([]);
+  }, [searchTerm]);
+
+  // Busca cores disponíveis quando o color picker é aberto
+  useEffect(() => {
+    if (!colorPickerProduto) {
+      setColorPickerOpcoes([]);
+      setLoadingColorPicker(false);
+      return;
+    }
+
+    const coresNoResultado = produtos.filter(p =>
+      p.produto.trim() === colorPickerProduto.produto.trim() && p.corProduto !== null
+    );
+
+    if (coresNoResultado.length > 0) {
+      setColorPickerOpcoes(coresNoResultado);
+      setLoadingColorPicker(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingColorPicker(true);
+    searchProdutos(colorPickerProduto.produto, filialSelecionada?.codFilial, null, companyKey, tipoOperacao === "entrada")
+      .then(result => {
+        if (!cancelled) {
+          setColorPickerOpcoes(result.filter(p =>
+            p.produto.trim() === colorPickerProduto.produto.trim() && p.corProduto !== null
+          ));
+        }
+      })
+      .catch(() => { if (!cancelled) setColorPickerOpcoes([]); })
+      .finally(() => { if (!cancelled) setLoadingColorPicker(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colorPickerProduto]);
+
   const criarProdutoSelecionado = useCallback((produto: Produto): ProdutoSelecionado | null => {
     if (!filialSelecionada) {
       mostrarNotificacao("Selecione uma filial primeiro", "error");
@@ -852,6 +901,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
         return {
           produto: produto.produto,
           descProduto: produto.descProduto,
+          codigoBarra: produto.codigoBarra ?? null,
           corProduto: produto.corProduto,
           descCor: produto.descCor,
           filial: filialSelecionada.codFilial,
@@ -867,6 +917,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
     return {
       produto: produto.produto,
       descProduto: produto.descProduto,
+      codigoBarra: produto.codigoBarra ?? null,
       corProduto: produto.corProduto,
       descCor: produto.descCor,
       filial: filialSelecionada.codFilial,
@@ -876,8 +927,83 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
     };
   }, [filialSelecionada, mostrarNotificacao, tipoOperacao]);
 
+  const ensureColorOptionsLoaded = useCallback(async (produtoSku: string) => {
+    const sku = (produtoSku || "").trim();
+    if (!sku) return;
+    if (colorOptionsByProduto[sku]?.length) return;
+    if (!filialSelecionada) return;
+    try {
+      const result = await searchProdutos(sku, filialSelecionada.codFilial, null, companyKey, true);
+      const options = result.filter(p => p.produto.trim() === sku && p.corProduto !== null);
+      setColorOptionsByProduto(prev => ({ ...prev, [sku]: options }));
+    } catch {
+      // silencioso: mantém apenas a cor atual
+    }
+  }, [colorOptionsByProduto, filialSelecionada, companyKey]);
+
+  const trocarCorProdutoSelecionado = useCallback((index: number, novaCorProduto: string) => {
+    if (tipoOperacao !== "entrada") return;
+    const cor = (novaCorProduto || "").trim();
+    if (!cor) return;
+    setProdutosSelecionados(prev => {
+      const atual = prev[index];
+      if (!atual) return prev;
+      const options = colorOptionsByProduto[atual.produto]?.filter(o => o.corProduto) ?? [];
+      const escolhido = options.find(o => (o.corProduto || "").trim() === cor);
+      if (!escolhido) return prev;
+      const estoqueFilial = escolhido.estoques.find(e => e.filial.trim() === atual.filial.trim());
+      const next = [...prev];
+      next[index] = {
+        ...atual,
+        corProduto: escolhido.corProduto,
+        descCor: escolhido.descCor,
+        codigoBarra: escolhido.codigoBarra ?? null,
+        estoque: estoqueFilial ? estoqueFilial.estoque : atual.estoque,
+      };
+      return next;
+    });
+  }, [tipoOperacao, colorOptionsByProduto]);
+
   const adicionarProdutoModal = useCallback((produto: Produto) => {
+    if (produto.corProduto === null) {
+      setColorPickerProduto(produto);
+      return;
+    }
+
     const novoItem = criarProdutoSelecionado(produto);
+    if (!novoItem) return;
+
+    setProdutosSelecionadosModal((prev) => {
+      const idx = prev.findIndex(
+        (p) =>
+          p.produto === novoItem.produto &&
+          p.corProduto === novoItem.corProduto &&
+          p.filial === novoItem.filial
+      );
+      if (idx === -1) {
+        mostrarNotificacao(`${novoItem.descProduto} adicionado`);
+        return [...prev, novoItem];
+      }
+
+      const atual = prev[idx];
+      const proxQtd = tipoOperacao === "entrada" ? atual.quantidade + 1 : Math.min(atual.estoque, atual.quantidade + 1);
+      const next = [...prev];
+      next[idx] = { ...atual, quantidade: proxQtd };
+
+      if (tipoOperacao === "saida" && proxQtd === atual.estoque) {
+        mostrarNotificacao(`Quantidade máxima atingida (estoque ${atual.estoque})`, "error");
+      } else {
+        mostrarNotificacao(`${novoItem.descProduto} adicionado`);
+      }
+
+      return next;
+    });
+  }, [criarProdutoSelecionado, mostrarNotificacao, tipoOperacao]);
+
+  const adicionarComCorSelecionada = useCallback((produtoComCor: Produto) => {
+    setColorPickerProduto(null);
+    setColorPickerOpcoes([]);
+    const novoItem = criarProdutoSelecionado(produtoComCor);
     if (!novoItem) return;
 
     setProdutosSelecionadosModal((prev) => {
@@ -1653,9 +1779,33 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                         <div className={styles.produtoSku}>
                           {produto.produto}
                           {produto.corProduto && ` · ${produto.descCor || produto.corProduto}`}
+                          {produto.codigoBarra && ` · ${produto.codigoBarra}`}
                         </div>
                       </div>
                       <div className={styles.produtoControls}>
+                        {tipoOperacao === "entrada" && produto.corProduto && (
+                          <div className={styles.inlineColorSelectWrap}>
+                            <select
+                              className={styles.inlineColorSelect}
+                              value={produto.corProduto}
+                              onFocus={() => ensureColorOptionsLoaded(produto.produto)}
+                              onChange={(e) => trocarCorProdutoSelecionado(index, e.target.value)}
+                              title="Trocar cor"
+                            >
+                              {colorOptionsByProduto[produto.produto]?.length ? (
+                                colorOptionsByProduto[produto.produto].map((op) => (
+                                  <option key={`${op.produto}-${op.corProduto}`} value={op.corProduto || ""}>
+                                    {op.descCor || op.corProduto}
+                                  </option>
+                                ))
+                              ) : (
+                                <option value={produto.corProduto}>
+                                  {produto.descCor || produto.corProduto}
+                                </option>
+                              )}
+                            </select>
+                          </div>
+                        )}
                         <div className={styles.qtyControl}>
                           <button
                             className={styles.qtyBtn}
@@ -1844,8 +1994,9 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                     const estoque = produto.estoques.find(e =>
                       e.filial.trim() === (filialSelecionada?.codFilial ?? '').trim()
                     );
+                    const isPickerActive = colorPickerProduto?.produto === produto.produto && produto.corProduto === null;
                     return (
-                      <div key={index} className={styles.produtoModalItem}>
+                      <div key={index} className={`${styles.produtoModalItem}${isPickerActive ? ` ${styles.produtoModalItemPickerActive}` : ''}`}>
                         <div className={styles.produtoModalIcon}>📦</div>
                         <div className={styles.produtoModalInfo}>
                           <div className={styles.produtoModalName}>{produto.descProduto}</div>
@@ -1855,16 +2006,56 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                             {estoque && ` · Estoque: ${estoque.estoque}`}
                           </div>
                         </div>
-                        <button
-                          className={`${styles.addModalBtn} ${tipoOperacao === "saida" ? styles.addModalBtnSaida : styles.addModalBtnEntrada}`}
-                          onClick={() => adicionarProdutoModal(produto)}
-                          disabled={tipoOperacao === "saida" && !estoque}
-                          title={estoque
-                            ? `Estoque: ${estoque.estoque}`
-                            : tipoOperacao === "saida"
-                              ? `Sem estoque em ${filialSelecionada?.filial}`
-                              : `Sem estoque cadastrado em ${filialSelecionada?.filial}`}
-                        >+</button>
+                        {!isPickerActive && (
+                          <button
+                            className={`${styles.addModalBtn} ${tipoOperacao === "saida" ? styles.addModalBtnSaida : styles.addModalBtnEntrada}`}
+                            onClick={() => adicionarProdutoModal(produto)}
+                            disabled={tipoOperacao === "saida" && !estoque}
+                            title={estoque
+                              ? `Estoque: ${estoque.estoque}`
+                              : tipoOperacao === "saida"
+                                ? `Sem estoque em ${filialSelecionada?.filial}`
+                                : `Sem estoque cadastrado em ${filialSelecionada?.filial}`}
+                          >+</button>
+                        )}
+                        {isPickerActive && (
+                          <div className={styles.colorPickerRow}>
+                            {loadingColorPicker ? (
+                              <span className={styles.colorPickerLoading}>Buscando cores...</span>
+                            ) : colorPickerOpcoes.length > 0 ? (
+                              <div className={styles.colorChips}>
+                                {colorPickerOpcoes.map((opcao) => {
+                                  const estoqueOpcao = opcao.estoques.find(e => e.filial.trim() === (filialSelecionada?.codFilial ?? '').trim());
+                                  return (
+                                    <button
+                                      key={opcao.corProduto}
+                                      className={`${styles.colorChip} ${tipoOperacao === "saida" ? styles.colorChipSaida : styles.colorChipEntrada}`}
+                                      onClick={() => adicionarComCorSelecionada(opcao)}
+                                      disabled={tipoOperacao === "saida" && !estoqueOpcao}
+                                      title={estoqueOpcao ? `Estoque: ${estoqueOpcao.estoque}` : `Sem estoque em ${filialSelecionada?.filial}`}
+                                    >
+                                      {opcao.descCor || opcao.corProduto}
+                                      {estoqueOpcao && <span className={styles.colorChipEstoque}> ({estoqueOpcao.estoque})</span>}
+                                    </button>
+                                  );
+                                })}
+                                <button
+                                  className={styles.colorChipCancel}
+                                  onClick={() => { setColorPickerProduto(null); setColorPickerOpcoes([]); }}
+                                  title="Cancelar"
+                                >✕</button>
+                              </div>
+                            ) : (
+                              <div className={styles.colorPickerNenhuma}>
+                                <span>Nenhuma cor disponível</span>
+                                <button
+                                  className={styles.colorChipCancel}
+                                  onClick={() => { setColorPickerProduto(null); setColorPickerOpcoes([]); }}
+                                >✕</button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
