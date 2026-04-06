@@ -21,6 +21,10 @@
   width: 100%;
 }
 
+.kpiRow3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .kpiRowTwo {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -454,6 +458,10 @@
 
 @media (max-width: 1200px) {
   .kpiRow {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .kpiRow.kpiRow3 {
     grid-template-columns: repeat(3, 1fr);
   }
 

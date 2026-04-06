@@ -344,7 +344,7 @@ export default function ProductDetailKPIs({
   return (
     <div className={styles.section}>
       {/* Primeira linha: 5 KPIs */}
-      <div className={styles.kpiRow}>
+      <div className={`${styles.kpiRow} ${canSeeCusto ? "" : styles.kpiRow3}`}>
         <article className={styles.card}>
           <header className={styles.cardHeader}>
             <span className={styles.cardLabel}>VALOR TOTAL DE VENDAS</span>
