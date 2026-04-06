@@ -44,6 +44,8 @@ export interface VendedorProdutoItem {
 export interface VendedoresListParams {
   company?: string;
   filial?: string | null;
+  /** Lista expandida de filiais (grupo). Quando fornecida, sobrescreve filial. */
+  filials?: string[];
   range?: { start?: Date | string; end?: Date | string };
   grupos?: string[];
   linhas?: string[];
@@ -118,6 +120,7 @@ export async function fetchVendedoresList(
     const {
       company,
       filial,
+      filials,
       range,
       grupos,
       linhas,
@@ -133,7 +136,14 @@ export async function fetchVendedoresList(
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+    // Se filials (grupo expandido) foi fornecido, filtra pela lista; senão filtra pela filial individual.
+    let filialFilter: string;
+    if (filials && filials.length > 0) {
+      filials.forEach((f, i) => request.input(`fgrp${i}`, sql.VarChar, f));
+      filialFilter = `AND f.FILIAL IN (${filials.map((_, i) => `@fgrp${i}`).join(', ')})`;
+    } else {
+      filialFilter = buildFilialFilter(request, company, 'sales', filial, 'f');
+    }
 
     const needProdutoJoin =
       (grupos?.length ?? 0) > 0 ||
@@ -144,25 +154,25 @@ export async function fetchVendedoresList(
 
     const grupoFilter = buildListFilter(
       request,
-      "COALESCE(vp.GRUPO_PRODUTO, p.GRUPO_PRODUTO, '')",
+      "COALESCE(p.GRUPO_PRODUTO, '')",
       grupos,
       'grupo'
     );
     const linhaFilter = buildListFilter(
       request,
-      "COALESCE(vp.LINHA, p.LINHA, '')",
+      "COALESCE(p.LINHA, '')",
       linhas,
       'linha'
     );
     const colecaoFilter = buildListFilter(
       request,
-      "COALESCE(vp.COLECAO, p.COLECAO, '')",
+      "COALESCE(p.COLECAO, '')",
       colecoes,
       'colecao'
     );
     const subgrupoFilter = buildListFilter(
       request,
-      "COALESCE(vp.SUBGRUPO_PRODUTO, p.SUBGRUPO_PRODUTO, '')",
+      "COALESCE(p.SUBGRUPO_PRODUTO, '')",
       subgrupos,
       'subgrupo'
     );
@@ -184,19 +194,27 @@ export async function fetchVendedoresList(
 
     const produtoJoin =
       needProdutoJoin
-        ? `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`
+        ? `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO`
         : '';
 
-    // Uma única passagem, SEM JOIN com pedido: só vp (itens). Muito mais rápido.
+    // Mesmo mapeamento do exportar_todos_relatorios.py:
+    // VENDEDOR vem de LOJA_VENDA, FILIAL vem de FILIAIS, apelido via LEFT JOIN LOJA_VENDEDORES.
     const mainQuery = `
       WITH Base AS (
         SELECT
-          vp.FILIAL,
-          vp.VENDEDOR,
-          valor = CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) END,
+          f.FILIAL,
+          LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR))) AS VENDEDOR,
+          ISNULL(LTRIM(RTRIM(lv.VENDEDOR_APELIDO)), LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR)))) AS VENDEDOR_APELIDO,
+          valor = CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - (vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) END,
           qtde_eff = CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.QTDE END,
           ticket = CASE WHEN vp.QTDE_CANCELADA = 0 AND vp.QTDE > 0 THEN vp.TICKET ELSE NULL END
-        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+          ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
+        LEFT JOIN FILIAIS f WITH (NOLOCK)
+          ON f.COD_FILIAL = vp.CODIGO_FILIAL
+        LEFT JOIN LOJA_VENDEDORES lv WITH (NOLOCK)
+          ON LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR))) = LTRIM(RTRIM(CAST(lv.VENDEDOR AS VARCHAR)))
         ${produtoJoin}
         WHERE vp.DATA_VENDA >= @startDate
           AND vp.DATA_VENDA < @endDate
@@ -213,6 +231,7 @@ export async function fetchVendedoresList(
         SELECT
           FILIAL,
           VENDEDOR,
+          MAX(VENDEDOR_APELIDO) AS VENDEDOR_APELIDO,
           SUM(valor) AS faturamento,
           SUM(qtde_eff) AS quantidadeVendida,
           COUNT(DISTINCT ticket) AS tickets
@@ -221,7 +240,8 @@ export async function fetchVendedoresList(
         HAVING SUM(valor) > 0
       )
       SELECT
-        VENDEDOR AS vendedor,
+        VENDEDOR AS vendedorCodigo,
+        VENDEDOR_APELIDO AS vendedor,
         FILIAL AS filial,
         faturamento,
         quantidadeVendida,
@@ -232,6 +252,7 @@ export async function fetchVendedoresList(
     `;
 
     const mainResult = await request.query<{
+      vendedorCodigo: string;
       vendedor: string;
       filial: string;
       faturamento: number;
@@ -240,31 +261,13 @@ export async function fetchVendedoresList(
       totalFilial: number;
     }>(mainQuery);
 
-    const codigos = [...new Set((mainResult.recordset ?? []).map((r) => (r.vendedor ?? '').trim()).filter(Boolean))];
-    const apelidoByCodigo = new Map<string, string>();
-
-    if (codigos.length > 0) {
-      codigos.forEach((cod, i) => request.input(`v${i}`, sql.VarChar, cod));
-      const inList = codigos.map((_, i) => `@v${i}`).join(', ');
-      const apelidoQuery = `
-        SELECT
-          LTRIM(RTRIM(CAST(VENDEDOR AS VARCHAR))) AS codigo,
-          LTRIM(RTRIM(ISNULL(VENDEDOR_APELIDO, ISNULL(NOME_VENDEDOR, VENDEDOR)))) AS apelido
-        FROM LOJA_VENDEDORES WITH (NOLOCK)
-        WHERE LTRIM(RTRIM(CAST(VENDEDOR AS VARCHAR))) IN (${inList})
-      `;
-      const apelidoResult = await request.query<{ codigo: string; apelido: string }>(apelidoQuery);
-      (apelidoResult.recordset ?? []).forEach((r) => apelidoByCodigo.set((r.codigo ?? '').trim(), (r.apelido ?? r.codigo ?? '').trim()));
-    }
-
     // Keep raw code→filial map for previous period matching
     const rawRows = mainResult.recordset.map(row => ({
-      codigo: (row.vendedor ?? '').trim(),
+      codigo: (row.vendedorCodigo ?? '').trim(),
       filial: row.filial,
     }));
 
     const items: VendedorItem[] = mainResult.recordset.map((row) => {
-      const codigo = (row.vendedor ?? '').trim();
       const faturamento = row.faturamento ?? 0;
       const tickets = row.tickets ?? 0;
       const quantidadeVendida = row.quantidadeVendida ?? 0;
@@ -272,7 +275,7 @@ export async function fetchVendedoresList(
       const ticketMedio = tickets > 0 ? faturamento / tickets : 0;
       const quantidadePorTicket = tickets > 0 ? quantidadeVendida / tickets : 0;
       const participacaoFilial = totalFilial > 0 ? (faturamento / totalFilial) * 100 : 0;
-      const nomeExibir = apelidoByCodigo.get(codigo) || codigo || 'SEM VENDEDOR';
+      const nomeExibir = (row.vendedor ?? '').trim() || 'SEM VENDEDOR';
 
       return {
         vendedor: nomeExibir,
@@ -307,19 +310,29 @@ export async function fetchVendedoresList(
       const prevMap = await withRequest(async (req) => {
         req.input('startDate', sql.DateTime, startPrev);
         req.input('endDate', sql.DateTime, endPrev);
-        const filialFilter = buildFilialFilter(req, params.company, 'sales', params.filial ?? null, 'vp');
+        let filialFilter: string;
+        if (params.filials && params.filials.length > 0) {
+          params.filials.forEach((fv, i) => req.input(`pfgrp${i}`, sql.VarChar, fv));
+          filialFilter = `AND f.FILIAL IN (${params.filials.map((_, i) => `@pfgrp${i}`).join(', ')})`;
+        } else {
+          filialFilter = buildFilialFilter(req, params.company, 'sales', params.filial ?? null, 'f');
+        }
         const query = `
           SELECT
-            vp.VENDEDOR AS vendedor,
-            vp.FILIAL AS filial,
-            SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) END) AS faturamento
-          FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+            LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR))) AS vendedor,
+            f.FILIAL AS filial,
+            SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - (vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) END) AS faturamento
+          FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+          INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+            ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
+          LEFT JOIN FILIAIS f WITH (NOLOCK)
+            ON f.COD_FILIAL = vp.CODIGO_FILIAL
           WHERE vp.DATA_VENDA >= @startDate
             AND vp.DATA_VENDA < @endDate
             AND vp.QTDE > 0
             ${filialFilter}
-          GROUP BY vp.VENDEDOR, vp.FILIAL
-          HAVING SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) END) > 0
+          GROUP BY LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR))), f.FILIAL
+          HAVING SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - (vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) END) > 0
         `;
         const result = await req.query<{ vendedor: string; filial: string; faturamento: number }>(query);
         const map = new Map<string, number>();

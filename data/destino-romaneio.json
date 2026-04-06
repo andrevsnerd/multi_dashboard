@@ -34,5 +34,17 @@
     "romaneio_id": "029381",
     "filial_origem": "NERD",
     "filial_destino": "NERD"
+  },
+  {
+    "company_key": "scarfme",
+    "romaneio_id": "029456",
+    "filial_origem": "NERD",
+    "filial_destino": "SCARFME MATRIZ CMS"
+  },
+  {
+    "company_key": "scarfme",
+    "romaneio_id": "029457",
+    "filial_origem": "SCARFME MATRIZ CMS",
+    "filial_destino": "NERD"
   }
 ]

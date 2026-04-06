@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { endOfMonth, startOfMonth } from "date-fns";
 import { useRouter } from "next/navigation";
 import type { CompanyKey } from "@/lib/config/company";
 import GoalsModal from "@/components/dashboard/GoalsModal";
 import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateRangeFilter";
-import { getCurrentMonthRange } from "@/lib/utils/date";
+import { formatDateForQuery, getCurrentMonthRange } from "@/lib/utils/date";
+import { exportControlePerformanceXlsx } from "@/lib/utils/exportControlePerformanceXlsx";
 import {
   OUTROS_LABEL,
   filterOutrosKeys,
@@ -99,6 +99,15 @@ function formatSignedPct(value: number): string {
   return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
 }
 
+function getComparisonBadge(
+  current: number,
+  previous: number
+): { kind: "pct"; value: number } | null {
+  const pct = getComparisonPct(current, previous);
+  if (pct !== null) return { kind: "pct", value: pct };
+  return null;
+}
+
 export default function ControlePerformancePage({ companyKey, companyName: _companyName }: Props) {
   const router = useRouter();
   const initialRange = useMemo(() => {
@@ -112,6 +121,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
   const [data, setData] = useState<PerformanceData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [comparisonMode, setComparisonMode] = useState<"month" | "year">("month");
@@ -133,6 +143,8 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
       filial,
       month: String(selectedMonth),
       year: String(selectedYear),
+      start: formatDateForQuery(range.startDate),
+      end: formatDateForQuery(range.endDate),
       compare: comparisonMode,
     });
     router.push(`/${companyKey}/controle-performance/filial?${params.toString()}`);
@@ -181,8 +193,10 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
     setLoading(true);
     setError(null);
     try {
+      const start = formatDateForQuery(range.startDate);
+      const end = formatDateForQuery(range.endDate);
       const res = await fetch(
-        `/api/controle-performance?company=${companyKey}&month=${selectedMonth}&year=${selectedYear}&compare=${comparisonMode}`,
+        `/api/controle-performance?company=${companyKey}&month=${selectedMonth}&year=${selectedYear}&start=${start}&end=${end}&compare=${comparisonMode}`,
         { cache: "no-store" }
       );
       if (!res.ok) throw new Error("Erro ao carregar dados");
@@ -193,7 +207,24 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
     } finally {
       setLoading(false);
     }
-  }, [companyKey, selectedMonth, selectedYear, comparisonMode]);
+  }, [companyKey, selectedMonth, selectedYear, comparisonMode, range.startDate, range.endDate]);
+
+  const handleExportXlsx = useCallback(async () => {
+    if (exporting) return;
+    setExporting(true);
+    setError(null);
+    try {
+      await exportControlePerformanceXlsx({
+        companyKey,
+        range: { startDate: range.startDate, endDate: range.endDate },
+        comparisonMode,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao exportar Excel");
+    } finally {
+      setExporting(false);
+    }
+  }, [companyKey, range.startDate, range.endDate, comparisonMode, exporting]);
 
   useEffect(() => {
     fetchData();
@@ -252,15 +283,20 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
           <DateRangeFilter
             value={range}
             onChange={(nextRange) => {
-              const baseDate = nextRange.startDate;
-              setRange({
-                startDate: startOfMonth(baseDate),
-                endDate: endOfMonth(baseDate),
-              });
+              setRange(nextRange);
             }}
           />
         </div>
         <div className={styles.headerActions}>
+          <button
+            type="button"
+            className={styles.exportButton}
+            onClick={handleExportXlsx}
+            disabled={loading || exporting}
+            title="Exporta um Excel com resumo, produtos e abas por filial"
+          >
+            {exporting ? "Exportando..." : "Exportar Excel"}
+          </button>
           <button
             type="button"
             className={`${styles.viewToggleBtn} ${viewMode === "table" ? styles.viewToggleBtnActive : ""}`}
@@ -331,7 +367,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
       {!loading && data && totals && viewMode === "cards" && (
         <div className={styles.cardsGrid}>
           {sortedFiliais.map(row => {
-            const variationPct = getComparisonPct(row.vendas, row.vendasPrevious);
+            const variation = getComparisonBadge(row.vendas, row.vendasPrevious);
             const salesPct = row.projecaoPct;
             const barPct = salesPct !== null ? Math.min(salesPct, 100) : 0;
             const barClass = salesPct !== null
@@ -377,9 +413,15 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                 {/* Left: filial name + variation */}
                 <div className={styles.cardLeft}>
                   <span className={styles.cardFilialName}>{row.displayName}</span>
-                  {variationPct !== null && (
-                    <span className={`${styles.variationBadge} ${variationPct >= 0 ? styles.variationPos : styles.variationNeg}`}>
-                      {variationPct >= 0 ? "↗" : "↘"} {formatSignedPct(variationPct)}
+                  {variation && (
+                    <span
+                      className={`${styles.variationBadge} ${
+                        variation.value >= 0
+                          ? styles.variationPos
+                          : styles.variationNeg
+                      }`}
+                    >
+                      {`${variation.value >= 0 ? "↗" : "↘"} ${formatSignedPct(variation.value)}`}
                     </span>
                   )}
                 </div>
@@ -500,15 +542,15 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                     <div className={styles.vendasCell}>
                       <span>{formatCurrency(row.vendas)}</span>
                       {(() => {
-                        const comparisonPct = getComparisonPct(row.vendas, row.vendasPrevious);
-                        if (comparisonPct === null) return null;
-                        const isPositive = comparisonPct >= 0;
+                        const comparison = getComparisonBadge(row.vendas, row.vendasPrevious);
+                        if (!comparison) return null;
+                        const isPositive = comparison.value >= 0;
                         return (
                           <span
                             className={`${styles.projecaoBadge} ${isPositive ? styles.badgeGreen : styles.badgeRed} ${styles.vendasCompareBadge}`}
                             title={`Comparativo com ${comparisonLabel}`}
                           >
-                            {comparisonPct >= 0 ? "+" : ""}{comparisonPct.toFixed(1)}%
+                            {`${comparison.value >= 0 ? "+" : ""}${comparison.value.toFixed(1)}%`}
                           </span>
                         );
                       })()}
@@ -599,15 +641,15 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                   <div className={styles.vendasCell}>
                     <span>{formatCurrency(totals.totalVendas)}</span>
                     {(() => {
-                      const comparisonPct = getComparisonPct(totals.totalVendas, totals.totalVendasPrevious);
-                      if (comparisonPct === null) return null;
-                      const isPositive = comparisonPct >= 0;
+                      const comparison = getComparisonBadge(totals.totalVendas, totals.totalVendasPrevious);
+                      if (!comparison) return null;
+                      const isPositive = comparison.value >= 0;
                       return (
                         <span
                           className={`${styles.projecaoBadge} ${isPositive ? styles.badgeGreen : styles.badgeRed} ${styles.vendasCompareBadge}`}
                           title={`Comparativo com ${comparisonLabel}`}
                         >
-                          {comparisonPct >= 0 ? "+" : ""}{comparisonPct.toFixed(1)}%
+                          {`${comparison.value >= 0 ? "+" : ""}${comparison.value.toFixed(1)}%`}
                         </span>
                       );
                     })()}

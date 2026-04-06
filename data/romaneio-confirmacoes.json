@@ -8,5 +8,25 @@
     "qtde_confirmada": 1,
     "confirmed_at": "2026-03-30T14:35:03.460Z",
     "confirmed_by": "andre.sabetta"
+  },
+  {
+    "company_key": "scarfme",
+    "romaneio_id": "029456",
+    "filial_destino": "SCARFME MATRIZ CMS",
+    "produto": "28.45.0257",
+    "cor_produto": "01",
+    "qtde_confirmada": 1,
+    "confirmed_at": "2026-04-02T14:45:30.362Z",
+    "confirmed_by": "andre.sabetta"
+  },
+  {
+    "company_key": "scarfme",
+    "romaneio_id": "029457",
+    "filial_destino": "NERD",
+    "produto": "28.45.0257",
+    "cor_produto": "01",
+    "qtde_confirmada": 1,
+    "confirmed_at": "2026-04-02T14:46:13.409Z",
+    "confirmed_by": "andre.sabetta"
   }
 ]

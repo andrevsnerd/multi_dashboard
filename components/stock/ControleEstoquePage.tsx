@@ -26,6 +26,7 @@ import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
 import type { CompanyKey } from "@/lib/config/company";
 import { resolveCompany } from "@/lib/config/company";
 import { getCurrentMonthRange } from "@/lib/utils/date";
+import { exportEstoqueConsultaXlsx } from "@/lib/utils/exportEstoqueConsultaXlsx";
 
 import styles from "./ControleEstoquePage.module.css";
 
@@ -366,6 +367,7 @@ export default function ControleEstoquePage({
   const [giroCategoriasPermitidas, setGiroCategoriasPermitidas] = useState<Set<string> | null>(null);
   const [giroProdutosPorChave, setGiroProdutosPorChave] = useState<Record<string, string[]> | null>(null);
   const [loadingGiro, setLoadingGiro] = useState(false);
+  const [exportando, setExportando] = useState(false);
 
   // Faixas de giro (mesma ordem do backend): cada uma = janela exclusiva em dias atrás
   const GIRO_BUCKETS = useMemo(() => [30, 60, 90, 120, 150, 300] as const, []);
@@ -1320,6 +1322,25 @@ export default function ControleEstoquePage({
     );
   }
 
+  async function handleExportarExcel() {
+    setExportando(true);
+    try {
+      await exportEstoqueConsultaXlsx({
+        companyKey,
+        companyName,
+        filial: selectedFilial,
+        linhas: selectedLinhas,
+        subgrupos: selectedSubgrupos,
+        grades: selectedGrades,
+        colecoes: selectedColecoes,
+        grupos: selectedGrupos,
+        categorias: categoriasFiltradas,
+      });
+    } finally {
+      setExportando(false);
+    }
+  }
+
   return (
     <div className={styles.wrapper}>
       <div className={styles.header}>
@@ -1767,6 +1788,15 @@ export default function ControleEstoquePage({
             return null;
           })()}
           <h2 className={styles.sectionTitle}>Por Categoria</h2>
+          <button
+            className={styles.projecaoButton}
+            onClick={handleExportarExcel}
+            disabled={exportando || categoriasFiltradas.length === 0}
+            title="Exportar estoque por linha e por produto/filial para Excel"
+            style={{ marginLeft: 'auto' }}
+          >
+            {exportando ? 'Exportando...' : 'Exportar Excel'}
+          </button>
         </div>
         <div className={styles.categoriasGrid}>
           {categoriasFiltradas.map((cat, index) => {

@@ -49,6 +49,28 @@
   border-color: #ccc;
 }
 
+.exportButton {
+  padding: 8px 16px;
+  background: #263238;
+  border: 1px solid #263238;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+
+.exportButton:hover {
+  background: #37474f;
+  border-color: #37474f;
+}
+
+.exportButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Summary Cards */
 .summaryCards {
   display: grid;

@@ -11,6 +11,7 @@ import {
   isOutrosCategory,
 } from "@/lib/performance/outrosCategories";
 import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateRangeFilter";
+import { formatDateForQuery } from "@/lib/utils/date";
 import FilialVendedoresTab from "./FilialVendedoresTab";
 import styles from "./FilialPerformancePage.module.css";
 
@@ -69,6 +70,16 @@ function fmtCurrency(n: number) {
 
 function formatSignedPct(value: number): string {
   return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
+}
+
+function getComparisonBadge(
+  current: number,
+  previous: number
+): { kind: "pct"; value: number } | { kind: "new" } | null {
+  if (!Number.isFinite(current) || !Number.isFinite(previous)) return null;
+  if (previous > 0) return { kind: "pct", value: ((current - previous) / previous) * 100 };
+  if (current > 0 && previous <= 0) return { kind: "new" };
+  return null;
 }
 
 // ─── ABC helpers ──────────────────────────────────────────────────────────────
@@ -160,6 +171,8 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
       filial,
       month: String(selectedMonth),
       year: String(selectedYear),
+      start: formatDateForQuery(range.startDate),
+      end: formatDateForQuery(range.endDate),
       compare: comparisonMode,
     });
     fetch(`/api/controle-performance/filial?${params}`, { cache: "no-store" })
@@ -221,9 +234,7 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
     : data?.qtde ?? 0;
   const displayCMV = produtosFiltrados.reduce((s, p) => s + p.custo * p.qtde, 0);
 
-  const variationPct = data && data.vendasPrevious > 0
-    ? ((data.vendas - data.vendasPrevious) / data.vendasPrevious) * 100
-    : null;
+  const variation = data ? getComparisonBadge(data.vendas, data.vendasPrevious) : null;
 
   const salesPct = data?.projecaoPct ?? null;
 
@@ -304,8 +315,7 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
                   label=""
                   value={range}
                   onChange={(nextRange) => {
-                    const base = nextRange.startDate;
-                    setRange({ startDate: startOfMonth(base), endDate: endOfMonth(base) });
+                    setRange(nextRange);
                   }}
                 />
               </div>
@@ -319,9 +329,19 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
                 <span className={styles.kpiLabel}>VENDAS</span>
                 <span className={styles.kpiValue}>{fmtCurrency(displayVendas)}</span>
                 {!selectedCategory && <span className={styles.kpiProjecao}>Projeção: {fmtCurrency(data.projecao)}</span>}
-                {variationPct !== null && (
-                  <span className={`${styles.variationBadge} ${variationPct >= 0 ? styles.variationPos : styles.variationNeg}`}>
-                    {variationPct >= 0 ? "↗" : "↘"} {formatSignedPct(variationPct)}
+                {variation && (
+                  <span
+                    className={`${styles.variationBadge} ${
+                      variation.kind === "new"
+                        ? styles.variationPos
+                        : variation.value >= 0
+                          ? styles.variationPos
+                          : styles.variationNeg
+                    }`}
+                  >
+                    {variation.kind === "new"
+                      ? "★ NOVO"
+                      : `${variation.value >= 0 ? "↗" : "↘"} ${formatSignedPct(variation.value)}`}
                     <span className={styles.variationLabel}> vs {comparisonLabel}</span>
                   </span>
                 )}
@@ -555,18 +575,21 @@ export default function FilialPerformancePage({ companyKey, filial, month, year,
                               <td>
                                 <div className={styles.productNameRow}>
                                   <span className={styles.productName}>{p.descricao || p.produto}</span>
-                                  {p.vendasPrevious > 0 && (() => {
-                                    const diffPct = ((p.vendas - p.vendasPrevious) / p.vendasPrevious) * 100;
-                                    const isPos = diffPct >= 0;
-                                    return (
-                                      <span
-                                        className={`${styles.prodCompareBadge} ${isPos ? styles.badgeGreen : styles.badgeRed}`}
-                                        title={`Comparativo com ${comparisonLabel}`}
-                                      >
-                                        {isPos ? "↑" : "↓"} {isPos ? "+" : ""}{diffPct.toFixed(1)}%
-                                      </span>
-                                    );
-                                  })()}
+                                {(() => {
+                                  const cmp = getComparisonBadge(p.vendas, p.vendasPrevious);
+                                  if (!cmp) return null;
+                                  const isPos = cmp.kind === "new" ? true : cmp.value >= 0;
+                                  return (
+                                    <span
+                                      className={`${styles.prodCompareBadge} ${isPos ? styles.badgeGreen : styles.badgeRed}`}
+                                      title={`Comparativo com ${comparisonLabel}`}
+                                    >
+                                      {cmp.kind === "new"
+                                        ? "NOVO"
+                                        : `${isPos ? "↑" : "↓"} ${isPos ? "+" : ""}${cmp.value.toFixed(1)}%`}
+                                    </span>
+                                  );
+                                })()}
                                 </div>
                                 {((p.descricao && p.produto !== p.descricao) || p.categoria) && (
                                   <div className={styles.productMeta}>

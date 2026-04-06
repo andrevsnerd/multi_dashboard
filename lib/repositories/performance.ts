@@ -1,6 +1,7 @@
 import sql from 'mssql';
 import { withRequest } from '@/lib/db/connection';
 import { resolveCompany, type CompanyKey } from '@/lib/config/company';
+import { shiftRangeByMonths, type NormalizedRange } from '@/lib/utils/date';
 
 export interface PerformanceCategoryRow {
   filial: string;
@@ -22,8 +23,7 @@ const MATRIZ_FILIAIS: Record<string, string[]> = {
 
 export async function fetchPerformanceData(
   companyKey: CompanyKey,
-  month: number,
-  year: number,
+  range: NormalizedRange,
   comparisonMode: 'month' | 'year' = 'month'
 ): Promise<PerformanceDataResult> {
   const company = resolveCompany(companyKey);
@@ -38,18 +38,13 @@ export async function fetchPerformanceData(
     f => !matrizFiliais.has(f) && !ecommerceSet.has(f)
   );
 
-  // Usar limites em UTC (início do dia) para bater com os ranges normalizados da dashboard.
-  const startCurrent = new Date(Date.UTC(year, month, 1));
-  const endCurrent = new Date(Date.UTC(year, month + 1, 1));
+  // Range deve vir normalizado para UTC: start no início do dia e end exclusivo (início do próximo dia)
+  const startCurrent = range.start;
+  const endCurrent = range.end;
 
-  const prevMonth = comparisonMode === 'year'
-    ? month
-    : (month === 0 ? 11 : month - 1);
-  const prevYear = comparisonMode === 'year'
-    ? year - 1
-    : (month === 0 ? year - 1 : year);
-  const startPrevious = new Date(Date.UTC(prevYear, prevMonth, 1));
-  const endPrevious = new Date(Date.UTC(prevYear, prevMonth + 1, 1));
+  const previousRange = shiftRangeByMonths(range, comparisonMode === 'year' ? -12 : -1);
+  const startPrevious = previousRange.start;
+  const endPrevious = previousRange.end;
 
   // Categoria via tabela PRODUTOS (p) — LOJA_VENDA_PRODUTO não possui GRUPO_PRODUTO/LINHA
   const categoriaExpr = companyKey === 'nerd'
@@ -274,21 +269,29 @@ export interface FilialProdutoSalesRow {
   vendasPrevious: number;
 }
 
+export interface FilialProdutoVendedorSalesRow {
+  vendedor: string;
+  produto: string;
+  descricao: string;
+  categoria: string;
+  grade: string;
+  vendas: number;
+  qtde: number;
+  vendasPrevious: number;
+}
+
 export async function fetchFilialProdutoSales(
   companyKey: CompanyKey,
   posFilialNames: string[],
   ecommerceFilialNames: string[],
-  month: number,
-  year: number,
+  range: NormalizedRange,
   comparisonMode: 'month' | 'year' = 'month',
 ): Promise<FilialProdutoSalesRow[]> {
-  const start = new Date(Date.UTC(year, month, 1));
-  const end = new Date(Date.UTC(year, month + 1, 1));
-
-  const prevMonth = comparisonMode === 'year' ? month : (month === 0 ? 11 : month - 1);
-  const prevYear = comparisonMode === 'year' ? year - 1 : (month === 0 ? year - 1 : year);
-  const startPrev = new Date(Date.UTC(prevYear, prevMonth, 1));
-  const endPrev = new Date(Date.UTC(prevYear, prevMonth + 1, 1));
+  const start = range.start;
+  const end = range.end;
+  const prev = shiftRangeByMonths(range, comparisonMode === 'year' ? -12 : -1);
+  const startPrev = prev.start;
+  const endPrev = prev.end;
 
   const categoriaExpr = companyKey === 'nerd'
     ? `UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, ''))))`
@@ -414,6 +417,180 @@ export async function fetchFilialProdutoSales(
   });
 
   // Apply vendasPrevious to current rows
+  merged.forEach((row, key) => {
+    row.vendasPrevious = prevMap.get(key) ?? 0;
+  });
+
+  return Array.from(merged.values()).sort((a, b) => b.vendas - a.vendas);
+}
+
+export async function fetchFilialProdutoVendedorSales(
+  companyKey: CompanyKey,
+  posFilialNames: string[],
+  ecommerceFilialNames: string[],
+  range: NormalizedRange,
+  comparisonMode: 'month' | 'year' = 'month',
+): Promise<FilialProdutoVendedorSalesRow[]> {
+  const start = range.start;
+  const end = range.end;
+  const prev = shiftRangeByMonths(range, comparisonMode === 'year' ? -12 : -1);
+  const startPrev = prev.start;
+  const endPrev = prev.end;
+
+  const categoriaExpr = companyKey === 'nerd'
+    ? `UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, ''))))`
+    : `UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, ''))))`;
+  const gradeExpr = companyKey === 'scarfme'
+    ? `UPPER(LTRIM(RTRIM(ISNULL(p.GRADE, ''))))`
+    : `''`;
+  const gradeGroupBy = gradeExpr === `''` ? '' : `, ${gradeExpr}`;
+
+  type RawRow = {
+    VENDEDOR: string;
+    VENDEDOR_APELIDO: string;
+    PRODUTO: string;
+    DESCRICAO: string;
+    CATEGORIA: string;
+    GRADE: string;
+    QTDE: number;
+    VENDAS: number;
+  };
+
+  const runPos = (s: Date, e: Date, prefix: string): Promise<Array<Omit<FilialProdutoVendedorSalesRow, 'vendasPrevious'>>> => {
+    if (posFilialNames.length === 0) return Promise.resolve([]);
+    return withRequest(async (request) => {
+      request.input(`${prefix}Start`, sql.DateTime, s);
+      request.input(`${prefix}End`, sql.DateTime, e);
+      posFilialNames.forEach((f, i) => request.input(`${prefix}F${i}`, sql.VarChar, f));
+      const placeholders = posFilialNames.map((_, i) => `@${prefix}F${i}`).join(', ');
+
+      const query = `
+        SELECT TOP 5000
+          ISNULL(
+            LTRIM(RTRIM(lv.VENDEDOR_APELIDO)),
+            ISNULL(LTRIM(RTRIM(lv.NOME_VENDEDOR)), LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR))))
+          ) AS VENDEDOR_APELIDO,
+          ISNULL(vp.PRODUTO, '') AS PRODUTO,
+          UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
+          ${categoriaExpr} AS CATEGORIA,
+          ${gradeExpr} AS GRADE,
+          SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS QTDE,
+          SUM(
+            CASE
+              WHEN vp.QTDE_CANCELADA > 0 THEN 0
+              ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - (vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0))
+            END
+          ) AS VENDAS
+        FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+          ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
+        LEFT JOIN FILIAIS f WITH (NOLOCK)
+          ON f.COD_FILIAL = vp.CODIGO_FILIAL
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO
+        LEFT JOIN LOJA_VENDEDORES lv WITH (NOLOCK)
+          ON LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR))) = LTRIM(RTRIM(CAST(lv.VENDEDOR AS VARCHAR)))
+        WHERE vp.DATA_VENDA >= @${prefix}Start
+          AND vp.DATA_VENDA < @${prefix}End
+          AND vp.QTDE > 0
+          AND f.FILIAL IN (${placeholders})
+          AND v.VENDEDOR IS NOT NULL
+        GROUP BY
+          ISNULL(LTRIM(RTRIM(lv.VENDEDOR_APELIDO)), ISNULL(LTRIM(RTRIM(lv.NOME_VENDEDOR)), LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR))))),
+          ISNULL(vp.PRODUTO, ''),
+          UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))),
+          ${categoriaExpr}${gradeGroupBy}
+        HAVING SUM(
+          CASE
+            WHEN vp.QTDE_CANCELADA > 0 THEN 0
+            ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - (vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0))
+          END
+        ) > 0
+        ORDER BY VENDAS DESC
+      `;
+
+      const result = await request.query<RawRow>(query);
+      return result.recordset.map(r => ({
+        vendedor: (r.VENDEDOR_APELIDO ?? r.VENDEDOR ?? '').trim() || 'SEM VENDEDOR',
+        produto: r.PRODUTO?.trim() ?? '',
+        descricao: r.DESCRICAO?.trim() ?? '',
+        categoria: r.CATEGORIA?.trim() ?? '',
+        grade: r.GRADE?.trim() ?? '',
+        vendas: Math.round(Number(r.VENDAS ?? 0)),
+        qtde: Math.round(Number(r.QTDE ?? 0)),
+      })).filter(r => r.produto !== '');
+    });
+  };
+
+  // Ecommerce: não há vendedor por item; agregamos como "ECOMMERCE"
+  const runEcom = (s: Date, e: Date, prefix: string): Promise<Array<Omit<FilialProdutoVendedorSalesRow, 'vendasPrevious'>>> => {
+    if (ecommerceFilialNames.length === 0) return Promise.resolve([]);
+    return withRequest(async (request) => {
+      request.input(`${prefix}EcomStart`, sql.DateTime, s);
+      request.input(`${prefix}EcomEnd`, sql.DateTime, e);
+      ecommerceFilialNames.forEach((f, i) => request.input(`${prefix}EcomF${i}`, sql.VarChar, f));
+      const placeholders = ecommerceFilialNames.map((_, i) => `@${prefix}EcomF${i}`).join(', ');
+
+      const query = `
+        SELECT TOP 5000
+          ISNULL(fp.PRODUTO, '') AS PRODUTO,
+          UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
+          ${categoriaExpr} AS CATEGORIA,
+          ${gradeExpr} AS GRADE,
+          SUM(CASE WHEN fp.QTDE > 0 THEN fp.QTDE ELSE 0 END) AS QTDE,
+          SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS VENDAS
+        FROM FATURAMENTO f WITH (NOLOCK)
+        JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+          ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
+        WHERE CAST(f.EMISSAO AS DATE) >= CAST(@${prefix}EcomStart AS DATE)
+          AND CAST(f.EMISSAO AS DATE) < CAST(@${prefix}EcomEnd AS DATE)
+          AND f.NOTA_CANCELADA = 0
+          AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+          AND fp.QTDE > 0
+          AND f.FILIAL IN (${placeholders})
+        GROUP BY ISNULL(fp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}${gradeGroupBy}
+        HAVING SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) > 0
+        ORDER BY VENDAS DESC
+      `;
+
+      const result = await request.query<{ PRODUTO: string; DESCRICAO: string; CATEGORIA: string; GRADE: string; QTDE: number; VENDAS: number }>(query);
+      return result.recordset.map(r => ({
+        vendedor: 'ECOMMERCE',
+        produto: r.PRODUTO?.trim() ?? '',
+        descricao: r.DESCRICAO?.trim() ?? '',
+        categoria: r.CATEGORIA?.trim() ?? '',
+        grade: r.GRADE?.trim() ?? '',
+        vendas: Math.round(Number(r.VENDAS ?? 0)),
+        qtde: Math.round(Number(r.QTDE ?? 0)),
+      })).filter(r => r.produto !== '');
+    });
+  };
+
+  const [posCur, ecomCur, posPrev, ecomPrev] = await Promise.all([
+    runPos(start, end, 'pvc'),
+    runEcom(start, end, 'pvc'),
+    runPos(startPrev, endPrev, 'pvp'),
+    runEcom(startPrev, endPrev, 'pvp'),
+  ]);
+
+  const merged = new Map<string, FilialProdutoVendedorSalesRow>();
+  [...posCur, ...ecomCur].forEach(r => {
+    const key = `${r.vendedor}||${r.produto}||${r.categoria}||${r.grade}`;
+    const existing = merged.get(key);
+    if (existing) {
+      existing.vendas += r.vendas;
+      existing.qtde += r.qtde;
+    } else {
+      merged.set(key, { ...r, vendasPrevious: 0 });
+    }
+  });
+
+  const prevMap = new Map<string, number>();
+  [...posPrev, ...ecomPrev].forEach(r => {
+    const key = `${r.vendedor}||${r.produto}||${r.categoria}||${r.grade}`;
+    prevMap.set(key, (prevMap.get(key) ?? 0) + r.vendas);
+  });
+
   merged.forEach((row, key) => {
     row.vendasPrevious = prevMap.get(key) ?? 0;
   });

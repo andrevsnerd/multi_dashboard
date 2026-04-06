@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { fetchVendedoresList } from '@/lib/repositories/vendedores-v2';
+import { resolveCompany, getFilialGroupMembers } from '@/lib/config/company';
 
 /** Timeout menor: queries otimizadas com CTEs. */
 export const maxDuration = 120;
@@ -29,10 +30,21 @@ export async function GET(request: Request) {
   const comparisonMode: 'month' | 'year' | undefined =
     compareParam === 'year' ? 'year' : compareParam === 'month' ? 'month' : undefined;
 
+  // Expande grupo de filiais (ex: PAULISTA FFF → [FFF, RSR, FFFR])
+  let filials: string[] | undefined;
+  if (filial && company) {
+    const companyConfig = resolveCompany(company);
+    if (companyConfig) {
+      const members = getFilialGroupMembers(companyConfig, filial);
+      if (members.length > 1) filials = members;
+    }
+  }
+
   try {
     const data = await fetchVendedoresList({
       company,
-      filial: filial || null,
+      filial: filials ? null : (filial || null),
+      filials,
       range,
       grupos,
       linhas,

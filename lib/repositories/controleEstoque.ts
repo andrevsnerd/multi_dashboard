@@ -4906,6 +4906,104 @@ export async function fetchProjecaoMensal({
       }
     }
 
+    // 4. Buscar entradas por mês do ano atual (para reconstrução do estoque retroativo dos meses passados)
+    // Usa mesma lógica de fetchEstoquePorCategoria: apenas entradas na matriz, excluindo devoluções
+    // (saída de loja no mesmo dia que entrada na matriz = devolução, não compra nova).
+    const categoriaFieldEntradas = company === 'nerd'
+      ? 'ISNULL(pr.GRUPO_PRODUTO, \'SEM GRUPO\')'
+      : 'ISNULL(pr.LINHA, \'SEM LINHA\')';
+
+    const camposEntradasProjecaoAdicionais = company === 'scarfme'
+      ? `, UPPER(LTRIM(RTRIM(ISNULL(pr.LINHA, '')))) AS linha, UPPER(LTRIM(RTRIM(ISNULL(pr.SUBGRUPO_PRODUTO, '')))) AS subgrupo, UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, pr.GRADE), '')))) AS grade, UPPER(LTRIM(RTRIM(ISNULL(pr.COLECAO, '')))) AS colecao, ISNULL(P.PRODUTO, '') AS produto`
+      : `, UPPER(LTRIM(RTRIM(ISNULL(pr.SUBGRUPO_PRODUTO, '')))) AS subgrupo, UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, pr.GRADE), '')))) AS grade, UPPER(LTRIM(RTRIM(ISNULL(pr.COLECAO, '')))) AS colecao, ISNULL(P.PRODUTO, '') AS produto`;
+
+    const groupByEntradasProjecaoAdicionais = company === 'scarfme'
+      ? `, UPPER(LTRIM(RTRIM(ISNULL(pr.LINHA, '')))), UPPER(LTRIM(RTRIM(ISNULL(pr.SUBGRUPO_PRODUTO, '')))), UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, pr.GRADE), '')))), UPPER(LTRIM(RTRIM(ISNULL(pr.COLECAO, '')))), ISNULL(P.PRODUTO, '')`
+      : `, UPPER(LTRIM(RTRIM(ISNULL(pr.SUBGRUPO_PRODUTO, '')))), UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, pr.GRADE), '')))), UPPER(LTRIM(RTRIM(ISNULL(pr.COLECAO, '')))), ISNULL(P.PRODUTO, '')`;
+
+    // Reutiliza params já registrados, apenas troca prefixo da tabela na string SQL
+    const grupoFilterEntradas = grupoFilter ? grupoFilter.replace(/p\./g, 'pr.') : '';
+    const linhaFilterEntradas = linhaFilter ? linhaFilter.replace(/p\./g, 'pr.') : '';
+    const colecaoFilterEntradas = colecaoFilter ? colecaoFilter.replace(/p\./g, 'pr.') : '';
+    const subgrupoFilterEntradas = subgrupoFilter ? subgrupoFilter.replace(/p\./g, 'pr.') : '';
+    const gradeFilterEntradas = gradeFilter ? gradeFilter.replace(/p\./g, 'pr.') : '';
+    const exclusionFilterEntradas = buildExclusionFilter(request, company, 'pr', 'excludedLineProjecaoEntradas');
+    const nerdOnlyEletronicosFilterEntradas = buildNerdOnlyLinhaEletronicosFilter(company, 'pr');
+
+    let matrizProjecaoFilialFilter = '';
+    let lojasProjecaoFilterSaidas = '';
+    {
+      const companyConf = resolveCompany(company);
+      if (companyConf) {
+        const matrizFiliais: string[] = company === 'scarfme' ? ['SCARF ME - MATRIZ'] : company === 'nerd' ? ['NERD'] : [];
+        if (matrizFiliais.length > 0) {
+          matrizFiliais.forEach((f, i) => request.input(`matrizProjecaoFilial${i}`, sql.VarChar, f));
+          const mPlaceholders = matrizFiliais.map((_, i) => `@matrizProjecaoFilial${i}`).join(', ');
+          matrizProjecaoFilialFilter = `AND E.FILIAL IN (${mPlaceholders})`;
+        }
+        const filiais = companyConf.filialFilters['inventory'] ?? [];
+        const ecommerceFilials = companyConf.ecommerceFilials ?? [];
+        const lojasNormais = filiais.filter(f =>
+          company === 'scarfme' ? f !== 'SCARF ME - MATRIZ' && !ecommerceFilials.includes(f)
+          : company === 'nerd' ? f !== 'NERD'
+          : true
+        );
+        if (lojasNormais.length > 0) {
+          lojasNormais.forEach((f, i) => request.input(`lojaSaidaProjecao${i}`, sql.VarChar, f));
+          const lPlaceholders = lojasNormais.map((_, i) => `@lojaSaidaProjecao${i}`).join(', ');
+          lojasProjecaoFilterSaidas = `AND S.FILIAL IN (${lPlaceholders})`;
+        }
+      }
+    }
+
+    const entradasPorMesQuery = `
+      SELECT
+        ${categoriaFieldEntradas} AS categoria
+        ${camposEntradasProjecaoAdicionais},
+        UPPER(LTRIM(RTRIM(ISNULL(P.COR_PRODUTO, '')))) AS cor,
+        MONTH(E.EMISSAO) AS mes,
+        SUM(CAST(P.QTDE AS FLOAT)) AS entradas
+      FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+      LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+      LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = P.PRODUTO
+      WHERE pr.PRODUTO IS NOT NULL
+        AND E.EMISSAO >= @anoAtualStart AND E.EMISSAO < @periodoEndMesAtual
+        ${matrizProjecaoFilialFilter}
+        ${grupoFilterEntradas}
+        ${linhaFilterEntradas}
+        ${colecaoFilterEntradas}
+        ${subgrupoFilterEntradas}
+        ${gradeFilterEntradas}
+        ${exclusionFilterEntradas}
+        ${nerdOnlyEletronicosFilterEntradas}
+        AND ${categoriaFieldEntradas} <> ''
+        AND ${categoriaFieldEntradas} <> 'SEM GRUPO'
+        AND ${categoriaFieldEntradas} <> 'SEM LINHA'
+        ${buildCategoriaExcludeNerd(company, categoriaFieldEntradas)}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM ESTOQUE_PROD_SAI AS S WITH (NOLOCK)
+          LEFT JOIN ESTOQUE_PROD1_SAI AS PS WITH (NOLOCK) ON S.ROMANEIO_PRODUTO = PS.ROMANEIO_PRODUTO
+          WHERE PS.PRODUTO = P.PRODUTO
+            AND ISNULL(PS.COR_PRODUTO, '') = ISNULL(P.COR_PRODUTO, '')
+            AND CAST(S.EMISSAO AS DATE) = CAST(E.EMISSAO AS DATE)
+            ${lojasProjecaoFilterSaidas}
+        )
+      GROUP BY ${categoriaFieldEntradas}${groupByEntradasProjecaoAdicionais}, UPPER(LTRIM(RTRIM(ISNULL(P.COR_PRODUTO, '')))), MONTH(E.EMISSAO)
+    `;
+
+    const entradasPorMesResult = await request.query<{
+      categoria: string;
+      linha?: string;
+      subgrupo?: string;
+      grade?: string;
+      colecao?: string;
+      produto?: string;
+      cor?: string;
+      mes: number;
+      entradas: number | null;
+    }>(entradasPorMesQuery);
+
     // Processar dados
     const mesesNomes = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
     
@@ -5034,6 +5132,15 @@ export async function fetchProjecaoMensal({
       const v30 = Number(row.vendas30Dias ?? 0);
       if (vma > 0) vendasMesAnteriorMap.set(key, (vendasMesAnteriorMap.get(key) || 0) + vma);
       if (v30 > 0) vendasUltimos30DiasMap.set(key, (vendasUltimos30DiasMap.get(key) || 0) + v30);
+    });
+
+    // Mapear entradas por mês do ano atual (para reconstrução retroativa do estoque dos meses passados)
+    const entradasPorMesMap = new Map<string, Map<number, number>>();
+    entradasPorMesResult.recordset.forEach(row => {
+      const key = `${row.categoria}|${row.linha || ''}|${row.subgrupo || ''}|${row.grade || ''}|${row.colecao || ''}|${row.produto || ''}|${row.cor || ''}`;
+      if (!entradasPorMesMap.has(key)) entradasPorMesMap.set(key, new Map());
+      const mesMap = entradasPorMesMap.get(key)!;
+      mesMap.set(row.mes, (mesMap.get(row.mes) || 0) + Number(row.entradas ?? 0));
     });
 
     // Gerar projeções para 12 meses a partir do mês atual
@@ -5221,6 +5328,32 @@ export async function fetchProjecaoMensal({
         }
         const estoqueUsado = projecao.meses[i].estoque;
         projecao.meses[i].duracao = estoqueUsado > 0 ? totalDias : 0;
+      }
+
+      // Reconstruir estoque retroativo dos meses passados a partir do estoque atual.
+      // Fórmula (mesma lógica do controle de estoque):
+      //   estoque_inicio_mes(m) = estoque_inicio_mes(m+1) + vendas_reais(m) - entradas(m)
+      // Partindo de: estoque_inicio_mesAtual = estoqueAgora + vendasMesAtualAteHoje - entradasMesAtualAteHoje
+      if (mesAtual > 1) {
+        const entradasPorMes = entradasPorMesMap.get(key) || new Map<number, number>();
+        const vendasMesAtualTotal = vendasMesAtualMap.get(key) || 0;
+        const entradasMesAtual = entradasPorMes.get(mesAtual) || 0;
+        let estoqueReconstruido = Math.max(0, estoqueInicial + vendasMesAtualTotal - entradasMesAtual);
+        for (let m = mesAtual - 1; m >= 1; m--) {
+          const vendasMes = vendasReaisPorMes.get(m) || 0;
+          const entradasMes = entradasPorMes.get(m) || 0;
+          estoqueReconstruido = Math.max(0, estoqueReconstruido + vendasMes - entradasMes);
+          const mesEntry = projecao.meses[m - 1];
+          if (mesEntry && mesEntry.isMesPassado) {
+            mesEntry.estoqueRealSnapshot = estoqueReconstruido;
+            if (estoqueReconstruido > 0 && vendasMes > 0) {
+              const diasNoMes = new Date(anoAtual, m, 0).getDate();
+              mesEntry.duracaoRealSnapshot = Math.round(estoqueReconstruido / (vendasMes / diasNoMes));
+            } else {
+              mesEntry.duracaoRealSnapshot = 0;
+            }
+          }
+        }
       }
     });
 

@@ -12,8 +12,6 @@ import {
   fetchProjecaoMensal,
   fetchCategoriasComGiro,
 } from '@/lib/repositories/controleEstoque';
-import { hasPostgres } from '@/lib/db/neon';
-import { saveProjecaoSnapshot, fetchSnapshotDates, fetchSnapshotRealPorMes } from '@/lib/repositories/projecaoEstoqueHistorico';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -176,53 +174,7 @@ export async function GET(request: Request) {
           filial,
           ...filters,
         });
-        let snapshotOk = false;
-        let snapshotDate: string | null = null;
-        // Auto-save histórico: apenas 1x por mês — na primeira carga da projeção no mês (ex.: dia 1 ou primeiro dia que abrir)
-        // Assim o mês anterior fica fixo no histórico e o atual só grava quando “fechar” no próximo mês.
-        if (company && hasPostgres() && projecao.length > 0) {
-          try {
-            const dates = await fetchSnapshotDates(company, filial);
-            const now = new Date();
-            const year = now.getFullYear();
-            const mesAtual = now.getMonth() + 1;
-            const month = String(mesAtual).padStart(2, '0');
-            const currentMonthPrefix = `${year}-${month}`;
-            const existingThisMonth =
-              dates.find((x) => String(x.snapshot_date).startsWith(currentMonthPrefix))?.snapshot_date ?? null;
-            if (existingThisMonth) {
-              snapshotOk = true;
-              snapshotDate = existingThisMonth;
-            } else {
-              await saveProjecaoSnapshot(now, company, filial, projecao);
-              snapshotOk = true;
-              snapshotDate = now.toISOString().slice(0, 10);
-            }
-          } catch (autoErr) {
-            console.error('Auto-save projeção histórico:', autoErr);
-          }
-          // Preencher estoque/duração real de meses passados a partir do snapshot (aparece ao virar o mês)
-          try {
-            const now = new Date();
-            const year = now.getFullYear();
-            const mesAtual = now.getMonth() + 1;
-            for (let mesNumero = 1; mesNumero < mesAtual; mesNumero++) {
-              const snapshotMap = await fetchSnapshotRealPorMes(company, filial, year, mesNumero);
-              for (const cat of projecao) {
-                const key = `${cat.categoria}|${cat.linha ?? ''}|${cat.subgrupo ?? ''}|${cat.grade ?? ''}|${cat.colecao ?? ''}`;
-                const snap = snapshotMap.get(key);
-                const mesEntry = cat.meses.find((m) => m.mesNumero === mesNumero && m.ano === year);
-                if (mesEntry && snap) {
-                  if (snap.estoque_real != null) mesEntry.estoqueRealSnapshot = snap.estoque_real;
-                  if (snap.duracao_real != null) mesEntry.duracaoRealSnapshot = snap.duracao_real;
-                }
-              }
-            }
-          } catch (snapErr) {
-            console.error('Carregar snapshot real por mês:', snapErr);
-          }
-        }
-        return NextResponse.json({ data: projecao, snapshot: { ok: snapshotOk, snapshot_date: snapshotDate } });
+        return NextResponse.json({ data: projecao });
       }
       case 'giro': {
         const diasGiroParam = searchParams.get('diasGiro');

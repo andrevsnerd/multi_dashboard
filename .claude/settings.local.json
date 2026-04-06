@@ -32,7 +32,12 @@
       "Bash(ls -la '/c/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/app/\\(companies\\)/\\\\[company\\\\]')",
       "Bash(find \"/c/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/app/\\(companies\\)\" -name \"page.tsx\" -type f)",
       "Bash(npm install:*)",
-      "Bash(ls \"c:\\\\Users\\\\NERD TIJUCA\\\\Documents\\\\NERD - ANDRE\\\\Dashboard NERD\\\\multi-dashboard\\\\app\\\\\\(companies\\)\\\\[company]\\\\mapa-clientes\")"
+      "Bash(ls \"c:\\\\Users\\\\NERD TIJUCA\\\\Documents\\\\NERD - ANDRE\\\\Dashboard NERD\\\\multi-dashboard\\\\app\\\\\\(companies\\)\\\\[company]\\\\mapa-clientes\")",
+      "Bash(cut -d';' -f1)",
+      "Bash(find 'c:\\\\Users\\\\NERD TIJUCA\\\\Documents\\\\NERD - ANDRE\\\\Dashboard NERD\\\\multi-dashboard' -type f -name *controle* -o -name *performance*)",
+      "Bash(find '/c/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/app' -type f -name *controle-estoque* -o -name *estoque*)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx|js\\)$\")",
+      "Bash(node -e \"require\\(''''./lib/utils/exportEstoqueConsultaXlsx''''\\)\")"
     ]
   }
 }
