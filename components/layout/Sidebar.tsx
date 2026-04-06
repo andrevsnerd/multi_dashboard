@@ -370,6 +370,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
                       <div className={styles.submenu}>
                         {item.subItems.filter((subItem) => {
                           if (!subItem.permission) return true;
+                          if (!user) return true;
                           if (user.role === "admin" || ((user.role === "gestor" || user.role === "logistica") && !user.permissions?.length)) return true;
                           return user.permissions?.includes(subItem.permission);
                         }).map((subItem) => {
