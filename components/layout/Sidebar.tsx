@@ -17,7 +17,7 @@ type NavItemBase = {
   label: string;
   permission?: PermissionKey | "admin" | "home";
   href?: string;
-  subItems?: { label: string; href: string }[];
+  subItems?: { label: string; href: string; permission?: PermissionKey }[];
 };
 
 export default function Sidebar({ companyName }: SidebarProps) {
@@ -155,8 +155,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
       href: undefined,
       permission: "produtos",
       subItems: [
-        { label: "Produtos por Venda", href: produtosHref },
-        { label: "Produto Detalhado", href: produtoDetalhadoHref },
+        { label: "Produtos por Venda", href: produtosHref, permission: "produtos" as const },
+        { label: "Produto Detalhado", href: produtoDetalhadoHref, permission: "produto-detalhado" as const },
       ],
     },
     { label: "Vendedores", href: vendedoresHref, permission: "vendedores" },
@@ -185,7 +185,13 @@ export default function Sidebar({ companyName }: SidebarProps) {
           : allNavItems.filter((item) => {
               if (item.permission === "home") return true;
               if (item.permission === "admin") return false;
-              return item.permission ? user.permissions?.includes(item.permission) : false;
+              if (!item.permission) return false;
+              if (user.permissions?.includes(item.permission)) return true;
+              // Mostrar item pai se o usuário tiver permissão em algum sub-item
+              if (item.subItems) {
+                return item.subItems.some((sub) => sub.permission && user.permissions?.includes(sub.permission));
+              }
+              return false;
             });
 
   const handleLinkClick = () => {
@@ -362,7 +368,11 @@ export default function Sidebar({ companyName }: SidebarProps) {
                     </div>
                     {isExpanded && item.subItems && (
                       <div className={styles.submenu}>
-                        {item.subItems.map((subItem) => {
+                        {item.subItems.filter((subItem) => {
+                          if (!subItem.permission) return true;
+                          if (user.role === "admin" || ((user.role === "gestor" || user.role === "logistica") && !user.permissions?.length)) return true;
+                          return user.permissions?.includes(subItem.permission);
+                        }).map((subItem) => {
                           let isSubItemActive = false;
                           if (subItem.label === "Produtos por Venda") {
                             isSubItemActive = pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado");

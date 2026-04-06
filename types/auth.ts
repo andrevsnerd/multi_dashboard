@@ -6,6 +6,7 @@ export type RoleKey = "admin" | "gestor" | "logistica";
 export type PermissionKey =
   | "dashboard"
   | "produtos"
+  | "produto-detalhado"
   | "vendedores"
   | "clientes"
   | "controle-estoque"
@@ -52,6 +53,7 @@ export interface UserSession {
 export const ALL_PERMISSION_KEYS: { key: PermissionKey; label: string }[] = [
   { key: "dashboard", label: "Dashboard" },
   { key: "produtos", label: "Produtos" },
+  { key: "produto-detalhado", label: "Produto Detalhado" },
   { key: "vendedores", label: "Vendedores" },
   { key: "clientes", label: "Clientes" },
   { key: "controle-estoque", label: "Controle de Estoque" },
