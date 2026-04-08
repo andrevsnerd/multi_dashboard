@@ -5514,9 +5514,9 @@ export async function fetchTopProdutosUltimos3Meses({
 }): Promise<ProdutoVendaUltimos3Meses[]> {
   return withRequest(async (request) => {
     const now = new Date();
-    // Últimos 60 dias
-    const inicio60Dias = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
-    request.input('inicio3m', sql.DateTime, inicio60Dias);
+    // Últimos 90 dias
+    const inicio90Dias = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    request.input('inicio3m', sql.DateTime, inicio90Dias);
     request.input('fim3m', sql.DateTime, now);
     request.input('lc_limit', sql.Int, limit);
 

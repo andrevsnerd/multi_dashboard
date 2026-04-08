@@ -432,7 +432,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
                 <span className={styles.summaryLabel}>Período Base</span>
-                <span className={styles.summaryValueNeutral}>Últimos 60 dias</span>
+                <span className={styles.summaryValueNeutral}>Últimos 90 dias</span>
               </div>
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
@@ -463,7 +463,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                   <tr>
                     <th style={{ width: 48 }}>#</th>
                     <th>Produto</th>
-                    <th className={styles.right}>Faturamento 60 dias</th>
+                    <th className={styles.right}>Faturamento 90 dias</th>
                     <th className={styles.right}>Qtd vendida</th>
                     <th className={styles.right}>Participação</th>
                     <th className={styles.right}>Qtd Proporcional</th>
