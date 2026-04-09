@@ -121,6 +121,34 @@ function fmtBRL(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 }
 
+function normalizeKey(s?: string | null) {
+  return (s ?? "")
+    .toString()
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
+function getLimiteDiasReposicao(p: { linha?: string; subgrupo?: string }) {
+  const linha = normalizeKey(p.linha);
+  const subgrupo = normalizeKey(p.subgrupo);
+
+  // Linha índia: regra exclusiva (subgrupo não conta)
+  if (linha === "INDIA") return 90;
+
+  // 120 dias apenas para subgrupos específicos
+  const subgrupos120 = new Set([
+    "CETIM DE SEDA",
+    "MOUSSELINE DE SEDA",
+    "SEDA PREMIUM",
+  ]);
+  if (subgrupos120.has(subgrupo)) return 120;
+
+  // Restante
+  return 60;
+}
+
 interface ProdutoSugestaoMin {
   produto: string;
   valor3meses: number;
@@ -155,8 +183,7 @@ function computeReposicaoScope(
   projecoes: ProjecaoCategoria[],
   getReaisPorMesFn: (p: ProjecaoCategoria) => { estoqueAtualReal: number; duracaoRealMesAtual: number }
 ): ReposicaoItem[] {
-  const isLençosLine = proj.categoria === "LENÇOS" || proj.categoria === "APROVEITAMENTO LENÇOS";
-  const limiteDiasAlerta = isLençosLine ? 120 : 90;
+  const limiteDiasAlerta = getLimiteDiasReposicao(proj);
 
   // Filtra projecoes ao escopo do proj clicado
   const inScope = projecoes.filter(p => {
@@ -170,6 +197,7 @@ function computeReposicaoScope(
 
   const result: ReposicaoItem[] = [];
   for (const item of inScope) {
+    const itemLimiteDias = getLimiteDiasReposicao(item);
     const { estoqueAtualReal, duracaoRealMesAtual } = getReaisPorMesFn(item);
     for (const mes of item.meses) {
       let duracaoReal = 0, estoqueReal = 0;
@@ -181,9 +209,9 @@ function computeReposicaoScope(
         estoqueReal = mes.estoqueRealSnapshot ?? 0;
       } else continue;
 
-      if (duracaoReal > 0 && duracaoReal <= limiteDiasAlerta && estoqueReal > 0) {
+      if (duracaoReal > 0 && duracaoReal <= itemLimiteDias && estoqueReal > 0) {
         const consumoDiario = estoqueReal / duracaoReal;
-        const diasCobertura = 30 + limiteDiasAlerta;
+        const diasCobertura = 30 + itemLimiteDias;
         const necessidadeTotal = consumoDiario * diasCobertura;
         const qtdCompra = Math.max(0, Math.round(necessidadeTotal - estoqueReal));
         if (qtdCompra > 0) {
@@ -735,8 +763,7 @@ export default function ProjecaoEstoquePage({
     projecoes.forEach(p => {
       const key = `${p.categoria}|${p.subgrupo ?? ""}|${p.grade ?? ""}|${p.colecao ?? ""}|${p.produto ?? ""}|${p.cor ?? ""}`;
       if (map.has(key)) return; // evita duplicatas
-      const isLencos = p.categoria === "LENÇOS" || p.categoria === "APROVEITAMENTO LENÇOS";
-      const limitDias = isLencos ? 120 : 90;
+      const limitDias = getLimiteDiasReposicao(p);
       const diasCobertura = 30 + limitDias;
 
       const newMeses = p.meses.map(m => ({ ...m }));
@@ -908,8 +935,7 @@ export default function ProjecaoEstoquePage({
     }>();
     listaExibida.forEach((proj, idx) => {
       const { estoqueAtualReal, duracaoRealMesAtual } = getReaisPorMes(proj);
-      const isLençosLine = proj.categoria === "LENÇOS" || proj.categoria === "APROVEITAMENTO LENÇOS";
-      const limiteDiasAlerta = isLençosLine ? 120 : 90;
+      const limiteDiasAlerta = getLimiteDiasReposicao(proj);
       // Gate: a PRÓPRIA linha deve ter duração em alerta (regra de negativo)
       for (const mes of proj.meses) {
         let duracaoReal = 0, estoqueReal = 0;
@@ -1617,8 +1643,7 @@ export default function ProjecaoEstoquePage({
                 const subCompraInfo = !compraInfo ? (subCompraMap.get(rowKey) ?? null) : null;
                 const simRowData = projetarComprasAtivo ? (simRowDataMap.get(rowKey) ?? null) : null;
                 const { estoqueAtualReal, duracaoRealMesAtual } = getReaisPorMes(proj);
-                const isLençosLine = proj.categoria === "LENÇOS" || proj.categoria === "APROVEITAMENTO LENÇOS";
-                const limiteDiasAlerta = isLençosLine ? 120 : 90;
+                const limiteDiasAlerta = getLimiteDiasReposicao(proj);
 
                 const ex = expansao.get(proj.categoria);
                 const nivel = ex?.nivel ?? 0;
@@ -1985,8 +2010,7 @@ export default function ProjecaoEstoquePage({
                             const c = sl.compras.find(cc => cc.mesNumero === simCompra.mesNumero && cc.ano === simCompra.ano);
                             if (!c || c.qtd <= 0) return [];
                             const estoqueNoMes = sl.meses[c.mesIdx]?.estoque ?? 0;
-                            const isLencos2 = p.categoria === "LENÇOS" || p.categoria === "APROVEITAMENTO LENÇOS";
-                            const lim2 = isLencos2 ? 120 : 90;
+                            const lim2 = getLimiteDiasReposicao(p);
                             const consumoDiario = estoqueNoMes > 0 ? estoqueNoMes / lim2 : 0;
                             return [{
                               produto: p.produto?.trim() ?? '',
@@ -2075,8 +2099,7 @@ export default function ProjecaoEstoquePage({
                                   const c = sl.compras.find(cc => cc.mesNumero === simCompra.mesNumero && cc.ano === simCompra.ano);
                                   if (!c || c.qtd <= 0) return;
                                   const estoqueAntes = Math.max(0, (sl.meses[c.mesIdx]?.estoque ?? 0) - c.qtd);
-                                  const isLencos2 = p.categoria === "LENÇOS" || p.categoria === "APROVEITAMENTO LENÇOS";
-                                  const lim2 = isLencos2 ? 120 : 90;
+                                  const lim2 = getLimiteDiasReposicao(p);
                                   const cDia = estoqueAntes > 0 ? estoqueAntes / lim2 : 0;
                                   const k = nextKey(p);
                                   const prev = byNext.get(k);
