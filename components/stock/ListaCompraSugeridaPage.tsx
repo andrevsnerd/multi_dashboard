@@ -2,6 +2,8 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+// @ts-ignore - xlsx não tem tipos perfeitos
+import * as XLSX from "xlsx";
 
 import type { CompanyKey } from "@/lib/config/company";
 import styles from "./ListaCompraSugeridaPage.module.css";
@@ -406,6 +408,39 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
     params.set("itemKey", itemKey);
     await fetch(`/api/controle-estoque/compra-final?${params}`, { method: "DELETE" });
     setCompraFinal((prev) => prev.filter((i) => i.itemKey !== itemKey));
+  };
+
+  const handleExportCompraFinalXlsx = () => {
+    const rows = compraFinalRows.map(({ it, estoque, custoUnit, custoTotal }) => ({
+      PRODUTO: it.produto,
+      DESC_PRODUTO: it.descricao,
+      COR_PRODUTO: it.corProduto ?? "",
+      DESC_COR_PRODUTO: it.corDescricao ?? "",
+      GRADE: it.grade ?? "",
+      COLECAO: it.colecao ?? "",
+      QTD_MANUAL: it.qtdManual ?? 0,
+      ESTOQUE_ATUAL: estoque ?? 0,
+      CUSTO_UNIT: custoUnit ?? 0,
+      CUSTO_TOTAL: custoTotal ?? 0,
+    }));
+
+    const kpis = [
+      { METRICA: "Empresa", VALOR: companyKey },
+      { METRICA: "Categoria", VALOR: categoria || "" },
+      { METRICA: "Filial (filtro)", VALOR: filial || "" },
+      { METRICA: "ContextKey", VALOR: contextKey },
+      { METRICA: "Itens", VALOR: compraFinalTotals.totalItens },
+      { METRICA: "Total Qtd Manual", VALOR: compraFinalTotals.totalQtdManual },
+      { METRICA: "Custo Total", VALOR: compraFinalTotals.totalCusto },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(kpis), "KPIs");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Compra Final");
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const filename = `compra-final-${companyKey}-${dateStr}.xlsx`;
+    XLSX.writeFile(wb, filename);
   };
 
   useEffect(() => {
@@ -1067,7 +1102,8 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
 
       {activeTab === "final" && (
         <>
-          <div className={styles.summaryCard}>
+          <div className={styles.summaryCard} style={{ justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 32, flexWrap: "wrap" }}>
             <div className={styles.summaryItem}>
               <span className={styles.summaryLabel}>Itens na Compra Final</span>
               <span className={styles.summaryValueNeutral}>{compraFinalTotals.totalItens}</span>
@@ -1082,6 +1118,15 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
               <span className={styles.summaryLabel}>Custo Total</span>
               <span className={styles.summaryValue}>{fmtBRL(compraFinalTotals.totalCusto)}</span>
             </div>
+            </div>
+
+            <button
+              type="button"
+              className={styles.exportBtn}
+              onClick={handleExportCompraFinalXlsx}
+            >
+              Exportar XLSX
+            </button>
           </div>
 
           <div className={styles.tableCard}>
