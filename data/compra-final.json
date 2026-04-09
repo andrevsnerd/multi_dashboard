@@ -26,9 +26,9 @@
       "descricao": "RAMOS DE PURPURA 06/23",
       "grade": "50X50",
       "colecao": "O9",
-      "qtdManual": 2,
+      "qtdManual": 20,
       "createdAt": "2026-04-09T14:17:05.876Z",
-      "updatedAt": "2026-04-09T14:17:05.876Z"
+      "updatedAt": "2026-04-09T16:20:18.678Z"
     },
     {
       "companyKey": "scarfme",
@@ -40,9 +40,9 @@
       "descricao": "COCAR PRETO 12/20",
       "grade": "8X130",
       "colecao": "H6",
-      "qtdManual": 6,
+      "qtdManual": 20,
       "createdAt": "2026-04-09T14:17:05.058Z",
-      "updatedAt": "2026-04-09T14:17:05.058Z"
+      "updatedAt": "2026-04-09T16:20:29.527Z"
     },
     {
       "companyKey": "scarfme",
@@ -54,9 +54,9 @@
       "descricao": "MARBLE FLOWERS 04/23",
       "grade": "8X130",
       "colecao": "P5",
-      "qtdManual": 5,
+      "qtdManual": 20,
       "createdAt": "2026-04-09T14:17:03.932Z",
-      "updatedAt": "2026-04-09T14:17:03.932Z"
+      "updatedAt": "2026-04-09T16:20:32.230Z"
     },
     {
       "companyKey": "scarfme",
@@ -68,9 +68,9 @@
       "descricao": "FLORESCER DA VOZ 03/25",
       "grade": "8X130",
       "colecao": "U4",
-      "qtdManual": 9,
+      "qtdManual": 20,
       "createdAt": "2026-04-09T14:16:50.729Z",
-      "updatedAt": "2026-04-09T14:17:01.269Z"
+      "updatedAt": "2026-04-09T16:20:34.645Z"
     }
   ]
 }

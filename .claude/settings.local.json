@@ -54,7 +54,8 @@
       "Bash(curl -s \"http://localhost:3000/api/admin/extrato-produto?produto=13.71.0365&cor=03&filial=GUARULHOS\" -H \"X-Auth-Username: andre.sabetta\")",
       "Bash(python -c ':*)",
       "Bash(python investigar_triggers.py)",
-      "Bash(node testar_saida_entrada.js)"
+      "Bash(node testar_saida_entrada.js)",
+      "Bash(grep -n \"filialDisplayNames\\\\|filialGroups\\\\|ecommerceFilials\" lib/repositories/*.ts)"
     ]
   }
 }
