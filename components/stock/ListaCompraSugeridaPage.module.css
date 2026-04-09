@@ -955,3 +955,15 @@
   background: #f8fafc;
   border-color: #cbd5e1;
 }
+
+.exportBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.exportActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}

@@ -23,7 +23,7 @@ export async function POST(request: Request) {
 
     if (!hasPostgres()) {
       return NextResponse.json(
-        { error: 'Neon não está configurado. Configure DATABASE_URL ou POSTGRES_URL.' },
+        { error: 'Neon não está configurado. Use DATABASE_URL, POSTGRES_URL ou outra URL exposta pela integração (ver lib/db/neon.ts).' },
         { status: 400 }
       );
     }

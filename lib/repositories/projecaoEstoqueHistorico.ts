@@ -30,7 +30,7 @@ let tableChecked = false;
 async function ensureTable() {
   if (tableChecked) return;
   if (!hasPostgres()) {
-    throw new Error('Neon/Postgres não configurado (DATABASE_URL/POSTGRES_URL).');
+    throw new Error('Neon/Postgres não configurado (veja variáveis em lib/db/neon.ts).');
   }
   const sql = getNeonSql();
   await sql`

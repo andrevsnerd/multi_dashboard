@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 // @ts-ignore - xlsx não tem tipos perfeitos
 import * as XLSX from "xlsx";
 
@@ -12,6 +12,7 @@ import {
   resolveCompany,
   type CompanyKey,
 } from "@/lib/config/company";
+import ComprasSalvasListPanel from "@/components/stock/ComprasSalvasListPanel";
 import styles from "./ListaCompraSugeridaPage.module.css";
 
 /** UserHeaderBar é sticky ~top:0 — cabeçalho da tabela ABC fica logo abaixo */
@@ -373,8 +374,15 @@ function getLimiteDiasReposicao(p: { linha?: string; subgrupo?: string }) {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
-export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: CompanyKey }) {
+export default function ListaCompraSugeridaPage({
+  companyKey,
+  companySlug = companyKey,
+}: {
+  companyKey: CompanyKey;
+  companySlug?: string;
+}) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const { isOpen: sidebarOpen } = useSidebar();
 
@@ -383,8 +391,27 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
   const filial = searchParams.get("filial") ?? "";
   const mode = searchParams.get("mode") ?? "";
 
-  const [activeTab, setActiveTab] = useState<"reposicao" | "abc" | "final">("reposicao");
+  const [activeTab, setActiveTab] = useState<"reposicao" | "abc" | "final" | "compras-salvas">("reposicao");
   const [expandirPorCor, setExpandirPorCor] = useState(true);
+  const [savingCompraSalva, setSavingCompraSalva] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("tab") === "compras-salvas") {
+      setActiveTab("compras-salvas");
+    }
+  }, [searchParams]);
+
+  const selectTab = useCallback(
+    (t: "reposicao" | "abc" | "final" | "compras-salvas") => {
+      setActiveTab(t);
+      const p = new URLSearchParams(searchParams.toString());
+      if (t === "compras-salvas") p.set("tab", "compras-salvas");
+      else p.delete("tab");
+      const qs = p.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
 
   // ── Aba Reposição ──────────────────────────────────────────────────────────
   const [reposicaoData, setReposicaoData] = useState<ReposicaoData | null>(null);
@@ -690,6 +717,44 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
     setCompraFinal((prev) => prev.filter((i) => i.itemKey !== itemKey));
   };
 
+  const handleSalvarCompraAtual = async () => {
+    if (compraFinal.length === 0) return;
+    setSavingCompraSalva(true);
+    try {
+      const title = `Compra ${new Date().toLocaleDateString("pt-BR")}`;
+      const res = await fetch("/api/controle-estoque/compras-salvas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyKey,
+          sourceContextKey: contextKey,
+          title,
+          expandirPorCor,
+          items: compraFinal.map((i) => ({
+            itemKey: i.itemKey,
+            produto: i.produto,
+            corProduto: i.corProduto,
+            corDescricao: i.corDescricao,
+            descricao: i.descricao,
+            grade: i.grade,
+            colecao: i.colecao,
+            qtdManual: i.qtdManual,
+          })),
+        }),
+      });
+      const json = await res.json() as { data?: { id?: string }; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Erro ao salvar");
+      const newId = json.data?.id;
+      if (newId) {
+        router.push(`/${companySlug}/controle-estoque/projecao/lista-compra/compras-salvas/${newId}`);
+      }
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Erro ao salvar compra");
+    } finally {
+      setSavingCompraSalva(false);
+    }
+  };
+
   const handleExportCompraFinalXlsx = () => {
     const rows = compraFinalRows.map(({ it, estoque, custoUnit, custoTotal }) => {
       const produto = it.produto.trim();
@@ -968,7 +1033,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
           <button
             type="button"
             className={`${styles.tab} ${activeTab === "reposicao" ? styles.tabActive : ""}`}
-            onClick={() => setActiveTab("reposicao")}
+            onClick={() => selectTab("reposicao")}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" />
@@ -978,7 +1043,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
           <button
             type="button"
             className={`${styles.tab} ${activeTab === "abc" ? styles.tabActive : ""}`}
-            onClick={() => setActiveTab("abc")}
+            onClick={() => selectTab("abc")}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" />
@@ -989,10 +1054,17 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
           <button
             type="button"
             className={`${styles.tab} ${activeTab === "final" ? styles.tabActive : ""}`}
-            onClick={() => setActiveTab("final")}
+            onClick={() => selectTab("final")}
           >
             Compra Final
             <span className={styles.tabBadgeInfo}>{compraFinal.length}</span>
+          </button>
+          <button
+            type="button"
+            className={`${styles.tab} ${activeTab === "compras-salvas" ? styles.tabActive : ""}`}
+            onClick={() => selectTab("compras-salvas")}
+          >
+            Compras salvas
           </button>
         </div>
       </div>
@@ -1597,13 +1669,19 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
             </div>
             </div>
 
-            <button
-              type="button"
-              className={styles.exportBtn}
-              onClick={handleExportCompraFinalXlsx}
-            >
-              Exportar XLSX
-            </button>
+            <div className={styles.exportActions}>
+              <button
+                type="button"
+                className={styles.exportBtn}
+                disabled={savingCompraSalva || compraFinal.length === 0}
+                onClick={() => { void handleSalvarCompraAtual(); }}
+              >
+                {savingCompraSalva ? "Salvando…" : "Salvar compra atual"}
+              </button>
+              <button type="button" className={styles.exportBtn} onClick={handleExportCompraFinalXlsx}>
+                Exportar XLSX
+              </button>
+            </div>
           </div>
 
           <div className={styles.tableCard}>
@@ -1729,6 +1807,12 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
             )}
           </div>
         </>
+      )}
+
+      {activeTab === "compras-salvas" && (
+        <div className={styles.tableCard} style={{ padding: 24 }}>
+          <ComprasSalvasListPanel companyKey={companyKey} companySlug={companySlug} />
+        </div>
       )}
 
       {sugestaoSTooltip && (

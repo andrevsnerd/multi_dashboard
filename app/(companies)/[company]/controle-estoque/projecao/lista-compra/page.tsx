@@ -18,7 +18,7 @@ export default async function ListaCompraSugeridaRoute({ params }: Props) {
 
   return (
     <PageLayout companyName={company.name}>
-      <ListaCompraSugeridaPage companyKey={company.key} />
+      <ListaCompraSugeridaPage companyKey={company.key} companySlug={companySlug} />
     </PageLayout>
   );
 }

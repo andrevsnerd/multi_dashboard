@@ -1,0 +1,280 @@
+import { randomUUID } from "crypto";
+import { promises as fs } from "fs";
+import path from "path";
+
+import { hasPostgres, getNeonSql } from "@/lib/db/neon";
+import type { CompraSalva, CompraSalvaItemRow, CompraSalvaListEntry } from "@/lib/types/compra-salva";
+
+export type { CompraSalva, CompraSalvaItemRow, CompraSalvaListEntry } from "@/lib/types/compra-salva";
+
+const FILE_PATH = path.join(process.cwd(), "data", "compras-salvas.json");
+
+let tableChecked = false;
+
+async function ensureDataFile() {
+  const dir = path.join(process.cwd(), "data");
+  try {
+    await fs.access(dir);
+  } catch {
+    await fs.mkdir(dir, { recursive: true });
+  }
+  try {
+    await fs.access(FILE_PATH);
+  } catch {
+    await fs.writeFile(FILE_PATH, JSON.stringify([]), "utf-8");
+  }
+}
+
+async function ensureTable() {
+  if (tableChecked) return;
+  const sql = getNeonSql();
+  await sql`
+    CREATE TABLE IF NOT EXISTS compras_salvas (
+      id TEXT PRIMARY KEY,
+      company_key TEXT NOT NULL,
+      source_context_key TEXT NOT NULL,
+      title TEXT NOT NULL,
+      expandir_por_cor BOOLEAN NOT NULL DEFAULT true,
+      items JSONB NOT NULL,
+      saved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  tableChecked = true;
+}
+
+function rowToCompraSalva(row: {
+  id: string;
+  company_key: string;
+  source_context_key: string;
+  title: string;
+  expandir_por_cor: boolean;
+  items: unknown;
+  saved_at: Date | string;
+  updated_at: Date | string;
+}): CompraSalva {
+  const items = Array.isArray(row.items) ? (row.items as CompraSalvaItemRow[]) : [];
+  return {
+    id: row.id,
+    companyKey: row.company_key,
+    sourceContextKey: row.source_context_key,
+    title: row.title,
+    expandirPorCor: !!row.expandir_por_cor,
+    items,
+    savedAt: new Date(row.saved_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+  };
+}
+
+async function readFileAll(): Promise<CompraSalva[]> {
+  await ensureDataFile();
+  const raw = await fs.readFile(FILE_PATH, "utf-8");
+  try {
+    const parsed = JSON.parse(raw) as CompraSalva[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeFileAll(rows: CompraSalva[]) {
+  await ensureDataFile();
+  await fs.writeFile(FILE_PATH, JSON.stringify(rows, null, 2), "utf-8");
+}
+
+function toListEntry(c: CompraSalva): CompraSalvaListEntry {
+  const totalQtdManual = c.items.reduce((s, i) => s + Math.max(0, Math.round(i.qtdManual ?? 0)), 0);
+  return {
+    id: c.id,
+    title: c.title,
+    itemCount: c.items.length,
+    totalQtdManual,
+    savedAt: c.savedAt,
+    updatedAt: c.updatedAt,
+  };
+}
+
+export async function listComprasSalvas(companyKey: string): Promise<CompraSalvaListEntry[]> {
+  if (hasPostgres()) {
+    await ensureTable();
+    const sql = getNeonSql();
+    const rows = await sql`
+      SELECT id, company_key, source_context_key, title, expandir_por_cor, items, saved_at, updated_at
+      FROM compras_salvas
+      WHERE company_key = ${companyKey}
+      ORDER BY saved_at DESC
+    `;
+    return rows.map((r) => toListEntry(rowToCompraSalva(r as never)));
+  }
+
+  const all = await readFileAll();
+  return all
+    .filter((c) => c.companyKey === companyKey)
+    .sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime())
+    .map(toListEntry);
+}
+
+export async function getCompraSalva(companyKey: string, id: string): Promise<CompraSalva | null> {
+  if (hasPostgres()) {
+    await ensureTable();
+    const sql = getNeonSql();
+    const rows = await sql`
+      SELECT id, company_key, source_context_key, title, expandir_por_cor, items, saved_at, updated_at
+      FROM compras_salvas
+      WHERE id = ${id} AND company_key = ${companyKey}
+      LIMIT 1
+    `;
+    const row = rows[0] as Parameters<typeof rowToCompraSalva>[0] | undefined;
+    return row ? rowToCompraSalva(row) : null;
+  }
+
+  const all = await readFileAll();
+  const c = all.find((x) => x.id === id && x.companyKey === companyKey);
+  return c ?? null;
+}
+
+export async function createCompraSalva(input: {
+  companyKey: string;
+  sourceContextKey: string;
+  title: string;
+  expandirPorCor: boolean;
+  items: CompraSalvaItemRow[];
+}): Promise<CompraSalva> {
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  const row: CompraSalva = {
+    id,
+    companyKey: input.companyKey,
+    sourceContextKey: input.sourceContextKey,
+    title: input.title.trim(),
+    expandirPorCor: input.expandirPorCor,
+    items: input.items.map((i) => ({
+      ...i,
+      qtdManual: Math.max(0, Math.round(i.qtdManual ?? 0)),
+    })),
+    savedAt: now,
+    updatedAt: now,
+  };
+
+  if (hasPostgres()) {
+    await ensureTable();
+    const sql = getNeonSql();
+    await sql`
+      INSERT INTO compras_salvas (
+        id, company_key, source_context_key, title, expandir_por_cor, items, saved_at, updated_at
+      ) VALUES (
+        ${row.id}, ${row.companyKey}, ${row.sourceContextKey}, ${row.title},
+        ${row.expandirPorCor}, ${JSON.stringify(row.items)}::jsonb,
+        ${row.savedAt}, ${row.updatedAt}
+      )
+    `;
+    return row;
+  }
+
+  const all = await readFileAll();
+  all.push(row);
+  await writeFileAll(all);
+  return row;
+}
+
+export async function updateCompraSalvaItemQtd(
+  companyKey: string,
+  id: string,
+  itemKey: string,
+  qtdManual: number
+): Promise<CompraSalva | null> {
+  const c = await getCompraSalva(companyKey, id);
+  if (!c) return null;
+  const idx = c.items.findIndex((i) => i.itemKey === itemKey);
+  if (idx < 0) return c;
+  const nextItems = [...c.items];
+  nextItems[idx] = { ...nextItems[idx], qtdManual: Math.max(0, Math.round(qtdManual)) };
+  const updatedAt = new Date().toISOString();
+
+  if (hasPostgres()) {
+    await ensureTable();
+    const sql = getNeonSql();
+    await sql`
+      UPDATE compras_salvas
+      SET items = ${JSON.stringify(nextItems)}::jsonb, updated_at = ${updatedAt}
+      WHERE id = ${id} AND company_key = ${companyKey}
+    `;
+  } else {
+    const all = await readFileAll();
+    const i = all.findIndex((x) => x.id === id && x.companyKey === companyKey);
+    if (i < 0) return null;
+    all[i] = { ...all[i], items: nextItems, updatedAt };
+    await writeFileAll(all);
+  }
+
+  return { ...c, items: nextItems, updatedAt };
+}
+
+export async function removeCompraSalvaItem(companyKey: string, id: string, itemKey: string): Promise<CompraSalva | null> {
+  const c = await getCompraSalva(companyKey, id);
+  if (!c) return null;
+  const nextItems = c.items.filter((i) => i.itemKey !== itemKey);
+  const updatedAt = new Date().toISOString();
+
+  if (hasPostgres()) {
+    await ensureTable();
+    const sql = getNeonSql();
+    await sql`
+      UPDATE compras_salvas
+      SET items = ${JSON.stringify(nextItems)}::jsonb, updated_at = ${updatedAt}
+      WHERE id = ${id} AND company_key = ${companyKey}
+    `;
+  } else {
+    const all = await readFileAll();
+    const i = all.findIndex((x) => x.id === id && x.companyKey === companyKey);
+    if (i < 0) return null;
+    all[i] = { ...all[i], items: nextItems, updatedAt };
+    await writeFileAll(all);
+  }
+
+  return { ...c, items: nextItems, updatedAt };
+}
+
+export async function updateCompraSalvaTitle(companyKey: string, id: string, title: string): Promise<CompraSalva | null> {
+  const c = await getCompraSalva(companyKey, id);
+  if (!c) return null;
+  const t = title.trim();
+  if (!t) return c;
+  const updatedAt = new Date().toISOString();
+
+  if (hasPostgres()) {
+    await ensureTable();
+    const sql = getNeonSql();
+    await sql`
+      UPDATE compras_salvas
+      SET title = ${t}, updated_at = ${updatedAt}
+      WHERE id = ${id} AND company_key = ${companyKey}
+    `;
+  } else {
+    const all = await readFileAll();
+    const i = all.findIndex((x) => x.id === id && x.companyKey === companyKey);
+    if (i < 0) return null;
+    all[i] = { ...all[i], title: t, updatedAt };
+    await writeFileAll(all);
+  }
+
+  return { ...c, title: t, updatedAt };
+}
+
+export async function deleteCompraSalva(companyKey: string, id: string): Promise<boolean> {
+  const existing = await getCompraSalva(companyKey, id);
+  if (!existing) return false;
+
+  if (hasPostgres()) {
+    await ensureTable();
+    const sql = getNeonSql();
+    await sql`
+      DELETE FROM compras_salvas WHERE id = ${id} AND company_key = ${companyKey}
+    `;
+    return true;
+  }
+
+  const all = await readFileAll();
+  await writeFileAll(all.filter((x) => !(x.id === id && x.companyKey === companyKey)));
+  return true;
+}
