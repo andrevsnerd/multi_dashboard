@@ -37,7 +37,12 @@ interface ReposicaoData {
 interface ProdutoSugestao {
   produto: string;
   cor?: string;
+  corDescricao?: string;
   descricao: string;
+  linha?: string;
+  subgrupo?: string;
+  grade?: string;
+  colecao?: string;
   vendas3meses: number;
   vendasMesAtual?: number;
   valor3meses: number;
@@ -77,6 +82,13 @@ async function fetchListaCompra(params: URLSearchParams): Promise<ProdutoSugesta
   const res = await fetch(`/api/controle-estoque/lista-compra-sugerida?${params}`, { cache: "no-store" });
   const json = await res.json() as { data?: ProdutoSugestao[]; error?: string };
   if (!res.ok) throw new Error(json.error ?? "Erro ao carregar");
+  return json.data ?? [];
+}
+
+async function fetchEstoquePorFilial(params: URLSearchParams): Promise<Array<{ filial: string; estoque: number }>> {
+  const res = await fetch(`/api/controle-estoque/estoque-por-filial-item?${params}`, { cache: "no-store" });
+  const json = await res.json() as { data?: Array<{ filial: string; estoque: number }>; error?: string };
+  if (!res.ok) throw new Error(json.error ?? "Erro ao carregar estoque por filial");
   return json.data ?? [];
 }
 
@@ -132,7 +144,33 @@ const CURVA_BAR_CLASS: Record<Curva, string> = {
   C: styles.percBarFillC,
 };
 
-const DIAS_META = 120;
+function normalizeKey(s?: string | null) {
+  return (s ?? "")
+    .toString()
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
+function getLimiteDiasReposicao(p: { linha?: string; subgrupo?: string }) {
+  const linha = normalizeKey(p.linha);
+  const subgrupo = normalizeKey(p.subgrupo);
+
+  // Linha índia: regra exclusiva (subgrupo não conta)
+  if (linha === "INDIA") return { limiteDias: 90, regra: "Linha Índia" };
+
+  // 120 dias apenas para subgrupos específicos
+  const subgrupos120 = new Set([
+    "CETIM DE SEDA",
+    "MOUSSELINE DE SEDA",
+    "SEDA PREMIUM",
+  ]);
+  if (subgrupos120.has(subgrupo)) return { limiteDias: 120, regra: `Subgrupo: ${p.subgrupo ?? ""}`.trim() };
+
+  // Restante
+  return { limiteDias: 60, regra: "Padrão" };
+}
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
@@ -146,7 +184,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
   const mode = searchParams.get("mode") ?? "";
 
   const [activeTab, setActiveTab] = useState<"reposicao" | "abc">("reposicao");
-  const [expandirPorCor, setExpandirPorCor] = useState(false);
+  const [expandirPorCor, setExpandirPorCor] = useState(true);
 
   // ── Aba Reposição ──────────────────────────────────────────────────────────
   const [reposicaoData, setReposicaoData] = useState<ReposicaoData | null>(null);
@@ -228,7 +266,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
   const [loadingABC, setLoadingABC] = useState(false);
   const [errorABC, setErrorABC] = useState<string | null>(null);
   const [abcLoadedKey, setAbcLoadedKey] = useState<string | null>(null);
-  const [modoReposicao, setModoReposicao] = useState(false);
+  const [modoReposicao, setModoReposicao] = useState(true);
   const [incluirCurvaB, setIncluirCurvaB] = useState(false);
   const [incluirCurvaC, setIncluirCurvaC] = useState(false);
 
@@ -238,6 +276,29 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
     if (vendasMes <= 0 || diasCorridosMes <= 0) return 0;
     return vendasMes / diasCorridosMes;
   };
+
+  const [duracaoTooltip, setDuracaoTooltip] = useState<null | {
+    x: number;
+    y: number;
+    regra: string;
+    limiteDias: number;
+    vendasMesAtual: number;
+    diasCorridos: number;
+    consumoDiario: number;
+    estoqueAtual: number;
+    duracaoDias: number;
+  }>(null);
+
+  const [estoqueTooltip, setEstoqueTooltip] = useState<null | {
+    x: number;
+    y: number;
+    produto: string;
+    corDescricao?: string;
+    filiais: Array<{ filial: string; estoque: number }>;
+    total: number;
+  }>(null);
+
+  const [estoquePorFilialCache, setEstoquePorFilialCache] = useState<Record<string, Array<{ filial: string; estoque: number }>>>({});
 
   const abcFetchKey = useMemo(() => {
     const gruposKey = searchParams.getAll("grupos").slice().sort().join("|");
@@ -298,10 +359,11 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
       if (!curvaAtiva) return { ...p, qtdFinal: 0, qtdSuficiente: false };
       const consumoDiario = consumoDiarioMesAtual(p);
       if (consumoDiario <= 0) return { ...p, qtdFinal: 0, qtdSuficiente: false };
+      const { limiteDias } = getLimiteDiasReposicao(p);
       const estoqueAtual = p.estoqueAtual ?? 0;
       const duracaoAtual = estoqueAtual / consumoDiario;
-      if (duracaoAtual >= DIAS_META) return { ...p, qtdFinal: 0, qtdSuficiente: true };
-      const qtd = Math.ceil(consumoDiario * (DIAS_META - duracaoAtual));
+      if (duracaoAtual >= limiteDias) return { ...p, qtdFinal: 0, qtdSuficiente: true };
+      const qtd = Math.ceil(consumoDiario * (limiteDias - duracaoAtual));
       return { ...p, qtdFinal: qtd, qtdSuficiente: false };
     });
   }, [produtosComCurva, modoReposicao, incluirCurvaB, incluirCurvaC, diasCorridosMes]);
@@ -381,21 +443,6 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
             Análise ABC
             <span className={styles.tabBadgeInfo}>visual</span>
           </button>
-        </div>
-
-        {/* Ações */}
-        <div className={styles.actionsBar}>
-          <button
-            type="button"
-            className={`${styles.actionButton} ${expandirPorCor ? styles.actionButtonActive : ""}`}
-            onClick={() => setExpandirPorCor(v => !v)}
-            title="Alterna entre agrupado por produto e detalhado por cor"
-          >
-            {expandirPorCor ? "✓" : "+"} Expandir por cor
-          </button>
-          <span className={styles.actionsHint}>
-            {expandirPorCor ? "Mostrando produto + cor" : "Mostrando produto agrupado"}
-          </span>
         </div>
       </div>
 
@@ -578,7 +625,29 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
               <div className={`${styles.toggleTrack} ${modoReposicao ? styles.toggleTrackOn : ""}`}>
                 <div className={`${styles.toggleThumb} ${modoReposicao ? styles.toggleThumbOn : ""}`} />
               </div>
-              <span className={styles.toggleLabelText}>Cálculo por Reposição Real</span>
+              <span className={styles.toggleLabelText}>Reposição Real</span>
+            </div>
+
+            <div className={styles.toggleDivider} />
+
+            <div
+              role="switch"
+              aria-checked={expandirPorCor}
+              tabIndex={0}
+              className={`${styles.toggleWrap} ${styles.toggleWrapSecondary}`}
+              onClick={() => setExpandirPorCor(v => !v)}
+              onKeyDown={e => {
+                if (e.key === " " || e.key === "Enter") {
+                  e.preventDefault();
+                  setExpandirPorCor(v => !v);
+                }
+              }}
+              title="Alterna entre produto agrupado e produto+cor"
+            >
+              <div className={`${styles.toggleTrack} ${expandirPorCor ? styles.toggleTrackOn : ""}`}>
+                <div className={`${styles.toggleThumb} ${expandirPorCor ? styles.toggleThumbOn : ""}`} />
+              </div>
+              <span className={styles.toggleLabelText}>Por Cor</span>
             </div>
 
             {modoReposicao ? (
@@ -606,7 +675,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}>
                     <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
                   </svg>
-                  Meta: {DIAS_META} dias de cobertura mínima
+                  Meta: por item (60/90/120 dias)
                 </span>
               </>
             ) : (
@@ -630,7 +699,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
               <div className={styles.summaryItem}>
                 <span className={styles.summaryLabel}>{modoReposicao ? "Cobertura Meta" : "Período Base"}</span>
                 <span className={styles.summaryValueNeutral} style={{ fontSize: 14 }}>
-                  {modoReposicao ? `${DIAS_META} dias mínimo` : "Últimos 12 meses"}
+                  {modoReposicao ? "Por item (60/90/120 dias)" : "Últimos 12 meses"}
                 </span>
               </div>
               <div className={styles.summaryDivider} />
@@ -663,8 +732,9 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                     <th style={{ width: 48 }}>#</th>
                     <th>Produto</th>
                     <th className={styles.right}>Vendas 12 meses</th>
-                    <th className={styles.right}>Qtd vendida (mês)</th>
+                    <th className={styles.right}>QTD 12 meses</th>
                     <th className={styles.right}>Estoque</th>
+                    <th className={styles.right}>QTD Mês Atual</th>
                     <th className={styles.right}>Duração</th>
                     <th className={styles.right}>Participação</th>
                     <th className={styles.right}>{modoReposicao ? "Qtd a Repor" : "Qtd Proporcional"}</th>
@@ -690,7 +760,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                               <span className={styles.sectionCount}>{grupo.length} produtos</span>
                               {curva === "A" && (
                                 <span className={styles.sectionNote}>
-                                  {modoReposicao ? `← meta: ${DIAS_META} dias` : "← referência proporcional"}
+                                  {modoReposicao ? "← meta por item (60/90/120)" : "← referência proporcional"}
                                 </span>
                               )}
                               {modoReposicao && curva !== "A" && curvaAtivaModo && (
@@ -712,17 +782,80 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                               </td>
                               <td>
                                 <div className={styles.productName}>{p.descricao || p.produto}</div>
-                                {p.descricao && p.produto !== p.descricao && (
-                                  <div className={styles.productCode}>{p.produto}</div>
+                                <div className={styles.productCode}>{p.produto}</div>
+                                {expandirPorCor && (p.corDescricao ?? "").trim() !== "" && (
+                                  <div className={styles.productCode}>{p.corDescricao}</div>
                                 )}
-                                {expandirPorCor && (p.cor ?? "").trim() !== "" && (
-                                  <div className={styles.productCode}>{p.cor}</div>
-                                )}
+                                {p.grade && <div className={styles.productCode}>Grade: {p.grade}</div>}
+                                {p.colecao && <div className={styles.productCode}>Coleção: {p.colecao}</div>}
                               </td>
                               <td className={styles.vendas}>{fmtBRL(p.valor3meses)}</td>
+                              <td className={styles.vendas}>{fmt(p.vendas3meses)}</td>
+                              <td
+                                className={styles.right}
+                                onMouseEnter={(e) => {
+                                  if (p.estoqueAtual == null) return;
+                                  const produto = (p.produto ?? '').trim();
+                                  const corProduto = expandirPorCor ? ((p.cor ?? '').trim() || null) : null;
+                                  const cacheKey = `${produto}||${corProduto ?? ''}`;
+                                  const cached = estoquePorFilialCache[cacheKey];
+                                  const show = (filiais: Array<{ filial: string; estoque: number }>) => {
+                                    const total = filiais.reduce((s, f) => s + (f.estoque ?? 0), 0);
+                                    setEstoqueTooltip({
+                                      x: e.clientX,
+                                      y: e.clientY,
+                                      produto,
+                                      corDescricao: expandirPorCor ? p.corDescricao : undefined,
+                                      filiais,
+                                      total,
+                                    });
+                                  };
+                                  if (cached) {
+                                    show(cached);
+                                    return;
+                                  }
+                                  const params = new URLSearchParams();
+                                  params.set("company", companyKey);
+                                  if (filial) params.set("filial", filial);
+                                  params.set("produto", produto);
+                                  if (corProduto) params.set("corProduto", corProduto);
+                                  fetchEstoquePorFilial(params)
+                                    .then((data) => {
+                                      setEstoquePorFilialCache((prev) => ({ ...prev, [cacheKey]: data }));
+                                      show(data);
+                                    })
+                                    .catch(() => {
+                                      show([]);
+                                    });
+                                }}
+                                onMouseLeave={() => setEstoqueTooltip(null)}
+                              >
+                                {p.estoqueAtual != null ? fmt(p.estoqueAtual) : "—"}
+                              </td>
                               <td className={styles.vendas}>{fmt(p.vendasMesAtual ?? 0)}</td>
-                              <td className={styles.right}>{p.estoqueAtual != null ? fmt(p.estoqueAtual) : "—"}</td>
-                              <td className={styles.right}>
+                              <td
+                                className={styles.right}
+                                onMouseEnter={(e) => {
+                                  const { limiteDias, regra } = getLimiteDiasReposicao(p);
+                                  const vendasMesAtual = p.vendasMesAtual ?? 0;
+                                  const diasCorridos = diasCorridosMes;
+                                  const consumoDiario = consumoDiarioMesAtual(p);
+                                  const estoqueAtual = p.estoqueAtual ?? 0;
+                                  const duracaoDias = consumoDiario > 0 ? Math.round(estoqueAtual / consumoDiario) : 0;
+                                  setDuracaoTooltip({
+                                    x: e.clientX,
+                                    y: e.clientY,
+                                    regra,
+                                    limiteDias,
+                                    vendasMesAtual,
+                                    diasCorridos,
+                                    consumoDiario,
+                                    estoqueAtual,
+                                    duracaoDias,
+                                  });
+                                }}
+                                onMouseLeave={() => setDuracaoTooltip(null)}
+                              >
                                 {(() => {
                                   const consumoDiario = consumoDiarioMesAtual(p);
                                   if (consumoDiario <= 0 || !p.estoqueAtual) return "—";
@@ -772,6 +905,50 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
             )}
           </div>
         </>
+      )}
+
+      {duracaoTooltip && (
+        <div
+          className={styles.tooltip}
+          style={{ left: duracaoTooltip.x + 12, top: duracaoTooltip.y + 12 }}
+        >
+          <div className={styles.tooltipTitle}>Duração real (mês atual)</div>
+          <div className={styles.tooltipLine}><strong>Regra:</strong> {duracaoTooltip.regra}</div>
+          <div className={styles.tooltipLine}><strong>Limite do item:</strong> {duracaoTooltip.limiteDias} dias</div>
+          <div className={styles.tooltipDivider} />
+          <div className={styles.tooltipLine}><strong>Vendas mês:</strong> {fmt(duracaoTooltip.vendasMesAtual)}</div>
+          <div className={styles.tooltipLine}><strong>Dias corridos:</strong> {duracaoTooltip.diasCorridos}</div>
+          <div className={styles.tooltipLine}><strong>Consumo/dia:</strong> {duracaoTooltip.consumoDiario.toFixed(2)}</div>
+          <div className={styles.tooltipLine}><strong>Estoque atual:</strong> {fmt(duracaoTooltip.estoqueAtual)}</div>
+          <div className={styles.tooltipLine}><strong>Duração:</strong> {duracaoTooltip.duracaoDias} dias</div>
+        </div>
+      )}
+
+      {estoqueTooltip && (
+        <div
+          className={styles.tooltip}
+          style={{ left: estoqueTooltip.x + 12, top: estoqueTooltip.y + 12 }}
+        >
+          <div className={styles.tooltipTitle}>Estoque por filial</div>
+          <div className={styles.tooltipLine}><strong>Produto:</strong> {estoqueTooltip.produto}</div>
+          {estoqueTooltip.corDescricao && (
+            <div className={styles.tooltipLine}><strong>Cor:</strong> {estoqueTooltip.corDescricao}</div>
+          )}
+          <div className={styles.tooltipDivider} />
+          {estoqueTooltip.filiais.length === 0 ? (
+            <div className={styles.tooltipLine}>Sem dados de estoque por filial.</div>
+          ) : (
+            <>
+              {estoqueTooltip.filiais.map((f) => (
+                <div key={f.filial} className={styles.tooltipLine}>
+                  <strong>{f.filial}:</strong> {fmt(f.estoque)}
+                </div>
+              ))}
+              <div className={styles.tooltipDivider} />
+              <div className={styles.tooltipLine}><strong>Total:</strong> {fmt(estoqueTooltip.total)}</div>
+            </>
+          )}
+        </div>
       )}
     </div>
   );

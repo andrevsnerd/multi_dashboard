@@ -5479,7 +5479,12 @@ export async function fetchProjecaoMensal({
 export interface ProdutoVendaUltimos3Meses {
   produto: string;
   cor?: string;
+  corDescricao?: string;
   descricao: string;
+  linha?: string;
+  subgrupo?: string;
+  grade?: string;
+  colecao?: string;
   vendas3meses: number;
   /** Qtde vendida no mês atual (até agora), usada para duração real */
   vendasMesAtual: number;
@@ -5520,6 +5525,7 @@ export async function fetchTopProdutosUltimos3Meses({
   limit?: number;
 }): Promise<ProdutoVendaUltimos3Meses[]> {
   return withRequest(async (request) => {
+    const useCoresTable = company === 'nerd';
     const now = new Date();
     // Últimos 12 meses
     const inicio12Meses = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
@@ -5568,11 +5574,24 @@ export async function fetchTopProdutosUltimos3Meses({
       }
     }
 
+    const coresJoin = (porCor && useCoresTable)
+      ? `LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR`
+      : '';
+
+    const corDescricaoExpr = useCoresTable
+      ? `COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO, vp.COR_PRODUTO)`
+      : `COALESCE(vp.DESC_COR_PRODUTO, vp.COR_PRODUTO)`;
+
     const query = `
       SELECT TOP (@lc_limit)
         ISNULL(vp.PRODUTO, '') AS produto,
         ${porCor ? "ISNULL(vp.COR_PRODUTO, '') AS cor," : ""}
+        ${porCor ? `MAX(ISNULL(${corDescricaoExpr}, '')) AS corDescricao,` : ""}
         UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS descricao,
+        MAX(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) AS linha,
+        MAX(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) AS subgrupo,
+        MAX(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) AS grade,
+        MAX(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) AS colecao,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS qtde3meses,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 AND vp.DATA_VENDA >= @inicioMesAtual THEN vp.QTDE ELSE 0 END) AS qtdeMesAtual,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) AS valor3meses,
@@ -5580,6 +5599,7 @@ export async function fetchTopProdutosUltimos3Meses({
         MAX(ISNULL(est.estoqueAtual, 0)) AS estoqueAtual
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      ${coresJoin}
       LEFT JOIN (
         SELECT
           e2.PRODUTO,
@@ -5611,7 +5631,12 @@ export async function fetchTopProdutosUltimos3Meses({
     const result = await request.query<{
       produto: string;
       cor?: string;
+      corDescricao?: string;
       descricao: string;
+      linha?: string;
+      subgrupo?: string;
+      grade?: string;
+      colecao?: string;
       qtde3meses: number;
       qtdeMesAtual: number;
       valor3meses: number;
@@ -5622,7 +5647,12 @@ export async function fetchTopProdutosUltimos3Meses({
     const rows = result.recordset.map(r => ({
       produto: r.produto?.trim() ?? '',
       ...(porCor ? { cor: (r.cor ?? "").trim() } : {}),
+      ...(porCor ? { corDescricao: (r.corDescricao ?? "").trim() || undefined } : {}),
       descricao: r.descricao?.trim() ?? '',
+      linha: (r.linha ?? '').trim() || undefined,
+      subgrupo: (r.subgrupo ?? '').trim() || undefined,
+      grade: (r.grade ?? '').trim() || undefined,
+      colecao: (r.colecao ?? '').trim() || undefined,
       vendas3meses: Math.round(Number(r.qtde3meses ?? 0)),
       vendasMesAtual: Math.round(Number(r.qtdeMesAtual ?? 0)),
       valor3meses: Math.round(Number(r.valor3meses ?? 0)),
@@ -5657,7 +5687,12 @@ export async function fetchTopProdutosUltimos3Meses({
       .map((r, i) => ({
         produto: r.produto,
         ...(porCor ? { cor: (r.cor ?? "").trim() } : {}),
+        ...(porCor ? { corDescricao: (r.corDescricao ?? "").trim() || undefined } : {}),
         descricao: r.descricao,
+        linha: (r.linha ?? '').trim() || undefined,
+        subgrupo: (r.subgrupo ?? '').trim() || undefined,
+        grade: (r.grade ?? '').trim() || undefined,
+        colecao: (r.colecao ?? '').trim() || undefined,
         vendas3meses: r.vendas3meses,
         vendasMesAtual: r.vendasMesAtual,
         valor3meses: r.valor3meses,
@@ -5668,6 +5703,57 @@ export async function fetchTopProdutosUltimos3Meses({
       }));
 
     return comSugestao;
+  });
+}
+
+export async function fetchEstoqueProdutoPorFilial({
+  company,
+  filial,
+  produto,
+  corProduto,
+}: {
+  company?: string;
+  filial?: string | null;
+  produto: string;
+  corProduto?: string | null;
+}): Promise<Array<{ filial: string; estoque: number }>> {
+  return withRequest(async (request) => {
+    const produtoNorm = produto.trim();
+    request.input('p_produto', sql.VarChar, produtoNorm);
+    const corNorm = (corProduto ?? '').trim();
+    request.input('p_cor', sql.VarChar, corNorm);
+
+    const estoqueFilialFilter = buildFilialFilter(request, company, filial ?? null, 'e');
+    const corFilter = corProduto != null ? `AND ISNULL(e.COR_PRODUTO, '') = @p_cor` : '';
+
+    const query = `
+      SELECT
+        e.FILIAL AS filial,
+        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS positiveStock,
+        SUM(CASE WHEN e.ESTOQUE < 0 THEN e.ESTOQUE ELSE 0 END) AS negativeStock,
+        COUNT(CASE WHEN e.ESTOQUE > 0 THEN 1 END) AS positiveCount
+      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      WHERE e.PRODUTO = @p_produto
+        ${corFilter}
+        ${estoqueFilialFilter}
+      GROUP BY e.FILIAL
+      ORDER BY e.FILIAL
+    `;
+
+    const result = await request.query<{
+      filial: string;
+      positiveStock: number | null;
+      negativeStock: number | null;
+      positiveCount: number | null;
+    }>(query);
+
+    return result.recordset.map((r) => {
+      const positiveStock = Number(r.positiveStock ?? 0);
+      const negativeStock = Number(r.negativeStock ?? 0);
+      const positiveCount = Number(r.positiveCount ?? 0);
+      const estoque = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
+      return { filial: r.filial, estoque: Math.round(estoque) };
+    });
   });
 }
 
