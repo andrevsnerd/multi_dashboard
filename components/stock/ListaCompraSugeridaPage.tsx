@@ -96,6 +96,13 @@ async function fetchEstoquePorFilial(params: URLSearchParams): Promise<Array<{ f
   return json.data ?? [];
 }
 
+async function fetchVendasPorFilialItem(params: URLSearchParams): Promise<Array<{ filial: string; qtde12m: number; qtde60d: number }>> {
+  const res = await fetch(`/api/controle-estoque/vendas-por-filial-item?${params}`, { cache: "no-store" });
+  const json = await res.json() as { data?: Array<{ filial: string; qtde12m: number; qtde60d: number }>; error?: string };
+  if (!res.ok) throw new Error(json.error ?? "Erro ao carregar vendas por filial");
+  return json.data ?? [];
+}
+
 /** Hamilton/Largest Remainder distribution */
 function hamiltonDistribute(items: { valor: number }[], total: number): number[] {
   const totalValor = items.reduce((s, r) => s + r.valor, 0);
@@ -330,6 +337,17 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
 
   const [estoquePorFilialCache, setEstoquePorFilialCache] = useState<Record<string, Array<{ filial: string; estoque: number }>>>({});
 
+  const [vendasTooltip, setVendasTooltip] = useState<null | {
+    x: number;
+    y: number;
+    produto: string;
+    corDescricao?: string;
+    mode: "12m" | "60d";
+    filiais: Array<{ filial: string; qtde12m: number; qtde60d: number }>;
+    loading: boolean;
+  }>(null);
+  const [vendasPorFilialCache, setVendasPorFilialCache] = useState<Record<string, Array<{ filial: string; qtde12m: number; qtde60d: number }>>>({});
+
   const abcFetchKey = useMemo(() => {
     const gruposKey = searchParams.getAll("grupos").slice().sort().join("|");
     const linhasKey = searchParams.getAll("linhas").slice().sort().join("|");
@@ -352,7 +370,27 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
     ].join("::");
   }, [companyKey, filial, categoria, qtdCompra, expandirPorCor, searchParams]);
 
-  const contextKey = abcFetchKey;
+  // contextKey estável para Compra Final — exclui o filtro de produto individual (p=)
+  // que é temporário e não deve mudar a "sessão" de compra
+  const contextKey = useMemo(() => {
+    const gruposKey = searchParams.getAll("grupos").slice().sort().join("|");
+    const linhasKey = searchParams.getAll("linhas").slice().sort().join("|");
+    const colecoesKey = searchParams.getAll("colecoes").slice().sort().join("|");
+    const subgruposKey = searchParams.getAll("subgrupos").slice().sort().join("|");
+    const gradesKey = searchParams.getAll("grades").slice().sort().join("|");
+    return [
+      companyKey,
+      filial,
+      categoria,
+      String(qtdCompra),
+      expandirPorCor ? "porcor" : "porproduto",
+      `g=${gruposKey}`,
+      `l=${linhasKey}`,
+      `c=${colecoesKey}`,
+      `s=${subgruposKey}`,
+      `gr=${gradesKey}`,
+    ].join("::");
+  }, [companyKey, filial, categoria, qtdCompra, expandirPorCor, searchParams]);
 
   async function fetchCompraFinalList(): Promise<CompraFinalItem[]> {
     const params = new URLSearchParams();
@@ -394,7 +432,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
       descricao: p.descricao || produto,
       grade: p.grade,
       colecao: p.colecao,
-      qtdManual: Math.max(0, Math.round(p.qtdFinal ?? 0)),
+      qtdManual: Math.max(0, Math.round(p.qtdFinal > 0 ? p.qtdFinal : temSugestaoS(p) ? calcQtdS(p) : 0)),
     };
     await fetch(`/api/controle-estoque/compra-final`, {
       method: "POST",
@@ -508,7 +546,8 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
   const temSugestaoS = (p: ProdutoComCurva) => {
     if (p.qtdFinal > 0 || p.qtdSuficiente) return false;
     const mediaVendasMes = p.vendas3meses / 12;
-    return mediaVendasMes >= 2 && (p.estoqueAtual ?? 0) <= mediaVendasMes;
+    // Dispara S se vende ≥ 2/mês em média e tem < 2 meses de cobertura de estoque
+    return mediaVendasMes >= 2 && (p.estoqueAtual ?? 0) <= mediaVendasMes * 2;
   };
 
   const calcQtdS = (p: ProdutoComCurva) => {
@@ -1016,7 +1055,32 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                                 {p.colecao && <div className={styles.productCode}>Coleção: {p.colecao}</div>}
                               </td>
                               <td className={styles.vendas}>{fmtBRL(p.valor3meses)}</td>
-                              <td className={styles.vendas}>{fmt(p.vendas3meses)}</td>
+                              <td
+                                className={`${styles.vendas} ${styles.tooltipCell}`}
+                                onMouseEnter={(e) => {
+                                  const produto = (p.produto ?? '').trim();
+                                  const corProduto = expandirPorCor ? ((p.cor ?? '').trim() || null) : null;
+                                  const cacheKey = `${produto}||${corProduto ?? ''}`;
+                                  const cached = vendasPorFilialCache[cacheKey];
+                                  if (cached) {
+                                    setVendasTooltip({ x: e.clientX, y: e.clientY, produto, corDescricao: expandirPorCor ? p.corDescricao : undefined, mode: "12m", filiais: cached, loading: false });
+                                    return;
+                                  }
+                                  setVendasTooltip({ x: e.clientX, y: e.clientY, produto, corDescricao: expandirPorCor ? p.corDescricao : undefined, mode: "12m", filiais: [], loading: true });
+                                  const params = new URLSearchParams();
+                                  params.set("company", companyKey);
+                                  if (filial) params.set("filial", filial);
+                                  params.set("produto", produto);
+                                  if (corProduto) params.set("corProduto", corProduto);
+                                  fetchVendasPorFilialItem(params)
+                                    .then((data) => {
+                                      setVendasPorFilialCache((prev) => ({ ...prev, [cacheKey]: data }));
+                                      setVendasTooltip((prev) => prev ? { ...prev, filiais: data, loading: false } : null);
+                                    })
+                                    .catch(() => setVendasTooltip((prev) => prev ? { ...prev, loading: false } : null));
+                                }}
+                                onMouseLeave={() => setVendasTooltip(null)}
+                              >{fmt(p.vendas3meses)}</td>
                               <td
                                 className={styles.right}
                                 onMouseEnter={(e) => {
@@ -1058,7 +1122,32 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                               >
                                 {p.estoqueAtual != null ? fmt(p.estoqueAtual) : "—"}
                               </td>
-                              <td className={styles.vendas}>{fmt(p.vendas60dias ?? 0)}</td>
+                              <td
+                                className={`${styles.vendas} ${styles.tooltipCell}`}
+                                onMouseEnter={(e) => {
+                                  const produto = (p.produto ?? '').trim();
+                                  const corProduto = expandirPorCor ? ((p.cor ?? '').trim() || null) : null;
+                                  const cacheKey = `${produto}||${corProduto ?? ''}`;
+                                  const cached = vendasPorFilialCache[cacheKey];
+                                  if (cached) {
+                                    setVendasTooltip({ x: e.clientX, y: e.clientY, produto, corDescricao: expandirPorCor ? p.corDescricao : undefined, mode: "60d", filiais: cached, loading: false });
+                                    return;
+                                  }
+                                  setVendasTooltip({ x: e.clientX, y: e.clientY, produto, corDescricao: expandirPorCor ? p.corDescricao : undefined, mode: "60d", filiais: [], loading: true });
+                                  const params = new URLSearchParams();
+                                  params.set("company", companyKey);
+                                  if (filial) params.set("filial", filial);
+                                  params.set("produto", produto);
+                                  if (corProduto) params.set("corProduto", corProduto);
+                                  fetchVendasPorFilialItem(params)
+                                    .then((data) => {
+                                      setVendasPorFilialCache((prev) => ({ ...prev, [cacheKey]: data }));
+                                      setVendasTooltip((prev) => prev ? { ...prev, filiais: data, loading: false } : null);
+                                    })
+                                    .catch(() => setVendasTooltip((prev) => prev ? { ...prev, loading: false } : null));
+                                }}
+                                onMouseLeave={() => setVendasTooltip(null)}
+                              >{fmt(p.vendas60dias ?? 0)}</td>
                               <td
                                 className={styles.right}
                                 onMouseEnter={(e) => {
@@ -1112,11 +1201,10 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                                     <td className={styles.qtdSuficienteTag}>quantidade suficiente</td>
                                   );
                                 }
-                                // Sugestão alternativa: vendeu >= 2/mês em média e estoque <= média mensal
-                                const mediaVendasMes = p.vendas3meses / 12;
-                                if (mediaVendasMes >= 2 && (p.estoqueAtual ?? 0) <= mediaVendasMes) {
+                                if (temSugestaoS(p)) {
+                                  const qtdS = calcQtdS(p);
+                                  const mediaVendasMes = p.vendas3meses / 12;
                                   const { limiteDias } = getLimiteDiasReposicao(p);
-                                  const qtdS = Math.ceil((limiteDias / 30) * mediaVendasMes);
                                   return (
                                     <td className={styles.qtdSugeridaS}>
                                       <span className={styles.qtdSugeridaSInner}>
@@ -1366,6 +1454,46 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
               <div className={styles.tooltipEstoqueTotal}>
                 <span>Total</span>
                 <span>{fmt(estoqueTooltip.total)}</span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {vendasTooltip && (
+        <div
+          className={styles.tooltipEstoque}
+          style={{ left: vendasTooltip.x + 12, top: vendasTooltip.y + 12 }}
+        >
+          <div className={styles.tooltipEstoqueHeader}>
+            {vendasTooltip.mode === "12m" ? "Vendas 12 meses por filial" : "Vendas 60 dias por filial"}
+          </div>
+          <div className={styles.tooltipEstoqueMeta}><strong>Produto:</strong> {vendasTooltip.produto}</div>
+          {vendasTooltip.corDescricao && (
+            <div className={styles.tooltipEstoqueMeta}><strong>Cor:</strong> {vendasTooltip.corDescricao}</div>
+          )}
+          <div className={styles.tooltipDivider} />
+          {vendasTooltip.loading ? (
+            <div className={styles.tooltipLine}>Carregando...</div>
+          ) : vendasTooltip.filiais.length === 0 ? (
+            <div className={styles.tooltipLine}>Sem vendas no período.</div>
+          ) : (
+            <>
+              <div className={styles.tooltipEstoqueFiliais}>
+                {vendasTooltip.filiais.map((f) => (
+                  <React.Fragment key={f.filial}>
+                    <span className={styles.tooltipEstoqueFilialNome}>{f.filial}</span>
+                    <span className={styles.tooltipEstoqueFilialQtd}>
+                      {fmt(vendasTooltip.mode === "12m" ? f.qtde12m : f.qtde60d)}
+                    </span>
+                  </React.Fragment>
+                ))}
+              </div>
+              <div className={styles.tooltipEstoqueTotal}>
+                <span>Total</span>
+                <span>
+                  {fmt(vendasTooltip.filiais.reduce((s, f) => s + (vendasTooltip.mode === "12m" ? f.qtde12m : f.qtde60d), 0))}
+                </span>
               </div>
             </>
           )}

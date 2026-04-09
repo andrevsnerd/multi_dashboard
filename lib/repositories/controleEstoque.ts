@@ -5765,6 +5765,58 @@ export async function fetchEstoqueProdutoPorFilial({
   });
 }
 
+export async function fetchVendasProdutoPorFilial({
+  company,
+  filial,
+  produto,
+  corProduto,
+}: {
+  company?: string;
+  filial?: string | null;
+  produto: string;
+  corProduto?: string | null;
+}): Promise<Array<{ filial: string; qtde12m: number; qtde60d: number }>> {
+  return withRequest(async (request) => {
+    const now = new Date();
+    const inicio12m = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+    const inicio60d = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    request.input('vf_inicio12m', sql.DateTime, inicio12m);
+    request.input('vf_fim', sql.DateTime, now);
+    request.input('vf_inicio60d', sql.DateTime, inicio60d);
+    request.input('vf_produto', sql.VarChar, produto.trim());
+
+    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial ?? null, 'vf');
+    const corNorm = (corProduto ?? '').trim();
+    const corFilter = corProduto != null ? `AND ISNULL(vf.COR_PRODUTO, '') = @vf_cor` : '';
+    if (corProduto != null) {
+      request.input('vf_cor', sql.VarChar, corNorm);
+    }
+
+    const query = `
+      SELECT
+        vf.FILIAL AS filial,
+        SUM(CASE WHEN vf.QTDE_CANCELADA = 0 THEN vf.QTDE ELSE 0 END) AS qtde12m,
+        SUM(CASE WHEN vf.QTDE_CANCELADA = 0 AND vf.DATA_VENDA >= @vf_inicio60d THEN vf.QTDE ELSE 0 END) AS qtde60d
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vf WITH (NOLOCK)
+      WHERE vf.DATA_VENDA >= @vf_inicio12m
+        AND vf.DATA_VENDA < @vf_fim
+        AND vf.QTDE > 0
+        AND LTRIM(RTRIM(ISNULL(vf.PRODUTO, ''))) = @vf_produto
+        ${corFilter}
+        ${vendasFilialFilter}
+      GROUP BY vf.FILIAL
+      ORDER BY vf.FILIAL
+    `;
+
+    const result = await request.query<{ filial: string; qtde12m: number; qtde60d: number }>(query);
+    return result.recordset.map(r => ({
+      filial: r.filial,
+      qtde12m: Math.round(Number(r.qtde12m ?? 0)),
+      qtde60d: Math.round(Number(r.qtde60d ?? 0)),
+    }));
+  });
+}
+
 /**
  * Busca produtos PARADOS por categoria: com estoque positivo nas filiais
  * que NÃO venderam no período selecionado.

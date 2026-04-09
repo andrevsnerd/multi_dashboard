@@ -142,6 +142,12 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
 }
 
+.table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
 .table thead th {
   background: #1e293b;
   padding: 14px 16px;
@@ -764,6 +770,12 @@
 .tooltipLine strong {
   color: #ffffff;
   font-weight: 800;
+}
+
+.tooltipCell {
+  cursor: help;
+  text-decoration: underline dotted rgba(100, 116, 139, 0.5);
+  text-underline-offset: 3px;
 }
 
 .tooltipDivider {
