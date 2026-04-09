@@ -637,11 +637,83 @@
   pointer-events: none;
 }
 
+.tooltipEstoque {
+  position: fixed;
+  z-index: 50;
+  min-width: 320px;
+  max-width: 480px;
+  background: rgba(15, 23, 42, 0.97);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 12px;
+  padding: 14px 18px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+.tooltipEstoqueFiliais {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 16px;
+  margin-top: 4px;
+}
+
+.tooltipEstoqueFilialNome {
+  font-size: 13px;
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tooltipEstoqueFilialQtd {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tooltipEstoqueFilialQtd.negative {
+  color: #f87171;
+}
+
+.tooltipEstoqueTotal {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.3);
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
 .tooltipTitle {
   font-size: 12px;
   font-weight: 800;
   margin-bottom: 6px;
   color: #ffffff;
+}
+
+.tooltipEstoqueHeader {
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 8px;
+  color: #ffffff;
+  letter-spacing: 0.02em;
+}
+
+.tooltipEstoqueMeta {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-bottom: 2px;
+}
+
+.tooltipEstoqueMeta strong {
+  color: #e2e8f0;
+  font-weight: 600;
 }
 
 .tooltipLine {

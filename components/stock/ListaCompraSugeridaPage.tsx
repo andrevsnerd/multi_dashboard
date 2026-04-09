@@ -993,7 +993,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                                   const cacheKey = `${produto}||${corProduto ?? ''}`;
                                   const cached = estoquePorFilialCache[cacheKey];
                                   const show = (filiais: Array<{ filial: string; estoque: number }>) => {
-                                    const total = filiais.reduce((s, f) => s + (f.estoque ?? 0), 0);
+                                    const total = filiais.reduce((s, f) => s + Math.max(0, f.estoque ?? 0), 0);
                                     setEstoqueTooltip({
                                       x: e.clientX,
                                       y: e.clientY,
@@ -1180,7 +1180,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                             const cacheKey = `${produto}||${corProduto ?? ""}`;
                             const cached = estoquePorFilialCache[cacheKey];
                             const show = (filiais: Array<{ filial: string; estoque: number }>) => {
-                              const total = filiais.reduce((s, f) => s + (f.estoque ?? 0), 0);
+                              const total = filiais.reduce((s, f) => s + Math.max(0, f.estoque ?? 0), 0);
                               setEstoqueTooltip({
                                 x: e.clientX,
                                 y: e.clientY,
@@ -1257,26 +1257,31 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
 
       {estoqueTooltip && (
         <div
-          className={styles.tooltip}
+          className={styles.tooltipEstoque}
           style={{ left: estoqueTooltip.x + 12, top: estoqueTooltip.y + 12 }}
         >
-          <div className={styles.tooltipTitle}>Estoque por filial</div>
-          <div className={styles.tooltipLine}><strong>Produto:</strong> {estoqueTooltip.produto}</div>
+          <div className={styles.tooltipEstoqueHeader}>Estoque por filial</div>
+          <div className={styles.tooltipEstoqueMeta}><strong>Produto:</strong> {estoqueTooltip.produto}</div>
           {estoqueTooltip.corDescricao && (
-            <div className={styles.tooltipLine}><strong>Cor:</strong> {estoqueTooltip.corDescricao}</div>
+            <div className={styles.tooltipEstoqueMeta}><strong>Cor:</strong> {estoqueTooltip.corDescricao}</div>
           )}
           <div className={styles.tooltipDivider} />
           {estoqueTooltip.filiais.length === 0 ? (
             <div className={styles.tooltipLine}>Sem dados de estoque por filial.</div>
           ) : (
             <>
-              {estoqueTooltip.filiais.map((f) => (
-                <div key={f.filial} className={styles.tooltipLine}>
-                  <strong>{f.filial}:</strong> {fmt(f.estoque)}
-                </div>
-              ))}
-              <div className={styles.tooltipDivider} />
-              <div className={styles.tooltipLine}><strong>Total:</strong> {fmt(estoqueTooltip.total)}</div>
+              <div className={styles.tooltipEstoqueFiliais}>
+                {estoqueTooltip.filiais.map((f) => (
+                  <React.Fragment key={f.filial}>
+                    <span className={styles.tooltipEstoqueFilialNome}>{f.filial}</span>
+                    <span className={`${styles.tooltipEstoqueFilialQtd}${f.estoque < 0 ? ` ${styles.negative}` : ""}`}>{fmt(f.estoque)}</span>
+                  </React.Fragment>
+                ))}
+              </div>
+              <div className={styles.tooltipEstoqueTotal}>
+                <span>Total</span>
+                <span>{fmt(estoqueTooltip.total)}</span>
+              </div>
             </>
           )}
         </div>
