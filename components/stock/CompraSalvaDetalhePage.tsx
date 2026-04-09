@@ -210,7 +210,7 @@ export default function CompraSalvaDetalhePage({
   vendasPorFilialCacheRef.current = vendasPorFilialCache;
   const destinoVendasFetchRef = useRef(new Set<string>());
 
- S  const expandirPorCor = doc?.expandirPorCor ?? true;
+  const expandirPorCor = doc?.expandirPorCor ?? true;
 
   useEffect(() => {
     let cancelled = false;
