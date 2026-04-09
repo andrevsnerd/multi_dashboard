@@ -36,6 +36,7 @@ interface ReposicaoData {
 
 interface ProdutoSugestao {
   produto: string;
+  cor?: string;
   descricao: string;
   vendas3meses: number;
   valor3meses: number;
@@ -94,6 +95,7 @@ function hamiltonDistribute(items: { valor: number }[], total: number): number[]
 
 /** Calcula curva ABC por faturamento acumulado */
 function calcularCurvas(produtos: ProdutoSugestao[], qtdCompra: number): ProdutoComCurva[] {
+  const keyOf = (p: ProdutoSugestao) => `${p.produto}||${p.cor ?? ""}`;
   const totalGeral = produtos.reduce((s, p) => s + p.valor3meses, 0);
   let cumulative = 0;
   const comCurva = produtos.map((p): ProdutoComCurva => {
@@ -104,10 +106,10 @@ function calcularCurvas(produtos: ProdutoSugestao[], qtdCompra: number): Produto
   });
   const curvaA = comCurva.filter(p => p.curva === "A");
   const qtds = hamiltonDistribute(curvaA.map(p => ({ valor: p.valor3meses })), qtdCompra);
-  const qtdMap = new Map(curvaA.map((p, i) => [p.produto, qtds[i]]));
+  const qtdMap = new Map(curvaA.map((p, i) => [keyOf(p), qtds[i]]));
   return comCurva.map(p => ({
     ...p,
-    qtdFinal: p.curva === "A" ? (qtdMap.get(p.produto) ?? 0) : 0,
+    qtdFinal: p.curva === "A" ? (qtdMap.get(keyOf(p)) ?? 0) : 0,
   }));
 }
 
@@ -143,6 +145,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
   const mode = searchParams.get("mode") ?? "";
 
   const [activeTab, setActiveTab] = useState<"reposicao" | "abc">("reposicao");
+  const [expandirPorCor, setExpandirPorCor] = useState(false);
 
   // ── Aba Reposição ──────────────────────────────────────────────────────────
   const [reposicaoData, setReposicaoData] = useState<ReposicaoData | null>(null);
@@ -169,26 +172,94 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
     }));
   }, [reposicaoData]);
 
-  const totalCustoReposicao = reposicaoComCusto.reduce((s, i) => s + i.custoTotal, 0);
-  const totalQtdReposicao = reposicaoComCusto.reduce((s, i) => s + i.qtdCompra, 0);
+  const reposicaoAgrupadaPorProduto = useMemo(() => {
+    if (!reposicaoData) return [];
+    const map = new Map<string, ReposicaoItem[]>();
+    reposicaoData.itens.forEach((it) => {
+      const k = (it.produto ?? "").trim();
+      if (!map.has(k)) map.set(k, []);
+      map.get(k)!.push(it);
+    });
+    const merged: ReposicaoItem[] = [];
+    map.forEach((items) => {
+      const base = items[0];
+      const qtdCompra = items.reduce((s, i) => s + (i.qtdCompra ?? 0), 0);
+      const estoqueReal = items.reduce((s, i) => s + (i.estoqueReal ?? 0), 0);
+      const consumoDiario = items.reduce((s, i) => s + (i.consumoDiario ?? 0), 0);
+      const duracaoReal = consumoDiario > 0 ? Math.round(estoqueReal / consumoDiario) : 0;
+      const diasCobertura = items.reduce((max, i) => Math.max(max, i.diasCobertura ?? 0), 0);
+      const necessidadeTotal = consumoDiario * diasCobertura;
+      merged.push({
+        produto: base.produto,
+        descricao: base.descricao,
+        subgrupo: base.subgrupo,
+        grade: base.grade,
+        colecao: base.colecao,
+        linha: base.linha,
+        qtdCompra,
+        estoqueReal,
+        duracaoReal,
+        consumoDiario,
+        diasCobertura,
+        necessidadeTotal,
+        custoUnit: base.custoUnit,
+      });
+    });
+    // ordena por qtdCompra desc
+    merged.sort((a, b) => (b.qtdCompra ?? 0) - (a.qtdCompra ?? 0));
+    return merged;
+  }, [reposicaoData]);
+
+  const reposicaoExibidaComCusto = useMemo(() => {
+    const base = expandirPorCor ? reposicaoComCusto : reposicaoAgrupadaPorProduto.map(item => ({
+      ...item,
+      custoUnit: item.custoUnit ?? 0,
+      custoTotal: (item.qtdCompra ?? 0) * (item.custoUnit ?? 0),
+    }));
+    return base;
+  }, [expandirPorCor, reposicaoComCusto, reposicaoAgrupadaPorProduto]);
+
+  const totalCustoReposicao = reposicaoExibidaComCusto.reduce((s, i) => s + (i.custoTotal ?? 0), 0);
+  const totalQtdReposicao = reposicaoExibidaComCusto.reduce((s, i) => s + (i.qtdCompra ?? 0), 0);
 
   // ── Aba ABC ────────────────────────────────────────────────────────────────
   const [produtosABC, setProdutosABC] = useState<ProdutoSugestao[]>([]);
   const [loadingABC, setLoadingABC] = useState(false);
   const [errorABC, setErrorABC] = useState<string | null>(null);
-  const [abcLoaded, setAbcLoaded] = useState(false);
+  const [abcLoadedKey, setAbcLoadedKey] = useState<string | null>(null);
   const [modoReposicao, setModoReposicao] = useState(false);
   const [incluirCurvaB, setIncluirCurvaB] = useState(false);
   const [incluirCurvaC, setIncluirCurvaC] = useState(false);
 
+  const abcFetchKey = useMemo(() => {
+    const gruposKey = searchParams.getAll("grupos").slice().sort().join("|");
+    const linhasKey = searchParams.getAll("linhas").slice().sort().join("|");
+    const colecoesKey = searchParams.getAll("colecoes").slice().sort().join("|");
+    const subgruposKey = searchParams.getAll("subgrupos").slice().sort().join("|");
+    const gradesKey = searchParams.getAll("grades").slice().sort().join("|");
+    return [
+      companyKey,
+      filial,
+      categoria,
+      String(qtdCompra),
+      expandirPorCor ? "porcor" : "porproduto",
+      `g=${gruposKey}`,
+      `l=${linhasKey}`,
+      `c=${colecoesKey}`,
+      `s=${subgruposKey}`,
+      `gr=${gradesKey}`,
+    ].join("::");
+  }, [companyKey, filial, categoria, qtdCompra, expandirPorCor, searchParams]);
+
   useEffect(() => {
-    if (activeTab !== "abc" || abcLoaded) return;
+    if (activeTab !== "abc" || abcLoadedKey === abcFetchKey) return;
     const params = new URLSearchParams();
     params.set("company", companyKey);
     if (filial) params.set("filial", filial);
     if (categoria) params.set("categoria", categoria);
     params.set("qtdCompra", String(qtdCompra));
     params.set("limit", "2000");
+    if (expandirPorCor) params.set("porCor", "1");
     searchParams.getAll("grupos").forEach((g) => params.append("grupos", g));
     searchParams.getAll("linhas").forEach((l) => params.append("linhas", l));
     searchParams.getAll("colecoes").forEach((c) => params.append("colecoes", c));
@@ -198,10 +269,10 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
     setLoadingABC(true);
     setErrorABC(null);
     fetchListaCompra(params)
-      .then(data => { setProdutosABC(data); setAbcLoaded(true); })
+      .then(data => { setProdutosABC(data); setAbcLoadedKey(abcFetchKey); })
       .catch((e) => setErrorABC(e instanceof Error ? e.message : "Erro"))
       .finally(() => setLoadingABC(false));
-  }, [activeTab, abcLoaded, companyKey, searchParams, categoria, qtdCompra, filial]);
+  }, [activeTab, abcLoadedKey, abcFetchKey, companyKey, searchParams, categoria, qtdCompra, filial, expandirPorCor]);
 
   const produtosComCurva = useMemo(
     () => (produtosABC.length > 0 ? calcularCurvas(produtosABC, qtdCompra) : []),
@@ -303,6 +374,21 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
             <span className={styles.tabBadgeInfo}>visual</span>
           </button>
         </div>
+
+        {/* Ações */}
+        <div className={styles.actionsBar}>
+          <button
+            type="button"
+            className={`${styles.actionButton} ${expandirPorCor ? styles.actionButtonActive : ""}`}
+            onClick={() => setExpandirPorCor(v => !v)}
+            title="Alterna entre agrupado por produto e detalhado por cor"
+          >
+            {expandirPorCor ? "✓" : "+"} Expandir por cor
+          </button>
+          <span className={styles.actionsHint}>
+            {expandirPorCor ? "Mostrando produto + cor" : "Mostrando produto agrupado"}
+          </span>
+        </div>
       </div>
 
       {/* ── ABA REPOSIÇÃO ─────────────────────────────────────────────────── */}
@@ -337,7 +423,9 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
                 <span className={styles.summaryLabel}>Produtos em Reposição</span>
-                <span className={styles.summaryValueNeutral}>{reposicaoData.itens.length}</span>
+                <span className={styles.summaryValueNeutral}>
+                  {expandirPorCor ? reposicaoData.itens.length : reposicaoAgrupadaPorProduto.length}
+                </span>
               </div>
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
@@ -384,19 +472,21 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                       <div className={styles.sectionLabel}>
                         <span className={`${styles.curvaBadge} ${styles.badgeReposicao}`}>↑</span>
                         <span className={styles.sectionTitle}>Produtos com estoque abaixo do limite — reposição individual</span>
-                        <span className={styles.sectionCount}>{reposicaoData.itens.length} produto(s)</span>
+                        <span className={styles.sectionCount}>
+                          {expandirPorCor ? reposicaoData.itens.length : reposicaoAgrupadaPorProduto.length} item(ns)
+                        </span>
                       </div>
                     </td>
                   </tr>
-                  {reposicaoComCusto.map((item, i) => (
-                    <tr key={`${item.produto}-${item.cor ?? ""}-${i}`}>
+                  {reposicaoExibidaComCusto.map((item, i) => (
+                    <tr key={`${item.produto}-${expandirPorCor ? (item.cor ?? "") : ""}-${i}`}>
                       <td>
                         <span className={`${styles.rank} ${i < 3 ? styles.top : ""}`}>{i + 1}</span>
                       </td>
                       <td>
                         <div className={styles.productName}>{item.descricao || item.produto}</div>
                         <div className={styles.productCode}>{item.produto}</div>
-                        {item.cor && <div className={styles.productCode}>{item.cor}</div>}
+                        {expandirPorCor && item.cor && <div className={styles.productCode}>{item.cor}</div>}
                         {item.grade && <div className={styles.productCode}>Grade: {item.grade}</div>}
                         {item.colecao && <div className={styles.productCode}>Coleção: {item.colecao}</div>}
                       </td>
@@ -415,7 +505,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                     </tr>
                   ))}
                   {/* Linha de total */}
-                  {reposicaoComCusto.length > 1 && (
+                  {reposicaoExibidaComCusto.length > 1 && (
                     <tr className={styles.totalRow}>
                       <td colSpan={5} style={{ textAlign: "right", fontWeight: 700, color: "#374151" }}>TOTAL</td>
                       <td className={styles.qtdSugerida}>{fmt(totalQtdReposicao)}</td>
@@ -602,10 +692,11 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                           </td>
                         </tr>
                         {grupo.map((p, i) => {
-                          const rankGlobal = produtosComCurvaFinal.findIndex(fp => fp.produto === p.produto) + 1;
+                          const keyOf = (x: ProdutoComCurva) => `${x.produto}||${x.cor ?? ""}`;
+                          const rankGlobal = produtosComCurvaFinal.findIndex(fp => keyOf(fp) === keyOf(p)) + 1;
                           const isDimmed = !curvaAtivaModo;
                           return (
-                            <tr key={p.produto} className={isDimmed ? styles.rowDimmed : ""}>
+                            <tr key={`${p.produto}-${p.cor ?? ""}`} className={isDimmed ? styles.rowDimmed : ""}>
                               <td>
                                 <span className={`${styles.rank} ${i < 3 && curva === "A" ? styles.top : ""}`}>
                                   {rankGlobal}
@@ -615,6 +706,9 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                                 <div className={styles.productName}>{p.descricao || p.produto}</div>
                                 {p.descricao && p.produto !== p.descricao && (
                                   <div className={styles.productCode}>{p.produto}</div>
+                                )}
+                                {expandirPorCor && (p.cor ?? "").trim() !== "" && (
+                                  <div className={styles.productCode}>{p.cor}</div>
                                 )}
                               </td>
                               <td className={styles.vendas}>{fmtBRL(p.valor3meses)}</td>

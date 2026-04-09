@@ -5478,6 +5478,7 @@ export async function fetchProjecaoMensal({
 
 export interface ProdutoVendaUltimos3Meses {
   produto: string;
+  cor?: string;
   descricao: string;
   vendas3meses: number;
   valor3meses: number;
@@ -5500,6 +5501,7 @@ export async function fetchTopProdutosUltimos3Meses({
   grades,
   produtos,
   qtdCompra,
+  porCor = false,
   limit = 50,
 }: {
   company?: string;
@@ -5512,6 +5514,7 @@ export async function fetchTopProdutosUltimos3Meses({
   grades?: string[] | null;
   produtos?: string[] | null;
   qtdCompra: number;
+  porCor?: boolean;
   limit?: number;
 }): Promise<ProdutoVendaUltimos3Meses[]> {
   return withRequest(async (request) => {
@@ -5564,6 +5567,7 @@ export async function fetchTopProdutosUltimos3Meses({
     const query = `
       SELECT TOP (@lc_limit)
         ISNULL(vp.PRODUTO, '') AS produto,
+        ${porCor ? "ISNULL(vp.COR_PRODUTO, '') AS cor," : ""}
         UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS descricao,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS qtde3meses,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) AS valor3meses,
@@ -5572,12 +5576,15 @@ export async function fetchTopProdutosUltimos3Meses({
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       LEFT JOIN (
-        SELECT e2.PRODUTO, SUM(CASE WHEN e2.ESTOQUE > 0 THEN e2.ESTOQUE ELSE 0 END) AS estoqueAtual
+        SELECT
+          e2.PRODUTO,
+          ${porCor ? "ISNULL(e2.COR_PRODUTO, '') AS cor," : ""}
+          SUM(CASE WHEN e2.ESTOQUE > 0 THEN e2.ESTOQUE ELSE 0 END) AS estoqueAtual
         FROM ESTOQUE_PRODUTOS e2 WITH (NOLOCK)
         WHERE 1=1
           ${estoqueFilialFilter}
-        GROUP BY e2.PRODUTO
-      ) est ON est.PRODUTO = ISNULL(vp.PRODUTO, '')
+        GROUP BY e2.PRODUTO${porCor ? ", ISNULL(e2.COR_PRODUTO, '')" : ""}
+      ) est ON est.PRODUTO = ISNULL(vp.PRODUTO, '')${porCor ? " AND ISNULL(est.cor, '') = ISNULL(vp.COR_PRODUTO, '')" : ""}
       WHERE vp.DATA_VENDA >= @inicio3m
         AND vp.DATA_VENDA < @fim3m
         AND vp.QTDE > 0
@@ -5591,13 +5598,14 @@ export async function fetchTopProdutosUltimos3Meses({
         ${nerdOnlyEletronicosFilter}
         ${categoriaFilter}
         ${produtosFilter}
-      GROUP BY ISNULL(vp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, ''))))
+      GROUP BY ISNULL(vp.PRODUTO, ''), ${porCor ? "ISNULL(vp.COR_PRODUTO, ''), " : ""}UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, ''))))
       HAVING SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) > 0
       ORDER BY valor3meses DESC
     `;
 
     const result = await request.query<{
       produto: string;
+      cor?: string;
       descricao: string;
       qtde3meses: number;
       valor3meses: number;
@@ -5607,6 +5615,7 @@ export async function fetchTopProdutosUltimos3Meses({
 
     const rows = result.recordset.map(r => ({
       produto: r.produto?.trim() ?? '',
+      ...(porCor ? { cor: (r.cor ?? "").trim() } : {}),
       descricao: r.descricao?.trim() ?? '',
       vendas3meses: Math.round(Number(r.qtde3meses ?? 0)),
       valor3meses: Math.round(Number(r.valor3meses ?? 0)),
@@ -5640,6 +5649,7 @@ export async function fetchTopProdutosUltimos3Meses({
     const comSugestao = withExact
       .map((r, i) => ({
         produto: r.produto,
+        ...(porCor ? { cor: (r.cor ?? "").trim() } : {}),
         descricao: r.descricao,
         vendas3meses: r.vendas3meses,
         valor3meses: r.valor3meses,

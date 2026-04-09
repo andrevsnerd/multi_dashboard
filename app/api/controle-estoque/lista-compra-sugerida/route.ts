@@ -9,6 +9,7 @@ export async function GET(request: Request) {
   const categoria = searchParams.get('categoria') || null;
   const qtdCompra = Number(searchParams.get('qtdCompra') ?? '0');
   const limit = Number(searchParams.get('limit') ?? '50');
+  const porCor = searchParams.get('porCor') === '1' || searchParams.get('porCor') === 'true';
 
   const grupos = searchParams.getAll('grupos').filter(Boolean);
   const linhas = searchParams.getAll('linhas').filter(Boolean);
@@ -29,6 +30,7 @@ export async function GET(request: Request) {
       grades: grades.length > 0 ? grades : null,
       produtos: produtos.length > 0 ? produtos : null,
       qtdCompra,
+      porCor,
       limit: Number.isFinite(limit) && limit > 0 ? limit : 50,
     });
 
