@@ -370,9 +370,25 @@ export default function AdminPage() {
             Gerencie usuários, permissões de páginas e filiais em um só lugar.
           </p>
         </div>
-        <button type="button" className={styles.addButton} onClick={openAdd}>
-          + Adicionar usuário
-        </button>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <Link
+            href="/admin/extrato-produto"
+            style={{
+              padding: "8px 14px",
+              background: "#1e293b",
+              border: "1px solid #334155",
+              borderRadius: 6,
+              color: "#94a3b8",
+              textDecoration: "none",
+              fontSize: 13,
+            }}
+          >
+            Extrato de Produto
+          </Link>
+          <button type="button" className={styles.addButton} onClick={openAdd}>
+            + Adicionar usuário
+          </button>
+        </div>
       </header>
 
       {error && <p className={styles.error}>{error}</p>}

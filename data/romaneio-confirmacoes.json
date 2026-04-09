@@ -28,5 +28,15 @@
     "qtde_confirmada": 1,
     "confirmed_at": "2026-04-02T14:46:13.409Z",
     "confirmed_by": "andre.sabetta"
+  },
+  {
+    "company_key": "nerd",
+    "romaneio_id": "029506",
+    "filial_destino": "NERD CENTER NORTE",
+    "produto": "N4.24.0281",
+    "cor_produto": "01",
+    "qtde_confirmada": 1,
+    "confirmed_at": "2026-04-08T20:36:03.196Z",
+    "confirmed_by": "andre.sabetta"
   }
 ]

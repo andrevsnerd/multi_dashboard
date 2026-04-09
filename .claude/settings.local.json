@@ -37,7 +37,24 @@
       "Bash(find 'c:\\\\Users\\\\NERD TIJUCA\\\\Documents\\\\NERD - ANDRE\\\\Dashboard NERD\\\\multi-dashboard' -type f -name *controle* -o -name *performance*)",
       "Bash(find '/c/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/app' -type f -name *controle-estoque* -o -name *estoque*)",
       "Bash(grep -E \"\\\\.\\(ts|tsx|js\\)$\")",
-      "Bash(node -e \"require\\(''''./lib/utils/exportEstoqueConsultaXlsx''''\\)\")"
+      "Bash(node -e \"require\\(''''./lib/utils/exportEstoqueConsultaXlsx''''\\)\")",
+      "Bash(python investigar_extrato_produto.py)",
+      "Bash(python investigar_extrato2.py)",
+      "Bash(python investigar_extrato3.py)",
+      "Bash(curl -s \"http://localhost:3000/api/admin/extrato-produto?produto=13.71.0365&cor=03&filial=GUARULHOS\" -H \"X-Auth-Username: andre\")",
+      "Bash(curl -s \"http://localhost:3000/api/auth/login\" -X POST -H \"Content-Type: application/json\" -d '{\"username\":\"andre\",\"password\":\"nerd123\"}')",
+      "Bash(node -e ':*)",
+      "Bash(curl -s \"http://localhost:3000/api/admin/extrato-produto?produto=13.71.0365&cor=03&filial=GUARULHOS\" -H \"X-Auth-Username: andre.nerd\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('linhas:', len\\(d.get\\('linhas',[]\\)\\), 'erros:', d.get\\('erros',[]\\)\\); [print\\(l['tipo'], l['doc'], l['qtde'], l['qtdeGrade']\\) for l in d.get\\('linhas',[]\\)[:10]]\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2\\)[:2000]\\)\")",
+      "Bash(curl -s \"http://localhost:3000/api/admin/users\" -H \"X-Auth-Username: admin\")",
+      "Bash(python -c \"import sys,json; users=json.load\\(sys.stdin\\); [print\\(u['username'], u['role']\\) for u in users]\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2\\)[:1000]\\)\")",
+      "Bash(cat data/*.json)",
+      "Bash(curl -s \"http://localhost:3000/api/admin/extrato-produto?produto=13.71.0365&cor=03&filial=GUARULHOS\" -H \"X-Auth-Username: andre.sabetta\")",
+      "Bash(python -c ':*)",
+      "Bash(python investigar_triggers.py)",
+      "Bash(node testar_saida_entrada.js)"
     ]
   }
 }
