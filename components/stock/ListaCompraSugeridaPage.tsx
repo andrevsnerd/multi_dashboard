@@ -183,7 +183,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
   const filial = searchParams.get("filial") ?? "";
   const mode = searchParams.get("mode") ?? "";
 
-  const [activeTab, setActiveTab] = useState<"reposicao" | "abc">("reposicao");
+  const [activeTab, setActiveTab] = useState<"reposicao" | "abc" | "final">("reposicao");
   const [expandirPorCor, setExpandirPorCor] = useState(true);
 
   // ── Aba Reposição ──────────────────────────────────────────────────────────
@@ -269,6 +269,23 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
   const [modoReposicao, setModoReposicao] = useState(true);
   const [incluirCurvaB, setIncluirCurvaB] = useState(false);
   const [incluirCurvaC, setIncluirCurvaC] = useState(false);
+  const [apenasCompras, setApenasCompras] = useState(false);
+
+  type CompraFinalItem = {
+    companyKey: string;
+    contextKey: string;
+    itemKey: string;
+    produto: string;
+    corProduto?: string;
+    corDescricao?: string;
+    descricao: string;
+    grade?: string;
+    colecao?: string;
+    qtdManual: number;
+  };
+  const [compraFinal, setCompraFinal] = useState<CompraFinalItem[]>([]);
+  const [loadingFinal, setLoadingFinal] = useState(false);
+  const [errorFinal, setErrorFinal] = useState<string | null>(null);
 
   const diasCorridosMes = useMemo(() => new Date().getDate(), []);
   const consumoDiarioMesAtual = (p: ProdutoSugestao) => {
@@ -319,6 +336,77 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
       `gr=${gradesKey}`,
     ].join("::");
   }, [companyKey, filial, categoria, qtdCompra, expandirPorCor, searchParams]);
+
+  const contextKey = abcFetchKey;
+
+  async function fetchCompraFinalList(): Promise<CompraFinalItem[]> {
+    const params = new URLSearchParams();
+    params.set("company", companyKey);
+    params.set("contextKey", contextKey);
+    const res = await fetch(`/api/controle-estoque/compra-final?${params}`, { cache: "no-store" });
+    const json = await res.json() as { data?: CompraFinalItem[]; error?: string };
+    if (!res.ok) throw new Error(json.error ?? "Erro ao carregar compra final");
+    return json.data ?? [];
+  }
+
+  useEffect(() => {
+    if (activeTab !== "final") return;
+    setLoadingFinal(true);
+    setErrorFinal(null);
+    fetchCompraFinalList()
+      .then((data) => setCompraFinal(data))
+      .catch((e) => setErrorFinal(e instanceof Error ? e.message : "Erro"))
+      .finally(() => setLoadingFinal(false));
+  }, [activeTab, contextKey, companyKey]);
+
+  const compraFinalMap = useMemo(() => {
+    return new Map(compraFinal.map((i) => [i.itemKey, i]));
+  }, [compraFinal]);
+
+  const itemKeyFromProduto = (produto: string, corProduto?: string) => `${produto.trim()}||${(corProduto ?? "").trim()}`;
+
+  const handleAddCompraFinal = async (p: ProdutoComCurva) => {
+    const produto = (p.produto ?? "").trim();
+    const corProduto = expandirPorCor ? ((p.cor ?? "").trim() || undefined) : undefined;
+    const itemKey = itemKeyFromProduto(produto, corProduto);
+    const payload: CompraFinalItem = {
+      companyKey,
+      contextKey,
+      itemKey,
+      produto,
+      corProduto,
+      corDescricao: expandirPorCor ? p.corDescricao : undefined,
+      descricao: p.descricao || produto,
+      grade: p.grade,
+      colecao: p.colecao,
+      qtdManual: Math.max(0, Math.round(p.qtdFinal ?? 0)),
+    };
+    await fetch(`/api/controle-estoque/compra-final`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const next = await fetchCompraFinalList();
+    setCompraFinal(next);
+  };
+
+  const handleUpdateQtdFinal = async (itemKey: string, qtdManual: number) => {
+    await fetch(`/api/controle-estoque/compra-final`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ companyKey, contextKey, itemKey, qtdManual }),
+    });
+    setCompraFinal((prev) => prev.map((i) => (i.itemKey === itemKey ? { ...i, qtdManual } : i)));
+  };
+
+  const handleRemoveFinal = async (itemKey: string) => {
+    const params = new URLSearchParams();
+    params.set("company", companyKey);
+    params.set("contextKey", contextKey);
+    params.set("itemKey", itemKey);
+    await fetch(`/api/controle-estoque/compra-final?${params}`, { method: "DELETE" });
+    setCompraFinal((prev) => prev.filter((i) => i.itemKey !== itemKey));
+  };
 
   useEffect(() => {
     if (activeTab !== "abc" || abcLoadedKey === abcFetchKey) return;
@@ -374,6 +462,34 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
     return cu > 0 ? s + p.qtdFinal * cu : s;
   }, 0);
   const totalQtdABC = produtosComCurvaFinal.reduce((s, p) => s + p.qtdFinal, 0);
+  const produtosTabelaABC = useMemo(
+    () => (apenasCompras ? produtosComCurvaFinal.filter((p) => p.qtdFinal > 0) : produtosComCurvaFinal),
+    [apenasCompras, produtosComCurvaFinal]
+  );
+
+  const compraFinalRows = useMemo(() => {
+    return compraFinal.map((it) => {
+      const produto = it.produto.trim();
+      const corProduto = (it.corProduto ?? "").trim();
+      const match = produtosComCurvaFinal.find((p) => {
+        const pProd = (p.produto ?? "").trim();
+        const pCor = (p.cor ?? "").trim();
+        return pProd === produto && (expandirPorCor ? pCor === corProduto : true);
+      });
+      const qtdSugerida = match?.qtdFinal ?? 0;
+      const estoque = match?.estoqueAtual ?? null;
+      const custoUnit = match?.custoUnitario ?? 0;
+      const custoTotal = custoUnit > 0 ? Math.round(it.qtdManual * custoUnit) : 0;
+      return { it, match, qtdSugerida, estoque, custoUnit, custoTotal };
+    });
+  }, [compraFinal, produtosComCurvaFinal, expandirPorCor]);
+
+  const compraFinalTotals = useMemo(() => {
+    const totalItens = compraFinal.length;
+    const totalQtdManual = compraFinal.reduce((s, i) => s + (i.qtdManual ?? 0), 0);
+    const totalCusto = compraFinalRows.reduce((s, r) => s + (r.custoTotal ?? 0), 0);
+    return { totalItens, totalQtdManual, totalCusto };
+  }, [compraFinal, compraFinalRows]);
   const maxPerc = produtosComCurva.length > 0 ? produtosComCurva[0].percParticipacao : 1;
   const countA = produtosComCurva.filter(p => p.curva === "A").length;
   const countB = produtosComCurva.filter(p => p.curva === "B").length;
@@ -442,6 +558,14 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
             </svg>
             Análise ABC
             <span className={styles.tabBadgeInfo}>visual</span>
+          </button>
+          <button
+            type="button"
+            className={`${styles.tab} ${activeTab === "final" ? styles.tabActive : ""}`}
+            onClick={() => setActiveTab("final")}
+          >
+            Compra Final
+            <span className={styles.tabBadgeInfo}>{compraFinal.length}</span>
           </button>
         </div>
       </div>
@@ -650,6 +774,28 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
               <span className={styles.toggleLabelText}>Por Cor</span>
             </div>
 
+            <div className={styles.toggleDivider} />
+
+            <div
+              role="switch"
+              aria-checked={apenasCompras}
+              tabIndex={0}
+              className={`${styles.toggleWrap} ${styles.toggleWrapSecondary}`}
+              onClick={() => setApenasCompras(v => !v)}
+              onKeyDown={e => {
+                if (e.key === " " || e.key === "Enter") {
+                  e.preventDefault();
+                  setApenasCompras(v => !v);
+                }
+              }}
+              title="Mostra apenas itens indicados para compra"
+            >
+              <div className={`${styles.toggleTrack} ${apenasCompras ? styles.toggleTrackOn : ""}`}>
+                <div className={`${styles.toggleThumb} ${apenasCompras ? styles.toggleThumbOn : ""}`} />
+              </div>
+              <span className={styles.toggleLabelText}>Apenas Compras</span>
+            </div>
+
             {modoReposicao ? (
               <>
                 <div className={styles.toggleDivider} />
@@ -744,7 +890,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                 </thead>
                 <tbody>
                   {groups.map(curva => {
-                    const grupo = produtosComCurvaFinal.filter(p => p.curva === curva);
+                    const grupo = produtosTabelaABC.filter(p => p.curva === curva);
                     if (grupo.length === 0) return null;
                     const curvaAtivaModo =
                       curva === "A" ||
@@ -771,8 +917,10 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                         </tr>
                         {grupo.map((p, i) => {
                           const keyOf = (x: ProdutoComCurva) => `${x.produto}||${x.cor ?? ""}`;
-                          const rankGlobal = produtosComCurvaFinal.findIndex(fp => keyOf(fp) === keyOf(p)) + 1;
+                          const rankGlobal = produtosTabelaABC.findIndex(fp => keyOf(fp) === keyOf(p)) + 1;
                           const isDimmed = !curvaAtivaModo;
+                          const addKey = itemKeyFromProduto((p.produto ?? "").trim(), expandirPorCor ? ((p.cor ?? "").trim() || undefined) : undefined);
+                          const isAdded = compraFinalMap.has(addKey);
                           return (
                             <tr key={`${p.produto}-${p.cor ?? ""}`} className={isDimmed ? styles.rowDimmed : ""}>
                               <td>
@@ -781,7 +929,17 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                                 </span>
                               </td>
                               <td>
-                                <div className={styles.productName}>{p.descricao || p.produto}</div>
+                                <div className={styles.productName}>
+                                  {p.descricao || p.produto}
+                                  <button
+                                    type="button"
+                                    className={`${styles.addBtn} ${isAdded ? styles.addBtnActive : ""}`}
+                                    onClick={() => { void handleAddCompraFinal(p); }}
+                                    title="Adicionar na Compra Final"
+                                  >
+                                    +
+                                  </button>
+                                </div>
                                 <div className={styles.productCode}>{p.produto}</div>
                                 {expandirPorCor && (p.corDescricao ?? "").trim() !== "" && (
                                   <div className={styles.productCode}>{p.corDescricao}</div>
@@ -898,6 +1056,134 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                           );
                         })}
                       </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
+
+      {activeTab === "final" && (
+        <>
+          <div className={styles.summaryCard}>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>Itens na Compra Final</span>
+              <span className={styles.summaryValueNeutral}>{compraFinalTotals.totalItens}</span>
+            </div>
+            <div className={styles.summaryDivider} />
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>Total Qtd Manual</span>
+              <span className={styles.summaryValue}>{fmt(compraFinalTotals.totalQtdManual)}</span>
+            </div>
+            <div className={styles.summaryDivider} />
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>Custo Total</span>
+              <span className={styles.summaryValue}>{fmtBRL(compraFinalTotals.totalCusto)}</span>
+            </div>
+          </div>
+
+          <div className={styles.tableCard}>
+            {loadingFinal && <div className={styles.loading}>Carregando compra final...</div>}
+            {errorFinal && <div className={styles.error}>{errorFinal}</div>}
+            {!loadingFinal && !errorFinal && compraFinal.length === 0 && (
+              <div className={styles.empty}>Nenhum item adicionado ainda.</div>
+            )}
+            {!loadingFinal && !errorFinal && compraFinal.length > 0 && (
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>Produto</th>
+                    <th className={styles.right}>Qtd</th>
+                    <th className={styles.right}>Estoque</th>
+                    <th className={styles.right}>Custo Unit.</th>
+                    <th className={styles.right}>Custo Total</th>
+                    <th style={{ width: 60 }} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {compraFinalRows.map(({ it, qtdSugerida, estoque, custoUnit, custoTotal }) => {
+                    return (
+                      <tr key={it.itemKey}>
+                        <td>
+                          <div className={styles.productName}>{it.descricao || it.produto}</div>
+                          <div className={styles.productCode}>{it.produto}</div>
+                          {it.corDescricao && <div className={styles.productCode}>{it.corDescricao}</div>}
+                          {it.grade && <div className={styles.productCode}>Grade: {it.grade}</div>}
+                          {it.colecao && <div className={styles.productCode}>Coleção: {it.colecao}</div>}
+                        </td>
+                        <td className={styles.right}>
+                          <input
+                            className={styles.qtyInput}
+                            type="number"
+                            value={it.qtdManual}
+                            min={0}
+                            onChange={(e) => {
+                              const v = Math.max(0, Math.round(Number(e.target.value ?? 0)));
+                              setCompraFinal((prev) => prev.map((x) => (x.itemKey === it.itemKey ? { ...x, qtdManual: v } : x)));
+                            }}
+                            onBlur={() => { void handleUpdateQtdFinal(it.itemKey, it.qtdManual); }}
+                          />
+                        </td>
+                        <td
+                          className={styles.right}
+                          onMouseEnter={(e) => {
+                            if (estoque == null) return;
+                            const produto = (it.produto ?? "").trim();
+                            const corProduto = expandirPorCor ? ((it.corProduto ?? "").trim() || null) : null;
+                            const cacheKey = `${produto}||${corProduto ?? ""}`;
+                            const cached = estoquePorFilialCache[cacheKey];
+                            const show = (filiais: Array<{ filial: string; estoque: number }>) => {
+                              const total = filiais.reduce((s, f) => s + (f.estoque ?? 0), 0);
+                              setEstoqueTooltip({
+                                x: e.clientX,
+                                y: e.clientY,
+                                produto,
+                                corDescricao: expandirPorCor ? it.corDescricao : undefined,
+                                filiais,
+                                total,
+                              });
+                            };
+                            if (cached) {
+                              show(cached);
+                              return;
+                            }
+                            const params = new URLSearchParams();
+                            params.set("company", companyKey);
+                            if (filial) params.set("filial", filial);
+                            params.set("produto", produto);
+                            if (corProduto) params.set("corProduto", corProduto);
+                            fetchEstoquePorFilial(params)
+                              .then((data) => {
+                                setEstoquePorFilialCache((prev) => ({ ...prev, [cacheKey]: data }));
+                                show(data);
+                              })
+                              .catch(() => {
+                                show([]);
+                              });
+                          }}
+                          onMouseLeave={() => setEstoqueTooltip(null)}
+                        >
+                          {estoque != null ? fmt(estoque) : "—"}
+                        </td>
+                        <td className={`${styles.right} ${custoUnit > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
+                          {custoUnit > 0 ? fmtBRL2(custoUnit) : "—"}
+                        </td>
+                        <td className={`${styles.right} ${custoTotal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
+                          {custoTotal > 0 ? fmtBRL(custoTotal) : "—"}
+                        </td>
+                        <td className={styles.right}>
+                          <button
+                            type="button"
+                            className={styles.removeBtn}
+                            onClick={() => { void handleRemoveFinal(it.itemKey); }}
+                            title="Remover"
+                          >
+                            ×
+                          </button>
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>

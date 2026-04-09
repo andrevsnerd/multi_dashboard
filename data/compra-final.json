@@ -1,0 +1,76 @@
+{
+  "scarfme::scarfme::::APROVEITAMENTO LENÇO::351::porcor::g=::l=::c=::s=::gr=": [
+    {
+      "companyKey": "scarfme",
+      "contextKey": "scarfme::::APROVEITAMENTO LENÇO::351::porcor::g=::l=::c=::s=::gr=",
+      "itemKey": "85.04.0101||22",
+      "produto": "85.04.0101",
+      "corProduto": "22",
+      "corDescricao": "CREME",
+      "descricao": "FLORESCER DA VOZ 03/25",
+      "grade": "8X130",
+      "colecao": "U4",
+      "qtdManual": 13,
+      "createdAt": "2026-04-09T14:13:30.989Z",
+      "updatedAt": "2026-04-09T14:13:30.989Z"
+    }
+  ],
+  "scarfme::scarfme::::APROVEITAMENTO LENÇO::361::porcor::g=::l=::c=::s=::gr=": [
+    {
+      "companyKey": "scarfme",
+      "contextKey": "scarfme::::APROVEITAMENTO LENÇO::361::porcor::g=::l=::c=::s=::gr=",
+      "itemKey": "13.46.0151||06",
+      "produto": "13.46.0151",
+      "corProduto": "06",
+      "corDescricao": "PRETO",
+      "descricao": "RAMOS DE PURPURA 06/23",
+      "grade": "50X50",
+      "colecao": "O9",
+      "qtdManual": 2,
+      "createdAt": "2026-04-09T14:17:05.876Z",
+      "updatedAt": "2026-04-09T14:17:05.876Z"
+    },
+    {
+      "companyKey": "scarfme",
+      "contextKey": "scarfme::::APROVEITAMENTO LENÇO::361::porcor::g=::l=::c=::s=::gr=",
+      "itemKey": "85.04.54||06",
+      "produto": "85.04.54",
+      "corProduto": "06",
+      "corDescricao": "PRETO",
+      "descricao": "COCAR PRETO 12/20",
+      "grade": "8X130",
+      "colecao": "H6",
+      "qtdManual": 6,
+      "createdAt": "2026-04-09T14:17:05.058Z",
+      "updatedAt": "2026-04-09T14:17:05.058Z"
+    },
+    {
+      "companyKey": "scarfme",
+      "contextKey": "scarfme::::APROVEITAMENTO LENÇO::361::porcor::g=::l=::c=::s=::gr=",
+      "itemKey": "13.71.0195||35",
+      "produto": "13.71.0195",
+      "corProduto": "35",
+      "corDescricao": "BORDEAUX",
+      "descricao": "MARBLE FLOWERS 04/23",
+      "grade": "8X130",
+      "colecao": "P5",
+      "qtdManual": 5,
+      "createdAt": "2026-04-09T14:17:03.932Z",
+      "updatedAt": "2026-04-09T14:17:03.932Z"
+    },
+    {
+      "companyKey": "scarfme",
+      "contextKey": "scarfme::::APROVEITAMENTO LENÇO::361::porcor::g=::l=::c=::s=::gr=",
+      "itemKey": "85.04.0101||22",
+      "produto": "85.04.0101",
+      "corProduto": "22",
+      "corDescricao": "CREME",
+      "descricao": "FLORESCER DA VOZ 03/25",
+      "grade": "8X130",
+      "colecao": "U4",
+      "qtdManual": 9,
+      "createdAt": "2026-04-09T14:16:50.729Z",
+      "updatedAt": "2026-04-09T14:17:01.269Z"
+    }
+  ]
+}

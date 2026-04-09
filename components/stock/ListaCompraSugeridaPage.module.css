@@ -660,3 +660,54 @@
   background: rgba(148, 163, 184, 0.25);
   margin: 8px 0;
 }
+
+/* ── Compra final / add button ── */
+.addBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #0f172a;
+  font-weight: 900;
+  cursor: pointer;
+  margin-left: 10px;
+}
+
+.addBtn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.addBtnActive {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #15803d;
+}
+
+.qtyInput {
+  width: 96px;
+  padding: 6px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.removeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #fff1f2;
+  color: #991b1b;
+  font-weight: 900;
+  cursor: pointer;
+}
