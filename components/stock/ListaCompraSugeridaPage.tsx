@@ -125,13 +125,15 @@ function matrizCodigosEmpresa(companyKey: CompanyKey): Set<string> {
   return new Set(companyKey === "scarfme" ? ["SCARF ME - MATRIZ"] : ["NERD"]);
 }
 
+type DestinoCompraFinalParte = { label: string; qtd: number };
+
 /** Pesos = média mensal (qtde 12m / 12); piso por filial; o que sobra vai para a matriz. */
-function textoDestinoCompraFinal(
+function partesDestinoCompraFinal(
   qtdManual: number,
   vendasPorFilial: Array<{ filial: string; qtde12m: number }>,
   companyKey: CompanyKey
-): string {
-  if (qtdManual <= 0) return "—";
+): DestinoCompraFinalParte[] | null {
+  if (qtdManual <= 0) return null;
   const cfg = resolveCompany(companyKey);
   const nomeExibicao = (f: string) => cfg?.filialDisplayNames?.[f] ?? f;
   const matrizSet = matrizCodigosEmpresa(companyKey);
@@ -142,7 +144,7 @@ function textoDestinoCompraFinal(
   }));
   const somaM = medias.reduce((s, r) => s + r.m, 0);
   if (somaM <= 0) {
-    return `MATRIZ: ${fmt(qtdManual)}`;
+    return [{ label: "MATRIZ", qtd: qtdManual }];
   }
 
   const pisos = medias.map((r) => ({
@@ -153,7 +155,7 @@ function textoDestinoCompraFinal(
   const sobra = qtdManual - somaPisos;
 
   let qtdMatriz = sobra;
-  const outras: Array<{ label: string; qtd: number }> = [];
+  const outras: DestinoCompraFinalParte[] = [];
   for (const row of pisos) {
     if (matrizSet.has(row.filial)) {
       qtdMatriz += row.piso;
@@ -172,11 +174,67 @@ function textoDestinoCompraFinal(
       ordIdx(a.label) - ordIdx(b.label) || a.label.localeCompare(b.label, "pt-BR")
   );
 
-  const partes: Array<{ label: string; qtd: number }> = [];
+  const partes: DestinoCompraFinalParte[] = [];
   if (qtdMatriz > 0) partes.push({ label: "MATRIZ", qtd: qtdMatriz });
   partes.push(...outras);
 
-  return partes.map((p) => `${p.label}: ${fmt(p.qtd)}`).join(" · ");
+  return partes;
+}
+
+function textoDestinoCompraFinal(
+  qtdManual: number,
+  vendasPorFilial: Array<{ filial: string; qtde12m: number }>,
+  companyKey: CompanyKey
+): string {
+  const partesH = partesDestinoCompraFinal(qtdManual, vendasPorFilial, companyKey);
+  if (partesH === null) return "—";
+  return partesH.map((p) => `${p.label}: ${fmt(p.qtd)}`).join(" · ");
+}
+
+/** Claros com cor perceptível, mas contida (meio-termo entre cinza e pastel forte). */
+const DESTINO_FILIAL_BADGE_THEMES = [
+  { bg: "#c8d4ea", fg: "#1e3a5f", border: "#7d9dc4" },
+  { bg: "#c5e0d0", fg: "#134332", border: "#5fa889" },
+  { bg: "#e8d5c4", fg: "#4a3020", border: "#b88a6a" },
+  { bg: "#d2cae6", fg: "#3a2d55", border: "#8f7eb5" },
+  { bg: "#c2e2e8", fg: "#13404a", border: "#5aa3b5" },
+  { bg: "#e2d0ee", fg: "#4a2565", border: "#9f7cbd" },
+  { bg: "#ebd9b8", fg: "#5c3d12", border: "#c49a4e" },
+  { bg: "#bee3dc", fg: "#12403a", border: "#4da894" },
+  { bg: "#e8c9c9", fg: "#5c2222", border: "#c97a7a" },
+  { bg: "#c2daf0", fg: "#153a5c", border: "#6c9ec9" },
+  { bg: "#d8cef0", fg: "#40296b", border: "#8f7dc8" },
+  { bg: "#d6e4c4", fg: "#354418", border: "#8baa5e" },
+] as const;
+
+function destinoBadgeThemeForFilial(label: string) {
+  let h = 2166136261;
+  for (let i = 0; i < label.length; i++) {
+    h ^= label.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  const idx = Math.abs(h) % DESTINO_FILIAL_BADGE_THEMES.length;
+  return DESTINO_FILIAL_BADGE_THEMES[idx];
+}
+
+function DestinoCompraFinalBadges({ partes }: { partes: DestinoCompraFinalParte[] }) {
+  return (
+    <div className={styles.destinoBadges}>
+      {partes.map((p) => {
+        const t = destinoBadgeThemeForFilial(p.label);
+        return (
+          <span
+            key={p.label}
+            className={styles.destinoFilialBadge}
+            style={{ background: t.bg, color: t.fg, borderColor: t.border }}
+          >
+            <span className={styles.destinoFilialBadgeName}>{p.label}</span>
+            <span className={styles.destinoFilialBadgeNum}>{fmt(p.qtd)}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
 }
 
 /** Calcula curva ABC por faturamento acumulado */
@@ -1559,10 +1617,10 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                     const corK = expandirPorCor ? ((it.corProduto ?? "").trim() || undefined) : undefined;
                     const vendasKey = `${produtoK}||${corK ?? ""}`;
                     const vendasRowsK = vendasPorFilialCache[vendasKey];
-                    const destinoCell =
+                    const partesDestino =
                       vendasRowsK === undefined
-                        ? "…"
-                        : textoDestinoCompraFinal(it.qtdManual ?? 0, vendasRowsK, companyKey);
+                        ? undefined
+                        : partesDestinoCompraFinal(it.qtdManual ?? 0, vendasRowsK, companyKey);
                     return (
                       <tr key={it.itemKey}>
                         <td>
@@ -1585,7 +1643,13 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                             onBlur={() => { void handleUpdateQtdFinal(it.itemKey, it.qtdManual); }}
                           />
                         </td>
-                        <td className={styles.destinoCell}>{destinoCell}</td>
+                        <td className={styles.destinoCell}>
+                          {partesDestino === undefined
+                            ? "…"
+                            : partesDestino === null
+                              ? "—"
+                              : <DestinoCompraFinalBadges partes={partesDestino} />}
+                        </td>
                         <td
                           className={styles.right}
                           onMouseEnter={(e) => {
