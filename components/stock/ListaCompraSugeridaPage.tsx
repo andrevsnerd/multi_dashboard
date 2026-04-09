@@ -869,7 +869,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
     window.addEventListener("resize", onScrollOrResize);
     const card = abcTableCardRef.current;
     const ro = card && typeof ResizeObserver !== "undefined" ? new ResizeObserver(onScrollOrResize) : null;
-    ro?.observe(card);
+    if (ro && card) ro.observe(card);
     const t = window.setTimeout(tick, 400);
 
     return () => {
