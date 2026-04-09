@@ -5481,6 +5481,8 @@ export interface ProdutoVendaUltimos3Meses {
   cor?: string;
   descricao: string;
   vendas3meses: number;
+  /** Qtde vendida no mês atual (até agora), usada para duração real */
+  vendasMesAtual: number;
   valor3meses: number;
   /** Custo unitário de reposição (PRODUTOS.CUSTO_REPOSICAO1), alinhado ao restante do estoque */
   custoUnitario: number;
@@ -5521,8 +5523,10 @@ export async function fetchTopProdutosUltimos3Meses({
     const now = new Date();
     // Últimos 12 meses
     const inicio12Meses = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+    const inicioMesAtual = new Date(now.getFullYear(), now.getMonth(), 1);
     request.input('inicio3m', sql.DateTime, inicio12Meses);
     request.input('fim3m', sql.DateTime, now);
+    request.input('inicioMesAtual', sql.DateTime, inicioMesAtual);
     request.input('lc_limit', sql.Int, limit);
 
     // Quando se busca por código de produto específico (lookup de preço unitário),
@@ -5570,6 +5574,7 @@ export async function fetchTopProdutosUltimos3Meses({
         ${porCor ? "ISNULL(vp.COR_PRODUTO, '') AS cor," : ""}
         UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS descricao,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS qtde3meses,
+        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 AND vp.DATA_VENDA >= @inicioMesAtual THEN vp.QTDE ELSE 0 END) AS qtdeMesAtual,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) AS valor3meses,
         MAX(ISNULL(p.CUSTO_REPOSICAO1, 0)) AS custoUnitario,
         MAX(ISNULL(est.estoqueAtual, 0)) AS estoqueAtual
@@ -5608,6 +5613,7 @@ export async function fetchTopProdutosUltimos3Meses({
       cor?: string;
       descricao: string;
       qtde3meses: number;
+      qtdeMesAtual: number;
       valor3meses: number;
       custoUnitario: number;
       estoqueAtual: number;
@@ -5618,6 +5624,7 @@ export async function fetchTopProdutosUltimos3Meses({
       ...(porCor ? { cor: (r.cor ?? "").trim() } : {}),
       descricao: r.descricao?.trim() ?? '',
       vendas3meses: Math.round(Number(r.qtde3meses ?? 0)),
+      vendasMesAtual: Math.round(Number(r.qtdeMesAtual ?? 0)),
       valor3meses: Math.round(Number(r.valor3meses ?? 0)),
       custoUnitario: Number(r.custoUnitario ?? 0),
       estoqueAtual: Math.round(Number(r.estoqueAtual ?? 0)),
@@ -5652,6 +5659,7 @@ export async function fetchTopProdutosUltimos3Meses({
         ...(porCor ? { cor: (r.cor ?? "").trim() } : {}),
         descricao: r.descricao,
         vendas3meses: r.vendas3meses,
+        vendasMesAtual: r.vendasMesAtual,
         valor3meses: r.valor3meses,
         custoUnitario: r.custoUnitario,
         estoqueAtual: r.estoqueAtual,

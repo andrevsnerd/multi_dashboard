@@ -39,6 +39,7 @@ interface ProdutoSugestao {
   cor?: string;
   descricao: string;
   vendas3meses: number;
+  vendasMesAtual?: number;
   valor3meses: number;
   /** Custo de reposição (cadastro), não preço médio de venda */
   custoUnitario?: number;
@@ -231,6 +232,13 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
   const [incluirCurvaB, setIncluirCurvaB] = useState(false);
   const [incluirCurvaC, setIncluirCurvaC] = useState(false);
 
+  const diasCorridosMes = useMemo(() => new Date().getDate(), []);
+  const consumoDiarioMesAtual = (p: ProdutoSugestao) => {
+    const vendasMes = p.vendasMesAtual ?? 0;
+    if (vendasMes <= 0 || diasCorridosMes <= 0) return 0;
+    return vendasMes / diasCorridosMes;
+  };
+
   const abcFetchKey = useMemo(() => {
     const gruposKey = searchParams.getAll("grupos").slice().sort().join("|");
     const linhasKey = searchParams.getAll("linhas").slice().sort().join("|");
@@ -288,7 +296,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
         (p.curva === "B" && incluirCurvaB) ||
         (p.curva === "C" && incluirCurvaC);
       if (!curvaAtiva) return { ...p, qtdFinal: 0, qtdSuficiente: false };
-      const consumoDiario = p.vendas3meses / 365;
+      const consumoDiario = consumoDiarioMesAtual(p);
       if (consumoDiario <= 0) return { ...p, qtdFinal: 0, qtdSuficiente: false };
       const estoqueAtual = p.estoqueAtual ?? 0;
       const duracaoAtual = estoqueAtual / consumoDiario;
@@ -296,7 +304,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
       const qtd = Math.ceil(consumoDiario * (DIAS_META - duracaoAtual));
       return { ...p, qtdFinal: qtd, qtdSuficiente: false };
     });
-  }, [produtosComCurva, modoReposicao, incluirCurvaB, incluirCurvaC]);
+  }, [produtosComCurva, modoReposicao, incluirCurvaB, incluirCurvaC, diasCorridosMes]);
 
   const totalCustoABC = produtosComCurvaFinal.reduce((s, p) => {
     if (p.qtdFinal <= 0) return s;
@@ -655,7 +663,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                     <th style={{ width: 48 }}>#</th>
                     <th>Produto</th>
                     <th className={styles.right}>Vendas 12 meses</th>
-                    <th className={styles.right}>Qtd vendida</th>
+                    <th className={styles.right}>Qtd vendida (mês)</th>
                     <th className={styles.right}>Estoque</th>
                     <th className={styles.right}>Duração</th>
                     <th className={styles.right}>Participação</th>
@@ -712,11 +720,11 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                                 )}
                               </td>
                               <td className={styles.vendas}>{fmtBRL(p.valor3meses)}</td>
-                              <td className={styles.vendas}>{fmt(p.vendas3meses)}</td>
+                              <td className={styles.vendas}>{fmt(p.vendasMesAtual ?? 0)}</td>
                               <td className={styles.right}>{p.estoqueAtual != null ? fmt(p.estoqueAtual) : "—"}</td>
                               <td className={styles.right}>
                                 {(() => {
-                                  const consumoDiario = p.vendas3meses / 365;
+                                  const consumoDiario = consumoDiarioMesAtual(p);
                                   if (consumoDiario <= 0 || !p.estoqueAtual) return "—";
                                   const dias = Math.round(p.estoqueAtual / consumoDiario);
                                   if (dias >= 365) return `${Math.round(dias / 30)} meses`;
