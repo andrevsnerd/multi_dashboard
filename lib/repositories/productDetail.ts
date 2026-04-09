@@ -844,10 +844,7 @@ export async function fetchProductDetail({
     let totalStock = 0;
     stockResult.recordset.forEach((row) => {
       const positiveStock = Number(row.positiveStock ?? 0);
-      const negativeStock = Number(row.negativeStock ?? 0);
-      const positiveCount = Number(row.positiveCount ?? 0);
-      const finalStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
-      totalStock += finalStock;
+      totalStock += positiveStock;
     });
 
     // Calcular variação de receita
@@ -1032,10 +1029,7 @@ async function fetchProductStockByFilialEcommerce({
     const stockMap = new Map<string, number>();
     stockResult.recordset.forEach((row) => {
       const positiveStock = Number(row.positiveStock ?? 0);
-      const negativeStock = Number(row.negativeStock ?? 0);
-      const positiveCount = Number(row.positiveCount ?? 0);
-      const finalStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
-      stockMap.set(row.FILIAL, finalStock);
+      stockMap.set(row.FILIAL, positiveStock);
     });
 
     const currentRevenueMap = new Map<string, number>();
@@ -1322,11 +1316,8 @@ export async function fetchProductStockByFilial({
     const stockMap = new Map<string, number>();
     stockResult.recordset.forEach((row) => {
       const positiveStock = Number(row.positiveStock ?? 0);
-      const negativeStock = Number(row.negativeStock ?? 0);
-      const positiveCount = Number(row.positiveCount ?? 0);
-      const finalStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
       const normalizedFilial = (row.FILIAL || '').trim();
-      stockMap.set(normalizedFilial, finalStock);
+      stockMap.set(normalizedFilial, positiveStock);
     });
 
     const currentRevenueMap = new Map<string, number>();
