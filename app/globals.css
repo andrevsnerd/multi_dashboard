@@ -3,10 +3,14 @@
   --foreground: #171717;
 }
 
+/*
+ * Não usar overflow-x: hidden no html/body — em muitos navegadores isso impede
+ * position:sticky (ex.: cabeçalho de tabela no scroll da página).
+ * max-width: 100% evita roda horizontal por 100vw incluir a largura da barra de rolagem.
+ */
 html,
 body {
-  max-width: 100vw;
-  overflow-x: hidden;
+  max-width: 100%;
 }
 
 body {

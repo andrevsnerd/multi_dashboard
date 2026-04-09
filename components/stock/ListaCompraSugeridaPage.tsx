@@ -1,12 +1,16 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 // @ts-ignore - xlsx não tem tipos perfeitos
 import * as XLSX from "xlsx";
 
-import type { CompanyKey } from "@/lib/config/company";
+import { useSidebar } from "@/components/layout/SidebarContext";
+import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 import styles from "./ListaCompraSugeridaPage.module.css";
+
+/** UserHeaderBar é sticky ~top:0 — cabeçalho da tabela ABC fica logo abaixo */
+const USER_STICKY_HEADER_PX = 48;
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -117,6 +121,64 @@ function hamiltonDistribute(items: { valor: number }[], total: number): number[]
   return floors.map((f, i) => f + (boost.has(i) ? 1 : 0));
 }
 
+function matrizCodigosEmpresa(companyKey: CompanyKey): Set<string> {
+  return new Set(companyKey === "scarfme" ? ["SCARF ME - MATRIZ"] : ["NERD"]);
+}
+
+/** Pesos = média mensal (qtde 12m / 12); piso por filial; o que sobra vai para a matriz. */
+function textoDestinoCompraFinal(
+  qtdManual: number,
+  vendasPorFilial: Array<{ filial: string; qtde12m: number }>,
+  companyKey: CompanyKey
+): string {
+  if (qtdManual <= 0) return "—";
+  const cfg = resolveCompany(companyKey);
+  const nomeExibicao = (f: string) => cfg?.filialDisplayNames?.[f] ?? f;
+  const matrizSet = matrizCodigosEmpresa(companyKey);
+
+  const medias = vendasPorFilial.map((r) => ({
+    filial: r.filial,
+    m: r.qtde12m / 12,
+  }));
+  const somaM = medias.reduce((s, r) => s + r.m, 0);
+  if (somaM <= 0) {
+    return `MATRIZ: ${fmt(qtdManual)}`;
+  }
+
+  const pisos = medias.map((r) => ({
+    filial: r.filial,
+    piso: Math.floor((qtdManual * r.m) / somaM),
+  }));
+  const somaPisos = pisos.reduce((s, r) => s + r.piso, 0);
+  const sobra = qtdManual - somaPisos;
+
+  let qtdMatriz = sobra;
+  const outras: Array<{ label: string; qtd: number }> = [];
+  for (const row of pisos) {
+    if (matrizSet.has(row.filial)) {
+      qtdMatriz += row.piso;
+    } else if (row.piso > 0) {
+      outras.push({ label: nomeExibicao(row.filial), qtd: row.piso });
+    }
+  }
+
+  const ordem = cfg?.estoqueFilialOrder ?? [];
+  const ordIdx = (label: string) => {
+    const i = ordem.indexOf(label);
+    return i === -1 ? 999 : i;
+  };
+  outras.sort(
+    (a, b) =>
+      ordIdx(a.label) - ordIdx(b.label) || a.label.localeCompare(b.label, "pt-BR")
+  );
+
+  const partes: Array<{ label: string; qtd: number }> = [];
+  if (qtdMatriz > 0) partes.push({ label: "MATRIZ", qtd: qtdMatriz });
+  partes.push(...outras);
+
+  return partes.map((p) => `${p.label}: ${fmt(p.qtd)}`).join(" · ");
+}
+
 /** Calcula curva ABC por faturamento acumulado */
 function calcularCurvas(produtos: ProdutoSugestao[], qtdCompra: number): ProdutoComCurva[] {
   const keyOf = (p: ProdutoSugestao) => `${p.produto}||${p.cor ?? ""}`;
@@ -155,6 +217,65 @@ const CURVA_BAR_CLASS: Record<Curva, string> = {
   C: styles.percBarFillC,
 };
 
+const ABC_ANALYSIS_COL_COUNT = 11;
+
+/** Replica larguras das colunas da tabela principal no header flutuante (px, table-layout: fixed). */
+function syncAbcStickyHeaderColumns(mainEl: HTMLTableElement | null, stickyEl: HTMLTableElement | null) {
+  if (!mainEl || !stickyEl) return;
+  let sourceCells: HTMLElement[] = [];
+  for (const tr of mainEl.querySelectorAll("tbody tr")) {
+    if (tr.children.length === ABC_ANALYSIS_COL_COUNT) {
+      sourceCells = Array.from(tr.querySelectorAll("td"), (td) => td as HTMLElement);
+      break;
+    }
+  }
+  if (sourceCells.length !== ABC_ANALYSIS_COL_COUNT) {
+    sourceCells = Array.from(mainEl.querySelectorAll("thead tr th"), (th) => th as HTMLElement);
+  }
+  const stickyThs = stickyEl.querySelectorAll("thead tr th");
+  if (sourceCells.length !== stickyThs.length || sourceCells.length === 0) return;
+
+  const widthsPx = sourceCells.map((c) => c.getBoundingClientRect().width);
+  const mainW = mainEl.getBoundingClientRect().width;
+  let sum = widthsPx.reduce((a, b) => a + b, 0);
+  if (sum <= 0 || mainW <= 0) return;
+
+  const scale = mainW / sum;
+  const scaled = widthsPx.map((w) => Math.max(0, Math.floor(w * scale)));
+  let diff = Math.round(mainW - scaled.reduce((a, b) => a + b, 0));
+  scaled[scaled.length - 1] = Math.max(0, scaled[scaled.length - 1] + diff);
+
+  stickyEl.style.tableLayout = "fixed";
+  stickyEl.style.width = `${mainW}px`;
+  scaled.forEach((w, i) => {
+    const th = stickyThs[i] as HTMLElement;
+    th.style.boxSizing = "border-box";
+    th.style.width = `${w}px`;
+    th.style.minWidth = `${w}px`;
+    th.style.maxWidth = `${w}px`;
+  });
+}
+
+function AbcAnalysisTableHead({ modoReposicao }: { modoReposicao: boolean }) {
+  return (
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Produto</th>
+        <th className={styles.right}>Vendas 12 meses</th>
+        <th className={styles.right}>QTD 12 meses</th>
+        <th className={styles.right}>Estoque</th>
+        <th className={styles.right}>QTD 60 dias</th>
+        <th className={styles.right}>Duração</th>
+        <th className={styles.right}>Participação</th>
+        <th className={styles.right}>{modoReposicao ? "Qtd a Repor" : "Qtd Proporcional"}</th>
+        <th className={styles.right}>Custo Unit.</th>
+        <th className={styles.right}>Custo Total</th>
+      </tr>
+    </thead>
+  );
+}
+
 function normalizeKey(s?: string | null) {
   return (s ?? "")
     .toString()
@@ -188,6 +309,7 @@ function getLimiteDiasReposicao(p: { linha?: string; subgrupo?: string }) {
 export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: CompanyKey }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { isOpen: sidebarOpen } = useSidebar();
 
   const categoria = searchParams.get("categoria") ?? "";
   const qtdCompra = Number(searchParams.get("qtdCompra") ?? "0");
@@ -281,6 +403,12 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
   const [incluirCurvaB, setIncluirCurvaB] = useState(false);
   const [incluirCurvaC, setIncluirCurvaC] = useState(false);
   const [apenasCompras, setApenasCompras] = useState(false);
+  const [abcHeadStuck, setAbcHeadStuck] = useState(false);
+  const abcTableCardRef = useRef<HTMLDivElement>(null);
+  const abcStickySentinelRef = useRef<HTMLDivElement>(null);
+  const abcStickyBarRef = useRef<HTMLDivElement>(null);
+  const abcMainAbcTableRef = useRef<HTMLTableElement>(null);
+  const abcStickyAbcTableRef = useRef<HTMLTableElement>(null);
 
   type CompraFinalItem = {
     companyKey: string;
@@ -347,6 +475,9 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
     loading: boolean;
   }>(null);
   const [vendasPorFilialCache, setVendasPorFilialCache] = useState<Record<string, Array<{ filial: string; qtde12m: number; qtde60d: number }>>>({});
+  const vendasPorFilialCacheRef = useRef(vendasPorFilialCache);
+  vendasPorFilialCacheRef.current = vendasPorFilialCache;
+  const destinoVendasFetchRef = useRef(new Set<string>());
 
   const abcFetchKey = useMemo(() => {
     const gruposKey = searchParams.getAll("grupos").slice().sort().join("|");
@@ -392,6 +523,10 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
     ].join("::");
   }, [companyKey, filial, categoria, qtdCompra, expandirPorCor, searchParams]);
 
+  useEffect(() => {
+    destinoVendasFetchRef.current.clear();
+  }, [companyKey, expandirPorCor, contextKey]);
+
   async function fetchCompraFinalList(): Promise<CompraFinalItem[]> {
     const params = new URLSearchParams();
     params.set("company", companyKey);
@@ -411,6 +546,30 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
       .catch((e) => setErrorFinal(e instanceof Error ? e.message : "Erro"))
       .finally(() => setLoadingFinal(false));
   }, [activeTab, contextKey, companyKey]);
+
+  // Vendas por filial (12m) sem filtro de filial — necessário para ratear a qtd da Compra Final entre todas as lojas.
+  useEffect(() => {
+    if (activeTab !== "final" || compraFinal.length === 0) return;
+    const unique = new Map<string, { produto: string; cor?: string }>();
+    compraFinal.forEach((it) => {
+      const produto = it.produto.trim();
+      const corProduto = expandirPorCor ? ((it.corProduto ?? "").trim() || undefined) : undefined;
+      const cacheKey = `${produto}||${corProduto ?? ""}`;
+      unique.set(cacheKey, { produto, cor: corProduto });
+    });
+    unique.forEach(({ produto, cor }, cacheKey) => {
+      if (vendasPorFilialCacheRef.current[cacheKey] !== undefined) return;
+      if (destinoVendasFetchRef.current.has(cacheKey)) return;
+      destinoVendasFetchRef.current.add(cacheKey);
+      const params = new URLSearchParams();
+      params.set("company", companyKey);
+      params.set("produto", produto);
+      if (cor) params.set("corProduto", cor);
+      void fetchVendasPorFilialItem(params)
+        .then((data) => setVendasPorFilialCache((p) => ({ ...p, [cacheKey]: data })))
+        .catch(() => setVendasPorFilialCache((p) => ({ ...p, [cacheKey]: [] })));
+    });
+  }, [activeTab, compraFinal, expandirPorCor, companyKey]);
 
   const compraFinalMap = useMemo(() => {
     return new Map(compraFinal.map((i) => [i.itemKey, i]));
@@ -462,18 +621,29 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
   };
 
   const handleExportCompraFinalXlsx = () => {
-    const rows = compraFinalRows.map(({ it, estoque, custoUnit, custoTotal }) => ({
-      PRODUTO: it.produto,
-      DESC_PRODUTO: it.descricao,
-      COR_PRODUTO: it.corProduto ?? "",
-      DESC_COR_PRODUTO: it.corDescricao ?? "",
-      GRADE: it.grade ?? "",
-      COLECAO: it.colecao ?? "",
-      QTD_MANUAL: it.qtdManual ?? 0,
-      ESTOQUE_ATUAL: estoque ?? 0,
-      CUSTO_UNIT: custoUnit ?? 0,
-      CUSTO_TOTAL: custoTotal ?? 0,
-    }));
+    const rows = compraFinalRows.map(({ it, estoque, custoUnit, custoTotal }) => {
+      const produto = it.produto.trim();
+      const corProduto = expandirPorCor ? ((it.corProduto ?? "").trim() || undefined) : undefined;
+      const cacheKey = `${produto}||${corProduto ?? ""}`;
+      const vendasRows = vendasPorFilialCache[cacheKey];
+      const destino =
+        vendasRows !== undefined
+          ? textoDestinoCompraFinal(it.qtdManual ?? 0, vendasRows, companyKey)
+          : "";
+      return {
+        PRODUTO: it.produto,
+        DESC_PRODUTO: it.descricao,
+        COR_PRODUTO: it.corProduto ?? "",
+        DESC_COR_PRODUTO: it.corDescricao ?? "",
+        GRADE: it.grade ?? "",
+        COLECAO: it.colecao ?? "",
+        QTD_MANUAL: it.qtdManual ?? 0,
+        DESTINO: destino,
+        ESTOQUE_ATUAL: estoque ?? 0,
+        CUSTO_UNIT: custoUnit ?? 0,
+        CUSTO_TOTAL: custoTotal ?? 0,
+      };
+    });
 
     const kpis = [
       { METRICA: "Empresa", VALOR: companyKey },
@@ -602,6 +772,86 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
   const countB = produtosComCurva.filter(p => p.curva === "B").length;
   const countC = produtosComCurva.filter(p => p.curva === "C").length;
   const groups: Curva[] = ["A", "B", "C"];
+
+  const abcStickyStateRef = useRef(false);
+  useEffect(() => {
+    if (activeTab !== "abc" || loadingABC || errorABC || produtosComCurva.length === 0) {
+      abcStickyStateRef.current = false;
+      setAbcHeadStuck(false);
+      return;
+    }
+
+    let raf = 0;
+    const tick = () => {
+      const sent = abcStickySentinelRef.current;
+      const card = abcTableCardRef.current;
+      const bar = abcStickyBarRef.current;
+      if (!sent) return;
+      const sr = sent.getBoundingClientRect();
+      const stuck = sr.bottom <= USER_STICKY_HEADER_PX + 0.5;
+      if (abcStickyStateRef.current !== stuck) {
+        abcStickyStateRef.current = stuck;
+        setAbcHeadStuck(stuck);
+      }
+      if (stuck && card && bar) {
+        const cr = card.getBoundingClientRect();
+        bar.style.left = `${cr.left}px`;
+        bar.style.width = `${cr.width}px`;
+        syncAbcStickyHeaderColumns(abcMainAbcTableRef.current, abcStickyAbcTableRef.current);
+      }
+    };
+
+    const onScrollOrResize = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(tick);
+    };
+
+    tick();
+    window.addEventListener("scroll", onScrollOrResize, true);
+    window.addEventListener("resize", onScrollOrResize);
+    const card = abcTableCardRef.current;
+    const ro = card && typeof ResizeObserver !== "undefined" ? new ResizeObserver(onScrollOrResize) : null;
+    ro?.observe(card);
+    const t = window.setTimeout(tick, 400);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScrollOrResize, true);
+      window.removeEventListener("resize", onScrollOrResize);
+      ro?.disconnect();
+      window.clearTimeout(t);
+    };
+  }, [activeTab, loadingABC, errorABC, produtosComCurva.length, abcFetchKey, sidebarOpen]);
+
+  useLayoutEffect(() => {
+    if (!abcHeadStuck || activeTab !== "abc") return;
+    const card = abcTableCardRef.current;
+    const bar = abcStickyBarRef.current;
+    if (!card || !bar) return;
+    const cr = card.getBoundingClientRect();
+    bar.style.left = `${cr.left}px`;
+    bar.style.width = `${cr.width}px`;
+    syncAbcStickyHeaderColumns(abcMainAbcTableRef.current, abcStickyAbcTableRef.current);
+    const id = requestAnimationFrame(() => {
+      const c2 = abcTableCardRef.current;
+      const b2 = abcStickyBarRef.current;
+      if (c2 && b2) {
+        const r = c2.getBoundingClientRect();
+        b2.style.left = `${r.left}px`;
+        b2.style.width = `${r.width}px`;
+      }
+      syncAbcStickyHeaderColumns(abcMainAbcTableRef.current, abcStickyAbcTableRef.current);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [
+    abcHeadStuck,
+    activeTab,
+    modoReposicao,
+    apenasCompras,
+    expandirPorCor,
+    produtosTabelaABC.length,
+    abcFetchKey,
+  ]);
 
   // ── Navegação de volta ─────────────────────────────────────────────────────
   const handleVoltar = () => {
@@ -972,29 +1222,31 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
           )}
 
           {/* Table ABC */}
-          <div className={styles.tableCard}>
+          <div ref={abcTableCardRef} className={`${styles.tableCard} ${styles.tableCardAbc}`}>
             {loadingABC && <div className={styles.loading}>Carregando análise ABC...</div>}
             {errorABC && <div className={styles.error}>{errorABC}</div>}
             {!loadingABC && !errorABC && produtosComCurva.length === 0 && (
               <div className={styles.empty}>Nenhum produto encontrado para este filtro.</div>
             )}
             {!loadingABC && !errorABC && produtosComCurva.length > 0 && (
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={{ width: 48 }}>#</th>
-                    <th>Produto</th>
-                    <th className={styles.right}>Vendas 12 meses</th>
-                    <th className={styles.right}>QTD 12 meses</th>
-                    <th className={styles.right}>Estoque</th>
-                    <th className={styles.right}>QTD 60 dias</th>
-                    <th className={styles.right}>Duração</th>
-                    <th className={styles.right}>Participação</th>
-                    <th className={styles.right}>{modoReposicao ? "Qtd a Repor" : "Qtd Proporcional"}</th>
-                    <th className={styles.right}>Custo Unit.</th>
-                    <th className={styles.right}>Custo Total</th>
-                  </tr>
-                </thead>
+              <>
+                {abcHeadStuck && (
+                  <div
+                    ref={abcStickyBarRef}
+                    className={styles.abcStickyHeaderBar}
+                    style={{ top: USER_STICKY_HEADER_PX }}
+                  >
+                    <table
+                      ref={abcStickyAbcTableRef}
+                      className={`${styles.table} ${styles.tableAbc} ${styles.abcStickyHeaderTable}`}
+                    >
+                      <AbcAnalysisTableHead modoReposicao={modoReposicao} />
+                    </table>
+                  </div>
+                )}
+                <div ref={abcStickySentinelRef} className={styles.abcStickySentinel} aria-hidden />
+                <table ref={abcMainAbcTableRef} className={`${styles.table} ${styles.tableAbc}`}>
+                  <AbcAnalysisTableHead modoReposicao={modoReposicao} />
                 <tbody>
                   {groups.map(curva => {
                     const grupo = produtosTabelaABC.filter(p => p.curva === curva);
@@ -1006,7 +1258,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                     return (
                       <React.Fragment key={curva}>
                         <tr className={`${styles.sectionRow} ${styles[`sectionRow${curva}`]}`}>
-                          <td colSpan={10}>
+                          <td colSpan={11}>
                             <div className={styles.sectionLabel}>
                               <span className={`${styles.curvaBadge} ${CURVA_BADGE_CLASS[curva]}`}>{curva}</span>
                               <span className={styles.sectionTitle}>{CURVA_LABEL[curva]}</span>
@@ -1247,6 +1499,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                   })}
                 </tbody>
               </table>
+              </>
             )}
           </div>
         </>
@@ -1293,6 +1546,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                   <tr>
                     <th>Produto</th>
                     <th className={styles.right}>Qtd</th>
+                    <th>Destino</th>
                     <th className={styles.right}>Estoque</th>
                     <th className={styles.right}>Custo Unit.</th>
                     <th className={styles.right}>Custo Total</th>
@@ -1300,7 +1554,15 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                   </tr>
                 </thead>
                 <tbody>
-                  {compraFinalRows.map(({ it, qtdSugerida, estoque, custoUnit, custoTotal }) => {
+                  {compraFinalRows.map(({ it, estoque, custoUnit, custoTotal }) => {
+                    const produtoK = it.produto.trim();
+                    const corK = expandirPorCor ? ((it.corProduto ?? "").trim() || undefined) : undefined;
+                    const vendasKey = `${produtoK}||${corK ?? ""}`;
+                    const vendasRowsK = vendasPorFilialCache[vendasKey];
+                    const destinoCell =
+                      vendasRowsK === undefined
+                        ? "…"
+                        : textoDestinoCompraFinal(it.qtdManual ?? 0, vendasRowsK, companyKey);
                     return (
                       <tr key={it.itemKey}>
                         <td>
@@ -1323,6 +1585,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                             onBlur={() => { void handleUpdateQtdFinal(it.itemKey, it.qtdManual); }}
                           />
                         </td>
+                        <td className={styles.destinoCell}>{destinoCell}</td>
                         <td
                           className={styles.right}
                           onMouseEnter={(e) => {

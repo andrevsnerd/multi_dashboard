@@ -132,8 +132,48 @@
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-  /* clip: mantém cantos arredondados SEM criar scroll container, permitindo sticky header */
+  /* clip esconde cantos; também impede thead sticky no scroll da janela — usar só onde não há sticky */
   overflow: clip;
+}
+
+/**
+ * ABC: card sem overflow — overflow clip no ancestral quebra sticky no scroll da página.
+ */
+.tableCardAbc {
+  overflow: visible;
+}
+
+/* Cabeçalho ABC “fixo” duplicado (IntersectionObserver) — não depende de sticky na <table> */
+.abcStickySentinel {
+  height: 1px;
+  width: 100%;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.abcStickyHeaderBar {
+  position: fixed;
+  z-index: 90;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 0 0 10px 10px;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.18);
+}
+
+.abcStickyHeaderTable {
+  margin: 0;
+  width: 100%;
+}
+
+/**
+ * border-collapse: collapse costuma quebrar position:sticky em <th> (Chrome/Safari).
+ */
+.tableAbc {
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .table {
@@ -163,6 +203,19 @@
   top: 0;
   z-index: 10;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+}
+
+.tableAbc thead th {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  /* fundo opaco evita ver linhas do corpo por baixo ao rolar */
+  background-color: #1e293b;
+}
+
+.tableAbc thead {
+  position: relative;
+  z-index: 30;
 }
 
 .table thead th.right {
@@ -276,6 +329,14 @@
   font-size: 11px;
   color: #94a3b8;
   margin-top: 2px;
+}
+
+.destinoCell {
+  font-size: 12px;
+  line-height: 1.35;
+  color: #334155;
+  max-width: 360px;
+  word-break: break-word;
 }
 
 /* Numbers */
