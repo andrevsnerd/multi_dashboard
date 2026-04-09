@@ -298,6 +298,15 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
     return vendasMes / diasCorridosMes;
   };
 
+  const [sugestaoSTooltip, setSugestaoSTooltip] = useState<null | {
+    x: number;
+    y: number;
+    mediaVendasMes: number;
+    estoqueAtual: number;
+    limiteDias: number;
+    qtdS: number;
+  }>(null);
+
   const [duracaoTooltip, setDuracaoTooltip] = useState<null | {
     x: number;
     y: number;
@@ -496,14 +505,33 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
     });
   }, [produtosComCurva, modoReposicao, incluirCurvaB, incluirCurvaC, diasCorridosMes]);
 
+  const temSugestaoS = (p: ProdutoComCurva) => {
+    if (p.qtdFinal > 0 || p.qtdSuficiente) return false;
+    const mediaVendasMes = p.vendas3meses / 12;
+    return mediaVendasMes >= 2 && (p.estoqueAtual ?? 0) <= mediaVendasMes;
+  };
+
+  const calcQtdS = (p: ProdutoComCurva) => {
+    const mediaVendasMes = p.vendas3meses / 12;
+    const { limiteDias } = getLimiteDiasReposicao(p);
+    return Math.ceil((limiteDias / 30) * mediaVendasMes);
+  };
+
   const totalCustoABC = produtosComCurvaFinal.reduce((s, p) => {
-    if (p.qtdFinal <= 0) return s;
     const cu = p.custoUnitario ?? 0;
-    return cu > 0 ? s + p.qtdFinal * cu : s;
+    if (cu <= 0) return s;
+    if (p.qtdFinal > 0) return s + p.qtdFinal * cu;
+    if (temSugestaoS(p)) return s + calcQtdS(p) * cu;
+    return s;
   }, 0);
-  const totalQtdABC = produtosComCurvaFinal.reduce((s, p) => s + p.qtdFinal, 0);
+  const totalQtdABC = produtosComCurvaFinal.reduce((s, p) => {
+    if (p.qtdFinal > 0) return s + p.qtdFinal;
+    if (temSugestaoS(p)) return s + calcQtdS(p);
+    return s;
+  }, 0);
+
   const produtosTabelaABC = useMemo(
-    () => (apenasCompras ? produtosComCurvaFinal.filter((p) => p.qtdFinal > 0) : produtosComCurvaFinal),
+    () => (apenasCompras ? produtosComCurvaFinal.filter((p) => p.qtdFinal > 0 || temSugestaoS(p)) : produtosComCurvaFinal),
     [apenasCompras, produtosComCurvaFinal]
   );
 
@@ -1073,25 +1101,56 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                                   <span className={styles.percText}>{p.percParticipacao.toFixed(1)}%</span>
                                 </div>
                               </td>
-                              <td className={
-                                p.qtdFinal > 0
-                                  ? styles.qtdSugerida
-                                  : p.qtdSuficiente
-                                    ? styles.qtdSuficienteTag
-                                    : styles.qtdSugeridaZero
-                              }>
-                                {p.qtdFinal > 0
-                                  ? fmt(p.qtdFinal)
-                                  : p.qtdSuficiente
-                                    ? "quantidade suficiente"
-                                    : "—"}
-                              </td>
-                              <td className={`${styles.right} ${p.qtdFinal > 0 && (p.custoUnitario ?? 0) > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
-                                {p.qtdFinal > 0 && (p.custoUnitario ?? 0) > 0 ? fmtBRL2(p.custoUnitario!) : "—"}
-                              </td>
-                              <td className={`${styles.right} ${p.qtdFinal > 0 && (p.custoUnitario ?? 0) > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
-                                {p.qtdFinal > 0 && (p.custoUnitario ?? 0) > 0 ? fmtBRL(p.qtdFinal * p.custoUnitario!) : "—"}
-                              </td>
+                              {(() => {
+                                if (p.qtdFinal > 0) {
+                                  return (
+                                    <td className={styles.qtdSugerida}>{fmt(p.qtdFinal)}</td>
+                                  );
+                                }
+                                if (p.qtdSuficiente) {
+                                  return (
+                                    <td className={styles.qtdSuficienteTag}>quantidade suficiente</td>
+                                  );
+                                }
+                                // Sugestão alternativa: vendeu >= 2/mês em média e estoque <= média mensal
+                                const mediaVendasMes = p.vendas3meses / 12;
+                                if (mediaVendasMes >= 2 && (p.estoqueAtual ?? 0) <= mediaVendasMes) {
+                                  const { limiteDias } = getLimiteDiasReposicao(p);
+                                  const qtdS = Math.ceil((limiteDias / 30) * mediaVendasMes);
+                                  return (
+                                    <td className={styles.qtdSugeridaS}>
+                                      <span className={styles.qtdSugeridaSInner}>
+                                        {fmt(qtdS)}
+                                        <span
+                                          className={styles.badgeS}
+                                          onMouseEnter={(e) => setSugestaoSTooltip({ x: e.clientX, y: e.clientY, mediaVendasMes, estoqueAtual: p.estoqueAtual ?? 0, limiteDias, qtdS })}
+                                          onMouseLeave={() => setSugestaoSTooltip(null)}
+                                        >S</span>
+                                      </span>
+                                    </td>
+                                  );
+                                }
+                                return <td className={styles.qtdSugeridaZero}>—</td>;
+                              })()}
+                              {(() => {
+                                const cu = p.custoUnitario ?? 0;
+                                const hasS = p.qtdFinal <= 0 && !p.qtdSuficiente && temSugestaoS(p);
+                                const qtdParaCusto = p.qtdFinal > 0 ? p.qtdFinal : hasS ? calcQtdS(p) : 0;
+                                const showCost = qtdParaCusto > 0 && cu > 0;
+                                const cellClass = showCost
+                                  ? hasS ? styles.qtdSugeridaS : styles.qtdSugerida
+                                  : styles.qtdSugeridaZero;
+                                return (
+                                  <>
+                                    <td className={`${styles.right} ${cellClass}`}>
+                                      {showCost ? fmtBRL2(cu) : "—"}
+                                    </td>
+                                    <td className={`${styles.right} ${cellClass}`}>
+                                      {showCost ? fmtBRL(qtdParaCusto * cu) : "—"}
+                                    </td>
+                                  </>
+                                );
+                              })()}
                             </tr>
                           );
                         })}
@@ -1241,6 +1300,27 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
             )}
           </div>
         </>
+      )}
+
+      {sugestaoSTooltip && (
+        <div
+          className={styles.tooltip}
+          style={{ left: sugestaoSTooltip.x + 12, top: sugestaoSTooltip.y + 12 }}
+        >
+          <div className={styles.tooltipTitle}>Sugestão por Critério S</div>
+          <div className={styles.tooltipLine} style={{ color: "#c4b5fd", marginBottom: 6 }}>
+            Produto com vendas consistentes e estoque abaixo da média mensal
+          </div>
+          <div className={styles.tooltipDivider} />
+          <div className={styles.tooltipLine}><strong>Média de vendas:</strong> {sugestaoSTooltip.mediaVendasMes.toFixed(1)} un/mês</div>
+          <div className={styles.tooltipLine}><strong>Estoque atual:</strong> {fmt(sugestaoSTooltip.estoqueAtual)} un</div>
+          <div className={styles.tooltipLine}><strong>Cobertura mínima:</strong> {sugestaoSTooltip.limiteDias} dias</div>
+          <div className={styles.tooltipDivider} />
+          <div className={styles.tooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoSTooltip.qtdS)} un</div>
+          <div className={styles.tooltipLine} style={{ color: "#94a3b8", marginTop: 4, fontSize: 11 }}>
+            = {sugestaoSTooltip.limiteDias / 30} meses × {sugestaoSTooltip.mediaVendasMes.toFixed(1)} un/mês
+          </div>
+        </div>
       )}
 
       {duracaoTooltip && (

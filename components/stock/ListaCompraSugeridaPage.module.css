@@ -132,7 +132,8 @@
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-  overflow: hidden;
+  /* clip: mantém cantos arredondados SEM criar scroll container, permitindo sticky header */
+  overflow: clip;
 }
 
 .table {
@@ -152,6 +153,10 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
 }
 
 .table thead th.right {
@@ -569,6 +574,40 @@
   font-size: 12px;
   color: #94a3b8;
   margin-left: auto;
+}
+
+/* ── Sugestão alternativa (badge S) ── */
+.qtdSugeridaS {
+  text-align: right;
+  font-weight: 700;
+  font-size: 14px;
+  color: #7c3aed;
+  font-variant-numeric: tabular-nums;
+  vertical-align: middle;
+}
+
+.qtdSugeridaSInner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  vertical-align: middle;
+}
+
+.badgeS {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: #7c3aed;
+  color: #ffffff;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+  line-height: 1;
+  cursor: default;
 }
 
 /* ── "quantidade suficiente" tag ── */
