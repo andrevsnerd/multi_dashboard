@@ -5483,6 +5483,8 @@ export interface ProdutoVendaUltimos3Meses {
   valor3meses: number;
   /** Custo unitário de reposição (PRODUTOS.CUSTO_REPOSICAO1), alinhado ao restante do estoque */
   custoUnitario: number;
+  /** Estoque atual (soma de todas as filiais filtradas) */
+  estoqueAtual: number;
   percParticipacao: number;
   qtdSugerida: number;
 }
@@ -5514,9 +5516,9 @@ export async function fetchTopProdutosUltimos3Meses({
 }): Promise<ProdutoVendaUltimos3Meses[]> {
   return withRequest(async (request) => {
     const now = new Date();
-    // Últimos 90 dias
-    const inicio90Dias = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-    request.input('inicio3m', sql.DateTime, inicio90Dias);
+    // Últimos 12 meses
+    const inicio12Meses = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+    request.input('inicio3m', sql.DateTime, inicio12Meses);
     request.input('fim3m', sql.DateTime, now);
     request.input('lc_limit', sql.Int, limit);
 
@@ -5526,6 +5528,7 @@ export async function fetchTopProdutosUltimos3Meses({
     const isProdutoLookup = produtos != null && produtos.length > 0;
 
     const vendasFilialFilter = isProdutoLookup ? '' : buildVendasFilialFilter(request, company, filial, 'vp');
+    const estoqueFilialFilter = isProdutoLookup ? '' : buildFilialFilter(request, company, filial, 'e2');
     const grupoFilter = isProdutoLookup ? '' : buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilter = isProdutoLookup ? '' : buildLinhaFilter(request, company, linhas, 'p');
     const colecaoFilter = isProdutoLookup ? '' : buildColecaoFilter(request, company, colecoes, 'p');
@@ -5564,9 +5567,17 @@ export async function fetchTopProdutosUltimos3Meses({
         UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS descricao,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS qtde3meses,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) AS valor3meses,
-        MAX(ISNULL(p.CUSTO_REPOSICAO1, 0)) AS custoUnitario
+        MAX(ISNULL(p.CUSTO_REPOSICAO1, 0)) AS custoUnitario,
+        MAX(ISNULL(est.estoqueAtual, 0)) AS estoqueAtual
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      LEFT JOIN (
+        SELECT e2.PRODUTO, SUM(CASE WHEN e2.ESTOQUE > 0 THEN e2.ESTOQUE ELSE 0 END) AS estoqueAtual
+        FROM ESTOQUE_PRODUTOS e2 WITH (NOLOCK)
+        WHERE 1=1
+          ${estoqueFilialFilter}
+        GROUP BY e2.PRODUTO
+      ) est ON est.PRODUTO = ISNULL(vp.PRODUTO, '')
       WHERE vp.DATA_VENDA >= @inicio3m
         AND vp.DATA_VENDA < @fim3m
         AND vp.QTDE > 0
@@ -5591,6 +5602,7 @@ export async function fetchTopProdutosUltimos3Meses({
       qtde3meses: number;
       valor3meses: number;
       custoUnitario: number;
+      estoqueAtual: number;
     }>(query);
 
     const rows = result.recordset.map(r => ({
@@ -5599,6 +5611,7 @@ export async function fetchTopProdutosUltimos3Meses({
       vendas3meses: Math.round(Number(r.qtde3meses ?? 0)),
       valor3meses: Math.round(Number(r.valor3meses ?? 0)),
       custoUnitario: Number(r.custoUnitario ?? 0),
+      estoqueAtual: Math.round(Number(r.estoqueAtual ?? 0)),
     })).filter(r => r.produto !== '' && r.valor3meses > 0);
 
     const totalValor = rows.reduce((s, r) => s + r.valor3meses, 0);
@@ -5631,10 +5644,10 @@ export async function fetchTopProdutosUltimos3Meses({
         vendas3meses: r.vendas3meses,
         valor3meses: r.valor3meses,
         custoUnitario: r.custoUnitario,
+        estoqueAtual: r.estoqueAtual,
         percParticipacao: Math.round(r.perc * 1000) / 10,
         qtdSugerida: r.floor + (boostSet.has(i) ? 1 : 0),
-      }))
-      .filter(r => r.qtdSugerida > 0);
+      }));
 
     return comSugestao;
   });

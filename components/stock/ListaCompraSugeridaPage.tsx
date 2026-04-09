@@ -41,6 +41,7 @@ interface ProdutoSugestao {
   valor3meses: number;
   /** Custo de reposição (cadastro), não preço médio de venda */
   custoUnitario?: number;
+  estoqueAtual?: number;
   percParticipacao: number;
   qtdSugerida: number;
 }
@@ -51,6 +52,7 @@ interface ProdutoComCurva extends ProdutoSugestao {
   curva: Curva;
   qtdFinal: number;
   percCumulativa: number;
+  qtdSuficiente?: boolean;
 }
 
 // ─── Formatação ──────────────────────────────────────────────────────────────
@@ -127,6 +129,8 @@ const CURVA_BAR_CLASS: Record<Curva, string> = {
   C: styles.percBarFillC,
 };
 
+const DIAS_META = 120;
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: CompanyKey }) {
@@ -173,6 +177,9 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
   const [loadingABC, setLoadingABC] = useState(false);
   const [errorABC, setErrorABC] = useState<string | null>(null);
   const [abcLoaded, setAbcLoaded] = useState(false);
+  const [modoReposicao, setModoReposicao] = useState(false);
+  const [incluirCurvaB, setIncluirCurvaB] = useState(false);
+  const [incluirCurvaC, setIncluirCurvaC] = useState(false);
 
   useEffect(() => {
     if (activeTab !== "abc" || abcLoaded) return;
@@ -181,6 +188,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
     if (filial) params.set("filial", filial);
     if (categoria) params.set("categoria", categoria);
     params.set("qtdCompra", String(qtdCompra));
+    params.set("limit", "2000");
     searchParams.getAll("grupos").forEach((g) => params.append("grupos", g));
     searchParams.getAll("linhas").forEach((l) => params.append("linhas", l));
     searchParams.getAll("colecoes").forEach((c) => params.append("colecoes", c));
@@ -200,11 +208,31 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
     [produtosABC, qtdCompra]
   );
 
-  const totalCustoABC = produtosComCurva.reduce((s, p) => {
+  // Modo Reposição Real: calcula qtd individualmente por produto (meta DIAS_META dias de cobertura)
+  const produtosComCurvaFinal = useMemo((): ProdutoComCurva[] => {
+    if (!modoReposicao) return produtosComCurva;
+    return produtosComCurva.map(p => {
+      const curvaAtiva =
+        p.curva === "A" ||
+        (p.curva === "B" && incluirCurvaB) ||
+        (p.curva === "C" && incluirCurvaC);
+      if (!curvaAtiva) return { ...p, qtdFinal: 0, qtdSuficiente: false };
+      const consumoDiario = p.vendas3meses / 365;
+      if (consumoDiario <= 0) return { ...p, qtdFinal: 0, qtdSuficiente: false };
+      const estoqueAtual = p.estoqueAtual ?? 0;
+      const duracaoAtual = estoqueAtual / consumoDiario;
+      if (duracaoAtual >= DIAS_META) return { ...p, qtdFinal: 0, qtdSuficiente: true };
+      const qtd = Math.ceil(consumoDiario * (DIAS_META - duracaoAtual));
+      return { ...p, qtdFinal: qtd, qtdSuficiente: false };
+    });
+  }, [produtosComCurva, modoReposicao, incluirCurvaB, incluirCurvaC]);
+
+  const totalCustoABC = produtosComCurvaFinal.reduce((s, p) => {
     if (p.qtdFinal <= 0) return s;
     const cu = p.custoUnitario ?? 0;
     return cu > 0 ? s + p.qtdFinal * cu : s;
   }, 0);
+  const totalQtdABC = produtosComCurvaFinal.reduce((s, p) => s + p.qtdFinal, 0);
   const maxPerc = produtosComCurva.length > 0 ? produtosComCurva[0].percParticipacao : 1;
   const countA = produtosComCurva.filter(p => p.curva === "A").length;
   const countB = produtosComCurva.filter(p => p.curva === "B").length;
@@ -407,32 +435,105 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
       {/* ── ABA ABC ───────────────────────────────────────────────────────── */}
       {activeTab === "abc" && (
         <>
-          <div className={styles.abcInfoBanner}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 2 }}>
-              <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <span>
-              Esta análise é <strong>apenas informativa</strong> — mostra a performance dos produtos por curva ABC.
-              A sugestão de compra real está na aba <strong>Reposição Necessária</strong>, calculada individualmente por produto.
-            </span>
+          {!modoReposicao && (
+            <div className={styles.abcInfoBanner}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 2 }}>
+                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <span>
+                Esta análise é <strong>apenas informativa</strong> — mostra a performance dos produtos por curva ABC.
+                A sugestão de compra real está na aba <strong>Reposição Necessária</strong>, calculada individualmente por produto.
+                Ative o toggle abaixo para calcular sugestões por reposição real.
+              </span>
+            </div>
+          )}
+
+          {/* ── Toggle de Modo ── */}
+          <div className={styles.modoBar}>
+            <div
+              role="switch"
+              aria-checked={modoReposicao}
+              tabIndex={0}
+              className={styles.toggleWrap}
+              onClick={() => {
+                if (modoReposicao) {
+                  setModoReposicao(false);
+                  setIncluirCurvaB(false);
+                  setIncluirCurvaC(false);
+                } else {
+                  setModoReposicao(true);
+                }
+              }}
+              onKeyDown={e => {
+                if (e.key === " " || e.key === "Enter") {
+                  e.preventDefault();
+                  if (modoReposicao) {
+                    setModoReposicao(false);
+                    setIncluirCurvaB(false);
+                    setIncluirCurvaC(false);
+                  } else {
+                    setModoReposicao(true);
+                  }
+                }
+              }}
+            >
+              <div className={`${styles.toggleTrack} ${modoReposicao ? styles.toggleTrackOn : ""}`}>
+                <div className={`${styles.toggleThumb} ${modoReposicao ? styles.toggleThumbOn : ""}`} />
+              </div>
+              <span className={styles.toggleLabelText}>Cálculo por Reposição Real</span>
+            </div>
+
+            {modoReposicao ? (
+              <>
+                <div className={styles.toggleDivider} />
+                <span className={styles.toggleIncluirLabel}>Incluir sugestões:</span>
+                <label className={`${styles.curvaCheckboxLabel} ${styles.checkboxLabelB}`}>
+                  <input
+                    type="checkbox"
+                    checked={incluirCurvaB}
+                    onChange={e => setIncluirCurvaB(e.target.checked)}
+                  />
+                  Curva B
+                </label>
+                <label className={`${styles.curvaCheckboxLabel} ${styles.checkboxLabelC}`}>
+                  <input
+                    type="checkbox"
+                    checked={incluirCurvaC}
+                    onChange={e => setIncluirCurvaC(e.target.checked)}
+                  />
+                  Curva C
+                </label>
+                <div className={styles.toggleDivider} />
+                <span className={styles.modoMetaTag}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}>
+                    <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  Meta: {DIAS_META} dias de cobertura mínima
+                </span>
+              </>
+            ) : (
+              <span className={styles.modoDescTag}>Distribuição proporcional pela qtd de referência</span>
+            )}
           </div>
 
           {/* Summary ABC */}
           {!loadingABC && !errorABC && produtosComCurva.length > 0 && (
             <div className={styles.summaryCard}>
               <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>QTD Referência</span>
-                <span className={styles.summaryValue}>{fmt(qtdCompra)}</span>
+                <span className={styles.summaryLabel}>{modoReposicao ? "Total Calculado" : "QTD Referência"}</span>
+                <span className={styles.summaryValue}>{modoReposicao ? fmt(totalQtdABC) : fmt(qtdCompra)}</span>
               </div>
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Custo (Curva A)</span>
-                <span className={styles.summaryValue}>{fmtBRL(totalCustoABC)}</span>
+                <span className={styles.summaryLabel}>{modoReposicao ? "Custo Total" : "Custo (Curva A)"}</span>
+                <span className={styles.summaryValue}>{totalCustoABC > 0 ? fmtBRL(totalCustoABC) : "—"}</span>
               </div>
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Período Base</span>
-                <span className={styles.summaryValueNeutral}>Últimos 90 dias</span>
+                <span className={styles.summaryLabel}>{modoReposicao ? "Cobertura Meta" : "Período Base"}</span>
+                <span className={styles.summaryValueNeutral} style={{ fontSize: 14 }}>
+                  {modoReposicao ? `${DIAS_META} dias mínimo` : "Últimos 12 meses"}
+                </span>
               </div>
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
@@ -463,36 +564,48 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                   <tr>
                     <th style={{ width: 48 }}>#</th>
                     <th>Produto</th>
-                    <th className={styles.right}>Faturamento 90 dias</th>
+                    <th className={styles.right}>Vendas 12 meses</th>
                     <th className={styles.right}>Qtd vendida</th>
+                    <th className={styles.right}>Estoque</th>
+                    <th className={styles.right}>Duração</th>
                     <th className={styles.right}>Participação</th>
-                    <th className={styles.right}>Qtd Proporcional</th>
+                    <th className={styles.right}>{modoReposicao ? "Qtd a Repor" : "Qtd Proporcional"}</th>
                     <th className={styles.right}>Custo Unit.</th>
                     <th className={styles.right}>Custo Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {groups.map(curva => {
-                    const grupo = produtosComCurva.filter(p => p.curva === curva);
+                    const grupo = produtosComCurvaFinal.filter(p => p.curva === curva);
                     if (grupo.length === 0) return null;
+                    const curvaAtivaModo =
+                      curva === "A" ||
+                      (curva === "B" && modoReposicao && incluirCurvaB) ||
+                      (curva === "C" && modoReposicao && incluirCurvaC);
                     return (
                       <React.Fragment key={curva}>
                         <tr className={`${styles.sectionRow} ${styles[`sectionRow${curva}`]}`}>
-                          <td colSpan={8}>
+                          <td colSpan={10}>
                             <div className={styles.sectionLabel}>
                               <span className={`${styles.curvaBadge} ${CURVA_BADGE_CLASS[curva]}`}>{curva}</span>
                               <span className={styles.sectionTitle}>{CURVA_LABEL[curva]}</span>
                               <span className={styles.sectionCount}>{grupo.length} produtos</span>
                               {curva === "A" && (
-                                <span className={styles.sectionNote}>← referência proporcional</span>
+                                <span className={styles.sectionNote}>
+                                  {modoReposicao ? `← meta: ${DIAS_META} dias` : "← referência proporcional"}
+                                </span>
+                              )}
+                              {modoReposicao && curva !== "A" && curvaAtivaModo && (
+                                <span className={styles.sectionNoteIncluida}>← incluída na sugestão</span>
                               )}
                             </div>
                           </td>
                         </tr>
                         {grupo.map((p, i) => {
-                          const rankGlobal = produtosComCurva.indexOf(p) + 1;
+                          const rankGlobal = produtosComCurvaFinal.findIndex(fp => fp.produto === p.produto) + 1;
+                          const isDimmed = !curvaAtivaModo;
                           return (
-                            <tr key={p.produto} className={curva !== "A" ? styles.rowDimmed : ""}>
+                            <tr key={p.produto} className={isDimmed ? styles.rowDimmed : ""}>
                               <td>
                                 <span className={`${styles.rank} ${i < 3 && curva === "A" ? styles.top : ""}`}>
                                   {rankGlobal}
@@ -506,6 +619,16 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                               </td>
                               <td className={styles.vendas}>{fmtBRL(p.valor3meses)}</td>
                               <td className={styles.vendas}>{fmt(p.vendas3meses)}</td>
+                              <td className={styles.right}>{p.estoqueAtual != null ? fmt(p.estoqueAtual) : "—"}</td>
+                              <td className={styles.right}>
+                                {(() => {
+                                  const consumoDiario = p.vendas3meses / 365;
+                                  if (consumoDiario <= 0 || !p.estoqueAtual) return "—";
+                                  const dias = Math.round(p.estoqueAtual / consumoDiario);
+                                  if (dias >= 365) return `${Math.round(dias / 30)} meses`;
+                                  return `${dias} dias`;
+                                })()}
+                              </td>
                               <td className={styles.percCell}>
                                 <div className={styles.percBar}>
                                   <div className={styles.percBarTrack}>
@@ -517,8 +640,18 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                                   <span className={styles.percText}>{p.percParticipacao.toFixed(1)}%</span>
                                 </div>
                               </td>
-                              <td className={p.qtdFinal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}>
-                                {p.qtdFinal > 0 ? fmt(p.qtdFinal) : "—"}
+                              <td className={
+                                p.qtdFinal > 0
+                                  ? styles.qtdSugerida
+                                  : p.qtdSuficiente
+                                    ? styles.qtdSuficienteTag
+                                    : styles.qtdSugeridaZero
+                              }>
+                                {p.qtdFinal > 0
+                                  ? fmt(p.qtdFinal)
+                                  : p.qtdSuficiente
+                                    ? "quantidade suficiente"
+                                    : "—"}
                               </td>
                               <td className={`${styles.right} ${p.qtdFinal > 0 && (p.custoUnitario ?? 0) > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
                                 {p.qtdFinal > 0 && (p.custoUnitario ?? 0) > 0 ? fmtBRL2(p.custoUnitario!) : "—"}
