@@ -46,6 +46,8 @@ interface ProdutoSugestao {
   grade?: string;
   colecao?: string;
   vendas3meses: number;
+  /** Últimos 60 dias — apenas exibição na tabela ABC */
+  vendas60dias?: number;
   vendasMesAtual?: number;
   valor3meses: number;
   /** Custo de reposição (cadastro), não preço médio de venda */
@@ -325,6 +327,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
     const colecoesKey = searchParams.getAll("colecoes").slice().sort().join("|");
     const subgruposKey = searchParams.getAll("subgrupos").slice().sort().join("|");
     const gradesKey = searchParams.getAll("grades").slice().sort().join("|");
+    const produtosKey = searchParams.getAll("produtos").slice().sort().join("|");
     return [
       companyKey,
       filial,
@@ -336,6 +339,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
       `c=${colecoesKey}`,
       `s=${subgruposKey}`,
       `gr=${gradesKey}`,
+      `p=${produtosKey}`,
     ].join("::");
   }, [companyKey, filial, categoria, qtdCompra, expandirPorCor, searchParams]);
 
@@ -457,6 +461,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
     searchParams.getAll("colecoes").forEach((c) => params.append("colecoes", c));
     searchParams.getAll("subgrupos").forEach((s) => params.append("subgrupos", s));
     searchParams.getAll("grades").forEach((g) => params.append("grades", g));
+    searchParams.getAll("produtos").forEach((p) => params.append("produtos", p));
 
     setLoadingABC(true);
     setErrorABC(null);
@@ -915,7 +920,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                     <th className={styles.right}>Vendas 12 meses</th>
                     <th className={styles.right}>QTD 12 meses</th>
                     <th className={styles.right}>Estoque</th>
-                    <th className={styles.right}>QTD Mês Atual</th>
+                    <th className={styles.right}>QTD 60 dias</th>
                     <th className={styles.right}>Duração</th>
                     <th className={styles.right}>Participação</th>
                     <th className={styles.right}>{modoReposicao ? "Qtd a Repor" : "Qtd Proporcional"}</th>
@@ -1025,7 +1030,7 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                               >
                                 {p.estoqueAtual != null ? fmt(p.estoqueAtual) : "—"}
                               </td>
-                              <td className={styles.vendas}>{fmt(p.vendasMesAtual ?? 0)}</td>
+                              <td className={styles.vendas}>{fmt(p.vendas60dias ?? 0)}</td>
                               <td
                                 className={styles.right}
                                 onMouseEnter={(e) => {

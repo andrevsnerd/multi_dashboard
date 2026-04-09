@@ -1982,8 +1982,18 @@ export default function ProjecaoEstoquePage({
                           grupos.forEach((g) => params.append("grupos", g));
                           linhas.forEach((l) => params.append("linhas", l));
                           colecoes.forEach((c) => params.append("colecoes", c));
-                          subgrupos.forEach((s) => params.append("subgrupos", s));
-                          grades.forEach((g) => params.append("grades", g));
+                          // Usa o subgrupo/grade/produto do row clicado (drill-down) em vez do filtro geral
+                          if (proj.subgrupo) {
+                            params.append("subgrupos", proj.subgrupo);
+                          } else {
+                            subgrupos.forEach((s) => params.append("subgrupos", s));
+                          }
+                          if (proj.grade) {
+                            params.append("grades", proj.grade);
+                          } else {
+                            grades.forEach((g) => params.append("grades", g));
+                          }
+                          if (proj.produto) params.append("produtos", proj.produto);
                           if (expansao.size > 0) {
                             params.set("expansao", JSON.stringify(Array.from(expansao.entries())));
                           }
@@ -2047,8 +2057,18 @@ export default function ProjecaoEstoquePage({
                           grupos.forEach((g) => params.append("grupos", g));
                           linhas.forEach((l) => params.append("linhas", l));
                           colecoes.forEach((c) => params.append("colecoes", c));
-                          subgrupos.forEach((s) => params.append("subgrupos", s));
-                          grades.forEach((g) => params.append("grades", g));
+                          // Usa o subgrupo/grade/produto do row clicado (drill-down) em vez do filtro geral
+                          if (proj.subgrupo) {
+                            params.append("subgrupos", proj.subgrupo);
+                          } else {
+                            subgrupos.forEach((s) => params.append("subgrupos", s));
+                          }
+                          if (proj.grade) {
+                            params.append("grades", proj.grade);
+                          } else {
+                            grades.forEach((g) => params.append("grades", g));
+                          }
+                          if (proj.produto) params.append("produtos", proj.produto);
                           if (expansao.size > 0) params.set("expansao", JSON.stringify(Array.from(expansao.entries())));
                           router.push(`/${companyKey}/controle-estoque/projecao/lista-compra?${params.toString()}`);
                         };

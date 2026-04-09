@@ -5486,6 +5486,8 @@ export interface ProdutoVendaUltimos3Meses {
   grade?: string;
   colecao?: string;
   vendas3meses: number;
+  /** Qtde vendida nos últimos 60 dias (referência visual na lista ABC) */
+  vendas60dias: number;
   /** Qtde vendida no mês atual (até agora), usada para duração real */
   vendasMesAtual: number;
   valor3meses: number;
@@ -5529,9 +5531,11 @@ export async function fetchTopProdutosUltimos3Meses({
     const now = new Date();
     // Últimos 12 meses
     const inicio12Meses = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+    const inicio60dias = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
     const inicioMesAtual = new Date(now.getFullYear(), now.getMonth(), 1);
     request.input('inicio3m', sql.DateTime, inicio12Meses);
     request.input('fim3m', sql.DateTime, now);
+    request.input('inicio60d', sql.DateTime, inicio60dias);
     request.input('inicioMesAtual', sql.DateTime, inicioMesAtual);
     request.input('lc_limit', sql.Int, limit);
 
@@ -5593,6 +5597,7 @@ export async function fetchTopProdutosUltimos3Meses({
         MAX(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) AS grade,
         MAX(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) AS colecao,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS qtde3meses,
+        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 AND vp.DATA_VENDA >= @inicio60d THEN vp.QTDE ELSE 0 END) AS qtde60dias,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 AND vp.DATA_VENDA >= @inicioMesAtual THEN vp.QTDE ELSE 0 END) AS qtdeMesAtual,
         SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) AS valor3meses,
         MAX(ISNULL(p.CUSTO_REPOSICAO1, 0)) AS custoUnitario,
@@ -5638,6 +5643,7 @@ export async function fetchTopProdutosUltimos3Meses({
       grade?: string;
       colecao?: string;
       qtde3meses: number;
+      qtde60dias: number;
       qtdeMesAtual: number;
       valor3meses: number;
       custoUnitario: number;
@@ -5654,6 +5660,7 @@ export async function fetchTopProdutosUltimos3Meses({
       grade: (r.grade ?? '').trim() || undefined,
       colecao: (r.colecao ?? '').trim() || undefined,
       vendas3meses: Math.round(Number(r.qtde3meses ?? 0)),
+      vendas60dias: Math.round(Number(r.qtde60dias ?? 0)),
       vendasMesAtual: Math.round(Number(r.qtdeMesAtual ?? 0)),
       valor3meses: Math.round(Number(r.valor3meses ?? 0)),
       custoUnitario: Number(r.custoUnitario ?? 0),
@@ -5694,6 +5701,7 @@ export async function fetchTopProdutosUltimos3Meses({
         grade: (r.grade ?? '').trim() || undefined,
         colecao: (r.colecao ?? '').trim() || undefined,
         vendas3meses: r.vendas3meses,
+        vendas60dias: r.vendas60dias,
         vendasMesAtual: r.vendasMesAtual,
         valor3meses: r.valor3meses,
         custoUnitario: r.custoUnitario,
