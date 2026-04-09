@@ -180,4 +180,90 @@ export function isEcommerceFilial(
   return ecommerceFilials.includes(filial);
 }
 
+/** Normaliza nome de filial do ERP para bater com filialDisplayNames / listas (espaços, hífens unicode). */
+function normalizeFilialNameForMatch(s: string): string {
+  return s
+    .trim()
+    .replace(/[\u2010-\u2015\u2212]/g, '-')
+    .replace(/\s+/g, ' ');
+}
+
+/** Nome curto da filial como na dashboard (E-COMMERCE, PAULISTA, MATRIZ, …). */
+export function getFilialLabelForDisplay(
+  company: CompanyConfig | null | undefined,
+  rawFilial: string
+): string {
+  const t = normalizeFilialNameForMatch(rawFilial);
+  if (!company) return t;
+
+  const map = company.filialDisplayNames;
+  if (map) {
+    if (map[rawFilial] !== undefined) return map[rawFilial];
+    if (map[t] !== undefined) return map[t];
+    for (const [key, label] of Object.entries(map)) {
+      if (normalizeFilialNameForMatch(key) === t) return label;
+    }
+  }
+
+  const ecommerce = company.ecommerceFilials ?? [];
+  if (ecommerce.some((f) => normalizeFilialNameForMatch(f) === t)) {
+    return 'E-COMMERCE';
+  }
+
+  const groups = company.filialGroups ?? {};
+  for (const [canonical, members] of Object.entries(groups)) {
+    if (normalizeFilialNameForMatch(canonical) === t) {
+      return map?.[canonical] ?? map?.[members[0] ?? ''] ?? canonical;
+    }
+    for (const m of members) {
+      if (normalizeFilialNameForMatch(m) === t) {
+        return map?.[canonical] ?? map?.[m] ?? canonical;
+      }
+    }
+  }
+
+  return t;
+}
+
+/**
+ * Soma vendas por filial quando vários códigos ERP compartilham o mesmo rótulo de exibição
+ * (ex.: filiais de e-commerce → "E-COMMERCE"; Paulista → "PAULISTA").
+ */
+export function aggregateVendasPorFilialByDisplayLabel<
+  T extends { filial: string; qtde12m: number; qtde60d: number },
+>(rows: T[], company: CompanyConfig | null | undefined): T[] {
+  const acc = new Map<string, { qtde12m: number; qtde60d: number }>();
+  for (const r of rows) {
+    const label = getFilialLabelForDisplay(company, r.filial);
+    const prev = acc.get(label);
+    if (!prev) {
+      acc.set(label, { qtde12m: r.qtde12m, qtde60d: r.qtde60d });
+    } else {
+      acc.set(label, {
+        qtde12m: prev.qtde12m + r.qtde12m,
+        qtde60d: prev.qtde60d + r.qtde60d,
+      });
+    }
+  }
+  return Array.from(acc.entries()).map(([filial, v]) => ({
+    filial,
+    qtde12m: v.qtde12m,
+    qtde60d: v.qtde60d,
+  })) as T[];
+}
+
+export function compareFilialDisplayOrder(
+  a: string,
+  b: string,
+  company: CompanyConfig | null | undefined
+): number {
+  const ord = company?.estoqueFilialOrder ?? [];
+  const ia = ord.indexOf(a);
+  const ib = ord.indexOf(b);
+  const fa = ia === -1 ? 999 : ia;
+  const fb = ib === -1 ? 999 : ib;
+  if (fa !== fb) return fa - fb;
+  return a.localeCompare(b, "pt-BR");
+}
+
 

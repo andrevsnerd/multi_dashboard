@@ -6,7 +6,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import * as XLSX from "xlsx";
 
 import { useSidebar } from "@/components/layout/SidebarContext";
-import { resolveCompany, type CompanyKey } from "@/lib/config/company";
+import {
+  aggregateVendasPorFilialByDisplayLabel,
+  compareFilialDisplayOrder,
+  resolveCompany,
+  type CompanyKey,
+} from "@/lib/config/company";
 import styles from "./ListaCompraSugeridaPage.module.css";
 
 /** UserHeaderBar é sticky ~top:0 — cabeçalho da tabela ABC fica logo abaixo */
@@ -121,24 +126,36 @@ function hamiltonDistribute(items: { valor: number }[], total: number): number[]
   return floors.map((f, i) => f + (boost.has(i) ? 1 : 0));
 }
 
-function matrizCodigosEmpresa(companyKey: CompanyKey): Set<string> {
-  return new Set(companyKey === "scarfme" ? ["SCARF ME - MATRIZ"] : ["NERD"]);
-}
-
 type DestinoCompraFinalParte = { label: string; qtd: number };
+
+/** Agrega códigos ERP por rótulo da dashboard (E-COMMERCE, PAULISTA, …) e ordena. */
+function normalizeVendasPorFilialParaExibicao(
+  companyKey: CompanyKey,
+  rows: Array<{ filial: string; qtde12m: number; qtde60d: number }>
+): Array<{ filial: string; qtde12m: number; qtde60d: number }> {
+  const cfg = resolveCompany(companyKey);
+  const merged = aggregateVendasPorFilialByDisplayLabel(rows, cfg);
+  return [...merged].sort((a, b) => compareFilialDisplayOrder(a.filial, b.filial, cfg));
+}
 
 /** Pesos = média mensal (qtde 12m / 12); piso por filial; o que sobra vai para a matriz. */
 function partesDestinoCompraFinal(
   qtdManual: number,
-  vendasPorFilial: Array<{ filial: string; qtde12m: number }>,
+  vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number }>,
   companyKey: CompanyKey
 ): DestinoCompraFinalParte[] | null {
   if (qtdManual <= 0) return null;
   const cfg = resolveCompany(companyKey);
-  const nomeExibicao = (f: string) => cfg?.filialDisplayNames?.[f] ?? f;
-  const matrizSet = matrizCodigosEmpresa(companyKey);
+  const agregadas = aggregateVendasPorFilialByDisplayLabel(
+    vendasPorFilial.map((r) => ({
+      filial: r.filial,
+      qtde12m: r.qtde12m,
+      qtde60d: r.qtde60d ?? 0,
+    })),
+    cfg
+  );
 
-  const medias = vendasPorFilial.map((r) => ({
+  const medias = agregadas.map((r) => ({
     filial: r.filial,
     m: r.qtde12m / 12,
   }));
@@ -157,22 +174,14 @@ function partesDestinoCompraFinal(
   let qtdMatriz = sobra;
   const outras: DestinoCompraFinalParte[] = [];
   for (const row of pisos) {
-    if (matrizSet.has(row.filial)) {
+    if (row.filial === "MATRIZ") {
       qtdMatriz += row.piso;
     } else if (row.piso > 0) {
-      outras.push({ label: nomeExibicao(row.filial), qtd: row.piso });
+      outras.push({ label: row.filial, qtd: row.piso });
     }
   }
 
-  const ordem = cfg?.estoqueFilialOrder ?? [];
-  const ordIdx = (label: string) => {
-    const i = ordem.indexOf(label);
-    return i === -1 ? 999 : i;
-  };
-  outras.sort(
-    (a, b) =>
-      ordIdx(a.label) - ordIdx(b.label) || a.label.localeCompare(b.label, "pt-BR")
-  );
+  outras.sort((a, b) => compareFilialDisplayOrder(a.label, b.label, cfg));
 
   const partes: DestinoCompraFinalParte[] = [];
   if (qtdMatriz > 0) partes.push({ label: "MATRIZ", qtd: qtdMatriz });
@@ -183,7 +192,7 @@ function partesDestinoCompraFinal(
 
 function textoDestinoCompraFinal(
   qtdManual: number,
-  vendasPorFilial: Array<{ filial: string; qtde12m: number }>,
+  vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number }>,
   companyKey: CompanyKey
 ): string {
   const partesH = partesDestinoCompraFinal(qtdManual, vendasPorFilial, companyKey);
@@ -624,7 +633,10 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
       params.set("produto", produto);
       if (cor) params.set("corProduto", cor);
       void fetchVendasPorFilialItem(params)
-        .then((data) => setVendasPorFilialCache((p) => ({ ...p, [cacheKey]: data })))
+        .then((data) => {
+          const norm = normalizeVendasPorFilialParaExibicao(companyKey, data);
+          setVendasPorFilialCache((p) => ({ ...p, [cacheKey]: norm }));
+        })
         .catch(() => setVendasPorFilialCache((p) => ({ ...p, [cacheKey]: [] })));
     });
   }, [activeTab, compraFinal, expandirPorCor, companyKey]);
@@ -1384,8 +1396,9 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                                   if (corProduto) params.set("corProduto", corProduto);
                                   fetchVendasPorFilialItem(params)
                                     .then((data) => {
-                                      setVendasPorFilialCache((prev) => ({ ...prev, [cacheKey]: data }));
-                                      setVendasTooltip((prev) => prev ? { ...prev, filiais: data, loading: false } : null);
+                                      const norm = normalizeVendasPorFilialParaExibicao(companyKey, data);
+                                      setVendasPorFilialCache((prev) => ({ ...prev, [cacheKey]: norm }));
+                                      setVendasTooltip((prev) => prev ? { ...prev, filiais: norm, loading: false } : null);
                                     })
                                     .catch(() => setVendasTooltip((prev) => prev ? { ...prev, loading: false } : null));
                                 }}
@@ -1451,8 +1464,9 @@ export default function ListaCompraSugeridaPage({ companyKey }: { companyKey: Co
                                   if (corProduto) params.set("corProduto", corProduto);
                                   fetchVendasPorFilialItem(params)
                                     .then((data) => {
-                                      setVendasPorFilialCache((prev) => ({ ...prev, [cacheKey]: data }));
-                                      setVendasTooltip((prev) => prev ? { ...prev, filiais: data, loading: false } : null);
+                                      const norm = normalizeVendasPorFilialParaExibicao(companyKey, data);
+                                      setVendasPorFilialCache((prev) => ({ ...prev, [cacheKey]: norm }));
+                                      setVendasTooltip((prev) => prev ? { ...prev, filiais: norm, loading: false } : null);
                                     })
                                     .catch(() => setVendasTooltip((prev) => prev ? { ...prev, loading: false } : null));
                                 }}

@@ -156,16 +156,15 @@ function buildVendasFilialFilter(
   }
 
   if (isScarfme && specificFilial === null) {
-    // Quando "Todas as filiais" (null), excluir e-commerce da query de varejo
-    // pois e-commerce tem query separada
+    // Todas as filiais: só varejo em W_CTB_LOJA_* (e-commerce ScarfMe vem de FATURAMENTO nas telas que unem as duas fontes).
     const normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
-    
+
     if (normalFiliais.length === 0) {
       return '';
     }
 
-    normalFiliais.forEach((filial, index) => {
-      request.input(`vendasFilial${index}`, sql.VarChar, filial);
+    normalFiliais.forEach((filialNome, index) => {
+      request.input(`vendasFilial${index}`, sql.VarChar, filialNome);
     });
 
     const placeholders = normalFiliais
@@ -190,6 +189,46 @@ function buildVendasFilialFilter(
     .join(', ');
 
   return `AND ${prefix}.FILIAL IN (${placeholders})`;
+}
+
+/**
+ * Filtro de filial em FATURAMENTO / e-commerce ScarfMe.
+ * Mesma regra de fetchVendasPorCategoriaGiro: todas (null) = IN ecommerceFilials; VAREJO = exclui;
+ * filial física só se estiver em ecommerceFilials.
+ */
+function buildScarfmeEcommerceFaturamentoFilialFilter(
+  request: sql.Request | RequestLike,
+  filial: string | null,
+  paramPrefix: string
+): string {
+  const companyConfig = resolveCompany('scarfme');
+  if (!companyConfig) {
+    return '';
+  }
+
+  const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
+
+  if (filial && filial !== VAREJO_VALUE) {
+    if (ecommerceFilials.includes(filial)) {
+      request.input(`${paramPrefix}Single`, sql.VarChar, filial);
+      return `AND f.FILIAL = @${paramPrefix}Single`;
+    }
+    return `AND 1=0`;
+  }
+
+  if (filial === VAREJO_VALUE) {
+    return `AND 1=0`;
+  }
+
+  if (ecommerceFilials.length === 0) {
+    return '';
+  }
+
+  ecommerceFilials.forEach((filialNome, index) => {
+    request.input(`${paramPrefix}${index}`, sql.VarChar, filialNome);
+  });
+  const placeholders = ecommerceFilials.map((_, i) => `@${paramPrefix}${i}`).join(', ');
+  return `AND f.FILIAL IN (${placeholders})`;
 }
 
 function buildGrupoFilter(
@@ -5527,6 +5566,7 @@ export async function fetchTopProdutosUltimos3Meses({
   limit?: number;
 }): Promise<ProdutoVendaUltimos3Meses[]> {
   return withRequest(async (request) => {
+    const filialSel = filial ?? null;
     const useCoresTable = company === 'nerd';
     const now = new Date();
     // Últimos 12 meses
@@ -5544,8 +5584,10 @@ export async function fetchTopProdutosUltimos3Meses({
     // Além disso, inclui todas as filiais (varejo + e-commerce) para preço real.
     const isProdutoLookup = produtos != null && produtos.length > 0;
 
-    const vendasFilialFilter = isProdutoLookup ? '' : buildVendasFilialFilter(request, company, filial, 'vp');
-    const estoqueFilialFilter = isProdutoLookup ? '' : buildFilialFilter(request, company, filial, 'e2');
+    const vendasFilialFilter = isProdutoLookup
+      ? ''
+      : buildVendasFilialFilter(request, company, filialSel, 'vp');
+    const estoqueFilialFilter = isProdutoLookup ? '' : buildFilialFilter(request, company, filialSel, 'e2');
     const grupoFilter = isProdutoLookup ? '' : buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilter = isProdutoLookup ? '' : buildLinhaFilter(request, company, linhas, 'p');
     const colecaoFilter = isProdutoLookup ? '' : buildColecaoFilter(request, company, colecoes, 'p');
@@ -5578,6 +5620,17 @@ export async function fetchTopProdutosUltimos3Meses({
       }
     }
 
+    const produtosFilterEc = produtosFilter.replace(/vp\./g, 'fp.');
+    const ecommerceFatFilialFilter =
+      company === 'scarfme' && !isProdutoLookup
+        ? buildScarfmeEcommerceFaturamentoFilialFilter(request, filialSel, 'lcEcFil')
+        : '';
+    const mergeScarfmeEcommerce =
+      company === 'scarfme' &&
+      !isProdutoLookup &&
+      ecommerceFatFilialFilter !== '' &&
+      !ecommerceFatFilialFilter.includes('1=0');
+
     const coresJoin = (porCor && useCoresTable)
       ? `LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR`
       : '';
@@ -5586,7 +5639,123 @@ export async function fetchTopProdutosUltimos3Meses({
       ? `COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO, vp.COR_PRODUTO)`
       : `COALESCE(vp.DESC_COR_PRODUTO, vp.COR_PRODUTO)`;
 
-    const query = `
+    const estoqueJoinSubquery = `
+      LEFT JOIN (
+        SELECT
+          e2.PRODUTO,
+          ${porCor ? "ISNULL(e2.COR_PRODUTO, '') AS cor," : ""}
+          SUM(CASE WHEN e2.ESTOQUE > 0 THEN e2.ESTOQUE ELSE 0 END) AS estoqueAtual
+        FROM ESTOQUE_PRODUTOS e2 WITH (NOLOCK)
+        WHERE 1=1
+          ${estoqueFilialFilter}
+        GROUP BY e2.PRODUTO${porCor ? ", ISNULL(e2.COR_PRODUTO, '')" : ""}
+      ) est ON est.PRODUTO = u.produto${porCor ? " AND ISNULL(est.cor, '') = ISNULL(u.cor, '')" : ""}
+    `;
+
+    const innerListaVarejo = `
+      SELECT
+        ISNULL(vp.PRODUTO, '') AS produto,
+        ${porCor ? "ISNULL(vp.COR_PRODUTO, '') AS cor," : ""}
+        ${porCor ? `MAX(ISNULL(${corDescricaoExpr}, '')) AS corDescricao,` : ""}
+        UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS descricao,
+        MAX(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) AS linha,
+        MAX(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) AS subgrupo,
+        MAX(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) AS grade,
+        MAX(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) AS colecao,
+        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS qtde3meses,
+        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 AND vp.DATA_VENDA >= @inicio60d THEN vp.QTDE ELSE 0 END) AS qtde60dias,
+        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 AND vp.DATA_VENDA >= @inicioMesAtual THEN vp.QTDE ELSE 0 END) AS qtdeMesAtual,
+        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) AS valor3meses,
+        MAX(ISNULL(p.CUSTO_REPOSICAO1, 0)) AS custoUnitario
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      ${coresJoin}
+      WHERE vp.DATA_VENDA >= @inicio3m
+        AND vp.DATA_VENDA < @fim3m
+        AND vp.QTDE > 0
+        ${vendasFilialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
+        ${categoriaFilter}
+        ${produtosFilter}
+      GROUP BY ISNULL(vp.PRODUTO, ''), ${porCor ? "ISNULL(vp.COR_PRODUTO, ''), " : ""}UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, ''))))
+    `;
+
+    const ecCoresJoinLista = porCor
+      ? 'LEFT JOIN CORES_BASICAS cb WITH (NOLOCK) ON fp.COR_PRODUTO = cb.COR'
+      : '';
+
+    const innerListaEcommerce = `
+      SELECT
+        ISNULL(fp.PRODUTO, '') AS produto,
+        ${porCor ? "ISNULL(fp.COR_PRODUTO, '') AS cor," : ""}
+        ${porCor ? "MAX(ISNULL(COALESCE(cb.DESC_COR, fp.COR_PRODUTO), '')) AS corDescricao," : ""}
+        UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS descricao,
+        MAX(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) AS linha,
+        MAX(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) AS subgrupo,
+        MAX(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) AS grade,
+        MAX(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) AS colecao,
+        SUM(CAST(fp.QTDE AS FLOAT)) AS qtde3meses,
+        SUM(CASE WHEN f.EMISSAO >= @inicio60d THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS qtde60dias,
+        SUM(CASE WHEN f.EMISSAO >= @inicioMesAtual THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS qtdeMesAtual,
+        SUM(CAST(fp.QTDE AS FLOAT) * ISNULL(fp.VALOR_LIQUIDO, 0)) AS valor3meses,
+        MAX(ISNULL(p.CUSTO_REPOSICAO1, 0)) AS custoUnitario
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO
+      ${ecCoresJoinLista}
+      WHERE f.EMISSAO >= @inicio3m
+        AND f.EMISSAO < @fim3m
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND CAST(fp.QTDE AS FLOAT) > 0
+        ${ecommerceFatFilialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
+        ${categoriaFilter}
+        ${produtosFilterEc}
+      GROUP BY ISNULL(fp.PRODUTO, ''), ${porCor ? "ISNULL(fp.COR_PRODUTO, ''), " : ""}UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, ''))))
+    `;
+
+    const query = mergeScarfmeEcommerce
+      ? `
+      SELECT TOP (@lc_limit)
+        u.produto,
+        ${porCor ? "u.cor," : ""}
+        ${porCor ? "MAX(u.corDescricao) AS corDescricao," : ""}
+        u.descricao,
+        MAX(u.linha) AS linha,
+        MAX(u.subgrupo) AS subgrupo,
+        MAX(u.grade) AS grade,
+        MAX(u.colecao) AS colecao,
+        SUM(u.qtde3meses) AS qtde3meses,
+        SUM(u.qtde60dias) AS qtde60dias,
+        SUM(u.qtdeMesAtual) AS qtdeMesAtual,
+        SUM(u.valor3meses) AS valor3meses,
+        MAX(u.custoUnitario) AS custoUnitario,
+        MAX(ISNULL(est.estoqueAtual, 0)) AS estoqueAtual
+      FROM (
+        ${innerListaVarejo}
+        UNION ALL
+        ${innerListaEcommerce}
+      ) u
+      ${estoqueJoinSubquery}
+      GROUP BY u.produto, ${porCor ? "u.cor, " : ""}u.descricao
+      HAVING SUM(u.valor3meses) > 0
+      ORDER BY SUM(u.valor3meses) DESC
+    `
+      : `
       SELECT TOP (@lc_limit)
         ISNULL(vp.PRODUTO, '') AS produto,
         ${porCor ? "ISNULL(vp.COR_PRODUTO, '') AS cor," : ""}
@@ -5775,46 +5944,163 @@ export async function fetchVendasProdutoPorFilial({
   filial?: string | null;
   produto: string;
   corProduto?: string | null;
-}): Promise<Array<{ filial: string; qtde12m: number; qtde60d: number }>> {
+}): Promise<Array<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number }>> {
   return withRequest(async (request) => {
+    const filialSel = filial ?? null;
     const now = new Date();
     const inicio12m = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
     const inicio60d = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    const inicioMesAtual = new Date(now.getFullYear(), now.getMonth(), 1);
     request.input('vf_inicio12m', sql.DateTime, inicio12m);
     request.input('vf_fim', sql.DateTime, now);
     request.input('vf_inicio60d', sql.DateTime, inicio60d);
+    request.input('vf_inicioMesAtual', sql.DateTime, inicioMesAtual);
     request.input('vf_produto', sql.VarChar, produto.trim());
 
-    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial ?? null, 'vf');
+    const vendasFilialFilter = buildVendasFilialFilter(request, company, filialSel, 'vf');
+    const ecommerceFatFilialFilter =
+      company === 'scarfme'
+        ? buildScarfmeEcommerceFaturamentoFilialFilter(request, filialSel, 'vfEcFil')
+        : '';
+    const mergeScarfmeEcommerce =
+      company === 'scarfme' &&
+      ecommerceFatFilialFilter !== '' &&
+      !ecommerceFatFilialFilter.includes('1=0');
+
     const corNorm = (corProduto ?? '').trim();
-    const corFilter = corProduto != null ? `AND ISNULL(vf.COR_PRODUTO, '') = @vf_cor` : '';
+    const corFilterVf = corProduto != null ? `AND ISNULL(vf.COR_PRODUTO, '') = @vf_cor` : '';
+    const corFilterFp = corProduto != null ? `AND ISNULL(fp.COR_PRODUTO, '') = @vf_cor` : '';
     if (corProduto != null) {
       request.input('vf_cor', sql.VarChar, corNorm);
     }
 
-    const query = `
+    const queryVarejo = `
       SELECT
         vf.FILIAL AS filial,
         SUM(CASE WHEN vf.QTDE_CANCELADA = 0 THEN vf.QTDE ELSE 0 END) AS qtde12m,
-        SUM(CASE WHEN vf.QTDE_CANCELADA = 0 AND vf.DATA_VENDA >= @vf_inicio60d THEN vf.QTDE ELSE 0 END) AS qtde60d
+        SUM(CASE WHEN vf.QTDE_CANCELADA = 0 AND vf.DATA_VENDA >= @vf_inicio60d THEN vf.QTDE ELSE 0 END) AS qtde60d,
+        SUM(CASE WHEN vf.QTDE_CANCELADA = 0 AND vf.DATA_VENDA >= @vf_inicioMesAtual THEN vf.QTDE ELSE 0 END) AS qtdeMesAtual
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vf WITH (NOLOCK)
       WHERE vf.DATA_VENDA >= @vf_inicio12m
         AND vf.DATA_VENDA < @vf_fim
         AND vf.QTDE > 0
         AND LTRIM(RTRIM(ISNULL(vf.PRODUTO, ''))) = @vf_produto
-        ${corFilter}
+        ${corFilterVf}
         ${vendasFilialFilter}
       GROUP BY vf.FILIAL
-      ORDER BY vf.FILIAL
     `;
 
-    const result = await request.query<{ filial: string; qtde12m: number; qtde60d: number }>(query);
-    return result.recordset.map(r => ({
-      filial: r.filial,
-      qtde12m: Math.round(Number(r.qtde12m ?? 0)),
-      qtde60d: Math.round(Number(r.qtde60d ?? 0)),
-    }));
+    const result = await request.query<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number | null }>(queryVarejo);
+    const byFilial = new Map<string, { filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number }>();
+    for (const r of result.recordset) {
+      byFilial.set(r.filial, {
+        filial: r.filial,
+        qtde12m: Math.round(Number(r.qtde12m ?? 0)),
+        qtde60d: Math.round(Number(r.qtde60d ?? 0)),
+        qtdeMesAtual: Math.round(Number(r.qtdeMesAtual ?? 0)),
+      });
+    }
+
+    if (mergeScarfmeEcommerce) {
+      const queryEcommerce = `
+        SELECT
+          f.FILIAL AS filial,
+          SUM(CAST(fp.QTDE AS FLOAT)) AS qtde12m,
+          SUM(CASE WHEN f.EMISSAO >= @vf_inicio60d THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS qtde60d,
+          SUM(CASE WHEN f.EMISSAO >= @vf_inicioMesAtual THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS qtdeMesAtual
+        FROM FATURAMENTO f WITH (NOLOCK)
+        JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+          ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+        WHERE f.EMISSAO >= @vf_inicio12m
+          AND f.EMISSAO < @vf_fim
+          AND f.NOTA_CANCELADA = 0
+          AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+          AND CAST(fp.QTDE AS FLOAT) > 0
+          AND LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) = @vf_produto
+          ${corFilterFp}
+          ${ecommerceFatFilialFilter}
+        GROUP BY f.FILIAL
+      `;
+      const ecRes = await request.query<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number | null }>(queryEcommerce);
+      for (const r of ecRes.recordset) {
+        const q12 = Math.round(Number(r.qtde12m ?? 0));
+        const q60 = Math.round(Number(r.qtde60d ?? 0));
+        const qMes = Math.round(Number(r.qtdeMesAtual ?? 0));
+        const ex = byFilial.get(r.filial);
+        if (ex) {
+          ex.qtde12m += q12;
+          ex.qtde60d += q60;
+          ex.qtdeMesAtual += qMes;
+        } else {
+          byFilial.set(r.filial, { filial: r.filial, qtde12m: q12, qtde60d: q60, qtdeMesAtual: qMes });
+        }
+      }
+    }
+
+    return Array.from(byFilial.values()).sort((a, b) => a.filial.localeCompare(b.filial));
   });
+}
+
+/**
+ * Totais de quantidade (12 meses + 60 dias) por item — **mesma função** que o tooltip
+ * (`fetchVendasProdutoPorFilial`), somando todas as filiais. Garante alinhamento com a API vendas-por-filial-item.
+ */
+export async function fetchVendasQuantidadesTotaisItensLote({
+  company,
+  filial,
+  porCor,
+  itens,
+}: {
+  company?: string;
+  filial?: string | null;
+  porCor: boolean;
+  itens: Array<{ produto: string; cor?: string | null }>;
+}): Promise<Map<string, { qtde12m: number; qtde60d: number; qtdeMesAtual: number }>> {
+  const normField = (s: string) => String(s ?? '').replace(/\u00A0/g, ' ').trim();
+  const keyOf = (produto: string, cor: string) =>
+    `${normField(produto)}||${porCor ? normField(cor) : ''}`;
+
+  const unique = new Map<string, { produto: string; corRaw: string | null }>();
+  for (const it of itens) {
+    const p = normField(it.produto);
+    if (!p) continue;
+    const corPart = porCor ? normField((it.cor ?? '') as string) : '';
+    const k = keyOf(p, corPart);
+    if (!unique.has(k)) {
+      unique.set(k, {
+        produto: p,
+        corRaw: porCor && corPart !== '' ? corPart : null,
+      });
+    }
+  }
+
+  const list = Array.from(unique.entries());
+  if (list.length === 0) {
+    return new Map();
+  }
+
+  const out = new Map<string, { qtde12m: number; qtde60d: number; qtdeMesAtual: number }>();
+  const CONCURRENCY = 10;
+
+  for (let i = 0; i < list.length; i += CONCURRENCY) {
+    const slice = list.slice(i, i + CONCURRENCY);
+    await Promise.all(
+      slice.map(async ([k, { produto, corRaw }]) => {
+        const rows = await fetchVendasProdutoPorFilial({
+          company,
+          filial,
+          produto,
+          corProduto: corRaw,
+        });
+        const qtde12m = rows.reduce((s, r) => s + r.qtde12m, 0);
+        const qtde60d = rows.reduce((s, r) => s + r.qtde60d, 0);
+        const qtdeMesAtual = rows.reduce((s, r) => s + r.qtdeMesAtual, 0);
+        out.set(k, { qtde12m, qtde60d, qtdeMesAtual });
+      })
+    );
+  }
+
+  return out;
 }
 
 /**
