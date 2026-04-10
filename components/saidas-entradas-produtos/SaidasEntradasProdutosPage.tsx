@@ -98,6 +98,13 @@ interface TransferenciaPermissao {
 
 type TipoOperacao = "saida" | "entrada";
 
+/** Cor na UI: prioriza descrição; a API às vezes manda só descCor com corProduto nulo (igual lista-loja). */
+function textoCorProduto(descCor: string, corProduto: string | null): string {
+  const d = (descCor || "").trim();
+  if (d) return d;
+  return (corProduto || "").trim();
+}
+
 function parseBackendDateTime(value: string): Date {
   // Normaliza datas que vêm sem timezone (ex: "2026-03-17 16:29:00" ou "2026-03-17T16:29:00")
   // para serem interpretadas no fuso local do usuário (ao invés de UTC implícito / parse inconsistente).
@@ -716,6 +723,8 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
     setProdutosSelecionadosModal(produtosSelecionados);
     setSearchTerm("");
     setProdutos([]);
+    setColorPickerProduto(null);
+    setColorPickerOpcoes([]);
     setModalAberto(true);
   }, [produtosSelecionados]);
 
@@ -800,7 +809,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
               filialSelecionada?.codFilial,
               corProdutoCodigoBarras,
               companyKey,
-              tipoOperacao === "entrada"
+              true
             );
 
             if (produtoCodigoBarras.produtosEncontrados > 1 && active) {
@@ -816,14 +825,14 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                 filialSelecionada?.codFilial,
                 null,
                 companyKey,
-                tipoOperacao === "entrada"
+                true
               );
             }
           }
         }
 
         if (results.length === 0) {
-          results = await searchProdutos(searchTermTrimmed, filialSelecionada?.codFilial, null, companyKey, tipoOperacao === "entrada");
+          results = await searchProdutos(searchTermTrimmed, filialSelecionada?.codFilial, null, companyKey, true);
         }
         
         if (active) {
@@ -872,7 +881,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
 
     let cancelled = false;
     setLoadingColorPicker(true);
-    searchProdutos(colorPickerProduto.produto, filialSelecionada?.codFilial, null, companyKey, tipoOperacao === "entrada")
+    searchProdutos(colorPickerProduto.produto, filialSelecionada?.codFilial, null, companyKey, true)
       .then(result => {
         if (!cancelled) {
           setColorPickerOpcoes(result.filter(p =>
@@ -883,8 +892,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       .catch(() => { if (!cancelled) setColorPickerOpcoes([]); })
       .finally(() => { if (!cancelled) setLoadingColorPicker(false); });
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colorPickerProduto]);
+  }, [colorPickerProduto, companyKey, produtos, filialSelecionada, tipoOperacao]);
 
   const criarProdutoSelecionado = useCallback((produto: Produto): ProdutoSelecionado | null => {
     if (!filialSelecionada) {
@@ -996,8 +1004,13 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
 
   const adicionarProdutoModal = useCallback((produto: Produto) => {
     if (produto.corProduto === null) {
-      setColorPickerProduto(produto);
-      return;
+      const temVariantesComCor = produtos.some(
+        (p) => p.produto.trim() === produto.produto.trim() && p.corProduto !== null
+      );
+      if (temVariantesComCor) {
+        setColorPickerProduto(produto);
+        return;
+      }
     }
 
     const novoItem = criarProdutoSelecionado(produto);
@@ -1802,13 +1815,15 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                 </div>
               ) : (
                 <div className={styles.produtosList}>
-                  {produtosSelecionados.map((produto, index) => (
+                  {produtosSelecionados.map((produto, index) => {
+                    const corTxt = textoCorProduto(produto.descCor, produto.corProduto);
+                    return (
                     <div key={index} className={styles.produtoItem}>
                       <div className={styles.produtoInfo}>
                         <div className={styles.produtoName}>{produto.descProduto}</div>
                         <div className={styles.produtoSku}>
                           {produto.produto}
-                          {produto.corProduto && ` · ${produto.descCor || produto.corProduto}`}
+                          {corTxt ? ` · ${corTxt}` : ""}
                           {produto.codigoBarra && ` · ${produto.codigoBarra}`}
                         </div>
                       </div>
@@ -1837,7 +1852,8 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                         <button className={styles.removeBtn} onClick={() => removerProduto(index)} title="Remover">🗑</button>
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               )}
 
@@ -2001,6 +2017,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                     const estoque = produto.estoques.find(e =>
                       e.filial.trim() === (filialSelecionada?.codFilial ?? '').trim()
                     );
+                    const corModalTxt = textoCorProduto(produto.descCor, produto.corProduto);
                     const isPickerActive = colorPickerProduto?.produto === produto.produto && produto.corProduto === null;
                     return (
                       <div key={index} className={`${styles.produtoModalItem}${isPickerActive ? ` ${styles.produtoModalItemPickerActive}` : ''}`}>
@@ -2009,7 +2026,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                           <div className={styles.produtoModalName}>{produto.descProduto}</div>
                           <div className={styles.produtoModalDetails}>
                             {produto.produto}
-                            {produto.corProduto && ` · ${produto.descCor || produto.corProduto}`}
+                            {corModalTxt ? ` · ${corModalTxt}` : ""}
                             {estoque && ` · Estoque: ${estoque.estoque}`}
                           </div>
                         </div>
@@ -2079,13 +2096,15 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                     </span>
                   </div>
                   <div className={styles.modalCartList}>
-                    {produtosSelecionadosModal.map((p, idx) => (
+                    {produtosSelecionadosModal.map((p, idx) => {
+                      const corCartTxt = textoCorProduto(p.descCor, p.corProduto);
+                      return (
                       <div key={`${p.produto}-${p.corProduto ?? ""}-${p.filial}-${idx}`} className={styles.produtoItem}>
                         <div className={styles.produtoInfo}>
                           <div className={styles.produtoName}>{p.descProduto}</div>
                           <div className={styles.produtoSku}>
                             {p.produto}
-                            {p.corProduto && ` · ${p.descCor || p.corProduto}`}
+                            {corCartTxt ? ` · ${corCartTxt}` : ""}
                             {p.codigoBarra && ` · ${p.codigoBarra}`}
                           </div>
                         </div>
@@ -2137,7 +2156,8 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                           <button className={styles.removeBtn} onClick={() => removerProdutoModal(idx)} title="Remover">🗑</button>
                         </div>
                       </div>
-                    ))}
+                    );
+                    })}
                   </div>
                 </div>
               )}

@@ -30,6 +30,7 @@ interface ProdutoSugestao {
   colecao?: string;
   custoUnitario?: number;
   estoqueAtual?: number;
+  qtdSugerida?: number;
 }
 
 function fmt(n: number) {
@@ -151,6 +152,8 @@ export default function CompraSalvaDetalhePage({
   const vendasPorFilialCacheRef = useRef(vendasPorFilialCache);
   vendasPorFilialCacheRef.current = vendasPorFilialCache;
   const destinoVendasFetchRef = useRef(new Set<string>());
+  const [listaRowsRefreshKey, setListaRowsRefreshKey] = useState(0);
+  const [vendasRefreshKey, setVendasRefreshKey] = useState(0);
 
   const expandirPorCor = doc?.expandirPorCor ?? true;
 
@@ -182,6 +185,20 @@ export default function CompraSalvaDetalhePage({
     };
   }, [companyKey, compraId]);
 
+  // Polling: refresh suggested quantities and store distribution every 5 minutes
+  useEffect(() => {
+    const POLL_MS = 5 * 60 * 1000;
+    const id = setInterval(() => {
+      setListaRowsRefreshKey((k) => k + 1);
+      // Clear vendas cache synchronously so next effect run re-fetches fresh data
+      destinoVendasFetchRef.current.clear();
+      vendasPorFilialCacheRef.current = {};
+      setVendasPorFilialCache({});
+      setVendasRefreshKey((k) => k + 1);
+    }, POLL_MS);
+    return () => clearInterval(id);
+  }, []);
+
   useEffect(() => {
     if (!doc || items.length === 0) return;
     destinoVendasFetchRef.current.clear();
@@ -192,10 +209,11 @@ export default function CompraSalvaDetalhePage({
     if (!doc || items.length === 0) return;
     const produtos = [...new Set(items.map((i) => i.produto.trim()).filter(Boolean))];
     if (produtos.length === 0) return;
+    const totalQtd = items.reduce((s, i) => s + Math.max(0, i.qtdManual ?? 0), 0);
     const params = new URLSearchParams();
     params.set("company", companyKey);
     params.set("limit", "8000");
-    params.set("qtdCompra", "0");
+    params.set("qtdCompra", String(totalQtd > 0 ? totalQtd : 1));
     if (expandirPorCor) params.set("porCor", "1");
     produtos.forEach((p) => params.append("produtos", p));
 
@@ -210,7 +228,7 @@ export default function CompraSalvaDetalhePage({
     return () => {
       cancelled = true;
     };
-  }, [doc, items, companyKey, expandirPorCor]);
+  }, [doc, items, companyKey, expandirPorCor, listaRowsRefreshKey]);
 
   useEffect(() => {
     if (!doc || items.length === 0) return;
@@ -236,7 +254,7 @@ export default function CompraSalvaDetalhePage({
         })
         .catch(() => setVendasPorFilialCache((p) => ({ ...p, [cacheKey]: [] })));
     });
-  }, [doc, items, expandirPorCor, companyKey]);
+  }, [doc, items, expandirPorCor, companyKey, vendasRefreshKey]);
 
   const rowsComputed = useMemo(() => {
     return items.map((it) => {
@@ -250,13 +268,18 @@ export default function CompraSalvaDetalhePage({
       const estoque = match?.estoqueAtual ?? null;
       const custoUnit = match?.custoUnitario ?? 0;
       const custoTotal = custoUnit > 0 ? Math.round(it.qtdManual * custoUnit) : 0;
-      return { it, match, estoque, custoUnit, custoTotal };
+      const qtdSugerida = typeof match?.qtdSugerida === "number" ? match.qtdSugerida : null;
+      return { it, match, estoque, custoUnit, custoTotal, qtdSugerida };
     });
   }, [items, listaRows, expandirPorCor]);
 
   const totals = useMemo(() => {
     const totalItens = items.length;
-    const totalQtdManual = items.reduce((s, i) => s + (i.qtdManual ?? 0), 0);
+    // Usa qtdSugerida quando disponível, incorporando a diferença no total
+    const totalQtdManual = rowsComputed.reduce(
+      (s, r) => s + (r.qtdSugerida !== null ? r.qtdSugerida : (r.it.qtdManual ?? 0)),
+      0
+    );
     const totalCusto = rowsComputed.reduce((s, r) => s + (r.custoTotal ?? 0), 0);
     return { totalItens, totalQtdManual, totalCusto };
   }, [items, rowsComputed]);
@@ -459,7 +482,7 @@ export default function CompraSalvaDetalhePage({
                   </tr>
                 </thead>
                 <tbody>
-                  {rowsComputed.map(({ it, estoque, custoUnit, custoTotal }) => {
+                  {rowsComputed.map(({ it, estoque, custoUnit, custoTotal, qtdSugerida }) => {
                     const produtoK = it.produto.trim();
                     const corK = expandirPorCor ? ((it.corProduto ?? "").trim() || undefined) : undefined;
                     const vendasKey = `${produtoK}||${corK ?? ""}`;
@@ -491,11 +514,25 @@ export default function CompraSalvaDetalhePage({
                           />
                         </td>
                         <td className={styles.destinoCell}>
-                          {partesDestino === undefined
-                            ? "…"
-                            : partesDestino === null
-                              ? "—"
-                              : <DestinoCompraFinalBadges partes={partesDestino} />}
+                          <div className={styles.destinoCellInner}>
+                            {partesDestino === undefined
+                              ? "…"
+                              : partesDestino === null
+                                ? "—"
+                                : <DestinoCompraFinalBadges partes={partesDestino} />}
+                            {qtdSugerida !== null && qtdSugerida !== it.qtdManual && (() => {
+                              const diff = qtdSugerida - it.qtdManual;
+                              return (
+                                <span
+                                  className={`${styles.badgeS} ${diff > 0 ? styles.badgeSDiffUp : styles.badgeSDiffDown}`}
+                                  style={{ width: "auto", padding: "0 5px" }}
+                                  title={`Sugerido: ${fmt(qtdSugerida)} (${diff > 0 ? "+" : ""}${diff})`}
+                                >
+                                  S:{diff > 0 ? "+" : ""}{diff}
+                                </span>
+                              );
+                            })()}
+                          </div>
                         </td>
                         <td
                           className={styles.right}

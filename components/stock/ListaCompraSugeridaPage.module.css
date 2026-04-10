@@ -967,3 +967,21 @@
   gap: 8px;
   align-items: center;
 }
+
+/* ── Destino cell com badge S de alteração (compras salvas) ── */
+.destinoCellInner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.badgeSDiffUp {
+  background: #7c3aed;
+  color: #ffffff;
+}
+
+.badgeSDiffDown {
+  background: #b45309;
+  color: #ffffff;
+}
