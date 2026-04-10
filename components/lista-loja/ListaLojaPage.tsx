@@ -162,16 +162,29 @@ function buildDefaultListName(filialNome?: string): string {
   return `${base} ${d} ${t}`;
 }
 
-function estoqueNaFilial(
-  estoques: Array<{ filial: string; estoque: number }>,
-  codFilial: string
-): number {
-  const key = codFilial.trim();
-  let sum = 0;
-  for (const e of estoques) {
-    if ((e.filial || "").trim() === key) sum += Number(e.estoque ?? 0);
+/** Estoque na filial (ou grupo lógico de filiais), alinhado ao Controle de Estoque — não usar só o snapshot da busca de produtos. */
+async function fetchEstoqueFilialSum(
+  companyKey: string,
+  codFilial: string,
+  produto: string,
+  corProduto: string | null
+): Promise<number | null> {
+  try {
+    const params = new URLSearchParams({
+      company: companyKey,
+      filial: codFilial.trim(),
+      produto: produto.trim(),
+    });
+    if (corProduto) params.set("corProduto", corProduto.trim());
+    const res = await fetch(`/api/controle-estoque/estoque-por-filial-item?${params}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { data?: Array<{ estoque: number }> };
+    const rows = json.data || [];
+    const sum = rows.reduce((s, r) => s + Number(r.estoque ?? 0), 0);
+    return Math.round(sum);
+  } catch {
+    return null;
   }
-  return sum;
 }
 
 async function fetchVendas90Projetado(
@@ -322,6 +335,8 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
   const [filiaisDisponiveis, setFiliaisDisponiveis] = useState<Filial[]>([]);
   const [filialSelecionada, setFilialSelecionada] = useState<Filial | null>(null);
   const [itens, setItens] = useState<ListaItem[]>([]);
+  const itensRef = useRef<ListaItem[]>(itens);
+  itensRef.current = itens;
 
   // Modal adicionar produto
   const [modalAberto, setModalAberto] = useState(false);
@@ -394,6 +409,42 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
       if (disponiveis.length > 0) setFilialSelecionada(disponiveis[0]);
     });
   }, [permissoes, permissoesCarregadas]);
+
+  // Ao mudar a loja ou abrir outra lista para edição, recalcula vendas 90d e estoque (mesma lógica do Controle de Estoque: grupos de filial, etc.)
+  useEffect(() => {
+    if (mode !== "editor") return;
+    const cod = filialSelecionada?.codFilial?.trim();
+    if (!cod || itensRef.current.length === 0) return;
+
+    const itemKey = (i: ListaItem) => `${i.produto}|${i.corProduto ?? ""}`;
+
+    let cancelled = false;
+    void (async () => {
+      const snapshot = itensRef.current;
+      const keys = snapshot.map(itemKey);
+      const metrics = await Promise.all(
+        snapshot.map(async (item) => {
+          const [vendas90d, estoqueFilial] = await Promise.all([
+            fetchVendas90Projetado(companyKey, cod, item.produto, item.corProduto),
+            fetchEstoqueFilialSum(companyKey, cod, item.produto, item.corProduto),
+          ]);
+          return { vendas90d, estoqueFilial };
+        })
+      );
+      if (cancelled) return;
+      const metricsByKey = new Map(keys.map((k, i) => [k, metrics[i]!]));
+      setItens((current) =>
+        current.map((it) => {
+          const m = metricsByKey.get(itemKey(it));
+          return m ? { ...it, vendas90d: m.vendas90d, estoqueFilial: m.estoqueFilial } : it;
+        })
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filialSelecionada?.codFilial, mode, companyKey, editingId]);
 
   // ─── Load lists ─────────────────────────────────────────────────────────────
 
@@ -546,10 +597,14 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
       };
 
       void (async () => {
-        const vendas90 = filialCod
-          ? await fetchVendas90Projetado(companyKey, filialCod, produto.produto, produto.corProduto)
-          : null;
-        const estoque = filialCod ? estoqueNaFilial(produto.estoques, filialCod) : null;
+        let vendas90: number | null = null;
+        let estoque: number | null = null;
+        if (filialCod) {
+          [vendas90, estoque] = await Promise.all([
+            fetchVendas90Projetado(companyKey, filialCod, produto.produto, produto.corProduto),
+            fetchEstoqueFilialSum(companyKey, filialCod, produto.produto, produto.corProduto),
+          ]);
+        }
         setItensModal((prev) => {
           const chave = `${base.produto}|${base.corProduto ?? ""}`;
           const idx = prev.findIndex((i) => `${i.produto}|${i.corProduto ?? ""}` === chave);
