@@ -156,8 +156,15 @@ function partesDestinoCompraFinal(
     cfg
   );
 
-  // Exclui MATRIZ — distribui apenas para filiais
-  const filiais = agregadas.filter((r) => r.filial !== "MATRIZ");
+  // Exclui MATRIZ e, para ScarfMe, não distribui para Ibirapuera.
+  // A redistribuição acontece automaticamente entre as demais filiais
+  // pelo mesmo método proporcional + maior resto.
+  const filiais = agregadas.filter((r) => {
+    const filialKey = normalizeKey(r.filial);
+    if (filialKey === "MATRIZ") return false;
+    if (companyKey === "scarfme" && filialKey.includes("IBIRAPUERA")) return false;
+    return true;
+  });
 
   const demandas = filiais.map((r) => ({
     filial: r.filial,
