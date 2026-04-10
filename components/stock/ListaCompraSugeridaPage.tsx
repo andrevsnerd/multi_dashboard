@@ -367,6 +367,23 @@ function normalizeKey(s?: string | null) {
     .replace(/\p{Diacritic}/gu, "");
 }
 
+// Filiais inativas: no tooltip, ocultar apenas quando estoque for zero.
+const INACTIVE_FILIAIS_ESTOQUE_TOOLTIP = new Set([
+  "SCARFME ME - PAULISTA FFF",
+  "SCARFME MATRIZ CMS",
+  "SCARFME - IBIRAPUERA LLL",
+  "SCARF ME - MATRIZ LLL",
+].map((filial) => normalizeKey(filial)));
+
+function filterEstoqueTooltipFiliais(filiais: Array<{ filial: string; estoque: number }>) {
+  return filiais.filter((f) => {
+    const filialKey = normalizeKey(f.filial);
+    const estoque = Number(f.estoque ?? 0);
+    if (INACTIVE_FILIAIS_ESTOQUE_TOOLTIP.has(filialKey) && estoque === 0) return false;
+    return true;
+  });
+}
+
 function getLimiteDiasReposicao(p: { linha?: string; subgrupo?: string }) {
   const linha = normalizeKey(p.linha);
   const subgrupo = normalizeKey(p.subgrupo);
@@ -1499,13 +1516,14 @@ export default function ListaCompraSugeridaPage({
                                   const cacheKey = `${produto}||${corProduto ?? ''}`;
                                   const cached = estoquePorFilialCache[cacheKey];
                                   const show = (filiais: Array<{ filial: string; estoque: number }>) => {
-                                    const total = filiais.reduce((s, f) => s + Math.max(0, f.estoque ?? 0), 0);
+                                    const filiaisVisiveis = filterEstoqueTooltipFiliais(filiais);
+                                    const total = filiaisVisiveis.reduce((s, f) => s + Math.max(0, f.estoque ?? 0), 0);
                                     setEstoqueTooltip({
                                       x: e.clientX,
                                       y: e.clientY,
                                       produto,
                                       corDescricao: expandirPorCor ? p.corDescricao : undefined,
-                                      filiais,
+                                      filiais: filiaisVisiveis,
                                       total,
                                     });
                                   };
@@ -1765,13 +1783,14 @@ export default function ListaCompraSugeridaPage({
                             const cacheKey = `${produto}||${corProduto ?? ""}`;
                             const cached = estoquePorFilialCache[cacheKey];
                             const show = (filiais: Array<{ filial: string; estoque: number }>) => {
-                              const total = filiais.reduce((s, f) => s + Math.max(0, f.estoque ?? 0), 0);
+                              const filiaisVisiveis = filterEstoqueTooltipFiliais(filiais);
+                              const total = filiaisVisiveis.reduce((s, f) => s + Math.max(0, f.estoque ?? 0), 0);
                               setEstoqueTooltip({
                                 x: e.clientX,
                                 y: e.clientY,
                                 produto,
                                 corDescricao: expandirPorCor ? it.corDescricao : undefined,
-                                filiais,
+                                filiais: filiaisVisiveis,
                                 total,
                               });
                             };
