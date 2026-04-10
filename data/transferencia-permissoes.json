@@ -40,7 +40,8 @@
       "SCARFME - IBIRAPUERA LLL",
       "SCARFME MATRIZ CMS",
       "SCARFME ME - PAULISTA FFF",
-      "VILLA LOBOS - LLL"
+      "VILLA LOBOS - LLL",
+      "SCARFME LLL - GALEAO RJ"
     ],
     "filiaisDestino": [
       "NERD",
@@ -65,7 +66,8 @@
       "SCARFME - IBIRAPUERA LLL",
       "SCARFME MATRIZ CMS",
       "SCARFME ME - PAULISTA FFF",
-      "VILLA LOBOS - LLL"
+      "VILLA LOBOS - LLL",
+      "SCARFME LLL - GALEAO RJ"
     ],
     "filiaisDestinoControle": [
       "GUARULHOS - RSR",
@@ -90,7 +92,8 @@
       "SCARFME - IBIRAPUERA LLL",
       "SCARFME MATRIZ CMS",
       "SCARFME ME - PAULISTA FFF",
-      "VILLA LOBOS - LLL"
+      "VILLA LOBOS - LLL",
+      "SCARFME LLL - GALEAO RJ"
     ],
     "tiposRomaneioPermitidos": [],
     "responsavelPadrao": "ANDRE.SABETTA",

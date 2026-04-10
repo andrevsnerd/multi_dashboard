@@ -53,13 +53,13 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
       'NERD CENTER NORTE': 'CENTER NORTE',
       'NERD HIGIENOPOLIS': 'HIGIENOPOLIS',
       'NERD LEBLON': 'LEBLON',
-      'NERD MORUMBI RDRRRJ': 'MORUMBI 1',
-      'NERD MORUMBI RDRRX': 'MORUMBI 2',
+      'NERD MORUMBI RDRRRJ': 'NERD MORUMBI 1 (RRJ)',
+      'NERD MORUMBI RDRRX': 'NERD MORUMBI 2 (RRX)',
       'NERD ELDORADO': 'ELDORADO',
       'NERD VILLA LOBOS': 'VILLA LOBOS',
       'NERD': 'MATRIZ',
     },
-    estoqueFilialOrder: ['MATRIZ', 'MORUMBI 1', 'MORUMBI 2', 'ELDORADO', 'VILLA LOBOS', 'HIGIENOPOLIS', 'LEBLON', 'CENTER NORTE'],
+    estoqueFilialOrder: ['MATRIZ', 'NERD MORUMBI 1 (RRJ)', 'NERD MORUMBI 2 (RRX)', 'ELDORADO', 'VILLA LOBOS', 'HIGIENOPOLIS', 'LEBLON', 'CENTER NORTE'],
   },
   scarfme: {
     key: 'scarfme',
@@ -81,6 +81,7 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
         'SCARF ME MATRIZ - FFF',
         'VILLA LOBOS - LLL',
         'MSC COMERCIO DE LENCOS LT',
+        'SCARFME LLL - GALEAO RJ',
       ],
       inventory: [
         'GUARULHOS - RSR',
@@ -98,6 +99,7 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
         'SCARF ME MATRIZ - FFF',
         'VILLA LOBOS - LLL',
         'MSC COMERCIO DE LENCOS LT',
+        'SCARFME LLL - GALEAO RJ',
       ],
     },
     filialDisplayNames: {
@@ -116,8 +118,9 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
       'SCARF ME MATRIZ - FFF': 'E-COMMERCE',
       'VILLA LOBOS - LLL': 'VILLA LOBOS',
       'MSC COMERCIO DE LENCOS LT': 'E-COMMERCE',
+      'SCARFME LLL - GALEAO RJ': 'GALEÃO RJ',
     },
-    estoqueFilialOrder: ['MATRIZ', 'E-COMMERCE', 'GUARULHOS', 'MORUMBI', 'OSCAR FREIRE', 'VILLA LOBOS'],
+    estoqueFilialOrder: ['MATRIZ', 'E-COMMERCE', 'GUARULHOS', 'MORUMBI', 'OSCAR FREIRE', 'VILLA LOBOS', 'GALEÃO RJ'],
     ecommerceFilials: ['SCARFME MATRIZ CMS', 'SCARF ME - MATRIZ LLL', 'SCARF ME MATRIZ - FFF', 'MSC COMERCIO DE LENCOS LT'],
     filialGroups: {
       // PAULISTA: várias entidades/CNPJs no sistema, tratadas como uma loja lógica

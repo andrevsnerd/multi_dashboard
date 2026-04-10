@@ -56,7 +56,10 @@
       "Bash(python investigar_triggers.py)",
       "Bash(node testar_saida_entrada.js)",
       "Bash(grep -n \"filialDisplayNames\\\\|filialGroups\\\\|ecommerceFilials\" lib/repositories/*.ts)",
-      "Bash(ls components/stock/Compras*)"
+      "Bash(ls components/stock/Compras*)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx|json|js\\)$\")",
+      "Bash(find . -path \"./data/*\" -name \"*.json\" -exec grep -l \"filial\\\\|destino\" {} \\\\;)",
+      "Bash(ls -la data/*.json)"
     ]
   }
 }

@@ -11,6 +11,13 @@ import {
   type PermissionKey,
 } from "@/types/auth";
 import styles from "./page.module.css";
+const _filialLabelOverrides: Record<string, string> = {
+  'NERD MORUMBI RDRRRJ': 'NERD MORUMBI 1 (RRJ)',
+  'NERD MORUMBI RDRRX': 'NERD MORUMBI 2 (RRX)',
+};
+function getFilialLabel(filial: string): string {
+  return _filialLabelOverrides[filial] ?? filial;
+}
 
 /* ── Tipos ── */
 interface UserRow {
@@ -657,7 +664,7 @@ export default function AdminPage() {
                                 }
                                 disabled={saving}
                               />
-                              {f.filial}
+                              {getFilialLabel(f.filial)}
                             </label>
                           ))}
                         </div>
@@ -683,7 +690,7 @@ export default function AdminPage() {
                                 }
                                 disabled={saving}
                               />
-                              {f.filial}
+                              {getFilialLabel(f.filial)}
                             </label>
                           ))}
                         </div>
@@ -725,7 +732,7 @@ export default function AdminPage() {
                                 }
                                 disabled={saving}
                               />
-                              {f.filial}
+                              {getFilialLabel(f.filial)}
                             </label>
                           ))}
                         </div>
