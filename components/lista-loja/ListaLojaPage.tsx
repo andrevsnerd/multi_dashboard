@@ -757,24 +757,8 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
           </div>
         </div>
 
-        {/* Produtos card */}
-        <div className={styles.card}>
-          <div className={styles.cardHeader}>
-            <span className={styles.cardTitle}>
-              <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
-                <path d="M12 2 20 6.5v11L12 22l-8-4.5v-11L12 2Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-                <path d="M20 6.5 12 12 4 6.5" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-                <path d="M12 12v10" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-              </svg>
-              Produtos da Lista
-            </span>
-            {itens.length > 0 && (
-              <span className={styles.badge}>
-                {itens.length} prod · {totalItens} un.
-              </span>
-            )}
-          </div>
-
+        {/* Produtos da lista (sem card; scroll da página) */}
+        <div className={styles.produtosSection}>
           {itens.length === 0 ? (
             <div className={styles.emptyProducts}>
               <div className={styles.emptyProductsIcon}>
@@ -803,6 +787,11 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
           )}
 
           <div className={styles.produtosActionsRow}>
+            {itens.length > 0 && (
+              <span className={styles.badge}>
+                {itens.length} prod · {totalItens} un.
+              </span>
+            )}
             <button
               type="button"
               className={styles.addProductBtn}
