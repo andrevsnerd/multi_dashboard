@@ -139,7 +139,7 @@ function normalizeVendasPorFilialParaExibicao(
   return [...merged].sort((a, b) => compareFilialDisplayOrder(a.filial, b.filial, cfg));
 }
 
-/** Pesos = média mensal (qtde 12m / 12); piso por filial; o que sobra vai para a matriz. */
+/** Pesos = média mensal (qtde 12m / 12); distribui apenas para filiais (exclui MATRIZ); sobra pelo maior resto. */
 function partesDestinoCompraFinal(
   qtdManual: number,
   vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number }>,
@@ -156,37 +156,34 @@ function partesDestinoCompraFinal(
     cfg
   );
 
-  const medias = agregadas.map((r) => ({
+  // Exclui MATRIZ — distribui apenas para filiais
+  const filiais = agregadas.filter((r) => r.filial !== "MATRIZ");
+
+  const medias = filiais.map((r) => ({
     filial: r.filial,
     m: r.qtde12m / 12,
   }));
   const somaM = medias.reduce((s, r) => s + r.m, 0);
-  if (somaM <= 0) {
-    return [{ label: "MATRIZ", qtd: qtdManual }];
-  }
+  if (somaM <= 0) return null;
 
-  const pisos = medias.map((r) => ({
-    filial: r.filial,
-    piso: Math.floor((qtdManual * r.m) / somaM),
-  }));
+  // Alocação por piso proporcional
+  const pisos = medias.map((r) => {
+    const exato = (qtdManual * r.m) / somaM;
+    return { filial: r.filial, piso: Math.floor(exato), resto: exato - Math.floor(exato) };
+  });
   const somaPisos = pisos.reduce((s, r) => s + r.piso, 0);
   const sobra = qtdManual - somaPisos;
 
-  let qtdMatriz = sobra;
-  const outras: DestinoCompraFinalParte[] = [];
-  for (const row of pisos) {
-    if (row.filial === "MATRIZ") {
-      qtdMatriz += row.piso;
-    } else if (row.piso > 0) {
-      outras.push({ label: row.filial, qtd: row.piso });
-    }
-  }
+  // Distribui a sobra para as filiais de maior resto (método do maior resto)
+  const boost = new Set(
+    [...pisos].sort((a, b) => b.resto - a.resto).slice(0, sobra).map((r) => r.filial)
+  );
 
-  outras.sort((a, b) => compareFilialDisplayOrder(a.label, b.label, cfg));
+  const partes: DestinoCompraFinalParte[] = pisos
+    .map((r) => ({ label: r.filial, qtd: r.piso + (boost.has(r.filial) ? 1 : 0) }))
+    .filter((r) => r.qtd > 0);
 
-  const partes: DestinoCompraFinalParte[] = [];
-  if (qtdMatriz > 0) partes.push({ label: "MATRIZ", qtd: qtdMatriz });
-  partes.push(...outras);
+  partes.sort((a, b) => compareFilialDisplayOrder(a.label, b.label, cfg));
 
   return partes;
 }
