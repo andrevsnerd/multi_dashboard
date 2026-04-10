@@ -139,7 +139,7 @@ function normalizeVendasPorFilialParaExibicao(
   return [...merged].sort((a, b) => compareFilialDisplayOrder(a.filial, b.filial, cfg));
 }
 
-/** Pesos = média mensal (qtde 12m / 12); distribui apenas para filiais (exclui MATRIZ); sobra pelo maior resto. */
+/** Demanda por filial com ajuste 60d; distribui apenas para filiais (exclui MATRIZ); sobra pelo maior resto. */
 function partesDestinoCompraFinal(
   qtdManual: number,
   vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number }>,
@@ -159,16 +159,26 @@ function partesDestinoCompraFinal(
   // Exclui MATRIZ — distribui apenas para filiais
   const filiais = agregadas.filter((r) => r.filial !== "MATRIZ");
 
-  const medias = filiais.map((r) => ({
+  const demandas = filiais.map((r) => ({
     filial: r.filial,
-    m: r.qtde12m / 12,
+    // Nova regra por filial:
+    // m12  = vendas_12m / 12
+    // peso = vendas_60d / (m12 * 2)
+    // demanda = m12 * peso
+    m12: r.qtde12m / 12,
+    demanda: (() => {
+      const m12 = r.qtde12m / 12;
+      if (m12 <= 0) return 0;
+      const peso = (r.qtde60d ?? 0) / (m12 * 2);
+      return m12 * peso;
+    })(),
   }));
-  const somaM = medias.reduce((s, r) => s + r.m, 0);
-  if (somaM <= 0) return null;
+  const somaDemanda = demandas.reduce((s, r) => s + r.demanda, 0);
+  if (somaDemanda <= 0) return null;
 
   // Alocação por piso proporcional
-  const pisos = medias.map((r) => {
-    const exato = (qtdManual * r.m) / somaM;
+  const pisos = demandas.map((r) => {
+    const exato = (qtdManual * r.demanda) / somaDemanda;
     return { filial: r.filial, piso: Math.floor(exato), resto: exato - Math.floor(exato) };
   });
   const somaPisos = pisos.reduce((s, r) => s + r.piso, 0);

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { withRequest } from '@/lib/db/connection';
 import sql from 'mssql';
+import { getColorDescription } from '@/lib/utils/colorMapping';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -209,12 +210,14 @@ export async function GET(request: Request) {
         const key = `${produto}::${cor}`;
 
         if (!produtosMap.has(key)) {
+          const descCorBanco = row.DESC_COR?.toString().trim() || '';
+          const descCorResolvida = getColorDescription(cor || undefined, descCorBanco);
           produtosMap.set(key, {
             produto,
             descProduto: row.DESC_PRODUTO?.toString().trim() || '',
             codigoBarra: row.CODIGO_BARRA?.toString().trim() || null,
             corProduto: cor || null,
-            descCor: row.DESC_COR?.toString().trim() || '',
+            descCor: descCorResolvida || descCorBanco,
             estoques: [],
           });
         }
@@ -245,6 +248,7 @@ export async function GET(request: Request) {
           estoques: produtosArray[0].estoques.length
         });
       }
+
       return produtosArray;
     });
 

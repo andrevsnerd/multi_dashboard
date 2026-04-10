@@ -118,6 +118,11 @@ export default function Sidebar({ companyName }: SidebarProps) {
     ? `${basePath}/romaneios`
     : "/romaneios";
 
+  // Construir o link para lista loja baseado no caminho base
+  const listaLojaHref = basePath && basePath !== "/"
+    ? `${basePath}/lista-loja`
+    : "/lista-loja";
+
   // Construir o link para mapa de clientes baseado no caminho base
   const mapaClientesHref = basePath && basePath !== "/"
     ? `${basePath}/mapa-clientes`
@@ -168,6 +173,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     { label: "Transferência de Produtos", href: transferenciaProdutosHref, permission: "transferencia-produtos" },
     { label: "Romaneios", href: romaneiosHref, permission: "romaneios" },
     { label: "Saídas e Entradas de Produtos", href: saidasEntradasProdutosHref, permission: "saidas-entradas-produtos" },
+    { label: "Lista Loja", href: listaLojaHref, permission: "lista-loja" },
     { label: "Exportar Relatórios", href: exportarRelatoriosHref, permission: "exportar-relatorios" },
     ...(isScarfme ? [{ label: "Mapa de Clientes", href: mapaClientesHref, permission: "mapa-clientes" as const }] : []),
   ];
@@ -263,6 +269,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
                 !pathname.includes("/transferencia-produtos") &&
                 !pathname.includes("/romaneios") &&
                 !pathname.includes("/saidas-entradas-produtos") &&
+                !pathname.includes("/lista-loja") &&
                 !pathname.includes("/produtos") &&
                 !pathname.includes("/produtos-recentes") &&
                 !pathname.includes("/produto-detalhado") &&
@@ -310,6 +317,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
             } else if (item.label === "Saídas e Entradas de Produtos") {
               // Saídas e Entradas de Produtos está ativo quando o pathname inclui /saidas-entradas-produtos
               isActive = pathname?.includes("/saidas-entradas-produtos") || pathname === item.href;
+            } else if (item.label === "Lista Loja") {
+              isActive = pathname?.includes("/lista-loja") || pathname === item.href;
             } else if (item.label === "Exportar Relatórios") {
               // Exportar Relatórios está ativo quando o pathname inclui /exportar-relatorios
               isActive = pathname?.includes("/exportar-relatorios") || pathname === item.href;
