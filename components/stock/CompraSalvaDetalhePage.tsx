@@ -13,6 +13,11 @@ import {
   type CompanyKey,
 } from "@/lib/config/company";
 import type { CompraSalva, CompraSalvaItemRow } from "@/lib/types/compra-salva";
+import {
+  partesDestinoCompraFinal,
+  textoDestinoCompraFinal,
+  type DestinoCompraFinalParte,
+} from "@/lib/utils/compra-final-destino";
 
 import styles from "./ListaCompraSugeridaPage.module.css";
 
@@ -44,8 +49,6 @@ function fmtBRL2(n: number) {
   });
 }
 
-type DestinoCompraFinalParte = { label: string; qtd: number };
-
 function normalizeVendasPorFilialParaExibicao(
   companyKey: CompanyKey,
   rows: Array<{ filial: string; qtde12m: number; qtde60d: number }>
@@ -53,67 +56,6 @@ function normalizeVendasPorFilialParaExibicao(
   const cfg = resolveCompany(companyKey);
   const merged = aggregateVendasPorFilialByDisplayLabel(rows, cfg);
   return [...merged].sort((a, b) => compareFilialDisplayOrder(a.filial, b.filial, cfg));
-}
-
-function partesDestinoCompraFinal(
-  qtdManual: number,
-  vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number }>,
-  companyKey: CompanyKey
-): DestinoCompraFinalParte[] | null {
-  if (qtdManual <= 0) return null;
-  const cfg = resolveCompany(companyKey);
-  const agregadas = aggregateVendasPorFilialByDisplayLabel(
-    vendasPorFilial.map((r) => ({
-      filial: r.filial,
-      qtde12m: r.qtde12m,
-      qtde60d: r.qtde60d ?? 0,
-    })),
-    cfg
-  );
-
-  const medias = agregadas.map((r) => ({
-    filial: r.filial,
-    m: r.qtde12m / 12,
-  }));
-  const somaM = medias.reduce((s, r) => s + r.m, 0);
-  if (somaM <= 0) {
-    return [{ label: "MATRIZ", qtd: qtdManual }];
-  }
-
-  const pisos = medias.map((r) => ({
-    filial: r.filial,
-    piso: Math.floor((qtdManual * r.m) / somaM),
-  }));
-  const somaPisos = pisos.reduce((s, r) => s + r.piso, 0);
-  const sobra = qtdManual - somaPisos;
-
-  let qtdMatriz = sobra;
-  const outras: DestinoCompraFinalParte[] = [];
-  for (const row of pisos) {
-    if (row.filial === "MATRIZ") {
-      qtdMatriz += row.piso;
-    } else if (row.piso > 0) {
-      outras.push({ label: row.filial, qtd: row.piso });
-    }
-  }
-
-  outras.sort((a, b) => compareFilialDisplayOrder(a.label, b.label, cfg));
-
-  const partes: DestinoCompraFinalParte[] = [];
-  if (qtdMatriz > 0) partes.push({ label: "MATRIZ", qtd: qtdMatriz });
-  partes.push(...outras);
-
-  return partes;
-}
-
-function textoDestinoCompraFinal(
-  qtdManual: number,
-  vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number }>,
-  companyKey: CompanyKey
-): string {
-  const partesH = partesDestinoCompraFinal(qtdManual, vendasPorFilial, companyKey);
-  if (partesH === null) return "—";
-  return partesH.map((p) => `${p.label}: ${fmt(p.qtd)}`).join(" · ");
 }
 
 const DESTINO_FILIAL_BADGE_THEMES = [

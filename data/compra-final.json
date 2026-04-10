@@ -104,5 +104,21 @@
       "createdAt": "2026-04-09T19:27:17.504Z",
       "updatedAt": "2026-04-09T19:27:17.504Z"
     }
+  ],
+  "scarfme::scarfme::::::0::porcor::g=::l=::c=::s=::gr=": [
+    {
+      "companyKey": "scarfme",
+      "contextKey": "scarfme::::::0::porcor::g=::l=::c=::s=::gr=",
+      "itemKey": "07.A1.00B3||40",
+      "produto": "07.A1.00B3",
+      "corProduto": "40",
+      "corDescricao": "MARINHO",
+      "descricao": "PASHMINA LISA TOQUE DE LA 06/24",
+      "grade": "70X180",
+      "colecao": "48",
+      "qtdManual": 31,
+      "createdAt": "2026-04-10T17:19:50.234Z",
+      "updatedAt": "2026-04-10T17:19:50.234Z"
+    }
   ]
 }

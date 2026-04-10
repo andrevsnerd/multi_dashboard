@@ -29,6 +29,10 @@ interface ListaItem {
   corProduto: string | null;
   descCor: string;
   quantidade: number;
+  /** Vendas em ~90 dias (proporcional ao volume dos últimos 12 meses), snapshot ao adicionar */
+  vendas90d?: number | null;
+  /** Estoque na filial da lista, snapshot ao adicionar */
+  estoqueFilial?: number | null;
 }
 
 interface ListaLoja {
@@ -158,6 +162,42 @@ function buildDefaultListName(filialNome?: string): string {
   return `${base} ${d} ${t}`;
 }
 
+function estoqueNaFilial(
+  estoques: Array<{ filial: string; estoque: number }>,
+  codFilial: string
+): number {
+  const key = codFilial.trim();
+  let sum = 0;
+  for (const e of estoques) {
+    if ((e.filial || "").trim() === key) sum += Number(e.estoque ?? 0);
+  }
+  return sum;
+}
+
+async function fetchVendas90Projetado(
+  companyKey: string,
+  codFilial: string,
+  produto: string,
+  corProduto: string | null
+): Promise<number | null> {
+  try {
+    const params = new URLSearchParams({
+      company: companyKey,
+      filial: codFilial.trim(),
+      produto: produto.trim(),
+    });
+    if (corProduto) params.set("corProduto", corProduto.trim());
+    const res = await fetch(`/api/controle-estoque/vendas-por-filial-item?${params}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { data?: Array<{ qtde12m: number }> };
+    const rows = json.data || [];
+    const qtde12m = rows.reduce((s, r) => s + Number(r.qtde12m ?? 0), 0);
+    return Math.round((qtde12m / 365) * 90);
+  } catch {
+    return null;
+  }
+}
+
 function sameCart(a: ListaItem[], b: ListaItem[]): boolean {
   if (a.length !== b.length) return false;
   const key = (i: ListaItem) => `${i.produto}|${i.corProduto ?? ""}`;
@@ -178,6 +218,93 @@ interface ListaLojaPageProps {
 }
 
 type Mode = "list" | "editor";
+
+type ListaLojaItensTableProps = {
+  itens: ListaItem[];
+  onIncrement: (index: number) => void;
+  onDecrement: (index: number) => void;
+  onQtyChange: (index: number, qtd: number) => void;
+  onRemove: (index: number) => void;
+};
+
+function ListaLojaItensTable({
+  itens,
+  onIncrement,
+  onDecrement,
+  onQtyChange,
+  onRemove,
+}: ListaLojaItensTableProps) {
+  if (itens.length === 0) return null;
+  return (
+    <div className={styles.produtosTableWrap}>
+      <table className={styles.produtosTable}>
+        <thead>
+          <tr>
+            <th className={styles.colProduto}>Produto</th>
+            <th className={styles.colNumeric}>Vendas 90 dias</th>
+            <th className={styles.colNumeric}>Estoque</th>
+          </tr>
+        </thead>
+        <tbody>
+          {itens.map((item, idx) => (
+            <tr key={`${item.produto}-${item.corProduto ?? "null"}-${idx}`}>
+              <td>
+                <div className={styles.productTitleRow}>
+                  <span className={styles.productTitleName} title={item.descProduto}>
+                    {item.descProduto}
+                  </span>
+                </div>
+                <div className={styles.productMeta}>{item.produto}</div>
+                <div className={styles.productMeta}>{(item.descCor || "").trim() || "—"}</div>
+                {item.codigoBarra ? (
+                  <div className={styles.productMeta}>Cód. barras: {item.codigoBarra}</div>
+                ) : null}
+                <div className={styles.productRowActions}>
+                  <div className={styles.qtyControl}>
+                    <button
+                      type="button"
+                      className={styles.qtyBtn}
+                      onClick={() => onDecrement(idx)}
+                      disabled={item.quantidade <= 1}
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      className={styles.qtyInput}
+                      value={item.quantidade}
+                      onChange={(e) => onQtyChange(idx, parseInt(e.target.value, 10) || 1)}
+                      min={1}
+                    />
+                    <button type="button" className={styles.qtyBtn} onClick={() => onIncrement(idx)}>
+                      +
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.removeBtn}
+                    onClick={() => onRemove(idx)}
+                    title="Remover"
+                  >🗑</button>
+                </div>
+              </td>
+              <td className={styles.colNumeric}>
+                <span className={styles.cellMetric}>
+                  {item.vendas90d != null ? item.vendas90d : "—"}
+                </span>
+              </td>
+              <td className={styles.colNumeric}>
+                <span className={styles.cellMetric}>
+                  {item.estoqueFilial != null ? item.estoqueFilial : "—"}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPageProps) {
   const { user, isLoading: authLoading } = useAuth();
@@ -400,64 +527,52 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
   const adicionarProdutoModal = useCallback(
     (produto: Produto) => {
       if (produto.corProduto === null) {
-        // Verifica se existem variantes com cor nos resultados atuais
         const temVariantesComCor = produtos.some(
           (p) => p.produto.trim() === produto.produto.trim() && p.corProduto !== null
         );
-        // Se não há variantes com cor → produto sem variação de cor, adiciona direto
-        if (!temVariantesComCor) {
-          const chave = `${produto.produto}|`;
-          setItensModal((prev) => {
-            const idx = prev.findIndex((i) => `${i.produto}|${i.corProduto ?? ""}` === chave);
-            if (idx === -1) {
-              mostrarNotificacao(`${produto.descProduto} adicionado`);
-              return [
-                ...prev,
-                {
-                  produto: produto.produto,
-                  descProduto: produto.descProduto,
-                  codigoBarra: produto.codigoBarra ?? null,
-                  corProduto: null,
-                  descCor: (produto.descCor || "").trim(),
-                  quantidade: 1,
-                },
-              ];
-            }
-            const next = [...prev];
-            next[idx] = { ...next[idx], quantidade: next[idx].quantidade + 1 };
-            mostrarNotificacao(`${produto.descProduto} +1`);
-            return next;
-          });
+        if (temVariantesComCor) {
+          setColorPickerProduto(produto);
           return;
         }
-        // Tem variantes com cor → abre color picker
-        setColorPickerProduto(produto);
-        return;
       }
-      const chave = `${produto.produto}|${produto.corProduto}`;
-      setItensModal((prev) => {
-        const idx = prev.findIndex((i) => `${i.produto}|${i.corProduto}` === chave);
-        if (idx === -1) {
-          mostrarNotificacao(`${produto.descProduto} adicionado`);
+
+      const filialCod = filialSelecionada?.codFilial?.trim() || "";
+      const base: Omit<ListaItem, "quantidade" | "vendas90d" | "estoqueFilial"> = {
+        produto: produto.produto,
+        descProduto: produto.descProduto,
+        codigoBarra: produto.codigoBarra ?? null,
+        corProduto: produto.corProduto,
+        descCor: (produto.descCor || "").trim(),
+      };
+
+      void (async () => {
+        const vendas90 = filialCod
+          ? await fetchVendas90Projetado(companyKey, filialCod, produto.produto, produto.corProduto)
+          : null;
+        const estoque = filialCod ? estoqueNaFilial(produto.estoques, filialCod) : null;
+        setItensModal((prev) => {
+          const chave = `${base.produto}|${base.corProduto ?? ""}`;
+          const idx = prev.findIndex((i) => `${i.produto}|${i.corProduto ?? ""}` === chave);
+          if (idx !== -1) {
+            const next = [...prev];
+            next[idx] = { ...next[idx], quantidade: next[idx].quantidade + 1 };
+            mostrarNotificacao(`${base.descProduto} +1`);
+            return next;
+          }
+          mostrarNotificacao(`${base.descProduto} adicionado`);
           return [
             ...prev,
             {
-              produto: produto.produto,
-              descProduto: produto.descProduto,
-              codigoBarra: produto.codigoBarra ?? null,
-              corProduto: produto.corProduto,
-              descCor: (produto.descCor || "").trim(),
+              ...base,
               quantidade: 1,
+              vendas90d: vendas90,
+              estoqueFilial: estoque,
             },
           ];
-        }
-        const next = [...prev];
-        next[idx] = { ...next[idx], quantidade: next[idx].quantidade + 1 };
-        mostrarNotificacao(`${produto.descProduto} +1`);
-        return next;
-      });
+        });
+      })();
     },
-    [mostrarNotificacao]
+    [mostrarNotificacao, produtos, filialSelecionada, companyKey]
   );
 
   const adicionarComCor = useCallback(
@@ -673,39 +788,17 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
             </div>
           ) : (
             <div className={styles.produtosList}>
-              {itens.map((item, idx) => (
-                <div key={`${item.produto}-${item.corProduto ?? "null"}-${idx}`} className={styles.produtoItem}>
-                  <div className={styles.produtoInfo}>
-                    <div className={styles.produtoName}>{item.descProduto}</div>
-                    <div className={styles.produtoSku}>
-                      {item.produto}
-                      {item.descCor ? ` · ${item.descCor}` : ""}
-                      {item.codigoBarra ? ` · ${item.codigoBarra}` : ""}
-                    </div>
-                  </div>
-                  <div className={styles.produtoControls}>
-                    <div className={styles.qtyControl}>
-                      <button
-                        className={styles.qtyBtn}
-                        onClick={() => atualizarQuantidade(idx, item.quantidade - 1)}
-                        disabled={item.quantidade <= 1}
-                      >−</button>
-                      <input
-                        type="number"
-                        className={styles.qtyInput}
-                        value={item.quantidade}
-                        onChange={(e) => atualizarQuantidade(idx, parseInt(e.target.value) || 1)}
-                        min={1}
-                      />
-                      <button
-                        className={styles.qtyBtn}
-                        onClick={() => atualizarQuantidade(idx, item.quantidade + 1)}
-                      >+</button>
-                    </div>
-                    <button className={styles.removeBtn} onClick={() => removerItem(idx)} title="Remover">🗑</button>
-                  </div>
-                </div>
-              ))}
+              <ListaLojaItensTable
+                itens={itens}
+                onIncrement={(idx) =>
+                  atualizarQuantidade(idx, (itens[idx]?.quantidade ?? 1) + 1)
+                }
+                onDecrement={(idx) =>
+                  atualizarQuantidade(idx, (itens[idx]?.quantidade ?? 1) - 1)
+                }
+                onQtyChange={(idx, q) => atualizarQuantidade(idx, q)}
+                onRemove={removerItem}
+              />
             </div>
           )}
 
@@ -836,46 +929,23 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
                       </span>
                     </div>
                     <div className={styles.modalCartList}>
-                      {itensModal.map((item, idx) => (
-                        <div
-                          key={`${item.produto}-${item.corProduto ?? "null"}-${idx}`}
-                          className={styles.produtoItem}
-                        >
-                          <div className={styles.produtoInfo}>
-                            <div className={styles.produtoName}>{item.descProduto}</div>
-                            <div className={styles.produtoSku}>
-                              {item.produto}
-                              {item.descCor ? ` · ${item.descCor}` : ""}
-                              {item.codigoBarra ? ` · ${item.codigoBarra}` : ""}
-                            </div>
-                          </div>
-                          <div className={styles.produtoControls}>
-                            <div className={styles.qtyControl}>
-                              <button
-                                className={styles.qtyBtn}
-                                onClick={() => atualizarQuantidadeModal(idx, item.quantidade - 1)}
-                                disabled={item.quantidade <= 1}
-                              >−</button>
-                              <input
-                                type="number"
-                                className={styles.qtyInput}
-                                value={item.quantidade}
-                                onChange={(e) => atualizarQuantidadeModal(idx, parseInt(e.target.value) || 1)}
-                                min={1}
-                              />
-                              <button
-                                className={styles.qtyBtn}
-                                onClick={() => atualizarQuantidadeModal(idx, item.quantidade + 1)}
-                              >+</button>
-                            </div>
-                            <button
-                              className={styles.removeBtn}
-                              onClick={() => removerItemModal(idx)}
-                              title="Remover"
-                            >🗑</button>
-                          </div>
-                        </div>
-                      ))}
+                      <ListaLojaItensTable
+                        itens={itensModal}
+                        onIncrement={(idx) =>
+                          atualizarQuantidadeModal(
+                            idx,
+                            (itensModal[idx]?.quantidade ?? 1) + 1
+                          )
+                        }
+                        onDecrement={(idx) =>
+                          atualizarQuantidadeModal(
+                            idx,
+                            (itensModal[idx]?.quantidade ?? 1) - 1
+                          )
+                        }
+                        onQtyChange={(idx, q) => atualizarQuantidadeModal(idx, q)}
+                        onRemove={removerItemModal}
+                      />
                     </div>
                   </div>
                 )}

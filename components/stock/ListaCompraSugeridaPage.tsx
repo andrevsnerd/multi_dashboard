@@ -12,6 +12,11 @@ import {
   resolveCompany,
   type CompanyKey,
 } from "@/lib/config/company";
+import {
+  partesDestinoCompraFinal,
+  textoDestinoCompraFinal,
+  type DestinoCompraFinalParte,
+} from "@/lib/utils/compra-final-destino";
 import ComprasSalvasListPanel from "@/components/stock/ComprasSalvasListPanel";
 import styles from "./ListaCompraSugeridaPage.module.css";
 
@@ -127,8 +132,6 @@ function hamiltonDistribute(items: { valor: number }[], total: number): number[]
   return floors.map((f, i) => f + (boost.has(i) ? 1 : 0));
 }
 
-type DestinoCompraFinalParte = { label: string; qtd: number };
-
 /** Agrega códigos ERP por rótulo da dashboard (E-COMMERCE, PAULISTA, …) e ordena. */
 function normalizeVendasPorFilialParaExibicao(
   companyKey: CompanyKey,
@@ -137,82 +140,6 @@ function normalizeVendasPorFilialParaExibicao(
   const cfg = resolveCompany(companyKey);
   const merged = aggregateVendasPorFilialByDisplayLabel(rows, cfg);
   return [...merged].sort((a, b) => compareFilialDisplayOrder(a.filial, b.filial, cfg));
-}
-
-/** Demanda por filial com ajuste 60d; distribui apenas para filiais (exclui MATRIZ); sobra pelo maior resto. */
-function partesDestinoCompraFinal(
-  qtdManual: number,
-  vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number }>,
-  companyKey: CompanyKey
-): DestinoCompraFinalParte[] | null {
-  if (qtdManual <= 0) return null;
-  const cfg = resolveCompany(companyKey);
-  const agregadas = aggregateVendasPorFilialByDisplayLabel(
-    vendasPorFilial.map((r) => ({
-      filial: r.filial,
-      qtde12m: r.qtde12m,
-      qtde60d: r.qtde60d ?? 0,
-    })),
-    cfg
-  );
-
-  // Exclui MATRIZ e, para ScarfMe, não distribui para Ibirapuera.
-  // A redistribuição acontece automaticamente entre as demais filiais
-  // pelo mesmo método proporcional + maior resto.
-  const filiais = agregadas.filter((r) => {
-    const filialKey = normalizeKey(r.filial);
-    if (filialKey === "MATRIZ") return false;
-    if (companyKey === "scarfme" && filialKey.includes("IBIRAPUERA")) return false;
-    return true;
-  });
-
-  const demandas = filiais.map((r) => ({
-    filial: r.filial,
-    // Nova regra por filial:
-    // m12  = vendas_12m / 12
-    // peso = vendas_60d / (m12 * 2)
-    // demanda = m12 * (0.5 + 0.5 * peso)
-    m12: r.qtde12m / 12,
-    demanda: (() => {
-      const m12 = r.qtde12m / 12;
-      if (m12 <= 0) return 0;
-      const peso = (r.qtde60d ?? 0) / (m12 * 2);
-      return m12 * (0.5 + 0.5 * peso);
-    })(),
-  }));
-  const somaDemanda = demandas.reduce((s, r) => s + r.demanda, 0);
-  if (somaDemanda <= 0) return null;
-
-  // Alocação por piso proporcional
-  const pisos = demandas.map((r) => {
-    const exato = (qtdManual * r.demanda) / somaDemanda;
-    return { filial: r.filial, piso: Math.floor(exato), resto: exato - Math.floor(exato) };
-  });
-  const somaPisos = pisos.reduce((s, r) => s + r.piso, 0);
-  const sobra = qtdManual - somaPisos;
-
-  // Distribui a sobra para as filiais de maior resto (método do maior resto)
-  const boost = new Set(
-    [...pisos].sort((a, b) => b.resto - a.resto).slice(0, sobra).map((r) => r.filial)
-  );
-
-  const partes: DestinoCompraFinalParte[] = pisos
-    .map((r) => ({ label: r.filial, qtd: r.piso + (boost.has(r.filial) ? 1 : 0) }))
-    .filter((r) => r.qtd > 0);
-
-  partes.sort((a, b) => compareFilialDisplayOrder(a.label, b.label, cfg));
-
-  return partes;
-}
-
-function textoDestinoCompraFinal(
-  qtdManual: number,
-  vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number }>,
-  companyKey: CompanyKey
-): string {
-  const partesH = partesDestinoCompraFinal(qtdManual, vendasPorFilial, companyKey);
-  if (partesH === null) return "—";
-  return partesH.map((p) => `${p.label}: ${fmt(p.qtd)}`).join(" · ");
 }
 
 /** Claros com cor perceptível, mas contida (meio-termo entre cinza e pastel forte). */

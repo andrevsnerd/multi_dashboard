@@ -223,6 +223,95 @@
 .produtosList::-webkit-scrollbar { width: 3px; }
 .produtosList::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 
+.produtosTableWrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.produtosTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+.produtosTable thead th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ll-text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--ll-border);
+  background: #fff;
+}
+
+.produtosTable tbody td {
+  vertical-align: top;
+  padding: 12px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #fff;
+}
+
+.produtosTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.colProduto {
+  width: 58%;
+  min-width: 200px;
+}
+
+.colNumeric {
+  text-align: right;
+  white-space: nowrap;
+  width: 21%;
+  min-width: 96px;
+}
+
+.produtosTable thead th.colNumeric {
+  text-align: right;
+}
+
+.productTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.productTitleName {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ll-text);
+  line-height: 1.25;
+  flex: 1;
+  min-width: 0;
+}
+
+.productMeta {
+  font-size: 13px;
+  color: var(--ll-text-3);
+  line-height: 1.35;
+  margin-top: 2px;
+}
+
+.productRowActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.cellMetric {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ll-text);
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px dotted #cbd5e1;
+  padding-bottom: 1px;
+}
+
 .produtoItem {
   display: flex;
   align-items: center;
