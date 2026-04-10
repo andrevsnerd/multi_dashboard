@@ -55,7 +55,8 @@
       "Bash(python -c ':*)",
       "Bash(python investigar_triggers.py)",
       "Bash(node testar_saida_entrada.js)",
-      "Bash(grep -n \"filialDisplayNames\\\\|filialGroups\\\\|ecommerceFilials\" lib/repositories/*.ts)"
+      "Bash(grep -n \"filialDisplayNames\\\\|filialGroups\\\\|ecommerceFilials\" lib/repositories/*.ts)",
+      "Bash(ls components/stock/Compras*)"
     ]
   }
 }

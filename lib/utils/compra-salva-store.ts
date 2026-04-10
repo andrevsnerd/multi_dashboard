@@ -183,98 +183,119 @@ export async function updateCompraSalvaItemQtd(
   itemKey: string,
   qtdManual: number
 ): Promise<CompraSalva | null> {
-  const c = await getCompraSalva(companyKey, id);
-  if (!c) return null;
-  const idx = c.items.findIndex((i) => i.itemKey === itemKey);
-  if (idx < 0) return c;
-  const nextItems = [...c.items];
-  nextItems[idx] = { ...nextItems[idx], qtdManual: Math.max(0, Math.round(qtdManual)) };
   const updatedAt = new Date().toISOString();
+  const qtd = Math.max(0, Math.round(qtdManual));
 
   if (hasPostgres()) {
     await ensureTable();
     const sql = getNeonSql();
-    await sql`
+    // Atualiza o item no JSONB diretamente sem re-fetch prévio
+    const rows = await sql`
       UPDATE compras_salvas
-      SET items = ${JSON.stringify(nextItems)}::jsonb, updated_at = ${updatedAt}
+      SET items = (
+        SELECT jsonb_agg(
+          CASE WHEN (elem->>'itemKey') = ${itemKey}
+            THEN jsonb_set(elem, '{qtdManual}', ${qtd}::text::jsonb)
+            ELSE elem
+          END
+        )
+        FROM jsonb_array_elements(items) AS elem
+      ),
+      updated_at = ${updatedAt}
       WHERE id = ${id} AND company_key = ${companyKey}
+      RETURNING id, company_key, source_context_key, title, expandir_por_cor, items, saved_at, updated_at
     `;
-  } else {
-    const all = await readFileAll();
-    const i = all.findIndex((x) => x.id === id && x.companyKey === companyKey);
-    if (i < 0) return null;
-    all[i] = { ...all[i], items: nextItems, updatedAt };
-    await writeFileAll(all);
+    const row = rows[0] as Parameters<typeof rowToCompraSalva>[0] | undefined;
+    return row ? rowToCompraSalva(row) : null;
   }
 
-  return { ...c, items: nextItems, updatedAt };
+  // Fallback JSON: leitura única, modificação, escrita
+  const all = await readFileAll();
+  const i = all.findIndex((x) => x.id === id && x.companyKey === companyKey);
+  if (i < 0) return null;
+  const c = all[i];
+  const idx = c.items.findIndex((item) => item.itemKey === itemKey);
+  if (idx < 0) return c;
+  const nextItems = [...c.items];
+  nextItems[idx] = { ...nextItems[idx], qtdManual: qtd };
+  all[i] = { ...c, items: nextItems, updatedAt };
+  await writeFileAll(all);
+  return all[i];
 }
 
 export async function removeCompraSalvaItem(companyKey: string, id: string, itemKey: string): Promise<CompraSalva | null> {
-  const c = await getCompraSalva(companyKey, id);
-  if (!c) return null;
-  const nextItems = c.items.filter((i) => i.itemKey !== itemKey);
   const updatedAt = new Date().toISOString();
 
   if (hasPostgres()) {
     await ensureTable();
     const sql = getNeonSql();
-    await sql`
+    const rows = await sql`
       UPDATE compras_salvas
-      SET items = ${JSON.stringify(nextItems)}::jsonb, updated_at = ${updatedAt}
+      SET items = (
+        SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
+        FROM jsonb_array_elements(items) AS elem
+        WHERE (elem->>'itemKey') != ${itemKey}
+      ),
+      updated_at = ${updatedAt}
       WHERE id = ${id} AND company_key = ${companyKey}
+      RETURNING id, company_key, source_context_key, title, expandir_por_cor, items, saved_at, updated_at
     `;
-  } else {
-    const all = await readFileAll();
-    const i = all.findIndex((x) => x.id === id && x.companyKey === companyKey);
-    if (i < 0) return null;
-    all[i] = { ...all[i], items: nextItems, updatedAt };
-    await writeFileAll(all);
+    const row = rows[0] as Parameters<typeof rowToCompraSalva>[0] | undefined;
+    return row ? rowToCompraSalva(row) : null;
   }
 
-  return { ...c, items: nextItems, updatedAt };
+  // Fallback JSON: leitura única, modificação, escrita
+  const all = await readFileAll();
+  const i = all.findIndex((x) => x.id === id && x.companyKey === companyKey);
+  if (i < 0) return null;
+  const c = all[i];
+  const nextItems = c.items.filter((item) => item.itemKey !== itemKey);
+  all[i] = { ...c, items: nextItems, updatedAt };
+  await writeFileAll(all);
+  return all[i];
 }
 
 export async function updateCompraSalvaTitle(companyKey: string, id: string, title: string): Promise<CompraSalva | null> {
-  const c = await getCompraSalva(companyKey, id);
-  if (!c) return null;
   const t = title.trim();
-  if (!t) return c;
+  if (!t) return getCompraSalva(companyKey, id);
   const updatedAt = new Date().toISOString();
 
   if (hasPostgres()) {
     await ensureTable();
     const sql = getNeonSql();
-    await sql`
+    const rows = await sql`
       UPDATE compras_salvas
       SET title = ${t}, updated_at = ${updatedAt}
       WHERE id = ${id} AND company_key = ${companyKey}
+      RETURNING id, company_key, source_context_key, title, expandir_por_cor, items, saved_at, updated_at
     `;
-  } else {
-    const all = await readFileAll();
-    const i = all.findIndex((x) => x.id === id && x.companyKey === companyKey);
-    if (i < 0) return null;
-    all[i] = { ...all[i], title: t, updatedAt };
-    await writeFileAll(all);
+    const row = rows[0] as Parameters<typeof rowToCompraSalva>[0] | undefined;
+    return row ? rowToCompraSalva(row) : null;
   }
 
-  return { ...c, title: t, updatedAt };
+  // Fallback JSON: leitura única, modificação, escrita
+  const all = await readFileAll();
+  const i = all.findIndex((x) => x.id === id && x.companyKey === companyKey);
+  if (i < 0) return null;
+  all[i] = { ...all[i], title: t, updatedAt };
+  await writeFileAll(all);
+  return all[i];
 }
 
 export async function deleteCompraSalva(companyKey: string, id: string): Promise<boolean> {
-  const existing = await getCompraSalva(companyKey, id);
-  if (!existing) return false;
-
   if (hasPostgres()) {
     await ensureTable();
     const sql = getNeonSql();
-    await sql`
+    const result = await sql`
       DELETE FROM compras_salvas WHERE id = ${id} AND company_key = ${companyKey}
+      RETURNING id
     `;
-    return true;
+    return result.length > 0;
   }
 
   const all = await readFileAll();
-  await writeFileAll(all.filter((x) => !(x.id === id && x.companyKey === companyKey)));
+  const next = all.filter((x) => !(x.id === id && x.companyKey === companyKey));
+  if (next.length === all.length) return false;
+  await writeFileAll(next);
   return true;
 }

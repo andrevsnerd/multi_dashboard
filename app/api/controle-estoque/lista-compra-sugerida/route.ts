@@ -1,12 +1,8 @@
 import { NextResponse } from 'next/server';
 
-import {
-  fetchTopProdutosUltimos3Meses,
-  fetchVendasQuantidadesTotaisItensLote,
-} from '@/lib/repositories/controleEstoque';
+import { fetchTopProdutosUltimos3Meses } from '@/lib/repositories/controleEstoque';
 
-/** Lista ABC pode chamar muitas leituras iguais ao tooltip; margem para somar 12m+60d por item. */
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -25,8 +21,9 @@ export async function GET(request: Request) {
   const produtos = searchParams.getAll('produtos').filter(Boolean);
 
   try {
-    const companyLc = (company ?? '').toLowerCase();
-    let data = await fetchTopProdutosUltimos3Meses({
+    // fetchTopProdutosUltimos3Meses já faz UNION ALL varejo + e-commerce para ScarfMe
+    // numa única query SQL — não há necessidade de re-fetch por item.
+    const data = await fetchTopProdutosUltimos3Meses({
       company,
       filial,
       categoria,
@@ -40,33 +37,6 @@ export async function GET(request: Request) {
       porCor,
       limit: Number.isFinite(limit) && limit > 0 ? limit : 50,
     });
-
-    // ScarfMe: mesmas quantidades do tooltip — soma via fetchVendasProdutoPorFilial (varejo + e-commerce).
-    if (companyLc === 'scarfme' && data.length > 0) {
-      const norm = (s: string) => String(s ?? '').replace(/\u00A0/g, ' ').trim();
-      const keyRow = (r: { produto: string; cor?: string }) =>
-        `${norm(r.produto)}||${porCor ? norm(r.cor ?? '') : ''}`;
-
-      const totais = await fetchVendasQuantidadesTotaisItensLote({
-        company,
-        filial,
-        porCor,
-        itens: data.map((r) => ({
-          produto: r.produto,
-          cor: porCor ? (r.cor ?? null) : null,
-        })),
-      });
-      data = data.map((r) => {
-        const t = totais.get(keyRow(r));
-        if (t == null) return r;
-        return {
-          ...r,
-          vendas3meses: t.qtde12m,
-          vendas60dias: t.qtde60d,
-          vendasMesAtual: t.qtdeMesAtual,
-        };
-      });
-    }
 
     return NextResponse.json({ data });
   } catch (error) {
