@@ -164,13 +164,13 @@ function partesDestinoCompraFinal(
     // Nova regra por filial:
     // m12  = vendas_12m / 12
     // peso = vendas_60d / (m12 * 2)
-    // demanda = m12 * peso
+    // demanda = m12 * (0.5 + 0.5 * peso)
     m12: r.qtde12m / 12,
     demanda: (() => {
       const m12 = r.qtde12m / 12;
       if (m12 <= 0) return 0;
       const peso = (r.qtde60d ?? 0) / (m12 * 2);
-      return m12 * peso;
+      return m12 * (0.5 + 0.5 * peso);
     })(),
   }));
   const somaDemanda = demandas.reduce((s, r) => s + r.demanda, 0);
