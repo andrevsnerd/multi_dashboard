@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { type CompanyKey } from "@/lib/config/company";
+import {
+  type CompanyKey,
+  type CompanyConfig,
+  resolveCompany,
+  getFilialLabelForDisplay,
+} from "@/lib/config/company";
 import { useAuth } from "@/components/auth/AuthContext";
 
 import styles from "./SaidasEntradasProdutosPage.module.css";
@@ -143,9 +148,18 @@ function formatLogDateTime(value: string): string {
   });
 }
 
-function formatLogRoute(filialOrigem?: string, filialDestino?: string): string {
-  const o = (filialOrigem || "").trim();
-  const d = (filialDestino || "").trim();
+function formatLogRoute(
+  filialOrigem: string | undefined,
+  filialDestino: string | undefined,
+  company: CompanyConfig | null
+): string {
+  const label = (raw: string) => {
+    const t = raw.trim();
+    if (!t || t === "—") return t;
+    return getFilialLabelForDisplay(company, t);
+  };
+  const o = label(filialOrigem || "");
+  const d = label(filialDestino || "");
   const hasO = Boolean(o && o !== "—");
   const hasD = Boolean(d && d !== "—");
   if (hasO && hasD) return `${o} → ${d}`;
@@ -479,6 +493,13 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
   const [colorPickerOpcoes, setColorPickerOpcoes] = useState<Produto[]>([]);
   const [loadingColorPicker, setLoadingColorPicker] = useState(false);
   const [colorOptionsByProduto, setColorOptionsByProduto] = useState<Record<string, Produto[]>>({});
+
+  const companyConfig = useMemo(() => resolveCompany(companyKey), [companyKey]);
+  const filialLabel = useCallback(
+    (raw: string | null | undefined) =>
+      getFilialLabelForDisplay(companyConfig, String(raw ?? "").trim()),
+    [companyConfig]
+  );
 
   const filiaisDestinoVisiveis = useMemo<Filial[]>(() => {
     const isDefeito = tipoRomaneioSelecionado.toUpperCase() === 'DEFEITO';
@@ -918,7 +939,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
           quantidade: 1,
         };
       }
-      mostrarNotificacao(`Produto não possui estoque na filial ${filialSelecionada.filial}`, "error");
+      mostrarNotificacao(`Produto não possui estoque na filial ${filialLabel(filialSelecionada.filial)}`, "error");
       return null;
     }
 
@@ -933,7 +954,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       estoque: estoque.estoque,
       quantidade: 1,
     };
-  }, [filialSelecionada, mostrarNotificacao, tipoOperacao]);
+  }, [filialSelecionada, mostrarNotificacao, tipoOperacao, filialLabel]);
 
   const ensureColorOptionsLoaded = useCallback(async (produtoSku: string) => {
     const sku = (produtoSku || "").trim();
@@ -1443,7 +1464,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
             {tipoOperacao === "saida" ? "Filial de Saída" : "Filial de Entrada"}
           </span>
           {filiaisDisponiveis.length === 1 && filialSelecionada ? (
-            <span className={styles.configBarText}>{filialSelecionada.filial}</span>
+            <span className={styles.configBarText}>{filialLabel(filialSelecionada.filial)}</span>
           ) : (
             <div className={styles.selectWrap}>
               <select
@@ -1457,7 +1478,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
               >
                 <option value="">Selecione...</option>
                 {filiaisDisponiveis.map(f => (
-                  <option key={f.codFilial} value={f.codFilial}>{f.filial}</option>
+                  <option key={f.codFilial} value={f.codFilial}>{filialLabel(f.filial)}</option>
                 ))}
               </select>
               <span className={styles.selectChevron} aria-hidden="true">
@@ -1488,7 +1509,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                 {isSaidaMkt ? (
                   <span className={styles.configBarText} style={{ opacity: 0.45 }}>— Não se aplica —</span>
                 ) : filiaisDestinoVisiveis.length === 1 ? (
-                  <span className={styles.configBarText}>{filiaisDestinoVisiveis[0].filial}</span>
+                  <span className={styles.configBarText}>{filialLabel(filiaisDestinoVisiveis[0].filial)}</span>
                 ) : (
                   <div className={styles.selectWrap}>
                     <select
@@ -1501,7 +1522,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                     >
                       <option value="" disabled>— Selecionar filial —</option>
                       {filiaisDestinoVisiveis.map(f => (
-                        <option key={f.codFilial} value={f.codFilial}>{f.filial}</option>
+                        <option key={f.codFilial} value={f.codFilial}>{filialLabel(f.filial)}</option>
                       ))}
                     </select>
                     <span className={styles.selectChevron} aria-hidden="true">
@@ -1699,7 +1720,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                             </div>
                           </div>
                           <div className={styles.logRoute}>
-                            {formatLogRoute(log.filialOrigem, log.filialDestino)}
+                            {formatLogRoute(log.filialOrigem, log.filialDestino, companyConfig)}
                           </div>
                           {log.responsavel && (
                             <div className={styles.logResponsavel}>{log.responsavel}</div>
@@ -1738,12 +1759,12 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                                         </span>
                                         {hasLojaO && (
                                           <span className={styles.logPopoverEstoqueItem}>
-                                            <strong>{lojaO}</strong>: {it.estoqueOrigem}
+                                            <strong>{filialLabel(lojaO)}</strong>: {it.estoqueOrigem}
                                           </span>
                                         )}
                                         {hasLojaD && (
                                           <span className={styles.logPopoverEstoqueItem}>
-                                            <strong>{lojaD}</strong>: {it.estoqueDestino}
+                                            <strong>{filialLabel(lojaD)}</strong>: {it.estoqueDestino}
                                           </span>
                                         )}
                                       </div>
@@ -1958,7 +1979,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
               </p>
               {tipoOperacao === "saida" && filialDestinoSaida && (
                 <p className={styles.confirmacaoTexto} style={{ marginTop: "8px" }}>
-                  Destino: <strong>{filialDestinoSaida.filial}</strong>
+                  Destino: <strong>{filialLabel(filialDestinoSaida.filial)}</strong>
                 </p>
               )}
             </div>
@@ -2038,8 +2059,8 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                             title={estoque
                               ? `Estoque: ${estoque.estoque}`
                               : tipoOperacao === "saida"
-                                ? `Sem estoque em ${filialSelecionada?.filial}`
-                                : `Sem estoque cadastrado em ${filialSelecionada?.filial}`}
+                                ? `Sem estoque em ${filialLabel(filialSelecionada?.filial)}`
+                                : `Sem estoque cadastrado em ${filialLabel(filialSelecionada?.filial)}`}
                           >+</button>
                         )}
                         {isPickerActive && (
@@ -2056,7 +2077,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                                       className={`${styles.colorChip} ${tipoOperacao === "saida" ? styles.colorChipSaida : styles.colorChipEntrada}`}
                                       onClick={() => adicionarComCorSelecionada(opcao)}
                                       disabled={tipoOperacao === "saida" && !estoqueOpcao}
-                                      title={estoqueOpcao ? `Estoque: ${estoqueOpcao.estoque}` : `Sem estoque em ${filialSelecionada?.filial}`}
+                                      title={estoqueOpcao ? `Estoque: ${estoqueOpcao.estoque}` : `Sem estoque em ${filialLabel(filialSelecionada?.filial)}`}
                                     >
                                       {opcao.descCor || opcao.corProduto}
                                       {estoqueOpcao && <span className={styles.colorChipEstoque}> ({estoqueOpcao.estoque})</span>}
@@ -2219,7 +2240,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
             <div className={styles.modalBody}>
               <div className={styles.modalInfoBox}>
                 <div><strong>Tipo:</strong> {tipoOperacao === "saida" ? "Saída" : "Entrada"}</div>
-                <div><strong>Filial:</strong> {tipoOperacao === "saida" ? logEditando.filialOrigem : logEditando.filialDestino}</div>
+                <div><strong>Filial:</strong> {filialLabel(tipoOperacao === "saida" ? logEditando.filialOrigem : logEditando.filialDestino)}</div>
                 <div><strong>Data:</strong> {formatLogDateTime(logEditando.dataEmissao)}</div>
                 <div><strong>Produtos:</strong> {logEditando.qtdProdutos} · <strong>Itens:</strong> {logEditando.qtdItens}</div>
               </div>
