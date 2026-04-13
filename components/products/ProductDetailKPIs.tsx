@@ -307,21 +307,45 @@ export default function ProductDetailKPIs({
 
     const comparisonRevByIso = new Map<string, number>();
     const comparisonQtyByIso = new Map<string, number>();
+    const comparisonSalesByDay = new Map<
+      string,
+      { filial: string; filialDisplayName: string; quantity: number; revenue: number }[]
+    >();
     saleHistoryComparison.forEach((sale) => {
       const d = sale.date instanceof Date ? sale.date : new Date(sale.date);
       const key = format(startOfDay(d), "yyyy-MM-dd");
       comparisonRevByIso.set(key, (comparisonRevByIso.get(key) ?? 0) + sale.revenue);
       comparisonQtyByIso.set(key, (comparisonQtyByIso.get(key) ?? 0) + sale.quantity);
+      if (!comparisonSalesByDay.has(key)) {
+        comparisonSalesByDay.set(key, []);
+      }
+      const cRow = comparisonSalesByDay.get(key)!;
+      const cFilial = cRow.find((s) => s.filial === sale.filial);
+      if (cFilial) {
+        cFilial.quantity += sale.quantity;
+        cFilial.revenue += sale.revenue;
+      } else {
+        cRow.push({
+          filial: sale.filial,
+          filialDisplayName: sale.filialDisplayName,
+          quantity: sale.quantity,
+          revenue: sale.revenue,
+        });
+      }
     });
 
     let cumulativeRange = 0;
+    let cumulativePeriodQuantity = 0;
     let comparisonCumulativeRev = 0;
     let comparisonCumulativeQty = 0;
 
     return days.map((day) => {
       const isoDay = format(day, "yyyy-MM-dd");
       const dayRevenue = revenueByDay.get(isoDay) ?? 0;
+      const dayQty =
+        salesByDay.get(isoDay)?.reduce((sum, s) => sum + s.quantity, 0) ?? 0;
       cumulativeRange += dayRevenue;
+      cumulativePeriodQuantity += dayQty;
 
       const equivPrevDay = startOfDay(subMonths(day, 1));
       const cmpIso = format(equivPrevDay, "yyyy-MM-dd");
@@ -331,19 +355,20 @@ export default function ProductDetailKPIs({
       const projection = Math.round(comparisonCumulativeRev * 100) / 100;
       const quantityProjection = Math.round(comparisonCumulativeQty);
 
-      const comparisonRefLong = format(
-        equivPrevDay,
-        "dd 'de' MMMM yyyy",
-        { locale: ptBR },
-      );
+      const comparisonDayRevenue = comparisonRevByIso.get(cmpIso) ?? 0;
+      const comparisonDayQuantity = Math.round(comparisonQtyByIso.get(cmpIso) ?? 0);
 
       const daySales = salesByDay.get(isoDay) ?? [];
+      const comparisonDayFilials = comparisonSalesByDay.get(cmpIso) ?? [];
       return {
         isoDay,
         day: format(day, "dd/MM", { locale: ptBR }),
         dateLong: format(day, "dd 'de' MMMM yyyy", { locale: ptBR }),
-        comparisonRefLong,
+        comparisonDayRevenue: Math.round(comparisonDayRevenue * 100) / 100,
+        comparisonDayQuantity,
+        comparisonSalesByFilial: comparisonDayFilials,
         vendasReais: Math.round(cumulativeRange * 100) / 100,
+        cumulativePeriodQuantity: Math.round(cumulativePeriodQuantity),
         projecao: projection,
         quantityProjection,
         hasSales: daySales.length > 0,
@@ -707,12 +732,12 @@ export default function ProductDetailKPIs({
           <h3 className={styles.chartTitle}>Performance de Vendas</h3>
           <p className={styles.chartSubtitle}>
             {isMultiMonthRange
-              ? "Acúmulo contínuo no período — a cinza soma o dia equivalente no mês anterior a cada passo (sobe junto, sem quebra); linhas verticais = início de mês"
-              : "Vendas acumuladas no período — comparação acumulada dia a dia (mesmo dia no mês anterior)"}
+              ? "Azul · acumulado no filtro · Cinza · mesmo dia no mês passado · Traço · troca de mês"
+              : "Azul · acumulado no período · Cinza · referência (mesmo dia, mês passado)"}
           </p>
           <div className={styles.chartLegend}>
             <span className={styles.chartLegendItem}>
-              <span className={styles.chartLegendDotBlue} /> Vendas reais (acum.)
+              <span className={styles.chartLegendDotBlue} /> Vendas no período
             </span>
             <span className={styles.chartLegendItem}>
               <span className={styles.chartLegendDotGray} /> {comparisonLegendLabel}
@@ -751,49 +776,199 @@ export default function ProductDetailKPIs({
                   tickFormatter={(v) => (v >= 1000 ? `R$ ${(v / 1000).toFixed(0)}k` : `R$ ${v}`)}
                 />
                 <Tooltip
-                  content={({ active, payload, label }) => {
+                  wrapperStyle={{ outline: "none" }}
+                  content={({ active, payload }) => {
                     if (!active || !payload || payload.length === 0) return null;
                     const data = payload[0]?.payload;
+                    const unitsThisDay =
+                      data.salesByFilial?.reduce(
+                        (sum: number, s: { quantity: number }) => sum + s.quantity,
+                        0,
+                      ) ?? 0;
+                    const revenueThisDay =
+                      data.salesByFilial?.reduce(
+                        (sum: number, s: { revenue: number }) => sum + s.revenue,
+                        0,
+                      ) ?? 0;
                     return (
-                      <div style={{
-                        backgroundColor: "#fff",
-                        border: "1px solid #e2e8f0",
-                        borderRadius: "8px",
-                        padding: "8px 12px",
-                        fontSize: "12px",
-                      }}>
-                        <p style={{ margin: "0 0 8px 0", color: "#64748b", fontWeight: 600 }}>
+                      <div
+                        style={{
+                          backgroundColor: "#fff",
+                          border: "1px solid #e2e8f0",
+                          borderRadius: "8px",
+                          padding: "12px 14px",
+                          fontSize: "12px",
+                          minWidth: 440,
+                          maxWidth: 620,
+                          width: "max-content",
+                        }}
+                      >
+                        <p style={{ margin: "0 0 10px 0", fontWeight: 600, color: "#64748b", fontSize: "11px" }}>
                           {data.dateLong}
                         </p>
-                        {data.hasSales ? (
-                          <>
-                            <p style={{ margin: "0 0 8px 0", color: "#2563eb", fontWeight: 600 }}>
-                              Vendas (acum. período): {formatCurrency(data.vendasReais)} (
-                              {data.salesByFilial?.reduce((sum: number, s: { quantity: number }) => sum + s.quantity, 0) ?? 0}{" "}
-                              un.)
-                            </p>
-                            <p style={{ margin: "0 0 8px 0", color: "#94a3b8" }}>
-                              Ref. mês ant. (acum.): {formatCurrency(data.projecao)} (
-                              {data.quantityProjection} un.) — dia equivalente {data.comparisonRefLong}
-                            </p>
-                            {data.salesByFilial && data.salesByFilial.length > 0 && (
-                              <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "8px" }}>
-                                <p style={{ margin: "0 0 4px 0", fontWeight: 600 }}>Filiais:</p>
-                                {data.salesByFilial.map((s: { filialDisplayName: string; quantity: number; revenue: number }, idx: number) => (
-                                  <div key={idx} style={{ display: "flex", justifyContent: "space-between", gap: "16px", marginBottom: "2px" }}>
-                                    <span style={{ color: "#475569" }}>{s.filialDisplayName}</span>
-                                    <span style={{ color: "#475569", fontWeight: 500 }}>{s.quantity} un. ({formatCurrency(s.revenue)})</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <p style={{ margin: "0 0 8px 0", color: "#94a3b8" }}>
-                            Ref. mês ant. (acum.): {formatCurrency(data.projecao)} (
-                            {data.quantityProjection} un.) — dia equivalente {data.comparisonRefLong}
+
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "row",
+                            flexWrap: "wrap",
+                            gap: "10px",
+                            alignItems: "stretch",
+                            marginBottom: "10px",
+                          }}
+                        >
+                        <div
+                          style={{
+                            flex: "1 1 220px",
+                            minWidth: 220,
+                            background: "linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%)",
+                            borderLeft: "3px solid #2563eb",
+                            borderRadius: "8px",
+                            padding: "10px 10px 8px 12px",
+                          }}
+                        >
+                          <p style={{ margin: "0 0 6px 0", fontSize: "10px", fontWeight: 700, color: "#1d4ed8", letterSpacing: "0.04em", textTransform: "uppercase" as const }}>
+                            Período atual
                           </p>
-                        )}
+                          <p style={{ margin: "0 0 4px 0", fontSize: "11px", fontWeight: 600, color: "#1e3a8a" }}>
+                            Neste dia
+                          </p>
+                          {data.hasSales && unitsThisDay > 0 ? (
+                            <>
+                              <p style={{ margin: "0 0 2px 0", fontSize: "18px", fontWeight: 700, color: "#2563eb" }}>
+                                {formatCurrency(revenueThisDay)}
+                              </p>
+                              <p style={{ margin: "0 0 8px 0", fontSize: "13px", fontWeight: 600, color: "#1d4ed8" }}>
+                                {unitsThisDay} {unitsThisDay === 1 ? "unidade" : "unidades"}
+                              </p>
+                            </>
+                          ) : (
+                            <p style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: 600, color: "#93c5fd" }}>
+                              Sem venda
+                            </p>
+                          )}
+                          {data.hasSales && data.salesByFilial && data.salesByFilial.length > 0 ? (
+                            <div style={{ paddingTop: "6px", borderTop: "1px solid rgba(37, 99, 235, 0.2)" }}>
+                              <p style={{ margin: "0 0 4px 0", fontSize: "10px", fontWeight: 700, color: "#1e40af" }}>
+                                Onde vendeu
+                              </p>
+                              {data.salesByFilial.map(
+                                (
+                                  s: {
+                                    filialDisplayName: string;
+                                    quantity: number;
+                                    revenue: number;
+                                  },
+                                  idx: number,
+                                ) => (
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      gap: "12px",
+                                      marginBottom: "3px",
+                                      fontSize: "11px",
+                                      color: "#1e3a8a",
+                                    }}
+                                  >
+                                    <span>{s.filialDisplayName}</span>
+                                    <span style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+                                      {s.quantity} un. {formatCurrency(s.revenue)}
+                                    </span>
+                                  </div>
+                                ),
+                              )}
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <div
+                          style={{
+                            flex: "1 1 220px",
+                            minWidth: 220,
+                            background: "#f8fafc",
+                            border: "1px solid #e2e8f0",
+                            borderRadius: "8px",
+                            padding: "10px 10px 8px 12px",
+                          }}
+                        >
+                          <p style={{ margin: "0 0 6px 0", fontSize: "10px", fontWeight: 700, color: "#94a3b8", letterSpacing: "0.04em", textTransform: "uppercase" as const }}>
+                            Mês anterior
+                          </p>
+                          {data.comparisonDayQuantity > 0 || data.comparisonDayRevenue > 0 ? (
+                            <>
+                              <p style={{ margin: "0 0 2px 0", fontSize: "16px", fontWeight: 700, color: "#9ca3af" }}>
+                                {formatCurrency(data.comparisonDayRevenue)}
+                              </p>
+                              <p style={{ margin: "0 0 8px 0", fontSize: "12px", fontWeight: 600, color: "#a8a29e" }}>
+                                {data.comparisonDayQuantity}{" "}
+                                {data.comparisonDayQuantity === 1 ? "unidade" : "unidades"}
+                              </p>
+                            </>
+                          ) : (
+                            <p style={{ margin: "0 0 8px 0", fontSize: "13px", fontWeight: 600, color: "#cbd5e1" }}>
+                              Sem venda
+                            </p>
+                          )}
+                          {data.comparisonSalesByFilial && data.comparisonSalesByFilial.length > 0 ? (
+                            <div style={{ paddingTop: "6px", borderTop: "1px solid #e2e8f0" }}>
+                              <p style={{ margin: "0 0 4px 0", fontSize: "10px", fontWeight: 700, color: "#94a3b8" }}>
+                                Onde vendeu
+                              </p>
+                              {data.comparisonSalesByFilial.map(
+                                (
+                                  s: {
+                                    filialDisplayName: string;
+                                    quantity: number;
+                                    revenue: number;
+                                  },
+                                  idx: number,
+                                ) => (
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      gap: "12px",
+                                      marginBottom: "3px",
+                                      fontSize: "11px",
+                                      color: "#9ca3af",
+                                    }}
+                                  >
+                                    <span>{s.filialDisplayName}</span>
+                                    <span style={{ fontWeight: 500, whiteSpace: "nowrap" }}>
+                                      {s.quantity} un. {formatCurrency(s.revenue)}
+                                    </span>
+                                  </div>
+                                ),
+                              )}
+                            </div>
+                          ) : null}
+                        </div>
+                        </div>
+
+                        <div
+                          style={{
+                            paddingTop: "8px",
+                            borderTop: "1px solid #f1f5f9",
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: "12px 20px",
+                            fontSize: "10px",
+                            color: "#94a3b8",
+                            fontWeight: 500,
+                          }}
+                        >
+                          <span style={{ whiteSpace: "nowrap" }}>
+                            Acumulado no período: {formatCurrency(data.vendasReais)} ·{" "}
+                            {data.cumulativePeriodQuantity} un.
+                          </span>
+                          <span style={{ whiteSpace: "nowrap" }}>
+                            Acumulado mês anterior: {formatCurrency(data.projecao)} ·{" "}
+                            {data.quantityProjection} un.
+                          </span>
+                        </div>
                       </div>
                     );
                   }}
@@ -801,7 +976,7 @@ export default function ProductDetailKPIs({
                 <Line
                   type="monotone"
                   dataKey="vendasReais"
-                  name="Vendas reais (acum.)"
+                  name="Vendas no período"
                   stroke="#2563eb"
                   strokeWidth={2}
                   dot={(props) => {

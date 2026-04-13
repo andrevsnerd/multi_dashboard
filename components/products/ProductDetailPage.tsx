@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useMemo, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import DateRangeFilter, {
   type DateRangeValue,
 } from "@/components/filters/DateRangeFilter";
@@ -90,6 +91,9 @@ export default function ProductDetailPage({
   companyKey,
   companyName,
 }: ProductDetailPageProps) {
+  const searchParams = useSearchParams();
+  const lastUrlProductId = useRef<string | null>(null);
+
   const initialRange = useMemo(() => {
     const range = getCurrentMonthRange();
     return {
@@ -132,6 +136,30 @@ export default function ProductDetailPage({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  // Abrir produto a partir de ?productId=… (ex.: link da Curva ABC)
+  useEffect(() => {
+    const id = searchParams.get("productId")?.trim();
+    if (!id) {
+      lastUrlProductId.current = null;
+      return;
+    }
+    if (lastUrlProductId.current === id) {
+      return;
+    }
+    lastUrlProductId.current = id;
+    const name = (searchParams.get("name") ?? id).trim();
+    const colorsParam = searchParams.get("colors");
+    const colors = colorsParam
+      ? colorsParam.split(",").map((c) => c.trim()).filter(Boolean)
+      : [];
+    setSelectedProductId(id);
+    setSelectedProductName(name);
+    setSearchTerm(name);
+    setShowSearchResults(false);
+    setSearchResults([]);
+    setSelectedColors(colors);
+  }, [searchParams]);
 
   // Buscar produtos ao digitar
   useEffect(() => {

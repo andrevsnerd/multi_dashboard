@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { startOfMonth, endOfMonth } from "date-fns";
 import type { CompanyKey } from "@/lib/config/company";
 import {
@@ -145,6 +146,18 @@ function hexToRgba(hex: string, alpha: number): string {
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function buildProductDetalhadoHref(
+  companyKey: CompanyKey,
+  p: Pick<ProdutoRow, "produto" | "descricao" | "cor">
+): string {
+  const params = new URLSearchParams();
+  params.set("productId", p.produto.trim());
+  params.set("name", (p.descricao || p.produto).trim());
+  const cor = (p.cor ?? "").trim();
+  if (cor) params.set("colors", cor);
+  return `/${companyKey}/produto-detalhado?${params.toString()}`;
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
@@ -666,50 +679,56 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                                 </span>
                               </td>
                               <td>
-                                <div className={styles.productNameRow}>
-                                  <span className={styles.productName}>{p.descricao || p.produto}</span>
-                                  {(() => {
-                                    const cmp = getComparisonBadge(p.vendas, p.vendasPrevious);
-                                    if (!cmp) return null;
-                                    const isPos = cmp.kind === "new" ? true : cmp.value >= 0;
-                                    return (
-                                      <span
-                                        className={`${styles.prodCompareBadge} ${isPos ? styles.badgeGreen : styles.badgeRed}`}
-                                        title={`Comparativo com ${comparisonLabel}`}
-                                      >
-                                        {cmp.kind === "new"
-                                          ? "NOVO"
-                                          : `${isPos ? "↑" : "↓"} ${isPos ? "+" : ""}${cmp.value.toFixed(1)}%`}
-                                      </span>
-                                    );
-                                  })()}
-                                </div>
-                                {((p.descricao && p.produto !== p.descricao) || p.categoria) && (
-                                  <div className={styles.productMeta}>
-                                    {p.descricao && p.produto !== p.descricao && (
-                                      <span className={styles.productCode}>{p.produto}</span>
-                                    )}
-                                    {p.descricao && p.produto !== p.descricao && p.categoria && (
-                                      <span className={styles.productMetaSeparator}>|</span>
-                                    )}
-                                    {p.categoria && (
-                                      <span className={styles.productCategoria}>
-                                        {getCategoryHeaderLabel(p.categoria)}
-                                        {companyKey === "scarfme" && p.grade && (
-                                          <>
-                                            <span className={styles.productMetaSeparator}>•</span>
-                                            <span className={styles.productGrade}>{p.grade}</span>
-                                          </>
-                                        )}
-                                      </span>
-                                    )}
+                                <Link
+                                  href={buildProductDetalhadoHref(companyKey, p)}
+                                  className={styles.productDetailLink}
+                                  title="Abrir produto detalhado"
+                                >
+                                  <div className={styles.productNameRow}>
+                                    <span className={styles.productName}>{p.descricao || p.produto}</span>
+                                    {(() => {
+                                      const cmp = getComparisonBadge(p.vendas, p.vendasPrevious);
+                                      if (!cmp) return null;
+                                      const isPos = cmp.kind === "new" ? true : cmp.value >= 0;
+                                      return (
+                                        <span
+                                          className={`${styles.prodCompareBadge} ${isPos ? styles.badgeGreen : styles.badgeRed}`}
+                                          title={`Comparativo com ${comparisonLabel}`}
+                                        >
+                                          {cmp.kind === "new"
+                                            ? "NOVO"
+                                            : `${isPos ? "↑" : "↓"} ${isPos ? "+" : ""}${cmp.value.toFixed(1)}%`}
+                                        </span>
+                                      );
+                                    })()}
                                   </div>
-                                )}
-                                {porCor && (p.corDescricao || p.cor) && (
-                                  <div className={styles.productCode} style={{ marginTop: 4 }}>
-                                    Cor: {p.corDescricao || p.cor}
-                                  </div>
-                                )}
+                                  {((p.descricao && p.produto !== p.descricao) || p.categoria) && (
+                                    <div className={styles.productMeta}>
+                                      {p.descricao && p.produto !== p.descricao && (
+                                        <span className={styles.productCode}>{p.produto}</span>
+                                      )}
+                                      {p.descricao && p.produto !== p.descricao && p.categoria && (
+                                        <span className={styles.productMetaSeparator}>|</span>
+                                      )}
+                                      {p.categoria && (
+                                        <span className={styles.productCategoria}>
+                                          {getCategoryHeaderLabel(p.categoria)}
+                                          {companyKey === "scarfme" && p.grade && (
+                                            <>
+                                              <span className={styles.productMetaSeparator}>•</span>
+                                              <span className={styles.productGrade}>{p.grade}</span>
+                                            </>
+                                          )}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                  {porCor && (p.corDescricao || p.cor) && (
+                                    <div className={styles.productCode} style={{ marginTop: 4 }}>
+                                      Cor: {p.corDescricao || p.cor}
+                                    </div>
+                                  )}
+                                </Link>
                               </td>
                               <td className={styles.percCell}>
                                 <div className={styles.percBar}>
