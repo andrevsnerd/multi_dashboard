@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { CompanyKey } from "@/lib/config/company";
-import type { CompraSalvaListEntry } from "@/lib/types/compra-salva";
+import type { CompraSalvaListEntry, CompraSalvaListSummary } from "@/lib/types/compra-salva";
 
 import styles from "./ComprasSalvasListPanel.module.css";
 
@@ -41,6 +41,14 @@ function fmtHora(iso: string) {
   }
 }
 
+function fmtDateOnly(isoDate: string) {
+  try {
+    return new Date(`${isoDate}T00:00:00`).toLocaleDateString("pt-BR");
+  } catch {
+    return isoDate;
+  }
+}
+
 export default function ComprasSalvasListPanel({
   companyKey,
   companySlug,
@@ -53,6 +61,13 @@ export default function ComprasSalvasListPanel({
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [toggling, setToggling] = useState<Set<string>>(new Set());
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [summary, setSummary] = useState<CompraSalvaListSummary>({
+    totalGeralPeriodo: 0,
+    totalCompras: 0,
+    porData: [],
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -60,14 +75,26 @@ export default function ComprasSalvasListPanel({
     setError(null);
     const params = new URLSearchParams();
     params.set("company", companyKey);
+    if (fromDate) params.set("from", fromDate);
+    if (toDate) params.set("to", toDate);
     fetch(`/api/controle-estoque/compras-salvas?${params}`, { cache: "no-store" })
       .then(async (r) => {
-        const j = (await r.json()) as { data?: CompraSalvaListEntry[]; error?: string };
+        const j = (await r.json()) as {
+          data?: CompraSalvaListEntry[];
+          summary?: CompraSalvaListSummary;
+          error?: string;
+        };
         if (!r.ok) throw new Error(j.error ?? "Erro ao carregar");
-        return j.data ?? [];
+        return {
+          data: j.data ?? [],
+          summary: j.summary ?? { totalGeralPeriodo: 0, totalCompras: 0, porData: [] },
+        };
       })
-      .then((data) => {
-        if (!cancelled) setItems(data);
+      .then((payload) => {
+        if (!cancelled) {
+          setItems(payload.data);
+          setSummary(payload.summary);
+        }
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "Erro");
@@ -78,7 +105,7 @@ export default function ComprasSalvasListPanel({
     return () => {
       cancelled = true;
     };
-  }, [companyKey]);
+  }, [companyKey, fromDate, toDate]);
 
   const filtered = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -140,6 +167,37 @@ export default function ComprasSalvasListPanel({
         Histórico de snapshots da Compra Final. Abra uma compra para acompanhar e editar quantidades.
       </p>
 
+      <div className={styles.kpiRow}>
+        <div className={styles.kpiCard}>
+          <span className={styles.kpiLabel}>Total comprado no período</span>
+          <strong className={styles.kpiValue}>{fmtBRL(summary.totalGeralPeriodo)}</strong>
+          <span className={styles.kpiSub}>{summary.totalCompras} compras no intervalo</span>
+        </div>
+      </div>
+
+      <div className={styles.filterRow}>
+        <label className={styles.dateField}>
+          <span>De</span>
+          <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+        </label>
+        <label className={styles.dateField}>
+          <span>Até</span>
+          <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+        </label>
+        {(fromDate || toDate) && (
+          <button
+            type="button"
+            className={styles.clearDates}
+            onClick={() => {
+              setFromDate("");
+              setToDate("");
+            }}
+          >
+            Limpar período
+          </button>
+        )}
+      </div>
+
       <div className={styles.searchBox}>
         <svg viewBox="0 0 24 24" fill="none" className={styles.searchIcon} aria-hidden="true">
           <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
@@ -161,6 +219,17 @@ export default function ComprasSalvasListPanel({
 
       {loading && <div className={styles.loading}>Carregando compras salvas...</div>}
       {error && <div className={styles.error}>{error}</div>}
+      {!loading && !error && summary.porData.length > 0 && (
+        <div className={styles.dailyTotals}>
+          {summary.porData.map((d) => (
+            <div key={d.date} className={styles.dailyTotalItem}>
+              <span>{fmtDateOnly(d.date)}</span>
+              <span>{d.totalCompras} compras</span>
+              <strong>{fmtBRL(d.totalValor)}</strong>
+            </div>
+          ))}
+        </div>
+      )}
       {!loading && !error && items.length === 0 && (
         <div className={styles.empty}>Nenhuma compra salva ainda. Use &quot;Salvar compra atual&quot; na aba Compra Final.</div>
       )}

@@ -1,17 +1,28 @@
 import { NextResponse } from "next/server";
 
 import { fetchCustosPorProdutos } from "@/lib/repositories/controleEstoque";
-import type { CompraSalvaItemRow, CompraSalvaListEntry } from "@/lib/types/compra-salva";
+import type { CompraSalvaItemRow, CompraSalvaListEntry, CompraSalvaListSummary } from "@/lib/types/compra-salva";
 import { createCompraSalva, listComprasSalvasFull } from "@/lib/utils/compra-salva-store";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const companyKey = searchParams.get("company") ?? "";
+  const from = searchParams.get("from") ?? "";
+  const to = searchParams.get("to") ?? "";
   if (!companyKey) {
     return NextResponse.json({ error: "company é obrigatório" }, { status: 400 });
   }
   try {
-    const compras = await listComprasSalvasFull(companyKey);
+    const comprasAll = await listComprasSalvasFull(companyKey);
+    const fromDate = from ? new Date(`${from}T00:00:00`) : null;
+    const toDate = to ? new Date(`${to}T23:59:59.999`) : null;
+    const compras = comprasAll.filter((c) => {
+      const savedAt = new Date(c.savedAt);
+      if (Number.isNaN(savedAt.getTime())) return false;
+      if (fromDate && savedAt < fromDate) return false;
+      if (toDate && savedAt > toDate) return false;
+      return true;
+    });
 
     // Coleta todos os códigos únicos de produto para buscar custo em lote
     const todosProdutos = Array.from(
@@ -50,7 +61,23 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json({ data });
+    const porDataMap = new Map<string, { totalValor: number; totalCompras: number }>();
+    for (const c of data) {
+      const date = c.savedAt.slice(0, 10);
+      const acc = porDataMap.get(date) ?? { totalValor: 0, totalCompras: 0 };
+      acc.totalValor += c.totalValor;
+      acc.totalCompras += 1;
+      porDataMap.set(date, acc);
+    }
+    const summary: CompraSalvaListSummary = {
+      totalGeralPeriodo: data.reduce((s, c) => s + c.totalValor, 0),
+      totalCompras: data.length,
+      porData: Array.from(porDataMap.entries())
+        .map(([date, v]) => ({ date, totalValor: v.totalValor, totalCompras: v.totalCompras }))
+        .sort((a, b) => b.date.localeCompare(a.date)),
+    };
+
+    return NextResponse.json({ data, summary });
   } catch (error) {
     console.error("Erro ao listar compras salvas", error);
     return NextResponse.json({ error: "Erro ao listar compras salvas" }, { status: 500 });

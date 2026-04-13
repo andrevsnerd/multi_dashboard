@@ -32,3 +32,15 @@ export interface CompraSalvaListEntry {
   savedAt: string;
   updatedAt: string;
 }
+
+export interface CompraSalvaDailyTotal {
+  date: string;
+  totalValor: number;
+  totalCompras: number;
+}
+
+export interface CompraSalvaListSummary {
+  totalGeralPeriodo: number;
+  totalCompras: number;
+  porData: CompraSalvaDailyTotal[];
+}
