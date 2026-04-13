@@ -84,14 +84,38 @@ async function writeFileAll(rows: CompraSalva[]) {
 
 function toListEntry(c: CompraSalva): CompraSalvaListEntry {
   const totalQtdManual = c.items.reduce((s, i) => s + Math.max(0, Math.round(i.qtdManual ?? 0)), 0);
+  const totalValor = c.items.reduce((s, i) => {
+    const cu = i.custoUnitario ?? 0;
+    return cu > 0 ? s + Math.round((i.qtdManual ?? 0) * cu) : s;
+  }, 0);
   return {
     id: c.id,
     title: c.title,
     itemCount: c.items.length,
     totalQtdManual,
+    totalValor,
     savedAt: c.savedAt,
     updatedAt: c.updatedAt,
   };
+}
+
+export async function listComprasSalvasFull(companyKey: string): Promise<CompraSalva[]> {
+  if (hasPostgres()) {
+    await ensureTable();
+    const sql = getNeonSql();
+    const rows = await sql`
+      SELECT id, company_key, source_context_key, title, expandir_por_cor, items, saved_at, updated_at
+      FROM compras_salvas
+      WHERE company_key = ${companyKey}
+      ORDER BY saved_at DESC
+    `;
+    return rows.map((r) => rowToCompraSalva(r as never));
+  }
+
+  const all = await readFileAll();
+  return all
+    .filter((c) => c.companyKey === companyKey)
+    .sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
 }
 
 export async function listComprasSalvas(companyKey: string): Promise<CompraSalvaListEntry[]> {

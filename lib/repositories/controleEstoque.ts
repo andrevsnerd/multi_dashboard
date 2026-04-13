@@ -6232,3 +6232,29 @@ export async function fetchParadosPorCategoriaGiro({
       .sort((a, b) => b.estoque - a.estoque);
   });
 }
+
+/**
+ * Busca CUSTO_REPOSICAO1 para uma lista de códigos de produto.
+ * Query leve usada para enriquecer compras salvas com valor total.
+ */
+export async function fetchCustosPorProdutos(
+  produtos: string[]
+): Promise<Map<string, number>> {
+  if (produtos.length === 0) return new Map();
+  return withRequest(async (request) => {
+    const normed = produtos.map((p) => p.trim()).filter(Boolean);
+    if (normed.length === 0) return new Map<string, number>();
+    normed.forEach((p, i) => request.input(`cp${i}`, sql.VarChar, p));
+    const placeholders = normed.map((_, i) => `@cp${i}`).join(', ');
+    const result = await request.query<{ produto: string; custoUnitario: number }>(`
+      SELECT LTRIM(RTRIM(PRODUTO)) AS produto, ISNULL(CUSTO_REPOSICAO1, 0) AS custoUnitario
+      FROM PRODUTOS WITH (NOLOCK)
+      WHERE LTRIM(RTRIM(PRODUTO)) IN (${placeholders})
+    `);
+    const map = new Map<string, number>();
+    for (const row of result.recordset) {
+      if (row.produto) map.set(row.produto.trim(), Number(row.custoUnitario ?? 0));
+    }
+    return map;
+  });
+}

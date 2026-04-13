@@ -268,6 +268,18 @@ Regras:
 
 - cria snapshot com `sourceContextKey`
 - permite editar título e `qtdManual` por item
+- item pode armazenar `custoUnitario`
+- listagem resumida calcula `totalValor` por compra
+  - `totalValor = soma(qtdManual * custo)`
+  - custo preferencial: `custoUnitario` salvo no item
+  - fallback: custo em lote do ERP (`PRODUTOS.CUSTO_REPOSICAO1`) via `fetchCustosPorProdutos` em `lib/repositories/controleEstoque.ts`
+
+Arquivos impactados nesta lógica:
+
+- `app/api/controle-estoque/compras-salvas/route.ts`
+- `lib/types/compra-salva.ts`
+- `lib/utils/compra-salva-store.ts`
+- `components/stock/ComprasSalvasListPanel.tsx`
 
 Ponto crítico:
 

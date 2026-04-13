@@ -116,6 +116,11 @@ Regras:
 - chave por `companyKey` + `id`
 - guarda contexto de origem (`sourceContextKey`) e itens com `qtdManual`
 - suporta listar, criar, atualizar item, renomear, remover item e excluir compra
+- cada item pode carregar `custoUnitario`
+- listagem resumida agora inclui `totalValor`:
+  - prioridade: custo salvo no item (`custoUnitario`)
+  - fallback: custo buscado no ERP (`PRODUTOS.CUSTO_REPOSICAO1`) via `fetchCustosPorProdutos`
+  - se custo indisponível, item não contribui para `totalValor`
 
 ---
 

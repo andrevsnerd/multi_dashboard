@@ -12,6 +12,10 @@ function fmt(n: number) {
   return n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 }
 
+function fmtBRL(n: number) {
+  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+}
+
 function fmtData(iso: string) {
   try {
     return new Date(iso).toLocaleString("pt-BR", {
@@ -114,6 +118,7 @@ export default function ComprasSalvasListPanel({
               <div className={styles.cardMeta}>
                 <span>{it.itemCount} itens</span>
                 <span>{fmt(it.totalQtdManual)} un.</span>
+                {it.totalValor > 0 && <span>{fmtBRL(it.totalValor)}</span>}
                 <span>Salva em {fmtData(it.savedAt)}</span>
               </div>
             </Link>

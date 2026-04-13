@@ -7,6 +7,7 @@ export interface CompraSalvaItemRow {
   grade?: string;
   colecao?: string;
   qtdManual: number;
+  custoUnitario?: number;
 }
 
 export interface CompraSalva {
@@ -25,6 +26,7 @@ export interface CompraSalvaListEntry {
   title: string;
   itemCount: number;
   totalQtdManual: number;
+  totalValor: number;
   savedAt: string;
   updatedAt: string;
 }

@@ -23,6 +23,54 @@ Prompt recomendado para iniciar qualquer tarefa:
 
 - “Leia `docs/MAPA_RAPIDO_TOKENS.md` e decida se precisa consultar `MAPA_LOGICAS_PAGINAS_COMPLETO.md` e/ou `RUNBOOK_LOGICAS_DETALHADAS.md` antes de implementar.”
 
+### Ordem obrigatória de leitura (anti desperdício de tokens)
+
+1. Ler **somente** `docs/MAPA_RAPIDO_TOKENS.md`.
+2. Definir tipo de tarefa:
+   - `T1` localização simples (rota/API/arquivo/menu)
+   - `T2` entendimento de uma página/fluxo
+   - `T3` alteração de regra/cálculo/SQL/persistência
+3. Abrir documentos adicionais apenas se necessário:
+   - `T1` -> parar no Mapa Rápido (não abrir outros docs)
+   - `T2` -> abrir `docs/MAPA_LOGICAS_PAGINAS_COMPLETO.md`
+   - `T3` -> abrir `docs/RUNBOOK_LOGICAS_DETALHADAS.md` e, se faltar contexto de página, também o `MAPA_LOGICAS_PAGINAS_COMPLETO.md`
+4. Só depois iniciar análise de código/implementação.
+
+### Regra de parada (muito importante)
+
+- Se já encontrou:
+  - rota correta
+  - API correta
+  - 1 arquivo principal de UI
+  - 1 arquivo principal de regra (repository/store)
+  então **parar de explorar** e implementar.
+
+### Limite de contexto por tarefa
+
+- Antes de implementar, usar no máximo:
+  - 1 doc (T1)
+  - 2 docs (T2)
+  - 2 ou 3 docs (T3)
+- E no código:
+  - 1 a 2 arquivos de UI
+  - 1 a 2 arquivos de API
+  - 1 a 2 arquivos de regra
+
+Se exceder isso, reavaliar escopo para não gastar tokens desnecessários.
+
+### Checklist rápido antes de começar
+
+- Já classifiquei a tarefa em `T1`, `T2` ou `T3`?
+- Estou lendo apenas os docs necessários para esse tipo?
+- Já identifiquei o menor conjunto de arquivos para agir?
+- Já tenho critérios de validação objetivos?
+
+### Prompt padrão (versão forte, recomendada)
+
+Use este prompt no início de qualquer tarefa:
+
+`Leia somente docs/MAPA_RAPIDO_TOKENS.md e classifique a tarefa em T1/T2/T3. Só abra os outros documentos se a classificação exigir. Em seguida, informe o conjunto mínimo de arquivos que será usado (UI/API/regra), os passos de execução e as validações. Evite exploração extra para economizar tokens.`
+
 ## 1) Snapshot do sistema
 
 - Stack: `Next.js` (App Router), `React`, `TypeScript`, `mssql`, `@neondatabase/serverless`, `@upstash/redis`.

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
-import type { CompraSalvaItemRow } from "@/lib/types/compra-salva";
-import { createCompraSalva, listComprasSalvas } from "@/lib/utils/compra-salva-store";
+import { fetchCustosPorProdutos } from "@/lib/repositories/controleEstoque";
+import type { CompraSalvaItemRow, CompraSalvaListEntry } from "@/lib/types/compra-salva";
+import { createCompraSalva, listComprasSalvasFull } from "@/lib/utils/compra-salva-store";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -10,7 +11,44 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "company é obrigatório" }, { status: 400 });
   }
   try {
-    const data = await listComprasSalvas(companyKey);
+    const compras = await listComprasSalvasFull(companyKey);
+
+    // Coleta todos os códigos únicos de produto para buscar custo em lote
+    const todosProdutos = Array.from(
+      new Set(compras.flatMap((c) => c.items.map((i) => i.produto.trim())))
+    );
+
+    // Custo do ERP — fallback silencioso se SQL Server indisponível
+    let custoMap = new Map<string, number>();
+    try {
+      custoMap = await fetchCustosPorProdutos(todosProdutos);
+    } catch {
+      // sem custo disponível — totalValor será 0
+    }
+
+    const data: CompraSalvaListEntry[] = compras.map((c) => {
+      const totalQtdManual = c.items.reduce(
+        (s, i) => s + Math.max(0, Math.round(i.qtdManual ?? 0)),
+        0
+      );
+      const totalValor = c.items.reduce((s, i) => {
+        // Custo salvo no item tem prioridade; fallback para lookup do ERP
+        const cu = (i.custoUnitario ?? 0) > 0
+          ? i.custoUnitario!
+          : (custoMap.get(i.produto.trim()) ?? 0);
+        return cu > 0 ? s + Math.round((i.qtdManual ?? 0) * cu) : s;
+      }, 0);
+      return {
+        id: c.id,
+        title: c.title,
+        itemCount: c.items.length,
+        totalQtdManual,
+        totalValor,
+        savedAt: c.savedAt,
+        updatedAt: c.updatedAt,
+      };
+    });
+
     return NextResponse.json({ data });
   } catch (error) {
     console.error("Erro ao listar compras salvas", error);
@@ -45,6 +83,7 @@ export async function POST(request: Request) {
       grade: row.grade ? String(row.grade) : undefined,
       colecao: row.colecao ? String(row.colecao) : undefined,
       qtdManual: Number(row.qtdManual ?? 0),
+      custoUnitario: row.custoUnitario != null ? Number(row.custoUnitario) : undefined,
     }));
 
     const t =
