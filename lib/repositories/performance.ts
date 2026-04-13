@@ -424,6 +424,89 @@ export async function fetchFilialProdutoSales(
   return Array.from(merged.values()).sort((a, b) => b.vendas - a.vendas);
 }
 
+export interface ProdutoQtdePorFilialRow {
+  produto: string;
+  filial: string;
+  qtde: number;
+}
+
+/**
+ * Retorna a quantidade vendida de cada produto, decomposta por filial.
+ * Usado para popular tooltips de "onde vendeu" na visão geral.
+ */
+export async function fetchProdutoQtdePorFilial(
+  companyKey: CompanyKey,
+  posFilialNames: string[],
+  ecommerceFilialNames: string[],
+  range: NormalizedRange,
+): Promise<ProdutoQtdePorFilialRow[]> {
+  const start = range.start;
+  const end = range.end;
+
+  type RawRow = { PRODUTO: string; FILIAL: string; QTDE: number };
+
+  const runPos = (): Promise<ProdutoQtdePorFilialRow[]> => {
+    if (posFilialNames.length === 0) return Promise.resolve([]);
+    return withRequest(async (request) => {
+      request.input('qtdStart', sql.DateTime, start);
+      request.input('qtdEnd', sql.DateTime, end);
+      posFilialNames.forEach((f, i) => request.input(`qtdF${i}`, sql.VarChar, f));
+      const placeholders = posFilialNames.map((_, i) => `@qtdF${i}`).join(', ');
+      const query = `
+        SELECT
+          ISNULL(vp.PRODUTO, '') AS PRODUTO,
+          ISNULL(vp.FILIAL, '') AS FILIAL,
+          SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS QTDE
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        WHERE vp.DATA_VENDA >= @qtdStart
+          AND vp.DATA_VENDA < @qtdEnd
+          AND vp.QTDE > 0
+          AND vp.FILIAL IN (${placeholders})
+        GROUP BY ISNULL(vp.PRODUTO, ''), ISNULL(vp.FILIAL, '')
+        HAVING SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) > 0
+      `;
+      const result = await request.query<RawRow>(query);
+      return result.recordset
+        .map(r => ({ produto: r.PRODUTO?.trim() ?? '', filial: r.FILIAL?.trim() ?? '', qtde: Math.round(Number(r.QTDE ?? 0)) }))
+        .filter(r => r.produto !== '');
+    });
+  };
+
+  const runEcom = (): Promise<ProdutoQtdePorFilialRow[]> => {
+    if (ecommerceFilialNames.length === 0) return Promise.resolve([]);
+    return withRequest(async (request) => {
+      request.input('qtdEcomStart', sql.DateTime, start);
+      request.input('qtdEcomEnd', sql.DateTime, end);
+      ecommerceFilialNames.forEach((f, i) => request.input(`qtdEcomF${i}`, sql.VarChar, f));
+      const placeholders = ecommerceFilialNames.map((_, i) => `@qtdEcomF${i}`).join(', ');
+      const query = `
+        SELECT
+          ISNULL(fp.PRODUTO, '') AS PRODUTO,
+          ISNULL(f.FILIAL, '') AS FILIAL,
+          SUM(CASE WHEN fp.QTDE > 0 THEN fp.QTDE ELSE 0 END) AS QTDE
+        FROM FATURAMENTO f WITH (NOLOCK)
+        JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+          ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+        WHERE CAST(f.EMISSAO AS DATE) >= CAST(@qtdEcomStart AS DATE)
+          AND CAST(f.EMISSAO AS DATE) < CAST(@qtdEcomEnd AS DATE)
+          AND f.NOTA_CANCELADA = 0
+          AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+          AND fp.QTDE > 0
+          AND f.FILIAL IN (${placeholders})
+        GROUP BY ISNULL(fp.PRODUTO, ''), ISNULL(f.FILIAL, '')
+        HAVING SUM(CASE WHEN fp.QTDE > 0 THEN fp.QTDE ELSE 0 END) > 0
+      `;
+      const result = await request.query<RawRow>(query);
+      return result.recordset
+        .map(r => ({ produto: r.PRODUTO?.trim() ?? '', filial: r.FILIAL?.trim() ?? '', qtde: Math.round(Number(r.QTDE ?? 0)) }))
+        .filter(r => r.produto !== '');
+    });
+  };
+
+  const [posRows, ecomRows] = await Promise.all([runPos(), runEcom()]);
+  return [...posRows, ...ecomRows];
+}
+
 export async function fetchFilialProdutoVendedorSales(
   companyKey: CompanyKey,
   posFilialNames: string[],

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { fetchPerformanceData, fetchFilialProdutoSales } from '@/lib/repositories/performance';
+import { fetchPerformanceData, fetchFilialProdutoSales, fetchProdutoQtdePorFilial } from '@/lib/repositories/performance';
 import { readGoals } from '@/lib/utils/goals-storage';
 import { resolveCompany, type CompanyKey } from '@/lib/config/company';
 import { normalizeRangeForQuery, formatDateForQuery } from '@/lib/utils/date';
@@ -231,11 +231,32 @@ export async function GET(request: Request) {
       const projecaoPct = meta > 0 ? (projecao / meta) * 100 : null;
 
       let produtos: Awaited<ReturnType<typeof fetchFilialProdutoSales>> = [];
+      let qtdePorFilialRows: Awaited<ReturnType<typeof fetchProdutoQtdePorFilial>> = [];
       try {
-        produtos = await fetchFilialProdutoSales(companyKey, allPosMembers, allEcomMembers, resolvedRange, comparisonMode);
+        [produtos, qtdePorFilialRows] = await Promise.all([
+          fetchFilialProdutoSales(companyKey, allPosMembers, allEcomMembers, resolvedRange, comparisonMode),
+          fetchProdutoQtdePorFilial(companyKey, allPosMembers, allEcomMembers, resolvedRange),
+        ]);
       } catch (produtosError) {
         console.error('Erro ao carregar produtos (não-fatal):', produtosError);
       }
+
+      // Montar mapa produto → filiais ordenadas por qtde desc
+      const qtdePorFilialMap = new Map<string, { filial: string; displayName: string; qtde: number }[]>();
+      qtdePorFilialRows.forEach(row => {
+        if (!qtdePorFilialMap.has(row.produto)) qtdePorFilialMap.set(row.produto, []);
+        qtdePorFilialMap.get(row.produto)!.push({
+          filial: row.filial,
+          displayName: company.filialDisplayNames?.[row.filial] ?? row.filial,
+          qtde: row.qtde,
+        });
+      });
+      qtdePorFilialMap.forEach(entries => entries.sort((a, b) => b.qtde - a.qtde));
+
+      const produtosComFilial = produtos.map(p => ({
+        ...p,
+        qtdePorFilial: qtdePorFilialMap.get(p.produto) ?? [],
+      }));
 
       return NextResponse.json({
         filial: null,
@@ -256,7 +277,7 @@ export async function GET(request: Request) {
           start: formatDateForQuery(new Date(resolvedRange.start.getTime())),
           end: formatDateForQuery(new Date(endInclusiveUtc.getTime())),
         },
-        produtos,
+        produtos: produtosComFilial,
       }, { headers: { 'Cache-Control': 'no-store' } });
     }
 

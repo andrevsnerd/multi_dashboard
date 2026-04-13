@@ -17,6 +17,12 @@ import styles from "./FilialPerformancePage.module.css";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
+interface QtdePorFilialEntry {
+  filial: string;
+  displayName: string;
+  qtde: number;
+}
+
 interface ProdutoRow {
   produto: string;
   descricao: string;
@@ -26,6 +32,7 @@ interface ProdutoRow {
   qtde: number;
   custo: number;
   vendasPrevious: number;
+  qtdePorFilial?: QtdePorFilialEntry[];
 }
 
 interface FilialData {
@@ -639,7 +646,25 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                                 </div>
                               </td>
                               <td className={styles.vendas}>{fmtBRL(p.vendas)}</td>
-                              <td className={styles.vendas}>{fmt(p.qtde)}</td>
+                              <td className={styles.vendas}>
+                                {p.qtdePorFilial && p.qtdePorFilial.length > 1 ? (
+                                  <div className={styles.qtdeTooltipWrapper}>
+                                    <span>{fmt(p.qtde)}</span>
+                                    <span className={styles.qtdeHint}>▾</span>
+                                    <div className={styles.qtdeTooltipContent}>
+                                      <div className={styles.tooltipTitle}>Onde vendeu</div>
+                                      {p.qtdePorFilial.map(entry => (
+                                        <div key={entry.filial} className={styles.tooltipRow}>
+                                          <span className={styles.tooltipFilial}>{entry.displayName}</span>
+                                          <span className={styles.tooltipQtde}>{fmt(entry.qtde)}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  fmt(p.qtde)
+                                )}
+                              </td>
                               <td className={styles.vendas}>{markup !== null ? <span className={styles.markupBadge}>{markup.toFixed(2)}x</span> : <span className={styles.noData}>—</span>}</td>
                             </tr>
                           );

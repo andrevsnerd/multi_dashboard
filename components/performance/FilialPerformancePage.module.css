@@ -680,6 +680,78 @@
   color: #cbd5e1;
 }
 
+/* ── Tooltip "onde vendeu" ── */
+.qtdeTooltipWrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: help;
+}
+
+.qtdeHint {
+  font-size: 10px;
+  color: #94a3b8;
+  line-height: 1;
+}
+
+.qtdeTooltipContent {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  background: #1e293b;
+  color: #f1f5f9;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 200;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  min-width: 160px;
+}
+
+.qtdeTooltipWrapper:hover .qtdeTooltipContent {
+  display: block;
+}
+
+.tooltipTitle {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.tooltipRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 2px 0;
+  border-bottom: 1px solid #334155;
+}
+
+.tooltipRow:last-child {
+  border-bottom: none;
+}
+
+.tooltipFilial {
+  color: #94a3b8;
+  font-weight: 400;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tooltipQtde {
+  color: #f1f5f9;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
 .markupBadge {
   display: inline-block;
   padding: 2px 8px;
