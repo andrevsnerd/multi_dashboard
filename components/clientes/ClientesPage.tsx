@@ -9,6 +9,7 @@ import FilialFilter from "@/components/filters/FilialFilter";
 import VendedorFilter from "@/components/filters/VendedorFilter";
 import ClientesTable from "@/components/clientes/ClientesTable";
 import type { ClienteRankingItem } from "@/lib/clientes/cliente-types";
+import { exportClientesToExcel } from "@/lib/utils/exportClientes";
 import { getCurrentMonthRange } from "@/lib/utils/date";
 import type { CompanyKey } from "@/lib/config/company";
 
@@ -180,6 +181,30 @@ export default function ClientesPage({
               )}
             </div>
           </div>
+          <button
+            type="button"
+            className={styles.exportButton}
+            onClick={() => exportClientesToExcel(data, companyKey, range)}
+            disabled={loading || data.length === 0}
+            title="Exportar lista exibida (mesmos dados da tabela)"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M8 2V11M8 11L5 8M8 11L11 8M2 14H14"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Exportar XLSX
+          </button>
           {error ? <span className={styles.error}>{error}</span> : null}
         </div>
       </div>
