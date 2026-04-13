@@ -41,14 +41,6 @@ function fmtHora(iso: string) {
   }
 }
 
-function fmtDateOnly(isoDate: string) {
-  try {
-    return new Date(`${isoDate}T00:00:00`).toLocaleDateString("pt-BR");
-  } catch {
-    return isoDate;
-  }
-}
-
 export default function ComprasSalvasListPanel({
   companyKey,
   companySlug,
@@ -219,17 +211,6 @@ export default function ComprasSalvasListPanel({
 
       {loading && <div className={styles.loading}>Carregando compras salvas...</div>}
       {error && <div className={styles.error}>{error}</div>}
-      {!loading && !error && summary.porData.length > 0 && (
-        <div className={styles.dailyTotals}>
-          {summary.porData.map((d) => (
-            <div key={d.date} className={styles.dailyTotalItem}>
-              <span>{fmtDateOnly(d.date)}</span>
-              <span>{d.totalCompras} compras</span>
-              <strong>{fmtBRL(d.totalValor)}</strong>
-            </div>
-          ))}
-        </div>
-      )}
       {!loading && !error && items.length === 0 && (
         <div className={styles.empty}>Nenhuma compra salva ainda. Use &quot;Salvar compra atual&quot; na aba Compra Final.</div>
       )}
