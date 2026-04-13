@@ -44,6 +44,7 @@ export async function GET(request: Request) {
         itemCount: c.items.length,
         totalQtdManual,
         totalValor,
+        comprada: !!c.comprada,
         savedAt: c.savedAt,
         updatedAt: c.updatedAt,
       };
