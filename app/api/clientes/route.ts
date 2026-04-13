@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { fetchClientes, fetchClientesCount, fetchClientesCountPreviousPeriod, fetchTopFilialByClientes, fetchFilialClientesPerformance, fetchTopVendedoresClientes } from '@/lib/repositories/clientes';
+import { fetchClientesRankingCompras } from '@/lib/repositories/clientes';
 
 export const maxDuration = 60; // 60 segundos
 
@@ -12,8 +12,6 @@ export async function GET(request: Request) {
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
   const searchTerm = searchParams.get('searchTerm');
-  const last7DaysStartParam = searchParams.get('last7DaysStart');
-  const last7DaysEndParam = searchParams.get('last7DaysEnd');
 
   const range =
     startParam && endParam
@@ -23,91 +21,17 @@ export async function GET(request: Request) {
         }
       : undefined;
 
-  // Calcular range dos últimos 7 dias se fornecido
-  const last7DaysRange = last7DaysStartParam && last7DaysEndParam
-    ? {
-        start: last7DaysStartParam,
-        end: last7DaysEndParam,
-      }
-    : undefined;
-
   try {
-    // Para crescimento semanal: comparar últimos 7 dias com os 7 dias anteriores
-    const last7DaysCountPromise = last7DaysRange
-      ? fetchClientesCount({
-          company,
-          filial: filial || null,
-          vendedor: vendedor || null,
-          range: last7DaysRange,
-          searchTerm: searchTerm || undefined,
-        })
-      : Promise.resolve(0);
+    const data = await fetchClientesRankingCompras({
+        company,
+        filial: filial || null,
+        vendedor: vendedor || null,
+        range,
+        searchTerm: searchTerm || undefined,
+        limit: 500,
+      });
 
-    const [data, count, last7DaysCount, countWeekPrevious, countMonth, topFilial, filialPerformance, topVendedores] = await Promise.all([
-      fetchClientes({
-        company,
-        filial: filial || null,
-        vendedor: vendedor || null,
-        range,
-        searchTerm: searchTerm || undefined,
-      }),
-      fetchClientesCount({
-        company,
-        filial: filial || null,
-        vendedor: vendedor || null,
-        range,
-        searchTerm: searchTerm || undefined,
-      }),
-      last7DaysCountPromise,
-      fetchClientesCountPreviousPeriod({
-        company,
-        filial: filial || null,
-        vendedor: vendedor || null,
-        range: last7DaysRange || range,
-        searchTerm: searchTerm || undefined,
-        periodType: 'week',
-      }),
-      fetchClientesCountPreviousPeriod({
-        company,
-        filial: filial || null,
-        vendedor: vendedor || null,
-        range,
-        searchTerm: searchTerm || undefined,
-        periodType: 'month',
-      }),
-      fetchTopFilialByClientes({
-        company,
-        filial: filial || null,
-        vendedor: vendedor || null,
-        range,
-        searchTerm: searchTerm || undefined,
-      }),
-      fetchFilialClientesPerformance({
-        company,
-        filial: null, // Sempre buscar todas as filiais
-        vendedor: vendedor || null,
-        range,
-        searchTerm: searchTerm || undefined,
-      }),
-      fetchTopVendedoresClientes({
-        company,
-        filial: filial || null,
-        range,
-        searchTerm: searchTerm || undefined,
-        limit: 5,
-      }),
-    ]);
-
-    return NextResponse.json({ 
-      data, 
-      count,
-      countWeek: last7DaysCount, // Últimos 7 dias
-      countWeekPrevious: countWeekPrevious, // 7 dias anteriores
-      countMonth,
-      topFilial,
-      filialPerformance,
-      topVendedores,
-    });
+    return NextResponse.json({ data });
   } catch (error) {
     console.error('Erro ao carregar clientes', error);
     

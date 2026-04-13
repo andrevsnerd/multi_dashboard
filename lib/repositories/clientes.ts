@@ -1,9 +1,17 @@
 import sql from 'mssql';
 
+import type {
+  ClienteCompraDetalheItem,
+  ClienteDetalheInfo,
+  ClienteRankingItem,
+} from '@/lib/clientes/cliente-types';
+import { parseSemCadastroChave, SEM_CAD_CHAVE_PREFIX } from '@/lib/clientes/sem-cadastro-chave';
 import { resolveCompany, isEcommerceFilial, type CompanyModule, VAREJO_VALUE } from '@/lib/config/company';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import { normalizeRangeForQuery, getCurrentMonthRange } from '@/lib/utils/date';
+
+export type { ClienteCompraDetalheItem, ClienteDetalheInfo, ClienteRankingItem };
 
 export interface ClienteItem {
   data: Date;
@@ -1149,5 +1157,370 @@ export async function fetchVendedoresList({
       console.error('Erro ao buscar lista de vendedores:', error);
       throw error;
     }
+  });
+}
+
+export async function fetchClientesRankingCompras({
+  company,
+  filial,
+  vendedor,
+  range,
+  searchTerm,
+  limit = 200,
+}: ClientesQueryParams & { limit?: number }): Promise<ClienteRankingItem[]> {
+  return withRequest(async (request) => {
+    const { start, end } = normalizeRangeForQuery(range);
+    request.input("startDate", sql.DateTime, start);
+    request.input("endDate", sql.DateTime, end);
+
+    const filialFilter = buildFilialFilter(request, company, "sales", filial, "v");
+
+    let vendedorFilter = "";
+    if (vendedor && vendedor.trim() !== "") {
+      const vendedorPattern = vendedor.trim();
+      request.input("vendedorPattern", sql.VarChar, vendedorPattern);
+
+      const codigoResult = await request.query<{ codigo: string }>(`
+        SELECT LTRIM(RTRIM(CAST(VENDEDOR AS VARCHAR))) AS codigo
+        FROM LOJA_VENDEDORES WITH (NOLOCK)
+        WHERE LTRIM(RTRIM(ISNULL(VENDEDOR_APELIDO, ISNULL(NOME_VENDEDOR, CAST(VENDEDOR AS VARCHAR))))) = @vendedorPattern
+           OR LTRIM(RTRIM(CAST(VENDEDOR AS VARCHAR))) = @vendedorPattern
+      `);
+
+      const codigos = (codigoResult.recordset ?? [])
+        .map((row) => row.codigo?.trim())
+        .filter(Boolean) as string[];
+
+      if (codigos.length === 0) {
+        codigos.push(vendedorPattern);
+      }
+
+      codigos.forEach((codigo, index) => {
+        request.input(`vcode${index}`, sql.VarChar, codigo);
+      });
+
+      vendedorFilter = `AND LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR))) IN (${codigos
+        .map((_, index) => `@vcode${index}`)
+        .join(", ")})`;
+    }
+
+    let searchFilter = "";
+    if (searchTerm && searchTerm.trim().length >= 2) {
+      request.input("searchTerm", sql.VarChar, `%${searchTerm.trim()}%`);
+      searchFilter = "AND LTRIM(RTRIM(ISNULL(v.CLIENTE_VAREJO, ''))) LIKE @searchTerm";
+    }
+
+    const query = `
+      WITH itens_por_ticket AS (
+        SELECT
+          vp.FILIAL,
+          vp.PEDIDO,
+          vp.TICKET,
+          SUM(
+            CASE
+              WHEN vp.QTDE_CANCELADA > 0 THEN 0
+              ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
+            END
+          ) AS totalTicket
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        WHERE vp.DATA_VENDA >= @startDate
+          AND vp.DATA_VENDA < @endDate
+          AND vp.QTDE > 0
+        GROUP BY vp.FILIAL, vp.PEDIDO, vp.TICKET
+      ),
+      ticket_totals AS (
+        SELECT
+          CASE
+            WHEN LTRIM(RTRIM(ISNULL(v.CLIENTE_VAREJO, ''))) = '' THEN 'SEM CADASTRO'
+            ELSE LTRIM(RTRIM(v.CLIENTE_VAREJO))
+          END AS nomeCliente,
+          CASE
+            WHEN LTRIM(RTRIM(ISNULL(v.CLIENTE_VAREJO, ''))) = '' THEN CONCAT('${SEM_CAD_CHAVE_PREFIX}', v.FILIAL, '_', CAST(v.PEDIDO AS VARCHAR(20)), '_', CAST(v.TICKET AS VARCHAR(20)))
+            ELSE LTRIM(RTRIM(v.CLIENTE_VAREJO))
+          END AS chaveCliente,
+          ipt.totalTicket
+        FROM itens_por_ticket ipt
+        INNER JOIN W_CTB_LOJA_VENDA_PEDIDO v WITH (NOLOCK)
+          ON v.FILIAL = ipt.FILIAL AND v.PEDIDO = ipt.PEDIDO AND v.TICKET = ipt.TICKET
+        WHERE v.DATA_VENDA >= @startDate
+          AND v.DATA_VENDA < @endDate
+          ${filialFilter}
+          ${vendedorFilter}
+          ${searchFilter}
+      )
+      SELECT TOP (${limit})
+        nomeCliente,
+        chaveCliente,
+        COUNT(*) AS tickets,
+        SUM(totalTicket) AS totalGasto
+      FROM ticket_totals
+      WHERE totalTicket > 0
+      GROUP BY nomeCliente, chaveCliente
+      ORDER BY COUNT(*) DESC, SUM(totalTicket) DESC
+    `;
+
+    const result = await request.query<{
+      nomeCliente: string;
+      chaveCliente: string;
+      totalGasto: number;
+      tickets: number;
+    }>(query);
+
+    return result.recordset.map((row) => ({
+      nomeCliente: row.nomeCliente?.trim() || "SEM CADASTRO",
+      chaveCliente: (row.chaveCliente?.trim() || row.nomeCliente?.trim()) ?? "",
+      totalGasto: row.totalGasto ?? 0,
+      tickets: row.tickets ?? 0,
+      cpf: undefined,
+    }));
+  });
+}
+
+export async function fetchClienteDetalheInfo({
+  company,
+  clienteNome,
+  cpf,
+  chaveCliente,
+}: {
+  company?: string;
+  clienteNome: string;
+  cpf?: string;
+  chaveCliente?: string | null;
+}): Promise<ClienteDetalheInfo | null> {
+  return withRequest(async (request) => {
+    const semCad = chaveCliente ? parseSemCadastroChave(chaveCliente) : null;
+    if (semCad) {
+      const filialFilter = buildFilialFilter(request, company, "sales", null, "v");
+      request.input("scFilial", sql.VarChar, semCad.filial);
+      request.input("scPedido", sql.VarChar, semCad.pedido);
+      request.input("scTicket", sql.VarChar, semCad.ticket);
+
+      const q = `
+        SELECT TOP 1
+          LTRIM(RTRIM(ISNULL(lv.VENDEDOR_APELIDO, ISNULL(lv.NOME_VENDEDOR, CAST(v.VENDEDOR AS VARCHAR))))) AS vendedor
+        FROM W_CTB_LOJA_VENDA_PEDIDO v WITH (NOLOCK)
+        LEFT JOIN LOJA_VENDEDORES lv WITH (NOLOCK)
+          ON LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR))) = LTRIM(RTRIM(CAST(lv.VENDEDOR AS VARCHAR)))
+        WHERE LTRIM(RTRIM(CAST(v.FILIAL AS VARCHAR))) = LTRIM(RTRIM(CAST(@scFilial AS VARCHAR)))
+          AND LTRIM(RTRIM(CAST(v.PEDIDO AS VARCHAR))) = LTRIM(RTRIM(CAST(@scPedido AS VARCHAR)))
+          AND LTRIM(RTRIM(CAST(v.TICKET AS VARCHAR))) = LTRIM(RTRIM(CAST(@scTicket AS VARCHAR)))
+          ${filialFilter}
+      `;
+      const r = await request.query<{ vendedor: string }>(q);
+      const vend = r.recordset[0]?.vendedor?.trim() || "";
+      return {
+        nomeCliente: "SEM CADASTRO",
+        telefone: "",
+        cpf: "",
+        endereco: "",
+        cidade: "",
+        vendedores: vend ? [vend] : [],
+        semCadastroNoCaixa: true,
+      };
+    }
+
+    const filialFilter = buildFilialFilter(request, company, "sales", null, "cv");
+
+    let clienteFilter = "";
+    const cpfDigits = (cpf ?? "").replace(/\D/g, "");
+    if (cpfDigits) {
+      request.input("cpfDigits", sql.VarChar, cpfDigits);
+      clienteFilter = `
+        AND REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(cv.CPF_CGC, ''), '.', ''), '-', ''), '/', ''), ' ', '') = @cpfDigits
+      `;
+    } else {
+      request.input("clienteNome", sql.VarChar, clienteNome.trim());
+      clienteFilter = "AND LTRIM(RTRIM(ISNULL(cv.CLIENTE_VAREJO, ''))) = @clienteNome";
+    }
+
+    const query = `
+      SELECT
+        LTRIM(RTRIM(ISNULL(cv.CLIENTE_VAREJO, 'SEM CADASTRO'))) AS nomeCliente,
+        LTRIM(RTRIM(ISNULL(cv.TELEFONE, ''))) AS telefone,
+        LTRIM(RTRIM(ISNULL(cv.CPF_CGC, ''))) AS cpf,
+        LTRIM(RTRIM(ISNULL(cv.ENDERECO, ''))) AS endereco,
+        LTRIM(RTRIM(ISNULL(cv.CIDADE, ''))) AS cidade,
+        LTRIM(RTRIM(ISNULL(lv.VENDEDOR_APELIDO, ISNULL(lv.NOME_VENDEDOR, CAST(cv.VENDEDOR AS VARCHAR))))) AS vendedor,
+        cv.CADASTRAMENTO
+      FROM CLIENTES_VAREJO cv WITH (NOLOCK)
+      LEFT JOIN LOJA_VENDEDORES lv WITH (NOLOCK)
+        ON LTRIM(RTRIM(CAST(cv.VENDEDOR AS VARCHAR))) = LTRIM(RTRIM(CAST(lv.VENDEDOR AS VARCHAR)))
+      WHERE 1 = 1
+        ${filialFilter}
+        ${clienteFilter}
+      ORDER BY cv.CADASTRAMENTO DESC
+    `;
+
+    const result = await request.query<{
+      nomeCliente: string;
+      telefone: string;
+      cpf: string;
+      endereco: string;
+      cidade: string;
+      vendedor: string;
+      CADASTRAMENTO: Date;
+    }>(query);
+
+    if (!result.recordset.length) {
+      return null;
+    }
+
+    const base = result.recordset[0];
+    const vendedores = Array.from(
+      new Set(
+        result.recordset
+          .map((row) => row.vendedor?.trim())
+          .filter((v): v is string => Boolean(v))
+      )
+    );
+
+    return {
+      nomeCliente: base.nomeCliente?.trim() || "SEM CADASTRO",
+      telefone: base.telefone?.trim() || "",
+      cpf: base.cpf?.trim() || "",
+      endereco: base.endereco?.trim() || "",
+      cidade: base.cidade?.trim() || "",
+      vendedores,
+    };
+  });
+}
+
+/** Nomes em CLIENTES_VAREJO para um CPF (lookup leve; sem filtro de filial para não duplicar @filial* no mesmo request). */
+async function fetchNomesClienteVarejoPorCpf(
+  request: sql.Request | RequestLike,
+  cpfDigits: string
+): Promise<string[]> {
+  request.input("cpfLookupNomes", sql.VarChar, cpfDigits);
+  const r = await request.query<{ nome: string }>(`
+    SELECT DISTINCT LTRIM(RTRIM(cv.CLIENTE_VAREJO)) AS nome
+    FROM CLIENTES_VAREJO cv WITH (NOLOCK)
+    WHERE REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(cv.CPF_CGC, ''), '.', ''), '-', ''), '/', ''), ' ', '') = @cpfLookupNomes
+      AND LTRIM(RTRIM(ISNULL(cv.CLIENTE_VAREJO, ''))) <> ''
+  `);
+  return (r.recordset ?? [])
+    .map((row) => row.nome?.trim())
+    .filter((n): n is string => Boolean(n));
+}
+
+export async function fetchClienteComprasDetalhe({
+  company,
+  clienteNome,
+  cpf,
+  chaveCliente,
+  range,
+}: {
+  company?: string;
+  clienteNome: string;
+  cpf?: string;
+  chaveCliente?: string | null;
+  range?: { start?: Date | string; end?: Date | string };
+}): Promise<ClienteCompraDetalheItem[]> {
+  return withRequest(async (request) => {
+    const { start, end } = normalizeRangeForQuery(range);
+    request.input("startDate", sql.DateTime, start);
+    request.input("endDate", sql.DateTime, end);
+
+    const filialFilter = buildFilialFilter(request, company, "sales", null, "v");
+
+    const semCad = chaveCliente ? parseSemCadastroChave(chaveCliente) : null;
+    let clienteFilter = "";
+    if (semCad) {
+      request.input("scFilial", sql.VarChar, semCad.filial);
+      request.input("scPedido", sql.VarChar, semCad.pedido);
+      request.input("scTicket", sql.VarChar, semCad.ticket);
+      clienteFilter = `
+        AND LTRIM(RTRIM(CAST(v.FILIAL AS VARCHAR))) = LTRIM(RTRIM(CAST(@scFilial AS VARCHAR)))
+        AND LTRIM(RTRIM(CAST(v.PEDIDO AS VARCHAR))) = LTRIM(RTRIM(CAST(@scPedido AS VARCHAR)))
+        AND LTRIM(RTRIM(CAST(v.TICKET AS VARCHAR))) = LTRIM(RTRIM(CAST(@scTicket AS VARCHAR)))
+      `;
+    } else {
+      const cpfDigits = (cpf ?? "").replace(/\D/g, "");
+      let nomesCliente: string[];
+      if (cpfDigits) {
+        nomesCliente = await fetchNomesClienteVarejoPorCpf(request, cpfDigits);
+        if (nomesCliente.length === 0) {
+          nomesCliente = [clienteNome.trim()];
+        }
+      } else {
+        nomesCliente = [clienteNome.trim()];
+      }
+
+      const nomesUnicos = Array.from(new Set(nomesCliente.filter(Boolean))).slice(0, 30);
+      if (nomesUnicos.length === 0) {
+        return [];
+      }
+
+      nomesUnicos.forEach((nome, i) => {
+        request.input(`cliNome${i}`, sql.VarChar, nome);
+      });
+      const clienteIn = nomesUnicos.map((_, i) => `@cliNome${i}`).join(", ");
+      clienteFilter = `AND LTRIM(RTRIM(ISNULL(v.CLIENTE_VAREJO, ''))) IN (${clienteIn})`;
+    }
+
+    const query = `
+      SELECT dataCompra, ticket, filial, codigo, produto, quantidade, valor, vendedor
+      FROM (
+        SELECT
+          MAX(COALESCE(vp.DATA_VENDA, v.DATA_VENDA)) AS dataCompra,
+          CAST(v.TICKET AS VARCHAR(30)) AS ticket,
+          LTRIM(RTRIM(vp.FILIAL)) AS filial,
+          MAX(LTRIM(RTRIM(ISNULL(vp.PRODUTO, '')))) AS codigo,
+          MAX(LTRIM(RTRIM(ISNULL(vp.DESC_PRODUTO, 'SEM DESCRIÇÃO')))) AS produto,
+          SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.QTDE END) AS quantidade,
+          SUM(
+            CASE
+              WHEN vp.QTDE_CANCELADA > 0 THEN 0
+              ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
+            END
+          ) AS valor,
+          MAX(LTRIM(RTRIM(ISNULL(lv.VENDEDOR_APELIDO, ISNULL(lv.NOME_VENDEDOR, CAST(v.VENDEDOR AS VARCHAR)))))) AS vendedor
+        FROM W_CTB_LOJA_VENDA_PEDIDO v WITH (NOLOCK)
+        INNER JOIN W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+          ON v.FILIAL = vp.FILIAL AND v.PEDIDO = vp.PEDIDO AND v.TICKET = vp.TICKET
+        LEFT JOIN LOJA_VENDEDORES lv WITH (NOLOCK)
+          ON LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR))) = LTRIM(RTRIM(CAST(lv.VENDEDOR AS VARCHAR)))
+        WHERE v.DATA_VENDA >= @startDate
+          AND v.DATA_VENDA < @endDate
+          AND vp.DATA_VENDA >= @startDate
+          AND vp.DATA_VENDA < @endDate
+          AND COALESCE(vp.DATA_VENDA, v.DATA_VENDA) IS NOT NULL
+          AND vp.QTDE > 0
+          ${clienteFilter}
+          ${filialFilter}
+        GROUP BY v.TICKET, vp.FILIAL, vp.PRODUTO
+        HAVING SUM(
+          CASE
+            WHEN vp.QTDE_CANCELADA > 0 THEN 0
+            ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
+          END
+        ) > 0
+      ) AS agg
+      ORDER BY agg.dataCompra DESC, agg.ticket DESC, agg.valor DESC
+    `;
+
+    const result = await request.query<{
+      dataCompra: Date;
+      ticket: string;
+      filial: string;
+      codigo: string;
+      produto: string;
+      quantidade: number;
+      valor: number;
+      vendedor: string;
+    }>(query);
+
+    return result.recordset.map((row) => ({
+      dataCompra:
+        row.dataCompra instanceof Date
+          ? row.dataCompra
+          : new Date(row.dataCompra),
+      ticket: row.ticket ?? "",
+      filial: row.filial?.trim() || "",
+      codigo: row.codigo?.trim() || "",
+      produto: row.produto?.trim() || "SEM DESCRIÇÃO",
+      quantidade: row.quantidade ?? 0,
+      valor: row.valor ?? 0,
+      vendedor: row.vendedor?.trim() || "",
+    }));
   });
 }

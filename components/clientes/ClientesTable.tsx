@@ -1,26 +1,31 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import type { ClienteItem } from "@/lib/repositories/clientes";
-import { resolveCompany } from "@/lib/config/company";
+import { useRouter } from "next/navigation";
+import type { ClienteRankingItem } from "@/lib/clientes/cliente-types";
+import type { DateRangeValue } from "@/components/filters/DateRangeFilter";
 
 import styles from "./ClientesTable.module.css";
 
 interface ClientesTableProps {
-  data: ClienteItem[];
+  data: ClienteRankingItem[];
   loading?: boolean;
-  companyKey?: string;
+  companyKey: string;
+  range: DateRangeValue;
 }
 
 export default function ClientesTable({
   data,
   loading,
   companyKey,
+  range,
 }: ClientesTableProps) {
-  const [sortColumn, setSortColumn] = useState<keyof ClienteItem>("data");
+  const router = useRouter();
+  const [sortColumn, setSortColumn] =
+    useState<keyof ClienteRankingItem>("tickets");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
-  const handleSort = (column: keyof ClienteItem) => {
+  const handleSort = (column: keyof ClienteRankingItem) => {
     if (sortColumn === column) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
@@ -36,12 +41,6 @@ export default function ClientesTable({
       
       if (aValue === null || aValue === undefined) return 1;
       if (bValue === null || bValue === undefined) return -1;
-      
-      if (aValue instanceof Date && bValue instanceof Date) {
-        return sortDirection === "asc" 
-          ? aValue.getTime() - bValue.getTime()
-          : bValue.getTime() - aValue.getTime();
-      }
       
       if (typeof aValue === "number" && typeof bValue === "number") {
         return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
@@ -59,92 +58,35 @@ export default function ClientesTable({
     return sorted;
   }, [data, sortColumn, sortDirection]);
 
-  const formatDate = (date: Date | string) => {
-    let dateObj: Date;
-    
-    if (date instanceof Date) {
-      dateObj = date;
-    } else if (typeof date === 'string') {
-      // Se a string está no formato "YYYY-MM-DD" (sem timezone), 
-      // precisamos criar a data no timezone local para evitar problemas
-      const dateMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
-      if (dateMatch) {
-        // Extrair ano, mês e dia diretamente da string e criar Date no timezone local
-        const year = parseInt(dateMatch[1], 10);
-        const month = parseInt(dateMatch[2], 10) - 1; // Mês é 0-indexed
-        const day = parseInt(dateMatch[3], 10);
-        dateObj = new Date(year, month, day);
-      } else {
-        // Se for string ISO com timezone, usar new Date normalmente
-        dateObj = new Date(date);
-      }
-    } else {
-      return 'Data inválida';
-    }
-    
-    if (isNaN(dateObj.getTime())) {
-      return 'Data inválida';
-    }
-    
-    // Usar toLocaleDateString com timezone local
-    return dateObj.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, // Usar timezone do navegador
+  const formatCurrency = (value: number) => {
+    return value.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     });
   };
 
-  const formatEndereco = (cliente: ClienteItem): string => {
-    const parts: string[] = [];
-    
-    if (cliente.endereco) {
-      parts.push(cliente.endereco);
-    }
-    
-    if (cliente.complemento) {
-      parts.push(cliente.complemento);
-    }
-    
-    if (cliente.bairro) {
-      parts.push(cliente.bairro);
-    }
-    
-    // Formato: endereço, complemento - bairro
-    if (parts.length === 0) return '';
-    if (parts.length === 1) return parts[0];
-    if (parts.length === 2) return `${parts[0]}, ${parts[1]}`;
-    return `${parts[0]}, ${parts[1]} - ${parts[2]}`;
+  const formatNumber = (value: number) => {
+    return value.toLocaleString("pt-BR", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
   };
 
-  const formatCPF = (cpf: string): string => {
-    if (!cpf) return '';
-    // Remove caracteres não numéricos
-    const cleaned = cpf.replace(/\D/g, '');
-    // Formata como XXX.XXX.XXX-XX
-    if (cleaned.length === 11) {
-      return cleaned.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  const goToDetalhe = (cliente: ClienteRankingItem) => {
+    const params = new URLSearchParams({
+      cliente: cliente.nomeCliente,
+      start: range.startDate.toISOString(),
+      end: range.endDate.toISOString(),
+    });
+    if (cliente.cpf) {
+      params.set("cpf", cliente.cpf);
     }
-    return cpf;
-  };
-
-  const formatTelefone = (telefone: string): string => {
-    if (!telefone) return '';
-    // Remove caracteres não numéricos
-    const cleaned = telefone.replace(/\D/g, '');
-    // Formata como (XX) XXXXX-XXXX ou (XX) XXXX-XXXX
-    if (cleaned.length === 11) {
-      return cleaned.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
-    } else if (cleaned.length === 10) {
-      return cleaned.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+    if (cliente.chaveCliente) {
+      params.set("chave", cliente.chaveCliente);
     }
-    return telefone;
-  };
-
-  const getFilialDisplayName = (filial: string): string => {
-    if (!companyKey) return filial;
-    const company = resolveCompany(companyKey);
-    return company?.filialDisplayNames?.[filial] ?? filial;
+    router.push(`/${companyKey}/clientes/detalhe?${params.toString()}`);
   };
 
   if (loading) {
@@ -171,35 +113,26 @@ export default function ClientesTable({
             <tr>
               <th
                 className={`${styles.sortable} ${styles.dateHeader}`}
-                onClick={() => handleSort("data")}
               >
-                DATA
-                {sortColumn === "data" && (
-                  <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "↑" : "↓"}
-                  </span>
-                )}
+                #
               </th>
               <th
                 className={`${styles.sortable} ${styles.textHeader}`}
                 onClick={() => handleSort("nomeCliente")}
               >
-                NOME DO CLIENTE
+                CLIENTE
                 {sortColumn === "nomeCliente" && (
                   <span className={styles.sortIndicator}>
                     {sortDirection === "asc" ? "↑" : "↓"}
                   </span>
                 )}
               </th>
-              <th className={styles.textHeader}>TELEFONE</th>
-              <th className={styles.textHeader}>CPF</th>
-              <th className={styles.textHeader}>ENDEREÇO</th>
               <th
                 className={`${styles.sortable} ${styles.textHeader}`}
-                onClick={() => handleSort("cidade")}
+                onClick={() => handleSort("tickets")}
               >
-                CIDADE
-                {sortColumn === "cidade" && (
+                TICKETS
+                {sortColumn === "tickets" && (
                   <span className={styles.sortIndicator}>
                     {sortDirection === "asc" ? "↑" : "↓"}
                   </span>
@@ -207,21 +140,10 @@ export default function ClientesTable({
               </th>
               <th
                 className={`${styles.sortable} ${styles.textHeader}`}
-                onClick={() => handleSort("vendedor")}
+                onClick={() => handleSort("totalGasto")}
               >
-                VENDEDOR
-                {sortColumn === "vendedor" && (
-                  <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "↑" : "↓"}
-                  </span>
-                )}
-              </th>
-              <th
-                className={`${styles.sortable} ${styles.textHeader}`}
-                onClick={() => handleSort("filial")}
-              >
-                FILIAL
-                {sortColumn === "filial" && (
+                TOTAL GASTO
+                {sortColumn === "totalGasto" && (
                   <span className={styles.sortIndicator}>
                     {sortDirection === "asc" ? "↑" : "↓"}
                   </span>
@@ -231,17 +153,22 @@ export default function ClientesTable({
           </thead>
           <tbody>
             {sortedData.map((cliente, index) => (
-              <tr key={`${cliente.nomeCliente}-${cliente.filial}-${index}`}>
-                <td className={styles.dateCell}>{formatDate(cliente.data)}</td>
+              <tr
+                key={`${cliente.chaveCliente}-${index}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => goToDetalhe(cliente)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    goToDetalhe(cliente);
+                  }
+                }}
+              >
+                <td className={styles.dateCell}>#{index + 1}</td>
                 <td className={styles.textCell}>{cliente.nomeCliente}</td>
-                <td className={styles.textCell}>{formatTelefone(cliente.telefone)}</td>
-                <td className={styles.textCell}>{formatCPF(cliente.cpf)}</td>
-                <td className={styles.textCell}>{formatEndereco(cliente)}</td>
-                <td className={styles.textCell}>{cliente.cidade || '--'}</td>
-                <td className={styles.textCell}>{cliente.vendedor}</td>
-                <td className={styles.textCell}>
-                  {getFilialDisplayName(cliente.filial)}
-                </td>
+                <td className={styles.textCell}>{formatNumber(cliente.tickets)}</td>
+                <td className={styles.textCell}>{formatCurrency(cliente.totalGasto)}</td>
               </tr>
             ))}
           </tbody>
@@ -249,37 +176,31 @@ export default function ClientesTable({
 
         {/* Mobile: Cards */}
         <div className={styles.mobileCards}>
-          {sortedData.map((cliente, index) => (
-            <div key={`${cliente.nomeCliente}-${cliente.filial}-${index}`} className={styles.card}>
+            {sortedData.map((cliente, index) => (
+            <div
+              key={`${cliente.chaveCliente}-${index}`}
+              className={styles.card}
+              role="button"
+              tabIndex={0}
+              onClick={() => goToDetalhe(cliente)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  goToDetalhe(cliente);
+                }
+              }}
+            >
               <div className={styles.cardHeader}>
                 <div className={styles.cardTitleRow}>
                   <div className={styles.cardTitle}>{cliente.nomeCliente}</div>
-                  {cliente.cpf && (
-                    <span className={styles.cardCpfInline}>({formatCPF(cliente.cpf)})</span>
-                  )}
+                  <span className={styles.cardCpfInline}>#{index + 1}</span>
                 </div>
-                <div className={styles.cardDate}>{formatDate(cliente.data)}</div>
+                <div className={styles.cardDate}>Tickets: {formatNumber(cliente.tickets)}</div>
               </div>
               <div className={styles.cardContent}>
                 <div className={styles.cardRow}>
-                  <span className={styles.cardLabel}>Telefone:</span>
-                  <span className={styles.cardValue}>{formatTelefone(cliente.telefone) || '--'}</span>
-                </div>
-                <div className={styles.cardRow}>
-                  <span className={styles.cardLabel}>Endereço:</span>
-                  <span className={styles.cardValue}>
-                    {formatEndereco(cliente) || '--'}
-                    {cliente.cidade && (
-                      <span className={styles.cardCityInline}> ({cliente.cidade})</span>
-                    )}
-                  </span>
-                </div>
-                <div className={styles.cardRow}>
-                  <span className={styles.cardLabel}>Vendedor:</span>
-                  <span className={styles.cardValue}>
-                    {cliente.vendedor}
-                    <span className={styles.cardFilialInline}> {getFilialDisplayName(cliente.filial)}</span>
-                  </span>
+                  <span className={styles.cardLabel}>Total gasto:</span>
+                  <span className={styles.cardValue}>{formatCurrency(cliente.totalGasto)}</span>
                 </div>
               </div>
             </div>
