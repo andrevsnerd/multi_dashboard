@@ -30,6 +30,17 @@ function fmtData(iso: string) {
   }
 }
 
+function fmtHora(iso: string) {
+  try {
+    return new Date(iso).toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "";
+  }
+}
+
 export default function ComprasSalvasListPanel({
   companyKey,
   companySlug,
@@ -114,13 +125,21 @@ export default function ComprasSalvasListPanel({
         <div className={styles.list}>
           {filtered.map((it) => (
             <Link key={it.id} href={`${base}/${it.id}`} className={styles.card}>
-              <div className={styles.cardTitle}>{it.title}</div>
-              <div className={styles.cardMeta}>
-                <span>{it.itemCount} itens</span>
-                <span>{fmt(it.totalQtdManual)} un.</span>
-                {it.totalValor > 0 && <span>{fmtBRL(it.totalValor)}</span>}
-                <span>Salva em {fmtData(it.savedAt)}</span>
+              <div className={styles.cardMain}>
+                <div className={styles.cardTitleRow}>
+                  <div className={styles.cardTitle}>{it.title}</div>
+                  <span className={styles.cardHour}>{fmtHora(it.savedAt)}</span>
+                </div>
+                <div className={styles.cardMeta}>
+                  <span>{it.itemCount} itens</span>
+                  <span>{fmt(it.totalQtdManual)} un.</span>
+                </div>
               </div>
+              {it.totalValor > 0 && (
+                <div className={styles.totalValorBox}>
+                  <strong className={styles.totalValorValue}>{fmtBRL(it.totalValor)}</strong>
+                </div>
+              )}
             </Link>
           ))}
         </div>
