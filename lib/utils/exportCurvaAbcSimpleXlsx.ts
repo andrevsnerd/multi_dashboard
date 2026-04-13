@@ -13,6 +13,7 @@ export interface CurvaAbcSimpleXlsxRow {
   "% acumulado": number;
   Faturamento: number;
   Qtd: number;
+  Estoque: number;
   Markup: number | "";
   "Var. vs período anterior": number | string;
 }

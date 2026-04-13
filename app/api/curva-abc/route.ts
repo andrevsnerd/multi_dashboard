@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import { fetchPerformanceData, fetchFilialProdutoSales, fetchProdutoQtdePorFilial } from '@/lib/repositories/performance';
+import {
+  fetchPerformanceData,
+  fetchFilialProdutoSales,
+  fetchProdutoQtdePorFilial,
+  fetchProdutoEstoquePorFilial,
+} from '@/lib/repositories/performance';
 import { readGoals } from '@/lib/utils/goals-storage';
 import { resolveCompany, type CompanyKey } from '@/lib/config/company';
 import { normalizeRangeForQuery, formatDateForQuery } from '@/lib/utils/date';
@@ -232,10 +237,12 @@ export async function GET(request: Request) {
 
       let produtos: Awaited<ReturnType<typeof fetchFilialProdutoSales>> = [];
       let qtdePorFilialRows: Awaited<ReturnType<typeof fetchProdutoQtdePorFilial>> = [];
+      let estoquePorFilialRows: Awaited<ReturnType<typeof fetchProdutoEstoquePorFilial>> = [];
       try {
-        [produtos, qtdePorFilialRows] = await Promise.all([
+        [produtos, qtdePorFilialRows, estoquePorFilialRows] = await Promise.all([
           fetchFilialProdutoSales(companyKey, allPosMembers, allEcomMembers, resolvedRange, comparisonMode),
           fetchProdutoQtdePorFilial(companyKey, allPosMembers, allEcomMembers, resolvedRange),
+          fetchProdutoEstoquePorFilial(companyKey, allPosMembers, allEcomMembers),
         ]);
       } catch (produtosError) {
         console.error('Erro ao carregar produtos (não-fatal):', produtosError);
@@ -253,10 +260,27 @@ export async function GET(request: Request) {
       });
       qtdePorFilialMap.forEach(entries => entries.sort((a, b) => b.qtde - a.qtde));
 
-      const produtosComFilial = produtos.map(p => ({
-        ...p,
-        qtdePorFilial: qtdePorFilialMap.get(p.produto) ?? [],
-      }));
+      const estoquePorFilialMap = new Map<string, { filial: string; displayName: string; qtde: number }[]>();
+      estoquePorFilialRows.forEach(row => {
+        if (!estoquePorFilialMap.has(row.produto)) estoquePorFilialMap.set(row.produto, []);
+        estoquePorFilialMap.get(row.produto)!.push({
+          filial: row.filial,
+          displayName: company.filialDisplayNames?.[row.filial] ?? row.filial,
+          qtde: row.estoque,
+        });
+      });
+      estoquePorFilialMap.forEach(entries => entries.sort((a, b) => b.qtde - a.qtde));
+
+      const produtosComFilial = produtos.map(p => {
+        const porFilial = estoquePorFilialMap.get(p.produto) ?? [];
+        const estoque = porFilial.reduce((s, e) => s + e.qtde, 0);
+        return {
+          ...p,
+          qtdePorFilial: qtdePorFilialMap.get(p.produto) ?? [],
+          estoque,
+          estoquePorFilial: porFilial,
+        };
+      });
 
       return NextResponse.json({
         filial: null,
@@ -320,11 +344,36 @@ export async function GET(request: Request) {
     });
 
     let produtos: Awaited<ReturnType<typeof fetchFilialProdutoSales>> = [];
+    let estoquePorFilialRows: Awaited<ReturnType<typeof fetchProdutoEstoquePorFilial>> = [];
     try {
-      produtos = await fetchFilialProdutoSales(companyKey, posMembers, ecomMembers, resolvedRange, comparisonMode);
+      [produtos, estoquePorFilialRows] = await Promise.all([
+        fetchFilialProdutoSales(companyKey, posMembers, ecomMembers, resolvedRange, comparisonMode),
+        fetchProdutoEstoquePorFilial(companyKey, posMembers, ecomMembers),
+      ]);
     } catch (produtosError) {
       console.error('Erro ao carregar produtos da filial (não-fatal):', produtosError);
     }
+
+    const estoquePorFilialMap = new Map<string, { filial: string; displayName: string; qtde: number }[]>();
+    estoquePorFilialRows.forEach(row => {
+      if (!estoquePorFilialMap.has(row.produto)) estoquePorFilialMap.set(row.produto, []);
+      estoquePorFilialMap.get(row.produto)!.push({
+        filial: row.filial,
+        displayName: company.filialDisplayNames?.[row.filial] ?? row.filial,
+        qtde: row.estoque,
+      });
+    });
+    estoquePorFilialMap.forEach(entries => entries.sort((a, b) => b.qtde - a.qtde));
+
+    const produtosComEstoque = produtos.map(p => {
+      const porFilial = estoquePorFilialMap.get(p.produto) ?? [];
+      const estoque = porFilial.reduce((s, e) => s + e.qtde, 0);
+      return {
+        ...p,
+        estoque,
+        estoquePorFilial: porFilial,
+      };
+    });
 
     return NextResponse.json({
       filial: filialParam,
@@ -345,7 +394,7 @@ export async function GET(request: Request) {
         start: formatDateForQuery(new Date(resolvedRange.start.getTime())),
         end: formatDateForQuery(new Date(endInclusiveUtc.getTime())),
       },
-      produtos,
+      produtos: produtosComEstoque,
     }, { headers: { 'Cache-Control': 'no-store' } });
 
   } catch (error) {

@@ -34,6 +34,8 @@ interface ProdutoRow {
   custo: number;
   vendasPrevious: number;
   qtdePorFilial?: QtdePorFilialEntry[];
+  estoque?: number;
+  estoquePorFilial?: QtdePorFilialEntry[];
 }
 
 interface FilialData {
@@ -323,6 +325,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
           "% acumulado": Math.round(p.percCumulativa * 1000) / 10,
           Faturamento: Math.round(p.vendas * 100) / 100,
           Qtd: p.qtde,
+          Estoque: p.estoque ?? 0,
           Markup: markup !== null ? Math.round(markup * 100) / 100 : "",
           "Var. vs período anterior": variacao,
         });
@@ -611,6 +614,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                     <th className={styles.right}>Participação</th>
                     <th className={styles.right}>Faturamento no período</th>
                     <th className={styles.right}>Qtd vendida</th>
+                    <th className={styles.right}>Estoque</th>
                     <th className={styles.right}>Markup</th>
                   </tr>
                 </thead>
@@ -621,7 +625,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                     return (
                       <React.Fragment key={curva}>
                         <tr className={`${styles.sectionRow} ${styles[`sectionRow${curva}`]}`}>
-                          <td colSpan={6}>
+                          <td colSpan={7}>
                             <div className={styles.sectionLabel}>
                               <span className={`${styles.curvaBadge} ${CURVA_BADGE_CLASS[curva]}`}>{curva}</span>
                               <span className={styles.sectionTitle}>{CURVA_LABEL[curva]}</span>
@@ -710,6 +714,25 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                                   </div>
                                 ) : (
                                   fmt(p.qtde)
+                                )}
+                              </td>
+                              <td className={styles.vendas}>
+                                {p.estoquePorFilial && p.estoquePorFilial.length > 0 ? (
+                                  <div className={styles.qtdeTooltipWrapper}>
+                                    <span>{fmt(p.estoque ?? 0)}</span>
+                                    <span className={styles.qtdeHint}>▾</span>
+                                    <div className={styles.qtdeTooltipContent}>
+                                      <div className={styles.tooltipTitle}>Estoque por filial</div>
+                                      {p.estoquePorFilial.map(entry => (
+                                        <div key={entry.filial} className={styles.tooltipRow}>
+                                          <span className={styles.tooltipFilial}>{entry.displayName}</span>
+                                          <span className={styles.tooltipQtde}>{fmt(entry.qtde)}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  fmt(p.estoque ?? 0)
                                 )}
                               </td>
                               <td className={styles.vendas}>{markup !== null ? <span className={styles.markupBadge}>{markup.toFixed(2)}x</span> : <span className={styles.noData}>—</span>}</td>

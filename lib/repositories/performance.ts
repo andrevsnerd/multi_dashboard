@@ -507,6 +507,49 @@ export async function fetchProdutoQtdePorFilial(
   return [...posRows, ...ecomRows];
 }
 
+export interface ProdutoEstoquePorFilialRow {
+  produto: string;
+  filial: string;
+  estoque: number;
+}
+
+/**
+ * Estoque líquido (soma de ESTOQUE em todas as cores/tamanhos) por produto e filial.
+ * Usado na Curva ABC para coluna de estoque e tooltip por filial.
+ */
+export async function fetchProdutoEstoquePorFilial(
+  _companyKey: CompanyKey,
+  posFilialNames: string[],
+  ecommerceFilialNames: string[],
+): Promise<ProdutoEstoquePorFilialRow[]> {
+  const allFiliais = [...new Set([...posFilialNames, ...ecommerceFilialNames])];
+  if (allFiliais.length === 0) return [];
+
+  return withRequest(async (request) => {
+    allFiliais.forEach((f, i) => request.input(`estF${i}`, sql.VarChar, f));
+    const placeholders = allFiliais.map((_, i) => `@estF${i}`).join(', ');
+    const query = `
+      SELECT
+        ISNULL(e.PRODUTO, '') AS PRODUTO,
+        ISNULL(e.FILIAL, '') AS FILIAL,
+        CAST(SUM(ISNULL(e.ESTOQUE, 0)) AS FLOAT) AS ESTOQUE
+      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      WHERE e.FILIAL IN (${placeholders})
+      GROUP BY ISNULL(e.PRODUTO, ''), ISNULL(e.FILIAL, '')
+      HAVING ABS(SUM(ISNULL(e.ESTOQUE, 0))) > 0
+    `;
+    type RawRow = { PRODUTO: string; FILIAL: string; ESTOQUE: number };
+    const result = await request.query<RawRow>(query);
+    return result.recordset
+      .map(r => ({
+        produto: r.PRODUTO?.trim() ?? '',
+        filial: r.FILIAL?.trim() ?? '',
+        estoque: Math.round(Number(r.ESTOQUE ?? 0)),
+      }))
+      .filter(r => r.produto !== '');
+  });
+}
+
 export async function fetchFilialProdutoVendedorSales(
   companyKey: CompanyKey,
   posFilialNames: string[],
