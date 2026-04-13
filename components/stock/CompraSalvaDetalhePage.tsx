@@ -50,6 +50,32 @@ function fmtBRL2(n: number) {
   });
 }
 
+function resumirAjusteEntreDestinos(
+  atual: DestinoCompraFinalParte[] | null,
+  sugerido: DestinoCompraFinalParte[] | null
+): string {
+  if (!atual || !sugerido) return "Sem distribuição por filial para comparar.";
+  const mapaAtual = new Map(atual.map((p) => [p.label, p.qtd]));
+  const mapaSug = new Map(sugerido.map((p) => [p.label, p.qtd]));
+  const labels = new Set([...mapaAtual.keys(), ...mapaSug.keys()]);
+  const sobe: string[] = [];
+  const desce: string[] = [];
+
+  labels.forEach((label) => {
+    const diff = (mapaSug.get(label) ?? 0) - (mapaAtual.get(label) ?? 0);
+    if (diff > 0) sobe.push(`${label} +${diff}`);
+    if (diff < 0) desce.push(`${label} ${diff}`);
+  });
+
+  if (sobe.length === 0 && desce.length === 0) {
+    return "Distribuição por filial sem mudança.";
+  }
+  const partes: string[] = [];
+  if (sobe.length > 0) partes.push(`Colocar: ${sobe.join(", ")}`);
+  if (desce.length > 0) partes.push(`Tirar: ${desce.join(", ")}`);
+  return partes.join(" | ");
+}
+
 function normalizeVendasPorFilialParaExibicao(
   companyKey: CompanyKey,
   rows: Array<{ filial: string; qtde12m: number; qtde60d: number }>
@@ -292,6 +318,18 @@ export default function CompraSalvaDetalhePage({
     filiais: Array<{ filial: string; estoque: number }>;
     total: number;
   }>(null);
+  const [sugestaoDiffTooltip, setSugestaoDiffTooltip] = useState<null | {
+    x: number;
+    y: number;
+    diffFmt: string;
+    explicacao: string;
+    qtdSugerida: number;
+    qtdManual: number;
+    mediaMensal12m: number;
+    ritmoMensal60d: number;
+    tendenciaTexto: string;
+    ajusteDestinoTexto: string;
+  }>(null);
 
   const handleUpdateQtd = async (itemKey: string, qtdManual: number) => {
     const params = new URLSearchParams();
@@ -491,6 +529,10 @@ export default function CompraSalvaDetalhePage({
                       vendasRowsK === undefined
                         ? undefined
                         : partesDestinoCompraFinal(it.qtdManual ?? 0, vendasRowsK, companyKey);
+                    const partesDestinoSugerido =
+                      vendasRowsK === undefined || qtdSugerida === null
+                        ? undefined
+                        : partesDestinoCompraFinal(qtdSugerida, vendasRowsK, companyKey);
                     return (
                       <tr key={it.itemKey}>
                         <td>
@@ -522,13 +564,47 @@ export default function CompraSalvaDetalhePage({
                                 : <DestinoCompraFinalBadges partes={partesDestino} />}
                             {qtdSugerida !== null && qtdSugerida !== it.qtdManual && (() => {
                               const diff = qtdSugerida - it.qtdManual;
+                              const diffFmt = `${diff > 0 ? "+" : ""}${diff}`;
+                              const explicacao =
+                                diff > 0
+                                  ? "Sugestão atual maior que a quantidade salva"
+                                  : "Sugestão atual menor que a quantidade salva";
+                              const total12m = (vendasRowsK ?? []).reduce((s, r) => s + (r.qtde12m ?? 0), 0);
+                              const total60d = (vendasRowsK ?? []).reduce((s, r) => s + (r.qtde60d ?? 0), 0);
+                              const mediaMensal12m = total12m / 12;
+                              const ritmoMensal60d = total60d / 2;
+                              const tendenciaTexto =
+                                mediaMensal12m <= 0
+                                  ? "Sem base de vendas para tendência."
+                                  : ritmoMensal60d >= mediaMensal12m
+                                    ? `Ritmo recente acima/igual da média (${ritmoMensal60d.toFixed(1)} vs ${mediaMensal12m.toFixed(1)} un/mês).`
+                                    : `Ritmo recente abaixo da média (${ritmoMensal60d.toFixed(1)} vs ${mediaMensal12m.toFixed(1)} un/mês).`;
+                              const ajusteDestinoTexto =
+                                partesDestinoSugerido === undefined
+                                  ? "Destino: aguardando dados de vendas por filial."
+                                  : resumirAjusteEntreDestinos(partesDestino ?? null, partesDestinoSugerido);
                               return (
                                 <span
                                   className={`${styles.badgeS} ${diff > 0 ? styles.badgeSDiffUp : styles.badgeSDiffDown}`}
-                                  style={{ width: "auto", padding: "0 5px" }}
-                                  title={`Sugerido: ${fmt(qtdSugerida)} (${diff > 0 ? "+" : ""}${diff})`}
+                                  style={{ width: "auto", padding: "0 6px" }}
+                                  aria-label={`Delta sugestão ${diffFmt}`}
+                                  onMouseEnter={(e) => {
+                                    setSugestaoDiffTooltip({
+                                      x: e.clientX,
+                                      y: e.clientY,
+                                      diffFmt,
+                                      explicacao,
+                                      qtdSugerida,
+                                      qtdManual: it.qtdManual ?? 0,
+                                      mediaMensal12m,
+                                      ritmoMensal60d,
+                                      tendenciaTexto,
+                                      ajusteDestinoTexto,
+                                    });
+                                  }}
+                                  onMouseLeave={() => setSugestaoDiffTooltip(null)}
                                 >
-                                  S:{diff > 0 ? "+" : ""}{diff}
+                                  Sug {diffFmt}
                                 </span>
                               );
                             })()}
@@ -629,6 +705,38 @@ export default function CompraSalvaDetalhePage({
               </div>
             </>
           )}
+        </div>
+      )}
+      {sugestaoDiffTooltip && (
+        <div
+          className={styles.tooltipEstoque}
+          style={{ left: sugestaoDiffTooltip.x + 12, top: sugestaoDiffTooltip.y + 12 }}
+        >
+          <div className={styles.tooltipEstoqueHeader}>Delta da sugestão</div>
+          <div className={styles.tooltipLine}>
+            <strong>Resultado:</strong> {sugestaoDiffTooltip.diffFmt}
+          </div>
+          <div className={styles.tooltipLine}>{sugestaoDiffTooltip.explicacao}</div>
+          <div className={styles.tooltipDivider} />
+          <div className={styles.tooltipLine}>
+            <strong>Sugerido atual:</strong> {fmt(sugestaoDiffTooltip.qtdSugerida)}
+          </div>
+          <div className={styles.tooltipLine}>
+            <strong>Salvo manual:</strong> {fmt(sugestaoDiffTooltip.qtdManual)}
+          </div>
+          <div className={styles.tooltipDivider} />
+          <div className={styles.tooltipLine}>
+            <strong>Media 12m:</strong> {sugestaoDiffTooltip.mediaMensal12m.toFixed(1)} un/mes
+          </div>
+          <div className={styles.tooltipLine}>
+            <strong>Ritmo 60d:</strong> {sugestaoDiffTooltip.ritmoMensal60d.toFixed(1)} un/mes
+          </div>
+          <div className={styles.tooltipLine}>{sugestaoDiffTooltip.tendenciaTexto}</div>
+          <div className={styles.tooltipDivider} />
+          <div className={styles.tooltipLine}>
+            <strong>Como ajustar por filial:</strong>
+          </div>
+          <div className={styles.tooltipLine}>{sugestaoDiffTooltip.ajusteDestinoTexto}</div>
         </div>
       )}
     </div>
