@@ -4,6 +4,7 @@ import {
   deleteCompraSalva,
   getCompraSalva,
   removeCompraSalvaItem,
+  toggleCompraSalvaComprada,
   updateCompraSalvaItemQtd,
   updateCompraSalvaTitle,
 } from "@/lib/utils/compra-salva-store";
@@ -42,7 +43,15 @@ export async function PATCH(
   }
   try {
     const body = await request.json();
-    const { title, itemKey, qtdManual, removeItemKey } = body ?? {};
+    const { title, itemKey, qtdManual, removeItemKey, comprada } = body ?? {};
+
+    if (typeof comprada === "boolean") {
+      const updated = await toggleCompraSalvaComprada(companyKey, id, comprada);
+      if (!updated) {
+        return NextResponse.json({ error: "Compra salva não encontrada" }, { status: 404 });
+      }
+      return NextResponse.json({ data: updated });
+    }
 
     if (typeof title === "string" && title.trim()) {
       const updated = await updateCompraSalvaTitle(companyKey, id, title);

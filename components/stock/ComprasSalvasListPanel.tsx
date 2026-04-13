@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { CompanyKey } from "@/lib/config/company";
 import type { CompraSalvaListEntry } from "@/lib/types/compra-salva";
@@ -52,6 +52,7 @@ export default function ComprasSalvasListPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [toggling, setToggling] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -89,6 +90,48 @@ export default function ComprasSalvasListPanel({
     );
   }, [items, searchTerm]);
 
+  const handleToggleComprada = useCallback(
+    async (e: React.SyntheticEvent, it: CompraSalvaListEntry) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (toggling.has(it.id)) return;
+      setToggling((prev) => new Set(prev).add(it.id));
+      const novaComprada = !it.comprada;
+      // Optimistic update
+      setItems((prev) =>
+        prev.map((x) => (x.id === it.id ? { ...x, comprada: novaComprada } : x))
+      );
+      try {
+        const params = new URLSearchParams({ company: companyKey });
+        const res = await fetch(
+          `/api/controle-estoque/compras-salvas/${it.id}?${params}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ comprada: novaComprada }),
+          }
+        );
+        if (!res.ok) {
+          // Reverte em caso de erro
+          setItems((prev) =>
+            prev.map((x) => (x.id === it.id ? { ...x, comprada: it.comprada } : x))
+          );
+        }
+      } catch {
+        setItems((prev) =>
+          prev.map((x) => (x.id === it.id ? { ...x, comprada: it.comprada } : x))
+        );
+      } finally {
+        setToggling((prev) => {
+          const next = new Set(prev);
+          next.delete(it.id);
+          return next;
+        });
+      }
+    },
+    [companyKey, toggling]
+  );
+
   const base = `/${companySlug}/controle-estoque/projecao/lista-compra/compras-salvas`;
 
   return (
@@ -124,22 +167,41 @@ export default function ComprasSalvasListPanel({
       {!loading && !error && filtered.length > 0 && (
         <div className={styles.list}>
           {filtered.map((it) => (
-            <Link key={it.id} href={`${base}/${it.id}`} className={styles.card}>
+            <Link
+              key={it.id}
+              href={`${base}/${it.id}`}
+              className={`${styles.card} ${it.comprada ? styles.cardComprada : ""}`}
+            >
               <div className={styles.cardMain}>
                 <div className={styles.cardTitleRow}>
+                  <input
+                    type="checkbox"
+                    className={styles.compradaCheckbox}
+                    checked={!!it.comprada}
+                    disabled={toggling.has(it.id)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onChange={(e) => void handleToggleComprada(e, it)}
+                    aria-label={it.comprada ? "Desmarcar como comprada" : "Marcar como comprada"}
+                  />
                   <div className={styles.cardTitle}>{it.title}</div>
                   <span className={styles.cardHour}>{fmtHora(it.savedAt)}</span>
                 </div>
-                <div className={styles.cardMeta}>
+              </div>
+              <div className={styles.cardRight}>
+                {it.comprada && <span className={styles.compradaBadge}>Comprada</span>}
+                <div className={styles.cardMetaInline}>
                   <span>{it.itemCount} itens</span>
                   <span>{fmt(it.totalQtdManual)} un.</span>
                 </div>
+                {it.totalValor > 0 && (
+                  <div className={styles.totalValorBox}>
+                    <strong className={styles.totalValorValue}>{fmtBRL(it.totalValor)}</strong>
+                  </div>
+                )}
               </div>
-              {it.totalValor > 0 && (
-                <div className={styles.totalValorBox}>
-                  <strong className={styles.totalValorValue}>{fmtBRL(it.totalValor)}</strong>
-                </div>
-              )}
             </Link>
           ))}
         </div>

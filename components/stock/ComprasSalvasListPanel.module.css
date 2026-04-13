@@ -63,12 +63,21 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   text-decoration: none;
   color: inherit;
-  transition: background-color 0.2s, box-shadow 0.2s;
+  transition: background-color 0.2s, box-shadow 0.2s, border-color 0.2s;
 }
 
 .card:hover {
   background: #f8fafc;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.cardComprada {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+.cardComprada:hover {
+  background: #dcfce7;
 }
 
 .cardTitle {
@@ -77,6 +86,8 @@
   color: #0f172a;
 }
 
+.cardComprada .cardTitle { color: #166534; }
+
 .cardTitleRow {
   display: flex;
   align-items: baseline;
@@ -84,10 +95,24 @@
   flex-wrap: wrap;
 }
 
+.compradaCheckbox {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: #334155;
+  flex-shrink: 0;
+}
+
+.compradaCheckbox:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .cardHour {
-  font-size: 12px;
+  font-size: 13px;
   color: #64748b;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .cardMain {
@@ -103,16 +128,44 @@
   gap: 16px;
 }
 
+.cardComprada .cardMeta { color: #15803d; }
+
+.cardRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+}
+
+.cardMetaInline {
+  font-size: 13px;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.cardComprada .cardMetaInline {
+  color: #15803d;
+}
+
 .totalValorBox {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 2px;
+  gap: 4px;
   padding: 8px 10px;
   border-radius: 10px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   flex-shrink: 0;
+}
+
+.cardComprada .totalValorBox {
+  border-color: #86efac;
+  background: #dcfce7;
 }
 
 .totalValorLabel {
@@ -129,6 +182,24 @@
   color: #0f172a;
 }
 
+.cardComprada .totalValorValue {
+  color: #166534;
+}
+
+.compradaBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #166534;
+  background: #dcfce7;
+  border: 1px solid #86efac;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
 @media (max-width: 900px) {
   .card {
     flex-wrap: wrap;
@@ -137,6 +208,12 @@
   .totalValorBox {
     width: 100%;
     align-items: flex-start;
+  }
+
+  .cardRight {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 }
 

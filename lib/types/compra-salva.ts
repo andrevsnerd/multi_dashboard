@@ -17,6 +17,7 @@ export interface CompraSalva {
   title: string;
   expandirPorCor: boolean;
   items: CompraSalvaItemRow[];
+  comprada: boolean;
   savedAt: string;
   updatedAt: string;
 }
@@ -27,6 +28,7 @@ export interface CompraSalvaListEntry {
   itemCount: number;
   totalQtdManual: number;
   totalValor: number;
+  comprada: boolean;
   savedAt: string;
   updatedAt: string;
 }
