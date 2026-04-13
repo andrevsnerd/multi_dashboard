@@ -11,6 +11,12 @@ import { normalizeRangeForQuery, formatDateForQuery } from '@/lib/utils/date';
 
 export const maxDuration = 300;
 
+/** Chave para alinhar produto + breakdowns (vendas/estoque por filial) com ou sem cor */
+function produtoAggKey(produto: string, cor: string | undefined, porCor: boolean): string {
+  if (!porCor) return produto;
+  return `${produto}||${(cor ?? '').trim()}`;
+}
+
 function normalizeFilialKey(value: string): string {
   return value
     .normalize('NFD')
@@ -55,6 +61,7 @@ export async function GET(request: Request) {
   const monthParam = searchParams.get('month');
   const yearParam = searchParams.get('year');
   const compareParam = searchParams.get('compare');
+  const porCor = searchParams.get('porCor') === '1';
 
   if (!companyKey) {
     return NextResponse.json({ error: 'Parâmetros obrigatórios faltando' }, { status: 400 });
@@ -240,19 +247,24 @@ export async function GET(request: Request) {
       let estoquePorFilialRows: Awaited<ReturnType<typeof fetchProdutoEstoquePorFilial>> = [];
       try {
         [produtos, qtdePorFilialRows, estoquePorFilialRows] = await Promise.all([
-          fetchFilialProdutoSales(companyKey, allPosMembers, allEcomMembers, resolvedRange, comparisonMode),
-          fetchProdutoQtdePorFilial(companyKey, allPosMembers, allEcomMembers, resolvedRange),
-          fetchProdutoEstoquePorFilial(companyKey, allPosMembers, allEcomMembers),
+          fetchFilialProdutoSales(companyKey, allPosMembers, allEcomMembers, resolvedRange, comparisonMode, {
+            groupByCor: porCor,
+          }),
+          fetchProdutoQtdePorFilial(companyKey, allPosMembers, allEcomMembers, resolvedRange, {
+            groupByCor: porCor,
+          }),
+          fetchProdutoEstoquePorFilial(companyKey, allPosMembers, allEcomMembers, { groupByCor: porCor }),
         ]);
       } catch (produtosError) {
         console.error('Erro ao carregar produtos (não-fatal):', produtosError);
       }
 
-      // Montar mapa produto → filiais ordenadas por qtde desc
+      // Montar mapa produto (+ cor) → filiais ordenadas por qtde desc
       const qtdePorFilialMap = new Map<string, { filial: string; displayName: string; qtde: number }[]>();
       qtdePorFilialRows.forEach(row => {
-        if (!qtdePorFilialMap.has(row.produto)) qtdePorFilialMap.set(row.produto, []);
-        qtdePorFilialMap.get(row.produto)!.push({
+        const k = produtoAggKey(row.produto, row.cor, porCor);
+        if (!qtdePorFilialMap.has(k)) qtdePorFilialMap.set(k, []);
+        qtdePorFilialMap.get(k)!.push({
           filial: row.filial,
           displayName: company.filialDisplayNames?.[row.filial] ?? row.filial,
           qtde: row.qtde,
@@ -262,8 +274,9 @@ export async function GET(request: Request) {
 
       const estoquePorFilialMap = new Map<string, { filial: string; displayName: string; qtde: number }[]>();
       estoquePorFilialRows.forEach(row => {
-        if (!estoquePorFilialMap.has(row.produto)) estoquePorFilialMap.set(row.produto, []);
-        estoquePorFilialMap.get(row.produto)!.push({
+        const k = produtoAggKey(row.produto, row.cor, porCor);
+        if (!estoquePorFilialMap.has(k)) estoquePorFilialMap.set(k, []);
+        estoquePorFilialMap.get(k)!.push({
           filial: row.filial,
           displayName: company.filialDisplayNames?.[row.filial] ?? row.filial,
           qtde: row.estoque,
@@ -272,11 +285,12 @@ export async function GET(request: Request) {
       estoquePorFilialMap.forEach(entries => entries.sort((a, b) => b.qtde - a.qtde));
 
       const produtosComFilial = produtos.map(p => {
-        const porFilial = estoquePorFilialMap.get(p.produto) ?? [];
+        const k = produtoAggKey(p.produto, p.cor, porCor);
+        const porFilial = estoquePorFilialMap.get(k) ?? [];
         const estoque = porFilial.reduce((s, e) => s + e.qtde, 0);
         return {
           ...p,
-          qtdePorFilial: qtdePorFilialMap.get(p.produto) ?? [],
+          qtdePorFilial: qtdePorFilialMap.get(k) ?? [],
           estoque,
           estoquePorFilial: porFilial,
         };
@@ -302,6 +316,7 @@ export async function GET(request: Request) {
           end: formatDateForQuery(new Date(endInclusiveUtc.getTime())),
         },
         produtos: produtosComFilial,
+        porCor,
       }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
@@ -347,8 +362,10 @@ export async function GET(request: Request) {
     let estoquePorFilialRows: Awaited<ReturnType<typeof fetchProdutoEstoquePorFilial>> = [];
     try {
       [produtos, estoquePorFilialRows] = await Promise.all([
-        fetchFilialProdutoSales(companyKey, posMembers, ecomMembers, resolvedRange, comparisonMode),
-        fetchProdutoEstoquePorFilial(companyKey, posMembers, ecomMembers),
+        fetchFilialProdutoSales(companyKey, posMembers, ecomMembers, resolvedRange, comparisonMode, {
+          groupByCor: porCor,
+        }),
+        fetchProdutoEstoquePorFilial(companyKey, posMembers, ecomMembers, { groupByCor: porCor }),
       ]);
     } catch (produtosError) {
       console.error('Erro ao carregar produtos da filial (não-fatal):', produtosError);
@@ -356,8 +373,9 @@ export async function GET(request: Request) {
 
     const estoquePorFilialMap = new Map<string, { filial: string; displayName: string; qtde: number }[]>();
     estoquePorFilialRows.forEach(row => {
-      if (!estoquePorFilialMap.has(row.produto)) estoquePorFilialMap.set(row.produto, []);
-      estoquePorFilialMap.get(row.produto)!.push({
+      const k = produtoAggKey(row.produto, row.cor, porCor);
+      if (!estoquePorFilialMap.has(k)) estoquePorFilialMap.set(k, []);
+      estoquePorFilialMap.get(k)!.push({
         filial: row.filial,
         displayName: company.filialDisplayNames?.[row.filial] ?? row.filial,
         qtde: row.estoque,
@@ -366,7 +384,8 @@ export async function GET(request: Request) {
     estoquePorFilialMap.forEach(entries => entries.sort((a, b) => b.qtde - a.qtde));
 
     const produtosComEstoque = produtos.map(p => {
-      const porFilial = estoquePorFilialMap.get(p.produto) ?? [];
+      const k = produtoAggKey(p.produto, p.cor, porCor);
+      const porFilial = estoquePorFilialMap.get(k) ?? [];
       const estoque = porFilial.reduce((s, e) => s + e.qtde, 0);
       return {
         ...p,
@@ -395,6 +414,7 @@ export async function GET(request: Request) {
         end: formatDateForQuery(new Date(endInclusiveUtc.getTime())),
       },
       produtos: produtosComEstoque,
+      porCor,
     }, { headers: { 'Cache-Control': 'no-store' } });
 
   } catch (error) {

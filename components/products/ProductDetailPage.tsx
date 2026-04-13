@@ -25,6 +25,7 @@ interface ProductDetailData {
   detail: ProductDetailInfo;
   stockByFilial: ProductStockByFilial[];
   saleHistory: ProductSaleHistory[];
+  saleHistoryComparison: ProductSaleHistory[];
   availableColors: ProductAvailableColor[];
 }
 
@@ -193,6 +194,11 @@ export default function ProductDetailPage({
         if (active) {
           // Converter datas de strings para Date objects se necessário
           if (productData) {
+            const mapSaleDates = (rows: ProductSaleHistory[]) =>
+              rows.map((sale) => ({
+                ...sale,
+                date: sale.date instanceof Date ? sale.date : new Date(sale.date),
+              }));
             const processedData = {
               ...productData,
               detail: {
@@ -203,10 +209,8 @@ export default function ProductDetailPage({
                     : new Date(productData.detail.lastEntryDate)
                   : null,
               },
-              saleHistory: productData.saleHistory.map((sale) => ({
-                ...sale,
-                date: sale.date instanceof Date ? sale.date : new Date(sale.date),
-              })),
+              saleHistory: mapSaleDates(productData.saleHistory),
+              saleHistoryComparison: mapSaleDates(productData.saleHistoryComparison ?? []),
             };
             setData(processedData);
           } else {
@@ -309,6 +313,7 @@ export default function ProductDetailPage({
         companyName={companyName}
         range={range}
         saleHistory={data.saleHistory}
+        saleHistoryComparison={data.saleHistoryComparison}
         stockByFilial={data.stockByFilial}
         onDetailUpdated={refetchDetail}
       />

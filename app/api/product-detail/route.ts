@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { endOfMonth, startOfDay, startOfMonth, subMonths } from 'date-fns';
 
 import {
   fetchProductDetail,
@@ -51,12 +52,32 @@ export async function GET(request: Request) {
   };
 
   try {
-    const [detail, stockByFilial, saleHistory, availableColors] = await Promise.all([
-      fetchProductDetail(baseParams),
-      fetchProductStockByFilial(baseParams),
-      fetchProductSaleHistory(baseParams),
-      fetchProductAvailableColors(productId, company),
-    ]);
+    const rangeStart = new Date(range.start);
+    const rangeEnd = new Date(range.end);
+    const startD = startOfDay(rangeStart);
+    const endD = startOfDay(rangeEnd);
+
+    // Do 1º dia do mês anterior ao início do range até o último dia do mês anterior ao fim do range
+    // (cobre todos os “mês anterior” necessários para cada dia do gráfico).
+    const comparisonRangeStart = startOfMonth(subMonths(startD, 1));
+    const comparisonRangeEnd = endOfMonth(subMonths(endD, 1));
+
+    const saleHistoryComparisonFetch = fetchProductSaleHistory({
+      ...baseParams,
+      range: {
+        start: comparisonRangeStart.toISOString(),
+        end: comparisonRangeEnd.toISOString(),
+      },
+    });
+
+    const [detail, stockByFilial, saleHistory, availableColors, saleHistoryComparison] =
+      await Promise.all([
+        fetchProductDetail(baseParams),
+        fetchProductStockByFilial(baseParams),
+        fetchProductSaleHistory(baseParams),
+        fetchProductAvailableColors(productId, company),
+        saleHistoryComparisonFetch,
+      ]);
 
     // Garantir que o estoque total do card seja a soma do estoque por filial (fonte única de verdade)
     const totalStockFromFilials = stockByFilial.reduce((sum, row) => sum + row.stock, 0);
@@ -70,6 +91,7 @@ export async function GET(request: Request) {
         detail: detailWithConsistentStock,
         stockByFilial,
         saleHistory,
+        saleHistoryComparison,
         availableColors,
       },
     });

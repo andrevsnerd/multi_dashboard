@@ -29,6 +29,8 @@ interface ProdutoRow {
   descricao: string;
   categoria: string;
   grade?: string;
+  cor?: string;
+  corDescricao?: string;
   vendas: number;
   qtde: number;
   custo: number;
@@ -41,6 +43,7 @@ interface ProdutoRow {
 interface FilialData {
   filial: string | null;
   displayName: string;
+  porCor?: boolean;
   vendas: number;
   vendasPrevious: number;
   qtde: number;
@@ -169,6 +172,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"produtos" | "vendedores">("produtos");
+  const [porCor, setPorCor] = useState(false);
 
   // Quando filial muda, voltar para aba de produtos
   useEffect(() => {
@@ -191,6 +195,9 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     if (selectedFilial) {
       params.set('filial', selectedFilial);
     }
+    if (porCor) {
+      params.set('porCor', '1');
+    }
     fetch(`/api/curva-abc?${params}`, { cache: "no-store" })
       .then(res => res.json())
       .then((json: FilialData & { error?: string }) => {
@@ -199,7 +206,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       })
       .catch(e => setError(e instanceof Error ? e.message : "Erro desconhecido"))
       .finally(() => setLoading(false));
-  }, [companyKey, selectedFilial, selectedMonth, selectedYear, comparisonMode]);
+  }, [companyKey, selectedFilial, selectedMonth, selectedYear, comparisonMode, range.startDate, range.endDate, porCor]);
 
   const outrosTooltip = useMemo(() => getOutrosTooltip(companyKey), [companyKey]);
 
@@ -321,6 +328,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
           Código: p.produto,
           Categoria: p.categoria ? getCategoryHeaderLabel(p.categoria) : "",
           Grade: companyKey === "scarfme" ? (p.grade ?? "") : "",
+          Cor: porCor ? (p.corDescricao || p.cor || "") : "",
           "Participação %": Math.round(p.percParticipacao * 10) / 10,
           "% acumulado": Math.round(p.percCumulativa * 1000) / 10,
           Faturamento: Math.round(p.vendas * 100) / 100,
@@ -533,7 +541,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
           {produtosComCurva.length > 0 && (
             <div className={styles.summaryCard}>
               <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>PRODUTOS ÚNICOS</span>
+                <span className={styles.summaryLabel}>{porCor ? "ITENS (PROD. + COR)" : "PRODUTOS ÚNICOS"}</span>
                 <span className={styles.summaryValueNeutral}>{produtosComCurva.length}</span>
               </div>
               <div className={styles.summaryDivider} />
@@ -580,6 +588,14 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                 Ano
               </button>
             </div>
+            <button
+              type="button"
+              className={`${styles.toggleBtn} ${porCor ? styles.toggleBtnActive : ""}`}
+              onClick={() => setPorCor(v => !v)}
+              title="Cada linha vira produto + cor (vendas, estoque e tooltips por cor)"
+            >
+              Por cor
+            </button>
             {produtosComCurva.length > 0 && (
               <button
                 type="button"
@@ -629,7 +645,9 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                             <div className={styles.sectionLabel}>
                               <span className={`${styles.curvaBadge} ${CURVA_BADGE_CLASS[curva]}`}>{curva}</span>
                               <span className={styles.sectionTitle}>{CURVA_LABEL[curva]}</span>
-                              <span className={styles.sectionCount}>{grupo.length} produtos</span>
+                              <span className={styles.sectionCount}>
+                                {grupo.length} {porCor ? "itens" : "produtos"}
+                              </span>
                             </div>
                           </td>
                         </tr>
@@ -638,7 +656,10 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                           const precoMedio = p.qtde > 0 ? p.vendas / p.qtde : 0;
                           const markup = p.custo > 0 && precoMedio > 0 ? precoMedio / p.custo : null;
                           return (
-                            <tr key={`${p.produto}-${p.categoria}`} className={curva !== "A" ? styles.rowDimmed : ""}>
+                            <tr
+                              key={`${p.produto}-${p.categoria}-${p.cor ?? ""}-${p.grade ?? ""}`}
+                              className={curva !== "A" ? styles.rowDimmed : ""}
+                            >
                               <td>
                                 <span className={`${styles.rank} ${i < 3 && curva === "A" ? styles.top : ""}`}>
                                   {rankGlobal}
@@ -684,6 +705,11 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                                     )}
                                   </div>
                                 )}
+                                {porCor && (p.corDescricao || p.cor) && (
+                                  <div className={styles.productCode} style={{ marginTop: 4 }}>
+                                    Cor: {p.corDescricao || p.cor}
+                                  </div>
+                                )}
                               </td>
                               <td className={styles.percCell}>
                                 <div className={styles.percBar}>
@@ -701,7 +727,6 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                                 {p.qtdePorFilial && p.qtdePorFilial.length > 1 ? (
                                   <div className={styles.qtdeTooltipWrapper}>
                                     <span>{fmt(p.qtde)}</span>
-                                    <span className={styles.qtdeHint}>▾</span>
                                     <div className={styles.qtdeTooltipContent}>
                                       <div className={styles.tooltipTitle}>Onde vendeu</div>
                                       {p.qtdePorFilial.map(entry => (
@@ -720,7 +745,6 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                                 {p.estoquePorFilial && p.estoquePorFilial.length > 0 ? (
                                   <div className={styles.qtdeTooltipWrapper}>
                                     <span>{fmt(p.estoque ?? 0)}</span>
-                                    <span className={styles.qtdeHint}>▾</span>
                                     <div className={styles.qtdeTooltipContent}>
                                       <div className={styles.tooltipTitle}>Estoque por filial</div>
                                       {p.estoquePorFilial.map(entry => (

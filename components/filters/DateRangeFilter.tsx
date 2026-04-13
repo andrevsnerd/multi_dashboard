@@ -1,6 +1,13 @@
 "use client";
 
-import { useMemo, useState, useRef, useEffect, useCallback } from "react";
+import {
+  useMemo,
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+} from "react";
 import { DateRange, RangeKeyDict } from "react-date-range";
 import { endOfMonth, endOfWeek, startOfMonth, startOfWeek, startOfYear, subDays, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -71,6 +78,7 @@ export default function DateRangeFilter({
     if (disabled) setIsOpen(false);
   }, [disabled]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const [isMobile, setIsMobile] = useState(false);
@@ -219,50 +227,6 @@ export default function DateRangeFilter({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Calcular posição do dropdown quando abrir
-  useEffect(() => {
-    if (!isOpen || !containerRef.current) {
-      setDropdownStyle({});
-      return;
-    }
-    if (isMobile) {
-      setDropdownStyle({});
-      return;
-    }
-
-    const updatePosition = () => {
-      if (!containerRef.current) return;
-
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
-      const dropdownWidth = 580;
-
-      // Por padrão alinhar à direita do container (dropdown abre para a esquerda).
-      // Só inverte para esquerda se não há espaço suficiente à esquerda.
-      const rightEdge = viewportWidth - containerRect.right;
-      const spaceOnLeft = containerRect.right; // quanto espaço há à esquerda do canto direito do container
-
-      if (spaceOnLeft >= dropdownWidth) {
-        // Alinha pelo lado direito do container
-        setDropdownStyle({ right: "0", left: "auto" });
-      } else {
-        // Alinha pelo lado esquerdo
-        setDropdownStyle({ left: "0", right: "auto" });
-      }
-      void rightEdge; // evita warning de variável não usada
-    };
-
-    const rafId = requestAnimationFrame(updatePosition);
-    window.addEventListener('resize', updatePosition);
-    window.addEventListener('scroll', updatePosition, true);
-
-    return () => {
-      cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition, true);
-    };
-  }, [isOpen, isMobile]);
-
   const display = formatDisplay({
     startDate: clampedRange.start,
     endDate: clampedRange.end,
@@ -278,6 +242,73 @@ export default function DateRangeFilter({
     }
     return { startDate: start, endDate: end };
   }, [draft, clampedRange.start, clampedRange.end, clampDate]);
+
+  // Desktop: fixed + coords do botão (evita top:100% quando o wrapper estica no layout)
+  useLayoutEffect(() => {
+    if (!isOpen || isMobile) {
+      setDropdownStyle({});
+      return;
+    }
+
+    const updatePosition = () => {
+      const btn = buttonRef.current;
+      if (!btn) return;
+
+      const rect = btn.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const gap = 12;
+      const dropdownWidth = 580;
+      const estHeight = dropdownRef.current?.offsetHeight ?? 400;
+
+      const top = rect.bottom + gap;
+      const fitsBelow = top + estHeight <= vh - gap;
+
+      const next: React.CSSProperties = {
+        position: "fixed",
+        zIndex: 1001,
+      };
+
+      if (!fitsBelow) {
+        next.top = "auto";
+        next.bottom = vh - rect.top + gap;
+      } else {
+        next.top = top;
+        next.bottom = "auto";
+      }
+
+      if (rect.right >= dropdownWidth) {
+        next.right = vw - rect.right;
+        next.left = "auto";
+      } else {
+        const left = Math.max(12, Math.min(rect.left, vw - dropdownWidth - 12));
+        next.left = left;
+        next.right = "auto";
+      }
+
+      setDropdownStyle(next);
+    };
+
+    updatePosition();
+    const rafId = requestAnimationFrame(updatePosition);
+
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    const panel = dropdownRef.current;
+    const ro =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => updatePosition())
+        : null;
+    if (panel && ro) ro.observe(panel);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      ro?.disconnect();
+    };
+  }, [isOpen, isMobile]);
 
   const selectionRange = {
     startDate: draftClamped.startDate,
@@ -323,9 +354,10 @@ export default function DateRangeFilter({
 
   return (
     <div className={styles.container} ref={containerRef}>
-      <span className={styles.label}>{label}</span>
+      {label ? <span className={styles.label}>{label}</span> : null}
       <button
         type="button"
+        ref={buttonRef}
         className={`${styles.button} ${isOpen ? styles.buttonActive : ""}`}
         onClick={() => {
           if (disabled) return;

@@ -10,8 +10,18 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ReferenceLine,
 } from "recharts";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  isSameMonth,
+  subMonths,
+  startOfDay,
+  differenceInCalendarDays,
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type {
   ProductDetailInfo,
@@ -34,6 +44,8 @@ export interface ProductDetailKPIsProps {
     endDate: Date;
   };
   saleHistory: ProductSaleHistory[];
+  /** Vendas nos meses anteriores ao range (para cada dia: acumulado até o mesmo dia do mês civil anterior). */
+  saleHistoryComparison?: ProductSaleHistory[];
   stockByFilial: ProductStockByFilial[];
   onDetailUpdated?: () => void;
 }
@@ -58,6 +70,7 @@ export default function ProductDetailKPIs({
   companyKey,
   range,
   saleHistory,
+  saleHistoryComparison = [],
   stockByFilial,
   onDetailUpdated,
 }: ProductDetailKPIsProps) {
@@ -218,37 +231,67 @@ export default function ProductDetailKPIs({
 
   const start = new Date(range.startDate);
   const end = new Date(range.endDate);
-  const currentMonth = new Date(start.getFullYear(), start.getMonth(), 1);
+  const startD = startOfDay(start);
+  const endD = startOfDay(end);
+  const isMultiMonthRange = !isSameMonth(startD, endD);
+  const rangeDayCount = Math.max(1, differenceInCalendarDays(endD, startD) + 1);
+
+  const currentMonthForProjection = new Date(start.getFullYear(), start.getMonth(), 1);
   const lastDayOfMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0);
   const totalDaysInMonth = lastDayOfMonth.getDate();
-  const daysPassed = Math.min(
-    Math.ceil((end.getTime() - currentMonth.getTime()) / (1000 * 60 * 60 * 24)),
-    totalDaysInMonth
-  );
+
+  const daysPassed = isMultiMonthRange
+    ? rangeDayCount
+    : Math.min(
+        differenceInCalendarDays(endD, startOfDay(currentMonthForProjection)) + 1,
+        totalDaysInMonth,
+      );
 
   const monthlyProjection = (() => {
     if (daysPassed <= 0 || detail.totalRevenue === 0) return 0;
     const averageDaily = detail.totalRevenue / daysPassed;
-    return averageDaily * totalDaysInMonth;
+    return averageDaily * (isMultiMonthRange ? rangeDayCount : totalDaysInMonth);
   })();
 
+  const chartMonthStart = startOfMonth(start);
+  const isChartMonthCurrent =
+    !isMultiMonthRange && isSameMonth(chartMonthStart, new Date());
+
+  const chartMonthBoundaryIsos = (() => {
+    const days = eachDayOfInterval({ start: startD, end: endD });
+    return days
+      .filter((d, idx) => idx > 0 && d.getDate() === 1)
+      .map((d) => format(d, "yyyy-MM-dd"));
+  })();
+
+  const chartTickIsos = (() => {
+    const days = eachDayOfInterval({ start: startD, end: endD });
+    const picked = days.filter(
+      (d, i) => i === 0 || d.getDate() === 1 || i === days.length - 1,
+    );
+    return picked.map((d) => format(d, "yyyy-MM-dd"));
+  })();
+
+  const comparisonLegendLabel = "Mês anterior";
+
   const chartData = (() => {
-    const monthStart = startOfMonth(start);
-    const monthEnd = endOfMonth(start);
-    const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+    const days = eachDayOfInterval({ start: startD, end: endD });
     const revenueByDay = new Map<string, number>();
-    const salesByDay = new Map<string, { filial: string; filialDisplayName: string; quantity: number; revenue: number }[]>();
-    
+    const salesByDay = new Map<
+      string,
+      { filial: string; filialDisplayName: string; quantity: number; revenue: number }[]
+    >();
+
     saleHistory.forEach((sale) => {
       const d = sale.date instanceof Date ? sale.date : new Date(sale.date);
-      const key = format(d, "yyyy-MM-dd");
+      const key = format(startOfDay(d), "yyyy-MM-dd");
       revenueByDay.set(key, (revenueByDay.get(key) ?? 0) + sale.revenue);
-      
+
       if (!salesByDay.has(key)) {
         salesByDay.set(key, []);
       }
       const existing = salesByDay.get(key)!;
-      const existingFilial = existing.find(s => s.filial === sale.filial);
+      const existingFilial = existing.find((s) => s.filial === sale.filial);
       if (existingFilial) {
         existingFilial.quantity += sale.quantity;
         existingFilial.revenue += sale.revenue;
@@ -261,29 +304,47 @@ export default function ProductDetailKPIs({
         });
       }
     });
-    
-    let cumulative = 0;
-    let cumulativeQuantity = 0;
-    const averageDaily = daysPassed > 0 && detail.totalRevenue > 0
-      ? detail.totalRevenue / daysPassed
-      : 0;
-    const averageQuantityDaily = daysPassed > 0 && detail.totalQuantity > 0
-      ? detail.totalQuantity / daysPassed
-      : 0;
+
+    const comparisonRevByIso = new Map<string, number>();
+    const comparisonQtyByIso = new Map<string, number>();
+    saleHistoryComparison.forEach((sale) => {
+      const d = sale.date instanceof Date ? sale.date : new Date(sale.date);
+      const key = format(startOfDay(d), "yyyy-MM-dd");
+      comparisonRevByIso.set(key, (comparisonRevByIso.get(key) ?? 0) + sale.revenue);
+      comparisonQtyByIso.set(key, (comparisonQtyByIso.get(key) ?? 0) + sale.quantity);
+    });
+
+    let cumulativeRange = 0;
+    let comparisonCumulativeRev = 0;
+    let comparisonCumulativeQty = 0;
+
     return days.map((day) => {
-      const key = format(day, "yyyy-MM-dd");
-      const dayRevenue = revenueByDay.get(key) ?? 0;
-      const dayQuantity = salesByDay.get(key)?.reduce((sum, s) => sum + s.quantity, 0) ?? 0;
-      cumulative += dayRevenue;
-      cumulativeQuantity += dayQuantity;
-      const dayIndex = day.getDate();
-      const projection = averageDaily * dayIndex;
-      const quantityProjection = Math.round(averageQuantityDaily * dayIndex);
-      const daySales = salesByDay.get(key) ?? [];
+      const isoDay = format(day, "yyyy-MM-dd");
+      const dayRevenue = revenueByDay.get(isoDay) ?? 0;
+      cumulativeRange += dayRevenue;
+
+      const equivPrevDay = startOfDay(subMonths(day, 1));
+      const cmpIso = format(equivPrevDay, "yyyy-MM-dd");
+      comparisonCumulativeRev += comparisonRevByIso.get(cmpIso) ?? 0;
+      comparisonCumulativeQty += comparisonQtyByIso.get(cmpIso) ?? 0;
+
+      const projection = Math.round(comparisonCumulativeRev * 100) / 100;
+      const quantityProjection = Math.round(comparisonCumulativeQty);
+
+      const comparisonRefLong = format(
+        equivPrevDay,
+        "dd 'de' MMMM yyyy",
+        { locale: ptBR },
+      );
+
+      const daySales = salesByDay.get(isoDay) ?? [];
       return {
-        day: format(day, "dd", { locale: ptBR }),
-        vendasReais: Math.round(cumulative * 100) / 100,
-        projecao: Math.round(projection * 100) / 100,
+        isoDay,
+        day: format(day, "dd/MM", { locale: ptBR }),
+        dateLong: format(day, "dd 'de' MMMM yyyy", { locale: ptBR }),
+        comparisonRefLong,
+        vendasReais: Math.round(cumulativeRange * 100) / 100,
+        projecao: projection,
         quantityProjection,
         hasSales: daySales.length > 0,
         salesByFilial: daySales,
@@ -366,7 +427,17 @@ export default function ProductDetailKPIs({
             )}
           </div>
           <p className={styles.cardDescription}>
-            Projeção Mês: {formatCurrency(monthlyProjection)}
+            {isMultiMonthRange ? (
+              <>
+                Média diária no período:{" "}
+                {formatCurrency(detail.totalRevenue / rangeDayCount)} · {rangeDayCount} dias
+              </>
+            ) : (
+              <>
+                {isChartMonthCurrent ? "Projeção mês" : "Projeção no mês (média do período)"}:{" "}
+                {formatCurrency(monthlyProjection)}
+              </>
+            )}
           </p>
         </article>
 
@@ -634,24 +705,44 @@ export default function ProductDetailKPIs({
       <div className={styles.chartRow}>
         <div className={styles.chartCard}>
           <h3 className={styles.chartTitle}>Performance de Vendas</h3>
-          <p className={styles.chartSubtitle}>Acompanhamento mensal de vendas vs projeção</p>
+          <p className={styles.chartSubtitle}>
+            {isMultiMonthRange
+              ? "Acúmulo contínuo no período — a cinza soma o dia equivalente no mês anterior a cada passo (sobe junto, sem quebra); linhas verticais = início de mês"
+              : "Vendas acumuladas no período — comparação acumulada dia a dia (mesmo dia no mês anterior)"}
+          </p>
           <div className={styles.chartLegend}>
             <span className={styles.chartLegendItem}>
-              <span className={styles.chartLegendDotBlue} /> Vendas Reais
+              <span className={styles.chartLegendDotBlue} /> Vendas reais (acum.)
             </span>
             <span className={styles.chartLegendItem}>
-              <span className={styles.chartLegendDotGray} /> Projeção
+              <span className={styles.chartLegendDotGray} /> {comparisonLegendLabel}
             </span>
           </div>
           <div className={styles.chartWrapper}>
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                {chartMonthBoundaryIsos.map((iso) => (
+                  <ReferenceLine
+                    key={iso}
+                    x={iso}
+                    stroke="#94a3b8"
+                    strokeWidth={1.5}
+                    strokeDasharray="4 4"
+                  />
+                ))}
                 <XAxis
-                  dataKey="day"
+                  dataKey="isoDay"
+                  type="category"
+                  ticks={chartTickIsos}
                   stroke="#94a3b8"
-                  style={{ fontSize: "12px" }}
+                  style={{ fontSize: "11px" }}
                   tick={{ fill: "#64748b" }}
+                  tickFormatter={(iso) =>
+                    format(new Date(`${iso}T12:00:00`), isMultiMonthRange ? "dd/MM" : "dd", {
+                      locale: ptBR,
+                    })
+                  }
                 />
                 <YAxis
                   stroke="#94a3b8"
@@ -671,14 +762,19 @@ export default function ProductDetailKPIs({
                         padding: "8px 12px",
                         fontSize: "12px",
                       }}>
-                        <p style={{ margin: "0 0 8px 0", color: "#64748b", fontWeight: 600 }}>Dia {label}</p>
+                        <p style={{ margin: "0 0 8px 0", color: "#64748b", fontWeight: 600 }}>
+                          {data.dateLong}
+                        </p>
                         {data.hasSales ? (
                           <>
                             <p style={{ margin: "0 0 8px 0", color: "#2563eb", fontWeight: 600 }}>
-                              Vendas: {formatCurrency(data.vendasReais)} ({data.salesByFilial?.reduce((sum: number, s: { quantity: number }) => sum + s.quantity, 0) ?? 0} un.)
+                              Vendas (acum. período): {formatCurrency(data.vendasReais)} (
+                              {data.salesByFilial?.reduce((sum: number, s: { quantity: number }) => sum + s.quantity, 0) ?? 0}{" "}
+                              un.)
                             </p>
                             <p style={{ margin: "0 0 8px 0", color: "#94a3b8" }}>
-                              Projeção: {formatCurrency(data.projecao)} ({data.quantityProjection} un.)
+                              Ref. mês ant. (acum.): {formatCurrency(data.projecao)} (
+                              {data.quantityProjection} un.) — dia equivalente {data.comparisonRefLong}
                             </p>
                             {data.salesByFilial && data.salesByFilial.length > 0 && (
                               <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "8px" }}>
@@ -694,7 +790,8 @@ export default function ProductDetailKPIs({
                           </>
                         ) : (
                           <p style={{ margin: "0 0 8px 0", color: "#94a3b8" }}>
-                            Projeção: {formatCurrency(data.projecao)} ({data.quantityProjection} un.)
+                            Ref. mês ant. (acum.): {formatCurrency(data.projecao)} (
+                            {data.quantityProjection} un.) — dia equivalente {data.comparisonRefLong}
                           </p>
                         )}
                       </div>
@@ -704,7 +801,7 @@ export default function ProductDetailKPIs({
                 <Line
                   type="monotone"
                   dataKey="vendasReais"
-                  name="Vendas Reais"
+                  name="Vendas reais (acum.)"
                   stroke="#2563eb"
                   strokeWidth={2}
                   dot={(props) => {
@@ -717,7 +814,7 @@ export default function ProductDetailKPIs({
                 <Line
                   type="monotone"
                   dataKey="projecao"
-                  name="Projeção"
+                  name={comparisonLegendLabel}
                   stroke="#94a3b8"
                   strokeWidth={1.5}
                   strokeDasharray="4 4"

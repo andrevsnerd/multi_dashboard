@@ -710,17 +710,10 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   cursor: help;
   /* Invisible hit area so hover reaches the popover without a “dead” gap */
   padding-bottom: 12px;
   margin-bottom: -12px;
-}
-
-.qtdeHint {
-  font-size: 10px;
-  color: #94a3b8;
-  line-height: 1;
 }
 
 .qtdeTooltipContent {

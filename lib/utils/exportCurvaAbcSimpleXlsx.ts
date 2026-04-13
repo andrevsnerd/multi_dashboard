@@ -9,6 +9,7 @@ export interface CurvaAbcSimpleXlsxRow {
   Código: string;
   Categoria: string;
   Grade: string;
+  Cor: string;
   "Participação %": number;
   "% acumulado": number;
   Faturamento: number;

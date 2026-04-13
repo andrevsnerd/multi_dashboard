@@ -263,6 +263,9 @@ export interface FilialProdutoSalesRow {
   descricao: string;
   categoria: string;
   grade: string;
+  /** Código de cor (COR_PRODUTO) quando agrupado por cor */
+  cor?: string;
+  corDescricao?: string;
   vendas: number;
   qtde: number;
   custo: number;
@@ -280,13 +283,20 @@ export interface FilialProdutoVendedorSalesRow {
   vendasPrevious: number;
 }
 
+function filialProdutoMergeKey(r: FilialProdutoSalesRow, groupByCor: boolean): string {
+  const cor = groupByCor ? (r.cor ?? '').trim() : '';
+  return `${r.produto}||${r.categoria}||${r.grade}||${cor}`;
+}
+
 export async function fetchFilialProdutoSales(
   companyKey: CompanyKey,
   posFilialNames: string[],
   ecommerceFilialNames: string[],
   range: NormalizedRange,
   comparisonMode: 'month' | 'year' = 'month',
+  options?: { groupByCor?: boolean },
 ): Promise<FilialProdutoSalesRow[]> {
+  const groupByCor = options?.groupByCor === true;
   const start = range.start;
   const end = range.end;
   const prev = shiftRangeByMonths(range, comparisonMode === 'year' ? -12 : -1);
@@ -301,8 +311,37 @@ export async function fetchFilialProdutoSales(
     : `''`;
   // SQL Server rejects GROUP BY on a literal constant — only include gradeExpr if it references a column
   const gradeGroupBy = gradeExpr === `''` ? '' : `, ${gradeExpr}`;
+  const topN = groupByCor ? 2000 : 500;
 
-  type RawRow = { PRODUTO: string; DESCRICAO: string; CATEGORIA: string; GRADE: string; CUSTO_UNIT: number; QTDE: number; VENDAS: number };
+  type RawRow = {
+    PRODUTO: string;
+    DESCRICAO: string;
+    CATEGORIA: string;
+    GRADE: string;
+    COR_PRODUTO?: string;
+    COR_DESCRICAO?: string;
+    CUSTO_UNIT: number;
+    QTDE: number;
+    VENDAS: number;
+  };
+
+  const mapRow = (r: RawRow): FilialProdutoSalesRow => {
+    const base: FilialProdutoSalesRow = {
+      produto: r.PRODUTO?.trim() ?? '',
+      descricao: r.DESCRICAO?.trim() ?? '',
+      categoria: r.CATEGORIA?.trim() ?? '',
+      grade: r.GRADE?.trim() ?? '',
+      custo: Number(r.CUSTO_UNIT ?? 0),
+      vendas: Math.round(Number(r.VENDAS ?? 0)),
+      qtde: Math.round(Number(r.QTDE ?? 0)),
+      vendasPrevious: 0,
+    };
+    if (groupByCor) {
+      base.cor = r.COR_PRODUTO?.trim() ?? '';
+      base.corDescricao = r.COR_DESCRICAO?.trim() ?? '';
+    }
+    return base;
+  };
 
   const runPos = (s: Date, e: Date, prefix: string): Promise<FilialProdutoSalesRow[]> => {
     if (posFilialNames.length === 0) return Promise.resolve([]);
@@ -311,36 +350,37 @@ export async function fetchFilialProdutoSales(
       request.input(`${prefix}End`, sql.DateTime, e);
       posFilialNames.forEach((f, i) => request.input(`${prefix}F${i}`, sql.VarChar, f));
       const placeholders = posFilialNames.map((_, i) => `@${prefix}F${i}`).join(', ');
+      const corSelect = groupByCor
+        ? `ISNULL(vp.COR_PRODUTO, '') AS COR_PRODUTO,
+          MAX(ISNULL(COALESCE(cor_ref.DESC_COR, vp.DESC_COR_PRODUTO), '')) AS COR_DESCRICAO,`
+        : '';
+      const corJoin = groupByCor
+        ? 'LEFT JOIN CORES_BASICAS cor_ref WITH (NOLOCK) ON cor_ref.COR = vp.COR_PRODUTO'
+        : '';
+      const corGroupBy = groupByCor ? ', ISNULL(vp.COR_PRODUTO, \'\')' : '';
       const query = `
-        SELECT TOP 500
+        SELECT TOP ${topN}
           ISNULL(vp.PRODUTO, '') AS PRODUTO,
           UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
           ${categoriaExpr} AS CATEGORIA,
           ${gradeExpr} AS GRADE,
+          ${corSelect}
           ISNULL(p.CUSTO_REPOSICAO1, 0) AS CUSTO_UNIT,
           SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS QTDE,
           SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) AS VENDAS
         FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
         LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO
+        ${corJoin}
         WHERE vp.DATA_VENDA >= @${prefix}Start
           AND vp.DATA_VENDA < @${prefix}End
           AND vp.QTDE > 0
           AND vp.FILIAL IN (${placeholders})
-        GROUP BY ISNULL(vp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}${gradeGroupBy}, ISNULL(p.CUSTO_REPOSICAO1, 0)
+        GROUP BY ISNULL(vp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}${gradeGroupBy}, ISNULL(p.CUSTO_REPOSICAO1, 0)${corGroupBy}
         HAVING SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) > 0
         ORDER BY VENDAS DESC
       `;
       const result = await request.query<RawRow>(query);
-      return result.recordset.map(r => ({
-        produto: r.PRODUTO?.trim() ?? '',
-        descricao: r.DESCRICAO?.trim() ?? '',
-        categoria: r.CATEGORIA?.trim() ?? '',
-        grade: r.GRADE?.trim() ?? '',
-        custo: Number(r.CUSTO_UNIT ?? 0),
-        vendas: Math.round(Number(r.VENDAS ?? 0)),
-        qtde: Math.round(Number(r.QTDE ?? 0)),
-        vendasPrevious: 0,
-      })).filter(r => r.produto !== '');
+      return result.recordset.map(mapRow).filter(r => r.produto !== '');
     });
   };
 
@@ -351,12 +391,21 @@ export async function fetchFilialProdutoSales(
       request.input(`${prefix}EcomEnd`, sql.DateTime, e);
       ecommerceFilialNames.forEach((f, i) => request.input(`${prefix}EcomF${i}`, sql.VarChar, f));
       const placeholders = ecommerceFilialNames.map((_, i) => `@${prefix}EcomF${i}`).join(', ');
+      const corSelect = groupByCor
+        ? `ISNULL(fp.COR_PRODUTO, '') AS COR_PRODUTO,
+          MAX(ISNULL(cor_ref.DESC_COR, '')) AS COR_DESCRICAO,`
+        : '';
+      const corJoin = groupByCor
+        ? 'LEFT JOIN CORES_BASICAS cor_ref WITH (NOLOCK) ON cor_ref.COR = fp.COR_PRODUTO'
+        : '';
+      const corGroupBy = groupByCor ? ', ISNULL(fp.COR_PRODUTO, \'\')' : '';
       const query = `
-        SELECT TOP 500
+        SELECT TOP ${topN}
           ISNULL(fp.PRODUTO, '') AS PRODUTO,
           UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
           ${categoriaExpr} AS CATEGORIA,
           ${gradeExpr} AS GRADE,
+          ${corSelect}
           ISNULL(p.CUSTO_REPOSICAO1, 0) AS CUSTO_UNIT,
           SUM(CASE WHEN fp.QTDE > 0 THEN fp.QTDE ELSE 0 END) AS QTDE,
           SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS VENDAS
@@ -364,27 +413,19 @@ export async function fetchFilialProdutoSales(
         JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
           ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
         LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
+        ${corJoin}
         WHERE CAST(f.EMISSAO AS DATE) >= CAST(@${prefix}EcomStart AS DATE)
           AND CAST(f.EMISSAO AS DATE) < CAST(@${prefix}EcomEnd AS DATE)
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
           AND fp.QTDE > 0
           AND f.FILIAL IN (${placeholders})
-        GROUP BY ISNULL(fp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}${gradeGroupBy}, ISNULL(p.CUSTO_REPOSICAO1, 0)
+        GROUP BY ISNULL(fp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}${gradeGroupBy}, ISNULL(p.CUSTO_REPOSICAO1, 0)${corGroupBy}
         HAVING SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) > 0
         ORDER BY VENDAS DESC
       `;
       const result = await request.query<RawRow>(query);
-      return result.recordset.map(r => ({
-        produto: r.PRODUTO?.trim() ?? '',
-        descricao: r.DESCRICAO?.trim() ?? '',
-        categoria: r.CATEGORIA?.trim() ?? '',
-        grade: r.GRADE?.trim() ?? '',
-        custo: Number(r.CUSTO_UNIT ?? 0),
-        vendas: Math.round(Number(r.VENDAS ?? 0)),
-        qtde: Math.round(Number(r.QTDE ?? 0)),
-        vendasPrevious: 0,
-      })).filter(r => r.produto !== '');
+      return result.recordset.map(mapRow).filter(r => r.produto !== '');
     });
   };
 
@@ -395,10 +436,9 @@ export async function fetchFilialProdutoSales(
     runEcom(startPrev, endPrev, 'fpp'),
   ]);
 
-  // Merge current: pos + ecom by produto+categoria+grade
   const merged = new Map<string, FilialProdutoSalesRow>();
   [...posCur, ...ecomCur].forEach(r => {
-    const key = `${r.produto}||${r.categoria}||${r.grade}`;
+    const key = filialProdutoMergeKey(r, groupByCor);
     const existing = merged.get(key);
     if (existing) {
       existing.vendas += r.vendas;
@@ -409,16 +449,14 @@ export async function fetchFilialProdutoSales(
     }
   });
 
-  // Merge previous: accumulate vendasPrevious per produto key
   const prevMap = new Map<string, number>();
   [...posPrev, ...ecomPrev].forEach(r => {
-    const key = `${r.produto}||${r.categoria}||${r.grade}`;
+    const key = filialProdutoMergeKey(r, groupByCor);
     prevMap.set(key, (prevMap.get(key) ?? 0) + r.vendas);
   });
 
-  // Apply vendasPrevious to current rows
-  merged.forEach((row, key) => {
-    row.vendasPrevious = prevMap.get(key) ?? 0;
+  merged.forEach(row => {
+    row.vendasPrevious = prevMap.get(filialProdutoMergeKey(row, groupByCor)) ?? 0;
   });
 
   return Array.from(merged.values()).sort((a, b) => b.vendas - a.vendas);
@@ -426,6 +464,8 @@ export async function fetchFilialProdutoSales(
 
 export interface ProdutoQtdePorFilialRow {
   produto: string;
+  /** COR_PRODUTO quando groupByCor; senão string vazia */
+  cor: string;
   filial: string;
   qtde: number;
 }
@@ -435,15 +475,17 @@ export interface ProdutoQtdePorFilialRow {
  * Usado para popular tooltips de "onde vendeu" na visão geral.
  */
 export async function fetchProdutoQtdePorFilial(
-  companyKey: CompanyKey,
+  _companyKey: CompanyKey,
   posFilialNames: string[],
   ecommerceFilialNames: string[],
   range: NormalizedRange,
+  options?: { groupByCor?: boolean },
 ): Promise<ProdutoQtdePorFilialRow[]> {
+  const groupByCor = options?.groupByCor === true;
   const start = range.start;
   const end = range.end;
 
-  type RawRow = { PRODUTO: string; FILIAL: string; QTDE: number };
+  type RawRow = { PRODUTO: string; FILIAL: string; QTDE: number; COR_PRODUTO?: string };
 
   const runPos = (): Promise<ProdutoQtdePorFilialRow[]> => {
     if (posFilialNames.length === 0) return Promise.resolve([]);
@@ -452,9 +494,12 @@ export async function fetchProdutoQtdePorFilial(
       request.input('qtdEnd', sql.DateTime, end);
       posFilialNames.forEach((f, i) => request.input(`qtdF${i}`, sql.VarChar, f));
       const placeholders = posFilialNames.map((_, i) => `@qtdF${i}`).join(', ');
+      const corSelect = groupByCor ? 'ISNULL(vp.COR_PRODUTO, \'\') AS COR_PRODUTO,' : '';
+      const corGroup = groupByCor ? ', ISNULL(vp.COR_PRODUTO, \'\')' : '';
       const query = `
         SELECT
           ISNULL(vp.PRODUTO, '') AS PRODUTO,
+          ${corSelect}
           ISNULL(vp.FILIAL, '') AS FILIAL,
           SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS QTDE
         FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
@@ -462,12 +507,17 @@ export async function fetchProdutoQtdePorFilial(
           AND vp.DATA_VENDA < @qtdEnd
           AND vp.QTDE > 0
           AND vp.FILIAL IN (${placeholders})
-        GROUP BY ISNULL(vp.PRODUTO, ''), ISNULL(vp.FILIAL, '')
+        GROUP BY ISNULL(vp.PRODUTO, ''), ISNULL(vp.FILIAL, '')${corGroup}
         HAVING SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) > 0
       `;
       const result = await request.query<RawRow>(query);
       return result.recordset
-        .map(r => ({ produto: r.PRODUTO?.trim() ?? '', filial: r.FILIAL?.trim() ?? '', qtde: Math.round(Number(r.QTDE ?? 0)) }))
+        .map(r => ({
+          produto: r.PRODUTO?.trim() ?? '',
+          cor: groupByCor ? (r.COR_PRODUTO?.trim() ?? '') : '',
+          filial: r.FILIAL?.trim() ?? '',
+          qtde: Math.round(Number(r.QTDE ?? 0)),
+        }))
         .filter(r => r.produto !== '');
     });
   };
@@ -479,9 +529,12 @@ export async function fetchProdutoQtdePorFilial(
       request.input('qtdEcomEnd', sql.DateTime, end);
       ecommerceFilialNames.forEach((f, i) => request.input(`qtdEcomF${i}`, sql.VarChar, f));
       const placeholders = ecommerceFilialNames.map((_, i) => `@qtdEcomF${i}`).join(', ');
+      const corSelect = groupByCor ? 'ISNULL(fp.COR_PRODUTO, \'\') AS COR_PRODUTO,' : '';
+      const corGroup = groupByCor ? ', ISNULL(fp.COR_PRODUTO, \'\')' : '';
       const query = `
         SELECT
           ISNULL(fp.PRODUTO, '') AS PRODUTO,
+          ${corSelect}
           ISNULL(f.FILIAL, '') AS FILIAL,
           SUM(CASE WHEN fp.QTDE > 0 THEN fp.QTDE ELSE 0 END) AS QTDE
         FROM FATURAMENTO f WITH (NOLOCK)
@@ -493,56 +546,75 @@ export async function fetchProdutoQtdePorFilial(
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
           AND fp.QTDE > 0
           AND f.FILIAL IN (${placeholders})
-        GROUP BY ISNULL(fp.PRODUTO, ''), ISNULL(f.FILIAL, '')
+        GROUP BY ISNULL(fp.PRODUTO, ''), ISNULL(f.FILIAL, '')${corGroup}
         HAVING SUM(CASE WHEN fp.QTDE > 0 THEN fp.QTDE ELSE 0 END) > 0
       `;
       const result = await request.query<RawRow>(query);
       return result.recordset
-        .map(r => ({ produto: r.PRODUTO?.trim() ?? '', filial: r.FILIAL?.trim() ?? '', qtde: Math.round(Number(r.QTDE ?? 0)) }))
+        .map(r => ({
+          produto: r.PRODUTO?.trim() ?? '',
+          cor: groupByCor ? (r.COR_PRODUTO?.trim() ?? '') : '',
+          filial: r.FILIAL?.trim() ?? '',
+          qtde: Math.round(Number(r.QTDE ?? 0)),
+        }))
         .filter(r => r.produto !== '');
     });
   };
 
   const [posRows, ecomRows] = await Promise.all([runPos(), runEcom()]);
-  return [...posRows, ...ecomRows];
+  const merged = new Map<string, ProdutoQtdePorFilialRow>();
+  for (const r of [...posRows, ...ecomRows]) {
+    const k = `${r.produto}||${r.cor}||${r.filial}`;
+    const ex = merged.get(k);
+    if (ex) ex.qtde += r.qtde;
+    else merged.set(k, { ...r });
+  }
+  return Array.from(merged.values());
 }
 
 export interface ProdutoEstoquePorFilialRow {
   produto: string;
+  cor: string;
   filial: string;
   estoque: number;
 }
 
 /**
- * Estoque líquido (soma de ESTOQUE em todas as cores/tamanhos) por produto e filial.
+ * Estoque líquido por produto e filial (e opcionalmente por cor).
  * Usado na Curva ABC para coluna de estoque e tooltip por filial.
  */
 export async function fetchProdutoEstoquePorFilial(
   _companyKey: CompanyKey,
   posFilialNames: string[],
   ecommerceFilialNames: string[],
+  options?: { groupByCor?: boolean },
 ): Promise<ProdutoEstoquePorFilialRow[]> {
+  const groupByCor = options?.groupByCor === true;
   const allFiliais = [...new Set([...posFilialNames, ...ecommerceFilialNames])];
   if (allFiliais.length === 0) return [];
 
   return withRequest(async (request) => {
     allFiliais.forEach((f, i) => request.input(`estF${i}`, sql.VarChar, f));
     const placeholders = allFiliais.map((_, i) => `@estF${i}`).join(', ');
+    const corSelect = groupByCor ? 'ISNULL(e.COR_PRODUTO, \'\') AS COR_PRODUTO,' : '';
+    const corGroup = groupByCor ? ', ISNULL(e.COR_PRODUTO, \'\')' : '';
     const query = `
       SELECT
         ISNULL(e.PRODUTO, '') AS PRODUTO,
+        ${corSelect}
         ISNULL(e.FILIAL, '') AS FILIAL,
         CAST(SUM(ISNULL(e.ESTOQUE, 0)) AS FLOAT) AS ESTOQUE
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       WHERE e.FILIAL IN (${placeholders})
-      GROUP BY ISNULL(e.PRODUTO, ''), ISNULL(e.FILIAL, '')
+      GROUP BY ISNULL(e.PRODUTO, ''), ISNULL(e.FILIAL, '')${corGroup}
       HAVING ABS(SUM(ISNULL(e.ESTOQUE, 0))) > 0
     `;
-    type RawRow = { PRODUTO: string; FILIAL: string; ESTOQUE: number };
+    type RawRow = { PRODUTO: string; FILIAL: string; ESTOQUE: number; COR_PRODUTO?: string };
     const result = await request.query<RawRow>(query);
     return result.recordset
       .map(r => ({
         produto: r.PRODUTO?.trim() ?? '',
+        cor: groupByCor ? (r.COR_PRODUTO?.trim() ?? '') : '',
         filial: r.FILIAL?.trim() ?? '',
         estoque: Math.round(Number(r.ESTOQUE ?? 0)),
       }))
