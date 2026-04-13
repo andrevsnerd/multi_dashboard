@@ -98,8 +98,13 @@ export default function Sidebar({ companyName }: SidebarProps) {
     ? `${basePath}/controle-performance`
     : "/controle-performance";
 
+  // Construir o link para curva ABC baseado no caminho base
+  const curvaAbcHref = basePath && basePath !== "/"
+    ? `${basePath}/curva-abc`
+    : "/curva-abc";
+
   // Construir o link para controle de transferências baseado no caminho base
-  const controleTransferenciasHref = basePath && basePath !== "/" 
+  const controleTransferenciasHref = basePath && basePath !== "/"
     ? `${basePath}/controle-transferencias`
     : "/controle-transferencias";
 
@@ -169,6 +174,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     { label: "Controle de Estoque", href: controleEstoqueHref, permission: "controle-estoque" },
     { label: "Controle de Giro", href: controleGiroHref, permission: "controle-giro" },
     { label: "Controle de Performance", href: controlePerformanceHref, permission: "controle-performance" },
+    { label: "Curva A,B,C", href: curvaAbcHref, permission: "curva-abc" },
     { label: "Controle de Transferências", href: controleTransferenciasHref, permission: "controle-transferencias" },
     { label: "Transferência de Produtos", href: transferenciaProdutosHref, permission: "transferencia-produtos" },
     { label: "Romaneios", href: romaneiosHref, permission: "romaneios" },

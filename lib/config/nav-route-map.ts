@@ -42,6 +42,9 @@ export const NAV_ROUTE_MAP: Record<string, PermissionKey | "admin"> = {
   "saidas-entradas-produtos": "saidas-entradas-produtos",
   "destino-romaneio": "destino-romaneio",
 
+  // ── Curva ABC ──────────────────────────────────────────────────
+  "curva-abc": "curva-abc",
+
   // ── Relatórios / Extras ────────────────────────────────────────
   "exportar-relatorios": "exportar-relatorios",
   blackfriday: "blackfriday",
