@@ -13,6 +13,7 @@ import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateR
 import FilialFilter from "@/components/filters/FilialFilter";
 import { formatDateForQuery } from "@/lib/utils/date";
 import FilialVendedoresTab from "./FilialVendedoresTab";
+import { exportCurvaAbcSimpleXlsx, type CurvaAbcSimpleXlsxRow } from "@/lib/utils/exportCurvaAbcSimpleXlsx";
 import styles from "./FilialPerformancePage.module.css";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -298,6 +299,42 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     setSelectedCategory(prev => prev === cat ? null : cat);
   };
 
+  const handleExportSimpleXlsx = () => {
+    if (produtosComCurva.length === 0) return;
+    const rows: CurvaAbcSimpleXlsxRow[] = [];
+    for (const curva of groups) {
+      const grupo = produtosComCurva.filter(p => p.curva === curva);
+      for (const p of grupo) {
+        const rankGlobal = produtosComCurva.indexOf(p) + 1;
+        const precoMedio = p.qtde > 0 ? p.vendas / p.qtde : 0;
+        const markup = p.custo > 0 && precoMedio > 0 ? precoMedio / p.custo : null;
+        const cmp = getComparisonBadge(p.vendas, p.vendasPrevious);
+        let variacao: number | string = "";
+        if (cmp?.kind === "new") variacao = "NOVO";
+        else if (cmp?.kind === "pct") variacao = Math.round(cmp.value * 10) / 10;
+        rows.push({
+          "#": rankGlobal,
+          Curva: curva,
+          Descrição: p.descricao || p.produto,
+          Código: p.produto,
+          Categoria: p.categoria ? getCategoryHeaderLabel(p.categoria) : "",
+          Grade: companyKey === "scarfme" ? (p.grade ?? "") : "",
+          "Participação %": Math.round(p.percParticipacao * 10) / 10,
+          "% acumulado": Math.round(p.percCumulativa * 1000) / 10,
+          Faturamento: Math.round(p.vendas * 100) / 100,
+          Qtd: p.qtde,
+          Markup: markup !== null ? Math.round(markup * 100) / 100 : "",
+          "Var. vs período anterior": variacao,
+        });
+      }
+    }
+    exportCurvaAbcSimpleXlsx(rows, {
+      companyKey,
+      range: { startDate: range.startDate, endDate: range.endDate },
+      filialLabel: selectedFilial ? (data?.displayName ?? selectedFilial) : null,
+    });
+  };
+
   const comparisonLabel = comparisonMode === "month" ? "mês anterior" : "mesmo período do ano anterior";
 
   const pageTitle = selectedFilial
@@ -521,7 +558,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
             </div>
           )}
 
-          {/* Comparação toggle */}
+          {/* Comparação toggle + export visão simples */}
           <div className={styles.comparisonRow}>
             <span className={styles.comparisonLabel}>Comparação:</span>
             <div className={styles.comparisonToggle}>
@@ -540,6 +577,16 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                 Ano
               </button>
             </div>
+            {produtosComCurva.length > 0 && (
+              <button
+                type="button"
+                className={styles.exportXlsxBtn}
+                onClick={handleExportSimpleXlsx}
+                title="Exporta a tabela atual (uma linha por produto) em Excel"
+              >
+                Exportar XLSX
+              </button>
+            )}
           </div>
 
           {/* ABC Table */}

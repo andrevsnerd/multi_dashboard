@@ -61,6 +61,30 @@
   align-items: center;
   gap: 10px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.exportXlsxBtn {
+  margin-left: auto;
+  padding: 8px 14px;
+  background: #fff;
+  border: 1px solid #0f172a;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.exportXlsxBtn:hover:not(:disabled) {
+  background: #0f172a;
+  color: #fff;
+}
+
+.exportXlsxBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .comparisonLabel {
@@ -427,7 +451,8 @@
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-  overflow: hidden;
+  /* visible so “Onde vendeu” popovers are not clipped */
+  overflow: visible;
 }
 
 .table {
@@ -687,6 +712,9 @@
   align-items: center;
   gap: 4px;
   cursor: help;
+  /* Invisible hit area so hover reaches the popover without a “dead” gap */
+  padding-bottom: 12px;
+  margin-bottom: -12px;
 }
 
 .qtdeHint {
@@ -698,18 +726,33 @@
 .qtdeTooltipContent {
   display: none;
   position: absolute;
-  bottom: calc(100% + 6px);
+  top: 100%;
   right: 0;
-  background: #1e293b;
-  color: #f1f5f9;
-  border-radius: 8px;
-  padding: 8px 12px;
+  left: auto;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 14px;
   font-size: 12px;
-  white-space: nowrap;
-  z-index: 200;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-  pointer-events: none;
-  min-width: 160px;
+  line-height: 1.35;
+  z-index: 500;
+  box-shadow:
+    0 12px 32px rgba(15, 23, 42, 0.35),
+    0 0 0 1px rgba(148, 163, 184, 0.12);
+  pointer-events: auto;
+  min-width: 188px;
+  max-width: min(300px, calc(100vw - 24px));
+  white-space: normal;
+}
+
+.qtdeTooltipContent::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  right: 14px;
+  margin-bottom: -1px;
+  border: 6px solid transparent;
+  border-bottom-color: #0f172a;
 }
 
 .qtdeTooltipWrapper:hover .qtdeTooltipContent {
@@ -721,16 +764,19 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #64748b;
-  margin-bottom: 6px;
+  color: #94a3b8;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
 }
 
 .tooltipRow {
   display: flex;
   justify-content: space-between;
-  gap: 20px;
-  padding: 2px 0;
-  border-bottom: 1px solid #334155;
+  align-items: baseline;
+  gap: 16px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.85);
 }
 
 .tooltipRow:last-child {
@@ -738,11 +784,11 @@
 }
 
 .tooltipFilial {
-  color: #94a3b8;
-  font-weight: 400;
-  max-width: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: #cbd5e1;
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
 }
 
 .tooltipQtde {
