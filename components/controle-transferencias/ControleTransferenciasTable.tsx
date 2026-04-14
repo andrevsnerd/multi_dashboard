@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
-import type { ProdutoTransferencia } from "@/lib/repositories/controleTransferencias";
+import type { ProdutoTransferencia, FilialData } from "@/lib/repositories/controleTransferencias";
 import type { DateRangeValue } from "@/components/filters/DateRangeFilter";
 import { useAuth } from "@/components/auth/AuthContext";
 import { exportTransfersToPDF } from "./exportToPDF";
@@ -84,6 +84,8 @@ async function executarTransferencia(
   return response.json();
 }
 
+type CurvaABC = 'A' | 'B' | 'C';
+
 interface TransferByOrigin {
   origem: string;
   items: TransferItem[];
@@ -97,6 +99,47 @@ interface ControleTransferenciasTableProps {
   loading?: boolean;
   dateRange?: DateRangeValue;
   selectedFilial?: string | null;
+}
+
+/** Ordem de atendimento dos destinos (para esta origem neste produto+cor). */
+export interface RoteiroDestinoAlocacao {
+  ordem: number;
+  destinoLabel: string;
+  destinoCanonico: string;
+  quantidade: number;
+}
+
+/** Trecho de alocação (origem → destino); vários podem ser somados na mesma linha após consolidação. */
+export interface QuantidadeExplicacaoChunk {
+  curva: CurvaABC;
+  destino: {
+    coberturaDias: number;
+    diasAlvo: number;
+    diaria: number;
+    necessidadeIntegral: number;
+    metaTransferencia: number;
+    fatorEscassez: number;
+  };
+  origem: {
+    coberturaDias: number;
+    /** Excedente ainda livre no mapa neste ponto (após outros destinos do mesmo produto). */
+    excedenteDisponivel: number;
+    /** Excedente ao começar o rateamento deste produto para esta origem (= filiaisComEstoque.excedente). */
+    excedenteInicialNaRodada: number;
+    /** Estoque físico na origem (mesma base da coluna da tabela). */
+    estoqueNaOrigem: number;
+    isMatrizPrincipal: boolean;
+  };
+  regra: {
+    zonaNeutraDias: number;
+    folgaCoberturaDias: number;
+  };
+  esteEnvio: {
+    faltava: number;
+    enviado: number;
+  };
+  /** Filas de destinos nesta origem, na ordem de prioridade do algoritmo (preenchido após o rateio do item). */
+  roteiroDestinosParaEstaOrigem?: RoteiroDestinoAlocacao[];
 }
 
 interface TransferItem {
@@ -114,7 +157,10 @@ interface TransferItem {
   /** Nome canônico da filial de destino (para API) */
   destinoCanonico: string;
   quantidade: number;
+  curva: CurvaABC;
   itemOriginal: ProdutoTransferencia;
+  /** Por que esta quantidade (preenchido em `calculateTransfers`). */
+  quantidadeExplicacao?: QuantidadeExplicacaoChunk[];
 }
 
 /** Chave estável do item para marcar como "realizada" (persiste só em produção). */
@@ -128,6 +174,19 @@ function destinoTemEstoqueNegativo(item: TransferItem): boolean {
     (f) => (f.filial || "").trim().toUpperCase() === (item.destinoCanonico || "").trim().toUpperCase()
   );
   return filialDestino != null && filialDestino.stock < 0;
+}
+
+function isBlockedDestinationFilial(filial: string): boolean {
+  const normalized = (filial || "").trim().toUpperCase();
+  return normalized.includes("IBIRAPUERA");
+}
+
+function isMainMatrizFilial(companyKey: CompanyKey, filial: string): boolean {
+  const norm = (filial || "").trim().toUpperCase();
+  if (!norm) return false;
+  if (companyKey === "nerd") return norm === "NERD";
+  if (companyKey === "scarfme") return norm === "SCARF ME - MATRIZ";
+  return false;
 }
 
 /**
@@ -150,27 +209,148 @@ function formatProductDescription(descricao: string, produto: string): {
   };
 }
 
+// --- Constantes de cobertura ---
+/** Dias mínimos que uma origem ativa deve manter (não parada) */
+const DIAS_COBERTURA_MIN  = 3;
+/** Cobertura acima deste valor + sem vendas 60d → loja classificada como "parada" */
+const DIAS_PARADA_COBERTURA = 15;
+
 /**
- * Calcula a projeção de venda do mês baseado no período selecionado
+ * Cobertura alvo dinâmica com curva contínua: elimina cliffs bruscos nas fronteiras 0.3 e 1.0.
+ *
+ *   diaria = 0   → 10 dias  (mínimo giro)
+ *   diaria = 1   →  5 dias  (alto giro)
+ *   diaria > 1   → clamp em 5 (floor)
+ *   faixa máx   → 12 dias (cap para produtos muito lentos/sazonais)
+ *
+ * Fórmula: clamp(5, 12, 10 - diaria × 5)
  */
-function calculateMonthlyProjection(
-  totalVendas: number,
-  dateRange?: DateRangeValue
+function calcDiasCobertura(demandaDiaria: number): number {
+  return Math.max(5, Math.min(12, 10 - demandaDiaria * 5));
+}
+
+/**
+ * Cobertura alvo com boost para Curva A.
+ * Produtos campeões (curva A) mantêm mínimo de 7 dias — nunca podem faltar.
+ */
+function calcDiasAlvo(demandaDiaria: number, curva: CurvaABC): number {
+  const base = calcDiasCobertura(demandaDiaria);
+  return curva === 'A' ? Math.max(base, 7) : base;
+}
+
+function applyClusterCoverageBias(baseDiasAlvo: number, cluster: StoreCluster): number {
+  if (cluster === "alto") return Math.max(4, baseDiasAlvo - 1);
+  if (cluster === "baixo") return Math.min(14, baseDiasAlvo + 1);
+  return baseDiasAlvo;
+}
+
+function getFilialLeadTimeDays(
+  company: ReturnType<typeof resolveCompany>,
+  filial: string
 ): number {
-  if (!dateRange) {
-    return totalVendas;
+  const defaultLead = Math.max(0, company?.leadTimeDays?.default ?? 0);
+  const byFilial = company?.leadTimeDays?.byFilial ?? {};
+  const normFilial = (filial || "").trim().toUpperCase();
+  if (!normFilial) return defaultLead;
+  const exact = byFilial[filial];
+  if (typeof exact === "number") return Math.max(0, exact);
+  for (const [k, v] of Object.entries(byFilial)) {
+    if ((k || "").trim().toUpperCase() === normFilial) return Math.max(0, v);
+  }
+  return defaultLead;
+}
+
+function getCurvaPeso(curva: CurvaABC): number {
+  if (curva === "A") return 1.4;
+  if (curva === "B") return 1.15;
+  return 1;
+}
+
+function fmtDiasPt(n: number): string {
+  const r = Math.round(n * 10) / 10;
+  return r.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+}
+
+function fmtUnPt(n: number): string {
+  return Math.round(n).toLocaleString("pt-BR");
+}
+
+function fmtDiariaPt(n: number): string {
+  const r = Math.round(n * 100) / 100;
+  return r.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function unidadesPt(n: number): string {
+  const r = Math.round(n);
+  if (r === 1) return "1 unidade";
+  return `${fmtUnPt(n)} unidades`;
+}
+
+function textoEstoqueDestino(coberturaDias: number): string {
+  if (coberturaDias < 0.75) return "estoque quase zero";
+  if (coberturaDias < 2) return `estoque muito baixo (~${fmtDiasPt(coberturaDias)} dias)`;
+  return `estoque ~${fmtDiasPt(coberturaDias)} dias`;
+}
+
+/** Rótulo curto para o cabeçalho do tooltip de quantidade. */
+function curvaLabelCurto(curva: CurvaABC): string {
+  if (curva === "A") return "Prioritário";
+  if (curva === "B") return "Normal";
+  return "Menor prioridade";
+}
+
+type StoreCluster = "alto" | "medio" | "baixo";
+
+/**
+ * Demanda diária com piso adaptativo ao histórico anual.
+ * Evita cobertura explosiva para produtos de cauda longa sem travar com valor fixo.
+ *
+ *   piso = max(mensal/30, m12/60, 0.05)
+ *   → m12/60: adapta ao ritmo histórico real (não força 0.1 para produto que vende 1x/mês)
+ *   → 0.05: floor absoluto contra divisão por zero
+ */
+function calcDiaria(demandaMensal: number, vendas12m: number): number {
+  if (demandaMensal <= 0) return 0;
+  const m12Diaria = vendas12m / 720; // vendas12m/12 meses / 60 dias
+  return Math.max(demandaMensal / 30, m12Diaria, 0.05);
+}
+
+/**
+ * Demanda mensal ponderada: combina média anual (estabilidade) com tendência recente (reatividade).
+ *
+ * m12     = vendas12m / 12
+ * recente = vendas60d / 2        (média mensal dos últimos 60 dias)
+ * peso    = clamp(recente/m12, 0.5, 1.5)
+ * demanda = m12 × (0.5 + 0.5 × peso)
+ *
+ * Proteção de ruptura: se stock ≤ 0 e m12 > 0, eleva demanda para ≥ 70% da média anual
+ * para não penalizar filiais que ficaram sem estoque.
+ */
+function calcDemandaPonderada(
+  vendas30d: number,
+  vendas60d: number,
+  vendas12m: number,
+  stock: number
+): number {
+  const m12     = vendas12m / 12;
+  const recente = vendas60d / 2;
+
+  if (m12 <= 0) {
+    // sem histórico anual: usa vendas recentes como estimativa
+    return Math.max(recente, vendas30d);
   }
 
-  const start = new Date(dateRange.startDate);
-  const end = new Date(dateRange.endDate);
-  
-  const daysInPeriod = Math.max(
-    1,
-    Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-  );
+  const peso  = Math.max(0.5, Math.min(recente / m12, 1.5));
+  let demanda = m12 * (0.5 + 0.5 * peso);
 
-  const vendaDiaria = totalVendas / daysInPeriod;
-  return vendaDiaria * 30;
+  // Ruptura detectada: stock zerado com histórico → piso de 80% do anual OU tendência recente (maior).
+  // max(recente, m12*0.8): garante recuperação mesmo se recente caiu por falta de produto (não queda real).
+  // Evita tanto inflar produto morto (< m12) quanto subestimar produto forte que esvaziou (≥ m12*0.8).
+  if (stock <= 0 && m12 > 0) {
+    demanda = Math.max(demanda, recente, m12 * 0.8);
+  }
+
+  return demanda;
 }
 
 /**
@@ -225,482 +405,332 @@ export function calculateTransfers(
     return [];
   }
 
-  const { matriz, ecommerce, filiais } = organizeFiliais(companyKey, data);
-  const filiaisCount = filiais.length;
-  const allFiliais = [matriz, ecommerce, ...filiais].filter(Boolean) as string[];
+  const { matriz, ecommerce } = organizeFiliais(companyKey, data);
 
   const transfers: TransferItem[] = [];
+
+  // --- Curva ABC global: top 20% por vendas anuais → A | próximos 30% → B | restante → C ---
+  const curvaMap = new Map<string, CurvaABC>();
+  {
+    const ranked = data
+      .map(item => ({
+        key: `${item.produto}|${item.cor}`,
+        totalVendas12m: item.filiais.reduce((s, f) => s + f.vendas12m, 0),
+      }))
+      .sort((a, b) => b.totalVendas12m - a.totalVendas12m);
+    const n = ranked.length;
+    ranked.forEach(({ key }, i) => {
+      const pct = i / n;
+      curvaMap.set(key, pct < 0.2 ? 'A' : pct < 0.5 ? 'B' : 'C');
+    });
+  }
 
   // Mapa para rastrear quantidades já transferidas para cada destino (produto+cor+destino)
   const quantidadeTransferidaPorDestino = new Map<string, number>();
 
   data.forEach((item) => {
-    const totalEstoque = item.totalEstoque;
-    const totalVendas = item.totalVendas;
-    const projecaoVendaMes = calculateMonthlyProjection(totalVendas, dateRange);
+    const ecommerceFilialsList = company.ecommerceFilials ?? [];
 
-    // FILTRO 1: Produto deve ter vendas
-    // Se totalVendas === 0 OU projecaoVendaMes === 0 → Ignora o produto
-    if (totalVendas === 0 || projecaoVendaMes === 0) {
-      return;
-    }
+    // --- 1. Calcular demanda ponderada e cobertura por filial ---
+    const demandaPorFilial  = new Map<string, number>();
+    const coberturaPorFilial = new Map<string, number>();
 
-    // FILTRO 2: Condição básica de transferência
-    // Se alguma filial com vendas tem estoque < 1
-    // E há estoque disponível em outras filiais (≥ 1 unidade)
-    // → Produto pode ser transferido
-    // IMPORTANTE: Considerar apenas estoque positivo para verificar disponibilidade
-    const filiaisComVendas = item.filiais.filter(f => f.sales > 0);
-    const algumaFilialComEstoqueBaixo = filiaisComVendas.some(f => {
-      const estoquePositivo = Math.max(0, f.stock);
-      return estoquePositivo < 1;
-    });
-    const temEstoqueDisponivel = item.filiais.some(f => {
-      const estoquePositivo = Math.max(0, f.stock);
-      return estoquePositivo >= 1;
+    item.filiais.forEach(f => {
+      const demanda = calcDemandaPonderada(f.salesLast30Days, f.vendas60d, f.vendas12m, f.stock);
+      demandaPorFilial.set(f.filial, demanda);
+      // Piso adaptativo: max(mensal/30, m12/60, 0.05) — evita cobertura explosiva
+      const diaria    = calcDiaria(demanda, f.vendas12m);
+      const estPos    = Math.max(0, f.stock);
+      const cobertura = diaria > 0 ? estPos / diaria : (estPos > 0 ? 999 : 0);
+      coberturaPorFilial.set(f.filial, cobertura);
     });
 
-    if (!algumaFilialComEstoqueBaixo || !temEstoqueDisponivel) {
-      return;
-    }
+    // FILTRO 1: produto deve ter demanda em pelo menos uma filial
+    const totalDemanda = Array.from(demandaPorFilial.values()).reduce((s, v) => s + v, 0);
+    if (totalDemanda <= 0) return;
+
+    // Curva ABC deste produto (A = campeão, B = relevante, C = cauda)
+    const curva = curvaMap.get(`${item.produto}|${item.cor}`) ?? 'C';
+
+    // Helper: mínimo de dias que esta origem deve manter antes de ceder estoque
+    const minDiasOrigem = (f: FilialData): number => {
+      const cobertura = coberturaPorFilial.get(f.filial) || 0;
+      const isParada  = cobertura > DIAS_PARADA_COBERTURA && f.vendas60d === 0;
+      return (isMainMatrizFilial(companyKey, f.filial) || isParada) ? 0 : DIAS_COBERTURA_MIN;
+    };
+
+    // Helper: demanda diária com piso adaptativo
+    const getDiaria = (demanda: number, vendas12m: number): number =>
+      calcDiaria(demanda, vendas12m);
+
+    // --- 2. Destinos: filiais com necessidade > 0 ---
+    const estoqueAgregadoEcommerce = item.filiais
+      .filter(f => ecommerceFilialsList.some(ec => (ec||'').trim().toUpperCase() === (f.filial||'').trim().toUpperCase()))
+      .reduce((sum, f) => sum + Math.max(0, f.stock), 0);
+
+    const filiaisQuePrecisam = item.filiais
+      .filter(f => {
+        if (isBlockedDestinationFilial(f.filial)) return false;
+        const isEcommerce = ecommerceFilialsList.some(ec => (ec||'').trim().toUpperCase() === (f.filial||'').trim().toUpperCase());
+        if (isEcommerce && estoqueAgregadoEcommerce >= 1) return false;
+        const demanda = demandaPorFilial.get(f.filial) || 0;
+        if (demanda <= 0) return false;
+        // Ultra-low sellers: < 1 unidade/mês — custo logístico não justifica movimentação
+        if (demanda < 1) return false;
+        const diaria      = calcDiaria(demanda, f.vendas12m);
+        const estPos      = Math.max(0, f.stock);
+        const diasAlvo    = calcDiasAlvo(diaria, curva);
+        const necessidade = (diaria * diasAlvo) - estPos;
+        return necessidade > 0;
+      })
+      .map(f => {
+        const demanda     = demandaPorFilial.get(f.filial) || 0;
+        const diaria      = calcDiaria(demanda, f.vendas12m);
+        const estPos      = Math.max(0, f.stock);
+        const cluster: StoreCluster = "medio";
+        const diasAlvoBase = calcDiasAlvo(diaria, curva);
+        const diasAlvoCluster = applyClusterCoverageBias(diasAlvoBase, cluster);
+        const leadTimeDays = getFilialLeadTimeDays(company, f.filial);
+        const diasAlvo = diasAlvoCluster + leadTimeDays;
+        const necessidade = Math.max(0, (diaria * diasAlvo) - estPos);
+        const cobertura   = coberturaPorFilial.get(f.filial) || 0;
+        const urgencia    = Math.max(0, diasAlvo - cobertura);
+        const pesoCurva = getCurvaPeso(curva);
+        const prioridade  = (urgencia * 2 + diaria) * pesoCurva;
+        return { filial: f.filial, stock: estPos, sales: f.sales, salesLast30Days: f.salesLast30Days,
+                 demanda, diaria, diasAlvo, necessidade, cobertura, prioridade };
+      })
+      .sort((a, b) => {
+        if (b.prioridade !== a.prioridade) return b.prioridade - a.prioridade;
+        return a.cobertura - b.cobertura; // fallback: menor cobertura = mais urgente
+      });
+
+    if (filiaisQuePrecisam.length === 0) return;
+
+    // --- 3. Origens: filiais com excedente > 0 ---
+    const filiaisComEstoque = item.filiais
+      .filter(f => {
+        const demanda   = demandaPorFilial.get(f.filial) || 0;
+        const diaria    = getDiaria(demanda, f.vendas12m);
+        const estPos    = Math.max(0, f.stock);
+        const minDias   = minDiasOrigem(f);
+        const excedente = estPos - (diaria * minDias);
+        return excedente > 0;
+      })
+      .map(f => {
+        const demanda    = demandaPorFilial.get(f.filial) || 0;
+        const diaria     = getDiaria(demanda, f.vendas12m);
+        const estPos     = Math.max(0, f.stock);
+        const cobertura  = coberturaPorFilial.get(f.filial) || 0;
+        const isParada   = cobertura > DIAS_PARADA_COBERTURA && f.vendas60d === 0;
+        const minDias    = minDiasOrigem(f);
+        const excedente  = Math.max(0, estPos - (diaria * minDias));
+        return { filial: f.filial, stock: estPos, sales: f.sales, salesLast30Days: f.salesLast30Days,
+                 demanda, diaria, cobertura, isParada,
+                 isEcommerceParado: isParada && f.filial === ecommerce,
+                 excedente };
+      })
+      .sort((a, b) => {
+        if (isMainMatrizFilial(companyKey, a.filial)) return -1;
+        if (isMainMatrizFilial(companyKey, b.filial)) return 1;
+        const aP = a.isParada || a.isEcommerceParado;
+        const bP = b.isParada || b.isEcommerceParado;
+        if (aP !== bP) return aP ? -1 : 1;
+        return b.cobertura - a.cobertura; // maior cobertura = mais folga = cede primeiro
+      });
 
     const productInfo = formatProductDescription(item.descricao, item.produto);
 
-    // Estoque agregado do e-commerce (soma das filiais que compõem "E-COMMERCE" no modal)
-    // Se o canal e-commerce como um todo já tem estoque >= 1, não sugerir transferência para nenhuma filial de e-commerce
-    const ecommerceFilialsList = company.ecommerceFilials ?? [];
-    const estoqueAgregadoEcommerce = item.filiais
-      .filter(f => ecommerceFilialsList.some(ec => (ec || '').trim().toUpperCase() === (f.filial || '').trim().toUpperCase()))
-      .reduce((sum, f) => sum + Math.max(0, f.stock), 0);
+    if (filiaisComEstoque.length === 0) return;
 
-    // Identificar filiais que precisam de estoque (e portanto podem ser DESTINO de transferência)
-    // REGRA: Transferir APENAS para filial que VENDEU e está SEM ESTOQUE (estoque < 1).
-    // E-COMMERCE: usar estoque AGREGADO das filiais de e-commerce; se agregado >= 1, não sugerir transferência para nenhuma delas.
-    // Ordenação de Prioridade: 1) Quem vendeu mais primeiro  2) Em caso de empate, quem tem menos estoque primeiro
-    const filiaisQuePrecisam = filiaisComVendas
-      .filter(f => {
-        const estoquePositivo = Math.max(0, f.stock);
-        const isFilialEcommerce = ecommerceFilialsList.some(ec => (ec || '').trim().toUpperCase() === (f.filial || '').trim().toUpperCase());
-        if (isFilialEcommerce && estoqueAgregadoEcommerce >= 1) {
-          return false; // canal e-commerce já tem estoque; não sugerir transferência para nenhuma filial e-commerce
-        }
-        return estoquePositivo < 1; // somente sem estoque (0 ou negativo tratado como 0)
-      })
-      .map(f => {
-        // IMPORTANTE: Usar apenas estoque positivo para ordenação
-        const estoquePositivo = Math.max(0, f.stock);
-        return {
-          filial: f.filial,
-          stock: estoquePositivo, // Usar apenas estoque positivo
-          sales: f.sales,
-          salesLast30Days: f.salesLast30Days,
+    // Excedente disponível por origem (decrementado a cada sugestão gerada)
+    const excedenteDisponivel = new Map<string, number>(
+      filiaisComEstoque.map(f => [f.filial, f.excedente])
+    );
+
+    // Visão global do produto: quando o excedente total não cobre toda necessidade,
+    // priorizamos filiais de maior impacto (curva + urgência + demanda).
+    const necessidadeTotalGlobal = filiaisQuePrecisam.reduce((s, f) => s + Math.ceil(f.necessidade), 0);
+    const excedenteTotalGlobal = Array.from(excedenteDisponivel.values()).reduce((s, v) => s + v, 0);
+    const fatorAtendimentoGlobal =
+      necessidadeTotalGlobal > 0 ? Math.min(1, excedenteTotalGlobal / necessidadeTotalGlobal) : 1;
+
+    const ordemDestinosCanon = filiaisQuePrecisam.map((d) => d.filial);
+    const transfersDesteItem: TransferItem[] = [];
+
+    // --- 4. Para cada destino, suprir de origens em ordem de prioridade ---
+    filiaisQuePrecisam.forEach(filialDestino => {
+      const destinoKey      = `${item.produto}|${item.cor}|${filialDestino.filial}`;
+      const jaTransferido   = quantidadeTransferidaPorDestino.get(destinoKey) || 0;
+      let necessidadeTotal = Math.ceil(filialDestino.necessidade);
+      if (fatorAtendimentoGlobal < 1) {
+        const necessidadeAjustada = Math.floor(necessidadeTotal * fatorAtendimentoGlobal);
+        necessidadeTotal = curva === "A"
+          ? Math.max(1, necessidadeAjustada)
+          : Math.max(0, necessidadeAjustada);
+      }
+
+      if (jaTransferido >= necessidadeTotal) return;
+
+      let aindaNecessario = necessidadeTotal - jaTransferido;
+      let totalTransferido = jaTransferido;
+      const destinoDisplayName = company.filialDisplayNames?.[filialDestino.filial] || filialDestino.filial;
+
+      // Ordenar origens: matriz → paradas (maior excedente) → ativas (maior cobertura)
+      const origensOrdenadas = [...filiaisComEstoque].sort((a, b) => {
+        if (isMainMatrizFilial(companyKey, a.filial)) return -1;
+        if (isMainMatrizFilial(companyKey, b.filial)) return 1;
+        const aP = a.isParada || a.isEcommerceParado;
+        const bP = b.isParada || b.isEcommerceParado;
+        if (aP !== bP) return aP ? -1 : 1;
+        return (excedenteDisponivel.get(b.filial) || 0) - (excedenteDisponivel.get(a.filial) || 0);
+      });
+
+      for (const origem of origensOrdenadas) {
+        if (aindaNecessario <= 0) break;
+        if (origem.filial === filialDestino.filial) continue;
+
+        const excDisponivel = excedenteDisponivel.get(origem.filial) || 0;
+        if (excDisponivel <= 0) continue;
+
+        // Zona neutra dinâmica: só move se a origem tiver folga de cobertura vs destino.
+        // max(2, diasAlvo * 0.3): para diaria>=1 → 2 dias; para diaria<0.3 → ~3 dias
+        const zonaNeutra = Math.max(2, filialDestino.diasAlvo * 0.3);
+        const diffCobertura = origem.cobertura - filialDestino.cobertura;
+        if (diffCobertura < zonaNeutra) continue;
+
+        const quantidade = Math.min(aindaNecessario, excDisponivel);
+        if (quantidade <= 0) continue;
+
+        const origemDisplayName = company.filialDisplayNames?.[origem.filial] || origem.filial;
+
+        const qtdEnvio = Math.ceil(quantidade);
+        const explicacaoChunk: QuantidadeExplicacaoChunk = {
+          curva,
+          destino: {
+            coberturaDias: filialDestino.cobertura,
+            diasAlvo: filialDestino.diasAlvo,
+            diaria: filialDestino.diaria,
+            necessidadeIntegral: Math.ceil(filialDestino.necessidade),
+            metaTransferencia: necessidadeTotal,
+            fatorEscassez: fatorAtendimentoGlobal,
+          },
+          origem: {
+            coberturaDias: origem.cobertura,
+            excedenteDisponivel: excDisponivel,
+            excedenteInicialNaRodada: origem.excedente,
+            estoqueNaOrigem: origem.stock,
+            isMatrizPrincipal: isMainMatrizFilial(companyKey, origem.filial),
+          },
+          regra: {
+            zonaNeutraDias: zonaNeutra,
+            folgaCoberturaDias: diffCobertura,
+          },
+          esteEnvio: {
+            faltava: Math.ceil(aindaNecessario),
+            enviado: qtdEnvio,
+          },
         };
-      })
-      .sort((a, b) => {
-        // Priorizar: quem vendeu mais primeiro
-        if (b.sales !== a.sales) {
-          return b.sales - a.sales;
-        }
-        // Em caso de empate, quem tem menos estoque primeiro
-        return a.stock - b.stock;
-      });
 
-    if (filiaisQuePrecisam.length === 0) {
-      return;
-    }
-
-    // Identificar filiais com estoque disponível
-    // Critérios:
-    // - Se a filial também vende: Estoque ≥ 2 (pode transferir pelo menos 1, deixando 1 na origem)
-    // - Se a filial não vende (loja parada): Estoque ≥ 1 (pode transferir mesmo tendo apenas 1)
-    // - Matriz: sempre pode transferir (mesmo com 1 unidade, pois não vende)
-    const filiaisComEstoque = item.filiais
-      .filter(f => {
-        // Matriz sempre pode transferir (mesmo com 1 unidade)
-        if (f.filial === matriz) {
-          return f.stock >= 1;
-        }
-        // Se a filial também vende: precisa ter pelo menos 2 para transferir (deixar 1)
-        if (f.sales > 0) {
-          return f.stock >= 2;
-        }
-        // Se não tem vendas (loja parada): pode transferir mesmo tendo apenas 1
-        return f.stock >= 1;
-      })
-      .map(f => {
-        // IMPORTANTE: Usar apenas estoque positivo para cálculos
-        const estoquePositivo = Math.max(0, f.stock);
-        
-        // Verificar se está parada há pelo menos 14 dias desde a última entrada
-        // Regra: estoque positivo (>= 1) sem vendas há 14+ dias desde última entrada
-        let isParada = false;
-        let isEcommerceParado = false;
-        
-        if (estoquePositivo >= 1 && f.sales === 0 && f.salesLast30Days === 0) {
-          // Verificar se a última entrada foi há pelo menos 14 dias
-          if (f.ultimaEntrada) {
-            const hoje = new Date();
-            const dataUltimaEntrada = new Date(f.ultimaEntrada);
-            const diasDesdeUltimaEntrada = Math.floor((hoje.getTime() - dataUltimaEntrada.getTime()) / (1000 * 60 * 60 * 24));
-            
-            // Só é considerada parada se a última entrada foi há 14+ dias
-            if (diasDesdeUltimaEntrada >= 14) {
-              isParada = true;
-              isEcommerceParado = f.filial === ecommerce;
-            }
-          } else {
-            // Se não há data de entrada registrada, considerar parada (comportamento antigo)
-            isParada = true;
-            isEcommerceParado = f.filial === ecommerce;
-          }
-        }
-        
-        return {
-          filial: f.filial,
-          stock: estoquePositivo, // Usar apenas estoque positivo
-          sales: f.sales,
-          salesLast30Days: f.salesLast30Days,
-          ultimaEntrada: f.ultimaEntrada,
-          // Identificação de Lojas Paradas: estoque >= 1 E vendas no período === 0 E vendas últimos 30 dias === 0 E última entrada há 14+ dias
-          isParada,
-          // Identificação de E-commerce Parado
-          isEcommerceParado,
-        };
-      })
-      .sort((a, b) => {
-        // Ordenação de Prioridade para Origem:
-        // 1. Matriz (sempre primeiro)
-        if (a.filial === matriz) return -1;
-        if (b.filial === matriz) return 1;
-        
-        // 2. Lojas Paradas e E-commerce Parado (mesma prioridade)
-        // Entre elas, ordenadas por maior estoque primeiro
-        const aIsParadoOuEcommerceParado = a.isParada || a.isEcommerceParado;
-        const bIsParadoOuEcommerceParado = b.isParada || b.isEcommerceParado;
-        
-        if (aIsParadoOuEcommerceParado !== bIsParadoOuEcommerceParado) {
-          return aIsParadoOuEcommerceParado ? -1 : 1;
-        }
-        
-        // Se ambos são parados/e-commerce parado, ordenar por maior estoque primeiro
-        if (aIsParadoOuEcommerceParado && bIsParadoOuEcommerceParado) {
-          return b.stock - a.stock;
-        }
-        
-        // 3. Outras Filiais: ordenadas por maior estoque
-        return b.stock - a.stock;
-      });
-
-    if (filiaisComEstoque.length === 0) {
-      return;
-    }
-
-    // Mapa para rastrear estoque disponível por origem
-    // IMPORTANTE: Ignorar estoque negativo - usar apenas estoque positivo
-    const estoqueDisponivelPorOrigem = new Map<string, number>();
-    filiaisComEstoque.forEach(f => {
-      // Usar apenas estoque positivo (ignorar negativo)
-      const estoquePositivo = Math.max(0, f.stock);
-      estoqueDisponivelPorOrigem.set(f.filial, estoquePositivo);
-    });
-
-    const daysInPeriod = dateRange ? 
-      Math.max(1, Math.ceil((new Date(dateRange.endDate).getTime() - new Date(dateRange.startDate).getTime()) / (1000 * 60 * 60 * 24))) : 30;
-
-    // Calcular total de vendas de TODAS as lojas que vendem (incluindo origens)
-    const totalVendasTodasLojas = item.filiais
-      .filter(f => f.sales > 0)
-      .reduce((sum, f) => sum + f.sales, 0);
-    
-    const temMultiplasLojas = filiaisQuePrecisam.length > 1;
-    
-    // Calcular estoque total disponível (soma de todas as origens)
-    // IMPORTANTE: Ignorar estoque negativo - usar apenas estoque positivo
-    let estoqueTotalDisponivel = 0;
-    filiaisComEstoque.forEach(f => {
-      const estoquePositivo = Math.max(0, f.stock);
-      estoqueTotalDisponivel += estoquePositivo;
-    });
-    
-    const usarDistribuicaoProporcional = temMultiplasLojas;
-
-    filiaisQuePrecisam.forEach((filialDestino) => {
-      // Garantia: nunca transferir para filial que já tem estoque (rechecagem a partir dos dados atuais do item)
-      const dadosDestinoAtual = item.filiais.find(f => f.filial === filialDestino.filial);
-      const estoqueDestinoAtual = dadosDestinoAtual ? Math.max(0, dadosDestinoAtual.stock) : 0;
-      if (estoqueDestinoAtual >= 1) {
-        return; // filial destino já tem estoque deste item — não sugerir transferência
-      }
-
-      const destinoKey = `${item.produto}|${item.cor}|${filialDestino.filial}`;
-      const quantidadeJaTransferida = quantidadeTransferidaPorDestino.get(destinoKey) || 0;
-
-      let quantidadeTotalNecessaria: number;
-      
-      // IMPORTANTE: Ignorar estoque negativo - considerar apenas estoque positivo ou zero
-      // A quantidade a transferir deve ser baseada nas vendas, não no déficit de estoque
-      const estoqueAtualDestinoPositivo = Math.max(0, filialDestino.stock);
-      
-      if (usarDistribuicaoProporcional) {
-        // Distribuição proporcional: considera TODAS as lojas que vendem (incluindo origens)
-        // Proporção desta loja destino = vendas desta loja / total de vendas de todas as lojas
-        const proporcaoDestino = filialDestino.sales / totalVendasTodasLojas;
-        
-        // Quantidade que esta loja destino deveria ter = proporção × estoque total disponível
-        const quantidadeIdealDestino = Math.floor(estoqueTotalDisponivel * proporcaoDestino);
-        
-        // Quantidade necessária = quantidade ideal - estoque atual (apenas positivo)
-        // Garantir mínimo de 1 unidade se necessário
-        quantidadeTotalNecessaria = Math.max(1, quantidadeIdealDestino - estoqueAtualDestinoPositivo);
-      } else {
-        // Caso 1: Uma única loja precisa
-        // estoqueMinimo = max(2, vendas do período)
-        // quantidadeNecessaria = max(estoqueMinimo - estoqueAtual, 2)
-        // IMPORTANTE: Se estoque é negativo, tratar como zero
-        const estoqueMinimo = Math.max(2, filialDestino.sales);
-        quantidadeTotalNecessaria = Math.max(estoqueMinimo - estoqueAtualDestinoPositivo, 2);
-      }
-      
-      // GARANTIA: A quantidade nunca deve ser maior que as vendas do destino
-      // Se uma loja tem -15 de estoque e vendeu 1, deve enviar apenas 1 (não 16)
-      quantidadeTotalNecessaria = Math.min(quantidadeTotalNecessaria, filialDestino.sales);
-      
-      if (quantidadeJaTransferida >= quantidadeTotalNecessaria) {
-        return;
-      }
-
-      const quantidadeFaltante = quantidadeTotalNecessaria - quantidadeJaTransferida;
-      
-      if (quantidadeJaTransferida >= 2 && quantidadeFaltante < 2) {
-        return;
-      }
-
-      // Seleção da Origem
-      // Processo:
-      // 1. Verifica Matriz (Sempre Prioridade) - Matriz pode transferir mesmo tendo apenas 1 unidade
-      // 2. Se não houver matriz disponível: Busca lojas paradas ou e-commerce parado (maior estoque primeiro)
-      // 3. Se não houver lojas paradas: Usa outras filiais com estoque disponível
-      let melhorOrigem: typeof filiaisComEstoque[0] | null = null;
-      
-      // 1. Primeiro, verificar se matriz tem estoque disponível
-      const matrizDisponivel = filiaisComEstoque.find(f => {
-        const disponivel = estoqueDisponivelPorOrigem.get(f.filial) || 0;
-        return f.filial === matriz && disponivel >= 1;
-      });
-      
-      if (matrizDisponivel) {
-        melhorOrigem = matrizDisponivel;
-      } else {
-        // 2. Depois, tentar encontrar lojas paradas ou e-commerce parado
-        const lojasParadasOuEcommerceParado = filiaisComEstoque.filter(f => {
-          const disponivel = estoqueDisponivelPorOrigem.get(f.filial) || 0;
-          return (f.isParada || f.isEcommerceParado) && disponivel >= 1;
-        });
-        
-        if (lojasParadasOuEcommerceParado.length > 0) {
-          // Entre lojas paradas, escolher a com maior estoque primeiro
-          lojasParadasOuEcommerceParado.sort((a, b) => {
-            const estoqueA = estoqueDisponivelPorOrigem.get(a.filial) || 0;
-            const estoqueB = estoqueDisponivelPorOrigem.get(b.filial) || 0;
-            return estoqueB - estoqueA;
-          });
-          melhorOrigem = lojasParadasOuEcommerceParado[0];
-        } else {
-          // 3. Por último, usar outras filiais com estoque disponível
-          melhorOrigem = filiaisComEstoque.find(f => {
-            const disponivel = estoqueDisponivelPorOrigem.get(f.filial) || 0;
-            const minimoNecessario = f.sales > 0 ? 2 : 1;
-            return disponivel >= minimoNecessario;
-          }) || null;
-        }
-      }
-
-      if (!melhorOrigem) {
-        return;
-      }
-
-      const estoqueOrigem = estoqueDisponivelPorOrigem.get(melhorOrigem.filial) || 0;
-
-      let estoqueMinimoNaOrigem = 0;
-      if (melhorOrigem.filial === matriz) {
-        estoqueMinimoNaOrigem = 0;
-      } else if (melhorOrigem.sales > 0) {
-        // Lojas que vendem sempre deixam pelo menos 1 unidade
-        estoqueMinimoNaOrigem = 1;
-      } else if (melhorOrigem.isParada || melhorOrigem.isEcommerceParado) {
-        // Lojas paradas há 14+ dias podem transferir tudo (sem estoque mínimo)
-        estoqueMinimoNaOrigem = 0;
-      } else {
-        // Lojas que não vendem mas entraram há menos de 14 dias: deixam pelo menos 1 unidade
-        // (não podem ficar com 0, pois não estão paradas há tempo suficiente)
-        estoqueMinimoNaOrigem = 1;
-      }
-      
-      let quantidade = Math.min(quantidadeFaltante, estoqueOrigem - estoqueMinimoNaOrigem);
-      
-      // GARANTIA: A quantidade nunca deve ser maior que as vendas do destino
-      // Se uma loja tem -15 de estoque e vendeu 1, deve enviar apenas 1 (não 16)
-      quantidade = Math.min(quantidade, filialDestino.sales);
-
-      if (usarDistribuicaoProporcional) {
-        // Quando há distribuição proporcional (múltiplas lojas precisando):
-        // A distribuição proporcional já garante justiça
-        // Lojas que vendem deixam apenas 1 unidade (mínimo)
-        // Não calcula estoque mínimo baseado em vendas da origem
-        if (melhorOrigem.sales > 0 && melhorOrigem.filial !== matriz) {
-          // Lojas que vendem deixam pelo menos 1 unidade
-          quantidade = Math.min(quantidade, estoqueOrigem - 1);
-        } else if (!melhorOrigem.isParada && !melhorOrigem.isEcommerceParado && melhorOrigem.filial !== matriz) {
-          // Lojas que não vendem mas não estão paradas há 14+ dias: deixam pelo menos 1 unidade
-          quantidade = Math.min(quantidade, estoqueOrigem - 1);
-        }
-        // Matriz e lojas paradas há 14+ dias podem transferir tudo se necessário
-      } else {
-        // Quando há apenas uma loja precisando:
-        // Lojas que vendem deixam pelo menos 1 unidade
-        // Transfere o necessário para a loja destino
-        if (melhorOrigem.sales > 0 && melhorOrigem.filial !== matriz) {
-          quantidade = Math.min(quantidade, estoqueOrigem - 1);
-        } else {
-          // Se é loja parada há 14+ dias:
-          // Normalmente: transfere só o necessário
-          // Exceção: se loja parada tem ≤ 5 unidades E é obrigatório enviar: pode transferir tudo
-          const isLojaparadaOuEcommerceParado = melhorOrigem.isParada || melhorOrigem.isEcommerceParado;
-          const isLojaparadaComPoucasUnidades = isLojaparadaOuEcommerceParado && estoqueOrigem <= 5;
-          
-          if (isLojaparadaOuEcommerceParado) {
-            if (!isLojaparadaComPoucasUnidades) {
-              // Limitar a quantidade ao necessário, não transferir tudo
-              quantidade = Math.min(quantidade, quantidadeFaltante);
-            }
-            // Se for loja parada/e-commerce parado com poucas unidades, pode transferir tudo se necessário
-          } else {
-            // Se não está parada há 14+ dias: deixar pelo menos 1 unidade
-            quantidade = Math.min(quantidade, estoqueOrigem - 1);
-          }
-        }
-      }
-
-      if (quantidade > 0) {
-        const origemDisplayName = company.filialDisplayNames?.[melhorOrigem.filial] || melhorOrigem.filial;
-        const destinoDisplayName = company.filialDisplayNames?.[filialDestino.filial] || filialDestino.filial;
-
-        transfers.push({
-          produto: item.produto,
-          descricao: productInfo.name,
-          codigo: productInfo.code,
-          codigoBarra: item.codigoBarra,
-          subgrupo: item.subgrupo,
-          grade: item.grade,
-          cor: item.cor,
-          origem: origemDisplayName,
-          destino: destinoDisplayName,
-          origemCanonico: melhorOrigem.filial,
+        const transferItem: TransferItem = {
+          produto:         item.produto,
+          descricao:       productInfo.name,
+          codigo:          productInfo.code,
+          codigoBarra:     item.codigoBarra,
+          subgrupo:        item.subgrupo,
+          grade:           item.grade,
+          cor:             item.cor,
+          origem:          origemDisplayName,
+          destino:         destinoDisplayName,
+          origemCanonico:  origem.filial,
           destinoCanonico: filialDestino.filial,
-          quantidade: Math.ceil(quantidade),
-          itemOriginal: item,
+          quantidade:      qtdEnvio,
+          curva,
+          itemOriginal:    item,
+          quantidadeExplicacao: [explicacaoChunk],
+        };
+        transfers.push(transferItem);
+        transfersDesteItem.push(transferItem);
+
+        excedenteDisponivel.set(origem.filial, excDisponivel - quantidade);
+        totalTransferido += quantidade;
+        quantidadeTransferidaPorDestino.set(destinoKey, totalTransferido);
+        aindaNecessario = necessidadeTotal - totalTransferido;
+      }
+
+    });
+
+    // Roteiro: ordem dos destinos (prioridade) e quanto esta origem envia para cada um neste produto+cor.
+    const porOrigem = new Map<string, TransferItem[]>();
+    for (const t of transfersDesteItem) {
+      const k = t.origemCanonico;
+      if (!porOrigem.has(k)) porOrigem.set(k, []);
+      porOrigem.get(k)!.push(t);
+    }
+    porOrigem.forEach((lista) => {
+      const porDestino = new Map<string, { label: string; canon: string; q: number }>();
+      for (const t of lista) {
+        const canon = t.destinoCanonico;
+        const cur = porDestino.get(canon);
+        if (cur) cur.q += t.quantidade;
+        else porDestino.set(canon, { label: t.destino, canon, q: t.quantidade });
+      }
+      const roteiro: RoteiroDestinoAlocacao[] = ordemDestinosCanon
+        .filter((canon) => porDestino.has(canon))
+        .map((canon, i) => {
+          const p = porDestino.get(canon)!;
+          return {
+            ordem: i + 1,
+            destinoLabel: p.label,
+            destinoCanonico: p.canon,
+            quantidade: p.q,
+          };
         });
-
-        const novoEstoque = estoqueOrigem - quantidade;
-        estoqueDisponivelPorOrigem.set(melhorOrigem.filial, novoEstoque);
-
-        let quantidadeTotalTransferida = quantidadeJaTransferida + quantidade;
-        quantidadeTransferidaPorDestino.set(destinoKey, quantidadeTotalTransferida);
-        
-        let quantidadeAindaFaltante = quantidadeTotalNecessaria - quantidadeTotalTransferida;
-        
-        while (quantidadeAindaFaltante > 0) {
-          const outrasOrigensDisponiveis = filiaisComEstoque.filter(f => {
-            const disponivel = estoqueDisponivelPorOrigem.get(f.filial) || 0;
-            if (f.filial === melhorOrigem.filial) return false;
-            
-            if (f.filial === matriz) {
-              return disponivel >= 1;
-            }
-            // Se está parada há 14+ dias, pode transferir mesmo tendo apenas 1
-            if (f.isParada || f.isEcommerceParado) {
-              return disponivel >= 1;
-            }
-            // Se não está parada há 14+ dias, precisa ter pelo menos 2 (deixa 1)
-            const minimoNecessario = f.sales > 0 ? 2 : 1;
-            return disponivel >= minimoNecessario;
-          });
-          
-          if (outrasOrigensDisponiveis.length === 0) break;
-          
-          outrasOrigensDisponiveis.sort((a, b) => {
-            if (a.filial === matriz) return -1;
-            if (b.filial === matriz) return 1;
-            const aIsParada = a.isParada || a.isEcommerceParado;
-            const bIsParada = b.isParada || b.isEcommerceParado;
-            if (aIsParada !== bIsParada) {
-              return aIsParada ? -1 : 1;
-            }
-            const estoqueA = estoqueDisponivelPorOrigem.get(a.filial) || 0;
-            const estoqueB = estoqueDisponivelPorOrigem.get(b.filial) || 0;
-            return bIsParada ? estoqueB - estoqueA : estoqueB - estoqueA;
-          });
-          
-          const outraOrigem = outrasOrigensDisponiveis[0];
-          const estoqueOutraOrigem = estoqueDisponivelPorOrigem.get(outraOrigem.filial) || 0;
-          
-          if (estoqueOutraOrigem <= 0) break;
-          
-          let estoqueMinimoOutraOrigem = 0;
-          if (outraOrigem.filial === matriz) {
-            estoqueMinimoOutraOrigem = 0;
-          } else if (outraOrigem.sales > 0) {
-            // Lojas que vendem sempre deixam pelo menos 1 unidade
-            estoqueMinimoOutraOrigem = 1;
-          } else if (outraOrigem.isParada || outraOrigem.isEcommerceParado) {
-            // Lojas paradas há 14+ dias podem transferir tudo (sem estoque mínimo)
-            estoqueMinimoOutraOrigem = 0;
-          } else {
-            // Lojas que não vendem mas entraram há menos de 14 dias: deixam pelo menos 1 unidade
-            estoqueMinimoOutraOrigem = 1;
-          }
-          
-          let quantidadeCompletar = Math.min(quantidadeAindaFaltante, estoqueOutraOrigem - estoqueMinimoOutraOrigem);
-          
-          // GARANTIA: A quantidade nunca deve ser maior que as vendas do destino
-          // Se uma loja tem -15 de estoque e vendeu 1, deve enviar apenas 1 (não 16)
-          const quantidadeMaximaPermitida = filialDestino.sales - quantidadeTotalTransferida;
-          quantidadeCompletar = Math.min(quantidadeCompletar, Math.max(0, quantidadeMaximaPermitida));
-          
-          if (quantidadeCompletar > 0) {
-            const origemDisplayNameCompletar = company.filialDisplayNames?.[outraOrigem.filial] || outraOrigem.filial;
-            
-            transfers.push({
-              produto: item.produto,
-              descricao: productInfo.name,
-              codigo: productInfo.code,
-              codigoBarra: item.codigoBarra,
-              subgrupo: item.subgrupo,
-              grade: item.grade,
-              cor: item.cor,
-              origem: origemDisplayNameCompletar,
-              destino: destinoDisplayName,
-              origemCanonico: outraOrigem.filial,
-              destinoCanonico: filialDestino.filial,
-              quantidade: Math.ceil(quantidadeCompletar),
-              itemOriginal: item,
-            });
-            
-            const novoEstoqueOutraOrigem = estoqueOutraOrigem - quantidadeCompletar;
-            estoqueDisponivelPorOrigem.set(outraOrigem.filial, novoEstoqueOutraOrigem);
-            
-            quantidadeTotalTransferida += quantidadeCompletar;
-            quantidadeTransferidaPorDestino.set(destinoKey, quantidadeTotalTransferida);
-            
-            quantidadeAindaFaltante = quantidadeTotalNecessaria - quantidadeTotalTransferida;
-            
-            if (quantidadeAindaFaltante <= 0) break;
-          } else {
-            break;
-          }
-        }
+      for (const t of lista) {
+        t.quantidadeExplicacao?.forEach((ch) => {
+          ch.roteiroDestinosParaEstaOrigem = roteiro;
+        });
       }
     });
+  });
+
+  // --- 5. Ordenar por score estratégico ---
+  // score = gap_cobertura * quantidade * peso_curva * demanda_destino
+  // Maior score = maior impacto de venda/ruptura.
+  transfers.sort((a, b) => {
+    const filialDestA = a.itemOriginal.filiais.find(f => f.filial === a.destinoCanonico);
+    const filialOrigA = a.itemOriginal.filiais.find(f => f.filial === a.origemCanonico);
+    const filialDestB = b.itemOriginal.filiais.find(f => f.filial === b.destinoCanonico);
+    const filialOrigB = b.itemOriginal.filiais.find(f => f.filial === b.origemCanonico);
+
+    const cobFilial = (f: FilialData | undefined): number => {
+      if (!f) return 999;
+      const dem = calcDemandaPonderada(f.salesLast30Days, f.vendas60d, f.vendas12m, f.stock);
+      const dia = calcDiaria(dem, f.vendas12m);
+      return dia > 0 ? Math.max(0, f.stock) / dia : (f.stock > 0 ? 999 : 0);
+    };
+
+    const demandaDestA = calcDemandaPonderada(
+      filialDestA?.salesLast30Days ?? 0,
+      filialDestA?.vendas60d ?? 0,
+      filialDestA?.vendas12m ?? 0,
+      filialDestA?.stock ?? 0
+    );
+    const demandaDestB = calcDemandaPonderada(
+      filialDestB?.salesLast30Days ?? 0,
+      filialDestB?.vendas60d ?? 0,
+      filialDestB?.vendas12m ?? 0,
+      filialDestB?.stock ?? 0
+    );
+    const gapA = Math.max(0, cobFilial(filialOrigA) - cobFilial(filialDestA));
+    const gapB = Math.max(0, cobFilial(filialOrigB) - cobFilial(filialDestB));
+    const dkA = (a.destinoCanonico || "").trim().toUpperCase();
+    const dkB = (b.destinoCanonico || "").trim().toUpperCase();
+    const pesoDestA = getCurvaPeso(a.curva);
+    const pesoDestB = getCurvaPeso(b.curva);
+    const scoreA = gapA * a.quantidade * pesoDestA * Math.max(1, demandaDestA);
+    const scoreB = gapB * b.quantidade * pesoDestB * Math.max(1, demandaDestB);
+    return scoreB - scoreA;
   });
 
   // Consolidar itens duplicados (mesmo produto+cor+origem+destino): somar quantidades
@@ -712,6 +742,19 @@ export function calculateTransfers(
     const existente = consolidatedMap.get(k);
     if (existente) {
       existente.quantidade += t.quantidade;
+      if (t.quantidadeExplicacao?.length) {
+        existente.quantidadeExplicacao = [
+          ...(existente.quantidadeExplicacao ?? []),
+          ...t.quantidadeExplicacao,
+        ];
+      }
+      const roteiro = t.quantidadeExplicacao?.find((c) => c.roteiroDestinosParaEstaOrigem?.length)
+        ?.roteiroDestinosParaEstaOrigem;
+      if (roteiro?.length) {
+        existente.quantidadeExplicacao?.forEach((ch) => {
+          if (!ch.roteiroDestinosParaEstaOrigem?.length) ch.roteiroDestinosParaEstaOrigem = roteiro;
+        });
+      }
     } else {
       consolidatedMap.set(k, { ...t });
     }
@@ -751,6 +794,208 @@ interface TransferByDestinationGroup {
   totalQuantidade: number;
 }
 
+function QuantidadeTransferenciaTooltipBody({
+  chunks,
+  quantidadeSugerida,
+  quantidadeExibida,
+  ajustadaPorEstoqueReal,
+  destinoCanonicoAtual,
+}: {
+  chunks: QuantidadeExplicacaoChunk[] | undefined;
+  quantidadeSugerida: number;
+  quantidadeExibida: number;
+  ajustadaPorEstoqueReal: boolean;
+  destinoCanonicoAtual?: string;
+}) {
+  const [detalhesAberto, setDetalhesAberto] = useState(false);
+  const first = chunks?.[0];
+
+  if (!first) {
+    return (
+      <div className={styles.qttSimple}>
+        <p className={styles.qttLeadMuted}>Estimativa a partir de estoque e vendas por loja.</p>
+        <p className={styles.qttEnviar}>
+          <span className={styles.qttEnviarArrow} aria-hidden>
+            {"\u2192"}
+          </span>{" "}
+          Enviar: <strong>{unidadesPt(quantidadeSugerida)}</strong>
+        </p>
+        {ajustadaPorEstoqueReal ? (
+          <footer className={styles.qttCardFooter}>
+            Estoque real na célula: <strong>{unidadesPt(quantidadeExibida)}</strong>
+          </footer>
+        ) : null}
+      </div>
+    );
+  }
+
+  const d = first.destino;
+  const escassez =
+    d.fatorEscassez < 0.999 && d.metaTransferencia < d.necessidadeIntegral;
+  const roteiro = chunks.find((c) => c.roteiroDestinosParaEstaOrigem?.length)
+    ?.roteiroDestinosParaEstaOrigem;
+  const canonAtual = (destinoCanonicoAtual || "").trim().toUpperCase();
+  const enviaTotalLinha = chunks.reduce((s, c) => s + c.esteEnvio.enviado, 0);
+
+  const roteiroPorLabel = roteiro
+    ? Array.from(
+        roteiro.reduce((acc, r) => {
+          const k = (r.destinoLabel || "").trim().toUpperCase();
+          const prev = acc.get(k);
+          const isAtual = (r.destinoCanonico || "").trim().toUpperCase() === canonAtual;
+          if (prev) {
+            prev.quantidade += r.quantidade;
+            prev.isAtual = prev.isAtual || isAtual;
+          } else {
+            acc.set(k, {
+              ordem: r.ordem,
+              destinoLabel: r.destinoLabel,
+              quantidade: r.quantidade,
+              isAtual,
+            });
+          }
+          return acc;
+        }, new Map<string, { ordem: number; destinoLabel: string; quantidade: number; isAtual: boolean }>())
+          .values()
+      )
+        .sort((a, b) => a.ordem - b.ordem)
+        .map((r, i) => ({ ...r, ordem: i + 1 }))
+    : [];
+
+  const kicker = `CURVA ${first.curva} · ${curvaLabelCurto(first.curva)}`;
+  const destinoLinha = `Destino: ${textoEstoqueDestino(d.coberturaDias)} (~${fmtDiasPt(d.diasAlvo)} dias alvo)`;
+
+  const estoqueOrigem = first.origem.estoqueNaOrigem;
+  const jaAlocadoSobra = Math.max(
+    0,
+    Math.ceil(first.origem.excedenteInicialNaRodada - first.origem.excedenteDisponivel)
+  );
+  const disponivelLinha = Math.ceil(first.origem.excedenteDisponivel);
+
+  const necessidadeExibir =
+    chunks.length === 1 ? chunks[0].esteEnvio.faltava : null;
+  const disponivelExibir = chunks.length === 1 ? disponivelLinha : null;
+  const resultadoExibir = enviaTotalLinha;
+
+  return (
+    <div className={styles.qttSimple}>
+      <header className={styles.qttDecision}>
+        <p className={styles.qttKicker}>{kicker}</p>
+        <p className={styles.qttDestino}>{destinoLinha}</p>
+        <p className={styles.qttEnviar}>
+          <span className={styles.qttEnviarArrow} aria-hidden>
+            {"\u2192"}
+          </span>{" "}
+          Enviar: <strong>{unidadesPt(enviaTotalLinha)}</strong>
+        </p>
+      </header>
+
+      <div className={styles.qttMotivo}>
+        <p className={styles.qttFormulaTitulo}>Envio = min(necessidade, disponível)</p>
+        {chunks.length === 1 && necessidadeExibir != null && disponivelExibir != null ? (
+          <dl className={styles.qttFormulaDl}>
+            <div className={styles.qttFormulaRow}>
+              <dt>necessidade</dt>
+              <dd>{fmtUnPt(necessidadeExibir)}</dd>
+            </div>
+            <div className={styles.qttFormulaRow}>
+              <dt>disponível</dt>
+              <dd>{fmtUnPt(disponivelExibir)}</dd>
+            </div>
+            <div className={`${styles.qttFormulaRow} ${styles.qttFormulaRowResult}`}>
+              <dt>resultado</dt>
+              <dd>{fmtUnPt(resultadoExibir)}</dd>
+            </div>
+          </dl>
+        ) : (
+          <>
+            <p className={styles.qttLeadMuted}>
+              Vários trechos — cada um: min(necessidade, disponível). Veja a quebra em{" "}
+              <strong>Ver detalhes</strong>.
+            </p>
+            <dl className={styles.qttFormulaDl}>
+              <div className={`${styles.qttFormulaRow} ${styles.qttFormulaRowResult}`}>
+                <dt>resultado</dt>
+                <dd>{fmtUnPt(resultadoExibir)}</dd>
+              </div>
+            </dl>
+          </>
+        )}
+      </div>
+
+      <button
+        type="button"
+        className={styles.qttDetailsBtn}
+        aria-expanded={detalhesAberto}
+        onClick={() => setDetalhesAberto((v) => !v)}
+      >
+        {detalhesAberto ? "Ocultar detalhes" : "Ver detalhes"}
+      </button>
+
+      {detalhesAberto ? (
+        <div className={styles.qttDetailsPanel}>
+          <p className={styles.qttDetailsLine}>
+            <span className={styles.qttDetailsK}>Origem</span>{" "}
+            <span className={styles.qttDetailsV}>{fmtUnPt(estoqueOrigem)} em estoque</span>
+          </p>
+          {jaAlocadoSobra > 0 ? (
+            <p className={styles.qttDetailsLine}>
+              <span className={styles.qttDetailsK}>Já alocado (outros destinos)</span>{" "}
+              <span className={styles.qttDetailsV}>{fmtUnPt(jaAlocadoSobra)}</span>
+            </p>
+          ) : null}
+          <p className={styles.qttDetailsLine}>
+            <span className={styles.qttDetailsK}>Disponível p/ esta linha</span>{" "}
+            <span className={styles.qttDetailsV}>{fmtUnPt(disponivelLinha)}</span>
+          </p>
+          {roteiroPorLabel.length > 0 ? (
+            <>
+              <p className={styles.qttDetailsSubtit}>Outros destinos (esta origem)</p>
+              <ul className={styles.qttDetailsUl}>
+                {roteiroPorLabel.map((r) => (
+                  <li key={`${r.destinoLabel}-${r.ordem}`}>
+                    {r.destinoLabel} → {r.quantidade} un.
+                    {r.isAtual ? (
+                      <span className={styles.qttDetailsBadge}>esta linha</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+          {chunks.length > 1 ? (
+            <>
+              <p className={styles.qttDetailsSubtit}>Trechos (min por etapa)</p>
+              <ul className={styles.qttDetailsUl}>
+                {chunks.map((c, i) => (
+                  <li key={`trecho-${i}-${c.esteEnvio.enviado}`}>
+                    min({fmtUnPt(c.esteEnvio.faltava)},{" "}
+                    {fmtUnPt(Math.ceil(c.origem.excedenteDisponivel))}) = {fmtUnPt(c.esteEnvio.enviado)}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+          {escassez ? (
+            <p className={styles.qttDetailsNota}>
+              Meta deste destino reduzida pelo rateio do grupo:{" "}
+              <strong>{Math.round(d.fatorEscassez * 100)}%</strong> da necessidade integral.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {ajustadaPorEstoqueReal ? (
+        <footer className={styles.qttCardFooter}>
+          Estoque real na célula: <strong>{unidadesPt(quantidadeExibida)}</strong>
+          <span className={styles.qttFooterSep}>·</span>
+          sugestão antes: <strong>{unidadesPt(quantidadeSugerida)}</strong>
+        </footer>
+      ) : null}
+    </div>
+  );
+}
+
 export default function ControleTransferenciasTable({
   companyKey,
   data,
@@ -775,7 +1020,7 @@ export default function ControleTransferenciasTable({
     }
     
     // Para cada grupo de origem, agrupar itens por destino
-    return filteredTransfers.map(group => {
+    const transferGroups = filteredTransfers.map(group => {
       // Agrupar itens por destino dentro desta origem
       const itemsByDest = new Map<string, TransferItem[]>();
       
@@ -838,6 +1083,7 @@ export default function ControleTransferenciasTable({
         destinationGroups,
       };
     });
+    return transferGroups;
   }, [data, companyKey, dateRange, selectedFilial, company]);
 
   const [markedKeys, setMarkedKeys] = useState<Set<string>>(new Set());
@@ -849,6 +1095,16 @@ export default function ControleTransferenciasTable({
   const [editingQuantidadeRealKey, setEditingQuantidadeRealKey] = useState<string | null>(null);
   const [inputQuantidadeReal, setInputQuantidadeReal] = useState("");
   const [hoveredCorTooltip, setHoveredCorTooltip] = useState<{ itemKey: string; codigoCor: string } | null>(null);
+  const [quantidadeTooltip, setQuantidadeTooltip] = useState<{
+    chunks: QuantidadeExplicacaoChunk[] | undefined;
+    quantidadeSugerida: number;
+    quantidadeExibida: number;
+    ajustadaPorEstoqueReal: boolean;
+    destinoCanonicoAtual?: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const quantidadeTooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { user, isLoading: authLoading } = useAuth();
   const [permissoes, setPermissoes] = useState<TransferenciaPermissao | null>(null);
@@ -1152,6 +1408,9 @@ export default function ControleTransferenciasTable({
       if (hoverTimeoutRef.current) {
         clearTimeout(hoverTimeoutRef.current);
       }
+      if (quantidadeTooltipTimeoutRef.current) {
+        clearTimeout(quantidadeTooltipTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -1340,9 +1599,11 @@ export default function ControleTransferenciasTable({
                     const estoqueReal = quantidadesReais[itemKey];
                     const temEstoqueReal = estoqueReal !== undefined && estoqueReal !== null;
                     
-                    // Determinar se é matriz
-                    const matriz = companyKey === "nerd" ? "NERD" : companyKey === "scarfme" ? "SCARF ME - MATRIZ" : null;
-                    const isMatriz = item.origemCanonico === matriz || filialOrigemData?.filial === matriz || item.origem === matriz;
+                    // Apenas as matrizes principais (NERD e SCARF ME - MATRIZ) podem enviar tudo.
+                    const isMatriz =
+                      isMainMatrizFilial(companyKey, item.origemCanonico) ||
+                      isMainMatrizFilial(companyKey, filialOrigemData?.filial ?? "") ||
+                      isMainMatrizFilial(companyKey, item.origem);
                     
                     // Verificar se está parada há 14+ dias
                     let isParada = false;
@@ -1649,15 +1910,40 @@ export default function ControleTransferenciasTable({
                   </td>
                   <td className={styles.quantidadeCell}>
                     <span
-                      className={
-                        quantidadeAfetada && quantidadeAjustada === 0
-                          ? `${styles.quantidadeBadge} ${styles.quantidadeZero}`
-                          : quantidadeAfetada
-                          ? `${styles.quantidadeBadge} ${styles.quantidadeAjustada}`
-                          : styles.quantidadeBadge
-                      }
+                      className={styles.quantidadeBadgeWrap}
+                      onMouseEnter={(e) => {
+                        if (quantidadeTooltipTimeoutRef.current) {
+                          clearTimeout(quantidadeTooltipTimeoutRef.current);
+                          quantidadeTooltipTimeoutRef.current = null;
+                        }
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setQuantidadeTooltip({
+                          chunks: item.quantidadeExplicacao,
+                          quantidadeSugerida: item.quantidade,
+                          quantidadeExibida: quantidadeAjustada,
+                          ajustadaPorEstoqueReal: quantidadeAfetada,
+                          destinoCanonicoAtual: item.destinoCanonico,
+                          x: rect.left + rect.width / 2,
+                          y: rect.top,
+                        });
+                      }}
+                      onMouseLeave={() => {
+                        quantidadeTooltipTimeoutRef.current = setTimeout(() => {
+                          setQuantidadeTooltip(null);
+                        }, 180);
+                      }}
                     >
-                      {quantidadeAjustada}
+                      <span
+                        className={
+                          quantidadeAfetada && quantidadeAjustada === 0
+                            ? `${styles.quantidadeBadge} ${styles.quantidadeZero}`
+                            : quantidadeAfetada
+                            ? `${styles.quantidadeBadge} ${styles.quantidadeAjustada}`
+                            : styles.quantidadeBadge
+                        }
+                      >
+                        {quantidadeAjustada}
+                      </span>
                     </span>
                   </td>
                   <td className={styles.transferirCell}>
@@ -1716,6 +2002,35 @@ export default function ControleTransferenciasTable({
           </div>
         </div>
       ))}
+
+      {quantidadeTooltip ? (
+        <div
+          className={styles.quantidadeExplicacaoTooltip}
+          style={{
+            left: `${quantidadeTooltip.x}px`,
+            top: `${quantidadeTooltip.y}px`,
+          }}
+          onMouseEnter={() => {
+            if (quantidadeTooltipTimeoutRef.current) {
+              clearTimeout(quantidadeTooltipTimeoutRef.current);
+              quantidadeTooltipTimeoutRef.current = null;
+            }
+          }}
+          onMouseLeave={() => {
+            quantidadeTooltipTimeoutRef.current = setTimeout(() => {
+              setQuantidadeTooltip(null);
+            }, 120);
+          }}
+        >
+          <QuantidadeTransferenciaTooltipBody
+            chunks={quantidadeTooltip.chunks}
+            quantidadeSugerida={quantidadeTooltip.quantidadeSugerida}
+            quantidadeExibida={quantidadeTooltip.quantidadeExibida}
+            ajustadaPorEstoqueReal={quantidadeTooltip.ajustadaPorEstoqueReal}
+            destinoCanonicoAtual={quantidadeTooltip.destinoCanonicoAtual}
+          />
+        </div>
+      ) : null}
       
       {/* Tooltip com detalhes do produto */}
       {hoveredItem && (
@@ -1782,6 +2097,8 @@ export default function ControleTransferenciasTable({
                     stock: totalStock,
                     sales: totalSales,
                     salesLast30Days: totalSalesLast30Days,
+                    vendas60d: ecommerceFiliais.reduce((s, f) => s + f.vendas60d, 0),
+                    vendas12m: ecommerceFiliais.reduce((s, f) => s + f.vendas12m, 0),
                     ultimaEntrada: ultimaEntradaEcommerce,
                   };
                 }

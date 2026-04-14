@@ -20,7 +20,11 @@ export interface FilialData {
   stock: number;
   sales: number;
   salesLast30Days: number;
-  ultimaEntrada?: Date | null; // Data da última entrada na filial
+  /** Vendas dos últimos 60 dias — usado na demanda ponderada */
+  vendas60d: number;
+  /** Vendas dos últimos 12 meses — base da demanda histórica ponderada */
+  vendas12m: number;
+  ultimaEntrada?: Date | null;
 }
 
 export interface ProdutoTransferencia {
@@ -114,13 +118,26 @@ export async function fetchControleTransferencias({
       end: range?.end,
     });
 
-    // Calcular data de 30 dias atrás
+    // Calcular janelas temporais para demanda ponderada
     const thirtyDaysAgo = new Date(end);
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const sixtyDaysAgo = new Date(end);
+    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+    const twelveMonthsAgo = new Date(end);
+    twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1);
 
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
     request.input('thirtyDaysAgo', sql.DateTime, thirtyDaysAgo);
+    request.input('sixtyDaysAgo', sql.DateTime, sixtyDaysAgo);
+    request.input('twelveMonthsAgo', sql.DateTime, twelveMonthsAgo);
+
+    // minStartDate = mais antiga entre startDate, 30d, 60d e 12m
+    // twelveMonthsAgo é sempre a mais antiga — usada como piso único da query combinada
+    const minStartDate = twelveMonthsAgo;
+    request.input('minStartDate', sql.DateTime, minStartDate);
 
     const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
     const vendasFilialFilter = buildFilialFilter(request, company, filial, 'vp');
@@ -159,81 +176,59 @@ export async function fetchControleTransferencias({
       GROUP BY e.PRODUTO, e.COR_PRODUTO, c.DESC_COR, e.FILIAL
     `;
 
-    // Query otimizada: busca vendas do período
-    const vendasQuery = `
-      SELECT 
+    // Query combinada: período, 30d, 60d e 12m em um único scan da tabela de vendas.
+    // @minStartDate = twelveMonthsAgo — cobre todos os horizontes temporais de uma vez.
+    const vendasCombinedQuery = `
+      SELECT
         vp.PRODUTO AS produto,
         vp.COR_PRODUTO AS corProduto,
         ISNULL(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), '') AS corBanco,
         vp.FILIAL AS filial,
-        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.QTDE END) AS vendas
+        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0
+                 WHEN vp.DATA_VENDA >= @startDate THEN vp.QTDE
+                 ELSE 0 END) AS vendasPeriodo,
+        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0
+                 WHEN vp.DATA_VENDA >= @thirtyDaysAgo THEN vp.QTDE
+                 ELSE 0 END) AS vendasLast30Days,
+        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0
+                 WHEN vp.DATA_VENDA >= @sixtyDaysAgo THEN vp.QTDE
+                 ELSE 0 END) AS vendas60d,
+        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0
+                 WHEN vp.DATA_VENDA >= @twelveMonthsAgo THEN vp.QTDE
+                 ELSE 0 END) AS vendas12m
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
-      WHERE vp.DATA_VENDA >= @startDate
+      WHERE vp.DATA_VENDA >= @minStartDate
         AND vp.DATA_VENDA < @endDate
         AND vp.QTDE > 0
         ${vendasFilialFilter}
       GROUP BY vp.PRODUTO, vp.COR_PRODUTO, COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), vp.FILIAL
     `;
 
-    // Query otimizada: busca vendas dos últimos 30 dias
-    const vendasLast30DaysQuery = `
-      SELECT 
-        vp.PRODUTO AS produto,
-        vp.COR_PRODUTO AS corProduto,
-        ISNULL(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), '') AS corBanco,
-        vp.FILIAL AS filial,
-        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.QTDE END) AS vendas
-      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
-      WHERE vp.DATA_VENDA >= @thirtyDaysAgo
-        AND vp.DATA_VENDA < @endDate
-        AND vp.QTDE > 0
-        ${vendasFilialFilter}
-      GROUP BY vp.PRODUTO, vp.COR_PRODUTO, COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), vp.FILIAL
-    `;
-
-    // Query para buscar vendas de e-commerce do período (apenas ScarfMe quando filial é null)
-    const ecommerceVendasQuery = shouldIncludeEcommerce ? `
-      SELECT 
+    // Query combinada de e-commerce: período, 30d, 60d e 12m em um único scan
+    // Sem CAST na coluna f.EMISSAO para habilitar uso de índice (GN-5)
+    const ecommerceCombinedQuery = shouldIncludeEcommerce ? `
+      SELECT
         fp.PRODUTO AS produto,
         fp.COR_PRODUTO AS corProduto,
         ISNULL(c.DESC_COR, '') AS corBanco,
         f.FILIAL AS filial,
-        SUM(CAST(fp.QTDE AS FLOAT)) AS vendas
+        SUM(CASE WHEN f.EMISSAO >= CAST(@startDate AS DATE) THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS vendasPeriodo,
+        SUM(CASE WHEN f.EMISSAO >= CAST(@thirtyDaysAgo AS DATE) THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS vendasLast30Days,
+        SUM(CASE WHEN f.EMISSAO >= CAST(@sixtyDaysAgo AS DATE) THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS vendas60d,
+        SUM(CASE WHEN f.EMISSAO >= CAST(@twelveMonthsAgo AS DATE) THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS vendas12m
       FROM FATURAMENTO f WITH (NOLOCK)
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON fp.COR_PRODUTO = c.COR
-      WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
+      WHERE f.EMISSAO >= CAST(@minStartDate AS DATE)
+        AND f.EMISSAO < DATEADD(day, 1, CAST(@endDate AS DATE))
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         AND CAST(fp.QTDE AS FLOAT) > 0
         ${ecommerceFilialFilter}
       GROUP BY fp.PRODUTO, fp.COR_PRODUTO, c.DESC_COR, f.FILIAL
-    ` : 'SELECT NULL AS produto, NULL AS corProduto, NULL AS corBanco, NULL AS filial, 0 AS vendas WHERE 1=0';
-
-    // Query para buscar vendas de e-commerce dos últimos 30 dias
-    const ecommerceVendasLast30DaysQuery = shouldIncludeEcommerce ? `
-      SELECT 
-        fp.PRODUTO AS produto,
-        fp.COR_PRODUTO AS corProduto,
-        ISNULL(c.DESC_COR, '') AS corBanco,
-        f.FILIAL AS filial,
-        SUM(CAST(fp.QTDE AS FLOAT)) AS vendas
-      FROM FATURAMENTO f WITH (NOLOCK)
-      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
-        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
-      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON fp.COR_PRODUTO = c.COR
-      WHERE CAST(f.EMISSAO AS DATE) >= CAST(@thirtyDaysAgo AS DATE)
-        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
-        AND f.NOTA_CANCELADA = 0
-        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-        AND CAST(fp.QTDE AS FLOAT) > 0
-        ${ecommerceFilialFilter}
-      GROUP BY fp.PRODUTO, fp.COR_PRODUTO, c.DESC_COR, f.FILIAL
-    ` : 'SELECT NULL AS produto, NULL AS corProduto, NULL AS corBanco, NULL AS filial, 0 AS vendas WHERE 1=0';
+    ` : 'SELECT NULL AS produto, NULL AS corProduto, NULL AS corBanco, NULL AS filial, 0 AS vendasPeriodo, 0 AS vendasLast30Days, 0 AS vendas60d, 0 AS vendas12m WHERE 1=0';
 
     // Query para buscar última data de entrada por produto+cor+filial
     // Busca em ESTOQUE_PROD_ENT e também em LOJA_ENTRADAS_PRODUTO (priorizando a mais recente)
@@ -261,10 +256,11 @@ export async function fetchControleTransferencias({
           E.FILIAL AS filial,
           E.EMISSAO AS ultimaEntrada
         FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
-        LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) 
+        LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK)
           ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
         LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON P.COR_PRODUTO = c.COR
         WHERE P.PRODUTO IS NOT NULL
+          AND E.EMISSAO >= DATEADD(day, -180, @endDate)
           ${ultimaEntradaFilialFilterAjustado}
         
         UNION ALL
@@ -282,6 +278,7 @@ export async function fetchControleTransferencias({
           AND LEP.ROMANEIO_PRODUTO = LE.ROMANEIO_PRODUTO
         LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON LEP.COR_PRODUTO = c.COR
         WHERE LEP.PRODUTO IS NOT NULL
+          AND LE.EMISSAO >= DATEADD(day, -180, @endDate)
           ${lojaEntradasFilialFilterAjustado}
       ) AS todas_entradas
       GROUP BY produto, corProduto, corBanco, filial
@@ -308,9 +305,9 @@ export async function fetchControleTransferencias({
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
       WHERE 1=1
         ${estoqueFilialFilter}
-      
-      UNION
-      
+
+      UNION ALL
+
       SELECT DISTINCT
         vp.PRODUTO AS produto,
         vp.COR_PRODUTO AS corProduto,
@@ -327,7 +324,8 @@ export async function fetchControleTransferencias({
         ${vendasFilialFilter}
     `;
 
-    // Query para buscar códigos de barras
+    // Query para buscar códigos de barras — limitada aos produtos desta empresa/filial
+    // para evitar scan total de PRODUTOS_BARRA
     const codigoBarraQuery = `
       SELECT DISTINCT
         pb.PRODUTO AS produto,
@@ -338,10 +336,16 @@ export async function fetchControleTransferencias({
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON pb.COR_PRODUTO = c.COR
       WHERE pb.CODIGO_BARRA IS NOT NULL
         AND pb.CODIGO_BARRA <> ''
+        AND pb.PRODUTO IN (
+          SELECT DISTINCT e.PRODUTO
+          FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+          WHERE 1=1
+          ${estoqueFilialFilter}
+        )
     `;
 
-    // Executar todas as queries em paralelo
-    const [estoqueResult, vendasResult, vendasLast30DaysResult, ecommerceVendasResult, ecommerceVendasLast30DaysResult, produtoInfoResult, codigoBarraResult, ultimaEntradaResult] = await Promise.all([
+    // Executar todas as queries em paralelo (reduzido de 8 para 6 queries)
+    const [estoqueResult, vendasCombinedResult, ecommerceCombinedResult, produtoInfoResult, codigoBarraResult, ultimaEntradaResult] = await Promise.all([
       request.query<{
         produto: string;
         corProduto: string | null;
@@ -355,29 +359,21 @@ export async function fetchControleTransferencias({
         corProduto: string | null;
         corBanco: string;
         filial: string;
-        vendas: number | null;
-      }>(vendasQuery),
+        vendasPeriodo: number | null;
+        vendasLast30Days: number | null;
+        vendas60d: number | null;
+        vendas12m: number | null;
+      }>(vendasCombinedQuery),
       request.query<{
         produto: string;
         corProduto: string | null;
         corBanco: string;
         filial: string;
-        vendas: number | null;
-      }>(vendasLast30DaysQuery),
-      request.query<{
-        produto: string;
-        corProduto: string | null;
-        corBanco: string;
-        filial: string;
-        vendas: number | null;
-      }>(ecommerceVendasQuery),
-      request.query<{
-        produto: string;
-        corProduto: string | null;
-        corBanco: string;
-        filial: string;
-        vendas: number | null;
-      }>(ecommerceVendasLast30DaysQuery),
+        vendasPeriodo: number | null;
+        vendasLast30Days: number | null;
+        vendas60d: number | null;
+        vendas12m: number | null;
+      }>(ecommerceCombinedQuery),
       request.query<{
         produto: string;
         corProduto: string | null;
@@ -413,77 +409,50 @@ export async function fetchControleTransferencias({
       return (filial || '').trim().toUpperCase();
     };
 
-    // Criar mapeamento reverso de filialDisplayNames para encontrar nome canônico
-    // Se "LEBLON" está mapeado para "NERD LEBLON", precisamos encontrar "NERD LEBLON" quando vier "LEBLON"
-    // companyConfig já foi declarado acima, reutilizar
-    const filialCanonicoMap = new Map<string, string>();
-    if (companyConfig?.filialDisplayNames) {
-      // Criar mapeamento reverso: displayName -> nomeCanonico
-      Object.entries(companyConfig.filialDisplayNames).forEach(([canonico, display]) => {
-        const canonicoNormalizado = normalizeFilial(canonico);
-        const displayNormalizado = normalizeFilial(display);
-        // Mapear tanto o nome canônico quanto o display name para o nome canônico
-        filialCanonicoMap.set(canonicoNormalizado, canonicoNormalizado);
-        filialCanonicoMap.set(displayNormalizado, canonicoNormalizado);
-      });
+    // Pré-construir mapa de lookup de filiais (O(1) por chamada em vez de 4 varreduras lineares)
+    // Os resultsets do SQL já vêm filtrados pelo IN clause, então o mapa cobre todos os casos reais.
+    const filialLookupMap = new Map<string, string>();
+    const filialFiltersInventory = companyConfig?.filialFilters?.inventory ?? [];
+
+    // Passo 1: correspondências exatas com filiais configuradas (maior prioridade)
+    for (const filialFiltro of filialFiltersInventory) {
+      const norm = normalizeFilial(filialFiltro);
+      filialLookupMap.set(norm, norm);
     }
 
-    // Função para obter nome canônico da filial
-    // Sempre retorna o nome canônico (do filtro) para garantir consistência
+    // Passo 2: display names → canônico
+    if (companyConfig?.filialDisplayNames) {
+      for (const [canonico, display] of Object.entries(companyConfig.filialDisplayNames)) {
+        const normCanonico = normalizeFilial(canonico);
+        const normDisplay = normalizeFilial(display);
+        if (!filialLookupMap.has(normDisplay)) filialLookupMap.set(normDisplay, normCanonico);
+        if (!filialLookupMap.has(normCanonico)) filialLookupMap.set(normCanonico, normCanonico);
+      }
+    }
+
+    // Passo 3: correspondência parcial — palavras do nome configurado (ex: "LEBLON" → "NERD LEBLON")
+    for (const filialFiltro of filialFiltersInventory) {
+      const normFiltro = normalizeFilial(filialFiltro);
+      for (const parte of normFiltro.split(/\s+/).filter(p => p.length > 3)) {
+        if (!filialLookupMap.has(parte)) filialLookupMap.set(parte, normFiltro);
+      }
+    }
+
+    // Lookup O(1): todos os casos reais estão pré-indexados acima
     const getFilialCanonico = (filial: string): string => {
       const normalizado = normalizeFilial(filial);
-      
-      // 1. Verificar correspondência exata com filiais do filtro (prioridade máxima)
-      if (companyConfig?.filialFilters?.inventory) {
-        for (const filialFiltro of companyConfig.filialFilters.inventory) {
-          const filialFiltroNormalizada = normalizeFilial(filialFiltro);
-          if (normalizado === filialFiltroNormalizada) {
-            return filialFiltroNormalizada; // Retornar nome canônico do filtro
-          }
-        }
-      }
-      
-      // 2. Verificar se existe no mapeamento reverso (display name -> canônico)
-      if (filialCanonicoMap.has(normalizado)) {
-        return filialCanonicoMap.get(normalizado)!;
-      }
-      
-      // 3. Verificar correspondência parcial com filiais do filtro
-      // Ex: "LEBLON" deve mapear para "NERD LEBLON" se "NERD LEBLON" está no filtro
-      if (companyConfig?.filialFilters?.inventory) {
-        for (const filialFiltro of companyConfig.filialFilters.inventory) {
-          const filialFiltroNormalizada = normalizeFilial(filialFiltro);
-          // Se o nome do banco está contido no nome do filtro ou vice-versa
-          if (normalizado.includes(filialFiltroNormalizada) || filialFiltroNormalizada.includes(normalizado)) {
-            // Sempre preferir o nome do filtro (mais completo e canônico)
-            return filialFiltroNormalizada;
-          }
-        }
-      }
-      
-      // 4. Verificar correspondência com display names
-      if (companyConfig?.filialDisplayNames) {
-        for (const [canonico, display] of Object.entries(companyConfig.filialDisplayNames)) {
-          const canonicoNormalizado = normalizeFilial(canonico);
-          const displayNormalizado = normalizeFilial(display);
-          if (normalizado === displayNormalizado || normalizado === canonicoNormalizado) {
-            return canonicoNormalizado; // Retornar nome canônico
-          }
-        }
-      }
-      
-      // 5. Se não encontrou correspondência, retornar normalizado
-      // (pode ser uma filial não mapeada, mas pelo menos está normalizada)
-      return normalizado;
+      return filialLookupMap.get(normalizado) ?? normalizado;
     };
 
     // Processar resultados
-    const estoqueMap = new Map<string, Map<string, number>>();
-    const vendasMap = new Map<string, Map<string, number>>();
-    const vendasLast30DaysMap = new Map<string, Map<string, number>>();
-    const ultimaEntradaMap = new Map<string, Map<string, Date | null>>(); // produto+cor -> filial -> data
-    const produtoInfoMap = new Map<string, { descricao: string; cor: string; subgrupo?: string; grade?: string }>();
-    const codigoBarraMap = new Map<string, string>();
+    const estoqueMap            = new Map<string, Map<string, number>>();
+    const vendasMap             = new Map<string, Map<string, number>>();
+    const vendasLast30DaysMap   = new Map<string, Map<string, number>>();
+    const vendas60dMap          = new Map<string, Map<string, number>>();
+    const vendas12mMap          = new Map<string, Map<string, number>>();
+    const ultimaEntradaMap      = new Map<string, Map<string, Date | null>>();
+    const produtoInfoMap        = new Map<string, { descricao: string; cor: string; subgrupo?: string; grade?: string }>();
+    const codigoBarraMap        = new Map<string, string>();
 
     // Processar estoque (chave estável por produto+corProduto para evitar duplicatas)
     estoqueResult.recordset.forEach(row => {
@@ -504,79 +473,43 @@ export async function fetchControleTransferencias({
       filialMap.set(filialCanonico, (filialMap.get(filialCanonico) || 0) + stock);
     });
 
-    // Processar vendas normais (chave estável)
-    vendasResult.recordset.forEach(row => {
+    // Helper: acumula um valor num Map<chave, Map<filial, number>>
+    const acumular = (
+      mapa: Map<string, Map<string, number>>,
+      chave: string,
+      filial: string,
+      qtd: number
+    ) => {
+      if (!mapa.has(chave)) mapa.set(chave, new Map());
+      const fm = mapa.get(chave)!;
+      fm.set(filial, (fm.get(filial) || 0) + qtd);
+    };
+
+    // Processar vendas normais combinadas (período, 30d, 60d e 12m em uma única passagem)
+    vendasCombinedResult.recordset.forEach(row => {
       const produto = row.produto?.trim() || '';
       const chave = getChaveStable(produto, row.corProduto);
-      
-      if (!vendasMap.has(chave)) {
-        vendasMap.set(chave, new Map());
-      }
-      
-      const filialMap = vendasMap.get(chave)!;
-      const vendas = Number(row.vendas ?? 0);
-      
-      // Usar nome canônico da filial para agrupar
-      const filialCanonico = getFilialCanonico(row.filial);
-      filialMap.set(filialCanonico, (filialMap.get(filialCanonico) || 0) + vendas);
+      const filial = getFilialCanonico(row.filial);
+
+      acumular(vendasMap,           chave, filial, Number(row.vendasPeriodo   ?? 0));
+      acumular(vendasLast30DaysMap, chave, filial, Number(row.vendasLast30Days ?? 0));
+      acumular(vendas60dMap,        chave, filial, Number(row.vendas60d        ?? 0));
+      acumular(vendas12mMap,        chave, filial, Number(row.vendas12m        ?? 0));
     });
 
-    // Processar vendas de e-commerce (agregar com vendas normais, chave estável)
+    // Processar vendas de e-commerce combinadas (período, 30d, 60d e 12m)
     if (shouldIncludeEcommerce) {
-      ecommerceVendasResult.recordset.forEach(row => {
+      ecommerceCombinedResult.recordset.forEach(row => {
         const produto = row.produto?.trim() || '';
-        if (!produto) return; // Ignorar linhas vazias da query dummy
-        
-        const chave = getChaveStable(produto, row.corProduto);
-        
-        if (!vendasMap.has(chave)) {
-          vendasMap.set(chave, new Map());
-        }
-        
-        const filialMap = vendasMap.get(chave)!;
-        const vendas = Number(row.vendas ?? 0);
-        
-        // Usar nome canônico da filial para agrupar
-        const filialCanonico = getFilialCanonico(row.filial);
-        filialMap.set(filialCanonico, (filialMap.get(filialCanonico) || 0) + vendas);
-      });
-    }
+        if (!produto) return;
 
-    // Processar vendas últimos 30 dias (normais, chave estável)
-    vendasLast30DaysResult.recordset.forEach(row => {
-      const produto = row.produto?.trim() || '';
-      const chave = getChaveStable(produto, row.corProduto);
-      
-      if (!vendasLast30DaysMap.has(chave)) {
-        vendasLast30DaysMap.set(chave, new Map());
-      }
-      
-      const filialMap = vendasLast30DaysMap.get(chave)!;
-      const vendas = Number(row.vendas ?? 0);
-      
-      // Usar nome canônico da filial para agrupar
-      const filialCanonico = getFilialCanonico(row.filial);
-      filialMap.set(filialCanonico, (filialMap.get(filialCanonico) || 0) + vendas);
-    });
-
-    // Processar vendas de e-commerce dos últimos 30 dias (chave estável)
-    if (shouldIncludeEcommerce) {
-      ecommerceVendasLast30DaysResult.recordset.forEach(row => {
-        const produto = row.produto?.trim() || '';
-        if (!produto) return; // Ignorar linhas vazias da query dummy
-        
         const chave = getChaveStable(produto, row.corProduto);
-        
-        if (!vendasLast30DaysMap.has(chave)) {
-          vendasLast30DaysMap.set(chave, new Map());
-        }
-        
-        const filialMap = vendasLast30DaysMap.get(chave)!;
-        const vendas = Number(row.vendas ?? 0);
-        
-        // Usar nome canônico da filial para agrupar
-        const filialCanonico = getFilialCanonico(row.filial);
-        filialMap.set(filialCanonico, (filialMap.get(filialCanonico) || 0) + vendas);
+        const filial = getFilialCanonico(row.filial);
+
+        acumular(vendasMap,           chave, filial, Number(row.vendasPeriodo   ?? 0));
+        acumular(vendasLast30DaysMap, chave, filial, Number(row.vendasLast30Days ?? 0));
+        acumular(vendas60dMap,        chave, filial, Number(row.vendas60d        ?? 0));
+        acumular(vendas12mMap,        chave, filial, Number(row.vendas12m        ?? 0));
       });
     }
 
@@ -653,12 +586,14 @@ export async function fetchControleTransferencias({
         descricao: '',
         cor: getColorDescription(corProduto, ''),
       };
-      
-      const estoquePorFilial = estoqueMap.get(chave) || new Map();
-      const vendasPorFilial = vendasMap.get(chave) || new Map();
+
+      const estoquePorFilial         = estoqueMap.get(chave)          || new Map();
+      const vendasPorFilial          = vendasMap.get(chave)            || new Map();
       const vendasLast30DaysPorFilial = vendasLast30DaysMap.get(chave) || new Map();
-      const ultimaEntradaPorFilial = ultimaEntradaMap.get(chave) || new Map();
-      
+      const vendas60dPorFilial       = vendas60dMap.get(chave)         || new Map();
+      const vendas12mPorFilial       = vendas12mMap.get(chave)         || new Map();
+      const ultimaEntradaPorFilial   = ultimaEntradaMap.get(chave)     || new Map();
+
       // Obter todas as filiais únicas
       const todasFiliais = new Set([
         ...estoquePorFilial.keys(),
@@ -667,13 +602,14 @@ export async function fetchControleTransferencias({
         ...ultimaEntradaPorFilial.keys(),
       ]);
 
-      // Reconhecimento de vendas sempre em últimos 30 dias (evita queda de transferências ao virar o mês)
       const filiais: FilialData[] = Array.from(todasFiliais).map(filial => ({
         filial,
-        stock: estoquePorFilial.get(filial) || 0,
-        sales: vendasLast30DaysPorFilial.get(filial) || 0,
+        stock:           estoquePorFilial.get(filial)          || 0,
+        sales:           vendasLast30DaysPorFilial.get(filial) || 0,
         salesLast30Days: vendasLast30DaysPorFilial.get(filial) || 0,
-        ultimaEntrada: ultimaEntradaPorFilial.get(filial) || null,
+        vendas60d:       vendas60dPorFilial.get(filial)        || 0,
+        vendas12m:       vendas12mPorFilial.get(filial)        || 0,
+        ultimaEntrada:   ultimaEntradaPorFilial.get(filial)    || null,
       }));
 
       const totalVendas = Array.from(vendasLast30DaysPorFilial.values()).reduce((sum, v) => sum + v, 0);
@@ -732,13 +668,17 @@ export async function fetchControleTransferencias({
             stock: 0,
             sales: 0,
             salesLast30Days: 0,
+            vendas60d: 0,
+            vendas12m: 0,
             ultimaEntrada: null,
           });
         }
         const acc = filiaisMap.get(filial)!;
-        acc.stock += f.stock;
-        acc.sales += f.sales;
+        acc.stock           += f.stock;
+        acc.sales           += f.sales;
         acc.salesLast30Days += f.salesLast30Days;
+        acc.vendas60d       += f.vendas60d;
+        acc.vendas12m       += f.vendas12m;
         acc.ultimaEntrada =
           !acc.ultimaEntrada && f.ultimaEntrada
             ? f.ultimaEntrada

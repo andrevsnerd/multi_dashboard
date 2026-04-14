@@ -25,7 +25,7 @@
     "id": "880503be-18cb-4557-b7e5-747a9e55ac66",
     "companyKey": "scarfme",
     "sourceContextKey": "scarfme::::::0::porcor::g=::l=::c=::s=::gr=",
-    "title": "Compra 14/04/2026",
+    "title": "Compra 14/04/2026 | Lenços",
     "expandirPorCor": true,
     "items": [
       {
@@ -36,7 +36,7 @@
         "descricao": "PANTANAL 05/23",
         "grade": "45X210",
         "colecao": "O8",
-        "qtdManual": 0,
+        "qtdManual": 14,
         "custoUnitario": 31.03
       },
       {
@@ -47,7 +47,7 @@
         "descricao": "PASHMINA LISA VISCOSE *",
         "grade": "70X180",
         "colecao": "48",
-        "qtdManual": 30,
+        "qtdManual": 9,
         "custoUnitario": 49.98
       },
       {
@@ -58,7 +58,7 @@
         "descricao": "MODERN DUBAI TERROSO 04/23",
         "grade": "50X50",
         "colecao": "P5",
-        "qtdManual": 43,
+        "qtdManual": 4,
         "custoUnitario": 10.47
       },
       {
@@ -69,7 +69,7 @@
         "descricao": "PASHMINA EM ACRÍLICO 06/23",
         "grade": "70 X 200",
         "colecao": "P2",
-        "qtdManual": 7,
+        "qtdManual": 10,
         "custoUnitario": 19
       },
       {
@@ -80,7 +80,7 @@
         "descricao": "PASHMINA LISA VISCOSE *",
         "grade": "70X180",
         "colecao": "48",
-        "qtdManual": 24,
+        "qtdManual": 4,
         "custoUnitario": 49.98
       },
       {
@@ -91,7 +91,7 @@
         "descricao": "BANDANA 11/24",
         "grade": "45X210",
         "colecao": "T6",
-        "qtdManual": 0,
+        "qtdManual": 12,
         "custoUnitario": 31.03
       },
       {
@@ -102,7 +102,7 @@
         "descricao": "ZARI DUPLA FACE 08/21",
         "grade": "75X200",
         "colecao": "90",
-        "qtdManual": 0,
+        "qtdManual": 10,
         "custoUnitario": 158.94
       },
       {
@@ -113,7 +113,7 @@
         "descricao": "PILAR 09/24",
         "grade": "90X90",
         "colecao": "R7",
-        "qtdManual": 25,
+        "qtdManual": 14,
         "custoUnitario": 140.31
       },
       {
@@ -124,7 +124,7 @@
         "descricao": "CARTAO POSTAL 04/25",
         "grade": "90X90",
         "colecao": "U7",
-        "qtdManual": 53,
+        "qtdManual": 15,
         "custoUnitario": 33.32
       },
       {
@@ -135,7 +135,7 @@
         "descricao": "PASHMINA GEOMETRICO 04/24",
         "grade": "60X180",
         "colecao": "48",
-        "qtdManual": 9,
+        "qtdManual": 15,
         "custoUnitario": 67
       },
       {
@@ -146,7 +146,7 @@
         "descricao": "PASHMINA LISA VISCOSE *",
         "grade": "70X180",
         "colecao": "48",
-        "qtdManual": 38,
+        "qtdManual": 8,
         "custoUnitario": 49.98
       },
       {
@@ -157,7 +157,7 @@
         "descricao": "A NEGRA 04/25",
         "grade": "90X90",
         "colecao": "U7",
-        "qtdManual": 9,
+        "qtdManual": 18,
         "custoUnitario": 172.16
       },
       {
@@ -168,7 +168,7 @@
         "descricao": "ARGOLA AMARRAÇÃO 09/19*",
         "grade": "UNICO",
         "colecao": "89",
-        "qtdManual": 26,
+        "qtdManual": 7,
         "custoUnitario": 25.56
       },
       {
@@ -179,7 +179,7 @@
         "descricao": "CASHMERE DIAMANTE 04/19*",
         "grade": "70 X 200",
         "colecao": "90",
-        "qtdManual": 0,
+        "qtdManual": 14,
         "custoUnitario": 64.52
       },
       {
@@ -190,7 +190,7 @@
         "descricao": "CASHMERE DIAMANTE 04/19*",
         "grade": "70 X 200",
         "colecao": "90",
-        "qtdManual": 0,
+        "qtdManual": 15,
         "custoUnitario": 64.52
       },
       {
@@ -201,7 +201,7 @@
         "descricao": "ZARI DUPLA FACE 08/21",
         "grade": "75X200",
         "colecao": "90",
-        "qtdManual": 12,
+        "qtdManual": 17,
         "custoUnitario": 158.94
       },
       {
@@ -212,7 +212,7 @@
         "descricao": "PASHMINA LISA VISCOSE *",
         "grade": "70X180",
         "colecao": "48",
-        "qtdManual": 34,
+        "qtdManual": 13,
         "custoUnitario": 49.98
       },
       {
@@ -383,6 +383,6 @@
     ],
     "comprada": false,
     "savedAt": "2026-04-14T12:15:54.931Z",
-    "updatedAt": "2026-04-14T12:15:54.931Z"
+    "updatedAt": "2026-04-14T13:57:12.187Z"
   }
 ]

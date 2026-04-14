@@ -531,6 +531,270 @@
   padding: 8px 16px;
 }
 
+.quantidadeBadgeWrap {
+  display: inline-flex;
+  cursor: help;
+  position: relative;
+  vertical-align: middle;
+}
+
+/* Tooltip fixo: motivo da quantidade (acima da célula) */
+.quantidadeExplicacaoTooltip {
+  position: fixed;
+  z-index: 1002;
+  max-width: min(360px, calc(100vw - 24px));
+  transform: translate(-50%, calc(-100% - 10px));
+  padding: 0;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14), 0 4px 12px rgba(15, 23, 42, 0.08);
+  font-size: 12px;
+  line-height: 1.45;
+  color: #334155;
+  pointer-events: auto;
+  text-align: left;
+  overflow: hidden;
+}
+
+.quantidadeExplicacaoTooltip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #ffffff;
+  filter: drop-shadow(0 1px 0 #e2e8f0);
+}
+
+/* Tooltip quantidade — layout enxuto (decisão + fórmula + detalhes) */
+.qttSimple {
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.qttDecision {
+  margin: 0;
+  padding-bottom: 2px;
+}
+
+.qttKicker {
+  margin: 0 0 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.qttDestino {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.35;
+}
+
+.qttEnviar {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.qttEnviarArrow {
+  margin-right: 2px;
+  color: #6366f1;
+  font-weight: 800;
+}
+
+.qttMotivo {
+  margin: 0;
+  padding: 10px 11px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.qttFormulaTitulo {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
+  color: #0f172a;
+}
+
+.qttLeadMuted {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.qttFormulaDl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.qttFormulaRow {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.qttFormulaRow dt {
+  margin: 0;
+  font-weight: 600;
+  color: #475569;
+}
+
+.qttFormulaRow dd {
+  margin: 0;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #0f172a;
+}
+
+.qttFormulaRowResult {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px dashed #cbd5e1;
+}
+
+.qttFormulaRowResult dt {
+  color: #0f172a;
+}
+
+.qttFormulaRowResult dd {
+  color: #4f46e5;
+  font-size: 14px;
+}
+
+.qttDetailsBtn {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.qttDetailsBtn:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.qttDetailsPanel {
+  margin: 0;
+  padding: 10px 11px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #475569;
+}
+
+.qttDetailsLine {
+  margin: 0 0 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+}
+
+.qttDetailsLine:last-of-type {
+  margin-bottom: 0;
+}
+
+.qttDetailsK {
+  font-weight: 700;
+  color: #64748b;
+}
+
+.qttDetailsV {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #0f172a;
+}
+
+.qttDetailsSubtit {
+  margin: 10px 0 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.qttDetailsSubtit:first-child {
+  margin-top: 0;
+}
+
+.qttDetailsUl {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.qttDetailsUl li {
+  margin: 0 0 4px;
+}
+
+.qttDetailsBadge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #1e40af;
+  background: #dbeafe;
+  border: 1px solid #93c5fd;
+  vertical-align: middle;
+}
+
+.qttDetailsNota {
+  margin: 10px 0 0;
+  padding: 8px 9px;
+  border-radius: 8px;
+  font-size: 11px;
+  color: #9a3412;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+}
+
+.qttCardFooter {
+  margin: 0 -14px -14px;
+  padding: 10px 14px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #475569;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+}
+
+.qttFooterSep {
+  margin: 0 6px;
+  color: #cbd5e1;
+}
+
 .quantidadeBadge {
   display: inline-block;
   padding: 4px 12px;

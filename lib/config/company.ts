@@ -22,6 +22,11 @@ export interface CompanyConfig {
    * Quando a filial canônica é selecionada, todas do grupo são incluídas nas consultas.
    */
   filialGroups?: Record<string, string[]>;
+  /** Lead time de reposição em dias (pode ser global e/ou por filial canônica). */
+  leadTimeDays?: {
+    default?: number;
+    byFilial?: Record<string, number>;
+  };
 }
 
 const companyConfigs: Record<CompanyKey, CompanyConfig> = {
@@ -60,6 +65,12 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
       'NERD': 'MATRIZ',
     },
     estoqueFilialOrder: ['MATRIZ', 'NERD MORUMBI 1 (RRJ)', 'NERD MORUMBI 2 (RRX)', 'ELDORADO', 'VILLA LOBOS', 'HIGIENOPOLIS', 'LEBLON', 'CENTER NORTE'],
+    leadTimeDays: {
+      default: 2,
+      byFilial: {
+        'NERD': 1,
+      },
+    },
   },
   scarfme: {
     key: 'scarfme',
@@ -139,6 +150,15 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
       'EMBALAGENS',
       'CAPAS E ACESSORIOS P/ CEL',
     ],
+    leadTimeDays: {
+      default: 3,
+      byFilial: {
+        'SCARF ME - MATRIZ': 2,
+        'SCARFME MATRIZ CMS': 2,
+        'SCARF ME - MATRIZ LLL': 2,
+        'SCARF ME MATRIZ - FFF': 2,
+      },
+    },
   },
 };
 
