@@ -779,24 +779,37 @@ export default function ListaCompraSugeridaPage({
         windowHeight: target.scrollHeight,
       });
 
+      const pageWidthMm = 210;
+      const pageHeightMm = (canvas.height * pageWidthMm) / canvas.width;
+      const maxSinglePageHeightMm = 5000;
+
+      if (pageHeightMm <= maxSinglePageHeightMm) {
+        const pdf = new jsPDF({
+          orientation: "portrait",
+          unit: "mm",
+          format: [pageWidthMm, pageHeightMm],
+        });
+        pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, pageWidthMm, pageHeightMm, undefined, "FAST");
+        const dateStr = new Date().toISOString().slice(0, 10);
+        pdf.save(`compra-final-${companyKey}-${dateStr}.pdf`);
+        return;
+      }
+
       const pdf = new jsPDF({
-        orientation: canvas.width > canvas.height ? "landscape" : "portrait",
+        orientation: "portrait",
         unit: "mm",
         format: "a4",
       });
-
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const imgWidth = pageWidth;
       const pageHeightPx = Math.floor((canvas.width * pageHeight) / pageWidth);
-
       let renderedHeightPx = 0;
       let pageIndex = 0;
 
       while (renderedHeightPx < canvas.height) {
         const remainingHeightPx = canvas.height - renderedHeightPx;
         const sliceHeightPx = Math.min(pageHeightPx, remainingHeightPx);
-
         const pageCanvas = document.createElement("canvas");
         pageCanvas.width = canvas.width;
         pageCanvas.height = sliceHeightPx;
@@ -805,18 +818,7 @@ export default function ListaCompraSugeridaPage({
 
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-        ctx.drawImage(
-          canvas,
-          0,
-          renderedHeightPx,
-          canvas.width,
-          sliceHeightPx,
-          0,
-          0,
-          pageCanvas.width,
-          pageCanvas.height
-        );
-
+        ctx.drawImage(canvas, 0, renderedHeightPx, canvas.width, sliceHeightPx, 0, 0, pageCanvas.width, pageCanvas.height);
         const imgHeight = (sliceHeightPx * imgWidth) / canvas.width;
         if (pageIndex > 0) pdf.addPage();
         pdf.addImage(pageCanvas.toDataURL("image/png"), "PNG", 0, 0, imgWidth, imgHeight, undefined, "FAST");
