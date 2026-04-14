@@ -180,6 +180,8 @@ export default function CompraSalvaDetalhePage({
   const destinoVendasFetchRef = useRef(new Set<string>());
   const [listaRowsRefreshKey, setListaRowsRefreshKey] = useState(0);
   const [vendasRefreshKey, setVendasRefreshKey] = useState(0);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const compraSalvaExportRef = useRef<HTMLDivElement>(null);
 
   const expandirPorCor = doc?.expandirPorCor ?? true;
 
@@ -420,6 +422,80 @@ export default function CompraSalvaDetalhePage({
     XLSX.writeFile(wb, `${safeName}.xlsx`);
   };
 
+  const handleExportPdf = async () => {
+    if (!compraSalvaExportRef.current || items.length === 0) return;
+
+    setExportingPdf(true);
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+
+      const target = compraSalvaExportRef.current;
+      const canvas = await html2canvas(target, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+        windowWidth: target.scrollWidth,
+        windowHeight: target.scrollHeight,
+      });
+
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? "landscape" : "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth;
+      const pageHeightPx = Math.floor((canvas.width * pageHeight) / pageWidth);
+
+      let renderedHeightPx = 0;
+      let pageIndex = 0;
+
+      while (renderedHeightPx < canvas.height) {
+        const remainingHeightPx = canvas.height - renderedHeightPx;
+        const sliceHeightPx = Math.min(pageHeightPx, remainingHeightPx);
+
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sliceHeightPx;
+        const ctx = pageCanvas.getContext("2d");
+        if (!ctx) break;
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        ctx.drawImage(
+          canvas,
+          0,
+          renderedHeightPx,
+          canvas.width,
+          sliceHeightPx,
+          0,
+          0,
+          pageCanvas.width,
+          pageCanvas.height
+        );
+
+        const imgHeight = (sliceHeightPx * imgWidth) / canvas.width;
+        if (pageIndex > 0) pdf.addPage();
+        pdf.addImage(pageCanvas.toDataURL("image/png"), "PNG", 0, 0, imgWidth, imgHeight, undefined, "FAST");
+
+        renderedHeightPx += sliceHeightPx;
+        pageIndex += 1;
+      }
+
+      const safeName = (doc?.title ?? "compra-salva").replace(/[^\w\-]+/g, "_").slice(0, 80);
+      pdf.save(`${safeName}.pdf`);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Erro ao exportar PDF");
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   const listBack = `/${companySlug}/controle-estoque/projecao/lista-compra?tab=compras-salvas`;
 
   return (
@@ -480,7 +556,7 @@ export default function CompraSalvaDetalhePage({
       {error && <div className={styles.error}>{error}</div>}
 
       {!loading && !error && doc && (
-        <>
+        <div ref={compraSalvaExportRef}>
           <div className={styles.summaryCard} style={{ justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 32, flexWrap: "wrap" }}>
               <div className={styles.summaryItem}>
@@ -498,9 +574,19 @@ export default function CompraSalvaDetalhePage({
                 <span className={styles.summaryValue}>{fmtBRL(totals.totalCusto)}</span>
               </div>
             </div>
-            <button type="button" className={styles.exportBtn} onClick={handleExportXlsx}>
-              Exportar XLSX
-            </button>
+            <div className={styles.exportActions}>
+              <button type="button" className={styles.exportBtn} onClick={handleExportXlsx}>
+                Exportar XLSX
+              </button>
+              <button
+                type="button"
+                className={styles.exportBtn}
+                disabled={exportingPdf || items.length === 0}
+                onClick={() => { void handleExportPdf(); }}
+              >
+                {exportingPdf ? "Exportando PDF…" : "Exportar PDF"}
+              </button>
+            </div>
           </div>
 
           {items.length === 0 ? (
@@ -671,7 +757,7 @@ export default function CompraSalvaDetalhePage({
               </table>
             </div>
           )}
-        </>
+        </div>
       )}
 
       {estoqueTooltip && doc && (
