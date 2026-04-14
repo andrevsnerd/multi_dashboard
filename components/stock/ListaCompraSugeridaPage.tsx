@@ -352,6 +352,8 @@ export default function ListaCompraSugeridaPage({
   const [activeTab, setActiveTab] = useState<"reposicao" | "abc" | "final" | "compras-salvas">("reposicao");
   const [expandirPorCor, setExpandirPorCor] = useState(true);
   const [savingCompraSalva, setSavingCompraSalva] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const compraFinalExportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (searchParams.get("tab") === "compras-salvas") {
@@ -756,6 +758,80 @@ export default function ListaCompraSugeridaPage({
     const dateStr = new Date().toISOString().slice(0, 10);
     const filename = `compra-final-${companyKey}-${dateStr}.xlsx`;
     XLSX.writeFile(wb, filename);
+  };
+
+  const handleExportCompraFinalPdf = async () => {
+    if (!compraFinalExportRef.current || compraFinal.length === 0) return;
+
+    setExportingPdf(true);
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+
+      const target = compraFinalExportRef.current;
+      const canvas = await html2canvas(target, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+        windowWidth: target.scrollWidth,
+        windowHeight: target.scrollHeight,
+      });
+
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? "landscape" : "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth;
+      const pageHeightPx = Math.floor((canvas.width * pageHeight) / pageWidth);
+
+      let renderedHeightPx = 0;
+      let pageIndex = 0;
+
+      while (renderedHeightPx < canvas.height) {
+        const remainingHeightPx = canvas.height - renderedHeightPx;
+        const sliceHeightPx = Math.min(pageHeightPx, remainingHeightPx);
+
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sliceHeightPx;
+        const ctx = pageCanvas.getContext("2d");
+        if (!ctx) break;
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        ctx.drawImage(
+          canvas,
+          0,
+          renderedHeightPx,
+          canvas.width,
+          sliceHeightPx,
+          0,
+          0,
+          pageCanvas.width,
+          pageCanvas.height
+        );
+
+        const imgHeight = (sliceHeightPx * imgWidth) / canvas.width;
+        if (pageIndex > 0) pdf.addPage();
+        pdf.addImage(pageCanvas.toDataURL("image/png"), "PNG", 0, 0, imgWidth, imgHeight, undefined, "FAST");
+
+        renderedHeightPx += sliceHeightPx;
+        pageIndex += 1;
+      }
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      pdf.save(`compra-final-${companyKey}-${dateStr}.pdf`);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Erro ao exportar PDF");
+    } finally {
+      setExportingPdf(false);
+    }
   };
 
   useEffect(() => {
@@ -1610,7 +1686,7 @@ export default function ListaCompraSugeridaPage({
       )}
 
       {activeTab === "final" && (
-        <>
+        <div ref={compraFinalExportRef}>
           <div className={styles.summaryCard} style={{ justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 32, flexWrap: "wrap" }}>
             <div className={styles.summaryItem}>
@@ -1640,6 +1716,14 @@ export default function ListaCompraSugeridaPage({
               </button>
               <button type="button" className={styles.exportBtn} onClick={handleExportCompraFinalXlsx}>
                 Exportar XLSX
+              </button>
+              <button
+                type="button"
+                className={styles.exportBtn}
+                disabled={exportingPdf || compraFinal.length === 0}
+                onClick={() => { void handleExportCompraFinalPdf(); }}
+              >
+                {exportingPdf ? "Exportando PDF…" : "Exportar PDF"}
               </button>
             </div>
           </div>
@@ -1767,7 +1851,7 @@ export default function ListaCompraSugeridaPage({
               </table>
             )}
           </div>
-        </>
+        </div>
       )}
 
       {activeTab === "compras-salvas" && (
