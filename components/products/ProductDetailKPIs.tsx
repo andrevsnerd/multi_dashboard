@@ -414,8 +414,10 @@ export default function ProductDetailKPIs({
       day: format(d, "dd/MM", { locale: ptBR }),
       dateLong: format(d, "dd 'de' MMMM yyyy", { locale: ptBR }),
       entries: row.entries,
-      saidasNeg: row.sales > 0 ? -row.sales : 0,
+      salesFlow: row.sales > 0 ? row.sales : 0,
+      stockExitFlow: row.stockExits > 0 ? row.stockExits : 0,
       stockGeral: row.stockGeral,
+      outOfStock: row.outOfStock,
       _raw: row,
     };
   });
@@ -1023,9 +1025,8 @@ export default function ProductDetailKPIs({
           <div className={styles.chartCard}>
             <h3 className={styles.chartTitle}>Movimento de estoque no período</h3>
             <p className={styles.chartSubtitle}>
-              Barras · entradas (romaneios) e saídas (vendas) por dia · Linha · saldo estimado (geral).
-              O saldo parte do estoque atual e desconta o líquido do período; no último dia coincide com o
-              estoque total do card quando só há essas movimentações.
+              Barras · entradas (romaneios), saídas por venda e saídas de mov. de estoque por dia · Linha · saldo estimado (geral).
+              Ponto vermelho indica dia sem estoque.
             </p>
             <div className={styles.chartLegend}>
               <span className={styles.chartLegendItem}>
@@ -1034,10 +1035,18 @@ export default function ProductDetailKPIs({
               </span>
               <span className={styles.chartLegendItem}>
                 <span style={{ display: "inline-block", width: 10, height: 10, background: "#ef4444", borderRadius: 2 }} />{" "}
-                Saídas
+                Saídas (vendas)
+              </span>
+              <span className={styles.chartLegendItem}>
+                <span style={{ display: "inline-block", width: 10, height: 10, background: "#f97316", borderRadius: 2 }} />{" "}
+                Saídas (mov. estoque)
               </span>
               <span className={styles.chartLegendItem}>
                 <span className={styles.chartLegendDotBlue} /> Saldo geral (un.)
+              </span>
+              <span className={styles.chartLegendItem}>
+                <span style={{ display: "inline-block", width: 10, height: 10, background: "#dc2626", borderRadius: "50%" }} />{" "}
+                Sem estoque
               </span>
             </div>
             <div className={styles.chartWrapper}>
@@ -1063,10 +1072,8 @@ export default function ProductDetailKPIs({
                   <YAxis
                     yAxisId="flow"
                     orientation="right"
-                    stroke="#94a3b8"
-                    style={{ fontSize: "11px" }}
-                    tick={{ fill: "#64748b" }}
-                    tickFormatter={(v) => formatInteger(Math.abs(v))}
+                    hide
+                    domain={[0, "dataMax + 2"]}
                   />
                   <YAxis
                     yAxisId="stock"
@@ -1099,11 +1106,16 @@ export default function ProductDetailKPIs({
                         const k = (s.filialDisplayName || "").toUpperCase().trim();
                         if (k) saleQtyByFilial.set(k, (saleQtyByFilial.get(k) ?? 0) + s.qty);
                       });
+                      const exitQtyByFilial = new Map<string, number>();
+                      raw.exitsByFilial.forEach((x) => {
+                        const k = (x.filialDisplayName || "").toUpperCase().trim();
+                        if (k) exitQtyByFilial.set(k, (exitQtyByFilial.get(k) ?? 0) + x.qty);
+                      });
                       return (
                         <div
                           style={{
                             backgroundColor: "#fff",
-                            border: "1px solid #e2e8f0",
+                            border: `1px solid ${raw.outOfStock ? "#fca5a5" : "#e2e8f0"}`,
                             borderRadius: "8px",
                             padding: "12px 14px",
                             fontSize: "12px",
@@ -1114,25 +1126,38 @@ export default function ProductDetailKPIs({
                           <p style={{ margin: "0 0 8px 0", fontWeight: 600, color: "#64748b", fontSize: "11px" }}>
                             {p.dateLong}
                           </p>
-                          <p style={{ margin: "0 4px 6px 0", color: "#15803d", fontWeight: 600 }}>
+                          {raw.outOfStock && (
+                            <p style={{ margin: "0 0 8px 0", fontWeight: 700, color: "#dc2626", fontSize: "11px" }}>
+                              Sem estoque neste dia
+                            </p>
+                          )}
+                          <p style={{ margin: "0 4px 4px 0", color: "#15803d", fontWeight: 600 }}>
                             +{formatInteger(raw.entries)} entradas
                           </p>
-                          <p style={{ margin: "0 4px 10px 0", color: "#b91c1c", fontWeight: 600 }}>
+                          <p style={{ margin: "0 4px 2px 0", color: "#b91c1c", fontWeight: 600 }}>
                             −{formatInteger(raw.sales)} saídas (vendas)
                           </p>
-                          <p style={{ margin: "0 0 8px 0", fontWeight: 700, color: "#1d4ed8" }}>
+                          {raw.stockExits > 0 && (
+                            <p style={{ margin: "0 4px 10px 0", color: "#b91c1c", fontWeight: 600 }}>
+                              −{formatInteger(raw.stockExits)} saídas (mov. estoque)
+                            </p>
+                          )}
+                          {raw.stockExits === 0 && <div style={{ marginBottom: "10px" }} />}
+                          <p style={{ margin: "0 0 8px 0", fontWeight: 700, color: raw.outOfStock ? "#dc2626" : "#1d4ed8" }}>
                             Saldo geral (fim do dia): {formatInteger(raw.stockGeral)} un.
                           </p>
                           {filialRows.length > 0 && (
                             <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "8px" }}>
                               <p style={{ margin: "0 0 6px 0", fontSize: "10px", fontWeight: 700, color: "#94a3b8" }}>
                                 Saldo por filial · <span style={{ fontWeight: 600 }}>+</span> entrada ·{" "}
-                                <span style={{ fontWeight: 600 }}>−</span> saída (no dia)
+                                <span style={{ fontWeight: 600 }}>−</span> venda ·{" "}
+                                <span style={{ fontWeight: 600 }}>↓</span> mov. estoque
                               </p>
                               {filialRows.map((f) => {
                                 const fk = (f.filialDisplayName || "").toUpperCase().trim();
                                 const ent = entryQtyByFilial.get(fk) ?? 0;
                                 const sai = saleQtyByFilial.get(fk) ?? 0;
+                                const ext = exitQtyByFilial.get(fk) ?? 0;
                                 return (
                                   <div
                                     key={f.filialDisplayName}
@@ -1154,17 +1179,15 @@ export default function ProductDetailKPIs({
                                         flexShrink: 0,
                                         fontVariantNumeric: "tabular-nums",
                                       }}
-                                      aria-label={
-                                        ent || sai
-                                          ? `Entrada ${ent}, saída ${sai}`
-                                          : "Sem movimento neste dia"
-                                      }
                                     >
                                       {ent > 0 ? (
                                         <span style={{ color: "#15803d", fontWeight: 700 }}>+{formatInteger(ent)}</span>
                                       ) : null}
                                       {sai > 0 ? (
                                         <span style={{ color: "#b91c1c", fontWeight: 700 }}>−{formatInteger(sai)}</span>
+                                      ) : null}
+                                      {ext > 0 ? (
+                                        <span style={{ color: "#ea580c", fontWeight: 700 }}>↓{formatInteger(ext)}</span>
                                       ) : null}
                                     </span>
                                     <span style={{ fontWeight: 600, flexShrink: 0, textAlign: "right" }}>
@@ -1179,8 +1202,9 @@ export default function ProductDetailKPIs({
                       );
                     }}
                   />
-                  <Bar yAxisId="flow" dataKey="entries" name="Entradas" fill="#22c55e" radius={[2, 2, 0, 0]} />
-                  <Bar yAxisId="flow" dataKey="saidasNeg" name="Saídas" fill="#ef4444" radius={[2, 2, 0, 0]} />
+                  <Bar yAxisId="flow" dataKey="entries" stackId="mov" name="Entradas" fill="#22c55e" radius={[2, 2, 0, 0]} />
+                  <Bar yAxisId="flow" dataKey="salesFlow" stackId="mov" name="Saídas (vendas)" fill="#ef4444" radius={[0, 0, 0, 0]} />
+                  <Bar yAxisId="flow" dataKey="stockExitFlow" stackId="mov" name="Saídas (mov. estoque)" fill="#f97316" radius={[0, 0, 0, 0]} />
                   <Line
                     yAxisId="stock"
                     type="monotone"
@@ -1188,7 +1212,13 @@ export default function ProductDetailKPIs({
                     name="Saldo geral"
                     stroke="#2563eb"
                     strokeWidth={2}
-                    dot={{ r: 2 }}
+                    dot={(dotProps) => {
+                      const { cx, cy, payload } = dotProps as { cx: number; cy: number; payload: (typeof stockProgressChart)[0] };
+                      if (payload.outOfStock) {
+                        return <circle key={`dot-${payload.isoDay}`} cx={cx} cy={cy} r={4} fill="#dc2626" stroke="#fff" strokeWidth={1.5} />;
+                      }
+                      return <circle key={`dot-${payload.isoDay}`} cx={cx} cy={cy} r={2} fill="#2563eb" />;
+                    }}
                   />
                 </ComposedChart>
               </ResponsiveContainer>

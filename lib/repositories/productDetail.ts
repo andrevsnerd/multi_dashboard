@@ -200,15 +200,20 @@ export interface ProductSaleHistory {
   colorDisplayName: string | null;
 }
 
-/** Série diária: entradas, saídas (vendas) e saldo estimado ao fim de cada dia (ver texto no gráfico). */
+/** Série diária: entradas, saídas (vendas + movimentações de estoque) e saldo estimado ao fim de cada dia. */
 export interface ProductStockProgressDay {
   dateIso: string;
   entries: number;
   sales: number;
+  /** Saídas de estoque não-venda no dia (transferências, ajustes via ESTOQUE_PROD1_SAI). */
+  stockExits: number;
+  /** true quando o saldo estimado ao fim do dia é zero ou negativo. */
+  outOfStock: boolean;
   stockGeral: number;
   stockByFilial: Record<string, number>;
   entriesByFilial: { filialDisplayName: string; qty: number }[];
   salesByFilial: { filialDisplayName: string; qty: number }[];
+  exitsByFilial: { filialDisplayName: string; qty: number }[];
 }
 
 function toLocalIsoDay(value: Date | string): string {
@@ -1716,6 +1721,42 @@ async function fetchStockEntriesDailyRows(
   });
 }
 
+/** Saídas de estoque não-venda por dia (ESTOQUE_PROD_SAI / ESTOQUE_PROD1_SAI). */
+async function fetchStockExitsDailyRows(
+  params: ProductDetailParams
+): Promise<StockMovementRow[]> {
+  const { start, end } = resolveRange(params.range);
+  return withRequest(async (request) => {
+    request.input('productId', sql.VarChar, params.productId);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+    const companyConfig = resolveCompany(params.company);
+    if (!companyConfig) return [];
+    const filialFilter = buildFilialFilter(request, params.company, 'inventory', params.filial, 'ES', 'exitF');
+    const colorFilterP = buildColorFilter(request, params.colors)('P');
+    const query = `
+      SELECT
+        CAST(ES.EMISSAO AS DATE) AS d,
+        ES.FILIAL AS filial,
+        SUM(ISNULL(P.QTDE, 0)) AS qty
+      FROM ESTOQUE_PROD_SAI AS ES WITH (NOLOCK)
+      INNER JOIN ESTOQUE_PROD1_SAI AS P WITH (NOLOCK) ON ES.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+      WHERE P.PRODUTO = @productId
+        AND ES.EMISSAO >= @startDate
+        AND ES.EMISSAO < @endDate
+        ${filialFilter}
+        ${colorFilterP}
+      GROUP BY CAST(ES.EMISSAO AS DATE), ES.FILIAL
+    `;
+    const result = await request.query<{ d: Date; filial: string; qty: number | null }>(query);
+    return (result.recordset ?? []).map((r) => ({
+      d: r.d instanceof Date ? r.d : new Date(r.d),
+      filial: r.filial ?? '',
+      qty: Number(r.qty ?? 0),
+    }));
+  });
+}
+
 async function fetchStockSalesDailyRetailRows(
   params: ProductDetailParams
 ): Promise<StockMovementRow[]> {
@@ -1873,24 +1914,29 @@ export async function fetchProductStockProgressSeries(
 
   let entryRows: StockMovementRow[];
   let saleRows: StockMovementRow[];
+  let exitRows: StockMovementRow[];
 
   if (shouldAggregateEcommerce(params.company, params.filial)) {
-    const [e, sr, se] = await Promise.all([
+    const [e, sr, se, ex] = await Promise.all([
       fetchStockEntriesDailyRows({ ...params, filial: null }),
       fetchStockSalesDailyRetailRows({ ...params, filial: VAREJO_VALUE }),
       fetchStockSalesDailyEcommerceRows({ ...params, filial: null }),
+      fetchStockExitsDailyRows({ ...params, filial: null }),
     ]);
     entryRows = e;
     saleRows = mergeSalesDailyRows(sr, se);
+    exitRows = ex;
   } else if (isEcFilial) {
-    [entryRows, saleRows] = await Promise.all([
+    [entryRows, saleRows, exitRows] = await Promise.all([
       fetchStockEntriesDailyRows(params),
       fetchStockSalesDailyEcommerceRows(params),
+      fetchStockExitsDailyRows(params),
     ]);
   } else {
-    [entryRows, saleRows] = await Promise.all([
+    [entryRows, saleRows, exitRows] = await Promise.all([
       fetchStockEntriesDailyRows(params),
       fetchStockSalesDailyRetailRows(params),
+      fetchStockExitsDailyRows(params),
     ]);
   }
 
@@ -1911,6 +1957,7 @@ export async function fetchProductStockProgressSeries(
 
   const totalE = new Map<string, number>();
   const totalS = new Map<string, number>();
+  const totalSE = new Map<string, number>();
   for (const r of entryRows) {
     const k = normDispKey(dispLabel(r.filial));
     totalE.set(k, (totalE.get(k) ?? 0) + r.qty);
@@ -1919,22 +1966,30 @@ export async function fetchProductStockProgressSeries(
     const k = normDispKey(dispLabel(r.filial));
     totalS.set(k, (totalS.get(k) ?? 0) + r.qty);
   }
+  for (const r of exitRows) {
+    const k = normDispKey(dispLabel(r.filial));
+    totalSE.set(k, (totalSE.get(k) ?? 0) + r.qty);
+  }
 
   const allKeys = new Set<string>([
     ...closingMap.keys(),
     ...totalE.keys(),
     ...totalS.keys(),
+    ...totalSE.keys(),
   ]);
   const running = new Map<string, number>();
   for (const k of allKeys) {
     const close = closingMap.get(k) ?? 0;
     const te = totalE.get(k) ?? 0;
     const ts = totalS.get(k) ?? 0;
-    running.set(k, close - te + ts);
+    const tse = totalSE.get(k) ?? 0;
+    // Rebobina para o início do período: estoque atual menos entradas mais todas as saídas
+    running.set(k, close - te + ts + tse);
   }
 
   const byDayEntry = new Map<string, Map<string, number>>();
   const byDaySale = new Map<string, Map<string, number>>();
+  const byDayExit = new Map<string, Map<string, number>>();
   const addDay = (m: Map<string, Map<string, number>>, iso: string, dispK: string, q: number) => {
     if (!q) return;
     if (!m.has(iso)) m.set(iso, new Map());
@@ -1951,6 +2006,11 @@ export async function fetchProductStockProgressSeries(
     if (!iso) continue;
     addDay(byDaySale, iso, normDispKey(dispLabel(r.filial)), r.qty);
   }
+  for (const r of exitRows) {
+    const iso = toLocalIsoDay(r.d);
+    if (!iso) continue;
+    addDay(byDayExit, iso, normDispKey(dispLabel(r.filial)), r.qty);
+  }
 
   const toFilialList = (inner: Map<string, number> | undefined) => {
     if (!inner || inner.size === 0) return [];
@@ -1965,8 +2025,10 @@ export async function fetchProductStockProgressSeries(
     const iso = toLocalIsoDay(day);
     const em = byDayEntry.get(iso);
     const sm = byDaySale.get(iso);
+    const xm = byDayExit.get(iso);
     let dayEntries = 0;
     let daySales = 0;
+    let dayExits = 0;
     if (em) {
       em.forEach((q, dispK) => {
         dayEntries += q;
@@ -1979,6 +2041,12 @@ export async function fetchProductStockProgressSeries(
         running.set(dispK, (running.get(dispK) ?? 0) - q);
       });
     }
+    if (xm) {
+      xm.forEach((q, dispK) => {
+        dayExits += q;
+        running.set(dispK, (running.get(dispK) ?? 0) - q);
+      });
+    }
     let stockGeral = 0;
     const stockByFilialOut: Record<string, number> = {};
     running.forEach((v, k) => {
@@ -1986,14 +2054,18 @@ export async function fetchProductStockProgressSeries(
       stockByFilialOut[k] = rounded;
       stockGeral += rounded;
     });
+    const stockGeralRounded = Math.round(stockGeral);
     out.push({
       dateIso: iso,
       entries: Math.round(dayEntries),
       sales: Math.round(daySales),
-      stockGeral: Math.round(stockGeral),
+      stockExits: Math.round(dayExits),
+      outOfStock: stockGeralRounded <= 0,
+      stockGeral: stockGeralRounded,
       stockByFilial: stockByFilialOut,
       entriesByFilial: toFilialList(em),
       salesByFilial: toFilialList(sm),
+      exitsByFilial: toFilialList(xm),
     });
   }
 
