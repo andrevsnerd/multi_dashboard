@@ -11,6 +11,8 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  ComposedChart,
+  Bar,
 } from "recharts";
 import {
   format,
@@ -29,6 +31,7 @@ import type {
   ProductStockByFilial,
   ProductPrecoItem,
   ProductCustoItem,
+  ProductStockProgressDay,
 } from "@/lib/repositories/productDetail";
 import { resolveCompany } from "@/lib/config/company";
 
@@ -47,6 +50,7 @@ export interface ProductDetailKPIsProps {
   /** Vendas nos meses anteriores ao range (para cada dia: acumulado até o mesmo dia do mês civil anterior). */
   saleHistoryComparison?: ProductSaleHistory[];
   stockByFilial: ProductStockByFilial[];
+  stockProgress: ProductStockProgressDay[];
   onDetailUpdated?: () => void;
 }
 
@@ -72,6 +76,7 @@ export default function ProductDetailKPIs({
   saleHistory,
   saleHistoryComparison = [],
   stockByFilial,
+  stockProgress = [],
   onDetailUpdated,
 }: ProductDetailKPIsProps) {
   const { user } = useAuth();
@@ -401,6 +406,19 @@ export default function ProductDetailKPIs({
     },
     [filialOrder, filialOrderMap]
   );
+
+  const stockProgressChart = stockProgress.map((row) => {
+    const d = new Date(`${row.dateIso}T12:00:00`);
+    return {
+      isoDay: row.dateIso,
+      day: format(d, "dd/MM", { locale: ptBR }),
+      dateLong: format(d, "dd 'de' MMMM yyyy", { locale: ptBR }),
+      entries: row.entries,
+      saidasNeg: row.sales > 0 ? -row.sales : 0,
+      stockGeral: row.stockGeral,
+      _raw: row,
+    };
+  });
 
   const salesByColorInfo = (() => {
     const codes = new Set(
@@ -1000,6 +1018,183 @@ export default function ProductDetailKPIs({
             </ResponsiveContainer>
           </div>
         </div>
+
+        {stockProgressChart.length > 0 && (
+          <div className={styles.chartCard}>
+            <h3 className={styles.chartTitle}>Movimento de estoque no período</h3>
+            <p className={styles.chartSubtitle}>
+              Barras · entradas (romaneios) e saídas (vendas) por dia · Linha · saldo estimado (geral).
+              O saldo parte do estoque atual e desconta o líquido do período; no último dia coincide com o
+              estoque total do card quando só há essas movimentações.
+            </p>
+            <div className={styles.chartLegend}>
+              <span className={styles.chartLegendItem}>
+                <span style={{ display: "inline-block", width: 10, height: 10, background: "#22c55e", borderRadius: 2 }} />{" "}
+                Entradas
+              </span>
+              <span className={styles.chartLegendItem}>
+                <span style={{ display: "inline-block", width: 10, height: 10, background: "#ef4444", borderRadius: 2 }} />{" "}
+                Saídas
+              </span>
+              <span className={styles.chartLegendItem}>
+                <span className={styles.chartLegendDotBlue} /> Saldo geral (un.)
+              </span>
+            </div>
+            <div className={styles.chartWrapper}>
+              <ResponsiveContainer width="100%" height={300}>
+                <ComposedChart data={stockProgressChart} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  {chartMonthBoundaryIsos.map((iso) => (
+                    <ReferenceLine key={`st-${iso}`} x={iso} stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="4 4" />
+                  ))}
+                  <XAxis
+                    dataKey="isoDay"
+                    type="category"
+                    ticks={chartTickIsos}
+                    stroke="#94a3b8"
+                    style={{ fontSize: "11px" }}
+                    tick={{ fill: "#64748b" }}
+                    tickFormatter={(iso) =>
+                      format(new Date(`${iso}T12:00:00`), isMultiMonthRange ? "dd/MM" : "dd", {
+                        locale: ptBR,
+                      })
+                    }
+                  />
+                  <YAxis
+                    yAxisId="flow"
+                    orientation="right"
+                    stroke="#94a3b8"
+                    style={{ fontSize: "11px" }}
+                    tick={{ fill: "#64748b" }}
+                    tickFormatter={(v) => formatInteger(Math.abs(v))}
+                  />
+                  <YAxis
+                    yAxisId="stock"
+                    orientation="left"
+                    stroke="#2563eb"
+                    style={{ fontSize: "11px" }}
+                    tick={{ fill: "#2563eb" }}
+                    tickFormatter={(v) => formatInteger(v)}
+                  />
+                  <Tooltip
+                    wrapperStyle={{ outline: "none" }}
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const p = payload[0]?.payload as (typeof stockProgressChart)[0];
+                      const raw = p._raw;
+                      const filialRows = sortedFiliaisByOrder(
+                        Object.entries(raw.stockByFilial).map(([name, qty]) => ({
+                          filialDisplayName: name,
+                          filial: name,
+                          stock: qty,
+                        })),
+                      );
+                      const entryQtyByFilial = new Map<string, number>();
+                      raw.entriesByFilial.forEach((e) => {
+                        const k = (e.filialDisplayName || "").toUpperCase().trim();
+                        if (k) entryQtyByFilial.set(k, (entryQtyByFilial.get(k) ?? 0) + e.qty);
+                      });
+                      const saleQtyByFilial = new Map<string, number>();
+                      raw.salesByFilial.forEach((s) => {
+                        const k = (s.filialDisplayName || "").toUpperCase().trim();
+                        if (k) saleQtyByFilial.set(k, (saleQtyByFilial.get(k) ?? 0) + s.qty);
+                      });
+                      return (
+                        <div
+                          style={{
+                            backgroundColor: "#fff",
+                            border: "1px solid #e2e8f0",
+                            borderRadius: "8px",
+                            padding: "12px 14px",
+                            fontSize: "12px",
+                            minWidth: 320,
+                            maxWidth: 480,
+                          }}
+                        >
+                          <p style={{ margin: "0 0 8px 0", fontWeight: 600, color: "#64748b", fontSize: "11px" }}>
+                            {p.dateLong}
+                          </p>
+                          <p style={{ margin: "0 4px 6px 0", color: "#15803d", fontWeight: 600 }}>
+                            +{formatInteger(raw.entries)} entradas
+                          </p>
+                          <p style={{ margin: "0 4px 10px 0", color: "#b91c1c", fontWeight: 600 }}>
+                            −{formatInteger(raw.sales)} saídas (vendas)
+                          </p>
+                          <p style={{ margin: "0 0 8px 0", fontWeight: 700, color: "#1d4ed8" }}>
+                            Saldo geral (fim do dia): {formatInteger(raw.stockGeral)} un.
+                          </p>
+                          {filialRows.length > 0 && (
+                            <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "8px" }}>
+                              <p style={{ margin: "0 0 6px 0", fontSize: "10px", fontWeight: 700, color: "#94a3b8" }}>
+                                Saldo por filial · <span style={{ fontWeight: 600 }}>+</span> entrada ·{" "}
+                                <span style={{ fontWeight: 600 }}>−</span> saída (no dia)
+                              </p>
+                              {filialRows.map((f) => {
+                                const fk = (f.filialDisplayName || "").toUpperCase().trim();
+                                const ent = entryQtyByFilial.get(fk) ?? 0;
+                                const sai = saleQtyByFilial.get(fk) ?? 0;
+                                return (
+                                  <div
+                                    key={f.filialDisplayName}
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      alignItems: "center",
+                                      gap: "10px",
+                                      marginBottom: "4px",
+                                      fontSize: "11px",
+                                      color: "#475569",
+                                    }}
+                                  >
+                                    <span style={{ flex: "1 1 auto", minWidth: 0 }}>{f.filialDisplayName}</span>
+                                    <span
+                                      style={{
+                                        display: "flex",
+                                        gap: "8px",
+                                        flexShrink: 0,
+                                        fontVariantNumeric: "tabular-nums",
+                                      }}
+                                      aria-label={
+                                        ent || sai
+                                          ? `Entrada ${ent}, saída ${sai}`
+                                          : "Sem movimento neste dia"
+                                      }
+                                    >
+                                      {ent > 0 ? (
+                                        <span style={{ color: "#15803d", fontWeight: 700 }}>+{formatInteger(ent)}</span>
+                                      ) : null}
+                                      {sai > 0 ? (
+                                        <span style={{ color: "#b91c1c", fontWeight: 700 }}>−{formatInteger(sai)}</span>
+                                      ) : null}
+                                    </span>
+                                    <span style={{ fontWeight: 600, flexShrink: 0, textAlign: "right" }}>
+                                      {formatInteger(f.stock ?? 0)} un.
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }}
+                  />
+                  <Bar yAxisId="flow" dataKey="entries" name="Entradas" fill="#22c55e" radius={[2, 2, 0, 0]} />
+                  <Bar yAxisId="flow" dataKey="saidasNeg" name="Saídas" fill="#ef4444" radius={[2, 2, 0, 0]} />
+                  <Line
+                    yAxisId="stock"
+                    type="monotone"
+                    dataKey="stockGeral"
+                    name="Saldo geral"
+                    stroke="#2563eb"
+                    strokeWidth={2}
+                    dot={{ r: 2 }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal Preços de venda */}

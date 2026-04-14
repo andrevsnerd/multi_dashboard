@@ -3,6 +3,8 @@ import sql from 'mssql';
 import { resolveCompany, isEcommerceFilial, type CompanyModule, VAREJO_VALUE } from '@/lib/config/company';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
+import { eachDayOfInterval, subMilliseconds } from 'date-fns';
+
 import { normalizeRangeForQuery, shiftRangeByMonths } from '@/lib/utils/date';
 import { getColorDescription } from '@/lib/utils/colorMapping';
 
@@ -196,6 +198,47 @@ export interface ProductSaleHistory {
   vendedor: string | null;
   color: string | null;
   colorDisplayName: string | null;
+}
+
+/** Série diária: entradas, saídas (vendas) e saldo estimado ao fim de cada dia (ver texto no gráfico). */
+export interface ProductStockProgressDay {
+  dateIso: string;
+  entries: number;
+  sales: number;
+  stockGeral: number;
+  stockByFilial: Record<string, number>;
+  entriesByFilial: { filialDisplayName: string; qty: number }[];
+  salesByFilial: { filialDisplayName: string; qty: number }[];
+}
+
+function toLocalIsoDay(value: Date | string): string {
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+type StockMovementRow = { d: Date; filial: string; qty: number };
+
+function mergeSalesDailyRows(a: StockMovementRow[], b: StockMovementRow[]): StockMovementRow[] {
+  const map = new Map<string, number>();
+  const add = (rows: StockMovementRow[]) => {
+    for (const r of rows) {
+      const iso = toLocalIsoDay(r.d);
+      if (!iso) continue;
+      const f = (r.filial || '').trim();
+      const key = `${iso}\0${f}`;
+      map.set(key, (map.get(key) ?? 0) + Number(r.qty ?? 0));
+    }
+  };
+  add(a);
+  add(b);
+  return Array.from(map.entries()).map(([key, qty]) => {
+    const [iso, filial] = key.split('\0');
+    return { d: new Date(`${iso}T12:00:00`), filial, qty };
+  });
 }
 
 export interface ProductDetailParams {
@@ -1504,29 +1547,71 @@ export async function fetchProductSaleHistory({
     const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
     const colorFilterVp = buildColorFilter(request, colors)('vp');
 
+    // Mesma base de cálculo que fetchProductDetail (TOTAL_VENDA - VALOR_TROCA por item/troca)
     const query = `
-      SELECT 
-        vp.DATA_VENDA AS date,
-        vp.FILIAL,
-        vp.QTDE AS quantity,
-        (
-          CASE
+      WITH vendas_base AS (
+        SELECT 
+          vp.*,
+          c.DESC_COR,
+          CASE 
             WHEN vp.QTDE_CANCELADA > 0 THEN 0
             ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
-          END
-        ) AS revenue,
-        vp.VENDEDOR AS vendedor,
-        vp.COR_PRODUTO AS color,
-        ISNULL(c.DESC_COR, '') AS corBanco
-      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
-      WHERE vp.PRODUTO = @productId
-        AND vp.DATA_VENDA >= @startDate
-        AND vp.DATA_VENDA < @endDate
-        AND vp.QTDE > 0
-        ${filialFilter}
-        ${colorFilterVp}
-      ORDER BY vp.DATA_VENDA DESC, vp.FILIAL
+          END AS TOTAL_VENDA,
+          CASE 
+            WHEN vp.QTDE_CANCELADA > 0 THEN 0
+            ELSE vp.QTDE
+          END AS TOTAL_QTDE_VENDA
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
+        WHERE vp.PRODUTO = @productId
+          AND vp.DATA_VENDA >= @startDate
+          AND vp.DATA_VENDA < @endDate
+          AND vp.QTDE > 0
+          ${filialFilter}
+          ${colorFilterVp}
+      ),
+      trocas_item AS (
+        SELECT 
+          TICKET,
+          CODIGO_FILIAL,
+          PRODUTO,
+          COR_PRODUTO,
+          TAMANHO,
+          SUM(QTDE) AS QTDE_TROCA,
+          SUM(PRECO_LIQUIDO * QTDE) AS VALOR_TROCA
+        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
+        WHERE QTDE_CANCELADA = 0
+        GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
+      ),
+      vendas_com_troca AS (
+        SELECT 
+          vb.*,
+          ISNULL(ti.QTDE_TROCA, 0) AS QTDE_TROCA_ITEM,
+          ISNULL(ti.VALOR_TROCA, 0) AS VALOR_TROCA_ITEM
+        FROM vendas_base vb
+        LEFT JOIN trocas_item ti ON ti.TICKET = vb.TICKET 
+          AND ti.CODIGO_FILIAL = vb.CODIGO_FILIAL
+          AND ti.PRODUTO = vb.PRODUTO
+          AND ISNULL(ti.COR_PRODUTO, '') = ISNULL(vb.COR_PRODUTO, '')
+          AND ISNULL(ti.TAMANHO, 0) = ISNULL(vb.TAMANHO, 0)
+      ),
+      vendas_finais AS (
+        SELECT 
+          *,
+          ISNULL(QTDE_TROCA_ITEM, 0) AS QTDE_TROCA,
+          ISNULL(VALOR_TROCA_ITEM, 0) AS VALOR_TROCA
+        FROM vendas_com_troca
+      )
+      SELECT 
+        vf.DATA_VENDA AS date,
+        vf.FILIAL,
+        (vf.TOTAL_QTDE_VENDA - vf.QTDE_TROCA) AS quantity,
+        (vf.TOTAL_VENDA - vf.VALOR_TROCA) AS revenue,
+        vf.VENDEDOR AS vendedor,
+        vf.COR_PRODUTO AS color,
+        ISNULL(vf.DESC_COR, '') AS corBanco
+      FROM vendas_finais vf
+      ORDER BY vf.DATA_VENDA DESC, vf.FILIAL
     `;
 
     const result = await request.query<{
@@ -1592,6 +1677,327 @@ export async function fetchProductSaleHistory({
       };
     });
   });
+}
+
+async function fetchStockEntriesDailyRows(
+  params: ProductDetailParams
+): Promise<StockMovementRow[]> {
+  const { start, end } = resolveRange(params.range);
+  return withRequest(async (request) => {
+    request.input('productId', sql.VarChar, params.productId);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+    const companyConfig = resolveCompany(params.company);
+    if (!companyConfig) {
+      return [];
+    }
+    const filialFilter = buildFilialFilter(request, params.company, 'inventory', params.filial, 'E', 'entF');
+    const colorFilterP = buildColorFilter(request, params.colors)('P');
+    const query = `
+      SELECT 
+        CAST(E.EMISSAO AS DATE) AS d,
+        E.FILIAL AS filial,
+        SUM(ISNULL(P.QTDE, 0)) AS qty
+      FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+      INNER JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+      WHERE P.PRODUTO = @productId
+        AND E.EMISSAO >= @startDate
+        AND E.EMISSAO < @endDate
+        ${filialFilter}
+        ${colorFilterP}
+      GROUP BY CAST(E.EMISSAO AS DATE), E.FILIAL
+    `;
+    const result = await request.query<{ d: Date; filial: string; qty: number | null }>(query);
+    return (result.recordset ?? []).map((r) => ({
+      d: r.d instanceof Date ? r.d : new Date(r.d),
+      filial: r.filial ?? '',
+      qty: Number(r.qty ?? 0),
+    }));
+  });
+}
+
+async function fetchStockSalesDailyRetailRows(
+  params: ProductDetailParams
+): Promise<StockMovementRow[]> {
+  const { start, end } = resolveRange(params.range);
+  return withRequest(async (request) => {
+    request.input('productId', sql.VarChar, params.productId);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+    const companyConfig = resolveCompany(params.company);
+    if (!companyConfig) {
+      return [];
+    }
+    const filialFilter = buildFilialFilter(request, params.company, 'sales', params.filial, 'vp', 'sdRetail');
+    const colorFilterVp = buildColorFilter(request, params.colors)('vp');
+    const query = `
+      WITH vendas_base AS (
+        SELECT 
+          vp.*,
+          c.DESC_COR,
+          CASE 
+            WHEN vp.QTDE_CANCELADA > 0 THEN 0
+            ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
+          END AS TOTAL_VENDA,
+          CASE 
+            WHEN vp.QTDE_CANCELADA > 0 THEN 0
+            ELSE vp.QTDE
+          END AS TOTAL_QTDE_VENDA
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
+        WHERE vp.PRODUTO = @productId
+          AND vp.DATA_VENDA >= @startDate
+          AND vp.DATA_VENDA < @endDate
+          AND vp.QTDE > 0
+          ${filialFilter}
+          ${colorFilterVp}
+      ),
+      trocas_item AS (
+        SELECT 
+          TICKET,
+          CODIGO_FILIAL,
+          PRODUTO,
+          COR_PRODUTO,
+          TAMANHO,
+          SUM(QTDE) AS QTDE_TROCA,
+          SUM(PRECO_LIQUIDO * QTDE) AS VALOR_TROCA
+        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
+        WHERE QTDE_CANCELADA = 0
+        GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
+      ),
+      vendas_com_troca AS (
+        SELECT 
+          vb.*,
+          ISNULL(ti.QTDE_TROCA, 0) AS QTDE_TROCA_ITEM,
+          ISNULL(ti.VALOR_TROCA, 0) AS VALOR_TROCA_ITEM
+        FROM vendas_base vb
+        LEFT JOIN trocas_item ti ON ti.TICKET = vb.TICKET 
+          AND ti.CODIGO_FILIAL = vb.CODIGO_FILIAL
+          AND ti.PRODUTO = vb.PRODUTO
+          AND ISNULL(ti.COR_PRODUTO, '') = ISNULL(vb.COR_PRODUTO, '')
+          AND ISNULL(ti.TAMANHO, 0) = ISNULL(vb.TAMANHO, 0)
+      ),
+      vendas_finais AS (
+        SELECT 
+          *,
+          ISNULL(QTDE_TROCA_ITEM, 0) AS QTDE_TROCA,
+          ISNULL(VALOR_TROCA_ITEM, 0) AS VALOR_TROCA
+        FROM vendas_com_troca
+      )
+      SELECT 
+        CAST(vf.DATA_VENDA AS DATE) AS d,
+        vf.FILIAL AS filial,
+        SUM(vf.TOTAL_QTDE_VENDA - vf.QTDE_TROCA) AS qty
+      FROM vendas_finais vf
+      GROUP BY CAST(vf.DATA_VENDA AS DATE), vf.FILIAL
+    `;
+    const result = await request.query<{ d: Date; filial: string; qty: number | null }>(query);
+    return (result.recordset ?? []).map((r) => ({
+      d: r.d instanceof Date ? r.d : new Date(r.d),
+      filial: r.filial ?? '',
+      qty: Number(r.qty ?? 0),
+    }));
+  });
+}
+
+async function fetchStockSalesDailyEcommerceRows(
+  params: ProductDetailParams
+): Promise<StockMovementRow[]> {
+  const { start, end } = resolveRange(params.range);
+  return withRequest(async (request) => {
+    request.input('productId', sql.VarChar, params.productId);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+    const companyConfig = resolveCompany(params.company);
+    if (!companyConfig) {
+      return [];
+    }
+    const filialFilter = buildEcommerceFilialFilter(request, params.company, params.filial, 'f');
+    const colorFilterFp = buildColorFilter(request, params.colors)('fp');
+    const query = `
+      SELECT 
+        CAST(f.EMISSAO AS DATE) AS d,
+        f.FILIAL AS filial,
+        SUM(fp.QTDE) AS qty
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE fp.PRODUTO = @productId
+        AND f.EMISSAO >= @startDate
+        AND f.EMISSAO < @endDate
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND fp.QTDE > 0
+        ${filialFilter}
+        ${colorFilterFp}
+      GROUP BY CAST(f.EMISSAO AS DATE), f.FILIAL
+    `;
+    const result = await request.query<{ d: Date; filial: string; qty: number | null }>(query);
+    return (result.recordset ?? []).map((r) => ({
+      d: r.d instanceof Date ? r.d : new Date(r.d),
+      filial: r.filial ?? '',
+      qty: Number(r.qty ?? 0),
+    }));
+  });
+}
+
+/**
+ * Entradas (romaneios) e saídas (vendas, mesma lógica do histórico) por dia;
+ * saldo ao fim do dia = estoque atual da tela menos (entradas − vendas) acumulados no período, recalculado dia a dia.
+ */
+export async function fetchProductStockProgressSeries(
+  params: ProductDetailParams,
+  stockByFilial: ProductStockByFilial[]
+): Promise<ProductStockProgressDay[]> {
+  const companyConfig = resolveCompany(params.company);
+  if (!companyConfig) {
+    return [];
+  }
+
+  const displayNames = companyConfig.filialDisplayNames ?? {};
+  const ecFiliais = companyConfig.ecommerceFilials ?? [];
+  const normDispKey = (raw: string) => {
+    const t = (raw || '').trim();
+    const name = displayNames[t] ?? displayNames[raw] ?? raw;
+    return name.toUpperCase().trim();
+  };
+  const dispLabel = (raw: string) => {
+    const t = (raw || '').trim();
+    return (displayNames[t] ?? displayNames[raw] ?? raw).trim();
+  };
+
+  const isEcFilial =
+    params.filial != null &&
+    params.filial !== VAREJO_VALUE &&
+    ecFiliais.some((f) => f.trim() === params.filial?.trim());
+
+  let entryRows: StockMovementRow[];
+  let saleRows: StockMovementRow[];
+
+  if (shouldAggregateEcommerce(params.company, params.filial)) {
+    const [e, sr, se] = await Promise.all([
+      fetchStockEntriesDailyRows({ ...params, filial: null }),
+      fetchStockSalesDailyRetailRows({ ...params, filial: VAREJO_VALUE }),
+      fetchStockSalesDailyEcommerceRows({ ...params, filial: null }),
+    ]);
+    entryRows = e;
+    saleRows = mergeSalesDailyRows(sr, se);
+  } else if (isEcFilial) {
+    [entryRows, saleRows] = await Promise.all([
+      fetchStockEntriesDailyRows(params),
+      fetchStockSalesDailyEcommerceRows(params),
+    ]);
+  } else {
+    [entryRows, saleRows] = await Promise.all([
+      fetchStockEntriesDailyRows(params),
+      fetchStockSalesDailyRetailRows(params),
+    ]);
+  }
+
+  const { start, end } = resolveRange(params.range);
+  const lastInclusive = subMilliseconds(end, 1);
+  let calendarDays: Date[];
+  try {
+    calendarDays = eachDayOfInterval({ start, end: lastInclusive });
+  } catch {
+    return [];
+  }
+
+  const closingMap = new Map<string, number>();
+  for (const row of stockByFilial) {
+    const k = normDispKey(row.filialDisplayName || row.filial);
+    closingMap.set(k, (closingMap.get(k) ?? 0) + Number(row.stock ?? 0));
+  }
+
+  const totalE = new Map<string, number>();
+  const totalS = new Map<string, number>();
+  for (const r of entryRows) {
+    const k = normDispKey(dispLabel(r.filial));
+    totalE.set(k, (totalE.get(k) ?? 0) + r.qty);
+  }
+  for (const r of saleRows) {
+    const k = normDispKey(dispLabel(r.filial));
+    totalS.set(k, (totalS.get(k) ?? 0) + r.qty);
+  }
+
+  const allKeys = new Set<string>([
+    ...closingMap.keys(),
+    ...totalE.keys(),
+    ...totalS.keys(),
+  ]);
+  const running = new Map<string, number>();
+  for (const k of allKeys) {
+    const close = closingMap.get(k) ?? 0;
+    const te = totalE.get(k) ?? 0;
+    const ts = totalS.get(k) ?? 0;
+    running.set(k, close - te + ts);
+  }
+
+  const byDayEntry = new Map<string, Map<string, number>>();
+  const byDaySale = new Map<string, Map<string, number>>();
+  const addDay = (m: Map<string, Map<string, number>>, iso: string, dispK: string, q: number) => {
+    if (!q) return;
+    if (!m.has(iso)) m.set(iso, new Map());
+    const inner = m.get(iso)!;
+    inner.set(dispK, (inner.get(dispK) ?? 0) + q);
+  };
+  for (const r of entryRows) {
+    const iso = toLocalIsoDay(r.d);
+    if (!iso) continue;
+    addDay(byDayEntry, iso, normDispKey(dispLabel(r.filial)), r.qty);
+  }
+  for (const r of saleRows) {
+    const iso = toLocalIsoDay(r.d);
+    if (!iso) continue;
+    addDay(byDaySale, iso, normDispKey(dispLabel(r.filial)), r.qty);
+  }
+
+  const toFilialList = (inner: Map<string, number> | undefined) => {
+    if (!inner || inner.size === 0) return [];
+    return Array.from(inner.entries())
+      .filter(([, q]) => q > 0)
+      .map(([k, qty]) => ({ filialDisplayName: k, qty }))
+      .sort((a, b) => a.filialDisplayName.localeCompare(b.filialDisplayName, 'pt-BR'));
+  };
+
+  const out: ProductStockProgressDay[] = [];
+  for (const day of calendarDays) {
+    const iso = toLocalIsoDay(day);
+    const em = byDayEntry.get(iso);
+    const sm = byDaySale.get(iso);
+    let dayEntries = 0;
+    let daySales = 0;
+    if (em) {
+      em.forEach((q, dispK) => {
+        dayEntries += q;
+        running.set(dispK, (running.get(dispK) ?? 0) + q);
+      });
+    }
+    if (sm) {
+      sm.forEach((q, dispK) => {
+        daySales += q;
+        running.set(dispK, (running.get(dispK) ?? 0) - q);
+      });
+    }
+    let stockGeral = 0;
+    const stockByFilialOut: Record<string, number> = {};
+    running.forEach((v, k) => {
+      const rounded = Math.round(v);
+      stockByFilialOut[k] = rounded;
+      stockGeral += rounded;
+    });
+    out.push({
+      dateIso: iso,
+      entries: Math.round(dayEntries),
+      sales: Math.round(daySales),
+      stockGeral: Math.round(stockGeral),
+      stockByFilial: stockByFilialOut,
+      entriesByFilial: toFilialList(em),
+      salesByFilial: toFilialList(sm),
+    });
+  }
+
+  return out;
 }
 
 // --- Preços e custos editáveis (como no script alterar_custo_produto.py) ---

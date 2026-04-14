@@ -12,6 +12,7 @@ import type {
   ProductStockByFilial,
   ProductSaleHistory,
   ProductAvailableColor,
+  ProductStockProgressDay,
 } from "@/lib/repositories/productDetail";
 
 import styles from "./ProductDetailPage.module.css";
@@ -28,6 +29,7 @@ interface ProductDetailData {
   saleHistory: ProductSaleHistory[];
   saleHistoryComparison: ProductSaleHistory[];
   availableColors: ProductAvailableColor[];
+  stockProgress: ProductStockProgressDay[];
 }
 
 async function searchProducts(
@@ -239,6 +241,7 @@ export default function ProductDetailPage({
               },
               saleHistory: mapSaleDates(productData.saleHistory),
               saleHistoryComparison: mapSaleDates(productData.saleHistoryComparison ?? []),
+              stockProgress: productData.stockProgress ?? [],
             };
             setData(processedData);
           } else {
@@ -343,6 +346,7 @@ export default function ProductDetailPage({
         saleHistory={data.saleHistory}
         saleHistoryComparison={data.saleHistoryComparison}
         stockByFilial={data.stockByFilial}
+        stockProgress={data.stockProgress ?? []}
         onDetailUpdated={refetchDetail}
       />
     </>

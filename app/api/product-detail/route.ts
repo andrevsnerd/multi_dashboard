@@ -6,9 +6,11 @@ import {
   fetchProductStockByFilial,
   fetchProductSaleHistory,
   fetchProductAvailableColors,
+  fetchProductStockProgressSeries,
   type ProductDetailInfo,
   type ProductStockByFilial,
   type ProductSaleHistory,
+  type ProductStockProgressDay,
 } from '@/lib/repositories/productDetail';
 import { getCurrentMonthRange } from '@/lib/utils/date';
 
@@ -86,6 +88,11 @@ export async function GET(request: Request) {
       totalStock: totalStockFromFilials,
     };
 
+    const stockProgress: ProductStockProgressDay[] = await fetchProductStockProgressSeries(
+      baseParams,
+      stockByFilial
+    );
+
     return NextResponse.json({
       data: {
         detail: detailWithConsistentStock,
@@ -93,6 +100,7 @@ export async function GET(request: Request) {
         saleHistory,
         saleHistoryComparison,
         availableColors,
+        stockProgress,
       },
     });
   } catch (error) {
