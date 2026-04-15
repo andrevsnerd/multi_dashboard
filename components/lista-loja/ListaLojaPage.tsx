@@ -332,7 +332,7 @@ function hasSugestaoS(item: ListaItem, qtdFinal: number, qtdSuficiente: boolean)
   if (qtdFinal > 0) return false;
   if (qtdSuficiente) return false;
   const mediaVendasMes = Number(item.qtde12m ?? 0) / 12;
-  if (mediaVendasMes < 2) return false;
+  if (mediaVendasMes < 1) return false;
   const estoqueAtual = Number(item.estoqueFilial ?? 0);
   return estoqueAtual <= mediaVendasMes * 2;
 }

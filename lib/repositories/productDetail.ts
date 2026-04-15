@@ -270,33 +270,33 @@ export async function fetchProductAvailableColors(
   productId: string,
   company?: string
 ): Promise<ProductAvailableColor[]> {
-  const companyConfig = resolveCompany(company);
-  const filiais = companyConfig?.filialFilters?.inventory ?? [];
-
   return withRequest(async (request) => {
     request.input('productId', sql.VarChar, productId);
-    if (filiais.length === 0) {
-      const query = `
-        SELECT DISTINCT ISNULL(e.COR_PRODUTO, '') AS COR, ISNULL(c.DESC_COR, '') AS DESC_COR
-        FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
-        LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
-        WHERE e.PRODUTO = @productId
-          AND EXISTS (SELECT 1 FROM ESTOQUE_PRODUTOS e2 WITH (NOLOCK) WHERE e2.PRODUTO = e.PRODUTO AND ISNULL(e2.COR_PRODUTO,'') = ISNULL(e.COR_PRODUTO,'') AND e2.ESTOQUE > 0)
-      `;
-      const result = await request.query<{ COR: string; DESC_COR: string }>(query);
-      return buildColorList(result.recordset);
-    }
-    filiais.forEach((f, i) => {
-      request.input(`filialInv${i}`, sql.VarChar, f);
-    });
-    const placeholders = filiais.map((_, i) => `@filialInv${i}`).join(', ');
+    // A lista de cores precisa refletir todas as variações do produto.
+    // Não restringimos por estoque positivo nem por filial para evitar perder cores válidas.
     const query = `
-      SELECT DISTINCT ISNULL(e.COR_PRODUTO, '') AS COR, ISNULL(c.DESC_COR, '') AS DESC_COR
-      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
-      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
-      WHERE e.PRODUTO = @productId
-        AND e.FILIAL IN (${placeholders})
-        AND e.ESTOQUE > 0
+      WITH cores_produto AS (
+        SELECT ISNULL(e.COR_PRODUTO, '') AS COR
+        FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+        WHERE e.PRODUTO = @productId
+
+        UNION
+
+        SELECT ISNULL(vp.COR_PRODUTO, '') AS COR
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        WHERE vp.PRODUTO = @productId
+
+        UNION
+
+        SELECT ISNULL(fp.COR_PRODUTO, '') AS COR
+        FROM W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        WHERE fp.PRODUTO = @productId
+      )
+      SELECT DISTINCT
+        cp.COR,
+        ISNULL(c.DESC_COR, '') AS DESC_COR
+      FROM cores_produto cp
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON cp.COR = c.COR
     `;
     const result = await request.query<{ COR: string; DESC_COR: string }>(query);
     return buildColorList(result.recordset);

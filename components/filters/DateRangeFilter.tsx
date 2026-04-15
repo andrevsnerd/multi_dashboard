@@ -164,6 +164,20 @@ export default function DateRangeFilter({
         },
       },
       {
+        label: "60 dias",
+        resolve: () => {
+          const endDate = clampDate(new Date());
+          let startDate = subDays(endDate, 59);
+          if (availableNormalized && startDate.getTime() < availableNormalized.start.getTime()) {
+            startDate = new Date(availableNormalized.start.getTime());
+          }
+          if (startDate.getTime() > endDate.getTime()) {
+            startDate = new Date(endDate.getTime());
+          }
+          return { startDate, endDate };
+        },
+      },
+      {
         label: "Esta semana",
         resolve: () => {
           const today = clampDate(new Date());
@@ -210,6 +224,20 @@ export default function DateRangeFilter({
             startDate = new Date(availableNormalized.start.getTime());
           }
           if (startDate.getTime() > endDate.getTime()) startDate = new Date(endDate.getTime());
+          return { startDate, endDate };
+        },
+      },
+      {
+        label: "12 meses",
+        resolve: () => {
+          const endDate = clampDate(new Date());
+          let startDate = subMonths(endDate, 12);
+          if (availableNormalized && startDate.getTime() < availableNormalized.start.getTime()) {
+            startDate = new Date(availableNormalized.start.getTime());
+          }
+          if (startDate.getTime() > endDate.getTime()) {
+            startDate = new Date(endDate.getTime());
+          }
           return { startDate, endDate };
         },
       },
