@@ -5954,7 +5954,7 @@ export async function fetchVendasProdutoPorFilial({
   filial?: string | null;
   produto: string;
   corProduto?: string | null;
-}): Promise<Array<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number; valor12m: number; custoUnitario: number }>> {
+}): Promise<Array<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number; valor12m: number; custoUnitario: number; diasDesdeUltimaVenda: number | null }>> {
   return withRequest(async (request) => {
     const filialSel = filial ?? null;
     const now = new Date();
@@ -6009,7 +6009,8 @@ export async function fetchVendasProdutoPorFilial({
         SUM(CASE WHEN vf.QTDE_CANCELADA = 0 AND vf.DATA_VENDA >= @vf_inicio60d THEN vf.QTDE ELSE 0 END) AS qtde60d,
         SUM(CASE WHEN vf.QTDE_CANCELADA = 0 AND vf.DATA_VENDA >= @vf_inicioMesAtual THEN vf.QTDE ELSE 0 END) AS qtdeMesAtual,
         SUM(CASE WHEN vf.QTDE_CANCELADA = 0 THEN (ISNULL(vf.PRECO_LIQUIDO, 0) * vf.QTDE) - ISNULL(vf.DESCONTO_VENDA, 0) ELSE 0 END) AS valor12m,
-        MAX(ISNULL(p.CUSTO_REPOSICAO1, 0)) AS custoUnitario
+        MAX(ISNULL(p.CUSTO_REPOSICAO1, 0)) AS custoUnitario,
+        MAX(CASE WHEN vf.QTDE_CANCELADA = 0 THEN vf.DATA_VENDA ELSE NULL END) AS ultimaVenda
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vf WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON LTRIM(RTRIM(ISNULL(p.PRODUTO, ''))) = @vf_produto
       WHERE vf.DATA_VENDA >= @vf_inicio12m
@@ -6021,8 +6022,9 @@ export async function fetchVendasProdutoPorFilial({
       GROUP BY vf.FILIAL
     `;
 
-    const result = await request.query<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number | null; valor12m: number | null; custoUnitario: number | null }>(queryVarejo);
-    const byFilial = new Map<string, { filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number; valor12m: number; custoUnitario: number }>();
+    const result = await request.query<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number | null; valor12m: number | null; custoUnitario: number | null; ultimaVenda: Date | null }>(queryVarejo);
+    const byFilial = new Map<string, { filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number; valor12m: number; custoUnitario: number; ultimaVenda: Date | null }>();
+    const msPerDay = 1000 * 60 * 60 * 24;
     for (const r of result.recordset) {
       byFilial.set(r.filial, {
         filial: r.filial,
@@ -6031,6 +6033,7 @@ export async function fetchVendasProdutoPorFilial({
         qtdeMesAtual: Math.round(Number(r.qtdeMesAtual ?? 0)),
         valor12m: Number(r.valor12m ?? 0),
         custoUnitario: Number(r.custoUnitario ?? 0),
+        ultimaVenda: r.ultimaVenda ? new Date(r.ultimaVenda) : null,
       });
     }
 
@@ -6042,7 +6045,8 @@ export async function fetchVendasProdutoPorFilial({
           SUM(CASE WHEN f.EMISSAO >= @vf_inicio60d THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS qtde60d,
           SUM(CASE WHEN f.EMISSAO >= @vf_inicioMesAtual THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS qtdeMesAtual,
           SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS valor12m,
-          MAX(ISNULL(p.CUSTO_REPOSICAO1, 0)) AS custoUnitario
+          MAX(ISNULL(p.CUSTO_REPOSICAO1, 0)) AS custoUnitario,
+          MAX(CASE WHEN f.NOTA_CANCELADA = 0 THEN f.EMISSAO ELSE NULL END) AS ultimaVenda
         FROM FATURAMENTO f WITH (NOLOCK)
         JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
           ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
@@ -6057,13 +6061,14 @@ export async function fetchVendasProdutoPorFilial({
           ${ecommerceFatFilialFilter}
         GROUP BY f.FILIAL
       `;
-      const ecRes = await request.query<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number | null; valor12m: number | null; custoUnitario: number | null }>(queryEcommerce);
+      const ecRes = await request.query<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number | null; valor12m: number | null; custoUnitario: number | null; ultimaVenda: Date | null }>(queryEcommerce);
       for (const r of ecRes.recordset) {
         const q12 = Math.round(Number(r.qtde12m ?? 0));
         const q60 = Math.round(Number(r.qtde60d ?? 0));
         const qMes = Math.round(Number(r.qtdeMesAtual ?? 0));
         const val = Number(r.valor12m ?? 0);
         const custo = Number(r.custoUnitario ?? 0);
+        const ecUltimaVenda = r.ultimaVenda ? new Date(r.ultimaVenda) : null;
         const ex = byFilial.get(r.filial);
         if (ex) {
           ex.qtde12m += q12;
@@ -6071,13 +6076,23 @@ export async function fetchVendasProdutoPorFilial({
           ex.qtdeMesAtual += qMes;
           ex.valor12m += val;
           ex.custoUnitario = Math.max(ex.custoUnitario, custo);
+          // mantém a data de venda mais recente entre varejo e e-commerce
+          if (ecUltimaVenda && (!ex.ultimaVenda || ecUltimaVenda > ex.ultimaVenda)) {
+            ex.ultimaVenda = ecUltimaVenda;
+          }
         } else {
-          byFilial.set(r.filial, { filial: r.filial, qtde12m: q12, qtde60d: q60, qtdeMesAtual: qMes, valor12m: val, custoUnitario: custo });
+          byFilial.set(r.filial, { filial: r.filial, qtde12m: q12, qtde60d: q60, qtdeMesAtual: qMes, valor12m: val, custoUnitario: custo, ultimaVenda: ecUltimaVenda });
         }
       }
     }
 
-    return Array.from(byFilial.values()).sort((a, b) => a.filial.localeCompare(b.filial));
+    const nowMs = Date.now();
+    return Array.from(byFilial.values())
+      .sort((a, b) => a.filial.localeCompare(b.filial))
+      .map((r) => ({
+        ...r,
+        diasDesdeUltimaVenda: r.ultimaVenda ? Math.floor((nowMs - r.ultimaVenda.getTime()) / msPerDay) : null,
+      }));
   });
 }
 

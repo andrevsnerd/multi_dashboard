@@ -48,6 +48,8 @@ interface ListaItem {
   custoUnit?: number | null;
   /** Estoque na filial da lista, snapshot ao adicionar */
   estoqueFilial?: number | null;
+  /** Dias desde a última venda registrada nos últimos 12 meses */
+  diasDesdeUltimaVenda?: number | null;
   linha?: string | null;
   subgrupo?: string | null;
 }
@@ -237,23 +239,27 @@ async function fetchVendasItemMetricas(
   codFilial: string | null,
   produto: string,
   corProduto: string | null
-): Promise<{ qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null } | null> {
+): Promise<{ qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null; diasDesdeUltimaVenda: number | null } | null> {
   try {
     const params = new URLSearchParams({ company: companyKey, produto: produto.trim() });
     if (codFilial && codFilial.trim()) params.set("filial", codFilial.trim());
     if (corProduto) params.set("corProduto", corProduto.trim());
     const res = await fetch(`/api/controle-estoque/vendas-por-filial-item?${params}`, { cache: "no-store" });
     if (!res.ok) return null;
-    const json = (await res.json()) as { data?: Array<{ qtde12m: number; qtde60d: number; qtdeMesAtual?: number; valor12m?: number; custoUnitario?: number }> };
+    const json = (await res.json()) as { data?: Array<{ qtde12m: number; qtde60d: number; qtdeMesAtual?: number; valor12m?: number; custoUnitario?: number; diasDesdeUltimaVenda?: number | null }> };
     const rows = json.data || [];
     const totalValor = rows.reduce((s, r) => s + Number(r.valor12m ?? 0), 0);
     const maxCusto = rows.reduce((max, r) => Math.max(max, Number(r.custoUnitario ?? 0)), 0);
+    // Última venda mais recente entre todas as filiais (menor número de dias)
+    const diasValidos = rows.map((r) => r.diasDesdeUltimaVenda).filter((d): d is number => d != null);
+    const diasDesdeUltimaVenda = diasValidos.length > 0 ? Math.min(...diasValidos) : null;
     return {
       qtde12m: Math.round(rows.reduce((s, r) => s + Number(r.qtde12m ?? 0), 0)),
       qtde60d: Math.round(rows.reduce((s, r) => s + Number(r.qtde60d ?? 0), 0)),
       vendasMesAtual: Math.round(rows.reduce((s, r) => s + Number(r.qtdeMesAtual ?? 0), 0)),
       valor12m: totalValor > 0 ? Math.round(totalValor) : null,
       custoUnit: maxCusto > 0 ? maxCusto : null,
+      diasDesdeUltimaVenda,
     };
   } catch {
     return null;
@@ -344,15 +350,47 @@ function calcQtdSugestaoS(item: ListaItem): number {
   return Math.max(0, Math.ceil((limiteDias / 30) * mediaVendasMes));
 }
 
+/**
+ * Sugestão E — produto parado por falta de estoque (estoque <= 0 há algum tempo).
+ * A média mensal real é subestimada porque o produto ficou sem estoque e não pôde vender.
+ * Calcula a velocidade ajustada excluindo o período inativo estimado.
+ */
+function calcQtdSugestaoEInfo(item: ListaItem): {
+  qtd: number;
+  velocidadeAjustada: number;
+  mesesSemVenda: number;
+  mesesAtivos: number;
+} | null {
+  const qtde12m = Number(item.qtde12m ?? 0);
+  if (qtde12m <= 0) return null;
+  const dias = item.diasDesdeUltimaVenda;
+  if (dias == null || dias < 30) return null; // vendeu recentemente, não está estagnado
+  const mesesSemVenda = dias / 30;
+  const mesesAtivos = 12 - mesesSemVenda;
+  if (mesesAtivos < 1) return null; // período ativo muito curto para extrapolar com confiança
+  const velocidadeAjustada = qtde12m / mesesAtivos;
+  if (velocidadeAjustada < 0.5) return null; // mesmo ajustado, velocidade insignificante
+  const limiteDias = getLimiteDiasReposicao(item);
+  const qtd = Math.max(1, Math.ceil((limiteDias / 30) * velocidadeAjustada));
+  return { qtd, velocidadeAjustada, mesesSemVenda, mesesAtivos };
+}
+
+function hasSugestaoE(item: ListaItem): boolean {
+  const estoqueAtual = Number(item.estoqueFilial ?? 0);
+  if (estoqueAtual > 0) return false; // tem estoque, não é caso de estagnação
+  return calcQtdSugestaoEInfo(item) !== null;
+}
+
 function getReposicaoCompraView(item: ListaItem, diasCorridosMes: number): {
   qtdFinal: number;
   qtdS: number;
+  qtdE: number;
   qtdSuficiente: boolean;
   semSugestao: boolean;
 } {
   const qtdFinal = getSuggestedDelta(item, diasCorridosMes) ?? 0;
   if (qtdFinal > 0) {
-    return { qtdFinal, qtdS: 0, qtdSuficiente: false, semSugestao: false };
+    return { qtdFinal, qtdS: 0, qtdE: 0, qtdSuficiente: false, semSugestao: false };
   }
   const vendasMes = Number(item.vendasMesAtual ?? 0);
   const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
@@ -361,18 +399,23 @@ function getReposicaoCompraView(item: ListaItem, diasCorridosMes: number): {
   const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
   const qtdSuficiente = consumoDiario > 0 && duracaoAtual >= limiteDias;
   if (qtdSuficiente) {
-    return { qtdFinal: 0, qtdS: 0, qtdSuficiente: true, semSugestao: false };
+    return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdSuficiente: true, semSugestao: false };
   }
   if (hasSugestaoS(item, qtdFinal, qtdSuficiente)) {
-    return { qtdFinal: 0, qtdS: calcQtdSugestaoS(item), qtdSuficiente: false, semSugestao: false };
+    return { qtdFinal: 0, qtdS: calcQtdSugestaoS(item), qtdE: 0, qtdSuficiente: false, semSugestao: false };
   }
-  return { qtdFinal: 0, qtdS: 0, qtdSuficiente: false, semSugestao: true };
+  const eInfo = hasSugestaoE(item) ? calcQtdSugestaoEInfo(item) : null;
+  if (eInfo) {
+    return { qtdFinal: 0, qtdS: 0, qtdE: eInfo.qtd, qtdSuficiente: false, semSugestao: false };
+  }
+  return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdSuficiente: false, semSugestao: true };
 }
 
 function getSuggestedQtyValue(item: ListaItem, diasCorridosMes: number): number {
   const sugestao = getReposicaoCompraView(item, diasCorridosMes);
   if (sugestao.qtdFinal > 0) return sugestao.qtdFinal;
   if (sugestao.qtdS > 0) return sugestao.qtdS;
+  if (sugestao.qtdE > 0) return sugestao.qtdE;
   return 0;
 }
 
@@ -520,6 +563,16 @@ function ListaLojaItensTable({
     limiteDias: number;
     qtdS: number;
   }>(null);
+  const [sugestaoETooltip, setSugestaoETooltip] = useState<null | {
+    x: number;
+    y: number;
+    qtde12m: number;
+    mesesSemVenda: number;
+    mesesAtivos: number;
+    velocidadeAjustada: number;
+    limiteDias: number;
+    qtdE: number;
+  }>(null);
 
   const [estoqueCache, setEstoqueCache] = useState<Record<string, Array<{ filial: string; estoque: number }>>>({});
   const [vendasCache, setVendasCache] = useState<Record<string, Array<{ filial: string; qtde12m: number; qtde60d: number; valor12m: number }>>>({});
@@ -533,6 +586,7 @@ function ListaLojaItensTable({
         valor12m: number | null;
         custoUnit: number | null;
         estoqueFilial: number | null;
+        diasDesdeUltimaVenda: number | null;
       }
     >
   >({});
@@ -562,6 +616,7 @@ function ListaLojaItensTable({
             valor12m: vendas?.valor12m ?? null,
             custoUnit: vendas?.custoUnit ?? null,
             estoqueFilial,
+            diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
           },
         };
       })
@@ -646,6 +701,7 @@ function ListaLojaItensTable({
                 const vendasMesAtual = live?.vendasMesAtual ?? item.vendasMesAtual ?? null;
                 const estoqueFilial = live?.estoqueFilial ?? item.estoqueFilial ?? null;
                 const custoUnit = live?.custoUnit ?? item.custoUnit ?? null;
+                const diasDesdeUltimaVenda = live?.diasDesdeUltimaVenda ?? item.diasDesdeUltimaVenda ?? null;
                 return (
                   <>
               <td>
@@ -1096,7 +1152,7 @@ function ListaLojaItensTable({
                     const diasCorridos = new Date().getDate();
                     const consumoDiario = vendasMes > 0 && diasCorridos > 0 ? vendasMes / diasCorridos : 0;
                     const estoque = estoqueFilial ?? 0;
-                    if (consumoDiario <= 0 || !estoque) return "—";
+                    if (consumoDiario <= 0 || estoque <= 0) return "—";
                     const dias = Math.round(estoque / consumoDiario);
                     if (dias >= 365) return `${Math.round(dias / 30)} meses`;
                     return `${dias} dias`;
@@ -1122,7 +1178,7 @@ function ListaLojaItensTable({
               <td className={styles.colNumeric}>
                 {(() => {
                   const sugestao = getReposicaoCompraView(
-                    { ...item, vendasMesAtual, estoqueFilial, qtde12m },
+                    { ...item, vendasMesAtual, estoqueFilial, qtde12m, diasDesdeUltimaVenda },
                     diasCorridosMes
                   );
                   if (sugestao.qtdFinal > 0) {
@@ -1194,6 +1250,47 @@ function ListaLojaItensTable({
                       </span>
                     );
                   }
+                  if (sugestao.qtdE > 0) {
+                    const eInfo = calcQtdSugestaoEInfo({ ...item, qtde12m, diasDesdeUltimaVenda });
+                    const limiteDias = getLimiteDiasReposicao(item);
+                    return (
+                      <span className={styles.reporAdd}>
+                        {fmt(sugestao.qtdE)}{" "}
+                        <span
+                          onMouseEnter={(e) =>
+                            eInfo && setSugestaoETooltip({
+                              x: e.clientX,
+                              y: e.clientY,
+                              qtde12m: Number(qtde12m ?? 0),
+                              mesesSemVenda: eInfo.mesesSemVenda,
+                              mesesAtivos: eInfo.mesesAtivos,
+                              velocidadeAjustada: eInfo.velocidadeAjustada,
+                              limiteDias,
+                              qtdE: sugestao.qtdE,
+                            })
+                          }
+                          onMouseLeave={() => setSugestaoETooltip(null)}
+                          style={{
+                            display: "inline-flex",
+                            width: 16,
+                            height: 16,
+                            borderRadius: "999px",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 10,
+                            fontWeight: 800,
+                            color: "#fff",
+                            background: "#f97316",
+                            border: "1px solid #ea580c",
+                            verticalAlign: "middle",
+                            cursor: "help",
+                          }}
+                        >
+                          E
+                        </span>
+                      </span>
+                    );
+                  }
                   if (sugestao.semSugestao) {
                     return <span className={styles.cellMetric}>—</span>;
                   }
@@ -1240,7 +1337,7 @@ function ListaLojaItensTable({
                       { ...item, vendasMesAtual, estoqueFilial, qtde12m },
                       diasCorridosMes
                     );
-                    const qtdBase = sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS;
+                    const qtdBase = sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS > 0 ? sugestao.qtdS : sugestao.qtdE;
                     if (!qtdBase || qtdBase <= 0) return "—";
                     return fmtBRL(qtdBase * custoUnit);
                   })()}
@@ -1403,6 +1500,30 @@ function ListaLojaItensTable({
           </div>
         </div>
       )}
+      {sugestaoETooltip && (
+        <div className={styles.metricTooltip} style={{ left: sugestaoETooltip.x + 12, top: sugestaoETooltip.y + 12 }}>
+          <div className={styles.metricTooltipTitle}>Regra E — Produto parado por falta de estoque</div>
+          <div className={styles.metricTooltipLine} style={{ color: "#94a3b8", fontSize: 11 }}>
+            A média mensal estava subestimada porque o produto ficou sem estoque.
+            A velocidade real é calculada excluindo o período inativo.
+          </div>
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine}><strong>Vendas nos últimos 12m:</strong> {fmt(sugestaoETooltip.qtde12m)} un</div>
+          <div className={styles.metricTooltipLine}><strong>Sem vendas há:</strong> ~{Math.round(sugestaoETooltip.mesesSemVenda)} meses ({Math.round(sugestaoETooltip.mesesSemVenda * 30)} dias)</div>
+          <div className={styles.metricTooltipLine}><strong>Período ativo estimado:</strong> ~{sugestaoETooltip.mesesAtivos.toFixed(1)} meses</div>
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine}><strong>Velocidade ajustada:</strong> {sugestaoETooltip.velocidadeAjustada.toFixed(2)} un/mês</div>
+          <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
+            = {fmt(sugestaoETooltip.qtde12m)} un ÷ {sugestaoETooltip.mesesAtivos.toFixed(1)} meses ativos
+          </div>
+          <div className={styles.metricTooltipLine}><strong>Cobertura mínima:</strong> {sugestaoETooltip.limiteDias} dias ({(sugestaoETooltip.limiteDias / 30).toFixed(1)} meses)</div>
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoETooltip.qtdE)} un</div>
+          <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
+            = ⌈{sugestaoETooltip.velocidadeAjustada.toFixed(2)} × {(sugestaoETooltip.limiteDias / 30).toFixed(1)}⌉ = {fmt(sugestaoETooltip.qtdE)}
+          </div>
+        </div>
+      )}
       {duracaoTooltip && (
         <div className={styles.metricTooltip} style={{ left: duracaoTooltip.x + 12, top: duracaoTooltip.y + 12 }}>
           <div className={styles.metricTooltipTitle}>Duração de estoque</div>
@@ -1559,6 +1680,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             valor12m: vendas?.valor12m ?? null,
             custoUnit: vendas?.custoUnit ?? null,
             estoqueFilial,
+            diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
           };
         })
       );
@@ -1735,7 +1857,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
       };
 
       void (async () => {
-        let vendas: { qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null } | null = null;
+        let vendas: { qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null; diasDesdeUltimaVenda: number | null } | null = null;
         let estoque: number | null = null;
         [vendas, estoque] = await Promise.all([
           fetchVendasItemMetricas(companyKey, filialCod, produto.produto, produto.corProduto),
@@ -1765,6 +1887,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                   valor12m: vendas?.valor12m ?? null,
                   custoUnit: vendas?.custoUnit ?? null,
                   estoqueFilial: estoque,
+                  diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
                 },
                 new Date().getDate()
               ),
@@ -1774,6 +1897,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
               valor12m: vendas?.valor12m ?? null,
               custoUnit: vendas?.custoUnit ?? null,
               estoqueFilial: estoque,
+              diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
             },
           ];
         });
@@ -1924,6 +2048,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             valor12m: vendas?.valor12m ?? null,
             custoUnit: vendas?.custoUnit ?? null,
             estoqueFilial,
+            diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
           }] as const;
         })
       );
@@ -1937,7 +2062,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             next[idx] = { ...next[idx], quantidade: next[idx].quantidade + agg.quantidade };
             continue;
           }
-          const metrics = metricsMap.get(key) || { qtde12m: null, valor12m: null, qtde60d: null, vendasMesAtual: null, custoUnit: null, estoqueFilial: null };
+          const metrics = metricsMap.get(key) || { qtde12m: null, valor12m: null, qtde60d: null, vendasMesAtual: null, custoUnit: null, estoqueFilial: null, diasDesdeUltimaVenda: null };
           const suggested = getSuggestedQtyValue(
             {
               ...agg.item,
@@ -1948,6 +2073,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
               vendasMesAtual: metrics.vendasMesAtual,
               custoUnit: metrics.custoUnit,
               estoqueFilial: metrics.estoqueFilial,
+              diasDesdeUltimaVenda: metrics.diasDesdeUltimaVenda,
             },
             new Date().getDate()
           );
@@ -1960,6 +2086,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             vendasMesAtual: metrics.vendasMesAtual,
             custoUnit: metrics.custoUnit,
             estoqueFilial: metrics.estoqueFilial,
+            diasDesdeUltimaVenda: metrics.diasDesdeUltimaVenda,
           });
         }
         return next;
@@ -2070,7 +2197,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
       const mode = emModal ? modalColorPickerMode : editorColorPickerMode;
       const filialCod = filialConsultaSelecionada;
 
-      let vendas: { qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null } | null = null;
+      let vendas: { qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null; diasDesdeUltimaVenda: number | null } | null = null;
       let estoque: number | null = null;
       [vendas, estoque] = await Promise.all([
         fetchVendasItemMetricas(companyKey, filialCod, produtoComCor.produto, produtoComCor.corProduto),
@@ -2084,6 +2211,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
         valor12m: vendas?.valor12m ?? null,
         custoUnit: vendas?.custoUnit ?? null,
         estoqueFilial: estoque,
+        diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
       };
 
       setLista((prev) => {
@@ -2284,14 +2412,14 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     const diasCorridosMes = new Date().getDate();
     const totalQtdSugerida = itens.reduce((s, item) => {
       const sugestao = getReposicaoCompraView(item, diasCorridosMes);
-      const qtd = sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS;
+      const qtd = sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS > 0 ? sugestao.qtdS : sugestao.qtdE;
       return s + Math.max(0, qtd);
     }, 0);
     const totalCustoReferencia = itens.reduce((s, item) => {
       const custoUnit = Number(item.custoUnit ?? 0);
       if (custoUnit <= 0) return s;
       const sugestao = getReposicaoCompraView(item, diasCorridosMes);
-      const qtd = sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS;
+      const qtd = sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS > 0 ? sugestao.qtdS : sugestao.qtdE;
       if (qtd <= 0) return s;
       return s + qtd * custoUnit;
     }, 0);
