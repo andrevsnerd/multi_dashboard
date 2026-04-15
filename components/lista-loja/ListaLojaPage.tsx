@@ -57,6 +57,7 @@ type Curva = "A" | "B" | "C";
 type CurvaInfo = {
   curva: Curva;
   percParticipacao: number;
+  percCumulativo: number;
 };
 
 interface ListaLoja {
@@ -390,6 +391,7 @@ function calcularCurvasRede(itens: ListaItem[]): Map<string, CurvaInfo> {
     out.set(keyOf(row.item), {
       curva,
       percParticipacao: total > 0 ? (Math.max(0, row.valor) / total) * 100 : 0,
+      percCumulativo: percCum * 100,
     });
   }
   return out;
@@ -408,6 +410,7 @@ type Mode = "list" | "editor" | "saved-purchases";
 type ListaLojaItensTableProps = {
   companyKey: CompanyKey;
   filialCod: string | null;
+  filialNome?: string | null;
   itens: ListaItem[];
   compraView: boolean;
   abcMap: Map<string, CurvaInfo>;
@@ -428,6 +431,7 @@ type ListaLojaItensTableProps = {
 function ListaLojaItensTable({
   companyKey,
   filialCod,
+  filialNome = null,
   itens,
   compraView,
   abcMap,
@@ -474,7 +478,12 @@ function ListaLojaItensTable({
     escopo: "geral" | "loja";
     periodo: string;
     regra: string;
-    rows: Array<{ filial: string; curva: Curva; valor12m: number; participacao: number; acumulado: number }>;
+    curva: Curva;
+    valor12m: number;
+    percParticipacao: number;
+    percCumulativo: number;
+    filiaisLoading: boolean;
+    filiais: Array<{ filial: string; curva: Curva; valor12m: number; participacao: number; acumulado: number }>;
   }>(null);
   const vendasHoverKeyRef = useRef<string | null>(null);
   const estoqueHoverKeyRef = useRef<string | null>(null);
@@ -760,62 +769,90 @@ function ListaLojaItensTable({
                     <span
                       className={`${styles.abcBadge} ${styles[`abcBadge${curva}`]}`}
                       onMouseEnter={async (e) => {
-                        const cacheKey = `${filialScopeKey}::${buildItemKey(item.produto, item.corProduto)}`;
-                        abcHoverKeyRef.current = cacheKey;
-                        const loadRows = async () => {
-                          const cached = vendasCache[cacheKey];
-                          if (cached) return cached;
-                          const rows = await fetchVendasPorFilialItem(companyKey, filialCod, item.produto, item.corProduto);
-                          setVendasCache((prev) => ({ ...prev, [cacheKey]: rows }));
-                          return rows;
-                        };
+                        const k = buildItemKey(item.produto, item.corProduto);
+                        const abc = abcMap.get(k);
+                        if (!abc) return;
+                        const liveKey = `${filialScopeKey}::${k}`;
+                        const liveVal = liveMetrics[liveKey]?.valor12m;
+                        const val12m = liveVal ?? Number(item.valor12m ?? 0);
+                        const hoverKey = `${filialScopeKey}::abc::${k}`;
+                        abcHoverKeyRef.current = hoverKey;
+                        // Mostra imediatamente os dados do badge (sem esperar o fetch)
+                        setAbcTooltip({
+                          x: e.clientX,
+                          y: e.clientY,
+                          produto: item.produto,
+                          cor: item.descCor || "",
+                          escopo: filialCod ? "loja" : "geral",
+                          periodo: "Últimos 12 meses",
+                          regra: "Classificação por faturamento acumulado (A até 80%, B até 95%, C acima de 95%).",
+                          curva: abc.curva,
+                          valor12m: val12m,
+                          percParticipacao: abc.percParticipacao,
+                          percCumulativo: abc.percCumulativo,
+                          filiaisLoading: true,
+                          filiais: [],
+                        });
+                        // Carrega vendas por filial de TODOS os itens para calcular ABC correto por loja
                         try {
-                          const rows = await loadRows();
-                          if (abcHoverKeyRef.current !== cacheKey) return;
-                          const sorted = [...rows].sort((a, b) => b.valor12m - a.valor12m);
-                          const total = sorted.reduce((s, r) => s + Math.max(0, r.valor12m), 0);
-                          let cumulative = 0;
-                          const byFilial = sorted.map((row) => {
-                            cumulative += Math.max(0, row.valor12m);
-                            const percCum = total > 0 ? cumulative / total : 1;
-                            const curvaFilial: Curva = percCum <= 0.8 ? "A" : percCum <= 0.95 ? "B" : "C";
-                            return {
-                              filial: row.filial,
-                              curva: curvaFilial,
-                              valor12m: row.valor12m,
-                              participacao: total > 0 ? (Math.max(0, row.valor12m) / total) * 100 : 0,
-                              acumulado: percCum * 100,
-                            };
-                          });
-                          setAbcTooltip({
-                            x: e.clientX,
-                            y: e.clientY,
-                            produto: item.produto,
-                            cor: item.descCor || "",
-                            escopo: filialCod ? "loja" : "geral",
-                            periodo: "Últimos 12 meses",
-                            regra: "Classificação por faturamento acumulado (A até 80%, B até 95%, C acima de 95%).",
-                            rows: byFilial,
-                          });
+                          const allItemsVendas = await Promise.all(
+                            itens.map(async (it) => {
+                              const ik = buildItemKey(it.produto, it.corProduto);
+                              const cacheKey = `__ALL__::${ik}`;
+                              let rows = vendasCache[cacheKey];
+                              if (!rows) {
+                                rows = await fetchVendasPorFilialItem(companyKey, null, it.produto, it.corProduto);
+                                setVendasCache((prev) => ({ ...prev, [cacheKey]: rows }));
+                              }
+                              return { ik, rows };
+                            })
+                          );
+                          if (abcHoverKeyRef.current !== hoverKey) return;
+                          // Agrupa por filial: para cada filial, coleta valor12m de cada item
+                          const filialItemsMap = new Map<string, Array<{ ik: string; valor12m: number }>>();
+                          for (const { ik, rows } of allItemsVendas) {
+                            for (const row of rows) {
+                              if (!filialItemsMap.has(row.filial)) filialItemsMap.set(row.filial, []);
+                              filialItemsMap.get(row.filial)!.push({ ik, valor12m: row.valor12m });
+                            }
+                          }
+                          // Para cada filial, calcula a posição deste produto na curva ABC daquela filial
+                          const filialResults: Array<{ filial: string; curva: Curva; valor12m: number; participacao: number; acumulado: number }> = [];
+                          for (const [filial, filialItens] of filialItemsMap) {
+                            // Pula a filial selecionada no filtro (já representada pelo badge)
+                            if (filialNome && filial === filialNome) continue;
+                            const sorted = [...filialItens].sort((a, b) => b.valor12m - a.valor12m);
+                            const total = sorted.reduce((s, r) => s + Math.max(0, r.valor12m), 0);
+                            let cum = 0;
+                            for (const it of sorted) {
+                              cum += Math.max(0, it.valor12m);
+                              if (it.ik === k) {
+                                const percCum = total > 0 ? cum / total : 1;
+                                const curvaFilial: Curva = percCum <= 0.8 ? "A" : percCum <= 0.95 ? "B" : "C";
+                                filialResults.push({
+                                  filial,
+                                  curva: curvaFilial,
+                                  valor12m: it.valor12m,
+                                  participacao: total > 0 ? (Math.max(0, it.valor12m) / total) * 100 : 0,
+                                  acumulado: percCum * 100,
+                                });
+                                break;
+                              }
+                            }
+                          }
+                          filialResults.sort((a, b) => b.valor12m - a.valor12m);
+                          if (abcHoverKeyRef.current !== hoverKey) return;
+                          setAbcTooltip((prev) => prev ? { ...prev, filiaisLoading: false, filiais: filialResults } : null);
                         } catch {
-                          if (abcHoverKeyRef.current !== cacheKey) return;
-                          setAbcTooltip({
-                            x: e.clientX,
-                            y: e.clientY,
-                            produto: item.produto,
-                            cor: item.descCor || "",
-                            escopo: filialCod ? "loja" : "geral",
-                            periodo: "Últimos 12 meses",
-                            regra: "Classificação por faturamento acumulado (A até 80%, B até 95%, C acima de 95%).",
-                            rows: [],
-                          });
+                          if (abcHoverKeyRef.current !== hoverKey) return;
+                          setAbcTooltip((prev) => prev ? { ...prev, filiaisLoading: false } : null);
                         }
                       }}
                       onMouseLeave={() => {
                         abcHoverKeyRef.current = null;
                         setAbcTooltip(null);
                       }}
-                      title="Curva ABC na rede; passe o mouse para ver por filial"
+                      title="Curva ABC; passe o mouse para ver a posição na lista por filial"
                     >
                       {curva}
                     </span>
@@ -1290,15 +1327,40 @@ function ListaLojaItensTable({
           <div className={styles.metricTooltipTitle}>Curva ABC (detalhe da lógica)</div>
           <div className={styles.metricTooltipMeta}><strong>Produto:</strong> {abcTooltip.produto}</div>
           {abcTooltip.cor && <div className={styles.metricTooltipMeta}><strong>Cor:</strong> {abcTooltip.cor}</div>}
-          <div className={styles.metricTooltipMeta}><strong>Escopo:</strong> {abcTooltip.escopo === "geral" ? "Geral (rede)" : "Loja específica"}</div>
+          <div className={styles.metricTooltipMeta}><strong>Escopo:</strong> {abcTooltip.escopo === "geral" ? "Rede (todas as filiais)" : "Loja selecionada"}</div>
           <div className={styles.metricTooltipMeta}><strong>Período:</strong> {abcTooltip.periodo}</div>
           <div className={styles.metricTooltipLine} style={{ marginTop: 6 }}>{abcTooltip.regra}</div>
           <div className={styles.metricTooltipDivider} />
-          {abcTooltip.rows.length === 0 ? (
-            <div className={styles.metricTooltipLine}>Sem dados para classificar.</div>
-          ) : (
+          <div className={styles.metricTooltipRow}>
+            <span>Valor 12 meses</span>
+            <span>{fmtBRL(abcTooltip.valor12m)}</span>
+          </div>
+          <div className={styles.metricTooltipRow}>
+            <span>Participação na lista</span>
+            <span>{abcTooltip.percParticipacao.toFixed(1)}%</span>
+          </div>
+          <div className={styles.metricTooltipRow}>
+            <span>Acumulado</span>
+            <span>{abcTooltip.percCumulativo.toFixed(1)}%</span>
+          </div>
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipRow}>
+            <span>Classificação ({abcTooltip.escopo === "geral" ? "rede" : "loja selecionada"})</span>
+            <span className={`${styles.abcBadgeMini} ${styles[`abcBadge${abcTooltip.curva}`]}`}>{abcTooltip.curva}</span>
+          </div>
+          {/* Breakdown por filial (posição do produto na lista de cada loja) */}
+          {abcTooltip.filiaisLoading ? (
             <>
-              {abcTooltip.rows.map((row) => (
+              <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>Carregando outras lojas...</div>
+            </>
+          ) : abcTooltip.filiais.filter((r) => r.valor12m > 0).length > 0 ? (
+            <>
+              <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>
+                Posição na lista por loja:
+              </div>
+              {abcTooltip.filiais.filter((r) => r.valor12m > 0).map((row) => (
                 <div key={row.filial} className={styles.metricTooltipRow}>
                   <span>{row.filial}</span>
                   <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1310,7 +1372,7 @@ function ListaLojaItensTable({
                 </div>
               ))}
             </>
-          )}
+          ) : null}
         </div>
       )}
       {sugestaoTooltip && (
@@ -2361,6 +2423,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
               <ListaLojaItensTable
                 companyKey={companyKey}
                 filialCod={filialConsultaSelecionada}
+                filialNome={filialConsultaSelecionada ? (filialSelecionada?.filial ?? null) : null}
                 itens={itens}
                 compraView={true}
                 abcMap={abcMapRede}
@@ -2545,6 +2608,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                       <ListaLojaItensTable
                         companyKey={companyKey}
                         filialCod={filialConsultaSelecionada}
+                        filialNome={filialConsultaSelecionada ? (filialSelecionada?.filial ?? null) : null}
                         itens={itensModal}
                         compraView={true}
                         abcMap={abcMapModal}
