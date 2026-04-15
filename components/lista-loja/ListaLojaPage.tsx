@@ -1463,9 +1463,9 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
           ? [{ codFilial: TODAS_FILIAIS_VALUE, filial: TODAS_FILIAIS_LABEL }, ...semMatriz]
           : semMatriz;
       setFiliaisDisponiveis(comTodas);
-      if (disponiveis.length > 0) {
+      if (comTodas.length > 0) {
         setFilialSelecionada((prev) => {
-          if (!prev) return disponiveis[0];
+          if (!prev) return comTodas[0];
           const match = comTodas.find((f) => f.codFilial === prev.codFilial);
           return match ?? comTodas[0];
         });
