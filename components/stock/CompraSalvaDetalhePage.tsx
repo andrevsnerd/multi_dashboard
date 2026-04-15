@@ -26,8 +26,12 @@ interface ProdutoSugestao {
   cor?: string;
   corDescricao?: string;
   descricao: string;
+  linha?: string;
+  subgrupo?: string;
   grade?: string;
   colecao?: string;
+  vendas3meses?: number;
+  vendasMesAtual?: number;
   custoUnitario?: number;
   estoqueAtual?: number;
   qtdSugerida?: number;
@@ -83,6 +87,51 @@ function normalizeVendasPorFilialParaExibicao(
   const cfg = resolveCompany(companyKey);
   const merged = aggregateVendasPorFilialByDisplayLabel(rows, cfg);
   return [...merged].sort((a, b) => compareFilialDisplayOrder(a.filial, b.filial, cfg));
+}
+
+function normalizeKey(s?: string | null) {
+  return (s ?? "")
+    .toString()
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
+function getLimiteDiasReposicao(p: { linha?: string; subgrupo?: string }) {
+  const linha = normalizeKey(p.linha);
+  const subgrupo = normalizeKey(p.subgrupo);
+  if (linha === "INDIA") return 90;
+  const subgrupos120 = new Set(["CETIM DE SEDA", "MOUSSELINE DE SEDA", "SEDA PREMIUM"]);
+  if (subgrupos120.has(subgrupo)) return 120;
+  return 60;
+}
+
+function calcularSugestaoAbc(match?: ProdutoSugestao | null): number | null {
+  if (!match) return null;
+  const diasCorridosMes = new Date().getDate();
+  const vendasMesAtual = Number(match.vendasMesAtual ?? 0);
+  const consumoDiario = diasCorridosMes > 0 ? vendasMesAtual / diasCorridosMes : 0;
+  const estoqueAtual = Number(match.estoqueAtual ?? 0);
+  const limiteDias = getLimiteDiasReposicao(match);
+  const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
+
+  if (consumoDiario > 0 && duracaoAtual < limiteDias) {
+    const qtdFinal = Math.ceil(consumoDiario * (limiteDias - duracaoAtual));
+    if (qtdFinal > 0) return qtdFinal;
+  }
+
+  const qtdSuficiente = consumoDiario > 0 && duracaoAtual >= limiteDias;
+  if (qtdSuficiente) return null;
+
+  const mediaVendasMes = Number(match.vendas3meses ?? 0) / 12;
+  const temSugestaoS = mediaVendasMes >= 2 && estoqueAtual <= mediaVendasMes * 2;
+  if (temSugestaoS) {
+    const qtdS = Math.ceil((limiteDias / 30) * mediaVendasMes);
+    return qtdS > 0 ? qtdS : null;
+  }
+
+  return null;
 }
 
 const DESTINO_FILIAL_BADGE_THEMES = [
@@ -153,6 +202,33 @@ async function fetchVendasPorFilialItem(
   return json.data ?? [];
 }
 
+async function fetchVendasItemMetricas(params: URLSearchParams): Promise<{
+  qtde12m: number;
+  qtde60d: number;
+  vendasMesAtual: number;
+} | null> {
+  const res = await fetch(`/api/controle-estoque/vendas-por-filial-item?${params}`, { cache: "no-store" });
+  const json = await res.json() as {
+    data?: Array<{ qtde12m: number; qtde60d: number; qtdeMesAtual?: number }>;
+    error?: string;
+  };
+  if (!res.ok) return null;
+  const rows = json.data ?? [];
+  return {
+    qtde12m: Math.round(rows.reduce((s, r) => s + Number(r.qtde12m ?? 0), 0)),
+    qtde60d: Math.round(rows.reduce((s, r) => s + Number(r.qtde60d ?? 0), 0)),
+    vendasMesAtual: Math.round(rows.reduce((s, r) => s + Number(r.qtdeMesAtual ?? 0), 0)),
+  };
+}
+
+async function fetchEstoqueFilialSum(params: URLSearchParams): Promise<number | null> {
+  const res = await fetch(`/api/controle-estoque/estoque-por-filial-item?${params}`, { cache: "no-store" });
+  const json = await res.json() as { data?: Array<{ estoque: number }>; error?: string };
+  if (!res.ok) return null;
+  const rows = json.data ?? [];
+  return Math.round(rows.reduce((s, r) => s + Math.max(0, Number(r.estoque ?? 0)), 0));
+}
+
 export default function CompraSalvaDetalhePage({
   companyKey,
   companySlug,
@@ -169,6 +245,7 @@ export default function CompraSalvaDetalhePage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [listaRows, setListaRows] = useState<ProdutoSugestao[]>([]);
+  const [liveMetrics, setLiveMetrics] = useState<Record<string, { qtde12m: number | null; vendasMesAtual: number | null; estoqueAtual: number | null }>>({});
   const [estoquePorFilialCache, setEstoquePorFilialCache] = useState<
     Record<string, Array<{ filial: string; estoque: number }>>
   >({});
@@ -260,6 +337,50 @@ export default function CompraSalvaDetalhePage({
 
   useEffect(() => {
     if (!doc || items.length === 0) return;
+    let cancelled = false;
+    const unique = new Map<string, { produto: string; corProduto: string | null }>();
+    items.forEach((it) => {
+      const produto = it.produto.trim();
+      const corProduto = expandirPorCor ? ((it.corProduto ?? "").trim() || null) : null;
+      const key = `${produto}||${corProduto ?? ""}`;
+      unique.set(key, { produto, corProduto });
+    });
+    void Promise.all(
+      Array.from(unique.entries()).map(async ([key, val]) => {
+        const params = new URLSearchParams();
+        params.set("company", companyKey);
+        params.set("produto", val.produto);
+        if (val.corProduto) params.set("corProduto", val.corProduto);
+        const [vendas, estoque] = await Promise.all([
+          fetchVendasItemMetricas(params),
+          fetchEstoqueFilialSum(params),
+        ]);
+        return {
+          key,
+          values: {
+            qtde12m: vendas?.qtde12m ?? null,
+            vendasMesAtual: vendas?.vendasMesAtual ?? null,
+            estoqueAtual: estoque,
+          },
+        };
+      })
+    ).then((rows) => {
+      if (cancelled) return;
+      setLiveMetrics((prev) => {
+        const next = { ...prev };
+        rows.forEach((r) => { next[r.key] = r.values; });
+        return next;
+      });
+    }).catch(() => {
+      // fallback silencioso: usa dados de listaRows
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [doc, items, companyKey, expandirPorCor]);
+
+  useEffect(() => {
+    if (!doc || items.length === 0) return;
     const unique = new Map<string, { produto: string; cor?: string }>();
     items.forEach((it) => {
       const produto = it.produto.trim();
@@ -293,13 +414,23 @@ export default function CompraSalvaDetalhePage({
         const pCor = (p.cor ?? "").trim();
         return pProd === produto && (expandirPorCor ? pCor === corProduto : true);
       });
-      const estoque = match?.estoqueAtual ?? null;
+      const cacheKey = `${produto}||${expandirPorCor ? corProduto : ""}`;
+      const live = liveMetrics[cacheKey];
+      const estoque = live?.estoqueAtual ?? match?.estoqueAtual ?? null;
       const custoUnit = match?.custoUnitario ?? 0;
       const custoTotal = custoUnit > 0 ? Math.round(it.qtdManual * custoUnit) : 0;
-      const qtdSugerida = typeof match?.qtdSugerida === "number" ? match.qtdSugerida : null;
+      const baseSugestao: ProdutoSugestao | null = match
+        ? {
+            ...match,
+            vendas3meses: live?.qtde12m ?? match.vendas3meses,
+            vendasMesAtual: live?.vendasMesAtual ?? match.vendasMesAtual,
+            estoqueAtual: live?.estoqueAtual ?? match.estoqueAtual,
+          }
+        : null;
+      const qtdSugerida = calcularSugestaoAbc(baseSugestao);
       return { it, match, estoque, custoUnit, custoTotal, qtdSugerida };
     });
-  }, [items, listaRows, expandirPorCor]);
+  }, [items, listaRows, expandirPorCor, liveMetrics]);
 
   const totals = useMemo(() => {
     const totalItens = items.length;

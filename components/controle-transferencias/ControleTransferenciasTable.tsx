@@ -10,12 +10,12 @@ import ConfirmarTransferenciaModal, { type TransferItemForModal } from "./Confir
 
 import styles from "./ControleTransferenciasTable.module.css";
 
-interface FilialApi {
+export interface ControleTransferenciasFilialApi {
   codFilial: string;
   filial: string;
 }
 
-interface TransferenciaPermissao {
+export interface ControleTransferenciasPermissao {
   username: string;
   filiaisOrigem: string[];
   filiaisDestino: string[];
@@ -27,27 +27,6 @@ interface TransferenciaPermissao {
   tipoRomaneioFixo: boolean;
   podeVerOutrasFiliais?: boolean;
   filialAtribuida?: string | null;
-}
-
-async function fetchPermissoes(username: string): Promise<TransferenciaPermissao | null> {
-  try {
-    const response = await fetch("/api/transferencia-produtos/permissoes", {
-      headers: { "x-auth-username": username },
-      cache: "no-store",
-    });
-    if (!response.ok) return null;
-    const json = (await response.json()) as { data: TransferenciaPermissao | null };
-    return json.data ?? null;
-  } catch {
-    return null;
-  }
-}
-
-async function fetchFiliais(): Promise<FilialApi[]> {
-  const response = await fetch("/api/transferencia-produtos/filiais", { cache: "no-store" });
-  if (!response.ok) return [];
-  const json = (await response.json()) as { data: FilialApi[] };
-  return json.data ?? [];
 }
 
 async function executarTransferencia(
@@ -99,6 +78,9 @@ interface ControleTransferenciasTableProps {
   loading?: boolean;
   dateRange?: DateRangeValue;
   selectedFilial?: string | null;
+  /** Carregados uma vez na página — evita GET duplicado em /permissoes e /filiais */
+  permissoes: ControleTransferenciasPermissao | null;
+  filiaisApi: ControleTransferenciasFilialApi[];
 }
 
 /** Ordem de atendimento dos destinos (para esta origem neste produto+cor). */
@@ -1002,25 +984,29 @@ export default function ControleTransferenciasTable({
   loading,
   dateRange,
   selectedFilial,
+  permissoes,
+  filiaisApi,
 }: ControleTransferenciasTableProps) {
   const company = resolveCompany(companyKey);
-  
+
+  /** Só depende de dados + período — evita recalcular algoritmo inteiro ao trocar só a filial de origem na UI. */
+  const transfersAllOrigins = useMemo(
+    () => calculateTransfers(data, companyKey, dateRange),
+    [data, companyKey, dateRange]
+  );
+
   // Agrupar por origem, e dentro de cada origem, agrupar por destino
   const transfersByOriginAndDestination = useMemo(() => {
-    const allTransfers = calculateTransfers(data, companyKey, dateRange);
-    
-    // Se uma filial foi selecionada, filtrar apenas transferências dessa filial como origem
-    let filteredTransfers = allTransfers;
+    let filteredTransfers = transfersAllOrigins;
     if (selectedFilial) {
       const selectedFilialDisplayName = company?.filialDisplayNames?.[selectedFilial] || selectedFilial;
-      filteredTransfers = allTransfers.filter(group => {
-        return group.origem === selectedFilial || 
-               group.origem === selectedFilialDisplayName;
-      });
+      filteredTransfers = transfersAllOrigins.filter(
+        (group) =>
+          group.origem === selectedFilial || group.origem === selectedFilialDisplayName
+      );
     }
-    
-    // Para cada grupo de origem, agrupar itens por destino
-    const transferGroups = filteredTransfers.map(group => {
+
+    const transferGroups = filteredTransfers.map((group) => {
       // Agrupar itens por destino dentro desta origem
       const itemsByDest = new Map<string, TransferItem[]>();
       
@@ -1084,7 +1070,7 @@ export default function ControleTransferenciasTable({
       };
     });
     return transferGroups;
-  }, [data, companyKey, dateRange, selectedFilial, company]);
+  }, [transfersAllOrigins, selectedFilial, company]);
 
   const [markedKeys, setMarkedKeys] = useState<Set<string>>(new Set());
   const [savingMarked, setSavingMarked] = useState(false);
@@ -1106,15 +1092,13 @@ export default function ControleTransferenciasTable({
   } | null>(null);
   const quantidadeTooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const { user, isLoading: authLoading } = useAuth();
-  const [permissoes, setPermissoes] = useState<TransferenciaPermissao | null>(null);
-  const [filiais, setFiliais] = useState<FilialApi[]>([]);
+  const { user } = useAuth();
   const [modalTransferItem, setModalTransferItem] = useState<TransferItemForModal | null>(null);
   const [onTransferSuccess, setOnTransferSuccess] = useState<(() => void) | null>(null);
 
   const filialToCodMap = useMemo(() => {
     const map = new Map<string, string>();
-    filiais.forEach((f) => {
+    filiaisApi.forEach((f) => {
       const key = (f.filial || "").trim();
       const cod = (f.codFilial || "").trim();
       if (key && cod) {
@@ -1134,7 +1118,7 @@ export default function ControleTransferenciasTable({
       });
       allCanonical.forEach((canon) => {
         if (!canon) return;
-        const found = filiais.find(
+        const found = filiaisApi.find(
           (fi) => (fi.filial || "").trim().toUpperCase() === canon.toUpperCase()
         );
         if (found?.codFilial) map.set(canon, found.codFilial.trim());
@@ -1148,17 +1132,7 @@ export default function ControleTransferenciasTable({
       });
     }
     return map;
-  }, [filiais, company]);
-
-  // Só buscar permissões depois do auth ter carregado (evita request sem header em local)
-  useEffect(() => {
-    if (authLoading || !user?.username) return;
-    fetchPermissoes(user.username).then(setPermissoes);
-  }, [authLoading, user?.username]);
-
-  useEffect(() => {
-    fetchFiliais().then(setFiliais);
-  }, []);
+  }, [filiaisApi, company]);
 
   const getCodFilial = useCallback(
     (canonico: string): string | null => {
@@ -1179,21 +1153,21 @@ export default function ControleTransferenciasTable({
       if (!perm || !canon) return false;
       const cod = getCodFilial(filialCanonico);
       if (cod && perm === cod) return true;
-      const filialFromPerm = filiais.find((f) => (f.codFilial || "").trim() === perm);
+      const filialFromPerm = filiaisApi.find((f) => (f.codFilial || "").trim() === perm);
       if (filialFromPerm) {
         const fn = (filialFromPerm.filial || "").trim();
         return fn === canon || fn.toUpperCase() === canon.toUpperCase();
       }
       return false;
     },
-    [getCodFilial, filiais]
+    [getCodFilial, filiaisApi]
   );
 
   const canTransfer = useCallback(
     (item: TransferItem): boolean => {
       if (user?.role === "admin") return true;
       if (!permissoes) return false;
-      if (filiais.length === 0) return false;
+      if (filiaisApi.length === 0) return false;
       const origemOk =
         permissoes.filiaisOrigem.length === 0 ||
         permissoes.filiaisOrigem.some((p) => permissaoMatchFilial(p, item.origemCanonico));
@@ -1202,12 +1176,12 @@ export default function ControleTransferenciasTable({
         permissoes.filiaisDestino.some((p) => permissaoMatchFilial(p, item.destinoCanonico));
       return Boolean(origemOk && destinoOk);
     },
-    [user?.role, permissoes, permissaoMatchFilial, filiais.length]
+    [user?.role, permissoes, permissaoMatchFilial, filiaisApi.length]
   );
 
   const filteredTransfersByOriginAndDestination = useMemo(() => {
     if (user?.role === "admin") return transfersByOriginAndDestination;
-    if (!permissoes || filiais.length === 0) return [];
+    if (!permissoes || filiaisApi.length === 0) return [];
     if (permissoes.podeVerOutrasFiliais) return transfersByOriginAndDestination;
     // Destinos visíveis: usa filiaisDestinoControle (visualização no controle de transferências).
     // Vazio = todos os destinos visíveis.
@@ -1239,17 +1213,18 @@ export default function ControleTransferenciasTable({
     user?.role,
     permissoes,
     permissaoMatchFilial,
-    filiais.length,
+    filiaisApi.length,
   ]);
 
-  const visibleItemKeys = useMemo(() => {
+  const { visibleItemKeys, visibleItemKeysSig } = useMemo(() => {
     const set = new Set<string>();
     filteredTransfersByOriginAndDestination.forEach((group) => {
       group.destinationGroups.forEach((dg) => {
         dg.items.forEach((item) => set.add(getTransferItemKey(item)));
       });
     });
-    return set;
+    const sig = [...set].sort().join("|");
+    return { visibleItemKeys: set, visibleItemKeysSig: sig };
   }, [filteredTransfersByOriginAndDestination]);
 
   const handleConfirmTransfer = useCallback(
@@ -1326,7 +1301,7 @@ export default function ControleTransferenciasTable({
     return () => {
       active = false;
     };
-  }, [companyKey, visibleItemKeys]);
+  }, [companyKey, visibleItemKeysSig]);
 
   // Carregar quantidades reais da API (Neon)
   useEffect(() => {

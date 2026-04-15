@@ -161,6 +161,55 @@
   margin-top: 4px;
 }
 
+.kpiCard {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: var(--ll-card);
+  border: 1px solid var(--ll-border);
+  border-radius: 12px;
+  padding: 12px 18px;
+  margin-bottom: 8px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}
+
+.kpiItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 120px;
+}
+
+.kpiLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ll-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kpiValue,
+.kpiValueNeutral {
+  font-size: 31px;
+  line-height: 1.1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiValue {
+  color: #047857;
+}
+
+.kpiValueNeutral {
+  color: #0f172a;
+}
+
+.kpiDivider {
+  width: 1px;
+  height: 40px;
+  background: var(--ll-border);
+}
+
 .badge {
   font-size: 13px;
   font-weight: 700;
@@ -206,6 +255,13 @@
   overflow-x: auto;
 }
 
+.produtosTableWrapCompra {
+  border: 1px solid var(--ll-border);
+  border-radius: 10px;
+  background: #fff;
+  padding: 6px 8px;
+}
+
 .produtosTable {
   width: 100%;
   border-collapse: collapse;
@@ -236,15 +292,13 @@
 }
 
 .colProduto {
-  width: 58%;
   min-width: 200px;
 }
 
 .colNumeric {
   text-align: right;
   white-space: nowrap;
-  width: 21%;
-  min-width: 96px;
+  min-width: 90px;
 }
 
 .produtosTable thead th.colNumeric {
@@ -256,6 +310,26 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 6px;
+}
+
+.dragHandle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  color: var(--ll-text-3);
+  background: #f8fafc;
+  border: 1px solid var(--ll-border);
+  cursor: grab;
+  user-select: none;
+  line-height: 1;
+  font-size: 12px;
+}
+
+.rowDragOver td {
+  background: #eff6ff;
 }
 
 .productTitleName {
@@ -404,6 +478,23 @@
 }
 .addProductBtn:hover { background: #dbeafe; border-color: var(--ll-accent); }
 
+.compraViewBtn {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--ll-accent-bdr);
+  background: var(--ll-accent-bg);
+  color: var(--ll-accent);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.compraViewBtn:hover {
+  background: #dbeafe;
+  border-color: var(--ll-accent);
+}
+
 .clearProductsBtn {
   padding: 8px 12px;
   border-radius: 8px;
@@ -417,6 +508,158 @@
   transition: background 120ms;
 }
 .clearProductsBtn:hover { background: #f8fafc; }
+
+.abcBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1px solid transparent;
+  cursor: default;
+}
+
+.abcBadgeMini {
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  border: 1px solid transparent;
+}
+
+.abcBadgeA {
+  color: #14532d;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.abcBadgeB {
+  color: #854d0e;
+  background: #fef3c7;
+  border-color: #fcd34d;
+}
+
+.abcBadgeC {
+  color: #9f1239;
+  background: #ffe4e6;
+  border-color: #fda4af;
+}
+
+.abcBadgeEmpty {
+  color: #64748b;
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.percBar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.percBarTrack {
+  width: 72px;
+  height: 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.percBarFill {
+  height: 100%;
+  background: #2563eb;
+  border-radius: 999px;
+}
+
+.percText {
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  font-variant-numeric: tabular-nums;
+}
+
+.reporAdd {
+  color: #0369a1;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.reporReduce {
+  color: #b45309;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.reporOk {
+  color: #15803d;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.metricTooltip {
+  position: fixed;
+  z-index: 2000;
+  min-width: 260px;
+  max-width: 340px;
+  background: #0f172a;
+  color: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 14px 40px rgba(2, 6, 23, 0.4);
+  pointer-events: none;
+}
+
+.metricTooltipTitle {
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.metricTooltipMeta {
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.metricTooltipDivider {
+  height: 1px;
+  background: rgba(148, 163, 184, 0.3);
+  margin: 7px 0;
+}
+
+.metricTooltipLine {
+  font-size: 12px;
+  color: #e2e8f0;
+}
+
+.metricTooltipRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: #e2e8f0;
+  margin-top: 3px;
+}
+
+.metricTooltipTotal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(148, 163, 184, 0.45);
+  font-size: 12px;
+  font-weight: 700;
+}
 
 /* ─── Modal ───────────────────────────────────────────────────────────────── */
 .modalOverlay {
@@ -520,6 +763,52 @@
   outline: none;
 }
 .searchInput::placeholder { color: var(--ll-text-3); }
+
+.batchBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.batchInput {
+  width: 100%;
+  border: 1px solid var(--ll-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--ll-text);
+  background: #fff;
+  resize: vertical;
+  min-height: 88px;
+  outline: none;
+}
+
+.batchInput:focus {
+  border-color: var(--ll-accent);
+}
+
+.batchBtn {
+  align-self: flex-end;
+  padding: 8px 12px;
+  border: 1px solid var(--ll-accent-bdr);
+  border-radius: 8px;
+  background: var(--ll-accent-bg);
+  color: var(--ll-accent);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms, opacity 120ms;
+}
+
+.batchBtn:hover:not(:disabled) {
+  background: #dbeafe;
+  border-color: var(--ll-accent);
+}
+
+.batchBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 .loadingText { font-size: 15px; color: var(--ll-text-3); text-align: center; padding: 12px 0; }
 .emptySearch { font-size: 15px; color: var(--ll-text-3); text-align: center; padding: 12px 0; }

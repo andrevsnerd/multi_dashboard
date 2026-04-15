@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
+import ComprasSalvasListPanel from "@/components/stock/ComprasSalvasListPanel";
 import { type CompanyKey } from "@/lib/config/company";
+import type { CompraSalvaItemRow } from "@/lib/types/compra-salva";
 
 import styles from "./ListaLojaPage.module.css";
 
@@ -13,12 +15,17 @@ interface Filial {
   filial: string;
 }
 
+const TODAS_FILIAIS_VALUE = "__TODAS__";
+const TODAS_FILIAIS_LABEL = "TODAS (visão geral)";
+
 interface Produto {
   produto: string;
   descProduto: string;
   codigoBarra: string | null;
   corProduto: string | null;
   descCor: string;
+  linha?: string | null;
+  subgrupo?: string | null;
   estoques: Array<{ filial: string; nomeFilial: string; estoque: number }>;
 }
 
@@ -29,11 +36,28 @@ interface ListaItem {
   corProduto: string | null;
   descCor: string;
   quantidade: number;
-  /** Vendas em ~90 dias (proporcional ao volume dos últimos 12 meses), snapshot ao adicionar */
-  vendas90d?: number | null;
+  /** QTD vendas 12 meses, snapshot ao adicionar */
+  qtde12m?: number | null;
+  /** Valor R$ vendas 12 meses, snapshot ao adicionar */
+  valor12m?: number | null;
+  /** QTD vendas 60 dias, snapshot ao adicionar */
+  qtde60d?: number | null;
+  /** Vendas no mês atual (para cálculo de Duração), snapshot ao adicionar */
+  vendasMesAtual?: number | null;
+  /** Custo unitário de reposição, snapshot ao adicionar */
+  custoUnit?: number | null;
   /** Estoque na filial da lista, snapshot ao adicionar */
   estoqueFilial?: number | null;
+  linha?: string | null;
+  subgrupo?: string | null;
 }
+
+type Curva = "A" | "B" | "C";
+
+type CurvaInfo = {
+  curva: Curva;
+  percParticipacao: number;
+};
 
 interface ListaLoja {
   id: string;
@@ -69,9 +93,11 @@ async function fetchPermissoes(username: string): Promise<TransferenciaPermissao
   }
 }
 
-async function fetchFiliais(): Promise<Filial[]> {
+async function fetchFiliais(companyKey?: string): Promise<Filial[]> {
   try {
-    const res = await fetch("/api/transferencia-produtos/filiais", { cache: "no-store" });
+    const params = new URLSearchParams();
+    if (companyKey) params.set("company", companyKey);
+    const res = await fetch(`/api/transferencia-produtos/filiais?${params.toString()}`, { cache: "no-store" });
     if (!res.ok) return [];
     const json = (await res.json()) as { data: Filial[] };
     return json.data || [];
@@ -148,6 +174,18 @@ async function deletarLista(id: string, username: string): Promise<void> {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+function fmt(n: number) {
+  return n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+}
+
+function fmtBRL(n: number) {
+  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+}
+
+function fmtBRL2(n: number) {
+  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function formatDate(value: string): string {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return value;
@@ -162,58 +200,90 @@ function buildDefaultListName(filialNome?: string): string {
   return `${base} ${d} ${t}`;
 }
 
+function appendUserToListName(nome: string, username: string): string {
+  const base = (nome || "").trim();
+  const user = (username || "").trim();
+  if (!base) return user ? `Lista ${user}` : "Lista";
+  if (!user) return base;
+  if (base.toLowerCase().includes(user.toLowerCase())) return base;
+  return `${base} · ${user}`;
+}
+
 /** Estoque na filial (ou grupo lógico de filiais), alinhado ao Controle de Estoque — não usar só o snapshot da busca de produtos. */
 async function fetchEstoqueFilialSum(
   companyKey: string,
-  codFilial: string,
+  codFilial: string | null,
   produto: string,
   corProduto: string | null
 ): Promise<number | null> {
   try {
-    const params = new URLSearchParams({
-      company: companyKey,
-      filial: codFilial.trim(),
-      produto: produto.trim(),
-    });
+    const params = new URLSearchParams({ company: companyKey, produto: produto.trim() });
+    if (codFilial && codFilial.trim()) params.set("filial", codFilial.trim());
     if (corProduto) params.set("corProduto", corProduto.trim());
     const res = await fetch(`/api/controle-estoque/estoque-por-filial-item?${params}`, { cache: "no-store" });
     if (!res.ok) return null;
     const json = (await res.json()) as { data?: Array<{ estoque: number }> };
     const rows = json.data || [];
-    const sum = rows.reduce((s, r) => s + Number(r.estoque ?? 0), 0);
+    const sum = rows.reduce((s, r) => s + Math.max(0, Number(r.estoque ?? 0)), 0);
     return Math.round(sum);
   } catch {
     return null;
   }
 }
 
-async function fetchVendas90Projetado(
+async function fetchVendasItemMetricas(
   companyKey: string,
-  codFilial: string,
+  codFilial: string | null,
   produto: string,
   corProduto: string | null
-): Promise<number | null> {
+): Promise<{ qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null } | null> {
   try {
-    const params = new URLSearchParams({
-      company: companyKey,
-      filial: codFilial.trim(),
-      produto: produto.trim(),
-    });
+    const params = new URLSearchParams({ company: companyKey, produto: produto.trim() });
+    if (codFilial && codFilial.trim()) params.set("filial", codFilial.trim());
     if (corProduto) params.set("corProduto", corProduto.trim());
     const res = await fetch(`/api/controle-estoque/vendas-por-filial-item?${params}`, { cache: "no-store" });
     if (!res.ok) return null;
-    const json = (await res.json()) as { data?: Array<{ qtde12m: number }> };
+    const json = (await res.json()) as { data?: Array<{ qtde12m: number; qtde60d: number; qtdeMesAtual?: number; valor12m?: number; custoUnitario?: number }> };
     const rows = json.data || [];
-    const qtde12m = rows.reduce((s, r) => s + Number(r.qtde12m ?? 0), 0);
-    return Math.round((qtde12m / 365) * 90);
+    const totalValor = rows.reduce((s, r) => s + Number(r.valor12m ?? 0), 0);
+    const maxCusto = rows.reduce((max, r) => Math.max(max, Number(r.custoUnitario ?? 0)), 0);
+    return {
+      qtde12m: Math.round(rows.reduce((s, r) => s + Number(r.qtde12m ?? 0), 0)),
+      qtde60d: Math.round(rows.reduce((s, r) => s + Number(r.qtde60d ?? 0), 0)),
+      vendasMesAtual: Math.round(rows.reduce((s, r) => s + Number(r.qtdeMesAtual ?? 0), 0)),
+      valor12m: totalValor > 0 ? Math.round(totalValor) : null,
+      custoUnit: maxCusto > 0 ? maxCusto : null,
+    };
   } catch {
     return null;
   }
 }
 
+async function fetchVendasPorFilialItem(
+  companyKey: string,
+  codFilial: string | null,
+  produto: string,
+  corProduto: string | null
+): Promise<Array<{ filial: string; qtde12m: number; qtde60d: number; valor12m: number }>> {
+  const params = new URLSearchParams({ company: companyKey, produto: produto.trim() });
+  if (codFilial && codFilial.trim()) params.set("filial", codFilial.trim());
+  if (corProduto) params.set("corProduto", corProduto.trim());
+  const res = await fetch(`/api/controle-estoque/vendas-por-filial-item?${params}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Erro ao carregar vendas por filial");
+  const json = (await res.json()) as {
+    data?: Array<{ filial: string; qtde12m: number; qtde60d: number; valor12m?: number | null }>;
+  };
+  return (json.data || []).map((row) => ({
+    filial: row.filial,
+    qtde12m: Number(row.qtde12m ?? 0),
+    qtde60d: Number(row.qtde60d ?? 0),
+    valor12m: Number(row.valor12m ?? 0),
+  }));
+}
+
 function sameCart(a: ListaItem[], b: ListaItem[]): boolean {
   if (a.length !== b.length) return false;
-  const key = (i: ListaItem) => `${i.produto}|${i.corProduto ?? ""}`;
+  const key = (i: ListaItem) => buildItemKey(i.produto, i.corProduto);
   const mapA = new Map<string, number>();
   for (const i of a) mapA.set(key(i), i.quantidade);
   for (const i of b) {
@@ -223,46 +293,357 @@ function sameCart(a: ListaItem[], b: ListaItem[]): boolean {
   return true;
 }
 
+function normalizeKey(s?: string | null) {
+  return (s ?? "")
+    .toString()
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
+function buildItemKey(produto?: string | null, corProduto?: string | null) {
+  return `${normalizeKey(produto)}|${normalizeKey(corProduto)}`;
+}
+
+function getLimiteDiasReposicao(item: { linha?: string | null; subgrupo?: string | null }) {
+  const linha = normalizeKey(item.linha);
+  const subgrupo = normalizeKey(item.subgrupo);
+  if (linha === "INDIA") return 90;
+  const subgrupos120 = new Set(["CETIM DE SEDA", "MOUSSELINE DE SEDA", "SEDA PREMIUM"]);
+  if (subgrupos120.has(subgrupo)) return 120;
+  return 60;
+}
+
+function getSuggestedDelta(item: ListaItem, diasCorridosMes: number): number | null {
+  const vendasMes = Number(item.vendasMesAtual ?? 0);
+  if (vendasMes <= 0 || diasCorridosMes <= 0) return 0;
+  const consumoDiario = vendasMes / diasCorridosMes;
+  if (consumoDiario <= 0) return 0;
+  const estoqueAtual = Number(item.estoqueFilial ?? 0);
+  const limiteDias = getLimiteDiasReposicao(item);
+  const duracaoAtual = estoqueAtual / consumoDiario;
+  if (duracaoAtual >= limiteDias) return 0;
+  const qtd = Math.ceil(consumoDiario * (limiteDias - duracaoAtual));
+  return Number.isFinite(qtd) ? Math.max(0, qtd) : 0;
+}
+
+function hasSugestaoS(item: ListaItem, qtdFinal: number, qtdSuficiente: boolean): boolean {
+  if (qtdFinal > 0) return false;
+  if (qtdSuficiente) return false;
+  const mediaVendasMes = Number(item.qtde12m ?? 0) / 12;
+  if (mediaVendasMes < 2) return false;
+  const estoqueAtual = Number(item.estoqueFilial ?? 0);
+  return estoqueAtual <= mediaVendasMes * 2;
+}
+
+function calcQtdSugestaoS(item: ListaItem): number {
+  const mediaVendasMes = Number(item.qtde12m ?? 0) / 12;
+  const limiteDias = getLimiteDiasReposicao(item);
+  return Math.max(0, Math.ceil((limiteDias / 30) * mediaVendasMes));
+}
+
+function getReposicaoCompraView(item: ListaItem, diasCorridosMes: number): {
+  qtdFinal: number;
+  qtdS: number;
+  qtdSuficiente: boolean;
+  semSugestao: boolean;
+} {
+  const qtdFinal = getSuggestedDelta(item, diasCorridosMes) ?? 0;
+  if (qtdFinal > 0) {
+    return { qtdFinal, qtdS: 0, qtdSuficiente: false, semSugestao: false };
+  }
+  const vendasMes = Number(item.vendasMesAtual ?? 0);
+  const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
+  const estoqueAtual = Number(item.estoqueFilial ?? 0);
+  const limiteDias = getLimiteDiasReposicao(item);
+  const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
+  const qtdSuficiente = consumoDiario > 0 && duracaoAtual >= limiteDias;
+  if (qtdSuficiente) {
+    return { qtdFinal: 0, qtdS: 0, qtdSuficiente: true, semSugestao: false };
+  }
+  if (hasSugestaoS(item, qtdFinal, qtdSuficiente)) {
+    return { qtdFinal: 0, qtdS: calcQtdSugestaoS(item), qtdSuficiente: false, semSugestao: false };
+  }
+  return { qtdFinal: 0, qtdS: 0, qtdSuficiente: false, semSugestao: true };
+}
+
+function getSuggestedQtyValue(item: ListaItem, diasCorridosMes: number): number {
+  const sugestao = getReposicaoCompraView(item, diasCorridosMes);
+  if (sugestao.qtdFinal > 0) return sugestao.qtdFinal;
+  if (sugestao.qtdS > 0) return sugestao.qtdS;
+  return 0;
+}
+
+function calcularCurvasRede(itens: ListaItem[]): Map<string, CurvaInfo> {
+  const keyOf = (i: ListaItem) => buildItemKey(i.produto, i.corProduto);
+  const base = [...itens]
+    .map((item) => ({ item, valor: Number(item.valor12m ?? 0) }))
+    .sort((a, b) => b.valor - a.valor);
+  const total = base.reduce((s, row) => s + Math.max(0, row.valor), 0);
+  let cumulative = 0;
+  const out = new Map<string, CurvaInfo>();
+  for (const row of base) {
+    cumulative += Math.max(0, row.valor);
+    const percCum = total > 0 ? cumulative / total : 1;
+    const curva: Curva = percCum <= 0.8 ? "A" : percCum <= 0.95 ? "B" : "C";
+    out.set(keyOf(row.item), {
+      curva,
+      percParticipacao: total > 0 ? (Math.max(0, row.valor) / total) * 100 : 0,
+    });
+  }
+  return out;
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface ListaLojaPageProps {
   companyKey: CompanyKey;
   companyName: string;
+  companySlug: string;
 }
 
-type Mode = "list" | "editor";
+type Mode = "list" | "editor" | "saved-purchases";
 
 type ListaLojaItensTableProps = {
+  companyKey: CompanyKey;
+  filialCod: string | null;
   itens: ListaItem[];
+  compraView: boolean;
+  abcMap: Map<string, CurvaInfo>;
+  onMoveItem?: (fromIndex: number, toIndex: number) => void;
   onIncrement: (index: number) => void;
   onDecrement: (index: number) => void;
   onQtyChange: (index: number, qtd: number) => void;
   onRemove: (index: number) => void;
+  onOpenColorPicker?: (index: number, mode: "replace" | "add") => void;
+  activeColorPickerIndex?: number | null;
+  activeColorPickerMode?: "replace" | "add" | null;
+  colorPickerOptions?: Produto[];
+  colorPickerLoading?: boolean;
+  onApplyColor?: (index: number, produtoComCor: Produto) => void;
+  onCancelColorPicker?: () => void;
 };
 
 function ListaLojaItensTable({
+  companyKey,
+  filialCod,
   itens,
+  compraView,
+  abcMap,
+  onMoveItem,
   onIncrement,
   onDecrement,
   onQtyChange,
   onRemove,
+  onOpenColorPicker,
+  activeColorPickerIndex,
+  activeColorPickerMode,
+  colorPickerOptions = [],
+  colorPickerLoading = false,
+  onApplyColor,
+  onCancelColorPicker,
 }: ListaLojaItensTableProps) {
+  const filialScopeKey = filialCod && filialCod.trim() ? filialCod.trim() : "__ALL__";
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const diasCorridosMes = new Date().getDate();
+
+  const [estoqueTooltip, setEstoqueTooltip] = useState<null | {
+    x: number;
+    y: number;
+    produto: string;
+    cor: string;
+    filiais: Array<{ filial: string; estoque: number }>;
+    total: number;
+  }>(null);
+  const [vendasTooltip, setVendasTooltip] = useState<null | {
+    x: number;
+    y: number;
+    produto: string;
+    cor: string;
+    mode: "12m" | "60d" | "valor12m";
+    filiais: Array<{ filial: string; qtde12m: number; qtde60d: number; valor12m: number }>;
+    loading: boolean;
+  }>(null);
+  const [abcTooltip, setAbcTooltip] = useState<null | {
+    x: number;
+    y: number;
+    produto: string;
+    cor: string;
+    escopo: "geral" | "loja";
+    periodo: string;
+    regra: string;
+    rows: Array<{ filial: string; curva: Curva; valor12m: number; participacao: number; acumulado: number }>;
+  }>(null);
+  const vendasHoverKeyRef = useRef<string | null>(null);
+  const estoqueHoverKeyRef = useRef<string | null>(null);
+  const abcHoverKeyRef = useRef<string | null>(null);
+  const [sugestaoTooltip, setSugestaoTooltip] = useState<null | {
+    x: number;
+    y: number;
+    titulo: string;
+    regra: string;
+    limiteDias: number;
+    vendasMesAtual: number;
+    diasCorridos: number;
+    consumoDiario: number;
+    estoqueAtual: number;
+    duracaoAtual: number;
+    qtdCalculada: number;
+  }>(null);
+  const [duracaoTooltip, setDuracaoTooltip] = useState<null | {
+    x: number;
+    y: number;
+    regra: string;
+    limiteDias: number;
+    vendasMesAtual: number;
+    diasCorridos: number;
+    consumoDiario: number;
+    estoqueAtual: number;
+    duracaoDias: number;
+  }>(null);
+  const [sugestaoSTooltip, setSugestaoSTooltip] = useState<null | {
+    x: number;
+    y: number;
+    mediaVendasMes: number;
+    estoqueAtual: number;
+    limiteDias: number;
+    qtdS: number;
+  }>(null);
+
+  const [estoqueCache, setEstoqueCache] = useState<Record<string, Array<{ filial: string; estoque: number }>>>({});
+  const [vendasCache, setVendasCache] = useState<Record<string, Array<{ filial: string; qtde12m: number; qtde60d: number; valor12m: number }>>>({});
+  const [liveMetrics, setLiveMetrics] = useState<
+    Record<
+      string,
+      {
+        qtde12m: number | null;
+        qtde60d: number | null;
+        vendasMesAtual: number | null;
+        valor12m: number | null;
+        custoUnit: number | null;
+        estoqueFilial: number | null;
+      }
+    >
+  >({});
+
+  useEffect(() => {
+    setEstoqueCache({});
+    setVendasCache({});
+    setLiveMetrics({});
+  }, [filialScopeKey]);
+
+  useEffect(() => {
+    if (itens.length === 0) return;
+    let cancelled = false;
+    void Promise.all(
+      itens.map(async (item) => {
+        const key = `${filialScopeKey}::${buildItemKey(item.produto, item.corProduto)}`;
+        const [vendas, estoqueFilial] = await Promise.all([
+          fetchVendasItemMetricas(companyKey, filialCod, item.produto, item.corProduto),
+          fetchEstoqueFilialSum(companyKey, filialCod, item.produto, item.corProduto),
+        ]);
+        return {
+          key,
+          values: {
+            qtde12m: vendas?.qtde12m ?? null,
+            qtde60d: vendas?.qtde60d ?? null,
+            vendasMesAtual: vendas?.vendasMesAtual ?? null,
+            valor12m: vendas?.valor12m ?? null,
+            custoUnit: vendas?.custoUnit ?? null,
+            estoqueFilial,
+          },
+        };
+      })
+    )
+      .then((rows) => {
+        if (cancelled) return;
+        setLiveMetrics((prev) => {
+          const next = { ...prev };
+          for (const row of rows) next[row.key] = row.values;
+          return next;
+        });
+      })
+      .catch(() => {
+        // silencioso: mantém fallback visual "—"
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyKey, filialCod, itens]);
+
+  const handleDrop = useCallback(
+    (toIndex: number) => {
+      if (!onMoveItem || dragIndex === null) return;
+      if (dragIndex !== toIndex) onMoveItem(dragIndex, toIndex);
+      setDragIndex(null);
+      setDragOverIndex(null);
+    },
+    [onMoveItem, dragIndex]
+  );
+
   if (itens.length === 0) return null;
   return (
-    <div className={styles.produtosTableWrap}>
+    <div className={`${styles.produtosTableWrap} ${compraView ? styles.produtosTableWrapCompra : ""}`}>
       <table className={styles.produtosTable}>
         <thead>
           <tr>
             <th className={styles.colProduto}>Produto</th>
-            <th className={styles.colNumeric}>Vendas 90 dias</th>
+            <th className={styles.colNumeric}>Curva ABC Rede</th>
+            <th className={styles.colNumeric}>Vendas 12 meses</th>
+            <th className={styles.colNumeric}>QTD 12 meses</th>
             <th className={styles.colNumeric}>Estoque</th>
+            <th className={styles.colNumeric}>QTD 60 dias</th>
+            <th className={styles.colNumeric}>Duração</th>
+            <th className={styles.colNumeric}>Participação</th>
+            <th className={styles.colNumeric}>Sugestão de Reposição</th>
+            <th className={styles.colNumeric}>Custo Unit.</th>
+            <th className={styles.colNumeric}>Custo Total</th>
           </tr>
         </thead>
         <tbody>
           {itens.map((item, idx) => (
-            <tr key={`${item.produto}-${item.corProduto ?? "null"}-${idx}`}>
+            <tr
+              key={`${item.produto}-${item.corProduto ?? "null"}-${idx}`}
+              draggable={!!onMoveItem}
+              className={dragOverIndex === idx ? styles.rowDragOver : undefined}
+              onDragStart={() => {
+                if (!onMoveItem) return;
+                setDragIndex(idx);
+                setDragOverIndex(idx);
+              }}
+              onDragOver={(e) => {
+                if (!onMoveItem) return;
+                e.preventDefault();
+                if (dragOverIndex !== idx) setDragOverIndex(idx);
+              }}
+              onDrop={(e) => {
+                if (!onMoveItem) return;
+                e.preventDefault();
+                handleDrop(idx);
+              }}
+              onDragEnd={() => {
+                setDragIndex(null);
+                setDragOverIndex(null);
+              }}
+            >
+              {(() => {
+                const itemKey = `${filialScopeKey}::${buildItemKey(item.produto, item.corProduto)}`;
+                const live = liveMetrics[itemKey];
+                const valor12m = live?.valor12m ?? item.valor12m ?? null;
+                const qtde12m = live?.qtde12m ?? item.qtde12m ?? null;
+                const qtde60d = live?.qtde60d ?? item.qtde60d ?? null;
+                const vendasMesAtual = live?.vendasMesAtual ?? item.vendasMesAtual ?? null;
+                const estoqueFilial = live?.estoqueFilial ?? item.estoqueFilial ?? null;
+                const custoUnit = live?.custoUnit ?? item.custoUnit ?? null;
+                return (
+                  <>
               <td>
                 <div className={styles.productTitleRow}>
+                  {onMoveItem ? (
+                    <span className={styles.dragHandle} title="Arraste para reordenar">⋮⋮</span>
+                  ) : null}
                   <span className={styles.productTitleName} title={item.descProduto}>
                     {item.descProduto}
                   </span>
@@ -272,13 +653,75 @@ function ListaLojaItensTable({
                 {item.codigoBarra ? (
                   <div className={styles.productMeta}>Cód. barras: {item.codigoBarra}</div>
                 ) : null}
+                {onOpenColorPicker && (
+                  <div className={styles.productRowActions}>
+                    <button
+                      type="button"
+                      className={styles.colorChip}
+                      onClick={() => onOpenColorPicker(idx, "replace")}
+                    >
+                      Trocar cor
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.colorChip}
+                      onClick={() => onOpenColorPicker(idx, "add")}
+                    >
+                      Adicionar cor
+                    </button>
+                  </div>
+                )}
+                {activeColorPickerIndex === idx && (
+                  <div className={styles.productRowActions}>
+                    <span className={styles.colorPickerLoading}>
+                      {activeColorPickerMode === "add" ? "Selecione a nova cor para adicionar:" : "Selecione a nova cor:"}
+                    </span>
+                  </div>
+                )}
+                {activeColorPickerIndex === idx && (
+                  <div className={styles.productRowActions}>
+                    {colorPickerLoading ? (
+                      <span className={styles.colorPickerLoading}>Buscando cores...</span>
+                    ) : colorPickerOptions.length > 0 ? (
+                      <div className={styles.colorChips}>
+                        {colorPickerOptions.map((opcao) => (
+                          <button
+                            key={`${opcao.produto}-${opcao.corProduto ?? "null"}-${opcao.codigoBarra ?? ""}`}
+                            className={styles.colorChip}
+                            onClick={() => onApplyColor?.(idx, opcao)}
+                          >
+                            {opcao.descCor || opcao.corProduto}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          className={styles.colorChipCancel}
+                          onClick={onCancelColorPicker}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <div className={styles.colorPickerNenhuma}>
+                        <span>Nenhuma cor disponível</span>
+                        <button
+                          type="button"
+                          className={styles.colorChipCancel}
+                          onClick={onCancelColorPicker}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className={styles.productRowActions}>
                   <div className={styles.qtyControl}>
                     <button
                       type="button"
                       className={styles.qtyBtn}
                       onClick={() => onDecrement(idx)}
-                      disabled={item.quantidade <= 1}
+                      disabled={item.quantidade <= 0}
                     >
                       −
                     </button>
@@ -286,8 +729,8 @@ function ListaLojaItensTable({
                       type="number"
                       className={styles.qtyInput}
                       value={item.quantidade}
-                      onChange={(e) => onQtyChange(idx, parseInt(e.target.value, 10) || 1)}
-                      min={1}
+                      onChange={(e) => onQtyChange(idx, Math.max(0, parseInt(e.target.value, 10) || 0))}
+                      min={0}
                     />
                     <button type="button" className={styles.qtyBtn} onClick={() => onIncrement(idx)}>
                       +
@@ -302,24 +745,620 @@ function ListaLojaItensTable({
                 </div>
               </td>
               <td className={styles.colNumeric}>
+                {(() => {
+                  const k = buildItemKey(item.produto, item.corProduto);
+                  const abc = abcMap.get(k);
+                  const curva = abc?.curva ?? null;
+                  if (!curva) {
+                    return (
+                      <span className={`${styles.abcBadge} ${styles.abcBadgeEmpty}`} title="Sem dados para classificar">
+                        —
+                      </span>
+                    );
+                  }
+                  return (
+                    <span
+                      className={`${styles.abcBadge} ${styles[`abcBadge${curva}`]}`}
+                      onMouseEnter={async (e) => {
+                        const cacheKey = `${filialScopeKey}::${buildItemKey(item.produto, item.corProduto)}`;
+                        abcHoverKeyRef.current = cacheKey;
+                        const loadRows = async () => {
+                          const cached = vendasCache[cacheKey];
+                          if (cached) return cached;
+                          const rows = await fetchVendasPorFilialItem(companyKey, filialCod, item.produto, item.corProduto);
+                          setVendasCache((prev) => ({ ...prev, [cacheKey]: rows }));
+                          return rows;
+                        };
+                        try {
+                          const rows = await loadRows();
+                          if (abcHoverKeyRef.current !== cacheKey) return;
+                          const sorted = [...rows].sort((a, b) => b.valor12m - a.valor12m);
+                          const total = sorted.reduce((s, r) => s + Math.max(0, r.valor12m), 0);
+                          let cumulative = 0;
+                          const byFilial = sorted.map((row) => {
+                            cumulative += Math.max(0, row.valor12m);
+                            const percCum = total > 0 ? cumulative / total : 1;
+                            const curvaFilial: Curva = percCum <= 0.8 ? "A" : percCum <= 0.95 ? "B" : "C";
+                            return {
+                              filial: row.filial,
+                              curva: curvaFilial,
+                              valor12m: row.valor12m,
+                              participacao: total > 0 ? (Math.max(0, row.valor12m) / total) * 100 : 0,
+                              acumulado: percCum * 100,
+                            };
+                          });
+                          setAbcTooltip({
+                            x: e.clientX,
+                            y: e.clientY,
+                            produto: item.produto,
+                            cor: item.descCor || "",
+                            escopo: filialCod ? "loja" : "geral",
+                            periodo: "Últimos 12 meses",
+                            regra: "Classificação por faturamento acumulado (A até 80%, B até 95%, C acima de 95%).",
+                            rows: byFilial,
+                          });
+                        } catch {
+                          if (abcHoverKeyRef.current !== cacheKey) return;
+                          setAbcTooltip({
+                            x: e.clientX,
+                            y: e.clientY,
+                            produto: item.produto,
+                            cor: item.descCor || "",
+                            escopo: filialCod ? "loja" : "geral",
+                            periodo: "Últimos 12 meses",
+                            regra: "Classificação por faturamento acumulado (A até 80%, B até 95%, C acima de 95%).",
+                            rows: [],
+                          });
+                        }
+                      }}
+                      onMouseLeave={() => {
+                        abcHoverKeyRef.current = null;
+                        setAbcTooltip(null);
+                      }}
+                      title="Curva ABC na rede; passe o mouse para ver por filial"
+                    >
+                      {curva}
+                    </span>
+                  );
+                })()}
+              </td>
+              <td className={styles.colNumeric}>
+                <span
+                  className={styles.cellMetric}
+                  onMouseEnter={async (e) => {
+                    const cacheKey = `${filialScopeKey}::${buildItemKey(item.produto, item.corProduto)}`;
+                    vendasHoverKeyRef.current = `${cacheKey}::12m`;
+                    const cached = vendasCache[cacheKey];
+                    if (cached) {
+                      if (vendasHoverKeyRef.current !== `${cacheKey}::12m`) return;
+                      setVendasTooltip({
+                        x: e.clientX,
+                        y: e.clientY,
+                        produto: item.produto,
+                        cor: item.descCor || "",
+                        mode: "valor12m",
+                        filiais: cached,
+                        loading: false,
+                      });
+                      return;
+                    }
+                    setVendasTooltip({
+                      x: e.clientX,
+                      y: e.clientY,
+                      produto: item.produto,
+                      cor: item.descCor || "",
+                      mode: "valor12m",
+                      filiais: [],
+                      loading: true,
+                    });
+                    try {
+                      const rows = await fetchVendasPorFilialItem(companyKey, filialCod, item.produto, item.corProduto);
+                      if (vendasHoverKeyRef.current !== `${cacheKey}::12m`) return;
+                      setVendasCache((prev) => ({ ...prev, [cacheKey]: rows }));
+                      setVendasTooltip((prev) =>
+                        vendasHoverKeyRef.current === `${cacheKey}::12m` && prev
+                          ? { ...prev, filiais: rows, loading: false }
+                          : null
+                      );
+                    } catch {
+                      if (vendasHoverKeyRef.current !== `${cacheKey}::12m`) return;
+                      setVendasTooltip((prev) => (prev ? { ...prev, loading: false } : null));
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    vendasHoverKeyRef.current = null;
+                    setVendasTooltip(null);
+                  }}
+                >
+                  {valor12m != null ? fmtBRL(valor12m) : "—"}
+                </span>
+              </td>
+              <td className={styles.colNumeric}>
+                <span
+                  className={styles.cellMetric}
+                  onMouseEnter={async (e) => {
+                    const cacheKey = `${filialScopeKey}::${buildItemKey(item.produto, item.corProduto)}`;
+                    vendasHoverKeyRef.current = `${cacheKey}::valor12m`;
+                    const cached = vendasCache[cacheKey];
+                    if (cached) {
+                      if (vendasHoverKeyRef.current !== `${cacheKey}::valor12m`) return;
+                      setVendasTooltip({
+                        x: e.clientX,
+                        y: e.clientY,
+                        produto: item.produto,
+                        cor: item.descCor || "",
+                        mode: "12m",
+                        filiais: cached,
+                        loading: false,
+                      });
+                      return;
+                    }
+                    setVendasTooltip({
+                      x: e.clientX,
+                      y: e.clientY,
+                      produto: item.produto,
+                      cor: item.descCor || "",
+                      mode: "12m",
+                      filiais: [],
+                      loading: true,
+                    });
+                    try {
+                      const rows = await fetchVendasPorFilialItem(companyKey, filialCod, item.produto, item.corProduto);
+                      if (vendasHoverKeyRef.current !== `${cacheKey}::valor12m`) return;
+                      setVendasCache((prev) => ({ ...prev, [cacheKey]: rows }));
+                      setVendasTooltip((prev) =>
+                        vendasHoverKeyRef.current === `${cacheKey}::valor12m` && prev
+                          ? { ...prev, filiais: rows, loading: false }
+                          : null
+                      );
+                    } catch {
+                      if (vendasHoverKeyRef.current !== `${cacheKey}::valor12m`) return;
+                      setVendasTooltip((prev) => (prev ? { ...prev, loading: false } : null));
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    vendasHoverKeyRef.current = null;
+                    setVendasTooltip(null);
+                  }}
+                >
+                  {qtde12m != null ? fmt(qtde12m) : "—"}
+                </span>
+              </td>
+              <td className={styles.colNumeric}>
+                <span
+                  className={styles.cellMetric}
+                  onMouseEnter={async (e) => {
+                    const cacheKey = `${filialScopeKey}::${buildItemKey(item.produto, item.corProduto)}`;
+                    estoqueHoverKeyRef.current = cacheKey;
+                    const cached = estoqueCache[cacheKey];
+                    const showTooltip = (rows: Array<{ filial: string; estoque: number }>) => {
+                      if (estoqueHoverKeyRef.current !== cacheKey) return;
+                      setEstoqueTooltip({
+                        x: e.clientX,
+                        y: e.clientY,
+                        produto: item.produto,
+                        cor: item.descCor || "",
+                        filiais: rows,
+                        total: rows.reduce((s, r) => s + Math.max(0, Number(r.estoque ?? 0)), 0),
+                      });
+                    };
+                    if (cached) {
+                      showTooltip(cached);
+                      return;
+                    }
+                    try {
+                      const params = new URLSearchParams({
+                        company: companyKey,
+                        produto: item.produto.trim(),
+                      });
+                      if (filialCod && filialCod.trim()) params.set("filial", filialCod.trim());
+                      if (item.corProduto) params.set("corProduto", item.corProduto.trim());
+                      const res = await fetch(`/api/controle-estoque/estoque-por-filial-item?${params}`, { cache: "no-store" });
+                      const json = (await res.json()) as { data?: Array<{ filial: string; estoque: number }> };
+                      const rows = (json.data || []).map((r) => ({ filial: r.filial, estoque: Number(r.estoque ?? 0) }));
+                      if (estoqueHoverKeyRef.current !== cacheKey) return;
+                      setEstoqueCache((prev) => ({ ...prev, [cacheKey]: rows }));
+                      showTooltip(rows);
+                    } catch {
+                      showTooltip([]);
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    estoqueHoverKeyRef.current = null;
+                    setEstoqueTooltip(null);
+                  }}
+                >
+                  {estoqueFilial != null ? fmt(estoqueFilial) : "—"}
+                </span>
+              </td>
+              <td className={styles.colNumeric}>
+                <span
+                  className={styles.cellMetric}
+                  onMouseEnter={async (e) => {
+                    const cacheKey = `${filialScopeKey}::${buildItemKey(item.produto, item.corProduto)}`;
+                    vendasHoverKeyRef.current = `${cacheKey}::60d`;
+                    const cached = vendasCache[cacheKey];
+                    if (cached) {
+                      if (vendasHoverKeyRef.current !== `${cacheKey}::60d`) return;
+                      setVendasTooltip({
+                        x: e.clientX,
+                        y: e.clientY,
+                        produto: item.produto,
+                        cor: item.descCor || "",
+                        mode: "60d",
+                        filiais: cached,
+                        loading: false,
+                      });
+                      return;
+                    }
+                    setVendasTooltip({
+                      x: e.clientX,
+                      y: e.clientY,
+                      produto: item.produto,
+                      cor: item.descCor || "",
+                      mode: "60d",
+                      filiais: [],
+                      loading: true,
+                    });
+                    try {
+                      const rows = await fetchVendasPorFilialItem(companyKey, filialCod, item.produto, item.corProduto);
+                      if (vendasHoverKeyRef.current !== `${cacheKey}::60d`) return;
+                      setVendasCache((prev) => ({ ...prev, [cacheKey]: rows }));
+                      setVendasTooltip((prev) =>
+                        vendasHoverKeyRef.current === `${cacheKey}::60d` && prev
+                          ? { ...prev, filiais: rows, loading: false }
+                          : null
+                      );
+                    } catch {
+                      if (vendasHoverKeyRef.current !== `${cacheKey}::60d`) return;
+                      setVendasTooltip((prev) => (prev ? { ...prev, loading: false } : null));
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    vendasHoverKeyRef.current = null;
+                    setVendasTooltip(null);
+                  }}
+                >
+                  {qtde60d != null ? fmt(qtde60d) : "—"}
+                </span>
+              </td>
+              <td className={styles.colNumeric}>
+                <span
+                  className={styles.cellMetric}
+                  onMouseEnter={(e) => {
+                    const limiteDias = getLimiteDiasReposicao(item);
+                    const linha = normalizeKey(item.linha);
+                    const subgrupo = normalizeKey(item.subgrupo);
+                    const regra =
+                      linha === "INDIA"
+                        ? "Linha Índia"
+                        : new Set(["CETIM DE SEDA", "MOUSSELINE DE SEDA", "SEDA PREMIUM"]).has(subgrupo)
+                          ? `Subgrupo: ${item.subgrupo ?? ""}`.trim()
+                          : "Padrão";
+                    const vendasMes = vendasMesAtual ?? 0;
+                    const diasCorridos = new Date().getDate();
+                    const consumoDiario = vendasMes > 0 && diasCorridos > 0 ? vendasMes / diasCorridos : 0;
+                    const estoque = estoqueFilial ?? 0;
+                    const duracaoDias = consumoDiario > 0 ? Math.round(estoque / consumoDiario) : 0;
+                    setDuracaoTooltip({
+                      x: e.clientX,
+                      y: e.clientY,
+                      regra,
+                      limiteDias,
+                      vendasMesAtual: vendasMes,
+                      diasCorridos,
+                      consumoDiario,
+                      estoqueAtual: estoque,
+                      duracaoDias,
+                    });
+                  }}
+                  onMouseLeave={() => setDuracaoTooltip(null)}
+                >
+                  {(() => {
+                    const vendasMes = vendasMesAtual ?? 0;
+                    const diasCorridos = new Date().getDate();
+                    const consumoDiario = vendasMes > 0 && diasCorridos > 0 ? vendasMes / diasCorridos : 0;
+                    const estoque = estoqueFilial ?? 0;
+                    if (consumoDiario <= 0 || !estoque) return "—";
+                    const dias = Math.round(estoque / consumoDiario);
+                    if (dias >= 365) return `${Math.round(dias / 30)} meses`;
+                    return `${dias} dias`;
+                  })()}
+                </span>
+              </td>
+              <td className={styles.colNumeric}>
+                {(() => {
+                  const k = buildItemKey(item.produto, item.corProduto);
+                  const abc = abcMap.get(k);
+                  if (!abc) return <span className={styles.cellMetric}>—</span>;
+                  const perc = abc.percParticipacao;
+                  return (
+                    <div className={styles.percBar}>
+                      <div className={styles.percBarTrack}>
+                        <div className={styles.percBarFill} style={{ width: `${Math.min(100, perc)}%` }} />
+                      </div>
+                      <span className={styles.percText}>{perc.toFixed(1)}%</span>
+                    </div>
+                  );
+                })()}
+              </td>
+              <td className={styles.colNumeric}>
+                {(() => {
+                  const sugestao = getReposicaoCompraView(
+                    { ...item, vendasMesAtual, estoqueFilial, qtde12m },
+                    diasCorridosMes
+                  );
+                  if (sugestao.qtdFinal > 0) {
+                    const vendasMes = Number(vendasMesAtual ?? 0);
+                    const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
+                    const estoqueAtual = Number(estoqueFilial ?? 0);
+                    const limiteDias = getLimiteDiasReposicao(item);
+                    const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
+                    return (
+                      <span
+                        className={styles.reporAdd}
+                        onMouseEnter={(e) =>
+                          setSugestaoTooltip({
+                            x: e.clientX,
+                            y: e.clientY,
+                            titulo: "Sugestão de reposição (cálculo principal)",
+                            regra: "Qtd = consumo/dia × (limite de cobertura - duração atual).",
+                            limiteDias,
+                            vendasMesAtual: vendasMes,
+                            diasCorridos: diasCorridosMes,
+                            consumoDiario,
+                            estoqueAtual,
+                            duracaoAtual,
+                            qtdCalculada: sugestao.qtdFinal,
+                          })
+                        }
+                        onMouseLeave={() => setSugestaoTooltip(null)}
+                      >
+                        {fmt(sugestao.qtdFinal)}
+                      </span>
+                    );
+                  }
+                  if (sugestao.qtdS > 0) {
+                    const mediaVendasMes = Number(qtde12m ?? 0) / 12;
+                    const limiteDias = getLimiteDiasReposicao(item);
+                    return (
+                      <span className={styles.reporAdd}>
+                        {fmt(sugestao.qtdS)}{" "}
+                        <span
+                          onMouseEnter={(e) =>
+                            setSugestaoSTooltip({
+                              x: e.clientX,
+                              y: e.clientY,
+                              mediaVendasMes,
+                              estoqueAtual: Number(estoqueFilial ?? 0),
+                              limiteDias,
+                              qtdS: sugestao.qtdS,
+                            })
+                          }
+                          onMouseLeave={() => setSugestaoSTooltip(null)}
+                          style={{
+                            display: "inline-flex",
+                            width: 16,
+                            height: 16,
+                            borderRadius: "999px",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 10,
+                            fontWeight: 800,
+                            color: "#0f172a",
+                            background: "#fde047",
+                            border: "1px solid #facc15",
+                            verticalAlign: "middle",
+                            cursor: "help",
+                          }}
+                        >
+                          S
+                        </span>
+                      </span>
+                    );
+                  }
+                  if (sugestao.semSugestao) {
+                    return <span className={styles.cellMetric}>—</span>;
+                  }
+                  const vendasMes = Number(vendasMesAtual ?? 0);
+                  const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
+                  const estoqueAtual = Number(estoqueFilial ?? 0);
+                  const limiteDias = getLimiteDiasReposicao(item);
+                  const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
+                  return (
+                    <span
+                      className={styles.reporOk}
+                      onMouseEnter={(e) =>
+                        setSugestaoTooltip({
+                          x: e.clientX,
+                          y: e.clientY,
+                          titulo: "Quantidade suficiente",
+                          regra: "Sem reposição: duração atual já atende o limite de cobertura.",
+                          limiteDias,
+                          vendasMesAtual: vendasMes,
+                          diasCorridos: diasCorridosMes,
+                          consumoDiario,
+                          estoqueAtual,
+                          duracaoAtual,
+                          qtdCalculada: 0,
+                        })
+                      }
+                      onMouseLeave={() => setSugestaoTooltip(null)}
+                    >
+                      Quantidade suficiente
+                    </span>
+                  );
+                })()}
+              </td>
+              <td className={styles.colNumeric}>
                 <span className={styles.cellMetric}>
-                  {item.vendas90d != null ? item.vendas90d : "—"}
+                  {custoUnit != null && custoUnit > 0 ? fmtBRL2(custoUnit) : "—"}
                 </span>
               </td>
               <td className={styles.colNumeric}>
                 <span className={styles.cellMetric}>
-                  {item.estoqueFilial != null ? item.estoqueFilial : "—"}
+                  {(() => {
+                    if (custoUnit == null || custoUnit <= 0) return "—";
+                    const sugestao = getReposicaoCompraView(
+                      { ...item, vendasMesAtual, estoqueFilial, qtde12m },
+                      diasCorridosMes
+                    );
+                    const qtdBase = sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS;
+                    if (!qtdBase || qtdBase <= 0) return "—";
+                    return fmtBRL(qtdBase * custoUnit);
+                  })()}
                 </span>
               </td>
+                  </>
+                );
+              })()}
             </tr>
           ))}
         </tbody>
       </table>
+      {estoqueTooltip && (
+        <div className={styles.metricTooltip} style={{ left: estoqueTooltip.x + 12, top: estoqueTooltip.y + 12 }}>
+          <div className={styles.metricTooltipTitle}>Estoque por filial</div>
+          <div className={styles.metricTooltipMeta}><strong>Produto:</strong> {estoqueTooltip.produto}</div>
+          {estoqueTooltip.cor && <div className={styles.metricTooltipMeta}><strong>Cor:</strong> {estoqueTooltip.cor}</div>}
+          <div className={styles.metricTooltipDivider} />
+          {estoqueTooltip.filiais.length === 0 ? (
+            <div className={styles.metricTooltipLine}>Sem dados de estoque por filial.</div>
+          ) : (
+            <>
+              {estoqueTooltip.filiais.map((row) => (
+                <div key={row.filial} className={styles.metricTooltipRow}>
+                  <span>{row.filial}</span>
+                  <span>{fmt(row.estoque)}</span>
+                </div>
+              ))}
+              <div className={styles.metricTooltipTotal}>
+                <span>Total</span>
+                <span>{fmt(estoqueTooltip.total)}</span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+      {vendasTooltip && (
+        <div className={styles.metricTooltip} style={{ left: vendasTooltip.x + 12, top: vendasTooltip.y + 12 }}>
+          <div className={styles.metricTooltipTitle}>
+            {vendasTooltip.mode === "12m"
+              ? "Vendas 12 meses por filial"
+              : vendasTooltip.mode === "60d"
+                ? "Vendas 60 dias por filial"
+                : "Valor vendas 12 meses por filial"}
+          </div>
+          <div className={styles.metricTooltipMeta}><strong>Produto:</strong> {vendasTooltip.produto}</div>
+          {vendasTooltip.cor && <div className={styles.metricTooltipMeta}><strong>Cor:</strong> {vendasTooltip.cor}</div>}
+          <div className={styles.metricTooltipDivider} />
+          {vendasTooltip.loading ? (
+            <div className={styles.metricTooltipLine}>Carregando...</div>
+          ) : vendasTooltip.filiais.length === 0 ? (
+            <div className={styles.metricTooltipLine}>Sem vendas no período.</div>
+          ) : (
+            <>
+              {vendasTooltip.filiais.map((row) => (
+                <div key={row.filial} className={styles.metricTooltipRow}>
+                  <span>{row.filial}</span>
+                  <span>
+                    {vendasTooltip.mode === "valor12m"
+                      ? fmtBRL(row.valor12m)
+                      : fmt(vendasTooltip.mode === "12m" ? row.qtde12m : row.qtde60d)}
+                  </span>
+                </div>
+              ))}
+              <div className={styles.metricTooltipTotal}>
+                <span>Total</span>
+                <span>
+                  {vendasTooltip.mode === "valor12m"
+                    ? fmtBRL(vendasTooltip.filiais.reduce((s, row) => s + Number(row.valor12m ?? 0), 0))
+                    : fmt(
+                        vendasTooltip.filiais.reduce(
+                          (s, row) => s + Number(vendasTooltip.mode === "12m" ? row.qtde12m : row.qtde60d),
+                          0
+                        )
+                      )}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+      {abcTooltip && (
+        <div className={styles.metricTooltip} style={{ left: abcTooltip.x + 12, top: abcTooltip.y + 12 }}>
+          <div className={styles.metricTooltipTitle}>Curva ABC (detalhe da lógica)</div>
+          <div className={styles.metricTooltipMeta}><strong>Produto:</strong> {abcTooltip.produto}</div>
+          {abcTooltip.cor && <div className={styles.metricTooltipMeta}><strong>Cor:</strong> {abcTooltip.cor}</div>}
+          <div className={styles.metricTooltipMeta}><strong>Escopo:</strong> {abcTooltip.escopo === "geral" ? "Geral (rede)" : "Loja específica"}</div>
+          <div className={styles.metricTooltipMeta}><strong>Período:</strong> {abcTooltip.periodo}</div>
+          <div className={styles.metricTooltipLine} style={{ marginTop: 6 }}>{abcTooltip.regra}</div>
+          <div className={styles.metricTooltipDivider} />
+          {abcTooltip.rows.length === 0 ? (
+            <div className={styles.metricTooltipLine}>Sem dados para classificar.</div>
+          ) : (
+            <>
+              {abcTooltip.rows.map((row) => (
+                <div key={row.filial} className={styles.metricTooltipRow}>
+                  <span>{row.filial}</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 11, color: "#cbd5e1" }}>
+                      {row.participacao.toFixed(1)}% | acum. {row.acumulado.toFixed(1)}%
+                    </span>
+                    <span className={`${styles.abcBadgeMini} ${styles[`abcBadge${row.curva}`]}`}>{row.curva}</span>
+                  </span>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+      {sugestaoTooltip && (
+        <div className={styles.metricTooltip} style={{ left: sugestaoTooltip.x + 12, top: sugestaoTooltip.y + 12 }}>
+          <div className={styles.metricTooltipTitle}>{sugestaoTooltip.titulo}</div>
+          <div className={styles.metricTooltipLine}>{sugestaoTooltip.regra}</div>
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine}><strong>Vendas mês:</strong> {fmt(sugestaoTooltip.vendasMesAtual)} un</div>
+          <div className={styles.metricTooltipLine}><strong>Dias corridos:</strong> {sugestaoTooltip.diasCorridos}</div>
+          <div className={styles.metricTooltipLine}><strong>Consumo/dia:</strong> {sugestaoTooltip.consumoDiario.toFixed(2)} un</div>
+          <div className={styles.metricTooltipLine}><strong>Estoque atual:</strong> {fmt(sugestaoTooltip.estoqueAtual)} un</div>
+          <div className={styles.metricTooltipLine}><strong>Duração atual:</strong> {Math.max(0, Math.round(sugestaoTooltip.duracaoAtual))} dias</div>
+          <div className={styles.metricTooltipLine}><strong>Limite do item:</strong> {sugestaoTooltip.limiteDias} dias</div>
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoTooltip.qtdCalculada)} un</div>
+        </div>
+      )}
+      {sugestaoSTooltip && (
+        <div className={styles.metricTooltip} style={{ left: sugestaoSTooltip.x + 12, top: sugestaoSTooltip.y + 12 }}>
+          <div className={styles.metricTooltipTitle}>Regra S (mesma lógica da ABC)</div>
+          <div className={styles.metricTooltipLine}><strong>Média de vendas:</strong> {sugestaoSTooltip.mediaVendasMes.toFixed(1)} un/mês</div>
+          <div className={styles.metricTooltipLine}><strong>Estoque atual:</strong> {fmt(sugestaoSTooltip.estoqueAtual)} un</div>
+          <div className={styles.metricTooltipLine}><strong>Cobertura mínima:</strong> {sugestaoSTooltip.limiteDias} dias</div>
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoSTooltip.qtdS)} un</div>
+          <div className={styles.metricTooltipLine}>
+            = {(sugestaoSTooltip.limiteDias / 30).toFixed(1)} meses × {sugestaoSTooltip.mediaVendasMes.toFixed(1)} un/mês
+          </div>
+        </div>
+      )}
+      {duracaoTooltip && (
+        <div className={styles.metricTooltip} style={{ left: duracaoTooltip.x + 12, top: duracaoTooltip.y + 12 }}>
+          <div className={styles.metricTooltipTitle}>Duração de estoque</div>
+          <div className={styles.metricTooltipLine}><strong>Regra:</strong> {duracaoTooltip.regra}</div>
+          <div className={styles.metricTooltipLine}><strong>Limite do item:</strong> {duracaoTooltip.limiteDias} dias</div>
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine}><strong>Vendas mês:</strong> {fmt(duracaoTooltip.vendasMesAtual)} un</div>
+          <div className={styles.metricTooltipLine}><strong>Dias corridos:</strong> {duracaoTooltip.diasCorridos}</div>
+          <div className={styles.metricTooltipLine}><strong>Consumo/dia:</strong> {duracaoTooltip.consumoDiario.toFixed(2)} un</div>
+          <div className={styles.metricTooltipLine}><strong>Estoque atual:</strong> {fmt(duracaoTooltip.estoqueAtual)} un</div>
+          <div className={styles.metricTooltipLine}><strong>Duração:</strong> {duracaoTooltip.duracaoDias} dias</div>
+        </div>
+      )}
     </div>
   );
 }
 
-export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPageProps) {
+export default function ListaLojaPage({ companyKey, companyName, companySlug }: ListaLojaPageProps) {
   const { user, isLoading: authLoading } = useAuth();
 
   const [mode, setMode] = useState<Mode>("list");
@@ -347,6 +1386,8 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
   const [searchTerm, setSearchTerm] = useState("");
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [loadingProdutos, setLoadingProdutos] = useState(false);
+  const [batchCodes, setBatchCodes] = useState("");
+  const [importandoBatch, setImportandoBatch] = useState(false);
 
   // Color picker (dentro do modal)
   const [colorPickerProduto, setColorPickerProduto] = useState<Produto | null>(null);
@@ -356,8 +1397,19 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
   // UI
   const [salvando, setSalvando] = useState(false);
   const [notificacao, setNotificacao] = useState<{ mensagem: string; tipo: "success" | "error" } | null>(null);
+  const [editorColorPickerIndex, setEditorColorPickerIndex] = useState<number | null>(null);
+  const [editorColorPickerMode, setEditorColorPickerMode] = useState<"replace" | "add" | null>(null);
+  const [editorColorPickerOpcoes, setEditorColorPickerOpcoes] = useState<Produto[]>([]);
+  const [editorColorPickerLoading, setEditorColorPickerLoading] = useState(false);
+  const [modalColorPickerIndex, setModalColorPickerIndex] = useState<number | null>(null);
+  const [modalColorPickerMode, setModalColorPickerMode] = useState<"replace" | "add" | null>(null);
+  const [modalColorPickerOpcoes, setModalColorPickerOpcoes] = useState<Produto[]>([]);
+  const [modalColorPickerLoading, setModalColorPickerLoading] = useState(false);
   const [permissoes, setPermissoes] = useState<TransferenciaPermissao | null>(null);
   const [permissoesCarregadas, setPermissoesCarregadas] = useState(false);
+  const filialConsultaSelecionada =
+    filialSelecionada?.codFilial === TODAS_FILIAIS_VALUE ? null : (filialSelecionada?.codFilial?.trim() || null);
+
 
   const notifTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -386,7 +1438,7 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
 
   useEffect(() => {
     if (!permissoesCarregadas) return;
-    fetchFiliais().then((data) => {
+    fetchFiliais(companyKey).then((data) => {
       setFiliais(data);
       let disponiveis = data;
       if (permissoes) {
@@ -405,18 +1457,28 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
         };
         disponiveis = resolveFiliais(permissoes.filiaisOrigem || []);
       }
-      setFiliaisDisponiveis(disponiveis);
-      if (disponiveis.length > 0) setFilialSelecionada(disponiveis[0]);
+      const semMatriz = disponiveis.filter((f) => f.codFilial.trim().toUpperCase() !== "NERD" && f.filial.trim().toUpperCase() !== "MATRIZ");
+      const comTodas =
+        semMatriz.length > 0
+          ? [{ codFilial: TODAS_FILIAIS_VALUE, filial: TODAS_FILIAIS_LABEL }, ...semMatriz]
+          : semMatriz;
+      setFiliaisDisponiveis(comTodas);
+      if (disponiveis.length > 0) {
+        setFilialSelecionada((prev) => {
+          if (!prev) return disponiveis[0];
+          const match = comTodas.find((f) => f.codFilial === prev.codFilial);
+          return match ?? comTodas[0];
+        });
+      }
     });
-  }, [permissoes, permissoesCarregadas]);
+  }, [permissoes, permissoesCarregadas, companyKey]);
 
   // Ao mudar a loja ou abrir outra lista para edição, recalcula vendas 90d e estoque (mesma lógica do Controle de Estoque: grupos de filial, etc.)
   useEffect(() => {
     if (mode !== "editor") return;
-    const cod = filialSelecionada?.codFilial?.trim();
-    if (!cod || itensRef.current.length === 0) return;
+    if (itensRef.current.length === 0) return;
 
-    const itemKey = (i: ListaItem) => `${i.produto}|${i.corProduto ?? ""}`;
+    const itemKey = (i: ListaItem) => buildItemKey(i.produto, i.corProduto);
 
     let cancelled = false;
     void (async () => {
@@ -424,11 +1486,18 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
       const keys = snapshot.map(itemKey);
       const metrics = await Promise.all(
         snapshot.map(async (item) => {
-          const [vendas90d, estoqueFilial] = await Promise.all([
-            fetchVendas90Projetado(companyKey, cod, item.produto, item.corProduto),
-            fetchEstoqueFilialSum(companyKey, cod, item.produto, item.corProduto),
+          const [vendas, estoqueFilial] = await Promise.all([
+            fetchVendasItemMetricas(companyKey, filialConsultaSelecionada, item.produto, item.corProduto),
+            fetchEstoqueFilialSum(companyKey, filialConsultaSelecionada, item.produto, item.corProduto),
           ]);
-          return { vendas90d, estoqueFilial };
+          return {
+            qtde12m: vendas?.qtde12m ?? null,
+            qtde60d: vendas?.qtde60d ?? null,
+            vendasMesAtual: vendas?.vendasMesAtual ?? null,
+            valor12m: vendas?.valor12m ?? null,
+            custoUnit: vendas?.custoUnit ?? null,
+            estoqueFilial,
+          };
         })
       );
       if (cancelled) return;
@@ -436,7 +1505,12 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
       setItens((current) =>
         current.map((it) => {
           const m = metricsByKey.get(itemKey(it));
-          return m ? { ...it, vendas90d: m.vendas90d, estoqueFilial: m.estoqueFilial } : it;
+          if (!m) return it;
+          const merged = { ...it, ...m };
+          return {
+            ...merged,
+            quantidade: getSuggestedQtyValue(merged, new Date().getDate()),
+          };
         })
       );
     })();
@@ -444,7 +1518,7 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
     return () => {
       cancelled = true;
     };
-  }, [filialSelecionada?.codFilial, mode, companyKey, editingId]);
+  }, [filialConsultaSelecionada, mode, companyKey, editingId]);
 
   // ─── Load lists ─────────────────────────────────────────────────────────────
 
@@ -587,27 +1661,27 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
         }
       }
 
-      const filialCod = filialSelecionada?.codFilial?.trim() || "";
-      const base: Omit<ListaItem, "quantidade" | "vendas90d" | "estoqueFilial"> = {
+      const filialCod = filialConsultaSelecionada;
+      const base: Omit<ListaItem, "quantidade" | "qtde12m" | "valor12m" | "qtde60d" | "vendasMesAtual" | "custoUnit" | "estoqueFilial"> = {
         produto: produto.produto,
         descProduto: produto.descProduto,
         codigoBarra: produto.codigoBarra ?? null,
         corProduto: produto.corProduto,
         descCor: (produto.descCor || "").trim(),
+        linha: produto.linha ?? null,
+        subgrupo: produto.subgrupo ?? null,
       };
 
       void (async () => {
-        let vendas90: number | null = null;
+        let vendas: { qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null } | null = null;
         let estoque: number | null = null;
-        if (filialCod) {
-          [vendas90, estoque] = await Promise.all([
-            fetchVendas90Projetado(companyKey, filialCod, produto.produto, produto.corProduto),
-            fetchEstoqueFilialSum(companyKey, filialCod, produto.produto, produto.corProduto),
-          ]);
-        }
+        [vendas, estoque] = await Promise.all([
+          fetchVendasItemMetricas(companyKey, filialCod, produto.produto, produto.corProduto),
+          fetchEstoqueFilialSum(companyKey, filialCod, produto.produto, produto.corProduto),
+        ]);
         setItensModal((prev) => {
-          const chave = `${base.produto}|${base.corProduto ?? ""}`;
-          const idx = prev.findIndex((i) => `${i.produto}|${i.corProduto ?? ""}` === chave);
+          const chave = buildItemKey(base.produto, base.corProduto);
+          const idx = prev.findIndex((i) => buildItemKey(i.produto, i.corProduto) === chave);
           if (idx !== -1) {
             const next = [...prev];
             next[idx] = { ...next[idx], quantidade: next[idx].quantidade + 1 };
@@ -619,15 +1693,31 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
             ...prev,
             {
               ...base,
-              quantidade: 1,
-              vendas90d: vendas90,
+              quantidade: getSuggestedQtyValue(
+                {
+                  ...base,
+                  quantidade: 0,
+                  qtde12m: vendas?.qtde12m ?? null,
+                  qtde60d: vendas?.qtde60d ?? null,
+                  vendasMesAtual: vendas?.vendasMesAtual ?? null,
+                  valor12m: vendas?.valor12m ?? null,
+                  custoUnit: vendas?.custoUnit ?? null,
+                  estoqueFilial: estoque,
+                },
+                new Date().getDate()
+              ),
+              qtde12m: vendas?.qtde12m ?? null,
+              qtde60d: vendas?.qtde60d ?? null,
+              vendasMesAtual: vendas?.vendasMesAtual ?? null,
+              valor12m: vendas?.valor12m ?? null,
+              custoUnit: vendas?.custoUnit ?? null,
               estoqueFilial: estoque,
             },
           ];
         });
       })();
     },
-    [mostrarNotificacao, produtos, filialSelecionada, companyKey]
+    [mostrarNotificacao, produtos, filialConsultaSelecionada, companyKey]
   );
 
   const adicionarComCor = useCallback(
@@ -644,13 +1734,192 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
   }, []);
 
   const atualizarQuantidadeModal = useCallback((index: number, qtd: number) => {
-    if (qtd < 1) return;
+    if (qtd < 0) return;
     setItensModal((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], quantidade: qtd };
       return next;
     });
   }, []);
+
+  const moverItemModal = useCallback((fromIndex: number, toIndex: number) => {
+    setItensModal((prev) => {
+      if (
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= prev.length ||
+        toIndex >= prev.length ||
+        fromIndex === toIndex
+      ) {
+        return prev;
+      }
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }, []);
+
+  const importarBatchProdutos = useCallback(async () => {
+    const codigos = batchCodes
+      .split(/\r?\n|,|;|\t/g)
+      .map((c) => c.trim())
+      .filter(Boolean);
+    if (codigos.length === 0) {
+      mostrarNotificacao("Cole pelo menos um codigo para importar", "error");
+      return;
+    }
+
+    const filialCod = filialConsultaSelecionada;
+    setImportandoBatch(true);
+    try {
+      const resolvidos = await Promise.all(
+        codigos.map(async (codigoOriginal) => {
+          const codigo = codigoOriginal.trim();
+          if (!codigo) return { codigoOriginal, produto: null as Produto | null };
+
+          try {
+            const porBarra = await buscarPorCodigoBarras(codigo, companyKey);
+            if (porBarra) {
+              const candidatosBarra = await searchProdutos(porBarra.produto, companyKey);
+              const matchBarra =
+                candidatosBarra.find(
+                  (p) =>
+                    p.produto.trim() === porBarra.produto.trim() &&
+                    (p.corProduto ?? "") === (porBarra.corProduto ?? "")
+                ) ||
+                candidatosBarra.find((p) => p.produto.trim() === porBarra.produto.trim()) ||
+                null;
+              if (matchBarra) return { codigoOriginal, produto: matchBarra };
+            }
+
+            const candidatos = await searchProdutos(codigo, companyKey);
+            if (candidatos.length === 0) return { codigoOriginal, produto: null as Produto | null };
+
+            const exactProduto = candidatos.find((p) => p.produto.trim() === codigo);
+            if (exactProduto) return { codigoOriginal, produto: exactProduto };
+
+            const exactBarra = candidatos.find((p) => (p.codigoBarra || "").trim() === codigo);
+            if (exactBarra) return { codigoOriginal, produto: exactBarra };
+
+            return { codigoOriginal, produto: candidatos[0] ?? null };
+          } catch {
+            return { codigoOriginal, produto: null as Produto | null };
+          }
+        })
+      );
+
+      type BatchAgg = {
+        item: Omit<ListaItem, "quantidade" | "qtde12m" | "valor12m" | "qtde60d" | "vendasMesAtual" | "custoUnit" | "estoqueFilial">;
+        quantidade: number;
+      };
+      const agregados = new Map<string, BatchAgg>();
+      let naoEncontrados = 0;
+      const codigosNaoReconhecidos: string[] = [];
+
+      for (const itemResolvido of resolvidos) {
+        const p = itemResolvido.produto;
+        if (!p) {
+          naoEncontrados += 1;
+          codigosNaoReconhecidos.push(itemResolvido.codigoOriginal.trim());
+          continue;
+        }
+        const key = buildItemKey(p.produto, p.corProduto);
+        const current = agregados.get(key);
+        if (current) {
+          current.quantidade += 1;
+          continue;
+        }
+        agregados.set(key, {
+          item: {
+            produto: p.produto,
+            descProduto: p.descProduto,
+            codigoBarra: p.codigoBarra ?? null,
+            corProduto: p.corProduto,
+            descCor: (p.descCor || "").trim(),
+            linha: p.linha ?? null,
+            subgrupo: p.subgrupo ?? null,
+          },
+          quantidade: 1,
+        });
+      }
+
+      if (agregados.size === 0) {
+        mostrarNotificacao("Nenhum codigo foi reconhecido", "error");
+        return;
+      }
+
+      const metricsEntries = await Promise.all(
+        Array.from(agregados.entries()).map(async ([key, agg]) => {
+          const [vendas, estoqueFilial] = await Promise.all([
+            fetchVendasItemMetricas(companyKey, filialCod, agg.item.produto, agg.item.corProduto),
+            fetchEstoqueFilialSum(companyKey, filialCod, agg.item.produto, agg.item.corProduto),
+          ]);
+          return [key, {
+            qtde12m: vendas?.qtde12m ?? null,
+            qtde60d: vendas?.qtde60d ?? null,
+            vendasMesAtual: vendas?.vendasMesAtual ?? null,
+            valor12m: vendas?.valor12m ?? null,
+            custoUnit: vendas?.custoUnit ?? null,
+            estoqueFilial,
+          }] as const;
+        })
+      );
+      const metricsMap = new Map(metricsEntries);
+
+      setItensModal((prev) => {
+        const next = [...prev];
+        for (const [key, agg] of agregados.entries()) {
+          const idx = next.findIndex((i) => buildItemKey(i.produto, i.corProduto) === key);
+          if (idx >= 0) {
+            next[idx] = { ...next[idx], quantidade: next[idx].quantidade + agg.quantidade };
+            continue;
+          }
+          const metrics = metricsMap.get(key) || { qtde12m: null, valor12m: null, qtde60d: null, vendasMesAtual: null, custoUnit: null, estoqueFilial: null };
+          const suggested = getSuggestedQtyValue(
+            {
+              ...agg.item,
+              quantidade: 0,
+              qtde12m: metrics.qtde12m,
+              valor12m: metrics.valor12m,
+              qtde60d: metrics.qtde60d,
+              vendasMesAtual: metrics.vendasMesAtual,
+              custoUnit: metrics.custoUnit,
+              estoqueFilial: metrics.estoqueFilial,
+            },
+            new Date().getDate()
+          );
+          next.push({
+            ...agg.item,
+            quantidade: Math.max(agg.quantidade, suggested),
+            qtde12m: metrics.qtde12m,
+            valor12m: metrics.valor12m,
+            qtde60d: metrics.qtde60d,
+            vendasMesAtual: metrics.vendasMesAtual,
+            custoUnit: metrics.custoUnit,
+            estoqueFilial: metrics.estoqueFilial,
+          });
+        }
+        return next;
+      });
+
+      const encontrados = codigos.length - naoEncontrados;
+      if (naoEncontrados > 0) {
+        const codigosNaoReconhecidosUnicos = Array.from(
+          new Set(codigosNaoReconhecidos.filter(Boolean))
+        );
+        mostrarNotificacao(
+          `Importacao: ${encontrados} reconhecido(s), ${naoEncontrados} nao encontrado(s). Nao reconhecidos: ${codigosNaoReconhecidosUnicos.join(", ")}`,
+          "error"
+        );
+      } else {
+        mostrarNotificacao(`Importacao concluida: ${encontrados} codigo(s) reconhecido(s)`);
+      }
+      setBatchCodes("");
+    } finally {
+      setImportandoBatch(false);
+    }
+  }, [batchCodes, filialConsultaSelecionada, companyKey, mostrarNotificacao]);
 
   // ─── Editor: lista items (fora do modal) ─────────────────────────────────────
 
@@ -659,13 +1928,169 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
   }, []);
 
   const atualizarQuantidade = useCallback((index: number, qtd: number) => {
-    if (qtd < 1) return;
+    if (qtd < 0) return;
     setItens((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], quantidade: qtd };
       return next;
     });
   }, []);
+
+  const moverItem = useCallback((fromIndex: number, toIndex: number) => {
+    setItens((prev) => {
+      if (
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= prev.length ||
+        toIndex >= prev.length ||
+        fromIndex === toIndex
+      ) {
+        return prev;
+      }
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }, []);
+
+  const abrirColorPickerItem = useCallback(
+    async (index: number, emModal: boolean, mode: "replace" | "add") => {
+      const source = emModal ? itensModal : itens;
+      const item = source[index];
+      if (!item) return;
+
+      if (emModal) {
+        setModalColorPickerIndex(index);
+        setModalColorPickerMode(mode);
+        setModalColorPickerLoading(true);
+      } else {
+        setEditorColorPickerIndex(index);
+        setEditorColorPickerMode(mode);
+        setEditorColorPickerLoading(true);
+      }
+
+      try {
+        const result = await searchProdutos(item.produto, companyKey);
+        const opcoes = result.filter(
+          (p) => p.produto.trim() === item.produto.trim() && p.corProduto !== null
+        );
+
+        const opcoesUnicas = Array.from(
+          new Map(opcoes.map((p) => [`${p.corProduto ?? ""}|${p.codigoBarra ?? ""}`, p])).values()
+        );
+
+        if (emModal) {
+          setModalColorPickerOpcoes(opcoesUnicas);
+        } else {
+          setEditorColorPickerOpcoes(opcoesUnicas);
+        }
+      } catch {
+        if (emModal) {
+          setModalColorPickerOpcoes([]);
+        } else {
+          setEditorColorPickerOpcoes([]);
+        }
+      } finally {
+        if (emModal) {
+          setModalColorPickerLoading(false);
+        } else {
+          setEditorColorPickerLoading(false);
+        }
+      }
+    },
+    [itens, itensModal, companyKey]
+  );
+
+  const trocarCorItem = useCallback(
+    async (index: number, produtoComCor: Produto, emModal: boolean) => {
+      const setLista = emModal ? setItensModal : setItens;
+      const mode = emModal ? modalColorPickerMode : editorColorPickerMode;
+      const filialCod = filialConsultaSelecionada;
+
+      let vendas: { qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null } | null = null;
+      let estoque: number | null = null;
+      [vendas, estoque] = await Promise.all([
+        fetchVendasItemMetricas(companyKey, filialCod, produtoComCor.produto, produtoComCor.corProduto),
+        fetchEstoqueFilialSum(companyKey, filialCod, produtoComCor.produto, produtoComCor.corProduto),
+      ]);
+
+      const novasMetricas = {
+        qtde12m: vendas?.qtde12m ?? null,
+        qtde60d: vendas?.qtde60d ?? null,
+        vendasMesAtual: vendas?.vendasMesAtual ?? null,
+        valor12m: vendas?.valor12m ?? null,
+        custoUnit: vendas?.custoUnit ?? null,
+        estoqueFilial: estoque,
+      };
+
+      setLista((prev) => {
+        const atual = prev[index];
+        if (!atual) return prev;
+
+        const chaveNova = buildItemKey(atual.produto, produtoComCor.corProduto);
+        const idxExistente = prev.findIndex(
+          (i, idx) => idx !== index && buildItemKey(i.produto, i.corProduto) === chaveNova
+        );
+
+        const novoItemBase: ListaItem = {
+          ...atual,
+          codigoBarra: produtoComCor.codigoBarra ?? null,
+          corProduto: produtoComCor.corProduto,
+          descCor: (produtoComCor.descCor || "").trim(),
+          linha: produtoComCor.linha ?? atual.linha ?? null,
+          subgrupo: produtoComCor.subgrupo ?? atual.subgrupo ?? null,
+          ...novasMetricas,
+        };
+
+        if (mode === "add") {
+          const novoItem: ListaItem = {
+            ...novoItemBase,
+            quantidade: getSuggestedQtyValue({ ...novoItemBase, quantidade: 0 }, new Date().getDate()),
+          };
+          if (idxExistente >= 0) {
+            const next = [...prev];
+            next[idxExistente] = {
+              ...next[idxExistente],
+              quantidade: next[idxExistente].quantidade + 1,
+              ...novasMetricas,
+            };
+            return next;
+          }
+          const next = [...prev];
+          next.splice(index + 1, 0, novoItem);
+          return next;
+        }
+
+        if (idxExistente >= 0) {
+          const next = [...prev];
+          next[idxExistente] = {
+            ...next[idxExistente],
+            quantidade: next[idxExistente].quantidade + atual.quantidade,
+            ...novasMetricas,
+          };
+          next.splice(index, 1);
+          return next;
+        }
+
+        const next = [...prev];
+        next[index] = novoItemBase;
+        return next;
+      });
+
+      if (emModal) {
+        setModalColorPickerIndex(null);
+        setModalColorPickerMode(null);
+        setModalColorPickerOpcoes([]);
+      } else {
+        setEditorColorPickerIndex(null);
+        setEditorColorPickerMode(null);
+        setEditorColorPickerOpcoes([]);
+      }
+      mostrarNotificacao(mode === "add" ? "Nova cor adicionada ao item" : "Cor atualizada com sucesso");
+    },
+    [companyKey, filialConsultaSelecionada, mostrarNotificacao, editorColorPickerMode, modalColorPickerMode]
+  );
 
   // ─── Navigation ─────────────────────────────────────────────────────────────
 
@@ -682,11 +2107,11 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
       setEditingId(lista.id);
       setNomeLista(lista.nome);
       setItens(Array.isArray(lista.itens) ? lista.itens : []);
-      const f = filiais.find((f) => f.codFilial === lista.filial);
+      const f = filiaisDisponiveis.find((f) => f.codFilial === lista.filial) ?? filiais.find((f) => f.codFilial === lista.filial);
       if (f) setFilialSelecionada(f);
       setMode("editor");
     },
-    [filiais]
+    [filiais, filiaisDisponiveis]
   );
 
   const voltarParaLista = useCallback(() => {
@@ -695,25 +2120,67 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
 
   // ─── Save ───────────────────────────────────────────────────────────────────
 
+  const enviarParaComprasSalvas = useCallback(async (customTitle?: string, stayInEditor: boolean = false) => {
+    if (itens.length === 0) {
+      mostrarNotificacao("Adicione pelo menos um produto para enviar", "error");
+      return;
+    }
+    const username = user?.username?.trim() || "";
+    const filialCtx = filialSelecionada?.codFilial?.trim() || "sem-filial";
+    const sourceContextKey = `lista-loja:${companyKey}:${filialCtx}:${editingId ?? "novo"}`;
+    const titleBase = nomeLista.trim() || buildDefaultListName(filialSelecionada?.filial || "Lista Loja");
+    const title = `[Lista Loja] ${appendUserToListName(customTitle?.trim() || titleBase, username)}`;
+    const payloadItems: CompraSalvaItemRow[] = itens.map((it) => ({
+      itemKey: buildItemKey(it.produto, it.corProduto),
+      produto: it.produto,
+      corProduto: it.corProduto ?? undefined,
+      corDescricao: it.descCor || undefined,
+      descricao: it.descProduto || it.produto,
+      qtdManual: Math.max(0, Math.round(it.quantidade ?? 0)),
+      custoUnitario: it.custoUnit != null ? Number(it.custoUnit) : undefined,
+    }));
+
+    try {
+      const res = await fetch("/api/controle-estoque/compras-salvas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyKey,
+          sourceContextKey,
+          title,
+          expandirPorCor: true,
+          items: payloadItems,
+        }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error || "Erro ao enviar para Compras Salvas");
+      mostrarNotificacao("Lista enviada para Compras Salvas com sucesso!");
+      if (!stayInEditor) setMode("saved-purchases");
+    } catch (err: unknown) {
+      mostrarNotificacao(err instanceof Error ? err.message : "Erro ao enviar para Compras Salvas", "error");
+    }
+  }, [companyKey, editingId, filialSelecionada, itens, mostrarNotificacao, nomeLista, user?.username]);
+
   const salvar = useCallback(async () => {
     if (!user?.username) return;
-    if (!filialSelecionada) { mostrarNotificacao("Selecione uma loja", "error"); return; }
     if (itens.length === 0) { mostrarNotificacao("Adicione pelo menos um produto", "error"); return; }
 
     setSalvando(true);
     try {
-      const nomeFinal = nomeLista.trim() || buildDefaultListName(filialSelecionada.filial);
+      const nomeBase = nomeLista.trim() || buildDefaultListName(filialSelecionada?.filial || "Lista");
+      const nomeFinal = appendUserToListName(nomeBase, user.username);
       const result = await salvarLista(
         {
           id: editingId,
           nome: nomeFinal,
-          filial: filialSelecionada.codFilial,
-          nomeFilial: filialSelecionada.filial,
+          filial: "LISTA_LOJA",
+          nomeFilial: "Lista Loja",
           company: companyKey,
           itens,
         },
         user.username
       );
+      await enviarParaComprasSalvas(nomeFinal, true);
       mostrarNotificacao("Lista salva com sucesso!");
       setEditingId(result.id);
       setNomeLista(nomeFinal);
@@ -722,7 +2189,7 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
     } finally {
       setSalvando(false);
     }
-  }, [user?.username, nomeLista, filialSelecionada, itens, editingId, companyKey, mostrarNotificacao]);
+  }, [user?.username, nomeLista, filialSelecionada?.filial, itens, editingId, companyKey, mostrarNotificacao, enviarParaComprasSalvas]);
 
   // ─── Delete ─────────────────────────────────────────────────────────────────
 
@@ -746,11 +2213,34 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
 
   // Produtos que já estão no modal (para não mostrar nos resultados de busca)
   const produtosJaNoModal = useMemo(() => {
-    return new Set(itensModal.map((i) => `${i.produto}|${i.corProduto ?? ""}`));
+    return new Set(itensModal.map((i) => buildItemKey(i.produto, i.corProduto)));
   }, [itensModal]);
 
   const totalItens = itens.reduce((s, i) => s + i.quantidade, 0);
   const totalItensModal = itensModal.reduce((s, i) => s + i.quantidade, 0);
+  const kpisLista = useMemo(() => {
+    const diasCorridosMes = new Date().getDate();
+    const totalQtdSugerida = itens.reduce((s, item) => {
+      const sugestao = getReposicaoCompraView(item, diasCorridosMes);
+      const qtd = sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS;
+      return s + Math.max(0, qtd);
+    }, 0);
+    const totalCustoReferencia = itens.reduce((s, item) => {
+      const custoUnit = Number(item.custoUnit ?? 0);
+      if (custoUnit <= 0) return s;
+      const sugestao = getReposicaoCompraView(item, diasCorridosMes);
+      const qtd = sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS;
+      if (qtd <= 0) return s;
+      return s + qtd * custoUnit;
+    }, 0);
+    return {
+      totalItens: itens.length,
+      totalQtdSugerida,
+      totalCustoReferencia,
+    };
+  }, [itens]);
+  const abcMapRede = useMemo(() => calcularCurvasRede(itens), [itens]);
+  const abcMapModal = useMemo(() => calcularCurvasRede(itensModal), [itensModal]);
 
   // ─── Render: loading ────────────────────────────────────────────────────────
 
@@ -784,13 +2274,36 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
             Voltar
           </button>
           <h1 className={styles.title}>{editingId ? "Editar Lista" : "Nova Lista"}</h1>
-          <button type="button" className={styles.saveBtn} onClick={salvar} disabled={salvando}>
-            {salvando ? "Salvando..." : "Salvar Lista"}
-          </button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              type="button"
+              className={styles.backBtn}
+              onClick={() => {
+                void enviarParaComprasSalvas();
+              }}
+              disabled={itens.length === 0}
+              title={itens.length === 0 ? "Adicione itens para enviar" : "Enviar para Compras Salvas"}
+            >
+              Enviar para Compras Salvas
+            </button>
+            <button type="button" className={styles.saveBtn} onClick={salvar} disabled={salvando}>
+              {salvando ? "Salvando..." : "Salvar Lista"}
+            </button>
+          </div>
         </div>
 
         {/* Meta form */}
         <div className={styles.formRow}>
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Nome da Lista</label>
+            <input
+              type="text"
+              className={styles.input}
+              value={nomeLista}
+              onChange={(e) => setNomeLista(e.target.value)}
+              placeholder={buildDefaultListName(filialSelecionada?.filial || "Lista")}
+            />
+          </div>
           <div className={styles.formGroup}>
             <label className={styles.label}>Loja</label>
             {filiaisDisponiveis.length === 1 && filialSelecionada ? (
@@ -800,7 +2313,7 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
                 className={styles.select}
                 value={filialSelecionada?.codFilial || ""}
                 onChange={(e) => {
-                  const f = filiaisDisponiveis.find((f) => f.codFilial === e.target.value);
+                    const f = filiaisDisponiveis.find((f) => f.codFilial === e.target.value);
                   if (f) setFilialSelecionada(f);
                 }}
               >
@@ -814,6 +2327,24 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
 
         {/* Produtos da lista (sem card; scroll da página) */}
         <div className={styles.produtosSection}>
+          {itens.length > 0 && (
+            <div className={styles.kpiCard}>
+              <div className={styles.kpiItem}>
+                <span className={styles.kpiLabel}>Itens</span>
+                <strong className={styles.kpiValueNeutral}>{kpisLista.totalItens}</strong>
+              </div>
+              <div className={styles.kpiDivider} />
+              <div className={styles.kpiItem}>
+                <span className={styles.kpiLabel}>Total Qtd</span>
+                <strong className={styles.kpiValue}>{fmt(kpisLista.totalQtdSugerida)}</strong>
+              </div>
+              <div className={styles.kpiDivider} />
+              <div className={styles.kpiItem}>
+                <span className={styles.kpiLabel}>Custo Total (Referência)</span>
+                <strong className={styles.kpiValue}>{fmtBRL(kpisLista.totalCustoReferencia)}</strong>
+              </div>
+            </div>
+          )}
           {itens.length === 0 ? (
             <div className={styles.emptyProducts}>
               <div className={styles.emptyProductsIcon}>
@@ -828,7 +2359,12 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
           ) : (
             <div className={styles.produtosList}>
               <ListaLojaItensTable
+                companyKey={companyKey}
+                filialCod={filialConsultaSelecionada}
                 itens={itens}
+                compraView={true}
+                abcMap={abcMapRede}
+                onMoveItem={moverItem}
                 onIncrement={(idx) =>
                   atualizarQuantidade(idx, (itens[idx]?.quantidade ?? 1) + 1)
                 }
@@ -837,6 +2373,21 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
                 }
                 onQtyChange={(idx, q) => atualizarQuantidade(idx, q)}
                 onRemove={removerItem}
+                onOpenColorPicker={(idx, mode) => {
+                  void abrirColorPickerItem(idx, false, mode);
+                }}
+                activeColorPickerIndex={editorColorPickerIndex}
+                activeColorPickerMode={editorColorPickerMode}
+                colorPickerOptions={editorColorPickerOpcoes}
+                colorPickerLoading={editorColorPickerLoading}
+                onApplyColor={(idx, produtoComCor) => {
+                  void trocarCorItem(idx, produtoComCor, false);
+                }}
+                onCancelColorPicker={() => {
+                  setEditorColorPickerIndex(null);
+                  setEditorColorPickerMode(null);
+                  setEditorColorPickerOpcoes([]);
+                }}
               />
             </div>
           )}
@@ -892,6 +2443,24 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
                   />
                 </div>
 
+                <div className={styles.batchBox}>
+                  <textarea
+                    className={styles.batchInput}
+                    placeholder="Importacao em lote: cole um codigo por linha"
+                    value={batchCodes}
+                    onChange={(e) => setBatchCodes(e.target.value)}
+                    rows={4}
+                  />
+                  <button
+                    type="button"
+                    className={styles.batchBtn}
+                    onClick={importarBatchProdutos}
+                    disabled={importandoBatch}
+                  >
+                    {importandoBatch ? "Importando..." : "Importar codigos"}
+                  </button>
+                </div>
+
                 {/* Results */}
                 {loadingProdutos ? (
                   <div className={styles.loadingText}>Buscando produtos...</div>
@@ -900,7 +2469,7 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
                 ) : (
                   <div className={styles.produtosModalList}>
                     {produtos
-                      .filter((p) => !produtosJaNoModal.has(`${p.produto}|${p.corProduto ?? ""}`))
+                      .filter((p) => !produtosJaNoModal.has(buildItemKey(p.produto, p.corProduto)))
                       .map((produto, index) => {
                         const isPickerActive =
                           colorPickerProduto?.produto === produto.produto && produto.corProduto === null;
@@ -974,7 +2543,12 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
                     </div>
                     <div className={styles.modalCartList}>
                       <ListaLojaItensTable
+                        companyKey={companyKey}
+                        filialCod={filialConsultaSelecionada}
                         itens={itensModal}
+                        compraView={true}
+                        abcMap={abcMapModal}
+                        onMoveItem={moverItemModal}
                         onIncrement={(idx) =>
                           atualizarQuantidadeModal(
                             idx,
@@ -989,6 +2563,21 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
                         }
                         onQtyChange={(idx, q) => atualizarQuantidadeModal(idx, q)}
                         onRemove={removerItemModal}
+                        onOpenColorPicker={(idx, mode) => {
+                          void abrirColorPickerItem(idx, true, mode);
+                        }}
+                        activeColorPickerIndex={modalColorPickerIndex}
+                        activeColorPickerMode={modalColorPickerMode}
+                        colorPickerOptions={modalColorPickerOpcoes}
+                        colorPickerLoading={modalColorPickerLoading}
+                        onApplyColor={(idx, produtoComCor) => {
+                          void trocarCorItem(idx, produtoComCor, true);
+                        }}
+                        onCancelColorPicker={() => {
+                          setModalColorPickerIndex(null);
+                          setModalColorPickerMode(null);
+                          setModalColorPickerOpcoes([]);
+                        }}
                       />
                     </div>
                   </div>
@@ -1036,6 +2625,34 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
     );
   }
 
+  if (mode === "saved-purchases") {
+    return (
+      <div className={styles.wrapper}>
+        {notificacao && (
+          <div className={`${styles.toast} ${notificacao.tipo === "error" ? styles.toastError : styles.toastSuccess}`}>
+            <span className={styles.toastIcon}>{notificacao.tipo === "success" ? "✓" : "✕"}</span>
+            {notificacao.mensagem}
+          </div>
+        )}
+        <div className={styles.topBar}>
+          <div>
+            <h1 className={styles.title}>Compras Salvas</h1>
+            <p className={styles.subtitle}>{companyName}</p>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" className={styles.backBtn} onClick={() => setMode("list")}>
+              Ver Listas
+            </button>
+            <button type="button" className={styles.saveBtn} onClick={abrirNovaLista}>
+              + Nova Lista
+            </button>
+          </div>
+        </div>
+        <ComprasSalvasListPanel companyKey={companyKey} companySlug={companySlug} />
+      </div>
+    );
+  }
+
   // ─── Render: list view ───────────────────────────────────────────────────────
 
   return (
@@ -1052,9 +2669,14 @@ export default function ListaLojaPage({ companyKey, companyName }: ListaLojaPage
           <h1 className={styles.title}>Lista Loja</h1>
           <p className={styles.subtitle}>{companyName}</p>
         </div>
-        <button type="button" className={styles.saveBtn} onClick={abrirNovaLista}>
-          + Nova Lista
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" className={styles.backBtn} onClick={() => setMode("saved-purchases")}>
+            Compras Salvas
+          </button>
+          <button type="button" className={styles.saveBtn} onClick={abrirNovaLista}>
+            + Nova Lista
+          </button>
+        </div>
       </div>
 
       {loadingListas ? (

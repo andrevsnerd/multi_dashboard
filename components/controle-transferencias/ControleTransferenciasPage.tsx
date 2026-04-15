@@ -5,38 +5,35 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 import FilialFilter from "@/components/filters/FilialFilter";
-import ControleTransferenciasTable from "@/components/controle-transferencias/ControleTransferenciasTable";
+import ControleTransferenciasTable, {
+  type ControleTransferenciasFilialApi,
+  type ControleTransferenciasPermissao,
+} from "@/components/controle-transferencias/ControleTransferenciasTable";
 import type { ProdutoTransferencia } from "@/lib/repositories/controleTransferencias";
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 import { useAuth } from "@/components/auth/AuthContext";
 
 import styles from "./ControleTransferenciasPage.module.css";
 
-interface TransferenciaPermissao {
-  filiaisOrigem: string[];
-  podeVerOutrasFiliais?: boolean;
-  filialAtribuida?: string | null;
-}
-
-async function fetchPermissoes(username: string): Promise<TransferenciaPermissao | null> {
+async function fetchPermissoes(username: string): Promise<ControleTransferenciasPermissao | null> {
   try {
     const res = await fetch("/api/transferencia-produtos/permissoes", {
       headers: { "x-auth-username": username },
       cache: "no-store",
     });
     if (!res.ok) return null;
-    const json = (await res.json()) as { data: TransferenciaPermissao | null };
+    const json = (await res.json()) as { data: ControleTransferenciasPermissao | null };
     return json.data ?? null;
   } catch {
     return null;
   }
 }
 
-async function fetchFiliais(): Promise<Array<{ codFilial: string; filial: string }>> {
+async function fetchFiliais(): Promise<ControleTransferenciasFilialApi[]> {
   try {
     const res = await fetch("/api/transferencia-produtos/filiais", { cache: "no-store" });
     if (!res.ok) return [];
-    const json = (await res.json()) as { data: Array<{ codFilial: string; filial: string }> };
+    const json = (await res.json()) as { data: ControleTransferenciasFilialApi[] };
     return json.data ?? [];
   } catch {
     return [];
@@ -113,8 +110,8 @@ export default function ControleTransferenciasPage({
   const defaultMatriz = useMemo(() => getDefaultMatriz(companyKey), [companyKey]);
 
   const [selectedFilial, setSelectedFilial] = useState<string | null>(defaultMatriz);
-  const [permissoes, setPermissoes] = useState<TransferenciaPermissao | null>(null);
-  const [filiais, setFiliais] = useState<Array<{ codFilial: string; filial: string }>>([]);
+  const [permissoes, setPermissoes] = useState<ControleTransferenciasPermissao | null>(null);
+  const [filiais, setFiliais] = useState<ControleTransferenciasFilialApi[]>([]);
   const [data, setData] = useState<ProdutoTransferencia[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -259,6 +256,8 @@ export default function ControleTransferenciasPage({
         loading={loading}
         dateRange={range}
         selectedFilial={selectedFilial}
+        permissoes={permissoes}
+        filiaisApi={filiais}
       />
     </div>
   );

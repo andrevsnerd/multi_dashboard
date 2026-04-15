@@ -5899,9 +5899,19 @@ export async function fetchEstoqueProdutoPorFilial({
     request.input('p_produto', sql.VarChar, produtoNorm);
     const corNorm = (corProduto ?? '').trim();
     request.input('p_cor', sql.VarChar, corNorm);
+    const corNormNum = Number.parseInt(corNorm, 10);
+    request.input('p_cor_num', sql.Int, Number.isNaN(corNormNum) ? null : corNormNum);
 
     const estoqueFilialFilter = buildFilialFilter(request, company, filial ?? null, 'e');
-    const corFilter = corProduto != null ? `AND ISNULL(e.COR_PRODUTO, '') = @p_cor` : '';
+    const corFilter = corProduto != null
+      ? `AND (
+          LTRIM(RTRIM(ISNULL(e.COR_PRODUTO, ''))) = @p_cor
+          OR (
+            @p_cor_num IS NOT NULL
+            AND TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(ISNULL(e.COR_PRODUTO, ''))), '')) = @p_cor_num
+          )
+        )`
+      : '';
 
     const query = `
       SELECT
@@ -5910,7 +5920,7 @@ export async function fetchEstoqueProdutoPorFilial({
         SUM(CASE WHEN e.ESTOQUE < 0 THEN e.ESTOQUE ELSE 0 END) AS negativeStock,
         COUNT(CASE WHEN e.ESTOQUE > 0 THEN 1 END) AS positiveCount
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
-      WHERE e.PRODUTO = @p_produto
+      WHERE LTRIM(RTRIM(ISNULL(e.PRODUTO, ''))) = @p_produto
         ${corFilter}
         ${estoqueFilialFilter}
       GROUP BY e.FILIAL
@@ -5944,7 +5954,7 @@ export async function fetchVendasProdutoPorFilial({
   filial?: string | null;
   produto: string;
   corProduto?: string | null;
-}): Promise<Array<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number }>> {
+}): Promise<Array<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number; valor12m: number; custoUnitario: number }>> {
   return withRequest(async (request) => {
     const filialSel = filial ?? null;
     const now = new Date();
@@ -5968,10 +5978,28 @@ export async function fetchVendasProdutoPorFilial({
       !ecommerceFatFilialFilter.includes('1=0');
 
     const corNorm = (corProduto ?? '').trim();
-    const corFilterVf = corProduto != null ? `AND ISNULL(vf.COR_PRODUTO, '') = @vf_cor` : '';
-    const corFilterFp = corProduto != null ? `AND ISNULL(fp.COR_PRODUTO, '') = @vf_cor` : '';
+    const corNormNum = Number.parseInt(corNorm, 10);
+    const corFilterVf = corProduto != null
+      ? `AND (
+          LTRIM(RTRIM(ISNULL(vf.COR_PRODUTO, ''))) = @vf_cor
+          OR (
+            @vf_cor_num IS NOT NULL
+            AND TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(ISNULL(vf.COR_PRODUTO, ''))), '')) = @vf_cor_num
+          )
+        )`
+      : '';
+    const corFilterFp = corProduto != null
+      ? `AND (
+          LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))) = @vf_cor
+          OR (
+            @vf_cor_num IS NOT NULL
+            AND TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))), '')) = @vf_cor_num
+          )
+        )`
+      : '';
     if (corProduto != null) {
       request.input('vf_cor', sql.VarChar, corNorm);
+      request.input('vf_cor_num', sql.Int, Number.isNaN(corNormNum) ? null : corNormNum);
     }
 
     const queryVarejo = `
@@ -5979,8 +6007,11 @@ export async function fetchVendasProdutoPorFilial({
         vf.FILIAL AS filial,
         SUM(CASE WHEN vf.QTDE_CANCELADA = 0 THEN vf.QTDE ELSE 0 END) AS qtde12m,
         SUM(CASE WHEN vf.QTDE_CANCELADA = 0 AND vf.DATA_VENDA >= @vf_inicio60d THEN vf.QTDE ELSE 0 END) AS qtde60d,
-        SUM(CASE WHEN vf.QTDE_CANCELADA = 0 AND vf.DATA_VENDA >= @vf_inicioMesAtual THEN vf.QTDE ELSE 0 END) AS qtdeMesAtual
+        SUM(CASE WHEN vf.QTDE_CANCELADA = 0 AND vf.DATA_VENDA >= @vf_inicioMesAtual THEN vf.QTDE ELSE 0 END) AS qtdeMesAtual,
+        SUM(CASE WHEN vf.QTDE_CANCELADA = 0 THEN (ISNULL(vf.PRECO_LIQUIDO, 0) * vf.QTDE) - ISNULL(vf.DESCONTO_VENDA, 0) ELSE 0 END) AS valor12m,
+        MAX(ISNULL(p.CUSTO_REPOSICAO1, 0)) AS custoUnitario
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vf WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON LTRIM(RTRIM(ISNULL(p.PRODUTO, ''))) = @vf_produto
       WHERE vf.DATA_VENDA >= @vf_inicio12m
         AND vf.DATA_VENDA < @vf_fim
         AND vf.QTDE > 0
@@ -5990,14 +6021,16 @@ export async function fetchVendasProdutoPorFilial({
       GROUP BY vf.FILIAL
     `;
 
-    const result = await request.query<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number | null }>(queryVarejo);
-    const byFilial = new Map<string, { filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number }>();
+    const result = await request.query<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number | null; valor12m: number | null; custoUnitario: number | null }>(queryVarejo);
+    const byFilial = new Map<string, { filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number; valor12m: number; custoUnitario: number }>();
     for (const r of result.recordset) {
       byFilial.set(r.filial, {
         filial: r.filial,
         qtde12m: Math.round(Number(r.qtde12m ?? 0)),
         qtde60d: Math.round(Number(r.qtde60d ?? 0)),
         qtdeMesAtual: Math.round(Number(r.qtdeMesAtual ?? 0)),
+        valor12m: Number(r.valor12m ?? 0),
+        custoUnitario: Number(r.custoUnitario ?? 0),
       });
     }
 
@@ -6007,10 +6040,13 @@ export async function fetchVendasProdutoPorFilial({
           f.FILIAL AS filial,
           SUM(CAST(fp.QTDE AS FLOAT)) AS qtde12m,
           SUM(CASE WHEN f.EMISSAO >= @vf_inicio60d THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS qtde60d,
-          SUM(CASE WHEN f.EMISSAO >= @vf_inicioMesAtual THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS qtdeMesAtual
+          SUM(CASE WHEN f.EMISSAO >= @vf_inicioMesAtual THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS qtdeMesAtual,
+          SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS valor12m,
+          MAX(ISNULL(p.CUSTO_REPOSICAO1, 0)) AS custoUnitario
         FROM FATURAMENTO f WITH (NOLOCK)
         JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
           ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON LTRIM(RTRIM(ISNULL(p.PRODUTO, ''))) = @vf_produto
         WHERE f.EMISSAO >= @vf_inicio12m
           AND f.EMISSAO < @vf_fim
           AND f.NOTA_CANCELADA = 0
@@ -6021,18 +6057,22 @@ export async function fetchVendasProdutoPorFilial({
           ${ecommerceFatFilialFilter}
         GROUP BY f.FILIAL
       `;
-      const ecRes = await request.query<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number | null }>(queryEcommerce);
+      const ecRes = await request.query<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number | null; valor12m: number | null; custoUnitario: number | null }>(queryEcommerce);
       for (const r of ecRes.recordset) {
         const q12 = Math.round(Number(r.qtde12m ?? 0));
         const q60 = Math.round(Number(r.qtde60d ?? 0));
         const qMes = Math.round(Number(r.qtdeMesAtual ?? 0));
+        const val = Number(r.valor12m ?? 0);
+        const custo = Number(r.custoUnitario ?? 0);
         const ex = byFilial.get(r.filial);
         if (ex) {
           ex.qtde12m += q12;
           ex.qtde60d += q60;
           ex.qtdeMesAtual += qMes;
+          ex.valor12m += val;
+          ex.custoUnitario = Math.max(ex.custoUnitario, custo);
         } else {
-          byFilial.set(r.filial, { filial: r.filial, qtde12m: q12, qtde60d: q60, qtdeMesAtual: qMes });
+          byFilial.set(r.filial, { filial: r.filial, qtde12m: q12, qtde60d: q60, qtdeMesAtual: qMes, valor12m: val, custoUnitario: custo });
         }
       }
     }

@@ -20,6 +20,7 @@ export async function GET(request: Request) {
       produto,
       corProduto: corProduto != null ? corProduto : null,
     });
+    // data inclui: filial, qtde12m, qtde60d, qtdeMesAtual, valor12m, custoUnitario
     return NextResponse.json({ data });
   } catch (error) {
     console.error('Erro ao carregar vendas por filial do item', error);

@@ -27,7 +27,7 @@ export default async function ListaLojaRoute({ params }: ListaLojaPageProps) {
     <PageLayout companyName={company.name}>
       <div className={styles.page}>
         <div className={styles.content}>
-          <ListaLojaPage companyKey={company.key} companyName={company.name} />
+          <ListaLojaPage companyKey={company.key} companyName={company.name} companySlug={companySlug} />
         </div>
       </div>
     </PageLayout>

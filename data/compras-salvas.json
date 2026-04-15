@@ -384,5 +384,44 @@
     "comprada": false,
     "savedAt": "2026-04-14T12:15:54.931Z",
     "updatedAt": "2026-04-14T13:57:12.187Z"
+  },
+  {
+    "id": "b9fc1859-83b2-43a2-838b-c50ee20526f5",
+    "companyKey": "nerd",
+    "sourceContextKey": "lista-loja:nerd:__TODAS__:novo",
+    "title": "[Lista Loja] TODAS (visão geral) 15/04/2026 10:58",
+    "expandirPorCor": true,
+    "items": [
+      {
+        "itemKey": "28.K2.04|01",
+        "produto": "28.K2.04",
+        "corProduto": "01",
+        "corDescricao": "BRANCO",
+        "descricao": "SELFIE RING LIGHT TOMATE COM RGB MLG-207",
+        "qtdManual": 7,
+        "custoUnitario": 22
+      },
+      {
+        "itemKey": "N7.11.0031|01",
+        "produto": "N7.11.0031",
+        "corProduto": "01",
+        "corDescricao": "BRANCO",
+        "descricao": "LIQUIDIFICADOR PORTATIL MAZ 007 TOMATE",
+        "qtdManual": 5,
+        "custoUnitario": 66
+      },
+      {
+        "itemKey": "H4.03.0015|06",
+        "produto": "H4.03.0015",
+        "corProduto": "06",
+        "corDescricao": "PRETO",
+        "descricao": "MASSAGEADOR PORTÁTIL TOMATE AM-027",
+        "qtdManual": 4,
+        "custoUnitario": 48
+      }
+    ],
+    "comprada": false,
+    "savedAt": "2026-04-15T13:58:59.454Z",
+    "updatedAt": "2026-04-15T14:05:24.669Z"
   }
 ]

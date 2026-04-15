@@ -5,15 +5,28 @@ import { resolveCompany } from '@/lib/config/company';
 // Lista canônica de filiais do dashboard (NERD + SCARF ME) para garantir que o select
 // mostre as mesmas filiais, incluindo e-commerce (MSC COMERCIO DE LENCOS LT) que
 // não bate no filtro NERD/SCARF/SCARFME.
-function getFiliaisCanonicas(): string[] {
+function getFiliaisCanonicas(companyKey?: string | null): string[] {
+  if (companyKey) {
+    const company = resolveCompany(companyKey);
+    if (company) {
+      const inventory = company.filialFilters.inventory ?? [];
+      const semMatriz = inventory.filter((filial) => {
+        const display = company.filialDisplayNames?.[filial] ?? filial;
+        return display.trim().toUpperCase() !== 'MATRIZ';
+      });
+      return [...new Set(semMatriz)];
+    }
+  }
   const nerd = resolveCompany('nerd')?.filialFilters.inventory ?? [];
   const scarfme = resolveCompany('scarfme')?.filialFilters.inventory ?? [];
   return [...new Set([...nerd, ...scarfme])];
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const filiaisCanonicas = getFiliaisCanonicas();
+    const { searchParams } = new URL(request.url);
+    const company = searchParams.get('company');
+    const filiaisCanonicas = getFiliaisCanonicas(company);
 
     const filiais = await withRequest(async (req) => {
       const query = `
