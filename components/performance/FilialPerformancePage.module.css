@@ -64,6 +64,48 @@
   flex-wrap: wrap;
 }
 
+.compraModeRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -10px 0 20px;
+  flex-wrap: wrap;
+}
+
+.compraCurvasChecks {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.compraCurvaCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+  user-select: none;
+}
+
+.compraCurvaCheck:hover {
+  background: #f8fafc;
+}
+
+.compraCurvaCheck input {
+  width: 14px;
+  height: 14px;
+  accent-color: #263238;
+}
+
 .exportXlsxBtn {
   margin-left: auto;
   padding: 8px 14px;
@@ -702,6 +744,7 @@
 .percBarFillA { background: #22c55e; }
 .percBarFillB { background: #eab308; }
 .percBarFillC { background: #ef4444; }
+.percBarFillCompra { background: #2563eb; }
 
 .percText {
   font-size: 12px;
@@ -814,6 +857,155 @@
   background: #f1f5f9;
   color: #475569;
   font-variant-numeric: tabular-nums;
+}
+
+.cellMetric {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px dotted #cbd5e1;
+  padding-bottom: 1px;
+}
+
+.abcBadgeMini {
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  border: 1px solid transparent;
+}
+
+.abcBadgeA {
+  color: #14532d;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.abcBadgeB {
+  color: #854d0e;
+  background: #fef3c7;
+  border-color: #fcd34d;
+}
+
+.abcBadgeC {
+  color: #9f1239;
+  background: #ffe4e6;
+  border-color: #fda4af;
+}
+
+.abcBadgeEmpty {
+  color: #64748b;
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.reporAdd {
+  color: #0369a1;
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.reporOk {
+  color: #15803d;
+  font-weight: 700;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.reporRuleBadgeS,
+.reporRuleBadgeE {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  vertical-align: middle;
+  cursor: help;
+}
+
+.reporRuleBadgeS {
+  color: #0f172a;
+  background: #fde047;
+  border: 1px solid #facc15;
+}
+
+.reporRuleBadgeE {
+  color: #ffffff;
+  background: #f97316;
+  border: 1px solid #ea580c;
+}
+
+.metricTooltip {
+  position: fixed;
+  z-index: 2000;
+  min-width: 260px;
+  max-width: 360px;
+  background: #0f172a;
+  color: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 14px 40px rgba(2, 6, 23, 0.4);
+  pointer-events: none;
+}
+
+.metricTooltipTitle {
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.metricTooltipMeta {
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.metricTooltipDivider {
+  height: 1px;
+  background: rgba(148, 163, 184, 0.3);
+  margin: 7px 0;
+}
+
+.metricTooltipLine {
+  font-size: 12px;
+  color: #e2e8f0;
+}
+
+.metricTooltipRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: #e2e8f0;
+  margin-top: 3px;
+}
+
+.metricTooltipTotal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(148, 163, 184, 0.45);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.metricTooltipInlineBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #cbd5e1;
 }
 
 /* ── States ── */

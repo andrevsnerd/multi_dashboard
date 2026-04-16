@@ -262,6 +262,7 @@ export interface FilialProdutoSalesRow {
   produto: string;
   descricao: string;
   categoria: string;
+  subgrupo?: string;
   grade: string;
   /** Código de cor (COR_PRODUTO) quando agrupado por cor */
   cor?: string;
@@ -318,6 +319,7 @@ export async function fetchFilialProdutoSales(
     PRODUTO: string;
     DESCRICAO: string;
     CATEGORIA: string;
+    SUBGRUPO?: string;
     GRADE: string;
     CODIGO_BARRA?: string;
     COR_PRODUTO?: string;
@@ -332,6 +334,7 @@ export async function fetchFilialProdutoSales(
       produto: r.PRODUTO?.trim() ?? '',
       descricao: r.DESCRICAO?.trim() ?? '',
       categoria: r.CATEGORIA?.trim() ?? '',
+      subgrupo: r.SUBGRUPO?.trim() ?? '',
       grade: r.GRADE?.trim() ?? '',
       codigoBarra: r.CODIGO_BARRA?.trim() ?? '',
       custo: Number(r.CUSTO_UNIT ?? 0),
@@ -366,6 +369,7 @@ export async function fetchFilialProdutoSales(
           ISNULL(vp.PRODUTO, '') AS PRODUTO,
           UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
           ${categoriaExpr} AS CATEGORIA,
+          MAX(UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, ''))))) AS SUBGRUPO,
           ${gradeExpr} AS GRADE,
           MAX(ISNULL(pbsel.CODIGO_BARRA, '')) AS CODIGO_BARRA,
           ${corSelect}
@@ -417,6 +421,7 @@ export async function fetchFilialProdutoSales(
           ISNULL(fp.PRODUTO, '') AS PRODUTO,
           UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
           ${categoriaExpr} AS CATEGORIA,
+          MAX(UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, ''))))) AS SUBGRUPO,
           ${gradeExpr} AS GRADE,
           MAX(ISNULL(pbsel.CODIGO_BARRA, '')) AS CODIGO_BARRA,
           ${corSelect}

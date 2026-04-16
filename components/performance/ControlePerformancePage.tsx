@@ -108,8 +108,48 @@ function getComparisonBadge(
   return null;
 }
 
-export default function ControlePerformancePage({ companyKey, companyName: _companyName }: Props) {
+function getCombinedCategoryMetrics(
+  categories: Record<string, CategoryData>,
+  keys: string[],
+  totalSales: number
+): { pct: number; deltaPct: number | null; currentSales: number; previousSales: number } | null {
+  if (keys.length === 0 || totalSales <= 0) return null;
+
+  let currentSales = 0;
+  let previousSales = 0;
+  let hasAny = false;
+
+  for (const key of keys) {
+    const category = categories[key];
+    const pct = category?.pct;
+    if (!Number.isFinite(pct)) continue;
+
+    const current = totalSales * (pct / 100);
+    currentSales += current;
+    hasAny = true;
+
+    const deltaPct = category?.deltaPct;
+    if (typeof deltaPct === "number" && Number.isFinite(deltaPct)) {
+      const factor = 1 + (deltaPct / 100);
+      if (factor > 0) {
+        previousSales += current / factor;
+      }
+    }
+  }
+
+  if (!hasAny) return null;
+
+  const pct = (currentSales / totalSales) * 100;
+  const deltaPct = previousSales > 0
+    ? ((currentSales - previousSales) / previousSales) * 100
+    : null;
+
+  return { pct: Math.round(pct), deltaPct, currentSales, previousSales };
+}
+
+export default function ControlePerformancePage({ companyKey, companyName }: Props) {
   const router = useRouter();
+  void companyName;
   const initialRange = useMemo(() => {
     const currentMonth = getCurrentMonthRange();
     return {
@@ -258,6 +298,29 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
     return { totalVendas, totalVendasPrevious, totalQtde, totalMeta, totalProjecao, totalProjecaoPct, categoryAvg };
   }, [data]);
 
+  const totalsOutrosMetrics = useMemo(() => {
+    if (!data || outrosKeys.length === 0) return null;
+    const filiais = data.filiais;
+    const totalCurrentSales = filiais.reduce((sum, row) => sum + row.vendas, 0);
+
+    let currentSales = 0;
+    let previousSales = 0;
+
+    for (const row of filiais) {
+      const metrics = getCombinedCategoryMetrics(row.categories, outrosKeys, row.vendas);
+      if (!metrics) continue;
+      currentSales += metrics.currentSales;
+      previousSales += metrics.previousSales;
+    }
+
+    if (currentSales <= 0) return null;
+
+    return {
+      pct: totalCurrentSales > 0 ? Math.round((currentSales / totalCurrentSales) * 100) : null,
+      deltaPct: previousSales > 0 ? ((currentSales - previousSales) / previousSales) * 100 : null,
+    };
+  }, [data, outrosKeys]);
+
   const sortedFiliais = useMemo(() => {
     if (!data) return [];
     return [...data.filiais].sort((a, b) => {
@@ -379,11 +442,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
 
             const getCardCatPct = (cat: string): number | null => {
               if (cat === OUTROS_LABEL) {
-                const entries = outrosKeys
-                  .map(c => row.categories[c]?.pct)
-                  .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
-                if (entries.length === 0) return null;
-                return Math.round(entries.reduce((s, v) => s + v, 0) / entries.length);
+                return getCombinedCategoryMetrics(row.categories, outrosKeys, row.vendas)?.pct ?? null;
               }
               const v = row.categories[cat]?.pct;
               return typeof v === "number" && Number.isFinite(v) ? Math.round(v) : null;
@@ -391,11 +450,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
 
             const getCardCatDelta = (cat: string): number | null => {
               if (cat === OUTROS_LABEL) {
-                const deltas = outrosKeys
-                  .map(c => row.categories[c]?.deltaPct)
-                  .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
-                if (deltas.length === 0) return null;
-                return deltas.reduce((s, v) => s + v, 0) / deltas.length;
+                return getCombinedCategoryMetrics(row.categories, outrosKeys, row.vendas)?.deltaPct ?? null;
               }
               const d = row.categories[cat]?.deltaPct;
               return typeof d === "number" && Number.isFinite(d) ? d : null;
@@ -659,12 +714,7 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
                 {(() => {
                   const getDisplayedPct = (cat: string): number | null => {
                     if (cat === OUTROS_LABEL) {
-                      const entries = outrosKeys
-                        .map(c => totals.categoryAvg[c]?.pct)
-                        .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
-                      if (entries.length === 0) return null;
-                      const avg = entries.reduce((s, v) => s + v, 0) / entries.length;
-                      return Math.round(avg);
+                      return totalsOutrosMetrics?.pct ?? null;
                     }
                     const v = totals.categoryAvg[cat]?.pct;
                     return typeof v === "number" && Number.isFinite(v) ? Math.round(v) : null;
@@ -674,18 +724,9 @@ export default function ControlePerformancePage({ companyKey, companyName: _comp
 
                   return displayedCategories.map(cat => {
                     if (cat === OUTROS_LABEL) {
-                      const selected = outrosKeys
-                        .map(c => totals.categoryAvg[c])
-                        .filter((v): v is { pct: number; deltaPct: number | null } => !!v);
-                      if (selected.length === 0) return <td key={cat} className={styles.tdCat}>—</td>;
-
                       const displayedPct = getDisplayedPct(OUTROS_LABEL);
-                      const selectedDeltaPcts = selected
-                        .map(v => v.deltaPct)
-                        .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
-                      const deltaPct = selectedDeltaPcts.length > 0
-                        ? selectedDeltaPcts.reduce((s, v) => s + v, 0) / selectedDeltaPcts.length
-                        : null;
+                      const deltaPct = totalsOutrosMetrics?.deltaPct ?? null;
+                      if (displayedPct === null && deltaPct === null) return <td key={cat} className={styles.tdCat}>—</td>;
                       const isPositive = (deltaPct ?? 0) >= 0;
                       const isMax = extremes.max !== null && displayedPct !== null && displayedPct === extremes.max;
                       const isMin = extremes.min !== null && displayedPct !== null && displayedPct === extremes.min;
