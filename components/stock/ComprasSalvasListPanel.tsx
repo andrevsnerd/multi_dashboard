@@ -44,9 +44,11 @@ function fmtHora(iso: string) {
 export default function ComprasSalvasListPanel({
   companyKey,
   companySlug,
+  source = "lista-compra",
 }: {
   companyKey: CompanyKey;
   companySlug: string;
+  source?: "lista-compra" | "lista-loja";
 }) {
   const [items, setItems] = useState<CompraSalvaListEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,6 +154,7 @@ export default function ComprasSalvasListPanel({
   );
 
   const base = `/${companySlug}/controle-estoque/projecao/lista-compra/compras-salvas`;
+  const detailQuery = source === "lista-loja" ? "?from=lista-loja" : "";
 
   return (
     <div className={styles.wrapper}>
@@ -219,7 +222,7 @@ export default function ComprasSalvasListPanel({
           {filtered.map((it) => (
             <Link
               key={it.id}
-              href={`${base}/${it.id}`}
+              href={`${base}/${it.id}${detailQuery}`}
               className={`${styles.card} ${it.comprada ? styles.cardComprada : ""}`}
             >
               <div className={styles.cardMain}>

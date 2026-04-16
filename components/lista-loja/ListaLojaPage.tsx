@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthContext";
 import ComprasSalvasListPanel from "@/components/stock/ComprasSalvasListPanel";
 import { type CompanyKey } from "@/lib/config/company";
@@ -1543,8 +1544,10 @@ function ListaLojaItensTable({
 
 export default function ListaLojaPage({ companyKey, companyName, companySlug }: ListaLojaPageProps) {
   const { user, isLoading: authLoading } = useAuth();
+  const searchParams = useSearchParams();
+  const initialMode: Mode = searchParams.get("view") === "compras-salvas" ? "saved-purchases" : "list";
 
-  const [mode, setMode] = useState<Mode>("list");
+  const [mode, setMode] = useState<Mode>(initialMode);
 
   // Lists view
   const [listas, setListas] = useState<ListaLoja[]>([]);
@@ -2840,7 +2843,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             </button>
           </div>
         </div>
-        <ComprasSalvasListPanel companyKey={companyKey} companySlug={companySlug} />
+        <ComprasSalvasListPanel companyKey={companyKey} companySlug={companySlug} source="lista-loja" />
       </div>
     );
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 // @ts-ignore
 import * as XLSX from "xlsx";
@@ -239,6 +239,11 @@ export default function CompraSalvaDetalhePage({
   compraId: string;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromListaLoja = searchParams.get("from") === "lista-loja";
+  const listBack = fromListaLoja
+    ? `/${companySlug}/lista-loja?view=compras-salvas`
+    : `/${companySlug}/controle-estoque/projecao/lista-compra?tab=compras-salvas`;
   const [doc, setDoc] = useState<CompraSalva | null>(null);
   const [items, setItems] = useState<CompraSalvaItemRow[]>([]);
   const [titleEdit, setTitleEdit] = useState("");
@@ -510,7 +515,7 @@ export default function CompraSalvaDetalhePage({
     params.set("company", companyKey);
     const res = await fetch(`/api/controle-estoque/compras-salvas/${compraId}?${params}`, { method: "DELETE" });
     if (res.ok) {
-      router.push(`/${companySlug}/controle-estoque/projecao/lista-compra?tab=compras-salvas`);
+      router.push(listBack);
     }
   };
 
@@ -628,8 +633,6 @@ export default function CompraSalvaDetalhePage({
       setExportingPdf(false);
     }
   };
-
-  const listBack = `/${companySlug}/controle-estoque/projecao/lista-compra?tab=compras-salvas`;
 
   return (
     <div className={styles.wrapper}>
