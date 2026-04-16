@@ -266,6 +266,7 @@ export interface FilialProdutoSalesRow {
   /** Código de cor (COR_PRODUTO) quando agrupado por cor */
   cor?: string;
   corDescricao?: string;
+  codigoBarra?: string;
   vendas: number;
   qtde: number;
   custo: number;
@@ -318,6 +319,7 @@ export async function fetchFilialProdutoSales(
     DESCRICAO: string;
     CATEGORIA: string;
     GRADE: string;
+    CODIGO_BARRA?: string;
     COR_PRODUTO?: string;
     COR_DESCRICAO?: string;
     CUSTO_UNIT: number;
@@ -331,6 +333,7 @@ export async function fetchFilialProdutoSales(
       descricao: r.DESCRICAO?.trim() ?? '',
       categoria: r.CATEGORIA?.trim() ?? '',
       grade: r.GRADE?.trim() ?? '',
+      codigoBarra: r.CODIGO_BARRA?.trim() ?? '',
       custo: Number(r.CUSTO_UNIT ?? 0),
       vendas: Math.round(Number(r.VENDAS ?? 0)),
       qtde: Math.round(Number(r.QTDE ?? 0)),
@@ -364,12 +367,22 @@ export async function fetchFilialProdutoSales(
           UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
           ${categoriaExpr} AS CATEGORIA,
           ${gradeExpr} AS GRADE,
+          MAX(ISNULL(pbsel.CODIGO_BARRA, '')) AS CODIGO_BARRA,
           ${corSelect}
           ISNULL(p.CUSTO_REPOSICAO1, 0) AS CUSTO_UNIT,
           SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS QTDE,
           SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) AS VENDAS
         FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
         LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO
+        OUTER APPLY (
+          SELECT TOP 1 pb.CODIGO_BARRA
+          FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+          WHERE pb.PRODUTO = vp.PRODUTO
+            AND pb.CODIGO_BARRA IS NOT NULL
+            AND pb.CODIGO_BARRA <> ''
+            ${groupByCor ? "AND ISNULL(pb.COR_PRODUTO, '') = ISNULL(vp.COR_PRODUTO, '')" : ''}
+          ORDER BY pb.CODIGO_BARRA
+        ) pbsel
         ${corJoin}
         WHERE vp.DATA_VENDA >= @${prefix}Start
           AND vp.DATA_VENDA < @${prefix}End
@@ -405,6 +418,7 @@ export async function fetchFilialProdutoSales(
           UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
           ${categoriaExpr} AS CATEGORIA,
           ${gradeExpr} AS GRADE,
+          MAX(ISNULL(pbsel.CODIGO_BARRA, '')) AS CODIGO_BARRA,
           ${corSelect}
           ISNULL(p.CUSTO_REPOSICAO1, 0) AS CUSTO_UNIT,
           SUM(CASE WHEN fp.QTDE > 0 THEN fp.QTDE ELSE 0 END) AS QTDE,
@@ -413,6 +427,14 @@ export async function fetchFilialProdutoSales(
         JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
           ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
         LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
+        OUTER APPLY (
+          SELECT TOP 1 pb.CODIGO_BARRA
+          FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+          WHERE pb.PRODUTO = fp.PRODUTO
+            AND pb.CODIGO_BARRA IS NOT NULL
+            AND pb.CODIGO_BARRA <> ''
+          ORDER BY pb.CODIGO_BARRA
+        ) pbsel
         ${corJoin}
         WHERE CAST(f.EMISSAO AS DATE) >= CAST(@${prefix}EcomStart AS DATE)
           AND CAST(f.EMISSAO AS DATE) < CAST(@${prefix}EcomEnd AS DATE)

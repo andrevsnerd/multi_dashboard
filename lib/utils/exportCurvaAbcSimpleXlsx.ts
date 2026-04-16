@@ -1,4 +1,3 @@
-// @ts-ignore - xlsx tipos incompletos
 import * as XLSX from "xlsx";
 import type { CompanyKey } from "@/lib/config/company";
 
@@ -7,6 +6,7 @@ export interface CurvaAbcSimpleXlsxRow {
   Curva: string;
   Descrição: string;
   Código: string;
+  "Codigo de Barras": string;
   Categoria: string;
   Grade: string;
   Cor: string;

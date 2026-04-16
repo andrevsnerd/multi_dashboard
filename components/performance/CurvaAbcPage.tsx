@@ -32,6 +32,7 @@ interface ProdutoRow {
   grade?: string;
   cor?: string;
   corDescricao?: string;
+  codigoBarra?: string;
   vendas: number;
   qtde: number;
   custo: number;
@@ -339,6 +340,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
           Curva: curva,
           Descrição: p.descricao || p.produto,
           Código: p.produto,
+          "Codigo de Barras": p.codigoBarra || "",
           Categoria: p.categoria ? getCategoryHeaderLabel(p.categoria) : "",
           Grade: companyKey === "scarfme" ? (p.grade ?? "") : "",
           Cor: porCor ? (p.corDescricao || p.cor || "") : "",
@@ -702,12 +704,20 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                                       );
                                     })()}
                                   </div>
-                                  {((p.descricao && p.produto !== p.descricao) || p.categoria) && (
+                                  {((p.descricao && p.produto !== p.descricao) || p.categoria || p.codigoBarra) && (
                                     <div className={styles.productMeta}>
-                                      {p.descricao && p.produto !== p.descricao && (
+                                      {((p.descricao && p.produto !== p.descricao) || p.codigoBarra) && (
                                         <span className={styles.productCode}>{p.produto}</span>
                                       )}
-                                      {p.descricao && p.produto !== p.descricao && p.categoria && (
+                                      {((p.descricao && p.produto !== p.descricao) || p.codigoBarra) && p.codigoBarra && (
+                                        <span className={styles.productMetaSeparator}>|</span>
+                                      )}
+                                      {p.codigoBarra && (
+                                        <span className={styles.productCategoria}>
+                                          CB: {p.codigoBarra}
+                                        </span>
+                                      )}
+                                      {((p.descricao && p.produto !== p.descricao) || p.codigoBarra) && p.categoria && (
                                         <span className={styles.productMetaSeparator}>|</span>
                                       )}
                                       {p.categoria && (
