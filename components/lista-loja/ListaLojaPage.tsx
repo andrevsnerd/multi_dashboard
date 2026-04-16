@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthContext";
 import ComprasSalvasListPanel from "@/components/stock/ComprasSalvasListPanel";
 import { type CompanyKey } from "@/lib/config/company";
+import { exportListaLojaToXlsx } from "@/lib/utils/exportListaLoja";
 import type { CompraSalvaItemRow } from "@/lib/types/compra-salva";
 
 import styles from "./ListaLojaPage.module.css";
@@ -418,6 +419,163 @@ function getSuggestedQtyValue(item: ListaItem, diasCorridosMes: number): number 
   if (sugestao.qtdS > 0) return sugestao.qtdS;
   if (sugestao.qtdE > 0) return sugestao.qtdE;
   return 0;
+}
+
+function itemTemSugestaoCompra(item: ListaItem, diasCorridosMes: number): boolean {
+  const sugestao = getReposicaoCompraView(item, diasCorridosMes);
+  return sugestao.qtdFinal > 0 || sugestao.qtdS > 0 || sugestao.qtdE > 0;
+}
+
+function itemEhBarrado(item: ListaItem, diasCorridosMes: number): boolean {
+  const sugestao = getReposicaoCompraView(item, diasCorridosMes);
+  return (
+    sugestao.qtdFinal === 0 &&
+    sugestao.qtdS === 0 &&
+    sugestao.qtdE === 0 &&
+    (sugestao.qtdSuficiente || sugestao.semSugestao)
+  );
+}
+
+function formatFixed(value: number, digits = 1): string {
+  if (!Number.isFinite(value)) return "0";
+  return value.toLocaleString("pt-BR", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
+function formatMaybe(value: number | null | undefined, digits = 1): string {
+  if (value == null || !Number.isFinite(value)) return "0";
+  return formatFixed(value, digits);
+}
+
+function buildFinalBlockReason(duracaoAtual: number, limiteDias: number): string {
+  return `Duração atual de ${Math.round(duracaoAtual)} dias não ficou abaixo do limite de ${limiteDias} dias.`;
+}
+
+function buildSBlockReason(mediaVendasMes: number, estoqueAtual: number): string {
+  if (mediaVendasMes < 1) {
+    return `Média mensal de ${formatFixed(mediaVendasMes)} un./mês ficou abaixo do mínimo de 1,0 un./mês.`;
+  }
+  return `Estoque atual de ${Math.round(estoqueAtual)} un. ficou acima de 2x a média mensal (${formatFixed(mediaVendasMes * 2)} un.).`;
+}
+
+function buildEBlockReason(
+  item: ListaItem,
+  mesesSemVenda: number | null,
+  mesesAtivos: number | null,
+  velocidadeAjustada: number | null,
+  estoqueAtual: number
+): string {
+  const qtde12m = Number(item.qtde12m ?? 0);
+  if (qtde12m <= 0) {
+    return "Não houve vendas nos últimos 12 meses, então não há base para sugestão E.";
+  }
+  if (item.diasDesdeUltimaVenda != null && item.diasDesdeUltimaVenda < 30) {
+    return `Última venda há ${Math.round(item.diasDesdeUltimaVenda)} dias, abaixo do mínimo de 30 dias para considerar item estagnado.`;
+  }
+  if (mesesAtivos != null && mesesAtivos < 1) {
+    return `Período ativo estimado de ${formatMaybe(mesesAtivos)} meses ficou abaixo do mínimo de 1,0 mês.`;
+  }
+  if (velocidadeAjustada != null && velocidadeAjustada < 0.5) {
+    return `Velocidade ajustada de ${formatMaybe(velocidadeAjustada)} un./mês ficou abaixo do corte de 0,5 un./mês.`;
+  }
+  if (estoqueAtual > 0) {
+    return `Estoque atual de ${Math.round(estoqueAtual)} un. ainda existe, então o item não entrou como E.`;
+  }
+  if (mesesSemVenda != null) {
+    return `Item parado há cerca de ${formatMaybe(mesesSemVenda)} meses, mas não passou no conjunto completo de critérios para sugestão E.`;
+  }
+  return "Não passou nos critérios de sugestão E com os dados atuais.";
+}
+
+function buildListaLojaExportRow(item: ListaItem, diasCorridosMes: number): Record<string, string | number | boolean | null> {
+  const sugestao = getReposicaoCompraView(item, diasCorridosMes);
+  const estoqueAtual = Number(item.estoqueFilial ?? 0);
+  const vendasMesAtual = Number(item.vendasMesAtual ?? 0);
+  const consumoDiario = diasCorridosMes > 0 ? vendasMesAtual / diasCorridosMes : 0;
+  const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
+  const limiteDias = getLimiteDiasReposicao(item);
+  const mediaVendasMes = Number(item.qtde12m ?? 0) / 12;
+  const mesesSemVenda = item.diasDesdeUltimaVenda != null ? item.diasDesdeUltimaVenda / 30 : null;
+  const mesesAtivos = mesesSemVenda != null ? 12 - mesesSemVenda : null;
+  const velocidadeAjustada = mesesAtivos != null && mesesAtivos > 0 ? Number(item.qtde12m ?? 0) / mesesAtivos : null;
+  const qtdCalculada = sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS > 0 ? sugestao.qtdS : sugestao.qtdE;
+  const status = qtdCalculada > 0 ? "Sugerido" : "Barrado";
+  const tipo = sugestao.qtdFinal > 0
+    ? "Final"
+    : sugestao.qtdS > 0
+      ? "S"
+      : sugestao.qtdE > 0
+        ? "E"
+        : sugestao.qtdSuficiente
+          ? "Suficiente"
+          : "Sem sugestão";
+
+  let regra = "";
+  let resumo = "";
+
+  if (sugestao.qtdFinal > 0) {
+    regra = "Consumo diário = vendas do mês atual / dias corridos. Se a duração atual fica abaixo do limite, a compra cobre a diferença.";
+    resumo = `Sugestão final de compra de ${qtdCalculada} un. porque a duração atual é ${Math.round(duracaoAtual)} dias, abaixo do limite de ${limiteDias} dias.`;
+  } else if (sugestao.qtdS > 0) {
+    regra = `Qtd S = teto((limite de ${limiteDias} dias / 30) x média mensal).`;
+    resumo = `Sugestão S de ${qtdCalculada} un. com base na média de ${formatFixed(mediaVendasMes)} un./mês e no limite de ${limiteDias} dias.`;
+  } else if (sugestao.qtdE > 0) {
+    regra = "Qtd E = teto((limite de reposição em meses x velocidade ajustada)).";
+    resumo = `Sugestão E de ${qtdCalculada} un. porque o item ficou cerca de ${formatFixed(mesesSemVenda ?? 0, 1)} meses sem venda e a velocidade ajustada é ${formatFixed(velocidadeAjustada ?? 0)} un./mês.`;
+  } else if (sugestao.qtdSuficiente) {
+    regra = `Estoque atual já cobre o limite de ${limiteDias} dias.`;
+    resumo = `Barrado porque o estoque atual já cobre o limite de ${limiteDias} dias.`;
+  } else {
+    regra = "Não houve sugestão calculada com os dados atuais.";
+    resumo = "Barrado porque os dados atuais não geraram sugestão de compra.";
+  }
+
+  return {
+    PRODUTO: item.produto,
+    DESC_PRODUTO: item.descProduto,
+    CODIGO_BARRA: item.codigoBarra || "",
+    COR_PRODUTO: item.corProduto || "",
+    DESC_COR: item.descCor || "",
+    QUANTIDADE: Math.max(0, Math.round(item.quantidade ?? 0)),
+    QTDE_12M: item.qtde12m ?? null,
+    VALOR_12M: item.valor12m ?? null,
+    QTDE_60D: item.qtde60d ?? null,
+    VENDAS_MES_ATUAL: item.vendasMesAtual ?? null,
+    CUSTO_UNIT: item.custoUnit ?? null,
+    ESTOQUE_FILIAL: item.estoqueFilial ?? null,
+    DIAS_DESDE_ULTIMA_VENDA: item.diasDesdeUltimaVenda ?? null,
+    LINHA: item.linha || "",
+    SUBGRUPO: item.subgrupo || "",
+    STATUS: status,
+    TIPO_SUGESTAO: tipo,
+    REGRA_REPOSICAO: regra,
+    LIMITE_DIAS: limiteDias,
+    VENDAS_MES: vendasMesAtual,
+    DIAS_CORRIDOS: diasCorridosMes,
+    CONSUMO_DIARIO: Number.isFinite(consumoDiario) ? consumoDiario : null,
+    ESTOQUE_ATUAL: estoqueAtual,
+    DURACAO_ATUAL: Number.isFinite(duracaoAtual) ? duracaoAtual : null,
+    QTD_CALCULADA: qtdCalculada > 0 ? qtdCalculada : null,
+    MEDIA_VENDAS_MES: mediaVendasMes,
+    MESES_SEM_VENDA: mesesSemVenda,
+    MESES_ATIVOS: mesesAtivos,
+    VELOCIDADE_AJUSTADA: velocidadeAjustada,
+    QTD_S: sugestao.qtdS > 0 ? sugestao.qtdS : null,
+    QTD_E: sugestao.qtdE > 0 ? sugestao.qtdE : null,
+    QTD_SUFICIENTE: sugestao.qtdSuficiente ? "Sim" : "Não",
+    SEM_SUGESTAO: sugestao.semSugestao ? "Sim" : "Não",
+    FALHA_FINAL: status === "Barrado" ? buildFinalBlockReason(duracaoAtual, limiteDias) : "",
+    FALHA_S: status === "Barrado" ? buildSBlockReason(mediaVendasMes, estoqueAtual) : "",
+    FALHA_E: status === "Barrado" ? buildEBlockReason(item, mesesSemVenda, mesesAtivos, velocidadeAjustada, estoqueAtual) : "",
+    MOTIVO_BARRADO: status === "Barrado"
+      ? `Barrado porque ${buildFinalBlockReason(duracaoAtual, limiteDias)} ${buildSBlockReason(mediaVendasMes, estoqueAtual)} ${buildEBlockReason(item, mesesSemVenda, mesesAtivos, velocidadeAjustada, estoqueAtual)}`
+      : "",
+    RESUMO: status === "Barrado"
+      ? `Barrado. Final: ${buildFinalBlockReason(duracaoAtual, limiteDias)} S: ${buildSBlockReason(mediaVendasMes, estoqueAtual)} E: ${buildEBlockReason(item, mesesSemVenda, mesesAtivos, velocidadeAjustada, estoqueAtual)}`
+      : resumo,
+  };
 }
 
 function calcularCurvasRede(itens: ListaItem[]): Map<string, CurvaInfo> {
@@ -1591,6 +1749,9 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
   const [modalColorPickerMode, setModalColorPickerMode] = useState<"replace" | "add" | null>(null);
   const [modalColorPickerOpcoes, setModalColorPickerOpcoes] = useState<Produto[]>([]);
   const [modalColorPickerLoading, setModalColorPickerLoading] = useState(false);
+  const [exportandoXlsx, setExportandoXlsx] = useState(false);
+  const [filtrarSugeridos, setFiltrarSugeridos] = useState(false);
+  const [filtrarBarrados, setFiltrarBarrados] = useState(false);
   const [permissoes, setPermissoes] = useState<TransferenciaPermissao | null>(null);
   const [permissoesCarregadas, setPermissoesCarregadas] = useState(false);
   const filialConsultaSelecionada =
@@ -2314,7 +2475,16 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
   // ─── Save ───────────────────────────────────────────────────────────────────
 
   const enviarParaComprasSalvas = useCallback(async (customTitle?: string, stayInEditor: boolean = false) => {
-    if (itens.length === 0) {
+    const diasCorridosMesLocal = new Date().getDate();
+    const itensBase = itens.filter((item) => {
+      if (!filtrarSugeridos && !filtrarBarrados) return true;
+      const sugerido = itemTemSugestaoCompra(item, diasCorridosMesLocal);
+      const barrado = itemEhBarrado(item, diasCorridosMesLocal);
+      if (filtrarSugeridos && filtrarBarrados) return sugerido || barrado;
+      if (filtrarSugeridos) return sugerido;
+      return barrado;
+    });
+    if (itensBase.length === 0) {
       mostrarNotificacao("Adicione pelo menos um produto para enviar", "error");
       return;
     }
@@ -2323,7 +2493,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     const sourceContextKey = `lista-loja:${companyKey}:${filialCtx}:${editingId ?? "novo"}`;
     const titleBase = nomeLista.trim() || buildDefaultListName(filialSelecionada?.filial || "Lista Loja");
     const title = `[Lista Loja] ${appendUserToListName(customTitle?.trim() || titleBase, username)}`;
-    const payloadItems: CompraSalvaItemRow[] = itens.map((it) => ({
+    const payloadItems: CompraSalvaItemRow[] = itensBase.map((it) => ({
       itemKey: buildItemKey(it.produto, it.corProduto),
       produto: it.produto,
       corProduto: it.corProduto ?? undefined,
@@ -2352,11 +2522,20 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     } catch (err: unknown) {
       mostrarNotificacao(err instanceof Error ? err.message : "Erro ao enviar para Compras Salvas", "error");
     }
-  }, [companyKey, editingId, filialSelecionada, itens, mostrarNotificacao, nomeLista, user?.username]);
+  }, [companyKey, editingId, filtrarBarrados, filtrarSugeridos, filialSelecionada, itens, mostrarNotificacao, nomeLista, user?.username]);
 
   const salvar = useCallback(async () => {
     if (!user?.username) return;
-    if (itens.length === 0) { mostrarNotificacao("Adicione pelo menos um produto", "error"); return; }
+    const diasCorridosMesLocal = new Date().getDate();
+    const itensBase = itens.filter((item) => {
+      if (!filtrarSugeridos && !filtrarBarrados) return true;
+      const sugerido = itemTemSugestaoCompra(item, diasCorridosMesLocal);
+      const barrado = itemEhBarrado(item, diasCorridosMesLocal);
+      if (filtrarSugeridos && filtrarBarrados) return sugerido || barrado;
+      if (filtrarSugeridos) return sugerido;
+      return barrado;
+    });
+    if (itensBase.length === 0) { mostrarNotificacao("Adicione pelo menos um produto", "error"); return; }
 
     setSalvando(true);
     try {
@@ -2369,7 +2548,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
           filial: "LISTA_LOJA",
           nomeFilial: "Lista Loja",
           company: companyKey,
-          itens,
+          itens: itensBase,
         },
         user.username
       );
@@ -2382,7 +2561,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     } finally {
       setSalvando(false);
     }
-  }, [user?.username, nomeLista, filialSelecionada?.filial, itens, editingId, companyKey, mostrarNotificacao, enviarParaComprasSalvas]);
+  }, [companyKey, editingId, filtrarBarrados, filtrarSugeridos, filialSelecionada?.filial, itens, mostrarNotificacao, nomeLista, user?.username, enviarParaComprasSalvas]);
 
   // ─── Delete ─────────────────────────────────────────────────────────────────
 
@@ -2409,16 +2588,43 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     return new Set(itensModal.map((i) => buildItemKey(i.produto, i.corProduto)));
   }, [itensModal]);
 
-  const totalItens = itens.reduce((s, i) => s + i.quantidade, 0);
   const totalItensModal = itensModal.reduce((s, i) => s + i.quantidade, 0);
+  const diasCorridosMes = new Date().getDate();
+  const filtrosAtivos = filtrarSugeridos || filtrarBarrados;
+  const itensVisiveis = useMemo(() => {
+    return itens.filter((item) => {
+      if (!filtrosAtivos) return true;
+      const sugerido = itemTemSugestaoCompra(item, diasCorridosMes);
+      const barrado = itemEhBarrado(item, diasCorridosMes);
+      if (filtrarSugeridos && filtrarBarrados) return sugerido || barrado;
+      if (filtrarSugeridos) return sugerido;
+      if (filtrarBarrados) return barrado;
+      return true;
+    });
+  }, [diasCorridosMes, filtrarBarrados, filtrarSugeridos, filtrosAtivos, itens]);
+  const indicesItensVisiveis = useMemo(
+    () =>
+      itens
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => {
+          if (!filtrosAtivos) return true;
+          const sugerido = itemTemSugestaoCompra(item, diasCorridosMes);
+          const barrado = itemEhBarrado(item, diasCorridosMes);
+          if (filtrarSugeridos && filtrarBarrados) return sugerido || barrado;
+          if (filtrarSugeridos) return sugerido;
+          if (filtrarBarrados) return barrado;
+          return true;
+        })
+        .map(({ index }) => index),
+    [diasCorridosMes, filtrarBarrados, filtrarSugeridos, filtrosAtivos, itens]
+  );
   const kpisLista = useMemo(() => {
-    const diasCorridosMes = new Date().getDate();
-    const totalQtdSugerida = itens.reduce((s, item) => {
+    const totalQtdSugerida = itensVisiveis.reduce((s, item) => {
       const sugestao = getReposicaoCompraView(item, diasCorridosMes);
       const qtd = sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS > 0 ? sugestao.qtdS : sugestao.qtdE;
       return s + Math.max(0, qtd);
     }, 0);
-    const totalCustoReferencia = itens.reduce((s, item) => {
+    const totalCustoReferencia = itensVisiveis.reduce((s, item) => {
       const custoUnit = Number(item.custoUnit ?? 0);
       if (custoUnit <= 0) return s;
       const sugestao = getReposicaoCompraView(item, diasCorridosMes);
@@ -2427,15 +2633,57 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
       return s + qtd * custoUnit;
     }, 0);
     return {
-      totalItens: itens.length,
+      totalItens: itensVisiveis.length,
       totalQtdSugerida,
       totalCustoReferencia,
     };
-  }, [itens]);
-  const abcMapRede = useMemo(() => calcularCurvasRede(itens), [itens]);
+  }, [diasCorridosMes, itensVisiveis]);
+  const abcMapRede = useMemo(() => calcularCurvasRede(itensVisiveis), [itensVisiveis]);
   const abcMapModal = useMemo(() => calcularCurvasRede(itensModal), [itensModal]);
 
   // ─── Render: loading ────────────────────────────────────────────────────────
+
+  const filtroAplicadoLabel = filtrarSugeridos && filtrarBarrados
+    ? "Sugeridos e barrados"
+    : filtrarSugeridos
+      ? "Sugeridos"
+      : filtrarBarrados
+        ? "Barrados"
+        : "Todos";
+
+  const exportarListaXlsx = useCallback(async () => {
+    if (itensVisiveis.length === 0) {
+      mostrarNotificacao("Adicione itens para exportar", "error");
+      return;
+    }
+
+    setExportandoXlsx(true);
+    try {
+      const rows = itensVisiveis.map((item) => buildListaLojaExportRow(item, diasCorridosMes));
+      exportListaLojaToXlsx({
+        companyKey,
+        companyName,
+        listaNome: nomeLista.trim() || buildDefaultListName(filialSelecionada?.filial || "Lista Loja"),
+        filialNome: filialSelecionada?.filial ?? null,
+        filtroAplicado: filtroAplicadoLabel,
+        rows,
+      });
+      mostrarNotificacao("XLSX exportado com sucesso!");
+    } catch (err: unknown) {
+      mostrarNotificacao(err instanceof Error ? err.message : "Erro ao exportar XLSX", "error");
+    } finally {
+      setExportandoXlsx(false);
+    }
+  }, [
+    companyKey,
+    companyName,
+    diasCorridosMes,
+    filtroAplicadoLabel,
+    filialSelecionada?.filial,
+    itensVisiveis,
+    mostrarNotificacao,
+    nomeLista,
+  ]);
 
   if (!permissoesCarregadas) {
     return (
@@ -2448,6 +2696,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
   // ─── Render: editor ─────────────────────────────────────────────────────────
 
   if (mode === "editor") {
+    const itensParaAcao = filtrosAtivos ? itensVisiveis : itens;
     return (
       <div className={styles.wrapper}>
         {/* Toast */}
@@ -2470,12 +2719,23 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button
               type="button"
+              className={styles.exportXlsxBtn}
+              onClick={() => {
+                void exportarListaXlsx();
+              }}
+              disabled={itensVisiveis.length === 0 || exportandoXlsx}
+              title={itensVisiveis.length === 0 ? "Adicione itens para exportar" : "Exportar a lista atual para XLSX"}
+            >
+              {exportandoXlsx ? "Exportando XLSX..." : "Exportar XLSX"}
+            </button>
+            <button
+              type="button"
               className={styles.backBtn}
               onClick={() => {
                 void enviarParaComprasSalvas();
               }}
-              disabled={itens.length === 0}
-              title={itens.length === 0 ? "Adicione itens para enviar" : "Enviar para Compras Salvas"}
+              disabled={itensParaAcao.length === 0}
+              title={itensParaAcao.length === 0 ? "Adicione itens para enviar" : "Enviar para Compras Salvas"}
             >
               Enviar para Compras Salvas
             </button>
@@ -2520,11 +2780,14 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
 
         {/* Produtos da lista (sem card; scroll da página) */}
         <div className={styles.produtosSection}>
-          {itens.length > 0 && (
+          {itensParaAcao.length > 0 && (
             <div className={styles.kpiCard}>
               <div className={styles.kpiItem}>
                 <span className={styles.kpiLabel}>Itens</span>
-                <strong className={styles.kpiValueNeutral}>{kpisLista.totalItens}</strong>
+                <strong className={styles.kpiValueNeutral}>
+                  {kpisLista.totalItens}
+                  {filtrosAtivos ? ` / ${itens.length}` : ""}
+                </strong>
               </div>
               <div className={styles.kpiDivider} />
               <div className={styles.kpiItem}>
@@ -2538,6 +2801,36 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
               </div>
             </div>
           )}
+          <div className={styles.filtroRow}>
+            <label className={styles.filtroToggle}>
+              <input
+                type="checkbox"
+                checked={filtrarSugeridos}
+                onChange={(e) => setFiltrarSugeridos(e.target.checked)}
+              />
+              <span>Sugeridos</span>
+            </label>
+            <label className={styles.filtroToggle}>
+              <input
+                type="checkbox"
+                checked={filtrarBarrados}
+                onChange={(e) => setFiltrarBarrados(e.target.checked)}
+              />
+              <span>Barrados</span>
+            </label>
+            {filtrosAtivos && (
+              <button
+                type="button"
+                className={styles.filtroClearBtn}
+                onClick={() => {
+                  setFiltrarSugeridos(false);
+                  setFiltrarBarrados(false);
+                }}
+              >
+                Limpar filtros
+              </button>
+            )}
+          </div>
           {itens.length === 0 ? (
             <div className={styles.emptyProducts}>
               <div className={styles.emptyProductsIcon}>
@@ -2549,33 +2842,53 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
               <div className={styles.emptyProductsTitle}>Nenhum produto adicionado</div>
               <div className={styles.emptyProductsSub}>Clique em &ldquo;Adicionar Produto&rdquo; para começar</div>
             </div>
+          ) : itensVisiveis.length === 0 ? (
+            <div className={styles.emptyProducts}>
+              <div className={styles.emptyProductsIcon}>
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2 20 6.5v11L12 22l-8-4.5v-11L12 2Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                  <path d="M20 6.5 12 12 4 6.5" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div className={styles.emptyProductsTitle}>Nenhum item corresponde aos filtros</div>
+              <div className={styles.emptyProductsSub}>Marque ou desmarque os filtros para voltar a visualizar os produtos.</div>
+            </div>
           ) : (
             <div className={styles.produtosList}>
               <ListaLojaItensTable
                 companyKey={companyKey}
                 filialCod={filialConsultaSelecionada}
                 filialNome={filialConsultaSelecionada ? (filialSelecionada?.filial ?? null) : null}
-                itens={itens}
+                itens={itensVisiveis}
                 compraView={true}
                 abcMap={abcMapRede}
-                onMoveItem={moverItem}
+                onMoveItem={(fromIndex, toIndex) => {
+                  const origem = indicesItensVisiveis[fromIndex];
+                  const destino = indicesItensVisiveis[toIndex];
+                  if (origem == null || destino == null) return;
+                  moverItem(origem, destino);
+                }}
                 onIncrement={(idx) =>
-                  atualizarQuantidade(idx, (itens[idx]?.quantidade ?? 1) + 1)
+                  atualizarQuantidade(indicesItensVisiveis[idx] ?? idx, (itensVisiveis[idx]?.quantidade ?? 1) + 1)
                 }
                 onDecrement={(idx) =>
-                  atualizarQuantidade(idx, (itens[idx]?.quantidade ?? 1) - 1)
+                  atualizarQuantidade(indicesItensVisiveis[idx] ?? idx, (itensVisiveis[idx]?.quantidade ?? 1) - 1)
                 }
-                onQtyChange={(idx, q) => atualizarQuantidade(idx, q)}
-                onRemove={removerItem}
+                onQtyChange={(idx, q) => atualizarQuantidade(indicesItensVisiveis[idx] ?? idx, q)}
+                onRemove={(idx) => removerItem(indicesItensVisiveis[idx] ?? idx)}
                 onOpenColorPicker={(idx, mode) => {
-                  void abrirColorPickerItem(idx, false, mode);
+                  void abrirColorPickerItem(indicesItensVisiveis[idx] ?? idx, false, mode);
                 }}
-                activeColorPickerIndex={editorColorPickerIndex}
+                activeColorPickerIndex={
+                  editorColorPickerIndex != null && indicesItensVisiveis.indexOf(editorColorPickerIndex) >= 0
+                    ? indicesItensVisiveis.indexOf(editorColorPickerIndex)
+                    : null
+                }
                 activeColorPickerMode={editorColorPickerMode}
                 colorPickerOptions={editorColorPickerOpcoes}
                 colorPickerLoading={editorColorPickerLoading}
                 onApplyColor={(idx, produtoComCor) => {
-                  void trocarCorItem(idx, produtoComCor, false);
+                  void trocarCorItem(indicesItensVisiveis[idx] ?? idx, produtoComCor, false);
                 }}
                 onCancelColorPicker={() => {
                   setEditorColorPickerIndex(null);
@@ -2587,9 +2900,9 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
           )}
 
           <div className={styles.produtosActionsRow}>
-            {itens.length > 0 && (
+            {itensParaAcao.length > 0 && (
               <span className={styles.badge}>
-                {itens.length} prod · {totalItens} un.
+                {itensParaAcao.length} prod · {itensParaAcao.reduce((s, i) => s + i.quantidade, 0)} un.
               </span>
             )}
             <button
@@ -2602,7 +2915,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
               </svg>
               Adicionar Produto
             </button>
-            {itens.length > 0 && (
+            {itensParaAcao.length > 0 && (
               <button
                 type="button"
                 className={styles.clearProductsBtn}
@@ -2835,6 +3148,17 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             <p className={styles.subtitle}>{companyName}</p>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              className={styles.exportXlsxBtn}
+              onClick={() => {
+                void exportarListaXlsx();
+              }}
+              disabled={itensVisiveis.length === 0 || exportandoXlsx}
+              title={itensVisiveis.length === 0 ? "Abra uma lista para exportar" : "Exportar a lista atual para XLSX"}
+            >
+              {exportandoXlsx ? "Exportando XLSX..." : "Exportar XLSX"}
+            </button>
             <button type="button" className={styles.backBtn} onClick={() => setMode("list")}>
               Ver Listas
             </button>
