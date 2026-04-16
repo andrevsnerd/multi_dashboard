@@ -8,6 +8,7 @@ export async function GET(request: Request) {
   const filial = searchParams.get('filial') || null;
   const produto = searchParams.get('produto') || '';
   const corProduto = searchParams.get('corProduto');
+  const includeHistoricoRows = searchParams.get('includeHistorico') === 'true';
 
   if (!produto.trim()) {
     return NextResponse.json({ error: 'Parâmetro produto é obrigatório' }, { status: 400 });
@@ -19,8 +20,9 @@ export async function GET(request: Request) {
       filial,
       produto,
       corProduto: corProduto != null ? corProduto : null,
+      includeHistoricoRows,
     });
-    // data inclui: filial, qtde12m, qtde60d, qtdeMesAtual, valor12m, custoUnitario
+    // data inclui: filial, qtde12m, qtde60d, qtdeMesAtual, valor12m, custoUnitario e historico por filial quando solicitado
     return NextResponse.json({ data });
   } catch (error) {
     console.error('Erro ao carregar vendas por filial do item', error);

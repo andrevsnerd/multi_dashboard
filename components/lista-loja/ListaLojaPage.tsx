@@ -52,6 +52,14 @@ interface ListaItem {
   estoqueFilial?: number | null;
   /** Dias desde a última venda registrada nos últimos 12 meses */
   diasDesdeUltimaVenda?: number | null;
+  /** Primeira entrada conhecida do item na filial selecionada */
+  primeiraEntradaFilial?: string | null;
+  /** Dias de historico real na filial, limitado a 365 */
+  diasHistoricoFilial?: number | null;
+  /** Meses de historico real na filial, entre 1 e 12 */
+  mesesHistoricoFilial?: number | null;
+  /** Indica que a filial ainda nao completou 12 meses de historico para o item */
+  historicoParcial?: boolean | null;
   linha?: string | null;
   subgrupo?: string | null;
 }
@@ -197,6 +205,77 @@ function formatDate(value: string): string {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
 }
 
+function formatHistoricoDate(value?: string | null): string {
+  if (!value) return "Nao encontrada";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function getMesesHistoricoFilial(item: Pick<ListaItem, "mesesHistoricoFilial">): number {
+  const meses = Number(item.mesesHistoricoFilial ?? 12);
+  if (!Number.isFinite(meses)) return 12;
+  return Math.min(12, Math.max(1, meses));
+}
+
+function getHistoricoFilialFallback() {
+  return {
+    primeiraEntradaFilial: null as string | null,
+    diasHistoricoFilial: 365,
+    mesesHistoricoFilial: 12,
+    historicoParcial: false,
+  };
+}
+
+function calculateHistoricoFilial(primeiraEntradaFilial?: string | Date | null) {
+  if (!primeiraEntradaFilial) return getHistoricoFilialFallback();
+  const data = primeiraEntradaFilial instanceof Date ? primeiraEntradaFilial : new Date(primeiraEntradaFilial);
+  if (Number.isNaN(data.getTime())) return getHistoricoFilialFallback();
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const diasHistoricoFilial = Math.min(365, Math.max(0, Math.floor((Date.now() - data.getTime()) / msPerDay)));
+  return {
+    primeiraEntradaFilial: data.toISOString(),
+    diasHistoricoFilial,
+    mesesHistoricoFilial: Math.min(12, Math.max(1, diasHistoricoFilial / 30)),
+    historicoParcial: diasHistoricoFilial < 365,
+  };
+}
+
+function mergeHistoricoFilialRows(
+  rows: Array<{
+    primeiraEntradaFilial?: string | null;
+    diasHistoricoFilial?: number | null;
+    mesesHistoricoFilial?: number | null;
+    historicoParcial?: boolean | null;
+  }>
+) {
+  let primeiraEntrada: Date | null = null;
+  for (const row of rows) {
+    if (!row.primeiraEntradaFilial) continue;
+    const data = new Date(row.primeiraEntradaFilial);
+    if (Number.isNaN(data.getTime())) continue;
+    if (!primeiraEntrada || data < primeiraEntrada) primeiraEntrada = data;
+  }
+  if (primeiraEntrada) return calculateHistoricoFilial(primeiraEntrada);
+
+  const parcial = rows.find(
+    (row) =>
+      row.diasHistoricoFilial != null &&
+      row.mesesHistoricoFilial != null &&
+      row.historicoParcial != null
+  );
+  if (parcial) {
+    return {
+      primeiraEntradaFilial: null,
+      diasHistoricoFilial: Math.min(365, Math.max(0, Number(parcial.diasHistoricoFilial ?? 365))),
+      mesesHistoricoFilial: getMesesHistoricoFilial({ mesesHistoricoFilial: parcial.mesesHistoricoFilial }),
+      historicoParcial: Boolean(parcial.historicoParcial),
+    };
+  }
+
+  return getHistoricoFilialFallback();
+}
+
 function buildDefaultListName(filialNome?: string): string {
   const base = (filialNome || "Lista").trim();
   const now = new Date();
@@ -241,20 +320,46 @@ async function fetchVendasItemMetricas(
   codFilial: string | null,
   produto: string,
   corProduto: string | null
-): Promise<{ qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null; diasDesdeUltimaVenda: number | null } | null> {
-  try {
+): Promise<{ qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null; diasDesdeUltimaVenda: number | null; primeiraEntradaFilial: string | null; diasHistoricoFilial: number; mesesHistoricoFilial: number; historicoParcial: boolean } | null> {
+  type VendasItemMetricasApiRow = {
+    qtde12m: number;
+    qtde60d: number;
+    qtdeMesAtual?: number;
+    valor12m?: number;
+    custoUnitario?: number;
+    diasDesdeUltimaVenda?: number | null;
+    primeiraEntradaFilial?: string | null;
+    diasHistoricoFilial?: number | null;
+    mesesHistoricoFilial?: number | null;
+    historicoParcial?: boolean | null;
+  };
+
+  const fetchRows = async (includeHistorico: boolean): Promise<VendasItemMetricasApiRow[]> => {
     const params = new URLSearchParams({ company: companyKey, produto: produto.trim() });
+    if (includeHistorico) params.set("includeHistorico", "true");
     if (codFilial && codFilial.trim()) params.set("filial", codFilial.trim());
     if (corProduto) params.set("corProduto", corProduto.trim());
     const res = await fetch(`/api/controle-estoque/vendas-por-filial-item?${params}`, { cache: "no-store" });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { data?: Array<{ qtde12m: number; qtde60d: number; qtdeMesAtual?: number; valor12m?: number; custoUnitario?: number; diasDesdeUltimaVenda?: number | null }> };
-    const rows = json.data || [];
+    if (!res.ok) throw new Error("Erro ao carregar metricas de vendas");
+    const json = (await res.json()) as { data?: VendasItemMetricasApiRow[] };
+    return json.data || [];
+  };
+
+  try {
+    let rows: VendasItemMetricasApiRow[];
+    try {
+      rows = await fetchRows(true);
+    } catch {
+      // Fallback seguro: se a consulta de historico falhar, preserva as metricas visuais.
+      rows = await fetchRows(false);
+    }
+
     const totalValor = rows.reduce((s, r) => s + Number(r.valor12m ?? 0), 0);
     const maxCusto = rows.reduce((max, r) => Math.max(max, Number(r.custoUnitario ?? 0)), 0);
     // Última venda mais recente entre todas as filiais (menor número de dias)
     const diasValidos = rows.map((r) => r.diasDesdeUltimaVenda).filter((d): d is number => d != null);
     const diasDesdeUltimaVenda = diasValidos.length > 0 ? Math.min(...diasValidos) : null;
+    const historicoFilial = mergeHistoricoFilialRows(rows);
     return {
       qtde12m: Math.round(rows.reduce((s, r) => s + Number(r.qtde12m ?? 0), 0)),
       qtde60d: Math.round(rows.reduce((s, r) => s + Number(r.qtde60d ?? 0), 0)),
@@ -262,6 +367,7 @@ async function fetchVendasItemMetricas(
       valor12m: totalValor > 0 ? Math.round(totalValor) : null,
       custoUnit: maxCusto > 0 ? maxCusto : null,
       diasDesdeUltimaVenda,
+      ...historicoFilial,
     };
   } catch {
     return null;
@@ -340,14 +446,14 @@ function getSuggestedDelta(item: ListaItem, diasCorridosMes: number): number | n
 function hasSugestaoS(item: ListaItem, qtdFinal: number, qtdSuficiente: boolean): boolean {
   if (qtdFinal > 0) return false;
   if (qtdSuficiente) return false;
-  const mediaVendasMes = Number(item.qtde12m ?? 0) / 12;
+  const mediaVendasMes = Number(item.qtde12m ?? 0) / getMesesHistoricoFilial(item);
   if (mediaVendasMes < 1) return false;
   const estoqueAtual = Number(item.estoqueFilial ?? 0);
   return estoqueAtual <= mediaVendasMes * 2;
 }
 
 function calcQtdSugestaoS(item: ListaItem): number {
-  const mediaVendasMes = Number(item.qtde12m ?? 0) / 12;
+  const mediaVendasMes = Number(item.qtde12m ?? 0) / getMesesHistoricoFilial(item);
   const limiteDias = getLimiteDiasReposicao(item);
   return Math.max(0, Math.ceil((limiteDias / 30) * mediaVendasMes));
 }
@@ -367,8 +473,9 @@ function calcQtdSugestaoEInfo(item: ListaItem): {
   if (qtde12m <= 0) return null;
   const dias = item.diasDesdeUltimaVenda;
   if (dias == null || dias < 30) return null; // vendeu recentemente, não está estagnado
+  const mesesBase = getMesesHistoricoFilial(item);
   const mesesSemVenda = dias / 30;
-  const mesesAtivos = 12 - mesesSemVenda;
+  const mesesAtivos = mesesBase - mesesSemVenda;
   if (mesesAtivos < 1) return null; // período ativo muito curto para extrapolar com confiança
   const velocidadeAjustada = qtde12m / mesesAtivos;
   if (velocidadeAjustada < 0.5) return null; // mesmo ajustado, velocidade insignificante
@@ -449,6 +556,12 @@ function formatMaybe(value: number | null | undefined, digits = 1): string {
   return formatFixed(value, digits);
 }
 
+function getHistoricoPeriodoLabel(mesesHistoricoFilial: number): string {
+  return mesesHistoricoFilial >= 12
+    ? "últimos 12 meses"
+    : `período real de ${formatFixed(mesesHistoricoFilial, 1)} meses`;
+}
+
 function buildFinalBlockReason(duracaoAtual: number, limiteDias: number): string {
   return `Duração atual de ${Math.round(duracaoAtual)} dias não ficou abaixo do limite de ${limiteDias} dias.`;
 }
@@ -468,8 +581,9 @@ function buildEBlockReason(
   estoqueAtual: number
 ): string {
   const qtde12m = Number(item.qtde12m ?? 0);
+  const mesesHistoricoFilial = getMesesHistoricoFilial(item);
   if (qtde12m <= 0) {
-    return "Não houve vendas nos últimos 12 meses, então não há base para sugestão E.";
+    return `Não houve vendas no ${getHistoricoPeriodoLabel(mesesHistoricoFilial)}, então não há base para sugestão E.`;
   }
   if (item.diasDesdeUltimaVenda != null && item.diasDesdeUltimaVenda < 30) {
     return `Última venda há ${Math.round(item.diasDesdeUltimaVenda)} dias, abaixo do mínimo de 30 dias para considerar item estagnado.`;
@@ -496,9 +610,12 @@ function buildListaLojaExportRow(item: ListaItem, diasCorridosMes: number): Reco
   const consumoDiario = diasCorridosMes > 0 ? vendasMesAtual / diasCorridosMes : 0;
   const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
   const limiteDias = getLimiteDiasReposicao(item);
-  const mediaVendasMes = Number(item.qtde12m ?? 0) / 12;
+  const diasHistoricoFilial = Math.min(365, Math.max(0, Number(item.diasHistoricoFilial ?? 365)));
+  const mesesHistoricoFilial = getMesesHistoricoFilial(item);
+  const historicoParcial = Boolean(item.historicoParcial ?? false);
+  const mediaVendasMes = Number(item.qtde12m ?? 0) / mesesHistoricoFilial;
   const mesesSemVenda = item.diasDesdeUltimaVenda != null ? item.diasDesdeUltimaVenda / 30 : null;
-  const mesesAtivos = mesesSemVenda != null ? 12 - mesesSemVenda : null;
+  const mesesAtivos = mesesSemVenda != null ? mesesHistoricoFilial - mesesSemVenda : null;
   const velocidadeAjustada = mesesAtivos != null && mesesAtivos > 0 ? Number(item.qtde12m ?? 0) / mesesAtivos : null;
   const qtdCalculada = sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS > 0 ? sugestao.qtdS : sugestao.qtdE;
   const status = qtdCalculada > 0 ? "Sugerido" : "Barrado";
@@ -546,6 +663,10 @@ function buildListaLojaExportRow(item: ListaItem, diasCorridosMes: number): Reco
     CUSTO_UNIT: item.custoUnit ?? null,
     ESTOQUE_FILIAL: item.estoqueFilial ?? null,
     DIAS_DESDE_ULTIMA_VENDA: item.diasDesdeUltimaVenda ?? null,
+    PRIMEIRA_ENTRADA_FILIAL: item.primeiraEntradaFilial ?? null,
+    DIAS_HISTORICO_FILIAL: diasHistoricoFilial,
+    MESES_HISTORICO_FILIAL: mesesHistoricoFilial,
+    HISTORICO_PARCIAL: historicoParcial ? "Sim" : "Nao",
     LINHA: item.linha || "",
     SUBGRUPO: item.subgrupo || "",
     STATUS: status,
@@ -718,6 +839,7 @@ function ListaLojaItensTable({
     x: number;
     y: number;
     mediaVendasMes: number;
+    mesesHistoricoFilial: number;
     estoqueAtual: number;
     limiteDias: number;
     qtdS: number;
@@ -726,11 +848,19 @@ function ListaLojaItensTable({
     x: number;
     y: number;
     qtde12m: number;
+    mesesHistoricoFilial: number;
     mesesSemVenda: number;
     mesesAtivos: number;
     velocidadeAjustada: number;
     limiteDias: number;
     qtdE: number;
+  }>(null);
+  const [historicoTooltip, setHistoricoTooltip] = useState<null | {
+    x: number;
+    y: number;
+    primeiraEntradaFilial: string | null;
+    diasHistoricoFilial: number;
+    mesesHistoricoFilial: number;
   }>(null);
 
   const [estoqueCache, setEstoqueCache] = useState<Record<string, Array<{ filial: string; estoque: number }>>>({});
@@ -746,6 +876,10 @@ function ListaLojaItensTable({
         custoUnit: number | null;
         estoqueFilial: number | null;
         diasDesdeUltimaVenda: number | null;
+        primeiraEntradaFilial: string | null;
+        diasHistoricoFilial: number | null;
+        mesesHistoricoFilial: number | null;
+        historicoParcial: boolean | null;
       }
     >
   >({});
@@ -776,6 +910,10 @@ function ListaLojaItensTable({
             custoUnit: vendas?.custoUnit ?? null,
             estoqueFilial,
             diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
+            primeiraEntradaFilial: vendas?.primeiraEntradaFilial ?? null,
+            diasHistoricoFilial: vendas?.diasHistoricoFilial ?? null,
+            mesesHistoricoFilial: vendas?.mesesHistoricoFilial ?? null,
+            historicoParcial: vendas?.historicoParcial ?? null,
           },
         };
       })
@@ -861,6 +999,10 @@ function ListaLojaItensTable({
                 const estoqueFilial = live?.estoqueFilial ?? item.estoqueFilial ?? null;
                 const custoUnit = live?.custoUnit ?? item.custoUnit ?? null;
                 const diasDesdeUltimaVenda = live?.diasDesdeUltimaVenda ?? item.diasDesdeUltimaVenda ?? null;
+                const primeiraEntradaFilial = live?.primeiraEntradaFilial ?? item.primeiraEntradaFilial ?? null;
+                const diasHistoricoFilial = live?.diasHistoricoFilial ?? item.diasHistoricoFilial ?? null;
+                const mesesHistoricoFilial = live?.mesesHistoricoFilial ?? item.mesesHistoricoFilial ?? null;
+                const historicoParcial = live?.historicoParcial ?? item.historicoParcial ?? false;
                 return (
                   <>
               <td>
@@ -990,6 +1132,9 @@ function ListaLojaItensTable({
                         const liveKey = `${filialScopeKey}::${k}`;
                         const liveVal = liveMetrics[liveKey]?.valor12m;
                         const val12m = liveVal ?? Number(item.valor12m ?? 0);
+                        const periodoHistorico = historicoParcial
+                          ? `Últimos ${formatFixed(getMesesHistoricoFilial({ mesesHistoricoFilial }))} meses (histórico real da filial)`
+                          : "Últimos 12 meses";
                         const hoverKey = `${filialScopeKey}::abc::${k}`;
                         abcHoverKeyRef.current = hoverKey;
                         // Mostra imediatamente os dados do badge (sem esperar o fetch)
@@ -999,7 +1144,7 @@ function ListaLojaItensTable({
                           produto: item.produto,
                           cor: item.descCor || "",
                           escopo: filialCod ? "loja" : "geral",
-                          periodo: "Últimos 12 meses",
+                          periodo: periodoHistorico,
                           regra: "Classificação por faturamento acumulado (A até 80%, B até 95%, C acima de 95%).",
                           curva: abc.curva,
                           valor12m: val12m,
@@ -1173,7 +1318,28 @@ function ListaLojaItensTable({
                     setVendasTooltip(null);
                   }}
                 >
-                  {qtde12m != null ? fmt(qtde12m) : "—"}
+                  {qtde12m != null ? (
+                    <>
+                      {fmt(qtde12m)}
+                      {historicoParcial ? (
+                        <span
+                          className={styles.partialHistoryBadge}
+                          onMouseEnter={(e) =>
+                            setHistoricoTooltip({
+                              x: e.clientX,
+                              y: e.clientY,
+                              primeiraEntradaFilial,
+                              diasHistoricoFilial: Number(diasHistoricoFilial ?? 365),
+                              mesesHistoricoFilial: getMesesHistoricoFilial({ mesesHistoricoFilial }),
+                            })
+                          }
+                          onMouseLeave={() => setHistoricoTooltip(null)}
+                        >
+                          (&lt;12m)
+                        </span>
+                      ) : null}
+                    </>
+                  ) : "—"}
                 </span>
               </td>
               <td className={styles.colNumeric}>
@@ -1337,7 +1503,17 @@ function ListaLojaItensTable({
               <td className={styles.colNumeric}>
                 {(() => {
                   const sugestao = getReposicaoCompraView(
-                    { ...item, vendasMesAtual, estoqueFilial, qtde12m, diasDesdeUltimaVenda },
+                    {
+                      ...item,
+                      vendasMesAtual,
+                      estoqueFilial,
+                      qtde12m,
+                      diasDesdeUltimaVenda,
+                      primeiraEntradaFilial,
+                      diasHistoricoFilial,
+                      mesesHistoricoFilial,
+                      historicoParcial,
+                    },
                     diasCorridosMes
                   );
                   if (sugestao.qtdFinal > 0) {
@@ -1371,7 +1547,7 @@ function ListaLojaItensTable({
                     );
                   }
                   if (sugestao.qtdS > 0) {
-                    const mediaVendasMes = Number(qtde12m ?? 0) / 12;
+                    const mediaVendasMes = Number(qtde12m ?? 0) / getMesesHistoricoFilial({ mesesHistoricoFilial });
                     const limiteDias = getLimiteDiasReposicao(item);
                     return (
                       <span className={styles.reporAdd}>
@@ -1382,6 +1558,7 @@ function ListaLojaItensTable({
                               x: e.clientX,
                               y: e.clientY,
                               mediaVendasMes,
+                              mesesHistoricoFilial: getMesesHistoricoFilial({ mesesHistoricoFilial }),
                               estoqueAtual: Number(estoqueFilial ?? 0),
                               limiteDias,
                               qtdS: sugestao.qtdS,
@@ -1410,7 +1587,15 @@ function ListaLojaItensTable({
                     );
                   }
                   if (sugestao.qtdE > 0) {
-                    const eInfo = calcQtdSugestaoEInfo({ ...item, qtde12m, diasDesdeUltimaVenda });
+                    const eInfo = calcQtdSugestaoEInfo({
+                      ...item,
+                      qtde12m,
+                      diasDesdeUltimaVenda,
+                      primeiraEntradaFilial,
+                      diasHistoricoFilial,
+                      mesesHistoricoFilial,
+                      historicoParcial,
+                    });
                     const limiteDias = getLimiteDiasReposicao(item);
                     return (
                       <span className={styles.reporAdd}>
@@ -1421,6 +1606,7 @@ function ListaLojaItensTable({
                               x: e.clientX,
                               y: e.clientY,
                               qtde12m: Number(qtde12m ?? 0),
+                              mesesHistoricoFilial: getMesesHistoricoFilial({ mesesHistoricoFilial }),
                               mesesSemVenda: eInfo.mesesSemVenda,
                               mesesAtivos: eInfo.mesesAtivos,
                               velocidadeAjustada: eInfo.velocidadeAjustada,
@@ -1493,7 +1679,17 @@ function ListaLojaItensTable({
                   {(() => {
                     if (custoUnit == null || custoUnit <= 0) return "—";
                     const sugestao = getReposicaoCompraView(
-                      { ...item, vendasMesAtual, estoqueFilial, qtde12m },
+                      {
+                        ...item,
+                        vendasMesAtual,
+                        estoqueFilial,
+                        qtde12m,
+                        diasDesdeUltimaVenda,
+                        primeiraEntradaFilial,
+                        diasHistoricoFilial,
+                        mesesHistoricoFilial,
+                        historicoParcial,
+                      },
                       diasCorridosMes
                     );
                     const qtdBase = sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS > 0 ? sugestao.qtdS : sugestao.qtdE;
@@ -1588,7 +1784,7 @@ function ListaLojaItensTable({
           <div className={styles.metricTooltipLine} style={{ marginTop: 6 }}>{abcTooltip.regra}</div>
           <div className={styles.metricTooltipDivider} />
           <div className={styles.metricTooltipRow}>
-            <span>Valor 12 meses</span>
+            <span>{abcTooltip.periodo === "Últimos 12 meses" ? "Valor 12 meses" : "Valor no período"}</span>
             <span>{fmtBRL(abcTooltip.valor12m)}</span>
           </div>
           <div className={styles.metricTooltipRow}>
@@ -1649,6 +1845,7 @@ function ListaLojaItensTable({
       {sugestaoSTooltip && (
         <div className={styles.metricTooltip} style={{ left: sugestaoSTooltip.x + 12, top: sugestaoSTooltip.y + 12 }}>
           <div className={styles.metricTooltipTitle}>Regra S (mesma lógica da ABC)</div>
+          <div className={styles.metricTooltipLine}><strong>Base historica filial:</strong> {sugestaoSTooltip.mesesHistoricoFilial.toFixed(1)} meses</div>
           <div className={styles.metricTooltipLine}><strong>Média de vendas:</strong> {sugestaoSTooltip.mediaVendasMes.toFixed(1)} un/mês</div>
           <div className={styles.metricTooltipLine}><strong>Estoque atual:</strong> {fmt(sugestaoSTooltip.estoqueAtual)} un</div>
           <div className={styles.metricTooltipLine}><strong>Cobertura mínima:</strong> {sugestaoSTooltip.limiteDias} dias</div>
@@ -1667,7 +1864,10 @@ function ListaLojaItensTable({
             A velocidade real é calculada excluindo o período inativo.
           </div>
           <div className={styles.metricTooltipDivider} />
-          <div className={styles.metricTooltipLine}><strong>Vendas nos últimos 12m:</strong> {fmt(sugestaoETooltip.qtde12m)} un</div>
+          <div className={styles.metricTooltipLine}>
+            <strong>Vendas no período base:</strong> {fmt(sugestaoETooltip.qtde12m)} un
+          </div>
+          <div className={styles.metricTooltipLine}><strong>Base historica filial:</strong> {sugestaoETooltip.mesesHistoricoFilial.toFixed(1)} meses</div>
           <div className={styles.metricTooltipLine}><strong>Sem vendas há:</strong> ~{Math.round(sugestaoETooltip.mesesSemVenda)} meses ({Math.round(sugestaoETooltip.mesesSemVenda * 30)} dias)</div>
           <div className={styles.metricTooltipLine}><strong>Período ativo estimado:</strong> ~{sugestaoETooltip.mesesAtivos.toFixed(1)} meses</div>
           <div className={styles.metricTooltipDivider} />
@@ -1681,6 +1881,18 @@ function ListaLojaItensTable({
           <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
             = ⌈{sugestaoETooltip.velocidadeAjustada.toFixed(2)} × {(sugestaoETooltip.limiteDias / 30).toFixed(1)}⌉ = {fmt(sugestaoETooltip.qtdE)}
           </div>
+        </div>
+      )}
+      {historicoTooltip && (
+        <div className={styles.metricTooltip} style={{ left: historicoTooltip.x + 12, top: historicoTooltip.y + 12 }}>
+          <div className={styles.metricTooltipTitle}>Historico parcial na filial</div>
+          <div className={styles.metricTooltipLine}>Este item ainda nao completou 12 meses de historico na filial selecionada.</div>
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine}><strong>Data base historico:</strong> {formatHistoricoDate(historicoTooltip.primeiraEntradaFilial)}</div>
+          <div className={styles.metricTooltipLine}><strong>Dias de historico:</strong> {fmt(historicoTooltip.diasHistoricoFilial)}</div>
+          <div className={styles.metricTooltipLine}><strong>Meses de historico:</strong> {historicoTooltip.mesesHistoricoFilial.toFixed(1)}</div>
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine}>Os calculos historicos usam o periodo real disponivel ate completar 12 meses.</div>
         </div>
       )}
       {duracaoTooltip && (
@@ -1845,6 +2057,10 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             custoUnit: vendas?.custoUnit ?? null,
             estoqueFilial,
             diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
+            primeiraEntradaFilial: vendas?.primeiraEntradaFilial ?? null,
+            diasHistoricoFilial: vendas?.diasHistoricoFilial ?? null,
+            mesesHistoricoFilial: vendas?.mesesHistoricoFilial ?? null,
+            historicoParcial: vendas?.historicoParcial ?? null,
           };
         })
       );
@@ -2021,7 +2237,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
       };
 
       void (async () => {
-        let vendas: { qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null; diasDesdeUltimaVenda: number | null } | null = null;
+        let vendas: Awaited<ReturnType<typeof fetchVendasItemMetricas>> = null;
         let estoque: number | null = null;
         [vendas, estoque] = await Promise.all([
           fetchVendasItemMetricas(companyKey, filialCod, produto.produto, produto.corProduto),
@@ -2052,6 +2268,10 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                   custoUnit: vendas?.custoUnit ?? null,
                   estoqueFilial: estoque,
                   diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
+                  primeiraEntradaFilial: vendas?.primeiraEntradaFilial ?? null,
+                  diasHistoricoFilial: vendas?.diasHistoricoFilial ?? null,
+                  mesesHistoricoFilial: vendas?.mesesHistoricoFilial ?? null,
+                  historicoParcial: vendas?.historicoParcial ?? null,
                 },
                 new Date().getDate()
               ),
@@ -2062,6 +2282,10 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
               custoUnit: vendas?.custoUnit ?? null,
               estoqueFilial: estoque,
               diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
+              primeiraEntradaFilial: vendas?.primeiraEntradaFilial ?? null,
+              diasHistoricoFilial: vendas?.diasHistoricoFilial ?? null,
+              mesesHistoricoFilial: vendas?.mesesHistoricoFilial ?? null,
+              historicoParcial: vendas?.historicoParcial ?? null,
             },
           ];
         });
@@ -2213,6 +2437,10 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             custoUnit: vendas?.custoUnit ?? null,
             estoqueFilial,
             diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
+            primeiraEntradaFilial: vendas?.primeiraEntradaFilial ?? null,
+            diasHistoricoFilial: vendas?.diasHistoricoFilial ?? null,
+            mesesHistoricoFilial: vendas?.mesesHistoricoFilial ?? null,
+            historicoParcial: vendas?.historicoParcial ?? null,
           }] as const;
         })
       );
@@ -2226,7 +2454,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             next[idx] = { ...next[idx], quantidade: next[idx].quantidade + agg.quantidade };
             continue;
           }
-          const metrics = metricsMap.get(key) || { qtde12m: null, valor12m: null, qtde60d: null, vendasMesAtual: null, custoUnit: null, estoqueFilial: null, diasDesdeUltimaVenda: null };
+          const metrics = metricsMap.get(key) || { qtde12m: null, valor12m: null, qtde60d: null, vendasMesAtual: null, custoUnit: null, estoqueFilial: null, diasDesdeUltimaVenda: null, primeiraEntradaFilial: null, diasHistoricoFilial: null, mesesHistoricoFilial: null, historicoParcial: null };
           const suggested = getSuggestedQtyValue(
             {
               ...agg.item,
@@ -2238,6 +2466,10 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
               custoUnit: metrics.custoUnit,
               estoqueFilial: metrics.estoqueFilial,
               diasDesdeUltimaVenda: metrics.diasDesdeUltimaVenda,
+              primeiraEntradaFilial: metrics.primeiraEntradaFilial,
+              diasHistoricoFilial: metrics.diasHistoricoFilial,
+              mesesHistoricoFilial: metrics.mesesHistoricoFilial,
+              historicoParcial: metrics.historicoParcial,
             },
             new Date().getDate()
           );
@@ -2251,6 +2483,10 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             custoUnit: metrics.custoUnit,
             estoqueFilial: metrics.estoqueFilial,
             diasDesdeUltimaVenda: metrics.diasDesdeUltimaVenda,
+            primeiraEntradaFilial: metrics.primeiraEntradaFilial,
+            diasHistoricoFilial: metrics.diasHistoricoFilial,
+            mesesHistoricoFilial: metrics.mesesHistoricoFilial,
+            historicoParcial: metrics.historicoParcial,
           });
         }
         return next;
@@ -2361,7 +2597,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
       const mode = emModal ? modalColorPickerMode : editorColorPickerMode;
       const filialCod = filialConsultaSelecionada;
 
-      let vendas: { qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null; diasDesdeUltimaVenda: number | null } | null = null;
+      let vendas: Awaited<ReturnType<typeof fetchVendasItemMetricas>> = null;
       let estoque: number | null = null;
       [vendas, estoque] = await Promise.all([
         fetchVendasItemMetricas(companyKey, filialCod, produtoComCor.produto, produtoComCor.corProduto),
@@ -2376,6 +2612,10 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
         custoUnit: vendas?.custoUnit ?? null,
         estoqueFilial: estoque,
         diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
+        primeiraEntradaFilial: vendas?.primeiraEntradaFilial ?? null,
+        diasHistoricoFilial: vendas?.diasHistoricoFilial ?? null,
+        mesesHistoricoFilial: vendas?.mesesHistoricoFilial ?? null,
+        historicoParcial: vendas?.historicoParcial ?? null,
       };
 
       setLista((prev) => {

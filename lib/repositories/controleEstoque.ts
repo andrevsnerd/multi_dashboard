@@ -106,6 +106,66 @@ function buildFilialFilter(
   return `AND ${prefix}.FILIAL IN (${placeholders})`;
 }
 
+function buildEntradaFilialFilter(
+  request: sql.Request | RequestLike,
+  companySlug: string | undefined,
+  specificFilial: string | null | undefined,
+  alias: string,
+  paramPrefix: string
+): string {
+  if (!companySlug) {
+    return '';
+  }
+
+  const company = resolveCompany(companySlug);
+
+  if (!company) {
+    return '';
+  }
+
+  const isScarfme = companySlug === 'scarfme';
+  const filiais = company.filialFilters['sales'] ?? [];
+  const ecommerceFilials = company.ecommerceFilials ?? [];
+
+  if (specificFilial && specificFilial !== VAREJO_VALUE) {
+    const members = getFilialGroupMembers(company, specificFilial);
+    if (members.length > 1) {
+      members.forEach((f, i) => request.input(`${paramPrefix}Group${i}`, sql.VarChar, f));
+      const placeholders = members.map((_, i) => `@${paramPrefix}Group${i}`).join(', ');
+      return `AND ${alias}.FILIAL IN (${placeholders})`;
+    }
+    request.input(`${paramPrefix}Single`, sql.VarChar, specificFilial);
+    return `AND ${alias}.FILIAL = @${paramPrefix}Single`;
+  }
+
+  if (isScarfme && specificFilial === VAREJO_VALUE) {
+    const normalFiliais = filiais.filter((f) => !ecommerceFilials.includes(f));
+    if (normalFiliais.length === 0) {
+      return '';
+    }
+    normalFiliais.forEach((filialNome, index) => {
+      request.input(`${paramPrefix}${index}`, sql.VarChar, filialNome);
+    });
+    const placeholders = normalFiliais.map((_, index) => `@${paramPrefix}${index}`).join(', ');
+    return `AND ${alias}.FILIAL IN (${placeholders})`;
+  }
+
+  const filiaisBase =
+    isScarfme && specificFilial === null
+      ? Array.from(new Set([...filiais, ...ecommerceFilials]))
+      : filiais.filter((f) => !ecommerceFilials.includes(f));
+
+  if (filiaisBase.length === 0) {
+    return '';
+  }
+
+  filiaisBase.forEach((filialNome, index) => {
+    request.input(`${paramPrefix}${index}`, sql.VarChar, filialNome);
+  });
+  const placeholders = filiaisBase.map((_, index) => `@${paramPrefix}${index}`).join(', ');
+  return `AND ${alias}.FILIAL IN (${placeholders})`;
+}
+
 function buildVendasFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
@@ -5949,12 +6009,14 @@ export async function fetchVendasProdutoPorFilial({
   filial,
   produto,
   corProduto,
+  includeHistoricoRows = false,
 }: {
   company?: string;
   filial?: string | null;
   produto: string;
   corProduto?: string | null;
-}): Promise<Array<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number; valor12m: number; custoUnitario: number; diasDesdeUltimaVenda: number | null }>> {
+  includeHistoricoRows?: boolean;
+}): Promise<Array<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number; valor12m: number; custoUnitario: number; diasDesdeUltimaVenda: number | null; primeiraEntradaFilial: Date | null; diasHistoricoFilial: number; mesesHistoricoFilial: number; historicoParcial: boolean }>> {
   return withRequest(async (request) => {
     const filialSel = filial ?? null;
     const now = new Date();
@@ -5972,6 +6034,8 @@ export async function fetchVendasProdutoPorFilial({
       company === 'scarfme'
         ? buildScarfmeEcommerceFaturamentoFilialFilter(request, filialSel, 'vfEcFil')
         : '';
+    const entradaEstoqueFilialFilter = buildEntradaFilialFilter(request, company, filialSel, 'E', 'entradaEstoqueFilial');
+    const entradaLojaFilialFilter = buildEntradaFilialFilter(request, company, filialSel, 'LE', 'entradaLojaFilial');
     const mergeScarfmeEcommerce =
       company === 'scarfme' &&
       ecommerceFatFilialFilter !== '' &&
@@ -5994,6 +6058,24 @@ export async function fetchVendasProdutoPorFilial({
           OR (
             @vf_cor_num IS NOT NULL
             AND TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))), '')) = @vf_cor_num
+          )
+        )`
+      : '';
+    const corFilterEntradaEstoque = corProduto != null
+      ? `AND (
+          LTRIM(RTRIM(ISNULL(P.COR_PRODUTO, ''))) = @vf_cor
+          OR (
+            @vf_cor_num IS NOT NULL
+            AND TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(ISNULL(P.COR_PRODUTO, ''))), '')) = @vf_cor_num
+          )
+        )`
+      : '';
+    const corFilterEntradaLoja = corProduto != null
+      ? `AND (
+          LTRIM(RTRIM(ISNULL(LEP.COR_PRODUTO, ''))) = @vf_cor
+          OR (
+            @vf_cor_num IS NOT NULL
+            AND TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(ISNULL(LEP.COR_PRODUTO, ''))), '')) = @vf_cor_num
           )
         )`
       : '';
@@ -6023,7 +6105,7 @@ export async function fetchVendasProdutoPorFilial({
     `;
 
     const result = await request.query<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number | null; valor12m: number | null; custoUnitario: number | null; ultimaVenda: Date | null }>(queryVarejo);
-    const byFilial = new Map<string, { filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number; valor12m: number; custoUnitario: number; ultimaVenda: Date | null }>();
+    const byFilial = new Map<string, { filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number; valor12m: number; custoUnitario: number; ultimaVenda: Date | null; primeiraEntradaFilial: Date | null; primeiraVendaFilial: Date | null }>();
     const msPerDay = 1000 * 60 * 60 * 24;
     for (const r of result.recordset) {
       byFilial.set(r.filial, {
@@ -6034,6 +6116,8 @@ export async function fetchVendasProdutoPorFilial({
         valor12m: Number(r.valor12m ?? 0),
         custoUnitario: Number(r.custoUnitario ?? 0),
         ultimaVenda: r.ultimaVenda ? new Date(r.ultimaVenda) : null,
+        primeiraEntradaFilial: null,
+        primeiraVendaFilial: null,
       });
     }
 
@@ -6081,18 +6165,179 @@ export async function fetchVendasProdutoPorFilial({
             ex.ultimaVenda = ecUltimaVenda;
           }
         } else {
-          byFilial.set(r.filial, { filial: r.filial, qtde12m: q12, qtde60d: q60, qtdeMesAtual: qMes, valor12m: val, custoUnitario: custo, ultimaVenda: ecUltimaVenda });
+          byFilial.set(r.filial, { filial: r.filial, qtde12m: q12, qtde60d: q60, qtdeMesAtual: qMes, valor12m: val, custoUnitario: custo, ultimaVenda: ecUltimaVenda, primeiraEntradaFilial: null, primeiraVendaFilial: null });
         }
       }
     }
 
+    if (includeHistoricoRows) {
+      const queryPrimeiraVenda = `
+        SELECT
+          filial,
+          MIN(primeiraVendaFilial) AS primeiraVendaFilial
+        FROM (
+          SELECT
+            vf.FILIAL AS filial,
+            vf.DATA_VENDA AS primeiraVendaFilial
+          FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vf WITH (NOLOCK)
+          WHERE vf.DATA_VENDA < @vf_fim
+            AND vf.QTDE > 0
+            AND vf.QTDE_CANCELADA = 0
+            AND LTRIM(RTRIM(ISNULL(vf.PRODUTO, ''))) = @vf_produto
+            ${corFilterVf}
+            ${vendasFilialFilter}
+
+          ${mergeScarfmeEcommerce ? `
+          UNION ALL
+
+          SELECT
+            f.FILIAL AS filial,
+            f.EMISSAO AS primeiraVendaFilial
+          FROM FATURAMENTO f WITH (NOLOCK)
+          JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+            ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+          WHERE f.EMISSAO < @vf_fim
+            AND f.NOTA_CANCELADA = 0
+            AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+            AND CAST(fp.QTDE AS FLOAT) > 0
+            AND LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) = @vf_produto
+            ${corFilterFp}
+            ${ecommerceFatFilialFilter}
+          ` : ''}
+        ) vendas_historicas
+        GROUP BY filial
+      `;
+
+      try {
+        const primeiraVendaResult = await request.query<{ filial: string; primeiraVendaFilial: Date | null }>(queryPrimeiraVenda);
+        for (const r of primeiraVendaResult.recordset) {
+          const primeiraVendaFilial = r.primeiraVendaFilial ? new Date(r.primeiraVendaFilial) : null;
+          const ex = byFilial.get(r.filial);
+          if (ex) {
+            ex.primeiraVendaFilial =
+              primeiraVendaFilial && (!ex.primeiraVendaFilial || primeiraVendaFilial < ex.primeiraVendaFilial)
+                ? primeiraVendaFilial
+                : ex.primeiraVendaFilial;
+          } else {
+            byFilial.set(r.filial, {
+              filial: r.filial,
+              qtde12m: 0,
+              qtde60d: 0,
+              qtdeMesAtual: 0,
+              valor12m: 0,
+              custoUnitario: 0,
+              ultimaVenda: null,
+              primeiraEntradaFilial: null,
+              primeiraVendaFilial,
+            });
+          }
+        }
+      } catch (error) {
+        console.warn('[fetchVendasProdutoPorFilial] Falha ao carregar primeira venda por filial; usando fallback seguro.', error);
+      }
+
+      const queryPrimeiraEntrada = `
+      SELECT
+        filial,
+        MIN(primeiraEntradaFilial) AS primeiraEntradaFilial
+      FROM (
+        SELECT
+          E.FILIAL AS filial,
+          E.EMISSAO AS primeiraEntradaFilial
+        FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+        JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK)
+          ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+          AND E.FILIAL = P.FILIAL
+        WHERE P.PRODUTO IS NOT NULL
+          AND E.EMISSAO IS NOT NULL
+          AND LTRIM(RTRIM(ISNULL(P.PRODUTO, ''))) = @vf_produto
+          ${corFilterEntradaEstoque}
+          ${entradaEstoqueFilialFilter}
+
+        UNION ALL
+
+        SELECT
+          LE.FILIAL AS filial,
+          LE.EMISSAO AS primeiraEntradaFilial
+        FROM LOJA_ENTRADAS_PRODUTO AS LEP WITH (NOLOCK)
+        INNER JOIN LOJA_ENTRADAS AS LE WITH (NOLOCK)
+          ON LEP.FILIAL = LE.FILIAL
+          AND LEP.ROMANEIO_PRODUTO = LE.ROMANEIO_PRODUTO
+        WHERE LEP.PRODUTO IS NOT NULL
+          AND LE.EMISSAO IS NOT NULL
+          AND LTRIM(RTRIM(ISNULL(LEP.PRODUTO, ''))) = @vf_produto
+          AND (LE.ENTRADA_CANCELADA = 0 OR LE.ENTRADA_CANCELADA IS NULL)
+          ${corFilterEntradaLoja}
+          ${entradaLojaFilialFilter}
+      ) entradas
+      GROUP BY filial
+    `;
+
+      try {
+        const entradasResult = await request.query<{ filial: string; primeiraEntradaFilial: Date | null }>(queryPrimeiraEntrada);
+        for (const r of entradasResult.recordset) {
+          const primeiraEntradaFilial = r.primeiraEntradaFilial ? new Date(r.primeiraEntradaFilial) : null;
+          const ex = byFilial.get(r.filial);
+          if (ex) {
+            ex.primeiraEntradaFilial =
+              primeiraEntradaFilial && (!ex.primeiraEntradaFilial || primeiraEntradaFilial < ex.primeiraEntradaFilial)
+                ? primeiraEntradaFilial
+                : ex.primeiraEntradaFilial;
+          } else {
+            byFilial.set(r.filial, {
+              filial: r.filial,
+              qtde12m: 0,
+              qtde60d: 0,
+              qtdeMesAtual: 0,
+              valor12m: 0,
+              custoUnitario: 0,
+              ultimaVenda: null,
+              primeiraEntradaFilial,
+              primeiraVendaFilial: null,
+            });
+          }
+        }
+      } catch (error) {
+        console.warn('[fetchVendasProdutoPorFilial] Falha ao carregar historico por filial; usando fallback seguro.', error);
+      }
+    }
+
     const nowMs = Date.now();
+    const buildHistoricoFilial = (primeiraEntradaFilial: Date | null, primeiraVendaFilial: Date | null) => {
+      // Entrada real e a base principal; venda mais antiga e fallback quando nao houver entrada.
+      const dataBase = primeiraEntradaFilial ?? primeiraVendaFilial;
+      if (!dataBase || Number.isNaN(dataBase.getTime())) {
+        return {
+          diasHistoricoFilial: 365,
+          mesesHistoricoFilial: 12,
+          historicoParcial: false,
+        };
+      }
+
+      const diasHistoricoFilial = Math.min(
+        365,
+        Math.max(0, Math.floor((nowMs - dataBase.getTime()) / msPerDay))
+      );
+      const mesesHistoricoFilial = Math.min(12, Math.max(1, diasHistoricoFilial / 30));
+      return {
+        diasHistoricoFilial,
+        mesesHistoricoFilial,
+        historicoParcial: diasHistoricoFilial < 365,
+      };
+    };
+
     return Array.from(byFilial.values())
       .sort((a, b) => a.filial.localeCompare(b.filial))
-      .map((r) => ({
-        ...r,
-        diasDesdeUltimaVenda: r.ultimaVenda ? Math.floor((nowMs - r.ultimaVenda.getTime()) / msPerDay) : null,
-      }));
+      .map((r) => {
+        const historico = buildHistoricoFilial(r.primeiraEntradaFilial, r.primeiraVendaFilial);
+        const dataBaseHistorico = r.primeiraEntradaFilial ?? r.primeiraVendaFilial;
+        return {
+          ...r,
+          diasDesdeUltimaVenda: r.ultimaVenda ? Math.floor((nowMs - r.ultimaVenda.getTime()) / msPerDay) : null,
+          primeiraEntradaFilial: dataBaseHistorico,
+          ...historico,
+        };
+      });
   });
 }
 
