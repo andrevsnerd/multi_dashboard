@@ -5594,6 +5594,10 @@ export interface ProdutoVendaUltimos3Meses {
   custoUnitario: number;
   /** Estoque atual (soma de todas as filiais filtradas) */
   estoqueAtual: number;
+  primeiraEntradaFilial?: string | null;
+  diasHistoricoFilial?: number;
+  mesesHistoricoFilial?: number;
+  historicoParcial?: boolean;
   percParticipacao: number;
   qtdSugerida: number;
 }
@@ -5648,6 +5652,8 @@ export async function fetchTopProdutosUltimos3Meses({
       ? ''
       : buildVendasFilialFilter(request, company, filialSel, 'vp');
     const estoqueFilialFilter = isProdutoLookup ? '' : buildFilialFilter(request, company, filialSel, 'e2');
+    const entradaEstoqueFilialFilter = isProdutoLookup ? '' : buildEntradaFilialFilter(request, company, filialSel, 'E', 'lcHistEntradaEstoque');
+    const entradaLojaFilialFilter = isProdutoLookup ? '' : buildEntradaFilialFilter(request, company, filialSel, 'LE', 'lcHistEntradaLoja');
     const grupoFilter = isProdutoLookup ? '' : buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilter = isProdutoLookup ? '' : buildLinhaFilter(request, company, linhas, 'p');
     const colecaoFilter = isProdutoLookup ? '' : buildColecaoFilter(request, company, colecoes, 'p');
@@ -5896,13 +5902,147 @@ export async function fetchTopProdutosUltimos3Meses({
       estoqueAtual: Math.round(Number(r.estoqueAtual ?? 0)),
     })).filter(r => r.produto !== '' && r.valor3meses > 0);
 
-    const totalValor = rows.reduce((s, r) => s + r.valor3meses, 0);
+    const makeHistoricoKey = (produto: string, cor?: string | null) =>
+      `${produto.trim()}|${porCor ? (cor ?? '').trim() : ''}`;
+    const historicoKeySql = (produtoExpr: string, corExpr: string) =>
+      porCor
+        ? `LTRIM(RTRIM(ISNULL(${produtoExpr}, ''))) + '|' + LTRIM(RTRIM(ISNULL(${corExpr}, '')))`
+        : `LTRIM(RTRIM(ISNULL(${produtoExpr}, ''))) + '|'`;
+    const buildHistorico = (dataBase: Date | null) => {
+      if (!dataBase || Number.isNaN(dataBase.getTime())) {
+        return {
+          diasHistoricoFilial: 365,
+          mesesHistoricoFilial: 12,
+          historicoParcial: false,
+        };
+      }
+      const msPerDay = 1000 * 60 * 60 * 24;
+      const diasHistoricoFilial = Math.min(365, Math.max(0, Math.floor((Date.now() - dataBase.getTime()) / msPerDay)));
+      return {
+        diasHistoricoFilial,
+        mesesHistoricoFilial: Math.min(12, Math.max(1, diasHistoricoFilial / 30)),
+        historicoParcial: diasHistoricoFilial < 365,
+      };
+    };
+
+    let rowsComHistorico = rows.map((r) => ({
+      ...r,
+      primeiraEntradaFilial: null as string | null,
+      ...buildHistorico(null),
+    }));
+
+    const historicoKeys = Array.from(new Set(rows.map((r) => makeHistoricoKey(r.produto, porCor ? r.cor : null))));
+    if (historicoKeys.length > 0) {
+      try {
+        request.input('lcHistoricoKeysJson', sql.NVarChar(sql.MAX), JSON.stringify(historicoKeys));
+        const vendasFilialHistoricoFilter = vendasFilialFilter.replace(/vp\./g, 'VH.');
+        const keyVarejo = historicoKeySql('VH.PRODUTO', 'VH.COR_PRODUTO');
+        const keyEcommerce = historicoKeySql('FP.PRODUTO', 'FP.COR_PRODUTO');
+        const keyEntradaEstoque = historicoKeySql('P.PRODUTO', 'P.COR_PRODUTO');
+        const keyEntradaLoja = historicoKeySql('LEP.PRODUTO', 'LEP.COR_PRODUTO');
+
+        const primeiraVendaResult = await request.query<{ itemKey: string; primeiraVendaFilial: Date | null }>(`
+          WITH keys AS (
+            SELECT CAST([value] AS VARCHAR(255)) AS itemKey
+            FROM OPENJSON(@lcHistoricoKeysJson)
+          )
+          SELECT itemKey, MIN(primeiraVendaFilial) AS primeiraVendaFilial
+          FROM (
+            SELECT
+              ${keyVarejo} AS itemKey,
+              VH.DATA_VENDA AS primeiraVendaFilial
+            FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO VH WITH (NOLOCK)
+            WHERE VH.DATA_VENDA < @fim3m
+              AND VH.QTDE > 0
+              AND VH.QTDE_CANCELADA = 0
+              AND ${keyVarejo} IN (SELECT itemKey FROM keys)
+              ${vendasFilialHistoricoFilter}
+
+            ${mergeScarfmeEcommerce ? `
+            UNION ALL
+
+            SELECT
+              ${keyEcommerce} AS itemKey,
+              F.EMISSAO AS primeiraVendaFilial
+            FROM FATURAMENTO F WITH (NOLOCK)
+            JOIN W_FATURAMENTO_PROD_02 FP WITH (NOLOCK)
+              ON F.FILIAL = FP.FILIAL AND F.NF_SAIDA = FP.NF_SAIDA AND F.SERIE_NF = FP.SERIE_NF
+            WHERE F.EMISSAO < @fim3m
+              AND F.NOTA_CANCELADA = 0
+              AND F.NATUREZA_SAIDA IN ('100.02', '100.022')
+              AND CAST(FP.QTDE AS FLOAT) > 0
+              AND ${keyEcommerce} IN (SELECT itemKey FROM keys)
+              ${ecommerceFatFilialFilter}
+            ` : ''}
+          ) vendas_historicas
+          GROUP BY itemKey
+        `);
+
+        const primeiraEntradaResult = await request.query<{ itemKey: string; primeiraEntradaFilial: Date | null }>(`
+          WITH keys AS (
+            SELECT CAST([value] AS VARCHAR(255)) AS itemKey
+            FROM OPENJSON(@lcHistoricoKeysJson)
+          )
+          SELECT itemKey, MIN(primeiraEntradaFilial) AS primeiraEntradaFilial
+          FROM (
+            SELECT
+              ${keyEntradaEstoque} AS itemKey,
+              E.EMISSAO AS primeiraEntradaFilial
+            FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+            JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK)
+              ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+              AND E.FILIAL = P.FILIAL
+            WHERE P.PRODUTO IS NOT NULL
+              AND E.EMISSAO IS NOT NULL
+              AND ${keyEntradaEstoque} IN (SELECT itemKey FROM keys)
+              ${entradaEstoqueFilialFilter}
+
+            UNION ALL
+
+            SELECT
+              ${keyEntradaLoja} AS itemKey,
+              LE.EMISSAO AS primeiraEntradaFilial
+            FROM LOJA_ENTRADAS_PRODUTO AS LEP WITH (NOLOCK)
+            INNER JOIN LOJA_ENTRADAS AS LE WITH (NOLOCK)
+              ON LEP.FILIAL = LE.FILIAL
+              AND LEP.ROMANEIO_PRODUTO = LE.ROMANEIO_PRODUTO
+            WHERE LEP.PRODUTO IS NOT NULL
+              AND LE.EMISSAO IS NOT NULL
+              AND (LE.ENTRADA_CANCELADA = 0 OR LE.ENTRADA_CANCELADA IS NULL)
+              AND ${keyEntradaLoja} IN (SELECT itemKey FROM keys)
+              ${entradaLojaFilialFilter}
+          ) entradas
+          GROUP BY itemKey
+        `);
+
+        const primeiraVendaMap = new Map(
+          primeiraVendaResult.recordset.map((r) => [r.itemKey, r.primeiraVendaFilial ? new Date(r.primeiraVendaFilial) : null])
+        );
+        const primeiraEntradaMap = new Map(
+          primeiraEntradaResult.recordset.map((r) => [r.itemKey, r.primeiraEntradaFilial ? new Date(r.primeiraEntradaFilial) : null])
+        );
+
+        rowsComHistorico = rows.map((r) => {
+          const key = makeHistoricoKey(r.produto, porCor ? r.cor : null);
+          const dataBase = primeiraEntradaMap.get(key) ?? primeiraVendaMap.get(key) ?? null;
+          return {
+            ...r,
+            primeiraEntradaFilial: dataBase ? dataBase.toISOString() : null,
+            ...buildHistorico(dataBase),
+          };
+        });
+      } catch (error) {
+        console.warn('[fetchTopProdutosUltimos3Meses] Falha ao carregar historico parcial por filial; usando fallback seguro.', error);
+      }
+    }
+
+    const totalValor = rowsComHistorico.reduce((s, r) => s + r.valor3meses, 0);
     if (totalValor === 0 || qtdCompra <= 0) {
-      return rows.map(r => ({ ...r, percParticipacao: 0, qtdSugerida: 0 }));
+      return rowsComHistorico.map(r => ({ ...r, percParticipacao: 0, qtdSugerida: 0 }));
     }
 
     // Distribuição proporcional por VALOR de venda — método da maior sobra (Hamilton)
-    const withExact = rows.map(r => {
+    const withExact = rowsComHistorico.map(r => {
       const perc = r.valor3meses / totalValor;
       const exato = perc * qtdCompra;
       const floor = Math.floor(exato);
@@ -5935,6 +6075,10 @@ export async function fetchTopProdutosUltimos3Meses({
         valor3meses: r.valor3meses,
         custoUnitario: r.custoUnitario,
         estoqueAtual: r.estoqueAtual,
+        primeiraEntradaFilial: r.primeiraEntradaFilial,
+        diasHistoricoFilial: r.diasHistoricoFilial,
+        mesesHistoricoFilial: r.mesesHistoricoFilial,
+        historicoParcial: r.historicoParcial,
         percParticipacao: Math.round(r.perc * 1000) / 10,
         qtdSugerida: r.floor + (boostSet.has(i) ? 1 : 0),
       }));

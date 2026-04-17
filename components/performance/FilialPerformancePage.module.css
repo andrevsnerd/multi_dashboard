@@ -868,6 +868,16 @@
   padding-bottom: 1px;
 }
 
+.partialHistoryBadge {
+  display: inline-flex;
+  margin-left: 4px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: middle;
+  cursor: help;
+}
+
 .abcBadgeMini {
   min-width: 22px;
   height: 22px;

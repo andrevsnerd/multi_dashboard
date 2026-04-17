@@ -68,6 +68,10 @@ interface ProdutoSugestao {
   /** Custo de reposição (cadastro), não preço médio de venda */
   custoUnitario?: number;
   estoqueAtual?: number;
+  primeiraEntradaFilial?: string | null;
+  diasHistoricoFilial?: number | null;
+  mesesHistoricoFilial?: number | null;
+  historicoParcial?: boolean | null;
   percParticipacao: number;
   qtdSugerida: number;
 }
@@ -93,6 +97,19 @@ function fmtBRL(n: number) {
 
 function fmtBRL2(n: number) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatHistoricoDate(value?: string | null): string {
+  if (!value) return "Nao encontrada";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function getMesesHistoricoFilial(item: { mesesHistoricoFilial?: number | null }): number {
+  const meses = Number(item.mesesHistoricoFilial ?? 12);
+  if (!Number.isFinite(meses)) return 12;
+  return Math.min(12, Math.max(1, meses));
 }
 
 // ─── ABC helpers (usados apenas na aba Análise ABC) ───────────────────────────
@@ -491,9 +508,18 @@ export default function ListaCompraSugeridaPage({
     x: number;
     y: number;
     mediaVendasMes: number;
+    mesesHistoricoFilial: number;
     estoqueAtual: number;
     limiteDias: number;
     qtdS: number;
+  }>(null);
+
+  const [historicoTooltip, setHistoricoTooltip] = useState<null | {
+    x: number;
+    y: number;
+    primeiraEntradaFilial: string | null;
+    diasHistoricoFilial: number;
+    mesesHistoricoFilial: number;
   }>(null);
 
   const [duracaoTooltip, setDuracaoTooltip] = useState<null | {
@@ -864,6 +890,7 @@ export default function ListaCompraSugeridaPage({
     () => (produtosABC.length > 0 ? calcularCurvas(produtosABC, qtdCompra) : []),
     [produtosABC, qtdCompra]
   );
+  const hasHistoricoParcialABC = produtosComCurva.some((p) => p.historicoParcial);
 
   // Modo Reposição Real: calcula qtd individualmente por produto (meta DIAS_META dias de cobertura)
   const produtosComCurvaFinal = useMemo((): ProdutoComCurva[] => {
@@ -887,13 +914,13 @@ export default function ListaCompraSugeridaPage({
 
   const temSugestaoS = (p: ProdutoComCurva) => {
     if (p.qtdFinal > 0 || p.qtdSuficiente) return false;
-    const mediaVendasMes = p.vendas3meses / 12;
+    const mediaVendasMes = p.vendas3meses / getMesesHistoricoFilial(p);
     // Dispara S se vende ≥ 2/mês em média e tem < 2 meses de cobertura de estoque
     return mediaVendasMes >= 2 && (p.estoqueAtual ?? 0) <= mediaVendasMes * 2;
   };
 
   const calcQtdS = (p: ProdutoComCurva) => {
-    const mediaVendasMes = p.vendas3meses / 12;
+    const mediaVendasMes = p.vendas3meses / getMesesHistoricoFilial(p);
     const { limiteDias } = getLimiteDiasReposicao(p);
     return Math.ceil((limiteDias / 30) * mediaVendasMes);
   };
@@ -1381,7 +1408,7 @@ export default function ListaCompraSugeridaPage({
               <div className={styles.summaryItem}>
                 <span className={styles.summaryLabel}>{modoReposicao ? "Cobertura Meta" : "Período Base"}</span>
                 <span className={styles.summaryValueNeutral} style={{ fontSize: 14 }}>
-                  {modoReposicao ? "Por item (60/90/120 dias)" : "Últimos 12 meses"}
+                  {modoReposicao ? "Por item (60/90/120 dias)" : hasHistoricoParcialABC ? "Historico real por item" : "Últimos 12 meses"}
                 </span>
               </div>
               <div className={styles.summaryDivider} />
@@ -1512,7 +1539,26 @@ export default function ListaCompraSugeridaPage({
                                     .catch(() => setVendasTooltip((prev) => prev ? { ...prev, loading: false } : null));
                                 }}
                                 onMouseLeave={() => setVendasTooltip(null)}
-                              >{fmt(p.vendas3meses)}</td>
+                              >
+                                {fmt(p.vendas3meses)}
+                                {p.historicoParcial ? (
+                                  <span
+                                    className={styles.partialHistoryBadge}
+                                    onMouseEnter={(e) =>
+                                      setHistoricoTooltip({
+                                        x: e.clientX,
+                                        y: e.clientY,
+                                        primeiraEntradaFilial: p.primeiraEntradaFilial ?? null,
+                                        diasHistoricoFilial: Number(p.diasHistoricoFilial ?? 365),
+                                        mesesHistoricoFilial: getMesesHistoricoFilial(p),
+                                      })
+                                    }
+                                    onMouseLeave={() => setHistoricoTooltip(null)}
+                                  >
+                                    (&lt;12m)
+                                  </span>
+                                ) : null}
+                              </td>
                               <td
                                 className={styles.right}
                                 onMouseEnter={(e) => {
@@ -1637,7 +1683,8 @@ export default function ListaCompraSugeridaPage({
                                 }
                                 if (temSugestaoS(p)) {
                                   const qtdS = calcQtdS(p);
-                                  const mediaVendasMes = p.vendas3meses / 12;
+                                  const mesesHistoricoFilial = getMesesHistoricoFilial(p);
+                                  const mediaVendasMes = p.vendas3meses / mesesHistoricoFilial;
                                   const { limiteDias } = getLimiteDiasReposicao(p);
                                   return (
                                     <td className={styles.qtdSugeridaS}>
@@ -1645,7 +1692,7 @@ export default function ListaCompraSugeridaPage({
                                         {fmt(qtdS)}
                                         <span
                                           className={styles.badgeS}
-                                          onMouseEnter={(e) => setSugestaoSTooltip({ x: e.clientX, y: e.clientY, mediaVendasMes, estoqueAtual: p.estoqueAtual ?? 0, limiteDias, qtdS })}
+                                          onMouseEnter={(e) => setSugestaoSTooltip({ x: e.clientX, y: e.clientY, mediaVendasMes, mesesHistoricoFilial, estoqueAtual: p.estoqueAtual ?? 0, limiteDias, qtdS })}
                                           onMouseLeave={() => setSugestaoSTooltip(null)}
                                         >S</span>
                                       </span>
@@ -1872,6 +1919,7 @@ export default function ListaCompraSugeridaPage({
             Produto com vendas consistentes e estoque abaixo da média mensal
           </div>
           <div className={styles.tooltipDivider} />
+          <div className={styles.tooltipLine}><strong>Base historica filial:</strong> {sugestaoSTooltip.mesesHistoricoFilial.toFixed(1)} meses</div>
           <div className={styles.tooltipLine}><strong>Média de vendas:</strong> {sugestaoSTooltip.mediaVendasMes.toFixed(1)} un/mês</div>
           <div className={styles.tooltipLine}><strong>Estoque atual:</strong> {fmt(sugestaoSTooltip.estoqueAtual)} un</div>
           <div className={styles.tooltipLine}><strong>Cobertura mínima:</strong> {sugestaoSTooltip.limiteDias} dias</div>
@@ -1880,6 +1928,22 @@ export default function ListaCompraSugeridaPage({
           <div className={styles.tooltipLine} style={{ color: "#94a3b8", marginTop: 4, fontSize: 11 }}>
             = {sugestaoSTooltip.limiteDias / 30} meses × {sugestaoSTooltip.mediaVendasMes.toFixed(1)} un/mês
           </div>
+        </div>
+      )}
+
+      {historicoTooltip && (
+        <div
+          className={styles.tooltip}
+          style={{ left: historicoTooltip.x + 12, top: historicoTooltip.y + 12 }}
+        >
+          <div className={styles.tooltipTitle}>Historico parcial na filial</div>
+          <div className={styles.tooltipLine}>Este item ainda nao completou 12 meses de historico na filial selecionada.</div>
+          <div className={styles.tooltipDivider} />
+          <div className={styles.tooltipLine}><strong>Data base historico:</strong> {formatHistoricoDate(historicoTooltip.primeiraEntradaFilial)}</div>
+          <div className={styles.tooltipLine}><strong>Dias de historico:</strong> {fmt(historicoTooltip.diasHistoricoFilial)}</div>
+          <div className={styles.tooltipLine}><strong>Meses de historico:</strong> {historicoTooltip.mesesHistoricoFilial.toFixed(1)}</div>
+          <div className={styles.tooltipDivider} />
+          <div className={styles.tooltipLine}>Os calculos historicos usam o periodo real disponivel ate completar 12 meses.</div>
         </div>
       )}
 

@@ -78,6 +78,10 @@ interface CompraMetricas {
   custoUnit: number | null;
   estoqueFilial: number | null;
   diasDesdeUltimaVenda: number | null;
+  primeiraEntradaFilial: string | null;
+  diasHistoricoFilial: number | null;
+  mesesHistoricoFilial: number | null;
+  historicoParcial: boolean | null;
 }
 
 interface CompraCurvaInfo {
@@ -98,6 +102,13 @@ function fmtBRL(n: number) {
 
 function fmtBRL2(n: number) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatHistoricoDate(value?: string | null): string {
+  if (!value) return "Nao encontrada";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 function fmtCurrency(n: number) {
@@ -244,6 +255,70 @@ function buildCompraItemKey(produto?: string | null, corProduto?: string | null)
   return `${normalizeCompraKey(produto)}|${normalizeCompraKey(corProduto)}`;
 }
 
+function getMesesHistoricoFilialCompra(item: { mesesHistoricoFilial?: number | null }): number {
+  const meses = Number(item.mesesHistoricoFilial ?? 12);
+  if (!Number.isFinite(meses)) return 12;
+  return Math.min(12, Math.max(1, meses));
+}
+
+function getHistoricoFilialFallbackCompra() {
+  return {
+    primeiraEntradaFilial: null as string | null,
+    diasHistoricoFilial: 365,
+    mesesHistoricoFilial: 12,
+    historicoParcial: false,
+  };
+}
+
+function calculateHistoricoFilialCompra(primeiraEntradaFilial?: string | Date | null) {
+  if (!primeiraEntradaFilial) return getHistoricoFilialFallbackCompra();
+  const data = primeiraEntradaFilial instanceof Date ? primeiraEntradaFilial : new Date(primeiraEntradaFilial);
+  if (Number.isNaN(data.getTime())) return getHistoricoFilialFallbackCompra();
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const diasHistoricoFilial = Math.min(365, Math.max(0, Math.floor((Date.now() - data.getTime()) / msPerDay)));
+  return {
+    primeiraEntradaFilial: data.toISOString(),
+    diasHistoricoFilial,
+    mesesHistoricoFilial: Math.min(12, Math.max(1, diasHistoricoFilial / 30)),
+    historicoParcial: diasHistoricoFilial < 365,
+  };
+}
+
+function mergeHistoricoFilialRowsCompra(
+  rows: Array<{
+    primeiraEntradaFilial?: string | null;
+    diasHistoricoFilial?: number | null;
+    mesesHistoricoFilial?: number | null;
+    historicoParcial?: boolean | null;
+  }>
+) {
+  let primeiraEntrada: Date | null = null;
+  for (const row of rows) {
+    if (!row.primeiraEntradaFilial) continue;
+    const data = new Date(row.primeiraEntradaFilial);
+    if (Number.isNaN(data.getTime())) continue;
+    if (!primeiraEntrada || data < primeiraEntrada) primeiraEntrada = data;
+  }
+  if (primeiraEntrada) return calculateHistoricoFilialCompra(primeiraEntrada);
+
+  const parcial = rows.find(
+    (row) =>
+      row.diasHistoricoFilial != null &&
+      row.mesesHistoricoFilial != null &&
+      row.historicoParcial != null
+  );
+  if (parcial) {
+    return {
+      primeiraEntradaFilial: null,
+      diasHistoricoFilial: Math.min(365, Math.max(0, Number(parcial.diasHistoricoFilial ?? 365))),
+      mesesHistoricoFilial: getMesesHistoricoFilialCompra({ mesesHistoricoFilial: parcial.mesesHistoricoFilial }),
+      historicoParcial: Boolean(parcial.historicoParcial),
+    };
+  }
+
+  return getHistoricoFilialFallbackCompra();
+}
+
 function getLimiteDiasReposicao(item: { linha?: string | null; subgrupo?: string | null }) {
   const linha = normalizeCompraKey(item.linha);
   const subgrupo = normalizeCompraKey(item.subgrupo);
@@ -273,6 +348,7 @@ function calcQtdSugestaoEInfo(item: {
   qtde12m?: number | null;
   estoqueFilial?: number | null;
   diasDesdeUltimaVenda?: number | null;
+  mesesHistoricoFilial?: number | null;
   linha?: string | null;
   subgrupo?: string | null;
 }): {
@@ -287,8 +363,9 @@ function calcQtdSugestaoEInfo(item: {
   if (estoqueAtual > 0) return null;
   const dias = item.diasDesdeUltimaVenda;
   if (dias == null || dias < 30) return null;
+  const mesesBase = getMesesHistoricoFilialCompra(item);
   const mesesSemVenda = dias / 30;
-  const mesesAtivos = 12 - mesesSemVenda;
+  const mesesAtivos = mesesBase - mesesSemVenda;
   if (mesesAtivos < 1) return null;
   const velocidadeAjustada = qtde12m / mesesAtivos;
   if (velocidadeAjustada < 0.5) return null;
@@ -302,6 +379,7 @@ function getReposicaoCompraView(item: {
   vendasMesAtual?: number | null;
   estoqueFilial?: number | null;
   diasDesdeUltimaVenda?: number | null;
+  mesesHistoricoFilial?: number | null;
   linha?: string | null;
   subgrupo?: string | null;
 }, diasCorridosMes: number): {
@@ -326,7 +404,7 @@ function getReposicaoCompraView(item: {
     return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdSuficiente: true, semSugestao: false };
   }
 
-  const mediaVendasMes = Number(item.qtde12m ?? 0) / 12;
+  const mediaVendasMes = Number(item.qtde12m ?? 0) / getMesesHistoricoFilialCompra(item);
   if (mediaVendasMes >= 1 && estoqueAtual <= mediaVendasMes * 2) {
     return {
       qtdFinal: 0,
@@ -390,26 +468,42 @@ async function fetchVendasItemMetricasCompra(
   produto: string,
   corProduto: string | null
 ): Promise<Omit<CompraMetricas, "estoqueFilial"> | null> {
-  try {
+  type VendasItemMetricasCompraApiRow = {
+    qtde12m: number;
+    qtde60d: number;
+    qtdeMesAtual?: number;
+    valor12m?: number;
+    custoUnitario?: number;
+    diasDesdeUltimaVenda?: number | null;
+    primeiraEntradaFilial?: string | null;
+    diasHistoricoFilial?: number | null;
+    mesesHistoricoFilial?: number | null;
+    historicoParcial?: boolean | null;
+  };
+
+  const fetchRows = async (includeHistorico: boolean): Promise<VendasItemMetricasCompraApiRow[]> => {
     const params = new URLSearchParams({ company: companyKey, produto: produto.trim() });
+    if (includeHistorico) params.set("includeHistorico", "true");
     if (filial && filial.trim()) params.set("filial", filial.trim());
     if (corProduto) params.set("corProduto", corProduto.trim());
     const res = await fetch(`/api/controle-estoque/vendas-por-filial-item?${params}`, { cache: "no-store" });
-    if (!res.ok) return null;
-    const json = (await res.json()) as {
-      data?: Array<{
-        qtde12m: number;
-        qtde60d: number;
-        qtdeMesAtual?: number;
-        valor12m?: number;
-        custoUnitario?: number;
-        diasDesdeUltimaVenda?: number | null;
-      }>;
-    };
-    const rows = json.data || [];
+    if (!res.ok) throw new Error("Erro ao carregar metricas de vendas");
+    const json = (await res.json()) as { data?: VendasItemMetricasCompraApiRow[] };
+    return json.data || [];
+  };
+
+  try {
+    let rows: VendasItemMetricasCompraApiRow[];
+    try {
+      rows = await fetchRows(true);
+    } catch {
+      rows = await fetchRows(false);
+    }
+
     const totalValor = rows.reduce((s, r) => s + Number(r.valor12m ?? 0), 0);
     const maxCusto = rows.reduce((max, r) => Math.max(max, Number(r.custoUnitario ?? 0)), 0);
     const diasValidos = rows.map((r) => r.diasDesdeUltimaVenda).filter((d): d is number => d != null);
+    const historicoFilial = mergeHistoricoFilialRowsCompra(rows);
     return {
       qtde12m: Math.round(rows.reduce((s, r) => s + Number(r.qtde12m ?? 0), 0)),
       qtde60d: Math.round(rows.reduce((s, r) => s + Number(r.qtde60d ?? 0), 0)),
@@ -417,6 +511,7 @@ async function fetchVendasItemMetricasCompra(
       valor12m: totalValor > 0 ? Math.round(totalValor) : null,
       custoUnit: maxCusto > 0 ? maxCusto : null,
       diasDesdeUltimaVenda: diasValidos.length > 0 ? Math.min(...diasValidos) : null,
+      ...historicoFilial,
     };
   } catch {
     return null;
@@ -540,6 +635,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     x: number;
     y: number;
     mediaVendasMes: number;
+    mesesHistoricoFilial: number;
     estoqueAtual: number;
     limiteDias: number;
     qtdS: number;
@@ -548,11 +644,19 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     x: number;
     y: number;
     qtde12m: number;
+    mesesHistoricoFilial: number;
     mesesSemVenda: number;
     mesesAtivos: number;
     velocidadeAjustada: number;
     limiteDias: number;
     qtdE: number;
+  }>(null);
+  const [compraHistoricoTooltip, setCompraHistoricoTooltip] = useState<null | {
+    x: number;
+    y: number;
+    primeiraEntradaFilial: string | null;
+    diasHistoricoFilial: number;
+    mesesHistoricoFilial: number;
   }>(null);
 
   // Quando filial muda, voltar para aba de produtos
@@ -660,6 +764,10 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
             custoUnit: vendas?.custoUnit ?? (p.custo > 0 ? p.custo : null),
             estoqueFilial,
             diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
+            primeiraEntradaFilial: vendas?.primeiraEntradaFilial ?? null,
+            diasHistoricoFilial: vendas?.diasHistoricoFilial ?? null,
+            mesesHistoricoFilial: vendas?.mesesHistoricoFilial ?? null,
+            historicoParcial: vendas?.historicoParcial ?? null,
           },
         };
       })
@@ -812,11 +920,19 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     const estoqueFilial = metric?.estoqueFilial ?? null;
     const custoUnit = metric?.custoUnit ?? (p.custo > 0 ? p.custo : null);
     const diasDesdeUltimaVenda = metric?.diasDesdeUltimaVenda ?? null;
+    const primeiraEntradaFilial = metric?.primeiraEntradaFilial ?? null;
+    const diasHistoricoFilial = metric?.diasHistoricoFilial ?? null;
+    const mesesHistoricoFilial = metric?.mesesHistoricoFilial ?? null;
+    const historicoParcial = metric?.historicoParcial ?? false;
     const itemCompra = {
       qtde12m,
       vendasMesAtual,
       estoqueFilial,
       diasDesdeUltimaVenda,
+      primeiraEntradaFilial,
+      diasHistoricoFilial,
+      mesesHistoricoFilial,
+      historicoParcial,
       linha: p.categoria,
       subgrupo: p.subgrupo ?? null,
     };
@@ -888,13 +1004,16 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       if (!abc) return;
       const hoverKey = `${compraFilialScope}::abc::${itemKey}`;
       compraAbcHoverKeyRef.current = hoverKey;
+      const periodoHistorico = historicoParcial
+        ? `Ultimos ${getMesesHistoricoFilialCompra({ mesesHistoricoFilial }).toFixed(1)} meses (historico real da filial)`
+        : "Ultimos 12 meses";
       setCompraAbcTooltip({
         x: e.clientX,
         y: e.clientY,
         produto: p.produto,
         cor: p.corDescricao || p.cor || "",
         escopo: selectedFilial ? "loja" : "geral",
-        periodo: "Ultimos 12 meses",
+        periodo: periodoHistorico,
         regra: "Classificacao por faturamento acumulado (A ate 80%, B ate 95%, C acima de 95%).",
         curva: abc.curva,
         valor12m: Number(valor12m ?? 0),
@@ -976,7 +1095,36 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
           )}
         </td>
         <td className={styles.right}><span className={styles.cellMetric} onMouseEnter={(e) => showVendasTooltip(e, "valor12m")} onMouseLeave={() => { compraVendasHoverKeyRef.current = null; setCompraVendasTooltip(null); }}>{valor12m != null ? fmtBRL(valor12m) : "—"}</span></td>
-        <td className={styles.right}><span className={styles.cellMetric} onMouseEnter={(e) => showVendasTooltip(e, "12m")} onMouseLeave={() => { compraVendasHoverKeyRef.current = null; setCompraVendasTooltip(null); }}>{qtde12m != null ? fmt(qtde12m) : "—"}</span></td>
+        <td className={styles.right}>
+          <span
+            className={styles.cellMetric}
+            onMouseEnter={(e) => showVendasTooltip(e, "12m")}
+            onMouseLeave={() => { compraVendasHoverKeyRef.current = null; setCompraVendasTooltip(null); }}
+          >
+            {qtde12m != null ? (
+              <>
+                {fmt(qtde12m)}
+                {historicoParcial ? (
+                  <span
+                    className={styles.partialHistoryBadge}
+                    onMouseEnter={(e) =>
+                      setCompraHistoricoTooltip({
+                        x: e.clientX,
+                        y: e.clientY,
+                        primeiraEntradaFilial,
+                        diasHistoricoFilial: Number(diasHistoricoFilial ?? 365),
+                        mesesHistoricoFilial: getMesesHistoricoFilialCompra({ mesesHistoricoFilial }),
+                      })
+                    }
+                    onMouseLeave={() => setCompraHistoricoTooltip(null)}
+                  >
+                    (&lt;12m)
+                  </span>
+                ) : null}
+              </>
+            ) : "—"}
+          </span>
+        </td>
         <td className={styles.right}><span className={styles.cellMetric} onMouseEnter={showEstoqueTooltip} onMouseLeave={() => { compraEstoqueHoverKeyRef.current = null; setCompraEstoqueTooltip(null); }}>{estoqueFilial != null ? fmt(estoqueFilial) : "—"}</span></td>
         <td className={styles.right}><span className={styles.cellMetric} onMouseEnter={(e) => showVendasTooltip(e, "60d")} onMouseLeave={() => { compraVendasHoverKeyRef.current = null; setCompraVendasTooltip(null); }}>{qtde60d != null ? fmt(qtde60d) : "—"}</span></td>
         <td className={styles.right}>
@@ -1025,14 +1173,15 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
               return <span className={styles.reporAdd} onMouseEnter={(e) => setCompraSugestaoTooltip({ x: e.clientX, y: e.clientY, titulo: "Sugestao de reposicao (calculo principal)", regra: "Qtd = consumo/dia x (limite de cobertura - duracao atual).", limiteDias, vendasMesAtual: vendasMes, diasCorridos: diasCorridosMes, consumoDiario, estoqueAtual, duracaoAtual, qtdCalculada: sugestao.qtdFinal })} onMouseLeave={() => setCompraSugestaoTooltip(null)}>{fmt(sugestao.qtdFinal)}</span>;
             }
             if (sugestao.qtdS > 0) {
-              const mediaVendasMes = Number(qtde12m ?? 0) / 12;
+              const mesesBase = getMesesHistoricoFilialCompra({ mesesHistoricoFilial });
+              const mediaVendasMes = Number(qtde12m ?? 0) / mesesBase;
               const limiteDias = getLimiteDiasReposicao(itemCompra);
-              return <span className={styles.reporAdd}>{fmt(sugestao.qtdS)}{" "}<span className={styles.reporRuleBadgeS} onMouseEnter={(e) => setCompraSugestaoSTooltip({ x: e.clientX, y: e.clientY, mediaVendasMes, estoqueAtual: Number(estoqueFilial ?? 0), limiteDias, qtdS: sugestao.qtdS })} onMouseLeave={() => setCompraSugestaoSTooltip(null)}>S</span></span>;
+              return <span className={styles.reporAdd}>{fmt(sugestao.qtdS)}{" "}<span className={styles.reporRuleBadgeS} onMouseEnter={(e) => setCompraSugestaoSTooltip({ x: e.clientX, y: e.clientY, mediaVendasMes, mesesHistoricoFilial: mesesBase, estoqueAtual: Number(estoqueFilial ?? 0), limiteDias, qtdS: sugestao.qtdS })} onMouseLeave={() => setCompraSugestaoSTooltip(null)}>S</span></span>;
             }
             if (sugestao.qtdE > 0) {
               const eInfo = calcQtdSugestaoEInfo(itemCompra);
               const limiteDias = getLimiteDiasReposicao(itemCompra);
-              return <span className={styles.reporAdd}>{fmt(sugestao.qtdE)}{" "}<span className={styles.reporRuleBadgeE} onMouseEnter={(e) => eInfo && setCompraSugestaoETooltip({ x: e.clientX, y: e.clientY, qtde12m: Number(qtde12m ?? 0), mesesSemVenda: eInfo.mesesSemVenda, mesesAtivos: eInfo.mesesAtivos, velocidadeAjustada: eInfo.velocidadeAjustada, limiteDias, qtdE: sugestao.qtdE })} onMouseLeave={() => setCompraSugestaoETooltip(null)}>E</span></span>;
+              return <span className={styles.reporAdd}>{fmt(sugestao.qtdE)}{" "}<span className={styles.reporRuleBadgeE} onMouseEnter={(e) => eInfo && setCompraSugestaoETooltip({ x: e.clientX, y: e.clientY, qtde12m: Number(qtde12m ?? 0), mesesHistoricoFilial: getMesesHistoricoFilialCompra({ mesesHistoricoFilial }), mesesSemVenda: eInfo.mesesSemVenda, mesesAtivos: eInfo.mesesAtivos, velocidadeAjustada: eInfo.velocidadeAjustada, limiteDias, qtdE: sugestao.qtdE })} onMouseLeave={() => setCompraSugestaoETooltip(null)}>E</span></span>;
             }
             if (sugestao.semSugestao) return <span className={styles.cellMetric}>—</span>;
             const vendasMes = Number(vendasMesAtual ?? 0);
@@ -1055,13 +1204,6 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       <div className={styles.headerCard}>
         <div className={styles.header}>
           <div className={styles.headerLeft}>
-            <div className={styles.iconWrapper}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="20" x2="18" y2="10" />
-                <line x1="12" y1="20" x2="12" y2="4" />
-                <line x1="6" y1="20" x2="6" y2="14" />
-              </svg>
-            </div>
             <div>
               <h1 className={styles.title}>{pageTitle}</h1>
               <p className={styles.subtitle}>{pageSubtitle}</p>
@@ -1077,7 +1219,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                   companyKey={companyKey}
                   value={selectedFilial}
                   onChange={setSelectedFilial}
-                  label="Filial"
+                  label=""
                 />
               </div>
             </div>
@@ -1598,7 +1740,10 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
           <div className={styles.metricTooltipMeta}><strong>Periodo:</strong> {compraAbcTooltip.periodo}</div>
           <div className={styles.metricTooltipLine} style={{ marginTop: 6 }}>{compraAbcTooltip.regra}</div>
           <div className={styles.metricTooltipDivider} />
-          <div className={styles.metricTooltipRow}><span>Valor 12 meses</span><span>{fmtBRL(compraAbcTooltip.valor12m)}</span></div>
+          <div className={styles.metricTooltipRow}>
+            <span>{compraAbcTooltip.periodo === "Ultimos 12 meses" ? "Valor 12 meses" : "Valor no periodo"}</span>
+            <span>{fmtBRL(compraAbcTooltip.valor12m)}</span>
+          </div>
           <div className={styles.metricTooltipRow}><span>Participacao na lista</span><span>{compraAbcTooltip.percParticipacao.toFixed(1)}%</span></div>
           <div className={styles.metricTooltipRow}><span>Acumulado</span><span>{compraAbcTooltip.percCumulativo.toFixed(1)}%</span></div>
           <div className={styles.metricTooltipDivider} />
@@ -1643,9 +1788,22 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
           <div className={styles.metricTooltipLine}><strong>Qtd sugerida:</strong> {fmt(compraSugestaoTooltip.qtdCalculada)} un</div>
         </div>
       )}
+      {compraHistoricoTooltip && (
+        <div className={styles.metricTooltip} style={{ left: compraHistoricoTooltip.x + 12, top: compraHistoricoTooltip.y + 12 }}>
+          <div className={styles.metricTooltipTitle}>Historico parcial na filial</div>
+          <div className={styles.metricTooltipLine}>Este item ainda nao completou 12 meses de historico na filial selecionada.</div>
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine}><strong>Data base historico:</strong> {formatHistoricoDate(compraHistoricoTooltip.primeiraEntradaFilial)}</div>
+          <div className={styles.metricTooltipLine}><strong>Dias de historico:</strong> {fmt(compraHistoricoTooltip.diasHistoricoFilial)}</div>
+          <div className={styles.metricTooltipLine}><strong>Meses de historico:</strong> {compraHistoricoTooltip.mesesHistoricoFilial.toFixed(1)}</div>
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine}>Os calculos historicos usam o periodo real disponivel ate completar 12 meses.</div>
+        </div>
+      )}
       {compraSugestaoSTooltip && (
         <div className={styles.metricTooltip} style={{ left: compraSugestaoSTooltip.x + 12, top: compraSugestaoSTooltip.y + 12 }}>
           <div className={styles.metricTooltipTitle}>Regra S (mesma logica da ABC)</div>
+          <div className={styles.metricTooltipLine}><strong>Base historica filial:</strong> {compraSugestaoSTooltip.mesesHistoricoFilial.toFixed(1)} meses</div>
           <div className={styles.metricTooltipLine}><strong>Media de vendas:</strong> {compraSugestaoSTooltip.mediaVendasMes.toFixed(1)} un/mes</div>
           <div className={styles.metricTooltipLine}><strong>Estoque atual:</strong> {fmt(compraSugestaoSTooltip.estoqueAtual)} un</div>
           <div className={styles.metricTooltipLine}><strong>Cobertura minima:</strong> {compraSugestaoSTooltip.limiteDias} dias</div>
@@ -1661,7 +1819,8 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
           <div className={styles.metricTooltipTitle}>Regra E - Produto parado por falta de estoque</div>
           <div className={styles.metricTooltipLine}>A media mensal estava subestimada porque o produto ficou sem estoque.</div>
           <div className={styles.metricTooltipDivider} />
-          <div className={styles.metricTooltipLine}><strong>Vendas nos ultimos 12m:</strong> {fmt(compraSugestaoETooltip.qtde12m)} un</div>
+          <div className={styles.metricTooltipLine}><strong>Vendas no periodo base:</strong> {fmt(compraSugestaoETooltip.qtde12m)} un</div>
+          <div className={styles.metricTooltipLine}><strong>Base historica filial:</strong> {compraSugestaoETooltip.mesesHistoricoFilial.toFixed(1)} meses</div>
           <div className={styles.metricTooltipLine}><strong>Sem vendas ha:</strong> ~{Math.round(compraSugestaoETooltip.mesesSemVenda)} meses ({Math.round(compraSugestaoETooltip.mesesSemVenda * 30)} dias)</div>
           <div className={styles.metricTooltipLine}><strong>Periodo ativo estimado:</strong> ~{compraSugestaoETooltip.mesesAtivos.toFixed(1)} meses</div>
           <div className={styles.metricTooltipDivider} />

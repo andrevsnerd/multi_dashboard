@@ -87,7 +87,7 @@ export default function FilialFilter({
 
   return (
     <div className={styles.container}>
-      <span className={styles.label}>{label}</span>
+      {label ? <span className={styles.label}>{label}</span> : null}
       <button
         type="button"
         className={`${styles.button} ${isOpen ? styles.buttonActive : ""}`}
