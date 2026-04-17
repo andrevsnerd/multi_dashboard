@@ -6,6 +6,7 @@ import {
   processarVendas,
   processarEcommerce,
   processarEntradas,
+  processarSaidas,
 } from '@/lib/utils/processRelatorios';
 
 export async function POST(request: Request) {
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
       );
     }
 
-    let resultado: Record<string, any>[] = [];
+    let resultado: Record<string, unknown>[] = [];
 
     switch (tipo) {
       case 'produtos':
@@ -75,8 +76,23 @@ export async function POST(request: Request) {
         );
         break;
 
+      case 'saidas':
+        if (!dadosAuxiliares?.produtos || !dadosAuxiliares?.cores) {
+          return NextResponse.json(
+            { error: 'Dados auxiliares (produtos, cores) sao obrigatorios para saidas' },
+            { status: 400 }
+          );
+        }
+        resultado = processarSaidas(
+          dados,
+          dadosAuxiliares.produtos,
+          dadosAuxiliares.cores
+        );
+        break;
+
       case 'produtos_barra':
       case 'cores':
+      case 'filiais':
         // Não precisam processamento
         resultado = dados;
         break;

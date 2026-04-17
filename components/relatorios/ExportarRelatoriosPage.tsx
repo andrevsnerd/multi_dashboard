@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { exportToExcel, exportToCSV } from "@/lib/utils/exportRelatorios";
 import styles from "./ExportarRelatoriosPage.module.css";
 
@@ -10,323 +10,515 @@ type RelatorioType =
   | "vendas"
   | "ecommerce"
   | "entradas"
+  | "saidas"
   | "produtos_barra"
-  | "cores";
+  | "cores"
+  | "filiais";
 
-// Apenas relatórios que são realmente exportados (excluindo auxiliares como produtos_barra e cores)
-type RelatorioExportavel = 
+type RelatorioExportavel =
   | "produtos"
   | "estoque"
   | "vendas"
   | "ecommerce"
-  | "entradas";
+  | "entradas"
+  | "saidas";
+
+type RelatorioRow = Record<string, unknown>;
 
 interface RelatorioStatus {
-  tipo: RelatorioType;
+  tipo: RelatorioExportavel;
   nome: string;
   status: "pendente" | "carregando" | "processando" | "pronto" | "erro";
   registros?: number;
-  dados?: Record<string, any>[];
+  dados?: RelatorioRow[];
   erro?: string;
-  tempoDecorrido?: number; // em segundos
+  tempoDecorrido?: number;
 }
 
-// Mapeamento dos nomes de arquivo padrão (exatamente como no script Python)
-const NOMES_ARQUIVO: Record<RelatorioType, string> = {
-  produtos: "produtos_tratados",
-  estoque: "estoque_tratados",
-  vendas: "vendas_tratadas",
-  ecommerce: "ecommerce",
-  entradas: "entradas",
-  produtos_barra: "produtos_barra",
-  cores: "cores",
-};
+const RELATORIOS_EXPORTAVEIS: RelatorioExportavel[] = [
+  "produtos",
+  "estoque",
+  "vendas",
+  "ecommerce",
+  "entradas",
+  "saidas",
+];
 
-// Apenas relatórios que são realmente exportados (excluindo auxiliares como produtos_barra e cores)
 const RELATORIO_INFO: Record<RelatorioExportavel, { nome: string; ordem: number }> = {
   produtos: { nome: "Produtos Tratados", ordem: 1 },
   estoque: { nome: "Estoque Tratado", ordem: 2 },
   vendas: { nome: "Vendas Tratadas", ordem: 3 },
   ecommerce: { nome: "E-commerce", ordem: 4 },
   entradas: { nome: "Entradas", ordem: 5 },
+  saidas: { nome: "Saidas", ordem: 6 },
 };
 
-export default function ExportarRelatoriosPage() {
-  const [relatorios, setRelatorios] = useState<RelatorioStatus[]>(() => {
-    return Object.entries(RELATORIO_INFO)
-      .sort(([, a], [, b]) => a.ordem - b.ordem)
-      .map(([tipo, info]) => ({
-        tipo: tipo as RelatorioType,
-        nome: info.nome,
-        status: "pendente" as const,
-      }));
+const NOMES_ARQUIVO: Record<RelatorioExportavel, string> = {
+  produtos: "produtos_tratados",
+  estoque: "estoque_tratados",
+  vendas: "vendas_tratadas",
+  ecommerce: "ecommerce",
+  entradas: "entradas",
+  saidas: "saidas",
+};
+
+const DEPENDENCIAS: Record<RelatorioExportavel, RelatorioType[]> = {
+  produtos: ["produtos_barra"],
+  estoque: ["produtos", "produtos_barra"],
+  vendas: ["produtos_barra"],
+  ecommerce: [],
+  entradas: ["produtos", "cores"],
+  saidas: ["produtos", "cores"],
+};
+
+const FILIAIS_CONSIDERADAS = [
+  "SCARF ME - HIGIENOPOLIS 2",
+  "SCARFME - IBIRAPUERA LLL",
+  "SCARFME ME - PAULISTA FFF",
+  "SCARF ME - PAULISTA RSR",
+  "SCARF ME - PAULISTA FFFR",
+  "SCARFME MATRIZ CMS",
+  "SCARF ME - MATRIZ",
+  "SCARF ME - MATRIZ LLL",
+  "SCARF ME MATRIZ - FFF",
+  "SCARF ME MATRIZ - RSR",
+  "MSC COMERCIO DE LENCOS LT",
+  "CIDADE DE SP - LLL",
+  "GUARULHOS - RSR",
+  "IGUATEMI SP - JJJ",
+  "MORUMBI - JJJ",
+  "NERD CAMPINAS",
+  "NERD CENTER NORTE",
+  "NERD HIGIENOPOLIS",
+  "NERD LEBLON",
+  "NERD MORUMBI RDRRRJ",
+  "NERD MORUMBI RDRRX",
+  "NERD TIJUCA RDRRX",
+  "NERD VILLA LOBOS",
+  "OSCAR FREIRE - FSZ",
+  "VILLA LOBOS - LLL",
+];
+
+function criarRelatoriosIniciais(): RelatorioStatus[] {
+  return Object.entries(RELATORIO_INFO)
+    .sort(([, a], [, b]) => a.ordem - b.ordem)
+    .map(([tipo, info]) => ({
+      tipo: tipo as RelatorioExportavel,
+      nome: info.nome,
+      status: "pendente" as const,
+    }));
+}
+
+function normalizarFilial(valor: unknown): string {
+  return String(valor ?? "").replace(/\u00a0/g, " ").trim();
+}
+
+function determinarQueriesNecessarias(relatorios: RelatorioExportavel[]): Set<RelatorioType> {
+  const queries = new Set<RelatorioType>(relatorios);
+
+  relatorios.forEach(relatorio => {
+    DEPENDENCIAS[relatorio].forEach(dep => queries.add(dep));
   });
 
+  let mudou = true;
+  while (mudou) {
+    mudou = false;
+    Array.from(queries).forEach(item => {
+      if (item in DEPENDENCIAS) {
+        DEPENDENCIAS[item as RelatorioExportavel].forEach(dep => {
+          if (!queries.has(dep)) {
+            queries.add(dep);
+            mudou = true;
+          }
+        });
+      }
+    });
+  }
+
+  if (relatorios.some(r => ["vendas", "estoque", "ecommerce", "entradas", "saidas"].includes(r))) {
+    queries.add("filiais");
+  }
+
+  return queries;
+}
+
+function filtrarPorFiliais(dfs: Partial<Record<RelatorioType, RelatorioRow[]>>) {
+  const consideradas = new Set(FILIAIS_CONSIDERADAS.map(normalizarFilial));
+  const filiais = dfs.filiais ?? [];
+  const codFiliaisConsiderados = new Set<number>();
+
+  filiais.forEach(row => {
+    if (consideradas.has(normalizarFilial(row.FILIAL))) {
+      const cod = Number(row.COD_FILIAL);
+      if (Number.isFinite(cod)) codFiliaisConsiderados.add(Math.trunc(cod));
+    }
+  });
+
+  (["vendas", "ecommerce", "entradas", "saidas"] as RelatorioExportavel[]).forEach(tipo => {
+    const dados = dfs[tipo];
+    if (!dados || dados.length === 0) return;
+
+    if (tipo === "vendas" && "CODIGO_FILIAL" in dados[0] && codFiliaisConsiderados.size > 0) {
+      dfs[tipo] = dados.filter(row => codFiliaisConsiderados.has(Math.trunc(Number(row.CODIGO_FILIAL))));
+      return;
+    }
+
+    if ("FILIAL" in dados[0]) {
+      dfs[tipo] = dados.filter(row => consideradas.has(normalizarFilial(row.FILIAL)));
+    }
+  });
+}
+
+async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(url, options);
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.details || result.error || "Erro ao consultar relatorio");
+  }
+
+  return result as T;
+}
+
+export default function ExportarRelatoriosPage() {
+  const [relatorios, setRelatorios] = useState<RelatorioStatus[]>(criarRelatoriosIniciais);
+  const [selecionados, setSelecionados] = useState<RelatorioExportavel[]>(RELATORIOS_EXPORTAVEIS);
   const [processando, setProcessando] = useState(false);
   const [tempoTotal, setTempoTotal] = useState<number | null>(null);
   const [progresso, setProgresso] = useState(0);
+  const [rotuloProcessamento, setRotuloProcessamento] = useState("");
 
   const atualizarRelatorio = (
-    tipo: RelatorioType,
+    tipo: RelatorioExportavel,
     updates: Partial<RelatorioStatus>
   ) => {
-    setRelatorios((prev) =>
-      prev.map((r) => (r.tipo === tipo ? { ...r, ...updates } : r))
+    setRelatorios(prev =>
+      prev.map(r => (r.tipo === tipo ? { ...r, ...updates } : r))
     );
   };
 
-  const buscarDados = async (tipo: RelatorioType, inicioTempo?: number) => {
-    const inicio = inicioTempo || Date.now();
-    atualizarRelatorio(tipo, { status: "carregando", tempoDecorrido: 0 });
-
-    try {
-      const response = await fetch(`/api/relatorios/query?tipo=${tipo}`);
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Erro ao buscar dados");
-      }
-
-      const tempoAteAgora = (Date.now() - inicio) / 1000;
-      atualizarRelatorio(tipo, {
-        status: "processando",
-        registros: result.registros,
-        dados: result.data,
-        tempoDecorrido: tempoAteAgora,
-      });
-
-      return { data: result.data, inicioTempo: inicio };
-    } catch (error) {
-      const tempoAteAgora = (Date.now() - inicio) / 1000;
-      atualizarRelatorio(tipo, {
-        status: "erro",
-        erro: error instanceof Error ? error.message : "Erro desconhecido",
-        tempoDecorrido: tempoAteAgora,
-      });
-      throw error;
-    }
+  const alternarSelecionado = (tipo: RelatorioExportavel) => {
+    setSelecionados(prev =>
+      prev.includes(tipo) ? prev.filter(item => item !== tipo) : [...prev, tipo]
+    );
   };
 
-  const processarRelatorio = async (
+  const buscarDados = async (
     tipo: RelatorioType,
-    dados: Record<string, any>[],
-    dadosAuxiliares: Record<string, any> | undefined,
-    inicioTempo: number
+    inicioRelatorio?: number,
+    exibirStatus = false
   ) => {
-    try {
-      const response = await fetch("/api/relatorios/processar", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          tipo,
-          dados,
-          dadosAuxiliares,
-        }),
+    if (exibirStatus) {
+      atualizarRelatorio(tipo as RelatorioExportavel, {
+        status: "carregando",
+        erro: undefined,
+        tempoDecorrido: 0,
       });
+    }
 
-      const result = await response.json();
+    const result = await fetchJson<{
+      success: boolean;
+      tipo: RelatorioType;
+      registros: number;
+      data: RelatorioRow[];
+    }>(`/api/relatorios/query?tipo=${tipo}`);
 
-      if (!response.ok) {
-        throw new Error(result.error || "Erro ao processar dados");
-      }
+    if (exibirStatus && inicioRelatorio) {
+      atualizarRelatorio(tipo as RelatorioExportavel, {
+        registros: result.registros,
+        tempoDecorrido: (Date.now() - inicioRelatorio) / 1000,
+      });
+    }
 
-      // Tempo total desde o início da busca até o fim do processamento
-      const tempoTotal = (Date.now() - inicioTempo) / 1000;
-      
+    return result.data;
+  };
+
+  const processarNoServidor = async (
+    tipo: RelatorioType,
+    dados: RelatorioRow[],
+    dadosAuxiliares?: Record<string, unknown>
+  ) => {
+    const result = await fetchJson<{
+      success: boolean;
+      tipo: RelatorioType;
+      registros: number;
+      data: RelatorioRow[];
+    }>("/api/relatorios/processar", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        tipo,
+        dados,
+        dadosAuxiliares,
+      }),
+    });
+
+    return result;
+  };
+
+  const processarRelatorioComStatus = async (
+    tipo: RelatorioExportavel,
+    dados: RelatorioRow[],
+    dadosAuxiliares: Record<string, unknown> | undefined,
+    inicioRelatorio: number
+  ) => {
+    atualizarRelatorio(tipo, { status: "processando" });
+
+    try {
+      const result = await processarNoServidor(tipo, dados, dadosAuxiliares);
       atualizarRelatorio(tipo, {
         status: "pronto",
         registros: result.registros,
         dados: result.data,
-        tempoDecorrido: tempoTotal,
+        tempoDecorrido: (Date.now() - inicioRelatorio) / 1000,
       });
-
       return result.data;
     } catch (error) {
-      // Tempo total até o erro
-      const tempoTotal = (Date.now() - inicioTempo) / 1000;
-      
       atualizarRelatorio(tipo, {
         status: "erro",
         erro: error instanceof Error ? error.message : "Erro desconhecido",
-        tempoDecorrido: tempoTotal,
+        tempoDecorrido: (Date.now() - inicioRelatorio) / 1000,
       });
       throw error;
     }
   };
 
-  const executarTodos = async () => {
+  const executarRelatorios = async (relatoriosProcessar: RelatorioExportavel[]) => {
+    if (processando || relatoriosProcessar.length === 0) return;
+
     const inicioTotal = Date.now();
+    const inicioPorRelatorio: Partial<Record<RelatorioExportavel, number>> = {};
+    const queriesNecessarias = determinarQueriesNecessarias(relatoriosProcessar);
+    const totalEtapas = queriesNecessarias.size + relatoriosProcessar.length;
+    let etapaAtual = 0;
+
+    const concluirEtapa = () => {
+      etapaAtual += 1;
+      setProgresso(Math.min(100, Math.round((etapaAtual / totalEtapas) * 100)));
+    };
+
     setProcessando(true);
     setTempoTotal(null);
     setProgresso(0);
-    
-    // Resetar tempos dos relatórios
-    relatorios.forEach(r => {
-      atualizarRelatorio(r.tipo, { tempoDecorrido: 0 });
-    });
+    setRotuloProcessamento(
+      relatoriosProcessar.length === RELATORIOS_EXPORTAVEIS.length
+        ? "Exportando todos os relatorios..."
+        : `Exportando ${relatoriosProcessar.map(r => RELATORIO_INFO[r].nome).join(", ")}...`
+    );
 
-    const totalEtapas = 10; // produtos busca, produtos processa, estoque busca, estoque processa, vendas busca, vendas processa, ecommerce busca, ecommerce processa, entradas busca, entradas processa
-    let etapaAtual = 0;
-
-    const atualizarProgresso = () => {
-      etapaAtual++;
-      setProgresso(Math.round((etapaAtual / totalEtapas) * 100));
-    };
+    setRelatorios(prev =>
+      prev.map(relatorio =>
+        relatoriosProcessar.includes(relatorio.tipo)
+          ? {
+              ...relatorio,
+              status: "pendente",
+              registros: undefined,
+              dados: undefined,
+              erro: undefined,
+              tempoDecorrido: 0,
+            }
+          : relatorio
+      )
+    );
 
     try {
-      // 1. Buscar dados auxiliares primeiro
-      console.log("[1/10] Buscando produtos...");
-      const inicioProdutos = Date.now();
-      const produtosRawResult = await buscarDados("produtos");
-      atualizarProgresso();
-      
-      // Códigos de barra e cores são apenas auxiliares - buscar sem mostrar na UI
-      console.log("[Auxiliar] Buscando códigos de barras...");
-      const codigosBarraResponse = await fetch("/api/relatorios/query?tipo=produtos_barra");
-      const codigosBarraResult = await codigosBarraResponse.json();
-      const codigosBarra = codigosBarraResult.data || [];
-      
-      console.log("[Auxiliar] Buscando cores...");
-      const coresResponse = await fetch("/api/relatorios/query?tipo=cores");
-      const coresResult = await coresResponse.json();
-      const cores = coresResult.data || [];
+      const dfs: Partial<Record<RelatorioType, RelatorioRow[]>> = {};
 
-      // 2. Processar produtos (usando o mesmo início do carregamento)
-      console.log("[2/10] Processando produtos...");
-      const produtosProcessados = await processarRelatorio(
-        "produtos",
-        produtosRawResult.data,
-        { codigosBarra },
-        inicioProdutos
-      );
-      atualizarProgresso();
-      const tempoProdutosTotal = relatorios.find(r => r.tipo === "produtos")?.tempoDecorrido || 0;
-      console.log(`✓ Produtos concluído em ${tempoProdutosTotal.toFixed(2)}s`);
+      for (const tipo of queriesNecessarias) {
+        const tipoExportavel = RELATORIOS_EXPORTAVEIS.includes(tipo as RelatorioExportavel)
+          ? (tipo as RelatorioExportavel)
+          : null;
+        const exibirStatus = Boolean(tipoExportavel && relatoriosProcessar.includes(tipoExportavel));
 
-      // 3. Buscar e processar estoque
-      console.log("[3/10] Buscando estoque...");
-      const inicioEstoque = Date.now();
-      const estoqueRawResult = await buscarDados("estoque");
-      atualizarProgresso();
-      
-      console.log("[4/10] Processando estoque...");
-      await processarRelatorio(
-        "estoque",
-        estoqueRawResult.data,
-        {
-          produtos: produtosProcessados,
-          codigosBarra,
-        },
-        inicioEstoque
-      );
-      atualizarProgresso();
-      const tempoEstoqueTotal = relatorios.find(r => r.tipo === "estoque")?.tempoDecorrido || 0;
-      console.log(`✓ Estoque concluído em ${tempoEstoqueTotal.toFixed(2)}s`);
+        if (tipoExportavel && exibirStatus) {
+          inicioPorRelatorio[tipoExportavel] = Date.now();
+        }
 
-      // 4. Buscar e processar vendas
-      console.log("[5/10] Buscando vendas...");
-      const inicioVendas = Date.now();
-      const vendasRawResult = await buscarDados("vendas");
-      atualizarProgresso();
-      
-      console.log("[6/10] Processando vendas...");
-      await processarRelatorio(
-        "vendas",
-        vendasRawResult.data,
-        { codigosBarra },
-        inicioVendas
-      );
-      atualizarProgresso();
-      const tempoVendasTotal = relatorios.find(r => r.tipo === "vendas")?.tempoDecorrido || 0;
-      console.log(`✓ Vendas concluído em ${tempoVendasTotal.toFixed(2)}s`);
+        setRotuloProcessamento(`Extraindo ${tipoExportavel ? RELATORIO_INFO[tipoExportavel].nome : tipo}...`);
+        dfs[tipo] = await buscarDados(tipo, tipoExportavel ? inicioPorRelatorio[tipoExportavel] : undefined, exibirStatus);
+        concluirEtapa();
+      }
 
-      // 5. Buscar e processar ecommerce
-      console.log("[7/10] Buscando e-commerce...");
-      const inicioEcommerce = Date.now();
-      const ecommerceRawResult = await buscarDados("ecommerce");
-      atualizarProgresso();
-      
-      console.log("[8/10] Processando e-commerce...");
-      await processarRelatorio(
-        "ecommerce",
-        ecommerceRawResult.data,
-        undefined,
-        inicioEcommerce
-      );
-      atualizarProgresso();
-      const tempoEcommerceTotal = relatorios.find(r => r.tipo === "ecommerce")?.tempoDecorrido || 0;
-      console.log(`✓ E-commerce concluído em ${tempoEcommerceTotal.toFixed(2)}s`);
+      filtrarPorFiliais(dfs);
 
-      // 6. Buscar e processar entradas
-      console.log("[9/10] Buscando entradas...");
-      const inicioEntradas = Date.now();
-      const entradasRawResult = await buscarDados("entradas");
-      atualizarProgresso();
-      
-      console.log("[10/10] Processando entradas...");
-      await processarRelatorio(
-        "entradas",
-        entradasRawResult.data,
-        {
-          produtos: produtosProcessados,
-          cores,
-        },
-        inicioEntradas
-      );
-      atualizarProgresso();
-      const tempoEntradasTotal = relatorios.find(r => r.tipo === "entradas")?.tempoDecorrido || 0;
-      console.log(`✓ Entradas concluído em ${tempoEntradasTotal.toFixed(2)}s`);
+      let produtosProcessados: RelatorioRow[] | null = null;
+      const codigosBarra = dfs.produtos_barra ?? [];
+      const cores = dfs.cores ?? [];
 
-      const tempoTotalFinal = (Date.now() - inicioTotal) / 1000;
-      setTempoTotal(tempoTotalFinal);
-      console.log(`\n========================================`);
-      console.log(`✅ EXPORTAÇÃO CONCLUÍDA!`);
-      console.log(`Tempo total: ${tempoTotalFinal.toFixed(2)}s`);
-      console.log(`========================================\n`);
+      if (relatoriosProcessar.includes("produtos")) {
+        produtosProcessados = await processarRelatorioComStatus(
+          "produtos",
+          dfs.produtos ?? [],
+          { codigosBarra },
+          inicioPorRelatorio.produtos ?? inicioTotal
+        );
+        concluirEtapa();
+      } else if (queriesNecessarias.has("produtos")) {
+        const produtos = await processarNoServidor("produtos", dfs.produtos ?? [], { codigosBarra });
+        produtosProcessados = produtos.data;
+      }
+
+      if (relatoriosProcessar.includes("estoque")) {
+        if (!produtosProcessados) {
+          const produtos = await processarNoServidor("produtos", dfs.produtos ?? [], { codigosBarra });
+          produtosProcessados = produtos.data;
+        }
+        setRotuloProcessamento("Processando Estoque Tratado...");
+        await processarRelatorioComStatus(
+          "estoque",
+          dfs.estoque ?? [],
+          { produtos: produtosProcessados, codigosBarra },
+          inicioPorRelatorio.estoque ?? inicioTotal
+        );
+        concluirEtapa();
+      }
+
+      if (relatoriosProcessar.includes("vendas")) {
+        setRotuloProcessamento("Processando Vendas Tratadas...");
+        await processarRelatorioComStatus(
+          "vendas",
+          dfs.vendas ?? [],
+          { codigosBarra },
+          inicioPorRelatorio.vendas ?? inicioTotal
+        );
+        concluirEtapa();
+      }
+
+      if (relatoriosProcessar.includes("ecommerce")) {
+        setRotuloProcessamento("Processando E-commerce...");
+        await processarRelatorioComStatus(
+          "ecommerce",
+          dfs.ecommerce ?? [],
+          undefined,
+          inicioPorRelatorio.ecommerce ?? inicioTotal
+        );
+        concluirEtapa();
+      }
+
+      if (relatoriosProcessar.includes("entradas")) {
+        if (!produtosProcessados) {
+          const produtos = await processarNoServidor("produtos", dfs.produtos ?? [], { codigosBarra });
+          produtosProcessados = produtos.data;
+        }
+        setRotuloProcessamento("Processando Entradas...");
+        await processarRelatorioComStatus(
+          "entradas",
+          dfs.entradas ?? [],
+          { produtos: produtosProcessados, cores },
+          inicioPorRelatorio.entradas ?? inicioTotal
+        );
+        concluirEtapa();
+      }
+
+      if (relatoriosProcessar.includes("saidas")) {
+        if (!produtosProcessados) {
+          const produtos = await processarNoServidor("produtos", dfs.produtos ?? [], { codigosBarra });
+          produtosProcessados = produtos.data;
+        }
+        setRotuloProcessamento("Processando Saidas...");
+        await processarRelatorioComStatus(
+          "saidas",
+          dfs.saidas ?? [],
+          { produtos: produtosProcessados, cores },
+          inicioPorRelatorio.saidas ?? inicioTotal
+        );
+        concluirEtapa();
+      }
+
+      setTempoTotal((Date.now() - inicioTotal) / 1000);
+      setProgresso(100);
+      setRotuloProcessamento("Exportacao concluida");
     } catch (error) {
-      console.error("Erro ao processar relatórios:", error);
-      alert("Erro ao processar relatórios. Verifique o console para detalhes.");
+      console.error("Erro ao processar relatorios:", error);
+      window.alert(error instanceof Error ? error.message : "Erro ao processar relatorios");
     } finally {
       setProcessando(false);
     }
   };
 
+  const executarSelecionados = () => {
+    if (selecionados.length === 0) {
+      window.alert("Selecione pelo menos um relatorio");
+      return;
+    }
+    void executarRelatorios(selecionados);
+  };
+
   const handleExportExcel = (relatorio: RelatorioStatus) => {
     if (relatorio.dados && relatorio.dados.length > 0) {
-      const nomeArquivo = NOMES_ARQUIVO[relatorio.tipo] || relatorio.nome;
-      exportToExcel(relatorio.dados, nomeArquivo);
+      exportToExcel(relatorio.dados, NOMES_ARQUIVO[relatorio.tipo]);
     }
   };
 
   const handleExportCSV = (relatorio: RelatorioStatus) => {
     if (relatorio.dados && relatorio.dados.length > 0) {
-      const nomeArquivo = NOMES_ARQUIVO[relatorio.tipo] || relatorio.nome;
-      exportToCSV(relatorio.dados, nomeArquivo);
+      exportToCSV(relatorio.dados, NOMES_ARQUIVO[relatorio.tipo]);
     }
   };
 
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Exportar Relatórios</h1>
+        <h1 className={styles.title}>Exportar Relatorios</h1>
         <p className={styles.subtitle}>
-          Gere todos os relatórios processados e exporte para Excel ou CSV.
+          Gere todos os relatorios ou selecione apenas os arquivos que voce precisa.
           <br />
           <span className={styles.subtitleHint}>
-            O processo continua automaticamente mesmo se você trocar de aba ou sair do computador.
+            A ordem, dependencias e filtros seguem o exportar_todos_relatorios.py.
           </span>
         </p>
+      </div>
+
+      <div className={styles.selectionBar}>
+        <div className={styles.selectionActions}>
+          <button
+            type="button"
+            className={styles.buttonSecondary}
+            onClick={() => setSelecionados(RELATORIOS_EXPORTAVEIS)}
+            disabled={processando}
+          >
+            Selecionar todos
+          </button>
+          <button
+            type="button"
+            className={styles.buttonSecondary}
+            onClick={() => setSelecionados([])}
+            disabled={processando}
+          >
+            Limpar selecao
+          </button>
+        </div>
+        <div className={styles.selectionGrid}>
+          {RELATORIOS_EXPORTAVEIS.map(tipo => (
+            <label key={tipo} className={styles.checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={selecionados.includes(tipo)}
+                onChange={() => alternarSelecionado(tipo)}
+                disabled={processando}
+              />
+              {RELATORIO_INFO[tipo].nome}
+            </label>
+          ))}
+        </div>
       </div>
 
       <div className={styles.actions}>
         <button
           className={styles.buttonPrimary}
-          onClick={executarTodos}
+          onClick={executarSelecionados}
+          disabled={processando || selecionados.length === 0}
+        >
+          {processando ? "Processando..." : "Iniciar selecionados"}
+        </button>
+        <button
+          className={styles.buttonSecondary}
+          onClick={() => void executarRelatorios(RELATORIOS_EXPORTAVEIS)}
           disabled={processando}
         >
-          {processando ? "Processando..." : "Iniciar Exportação"}
+          Exportar todos
         </button>
       </div>
 
@@ -335,7 +527,7 @@ export default function ExportarRelatoriosPage() {
           <div className={styles.progressHeader}>
             <div className={styles.progressInfo}>
               <span className={styles.progressLabel}>
-                {processando ? "Exportando relatórios..." : "Exportação concluída!"}
+                {rotuloProcessamento || (processando ? "Exportando relatorios..." : "Exportacao concluida")}
               </span>
               {processando && (
                 <span className={styles.progressPercent}>{progresso}%</span>
@@ -344,7 +536,7 @@ export default function ExportarRelatoriosPage() {
             {tempoTotal !== null && (
               <div className={styles.timeInfo}>
                 <span className={styles.tempoTotal}>
-                  ✅ Tempo total: {formatarTempo(tempoTotal)}
+                  Tempo total: {formatarTempo(tempoTotal)}
                 </span>
               </div>
             )}
@@ -361,11 +553,19 @@ export default function ExportarRelatoriosPage() {
       )}
 
       <div className={styles.relatoriosList}>
-        {relatorios.map((relatorio) => (
+        {relatorios.map(relatorio => (
           <div key={relatorio.tipo} className={styles.relatorioCard}>
             <div className={styles.relatorioHeader}>
               <div className={styles.relatorioInfo}>
-                <h3 className={styles.relatorioNome}>{relatorio.nome}</h3>
+                <label className={styles.relatorioTitleLine}>
+                  <input
+                    type="checkbox"
+                    checked={selecionados.includes(relatorio.tipo)}
+                    onChange={() => alternarSelecionado(relatorio.tipo)}
+                    disabled={processando}
+                  />
+                  <h3 className={styles.relatorioNome}>{relatorio.nome}</h3>
+                </label>
                 <div className={styles.relatorioMetadata}>
                   {relatorio.registros != null && (
                     <span className={styles.relatorioRegistros}>
@@ -374,7 +574,7 @@ export default function ExportarRelatoriosPage() {
                   )}
                   {relatorio.tempoDecorrido !== undefined && relatorio.tempoDecorrido > 0 && (
                     <span className={styles.relatorioTempo}>
-                      ⏱️ {formatarTempo(relatorio.tempoDecorrido)}
+                      {formatarTempo(relatorio.tempoDecorrido)}
                     </span>
                   )}
                 </div>
@@ -390,46 +590,33 @@ export default function ExportarRelatoriosPage() {
               </div>
             )}
 
-            {relatorio.status === "pronto" && (
-              <div className={styles.exportButtons}>
-                <button
-                  className={styles.buttonExport}
-                  onClick={() => handleExportExcel(relatorio)}
-                >
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
+            <div className={styles.cardActions}>
+              <button
+                type="button"
+                className={styles.buttonSmall}
+                onClick={() => void executarRelatorios([relatorio.tipo])}
+                disabled={processando}
+              >
+                Gerar este relatorio
+              </button>
+
+              {relatorio.status === "pronto" && (
+                <div className={styles.exportButtons}>
+                  <button
+                    className={styles.buttonExport}
+                    onClick={() => handleExportExcel(relatorio)}
                   >
-                    <path
-                      d="M2 14H14V2H2V14ZM4 4H12V6H4V4ZM4 7H12V9H4V7ZM4 10H12V12H4V10Z"
-                      fill="currentColor"
-                    />
-                  </svg>
-                  Exportar XLSX
-                </button>
-                <button
-                  className={styles.buttonExport}
-                  onClick={() => handleExportCSV(relatorio)}
-                >
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
+                    Exportar XLSX
+                  </button>
+                  <button
+                    className={styles.buttonExport}
+                    onClick={() => handleExportCSV(relatorio)}
                   >
-                    <path
-                      d="M2 14H14V2H2V14ZM4 4H12V6H4V4ZM4 7H12V9H4V7ZM4 10H12V12H4V10Z"
-                      fill="currentColor"
-                    />
-                  </svg>
-                  Exportar CSV
-                </button>
-              </div>
-            )}
+                    Exportar CSV
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -466,4 +653,3 @@ function formatarTempo(segundos: number): string {
   const segs = Math.floor(segundos % 60);
   return `${minutos}m ${segs}s`;
 }
-

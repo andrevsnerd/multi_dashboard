@@ -14,6 +14,8 @@ import pyodbc
 import shutil
 from datetime import datetime
 
+from mapeamento_cores import get_df_cores
+
 # Config conexão
 DB_CONFIG = {
     'server': '177.92.78.250',
@@ -22,6 +24,37 @@ DB_CONFIG = {
     'username': 'andre.nerd',
     'password': 'nerd123@'
 }
+
+# Filiais consideradas para vendas, estoque, e-commerce, entradas e saídas
+# Inclui Scarfme + filiais que aparecem nas vendas (ex.: NERD) para não excluir nenhuma filial com movimento
+FILIAIS_CONSIDERADAS = [
+    'SCARF ME - HIGIENOPOLIS 2',
+    'SCARFME - IBIRAPUERA LLL',
+    'SCARFME ME - PAULISTA FFF',
+    'SCARF ME - PAULISTA RSR',
+    'SCARF ME - PAULISTA FFFR',
+    'SCARFME MATRIZ CMS',
+    'SCARF ME - MATRIZ',
+    'SCARF ME - MATRIZ LLL',
+    'SCARF ME MATRIZ - FFF',
+    'SCARF ME MATRIZ - RSR',
+    'MSC COMERCIO DE LENCOS LT',
+    # Filiais com vendas que antes ficavam de fora (NERD e outras)
+    'CIDADE DE SP - LLL',
+    'GUARULHOS - RSR',
+    'IGUATEMI SP - JJJ',
+    'MORUMBI - JJJ',
+    'NERD CAMPINAS',
+    'NERD CENTER NORTE',
+    'NERD HIGIENOPOLIS',
+    'NERD LEBLON',
+    'NERD MORUMBI RDRRRJ',
+    'NERD MORUMBI RDRRX',
+    'NERD TIJUCA RDRRX',
+    'NERD VILLA LOBOS',
+    'OSCAR FREIRE - FSZ',
+    'VILLA LOBOS - LLL',
+]
 
 # Colunas a remover por relatório
 COLS_REMOVER = {
@@ -265,10 +298,23 @@ def processar_ecommerce(df):
     """Processa relatório de e-commerce"""
     t = time.time()
     print("\n[E-COMMERCE]")
-    
+
     # Converter datas
     df = converter_datas(df, ['EMISSAO', 'DATA_SAIDA', 'ENTREGA'])
-    
+
+    # Derivar REGIAO a partir do UF do cliente (não da filial)
+    UF_TO_REGIAO = {
+        'AC': 'NORTE', 'AM': 'NORTE', 'AP': 'NORTE', 'PA': 'NORTE',
+        'RO': 'NORTE', 'RR': 'NORTE', 'TO': 'NORTE',
+        'AL': 'NORDESTE', 'BA': 'NORDESTE', 'CE': 'NORDESTE', 'MA': 'NORDESTE',
+        'PB': 'NORDESTE', 'PE': 'NORDESTE', 'PI': 'NORDESTE', 'RN': 'NORDESTE', 'SE': 'NORDESTE',
+        'DF': 'CENTRO-OESTE', 'GO': 'CENTRO-OESTE', 'MS': 'CENTRO-OESTE', 'MT': 'CENTRO-OESTE',
+        'ES': 'SUDESTE', 'MG': 'SUDESTE', 'RJ': 'SUDESTE', 'SP': 'SUDESTE',
+        'PR': 'SUL', 'RS': 'SUL', 'SC': 'SUL',
+    }
+    if 'UF' in df.columns:
+        df['REGIAO'] = df['UF'].map(UF_TO_REGIAO)
+
     # Remover duplicatas mantendo apenas uma linha por NF_SAIDA + SERIE_NF + ITEM
     # Isso garante que não haja registros duplicados no relatório
     if not df.empty:
@@ -308,7 +354,6 @@ def processar_entradas(df_mov, df_produtos, df_cores):
     # Ordena colunas
     ordem = ['EMISSAO', 'FILIAL', 'ROMANEIO_PRODUTO', 'PRODUTO', 'DESC_PRODUTO',
              'COR_PRODUTO', 'DESC_COR_PRODUTO', 'QTDE_TOTAL', 'TIPO_ENTRADA', 'TIPO_ROMANEIO',
-             'RESPONSAVEL', 'CM_OPERACAO', 'CM_DESC_OPERACAO', 'EMPRESA',
              'GRUPO_PRODUTO', 'SUBGRUPO_PRODUTO', 'LINHA', 'COLECAO']
     df = df[[c for c in ordem if c in df.columns]]
     
@@ -338,7 +383,7 @@ def processar_saidas(df_saidas, df_produtos, df_cores):
     
     # Ordena colunas
     ordem = ['EMISSAO', 'FILIAL', 'FILIAL_DESTINO', 'ROMANEIO_PRODUTO', 'PRODUTO', 'DESC_PRODUTO',
-             'COR_PRODUTO', 'DESC_COR_PRODUTO', 'QTDE_TOTAL', 'TIPO_ROMANEIO', 'RESPONSAVEL',
+             'COR_PRODUTO', 'DESC_COR_PRODUTO', 'QTDE_TOTAL', 'TIPO_ROMANEIO',
              'GRUPO_PRODUTO', 'SUBGRUPO_PRODUTO', 'LINHA', 'COLECAO']
     df = df[[c for c in ordem if c in df.columns]]
     
@@ -561,7 +606,7 @@ def main():
                     ON c.COR = vp.COR_PRODUTO
                 LEFT JOIN LOJA_VENDEDORES lv WITH (NOLOCK)
                     ON LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR))) = LTRIM(RTRIM(CAST(lv.VENDEDOR AS VARCHAR)))
-                WHERE vp.DATA_VENDA >= '2025-01-01'
+                WHERE vp.DATA_VENDA >= '2024-01-01'
             ),
             TrocasItem AS (
                 SELECT 
@@ -624,7 +669,7 @@ def main():
                 LEFT JOIN LOJA_VENDEDORES lv WITH (NOLOCK)
                     ON LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR))) = LTRIM(RTRIM(CAST(lv.VENDEDOR AS VARCHAR)))
                 WHERE vt.QTDE_CANCELADA = 0
-                    AND v.DATA_VENDA >= '2025-01-01'
+                    AND v.DATA_VENDA >= '2024-01-01'
                     AND NOT EXISTS (
                         SELECT 1 
                         FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
@@ -748,21 +793,18 @@ def main():
                    p.DESC_PRODUTO, p.COLECAO, p.TABELA_OPERACOES, p.TABELA_MEDIDAS,
                    p.TIPO_PRODUTO, p.GRUPO_PRODUTO, p.SUBGRUPO_PRODUTO, p.LINHA,
                    p.GRADE, p.GRIFFE, p.CARTELA, p.REVENDA, p.MODELAGEM, p.FABRICANTE,
-                   p.ESTILISTA, p.MODELISTA, fp.DESC_COLECAO, fl.REGIAO, cv.UF
+                   p.ESTILISTA, p.MODELISTA, fp.DESC_COLECAO, fp.UF
     FROM FATURAMENTO f WITH(NOLOCK)
-    JOIN W_FATURAMENTO_PROD_02 fp WITH(NOLOCK) 
+    JOIN W_FATURAMENTO_PROD_02 fp WITH(NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
             LEFT JOIN PRODUTOS p WITH(NOLOCK) ON fp.PRODUTO = p.PRODUTO
-            LEFT JOIN FILIAIS fl WITH(NOLOCK) ON f.FILIAL = fl.FILIAL
-            LEFT JOIN CLIENTES_VAREJO cv WITH(NOLOCK) ON f.NOME_CLIFOR = cv.CLIENTE_VAREJO
             WHERE f.EMISSAO >= '2025-01-01' AND f.NOTA_CANCELADA = 0
       AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         """,
         'entradas': """
             SELECT E.ROMANEIO_PRODUTO, E.EMISSAO, E.FILIAL, P.PRODUTO,
                    P.COR_PRODUTO, P.QTDE AS QTDE_TOTAL,
-                   E.TIPO_ENTRADA, E.TIPO_ROMANEIO, E.RESPONSAVEL,
-                   E.CM_OPERACAO, E.CM_DESC_OPERACAO, E.EMPRESA
+                   E.TIPO_ENTRADA, E.TIPO_ROMANEIO
             FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
             LEFT JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) 
                 ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
@@ -772,7 +814,7 @@ def main():
         'saidas': """
             SELECT S.ROMANEIO_PRODUTO, S.EMISSAO, S.FILIAL, S.FILIAL_DESTINO,
                    P.PRODUTO, P.COR_PRODUTO, P.QTDE AS QTDE_TOTAL,
-                   S.TIPO_ROMANEIO, S.RESPONSAVEL
+                   S.TIPO_ROMANEIO
             FROM ESTOQUE_PROD_SAI AS S WITH (NOLOCK)
             LEFT JOIN ESTOQUE_PROD1_SAI AS P WITH (NOLOCK) 
                 ON S.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
@@ -780,8 +822,13 @@ def main():
             WHERE S.EMISSAO >= '2025-01-01'
                 AND P.PRODUTO IS NOT NULL
         """,
-        'cores': "SELECT COR, DESC_COR FROM CORES_BASICAS"
+        'cores': "SELECT COR, DESC_COR FROM CORES_BASICAS",
+        'filiais': "SELECT COD_FILIAL, FILIAL FROM FILIAIS WITH (NOLOCK)"
     }
+    
+    # Incluir filiais na extração quando for filtrar vendas/estoque/ecommerce/entradas/saidas
+    if any(r in relatorios_processar for r in ['vendas', 'estoque', 'ecommerce', 'entradas', 'saidas']):
+        queries_necessarias.add('filiais')
     
     conn = None
     try:
@@ -799,7 +846,8 @@ def main():
             'entradas': 'Entradas',
             'saidas': 'Saídas',
             'produtos_barra': 'Códigos de Barra',
-            'cores': 'Cores'
+            'cores': 'Cores',
+            'filiais': 'Filiais'
         }
         
         for nome in queries_necessarias:
@@ -821,6 +869,31 @@ def main():
                 dfs[nome] = pd.DataFrame()
         
         print(f"\n✓ Extração concluída: {time.time()-t_ext:.2f}s")
+        
+        # Conjunto de nomes de filiais consideradas (normalizado) para comparação
+        consideradas_norm = set(str(s).replace('\xa0', ' ').strip() for s in FILIAIS_CONSIDERADAS)
+        # Códigos de filial a considerar (a partir da tabela FILIAIS), para filtrar vendas por CODIGO_FILIAL
+        cod_filiais_considerados = set()
+        if 'filiais' in dfs and not dfs['filiais'].empty:
+            df_f = dfs['filiais']
+            filial_norm = df_f['FILIAL'].astype(str).str.replace('\xa0', ' ', regex=False).str.strip()
+            mask = filial_norm.isin(consideradas_norm)
+            cod_filiais_considerados = set(df_f.loc[mask, 'COD_FILIAL'].dropna().astype(int))
+        
+        # Filtrar por filiais consideradas (vendas, ecommerce, entradas, saidas). Estoque: trazer TUDO.
+        for nome in ['vendas', 'ecommerce', 'entradas', 'saidas']:
+            if nome not in dfs or dfs[nome].empty:
+                continue
+            df = dfs[nome]
+            antes = len(df)
+            if nome == 'vendas' and 'CODIGO_FILIAL' in df.columns and cod_filiais_considerados:
+                cod_v = pd.to_numeric(df['CODIGO_FILIAL'], errors='coerce').fillna(-999).astype(int)
+                dfs[nome] = df[cod_v.isin(cod_filiais_considerados)].copy()
+            elif 'FILIAL' in df.columns:
+                filial_norm = df['FILIAL'].astype(str).str.replace('\xa0', ' ', regex=False).str.strip()
+                dfs[nome] = df[filial_norm.isin(consideradas_norm)].copy()
+            if len(dfs[nome]) != antes:
+                print(f"  Filiais consideradas: {len(dfs[nome]):,} registros de {nome} (antes: {antes:,})")
         
         # Verificar se todas as dependências necessárias foram extraídas
         chaves_faltando = []
@@ -908,13 +981,16 @@ def main():
         if df_produtos is None:
             # Se produtos não foi processado mas é necessário, processar agora (sem salvar)
             df_produtos = processar_produtos(dfs['produtos'], dfs['produtos_barra'], salvar=False)
-        processar_entradas(dfs['entradas'], df_produtos, dfs['cores'])
+        # Preferir mapeamento de cores atualizado (cores_limpo/vendas) sobre CORES_BASICAS
+        df_cores_entradas = get_df_cores()
+        processar_entradas(dfs['entradas'], df_produtos, df_cores_entradas if not df_cores_entradas.empty else dfs['cores'])
     
     if 'saidas' in relatorios_processar:
         if df_produtos is None:
             # Se produtos não foi processado mas é necessário, processar agora (sem salvar)
             df_produtos = processar_produtos(dfs['produtos'], dfs['produtos_barra'], salvar=False)
-        processar_saidas(dfs['saidas'], df_produtos, dfs['cores'])
+        df_cores_saidas = get_df_cores()
+        processar_saidas(dfs['saidas'], df_produtos, df_cores_saidas if not df_cores_saidas.empty else dfs['cores'])
     
     print(f"\nProcessamento: {time.time()-t_proc:.2f}s")
     

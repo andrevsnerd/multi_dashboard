@@ -30,6 +30,47 @@
 
 .actions {
   margin-bottom: 32px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.selectionBar {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  background: white;
+}
+
+.selectionActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.selectionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.checkboxLabel,
+.relatorioTitleLine {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.checkboxLabel input,
+.relatorioTitleLine input {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
 }
 
 .progressContainer {
@@ -131,6 +172,28 @@
   cursor: not-allowed;
 }
 
+.buttonSecondary {
+  background: white;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.buttonSecondary:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.buttonSecondary:disabled {
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
 .relatoriosList {
   display: flex;
   flex-direction: column;
@@ -164,7 +227,7 @@
   font-size: 18px;
   font-weight: 600;
   color: #1f2937;
-  margin: 0 0 4px 0;
+  margin: 0;
 }
 
 .relatorioRegistros {
@@ -235,7 +298,38 @@
 .exportButtons {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cardActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
   margin-top: 16px;
+}
+
+.buttonSmall {
+  background: #f9fafb;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 8px 14px;
+  color: #374151;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.buttonSmall:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.buttonSmall:disabled {
+  color: #9ca3af;
+  cursor: not-allowed;
 }
 
 .buttonExport {
@@ -275,6 +369,15 @@
 
   .exportButtons {
     flex-direction: column;
+    width: 100%;
+  }
+
+  .cardActions {
+    align-items: stretch;
+  }
+
+  .buttonSmall {
+    width: 100%;
   }
 
   .buttonExport {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, prefer-const */
 /**
  * Funções de processamento de relatórios
  * Replicam exatamente a lógica do script Python exportar_todos_relatorios.py
@@ -54,9 +55,9 @@ export const COLS_REMOVER = {
     'TIMESTAMP', 'PRIMEIRA_ENTRADA', 'LX_STATUS_REGISTRO', 'LX_HASH'
   ],
   vendas: [
-    'TAMANHO', 'PEDIDO', 'DESCONTO_ITEM', 'CODIGO_DESCONTO',
+    'TAMANHO', 'DESCONTO_ITEM', 'CODIGO_DESCONTO',
     'CODIGO_TAB_PRECO', 'OPERACAO_VENDA', 'FATOR_VENDA_LIQ', 'VALOR_TIKET',
-    'DESCONTO', 'DATA_HORA_CANCELAMENTO', 'QTDE_CANCELADA'
+    'DESCONTO_VENDA', 'DATA_HORA_CANCELAMENTO', 'QTDE_CANCELADA'
   ]
 };
 
@@ -177,6 +178,63 @@ function enriquecerComCodigoBarra(
 /**
  * Processa relatório de produtos
  */
+function enriquecerComCodigoBarraAtualizado(
+  data: Record<string, any>[],
+  codigosBarra: Record<string, any>[],
+  prioridadeTamanho = true
+): Record<string, any>[] {
+  if (data.length === 0 || codigosBarra.length === 0) return data;
+  if (!Object.prototype.hasOwnProperty.call(data[0], 'PRODUTO')) return data;
+
+  const hasColumns = (cols: string[]) =>
+    cols.every(col => Object.prototype.hasOwnProperty.call(data[0], col));
+
+  const chavesOpcoes: string[][] = [];
+  if (prioridadeTamanho && hasColumns(['PRODUTO', 'COR_PRODUTO', 'TAMANHO'])) {
+    chavesOpcoes.push(['PRODUTO', 'COR_PRODUTO', 'TAMANHO']);
+  }
+  if (hasColumns(['PRODUTO', 'COR_PRODUTO'])) {
+    chavesOpcoes.push(['PRODUTO', 'COR_PRODUTO']);
+  }
+  chavesOpcoes.push(['PRODUTO']);
+
+  for (const chaves of chavesOpcoes) {
+    const codigoMap = new Map<string, any>();
+
+    codigosBarra.forEach(item => {
+      const temChaves = chaves.every(col => item[col] !== null && item[col] !== undefined);
+      if (!temChaves || item.CODIGO_BARRA === null || item.CODIGO_BARRA === undefined) return;
+
+      const key = chaves.map(col => String(item[col])).join('|');
+      if (!codigoMap.has(key)) {
+        codigoMap.set(key, item.CODIGO_BARRA);
+      }
+    });
+
+    const encontrouAlgum = data.some(row => {
+      const temChaves = chaves.every(col => row[col] !== null && row[col] !== undefined);
+      if (!temChaves) return false;
+      const key = chaves.map(col => String(row[col])).join('|');
+      return codigoMap.has(key);
+    });
+
+    if (encontrouAlgum) {
+      return data.map(row => {
+        const temChaves = chaves.every(col => row[col] !== null && row[col] !== undefined);
+        if (!temChaves) return { ...row };
+
+        const key = chaves.map(col => String(row[col])).join('|');
+        return {
+          ...row,
+          CODIGO_BARRA: codigoMap.get(key) ?? null,
+        };
+      });
+    }
+  }
+
+  return data;
+}
+
 export function processarProdutos(
   produtos: Record<string, any>[],
   codigosBarra: Record<string, any>[]
@@ -188,7 +246,7 @@ export function processarProdutos(
   ]);
   
   result = removerColunas(result, COLS_REMOVER.produtos);
-  result = enriquecerComCodigoBarra(result, codigosBarra);
+  result = enriquecerComCodigoBarraAtualizado(result, codigosBarra, false);
   
   return result;
 }
@@ -207,7 +265,7 @@ export function processarEstoque(
   const produtoMap = new Map<string, Record<string, any>>();
   const colsProd = [
     'PRODUTO', 'DESC_PRODUTO', 'CUSTO_REPOSICAO1', 'PRECO_REPOSICAO_1',
-    'LINHA', 'GRUPO_PRODUTO', 'SUBGRUPO_PRODUTO', 'GRADE', 'GRIFFE', 'COLECAO'
+    'LINHA', 'GRUPO_PRODUTO', 'SUBGRUPO_PRODUTO', 'GRADE', 'GRIFFE'
   ];
   
   produtos.forEach(prod => {
@@ -254,7 +312,7 @@ export function processarEstoque(
   result = removerColunas(result, COLS_REMOVER.estoque);
   
   // Enriquecer com código de barras
-  result = enriquecerComCodigoBarra(result, codigosBarra);
+  result = enriquecerComCodigoBarraAtualizado(result, codigosBarra, true);
   
   return result;
 }
@@ -263,6 +321,90 @@ export function processarEstoque(
  * Processa relatório de vendas
  */
 export function processarVendas(
+  vendas: Record<string, any>[],
+  codigosBarra: Record<string, any>[]
+): Record<string, any>[] {
+  let result = converterDatas(vendas, ['DATA_VENDA']);
+
+  result = enriquecerComCodigoBarraAtualizado(result, codigosBarra, true);
+
+  result = result.map(row => {
+    const precoLiquido = Number(row.PRECO_LIQUIDO ?? 0);
+    const qtde = Number(row.QTDE ?? 0);
+    const desconto = Number(row.DESCONTO ?? 0);
+    return {
+      ...row,
+      TOTAL_VENDA: (precoLiquido * qtde) - desconto,
+      TOTAL_QTDE_VENDA: qtde,
+      QTDE_TROCA_ITEM: Number(row.QTDE_TROCA_ITEM ?? 0),
+      VALOR_TROCA_ITEM: Number(row.VALOR_TROCA_ITEM ?? 0),
+    };
+  });
+
+  result = result.map(row => ({
+    ...row,
+    QTDE_TROCA: Number(row.QTDE_TROCA_ITEM ?? 0),
+    VALOR_TROCA: Number(row.VALOR_TROCA_ITEM ?? 0),
+  }));
+
+  result = result.map(row => {
+    const totalVenda = Number(row.TOTAL_VENDA ?? 0);
+    const valorTroca = Number(row.VALOR_TROCA ?? 0);
+    const totalQtdeVenda = Number(row.TOTAL_QTDE_VENDA ?? 0);
+    const qtdeTroca = Number(row.QTDE_TROCA ?? 0);
+
+    return {
+      ...row,
+      VALOR_LIQUIDO: totalVenda - valorTroca,
+      QTDE: Math.trunc(totalQtdeVenda - qtdeTroca),
+      TOTAL_QTDE_VENDA: Math.trunc(totalQtdeVenda),
+      QTDE_TROCA: Math.trunc(qtdeTroca),
+    };
+  });
+
+  result = removerColunas(result, COLS_REMOVER.vendas);
+
+  if (result.length > 0) {
+    const cols = Object.keys(result[0]);
+    const colunasParaFinal = ['TOTAL_VENDA', 'TOTAL_QTDE_VENDA', 'QTDE_TROCA', 'VALOR_TROCA'];
+
+    const colsReordenadas = cols.filter(col => !colunasParaFinal.includes(col));
+
+    if (colsReordenadas.includes('VALOR_LIQUIDO') && colsReordenadas.includes('QTDE')) {
+      const idxValor = colsReordenadas.indexOf('VALOR_LIQUIDO');
+      colsReordenadas.splice(idxValor, 1);
+      const idxQtde = colsReordenadas.indexOf('QTDE') + 1;
+      colsReordenadas.splice(idxQtde, 0, 'VALOR_LIQUIDO');
+    }
+
+    if (colsReordenadas.includes('PRECO_LIQUIDO')) {
+      const idx = colsReordenadas.indexOf('PRECO_LIQUIDO');
+      colsReordenadas.splice(idx, 1);
+      colsReordenadas.push('PRECO_LIQUIDO');
+    }
+    if (colsReordenadas.includes('DESCONTO_VENDA')) {
+      const idx = colsReordenadas.indexOf('DESCONTO_VENDA');
+      colsReordenadas.splice(idx, 1);
+      colsReordenadas.push('DESCONTO_VENDA');
+    }
+
+    colunasParaFinal.forEach(col => {
+      if (cols.includes(col)) colsReordenadas.push(col);
+    });
+
+    result = result.map(row => {
+      const newRow: Record<string, any> = {};
+      colsReordenadas.forEach(col => {
+        if (col in row) newRow[col] = row[col];
+      });
+      return newRow;
+    });
+  }
+
+  return result;
+}
+
+function processarVendasAntigo(
   vendas: Record<string, any>[],
   codigosBarra: Record<string, any>[]
 ): Record<string, any>[] {
@@ -442,6 +584,24 @@ export function processarEcommerce(
 ): Record<string, any>[] {
   // Converter datas
   let result = converterDatas(ecommerce, ['EMISSAO', 'DATA_SAIDA', 'ENTREGA']);
+
+  const ufToRegiao: Record<string, string> = {
+    AC: 'NORTE', AM: 'NORTE', AP: 'NORTE', PA: 'NORTE',
+    RO: 'NORTE', RR: 'NORTE', TO: 'NORTE',
+    AL: 'NORDESTE', BA: 'NORDESTE', CE: 'NORDESTE', MA: 'NORDESTE',
+    PB: 'NORDESTE', PE: 'NORDESTE', PI: 'NORDESTE', RN: 'NORDESTE', SE: 'NORDESTE',
+    DF: 'CENTRO-OESTE', GO: 'CENTRO-OESTE', MS: 'CENTRO-OESTE', MT: 'CENTRO-OESTE',
+    ES: 'SUDESTE', MG: 'SUDESTE', RJ: 'SUDESTE', SP: 'SUDESTE',
+    PR: 'SUL', RS: 'SUL', SC: 'SUL',
+  };
+
+  result = result.map(row => {
+    if (!Object.prototype.hasOwnProperty.call(row, 'UF')) return row;
+    return {
+      ...row,
+      REGIAO: ufToRegiao[String(row.UF ?? '').trim().toUpperCase()] ?? undefined,
+    };
+  });
   
   // Remover duplicatas mantendo apenas uma linha por NF_SAIDA + SERIE_NF + ITEM
   const seen = new Set<string>();
@@ -526,8 +686,8 @@ export function processarEntradas(
   // Ordenar colunas (exatamente como no Python)
   const ordem = [
     'EMISSAO', 'FILIAL', 'ROMANEIO_PRODUTO', 'PRODUTO', 'DESC_PRODUTO',
-    'COR_PRODUTO', 'DESC_COR_PRODUTO', 'QTDE_TOTAL', 'GRUPO_PRODUTO',
-    'SUBGRUPO_PRODUTO', 'LINHA', 'COLECAO'
+    'COR_PRODUTO', 'DESC_COR_PRODUTO', 'QTDE_TOTAL', 'TIPO_ENTRADA',
+    'TIPO_ROMANEIO', 'GRUPO_PRODUTO', 'SUBGRUPO_PRODUTO', 'LINHA', 'COLECAO'
   ];
   
   if (result.length > 0) {
@@ -551,6 +711,89 @@ export function processarEntradas(
     });
   }
   
+  return result;
+}
+
+export function processarSaidas(
+  saidas: Record<string, any>[],
+  produtos: Record<string, any>[],
+  cores: Record<string, any>[]
+): Record<string, any>[] {
+  if (saidas.length === 0) return [];
+
+  let result = saidas.filter(row => row.PRODUTO != null);
+
+  const produtoMap = new Map<string, Record<string, any>>();
+  const colsProd = [
+    'PRODUTO', 'DESC_PRODUTO', 'GRUPO_PRODUTO', 'SUBGRUPO_PRODUTO',
+    'LINHA', 'COLECAO'
+  ];
+
+  produtos.forEach(prod => {
+    if (prod.PRODUTO) {
+      const prodData: Record<string, any> = {};
+      colsProd.forEach(col => {
+        if (col in prod) {
+          prodData[col] = prod[col];
+        }
+      });
+      produtoMap.set(prod.PRODUTO, prodData);
+    }
+  });
+
+  result = result.map(row => {
+    const newRow = { ...row };
+    const prodData = produtoMap.get(row.PRODUTO);
+    if (prodData) {
+      Object.assign(newRow, prodData);
+    }
+    return newRow;
+  });
+
+  const coresMap = new Map<string, Record<string, any>>();
+  cores.forEach(cor => {
+    if (cor.COR) {
+      coresMap.set(cor.COR, {
+        COR_PRODUTO: cor.COR,
+        DESC_COR_PRODUTO: cor.DESC_COR
+      });
+    }
+  });
+
+  result = result.map(row => {
+    const newRow = { ...row };
+    const corData = coresMap.get(row.COR_PRODUTO);
+    if (corData) {
+      Object.assign(newRow, corData);
+    }
+    return newRow;
+  });
+
+  result = converterDatas(result, ['EMISSAO']);
+
+  const ordem = [
+    'EMISSAO', 'FILIAL', 'FILIAL_DESTINO', 'ROMANEIO_PRODUTO', 'PRODUTO',
+    'DESC_PRODUTO', 'COR_PRODUTO', 'DESC_COR_PRODUTO', 'QTDE_TOTAL',
+    'TIPO_ROMANEIO', 'GRUPO_PRODUTO', 'SUBGRUPO_PRODUTO', 'LINHA', 'COLECAO'
+  ];
+
+  if (result.length > 0) {
+    const cols = Object.keys(result[0]);
+    const ordemFinal = ordem.filter(col => cols.includes(col));
+    const outrasCols = cols.filter(col => !ordem.includes(col));
+
+    result = result.map(row => {
+      const newRow: Record<string, any> = {};
+      ordemFinal.forEach(col => {
+        newRow[col] = row[col];
+      });
+      outrasCols.forEach(col => {
+        newRow[col] = row[col];
+      });
+      return newRow;
+    });
+  }
+
   return result;
 }
 
