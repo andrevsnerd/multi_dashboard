@@ -272,7 +272,7 @@ export async function queryViaProxy<T>(
  * Interface comum para request (compatível com sql.Request e ProxyRequest)
  */
 export interface RequestLike {
-  input(name: string, type: any, value: any): any;
+  input(name: string, type: any, value: any): RequestLike;
   query<T = any>(queryText: string): Promise<{ recordset: T[] }>;
 }
 
