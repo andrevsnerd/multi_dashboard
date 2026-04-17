@@ -24,8 +24,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const search = request.nextUrl.searchParams.get("search")?.trim() ?? "";
+
     const [entradas, confirmadosCounter] = await Promise.all([
-      fetchLogEntradas(200, 90),
+      fetchLogEntradas(1000, 90, search),
       getContadorConfirmadosByCompany(companyKey),
     ]);
 

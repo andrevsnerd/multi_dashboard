@@ -133,6 +133,10 @@ export default function Sidebar({ companyName }: SidebarProps) {
     ? `${basePath}/mapa-clientes`
     : "/mapa-clientes";
 
+  const sincronizacaoHref = basePath && basePath !== "/"
+    ? `${basePath}/sincronizacao`
+    : "/sincronizacao";
+
   // Verificar se é scarfme (apenas scarfme tem e-commerce)
   const isScarfme = basePath === "/scarfme";
 
@@ -182,6 +186,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     { label: "Lista Loja", href: listaLojaHref, permission: "lista-loja" },
     { label: "Exportar Relatórios", href: exportarRelatoriosHref, permission: "exportar-relatorios" },
     ...(isScarfme ? [{ label: "Mapa de Clientes", href: mapaClientesHref, permission: "mapa-clientes" as const }] : []),
+    { label: "Sincronização", href: sincronizacaoHref, permission: "sincronizacao" },
   ];
 
   const navItems =
@@ -282,7 +287,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
                 !pathname.includes("/vendedores") &&
                 !pathname.includes("/clientes") &&
                 !pathname.includes("/exportar-relatorios") &&
-                !pathname.includes("/mapa-clientes");
+                !pathname.includes("/mapa-clientes") &&
+                !pathname.includes("/sincronizacao");
             } else if (item.label === "Produtos") {
               // Produtos não tem href próprio, apenas expande/recolhe o submenu
               isActive = false;
@@ -330,6 +336,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
               isActive = pathname?.includes("/exportar-relatorios") || pathname === item.href;
             } else if (item.label === "Mapa de Clientes") {
               isActive = pathname?.includes("/mapa-clientes") || pathname === item.href;
+            } else if (item.label === "Sincronização") {
+              isActive = pathname?.includes("/sincronizacao") || pathname === item.href;
             }
             // TODO: Descomentar quando estoque por filial estiver pronto
             // else if (item.label === "Estoque por Filial") {

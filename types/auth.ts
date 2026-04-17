@@ -23,7 +23,8 @@ export type PermissionKey =
   | "destino-romaneio"
   | "mapa-clientes"
   | "lista-loja"
-  | "curva-abc";
+  | "curva-abc"
+  | "sincronizacao";
 
 export type { CompanyKey };
 
@@ -73,6 +74,7 @@ export const ALL_PERMISSION_KEYS: { key: PermissionKey; label: string }[] = [
   { key: "mapa-clientes", label: "Mapa de Clientes" },
   { key: "lista-loja", label: "Lista Loja" },
   { key: "curva-abc", label: "Curva A,B,C" },
+  { key: "sincronizacao", label: "Sincronizacao" },
 ];
 
 export const ROLE_LABELS: Record<RoleKey, string> = {

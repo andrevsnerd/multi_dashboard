@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useDeferredValue } from "react";
 import Link from "next/link";
 
 import { useAuth } from "@/components/auth/AuthContext";
@@ -35,9 +35,13 @@ interface RomaneiosPageProps {
 
 async function fetchLogSaidas(
   companySlug: string,
-  username?: string | null
+  username?: string | null,
+  searchTerm = ""
 ): Promise<RomaneioListItem[]> {
-  const url = `/api/romaneios/saidas?company=${encodeURIComponent(companySlug)}`;
+  const params = new URLSearchParams({ company: companySlug });
+  const search = searchTerm.trim();
+  if (search) params.set("search", search);
+  const url = `/api/romaneios/saidas?${params.toString()}`;
   const headers: Record<string, string> = {};
   if (username) headers["x-auth-username"] = username;
   const response = await fetch(url, { headers, cache: "no-store" });
@@ -48,9 +52,13 @@ async function fetchLogSaidas(
 
 async function fetchLogEntradas(
   companySlug: string,
-  username?: string | null
+  username?: string | null,
+  searchTerm = ""
 ): Promise<RomaneioListItem[]> {
-  const url = `/api/romaneios/entradas?company=${encodeURIComponent(companySlug)}`;
+  const params = new URLSearchParams({ company: companySlug });
+  const search = searchTerm.trim();
+  if (search) params.set("search", search);
+  const url = `/api/romaneios/entradas?${params.toString()}`;
   const headers: Record<string, string> = {};
   if (username) headers["x-auth-username"] = username;
   const response = await fetch(url, { headers, cache: "no-store" });
@@ -59,16 +67,9 @@ async function fetchLogEntradas(
   return (json.data || []).map((row) => ({ ...row, tipo: "entrada" as const }));
 }
 
-function getStatusClass(status: string): string {
-  const s = (status || "").toLowerCase();
-  if (s.includes("concluíd") || s.includes("concluida")) return styles.statusConcluida;
-  if (s.includes("andamento") || s.includes("em andamento")) return styles.statusEmAndamento;
-  return styles.statusPendente;
-}
-
 type TabType = "saida" | "entrada";
 
-export default function RomaneiosPage({ companySlug, companyName }: RomaneiosPageProps) {
+export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
   const { user, isLoading: authLoading } = useAuth();
   const [saidas, setSaidas] = useState<RomaneioListItem[]>([]);
   const [entradas, setEntradas] = useState<RomaneioListItem[]>([]);
@@ -76,14 +77,14 @@ export default function RomaneiosPage({ companySlug, companyName }: RomaneiosPag
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("saida");
   const [searchTerm, setSearchTerm] = useState("");
+  const deferredSearchTerm = useDeferredValue(searchTerm);
 
   useEffect(() => {
     if (authLoading) return; // Aguardar auth terminar antes de buscar dados do usuário
     let cancelled = false;
-    setLoading(true);
     Promise.all([
-      fetchLogSaidas(companySlug, user?.username),
-      fetchLogEntradas(companySlug, user?.username),
+      fetchLogSaidas(companySlug, user?.username, deferredSearchTerm),
+      fetchLogEntradas(companySlug, user?.username, deferredSearchTerm),
       fetch("/api/transferencia-produtos/filiais", { cache: "no-store" }).then(async (r) => {
         if (!r.ok) return [];
         const j = (await r.json()) as { data: FilialOption[] };
@@ -108,7 +109,7 @@ export default function RomaneiosPage({ companySlug, companyName }: RomaneiosPag
     return () => {
       cancelled = true;
     };
-  }, [companySlug, user?.username, authLoading]);
+  }, [companySlug, user?.username, authLoading, deferredSearchTerm]);
 
   const basePath = `/${companySlug}`;
   const romaneiosBase = activeTab === "saida" ? saidas : entradas;
@@ -156,7 +157,10 @@ export default function RomaneiosPage({ companySlug, companyName }: RomaneiosPag
             className={styles.searchInput}
             placeholder="Buscar por romaneio, responsável, filial, tipo..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setLoading(true);
+              setSearchTerm(e.target.value);
+            }}
           />
           {searchTerm && (
             <button className={styles.searchClear} onClick={() => setSearchTerm("")} aria-label="Limpar">×</button>

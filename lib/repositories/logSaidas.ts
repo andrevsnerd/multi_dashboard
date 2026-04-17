@@ -1,4 +1,5 @@
 import { withRequest } from "@/lib/db/connection";
+import sql from "mssql";
 
 export interface LogSaidaRow {
   romaneio: string;
@@ -13,11 +14,76 @@ export interface LogSaidaRow {
   tipoRomaneio: string;
 }
 
-export async function fetchLogSaidas(limit = 200, dias = 90): Promise<LogSaidaRow[]> {
-  const limitClamp = Math.min(limit || 200, 500);
-  const diasClamp = Math.min(dias || 30, 90);
+function buildSearchConfig(searchTerm = "") {
+  const search = searchTerm.trim();
+  if (!search) {
+    return {
+      hasSearch: false,
+      isRomaneioSearch: false,
+      like: "",
+      exactRomaneio: "",
+    };
+  }
+
+  const digits = search.replace(/\D/g, "");
+  const exactRomaneio = digits ? digits.padStart(6, "0") : search;
+  const isRomaneioSearch = digits.length >= 4 && /^[A-Za-z]?\d[\d\s.-]*$/.test(search);
+
+  return {
+    hasSearch: true,
+    isRomaneioSearch,
+    like: `%${search}%`,
+    exactRomaneio,
+  };
+}
+
+export async function fetchLogSaidas(
+  limit = 200,
+  dias = 90,
+  searchTerm = ""
+): Promise<LogSaidaRow[]> {
+  const limitClamp = Math.min(Math.max(limit || 200, 1), 1000);
+  const diasClamp = Math.min(Math.max(dias || 30, 1), 365);
+  const searchConfig = buildSearchConfig(searchTerm);
+  const useDateFilter = !searchConfig.isRomaneioSearch;
+  const dateFilterEstoque = useDateFilter
+    ? `AND es.EMISSAO >= DATEADD(DAY, -${diasClamp}, GETDATE())`
+    : "";
+  const dateFilterLoja = useDateFilter
+    ? `AND s.EMISSAO >= DATEADD(DAY, -${diasClamp}, GETDATE())`
+    : "";
+  const searchFilterEstoque = searchConfig.hasSearch
+    ? `
+          AND (
+            LTRIM(RTRIM(es.ROMANEIO_PRODUTO)) = @searchExactRomaneio
+            OR LTRIM(RTRIM(es.ROMANEIO_PRODUTO)) LIKE @searchLike
+            OR LTRIM(RTRIM(ISNULL(es.FILIAL, ''))) LIKE @searchLike
+            OR LTRIM(RTRIM(ISNULL(es.FILIAL_DESTINO, ''))) LIKE @searchLike
+            OR LTRIM(RTRIM(ISNULL(es.RESPONSAVEL, ''))) LIKE @searchLike
+            OR LTRIM(RTRIM(ISNULL(es.TIPO_ROMANEIO, ''))) LIKE @searchLike
+            OR LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR(MAX), es.OBS), ''))) LIKE @searchLike
+          )
+        `
+    : "";
+  const searchFilterLoja = searchConfig.hasSearch
+    ? `
+          AND (
+            LTRIM(RTRIM(s.ROMANEIO_PRODUTO)) = @searchExactRomaneio
+            OR LTRIM(RTRIM(s.ROMANEIO_PRODUTO)) LIKE @searchLike
+            OR LTRIM(RTRIM(ISNULL(s.FILIAL, ''))) LIKE @searchLike
+            OR LTRIM(RTRIM(ISNULL(s.FILIAL_DESTINO, ''))) LIKE @searchLike
+            OR LTRIM(RTRIM(ISNULL(s.RESPONSAVEL, ''))) LIKE @searchLike
+            OR LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR(MAX), s.OBS), ''))) LIKE @searchLike
+          )
+        `
+    : "";
 
   const saidas = await withRequest(async (req) => {
+    if (searchConfig.hasSearch) {
+      req.input("searchLike", sql.VarChar, searchConfig.like);
+      req.input("searchExactRomaneio", sql.VarChar, searchConfig.exactRomaneio);
+    }
+
     const query = `
       SELECT TOP (${limitClamp}) * FROM (
         SELECT
@@ -34,7 +100,9 @@ export async function fetchLogSaidas(limit = 200, dias = 90): Promise<LogSaidaRo
           (SELECT ISNULL(SUM(ep.QTDE), 0) FROM ESTOQUE_PROD1_SAI ep WITH (NOLOCK)
            WHERE ep.ROMANEIO_PRODUTO = es.ROMANEIO_PRODUTO AND ep.FILIAL = es.FILIAL) AS QTD_ITENS
         FROM ESTOQUE_PROD_SAI es WITH (NOLOCK)
-        WHERE es.EMISSAO >= DATEADD(DAY, -${diasClamp}, GETDATE())
+        WHERE 1 = 1
+          ${dateFilterEstoque}
+          ${searchFilterEstoque}
 
         UNION ALL
 
@@ -68,9 +136,10 @@ export async function fetchLogSaidas(limit = 200, dias = 90): Promise<LogSaidaRo
             AND LTRIM(RTRIM(ISNULL(es2.FILIAL, ''))) = LTRIM(RTRIM(ISNULL(s.FILIAL, '')))
         )
         AND (s.SAIDA_CANCELADA = 0 OR s.SAIDA_CANCELADA IS NULL)
-        AND s.EMISSAO >= DATEADD(DAY, -${diasClamp}, GETDATE())
+        ${dateFilterLoja}
+        ${searchFilterLoja}
       ) AS unificado
-      ORDER BY EMISSAO DESC
+      ORDER BY EMISSAO DESC, ROMANEIO_PRODUTO DESC
     `;
 
     const result = await req.query<{

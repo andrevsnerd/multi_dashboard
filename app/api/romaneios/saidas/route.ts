@@ -25,8 +25,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const search = request.nextUrl.searchParams.get("search")?.trim() ?? "";
+
     const [saidas, destinosMap, confirmadosCounter] = await Promise.all([
-      fetchLogSaidas(200, 90),
+      fetchLogSaidas(1000, 90, search),
       getAllDestinosByCompany(companyKey),
       getContadorConfirmadosByCompany(companyKey),
     ]);

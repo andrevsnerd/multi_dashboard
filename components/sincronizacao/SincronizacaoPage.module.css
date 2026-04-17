@@ -1,0 +1,155 @@
+.wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.error {
+  color: #dc2626;
+  background: #fee2e2;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.loading {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.groupContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.groupSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.groupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.groupTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.groupCount {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.listItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.leftBlock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 280px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.dotOK {
+  background: #22c55e;
+}
+
+.dotATENCAO {
+  background: #f59e0b;
+}
+
+.dotATRASADO,
+.dotSEM_VENDAS {
+  background: #ef4444;
+}
+
+.filialName {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.statusText {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  font-size: 13px;
+  color: #475569;
+  justify-content: flex-end;
+}
+
+@media (max-width: 900px) {
+  .listItem {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .details {
+    justify-content: flex-start;
+  }
+}
