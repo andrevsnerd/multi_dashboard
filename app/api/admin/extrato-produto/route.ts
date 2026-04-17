@@ -24,16 +24,223 @@ export interface ExtratoLinha {
   statusTransito: number | null;
 }
 
+export interface ProdutoCorOption {
+  cor: string;
+  descCor: string | null;
+  codigoBarra: string | null;
+  estoqueAtual: number;
+}
+
+export interface ProdutoFilialOption {
+  filial: string;
+  estoqueAtual: number;
+}
+
 export interface ExtratoResponse {
   produto: string;
   descProduto: string | null;
   cor: string;
   descCor: string | null;
+  codigoBarra: string | null;
   grade: string | null;
   filial: string;
   estoqueAtual: number;
+  coresDisponiveis: ProdutoCorOption[];
+  filiaisDisponiveis: ProdutoFilialOption[];
   linhas: ExtratoLinha[];
   erros: string[];
+}
+
+export interface ProdutoLookupResponse {
+  produto: string;
+  descProduto: string | null;
+  cor: string | null;
+  descCor: string | null;
+  codigoBarra: string | null;
+  barcodeMatched: boolean;
+  coresDisponiveis: ProdutoCorOption[];
+  filiaisDisponiveis: ProdutoFilialOption[];
+}
+
+interface ProdutoResolvido {
+  produto: string;
+  descProduto: string | null;
+  cor: string | null;
+  descCor: string | null;
+  codigoBarra: string | null;
+  barcodeMatched: boolean;
+}
+
+function sqlText(value: string) {
+  return value.replace(/'/g, "''");
+}
+
+function trimValue(value: unknown) {
+  return value == null ? "" : String(value).trim();
+}
+
+function produtoEqualsSql(column: string, produto: string) {
+  return `RTRIM(LTRIM(CAST(${column} AS VARCHAR(50)))) = '${sqlText(produto)}'`;
+}
+
+function corEqualsSql(column: string, cor: string) {
+  return `RTRIM(LTRIM(ISNULL(CAST(${column} AS VARCHAR(20)), ''))) = '${sqlText(cor)}'`;
+}
+
+async function resolveProdutoInput(input: string): Promise<ProdutoResolvido | null> {
+  const term = input.trim();
+  if (!term) return null;
+  const termSql = sqlText(term);
+
+  const barcodeRows = await query<{
+    PRODUTO: string;
+    DESC_PRODUTO: string | null;
+    COR_PRODUTO: string | null;
+    DESC_COR: string | null;
+    CODIGO_BARRA: string | null;
+  }>(`
+    SELECT TOP 1
+      pb.PRODUTO,
+      p.DESC_PRODUTO,
+      pb.COR_PRODUTO,
+      c.DESC_COR,
+      pb.CODIGO_BARRA
+    FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+    LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = pb.PRODUTO
+    LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = pb.COR_PRODUTO
+    WHERE LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) = '${termSql}'
+    ORDER BY pb.PRODUTO, pb.COR_PRODUTO
+  `);
+
+  if (barcodeRows.length > 0) {
+    const row = barcodeRows[0];
+    return {
+      produto: trimValue(row.PRODUTO),
+      descProduto: trimValue(row.DESC_PRODUTO) || null,
+      cor: trimValue(row.COR_PRODUTO) || null,
+      descCor: trimValue(row.DESC_COR) || null,
+      codigoBarra: trimValue(row.CODIGO_BARRA) || null,
+      barcodeMatched: true,
+    };
+  }
+
+  const productRows = await query<{
+    PRODUTO: string;
+    DESC_PRODUTO: string | null;
+  }>(`
+    SELECT TOP 1 p.PRODUTO, p.DESC_PRODUTO
+    FROM PRODUTOS p WITH (NOLOCK)
+    WHERE ${produtoEqualsSql("p.PRODUTO", term)}
+    ORDER BY p.PRODUTO
+  `);
+
+  if (productRows.length > 0) {
+    const row = productRows[0];
+    return {
+      produto: trimValue(row.PRODUTO),
+      descProduto: trimValue(row.DESC_PRODUTO) || null,
+      cor: null,
+      descCor: null,
+      codigoBarra: null,
+      barcodeMatched: false,
+    };
+  }
+
+  return null;
+}
+
+async function fetchCoresDisponiveis(produto: string, filial?: string | null): Promise<ProdutoCorOption[]> {
+  const filialSql = filial ? sqlText(filial) : "";
+  const filialFilter = filialSql ? `AND ep.FILIAL LIKE '%${filialSql}%'` : "";
+
+  const rows = await query<{
+    COR_PRODUTO: string | null;
+    DESC_COR: string | null;
+    CODIGO_BARRA: string | null;
+    ESTOQUE: number | null;
+  }>(`
+    ;WITH cores AS (
+      SELECT DISTINCT
+        RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))) AS COR_PRODUTO
+      FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+      WHERE ${produtoEqualsSql("pb.PRODUTO", produto)}
+        AND pb.COR_PRODUTO IS NOT NULL
+        AND RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))) <> ''
+
+      UNION
+
+      SELECT DISTINCT
+        RTRIM(LTRIM(CAST(ep.COR_PRODUTO AS VARCHAR(20)))) AS COR_PRODUTO
+      FROM ESTOQUE_PRODUTOS ep WITH (NOLOCK)
+      WHERE ${produtoEqualsSql("ep.PRODUTO", produto)}
+        AND ep.COR_PRODUTO IS NOT NULL
+        AND RTRIM(LTRIM(CAST(ep.COR_PRODUTO AS VARCHAR(20)))) <> ''
+    ),
+    barras AS (
+      SELECT
+        RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))) AS COR_PRODUTO,
+        MIN(NULLIF(RTRIM(LTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))), '')) AS CODIGO_BARRA
+      FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+      WHERE ${produtoEqualsSql("pb.PRODUTO", produto)}
+      GROUP BY RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20))))
+    ),
+    estoque AS (
+      SELECT
+        RTRIM(LTRIM(CAST(ep.COR_PRODUTO AS VARCHAR(20)))) AS COR_PRODUTO,
+        SUM(ISNULL(ep.ESTOQUE, 0)) AS ESTOQUE
+      FROM ESTOQUE_PRODUTOS ep WITH (NOLOCK)
+      WHERE ${produtoEqualsSql("ep.PRODUTO", produto)}
+        ${filialFilter}
+      GROUP BY RTRIM(LTRIM(CAST(ep.COR_PRODUTO AS VARCHAR(20))))
+    )
+    SELECT
+      cores.COR_PRODUTO,
+      cb.DESC_COR,
+      barras.CODIGO_BARRA,
+      ISNULL(estoque.ESTOQUE, 0) AS ESTOQUE
+    FROM cores
+    LEFT JOIN CORES_BASICAS cb WITH (NOLOCK) ON cb.COR = cores.COR_PRODUTO
+    LEFT JOIN barras ON barras.COR_PRODUTO = cores.COR_PRODUTO
+    LEFT JOIN estoque ON estoque.COR_PRODUTO = cores.COR_PRODUTO
+    ORDER BY cores.COR_PRODUTO
+  `);
+
+  return rows
+    .map((row) => ({
+      cor: trimValue(row.COR_PRODUTO),
+      descCor: trimValue(row.DESC_COR) || null,
+      codigoBarra: trimValue(row.CODIGO_BARRA) || null,
+      estoqueAtual: Number(row.ESTOQUE ?? 0),
+    }))
+    .filter((row) => row.cor);
+}
+
+async function fetchFiliaisDisponiveis(produto: string, cor?: string | null): Promise<ProdutoFilialOption[]> {
+  const corFilter = cor ? `AND ${corEqualsSql("ep.COR_PRODUTO", cor)}` : "";
+
+  const rows = await query<{
+    FILIAL: string | null;
+    ESTOQUE: number | null;
+  }>(`
+    SELECT
+      RTRIM(LTRIM(CAST(ep.FILIAL AS VARCHAR(100)))) AS FILIAL,
+      SUM(ISNULL(ep.ESTOQUE, 0)) AS ESTOQUE
+    FROM ESTOQUE_PRODUTOS ep WITH (NOLOCK)
+    WHERE ${produtoEqualsSql("ep.PRODUTO", produto)}
+      ${corFilter}
+      AND ep.FILIAL IS NOT NULL
+      AND RTRIM(LTRIM(CAST(ep.FILIAL AS VARCHAR(100)))) <> ''
+    GROUP BY RTRIM(LTRIM(CAST(ep.FILIAL AS VARCHAR(100))))
+    HAVING SUM(ISNULL(ep.ESTOQUE, 0)) <> 0
+    ORDER BY FILIAL
+  `);
+
+  return rows
+    .map((row) => ({
+      filial: trimValue(row.FILIAL),
+      estoqueAtual: Number(row.ESTOQUE ?? 0),
+    }))
+    .filter((row) => row.filial);
 }
 
 export async function GET(request: NextRequest) {
@@ -43,25 +250,95 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  const produto = searchParams.get("produto")?.trim();
-  const cor = searchParams.get("cor")?.trim();
+  const produtoInput = searchParams.get("produto")?.trim();
+  const corInput = searchParams.get("cor")?.trim();
   const filial = searchParams.get("filial")?.trim(); // pode ser parte do nome
+  const lookupOnly = searchParams.get("lookup") === "1";
 
-  if (!produto || !cor) {
+  if (!produtoInput) {
     return NextResponse.json(
-      { error: "Parâmetros 'produto' e 'cor' são obrigatórios" },
+      { error: "Parâmetro 'produto' é obrigatório" },
       { status: 400 }
     );
   }
+
+  let resolved: ProdutoResolvido | null = null;
+  try {
+    resolved = await resolveProdutoInput(produtoInput);
+  } catch (e) {
+    if (lookupOnly) {
+      return NextResponse.json({ error: `Produto/código de barras: ${(e as Error).message}` }, { status: 500 });
+    }
+  }
+
+  const produto = resolved?.produto || produtoInput;
+  let coresDisponiveis: ProdutoCorOption[] = [];
+  try {
+    coresDisponiveis = await fetchCoresDisponiveis(produto);
+  } catch (e) {
+    if (lookupOnly) {
+      return NextResponse.json({ error: `Cores disponíveis: ${(e as Error).message}` }, { status: 500 });
+    }
+  }
+
+  const corResolvida =
+    corInput ||
+    resolved?.cor ||
+    (coresDisponiveis.length === 1 ? coresDisponiveis[0].cor : undefined);
+  const corOption = corResolvida
+    ? coresDisponiveis.find((item) => item.cor === corResolvida) ?? null
+    : null;
+  let filiaisDisponiveis: ProdutoFilialOption[] = [];
+  try {
+    filiaisDisponiveis = await fetchFiliaisDisponiveis(produto, corResolvida);
+  } catch (e) {
+    if (lookupOnly) {
+      return NextResponse.json({ error: `Filiais disponíveis: ${(e as Error).message}` }, { status: 500 });
+    }
+  }
+
+  if (lookupOnly) {
+    const response: ProdutoLookupResponse = {
+      produto,
+      descProduto: resolved?.descProduto ?? null,
+      cor: corResolvida ?? null,
+      descCor: resolved?.descCor ?? corOption?.descCor ?? null,
+      codigoBarra: resolved?.codigoBarra ?? corOption?.codigoBarra ?? null,
+      barcodeMatched: resolved?.barcodeMatched ?? false,
+      coresDisponiveis,
+      filiaisDisponiveis,
+    };
+    return NextResponse.json(response);
+  }
+
+  if (!corResolvida) {
+    return NextResponse.json(
+      {
+        error:
+          coresDisponiveis.length > 1
+            ? "Selecione uma cor para este produto."
+            : "Parâmetro 'cor' é obrigatório para este produto.",
+        coresDisponiveis,
+        filiaisDisponiveis,
+      },
+      { status: 400 }
+    );
+  }
+
+  const cor = corResolvida;
+  const produtoSql = sqlText(produto);
+  const corSql = sqlText(cor);
+  const filialSql = filial ? sqlText(filial) : "";
 
   const erros: string[] = [];
   const linhas: ExtratoLinha[] = [];
 
   // Filtro de filial para queries
-  const filialFilter = filial ? `AND le.FILIAL LIKE '%${filial.replace(/'/g, "''")}%'` : "";
-  const filialFilterSai = filial ? `AND s.FILIAL LIKE '%${filial.replace(/'/g, "''")}%'` : "";
-  const filialFilterLs = filial ? `AND ls.FILIAL LIKE '%${filial.replace(/'/g, "''")}%'` : "";
-  const filialFilterV = filial ? `AND vp.CODIGO_FILIAL IN (SELECT CODIGO_FILIAL FROM LOJA_VENDA WHERE FILIAL LIKE '%${filial.replace(/'/g, "''")}%')` : "";
+  const filialFilter = filialSql ? `AND le.FILIAL LIKE '%${filialSql}%'` : "";
+  const filialFilterEnt = filialSql ? `AND e.FILIAL LIKE '%${filialSql}%'` : "";
+  const filialFilterSai = filialSql ? `AND s.FILIAL LIKE '%${filialSql}%'` : "";
+  const filialFilterLs = filialSql ? `AND ls.FILIAL LIKE '%${filialSql}%'` : "";
+  const filialFilterV = filialSql ? `AND (f.FILIAL LIKE '%${filialSql}%' OR vp.CODIGO_FILIAL LIKE '%${filialSql}%')` : "";
 
   // ── Info do produto ──
   let descProduto: string | null = null;
@@ -74,28 +351,33 @@ export async function GET(request: NextRequest) {
       DESC_PRODUTO: string;
       GRADE: string;
       DESC_COR: string;
-      ESTOQUE: number;
     }>(`
       SELECT TOP 1
         p.DESC_PRODUTO,
         p.GRADE,
-        c.DESC_COR,
-        ISNULL(ep.ESTOQUE, 0) AS ESTOQUE
+        c.DESC_COR
       FROM PRODUTOS p WITH (NOLOCK)
-      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = '${cor.replace(/'/g, "''")}'
-      LEFT JOIN ESTOQUE_PRODUTOS ep WITH (NOLOCK)
-        ON ep.PRODUTO = p.PRODUTO AND ep.COR_PRODUTO = '${cor.replace(/'/g, "''")}' ${filial ? `AND ep.FILIAL LIKE '%${filial.replace(/'/g, "''")}%'` : ""}
-      WHERE p.PRODUTO = '${produto.replace(/'/g, "''")}'
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = '${corSql}'
+      WHERE ${produtoEqualsSql("p.PRODUTO", produto)}
+    `);
+    const estoqueRows = await query<{ ESTOQUE: number }>(`
+      SELECT ISNULL(SUM(ISNULL(ep.ESTOQUE, 0)), 0) AS ESTOQUE
+      FROM ESTOQUE_PRODUTOS ep WITH (NOLOCK)
+      WHERE ${produtoEqualsSql("ep.PRODUTO", produto)}
+        AND ${corEqualsSql("ep.COR_PRODUTO", cor)}
+        ${filialSql ? `AND ep.FILIAL LIKE '%${filialSql}%'` : ""}
     `);
     if (prodInfo.length > 0) {
       descProduto = prodInfo[0].DESC_PRODUTO?.trim() ?? null;
       grade = prodInfo[0].GRADE?.trim() ?? null;
       descCor = prodInfo[0].DESC_COR?.trim() ?? null;
-      estoqueAtual = prodInfo[0].ESTOQUE ?? 0;
     }
+    estoqueAtual = Number(estoqueRows[0]?.ESTOQUE ?? 0);
   } catch (e) {
     erros.push(`Info produto: ${(e as Error).message}`);
   }
+  descProduto = descProduto ?? resolved?.descProduto ?? null;
+  descCor = descCor ?? resolved?.descCor ?? corOption?.descCor ?? null;
 
   // ── 1. LOJA ENTRADAS (romaneios de chegada de fornecedor/transferência confirmada) ──
   try {
@@ -133,8 +415,8 @@ export async function GET(request: NextRequest) {
         ON le.FILIAL = lep.FILIAL AND le.ROMANEIO_PRODUTO = lep.ROMANEIO_PRODUTO
       LEFT JOIN LOJA_TIPOS_ENTRADA_SAIDA t WITH (NOLOCK)
         ON t.TIPO_ENTRADA_SAIDA = le.TIPO_ENTRADA_SAIDA
-      WHERE lep.PRODUTO = '${produto.replace(/'/g, "''")}'
-        AND lep.COR_PRODUTO = '${cor.replace(/'/g, "''")}'
+      WHERE lep.PRODUTO = '${produtoSql}'
+        AND lep.COR_PRODUTO = '${corSql}'
         ${filialFilter}
       ORDER BY le.EMISSAO
     `);
@@ -188,10 +470,12 @@ export async function GET(request: NextRequest) {
         e.ROMANEIO_ORIGEM,
         CAST(e.OBS AS varchar(500)) AS OBS
       FROM ESTOQUE_PROD_ENT e WITH (NOLOCK)
-      JOIN ESTOQUE_PROD1_ENT p WITH (NOLOCK) ON e.ROMANEIO_PRODUTO = p.ROMANEIO_PRODUTO
-      WHERE p.PRODUTO = '${produto.replace(/'/g, "''")}'
-        AND p.COR_PRODUTO = '${cor.replace(/'/g, "''")}'
-        ${filialFilter.replace('le.FILIAL', 'e.FILIAL')}
+      JOIN ESTOQUE_PROD1_ENT p WITH (NOLOCK)
+        ON e.ROMANEIO_PRODUTO = p.ROMANEIO_PRODUTO
+        AND e.FILIAL = p.FILIAL
+      WHERE p.PRODUTO = '${produtoSql}'
+        AND p.COR_PRODUTO = '${corSql}'
+        ${filialFilterEnt}
       ORDER BY e.EMISSAO
     `);
     for (const r of rows) {
@@ -208,7 +492,7 @@ export async function GET(request: NextRequest) {
         valor: 0,
         preco: r.CUSTO1 ?? 0,
         obs: r.OBS?.trim() ?? null,
-        atualizouEstoque: null,
+        atualizouEstoque: true,
         statusTransito: null,
       });
     }
@@ -242,9 +526,11 @@ export async function GET(request: NextRequest) {
         p.CUSTO1,
         CAST(s.OBS AS varchar(500)) AS OBS
       FROM ESTOQUE_PROD_SAI s WITH (NOLOCK)
-      JOIN ESTOQUE_PROD1_SAI p WITH (NOLOCK) ON s.ROMANEIO_PRODUTO = p.ROMANEIO_PRODUTO
-      WHERE p.PRODUTO = '${produto.replace(/'/g, "''")}'
-        AND p.COR_PRODUTO = '${cor.replace(/'/g, "''")}'
+      JOIN ESTOQUE_PROD1_SAI p WITH (NOLOCK)
+        ON s.ROMANEIO_PRODUTO = p.ROMANEIO_PRODUTO
+        AND s.FILIAL = p.FILIAL
+      WHERE p.PRODUTO = '${produtoSql}'
+        AND p.COR_PRODUTO = '${corSql}'
         ${filialFilterSai}
       ORDER BY s.EMISSAO
     `);
@@ -262,7 +548,7 @@ export async function GET(request: NextRequest) {
         valor: 0,
         preco: r.CUSTO1 ?? 0,
         obs: r.OBS?.trim() ?? null,
-        atualizouEstoque: null,
+        atualizouEstoque: true,
         statusTransito: null,
       });
     }
@@ -277,6 +563,7 @@ export async function GET(request: NextRequest) {
     const rows = await query<{
       DATA_VENDA: Date;
       CODIGO_FILIAL: string;
+      FILIAL_VENDA: string | null;
       TICKET: string;
       QTDE: number;
       PRECO_LIQUIDO: number;
@@ -285,6 +572,7 @@ export async function GET(request: NextRequest) {
       SELECT
         v.DATA_VENDA,
         v.CODIGO_FILIAL,
+        f.FILIAL AS FILIAL_VENDA,
         v.TICKET,
         vp.QTDE,
         vp.PRECO_LIQUIDO,
@@ -292,10 +580,12 @@ export async function GET(request: NextRequest) {
       FROM LOJA_VENDA v WITH (NOLOCK)
       JOIN LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
         ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
-      WHERE vp.PRODUTO = '${produto.replace(/'/g, "''")}'
-        AND vp.COR_PRODUTO = '${cor.replace(/'/g, "''")}'
+      LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.COD_FILIAL = vp.CODIGO_FILIAL
+      WHERE vp.PRODUTO = '${produtoSql}'
+        AND vp.COR_PRODUTO = '${corSql}'
         AND vp.QTDE_CANCELADA = 0
         AND ISNULL(vp.NAO_MOVIMENTA_ESTOQUE, 0) = 0
+        ${filialFilterV}
       ORDER BY v.DATA_VENDA
     `);
     for (const r of rows) {
@@ -305,7 +595,7 @@ export async function GET(request: NextRequest) {
         tipo: "LOJA VENDAS",
         tipoRomaneio: null,
         doc: r.TICKET?.trim() ?? "",
-        filialOrigem: r.CODIGO_FILIAL?.trim() ?? null,
+        filialOrigem: r.FILIAL_VENDA?.trim() || r.CODIGO_FILIAL?.trim() || null,
         filialDestino: null,
         romaneio: null,
         qtde: -qtdeLiquida,
@@ -349,8 +639,8 @@ export async function GET(request: NextRequest) {
         ON ls.FILIAL = lsp.FILIAL AND ls.ROMANEIO_PRODUTO = lsp.ROMANEIO_PRODUTO
       LEFT JOIN LOJA_TIPOS_ENTRADA_SAIDA t WITH (NOLOCK)
         ON t.TIPO_ENTRADA_SAIDA = ls.TIPO_ENTRADA_SAIDA
-      WHERE lsp.PRODUTO = '${produto.replace(/'/g, "''")}'
-        AND lsp.COR_PRODUTO = '${cor.replace(/'/g, "''")}'
+      WHERE lsp.PRODUTO = '${produtoSql}'
+        AND lsp.COR_PRODUTO = '${corSql}'
         ${filialFilterLs}
       ORDER BY ls.EMISSAO
     `);
@@ -368,7 +658,7 @@ export async function GET(request: NextRequest) {
         valor: 0,
         preco: 0,
         obs: r.OBS?.trim() ?? null,
-        atualizouEstoque: null,
+        atualizouEstoque: true,
         statusTransito: null,
       });
     }
@@ -384,9 +674,12 @@ export async function GET(request: NextRequest) {
     descProduto,
     cor,
     descCor,
+    codigoBarra: resolved?.codigoBarra ?? corOption?.codigoBarra ?? null,
     grade,
     filial: filial ?? "Todas",
     estoqueAtual,
+    coresDisponiveis,
+    filiaisDisponiveis,
     linhas,
     erros,
   };

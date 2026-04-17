@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthContext";
-import type { ExtratoResponse, ExtratoLinha } from "@/app/api/admin/extrato-produto/route";
+import type {
+  ExtratoResponse,
+  ProdutoCorOption,
+  ProdutoFilialOption,
+  ProdutoLookupResponse,
+} from "@/app/api/admin/extrato-produto/route";
 
 // ── Constantes ──────────────────────────────────────────────────────────────
 
@@ -64,9 +69,14 @@ export default function ExtratoPage() {
   const [filial, setFilial] = useState("");
   const [dados, setDados] = useState<ExtratoResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [lookupLoading, setLookupLoading] = useState(false);
   const [erro, setErro] = useState("");
+  const [lookupMsg, setLookupMsg] = useState("");
+  const [coresDisponiveis, setCoresDisponiveis] = useState<ProdutoCorOption[]>([]);
+  const [filiaisDisponiveis, setFiliaisDisponiveis] = useState<ProdutoFilialOption[]>([]);
   const [tiposFiltro, setTiposFiltro] = useState<string[]>([]);
   const [mostrarZeroGrade, setMostrarZeroGrade] = useState(true);
+  const corRef = useRef(cor);
   const tableRef = useRef<HTMLDivElement>(null);
 
   const authHeader = useCallback(
@@ -75,10 +85,90 @@ export default function ExtratoPage() {
     [user]
   );
 
+  useEffect(() => {
+    corRef.current = cor;
+  }, [cor]);
+
+  useEffect(() => {
+    if (!user) return;
+    const termo = produto.trim();
+    if (termo.length < 2) {
+      setCoresDisponiveis([]);
+      setFiliaisDisponiveis([]);
+      setLookupMsg("");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setLookupLoading(true);
+      setLookupMsg("");
+      try {
+        const params = new URLSearchParams({ produto: termo, lookup: "1" });
+        if (corRef.current.trim()) params.set("cor", corRef.current.trim());
+        const res = await fetch(`/api/admin/extrato-produto?${params}`, {
+          headers: authHeader(),
+          signal: controller.signal,
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Erro ao buscar cores");
+
+        const lookup = json as ProdutoLookupResponse;
+        setCoresDisponiveis(lookup.coresDisponiveis ?? []);
+        setFiliaisDisponiveis(lookup.filiaisDisponiveis ?? []);
+
+        if (lookup.barcodeMatched && lookup.produto) {
+          setProduto(lookup.produto);
+          setLookupMsg(
+            lookup.codigoBarra
+              ? `Código ${lookup.codigoBarra} localizado.`
+              : "Código de barras localizado."
+          );
+        }
+
+        if (lookup.cor && lookup.cor !== corRef.current) {
+          setCor(lookup.cor);
+        } else if (
+          lookup.coresDisponiveis.length === 1 &&
+          lookup.coresDisponiveis[0].cor !== corRef.current
+        ) {
+          setCor(lookup.coresDisponiveis[0].cor);
+        } else if (
+          corRef.current &&
+          lookup.coresDisponiveis.length > 0 &&
+          !lookup.coresDisponiveis.some((item) => item.cor === corRef.current)
+        ) {
+          setCor("");
+        }
+
+        if (
+          filial.trim() &&
+          lookup.filiaisDisponiveis.length > 0 &&
+          !lookup.filiaisDisponiveis.some((item) => item.filial === filial.trim())
+        ) {
+          setFilial("");
+        }
+      } catch (ex) {
+        if ((ex as Error).name !== "AbortError") {
+          setCoresDisponiveis([]);
+          setFiliaisDisponiveis([]);
+          setLookupMsg((ex as Error).message);
+        }
+      } finally {
+        if (!controller.signal.aborted) setLookupLoading(false);
+      }
+    }, 350);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [produto, cor, filial, user, authHeader]);
+
   async function buscar(e: React.FormEvent) {
     e.preventDefault();
-    if (!produto.trim() || !cor.trim()) {
-      setErro("Preencha Produto e Cor.");
+    if (!produto.trim()) {
+      setErro("Preencha Produto ou Código de Barras.");
       return;
     }
     setLoading(true);
@@ -86,7 +176,8 @@ export default function ExtratoPage() {
     setDados(null);
 
     try {
-      const params = new URLSearchParams({ produto: produto.trim(), cor: cor.trim() });
+      const params = new URLSearchParams({ produto: produto.trim() });
+      if (cor.trim()) params.set("cor", cor.trim());
       if (filial.trim()) params.set("filial", filial.trim());
 
       const res = await fetch(`/api/admin/extrato-produto?${params}`, {
@@ -95,6 +186,10 @@ export default function ExtratoPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Erro ao buscar");
       setDados(json as ExtratoResponse);
+      setProduto((json as ExtratoResponse).produto);
+      setCor((json as ExtratoResponse).cor);
+      setCoresDisponiveis((json as ExtratoResponse).coresDisponiveis ?? []);
+      setFiliaisDisponiveis((json as ExtratoResponse).filiaisDisponiveis ?? []);
       setTiposFiltro([]); // reset filtro
     } catch (ex) {
       setErro((ex as Error).message);
@@ -109,6 +204,13 @@ export default function ExtratoPage() {
   const tiposDisponiveis = dados
     ? [...new Set(dados.linhas.map((l) => l.tipo))].sort()
     : [];
+  const saldoMovimentos = dados
+    ? dados.linhas.reduce((s, l) => s + l.qtde, 0)
+    : 0;
+  const saldoGrade = dados
+    ? dados.linhas.reduce((s, l) => s + l.qtdeGrade, 0)
+    : 0;
+  const diferencaEstoque = dados ? dados.estoqueAtual - saldoMovimentos : 0;
 
   const linhasFiltradas = dados
     ? dados.linhas.filter((l) => {
@@ -118,12 +220,10 @@ export default function ExtratoPage() {
       })
     : [];
 
-  // Saldo corrente acumulado (usando qtdeGrade quando != 0, senão qtde)
+  // Saldo corrente acumulado pelo movimento total declarado em QTDE.
   let saldo = 0;
   const linhasComSaldo = linhasFiltradas.map((l) => {
-    // Se o campo grade está zerado mas qtde não, usa qtde para o saldo
-    const movimentoEfetivo = l.qtdeGrade !== 0 ? l.qtdeGrade : l.qtde;
-    saldo += movimentoEfetivo;
+    saldo += l.qtde;
     return { ...l, saldoAcumulado: saldo };
   });
 
@@ -157,36 +257,70 @@ export default function ExtratoPage() {
       {/* ── Formulário ── */}
       <form onSubmit={buscar} style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "flex-end" }}>
         <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#94a3b8" }}>
-          Produto *
+          Produto ou código de barras *
           <input
             type="text"
             value={produto}
-            onChange={(e) => setProduto(e.target.value)}
-            placeholder="Ex: 13.71.0365"
+            onChange={(e) => {
+              setProduto(e.target.value);
+              setDados(null);
+              setFiliaisDisponiveis([]);
+            }}
+            placeholder="Ex: 13.71.0365 ou 789..."
             style={inputStyle}
             required
           />
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#94a3b8" }}>
           Cor *
-          <input
-            type="text"
-            value={cor}
-            onChange={(e) => setCor(e.target.value)}
-            placeholder="Ex: 03"
-            style={{ ...inputStyle, width: 80 }}
-            required
-          />
+          {coresDisponiveis.length > 0 ? (
+            <select
+              value={cor}
+              onChange={(e) => setCor(e.target.value)}
+              style={{ ...inputStyle, width: 220 }}
+              required
+            >
+              <option value="">Selecione</option>
+              {coresDisponiveis.map((item) => (
+                <option key={item.cor} value={item.cor}>
+                  {item.cor} - {item.descCor ?? "sem descrição"} ({item.estoqueAtual} un)
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              value={cor}
+              onChange={(e) => setCor(e.target.value)}
+              placeholder="Ex: 03"
+              style={{ ...inputStyle, width: 80 }}
+            />
+          )}
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#94a3b8" }}>
-          Filial (parcial, opcional)
-          <input
-            type="text"
-            value={filial}
-            onChange={(e) => setFilial(e.target.value)}
-            placeholder="Ex: GUARULHOS"
-            style={inputStyle}
-          />
+          Filial
+          {filiaisDisponiveis.length > 0 ? (
+            <select
+              value={filial}
+              onChange={(e) => setFilial(e.target.value)}
+              style={{ ...inputStyle, width: 260 }}
+            >
+              <option value="">Todas juntas</option>
+              {filiaisDisponiveis.map((item) => (
+                <option key={item.filial} value={item.filial}>
+                  {item.filial} ({item.estoqueAtual} un)
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              value={filial}
+              onChange={(e) => setFilial(e.target.value)}
+              placeholder="Todas juntas ou Ex: GUARULHOS"
+              style={inputStyle}
+            />
+          )}
         </label>
         <button
           type="submit"
@@ -207,6 +341,15 @@ export default function ExtratoPage() {
         </button>
       </form>
 
+      {(lookupLoading || lookupMsg || coresDisponiveis.length > 0 || filiaisDisponiveis.length > 0) && (
+        <div style={{ marginTop: -14, marginBottom: 18, fontSize: 12, color: lookupMsg.includes("Erro") ? "#fca5a5" : "#94a3b8" }}>
+          {lookupLoading
+            ? "Buscando cores e filiais disponíveis..."
+            : lookupMsg ||
+              `${coresDisponiveis.length} cor${coresDisponiveis.length === 1 ? "" : "es"} e ${filiaisDisponiveis.length} ${filiaisDisponiveis.length === 1 ? "filial" : "filiais"} disponíveis para este produto.`}
+        </div>
+      )}
+
       {erro && (
         <div style={{ background: "#450a0a", border: "1px solid #dc2626", borderRadius: 6, padding: "10px 16px", color: "#fca5a5", marginBottom: 16, fontSize: 13 }}>
           {erro}
@@ -220,9 +363,13 @@ export default function ExtratoPage() {
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 20 }}>
             <InfoCard label="Produto" value={`${dados.produto} — ${dados.descProduto ?? "?"}`} />
             <InfoCard label="Cor" value={`${dados.cor} — ${dados.descCor ?? "?"}`} />
+            {dados.codigoBarra && <InfoCard label="Código barra" value={dados.codigoBarra} />}
             <InfoCard label="Grade" value={dados.grade ?? "—"} highlight />
             <InfoCard label="Filial" value={dados.filial} />
             <InfoCard label="Estoque atual" value={`${dados.estoqueAtual} un`} highlight />
+            <InfoCard label="Saldo QTDE" value={`${saldoMovimentos} un`} />
+            <InfoCard label="Saldo grade" value={`${saldoGrade} un`} />
+            <InfoCard label="Diferença" value={`${diferencaEstoque} un`} highlight={diferencaEstoque !== 0} />
             <InfoCard label="Movimentos" value={`${dados.linhas.length}`} />
           </div>
 
@@ -395,7 +542,7 @@ export default function ExtratoPage() {
                 <strong style={{ color: "#f59e0b" }}>Grade ({dados.grade ?? "?"})</strong> — campo EN_1/SA_1 (grade específica)
               </div>
               <div>
-                <strong style={{ color: "#22d3ee" }}>Saldo</strong> — acumulado cronológico (usa grade quando ≠ 0, senão usa QTDE)
+                <strong style={{ color: "#22d3ee" }}>Saldo</strong> — acumulado cronológico pelo campo QTDE
               </div>
               <div>
                 <strong style={{ color: "#f59e0b" }}>⚠ Grade zerada</strong> — QTDE tem valor mas EN_1/SA_1 = 0 → divergência no Linx
