@@ -61,6 +61,8 @@ export async function fetchLogEntradas(
             OR LTRIM(RTRIM(ISNULL(e.ROMANEIO_ORIGEM, ''))) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(e.FILIAL, ''))) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(e.FILIAL_ORIGEM, ''))) LIKE @searchLike
+            OR LTRIM(RTRIM(ISNULL(fd.FILIAL, ''))) LIKE @searchLike
+            OR LTRIM(RTRIM(ISNULL(fo.FILIAL, ''))) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(e.RESPONSAVEL, ''))) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(e.TIPO_ROMANEIO, ''))) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR(MAX), e.OBS), ''))) LIKE @searchLike
@@ -74,6 +76,8 @@ export async function fetchLogEntradas(
             OR LTRIM(RTRIM(le.ROMANEIO_PRODUTO)) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(le.FILIAL, ''))) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(le.FILIAL_ORIGEM, ''))) LIKE @searchLike
+            OR LTRIM(RTRIM(ISNULL(fd2.FILIAL, ''))) LIKE @searchLike
+            OR LTRIM(RTRIM(ISNULL(fo2.FILIAL, ''))) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(le.RESPONSAVEL, ''))) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR(MAX), le.OBS), ''))) LIKE @searchLike
           )
@@ -102,6 +106,12 @@ export async function fetchLogEntradas(
           (SELECT ISNULL(SUM(ep.QTDE), 0) FROM ESTOQUE_PROD1_ENT ep WITH (NOLOCK)
            WHERE ep.ROMANEIO_PRODUTO = e.ROMANEIO_PRODUTO AND ep.FILIAL = e.FILIAL) AS QTD_ITENS
         FROM ESTOQUE_PROD_ENT e WITH (NOLOCK)
+        LEFT JOIN FILIAIS fd WITH (NOLOCK)
+          ON LTRIM(RTRIM(ISNULL(fd.COD_FILIAL, ''))) = LTRIM(RTRIM(ISNULL(e.FILIAL, '')))
+          OR LTRIM(RTRIM(ISNULL(fd.FILIAL, ''))) = LTRIM(RTRIM(ISNULL(e.FILIAL, '')))
+        LEFT JOIN FILIAIS fo WITH (NOLOCK)
+          ON LTRIM(RTRIM(ISNULL(fo.COD_FILIAL, ''))) = LTRIM(RTRIM(ISNULL(e.FILIAL_ORIGEM, '')))
+          OR LTRIM(RTRIM(ISNULL(fo.FILIAL, ''))) = LTRIM(RTRIM(ISNULL(e.FILIAL_ORIGEM, '')))
         WHERE 1 = 1
           ${dateFilterEstoque}
           ${searchFilterEstoque}
@@ -122,6 +132,12 @@ export async function fetchLogEntradas(
           (SELECT ISNULL(SUM(ISNULL(lep.QTDE_ENTRADA, 0)), 0) FROM LOJA_ENTRADAS_PRODUTO lep WITH (NOLOCK)
            WHERE lep.ROMANEIO_PRODUTO = le.ROMANEIO_PRODUTO AND lep.FILIAL = le.FILIAL) AS QTD_ITENS
         FROM LOJA_ENTRADAS le WITH (NOLOCK)
+        LEFT JOIN FILIAIS fd2 WITH (NOLOCK)
+          ON LTRIM(RTRIM(ISNULL(fd2.COD_FILIAL, ''))) = LTRIM(RTRIM(ISNULL(le.FILIAL, '')))
+          OR LTRIM(RTRIM(ISNULL(fd2.FILIAL, ''))) = LTRIM(RTRIM(ISNULL(le.FILIAL, '')))
+        LEFT JOIN FILIAIS fo2 WITH (NOLOCK)
+          ON LTRIM(RTRIM(ISNULL(fo2.COD_FILIAL, ''))) = LTRIM(RTRIM(ISNULL(le.FILIAL_ORIGEM, '')))
+          OR LTRIM(RTRIM(ISNULL(fo2.FILIAL, ''))) = LTRIM(RTRIM(ISNULL(le.FILIAL_ORIGEM, '')))
         WHERE NOT EXISTS (
           SELECT 1 FROM ESTOQUE_PROD_ENT ee WITH (NOLOCK)
           WHERE ee.ROMANEIO_PRODUTO = le.ROMANEIO_PRODUTO

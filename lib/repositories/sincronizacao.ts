@@ -7,11 +7,13 @@ const SINCRONIZACAO_FILIAIS = [
   "SCARF ME - HIGIENOPOLIS 2",
   "SCARF ME - PAULISTA RSR",
   "SCARF ME - PAULISTA FFFR",
+  "SCARFME LLL - GALEAO RJ",
   "MSC COMERCIO DE LENCOS LT",
   "GUARULHOS - RSR",
   "IGUATEMI SP - JJJ",
   "MORUMBI - JJJ",
   "NERD CENTER NORTE",
+  "NERD ELDORADO",
   "NERD HIGIENOPOLIS",
   "NERD LEBLON",
   "NERD MORUMBI RDRRRJ",
@@ -51,7 +53,11 @@ export interface SincronizacaoFilial {
 }
 
 function normalizarFilial(valor: unknown): string {
-  return String(valor ?? "").replace(/\u00a0/g, " ").trim();
+  return String(valor ?? "")
+    .replace(/\u00a0/g, " ")
+    .replace(/[\u2010-\u2015\u2212]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function normalizarChaveFilial(valor: unknown): string {

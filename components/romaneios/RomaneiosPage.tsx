@@ -79,6 +79,12 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
+  function getFilialDisplayName(filialValue: string | null | undefined) {
+    const filial = (filialValue || "").trim();
+    if (!filial) return "";
+    return filiais.find((f) => f.codFilial === filial || f.filial === filial)?.filial || filial;
+  }
+
   useEffect(() => {
     if (authLoading) return; // Aguardar auth terminar antes de buscar dados do usuário
     let cancelled = false;
@@ -121,6 +127,9 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
       (r.responsavel || "").toLowerCase().includes(q) ||
       (r.filialOrigem || "").toLowerCase().includes(q) ||
       (r.filialDestino || "").toLowerCase().includes(q) ||
+      getFilialDisplayName(r.filialOrigem).toLowerCase().includes(q) ||
+      getFilialDisplayName(r.filialDestino).toLowerCase().includes(q) ||
+      getFilialDisplayName(r.destinoCodigo).toLowerCase().includes(q) ||
       (r.tipoRomaneio || "").toLowerCase().includes(q)
     );
   })();

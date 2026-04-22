@@ -38,6 +38,7 @@ FILIAIS_CONSIDERADAS = [
     'SCARF ME - MATRIZ LLL',
     'SCARF ME MATRIZ - FFF',
     'SCARF ME MATRIZ - RSR',
+    'SCARFME LLL -  GALEAO RJ',
     'MSC COMERCIO DE LENCOS LT',
     # Filiais com vendas que antes ficavam de fora (NERD e outras)
     'CIDADE DE SP - LLL',
@@ -47,6 +48,7 @@ FILIAIS_CONSIDERADAS = [
     'NERD CAMPINAS',
     'NERD CENTER NORTE',
     'NERD HIGIENOPOLIS',
+    'NERD ELDORADO',
     'NERD LEBLON',
     'NERD MORUMBI RDRRRJ',
     'NERD MORUMBI RDRRX',

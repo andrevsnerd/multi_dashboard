@@ -59,6 +59,8 @@ export async function fetchLogSaidas(
             OR LTRIM(RTRIM(es.ROMANEIO_PRODUTO)) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(es.FILIAL, ''))) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(es.FILIAL_DESTINO, ''))) LIKE @searchLike
+            OR LTRIM(RTRIM(ISNULL(fo.FILIAL, ''))) LIKE @searchLike
+            OR LTRIM(RTRIM(ISNULL(fd.FILIAL, ''))) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(es.RESPONSAVEL, ''))) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(es.TIPO_ROMANEIO, ''))) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR(MAX), es.OBS), ''))) LIKE @searchLike
@@ -72,6 +74,8 @@ export async function fetchLogSaidas(
             OR LTRIM(RTRIM(s.ROMANEIO_PRODUTO)) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(s.FILIAL, ''))) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(s.FILIAL_DESTINO, ''))) LIKE @searchLike
+            OR LTRIM(RTRIM(ISNULL(fo2.FILIAL, ''))) LIKE @searchLike
+            OR LTRIM(RTRIM(ISNULL(fd2.FILIAL, ''))) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(s.RESPONSAVEL, ''))) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR(MAX), s.OBS), ''))) LIKE @searchLike
           )
@@ -100,6 +104,12 @@ export async function fetchLogSaidas(
           (SELECT ISNULL(SUM(ep.QTDE), 0) FROM ESTOQUE_PROD1_SAI ep WITH (NOLOCK)
            WHERE ep.ROMANEIO_PRODUTO = es.ROMANEIO_PRODUTO AND ep.FILIAL = es.FILIAL) AS QTD_ITENS
         FROM ESTOQUE_PROD_SAI es WITH (NOLOCK)
+        LEFT JOIN FILIAIS fo WITH (NOLOCK)
+          ON LTRIM(RTRIM(ISNULL(fo.COD_FILIAL, ''))) = LTRIM(RTRIM(ISNULL(es.FILIAL, '')))
+          OR LTRIM(RTRIM(ISNULL(fo.FILIAL, ''))) = LTRIM(RTRIM(ISNULL(es.FILIAL, '')))
+        LEFT JOIN FILIAIS fd WITH (NOLOCK)
+          ON LTRIM(RTRIM(ISNULL(fd.COD_FILIAL, ''))) = LTRIM(RTRIM(ISNULL(es.FILIAL_DESTINO, '')))
+          OR LTRIM(RTRIM(ISNULL(fd.FILIAL, ''))) = LTRIM(RTRIM(ISNULL(es.FILIAL_DESTINO, '')))
         WHERE 1 = 1
           ${dateFilterEstoque}
           ${searchFilterEstoque}
@@ -130,6 +140,12 @@ export async function fetchLogSaidas(
             WHERE ep.ROMANEIO_PRODUTO = s.ROMANEIO_PRODUTO AND ep.FILIAL = s.FILIAL
           )) AS QTD_ITENS
         FROM LOJA_SAIDAS s WITH (NOLOCK)
+        LEFT JOIN FILIAIS fo2 WITH (NOLOCK)
+          ON LTRIM(RTRIM(ISNULL(fo2.COD_FILIAL, ''))) = LTRIM(RTRIM(ISNULL(s.FILIAL, '')))
+          OR LTRIM(RTRIM(ISNULL(fo2.FILIAL, ''))) = LTRIM(RTRIM(ISNULL(s.FILIAL, '')))
+        LEFT JOIN FILIAIS fd2 WITH (NOLOCK)
+          ON LTRIM(RTRIM(ISNULL(fd2.COD_FILIAL, ''))) = LTRIM(RTRIM(ISNULL(s.FILIAL_DESTINO, '')))
+          OR LTRIM(RTRIM(ISNULL(fd2.FILIAL, ''))) = LTRIM(RTRIM(ISNULL(s.FILIAL_DESTINO, '')))
         WHERE NOT EXISTS (
           SELECT 1 FROM ESTOQUE_PROD_SAI es2 WITH (NOLOCK)
           WHERE es2.ROMANEIO_PRODUTO = s.ROMANEIO_PRODUTO

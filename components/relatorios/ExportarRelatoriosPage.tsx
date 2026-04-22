@@ -82,6 +82,7 @@ const FILIAIS_CONSIDERADAS = [
   "SCARF ME - MATRIZ LLL",
   "SCARF ME MATRIZ - FFF",
   "SCARF ME MATRIZ - RSR",
+  "SCARFME LLL - GALEAO RJ",
   "MSC COMERCIO DE LENCOS LT",
   "CIDADE DE SP - LLL",
   "GUARULHOS - RSR",
@@ -89,6 +90,7 @@ const FILIAIS_CONSIDERADAS = [
   "MORUMBI - JJJ",
   "NERD CAMPINAS",
   "NERD CENTER NORTE",
+  "NERD ELDORADO",
   "NERD HIGIENOPOLIS",
   "NERD LEBLON",
   "NERD MORUMBI RDRRRJ",
@@ -110,7 +112,11 @@ function criarRelatoriosIniciais(): RelatorioStatus[] {
 }
 
 function normalizarFilial(valor: unknown): string {
-  return String(valor ?? "").replace(/\u00a0/g, " ").trim();
+  return String(valor ?? "")
+    .replace(/\u00a0/g, " ")
+    .replace(/[\u2010-\u2015\u2212]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function determinarQueriesNecessarias(relatorios: RelatorioExportavel[]): Set<RelatorioType> {
