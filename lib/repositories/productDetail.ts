@@ -226,6 +226,11 @@ function toLocalIsoDay(value: Date | string): string {
 }
 
 type StockMovementRow = { d: Date; filial: string; qty: number };
+type StockAggregationRow = {
+  positiveStock?: number | null;
+  negativeStock?: number | null;
+  positiveCount?: number | null;
+};
 
 function mergeSalesDailyRows(a: StockMovementRow[], b: StockMovementRow[]): StockMovementRow[] {
   const map = new Map<string, number>();
@@ -244,6 +249,17 @@ function mergeSalesDailyRows(a: StockMovementRow[], b: StockMovementRow[]): Stoc
     const [iso, filial] = key.split('\0');
     return { d: new Date(`${iso}T12:00:00`), filial, qty };
   });
+}
+
+function getDisplayedStock(row: StockAggregationRow): number {
+  const positiveStock = Number(row.positiveStock ?? 0);
+  const negativeStock = Number(row.negativeStock ?? 0);
+  const positiveCount = Number(row.positiveCount ?? 0);
+  return positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
+}
+
+function toNonNegativeStock(value: number): number {
+  return value > 0 ? value : 0;
 }
 
 export interface ProductDetailParams {
@@ -891,8 +907,7 @@ export async function fetchProductDetail({
     // Calcular estoque total
     let totalStock = 0;
     stockResult.recordset.forEach((row) => {
-      const positiveStock = Number(row.positiveStock ?? 0);
-      totalStock += positiveStock;
+      totalStock += toNonNegativeStock(getDisplayedStock(row));
     });
 
     // Calcular variação de receita
@@ -1076,8 +1091,7 @@ async function fetchProductStockByFilialEcommerce({
     // Criar mapas
     const stockMap = new Map<string, number>();
     stockResult.recordset.forEach((row) => {
-      const positiveStock = Number(row.positiveStock ?? 0);
-      stockMap.set(row.FILIAL, positiveStock);
+      stockMap.set(row.FILIAL, getDisplayedStock(row));
     });
 
     const currentRevenueMap = new Map<string, number>();
@@ -1363,9 +1377,8 @@ export async function fetchProductStockByFilial({
     // Criar mapas - normalizar nomes das filiais (trim) para garantir correspondência
     const stockMap = new Map<string, number>();
     stockResult.recordset.forEach((row) => {
-      const positiveStock = Number(row.positiveStock ?? 0);
       const normalizedFilial = (row.FILIAL || '').trim();
-      stockMap.set(normalizedFilial, positiveStock);
+      stockMap.set(normalizedFilial, getDisplayedStock(row));
     });
 
     const currentRevenueMap = new Map<string, number>();
@@ -2052,7 +2065,7 @@ export async function fetchProductStockProgressSeries(
     running.forEach((v, k) => {
       const rounded = Math.round(v);
       stockByFilialOut[k] = rounded;
-      stockGeral += rounded;
+      stockGeral += toNonNegativeStock(rounded);
     });
     const stockGeralRounded = Math.round(stockGeral);
     out.push({

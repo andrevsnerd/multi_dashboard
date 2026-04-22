@@ -18,6 +18,9 @@ export function shouldUseProxy(): boolean {
   const isProduction = process.env.NODE_ENV === 'production';
   const hasProxyUrl = !!PROXY_URL;
   const hasDbConfig = !!process.env.DB_SERVER;
+  const forceProxy = ['1', 'true', 'yes', 'on'].includes(
+    (process.env.FORCE_PROXY || process.env.USE_PROXY || '').trim().toLowerCase()
+  );
   
   // Log para debug (apenas em produção para não poluir logs locais)
   if (isProduction && hasProxyUrl) {
@@ -25,14 +28,18 @@ export function shouldUseProxy(): boolean {
       hasProxyUrl,
       isProduction,
       hasDbConfig,
+      forceProxy,
       proxyUrl: PROXY_URL ? `${PROXY_URL.substring(0, 20)}...` : 'não configurado',
     });
   }
   
-  // Se tiver PROXY_URL configurado, usa proxy (mesmo em dev se necessário)
-  // Mas prioriza produção quando ambas estão configuradas
+  // Se FORCE_PROXY/USE_PROXY estiver ligado e houver PROXY_URL, usa proxy também em dev.
+  if (hasProxyUrl && forceProxy) {
+    return true;
+  }
+
+  // Se tiver PROXY_URL configurado, usa proxy em produção ou quando não há config direta.
   if (hasProxyUrl) {
-    // Se estiver em produção OU se não tiver variáveis de banco configuradas, usa proxy
     return isProduction || !hasDbConfig;
   }
   

@@ -8,8 +8,6 @@ import {
   fetchProductAvailableColors,
   fetchProductStockProgressSeries,
   type ProductDetailInfo,
-  type ProductStockByFilial,
-  type ProductSaleHistory,
   type ProductStockProgressDay,
 } from '@/lib/repositories/productDetail';
 import { getCurrentMonthRange } from '@/lib/utils/date';
@@ -82,7 +80,10 @@ export async function GET(request: Request) {
       ]);
 
     // Garantir que o estoque total do card seja a soma do estoque por filial (fonte única de verdade)
-    const totalStockFromFilials = stockByFilial.reduce((sum, row) => sum + row.stock, 0);
+    const totalStockFromFilials = stockByFilial.reduce(
+      (sum, row) => sum + Math.max(Number(row.stock ?? 0), 0),
+      0
+    );
     const detailWithConsistentStock: ProductDetailInfo = {
       ...detail,
       totalStock: totalStockFromFilials,
@@ -111,4 +112,3 @@ export async function GET(request: Request) {
     );
   }
 }
-

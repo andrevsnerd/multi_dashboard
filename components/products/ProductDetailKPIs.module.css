@@ -281,6 +281,10 @@
   text-align: right;
 }
 
+.stockByFilialQtyNegative {
+  color: #b91c1c;
+}
+
 .stockByFilialPct {
   color: #64748b;
   font-weight: 600;

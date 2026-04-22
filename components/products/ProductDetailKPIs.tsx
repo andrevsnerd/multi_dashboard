@@ -68,6 +68,10 @@ function formatInteger(value: number): string {
   });
 }
 
+function getPositiveStockTotal(values: Array<{ stock?: number | null }>): number {
+  return values.reduce((sum, item) => sum + Math.max(Number(item.stock ?? 0), 0), 0);
+}
+
 export default function ProductDetailKPIs({
   detail,
   productId,
@@ -559,8 +563,8 @@ export default function ProductDetailKPIs({
         <section className={styles.stockByFilialCard}>
           {(() => {
             const sorted = sortedFiliaisByOrder(stockByFilial);
-            const total = sorted.reduce((sum, f) => sum + (f.stock ?? 0), 0);
-            const max = Math.max(1, ...sorted.map((f) => f.stock ?? 0));
+            const total = getPositiveStockTotal(sorted);
+            const max = Math.max(1, ...sorted.map((f) => Math.max(Number(f.stock ?? 0), 0)));
 
             return (
               <>
@@ -573,9 +577,10 @@ export default function ProductDetailKPIs({
 
                 <div className={styles.stockByFilialList}>
                   {sorted.map((filial) => {
-                    const value = filial.stock ?? 0;
-                    const pct = total > 0 ? (value / total) * 100 : 0;
-                    const bar = (value / max) * 100;
+                    const value = Number(filial.stock ?? 0);
+                    const positiveValue = Math.max(value, 0);
+                    const pct = total > 0 && positiveValue > 0 ? (positiveValue / total) * 100 : 0;
+                    const bar = (positiveValue / max) * 100;
                     return (
                       <div key={filial.filial} className={styles.stockByFilialRow}>
                         <div className={styles.stockByFilialName}>
@@ -585,7 +590,9 @@ export default function ProductDetailKPIs({
                           <div className={styles.stockByFilialBar} style={{ width: `${bar}%` }} />
                         </div>
                         <div className={styles.stockByFilialNumbers}>
-                          <span className={styles.stockByFilialQty}>{formatInteger(value)}</span>
+                          <span className={`${styles.stockByFilialQty}${value < 0 ? ` ${styles.stockByFilialQtyNegative}` : ""}`}>
+                            {formatInteger(value)}
+                          </span>
                           <span className={styles.stockByFilialPct}>{pct.toFixed(1)}%</span>
                         </div>
                       </div>

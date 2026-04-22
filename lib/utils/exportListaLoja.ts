@@ -11,8 +11,23 @@ export interface ExportListaLojaOptions {
   rows: Array<Record<string, XlsxCellValue>>;
 }
 
+function getHeaders(rows: Array<Record<string, XlsxCellValue>>): string[] {
+  const headers: string[] = [];
+  const seen = new Set<string>();
+
+  for (const row of rows) {
+    for (const key of Object.keys(row)) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+      headers.push(key);
+    }
+  }
+
+  return headers;
+}
+
 function addAutoWidths(worksheet: XLSX.WorkSheet, rows: Array<Record<string, XlsxCellValue>>) {
-  const headers = rows.length > 0 ? Object.keys(rows[0]!) : [];
+  const headers = getHeaders(rows);
   worksheet["!cols"] = headers.map((header) => {
     const maxLength = Math.max(
       header.length,
@@ -22,7 +37,11 @@ function addAutoWidths(worksheet: XLSX.WorkSheet, rows: Array<Record<string, Xls
         return String(value).length;
       })
     );
-    return { wch: Math.min(Math.max(maxLength + 2, 12), 55) };
+    const detailColumn =
+      header.includes("FILIAIS") ||
+      header.includes("DETALHE_") ||
+      header.includes("VALOR_12M_");
+    return { wch: Math.min(Math.max(maxLength + 2, 12), detailColumn ? 90 : 55) };
   });
 }
 
@@ -46,7 +65,7 @@ export function exportListaLojaToXlsx(options: ExportListaLojaOptions): void {
   resumoWs["!cols"] = [{ wch: 24 }, { wch: 60 }];
   XLSX.utils.book_append_sheet(workbook, resumoWs, "Resumo");
 
-  const itensWs = XLSX.utils.json_to_sheet(rows);
+  const itensWs = XLSX.utils.json_to_sheet(rows, { header: getHeaders(rows) });
   addAutoWidths(itensWs, rows);
   XLSX.utils.book_append_sheet(workbook, itensWs, "Itens");
 

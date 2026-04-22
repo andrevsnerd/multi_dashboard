@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { withRequest } from '@/lib/db/connection';
+import { getPublicDatabaseErrorMessage, isDatabaseConnectionError, withRequest } from '@/lib/db/connection';
 import sql from 'mssql';
 import { getColorDescription } from '@/lib/utils/colorMapping';
 
@@ -255,9 +255,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ data: produtos });
   } catch (error) {
     console.error('Erro ao buscar produtos', error);
+    const isDbUnavailable = isDatabaseConnectionError(error);
     return NextResponse.json(
-      { error: 'Erro ao buscar produtos' },
-      { status: 500 }
+      {
+        error: isDbUnavailable ? getPublicDatabaseErrorMessage(error) : 'Erro ao buscar produtos',
+      },
+      { status: isDbUnavailable ? 503 : 500 }
     );
   }
 }

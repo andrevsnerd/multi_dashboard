@@ -65,6 +65,62 @@ const baseConfig = {
 let pool: sql.ConnectionPool | null = null;
 let activeServer: string = DB_SERVER!;
 
+function getErrorCodes(error: unknown): string[] {
+  const codes = new Set<string>();
+
+  const collect = (value: unknown) => {
+    if (!value || typeof value !== 'object') return;
+    const maybeCode = (value as { code?: unknown }).code;
+    if (typeof maybeCode === 'string' && maybeCode.trim()) codes.add(maybeCode.trim().toUpperCase());
+    const originalError = (value as { originalError?: unknown }).originalError;
+    if (originalError && originalError !== value) collect(originalError);
+    const cause = (value as { cause?: unknown }).cause;
+    if (cause && cause !== value) collect(cause);
+    if (value instanceof AggregateError) {
+      for (const inner of value.errors) collect(inner);
+    }
+  };
+
+  collect(error);
+  return [...codes];
+}
+
+export function isDatabaseConnectionError(error: unknown): boolean {
+  const codes = getErrorCodes(error);
+  if (codes.some((code) => ['ESOCKET', 'ETIMEOUT', 'ELOGIN', 'ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND'].includes(code))) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message.toLowerCase()
+      : String(error ?? '').toLowerCase();
+
+  return (
+    message.includes('failed to connect') ||
+    message.includes('could not connect') ||
+    message.includes('connectionerror') ||
+    message.includes('esocket') ||
+    message.includes('timeout') ||
+    message.includes('login failed')
+  );
+}
+
+export function getPublicDatabaseErrorMessage(error: unknown): string {
+  if (!isDatabaseConnectionError(error)) {
+    return 'Erro ao acessar o banco de dados.';
+  }
+
+  const hasProxyUrl = !!(process.env.PROXY_URL || '').trim();
+  const shouldSuggestProxy = hasProxyUrl && !shouldUseProxy();
+
+  if (shouldSuggestProxy) {
+    return 'Banco de dados indisponível por conexão direta. Se este ambiente usa proxy, habilite FORCE_PROXY=true para rotear as consultas pelo proxy.';
+  }
+
+  return 'Banco de dados indisponível no momento. Não foi possível conectar ao SQL Server.';
+}
+
 export async function getConnectionPool(): Promise<sql.ConnectionPool> {
   // Se estiver usando proxy, não tenta conectar diretamente
   if (shouldUseProxy()) {
@@ -75,7 +131,7 @@ export async function getConnectionPool(): Promise<sql.ConnectionPool> {
 
   if (!pool || !pool.connected) {
     if (pool) {
-      try { await pool.close(); } catch (_) {}
+      try { await pool.close(); } catch {}
       pool = null;
     }
 
@@ -128,6 +184,4 @@ export async function query<T>(queryText: string): Promise<T[]> {
     return result.recordset as T[];
   });
 }
-
-
 

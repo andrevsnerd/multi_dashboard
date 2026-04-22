@@ -4,7 +4,13 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthContext";
 import ComprasSalvasListPanel from "@/components/stock/ComprasSalvasListPanel";
-import { type CompanyKey } from "@/lib/config/company";
+import {
+  compareFilialDisplayOrder,
+  getFilialLabelForDisplay,
+  resolveCompany,
+  type CompanyConfig,
+  type CompanyKey,
+} from "@/lib/config/company";
 import { exportListaLojaToXlsx } from "@/lib/utils/exportListaLoja";
 import type { CompraSalvaItemRow } from "@/lib/types/compra-salva";
 
@@ -89,6 +95,27 @@ interface TransferenciaPermissao {
   filiaisOrigem: string[];
   filialAtribuida?: string | null;
 }
+
+type FilialEstoqueRow = {
+  filial: string;
+  estoque: number;
+};
+
+type FilialVendaRow = {
+  filial: string;
+  qtde12m: number;
+  qtde60d: number;
+  qtdeMesAtual: number;
+  valor12m: number;
+};
+
+type FilialExportMetrics = {
+  estoque: number;
+  qtde12m: number;
+  qtde60d: number;
+  qtdeMesAtual: number;
+  valor12m: number;
+};
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
 
@@ -379,20 +406,45 @@ async function fetchVendasPorFilialItem(
   codFilial: string | null,
   produto: string,
   corProduto: string | null
-): Promise<Array<{ filial: string; qtde12m: number; qtde60d: number; valor12m: number }>> {
+): Promise<FilialVendaRow[]> {
   const params = new URLSearchParams({ company: companyKey, produto: produto.trim() });
   if (codFilial && codFilial.trim()) params.set("filial", codFilial.trim());
   if (corProduto) params.set("corProduto", corProduto.trim());
   const res = await fetch(`/api/controle-estoque/vendas-por-filial-item?${params}`, { cache: "no-store" });
   if (!res.ok) throw new Error("Erro ao carregar vendas por filial");
   const json = (await res.json()) as {
-    data?: Array<{ filial: string; qtde12m: number; qtde60d: number; valor12m?: number | null }>;
+    data?: Array<{
+      filial: string;
+      qtde12m: number;
+      qtde60d: number;
+      qtdeMesAtual?: number | null;
+      valor12m?: number | null;
+    }>;
   };
   return (json.data || []).map((row) => ({
     filial: row.filial,
     qtde12m: Number(row.qtde12m ?? 0),
     qtde60d: Number(row.qtde60d ?? 0),
+    qtdeMesAtual: Number(row.qtdeMesAtual ?? 0),
     valor12m: Number(row.valor12m ?? 0),
+  }));
+}
+
+async function fetchEstoquePorFilialItem(
+  companyKey: string,
+  codFilial: string | null,
+  produto: string,
+  corProduto: string | null
+): Promise<FilialEstoqueRow[]> {
+  const params = new URLSearchParams({ company: companyKey, produto: produto.trim() });
+  if (codFilial && codFilial.trim()) params.set("filial", codFilial.trim());
+  if (corProduto) params.set("corProduto", corProduto.trim());
+  const res = await fetch(`/api/controle-estoque/estoque-por-filial-item?${params}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Erro ao carregar estoque por filial");
+  const json = (await res.json()) as { data?: Array<{ filial: string; estoque: number | null }> };
+  return (json.data || []).map((row) => ({
+    filial: row.filial,
+    estoque: Number(row.estoque ?? 0),
   }));
 }
 
@@ -419,6 +471,220 @@ function normalizeKey(s?: string | null) {
 
 function buildItemKey(produto?: string | null, corProduto?: string | null) {
   return `${normalizeKey(produto)}|${normalizeKey(corProduto)}`;
+}
+
+function buildExportHeaderToken(value: string) {
+  const normalized = normalizeKey(value)
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return normalized || "SEM_FILIAL";
+}
+
+function aggregateEstoqueRowsForExport(
+  rows: FilialEstoqueRow[],
+  company: CompanyConfig | null
+): FilialEstoqueRow[] {
+  const acc = new Map<string, number>();
+  for (const row of rows) {
+    const label = getFilialLabelForDisplay(company, row.filial);
+    acc.set(label, (acc.get(label) ?? 0) + Number(row.estoque ?? 0));
+  }
+  return Array.from(acc.entries())
+    .map(([filial, estoque]) => ({ filial, estoque: Math.round(estoque) }))
+    .sort((a, b) => compareFilialDisplayOrder(a.filial, b.filial, company));
+}
+
+function aggregateVendasRowsForExport(
+  rows: FilialVendaRow[],
+  company: CompanyConfig | null
+): FilialVendaRow[] {
+  const acc = new Map<string, FilialVendaRow>();
+  for (const row of rows) {
+    const label = getFilialLabelForDisplay(company, row.filial);
+    const prev = acc.get(label);
+    if (prev) {
+      prev.qtde12m += Number(row.qtde12m ?? 0);
+      prev.qtde60d += Number(row.qtde60d ?? 0);
+      prev.qtdeMesAtual += Number(row.qtdeMesAtual ?? 0);
+      prev.valor12m += Number(row.valor12m ?? 0);
+      continue;
+    }
+    acc.set(label, {
+      filial: label,
+      qtde12m: Number(row.qtde12m ?? 0),
+      qtde60d: Number(row.qtde60d ?? 0),
+      qtdeMesAtual: Number(row.qtdeMesAtual ?? 0),
+      valor12m: Number(row.valor12m ?? 0),
+    });
+  }
+  return Array.from(acc.values()).sort((a, b) => compareFilialDisplayOrder(a.filial, b.filial, company));
+}
+
+function buildExportListText(values: string[]): string {
+  return values.filter((value) => value.trim().length > 0).join(" | ");
+}
+
+function buildEstoqueTooltipText(rows: FilialEstoqueRow[]): string {
+  return buildExportListText(
+    rows
+      .filter((row) => Number(row.estoque ?? 0) !== 0)
+      .map((row) => `${row.filial}: ${fmt(Number(row.estoque ?? 0))}`)
+  );
+}
+
+function buildVendasTooltipText(
+  rows: FilialVendaRow[],
+  mode: "12m" | "60d" | "mesAtual" | "valor12m"
+): string {
+  return buildExportListText(
+    rows
+      .filter((row) => {
+        if (mode === "12m") return Number(row.qtde12m ?? 0) > 0;
+        if (mode === "60d") return Number(row.qtde60d ?? 0) > 0;
+        if (mode === "mesAtual") return Number(row.qtdeMesAtual ?? 0) > 0;
+        return Number(row.valor12m ?? 0) > 0;
+      })
+      .map((row) => {
+        if (mode === "valor12m") {
+          return `${row.filial}: ${fmtBRL(Number(row.valor12m ?? 0))}`;
+        }
+
+        const quantidade =
+          mode === "12m"
+            ? Number(row.qtde12m ?? 0)
+            : mode === "60d"
+              ? Number(row.qtde60d ?? 0)
+              : Number(row.qtdeMesAtual ?? 0);
+        return `${row.filial}: ${fmt(quantidade)}`;
+      })
+  );
+}
+
+function buildFiliaisComEstoqueText(rows: FilialEstoqueRow[]): string {
+  return buildExportListText(
+    rows
+      .filter((row) => Number(row.estoque ?? 0) > 0)
+      .map((row) => row.filial)
+  );
+}
+
+function buildFiliaisQueVenderamText(rows: FilialVendaRow[]): string {
+  return buildExportListText(
+    rows
+      .filter((row) =>
+        Number(row.qtde12m ?? 0) > 0 ||
+        Number(row.qtde60d ?? 0) > 0 ||
+        Number(row.qtdeMesAtual ?? 0) > 0 ||
+        Number(row.valor12m ?? 0) > 0
+      )
+      .map((row) => row.filial)
+  );
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  mapper: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  const worker = async () => {
+    while (true) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      if (currentIndex >= items.length) return;
+      results[currentIndex] = await mapper(items[currentIndex]!, currentIndex);
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      await worker();
+    })
+  );
+
+  return results;
+}
+
+async function buildListaLojaExportRows(
+  companyKey: string,
+  codFilial: string | null,
+  itens: ListaItem[],
+  diasCorridosMes: number
+): Promise<Array<Record<string, string | number | boolean | null>>> {
+  const company = resolveCompany(companyKey);
+
+  const detalhesPorItem = await mapWithConcurrency(itens, 6, async (item) => {
+    const [estoqueRowsRaw, vendasRowsRaw] = await Promise.all([
+      fetchEstoquePorFilialItem(companyKey, codFilial, item.produto, item.corProduto),
+      fetchVendasPorFilialItem(companyKey, codFilial, item.produto, item.corProduto),
+    ]);
+
+    const byFilial = new Map<string, FilialExportMetrics>();
+
+    for (const row of aggregateEstoqueRowsForExport(estoqueRowsRaw, company)) {
+      byFilial.set(row.filial, {
+        estoque: Number(row.estoque ?? 0),
+        qtde12m: 0,
+        qtde60d: 0,
+        qtdeMesAtual: 0,
+        valor12m: 0,
+      });
+    }
+
+    for (const row of aggregateVendasRowsForExport(vendasRowsRaw, company)) {
+      const prev = byFilial.get(row.filial);
+      byFilial.set(row.filial, {
+        estoque: prev?.estoque ?? 0,
+        qtde12m: Number(row.qtde12m ?? 0),
+        qtde60d: Number(row.qtde60d ?? 0),
+        qtdeMesAtual: Number(row.qtdeMesAtual ?? 0),
+        valor12m: Number(row.valor12m ?? 0),
+      });
+    }
+
+    return {
+      byFilial,
+      filiaisComEstoque: buildFiliaisComEstoqueText(estoqueRowsRaw),
+      filiaisQueVenderam: buildFiliaisQueVenderamText(vendasRowsRaw),
+      detalheEstoqueTooltip: buildEstoqueTooltipText(estoqueRowsRaw),
+      detalheVendas12mTooltip: buildVendasTooltipText(vendasRowsRaw, "12m"),
+      detalheVendas60dTooltip: buildVendasTooltipText(vendasRowsRaw, "60d"),
+      detalheVendasMesAtualTooltip: buildVendasTooltipText(vendasRowsRaw, "mesAtual"),
+      detalheValor12mTooltip: buildVendasTooltipText(vendasRowsRaw, "valor12m"),
+    };
+  });
+
+  const filiaisOrdenadas = Array.from(
+    new Set(detalhesPorItem.flatMap((detail) => Array.from(detail.byFilial.keys())))
+  ).sort((a, b) => compareFilialDisplayOrder(a, b, company));
+
+  return itens.map((item, index) => {
+    const baseRow = buildListaLojaExportRow(item, diasCorridosMes);
+    const detalhes = detalhesPorItem[index];
+
+    baseRow.FILIAIS_COM_ESTOQUE = detalhes.filiaisComEstoque;
+    baseRow.FILIAIS_QUE_VENDERAM = detalhes.filiaisQueVenderam;
+    baseRow.DETALHE_ESTOQUE_FILIAIS_TOOLTIP = detalhes.detalheEstoqueTooltip;
+    baseRow.DETALHE_VENDAS_12M_FILIAIS_TOOLTIP = detalhes.detalheVendas12mTooltip;
+    baseRow.DETALHE_VENDAS_60D_FILIAIS_TOOLTIP = detalhes.detalheVendas60dTooltip;
+    baseRow.DETALHE_VENDAS_MES_ATUAL_FILIAIS_TOOLTIP = detalhes.detalheVendasMesAtualTooltip;
+    baseRow.DETALHE_VALOR_12M_FILIAIS_TOOLTIP = detalhes.detalheValor12mTooltip;
+
+    for (const filial of filiaisOrdenadas) {
+      const token = buildExportHeaderToken(filial);
+      const metricas = detalhes.byFilial.get(filial);
+      baseRow[`ESTOQUE_${token}`] = metricas?.estoque ?? 0;
+      baseRow[`QTDE_12M_OU_PERIODO_${token}`] = metricas?.qtde12m ?? 0;
+      baseRow[`QTDE_12M_${token}`] = metricas?.qtde12m ?? 0;
+      baseRow[`QTDE_60D_${token}`] = metricas?.qtde60d ?? 0;
+      baseRow[`QTDE_MES_ATUAL_${token}`] = metricas?.qtdeMesAtual ?? 0;
+      baseRow[`VALOR_12M_${token}`] = metricas?.valor12m ?? 0;
+    }
+
+    return baseRow;
+  });
 }
 
 function getLimiteDiasReposicao(item: { linha?: string | null; subgrupo?: string | null }) {
@@ -932,7 +1198,7 @@ function ListaLojaItensTable({
     return () => {
       cancelled = true;
     };
-  }, [companyKey, filialCod, itens]);
+  }, [companyKey, filialCod, filialScopeKey, itens]);
 
   const handleDrop = useCallback(
     (toIndex: number) => {
@@ -2899,7 +3165,12 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
 
     setExportandoXlsx(true);
     try {
-      const rows = itensVisiveis.map((item) => buildListaLojaExportRow(item, diasCorridosMes));
+      const rows = await buildListaLojaExportRows(
+        companyKey,
+        filialSelecionada?.codFilial ?? null,
+        itensVisiveis,
+        diasCorridosMes
+      );
       exportListaLojaToXlsx({
         companyKey,
         companyName,
@@ -2919,6 +3190,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     companyName,
     diasCorridosMes,
     filtroAplicadoLabel,
+    filialSelecionada?.codFilial,
     filialSelecionada?.filial,
     itensVisiveis,
     mostrarNotificacao,
