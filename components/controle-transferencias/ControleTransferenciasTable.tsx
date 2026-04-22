@@ -171,6 +171,43 @@ function isMainMatrizFilial(companyKey: CompanyKey, filial: string): boolean {
   return false;
 }
 
+function getFilialData(
+  item: ProdutoTransferencia,
+  company: ReturnType<typeof resolveCompany> | null | undefined,
+  filialCanonico?: string | null,
+  filialLabel?: string | null
+): FilialData | undefined {
+  const canonico = (filialCanonico || "").trim().toUpperCase();
+  const label = (filialLabel || "").trim().toUpperCase();
+
+  if (canonico) {
+    const byCanonico = item.filiais.find(
+      (f) => (f.filial || "").trim().toUpperCase() === canonico
+    );
+    if (byCanonico) return byCanonico;
+  }
+
+  if (label) {
+    const byDisplay = item.filiais.find((f) => {
+      const filialDisplayName = company?.filialDisplayNames?.[f.filial] || f.filial;
+      return (filialDisplayName || "").trim().toUpperCase() === label;
+    });
+    if (byDisplay) return byDisplay;
+
+    return item.filiais.find(
+      (f) => (f.filial || "").trim().toUpperCase() === label
+    );
+  }
+
+  return undefined;
+}
+
+function aggregateLogicalStock(filiais: FilialData[]): number {
+  const positiveStock = filiais.reduce((sum, filial) => sum + Math.max(0, filial.stock), 0);
+  if (positiveStock > 0) return positiveStock;
+  return filiais.reduce((sum, filial) => sum + filial.stock, 0);
+}
+
 /**
  * Formata a descrição do produto com código
  */
@@ -495,9 +532,10 @@ export function calculateTransfers(
         const demanda   = demandaPorFilial.get(f.filial) || 0;
         const diaria    = getDiaria(demanda, f.vendas12m);
         const estPos    = Math.max(0, f.stock);
+        if (estPos < 1) return false;
         const minDias   = minDiasOrigem(f);
         const excedente = estPos - (diaria * minDias);
-        return excedente > 0;
+        return Math.floor(excedente) >= 1;
       })
       .map(f => {
         const demanda    = demandaPorFilial.get(f.filial) || 0;
@@ -506,7 +544,7 @@ export function calculateTransfers(
         const cobertura  = coberturaPorFilial.get(f.filial) || 0;
         const isParada   = cobertura > DIAS_PARADA_COBERTURA && f.vendas60d === 0;
         const minDias    = minDiasOrigem(f);
-        const excedente  = Math.max(0, estPos - (diaria * minDias));
+        const excedente  = Math.floor(Math.max(0, estPos - (diaria * minDias)));
         return { filial: f.filial, stock: estPos, sales: f.sales, salesLast30Days: f.salesLast30Days,
                  demanda, diaria, cobertura, isParada,
                  isEcommerceParado: isParada && f.filial === ecommerce,
@@ -571,9 +609,10 @@ export function calculateTransfers(
       for (const origem of origensOrdenadas) {
         if (aindaNecessario <= 0) break;
         if (origem.filial === filialDestino.filial) continue;
+        if (origem.stock < 1) continue;
 
-        const excDisponivel = excedenteDisponivel.get(origem.filial) || 0;
-        if (excDisponivel <= 0) continue;
+        const excDisponivel = Math.floor(excedenteDisponivel.get(origem.filial) || 0);
+        if (excDisponivel < 1) continue;
 
         // Zona neutra dinâmica: só move se a origem tiver folga de cobertura vs destino.
         // max(2, diasAlvo * 0.3): para diaria>=1 → 2 dias; para diaria<0.3 → ~3 dias
@@ -581,12 +620,16 @@ export function calculateTransfers(
         const diffCobertura = origem.cobertura - filialDestino.cobertura;
         if (diffCobertura < zonaNeutra) continue;
 
-        const quantidade = Math.min(aindaNecessario, excDisponivel);
-        if (quantidade <= 0) continue;
+        const quantidade = Math.min(
+          aindaNecessario,
+          excDisponivel,
+          Math.floor(origem.stock)
+        );
+        if (quantidade < 1) continue;
 
         const origemDisplayName = company.filialDisplayNames?.[origem.filial] || origem.filial;
 
-        const qtdEnvio = Math.ceil(quantidade);
+        const qtdEnvio = quantidade;
         const explicacaoChunk: QuantidadeExplicacaoChunk = {
           curva,
           destino: {
@@ -1420,11 +1463,11 @@ export default function ControleTransferenciasTable({
         totalQuantidade: destGroup.totalQuantidade,
         items: destGroup.items.map((item) => {
           // Buscar estoque da origem
-          const filialOrigemData = item.itemOriginal.filiais.find(
-            f => {
-              const filialDisplayName = company?.filialDisplayNames?.[f.filial] || f.filial;
-              return f.filial === item.origem || filialDisplayName === item.origem;
-            }
+          const filialOrigemData = getFilialData(
+            item.itemOriginal,
+            company,
+            item.origemCanonico,
+            item.origem
           );
           return {
             produto: item.produto,
@@ -1542,25 +1585,11 @@ export default function ControleTransferenciasTable({
                 <tbody>
                   {destGroup.items.map((item, index) => {
                     // Buscar estoque atual da filial origem
-                    // item.origem pode ser o display name, então precisamos verificar tanto o nome canônico quanto o display name
-                    const filialOrigemData = item.itemOriginal.filiais.find(
-                      f => {
-                        const filialDisplayName = company?.filialDisplayNames?.[f.filial] || f.filial;
-                        // Verificar se corresponde ao nome canônico ou ao display name
-                        return f.filial === item.origem || filialDisplayName === item.origem;
-                      }
-                    ) || item.itemOriginal.filiais.find(
-                      f => {
-                        // Tentar encontrar pelo nome canônico reverso (se item.origem é display name, buscar o canônico)
-                        if (company?.filialDisplayNames) {
-                          for (const [canonico, display] of Object.entries(company.filialDisplayNames)) {
-                            if (display === item.origem && canonico === f.filial) {
-                              return true;
-                            }
-                          }
-                        }
-                        return false;
-                      }
+                    const filialOrigemData = getFilialData(
+                      item.itemOriginal,
+                      company,
+                      item.origemCanonico,
+                      item.origem
                     );
                     const estoqueOrigem = filialOrigemData?.stock || 0;
                     
@@ -2055,7 +2084,7 @@ export default function ControleTransferenciasTable({
                 // Agregar filiais de e-commerce
                 let ecommerceAggregated: typeof hoveredItem.itemOriginal.filiais[0] | null = null;
                 if (ecommerceFiliais.length > 0) {
-                  const totalStock = ecommerceFiliais.reduce((sum, f) => sum + f.stock, 0);
+                  const totalStock = aggregateLogicalStock(ecommerceFiliais);
                   const totalSales = ecommerceFiliais.reduce((sum, f) => sum + f.sales, 0);
                   const totalSalesLast30Days = ecommerceFiliais.reduce((sum, f) => sum + f.salesLast30Days, 0);
                   
@@ -2099,7 +2128,7 @@ export default function ControleTransferenciasTable({
                     };
                   } else {
                     // Se tem múltiplas filiais com mesmo display name, agregar
-                    const totalStock = filiais.reduce((sum, f) => sum + f.stock, 0);
+                    const totalStock = aggregateLogicalStock(filiais);
                     const totalSales = filiais.reduce((sum, f) => sum + f.sales, 0);
                     const totalSalesLast30Days = filiais.reduce((sum, f) => sum + f.salesLast30Days, 0);
                     

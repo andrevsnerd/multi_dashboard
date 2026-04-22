@@ -4,7 +4,7 @@ import { startOfMonth, subMonths } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
 
 import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateRangeFilter";
-import type { CompanyKey } from "@/lib/config/company";
+import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 import {
   CURVA_LABELS,
   getComparableFilialOptions,
@@ -152,6 +152,19 @@ function fmtQty(value: number, maxDigits: number = 1) {
   });
 }
 
+function fmtSignedInt(value: number) {
+  const rounded = Math.round(value);
+  if (rounded > 0) return `+${fmtInt(rounded)}`;
+  if (rounded < 0) return `-${fmtInt(Math.abs(rounded))}`;
+  return "0";
+}
+
+function fmtDeltaPct(value: number) {
+  const delta = value - 100;
+  const prefix = delta > 0 ? "+" : "";
+  return `${prefix}${delta.toFixed(1)}%`;
+}
+
 function getInitialRange(): DateRangeValue {
   const now = new Date();
   return {
@@ -179,10 +192,20 @@ function getCurveTone(curva: Curva | null) {
   return styles.curveEmpty;
 }
 
+function getCategoryStatus(row: CategoryRow): ItemRow["status"] {
+  if (row.shortageQty > 0) return "faltando";
+  if (row.excessQty > 0) return "excesso";
+  return "ok";
+}
+
 export default function NovaFilialPage({ companyKey }: Props) {
   const localStores = useMemo(() => getComparableFilialOptions(companyKey), [companyKey]);
   const localPresets = useMemo(() => getNovaFilialPresets(companyKey), [companyKey]);
   const defaultPreset = useMemo(() => getDefaultNovaFilialPreset(companyKey), [companyKey]);
+  const companyName = useMemo(
+    () => resolveCompany(companyKey)?.name ?? companyKey.toUpperCase(),
+    [companyKey]
+  );
 
   const [range, setRange] = useState<DateRangeValue>(() => getInitialRange());
   const [selectedModel, setSelectedModel] = useState<string>(
@@ -199,6 +222,7 @@ export default function NovaFilialPage({ companyKey }: Props) {
   const [data, setData] = useState<ApiData | null>(null);
   const [resolvedRequestKey, setResolvedRequestKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
   const requestKey = useMemo(() => {
     if (!selectedModel || !selectedTarget) return null;
     return [
@@ -274,6 +298,14 @@ export default function NovaFilialPage({ companyKey }: Props) {
       .slice(0, 20);
   }, [data]);
 
+  const revenueByCategory = useMemo(() => {
+    if (!data) return [];
+
+    return [...data.categoryRows]
+      .filter((row) => row.avgMonthlyDemandUnits > 0 || row.currentStock > 0)
+      .sort((a, b) => b.projectedRevenueWithCurrentStock - a.projectedRevenueWithCurrentStock);
+  }, [data]);
+
   const hasGrade = useMemo(
     () => Boolean(data?.itemRows.some((item) => item.grade && item.grade.trim())),
     [data]
@@ -281,19 +313,18 @@ export default function NovaFilialPage({ companyKey }: Props) {
 
   return (
     <div className={styles.page}>
-      <section className={styles.hero}>
-        <div className={styles.heroTopline}>Planejamento de sortimento para novas operacoes</div>
-        <div className={styles.heroHeader}>
+      <section className={styles.controlPanel}>
+        <div className={styles.compactHeader}>
           <div>
-            <h1 className={styles.title}>Nova Filial</h1>
-            <p className={styles.subtitle}>
-              Esta visao projeta o potencial mensal da loja nova com base na loja modelo,
-              reaproveitando a mesma logica de Curva ABC da pagina atual e comparando isso
-              com o estoque que ja existe na filial de destino.
+            <span className={styles.sectionEyebrow}>Nova Filial</span>
+            <h1 className={styles.pageTitle}>Planejamento de estoque ideal</h1>
+            <p className={styles.cardText}>
+              Compare uma loja referencia com a nova operacao e veja o estoque ideal, o gap e o
+              potencial de venda com o que ja existe hoje.
             </p>
           </div>
-          <div className={styles.legendCard}>
-            <div className={styles.legendTitle}>Mesma logica da Curva ABC</div>
+          <div className={styles.legendInline}>
+            <span className={styles.legendTitle}>Curva ABC</span>
             {(["A", "B", "C"] as Curva[]).map((curva) => (
               <div key={curva} className={styles.legendRow}>
                 <span className={`${styles.curveBadge} ${getCurveTone(curva)}`}>{curva}</span>
@@ -302,23 +333,19 @@ export default function NovaFilialPage({ companyKey }: Props) {
             ))}
           </div>
         </div>
-      </section>
 
-      <section className={styles.controlPanel}>
         <div className={styles.cardHeader}>
           <div>
-            <h2 className={styles.cardTitle}>Comparacao customizavel</h2>
+            <h2 className={styles.cardTitle}>Comparacao</h2>
             <p className={styles.cardText}>
-              Escolha a loja modelo e a loja comparada. Os cenarios padrao abaixo
-              so aceleram o preenchimento.
+              Escolha a loja modelo e a loja nova. Os cenarios abaixo so aceleram a selecao.
             </p>
           </div>
         </div>
 
         <div className={styles.presetGrid}>
           {activePresets.map((preset) => {
-            const isActive =
-              preset.model === selectedModel && preset.target === selectedTarget;
+            const isActive = preset.model === selectedModel && preset.target === selectedTarget;
             return (
               <button
                 key={preset.id}
@@ -377,182 +404,198 @@ export default function NovaFilialPage({ companyKey }: Props) {
         <section className={styles.errorCard}>{error}</section>
       ) : data ? (
         <>
-          <section className={styles.relationshipStrip}>
-            <div>
-              <span className={styles.relationshipLabel}>Loja modelo</span>
-              <strong>{data.modelStore.label}</strong>
-            </div>
-            <div className={styles.relationshipArrow}>→</div>
-            <div>
-              <span className={styles.relationshipLabel}>Loja comparada</span>
-              <strong>{data.targetStore.label}</strong>
-            </div>
-            <div className={styles.relationshipMeta}>
-              {data.range.monthsCount} meses analisados: {data.range.start} ate {data.range.end}
-            </div>
-          </section>
-
-          <section className={styles.summaryGrid}>
-            <article className={styles.metricCard}>
-              <span className={styles.metricLabel}>Venda mensal projetada</span>
-              <strong className={styles.metricValue}>{fmtBRL(data.summary.demandRevenueMonthly)}</strong>
-              <span className={styles.metricSubtext}>
-                Media mensal da loja modelo no periodo.
-              </span>
-            </article>
-
-            <article className={styles.metricCard}>
-              <span className={styles.metricLabel}>Demanda mensal em pecas</span>
-              <strong className={styles.metricValue}>{fmtQty(data.summary.demandUnitsMonthly)}</strong>
-              <span className={styles.metricSubtext}>
-                Media real de pecas vendidas por mes na loja modelo.
-              </span>
-            </article>
-
-            <article className={styles.metricCard}>
-              <span className={styles.metricLabel}>Mix minimo sugerido</span>
-              <strong className={styles.metricValue}>{fmtInt(data.summary.mixTargetUnitsMonthly)}</strong>
-              <span className={styles.metricSubtext}>
-                {fmtInt(data.summary.activeItems)} itens ativos e profundidade media de{" "}
-                {data.summary.depthPerItem.toFixed(1)} pecas por item.
-              </span>
-            </article>
-
-            <article className={styles.metricCard}>
-              <span className={styles.metricLabel}>Cobertura do mix</span>
-              <strong className={styles.metricValue}>{fmtPct(data.summary.mixCoveragePct)}</strong>
-              <span className={styles.metricSubtext}>
-                {fmtInt(data.summary.usefulMixStockUnits)} pecas uteis no mix sugerido.
-              </span>
-            </article>
-
-            <article className={styles.metricCard}>
-              <span className={styles.metricLabel}>Gap de mix</span>
-              <strong className={styles.metricValue}>
-                {data.summary.isStockEnough ? "Estoque suficiente" : `${fmtInt(data.summary.shortageUnits)} faltando`}
-              </strong>
-              <span className={styles.metricSubtext}>
-                Excesso atual de {fmtInt(data.summary.excessUnits)} pecas.
-              </span>
-            </article>
-
-            <article className={styles.metricCard}>
-              <span className={styles.metricLabel}>Venda provavel com estoque atual</span>
-              <strong className={styles.metricValue}>
-                {fmtBRL(data.summary.projectedRevenueWithCurrentStock)}
-              </strong>
-              <span className={styles.metricSubtext}>
-                {fmtPct(data.summary.revenueCoveragePct)} do potencial de venda mensal.
-              </span>
-            </article>
-
-            <article className={styles.metricCard}>
-              <span className={styles.metricLabel}>Cobertura da demanda</span>
-              <strong className={styles.metricValue}>{fmtPct(data.summary.demandCoveragePct)}</strong>
-              <span className={styles.metricSubtext}>
-                {fmtQty(data.summary.usefulDemandStockUnits)} pecas da demanda media ja estao cobertas.
-              </span>
-            </article>
-
-            <article className={styles.metricCard}>
-              <span className={styles.metricLabel}>Curva A que nao pode faltar</span>
-              <strong className={styles.metricValue}>{fmtInt(data.summary.curveAItems)} itens</strong>
-              <span className={styles.metricSubtext}>
-                Gap de {fmtInt(data.summary.curveAShortageUnits)} pecas na Curva A.
-              </span>
-            </article>
-          </section>
-
-          <section className={styles.explainerStrip}>
-            <div className={styles.explainerCard}>
-              <span className={styles.explainerLabel}>Demanda mensal</span>
-              <strong>{fmtQty(data.summary.demandUnitsMonthly)} pecas</strong>
-              <p>Quanto a loja modelo realmente vende, em media, por mes.</p>
-            </div>
-            <div className={styles.explainerCard}>
-              <span className={styles.explainerLabel}>Mix minimo sugerido</span>
-              <strong>{fmtInt(data.summary.mixTargetUnitsMonthly)} pecas</strong>
-              <p>Sortimento minimo por SKU para a nova loja nao perder cobertura de mix.</p>
-            </div>
-            <div className={styles.explainerCard}>
-              <span className={styles.explainerLabel}>Leitura do gap</span>
-              <strong>{fmtInt(data.summary.shortageUnits)} faltando</strong>
-              <p>Falta mostra o que precisa entrar. Excesso mostra o que sobra fora do mix ideal.</p>
-            </div>
-          </section>
-
-          <section className={styles.dualCardGrid}>
-            <article className={styles.panelCard}>
-              <div className={styles.cardHeader}>
-                <div>
-                  <h2 className={styles.cardTitle}>Base da projecao</h2>
-                  <p className={styles.cardText}>
-                    Tudo abaixo parte da performance real da loja modelo no periodo selecionado.
-                  </p>
-                </div>
+          <section className={styles.panelCard}>
+            <div className={styles.cardHeader}>
+              <div>
+                <h2 className={styles.cardTitle}>Resumo executivo</h2>
+                <p className={styles.cardText}>
+                  O numero mais importante aqui e o estoque ideal para a nova loja performar de
+                  forma parecida com a referencia.
+                </p>
               </div>
-              <div className={styles.inlineMetrics}>
-                <div>
-                  <span>Venda no periodo</span>
-                  <strong>{fmtBRL(data.modelSummary.vendasPeriodo)}</strong>
-                </div>
-                <div>
-                  <span>Pecas vendidas</span>
-                  <strong>{fmtInt(data.modelSummary.qtdePeriodo)}</strong>
-                </div>
-                <div>
-                  <span>Media mensal</span>
-                  <strong>{fmtBRL(data.modelSummary.avgMonthlySales)}</strong>
-                </div>
-                <div>
-                  <span>Demanda media mensal</span>
-                  <strong>{fmtQty(data.modelSummary.avgMonthlyUnits)}</strong>
-                </div>
-                <div>
-                  <span>Mix minimo sugerido</span>
-                  <strong>{fmtInt(data.modelSummary.mixTargetUnitsMonthly)}</strong>
-                </div>
-              </div>
-            </article>
+            </div>
 
-            <article className={styles.panelCard}>
-              <div className={styles.cardHeader}>
-                <div>
-                  <h2 className={styles.cardTitle}>O que responder rapido</h2>
-                  <p className={styles.cardText}>
-                    Esta filial tende a vender {fmtQty(data.summary.demandUnitsMonthly)} pecas por mes
-                    e precisa operar com um mix minimo sugerido de {fmtInt(data.summary.mixTargetUnitsMonthly)} pecas
-                    para buscar uma performance similar.
-                  </p>
-                </div>
-              </div>
-              <ul className={styles.answerList}>
-                <li>
-                  Estoque atual {data.summary.isStockEnough ? "suficiente" : "insuficiente"} para o mix sugerido.
-                </li>
-                <li>
-                  Faltam {fmtInt(data.summary.shortageUnits)} pecas e ha excesso de{" "}
-                  {fmtInt(data.summary.excessUnits)} pecas.
-                </li>
-                <li>
-                  O estoque atual tende a suportar cerca de{" "}
-                  {fmtBRL(data.summary.projectedRevenueWithCurrentStock)} em vendas mensais.
-                </li>
-                <li>
-                  {fmtInt(data.summary.activeCategories)} categorias e {fmtInt(data.summary.activeItems)} itens
-                  entram no sortimento ideal.
-                </li>
-              </ul>
-            </article>
+            <div className={styles.tableWrap}>
+              <table className={`${styles.table} ${styles.summaryTable}`}>
+                <thead>
+                  <tr>
+                    <th>Nova loja</th>
+                    <th>Referencia</th>
+                    <th>Empresa</th>
+                    <th className={styles.numeric}>Fat. meta mensal</th>
+                    <th className={styles.numeric}>Qtd meta</th>
+                    <th className={styles.numeric}>Est. ideal</th>
+                    <th className={styles.numeric}>Est. util atual</th>
+                    <th className={styles.numeric}>Cobertura</th>
+                    <th className={styles.numeric}>Rev. est. mes 1</th>
+                    <th className={styles.numeric}>Delta receita</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>{data.targetStore.label}</td>
+                    <td>{data.modelStore.label}</td>
+                    <td>{companyName}</td>
+                    <td className={styles.numeric}>{fmtBRL(data.summary.demandRevenueMonthly)}</td>
+                    <td className={styles.numeric}>{fmtQty(data.summary.demandUnitsMonthly)}</td>
+                    <td className={styles.numeric}>{fmtInt(data.summary.mixTargetUnitsMonthly)}</td>
+                    <td className={styles.numeric}>{fmtInt(data.summary.usefulMixStockUnits)}</td>
+                    <td className={styles.numeric}>{fmtPct(data.summary.mixCoveragePct)}</td>
+                    <td className={styles.numeric}>
+                      {fmtBRL(data.summary.projectedRevenueWithCurrentStock)}
+                    </td>
+                    <td
+                      className={`${styles.numeric} ${
+                        data.summary.revenueCoveragePct >= 100
+                          ? styles.deltaPositive
+                          : styles.deltaNegative
+                      }`}
+                    >
+                      {fmtDeltaPct(data.summary.revenueCoveragePct)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className={styles.summaryHighlights}>
+              <article className={styles.highlightCard}>
+                <span className={styles.metricLabel}>Estoque ideal</span>
+                <strong className={styles.highlightValue}>
+                  {fmtInt(data.summary.mixTargetUnitsMonthly)} pecas
+                </strong>
+                <span className={styles.highlightMeta}>
+                  {fmtInt(data.summary.activeItems)} itens ativos e profundidade media de{" "}
+                  {data.summary.depthPerItem.toFixed(1)} pecas por item.
+                </span>
+              </article>
+
+              <article className={styles.highlightCard}>
+                <span className={styles.metricLabel}>Estoque util atual</span>
+                <strong className={styles.highlightValue}>
+                  {fmtInt(data.summary.usefulMixStockUnits)} pecas
+                </strong>
+                <span className={styles.highlightMeta}>
+                  {fmtInt(data.summary.currentStockUnits)} pecas no total, sendo{" "}
+                  {fmtInt(data.summary.excessUnits)} fora do mix ideal.
+                </span>
+              </article>
+
+              <article className={styles.highlightCard}>
+                <span className={styles.metricLabel}>Gap de pecas</span>
+                <strong className={styles.highlightValue}>
+                  {data.summary.shortageUnits > 0
+                    ? `${fmtInt(data.summary.shortageUnits)} faltando`
+                    : "Estoque suficiente"}
+                </strong>
+                <span className={styles.highlightMeta}>
+                  Cobertura atual de {fmtPct(data.summary.mixCoveragePct)} do estoque ideal.
+                </span>
+              </article>
+
+              <article className={styles.highlightCard}>
+                <span className={styles.metricLabel}>Receita estimada mes 1</span>
+                <strong className={styles.highlightValue}>
+                  {fmtBRL(data.summary.projectedRevenueWithCurrentStock)}
+                </strong>
+                <span className={styles.highlightMeta}>
+                  {fmtPct(data.summary.revenueCoveragePct)} da meta mensal de venda.
+                </span>
+              </article>
+            </div>
+
+            <div className={styles.summaryMeta}>
+              <span>
+                <strong>{data.modelStore.label}</strong>
+                {" -> "}
+                <strong>{data.targetStore.label}</strong>
+              </span>
+              <span>
+                Periodo: {data.range.start} ate {data.range.end} ({data.range.monthsCount} meses)
+              </span>
+              <span>
+                Curva A critica: {fmtInt(data.summary.curveAItems)} itens com gap de{" "}
+                {fmtInt(data.summary.curveAShortageUnits)} pecas
+              </span>
+            </div>
           </section>
 
           <section className={styles.panelCard}>
             <div className={styles.cardHeader}>
               <div>
-                <h2 className={styles.cardTitle}>Categorias por prioridade</h2>
+                <h2 className={styles.cardTitle}>Categorias - Curva ABC e gap de estoque</h2>
                 <p className={styles.cardText}>
-                  Curva da categoria, demanda media, mix sugerido, gap atual e quanto o estoque
-                  atual consegue sustentar em venda.
+                  O ideal e usar esta tabela para decidir compra. Ela mostra quanto cada categoria
+                  precisa ter, quanto ja existe e se a leitura principal e falta ou excesso.
+                </p>
+              </div>
+            </div>
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>Curva</th>
+                    <th>Categoria</th>
+                    <th className={styles.numeric}>Part.</th>
+                    <th className={styles.numeric}>Fat./mes</th>
+                    <th className={styles.numeric}>Qtd/mes</th>
+                    <th className={styles.numeric}>Est. ideal</th>
+                    <th className={styles.numeric}>Estoque atual</th>
+                    <th className={styles.numeric}>Gap</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.categoryRows.map((row) => {
+                    const status = getCategoryStatus(row);
+
+                    return (
+                      <tr key={row.categoria}>
+                        <td>
+                          <span className={`${styles.curveBadge} ${getCurveTone(row.categoriaCurva)}`}>
+                            {row.categoriaCurva ?? "-"}
+                          </span>
+                        </td>
+                        <td>{row.categoria}</td>
+                        <td className={styles.numeric}>{fmtPct(row.categoriaParticipacao)}</td>
+                        <td className={styles.numeric}>{fmtBRL(row.avgMonthlySales)}</td>
+                        <td className={styles.numeric}>{fmtQty(row.avgMonthlyDemandUnits)}</td>
+                        <td className={styles.numeric}>{fmtInt(row.mixTargetQty)}</td>
+                        <td className={styles.numeric}>{fmtInt(row.currentStock)}</td>
+                        <td
+                          className={`${styles.numeric} ${
+                            row.shortageQty > 0
+                              ? styles.missingCell
+                              : row.excessQty > 0
+                                ? styles.excessCell
+                                : ""
+                          }`}
+                        >
+                          {row.shortageQty > 0
+                            ? fmtSignedInt(row.shortageQty)
+                            : row.excessQty > 0
+                              ? fmtSignedInt(-row.excessQty)
+                              : "0"}
+                        </td>
+                        <td>
+                          <span className={`${styles.statusBadge} ${getStatusTone(status)}`}>
+                            {getStatusLabel(status)}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className={styles.panelCard}>
+            <div className={styles.cardHeader}>
+              <div>
+                <h2 className={styles.cardTitle}>Receita estimada com o estoque atual</h2>
+                <p className={styles.cardText}>
+                  Projecao do que a loja tende a vender no primeiro mes mantendo o estoque de hoje.
                 </p>
               </div>
             </div>
@@ -561,36 +604,33 @@ export default function NovaFilialPage({ companyKey }: Props) {
                 <thead>
                   <tr>
                     <th>Categoria</th>
-                    <th>Curva</th>
-                    <th className={styles.numeric}>Part.</th>
-                    <th className={styles.numeric}>Venda media</th>
-                    <th className={styles.numeric}>Demanda mes</th>
-                    <th className={styles.numeric}>Mix sugerido</th>
-                    <th className={styles.numeric}>Estoque atual</th>
-                    <th className={styles.numeric}>Gap falta</th>
-                    <th className={styles.numeric}>Excesso</th>
-                    <th className={styles.numeric}>Cobertura mix</th>
+                    <th className={styles.numeric}>Est. atual</th>
+                    <th className={styles.numeric}>Vel. ref./mes</th>
+                    <th className={styles.numeric}>Vendas est.</th>
+                    <th className={styles.numeric}>RPP</th>
+                    <th className={styles.numeric}>Receita est.</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.categoryRows.map((row) => (
-                    <tr key={row.categoria}>
-                      <td>{row.categoria}</td>
-                      <td>
-                        <span className={`${styles.curveBadge} ${getCurveTone(row.categoriaCurva)}`}>
-                          {row.categoriaCurva ?? "—"}
-                        </span>
-                      </td>
-                      <td className={styles.numeric}>{fmtPct(row.categoriaParticipacao)}</td>
-                      <td className={styles.numeric}>{fmtBRL(row.avgMonthlySales)}</td>
-                      <td className={styles.numeric}>{fmtQty(row.avgMonthlyDemandUnits)}</td>
-                      <td className={styles.numeric}>{fmtInt(row.mixTargetQty)}</td>
-                      <td className={styles.numeric}>{fmtInt(row.currentStock)}</td>
-                      <td className={`${styles.numeric} ${styles.missingCell}`}>{fmtInt(row.shortageQty)}</td>
-                      <td className={`${styles.numeric} ${styles.excessCell}`}>{fmtInt(row.excessQty)}</td>
-                      <td className={styles.numeric}>{fmtPct(row.mixCoveragePct)}</td>
-                    </tr>
-                  ))}
+                  {revenueByCategory.map((row) => {
+                    const avgPrice =
+                      row.avgMonthlyDemandUnits > 0
+                        ? row.avgMonthlySales / row.avgMonthlyDemandUnits
+                        : 0;
+
+                    return (
+                      <tr key={`rev-${row.categoria}`}>
+                        <td>{row.categoria}</td>
+                        <td className={styles.numeric}>{fmtInt(row.currentStock)}</td>
+                        <td className={styles.numeric}>{fmtQty(row.avgMonthlyDemandUnits)}</td>
+                        <td className={styles.numeric}>{fmtQty(row.coveredDemandUnits)}</td>
+                        <td className={styles.numeric}>{fmtBRL(avgPrice)}</td>
+                        <td className={styles.numeric}>
+                          {fmtBRL(row.projectedRevenueWithCurrentStock)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -613,9 +653,9 @@ export default function NovaFilialPage({ companyKey }: Props) {
                     <th>Cor</th>
                     {hasGrade ? <th>Grade</th> : null}
                     <th>Categoria</th>
-                    <th className={styles.numeric}>Venda media</th>
-                    <th className={styles.numeric}>Demanda mes</th>
-                    <th className={styles.numeric}>Mix sugerido</th>
+                    <th className={styles.numeric}>Fat./mes</th>
+                    <th className={styles.numeric}>Qtd/mes</th>
+                    <th className={styles.numeric}>Prof. ideal</th>
                     <th className={styles.numeric}>Estoque atual</th>
                     <th className={styles.numeric}>Gap</th>
                   </tr>
@@ -630,12 +670,12 @@ export default function NovaFilialPage({ companyKey }: Props) {
                         </div>
                       </td>
                       <td>{item.corDescricao || item.cor || "Sem cor"}</td>
-                      {hasGrade ? <td>{item.grade || "—"}</td> : null}
+                      {hasGrade ? <td>{item.grade || "-"}</td> : null}
                       <td>
                         <div className={styles.categoryCell}>
                           <span>{item.categoria}</span>
                           <span className={`${styles.curveBadge} ${getCurveTone(item.categoriaCurva)}`}>
-                            {item.categoriaCurva ?? "—"}
+                            {item.categoriaCurva ?? "-"}
                           </span>
                         </div>
                       </td>
@@ -643,7 +683,11 @@ export default function NovaFilialPage({ companyKey }: Props) {
                       <td className={styles.numeric}>{fmtQty(item.avgMonthlyDemandUnits)}</td>
                       <td className={styles.numeric}>{fmtInt(item.mixTargetQty)}</td>
                       <td className={styles.numeric}>{fmtInt(item.currentStock)}</td>
-                      <td className={`${styles.numeric} ${item.gapQty < 0 ? styles.missingCell : styles.excessCell}`}>
+                      <td
+                        className={`${styles.numeric} ${
+                          item.gapQty < 0 ? styles.missingCell : styles.excessCell
+                        }`}
+                      >
                         {item.gapQty > 0 ? `+${fmtInt(item.gapQty)}` : fmtInt(item.gapQty)}
                       </td>
                     </tr>
@@ -658,28 +702,33 @@ export default function NovaFilialPage({ companyKey }: Props) {
               <div>
                 <h2 className={styles.cardTitle}>Detalhe do gap por item</h2>
                 <p className={styles.cardText}>
-                  A tabela abaixo mostra tudo o que esta faltando ou em excesso em relacao ao mix
-                  sugerido da loja modelo. Itens sem gap podem ficar ocultos por padrao.
+                  Aqui entra o detalhe completo do que falta ou sobra em relacao ao mix ideal.
                 </p>
               </div>
               <div className={styles.toolbar}>
                 <button
                   type="button"
-                  className={`${styles.toolbarButton} ${statusFilter === "todos" ? styles.toolbarButtonActive : ""}`}
+                  className={`${styles.toolbarButton} ${
+                    statusFilter === "todos" ? styles.toolbarButtonActive : ""
+                  }`}
                   onClick={() => setStatusFilter("todos")}
                 >
                   Todos
                 </button>
                 <button
                   type="button"
-                  className={`${styles.toolbarButton} ${statusFilter === "faltando" ? styles.toolbarButtonActive : ""}`}
+                  className={`${styles.toolbarButton} ${
+                    statusFilter === "faltando" ? styles.toolbarButtonActive : ""
+                  }`}
                   onClick={() => setStatusFilter("faltando")}
                 >
                   So faltas
                 </button>
                 <button
                   type="button"
-                  className={`${styles.toolbarButton} ${statusFilter === "excesso" ? styles.toolbarButtonActive : ""}`}
+                  className={`${styles.toolbarButton} ${
+                    statusFilter === "excesso" ? styles.toolbarButtonActive : ""
+                  }`}
                   onClick={() => setStatusFilter("excesso")}
                 >
                   So excessos
@@ -705,12 +754,12 @@ export default function NovaFilialPage({ companyKey }: Props) {
                     <th>Cor</th>
                     {hasGrade ? <th>Grade</th> : null}
                     <th>Categoria</th>
-                    <th className={styles.numeric}>Venda media</th>
-                    <th className={styles.numeric}>Demanda mes</th>
-                    <th className={styles.numeric}>Mix sugerido</th>
+                    <th className={styles.numeric}>Fat./mes</th>
+                    <th className={styles.numeric}>Qtd/mes</th>
+                    <th className={styles.numeric}>Prof. ideal</th>
                     <th className={styles.numeric}>Estoque atual</th>
                     <th className={styles.numeric}>Gap</th>
-                    <th className={styles.numeric}>Venda provavel</th>
+                    <th className={styles.numeric}>Receita est.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -723,12 +772,12 @@ export default function NovaFilialPage({ companyKey }: Props) {
                       </td>
                       <td>
                         <span className={`${styles.curveBadge} ${getCurveTone(item.itemCurva)}`}>
-                          {item.itemCurva ?? "—"}
+                          {item.itemCurva ?? "-"}
                         </span>
                       </td>
                       <td>
                         <span className={`${styles.curveBadge} ${getCurveTone(item.categoriaCurva)}`}>
-                          {item.categoriaCurva ?? "—"}
+                          {item.categoriaCurva ?? "-"}
                         </span>
                       </td>
                       <td>
@@ -738,13 +787,21 @@ export default function NovaFilialPage({ companyKey }: Props) {
                         </div>
                       </td>
                       <td>{item.corDescricao || item.cor || "Sem cor"}</td>
-                      {hasGrade ? <td>{item.grade || "—"}</td> : null}
+                      {hasGrade ? <td>{item.grade || "-"}</td> : null}
                       <td>{item.categoria}</td>
                       <td className={styles.numeric}>{fmtBRL(item.avgMonthlySales)}</td>
                       <td className={styles.numeric}>{fmtQty(item.avgMonthlyDemandUnits)}</td>
                       <td className={styles.numeric}>{fmtInt(item.mixTargetQty)}</td>
                       <td className={styles.numeric}>{fmtInt(item.currentStock)}</td>
-                      <td className={`${styles.numeric} ${item.gapQty < 0 ? styles.missingCell : item.gapQty > 0 ? styles.excessCell : ""}`}>
+                      <td
+                        className={`${styles.numeric} ${
+                          item.gapQty < 0
+                            ? styles.missingCell
+                            : item.gapQty > 0
+                              ? styles.excessCell
+                              : ""
+                        }`}
+                      >
                         {item.gapQty > 0 ? `+${fmtInt(item.gapQty)}` : fmtInt(item.gapQty)}
                       </td>
                       <td className={styles.numeric}>{fmtBRL(item.projectedRevenueWithCurrentStock)}</td>
@@ -753,22 +810,6 @@ export default function NovaFilialPage({ companyKey }: Props) {
                 </tbody>
               </table>
             </div>
-          </section>
-
-          <section className={styles.panelCard}>
-            <div className={styles.cardHeader}>
-              <div>
-                <h2 className={styles.cardTitle}>De onde vem esta leitura</h2>
-                <p className={styles.cardText}>
-                  Referencia de dados usada para manter a consistencia com a pagina Curva ABC.
-                </p>
-              </div>
-            </div>
-            <ul className={styles.answerList}>
-              {data.sourceInfo.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
           </section>
         </>
       ) : null}

@@ -168,7 +168,8 @@ export async function fetchControleTransferencias({
         ISNULL(c.DESC_COR, '') AS corBanco,
         e.FILIAL AS filial,
         SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS positiveStock,
-        SUM(CASE WHEN e.ESTOQUE < 0 THEN e.ESTOQUE ELSE 0 END) AS negativeStock
+        SUM(CASE WHEN e.ESTOQUE < 0 THEN e.ESTOQUE ELSE 0 END) AS negativeStock,
+        COUNT(CASE WHEN e.ESTOQUE > 0 THEN 1 END) AS positiveCount
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
       WHERE 1=1
@@ -353,6 +354,7 @@ export async function fetchControleTransferencias({
         filial: string;
         positiveStock: number | null;
         negativeStock: number | null;
+        positiveCount: number | null;
       }>(estoqueQuery),
       request.query<{
         produto: string;
@@ -413,6 +415,27 @@ export async function fetchControleTransferencias({
     // Os resultsets do SQL já vêm filtrados pelo IN clause, então o mapa cobre todos os casos reais.
     const filialLookupMap = new Map<string, string>();
     const filialFiltersInventory = companyConfig?.filialFilters?.inventory ?? [];
+    const filialGroupCanonicalMap = new Map<string, string>();
+
+    for (const [canonical, members] of Object.entries(companyConfig?.filialGroups ?? {})) {
+      const normalizedCanonical = normalizeFilial(canonical);
+      filialGroupCanonicalMap.set(normalizedCanonical, normalizedCanonical);
+
+      members.forEach((member) => {
+        filialGroupCanonicalMap.set(normalizeFilial(member), normalizedCanonical);
+      });
+    }
+
+    // E-commerce também é uma filial lógica única na dashboard, mesmo quando
+    // o ERP expõe múltiplas entidades/códigos para esse mesmo estoque.
+    const ecommerceCanonical = normalizeFilial(companyConfig?.ecommerceFilials?.[0]);
+    if (ecommerceCanonical) {
+      filialGroupCanonicalMap.set(ecommerceCanonical, ecommerceCanonical);
+
+      (companyConfig?.ecommerceFilials ?? []).forEach((member) => {
+        filialGroupCanonicalMap.set(normalizeFilial(member), ecommerceCanonical);
+      });
+    }
 
     // Passo 1: correspondências exatas com filiais configuradas (maior prioridade)
     for (const filialFiltro of filialFiltersInventory) {
@@ -441,10 +464,14 @@ export async function fetchControleTransferencias({
     // Lookup O(1): todos os casos reais estão pré-indexados acima
     const getFilialCanonico = (filial: string): string => {
       const normalizado = normalizeFilial(filial);
-      return filialLookupMap.get(normalizado) ?? normalizado;
+      const mapped = filialLookupMap.get(normalizado) ?? normalizado;
+      return filialGroupCanonicalMap.get(mapped)
+        ?? filialGroupCanonicalMap.get(normalizado)
+        ?? mapped;
     };
 
     // Processar resultados
+    const estoqueComponentMap   = new Map<string, Map<string, { positiveStock: number; negativeStock: number; positiveCount: number }>>();
     const estoqueMap            = new Map<string, Map<string, number>>();
     const vendasMap             = new Map<string, Map<string, number>>();
     const vendasLast30DaysMap   = new Map<string, Map<string, number>>();
@@ -454,23 +481,47 @@ export async function fetchControleTransferencias({
     const produtoInfoMap        = new Map<string, { descricao: string; cor: string; subgrupo?: string; grade?: string }>();
     const codigoBarraMap        = new Map<string, string>();
 
-    // Processar estoque (chave estável por produto+corProduto para evitar duplicatas)
+    // Processar estoque por componentes para aplicar a regra correta também
+    // na agregação de filiais lógicas (ex.: E-COMMERCE, PAULISTA).
     estoqueResult.recordset.forEach(row => {
       const produto = row.produto?.trim() || '';
       const chave = getChaveStable(produto, row.corProduto);
       
-      if (!estoqueMap.has(chave)) {
-        estoqueMap.set(chave, new Map());
+      if (!estoqueComponentMap.has(chave)) {
+        estoqueComponentMap.set(chave, new Map());
       }
       
-      const filialMap = estoqueMap.get(chave)!;
+      const filialMap = estoqueComponentMap.get(chave)!;
       const positiveStock = Number(row.positiveStock ?? 0);
       const negativeStock = Number(row.negativeStock ?? 0);
-      const stock = positiveStock + negativeStock;
+      const positiveCount = Number(row.positiveCount ?? 0);
       
       // Usar nome canônico da filial para agrupar
       const filialCanonico = getFilialCanonico(row.filial);
-      filialMap.set(filialCanonico, (filialMap.get(filialCanonico) || 0) + stock);
+      const existente = filialMap.get(filialCanonico) ?? {
+        positiveStock: 0,
+        negativeStock: 0,
+        positiveCount: 0,
+      };
+
+      filialMap.set(filialCanonico, {
+        positiveStock: existente.positiveStock + positiveStock,
+        negativeStock: existente.negativeStock + negativeStock,
+        positiveCount: existente.positiveCount + positiveCount,
+      });
+    });
+
+    estoqueComponentMap.forEach((filialMap, chave) => {
+      const finalMap = new Map<string, number>();
+
+      filialMap.forEach((components, filial) => {
+        const stock = components.positiveCount > 0
+          ? components.positiveStock
+          : (components.positiveStock + components.negativeStock);
+        finalMap.set(filial, stock);
+      });
+
+      estoqueMap.set(chave, finalMap);
     });
 
     // Helper: acumula um valor num Map<chave, Map<filial, number>>
