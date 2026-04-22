@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "./SidebarContext";
@@ -25,12 +25,9 @@ export default function Sidebar({ companyName }: SidebarProps) {
   const { user } = useAuth();
   const { isOpen, toggle, close } = useSidebar();
   const [isMobile, setIsMobile] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
   const [produtosExpanded, setProdutosExpanded] = useState(false);
-  const prevPathnameRef = useRef<string | null>(null);
 
   useEffect(() => {
-    setIsMounted(true);
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 1024);
     };
@@ -103,6 +100,10 @@ export default function Sidebar({ companyName }: SidebarProps) {
     ? `${basePath}/curva-abc`
     : "/curva-abc";
 
+  const novaFilialHref = basePath && basePath !== "/"
+    ? `${basePath}/nova-filial`
+    : "/nova-filial";
+
   // Construir o link para controle de transferências baseado no caminho base
   const controleTransferenciasHref = basePath && basePath !== "/"
     ? `${basePath}/controle-transferencias`
@@ -144,22 +145,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
   const isProdutosSubItemActive = pathname?.includes("/produto-detalhado") || pathname?.includes("/produtos-recentes") || (pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado"));
   const isProdutosPageActive = pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado");
   const isAnyProdutosPage = isProdutosSubItemActive || isProdutosPageActive;
-  
-  // Expandir submenu de Produtos automaticamente quando navegar para uma página de produtos
-  // Só expande quando o pathname muda (navegação), não a cada render
-  useEffect(() => {
-    if (pathname && pathname !== prevPathnameRef.current) {
-      prevPathnameRef.current = pathname;
-      // Verificar se é uma página de produtos
-      const isProdutosSubItem = pathname?.includes("/produto-detalhado") || pathname?.includes("/produtos-recentes");
-      const isProdutosPage = pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado");
-      const isAnyProdutos = isProdutosSubItem || isProdutosPage;
-      
-      if (isAnyProdutos) {
-        setProdutosExpanded(true);
-      }
-    }
-  }, [pathname]);
+  const produtosExpandedEffective = produtosExpanded || isAnyProdutosPage;
 
   const allNavItems: NavItemBase[] = [
     { label: "Home", href: "/", permission: "home" },
@@ -179,6 +165,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     { label: "Controle de Giro", href: controleGiroHref, permission: "controle-giro" },
     { label: "Controle de Performance", href: controlePerformanceHref, permission: "controle-performance" },
     { label: "Curva A,B,C", href: curvaAbcHref, permission: "curva-abc" },
+    { label: "Nova Filial", href: novaFilialHref, permission: "curva-abc" },
     { label: "Controle de Transferências", href: controleTransferenciasHref, permission: "controle-transferencias" },
     { label: "Transferência de Produtos", href: transferenciaProdutosHref, permission: "transferencia-produtos" },
     { label: "Romaneios", href: romaneiosHref, permission: "romaneios" },
@@ -221,7 +208,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
   return (
     <>
       {/* Overlay para mobile - só aparece quando sidebar está aberta no mobile */}
-      {isMounted && isOpen && isMobile && (
+      {isOpen && isMobile && (
         <div 
           className={styles.overlay} 
           onClick={close} 
@@ -346,7 +333,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
             // }
             
             const isProdutosItem = item.label === "Produtos" && item.subItems;
-            const isExpanded = isProdutosItem && produtosExpanded;
+            const isExpanded = isProdutosItem && produtosExpandedEffective;
             
             return (
               <div key={item.href || item.label}>
@@ -436,4 +423,3 @@ export default function Sidebar({ companyName }: SidebarProps) {
     </>
   );
 }
-

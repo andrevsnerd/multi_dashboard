@@ -21,6 +21,38 @@ const MATRIZ_FILIAIS: Record<string, string[]> = {
   nerd: ['NERD'],
 };
 
+function normalizeFilialFilterValue(value: string): string {
+  return value
+    .trim()
+    .replace(/\u00A0/g, ' ')
+    .replace(/[\u2010-\u2015\u2212]/g, '-')
+    .replace(/\s+/g, ' ')
+    .toUpperCase();
+}
+
+function buildNormalizedFilialSqlExpr(column: string): string {
+  return `
+    UPPER(
+      REPLACE(
+        REPLACE(
+          REPLACE(
+            REPLACE(
+              REPLACE(
+                REPLACE(LTRIM(RTRIM(ISNULL(${column}, ''))), NCHAR(0x00A0), ' '),
+                CHAR(9), ' '
+              ),
+              NCHAR(0x2010), '-'
+            ),
+            NCHAR(0x2011), '-'
+          ),
+          NCHAR(0x2013), '-'
+        ),
+        '  ', ' '
+      )
+    )
+  `;
+}
+
 export async function fetchPerformanceData(
   companyKey: CompanyKey,
   range: NormalizedRange,
@@ -296,7 +328,7 @@ export async function fetchFilialProdutoSales(
   ecommerceFilialNames: string[],
   range: NormalizedRange,
   comparisonMode: 'month' | 'year' = 'month',
-  options?: { groupByCor?: boolean },
+  options?: { groupByCor?: boolean; limit?: number },
 ): Promise<FilialProdutoSalesRow[]> {
   const groupByCor = options?.groupByCor === true;
   const start = range.start;
@@ -313,7 +345,10 @@ export async function fetchFilialProdutoSales(
     : `''`;
   // SQL Server rejects GROUP BY on a literal constant — only include gradeExpr if it references a column
   const gradeGroupBy = gradeExpr === `''` ? '' : `, ${gradeExpr}`;
-  const topN = groupByCor ? 2000 : 500;
+  const requestedLimit = Number(options?.limit ?? NaN);
+  const topN = Number.isFinite(requestedLimit) && requestedLimit > 0
+    ? Math.floor(requestedLimit)
+    : groupByCor ? 2000 : 500;
 
   type RawRow = {
     PRODUTO: string;
@@ -621,31 +656,155 @@ export async function fetchProdutoEstoquePorFilial(
   if (allFiliais.length === 0) return [];
 
   return withRequest(async (request) => {
-    allFiliais.forEach((f, i) => request.input(`estF${i}`, sql.VarChar, f));
+    allFiliais.forEach((f, i) => request.input(`estF${i}`, sql.VarChar, normalizeFilialFilterValue(f)));
     const placeholders = allFiliais.map((_, i) => `@estF${i}`).join(', ');
     const corSelect = groupByCor ? 'ISNULL(e.COR_PRODUTO, \'\') AS COR_PRODUTO,' : '';
     const corGroup = groupByCor ? ', ISNULL(e.COR_PRODUTO, \'\')' : '';
+    const filialExpr = buildNormalizedFilialSqlExpr('e.FILIAL');
     const query = `
       SELECT
         ISNULL(e.PRODUTO, '') AS PRODUTO,
         ${corSelect}
         ISNULL(e.FILIAL, '') AS FILIAL,
-        CAST(SUM(ISNULL(e.ESTOQUE, 0)) AS FLOAT) AS ESTOQUE
+        CAST(SUM(CASE WHEN ISNULL(e.ESTOQUE, 0) > 0 THEN e.ESTOQUE ELSE 0 END) AS FLOAT) AS POSITIVE_STOCK,
+        CAST(SUM(CASE WHEN ISNULL(e.ESTOQUE, 0) < 0 THEN e.ESTOQUE ELSE 0 END) AS FLOAT) AS NEGATIVE_STOCK,
+        COUNT(CASE WHEN ISNULL(e.ESTOQUE, 0) > 0 THEN 1 END) AS POSITIVE_COUNT
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
-      WHERE e.FILIAL IN (${placeholders})
+      WHERE ${filialExpr} IN (${placeholders})
       GROUP BY ISNULL(e.PRODUTO, ''), ISNULL(e.FILIAL, '')${corGroup}
       HAVING ABS(SUM(ISNULL(e.ESTOQUE, 0))) > 0
     `;
-    type RawRow = { PRODUTO: string; FILIAL: string; ESTOQUE: number; COR_PRODUTO?: string };
+    type RawRow = {
+      PRODUTO: string;
+      FILIAL: string;
+      POSITIVE_STOCK: number;
+      NEGATIVE_STOCK: number;
+      POSITIVE_COUNT: number;
+      COR_PRODUTO?: string;
+    };
     const result = await request.query<RawRow>(query);
     return result.recordset
-      .map(r => ({
-        produto: r.PRODUTO?.trim() ?? '',
-        cor: groupByCor ? (r.COR_PRODUTO?.trim() ?? '') : '',
-        filial: r.FILIAL?.trim() ?? '',
-        estoque: Math.round(Number(r.ESTOQUE ?? 0)),
-      }))
+      .map(r => {
+        const positiveStock = Number(r.POSITIVE_STOCK ?? 0);
+        const negativeStock = Number(r.NEGATIVE_STOCK ?? 0);
+        const positiveCount = Number(r.POSITIVE_COUNT ?? 0);
+        const finalStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
+
+        return {
+          produto: r.PRODUTO?.trim() ?? '',
+          cor: groupByCor ? (r.COR_PRODUTO?.trim() ?? '') : '',
+          filial: r.FILIAL?.trim() ?? '',
+          estoque: Math.round(finalStock),
+        };
+      })
       .filter(r => r.produto !== '');
+  });
+}
+
+export interface ProdutoEstoqueDetalhadoPorFilialRow {
+  produto: string;
+  descricao: string;
+  categoria: string;
+  subgrupo?: string;
+  grade?: string;
+  cor?: string;
+  corDescricao?: string;
+  filial: string;
+  estoque: number;
+}
+
+export async function fetchProdutoEstoqueDetalhadoPorFilial(
+  companyKey: CompanyKey,
+  posFilialNames: string[],
+  ecommerceFilialNames: string[],
+  options?: { groupByCor?: boolean },
+): Promise<ProdutoEstoqueDetalhadoPorFilialRow[]> {
+  const groupByCor = options?.groupByCor === true;
+  const allFiliais = [...new Set([...posFilialNames, ...ecommerceFilialNames])];
+  if (allFiliais.length === 0) return [];
+
+  const categoriaExpr = companyKey === 'nerd'
+    ? `UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, ''))))`
+    : `UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, ''))))`;
+  const gradeExpr = companyKey === 'scarfme'
+    ? `UPPER(LTRIM(RTRIM(ISNULL(p.GRADE, ''))))`
+    : `''`;
+  const gradeGroup = gradeExpr === `''` ? '' : `, ${gradeExpr}`;
+
+  return withRequest(async (request) => {
+    allFiliais.forEach((f, i) => request.input(`estDetF${i}`, sql.VarChar, normalizeFilialFilterValue(f)));
+    const placeholders = allFiliais.map((_, i) => `@estDetF${i}`).join(', ');
+    const corSelect = groupByCor
+      ? `ISNULL(e.COR_PRODUTO, '') AS COR_PRODUTO,
+          MAX(ISNULL(cor_ref.DESC_COR, '')) AS COR_DESCRICAO,`
+      : '';
+    const corJoin = groupByCor
+      ? 'LEFT JOIN CORES_BASICAS cor_ref WITH (NOLOCK) ON cor_ref.COR = e.COR_PRODUTO'
+      : '';
+    const corGroup = groupByCor ? `, ISNULL(e.COR_PRODUTO, '')` : '';
+    const filialExpr = buildNormalizedFilialSqlExpr('e.FILIAL');
+
+    const query = `
+      SELECT
+        ISNULL(e.PRODUTO, '') AS PRODUTO,
+        UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
+        ${categoriaExpr} AS CATEGORIA,
+        MAX(UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, ''))))) AS SUBGRUPO,
+        ${gradeExpr} AS GRADE,
+        ${corSelect}
+        ISNULL(e.FILIAL, '') AS FILIAL,
+        CAST(SUM(CASE WHEN ISNULL(e.ESTOQUE, 0) > 0 THEN e.ESTOQUE ELSE 0 END) AS FLOAT) AS POSITIVE_STOCK,
+        CAST(SUM(CASE WHEN ISNULL(e.ESTOQUE, 0) < 0 THEN e.ESTOQUE ELSE 0 END) AS FLOAT) AS NEGATIVE_STOCK,
+        COUNT(CASE WHEN ISNULL(e.ESTOQUE, 0) > 0 THEN 1 END) AS POSITIVE_COUNT
+      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK)
+        ON p.PRODUTO = e.PRODUTO
+      ${corJoin}
+      WHERE ${filialExpr} IN (${placeholders})
+      GROUP BY
+        ISNULL(e.PRODUTO, ''),
+        UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))),
+        ${categoriaExpr},
+        ISNULL(e.FILIAL, '')${gradeGroup}${corGroup}
+      HAVING ABS(SUM(ISNULL(e.ESTOQUE, 0))) > 0
+      ORDER BY SUM(CASE WHEN ISNULL(e.ESTOQUE, 0) > 0 THEN e.ESTOQUE ELSE 0 END) DESC
+    `;
+
+    type RawRow = {
+      PRODUTO: string;
+      DESCRICAO: string;
+      CATEGORIA: string;
+      SUBGRUPO?: string;
+      GRADE?: string;
+      COR_PRODUTO?: string;
+      COR_DESCRICAO?: string;
+      FILIAL: string;
+      POSITIVE_STOCK: number;
+      NEGATIVE_STOCK: number;
+      POSITIVE_COUNT: number;
+    };
+
+    const result = await request.query<RawRow>(query);
+    return result.recordset
+      .map((row) => {
+        const positiveStock = Number(row.POSITIVE_STOCK ?? 0);
+        const negativeStock = Number(row.NEGATIVE_STOCK ?? 0);
+        const positiveCount = Number(row.POSITIVE_COUNT ?? 0);
+        const finalStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
+
+        return {
+          produto: row.PRODUTO?.trim() ?? '',
+          descricao: row.DESCRICAO?.trim() ?? '',
+          categoria: row.CATEGORIA?.trim() ?? '',
+          subgrupo: row.SUBGRUPO?.trim() ?? '',
+          grade: row.GRADE?.trim() ?? '',
+          cor: groupByCor ? (row.COR_PRODUTO?.trim() ?? '') : '',
+          corDescricao: groupByCor ? (row.COR_DESCRICAO?.trim() ?? '') : '',
+          filial: row.FILIAL?.trim() ?? '',
+          estoque: Math.round(finalStock),
+        };
+      })
+      .filter((row) => row.produto !== '');
   });
 }
 

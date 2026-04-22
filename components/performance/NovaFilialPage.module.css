@@ -1,0 +1,490 @@
+.page {
+  --bg-soft: linear-gradient(180deg, #f7efe4 0%, #fffaf4 100%);
+  --line: rgba(115, 85, 49, 0.14);
+  --text-main: #312117;
+  --text-soft: #6f5945;
+  --card: rgba(255, 255, 255, 0.88);
+  --shadow: 0 20px 50px rgba(100, 69, 39, 0.12);
+  --accent: #0e7490;
+  --accent-soft: rgba(14, 116, 144, 0.12);
+  --danger: #b42318;
+  --danger-soft: rgba(180, 35, 24, 0.12);
+  --success: #13795b;
+  --success-soft: rgba(19, 121, 91, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  color: var(--text-main);
+}
+
+.hero,
+.controlPanel,
+.panelCard,
+.loadingCard,
+.errorCard,
+.relationshipStrip {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.hero {
+  padding: 28px;
+  background: radial-gradient(circle at top left, rgba(255, 214, 153, 0.28), transparent 38%),
+    var(--bg-soft);
+}
+
+.heroTopline {
+  margin-bottom: 10px;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #8c6a4d;
+}
+
+.heroHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 0.95fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 0.98;
+}
+
+.subtitle {
+  margin: 12px 0 0;
+  max-width: 760px;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text-soft);
+}
+
+.legendCard {
+  padding: 18px;
+  border: 1px solid rgba(115, 85, 49, 0.12);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.legendTitle,
+.cardTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.legendRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  color: var(--text-soft);
+  font-size: 14px;
+}
+
+.controlPanel,
+.panelCard {
+  padding: 22px;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.cardText {
+  margin: 6px 0 0;
+  color: var(--text-soft);
+  line-height: 1.55;
+  font-size: 14px;
+}
+
+.presetGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.presetButton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(115, 85, 49, 0.14);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--text-main);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.presetButton span {
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.presetButton:hover,
+.presetButtonActive {
+  transform: translateY(-1px);
+  border-color: rgba(14, 116, 144, 0.35);
+  box-shadow: 0 18px 35px rgba(14, 116, 144, 0.12);
+}
+
+.filtersRow {
+  display: grid;
+  grid-template-columns: minmax(300px, 1.3fr) repeat(2, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+  align-items: end;
+}
+
+.filterBlockWide {
+  min-width: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8c6a4d;
+}
+
+.select {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(115, 85, 49, 0.16);
+  background: #fff;
+  color: var(--text-main);
+  font-size: 14px;
+  box-shadow: 0 8px 24px rgba(115, 85, 49, 0.08);
+}
+
+.loadingCard,
+.errorCard {
+  padding: 28px;
+  font-size: 15px;
+}
+
+.errorCard {
+  border-color: rgba(180, 35, 24, 0.28);
+  color: var(--danger);
+  background: linear-gradient(180deg, rgba(255, 240, 238, 0.96), rgba(255, 249, 248, 0.96));
+}
+
+.relationshipStrip {
+  display: grid;
+  grid-template-columns: auto auto auto minmax(180px, 1fr);
+  gap: 16px;
+  align-items: center;
+  padding: 18px 22px;
+}
+
+.relationshipLabel,
+.metricLabel {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #8c6a4d;
+}
+
+.relationshipArrow {
+  font-size: 22px;
+  color: var(--accent);
+}
+
+.relationshipMeta {
+  justify-self: end;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.metricCard {
+  padding: 20px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 12px 32px rgba(100, 69, 39, 0.08);
+}
+
+.metricValue {
+  display: block;
+  font-size: clamp(1.4rem, 2vw, 2rem);
+  line-height: 1.05;
+}
+
+.metricSubtext {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-soft);
+  line-height: 1.55;
+  font-size: 13px;
+}
+
+.dualCardGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.explainerStrip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.explainerCard {
+  padding: 18px 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(115, 85, 49, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(250, 244, 236, 0.92));
+  box-shadow: 0 12px 28px rgba(100, 69, 39, 0.08);
+}
+
+.explainerLabel {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #8c6a4d;
+}
+
+.explainerCard strong {
+  display: block;
+  font-size: 1.35rem;
+  line-height: 1.1;
+}
+
+.explainerCard p {
+  margin: 8px 0 0;
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.inlineMetrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.inlineMetrics div {
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(247, 239, 228, 0.7);
+}
+
+.inlineMetrics span {
+  display: block;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.inlineMetrics strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.1rem;
+}
+
+.answerList {
+  margin: 18px 0 0;
+  padding-left: 18px;
+  color: var(--text-soft);
+  line-height: 1.65;
+}
+
+.tableWrap {
+  margin-top: 18px;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid rgba(115, 85, 49, 0.12);
+  vertical-align: top;
+  font-size: 14px;
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  background: #fffaf5;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8c6a4d;
+}
+
+.numeric {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.curveBadge,
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.curveA {
+  background: rgba(245, 158, 11, 0.18);
+  color: #9a6700;
+}
+
+.curveB {
+  background: rgba(14, 116, 144, 0.16);
+  color: #0f5f74;
+}
+
+.curveC {
+  background: rgba(71, 85, 105, 0.14);
+  color: #475569;
+}
+
+.curveEmpty {
+  background: rgba(148, 163, 184, 0.14);
+  color: #64748b;
+}
+
+.statusMissing {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.statusExcess {
+  background: rgba(180, 107, 0, 0.14);
+  color: #9a6700;
+}
+
+.statusOk {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.productCell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.productCell strong {
+  font-size: 14px;
+}
+
+.productCell span {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.categoryCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.toolbarButton {
+  border: 1px solid rgba(115, 85, 49, 0.16);
+  background: #fff;
+  color: var(--text-main);
+  padding: 10px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.toolbarButtonActive,
+.toolbarButton:hover {
+  border-color: rgba(14, 116, 144, 0.3);
+  background: var(--accent-soft);
+}
+
+.missingCell {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.excessCell {
+  color: #9a6700;
+  font-weight: 700;
+}
+
+@media (max-width: 1100px) {
+  .heroHeader,
+  .filtersRow,
+  .summaryGrid,
+  .explainerStrip,
+  .dualCardGrid,
+  .relationshipStrip {
+    grid-template-columns: 1fr;
+  }
+
+  .relationshipMeta {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 720px) {
+  .hero,
+  .controlPanel,
+  .panelCard,
+  .loadingCard,
+  .errorCard {
+    padding: 18px;
+  }
+
+  .toolbar {
+    width: 100%;
+  }
+
+  .toolbarButton {
+    flex: 1 1 160px;
+  }
+}
