@@ -423,5 +423,50 @@
     "comprada": false,
     "savedAt": "2026-04-15T14:25:24.833Z",
     "updatedAt": "2026-04-15T14:25:24.833Z"
+  },
+  {
+    "id": "dc4f77ce-ab8c-487b-8259-b3e90fc37d70",
+    "companyKey": "scarfme",
+    "sourceContextKey": "scarfme::::PASHMINA::596::porcor::g=::l=::c=::s=VISCOSE (PASHMINA)::gr=70X180",
+    "title": "Compra 23/04/2026",
+    "expandirPorCor": true,
+    "items": [
+      {
+        "itemKey": "07.06.0002||13",
+        "produto": "07.06.0002",
+        "corProduto": "13",
+        "corDescricao": "OFF WHITE",
+        "descricao": "PASHMINA LISA VISCOSE *",
+        "grade": "70X180",
+        "colecao": "48",
+        "qtdManual": 23,
+        "custoUnitario": 49.98
+      },
+      {
+        "itemKey": "07.06.0002||06",
+        "produto": "07.06.0002",
+        "corProduto": "06",
+        "corDescricao": "PRETO",
+        "descricao": "PASHMINA LISA VISCOSE *",
+        "grade": "70X180",
+        "colecao": "48",
+        "qtdManual": 45,
+        "custoUnitario": 49.98
+      },
+      {
+        "itemKey": "07.06.0002||83",
+        "produto": "07.06.0002",
+        "corProduto": "83",
+        "corDescricao": "ESMERALDA",
+        "descricao": "PASHMINA LISA VISCOSE *",
+        "grade": "70X180",
+        "colecao": "48",
+        "qtdManual": 205,
+        "custoUnitario": 49.98
+      }
+    ],
+    "comprada": false,
+    "savedAt": "2026-04-23T11:27:33.725Z",
+    "updatedAt": "2026-04-23T11:27:33.725Z"
   }
 ]

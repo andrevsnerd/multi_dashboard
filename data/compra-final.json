@@ -554,5 +554,49 @@
       "createdAt": "2026-04-10T17:19:50.234Z",
       "updatedAt": "2026-04-14T12:14:31.858Z"
     }
+  ],
+  "scarfme::scarfme::::PASHMINA::596::porcor::g=::l=::c=::s=VISCOSE (PASHMINA)::gr=70X180": [
+    {
+      "companyKey": "scarfme",
+      "contextKey": "scarfme::::PASHMINA::596::porcor::g=::l=::c=::s=VISCOSE (PASHMINA)::gr=70X180",
+      "itemKey": "07.06.0002||13",
+      "produto": "07.06.0002",
+      "corProduto": "13",
+      "corDescricao": "OFF WHITE",
+      "descricao": "PASHMINA LISA VISCOSE *",
+      "grade": "70X180",
+      "colecao": "48",
+      "qtdManual": 23,
+      "createdAt": "2026-04-23T11:27:19.846Z",
+      "updatedAt": "2026-04-23T11:27:19.846Z"
+    },
+    {
+      "companyKey": "scarfme",
+      "contextKey": "scarfme::::PASHMINA::596::porcor::g=::l=::c=::s=VISCOSE (PASHMINA)::gr=70X180",
+      "itemKey": "07.06.0002||06",
+      "produto": "07.06.0002",
+      "corProduto": "06",
+      "corDescricao": "PRETO",
+      "descricao": "PASHMINA LISA VISCOSE *",
+      "grade": "70X180",
+      "colecao": "48",
+      "qtdManual": 45,
+      "createdAt": "2026-04-23T11:27:14.462Z",
+      "updatedAt": "2026-04-23T11:27:14.462Z"
+    },
+    {
+      "companyKey": "scarfme",
+      "contextKey": "scarfme::::PASHMINA::596::porcor::g=::l=::c=::s=VISCOSE (PASHMINA)::gr=70X180",
+      "itemKey": "07.06.0002||83",
+      "produto": "07.06.0002",
+      "corProduto": "83",
+      "corDescricao": "ESMERALDA",
+      "descricao": "PASHMINA LISA VISCOSE *",
+      "grade": "70X180",
+      "colecao": "48",
+      "qtdManual": 205,
+      "createdAt": "2026-04-23T11:27:12.795Z",
+      "updatedAt": "2026-04-23T11:27:12.795Z"
+    }
   ]
 }

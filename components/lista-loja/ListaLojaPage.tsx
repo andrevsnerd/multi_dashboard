@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthContext";
+import { calculateTransfers } from "@/components/controle-transferencias/ControleTransferenciasTable";
 import ComprasSalvasListPanel from "@/components/stock/ComprasSalvasListPanel";
 import {
   compareFilialDisplayOrder,
@@ -13,6 +14,7 @@ import {
 } from "@/lib/config/company";
 import { exportListaLojaToXlsx } from "@/lib/utils/exportListaLoja";
 import type { CompraSalvaItemRow } from "@/lib/types/compra-salva";
+import type { ProdutoTransferencia } from "@/lib/repositories/controleTransferencias";
 
 import styles from "./ListaLojaPage.module.css";
 
@@ -115,6 +117,12 @@ type FilialExportMetrics = {
   qtde60d: number;
   qtdeMesAtual: number;
   valor12m: number;
+};
+
+type TransferenciaDestinoSugestao = {
+  label: string;
+  canonico: string;
+  quantidade: number;
 };
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
@@ -448,6 +456,27 @@ async function fetchEstoquePorFilialItem(
   }));
 }
 
+async function fetchControleTransferenciasLista(companyKey: string): Promise<ProdutoTransferencia[]> {
+  const end = new Date();
+  const start = new Date(end);
+  start.setDate(start.getDate() - 30);
+  const params = new URLSearchParams({
+    company: companyKey,
+    start: start.toISOString(),
+    end: end.toISOString(),
+  });
+  const res = await fetch(`/api/controle-transferencias?${params}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Erro ao carregar transferencias");
+  const json = (await res.json()) as { data?: ProdutoTransferencia[] };
+  return (json.data || []).map((item) => ({
+    ...item,
+    filiais: item.filiais.map((filial) => ({
+      ...filial,
+      ultimaEntrada: filial.ultimaEntrada ? new Date(filial.ultimaEntrada) : null,
+    })),
+  }));
+}
+
 function sameCart(a: ListaItem[], b: ListaItem[]): boolean {
   if (a.length !== b.length) return false;
   const key = (i: ListaItem) => buildItemKey(i.produto, i.corProduto);
@@ -471,6 +500,71 @@ function normalizeKey(s?: string | null) {
 
 function buildItemKey(produto?: string | null, corProduto?: string | null) {
   return `${normalizeKey(produto)}|${normalizeKey(corProduto)}`;
+}
+
+function matchFilialName(a?: string | null, b?: string | null) {
+  return normalizeKey(a) === normalizeKey(b);
+}
+
+function getTransferenciaItemKeys(transferItem: {
+  produto: string;
+  cor?: string | null;
+  itemOriginal?: { codigoCor?: string | null; cor?: string | null };
+}) {
+  return [
+    buildItemKey(transferItem.produto, transferItem.itemOriginal?.codigoCor ?? null),
+    buildItemKey(transferItem.produto, transferItem.itemOriginal?.cor ?? null),
+    buildItemKey(transferItem.produto, transferItem.cor ?? null),
+  ];
+}
+
+function itemTemTransferenciaSugerida(
+  item: ListaItem,
+  diasCorridosMes: number,
+  transferenciasPorItem: Record<string, TransferenciaDestinoSugestao[]>
+): boolean {
+  const sugestao = getReposicaoCompraView(item, diasCorridosMes);
+  if (!sugestao.qtdSuficiente) return false;
+  return (transferenciasPorItem[buildItemKey(item.produto, item.corProduto)] ?? []).length > 0;
+}
+
+const TRANSFERENCIA_BADGE_THEMES = [
+  { bg: "#c8d4ea", fg: "#1e3a5f", border: "#7d9dc4" },
+  { bg: "#c5e0d0", fg: "#134332", border: "#5fa889" },
+  { bg: "#e8d5c4", fg: "#4a3020", border: "#b88a6a" },
+  { bg: "#d2cae6", fg: "#3a2d55", border: "#8f7eb5" },
+  { bg: "#c2e2e8", fg: "#13404a", border: "#5aa3b5" },
+  { bg: "#e2d0ee", fg: "#4a2565", border: "#9f7cbd" },
+] as const;
+
+function transferenciaBadgeThemeForFilial(label: string) {
+  let h = 2166136261;
+  for (let i = 0; i < label.length; i++) {
+    h ^= label.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return TRANSFERENCIA_BADGE_THEMES[Math.abs(h) % TRANSFERENCIA_BADGE_THEMES.length];
+}
+
+function TransferenciaDestinoBadges({ destinos }: { destinos: TransferenciaDestinoSugestao[] }) {
+  if (destinos.length === 0) return <span className={styles.cellMetric}>—</span>;
+  return (
+    <div className={styles.transferenciaBadges}>
+      {destinos.map((destino) => {
+        const theme = transferenciaBadgeThemeForFilial(destino.label);
+        return (
+          <span
+            key={destino.canonico || destino.label}
+            className={styles.transferenciaFilialBadge}
+            style={{ background: theme.bg, color: theme.fg, borderColor: theme.border }}
+          >
+            <span className={styles.transferenciaFilialBadgeName}>{destino.label}</span>
+            <span className={styles.transferenciaFilialBadgeNum}>{fmt(destino.quantidade)}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
 }
 
 function buildExportHeaderToken(value: string) {
@@ -1003,6 +1097,7 @@ type ListaLojaItensTableProps = {
   itens: ListaItem[];
   compraView: boolean;
   abcMap: Map<string, CurvaInfo>;
+  transferenciasPorItem?: Record<string, TransferenciaDestinoSugestao[]>;
   onMoveItem?: (fromIndex: number, toIndex: number) => void;
   onIncrement: (index: number) => void;
   onDecrement: (index: number) => void;
@@ -1024,6 +1119,7 @@ function ListaLojaItensTable({
   itens,
   compraView,
   abcMap,
+  transferenciasPorItem,
   onMoveItem,
   onIncrement,
   onDecrement,
@@ -1041,6 +1137,7 @@ function ListaLojaItensTable({
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const diasCorridosMes = new Date().getDate();
+  const showTransferenciaColumn = transferenciasPorItem != null;
 
   const [estoqueTooltip, setEstoqueTooltip] = useState<null | {
     x: number;
@@ -1225,6 +1322,7 @@ function ListaLojaItensTable({
             <th className={styles.colNumeric}>Duração</th>
             <th className={styles.colNumeric}>Participação</th>
             <th className={styles.colNumeric}>Sugestão de Reposição</th>
+            {showTransferenciaColumn && <th>Sugestão de Transferência</th>}
             <th className={styles.colNumeric}>Custo Unit.</th>
             <th className={styles.colNumeric}>Custo Total</th>
           </tr>
@@ -1935,6 +2033,28 @@ function ListaLojaItensTable({
                   );
                 })()}
               </td>
+              {showTransferenciaColumn && (
+                <td>
+                  {(() => {
+                    const itemComMetricas = {
+                      ...item,
+                      vendasMesAtual,
+                      estoqueFilial,
+                      qtde12m,
+                      diasDesdeUltimaVenda,
+                      primeiraEntradaFilial,
+                      diasHistoricoFilial,
+                      mesesHistoricoFilial,
+                      historicoParcial,
+                    };
+                    const sugestao = getReposicaoCompraView(itemComMetricas, diasCorridosMes);
+                    const destinos = sugestao.qtdSuficiente
+                      ? transferenciasPorItem?.[buildItemKey(item.produto, item.corProduto)] ?? []
+                      : [];
+                    return <TransferenciaDestinoBadges destinos={destinos} />;
+                  })()}
+                </td>
+              )}
               <td className={styles.colNumeric}>
                 <span className={styles.cellMetric}>
                   {custoUnit != null && custoUnit > 0 ? fmtBRL2(custoUnit) : "—"}
@@ -2230,10 +2350,16 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
   const [exportandoXlsx, setExportandoXlsx] = useState(false);
   const [filtrarSugeridos, setFiltrarSugeridos] = useState(false);
   const [filtrarBarrados, setFiltrarBarrados] = useState(false);
+  const [filtrarTransferencias, setFiltrarTransferencias] = useState(false);
+  const [transferenciasPorItem, setTransferenciasPorItem] = useState<Record<string, TransferenciaDestinoSugestao[]>>({});
   const [permissoes, setPermissoes] = useState<TransferenciaPermissao | null>(null);
   const [permissoesCarregadas, setPermissoesCarregadas] = useState(false);
   const filialConsultaSelecionada =
     filialSelecionada?.codFilial === TODAS_FILIAIS_VALUE ? null : (filialSelecionada?.codFilial?.trim() || null);
+  const itensTransferenciaKey = useMemo(
+    () => itens.map((item) => buildItemKey(item.produto, item.corProduto)).sort().join("\n"),
+    [itens]
+  );
 
 
   const notifTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -2349,6 +2475,59 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
       cancelled = true;
     };
   }, [filialConsultaSelecionada, mode, companyKey, editingId]);
+
+  useEffect(() => {
+    if (mode !== "editor" || !filialConsultaSelecionada || itensTransferenciaKey.length === 0) {
+      setTransferenciasPorItem({});
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await fetchControleTransferenciasLista(companyKey);
+        if (cancelled) return;
+
+        const itemKeys = new Set(itensTransferenciaKey.split("\n").filter(Boolean));
+        const grupos = calculateTransfers(data, companyKey);
+        const next: Record<string, TransferenciaDestinoSugestao[]> = {};
+
+        for (const grupo of grupos) {
+          const origemCanonicaGrupo = grupo.items[0]?.origemCanonico ?? grupo.origem;
+          const origemEhLojaSelecionada =
+            matchFilialName(origemCanonicaGrupo, filialConsultaSelecionada) ||
+            matchFilialName(grupo.origem, filialSelecionada?.filial);
+          if (!origemEhLojaSelecionada) continue;
+
+          for (const transferItem of grupo.items) {
+            const key = getTransferenciaItemKeys(transferItem).find((k) => itemKeys.has(k));
+            if (!key) continue;
+            const destinoKey = normalizeKey(transferItem.destinoCanonico || transferItem.destino);
+            const list = next[key] ?? [];
+            const existing = list.find((d) => normalizeKey(d.canonico || d.label) === destinoKey);
+            if (existing) {
+              existing.quantidade += Math.max(0, Math.round(transferItem.quantidade ?? 0));
+            } else {
+              list.push({
+                label: transferItem.destino,
+                canonico: transferItem.destinoCanonico || transferItem.destino,
+                quantidade: Math.max(0, Math.round(transferItem.quantidade ?? 0)),
+              });
+            }
+            next[key] = list.filter((d) => d.quantidade > 0);
+          }
+        }
+
+        if (!cancelled) setTransferenciasPorItem(next);
+      } catch {
+        if (!cancelled) setTransferenciasPorItem({});
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [companyKey, filialConsultaSelecionada, filialSelecionada?.filial, itensTransferenciaKey, mode]);
 
   // ─── Load lists ─────────────────────────────────────────────────────────────
 
@@ -2983,7 +3162,8 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
   const enviarParaComprasSalvas = useCallback(async (customTitle?: string, stayInEditor: boolean = false) => {
     const diasCorridosMesLocal = new Date().getDate();
     const itensBase = itens.filter((item) => {
-      if (!filtrarSugeridos && !filtrarBarrados) return true;
+      if (!filtrarSugeridos && !filtrarBarrados && !filtrarTransferencias) return true;
+      if (filtrarTransferencias) return itemTemTransferenciaSugerida(item, diasCorridosMesLocal, transferenciasPorItem);
       const sugerido = itemTemSugestaoCompra(item, diasCorridosMesLocal);
       const barrado = itemEhBarrado(item, diasCorridosMesLocal);
       if (filtrarSugeridos && filtrarBarrados) return sugerido || barrado;
@@ -3028,13 +3208,14 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     } catch (err: unknown) {
       mostrarNotificacao(err instanceof Error ? err.message : "Erro ao enviar para Compras Salvas", "error");
     }
-  }, [companyKey, editingId, filtrarBarrados, filtrarSugeridos, filialSelecionada, itens, mostrarNotificacao, nomeLista, user?.username]);
+  }, [companyKey, editingId, filtrarBarrados, filtrarSugeridos, filtrarTransferencias, filialSelecionada, itens, mostrarNotificacao, nomeLista, transferenciasPorItem, user?.username]);
 
   const salvar = useCallback(async () => {
     if (!user?.username) return;
     const diasCorridosMesLocal = new Date().getDate();
     const itensBase = itens.filter((item) => {
-      if (!filtrarSugeridos && !filtrarBarrados) return true;
+      if (!filtrarSugeridos && !filtrarBarrados && !filtrarTransferencias) return true;
+      if (filtrarTransferencias) return itemTemTransferenciaSugerida(item, diasCorridosMesLocal, transferenciasPorItem);
       const sugerido = itemTemSugestaoCompra(item, diasCorridosMesLocal);
       const barrado = itemEhBarrado(item, diasCorridosMesLocal);
       if (filtrarSugeridos && filtrarBarrados) return sugerido || barrado;
@@ -3067,7 +3248,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     } finally {
       setSalvando(false);
     }
-  }, [companyKey, editingId, filtrarBarrados, filtrarSugeridos, filialSelecionada?.filial, itens, mostrarNotificacao, nomeLista, user?.username, enviarParaComprasSalvas]);
+  }, [companyKey, editingId, filtrarBarrados, filtrarSugeridos, filtrarTransferencias, filialSelecionada?.filial, itens, mostrarNotificacao, nomeLista, transferenciasPorItem, user?.username, enviarParaComprasSalvas]);
 
   // ─── Delete ─────────────────────────────────────────────────────────────────
 
@@ -3096,10 +3277,11 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
 
   const totalItensModal = itensModal.reduce((s, i) => s + i.quantidade, 0);
   const diasCorridosMes = new Date().getDate();
-  const filtrosAtivos = filtrarSugeridos || filtrarBarrados;
+  const filtrosAtivos = filtrarSugeridos || filtrarBarrados || filtrarTransferencias;
   const itensVisiveis = useMemo(() => {
     return itens.filter((item) => {
       if (!filtrosAtivos) return true;
+      if (filtrarTransferencias) return itemTemTransferenciaSugerida(item, diasCorridosMes, transferenciasPorItem);
       const sugerido = itemTemSugestaoCompra(item, diasCorridosMes);
       const barrado = itemEhBarrado(item, diasCorridosMes);
       if (filtrarSugeridos && filtrarBarrados) return sugerido || barrado;
@@ -3107,13 +3289,14 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
       if (filtrarBarrados) return barrado;
       return true;
     });
-  }, [diasCorridosMes, filtrarBarrados, filtrarSugeridos, filtrosAtivos, itens]);
+  }, [diasCorridosMes, filtrarBarrados, filtrarSugeridos, filtrarTransferencias, filtrosAtivos, itens, transferenciasPorItem]);
   const indicesItensVisiveis = useMemo(
     () =>
       itens
         .map((item, index) => ({ item, index }))
         .filter(({ item }) => {
           if (!filtrosAtivos) return true;
+          if (filtrarTransferencias) return itemTemTransferenciaSugerida(item, diasCorridosMes, transferenciasPorItem);
           const sugerido = itemTemSugestaoCompra(item, diasCorridosMes);
           const barrado = itemEhBarrado(item, diasCorridosMes);
           if (filtrarSugeridos && filtrarBarrados) return sugerido || barrado;
@@ -3122,7 +3305,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
           return true;
         })
         .map(({ index }) => index),
-    [diasCorridosMes, filtrarBarrados, filtrarSugeridos, filtrosAtivos, itens]
+    [diasCorridosMes, filtrarBarrados, filtrarSugeridos, filtrarTransferencias, filtrosAtivos, itens, transferenciasPorItem]
   );
   const kpisLista = useMemo(() => {
     const totalQtdSugerida = itensVisiveis.reduce((s, item) => {
@@ -3149,13 +3332,15 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
 
   // ─── Render: loading ────────────────────────────────────────────────────────
 
-  const filtroAplicadoLabel = filtrarSugeridos && filtrarBarrados
-    ? "Sugeridos e barrados"
-    : filtrarSugeridos
-      ? "Sugeridos"
-      : filtrarBarrados
-        ? "Barrados"
-        : "Todos";
+  const filtroAplicadoLabel = filtrarTransferencias
+    ? "Transferências"
+    : filtrarSugeridos && filtrarBarrados
+      ? "Sugeridos e barrados"
+      : filtrarSugeridos
+        ? "Sugeridos"
+        : filtrarBarrados
+          ? "Barrados"
+          : "Todos";
 
   const exportarListaXlsx = useCallback(async () => {
     if (itensVisiveis.length === 0) {
@@ -3330,6 +3515,15 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
               />
               <span>Barrados</span>
             </label>
+            <label className={styles.filtroToggle}>
+              <input
+                type="checkbox"
+                checked={filtrarTransferencias}
+                onChange={(e) => setFiltrarTransferencias(e.target.checked)}
+                disabled={!filialConsultaSelecionada}
+              />
+              <span>Transferências</span>
+            </label>
             {filtrosAtivos && (
               <button
                 type="button"
@@ -3337,6 +3531,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                 onClick={() => {
                   setFiltrarSugeridos(false);
                   setFiltrarBarrados(false);
+                  setFiltrarTransferencias(false);
                 }}
               >
                 Limpar filtros
@@ -3374,6 +3569,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                 itens={itensVisiveis}
                 compraView={true}
                 abcMap={abcMapRede}
+                transferenciasPorItem={transferenciasPorItem}
                 onMoveItem={(fromIndex, toIndex) => {
                   const origem = indicesItensVisiveis[fromIndex];
                   const destino = indicesItensVisiveis[toIndex];
