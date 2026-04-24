@@ -5633,12 +5633,15 @@ export async function fetchTopProdutosUltimos3Meses({
     const filialSel = filial ?? null;
     const useCoresTable = company === 'nerd';
     const now = new Date();
+    const fimPeriodo = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() + 1));
     // Últimos 12 meses
-    const inicio12Meses = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-    const inicio60dias = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
-    const inicioMesAtual = new Date(now.getFullYear(), now.getMonth(), 1);
+    const inicio12Meses = new Date(fimPeriodo);
+    inicio12Meses.setDate(inicio12Meses.getDate() - 365);
+    const inicio60dias = new Date(fimPeriodo);
+    inicio60dias.setDate(inicio60dias.getDate() - 60);
+    const inicioMesAtual = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
     request.input('inicio3m', sql.DateTime, inicio12Meses);
-    request.input('fim3m', sql.DateTime, now);
+    request.input('fim3m', sql.DateTime, fimPeriodo);
     request.input('inicio60d', sql.DateTime, inicio60dias);
     request.input('inicioMesAtual', sql.DateTime, inicioMesAtual);
     request.input('lc_limit', sql.Int, limit);
@@ -6164,11 +6167,14 @@ export async function fetchVendasProdutoPorFilial({
   return withRequest(async (request) => {
     const filialSel = filial ?? null;
     const now = new Date();
-    const inicio12m = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-    const inicio60d = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
-    const inicioMesAtual = new Date(now.getFullYear(), now.getMonth(), 1);
+    const fimPeriodo = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+    const inicio12m = new Date(fimPeriodo);
+    inicio12m.setDate(inicio12m.getDate() - 365);
+    const inicio60d = new Date(fimPeriodo);
+    inicio60d.setDate(inicio60d.getDate() - 60);
+    const inicioMesAtual = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
     request.input('vf_inicio12m', sql.DateTime, inicio12m);
-    request.input('vf_fim', sql.DateTime, now);
+    request.input('vf_fim', sql.DateTime, fimPeriodo);
     request.input('vf_inicio60d', sql.DateTime, inicio60d);
     request.input('vf_inicioMesAtual', sql.DateTime, inicioMesAtual);
     request.input('vf_produto', sql.VarChar, produto.trim());
@@ -6233,7 +6239,6 @@ export async function fetchVendasProdutoPorFilial({
         vf.FILIAL AS filial,
         SUM(CASE WHEN vf.QTDE_CANCELADA = 0 THEN vf.QTDE ELSE 0 END) AS qtde12m,
         SUM(CASE WHEN vf.QTDE_CANCELADA = 0 AND vf.DATA_VENDA >= @vf_inicio60d THEN vf.QTDE ELSE 0 END) AS qtde60d,
-        SUM(CASE WHEN vf.QTDE_CANCELADA = 0 AND vf.DATA_VENDA >= @vf_inicioMesAtual THEN vf.QTDE ELSE 0 END) AS qtdeMesAtual,
         SUM(CASE WHEN vf.QTDE_CANCELADA = 0 THEN (ISNULL(vf.PRECO_LIQUIDO, 0) * vf.QTDE) - ISNULL(vf.DESCONTO_VENDA, 0) ELSE 0 END) AS valor12m,
         MAX(ISNULL(p.CUSTO_REPOSICAO1, 0)) AS custoUnitario,
         MAX(CASE WHEN vf.QTDE_CANCELADA = 0 THEN vf.DATA_VENDA ELSE NULL END) AS ultimaVenda
@@ -6248,7 +6253,7 @@ export async function fetchVendasProdutoPorFilial({
       GROUP BY vf.FILIAL
     `;
 
-    const result = await request.query<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number | null; valor12m: number | null; custoUnitario: number | null; ultimaVenda: Date | null }>(queryVarejo);
+    const result = await request.query<{ filial: string; qtde12m: number; qtde60d: number; valor12m: number | null; custoUnitario: number | null; ultimaVenda: Date | null }>(queryVarejo);
     const byFilial = new Map<string, { filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number; valor12m: number; custoUnitario: number; ultimaVenda: Date | null; primeiraEntradaFilial: Date | null; primeiraVendaFilial: Date | null }>();
     const msPerDay = 1000 * 60 * 60 * 24;
     for (const r of result.recordset) {
@@ -6256,7 +6261,7 @@ export async function fetchVendasProdutoPorFilial({
         filial: r.filial,
         qtde12m: Math.round(Number(r.qtde12m ?? 0)),
         qtde60d: Math.round(Number(r.qtde60d ?? 0)),
-        qtdeMesAtual: Math.round(Number(r.qtdeMesAtual ?? 0)),
+        qtdeMesAtual: 0,
         valor12m: Number(r.valor12m ?? 0),
         custoUnitario: Number(r.custoUnitario ?? 0),
         ultimaVenda: r.ultimaVenda ? new Date(r.ultimaVenda) : null,
@@ -6271,7 +6276,6 @@ export async function fetchVendasProdutoPorFilial({
           f.FILIAL AS filial,
           SUM(CAST(fp.QTDE AS FLOAT)) AS qtde12m,
           SUM(CASE WHEN f.EMISSAO >= @vf_inicio60d THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS qtde60d,
-          SUM(CASE WHEN f.EMISSAO >= @vf_inicioMesAtual THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS qtdeMesAtual,
           SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS valor12m,
           MAX(ISNULL(p.CUSTO_REPOSICAO1, 0)) AS custoUnitario,
           MAX(CASE WHEN f.NOTA_CANCELADA = 0 THEN f.EMISSAO ELSE NULL END) AS ultimaVenda
@@ -6289,11 +6293,10 @@ export async function fetchVendasProdutoPorFilial({
           ${ecommerceFatFilialFilter}
         GROUP BY f.FILIAL
       `;
-      const ecRes = await request.query<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number | null; valor12m: number | null; custoUnitario: number | null; ultimaVenda: Date | null }>(queryEcommerce);
+      const ecRes = await request.query<{ filial: string; qtde12m: number; qtde60d: number; valor12m: number | null; custoUnitario: number | null; ultimaVenda: Date | null }>(queryEcommerce);
       for (const r of ecRes.recordset) {
         const q12 = Math.round(Number(r.qtde12m ?? 0));
         const q60 = Math.round(Number(r.qtde60d ?? 0));
-        const qMes = Math.round(Number(r.qtdeMesAtual ?? 0));
         const val = Number(r.valor12m ?? 0);
         const custo = Number(r.custoUnitario ?? 0);
         const ecUltimaVenda = r.ultimaVenda ? new Date(r.ultimaVenda) : null;
@@ -6301,7 +6304,6 @@ export async function fetchVendasProdutoPorFilial({
         if (ex) {
           ex.qtde12m += q12;
           ex.qtde60d += q60;
-          ex.qtdeMesAtual += qMes;
           ex.valor12m += val;
           ex.custoUnitario = Math.max(ex.custoUnitario, custo);
           // mantém a data de venda mais recente entre varejo e e-commerce
@@ -6309,7 +6311,83 @@ export async function fetchVendasProdutoPorFilial({
             ex.ultimaVenda = ecUltimaVenda;
           }
         } else {
-          byFilial.set(r.filial, { filial: r.filial, qtde12m: q12, qtde60d: q60, qtdeMesAtual: qMes, valor12m: val, custoUnitario: custo, ultimaVenda: ecUltimaVenda, primeiraEntradaFilial: null, primeiraVendaFilial: null });
+          byFilial.set(r.filial, { filial: r.filial, qtde12m: q12, qtde60d: q60, qtdeMesAtual: 0, valor12m: val, custoUnitario: custo, ultimaVenda: ecUltimaVenda, primeiraEntradaFilial: null, primeiraVendaFilial: null });
+        }
+      }
+    }
+
+    const queryVarejoMesAtual = `
+      SELECT
+        vf.FILIAL AS filial,
+        SUM(CASE WHEN vf.QTDE_CANCELADA = 0 THEN vf.QTDE ELSE 0 END) AS qtdeMesAtual
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vf WITH (NOLOCK)
+      WHERE vf.DATA_VENDA >= @vf_inicioMesAtual
+        AND vf.DATA_VENDA < @vf_fim
+        AND vf.QTDE > 0
+        AND LTRIM(RTRIM(ISNULL(vf.PRODUTO, ''))) = @vf_produto
+        ${corFilterVf}
+        ${vendasFilialFilter}
+      GROUP BY vf.FILIAL
+    `;
+
+    const varejoMesAtualRes = await request.query<{ filial: string; qtdeMesAtual: number | null }>(queryVarejoMesAtual);
+    for (const r of varejoMesAtualRes.recordset) {
+      const qMes = Math.round(Number(r.qtdeMesAtual ?? 0));
+      const ex = byFilial.get(r.filial);
+      if (ex) {
+        ex.qtdeMesAtual = qMes;
+      } else {
+        byFilial.set(r.filial, {
+          filial: r.filial,
+          qtde12m: 0,
+          qtde60d: 0,
+          qtdeMesAtual: qMes,
+          valor12m: 0,
+          custoUnitario: 0,
+          ultimaVenda: null,
+          primeiraEntradaFilial: null,
+          primeiraVendaFilial: null,
+        });
+      }
+    }
+
+    if (mergeScarfmeEcommerce) {
+      const queryEcommerceMesAtual = `
+        SELECT
+          f.FILIAL AS filial,
+          SUM(CAST(fp.QTDE AS FLOAT)) AS qtdeMesAtual
+        FROM FATURAMENTO f WITH (NOLOCK)
+        JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+          ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+        WHERE f.EMISSAO >= @vf_inicioMesAtual
+          AND f.EMISSAO < @vf_fim
+          AND f.NOTA_CANCELADA = 0
+          AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+          AND CAST(fp.QTDE AS FLOAT) > 0
+          AND LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) = @vf_produto
+          ${corFilterFp}
+          ${ecommerceFatFilialFilter}
+        GROUP BY f.FILIAL
+      `;
+
+      const ecommerceMesAtualRes = await request.query<{ filial: string; qtdeMesAtual: number | null }>(queryEcommerceMesAtual);
+      for (const r of ecommerceMesAtualRes.recordset) {
+        const qMes = Math.round(Number(r.qtdeMesAtual ?? 0));
+        const ex = byFilial.get(r.filial);
+        if (ex) {
+          ex.qtdeMesAtual += qMes;
+        } else {
+          byFilial.set(r.filial, {
+            filial: r.filial,
+            qtde12m: 0,
+            qtde60d: 0,
+            qtdeMesAtual: qMes,
+            valor12m: 0,
+            custoUnitario: 0,
+            ultimaVenda: null,
+            primeiraEntradaFilial: null,
+            primeiraVendaFilial: null,
+          });
         }
       }
     }
