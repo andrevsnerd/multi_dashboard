@@ -41,6 +41,9 @@ interface ProdutoRow {
   qtdePorFilial?: QtdePorFilialEntry[];
   estoque?: number;
   estoquePorFilial?: QtdePorFilialEntry[];
+  qtde12m?: number;
+  mesesHistoricoFilial?: number;
+  diasDesdeUltimaVenda?: number | null;
 }
 
 interface FilialData {
@@ -82,6 +85,21 @@ function fmtBRL(n: number) {
 
 function fmtCurrency(n: number) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function getTooltipViewportPosition(x: number, y: number): { left: number; top: number } {
+  const offset = 12;
+  const tooltipWidth = 360;
+  const tooltipHeight = 280;
+  const margin = 12;
+  if (typeof window === "undefined") {
+    return { left: x + offset, top: y + offset };
+  }
+  const maxLeft = Math.max(margin, window.innerWidth - tooltipWidth - margin);
+  const maxTop = Math.max(margin, window.innerHeight - tooltipHeight - margin);
+  const left = Math.min(Math.max(margin, x + offset), maxLeft);
+  const top = Math.min(Math.max(margin, y + offset), maxTop);
+  return { left, top };
 }
 
 function formatSignedPct(value: number): string {
@@ -189,6 +207,217 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+function normalizeKey(v?: string | null): string {
+  return (v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
+}
+
+function getMesesHistoricoFilial(item: { mesesHistoricoFilial?: number }): number {
+  const meses = Number(item.mesesHistoricoFilial ?? 12);
+  if (!Number.isFinite(meses)) return 12;
+  return Math.min(12, Math.max(1, meses));
+}
+
+function getLimiteDiasReposicao(item: { linha?: string | null; subgrupo?: string | null }) {
+  const linha = normalizeKey(item.linha);
+  const subgrupo = normalizeKey(item.subgrupo);
+  if (linha === "INDIA") return 90;
+  const subgrupos120 = new Set(["CETIM DE SEDA", "MOUSSELINE DE SEDA", "SEDA PREMIUM"]);
+  if (subgrupos120.has(subgrupo)) return 120;
+  return 60;
+}
+
+function getSuggestedDelta(
+  item: { vendasMesAtual?: number; estoqueFilial?: number; linha?: string | null; subgrupo?: string | null },
+  diasCorridosMes: number
+): number | null {
+  const vendasMes = Number(item.vendasMesAtual ?? 0);
+  if (vendasMes <= 0 || diasCorridosMes <= 0) return 0;
+  const consumoDiario = vendasMes / diasCorridosMes;
+  if (consumoDiario <= 0) return 0;
+  const estoqueAtual = Number(item.estoqueFilial ?? 0);
+  const limiteDias = getLimiteDiasReposicao(item);
+  const duracaoAtual = estoqueAtual / consumoDiario;
+  if (duracaoAtual >= limiteDias) return 0;
+  const qtd = Math.ceil(consumoDiario * (limiteDias - duracaoAtual));
+  return Number.isFinite(qtd) ? Math.max(0, qtd) : 0;
+}
+
+function hasSugestaoS(
+  item: { qtde12m?: number; mesesHistoricoFilial?: number; estoqueFilial?: number },
+  qtdFinal: number,
+  qtdSuficiente: boolean
+): boolean {
+  if (qtdFinal > 0) return false;
+  if (qtdSuficiente) return false;
+  const mediaVendasMes = Number(item.qtde12m ?? 0) / getMesesHistoricoFilial(item);
+  if (mediaVendasMes < 1) return false;
+  const estoqueAtual = Number(item.estoqueFilial ?? 0);
+  return estoqueAtual <= mediaVendasMes * 2;
+}
+
+function calcQtdSugestaoS(item: {
+  qtde12m?: number;
+  mesesHistoricoFilial?: number;
+  linha?: string | null;
+  subgrupo?: string | null;
+}): number {
+  const mediaVendasMes = Number(item.qtde12m ?? 0) / getMesesHistoricoFilial(item);
+  const limiteDias = getLimiteDiasReposicao(item);
+  return Math.max(0, Math.ceil((limiteDias / 30) * mediaVendasMes));
+}
+
+function calcQtdSugestaoEInfo(item: {
+  qtde12m?: number;
+  diasDesdeUltimaVenda?: number | null;
+  mesesHistoricoFilial?: number;
+  linha?: string | null;
+  subgrupo?: string | null;
+}): {
+  qtd: number;
+  velocidadeAjustada: number;
+  mesesSemVenda: number;
+  mesesAtivos: number;
+} | null {
+  const qtde12m = Number(item.qtde12m ?? 0);
+  if (qtde12m <= 0) return null;
+  const dias = item.diasDesdeUltimaVenda;
+  if (dias == null || dias < 30) return null;
+  const mesesBase = getMesesHistoricoFilial(item);
+  const mesesSemVenda = dias / 30;
+  const mesesAtivos = mesesBase - mesesSemVenda;
+  if (mesesAtivos < 1) return null;
+  const velocidadeAjustada = qtde12m / mesesAtivos;
+  if (velocidadeAjustada < 0.5) return null;
+  const limiteDias = getLimiteDiasReposicao(item);
+  const qtd = Math.max(1, Math.ceil((limiteDias / 30) * velocidadeAjustada));
+  return { qtd, velocidadeAjustada, mesesSemVenda, mesesAtivos };
+}
+
+function hasSugestaoE(item: {
+  estoqueFilial?: number;
+  qtde12m?: number;
+  diasDesdeUltimaVenda?: number | null;
+  mesesHistoricoFilial?: number;
+  linha?: string | null;
+  subgrupo?: string | null;
+}): boolean {
+  const estoqueAtual = Number(item.estoqueFilial ?? 0);
+  if (estoqueAtual > 0) return false;
+  return calcQtdSugestaoEInfo(item) !== null;
+}
+
+function getReposicaoCompraView(
+  item: {
+    vendasMesAtual?: number;
+    estoqueFilial?: number;
+    linha?: string | null;
+    subgrupo?: string | null;
+    qtde12m?: number;
+    mesesHistoricoFilial?: number;
+    diasDesdeUltimaVenda?: number | null;
+  },
+  diasCorridosMes: number
+): {
+  qtdFinal: number;
+  qtdS: number;
+  qtdE: number;
+  qtdSuficiente: boolean;
+  semSugestao: boolean;
+} {
+  const qtdFinal = getSuggestedDelta(item, diasCorridosMes) ?? 0;
+  if (qtdFinal > 0) {
+    return { qtdFinal, qtdS: 0, qtdE: 0, qtdSuficiente: false, semSugestao: false };
+  }
+  const vendasMes = Number(item.vendasMesAtual ?? 0);
+  const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
+  const estoqueAtual = Number(item.estoqueFilial ?? 0);
+  const limiteDias = getLimiteDiasReposicao(item);
+  const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
+  const qtdSuficiente = consumoDiario > 0 && duracaoAtual >= limiteDias;
+  if (qtdSuficiente) {
+    return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdSuficiente: true, semSugestao: false };
+  }
+  if (hasSugestaoS(item, qtdFinal, qtdSuficiente)) {
+    return { qtdFinal: 0, qtdS: calcQtdSugestaoS(item), qtdE: 0, qtdSuficiente: false, semSugestao: false };
+  }
+  const eInfo = hasSugestaoE(item) ? calcQtdSugestaoEInfo(item) : null;
+  if (eInfo) {
+    return { qtdFinal: 0, qtdS: 0, qtdE: eInfo.qtd, qtdSuficiente: false, semSugestao: false };
+  }
+  return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdSuficiente: false, semSugestao: true };
+}
+
+async function fetchEstoqueFilialSum(
+  companyKey: string,
+  codFilial: string | null,
+  produto: string,
+  corProduto: string | null
+): Promise<number | null> {
+  try {
+    const params = new URLSearchParams({ company: companyKey, produto: produto.trim() });
+    if (codFilial && codFilial.trim()) params.set("filial", codFilial.trim());
+    if (corProduto) params.set("corProduto", corProduto.trim());
+    const res = await fetch(`/api/controle-estoque/estoque-por-filial-item?${params}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { data?: Array<{ estoque: number }> };
+    const rows = json.data || [];
+    const sum = rows.reduce((s, r) => s + Math.max(0, Number(r.estoque ?? 0)), 0);
+    return Math.round(sum);
+  } catch {
+    return null;
+  }
+}
+
+async function fetchVendasItemMetricas(
+  companyKey: string,
+  codFilial: string | null,
+  produto: string,
+  corProduto: string | null
+): Promise<{
+  qtde12m: number;
+  vendasMesAtual: number;
+  diasDesdeUltimaVenda: number | null;
+  mesesHistoricoFilial: number;
+} | null> {
+  type Row = {
+    qtde12m: number;
+    qtdeMesAtual?: number;
+    diasDesdeUltimaVenda?: number | null;
+    mesesHistoricoFilial?: number | null;
+  };
+  const fetchRows = async (includeHistorico: boolean): Promise<Row[]> => {
+    const params = new URLSearchParams({ company: companyKey, produto: produto.trim() });
+    if (includeHistorico) params.set("includeHistorico", "true");
+    if (codFilial && codFilial.trim()) params.set("filial", codFilial.trim());
+    if (corProduto) params.set("corProduto", corProduto.trim());
+    const res = await fetch(`/api/controle-estoque/vendas-por-filial-item?${params}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Erro ao carregar métricas de vendas");
+    const json = (await res.json()) as { data?: Row[] };
+    return json.data || [];
+  };
+  try {
+    let rows: Row[] = [];
+    try {
+      rows = await fetchRows(true);
+    } catch {
+      rows = await fetchRows(false);
+    }
+    const diasValidos = rows.map((r) => r.diasDesdeUltimaVenda).filter((d): d is number => d != null);
+    const mesesValidos = rows
+      .map((r) => Number(r.mesesHistoricoFilial ?? null))
+      .filter((m) => Number.isFinite(m) && m > 0);
+    const mesesHistoricoFilial = mesesValidos.length > 0 ? Math.min(...mesesValidos) : 12;
+    return {
+      qtde12m: Math.round(rows.reduce((s, r) => s + Number(r.qtde12m ?? 0), 0)),
+      vendasMesAtual: Math.round(rows.reduce((s, r) => s + Number(r.qtdeMesAtual ?? 0), 0)),
+      diasDesdeUltimaVenda: diasValidos.length > 0 ? Math.min(...diasValidos) : null,
+      mesesHistoricoFilial: Math.min(12, Math.max(1, mesesHistoricoFilial)),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function buildProductDetalhadoHref(
   companyKey: CompanyKey,
   p: Pick<ProdutoRow, "produto" | "descricao" | "cor">
@@ -233,7 +462,53 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"produtos" | "vendedores">("produtos");
-  const [porCor, setPorCor] = useState(false);
+  const [porCor, setPorCor] = useState(true);
+  const [compraMode, setCompraMode] = useState(false);
+  const [compraMetrics, setCompraMetrics] = useState<
+    Record<
+      string,
+      {
+        qtde12m: number | null;
+        vendasMesAtual: number | null;
+        estoqueFilial: number | null;
+        diasDesdeUltimaVenda: number | null;
+        mesesHistoricoFilial: number | null;
+      }
+    >
+  >({});
+  const [sugestaoTooltip, setSugestaoTooltip] = useState<null | {
+    x: number;
+    y: number;
+    titulo: string;
+    regra: string;
+    limiteDias: number;
+    vendasMesAtual: number;
+    diasCorridos: number;
+    consumoDiario: number;
+    estoqueAtual: number;
+    duracaoAtual: number;
+    qtdCalculada: number;
+  }>(null);
+  const [sugestaoSTooltip, setSugestaoSTooltip] = useState<null | {
+    x: number;
+    y: number;
+    mediaVendasMes: number;
+    mesesHistoricoFilial: number;
+    estoqueAtual: number;
+    limiteDias: number;
+    qtdS: number;
+  }>(null);
+  const [sugestaoETooltip, setSugestaoETooltip] = useState<null | {
+    x: number;
+    y: number;
+    qtde12m: number;
+    mesesHistoricoFilial: number;
+    mesesSemVenda: number;
+    mesesAtivos: number;
+    velocidadeAjustada: number;
+    limiteDias: number;
+    qtdE: number;
+  }>(null);
 
   // Quando filial muda, voltar para aba de produtos
   useEffect(() => {
@@ -315,6 +590,52 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     ? produtosFiltrados.reduce((s, p) => s + p.qtde, 0)
     : data?.qtde ?? 0;
   const displayCMV = produtosFiltrados.reduce((s, p) => s + p.custo * p.qtde, 0);
+  const diasCorridosMes = Math.max(1, data?.daysElapsed ?? 1);
+
+  useEffect(() => {
+    setCompraMetrics({});
+  }, [companyKey, selectedFilial, porCor, selectedCategory, range.startDate, range.endDate]);
+
+  useEffect(() => {
+    if (!compraMode || produtosComCurva.length === 0) return;
+    let cancelled = false;
+    const load = async () => {
+      const CHUNK_SIZE = 12;
+      for (let i = 0; i < produtosComCurva.length; i += CHUNK_SIZE) {
+        if (cancelled) return;
+        const chunk = produtosComCurva.slice(i, i + CHUNK_SIZE);
+        const rows = await Promise.all(
+          chunk.map(async (p) => {
+            const key = `${(p.produto ?? "").trim()}||${((p.cor ?? "") || "").trim()}`;
+            const [vendas, estoque] = await Promise.all([
+              fetchVendasItemMetricas(companyKey, selectedFilial, p.produto, porCor ? (p.cor ?? null) : null),
+              fetchEstoqueFilialSum(companyKey, selectedFilial, p.produto, porCor ? (p.cor ?? null) : null),
+            ]);
+            return {
+              key,
+              values: {
+                qtde12m: vendas?.qtde12m ?? null,
+                vendasMesAtual: vendas?.vendasMesAtual ?? null,
+                estoqueFilial: estoque,
+                diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
+                mesesHistoricoFilial: vendas?.mesesHistoricoFilial ?? null,
+              },
+            };
+          })
+        );
+        if (cancelled) return;
+        setCompraMetrics((prev) => {
+          const next = { ...prev };
+          for (const row of rows) next[row.key] = row.values;
+          return next;
+        });
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [compraMode, produtosComCurva, companyKey, selectedFilial, porCor]);
 
   const variation = data ? getComparisonBadge(data.vendas, data.vendasPrevious) : null;
 
@@ -643,6 +964,14 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
             >
               Por cor
             </button>
+            <button
+              type="button"
+              className={`${styles.toggleBtn} ${compraMode ? styles.toggleBtnActive : ""}`}
+              onClick={() => setCompraMode(v => !v)}
+              title="Adiciona a coluna de sugestão de compra"
+            >
+              Compra
+            </button>
             {produtosComCurva.length > 0 && (
               <button
                 type="button"
@@ -680,6 +1009,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                       <th className={styles.right}>Qtd vendida</th>
                       <th className={styles.right}>Estoque</th>
                       <th className={styles.right}>Markup</th>
+                      {compraMode && <th className={styles.right}>Sugestão de compra</th>}
                     </>
                   </tr>
                 </thead>
@@ -690,7 +1020,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                     return (
                       <React.Fragment key={curva}>
                         <tr className={`${styles.sectionRow} ${styles[`sectionRow${curva}`]}`}>
-                          <td colSpan={7}>
+                          <td colSpan={compraMode ? 8 : 7}>
                             <div className={styles.sectionLabel}>
                               <span className={`${styles.curvaBadge} ${CURVA_BADGE_CLASS[curva]}`}>{curva}</span>
                               <span className={styles.sectionTitle}>{CURVA_LABEL[curva]}</span>
@@ -824,6 +1154,170 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                                 )}
                               </td>
                               <td className={styles.vendas}>{markup !== null ? <span className={styles.markupBadge}>{markup.toFixed(2)}x</span> : <span className={styles.noData}>—</span>}</td>
+                              {compraMode && (
+                                <td className={styles.vendas}>
+                                  {(() => {
+                                    const metricKey = `${(p.produto ?? "").trim()}||${((p.cor ?? "") || "").trim()}`;
+                                    const live = compraMetrics[metricKey];
+                                    const hasLive = Object.prototype.hasOwnProperty.call(compraMetrics, metricKey);
+                                    if (!hasLive) {
+                                      return <span className={styles.cellMetric}>…</span>;
+                                    }
+                                    const semBaseLive =
+                                      live?.qtde12m == null &&
+                                      live?.vendasMesAtual == null &&
+                                      live?.estoqueFilial == null;
+                                    if (semBaseLive) {
+                                      return <span className={styles.cellMetric}>—</span>;
+                                    }
+                                    const compraItem = {
+                                      vendasMesAtual: live?.vendasMesAtual ?? 0,
+                                      estoqueFilial: live?.estoqueFilial ?? 0,
+                                      linha: p.categoria,
+                                      subgrupo: p.subgrupo ?? "",
+                                      qtde12m: live?.qtde12m ?? 0,
+                                      mesesHistoricoFilial: live?.mesesHistoricoFilial ?? 12,
+                                      diasDesdeUltimaVenda: live?.diasDesdeUltimaVenda ?? null,
+                                    };
+                                    const sugestao = getReposicaoCompraView(compraItem, diasCorridosMes);
+                                    if (sugestao.qtdFinal > 0) {
+                                      const vendasMes = Number(compraItem.vendasMesAtual ?? 0);
+                                      const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
+                                      const estoqueAtual = Number(compraItem.estoqueFilial ?? 0);
+                                      const limiteDias = getLimiteDiasReposicao(compraItem);
+                                      const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
+                                      return (
+                                        <span
+                                          className={styles.reporAdd}
+                                          onMouseEnter={(e) => setSugestaoTooltip({
+                                            x: e.clientX,
+                                            y: e.clientY,
+                                            titulo: "Sugestão de reposição (cálculo principal)",
+                                            regra: "Qtd = consumo/dia × (limite de cobertura - duração atual).",
+                                            limiteDias,
+                                            vendasMesAtual: vendasMes,
+                                            diasCorridos: diasCorridosMes,
+                                            consumoDiario,
+                                            estoqueAtual,
+                                            duracaoAtual,
+                                            qtdCalculada: sugestao.qtdFinal,
+                                          })}
+                                          onMouseLeave={() => setSugestaoTooltip(null)}
+                                        >
+                                          {fmt(sugestao.qtdFinal)}
+                                        </span>
+                                      );
+                                    }
+                                    if (sugestao.qtdS > 0) {
+                                      const mediaVendasMes = Number(compraItem.qtde12m ?? 0) / getMesesHistoricoFilial(compraItem);
+                                      const limiteDias = getLimiteDiasReposicao(compraItem);
+                                      return (
+                                        <span className={styles.reporAdd}>
+                                          {fmt(sugestao.qtdS)}{" "}
+                                          <span
+                                            onMouseEnter={(e) => setSugestaoSTooltip({
+                                              x: e.clientX,
+                                              y: e.clientY,
+                                              mediaVendasMes,
+                                              mesesHistoricoFilial: getMesesHistoricoFilial(compraItem),
+                                              estoqueAtual: Number(compraItem.estoqueFilial ?? 0),
+                                              limiteDias,
+                                              qtdS: sugestao.qtdS,
+                                            })}
+                                            onMouseLeave={() => setSugestaoSTooltip(null)}
+                                            style={{
+                                              display: "inline-flex",
+                                              width: 16,
+                                              height: 16,
+                                              borderRadius: "999px",
+                                              alignItems: "center",
+                                              justifyContent: "center",
+                                              fontSize: 10,
+                                              fontWeight: 800,
+                                              color: "#0f172a",
+                                              background: "#fde047",
+                                              border: "1px solid #facc15",
+                                              verticalAlign: "middle",
+                                              cursor: "help",
+                                            }}
+                                          >
+                                            S
+                                          </span>
+                                        </span>
+                                      );
+                                    }
+                                    if (sugestao.qtdE > 0) {
+                                      const eInfo = calcQtdSugestaoEInfo(compraItem);
+                                      const limiteDias = getLimiteDiasReposicao(compraItem);
+                                      return (
+                                        <span className={styles.reporAdd}>
+                                          {fmt(sugestao.qtdE)}{" "}
+                                          <span
+                                            onMouseEnter={(e) => eInfo && setSugestaoETooltip({
+                                              x: e.clientX,
+                                              y: e.clientY,
+                                              qtde12m: Number(compraItem.qtde12m ?? 0),
+                                              mesesHistoricoFilial: getMesesHistoricoFilial(compraItem),
+                                              mesesSemVenda: eInfo.mesesSemVenda,
+                                              mesesAtivos: eInfo.mesesAtivos,
+                                              velocidadeAjustada: eInfo.velocidadeAjustada,
+                                              limiteDias,
+                                              qtdE: sugestao.qtdE,
+                                            })}
+                                            onMouseLeave={() => setSugestaoETooltip(null)}
+                                            style={{
+                                              display: "inline-flex",
+                                              width: 16,
+                                              height: 16,
+                                              borderRadius: "999px",
+                                              alignItems: "center",
+                                              justifyContent: "center",
+                                              fontSize: 10,
+                                              fontWeight: 800,
+                                              color: "#fff",
+                                              background: "#f97316",
+                                              border: "1px solid #ea580c",
+                                              verticalAlign: "middle",
+                                              cursor: "help",
+                                            }}
+                                          >
+                                            E
+                                          </span>
+                                        </span>
+                                      );
+                                    }
+                                    if (sugestao.semSugestao) {
+                                      return <span className={styles.cellMetric}>—</span>;
+                                    }
+                                    const vendasMes = Number(compraItem.vendasMesAtual ?? 0);
+                                    const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
+                                    const estoqueAtual = Number(compraItem.estoqueFilial ?? 0);
+                                    const limiteDias = getLimiteDiasReposicao(compraItem);
+                                    const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
+                                    return (
+                                      <span
+                                        className={styles.reporOk}
+                                        onMouseEnter={(e) => setSugestaoTooltip({
+                                          x: e.clientX,
+                                          y: e.clientY,
+                                          titulo: "Quantidade suficiente",
+                                          regra: "Sem reposição: duração atual já atende o limite de cobertura.",
+                                          limiteDias,
+                                          vendasMesAtual: vendasMes,
+                                          diasCorridos: diasCorridosMes,
+                                          consumoDiario,
+                                          estoqueAtual,
+                                          duracaoAtual,
+                                          qtdCalculada: 0,
+                                        })}
+                                        onMouseLeave={() => setSugestaoTooltip(null)}
+                                      >
+                                        Quantidade suficiente
+                                      </span>
+                                    );
+                                  })()}
+                                </td>
+                              )}
                               </>
                             </tr>
                           );
@@ -836,6 +1330,71 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
             )}
           </div>
         </>
+      )}
+      {sugestaoTooltip && (
+        <div
+          className={styles.metricTooltip}
+          style={getTooltipViewportPosition(sugestaoTooltip.x, sugestaoTooltip.y)}
+        >
+          <div className={styles.metricTooltipTitle}>{sugestaoTooltip.titulo}</div>
+          <div className={styles.metricTooltipLine}>{sugestaoTooltip.regra}</div>
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine}><strong>Vendas mês:</strong> {fmt(sugestaoTooltip.vendasMesAtual)} un</div>
+          <div className={styles.metricTooltipLine}><strong>Dias corridos:</strong> {sugestaoTooltip.diasCorridos}</div>
+          <div className={styles.metricTooltipLine}><strong>Consumo/dia:</strong> {sugestaoTooltip.consumoDiario.toFixed(2)} un</div>
+          <div className={styles.metricTooltipLine}><strong>Estoque atual:</strong> {fmt(sugestaoTooltip.estoqueAtual)} un</div>
+          <div className={styles.metricTooltipLine}><strong>Duração atual:</strong> {Math.max(0, Math.round(sugestaoTooltip.duracaoAtual))} dias</div>
+          <div className={styles.metricTooltipLine}><strong>Limite do item:</strong> {sugestaoTooltip.limiteDias} dias</div>
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoTooltip.qtdCalculada)} un</div>
+        </div>
+      )}
+      {sugestaoSTooltip && (
+        <div
+          className={styles.metricTooltip}
+          style={getTooltipViewportPosition(sugestaoSTooltip.x, sugestaoSTooltip.y)}
+        >
+          <div className={styles.metricTooltipTitle}>Regra S (mesma lógica da ABC)</div>
+          <div className={styles.metricTooltipLine}><strong>Base historica filial:</strong> {sugestaoSTooltip.mesesHistoricoFilial.toFixed(1)} meses</div>
+          <div className={styles.metricTooltipLine}><strong>Média de vendas:</strong> {sugestaoSTooltip.mediaVendasMes.toFixed(1)} un/mês</div>
+          <div className={styles.metricTooltipLine}><strong>Estoque atual:</strong> {fmt(sugestaoSTooltip.estoqueAtual)} un</div>
+          <div className={styles.metricTooltipLine}><strong>Cobertura mínima:</strong> {sugestaoSTooltip.limiteDias} dias</div>
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoSTooltip.qtdS)} un</div>
+          <div className={styles.metricTooltipLine}>
+            = {(sugestaoSTooltip.limiteDias / 30).toFixed(1)} meses × {sugestaoSTooltip.mediaVendasMes.toFixed(1)} un/mês
+          </div>
+        </div>
+      )}
+      {sugestaoETooltip && (
+        <div
+          className={styles.metricTooltip}
+          style={getTooltipViewportPosition(sugestaoETooltip.x, sugestaoETooltip.y)}
+        >
+          <div className={styles.metricTooltipTitle}>Regra E — Produto parado por falta de estoque</div>
+          <div className={styles.metricTooltipLine} style={{ color: "#94a3b8", fontSize: 11 }}>
+            A média mensal estava subestimada porque o produto ficou sem estoque.
+            A velocidade real é calculada excluindo o período inativo.
+          </div>
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine}>
+            <strong>Vendas no período base:</strong> {fmt(sugestaoETooltip.qtde12m)} un
+          </div>
+          <div className={styles.metricTooltipLine}><strong>Base historica filial:</strong> {sugestaoETooltip.mesesHistoricoFilial.toFixed(1)} meses</div>
+          <div className={styles.metricTooltipLine}><strong>Sem vendas há:</strong> ~{Math.round(sugestaoETooltip.mesesSemVenda)} meses ({Math.round(sugestaoETooltip.mesesSemVenda * 30)} dias)</div>
+          <div className={styles.metricTooltipLine}><strong>Período ativo estimado:</strong> ~{sugestaoETooltip.mesesAtivos.toFixed(1)} meses</div>
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine}><strong>Velocidade ajustada:</strong> {sugestaoETooltip.velocidadeAjustada.toFixed(2)} un/mês</div>
+          <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
+            = {fmt(sugestaoETooltip.qtde12m)} un ÷ {sugestaoETooltip.mesesAtivos.toFixed(1)} meses ativos
+          </div>
+          <div className={styles.metricTooltipLine}><strong>Cobertura mínima:</strong> {sugestaoETooltip.limiteDias} dias ({(sugestaoETooltip.limiteDias / 30).toFixed(1)} meses)</div>
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoETooltip.qtdE)} un</div>
+          <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
+            = ⌈{sugestaoETooltip.velocidadeAjustada.toFixed(2)} × {(sugestaoETooltip.limiteDias / 30).toFixed(1)}⌉ = {fmt(sugestaoETooltip.qtdE)}
+          </div>
+        </div>
       )}
     </div>
   );

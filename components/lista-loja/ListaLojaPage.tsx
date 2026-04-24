@@ -1356,17 +1356,18 @@ function ListaLojaItensTable({
               {(() => {
                 const itemKey = `${filialScopeKey}::${buildItemKey(item.produto, item.corProduto)}`;
                 const live = liveMetrics[itemKey];
-                const valor12m = live?.valor12m ?? item.valor12m ?? null;
-                const qtde12m = live?.qtde12m ?? item.qtde12m ?? null;
-                const qtde60d = live?.qtde60d ?? item.qtde60d ?? null;
-                const vendasMesAtual = live?.vendasMesAtual ?? item.vendasMesAtual ?? null;
-                const estoqueFilial = live?.estoqueFilial ?? item.estoqueFilial ?? null;
-                const custoUnit = live?.custoUnit ?? item.custoUnit ?? null;
-                const diasDesdeUltimaVenda = live?.diasDesdeUltimaVenda ?? item.diasDesdeUltimaVenda ?? null;
-                const primeiraEntradaFilial = live?.primeiraEntradaFilial ?? item.primeiraEntradaFilial ?? null;
-                const diasHistoricoFilial = live?.diasHistoricoFilial ?? item.diasHistoricoFilial ?? null;
-                const mesesHistoricoFilial = live?.mesesHistoricoFilial ?? item.mesesHistoricoFilial ?? null;
-                const historicoParcial = live?.historicoParcial ?? item.historicoParcial ?? false;
+                const hasLive = Object.prototype.hasOwnProperty.call(liveMetrics, itemKey);
+                const valor12m = hasLive ? (live?.valor12m ?? null) : (item.valor12m ?? null);
+                const qtde12m = hasLive ? (live?.qtde12m ?? null) : (item.qtde12m ?? null);
+                const qtde60d = hasLive ? (live?.qtde60d ?? null) : (item.qtde60d ?? null);
+                const vendasMesAtual = hasLive ? (live?.vendasMesAtual ?? null) : (item.vendasMesAtual ?? null);
+                const estoqueFilial = hasLive ? (live?.estoqueFilial ?? null) : (item.estoqueFilial ?? null);
+                const custoUnit = hasLive ? (live?.custoUnit ?? null) : (item.custoUnit ?? null);
+                const diasDesdeUltimaVenda = hasLive ? (live?.diasDesdeUltimaVenda ?? null) : (item.diasDesdeUltimaVenda ?? null);
+                const primeiraEntradaFilial = hasLive ? (live?.primeiraEntradaFilial ?? null) : (item.primeiraEntradaFilial ?? null);
+                const diasHistoricoFilial = hasLive ? (live?.diasHistoricoFilial ?? null) : (item.diasHistoricoFilial ?? null);
+                const mesesHistoricoFilial = hasLive ? (live?.mesesHistoricoFilial ?? null) : (item.mesesHistoricoFilial ?? null);
+                const historicoParcial = hasLive ? (live?.historicoParcial ?? false) : (item.historicoParcial ?? false);
                 return (
                   <>
               <td>
