@@ -464,6 +464,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [activeTab, setActiveTab] = useState<"produtos" | "vendedores">("produtos");
   const [porCor, setPorCor] = useState(true);
   const [compraMode, setCompraMode] = useState(false);
+  const [filtrarSugeridos, setFiltrarSugeridos] = useState(false);
   const [compraMetrics, setCompraMetrics] = useState<
     Record<
       string,
@@ -576,11 +577,38 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     if (produtosFiltrados.length === 0) return [];
     return calcularCurvas(produtosFiltrados);
   }, [produtosFiltrados]);
+  const diasCorridosMes = Math.max(1, data?.daysElapsed ?? 1);
 
-  const maxPerc = produtosComCurva.length > 0 ? produtosComCurva[0].percParticipacao : 1;
-  const countA = produtosComCurva.filter(p => p.curva === "A").length;
-  const countB = produtosComCurva.filter(p => p.curva === "B").length;
-  const countC = produtosComCurva.filter(p => p.curva === "C").length;
+  const produtosComCurvaExibidos = useMemo(() => {
+    if (!compraMode || !filtrarSugeridos) return produtosComCurva;
+    return produtosComCurva.filter((p) => {
+      const metricKey = `${(p.produto ?? "").trim()}||${((p.cor ?? "") || "").trim()}`;
+      const live = compraMetrics[metricKey];
+      const hasLive = Object.prototype.hasOwnProperty.call(compraMetrics, metricKey);
+      if (!hasLive) return false;
+      const semBaseLive =
+        live?.qtde12m == null &&
+        live?.vendasMesAtual == null &&
+        live?.estoqueFilial == null;
+      if (semBaseLive) return false;
+      const compraItem = {
+        vendasMesAtual: live?.vendasMesAtual ?? 0,
+        estoqueFilial: live?.estoqueFilial ?? 0,
+        linha: p.categoria,
+        subgrupo: p.subgrupo ?? "",
+        qtde12m: live?.qtde12m ?? 0,
+        mesesHistoricoFilial: live?.mesesHistoricoFilial ?? 12,
+        diasDesdeUltimaVenda: live?.diasDesdeUltimaVenda ?? null,
+      };
+      const sugestao = getReposicaoCompraView(compraItem, diasCorridosMes);
+      return sugestao.qtdFinal > 0 || sugestao.qtdS > 0 || sugestao.qtdE > 0;
+    });
+  }, [compraMode, filtrarSugeridos, produtosComCurva, compraMetrics, diasCorridosMes]);
+
+  const maxPerc = produtosComCurvaExibidos.length > 0 ? produtosComCurvaExibidos[0].percParticipacao : 1;
+  const countA = produtosComCurvaExibidos.filter(p => p.curva === "A").length;
+  const countB = produtosComCurvaExibidos.filter(p => p.curva === "B").length;
+  const countC = produtosComCurvaExibidos.filter(p => p.curva === "C").length;
   const groups: Curva[] = ["A", "B", "C"];
 
   const displayVendas = selectedCategory
@@ -590,7 +618,6 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     ? produtosFiltrados.reduce((s, p) => s + p.qtde, 0)
     : data?.qtde ?? 0;
   const displayCMV = produtosFiltrados.reduce((s, p) => s + p.custo * p.qtde, 0);
-  const diasCorridosMes = Math.max(1, data?.daysElapsed ?? 1);
 
   useEffect(() => {
     setCompraMetrics({});
@@ -972,6 +999,27 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
             >
               Compra
             </button>
+            {compraMode && (
+              <label
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  marginLeft: 6,
+                  fontSize: 13,
+                  color: "#334155",
+                  userSelect: "none",
+                }}
+                title="Mostra apenas produtos com sugestão de compra"
+              >
+                <input
+                  type="checkbox"
+                  checked={filtrarSugeridos}
+                  onChange={(e) => setFiltrarSugeridos(e.target.checked)}
+                />
+                Sugeridos
+              </label>
+            )}
             {produtosComCurva.length > 0 && (
               <button
                 type="button"
@@ -986,15 +1034,19 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
 
           {/* ABC Table */}
           <div className={styles.tableCard}>
-            {produtosComCurva.length === 0 && selectedCategory && (
+            {produtosComCurvaExibidos.length === 0 && selectedCategory && (
               <div className={styles.empty}>
                 Nenhum produto encontrado para a categoria <strong>{getCategoryHeaderLabel(selectedCategory)}</strong> neste período.
               </div>
             )}
-            {produtosComCurva.length === 0 && !selectedCategory && (
-              <div className={styles.empty}>Nenhum produto encontrado para este período.</div>
+            {produtosComCurvaExibidos.length === 0 && !selectedCategory && (
+              <div className={styles.empty}>
+                {compraMode && filtrarSugeridos
+                  ? "Nenhum produto com sugestão de compra neste filtro."
+                  : "Nenhum produto encontrado para este período."}
+              </div>
             )}
-            {produtosComCurva.length > 0 && (
+            {produtosComCurvaExibidos.length > 0 && (
               <table className={styles.table}>
                 <thead>
                   <tr>
@@ -1015,7 +1067,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                 </thead>
                 <tbody>
                   {groups.map(curva => {
-                    const grupo = produtosComCurva.filter(p => p.curva === curva);
+                    const grupo = produtosComCurvaExibidos.filter(p => p.curva === curva);
                     if (grupo.length === 0) return null;
                     return (
                       <React.Fragment key={curva}>
@@ -1031,7 +1083,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                           </td>
                         </tr>
                         {grupo.map((p, i) => {
-                          const rankGlobal = produtosComCurva.indexOf(p) + 1;
+                          const rankGlobal = produtosComCurvaExibidos.indexOf(p) + 1;
                           const precoMedio = p.qtde > 0 ? p.vendas / p.qtde : 0;
                           const markup = p.custo > 0 && precoMedio > 0 ? precoMedio / p.custo : null;
                           return (
