@@ -325,20 +325,28 @@ function getReposicaoCompraView(
   semSugestao: boolean;
 } {
   const qtdFinal = getSuggestedDelta(item, diasCorridosMes) ?? 0;
-  if (qtdFinal > 0) {
-    return { qtdFinal, qtdS: 0, qtdE: 0, qtdSuficiente: false, semSugestao: false };
-  }
   const vendasMes = Number(item.vendasMesAtual ?? 0);
   const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
   const estoqueAtual = Number(item.estoqueFilial ?? 0);
   const limiteDias = getLimiteDiasReposicao(item);
   const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
   const qtdSuficiente = consumoDiario > 0 && duracaoAtual >= limiteDias;
+
+  const mediaVendasMes = Number(item.qtde12m ?? 0) / getMesesHistoricoFilial(item);
+  const sEligivel = mediaVendasMes >= 1 && estoqueAtual <= mediaVendasMes * 2;
+  const qtdS = sEligivel ? calcQtdSugestaoS(item) : 0;
+
+  if (qtdFinal > 0) {
+    if (qtdS > 0 && qtdFinal < 0.6 * qtdS) {
+      return { qtdFinal: Math.round(0.8 * qtdS + 0.4 * qtdFinal), qtdS: 0, qtdE: 0, qtdSuficiente: false, semSugestao: false };
+    }
+    return { qtdFinal, qtdS: 0, qtdE: 0, qtdSuficiente: false, semSugestao: false };
+  }
   if (qtdSuficiente) {
     return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdSuficiente: true, semSugestao: false };
   }
-  if (hasSugestaoS(item, qtdFinal, qtdSuficiente)) {
-    return { qtdFinal: 0, qtdS: calcQtdSugestaoS(item), qtdE: 0, qtdSuficiente: false, semSugestao: false };
+  if (sEligivel && qtdS > 0) {
+    return { qtdFinal: 0, qtdS, qtdE: 0, qtdSuficiente: false, semSugestao: false };
   }
   const eInfo = hasSugestaoE(item) ? calcQtdSugestaoEInfo(item) : null;
   if (eInfo) {

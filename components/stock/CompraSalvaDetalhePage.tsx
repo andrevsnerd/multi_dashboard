@@ -166,21 +166,26 @@ function calcularSugestaoCompleto(
   const limiteDias = getLimiteDiasReposicao({ linha: item.linha ?? undefined, subgrupo: item.subgrupo ?? undefined });
   const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
 
+  // Regra S: pré-computa para aplicar blend quando Final < 60% de S
+  const mesesHistorico = getMesesHistorico(item);
+  const mediaVendasMes = Number(item.qtde12m ?? 0) / mesesHistorico;
+  const sEligivel = mediaVendasMes >= 1 && estoqueAtual <= mediaVendasMes * 2;
+  const qtdS = sEligivel ? Math.max(0, Math.ceil((limiteDias / 30) * mediaVendasMes)) : 0;
+
   if (consumoDiario > 0 && duracaoAtual < limiteDias) {
     const qtdFinal = Math.ceil(consumoDiario * (limiteDias - duracaoAtual));
-    if (qtdFinal > 0) return qtdFinal;
+    if (qtdFinal > 0) {
+      if (qtdS > 0 && qtdFinal < 0.6 * qtdS) {
+        return Math.round(0.8 * qtdS + 0.4 * qtdFinal);
+      }
+      return qtdFinal;
+    }
   }
 
   const qtdSuficiente = consumoDiario > 0 && duracaoAtual >= limiteDias;
   if (qtdSuficiente) return null;
 
-  // Regra S: produto com venda histórica relevante mas sem ritmo atual
-  const mesesHistorico = getMesesHistorico(item);
-  const mediaVendasMes = Number(item.qtde12m ?? 0) / mesesHistorico;
-  if (mediaVendasMes >= 1 && estoqueAtual <= mediaVendasMes * 2) {
-    const qtdS = Math.max(0, Math.ceil((limiteDias / 30) * mediaVendasMes));
-    return qtdS > 0 ? qtdS : null;
-  }
+  if (qtdS > 0) return qtdS;
 
   // Regra E: produto parado por falta de estoque (estoque <= 0, dias sem venda >= 30)
   const qtde12m = Number(item.qtde12m ?? 0);

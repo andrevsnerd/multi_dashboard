@@ -411,9 +411,6 @@ function calcQtdSugestaoEInfoFromListaCompraRule(item: ProdutoSugestao): { qtd: 
 
 function getSuggestionViewFromListaCompraRule(item: ProdutoSugestao, diasCorridosMes: number): SuggestionView {
   const qtdFinal = getSuggestedDeltaFromListaCompraRule(item, diasCorridosMes);
-  if (qtdFinal > 0) {
-    return { type: "COMPRA", qty: qtdFinal, qtdFinal, qtdS: 0, qtdE: 0 };
-  }
 
   const vendasMes = Number(item.vendasMesAtual ?? 0);
   const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
@@ -421,15 +418,25 @@ function getSuggestionViewFromListaCompraRule(item: ProdutoSugestao, diasCorrido
   const { limiteDias } = getLimiteDiasReposicao(item);
   const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
   const qtdSuficiente = consumoDiario > 0 && duracaoAtual >= limiteDias;
+
+  const mediaVendasMes = getQtde12mBase(item) / getMesesHistoricoFilial(item);
+  const sEligivel = mediaVendasMes >= 1 && estoqueAtual <= mediaVendasMes * 2;
+  const qtdS = sEligivel ? calcQtdSugestaoSFromListaCompraRule(item) : 0;
+
+  if (qtdFinal > 0) {
+    if (qtdS > 0 && qtdFinal < 0.6 * qtdS) {
+      const blended = Math.round(0.8 * qtdS + 0.4 * qtdFinal);
+      return { type: "COMPRA", qty: blended, qtdFinal: blended, qtdS: 0, qtdE: 0 };
+    }
+    return { type: "COMPRA", qty: qtdFinal, qtdFinal, qtdS: 0, qtdE: 0 };
+  }
+
   if (qtdSuficiente) {
     return { type: "SUFICIENTE", qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0 };
   }
 
-  const mediaVendasMes = getQtde12mBase(item) / getMesesHistoricoFilial(item);
-  const hasSugestaoS = mediaVendasMes >= 1 && estoqueAtual <= mediaVendasMes * 2;
-  if (hasSugestaoS) {
-    const qtdS = calcQtdSugestaoSFromListaCompraRule(item);
-    if (qtdS > 0) return { type: "S", qty: qtdS, qtdFinal: 0, qtdS, qtdE: 0 };
+  if (sEligivel && qtdS > 0) {
+    return { type: "S", qty: qtdS, qtdFinal: 0, qtdS, qtdE: 0 };
   }
 
   const hasSugestaoE = estoqueAtual <= 0;
