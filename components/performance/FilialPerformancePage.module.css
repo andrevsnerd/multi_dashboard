@@ -417,6 +417,12 @@
   color: #c62828;
 }
 
+.catPillNeutral {
+  background: #f1f3f5;
+  border-color: #d0d7de;
+  color: #6b7280;
+}
+
 .catPillActive {
   background: #1e293b !important;
   border-color: #1e293b !important;

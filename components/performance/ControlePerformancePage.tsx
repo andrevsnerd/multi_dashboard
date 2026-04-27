@@ -51,19 +51,6 @@ interface Props {
   companyName: string;
 }
 
-const CATEGORY_COLORS = [
-  "#1565c0",
-  "#e65100",
-  "#00695c",
-  "#4527a0",
-  "#ad1457",
-  "#37474f",
-  "#4e342e",
-  "#1b5e20",
-  "#00838f",
-  "#6d4c41",
-];
-
 function getCategoryHeaderLabel(category: string): string {
   const normalized = category
     .normalize("NFD")
@@ -78,13 +65,6 @@ function getCategoryHeaderLabel(category: string): string {
     .replace(/^\w/, c => c.toUpperCase());
 }
 
-function hexToRgba(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
 function formatCurrency(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
@@ -97,6 +77,23 @@ function getComparisonPct(current: number, previous: number): number | null {
 
 function formatSignedPct(value: number): string {
   return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
+}
+
+function formatCompactSignedPctForBadge(value: number): string {
+  const sign = value >= 0 ? "+" : "-";
+  const absRounded = Math.round(Math.abs(value));
+
+  // Keep up to 3 digits without decimal separator; compact when larger.
+  if (absRounded <= 999) {
+    return `${sign}${absRounded}%`;
+  }
+
+  const thousands = Math.floor(absRounded / 1000);
+  if (thousands <= 999) {
+    return `${sign}${thousands}K%`;
+  }
+
+  return `${sign}999K%`;
 }
 
 function getComparisonBadge(
@@ -503,33 +500,60 @@ export default function ControlePerformancePage({ companyKey, companyName }: Pro
 
                 {/* Right: categories */}
                 <div className={styles.cardCategoriesSection}>
-                  {displayedCategories.map((cat, idx) => {
+                  {displayedCategories.map(cat => {
                     const pct = getCardCatPct(cat);
                     const delta = getCardCatDelta(cat);
                     if (pct === null) return null;
-                    const color = CATEGORY_COLORS[idx % CATEGORY_COLORS.length];
+                    const categoryComparisonValues = (() => {
+                      if (cat === OUTROS_LABEL) {
+                        const combined = getCombinedCategoryMetrics(row.categories, outrosKeys, row.vendas);
+                        if (!combined) return null;
+                        return {
+                          current: combined.currentSales,
+                          previous: combined.previousSales > 0 ? combined.previousSales : null,
+                        };
+                      }
+
+                      const catData = row.categories[cat];
+                      if (!catData) return null;
+                      const current = row.vendas * (catData.pct / 100);
+                      if (!Number.isFinite(current)) return null;
+
+                      const deltaPct = catData.deltaPct;
+                      if (typeof deltaPct === "number" && Number.isFinite(deltaPct)) {
+                        const factor = 1 + (deltaPct / 100);
+                        if (factor > 0) {
+                          return {
+                            current,
+                            previous: current / factor,
+                          };
+                        }
+                      }
+
+                      return {
+                        current,
+                        previous: null,
+                      };
+                    })();
                     const catPillTrendClass = delta === null
-                      ? ""
+                      ? styles.catPillNeutral
                       : (delta >= 0 ? styles.catPillUp : styles.catPillDown);
+                    const baseTitle = cat === OUTROS_LABEL ? outrosTooltip : getCategoryHeaderLabel(cat);
+                    const comparisonValuesTitle = categoryComparisonValues
+                      ? `Atual: ${formatCurrency(categoryComparisonValues.current)} | Anterior: ${categoryComparisonValues.previous !== null ? formatCurrency(categoryComparisonValues.previous) : "—"}`
+                      : "Atual: — | Anterior: —";
                     return (
                       <span
                         key={cat}
                         className={`${styles.catPill} ${catPillTrendClass}`}
-                        title={cat === OUTROS_LABEL ? outrosTooltip : undefined}
-                        style={{
-                          backgroundColor: delta === null ? hexToRgba(color, 0.12) : undefined,
-                          borderColor: delta === null ? hexToRgba(color, 0.35) : undefined,
-                          color: delta === null ? color : undefined,
-                        }}
+                        title={`${baseTitle} | Variação vs ${comparisonLabel} | ${comparisonValuesTitle}`}
                       >
-                        {getCategoryHeaderLabel(cat)} {pct}%
-                        {delta !== null && (
-                          <span
-                            className={delta >= 0 ? styles.catArrowUp : styles.catArrowDown}
-                          >
-                            {delta >= 0 ? " ↑" : " ↓"}
-                          </span>
-                        )}
+                        {getCategoryHeaderLabel(cat)} {delta !== null ? formatCompactSignedPctForBadge(delta) : "—"}
+                        <span
+                          className={delta === null ? "" : (delta >= 0 ? styles.catArrowUp : styles.catArrowDown)}
+                        >
+                          {delta === null ? "" : (delta >= 0 ? " ↑" : " ↓")}
+                        </span>
                       </span>
                     );
                   })}

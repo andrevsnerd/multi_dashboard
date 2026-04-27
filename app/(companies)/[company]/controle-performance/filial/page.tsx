@@ -5,12 +5,19 @@ import { resolveCompany } from "@/lib/config/company";
 
 interface Props {
   params: Promise<{ company: string }>;
-  searchParams: Promise<{ filial?: string; month?: string; year?: string; compare?: string }>;
+  searchParams: Promise<{
+    filial?: string;
+    month?: string;
+    year?: string;
+    compare?: string;
+    start?: string;
+    end?: string;
+  }>;
 }
 
 export default async function FilialPerformanceRoute({ params, searchParams }: Props) {
   const { company: companySlug } = await params;
-  const { filial, month, year, compare } = await searchParams;
+  const { filial, month, year, compare, start, end } = await searchParams;
 
   const company = resolveCompany(companySlug);
   if (!company || !filial) {
@@ -29,6 +36,8 @@ export default async function FilialPerformanceRoute({ params, searchParams }: P
         month={monthNum}
         year={yearNum}
         compare={compareMode}
+        initialStart={start}
+        initialEnd={end}
       />
     </PageLayout>
   );

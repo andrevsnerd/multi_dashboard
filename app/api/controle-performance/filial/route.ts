@@ -147,9 +147,23 @@ export async function GET(request: Request) {
       members: Array.from(new Set([canonical, ...members])).map(normalizeFilialKey),
     }));
 
+    const regularFiliais = filiais.filter(f => !nonCanonicalFilials.has(f) && !ecommerceFilials.has(f));
+    const displayFiliais = [
+      ...(ecommerceCanonical ? [ecommerceCanonical] : []),
+      ...regularFiliais,
+    ];
+
+    // Resolve the requested filial to canonical key used in KPI aggregation.
+    const requestedCanonical = resolveCanonicalFilial(
+      filialParam,
+      memberToCanonical,
+      canonicalToMemberNorms
+    );
+    const selectedFilialKey = displayFiliais.includes(requestedCanonical) ? requestedCanonical : filialParam;
+
     // Resolve the requested filial's members
-    const groupMembers = canonicalToMembers.get(filialParam) ?? [filialParam];
-    const isEcommerceFilial = filialParam === ecommerceCanonical;
+    const groupMembers = canonicalToMembers.get(selectedFilialKey) ?? [selectedFilialKey];
+    const isEcommerceFilial = selectedFilialKey === ecommerceCanonical;
 
     const posMembers = isEcommerceFilial ? [] : groupMembers.filter(f => !ecommerceFilials.has(f));
     const ecomMembers = isEcommerceFilial ? groupMembers : [];
@@ -205,26 +219,60 @@ export async function GET(request: Request) {
       ? endInclusiveUtc.getUTCDate()
       : Math.max(1, Math.ceil((resolvedRange.end.getTime() - resolvedRange.start.getTime()) / oneDayMs));
 
-    const currentData = currentByFilial.get(filialParam) ?? new Map();
-    const previousData = previousByFilial.get(filialParam) ?? new Map();
+    // Build filial rows using the same logic as the main endpoint,
+    // then select the requested filial to ensure exact consistency.
+    const filialRows = displayFiliais.map(filial => {
+      const currentData = currentByFilial.get(filial) ?? new Map();
+      const previousData = previousByFilial.get(filial) ?? new Map();
 
-    const vendas = Array.from(currentData.values()).reduce((s, d) => s + d.vendas, 0);
-    const vendasPrevious = Array.from(previousData.values()).reduce((s, d) => s + d.vendas, 0);
-    const qtde = Array.from(currentData.values()).reduce((s, d) => s + d.qtde, 0);
-    const meta = groupMembers.reduce((s, f) => s + (monthGoals[f] ?? 0), 0);
-    const projecao = daysElapsed > 0 ? (vendas / daysElapsed) * totalDaysInMonth : vendas;
-    const projecaoPct = meta > 0 ? (projecao / meta) * 100 : null;
+      const vendas = Array.from(currentData.values()).reduce((s, d) => s + d.vendas, 0);
+      const vendasPrevious = Array.from(previousData.values()).reduce((s, d) => s + d.vendas, 0);
+      const qtde = Array.from(currentData.values()).reduce((s, d) => s + d.qtde, 0);
 
-    const categoryData: Record<string, { pct: number; deltaPct: number | null }> = {};
-    categories.forEach(cat => {
-      const cur = currentData.get(cat) ?? { vendas: 0, qtde: 0 };
-      const prev = previousData.get(cat) ?? { vendas: 0, qtde: 0 };
-      const deltaPct = prev.vendas > 0 ? ((cur.vendas - prev.vendas) / prev.vendas) * 100 : null;
-      categoryData[cat] = {
-        pct: vendas > 0 ? (cur.vendas / vendas) * 100 : 0,
-        deltaPct,
+      const rowGroupMembers = canonicalToMembers.get(filial) ?? [filial];
+      const meta = rowGroupMembers.reduce((s, f) => s + (monthGoals[f] ?? 0), 0);
+
+      const projecao = daysElapsed > 0 ? (vendas / daysElapsed) * totalDaysInMonth : vendas;
+      const projecaoPct = meta > 0 ? (projecao / meta) * 100 : null;
+
+      const categoryData: Record<string, { pct: number; deltaPct: number | null }> = {};
+      categories.forEach(cat => {
+        const cur = currentData.get(cat) ?? { vendas: 0, qtde: 0 };
+        const prev = previousData.get(cat) ?? { vendas: 0, qtde: 0 };
+        const deltaPct = prev.vendas > 0 ? ((cur.vendas - prev.vendas) / prev.vendas) * 100 : null;
+        categoryData[cat] = {
+          pct: vendas > 0 ? (cur.vendas / vendas) * 100 : 0,
+          deltaPct,
+        };
+      });
+
+      return {
+        filial,
+        displayName: company.filialDisplayNames?.[filial] ?? filial,
+        meta,
+        vendas,
+        vendasPrevious,
+        qtde,
+        projecao,
+        projecaoPct,
+        categories: categoryData,
       };
     });
+
+    const selectedFilialRow = filialRows.find(row => row.filial === selectedFilialKey) ?? {
+      filial: selectedFilialKey,
+      displayName: company.filialDisplayNames?.[selectedFilialKey] ?? selectedFilialKey,
+      meta: groupMembers.reduce((s, f) => s + (monthGoals[f] ?? 0), 0),
+      vendas: 0,
+      vendasPrevious: 0,
+      qtde: 0,
+      projecao: 0,
+      projecaoPct: null,
+      categories: categories.reduce<Record<string, { pct: number; deltaPct: number | null }>>((acc, cat) => {
+        acc[cat] = { pct: 0, deltaPct: null };
+        return acc;
+      }, {}),
+    };
 
     // Fetch product-level sales for ABC (non-fatal: if this fails, return KPIs without products)
     let produtos: Awaited<ReturnType<typeof fetchFilialProdutoSales>> = [];
@@ -235,15 +283,15 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({
-      filial: filialParam,
-      displayName: company.filialDisplayNames?.[filialParam] ?? filialParam,
-      vendas,
-      vendasPrevious,
-      qtde,
-      meta,
-      projecao,
-      projecaoPct,
-      categories: categoryData,
+      filial: selectedFilialRow.filial,
+      displayName: selectedFilialRow.displayName,
+      vendas: selectedFilialRow.vendas,
+      vendasPrevious: selectedFilialRow.vendasPrevious,
+      qtde: selectedFilialRow.qtde,
+      meta: selectedFilialRow.meta,
+      projecao: selectedFilialRow.projecao,
+      projecaoPct: selectedFilialRow.projecaoPct,
+      categories: selectedFilialRow.categories,
       categoryList: categories,
       daysElapsed,
       totalDaysInMonth,

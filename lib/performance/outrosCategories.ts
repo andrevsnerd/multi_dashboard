@@ -38,6 +38,7 @@ const OUTROS_NERD_NORMALIZED = new Set([
   "GAMER",
   "CAFTAN LONGO",
   "ALMOFADA",
+  "PROMOCIONAIS",
 ]);
 
 const OUTROS_NERD_TOOLTIP_LINES = [
@@ -65,9 +66,13 @@ const OUTROS_NERD_TOOLTIP_LINES = [
   "Gamer",
   "Caftan longo",
   "Almofada",
+  "Promocionais",
 ];
 
 const OUTROS_SCARFME_TOOLTIP_LINES = Array.from(OUTROS_CATEGORIES_SCARFME);
+if (!OUTROS_SCARFME_TOOLTIP_LINES.includes("PROMOCIONAIS")) {
+  OUTROS_SCARFME_TOOLTIP_LINES.push("PROMOCIONAIS");
+}
 
 export function normalizeCategoryKey(cat: string): string {
   return cat
@@ -78,10 +83,17 @@ export function normalizeCategoryKey(cat: string): string {
 }
 
 export function isOutrosCategory(companyKey: CompanyKey, cat: string): boolean {
+  const normalized = normalizeCategoryKey(cat);
   if (companyKey === "nerd") {
-    return OUTROS_NERD_NORMALIZED.has(normalizeCategoryKey(cat));
+    if (OUTROS_NERD_NORMALIZED.has(normalized)) return true;
+    // Defensive match: handles naming variants like PROMOCIONAL/PROMOCIONAIS.
+    if (normalized.startsWith("PROMOC")) return true;
+    return false;
   }
-  return OUTROS_CATEGORIES_SCARFME.has(cat);
+  if (OUTROS_CATEGORIES_SCARFME.has(cat)) return true;
+  // Defensive match for other companies too.
+  if (normalized.startsWith("PROMOC")) return true;
+  return false;
 }
 
 export function getOutrosTooltip(companyKey: CompanyKey): string {
