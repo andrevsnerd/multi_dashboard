@@ -80,6 +80,18 @@ type CurvaInfo = {
   percCumulativo: number;
 };
 
+type CurvaAbcProdutoRow = {
+  produto: string;
+  cor?: string | null;
+  corDescricao?: string | null;
+  vendas: number;
+};
+
+type CurvaAbcScopeData = {
+  displayName?: string;
+  produtos?: CurvaAbcProdutoRow[];
+};
+
 interface ListaLoja {
   id: string;
   nome: string;
@@ -1060,10 +1072,9 @@ function buildListaLojaExportRow(item: ListaItem, diasCorridosMes: number): Reco
   };
 }
 
-function calcularCurvasRede(itens: ListaItem[]): Map<string, CurvaInfo> {
-  const keyOf = (i: ListaItem) => buildItemKey(i.produto, i.corProduto);
-  const base = [...itens]
-    .map((item) => ({ item, valor: Number(item.valor12m ?? 0) }))
+function calcularCurvasAbcProdutos(produtos: CurvaAbcProdutoRow[]): Map<string, CurvaInfo> {
+  const base = [...produtos]
+    .map((produto) => ({ produto, valor: Number(produto.vendas ?? 0) }))
     .sort((a, b) => b.valor - a.valor);
   const total = base.reduce((s, row) => s + Math.max(0, row.valor), 0);
   let cumulative = 0;
@@ -1072,13 +1083,69 @@ function calcularCurvasRede(itens: ListaItem[]): Map<string, CurvaInfo> {
     cumulative += Math.max(0, row.valor);
     const percCum = total > 0 ? cumulative / total : 1;
     const curva: Curva = percCum <= 0.8 ? "A" : percCum <= 0.95 ? "B" : "C";
-    out.set(keyOf(row.item), {
+    const info = {
       curva,
       percParticipacao: total > 0 ? (Math.max(0, row.valor) / total) * 100 : 0,
       percCumulativo: percCum * 100,
-    });
+    };
+    out.set(buildItemKey(row.produto.produto, row.produto.cor ?? null), info);
   }
   return out;
+}
+
+function formatYmdForCurvaAbc(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+const curvaAbcScopeCache = new Map<string, Promise<CurvaAbcScopeData>>();
+
+function fetchCurvaAbcScope(companyKey: CompanyKey, filial: string | null): Promise<CurvaAbcScopeData> {
+  const today = new Date();
+  const start = new Date(today);
+  start.setDate(start.getDate() - 365);
+  const cacheKey = `${companyKey}|${filial ?? "__ALL__"}|${formatYmdForCurvaAbc(today)}`;
+  const cached = curvaAbcScopeCache.get(cacheKey);
+  if (cached) return cached;
+
+  const params = new URLSearchParams({
+    company: companyKey,
+    start: formatYmdForCurvaAbc(start),
+    end: formatYmdForCurvaAbc(today),
+    porCor: "1",
+  });
+  if (filial) params.set("filial", filial);
+
+  const promise = fetch(`/api/curva-abc?${params.toString()}`, { cache: "no-store" }).then(async (res) => {
+    if (!res.ok) throw new Error("Erro ao carregar Curva ABC");
+    return (await res.json()) as CurvaAbcScopeData;
+  });
+  curvaAbcScopeCache.set(cacheKey, promise);
+  return promise;
+}
+
+function getLogicalAbcFilialScopes(companyKey: CompanyKey, company: CompanyConfig | null): Array<{ filial: string; label: string }> {
+  const filiais = company?.filialFilters.sales ?? [];
+  const matrizFiliais = new Set(companyKey === "scarfme" ? ["SCARF ME - MATRIZ"] : companyKey === "nerd" ? ["NERD"] : []);
+  const ecommerceFilials = new Set(company?.ecommerceFilials ?? []);
+  const ecommerceCanonical = filiais.find((filial) => ecommerceFilials.has(filial)) ?? null;
+  const nonCanonical = new Set<string>();
+  Object.entries(company?.filialGroups ?? {}).forEach(([canonical, members]) => {
+    members.forEach((member) => {
+      if (member !== canonical) nonCanonical.add(member);
+    });
+  });
+
+  return filiais
+    .filter((filial) => {
+      if (matrizFiliais.has(filial)) return false;
+      if (nonCanonical.has(filial)) return false;
+      if (ecommerceFilials.has(filial) && filial !== ecommerceCanonical) return false;
+      return true;
+    })
+    .map((filial) => ({ filial, label: getFilialLabelForDisplay(company, filial) }));
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -1228,7 +1295,7 @@ function ListaLojaItensTable({
   }>(null);
 
   const [estoqueCache, setEstoqueCache] = useState<Record<string, Array<{ filial: string; estoque: number }>>>({});
-  const [vendasCache, setVendasCache] = useState<Record<string, Array<{ filial: string; qtde12m: number; qtde60d: number; valor12m: number }>>>({});
+  const [vendasCache, setVendasCache] = useState<Record<string, FilialVendaRow[]>>({});
   const [liveMetrics, setLiveMetrics] = useState<
     Record<
       string,
@@ -1249,10 +1316,36 @@ function ListaLojaItensTable({
   >({});
 
   useEffect(() => {
-    setEstoqueCache({});
-    setVendasCache({});
-    setLiveMetrics({});
+    const timeoutId = window.setTimeout(() => {
+      setEstoqueCache({});
+      setVendasCache({});
+      setLiveMetrics({});
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [filialScopeKey]);
+
+  const companyConfig = useMemo(() => resolveCompany(companyKey), [companyKey]);
+  const [abcFullMap, setAbcFullMap] = useState<Map<string, CurvaInfo> | null>(null);
+  const [abcFullLoadFailed, setAbcFullLoadFailed] = useState(false);
+  const abcDisplayMap = abcFullMap ?? (abcFullLoadFailed ? abcMap : new Map<string, CurvaInfo>());
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCurvaAbcScope(companyKey, filialCod)
+      .then((data) => {
+        if (cancelled) return;
+        setAbcFullMap(calcularCurvasAbcProdutos(data.produtos ?? []));
+        setAbcFullLoadFailed(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAbcFullMap(null);
+        setAbcFullLoadFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyKey, filialCod, filialScopeKey]);
 
   useEffect(() => {
     if (itens.length === 0) return;
@@ -1321,7 +1414,6 @@ function ListaLojaItensTable({
             <th className={styles.colNumeric}>Estoque</th>
             <th className={styles.colNumeric}>QTD 60 dias</th>
             <th className={styles.colNumeric}>Duração</th>
-            <th className={styles.colNumeric}>Participação</th>
             <th className={styles.colNumeric}>Sugestão de Reposição</th>
             {showTransferenciaColumn && <th>Sugestão de Transferência</th>}
             <th className={styles.colNumeric}>Custo Unit.</th>
@@ -1479,7 +1571,7 @@ function ListaLojaItensTable({
               <td className={styles.colNumeric}>
                 {(() => {
                   const k = buildItemKey(item.produto, item.corProduto);
-                  const abc = abcMap.get(k);
+                  const abc = abcDisplayMap.get(k);
                   const curva = abc?.curva ?? null;
                   if (!curva) {
                     return (
@@ -1493,7 +1585,7 @@ function ListaLojaItensTable({
                       className={`${styles.abcBadge} ${styles[`abcBadge${curva}`]}`}
                       onMouseEnter={async (e) => {
                         const k = buildItemKey(item.produto, item.corProduto);
-                        const abc = abcMap.get(k);
+                        const abc = abcDisplayMap.get(k);
                         if (!abc) return;
                         const liveKey = `${filialScopeKey}::${k}`;
                         const liveVal = liveMetrics[liveKey]?.valor12m;
@@ -1519,52 +1611,35 @@ function ListaLojaItensTable({
                           filiaisLoading: true,
                           filiais: [],
                         });
-                        // Carrega vendas por filial de TODOS os itens para calcular ABC correto por loja
+                        // Carrega a base ABC completa de cada loja logica.
                         try {
-                          const allItemsVendas = await Promise.all(
-                            itens.map(async (it) => {
-                              const ik = buildItemKey(it.produto, it.corProduto);
-                              const cacheKey = `__ALL__::${ik}`;
-                              let rows = vendasCache[cacheKey];
-                              if (!rows) {
-                                rows = await fetchVendasPorFilialItem(companyKey, null, it.produto, it.corProduto);
-                                setVendasCache((prev) => ({ ...prev, [cacheKey]: rows }));
-                              }
-                              return { ik, rows };
-                            })
+                          const scopes = getLogicalAbcFilialScopes(companyKey, companyConfig);
+                          const selectedLabel = filialNome ? getFilialLabelForDisplay(companyConfig, filialNome) : null;
+                          const scopeResults = await Promise.all(
+                            scopes.map(async (scope) => ({
+                              scope,
+                              data: await fetchCurvaAbcScope(companyKey, scope.filial),
+                            }))
                           );
                           if (abcHoverKeyRef.current !== hoverKey) return;
-                          // Agrupa por filial: para cada filial, coleta valor12m de cada item
-                          const filialItemsMap = new Map<string, Array<{ ik: string; valor12m: number }>>();
-                          for (const { ik, rows } of allItemsVendas) {
-                            for (const row of rows) {
-                              if (!filialItemsMap.has(row.filial)) filialItemsMap.set(row.filial, []);
-                              filialItemsMap.get(row.filial)!.push({ ik, valor12m: row.valor12m });
-                            }
-                          }
-                          // Para cada filial, calcula a posição deste produto na curva ABC daquela filial
+                          // Usa a base ABC completa de cada loja logica, nao apenas os itens da lista.
                           const filialResults: Array<{ filial: string; curva: Curva; valor12m: number; participacao: number; acumulado: number }> = [];
-                          for (const [filial, filialItens] of filialItemsMap) {
-                            // Pula a filial selecionada no filtro (já representada pelo badge)
-                            if (filialNome && filial === filialNome) continue;
-                            const sorted = [...filialItens].sort((a, b) => b.valor12m - a.valor12m);
-                            const total = sorted.reduce((s, r) => s + Math.max(0, r.valor12m), 0);
-                            let cum = 0;
-                            for (const it of sorted) {
-                              cum += Math.max(0, it.valor12m);
-                              if (it.ik === k) {
-                                const percCum = total > 0 ? cum / total : 1;
-                                const curvaFilial: Curva = percCum <= 0.8 ? "A" : percCum <= 0.95 ? "B" : "C";
-                                filialResults.push({
-                                  filial,
-                                  curva: curvaFilial,
-                                  valor12m: it.valor12m,
-                                  participacao: total > 0 ? (Math.max(0, it.valor12m) / total) * 100 : 0,
-                                  acumulado: percCum * 100,
-                                });
-                                break;
-                              }
-                            }
+                          for (const { scope, data } of scopeResults) {
+                            if (selectedLabel && normalizeKey(scope.label) === normalizeKey(selectedLabel)) continue;
+                            const produtos = data.produtos ?? [];
+                            const scopeMap = calcularCurvasAbcProdutos(produtos);
+                            const itemAbc = scopeMap.get(k);
+                            if (!itemAbc) continue;
+                            const produtoAbc = produtos.find((p) => buildItemKey(p.produto, p.cor ?? null) === k);
+                            const valor12mFilial = Number(produtoAbc?.vendas ?? 0);
+                            if (valor12mFilial <= 0) continue;
+                            filialResults.push({
+                              filial: scope.label,
+                              curva: itemAbc.curva,
+                              valor12m: valor12mFilial,
+                              participacao: itemAbc.percParticipacao,
+                              acumulado: itemAbc.percCumulativo,
+                            });
                           }
                           filialResults.sort((a, b) => b.valor12m - a.valor12m);
                           if (abcHoverKeyRef.current !== hoverKey) return;
@@ -1849,22 +1924,6 @@ function ListaLojaItensTable({
                     return `${dias} dias`;
                   })()}
                 </span>
-              </td>
-              <td className={styles.colNumeric}>
-                {(() => {
-                  const k = buildItemKey(item.produto, item.corProduto);
-                  const abc = abcMap.get(k);
-                  if (!abc) return <span className={styles.cellMetric}>—</span>;
-                  const perc = abc.percParticipacao;
-                  return (
-                    <div className={styles.percBar}>
-                      <div className={styles.percBarTrack}>
-                        <div className={styles.percBarFill} style={{ width: `${Math.min(100, perc)}%` }} />
-                      </div>
-                      <span className={styles.percText}>{perc.toFixed(1)}%</span>
-                    </div>
-                  );
-                })()}
               </td>
               <td className={styles.colNumeric}>
                 {(() => {
@@ -3330,8 +3389,8 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
       totalCustoReferencia,
     };
   }, [diasCorridosMes, itensVisiveis]);
-  const abcMapRede = useMemo(() => calcularCurvasRede(itensVisiveis), [itensVisiveis]);
-  const abcMapModal = useMemo(() => calcularCurvasRede(itensModal), [itensModal]);
+  const abcMapRede = useMemo(() => new Map<string, CurvaInfo>(), []);
+  const abcMapModal = useMemo(() => new Map<string, CurvaInfo>(), []);
 
   // ─── Render: loading ────────────────────────────────────────────────────────
 
