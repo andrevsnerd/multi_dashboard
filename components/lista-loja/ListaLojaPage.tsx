@@ -785,8 +785,9 @@ function getLimiteDiasReposicao(item: { linha?: string | null; subgrupo?: string
   const linha = normalizeKey(item.linha);
   const subgrupo = normalizeKey(item.subgrupo);
   if (linha === "INDIA") return 90;
-  const subgrupos120 = new Set(["CETIM DE SEDA", "MOUSSELINE DE SEDA", "SEDA PREMIUM"]);
-  if (subgrupos120.has(subgrupo)) return 120;
+  if (linha === "ELETRONICOS") return 120;
+  const subgrupos90 = new Set(["CETIM DE SEDA", "MOUSSELINE DE SEDA", "SEDA PREMIUM"]);
+  if (subgrupos90.has(subgrupo)) return 90;
   return 60;
 }
 
@@ -3188,6 +3189,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
       descricao: it.descProduto || it.produto,
       qtdManual: Math.max(0, Math.round(it.quantidade ?? 0)),
       custoUnitario: it.custoUnit != null ? Number(it.custoUnit) : undefined,
+      filialOrigem: filialConsultaSelecionada,
     }));
 
     try {

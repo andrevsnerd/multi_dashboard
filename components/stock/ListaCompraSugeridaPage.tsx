@@ -40,6 +40,12 @@ interface ReposicaoItem {
   diasCobertura: number;
   necessidadeTotal: number;
   custoUnit?: number;
+  /** Quantidade já calculada pela regra Lista-Loja em ProjecaoEstoquePage (evita re-fetch) */
+  suggestionQty?: number;
+  /** Tipo da sugestão: COMPRA, S, E, SUFICIENTE, SEM_SUGESTAO */
+  suggestionType?: string;
+  /** Dados para tooltip do critério S */
+  suggestionSData?: { mediaVendasMes: number; mesesHistoricoFilial: number; estoqueAtual: number; limiteDias: number };
 }
 
 interface ReposicaoData {
@@ -60,6 +66,7 @@ interface ProdutoSugestao {
   subgrupo?: string;
   grade?: string;
   colecao?: string;
+  qtde12m?: number;
   vendas3meses: number;
   /** Últimos 60 dias — apenas exibição na tabela ABC */
   vendas60dias?: number;
@@ -72,6 +79,7 @@ interface ProdutoSugestao {
   diasHistoricoFilial?: number | null;
   mesesHistoricoFilial?: number | null;
   historicoParcial?: boolean | null;
+  diasDesdeUltimaVenda?: number | null;
   percParticipacao: number;
   qtdSugerida: number;
 }
@@ -83,6 +91,20 @@ interface ProdutoComCurva extends ProdutoSugestao {
   qtdFinal: number;
   percCumulativa: number;
   qtdSuficiente?: boolean;
+}
+
+type SuggestionType = "COMPRA" | "S" | "E" | "SUFICIENTE" | "SEM_SUGESTAO";
+
+interface SuggestionView {
+  type: SuggestionType;
+  qty: number;
+  qtdFinal: number;
+  qtdS: number;
+  qtdE: number;
+}
+
+function buildSuggestionKey(produto?: string | null, cor?: string | null): string {
+  return `${normalizeKey(produto)}||${normalizeKey(cor)}`;
 }
 
 // ─── Formatação ──────────────────────────────────────────────────────────────
@@ -110,6 +132,10 @@ function getMesesHistoricoFilial(item: { mesesHistoricoFilial?: number | null })
   const meses = Number(item.mesesHistoricoFilial ?? 12);
   if (!Number.isFinite(meses)) return 12;
   return Math.min(12, Math.max(1, meses));
+}
+
+function getQtde12mBase(item: { qtde12m?: number; vendas3meses?: number }): number {
+  return Number(item.qtde12m ?? item.vendas3meses ?? 0);
 }
 
 // ─── ABC helpers (usados apenas na aba Análise ABC) ───────────────────────────
@@ -331,20 +357,88 @@ function filterEstoqueTooltipFiliais(filiais: Array<{ filial: string; estoque: n
 function getLimiteDiasReposicao(p: { linha?: string; subgrupo?: string }) {
   const linha = normalizeKey(p.linha);
   const subgrupo = normalizeKey(p.subgrupo);
+  if (linha === "ELETRONICOS") return { limiteDias: 120, regra: "Linha Eletronicos" };
 
   // Linha índia: regra exclusiva (subgrupo não conta)
   if (linha === "INDIA") return { limiteDias: 90, regra: "Linha Índia" };
 
-  // 120 dias apenas para subgrupos específicos
-  const subgrupos120 = new Set([
+  // 90 dias para subgrupos específicos de seda
+  const subgrupos90 = new Set([
     "CETIM DE SEDA",
     "MOUSSELINE DE SEDA",
     "SEDA PREMIUM",
   ]);
-  if (subgrupos120.has(subgrupo)) return { limiteDias: 120, regra: `Subgrupo: ${p.subgrupo ?? ""}`.trim() };
+  if (subgrupos90.has(subgrupo)) return { limiteDias: 90, regra: `Subgrupo: ${p.subgrupo ?? ""}`.trim() };
 
   // Restante
   return { limiteDias: 60, regra: "Padrão" };
+}
+
+function getSuggestedDeltaFromListaCompraRule(item: ProdutoSugestao, diasCorridosMes: number): number {
+  const vendasMes = Number(item.vendasMesAtual ?? 0);
+  if (vendasMes <= 0 || diasCorridosMes <= 0) return 0;
+  const consumoDiario = vendasMes / diasCorridosMes;
+  if (consumoDiario <= 0) return 0;
+  const estoqueAtual = Number(item.estoqueAtual ?? 0);
+  const { limiteDias } = getLimiteDiasReposicao(item);
+  const duracaoAtual = estoqueAtual / consumoDiario;
+  if (duracaoAtual >= limiteDias) return 0;
+  const qtd = Math.ceil(consumoDiario * (limiteDias - duracaoAtual));
+  return Number.isFinite(qtd) ? Math.max(0, qtd) : 0;
+}
+
+function calcQtdSugestaoSFromListaCompraRule(item: ProdutoSugestao): number {
+  const mediaVendasMes = getQtde12mBase(item) / getMesesHistoricoFilial(item);
+  const { limiteDias } = getLimiteDiasReposicao(item);
+  return Math.max(0, Math.ceil((limiteDias / 30) * mediaVendasMes));
+}
+
+function calcQtdSugestaoEInfoFromListaCompraRule(item: ProdutoSugestao): { qtd: number } | null {
+  const qtdeBase = getQtde12mBase(item);
+  if (qtdeBase <= 0) return null;
+  const dias = item.diasDesdeUltimaVenda;
+  if (dias == null || dias < 30) return null;
+  const mesesBase = getMesesHistoricoFilial(item);
+  const mesesSemVenda = dias / 30;
+  const mesesAtivos = mesesBase - mesesSemVenda;
+  if (mesesAtivos < 1) return null;
+  const velocidadeAjustada = qtdeBase / mesesAtivos;
+  if (velocidadeAjustada < 0.5) return null;
+  const { limiteDias } = getLimiteDiasReposicao(item);
+  const qtd = Math.max(1, Math.ceil((limiteDias / 30) * velocidadeAjustada));
+  return { qtd };
+}
+
+function getSuggestionViewFromListaCompraRule(item: ProdutoSugestao, diasCorridosMes: number): SuggestionView {
+  const qtdFinal = getSuggestedDeltaFromListaCompraRule(item, diasCorridosMes);
+  if (qtdFinal > 0) {
+    return { type: "COMPRA", qty: qtdFinal, qtdFinal, qtdS: 0, qtdE: 0 };
+  }
+
+  const vendasMes = Number(item.vendasMesAtual ?? 0);
+  const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
+  const estoqueAtual = Number(item.estoqueAtual ?? 0);
+  const { limiteDias } = getLimiteDiasReposicao(item);
+  const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
+  const qtdSuficiente = consumoDiario > 0 && duracaoAtual >= limiteDias;
+  if (qtdSuficiente) {
+    return { type: "SUFICIENTE", qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0 };
+  }
+
+  const mediaVendasMes = getQtde12mBase(item) / getMesesHistoricoFilial(item);
+  const hasSugestaoS = mediaVendasMes >= 1 && estoqueAtual <= mediaVendasMes * 2;
+  if (hasSugestaoS) {
+    const qtdS = calcQtdSugestaoSFromListaCompraRule(item);
+    if (qtdS > 0) return { type: "S", qty: qtdS, qtdFinal: 0, qtdS, qtdE: 0 };
+  }
+
+  const hasSugestaoE = estoqueAtual <= 0;
+  const eInfo = hasSugestaoE ? calcQtdSugestaoEInfoFromListaCompraRule(item) : null;
+  if (eInfo?.qtd) {
+    return { type: "E", qty: eInfo.qtd, qtdFinal: 0, qtdS: 0, qtdE: eInfo.qtd };
+  }
+
+  return { type: "SEM_SUGESTAO", qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0 };
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
@@ -392,6 +486,9 @@ export default function ListaCompraSugeridaPage({
 
   // ── Aba Reposição ──────────────────────────────────────────────────────────
   const [reposicaoData, setReposicaoData] = useState<ReposicaoData | null>(null);
+  const [reposicaoSuggestionMap, setReposicaoSuggestionMap] = useState<Record<string, ProdutoSugestao>>({});
+  const [reposicaoSuggestionLoading, setReposicaoSuggestionLoading] = useState(false);
+  const diasCorridosMes = useMemo(() => new Date().getDate(), []);
 
   useEffect(() => {
     try {
@@ -415,6 +512,60 @@ export default function ListaCompraSugeridaPage({
     }));
   }, [reposicaoData]);
 
+  // Busca fallback via API apenas quando os itens não carregam suggestionQty do sessionStorage
+  useEffect(() => {
+    if (!reposicaoData || reposicaoData.itens.length === 0) {
+      setReposicaoSuggestionMap({});
+      setReposicaoSuggestionLoading(false);
+      return;
+    }
+    // Se todos os itens já têm suggestionQty pré-computada, não precisa buscar
+    if (reposicaoData.itens.every(item => item.suggestionQty != null)) {
+      setReposicaoSuggestionMap({});
+      setReposicaoSuggestionLoading(false);
+      return;
+    }
+    const produtos = Array.from(
+      new Set(reposicaoData.itens.map((item) => (item.produto ?? "").trim()).filter(Boolean))
+    );
+    if (produtos.length === 0) {
+      setReposicaoSuggestionMap({});
+      setReposicaoSuggestionLoading(false);
+      return;
+    }
+    setReposicaoSuggestionLoading(true);
+    const params = new URLSearchParams();
+    params.set("company", companyKey);
+    if (filial) params.set("filial", filial);
+    if (categoria) params.set("categoria", categoria);
+    params.set("qtdCompra", "0");
+    params.set("limit", String(Math.max(100, produtos.length * 6)));
+    if (expandirPorCor) params.set("porCor", "1");
+    searchParams.getAll("grupos").forEach((g) => params.append("grupos", g));
+    searchParams.getAll("linhas").forEach((l) => params.append("linhas", l));
+    searchParams.getAll("colecoes").forEach((c) => params.append("colecoes", c));
+    produtos.forEach((p) => params.append("produtos", p));
+
+    fetchListaCompra(params)
+      .then((rows) => {
+        const next: Record<string, ProdutoSugestao> = {};
+        rows.forEach((r) => {
+          r.qtde12m = getQtde12mBase(r);
+          const produto = (r.produto ?? "").trim();
+          if (!produto) return;
+          const keyCorCodigo = buildSuggestionKey(produto, r.cor ?? "");
+          next[keyCorCodigo] = r;
+          if ((r.corDescricao ?? "").trim()) {
+            const keyCorDescricao = buildSuggestionKey(produto, r.corDescricao ?? "");
+            next[keyCorDescricao] = r;
+          }
+        });
+        setReposicaoSuggestionMap(next);
+      })
+      .catch(() => setReposicaoSuggestionMap({}))
+      .finally(() => setReposicaoSuggestionLoading(false));
+  }, [reposicaoData, companyKey, filial, categoria, searchParams, expandirPorCor]);
+
   const reposicaoAgrupadaPorProduto = useMemo(() => {
     if (!reposicaoData) return [];
     const map = new Map<string, ReposicaoItem[]>();
@@ -432,6 +583,11 @@ export default function ListaCompraSugeridaPage({
       const duracaoReal = consumoDiario > 0 ? Math.round(estoqueReal / consumoDiario) : 0;
       const diasCobertura = items.reduce((max, i) => Math.max(max, i.diasCobertura ?? 0), 0);
       const necessidadeTotal = consumoDiario * diasCobertura;
+      // Soma das sugestões individuais por cor; undefined se algum item não tem suggestionQty
+      const allHaveSuggestion = items.every(i => i.suggestionQty != null);
+      const sumSuggestionQty = allHaveSuggestion ? items.reduce((s, i) => s + (i.suggestionQty ?? 0), 0) : undefined;
+      const suggestionType = allHaveSuggestion ? (items[0].suggestionType ?? "SEM_SUGESTAO") : undefined;
+      const sItem = items.find(i => i.suggestionType === "S");
       merged.push({
         produto: base.produto,
         descricao: base.descricao,
@@ -446,10 +602,13 @@ export default function ListaCompraSugeridaPage({
         diasCobertura,
         necessidadeTotal,
         custoUnit: base.custoUnit,
+        suggestionQty: sumSuggestionQty,
+        suggestionType,
+        suggestionSData: sItem?.suggestionSData,
       });
     });
-    // ordena por qtdCompra desc
-    merged.sort((a, b) => (b.qtdCompra ?? 0) - (a.qtdCompra ?? 0));
+    // ordena por suggestionQty (ou qtdCompra como fallback) desc
+    merged.sort((a, b) => (b.suggestionQty ?? b.qtdCompra ?? 0) - (a.suggestionQty ?? a.qtdCompra ?? 0));
     return merged;
   }, [reposicaoData]);
 
@@ -459,11 +618,42 @@ export default function ListaCompraSugeridaPage({
       custoUnit: item.custoUnit ?? 0,
       custoTotal: (item.qtdCompra ?? 0) * (item.custoUnit ?? 0),
     }));
-    return base;
-  }, [expandirPorCor, reposicaoComCusto, reposicaoAgrupadaPorProduto]);
+    return base
+      .map((item) => {
+        // Caminho principal: usa suggestionQty + type pré-computados pela ProjecaoEstoquePage
+        if (item.suggestionQty != null && item.suggestionType != null) {
+          const sugestaoQtd = item.suggestionQty;
+          const sugestaoTipo = item.suggestionType as SuggestionType;
+          if (sugestaoQtd <= 0 || (sugestaoTipo !== "COMPRA" && sugestaoTipo !== "S" && sugestaoTipo !== "E")) {
+            return { ...item, sugestaoTipo: (sugestaoTipo || "SEM_SUGESTAO") as SuggestionType, sugestaoQtd: 0, custoTotal: 0 };
+          }
+          return {
+            ...item,
+            sugestaoTipo,
+            sugestaoQtd,
+            custoTotal: sugestaoQtd * (item.custoUnit ?? 0),
+          };
+        }
+        // Fallback: recalcula via mapa de sugestões buscado da API
+        const key = buildSuggestionKey(item.produto, expandirPorCor ? (item.cor ?? "") : "");
+        const suggestionSource = reposicaoSuggestionMap[key] ?? null;
+        const suggestion = suggestionSource
+          ? getSuggestionViewFromListaCompraRule(suggestionSource, diasCorridosMes)
+          : { type: "SEM_SUGESTAO" as SuggestionType, qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0 };
+        const sugestaoQtd = suggestion.qty;
+        return {
+          ...item,
+          sugestaoTipo: suggestion.type,
+          sugestaoQtd,
+          custoTotal: sugestaoQtd * (item.custoUnit ?? 0),
+        };
+      })
+      .filter((item) => item.sugestaoTipo === "COMPRA" || item.sugestaoTipo === "S" || item.sugestaoTipo === "E")
+      .sort((a, b) => (b.sugestaoQtd ?? 0) - (a.sugestaoQtd ?? 0));
+  }, [expandirPorCor, reposicaoComCusto, reposicaoAgrupadaPorProduto, reposicaoSuggestionMap, diasCorridosMes]);
 
   const totalCustoReposicao = reposicaoExibidaComCusto.reduce((s, i) => s + (i.custoTotal ?? 0), 0);
-  const totalQtdReposicao = reposicaoExibidaComCusto.reduce((s, i) => s + (i.qtdCompra ?? 0), 0);
+  const totalQtdReposicao = reposicaoExibidaComCusto.reduce((s, i) => s + (i.sugestaoQtd ?? 0), 0);
 
   // ── Aba ABC ────────────────────────────────────────────────────────────────
   const [produtosABC, setProdutosABC] = useState<ProdutoSugestao[]>([]);
@@ -497,7 +687,6 @@ export default function ListaCompraSugeridaPage({
   const [loadingFinal, setLoadingFinal] = useState(false);
   const [errorFinal, setErrorFinal] = useState<string | null>(null);
 
-  const diasCorridosMes = useMemo(() => new Date().getDate(), []);
   const consumoDiarioMesAtual = (p: ProdutoSugestao) => {
     const vendasMes = p.vendasMesAtual ?? 0;
     if (vendasMes <= 0 || diasCorridosMes <= 0) return 0;
@@ -726,6 +915,7 @@ export default function ListaCompraSugeridaPage({
             colecao: it.colecao,
             qtdManual: it.qtdManual,
             custoUnitario: custoUnit > 0 ? custoUnit : undefined,
+            filialOrigem: filial || null,
           })),
         }),
       });
@@ -1166,7 +1356,7 @@ export default function ListaCompraSugeridaPage({
               <div className={styles.summaryItem}>
                 <span className={styles.summaryLabel}>Produtos em Reposição</span>
                 <span className={styles.summaryValueNeutral}>
-                  {expandirPorCor ? reposicaoData.itens.length : reposicaoAgrupadaPorProduto.length}
+                  {reposicaoExibidaComCusto.length}
                 </span>
               </div>
               <div className={styles.summaryDivider} />
@@ -1181,6 +1371,12 @@ export default function ListaCompraSugeridaPage({
 
           {/* Table */}
           <div className={styles.tableCard}>
+            {reposicaoData && reposicaoSuggestionLoading && (
+              <div className={styles.inlineLoading}>
+                <span className={styles.inlineLoadingDot} />
+                Atualizando sugestões...
+              </div>
+            )}
             {!reposicaoData && (
               <div className={styles.empty}>
                 <div style={{ marginBottom: 8, fontSize: 32 }}>📋</div>
@@ -1190,10 +1386,10 @@ export default function ListaCompraSugeridaPage({
                 </div>
               </div>
             )}
-            {reposicaoData && reposicaoData.itens.length === 0 && (
+            {reposicaoData && !reposicaoSuggestionLoading && reposicaoExibidaComCusto.length === 0 && (
               <div className={styles.empty}>Nenhum produto precisa de reposição neste escopo.</div>
             )}
-            {reposicaoData && reposicaoData.itens.length > 0 && (
+            {reposicaoData && !reposicaoSuggestionLoading && reposicaoExibidaComCusto.length > 0 && (
               <table className={styles.table}>
                 <thead>
                   <tr>
@@ -1202,7 +1398,7 @@ export default function ListaCompraSugeridaPage({
                     <th className={styles.right}>Estoque Atual</th>
                     <th className={styles.right}>Duração Atual</th>
                     <th className={styles.right}>Consumo/dia</th>
-                    <th className={styles.right}>Qtd a Repor</th>
+                    <th className={styles.right}>Sugestão</th>
                     <th className={styles.right}>Custo Unit.</th>
                     <th className={styles.right}>Custo Total</th>
                   </tr>
@@ -1213,9 +1409,9 @@ export default function ListaCompraSugeridaPage({
                     <td colSpan={8}>
                       <div className={styles.sectionLabel}>
                         <span className={`${styles.curvaBadge} ${styles.badgeReposicao}`}>↑</span>
-                        <span className={styles.sectionTitle}>Produtos com estoque abaixo do limite — reposição individual</span>
+                        <span className={styles.sectionTitle}>Produtos com sugestão acionável pela regra da Lista Loja (Compra, S, E)</span>
                         <span className={styles.sectionCount}>
-                          {expandirPorCor ? reposicaoData.itens.length : reposicaoAgrupadaPorProduto.length} item(ns)
+                          {reposicaoExibidaComCusto.length} item(ns)
                         </span>
                       </div>
                     </td>
@@ -1237,7 +1433,25 @@ export default function ListaCompraSugeridaPage({
                         <span className={styles.duracaoBadge}>{item.duracaoReal} dias</span>
                       </td>
                       <td className={styles.vendas}>{item.consumoDiario.toFixed(1)}/dia</td>
-                      <td className={styles.qtdSugerida}>{fmt(item.qtdCompra)}</td>
+                      <td className={item.sugestaoTipo === "S" ? styles.qtdSugeridaS : styles.qtdSugerida}>
+                        <span className={item.sugestaoTipo === "S" ? styles.qtdSugeridaSInner : undefined}>
+                          {fmt(item.sugestaoQtd ?? 0)}
+                          {item.sugestaoTipo === "S" && (
+                            <span
+                              className={styles.badgeS}
+                              style={{ marginLeft: 6 }}
+                              onMouseEnter={(e) => {
+                                const sd = item.suggestionSData;
+                                if (sd) setSugestaoSTooltip({ x: e.clientX, y: e.clientY, mediaVendasMes: sd.mediaVendasMes, mesesHistoricoFilial: sd.mesesHistoricoFilial, estoqueAtual: sd.estoqueAtual, limiteDias: sd.limiteDias, qtdS: item.sugestaoQtd ?? 0 });
+                              }}
+                              onMouseLeave={() => setSugestaoSTooltip(null)}
+                            >S</span>
+                          )}
+                          {item.sugestaoTipo === "E" && (
+                            <span className={styles.badgeE} style={{ marginLeft: 6 }}>E</span>
+                          )}
+                        </span>
+                      </td>
                       <td className={`${styles.right} ${item.custoUnit > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
                         {item.custoUnit > 0 ? fmtBRL2(item.custoUnit) : "—"}
                       </td>
@@ -1384,7 +1598,7 @@ export default function ListaCompraSugeridaPage({
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}>
                     <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
                   </svg>
-                  Meta: por item (60/90/120 dias)
+                  Meta: por item (60/90 dias)
                 </span>
               </>
             ) : (
@@ -1408,7 +1622,7 @@ export default function ListaCompraSugeridaPage({
               <div className={styles.summaryItem}>
                 <span className={styles.summaryLabel}>{modoReposicao ? "Cobertura Meta" : "Período Base"}</span>
                 <span className={styles.summaryValueNeutral} style={{ fontSize: 14 }}>
-                  {modoReposicao ? "Por item (60/90/120 dias)" : hasHistoricoParcialABC ? "Historico real por item" : "Últimos 12 meses"}
+                  {modoReposicao ? "Por item (60/90 dias)" : hasHistoricoParcialABC ? "Historico real por item" : "Últimos 12 meses"}
                 </span>
               </div>
               <div className={styles.summaryDivider} />
@@ -1471,7 +1685,7 @@ export default function ListaCompraSugeridaPage({
                               <span className={styles.sectionCount}>{grupo.length} produtos</span>
                               {curva === "A" && (
                                 <span className={styles.sectionNote}>
-                                  {modoReposicao ? "← meta por item (60/90/120)" : "← referência proporcional"}
+                                  {modoReposicao ? "← meta por item (60/90)" : "← referência proporcional"}
                                 </span>
                               )}
                               {modoReposicao && curva !== "A" && curvaAtivaModo && (

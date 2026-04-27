@@ -112,6 +112,11 @@ export async function POST(request: Request) {
       colecao: row.colecao ? String(row.colecao) : undefined,
       qtdManual: Number(row.qtdManual ?? 0),
       custoUnitario: row.custoUnitario != null ? Number(row.custoUnitario) : undefined,
+      filialOrigem: row.filialOrigem === null
+        ? null
+        : row.filialOrigem != null
+          ? String(row.filialOrigem)
+          : undefined,
     }));
 
     const t =

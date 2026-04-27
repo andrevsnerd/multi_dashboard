@@ -871,6 +871,28 @@
   pointer-events: none;
 }
 
+.compraQtdLoadingInline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #15803d;
+}
+
+.compraQtdLoadingDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #16a34a;
+  animation: compraQtdDotBlink 1s ease-in-out infinite;
+}
+
+@keyframes compraQtdDotBlink {
+  0%, 100% { opacity: 0.35; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
 /* Tooltip didático do cálculo da Qtd Compra */
 .compraDebugTooltip {
   position: fixed;

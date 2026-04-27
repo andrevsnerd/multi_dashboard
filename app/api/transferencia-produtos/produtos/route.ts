@@ -33,6 +33,8 @@ export async function GET(request: Request) {
             e.FILIAL AS FILIAL,
             e.ESTOQUE,
             p.DESC_PRODUTO,
+            ISNULL(p.LINHA, '') AS LINHA,
+            ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
             ISNULL(c.DESC_COR, '') AS DESC_COR,
             e.FILIAL AS NOME_FILIAL,
             pb.CODIGO_BARRA
@@ -90,6 +92,8 @@ export async function GET(request: Request) {
             ${filialOrigem ? `@filialOrigemParam` : `ISNULL(es.FILIAL, '')`} AS FILIAL,
             ISNULL(es.ESTOQUE, 0) AS ESTOQUE,
             p.DESC_PRODUTO,
+            ISNULL(p.LINHA, '') AS LINHA,
+            ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
             ISNULL(c.DESC_COR, '') AS DESC_COR,
             ${filialOrigem ? `@filialOrigemParam` : `ISNULL(es.FILIAL, '')`} AS NOME_FILIAL,
             pb.CODIGO_BARRA
@@ -125,6 +129,8 @@ export async function GET(request: Request) {
             e.FILIAL AS FILIAL,
             e.ESTOQUE,
             p.DESC_PRODUTO,
+            ISNULL(p.LINHA, '') AS LINHA,
+            ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
             ISNULL(c.DESC_COR, '') AS DESC_COR,
             e.FILIAL AS NOME_FILIAL,
             pb.CODIGO_BARRA
@@ -162,6 +168,8 @@ export async function GET(request: Request) {
       const result = await req.query<{
         PRODUTO: string;
         DESC_PRODUTO: string | null;
+        LINHA: string | null;
+        SUBGRUPO: string | null;
         CODIGO_BARRA: string | null;
         COR_PRODUTO: string | null;
         FILIAL: string | null;
@@ -194,6 +202,8 @@ export async function GET(request: Request) {
       const produtosMap = new Map<string, {
         produto: string;
         descProduto: string;
+        linha: string | null;
+        subgrupo: string | null;
         codigoBarra: string | null;
         corProduto: string | null;
         descCor: string;
@@ -215,6 +225,8 @@ export async function GET(request: Request) {
           produtosMap.set(key, {
             produto,
             descProduto: row.DESC_PRODUTO?.toString().trim() || '',
+            linha: row.LINHA?.toString().trim() || null,
+            subgrupo: row.SUBGRUPO?.toString().trim() || null,
             codigoBarra: row.CODIGO_BARRA?.toString().trim() || null,
             corProduto: cor || null,
             descCor: descCorResolvida || descCorBanco,

@@ -130,20 +130,25 @@ function normalizeKey(s?: string | null) {
     .replace(/\p{Diacritic}/gu, "");
 }
 
+function buildProdutoCorKey(produto?: string | null, cor?: string | null) {
+  return `${normalizeKey(produto)}||${normalizeKey(cor)}`;
+}
+
 function getLimiteDiasReposicao(p: { linha?: string; subgrupo?: string }) {
   const linha = normalizeKey(p.linha);
   const subgrupo = normalizeKey(p.subgrupo);
 
   // Linha índia: regra exclusiva (subgrupo não conta)
   if (linha === "INDIA") return 90;
+  if (linha === "ELETRONICOS") return 120;
 
-  // 120 dias apenas para subgrupos específicos
-  const subgrupos120 = new Set([
+  // 90 dias para subgrupos específicos de seda
+  const subgrupos90 = new Set([
     "CETIM DE SEDA",
     "MOUSSELINE DE SEDA",
     "SEDA PREMIUM",
   ]);
-  if (subgrupos120.has(subgrupo)) return 120;
+  if (subgrupos90.has(subgrupo)) return 90;
 
   // Restante
   return 60;
@@ -151,9 +156,21 @@ function getLimiteDiasReposicao(p: { linha?: string; subgrupo?: string }) {
 
 interface ProdutoSugestaoMin {
   produto: string;
+  cor?: string;
+  linha?: string;
+  subgrupo?: string;
+  qtde12m?: number;
   valor3meses: number;
   vendas3meses: number;
+  vendasMesAtual?: number;
+  estoqueAtual?: number;
+  mesesHistoricoFilial?: number | null;
+  diasDesdeUltimaVenda?: number | null;
   custoUnitario?: number;
+}
+
+function getQtde12mBaseMin(item: { qtde12m?: number; vendas3meses?: number }): number {
+  return Number(item.qtde12m ?? item.vendas3meses ?? 0);
 }
 
 /** Item individual com necessidade de reposição */
@@ -172,6 +189,70 @@ interface ReposicaoItem {
   diasCobertura: number;
   necessidadeTotal: number;
   custoUnit?: number;
+}
+
+function getMesesHistoricoFilial(item: { mesesHistoricoFilial?: number | null }): number {
+  const meses = Number(item.mesesHistoricoFilial ?? 12);
+  if (!Number.isFinite(meses)) return 12;
+  return Math.min(12, Math.max(1, meses));
+}
+
+type SuggestionResult = {
+  qty: number;
+  type: "COMPRA" | "S" | "E" | "SUFICIENTE" | "SEM_SUGESTAO";
+  /** Dados para tooltip do critério S */
+  sData?: { mediaVendasMes: number; mesesHistoricoFilial: number; estoqueAtual: number; limiteDias: number };
+};
+
+function getSuggestionListaLojaRule(item: ProdutoSugestaoMin): SuggestionResult {
+  const diasCorridosMes = new Date().getDate();
+  const vendasMes = Number(item.vendasMesAtual ?? 0);
+  const estoqueAtual = Number(item.estoqueAtual ?? 0);
+  if (vendasMes > 0 && diasCorridosMes > 0) {
+    const consumoDiario = vendasMes / diasCorridosMes;
+    if (consumoDiario > 0) {
+      const limiteDias = getLimiteDiasReposicao(item);
+      const duracaoAtual = estoqueAtual / consumoDiario;
+      if (duracaoAtual < limiteDias) {
+        const qty = Math.ceil(consumoDiario * (limiteDias - duracaoAtual));
+        if (qty > 0) return { qty, type: "COMPRA" };
+      }
+      if (duracaoAtual >= limiteDias) return { qty: 0, type: "SUFICIENTE" };
+    }
+  }
+
+  const mesesHistoricoFilial = getMesesHistoricoFilial(item);
+  const mediaVendasMes = getQtde12mBaseMin(item) / mesesHistoricoFilial;
+  if (mediaVendasMes >= 1 && estoqueAtual <= mediaVendasMes * 2) {
+    const limiteDias = getLimiteDiasReposicao(item);
+    const qty = Math.ceil((limiteDias / 30) * mediaVendasMes);
+    if (qty > 0) return { qty, type: "S", sData: { mediaVendasMes, mesesHistoricoFilial, estoqueAtual, limiteDias } };
+  }
+
+  const diasDesdeUltimaVenda = item.diasDesdeUltimaVenda;
+  if (estoqueAtual <= 0 && diasDesdeUltimaVenda != null && diasDesdeUltimaVenda >= 30) {
+    const qtdeBase = getQtde12mBaseMin(item);
+    if (qtdeBase > 0) {
+      const mesesBase = getMesesHistoricoFilial(item);
+      const mesesSemVenda = diasDesdeUltimaVenda / 30;
+      const mesesAtivos = mesesBase - mesesSemVenda;
+      if (mesesAtivos >= 1) {
+        const velocidadeAjustada = qtdeBase / mesesAtivos;
+        if (velocidadeAjustada >= 0.5) {
+          const limiteDias = getLimiteDiasReposicao(item);
+          const qty = Math.max(1, Math.ceil((limiteDias / 30) * velocidadeAjustada));
+          if (qty > 0) return { qty, type: "E" };
+        }
+      }
+    }
+  }
+
+  return { qty: 0, type: "SEM_SUGESTAO" };
+}
+
+/** Mantido para compatibilidade com chamadas que só precisam do número */
+function getSuggestedQtyListaLojaRule(item: ProdutoSugestaoMin): number {
+  return getSuggestionListaLojaRule(item).qty;
 }
 
 /**
@@ -1015,25 +1096,71 @@ export default function ProjecaoEstoquePage({
 
   // Custo unitário de reposição (PRODUTOS.CUSTO_REPOSICAO1) por código — não usar preço médio de venda
   const [unitPrices, setUnitPrices] = useState<Record<string, number>>({});
+  const [suggestionQtyMap, setSuggestionQtyMap] = useState<Record<string, number>>({});
+  const [suggestionResultMap, setSuggestionResultMap] = useState<Record<string, SuggestionResult>>({});
+  const [suggestionQtyLoading, setSuggestionQtyLoading] = useState(false);
   useEffect(() => {
-    if (allProdutosReposicao.length === 0) return;
+    if (allProdutosReposicao.length === 0) {
+      setSuggestionQtyLoading(false);
+      return;
+    }
+    setSuggestionQtyLoading(true);
     const params = new URLSearchParams();
     params.set("company", companyKey);
-    // Não passa filial: custo vem do cadastro do produto
+    // Passa filial para que mesesHistoricoFilial seja calculado por filial (sugestão S/E mais precisa)
+    // O custo unitário vem do cadastro e não muda com filial
+    if (filial) params.set("filial", filial);
     params.set("qtdCompra", "0");
-    params.set("limit", String(allProdutosReposicao.length + 20));
+    // porCor pode gerar muitas variações por produto; limite baixo corta cores e zera o match.
+    params.set("limit", String(Math.max(3000, allProdutosReposicao.length * 20)));
+    params.set("porCor", "1");
     allProdutosReposicao.forEach(p => params.append("produtos", p));
     fetch(`/api/controle-estoque/lista-compra-sugerida?${params}`, { cache: "no-store" })
       .then(r => r.json())
       .then((json: { data?: ProdutoSugestaoMin[] }) => {
         const prices: Record<string, number> = {};
+        const sugestoes: Record<string, number> = {};
+        const results: Record<string, SuggestionResult> = {};
         (json.data ?? []).forEach(p => {
           prices[p.produto] = Number(p.custoUnitario ?? 0);
+          const kCor = buildProdutoCorKey(p.produto, p.cor ?? "");
+          const kCorDesc = buildProdutoCorKey(p.produto, (p as { corDescricao?: string }).corDescricao ?? "");
+          const result = getSuggestionListaLojaRule(p);
+          sugestoes[kCor] = result.qty;
+          results[kCor] = result;
+          if (kCorDesc !== kCor) {
+            sugestoes[kCorDesc] = result.qty;
+            results[kCorDesc] = result;
+          }
         });
         setUnitPrices(prices);
+        setSuggestionQtyMap(sugestoes);
+        setSuggestionResultMap(results);
       })
-      .catch(() => {});
+      .catch(() => {
+        setSuggestionQtyMap({});
+        setSuggestionResultMap({});
+      })
+      .finally(() => setSuggestionQtyLoading(false));
   }, [allProdutosReposicao, companyKey, filial]);
+
+  const getSuggestedTotalForItems = useCallback((items: ReposicaoItem[]) => {
+    return items.reduce((s, item) => {
+      const k = buildProdutoCorKey(item.produto, item.cor ?? "");
+      const qtd = suggestionQtyMap[k] ?? 0;
+      return s + Math.max(0, Math.round(qtd));
+    }, 0);
+  }, [suggestionQtyMap]);
+
+  const getSuggestedQtyForItem = useCallback((item: ReposicaoItem) => {
+    const k = buildProdutoCorKey(item.produto, item.cor ?? "");
+    return Math.max(0, Math.round(suggestionQtyMap[k] ?? 0));
+  }, [suggestionQtyMap]);
+
+  const getSuggestionForItem = useCallback((item: ReposicaoItem): SuggestionResult => {
+    const k = buildProdutoCorKey(item.produto, item.cor ?? "");
+    return suggestionResultMap[k] ?? { qty: 0, type: "SEM_SUGESTAO" };
+  }, [suggestionResultMap]);
 
   // Custo por row = soma dos custos individuais de cada produto em reposição
   const custosCompra = useMemo(() => {
@@ -1042,26 +1169,26 @@ export default function ProjecaoEstoquePage({
       let total = 0;
       reposicaoItems.forEach(item => {
         const unitPrice = unitPrices[item.produto?.trim() ?? ''] ?? 0;
-        total += item.qtdCompra * unitPrice;
+        total += getSuggestedQtyForItem(item) * unitPrice;
       });
       if (total > 0) costs[rowKey] = total;
     });
     return costs;
-  }, [compraInfoMap, unitPrices]);
+  }, [compraInfoMap, unitPrices, getSuggestedQtyForItem]);
 
   // Qtd e custo agregados dos sub-níveis (para linhas macro sem alerta próprio)
   const subCompraMap = useMemo(() => {
     const map = new Map<string, { qtdTotal: number; custoTotal: number; reposicaoItems: ReposicaoItem[] }>();
     rawSubCompraItems.forEach((subItems, rowKey) => {
-      const qtdTotal = subItems.reduce((s, i) => s + i.qtdCompra, 0);
+      const qtdTotal = subItems.reduce((s, i) => s + getSuggestedQtyForItem(i), 0);
       const custoTotal = subItems.reduce((s, i) => {
         const unitPrice = unitPrices[i.produto?.trim() ?? ''] ?? 0;
-        return s + i.qtdCompra * unitPrice;
+        return s + getSuggestedQtyForItem(i) * unitPrice;
       }, 0);
       if (qtdTotal > 0) map.set(rowKey, { qtdTotal, custoTotal, reposicaoItems: subItems });
     });
     return map;
-  }, [rawSubCompraItems, unitPrices]);
+  }, [rawSubCompraItems, unitPrices, getSuggestedQtyForItem]);
 
   // ── Simulação de compras futuras — nível agregado por linha exibida ────────
   const simRowDataMap = useMemo((): Map<string, SimRowData> => {
@@ -1961,16 +2088,23 @@ export default function ProjecaoEstoquePage({
                         const handleClickQtdCompra = () => {
                           const info = compraInfo ?? (isSubNivelMonth ? subCompraInfo : null);
                           if (!info) return;
-                          const qtd = compraInfo ? compraInfo.qtdCompra : subCompraInfo!.qtdTotal;
                           const items = compraInfo ? compraInfo.reposicaoItems : subCompraInfo!.reposicaoItems;
+                          const qtd = getSuggestedTotalForItems(items);
+                          if (qtd <= 0) return;
                           try {
                             sessionStorage.setItem("lista_compra_reposicao", JSON.stringify({
                               categoria: proj.categoria,
                               totalQtd: qtd,
-                              itens: items.map(item => ({
-                                ...item,
-                                custoUnit: unitPrices[item.produto?.trim() ?? ""] ?? 0,
-                              })),
+                              itens: items.map(item => {
+                                const sg = getSuggestionForItem(item);
+                                return {
+                                  ...item,
+                                  custoUnit: unitPrices[item.produto?.trim() ?? ""] ?? 0,
+                                  suggestionQty: sg.qty,
+                                  suggestionType: sg.type,
+                                  suggestionSData: sg.sData,
+                                };
+                              }),
                               timestamp: Date.now(),
                             }));
                           } catch (_) { /* ignora se sessionStorage não disponível */ }
@@ -1982,18 +2116,13 @@ export default function ProjecaoEstoquePage({
                           grupos.forEach((g) => params.append("grupos", g));
                           linhas.forEach((l) => params.append("linhas", l));
                           colecoes.forEach((c) => params.append("colecoes", c));
-                          // Usa o subgrupo/grade/produto do row clicado (drill-down) em vez do filtro geral
-                          if (proj.subgrupo) {
-                            params.append("subgrupos", proj.subgrupo);
-                          } else {
-                            subgrupos.forEach((s) => params.append("subgrupos", s));
-                          }
-                          if (proj.grade) {
-                            params.append("grades", proj.grade);
-                          } else {
-                            grades.forEach((g) => params.append("grades", g));
-                          }
-                          if (proj.produto) params.append("produtos", proj.produto);
+                          // Usa o escopo real dos itens calculados para evitar levar um produto/filtro incorreto da linha agregada
+                          const subgruposEscopo = Array.from(new Set(items.map((it) => (it.subgrupo ?? "").trim()).filter(Boolean)));
+                          const gradesEscopo = Array.from(new Set(items.map((it) => (it.grade ?? "").trim()).filter(Boolean)));
+                          const produtosEscopo = Array.from(new Set(items.map((it) => (it.produto ?? "").trim()).filter(Boolean)));
+                          subgruposEscopo.forEach((s) => params.append("subgrupos", s));
+                          gradesEscopo.forEach((g) => params.append("grades", g));
+                          produtosEscopo.forEach((p) => params.append("produtos", p));
                           if (expansao.size > 0) {
                             params.set("expansao", JSON.stringify(Array.from(expansao.entries())));
                           }
@@ -2037,6 +2166,8 @@ export default function ProjecaoEstoquePage({
                               diasCobertura: 30 + lim2,
                               necessidadeTotal: consumoDiario * (30 + lim2),
                               custoUnit: unitPrices[p.produto?.trim() ?? ''] ?? 0,
+                              suggestionQty: c.qtd,
+                              suggestionType: "COMPRA",
                             }];
                           });
                           try {
@@ -2057,18 +2188,12 @@ export default function ProjecaoEstoquePage({
                           grupos.forEach((g) => params.append("grupos", g));
                           linhas.forEach((l) => params.append("linhas", l));
                           colecoes.forEach((c) => params.append("colecoes", c));
-                          // Usa o subgrupo/grade/produto do row clicado (drill-down) em vez do filtro geral
-                          if (proj.subgrupo) {
-                            params.append("subgrupos", proj.subgrupo);
-                          } else {
-                            subgrupos.forEach((s) => params.append("subgrupos", s));
-                          }
-                          if (proj.grade) {
-                            params.append("grades", proj.grade);
-                          } else {
-                            grades.forEach((g) => params.append("grades", g));
-                          }
-                          if (proj.produto) params.append("produtos", proj.produto);
+                          const subgruposEscopo = Array.from(new Set(simItems.map((it) => (it.subgrupo ?? "").trim()).filter(Boolean)));
+                          const gradesEscopo = Array.from(new Set(simItems.map((it) => (it.grade ?? "").trim()).filter(Boolean)));
+                          const produtosEscopo = Array.from(new Set(simItems.map((it) => (it.produto ?? "").trim()).filter(Boolean)));
+                          subgruposEscopo.forEach((s) => params.append("subgrupos", s));
+                          gradesEscopo.forEach((g) => params.append("grades", g));
+                          produtosEscopo.forEach((p) => params.append("produtos", p));
                           if (expansao.size > 0) params.set("expansao", JSON.stringify(Array.from(expansao.entries())));
                           router.push(`/${companyKey}/controle-estoque/projecao/lista-compra?${params.toString()}`);
                         };
@@ -2143,12 +2268,26 @@ export default function ProjecaoEstoquePage({
                           >
                             {isRedMonth ? (
                               <span className={styles.compraQtdCellWrapper}>
-                                {fmt(compraInfo!.qtdCompra)}
+                                {suggestionQtyLoading ? (
+                                  <span className={styles.compraQtdLoadingInline}>
+                                    <span className={styles.compraQtdLoadingDot} />
+                                    Carregando...
+                                  </span>
+                                ) : (
+                                  fmt(getSuggestedTotalForItems(compraInfo!.reposicaoItems))
+                                )}
                                 <span className={styles.compraQtdArrow}>→</span>
                               </span>
                             ) : isSubNivelMonth ? (
                               <span className={styles.compraQtdCellWrapper}>
-                                {fmt(subCompraInfo!.qtdTotal)}
+                                {suggestionQtyLoading ? (
+                                  <span className={styles.compraQtdLoadingInline}>
+                                    <span className={styles.compraQtdLoadingDot} />
+                                    Carregando...
+                                  </span>
+                                ) : (
+                                  fmt(getSuggestedTotalForItems(subCompraInfo!.reposicaoItems))
+                                )}
                                 <span className={styles.compraQtdArrow}>→</span>
                               </span>
                             ) : isSimMonth ? (

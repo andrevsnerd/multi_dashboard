@@ -468,5 +468,27 @@
     "comprada": false,
     "savedAt": "2026-04-23T11:27:33.725Z",
     "updatedAt": "2026-04-23T11:27:33.725Z"
+  },
+  {
+    "id": "4614edcb-999e-4a51-823e-7678c2d380bf",
+    "companyKey": "scarfme",
+    "sourceContextKey": "lista-loja:scarfme:__TODAS__:novo",
+    "title": "[Lista Loja] TODAS (visão geral) 27/04/2026 10:41 · andre.sabetta",
+    "expandirPorCor": true,
+    "items": [
+      {
+        "itemKey": "13.71.0672|04",
+        "produto": "13.71.0672",
+        "corProduto": "04",
+        "corDescricao": "VERDE",
+        "descricao": "MATA ATLANTICA C 01/26",
+        "qtdManual": 17,
+        "custoUnitario": 97.31,
+        "filialOrigem": null
+      }
+    ],
+    "comprada": false,
+    "savedAt": "2026-04-27T13:41:32.281Z",
+    "updatedAt": "2026-04-27T13:41:32.281Z"
   }
 ]

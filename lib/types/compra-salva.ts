@@ -8,6 +8,8 @@ export interface CompraSalvaItemRow {
   colecao?: string;
   qtdManual: number;
   custoUnitario?: number;
+  /** codFilial usado para calcular a sugestão ao salvar. null = todas as filiais. undefined = compra antiga sem esta informação. */
+  filialOrigem?: string | null;
 }
 
 export interface CompraSalva {

@@ -221,8 +221,9 @@ function getLimiteDiasReposicao(item: { linha?: string | null; subgrupo?: string
   const linha = normalizeKey(item.linha);
   const subgrupo = normalizeKey(item.subgrupo);
   if (linha === "INDIA") return 90;
-  const subgrupos120 = new Set(["CETIM DE SEDA", "MOUSSELINE DE SEDA", "SEDA PREMIUM"]);
-  if (subgrupos120.has(subgrupo)) return 120;
+  if (linha === "ELETRONICOS") return 120;
+  const subgrupos90 = new Set(["CETIM DE SEDA", "MOUSSELINE DE SEDA", "SEDA PREMIUM"]);
+  if (subgrupos90.has(subgrupo)) return 90;
   return 60;
 }
 
@@ -463,7 +464,6 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"produtos" | "vendedores">("produtos");
   const [porCor, setPorCor] = useState(true);
-  const [compraMode, setCompraMode] = useState(false);
   const [filtrarSugeridos, setFiltrarSugeridos] = useState(false);
   const [compraMetrics, setCompraMetrics] = useState<
     Record<
@@ -580,7 +580,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const diasCorridosMes = Math.max(1, data?.daysElapsed ?? 1);
 
   const produtosComCurvaExibidos = useMemo(() => {
-    if (!compraMode || !filtrarSugeridos) return produtosComCurva;
+    if (!filtrarSugeridos) return produtosComCurva;
     return produtosComCurva.filter((p) => {
       const metricKey = `${(p.produto ?? "").trim()}||${((p.cor ?? "") || "").trim()}`;
       const live = compraMetrics[metricKey];
@@ -603,7 +603,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       const sugestao = getReposicaoCompraView(compraItem, diasCorridosMes);
       return sugestao.qtdFinal > 0 || sugestao.qtdS > 0 || sugestao.qtdE > 0;
     });
-  }, [compraMode, filtrarSugeridos, produtosComCurva, compraMetrics, diasCorridosMes]);
+  }, [filtrarSugeridos, produtosComCurva, compraMetrics, diasCorridosMes]);
 
   const maxPerc = produtosComCurvaExibidos.length > 0 ? produtosComCurvaExibidos[0].percParticipacao : 1;
   const countA = produtosComCurvaExibidos.filter(p => p.curva === "A").length;
@@ -624,7 +624,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   }, [companyKey, selectedFilial, porCor, selectedCategory, range.startDate, range.endDate]);
 
   useEffect(() => {
-    if (!compraMode || produtosComCurva.length === 0) return;
+    if (produtosComCurva.length === 0) return;
     let cancelled = false;
     const load = async () => {
       const CHUNK_SIZE = 12;
@@ -662,7 +662,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     return () => {
       cancelled = true;
     };
-  }, [compraMode, produtosComCurva, companyKey, selectedFilial, porCor]);
+  }, [produtosComCurva, companyKey, selectedFilial, porCor]);
 
   const variation = data ? getComparisonBadge(data.vendas, data.vendasPrevious) : null;
 
@@ -991,35 +991,25 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
             >
               Por cor
             </button>
-            <button
-              type="button"
-              className={`${styles.toggleBtn} ${compraMode ? styles.toggleBtnActive : ""}`}
-              onClick={() => setCompraMode(v => !v)}
-              title="Adiciona a coluna de sugestão de compra"
+            <label
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                marginLeft: 6,
+                fontSize: 13,
+                color: "#334155",
+                userSelect: "none",
+              }}
+              title="Mostra apenas produtos com sugestão de compra"
             >
-              Compra
-            </button>
-            {compraMode && (
-              <label
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  marginLeft: 6,
-                  fontSize: 13,
-                  color: "#334155",
-                  userSelect: "none",
-                }}
-                title="Mostra apenas produtos com sugestão de compra"
-              >
-                <input
-                  type="checkbox"
-                  checked={filtrarSugeridos}
-                  onChange={(e) => setFiltrarSugeridos(e.target.checked)}
-                />
-                Sugeridos
-              </label>
-            )}
+              <input
+                type="checkbox"
+                checked={filtrarSugeridos}
+                onChange={(e) => setFiltrarSugeridos(e.target.checked)}
+              />
+              Sugeridos
+            </label>
             {produtosComCurva.length > 0 && (
               <button
                 type="button"
@@ -1041,7 +1031,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
             )}
             {produtosComCurvaExibidos.length === 0 && !selectedCategory && (
               <div className={styles.empty}>
-                {compraMode && filtrarSugeridos
+                {filtrarSugeridos
                   ? "Nenhum produto com sugestão de compra neste filtro."
                   : "Nenhum produto encontrado para este período."}
               </div>
@@ -1061,7 +1051,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                       <th className={styles.right}>Qtd vendida</th>
                       <th className={styles.right}>Estoque</th>
                       <th className={styles.right}>Markup</th>
-                      {compraMode && <th className={styles.right}>Sugestão de compra</th>}
+                      <th className={styles.right}>Sugestão de compra</th>
                     </>
                   </tr>
                 </thead>
@@ -1072,7 +1062,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                     return (
                       <React.Fragment key={curva}>
                         <tr className={`${styles.sectionRow} ${styles[`sectionRow${curva}`]}`}>
-                          <td colSpan={compraMode ? 8 : 7}>
+                          <td colSpan={8}>
                             <div className={styles.sectionLabel}>
                               <span className={`${styles.curvaBadge} ${CURVA_BADGE_CLASS[curva]}`}>{curva}</span>
                               <span className={styles.sectionTitle}>{CURVA_LABEL[curva]}</span>
@@ -1206,8 +1196,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                                 )}
                               </td>
                               <td className={styles.vendas}>{markup !== null ? <span className={styles.markupBadge}>{markup.toFixed(2)}x</span> : <span className={styles.noData}>—</span>}</td>
-                              {compraMode && (
-                                <td className={styles.vendas}>
+                              <td className={styles.vendas}>
                                   {(() => {
                                     const metricKey = `${(p.produto ?? "").trim()}||${((p.cor ?? "") || "").trim()}`;
                                     const live = compraMetrics[metricKey];
@@ -1369,7 +1358,6 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                                     );
                                   })()}
                                 </td>
-                              )}
                               </>
                             </tr>
                           );

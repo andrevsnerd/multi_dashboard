@@ -5647,16 +5647,19 @@ export async function fetchTopProdutosUltimos3Meses({
     request.input('lc_limit', sql.Int, limit);
 
     // Quando se busca por código de produto específico (lookup de preço unitário),
-    // os filtros de empresa/exclusão/filial são irrelevantes — o código já identifica o produto.
-    // Além disso, inclui todas as filiais (varejo + e-commerce) para preço real.
+    // os filtros de empresa/exclusão/filial são ignorados nas queries de vendas/estoque
+    // para incluir todas as filiais e obter o preço real.
+    // Porém, os filtros de histórico (primeira entrada/venda por filial) SEMPRE usam filial
+    // para que mesesHistoricoFilial reflita o período real do produto naquela filial.
     const isProdutoLookup = produtos != null && produtos.length > 0;
 
     const vendasFilialFilter = isProdutoLookup
       ? ''
       : buildVendasFilialFilter(request, company, filialSel, 'vp');
     const estoqueFilialFilter = isProdutoLookup ? '' : buildFilialFilter(request, company, filialSel, 'e2');
-    const entradaEstoqueFilialFilter = isProdutoLookup ? '' : buildEntradaFilialFilter(request, company, filialSel, 'E', 'lcHistEntradaEstoque');
-    const entradaLojaFilialFilter = isProdutoLookup ? '' : buildEntradaFilialFilter(request, company, filialSel, 'LE', 'lcHistEntradaLoja');
+    // Filtros de histórico sempre respeitam filial (preço ignora filial, mas período histórico não)
+    const entradaEstoqueFilialFilter = buildEntradaFilialFilter(request, company, filialSel, 'E', 'lcHistEntradaEstoque');
+    const entradaLojaFilialFilter = buildEntradaFilialFilter(request, company, filialSel, 'LE', 'lcHistEntradaLoja');
     const grupoFilter = isProdutoLookup ? '' : buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilter = isProdutoLookup ? '' : buildLinhaFilter(request, company, linhas, 'p');
     const colecaoFilter = isProdutoLookup ? '' : buildColecaoFilter(request, company, colecoes, 'p');
@@ -5938,7 +5941,12 @@ export async function fetchTopProdutosUltimos3Meses({
     if (historicoKeys.length > 0) {
       try {
         request.input('lcHistoricoKeysJson', sql.NVarChar(sql.MAX), JSON.stringify(historicoKeys));
-        const vendasFilialHistoricoFilter = vendasFilialFilter.replace(/vp\./g, 'VH.');
+        // No modo isProdutoLookup, vendasFilialFilter está vazio mas o histórico precisa de filial.
+        // Chama buildVendasFilialFilter com alias VH (primeira vez — sem colisão de params).
+        // No modo normal, reutiliza o filtro já construído apenas trocando o alias.
+        const vendasFilialHistoricoFilter = isProdutoLookup
+          ? buildVendasFilialFilter(request, company, filialSel, 'VH')
+          : vendasFilialFilter.replace(/vp\./g, 'VH.');
         const keyVarejo = historicoKeySql('VH.PRODUTO', 'VH.COR_PRODUTO');
         const keyEcommerce = historicoKeySql('FP.PRODUTO', 'FP.COR_PRODUTO');
         const keyEntradaEstoque = historicoKeySql('P.PRODUTO', 'P.COR_PRODUTO');
@@ -5949,35 +5957,44 @@ export async function fetchTopProdutosUltimos3Meses({
             SELECT CAST([value] AS VARCHAR(255)) AS itemKey
             FROM OPENJSON(@lcHistoricoKeysJson)
           )
-          SELECT itemKey, MIN(primeiraVendaFilial) AS primeiraVendaFilial
+          SELECT itemKey, MAX(primeiraVendaFilial) AS primeiraVendaFilial
           FROM (
             SELECT
-              ${keyVarejo} AS itemKey,
-              VH.DATA_VENDA AS primeiraVendaFilial
-            FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO VH WITH (NOLOCK)
-            WHERE VH.DATA_VENDA < @fim3m
-              AND VH.QTDE > 0
-              AND VH.QTDE_CANCELADA = 0
-              AND ${keyVarejo} IN (SELECT itemKey FROM keys)
-              ${vendasFilialHistoricoFilter}
+              itemKey,
+              filial,
+              MIN(primeiraVendaFilial) AS primeiraVendaFilial
+            FROM (
+              SELECT
+                ${keyVarejo} AS itemKey,
+                VH.FILIAL AS filial,
+                VH.DATA_VENDA AS primeiraVendaFilial
+              FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO VH WITH (NOLOCK)
+              WHERE VH.DATA_VENDA < @fim3m
+                AND VH.QTDE > 0
+                AND VH.QTDE_CANCELADA = 0
+                AND ${keyVarejo} IN (SELECT itemKey FROM keys)
+                ${vendasFilialHistoricoFilter}
 
-            ${mergeScarfmeEcommerce ? `
-            UNION ALL
+              ${mergeScarfmeEcommerce ? `
+              UNION ALL
 
-            SELECT
-              ${keyEcommerce} AS itemKey,
-              F.EMISSAO AS primeiraVendaFilial
-            FROM FATURAMENTO F WITH (NOLOCK)
-            JOIN W_FATURAMENTO_PROD_02 FP WITH (NOLOCK)
-              ON F.FILIAL = FP.FILIAL AND F.NF_SAIDA = FP.NF_SAIDA AND F.SERIE_NF = FP.SERIE_NF
-            WHERE F.EMISSAO < @fim3m
-              AND F.NOTA_CANCELADA = 0
-              AND F.NATUREZA_SAIDA IN ('100.02', '100.022')
-              AND CAST(FP.QTDE AS FLOAT) > 0
-              AND ${keyEcommerce} IN (SELECT itemKey FROM keys)
-              ${ecommerceFatFilialFilter}
-            ` : ''}
-          ) vendas_historicas
+              SELECT
+                ${keyEcommerce} AS itemKey,
+                F.FILIAL AS filial,
+                F.EMISSAO AS primeiraVendaFilial
+              FROM FATURAMENTO F WITH (NOLOCK)
+              JOIN W_FATURAMENTO_PROD_02 FP WITH (NOLOCK)
+                ON F.FILIAL = FP.FILIAL AND F.NF_SAIDA = FP.NF_SAIDA AND F.SERIE_NF = FP.SERIE_NF
+              WHERE F.EMISSAO < @fim3m
+                AND F.NOTA_CANCELADA = 0
+                AND F.NATUREZA_SAIDA IN ('100.02', '100.022')
+                AND CAST(FP.QTDE AS FLOAT) > 0
+                AND ${keyEcommerce} IN (SELECT itemKey FROM keys)
+                ${ecommerceFatFilialFilter}
+              ` : ''}
+            ) vendas_historicas
+            GROUP BY itemKey, filial
+          ) primeiras_vendas_por_filial
           GROUP BY itemKey
         `);
 
@@ -5986,35 +6003,44 @@ export async function fetchTopProdutosUltimos3Meses({
             SELECT CAST([value] AS VARCHAR(255)) AS itemKey
             FROM OPENJSON(@lcHistoricoKeysJson)
           )
-          SELECT itemKey, MIN(primeiraEntradaFilial) AS primeiraEntradaFilial
+          SELECT itemKey, MAX(primeiraEntradaFilial) AS primeiraEntradaFilial
           FROM (
             SELECT
-              ${keyEntradaEstoque} AS itemKey,
-              E.EMISSAO AS primeiraEntradaFilial
-            FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
-            JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK)
-              ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
-              AND E.FILIAL = P.FILIAL
-            WHERE P.PRODUTO IS NOT NULL
-              AND E.EMISSAO IS NOT NULL
-              AND ${keyEntradaEstoque} IN (SELECT itemKey FROM keys)
-              ${entradaEstoqueFilialFilter}
+              itemKey,
+              filial,
+              MIN(primeiraEntradaFilial) AS primeiraEntradaFilial
+            FROM (
+              SELECT
+                ${keyEntradaEstoque} AS itemKey,
+                E.FILIAL AS filial,
+                E.EMISSAO AS primeiraEntradaFilial
+              FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+              JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK)
+                ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+                AND E.FILIAL = P.FILIAL
+              WHERE P.PRODUTO IS NOT NULL
+                AND E.EMISSAO IS NOT NULL
+                AND ${keyEntradaEstoque} IN (SELECT itemKey FROM keys)
+                ${entradaEstoqueFilialFilter}
 
-            UNION ALL
+              UNION ALL
 
-            SELECT
-              ${keyEntradaLoja} AS itemKey,
-              LE.EMISSAO AS primeiraEntradaFilial
-            FROM LOJA_ENTRADAS_PRODUTO AS LEP WITH (NOLOCK)
-            INNER JOIN LOJA_ENTRADAS AS LE WITH (NOLOCK)
-              ON LEP.FILIAL = LE.FILIAL
-              AND LEP.ROMANEIO_PRODUTO = LE.ROMANEIO_PRODUTO
-            WHERE LEP.PRODUTO IS NOT NULL
-              AND LE.EMISSAO IS NOT NULL
-              AND (LE.ENTRADA_CANCELADA = 0 OR LE.ENTRADA_CANCELADA IS NULL)
-              AND ${keyEntradaLoja} IN (SELECT itemKey FROM keys)
-              ${entradaLojaFilialFilter}
-          ) entradas
+              SELECT
+                ${keyEntradaLoja} AS itemKey,
+                LE.FILIAL AS filial,
+                LE.EMISSAO AS primeiraEntradaFilial
+              FROM LOJA_ENTRADAS_PRODUTO AS LEP WITH (NOLOCK)
+              INNER JOIN LOJA_ENTRADAS AS LE WITH (NOLOCK)
+                ON LEP.FILIAL = LE.FILIAL
+                AND LEP.ROMANEIO_PRODUTO = LE.ROMANEIO_PRODUTO
+              WHERE LEP.PRODUTO IS NOT NULL
+                AND LE.EMISSAO IS NOT NULL
+                AND (LE.ENTRADA_CANCELADA = 0 OR LE.ENTRADA_CANCELADA IS NULL)
+                AND ${keyEntradaLoja} IN (SELECT itemKey FROM keys)
+                ${entradaLojaFilialFilter}
+            ) entradas
+            GROUP BY itemKey, filial
+          ) primeiras_entradas_por_filial
           GROUP BY itemKey
         `);
 
