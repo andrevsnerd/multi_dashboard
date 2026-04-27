@@ -63,6 +63,11 @@ export async function GET(request: Request) {
               p.DESC_PRODUTO LIKE @searchPattern
               OR RTRIM(LTRIM(CAST(p.PRODUTO AS VARCHAR(50)))) LIKE @searchPattern
               OR LTRIM(RTRIM(CAST(pb0.CODIGO_BARRA AS VARCHAR(100)))) = LTRIM(RTRIM(@searchTermExato))
+              OR (
+                TRY_CONVERT(BIGINT, LTRIM(RTRIM(CAST(pb0.CODIGO_BARRA AS VARCHAR(100))))) IS NOT NULL
+                AND TRY_CONVERT(BIGINT, LTRIM(RTRIM(@searchTermExato))) IS NOT NULL
+                AND TRY_CONVERT(BIGINT, LTRIM(RTRIM(CAST(pb0.CODIGO_BARRA AS VARCHAR(100))))) = TRY_CONVERT(BIGINT, LTRIM(RTRIM(@searchTermExato)))
+              )
             )
           ),
           base_cores AS (
@@ -142,6 +147,11 @@ export async function GET(request: Request) {
             p.DESC_PRODUTO LIKE @searchPattern
             OR RTRIM(LTRIM(CAST(e.PRODUTO AS VARCHAR(50)))) LIKE @searchPattern
             OR LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) = LTRIM(RTRIM(@searchTermExato))
+            OR (
+              TRY_CONVERT(BIGINT, LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100))))) IS NOT NULL
+              AND TRY_CONVERT(BIGINT, LTRIM(RTRIM(@searchTermExato))) IS NOT NULL
+              AND TRY_CONVERT(BIGINT, LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100))))) = TRY_CONVERT(BIGINT, LTRIM(RTRIM(@searchTermExato)))
+            )
           )
           AND e.ESTOQUE > 0
         `;

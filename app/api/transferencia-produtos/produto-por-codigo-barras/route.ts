@@ -31,6 +31,11 @@ export async function GET(request: Request) {
         FROM PRODUTOS_BARRA pb WITH (NOLOCK)
         INNER JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = pb.PRODUTO
         WHERE LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) = LTRIM(RTRIM(@codigoBarras))
+          OR (
+            TRY_CONVERT(BIGINT, LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100))))) IS NOT NULL
+            AND TRY_CONVERT(BIGINT, LTRIM(RTRIM(@codigoBarras))) IS NOT NULL
+            AND TRY_CONVERT(BIGINT, LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100))))) = TRY_CONVERT(BIGINT, LTRIM(RTRIM(@codigoBarras)))
+          )
       `;
 
       req.input('codigoBarras', sql.VarChar, codigoLimpo.trim());
