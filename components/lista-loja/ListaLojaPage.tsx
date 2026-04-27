@@ -1262,6 +1262,9 @@ function ListaLojaItensTable({
     estoqueAtual: number;
     duracaoAtual: number;
     qtdCalculada: number;
+    blendAplicado?: boolean;
+    qtdFinalPuro?: number;
+    qtdSBlend?: number;
   }>(null);
   const [duracaoTooltip, setDuracaoTooltip] = useState<null | {
     x: number;
@@ -1955,6 +1958,13 @@ function ListaLojaItensTable({
                     const estoqueAtual = Number(estoqueFilial ?? 0);
                     const limiteDias = getLimiteDiasReposicao(item);
                     const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
+                    const qtdFinalPuro = consumoDiario > 0 && duracaoAtual < limiteDias
+                      ? Math.ceil(consumoDiario * (limiteDias - duracaoAtual))
+                      : 0;
+                    const mediaVendasMesBlend = Number(qtde12m ?? 0) / getMesesHistoricoFilial({ mesesHistoricoFilial });
+                    const sEligivelBlend = mediaVendasMesBlend >= 1 && estoqueAtual <= mediaVendasMesBlend * 2;
+                    const qtdSBlend = sEligivelBlend ? calcQtdSugestaoS(item) : 0;
+                    const blendAplicado = qtdSBlend > 0 && qtdFinalPuro > 0 && qtdFinalPuro < 0.6 * qtdSBlend;
                     return (
                       <span
                         className={styles.reporAdd}
@@ -1962,8 +1972,12 @@ function ListaLojaItensTable({
                           setSugestaoTooltip({
                             x: e.clientX,
                             y: e.clientY,
-                            titulo: "Sugestão de reposição (cálculo principal)",
-                            regra: "Qtd = consumo/dia × (limite de cobertura - duração atual).",
+                            titulo: blendAplicado
+                              ? "Sugestão de reposição (ajuste histórico aplicado)"
+                              : "Sugestão de reposição (cálculo principal)",
+                            regra: blendAplicado
+                              ? "Mês atual baixo (< 60% da média histórica). Qtd = 80% histórico + 40% atual."
+                              : "Qtd = consumo/dia × (limite de cobertura - duração atual).",
                             limiteDias,
                             vendasMesAtual: vendasMes,
                             diasCorridos: diasCorridosMes,
@@ -1971,11 +1985,14 @@ function ListaLojaItensTable({
                             estoqueAtual,
                             duracaoAtual,
                             qtdCalculada: sugestao.qtdFinal,
+                            blendAplicado,
+                            qtdFinalPuro,
+                            qtdSBlend,
                           })
                         }
                         onMouseLeave={() => setSugestaoTooltip(null)}
                       >
-                        {fmt(sugestao.qtdFinal)}
+                        {fmt(sugestao.qtdFinal)}{blendAplicado && <>{" "}<span style={{ display: "inline-flex", width: 16, height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#0f172a", background: "#fde047", border: "1px solid #facc15", verticalAlign: "middle", cursor: "help" }}>⚡</span></>}
                       </span>
                     );
                   }
@@ -2293,6 +2310,19 @@ function ListaLojaItensTable({
           <div className={styles.metricTooltipLine}><strong>Estoque atual:</strong> {fmt(sugestaoTooltip.estoqueAtual)} un</div>
           <div className={styles.metricTooltipLine}><strong>Duração atual:</strong> {Math.max(0, Math.round(sugestaoTooltip.duracaoAtual))} dias</div>
           <div className={styles.metricTooltipLine}><strong>Limite do item:</strong> {sugestaoTooltip.limiteDias} dias</div>
+          {sugestaoTooltip.blendAplicado && sugestaoTooltip.qtdFinalPuro != null && sugestaoTooltip.qtdSBlend != null && (
+            <>
+              <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine}><strong>Cálculo atual (consumo):</strong> {fmt(sugestaoTooltip.qtdFinalPuro)} un</div>
+              <div className={styles.metricTooltipLine}><strong>Cálculo histórico (S):</strong> {fmt(sugestaoTooltip.qtdSBlend)} un</div>
+              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
+                Atual ({fmt(sugestaoTooltip.qtdFinalPuro)}) &lt; 60% de S ({fmt(Math.round(0.6 * sugestaoTooltip.qtdSBlend))}) → blend aplicado
+              </div>
+              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
+                = 80% × {fmt(sugestaoTooltip.qtdSBlend)} + 40% × {fmt(sugestaoTooltip.qtdFinalPuro)} = {fmt(sugestaoTooltip.qtdCalculada)}
+              </div>
+            </>
+          )}
           <div className={styles.metricTooltipDivider} />
           <div className={styles.metricTooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoTooltip.qtdCalculada)} un</div>
         </div>
