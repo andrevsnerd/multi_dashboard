@@ -373,6 +373,10 @@ export default function ProductDetailPage({
       </div>
 
       <div className={styles.controlsRow}>
+        <div className={styles.rangeWrapper}>
+          <DateRangeFilter value={range} onChange={setRange} label="" />
+        </div>
+
         <div className={styles.searchContainer} ref={searchContainerRef}>
           <div className={styles.searchInputWrapper}>
             <span className={styles.searchIcon} aria-hidden>
@@ -446,9 +450,6 @@ export default function ProductDetailPage({
           )}
         </div>
 
-        <div className={styles.rangeWrapper}>
-          <DateRangeFilter value={range} onChange={setRange} label="" />
-        </div>
       </div>
       {(loading || error) && (
         <div className={styles.controlsStatus}>
