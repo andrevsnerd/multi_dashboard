@@ -472,6 +472,7 @@ export default function ControlePerformancePage({ companyKey, companyName }: Pro
                           ? styles.variationPos
                           : styles.variationNeg
                       }`}
+                      title={`Variação vs ${comparisonLabel} | Atual: ${formatCurrency(row.vendas)} | Anterior: ${row.vendasPrevious > 0 ? formatCurrency(row.vendasPrevious) : "—"}`}
                     >
                       {`${variation.value >= 0 ? "↗" : "↘"} ${formatSignedPct(variation.value)}`}
                     </span>
