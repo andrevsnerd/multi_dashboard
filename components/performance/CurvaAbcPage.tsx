@@ -106,6 +106,17 @@ function formatSignedPct(value: number): string {
   return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
 }
 
+function formatCompactSignedPctForBadge(value: number): string {
+  const sign = value >= 0 ? "+" : "-";
+  const absRounded = Math.round(Math.abs(value));
+  if (absRounded <= 999) return `${sign}${absRounded}%`;
+
+  const thousands = Math.floor(absRounded / 1000);
+  if (thousands <= 999) return `${sign}${thousands}K%`;
+
+  return `${sign}999K%`;
+}
+
 function getComparisonBadge(
   current: number,
   previous: number
@@ -120,7 +131,7 @@ function getCombinedCategoryMetrics(
   categories: Record<string, { pct: number; deltaPct: number | null }>,
   keys: string[],
   totalSales: number
-): { pct: number; deltaPct: number | null } | null {
+): { pct: number; deltaPct: number | null; currentSales: number; previousSales: number } | null {
   if (keys.length === 0 || totalSales <= 0) return null;
 
   let currentSales = 0;
@@ -152,7 +163,7 @@ function getCombinedCategoryMetrics(
     ? ((currentSales - previousSales) / previousSales) * 100
     : null;
 
-  return { pct: Math.round(pct), deltaPct };
+  return { pct: Math.round(pct), deltaPct, currentSales, previousSales };
 }
 
 // ─── ABC helpers ──────────────────────────────────────────────────────────────
@@ -189,22 +200,10 @@ const CURVA_BAR_CLASS: Record<Curva, string> = {
 
 // ─── Category helpers ─────────────────────────────────────────────────────────
 
-const CATEGORY_COLORS = [
-  "#1565c0", "#e65100", "#00695c", "#4527a0", "#ad1457",
-  "#37474f", "#4e342e", "#1b5e20", "#00838f", "#6d4c41",
-];
-
 function getCategoryHeaderLabel(category: string): string {
   const normalized = category.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toUpperCase();
   if (normalized.includes("APROVEITAMENTO") && normalized.includes("LENC")) return "Ap. Lenços";
   return category.toLowerCase().replace(/^\w/, c => c.toUpperCase());
-}
-
-function hexToRgba(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 function normalizeKey(v?: string | null): string {
@@ -895,32 +894,56 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                   ✕ Todos
                 </button>
               )}
-              {displayedCategories.map((cat, idx) => {
+              {displayedCategories.map(cat => {
                 const pct = getCardCatPct(cat);
                 const delta = getCardCatDelta(cat);
                 if (pct === null) return null;
                 const isActive = selectedCategory === cat;
                 const isInactive = selectedCategory !== null && !isActive;
-                const color = CATEGORY_COLORS[idx % CATEGORY_COLORS.length];
+                const categoryComparisonValues = (() => {
+                  if (!data) return null;
+                  if (cat === OUTROS_LABEL) {
+                    const combined = getCombinedCategoryMetrics(data.categories, outrosKeys, data.vendas);
+                    if (!combined) return null;
+                    return {
+                      current: combined.currentSales,
+                      previous: combined.previousSales > 0 ? combined.previousSales : null,
+                    };
+                  }
+
+                  const catData = data.categories[cat];
+                  if (!catData) return null;
+                  const current = data.vendas * (catData.pct / 100);
+                  if (!Number.isFinite(current)) return null;
+                  if (typeof catData.deltaPct === "number" && Number.isFinite(catData.deltaPct)) {
+                    const factor = 1 + (catData.deltaPct / 100);
+                    if (factor > 0) {
+                      return {
+                        current,
+                        previous: current / factor,
+                      };
+                    }
+                  }
+                  return { current, previous: null };
+                })();
                 const catPillTrendClass = isActive
                   ? styles.catPillActive
                   : delta === null
-                    ? ""
+                    ? styles.catPillNeutral
                     : (delta >= 0 ? styles.catPillUp : styles.catPillDown);
+                const baseTitle = cat === OUTROS_LABEL ? outrosTooltip : getCategoryHeaderLabel(cat);
+                const comparisonValuesTitle = categoryComparisonValues
+                  ? `Atual: ${fmtCurrency(categoryComparisonValues.current)} | Anterior: ${categoryComparisonValues.previous !== null ? fmtCurrency(categoryComparisonValues.previous) : "—"}`
+                  : "Atual: — | Anterior: —";
                 return (
                   <button
                     key={cat}
                     type="button"
                     className={`${styles.catPill} ${catPillTrendClass} ${isInactive ? styles.catPillInactive : ""}`}
-                    title={cat === OUTROS_LABEL ? outrosTooltip : `Filtrar ABC por ${cat}`}
+                    title={`${baseTitle} | Variação vs ${comparisonLabel} | ${comparisonValuesTitle}`}
                     onClick={() => handleBadgeClick(cat)}
-                    style={!isActive ? {
-                      backgroundColor: delta === null ? hexToRgba(color, 0.12) : undefined,
-                      borderColor: delta === null ? hexToRgba(color, 0.35) : undefined,
-                      color: delta === null ? color : undefined,
-                    } : undefined}
                   >
-                    {getCategoryHeaderLabel(cat)} {pct}%
+                    {getCategoryHeaderLabel(cat)} {delta !== null ? formatCompactSignedPctForBadge(delta) : "—"}
                     {delta !== null && !isActive && (
                       <span className={delta >= 0 ? styles.catArrowUp : styles.catArrowDown}>
                         {delta >= 0 ? " ↑" : " ↓"}
