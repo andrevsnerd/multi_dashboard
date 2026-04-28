@@ -803,6 +803,13 @@
   font-weight: 700;
 }
 
+.transferenciaDestinoResumo {
+  font-size: 11px;
+  color: #cbd5e1;
+  text-align: right;
+  line-height: 1.35;
+}
+
 /* ─── Modal ───────────────────────────────────────────────────────────────── */
 .modalOverlay {
   position: fixed;

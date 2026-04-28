@@ -2415,12 +2415,12 @@ function ListaLojaItensTable({
             {destinosSorted.length > 0 && (
               <>
                 <div className={styles.metricTooltipDivider} />
-                <div className={styles.metricTooltipMeta} style={{ marginBottom: 4 }}>Lojas destino (por urgência):</div>
+                <div className={styles.metricTooltipMeta} style={{ marginBottom: 6 }}>Lojas destino (por urgência):</div>
                 {destinosSorted.map((d) => (
-                  <div key={d.label} className={styles.metricTooltipRow} style={{ alignItems: "flex-start" }}>
-                    <span style={{ minWidth: 80 }}>{d.label}</span>
-                    <span style={{ color: "#94a3b8", fontSize: 11, textAlign: "right" }}>
-                      {Math.round(d.cobertura)}d cob · {d.diaria.toFixed(1)}/dia · est. {fmt(d.estoque)}
+                  <div key={d.label} className={styles.metricTooltipRow} style={{ alignItems: "flex-start", gap: 10 }}>
+                    <span style={{ minWidth: 82 }}>{d.label}</span>
+                    <span className={styles.transferenciaDestinoResumo}>
+                      Cob {Math.round(d.cobertura)}d · Cons {d.diaria.toFixed(1)}/dia · Est {fmt(d.estoque)} · V12m {fmt(d.vendas12m)}
                     </span>
                   </div>
                 ))}
