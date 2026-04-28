@@ -672,6 +672,38 @@ function buildFiliaisQueVenderamText(rows: FilialVendaRow[]): string {
   );
 }
 
+function buildTransferenciaExportData(rotas: TransferenciaDestinoSugestao[]): {
+  total: number;
+  resumoRotas: string;
+  resumoDestinosUrgencia: string;
+} {
+  const total = rotas.reduce((sum, rota) => sum + Math.max(0, Math.round(rota.quantidade ?? 0)), 0);
+  const resumoRotas = buildExportListText(
+    rotas.map((rota) => `${rota.origemLabel} -> ${rota.destinoLabel}: ${fmt(rota.quantidade)} un`)
+  );
+
+  const destinosMap = new Map<string, { label: string; cobertura?: number }>();
+  rotas.forEach((rota) => {
+    if (!destinosMap.has(rota.destinoCanonico)) {
+      destinosMap.set(rota.destinoCanonico, {
+        label: rota.destinoLabel,
+        cobertura: rota.destinoCobertura,
+      });
+    }
+  });
+  const resumoDestinosUrgencia = buildExportListText(
+    Array.from(destinosMap.values())
+      .sort((a, b) => (a.cobertura ?? Number.POSITIVE_INFINITY) - (b.cobertura ?? Number.POSITIVE_INFINITY))
+      .map((destino) =>
+        destino.cobertura != null
+          ? `${destino.label}: ${Math.round(destino.cobertura)}d cobertura`
+          : `${destino.label}: sem cobertura`
+      )
+  );
+
+  return { total, resumoRotas, resumoDestinosUrgencia };
+}
+
 async function mapWithConcurrency<T, R>(
   items: T[],
   limit: number,
@@ -702,9 +734,17 @@ async function buildListaLojaExportRows(
   companyKey: string,
   codFilial: string | null,
   itens: ListaItem[],
-  diasCorridosMes: number
+  diasCorridosMes: number,
+  transferenciasPorItem?: Record<string, TransferenciaDestinoSugestao[]>
 ): Promise<Array<Record<string, string | number | boolean | null>>> {
   const company = resolveCompany(companyKey);
+  let curvaAbcMap = new Map<string, CurvaInfo>();
+  try {
+    const abcScope = await fetchCurvaAbcScope(companyKey as CompanyKey, codFilial);
+    curvaAbcMap = calcularCurvasAbcProdutos(abcScope.produtos ?? []);
+  } catch {
+    curvaAbcMap = new Map<string, CurvaInfo>();
+  }
 
   const detalhesPorItem = await mapWithConcurrency(itens, 6, async (item) => {
     const [estoqueRowsRaw, vendasRowsRaw] = await Promise.all([
@@ -752,7 +792,12 @@ async function buildListaLojaExportRows(
   ).sort((a, b) => compareFilialDisplayOrder(a, b, company));
 
   return itens.map((item, index) => {
-    const baseRow = buildListaLojaExportRow(item, diasCorridosMes);
+    const itemKey = buildItemKey(item.produto, item.corProduto);
+    const rotasTransferencia = transferenciasPorItem?.[itemKey] ?? [];
+    const transferenciaExport =
+      rotasTransferencia.length > 0 ? buildTransferenciaExportData(rotasTransferencia) : null;
+    const curvaAbc = curvaAbcMap.get(itemKey)?.curva ?? null;
+    const baseRow = buildListaLojaExportRow(item, diasCorridosMes, { curvaAbc, transferenciaExport });
     const detalhes = detalhesPorItem[index];
 
     baseRow.FILIAIS_COM_ESTOQUE = detalhes.filiaisComEstoque;
@@ -969,7 +1014,18 @@ function buildEBlockReason(
   return "Não passou nos critérios de sugestão E com os dados atuais.";
 }
 
-function buildListaLojaExportRow(item: ListaItem, diasCorridosMes: number): Record<string, string | number | boolean | null> {
+function buildListaLojaExportRow(
+  item: ListaItem,
+  diasCorridosMes: number,
+  exportData?: {
+    curvaAbc: Curva | null;
+    transferenciaExport: {
+      total: number;
+      resumoRotas: string;
+      resumoDestinosUrgencia: string;
+    } | null;
+  }
+): Record<string, string | number | boolean | null> {
   const sugestao = getReposicaoCompraView(item, diasCorridosMes);
   const estoqueAtual = Number(item.estoqueFilial ?? 0);
   const vendasMesAtual = Number(item.vendasMesAtual ?? 0);
@@ -1035,6 +1091,7 @@ function buildListaLojaExportRow(item: ListaItem, diasCorridosMes: number): Reco
     HISTORICO_PARCIAL: historicoParcial ? "Sim" : "Nao",
     LINHA: item.linha || "",
     SUBGRUPO: item.subgrupo || "",
+    CURVA_ABC_REDE: exportData?.curvaAbc ?? "",
     STATUS: status,
     TIPO_SUGESTAO: tipo,
     REGRA_REPOSICAO: regra,
@@ -1051,6 +1108,14 @@ function buildListaLojaExportRow(item: ListaItem, diasCorridosMes: number): Reco
     VELOCIDADE_AJUSTADA: velocidadeAjustada,
     QTD_S: sugestao.qtdS > 0 ? sugestao.qtdS : null,
     QTD_E: sugestao.qtdE > 0 ? sugestao.qtdE : null,
+    CUSTO_TOTAL_SUGERIDO:
+      qtdCalculada > 0 && Number(item.custoUnit ?? 0) > 0
+        ? qtdCalculada * Number(item.custoUnit ?? 0)
+        : null,
+    TEM_TRANSFERENCIA_SUGERIDA: exportData?.transferenciaExport ? "Sim" : "Não",
+    TRANSFERENCIA_QTD_TOTAL: exportData?.transferenciaExport?.total ?? null,
+    TRANSFERENCIA_ROTAS: exportData?.transferenciaExport?.resumoRotas ?? "",
+    TRANSFERENCIA_DESTINOS_URGENCIA: exportData?.transferenciaExport?.resumoDestinosUrgencia ?? "",
     QTD_SUFICIENTE: sugestao.qtdSuficiente ? "Sim" : "Não",
     SEM_SUGESTAO: sugestao.semSugestao ? "Sim" : "Não",
     FALHA_FINAL: status === "Barrado" ? buildFinalBlockReason(duracaoAtual, limiteDias) : "",
@@ -3497,7 +3562,8 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
         companyKey,
         filialSelecionada?.codFilial ?? null,
         itensVisiveis,
-        diasCorridosMes
+        diasCorridosMes,
+        transferenciasPorItem
       );
       exportListaLojaToXlsx({
         companyKey,
@@ -3521,6 +3587,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     filialSelecionada?.codFilial,
     filialSelecionada?.filial,
     itensVisiveis,
+    transferenciasPorItem,
     mostrarNotificacao,
     nomeLista,
   ]);
