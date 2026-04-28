@@ -4145,6 +4145,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
               >
                 <div className={styles.listaCardContent}>
                   <div className={styles.listaCardTop}>
+                    <span className={styles.listaNome}>{lista.nome}</span>
                     <span className={styles.listaFilialTag}>{lista.nome_filial}</span>
                   </div>
                   <div className={styles.listaCardMeta}>
