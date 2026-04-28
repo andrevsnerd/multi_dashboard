@@ -32,6 +32,7 @@ const SINCRONIZACAO_FILIAIS_EXCLUIDAS = [
   "NERD MORUMBI",
   "SCARF ME- HIGIENOPOLIS",
 ] as const;
+const SINCRONIZACAO_FILIAL_OCULTA_EXATA = "NERD MORUMBI RDRRRJ";
 const SINCRONIZACAO_FILIAIS_EXCLUIDAS_NORMALIZADAS = new Set(
   SINCRONIZACAO_FILIAIS_EXCLUIDAS.map((f) => normalizarFilial(f))
 );
@@ -128,6 +129,9 @@ export async function fetchSincronizacaoFiliais(): Promise<{
       }))
       .filter((row) => {
         if (!Number.isFinite(row.codFilial)) {
+          return false;
+        }
+        if (row.filial === SINCRONIZACAO_FILIAL_OCULTA_EXATA) {
           return false;
         }
         if (SINCRONIZACAO_FILIAIS_EXCLUIDAS_NORMALIZADAS.has(row.filial)) {

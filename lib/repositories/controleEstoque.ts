@@ -6205,6 +6205,13 @@ export async function fetchVendasProdutoPorFilial({
     request.input('vf_inicioMesAtual', sql.DateTime, inicioMesAtual);
     request.input('vf_produto', sql.VarChar, produto.trim());
 
+    const produtoCadastroResult = await request.query<{ custoUnitario: number | null }>(`
+      SELECT TOP 1 ISNULL(CUSTO_REPOSICAO1, 0) AS custoUnitario
+      FROM PRODUTOS WITH (NOLOCK)
+      WHERE LTRIM(RTRIM(ISNULL(PRODUTO, ''))) = @vf_produto
+    `);
+    const produtoCustoUnitario = Number(produtoCadastroResult.recordset[0]?.custoUnitario ?? 0);
+
     const vendasFilialFilter = buildVendasFilialFilter(request, company, filialSel, 'vf');
     const ecommerceFatFilialFilter =
       company === 'scarfme'
@@ -6289,7 +6296,7 @@ export async function fetchVendasProdutoPorFilial({
         qtde60d: Math.round(Number(r.qtde60d ?? 0)),
         qtdeMesAtual: 0,
         valor12m: Number(r.valor12m ?? 0),
-        custoUnitario: Number(r.custoUnitario ?? 0),
+        custoUnitario: Number(r.custoUnitario ?? 0) || produtoCustoUnitario,
         ultimaVenda: r.ultimaVenda ? new Date(r.ultimaVenda) : null,
         primeiraEntradaFilial: null,
         primeiraVendaFilial: null,
@@ -6331,13 +6338,13 @@ export async function fetchVendasProdutoPorFilial({
           ex.qtde12m += q12;
           ex.qtde60d += q60;
           ex.valor12m += val;
-          ex.custoUnitario = Math.max(ex.custoUnitario, custo);
+          ex.custoUnitario = Math.max(ex.custoUnitario, custo || produtoCustoUnitario);
           // mantém a data de venda mais recente entre varejo e e-commerce
           if (ecUltimaVenda && (!ex.ultimaVenda || ecUltimaVenda > ex.ultimaVenda)) {
             ex.ultimaVenda = ecUltimaVenda;
           }
         } else {
-          byFilial.set(r.filial, { filial: r.filial, qtde12m: q12, qtde60d: q60, qtdeMesAtual: 0, valor12m: val, custoUnitario: custo, ultimaVenda: ecUltimaVenda, primeiraEntradaFilial: null, primeiraVendaFilial: null });
+          byFilial.set(r.filial, { filial: r.filial, qtde12m: q12, qtde60d: q60, qtdeMesAtual: 0, valor12m: val, custoUnitario: custo || produtoCustoUnitario, ultimaVenda: ecUltimaVenda, primeiraEntradaFilial: null, primeiraVendaFilial: null });
         }
       }
     }
@@ -6369,7 +6376,7 @@ export async function fetchVendasProdutoPorFilial({
           qtde60d: 0,
           qtdeMesAtual: qMes,
           valor12m: 0,
-          custoUnitario: 0,
+          custoUnitario: produtoCustoUnitario,
           ultimaVenda: null,
           primeiraEntradaFilial: null,
           primeiraVendaFilial: null,
@@ -6409,7 +6416,7 @@ export async function fetchVendasProdutoPorFilial({
             qtde60d: 0,
             qtdeMesAtual: qMes,
             valor12m: 0,
-            custoUnitario: 0,
+            custoUnitario: produtoCustoUnitario,
             ultimaVenda: null,
             primeiraEntradaFilial: null,
             primeiraVendaFilial: null,
@@ -6473,7 +6480,7 @@ export async function fetchVendasProdutoPorFilial({
               qtde60d: 0,
               qtdeMesAtual: 0,
               valor12m: 0,
-              custoUnitario: 0,
+              custoUnitario: produtoCustoUnitario,
               ultimaVenda: null,
               primeiraEntradaFilial: null,
               primeiraVendaFilial,
@@ -6538,7 +6545,7 @@ export async function fetchVendasProdutoPorFilial({
               qtde60d: 0,
               qtdeMesAtual: 0,
               valor12m: 0,
-              custoUnitario: 0,
+              custoUnitario: produtoCustoUnitario,
               ultimaVenda: null,
               primeiraEntradaFilial,
               primeiraVendaFilial: null,
@@ -6574,6 +6581,20 @@ export async function fetchVendasProdutoPorFilial({
       };
     };
 
+    if (byFilial.size === 0 && produtoCustoUnitario > 0) {
+      byFilial.set(filialSel ?? 'TODAS', {
+        filial: filialSel ?? 'TODAS',
+        qtde12m: 0,
+        qtde60d: 0,
+        qtdeMesAtual: 0,
+        valor12m: 0,
+        custoUnitario: produtoCustoUnitario,
+        ultimaVenda: null,
+        primeiraEntradaFilial: null,
+        primeiraVendaFilial: null,
+      });
+    }
+
     return Array.from(byFilial.values())
       .sort((a, b) => a.filial.localeCompare(b.filial))
       .map((r) => {
@@ -6581,6 +6602,7 @@ export async function fetchVendasProdutoPorFilial({
         const dataBaseHistorico = r.primeiraEntradaFilial ?? r.primeiraVendaFilial;
         return {
           ...r,
+          custoUnitario: Number(r.custoUnitario ?? 0) || produtoCustoUnitario,
           diasDesdeUltimaVenda: r.ultimaVenda ? Math.floor((nowMs - r.ultimaVenda.getTime()) / msPerDay) : null,
           primeiraEntradaFilial: dataBaseHistorico,
           ...historico,

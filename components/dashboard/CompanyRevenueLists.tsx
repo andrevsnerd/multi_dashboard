@@ -24,6 +24,48 @@ interface RevenueState {
   categories: CategoryRevenue[];
 }
 
+function normalizeDisplayName(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+}
+
+function aggregateByDisplayName(items: FilialPerformance[]): FilialPerformance[] {
+  const byDisplayName = new Map<string, FilialPerformance>();
+
+  for (const item of items) {
+    const normalizedName = normalizeDisplayName(item.filialDisplayName);
+    const displayName = item.filialDisplayName.replace(/\s+/g, " ").trim();
+    const existing = byDisplayName.get(normalizedName);
+
+    if (!existing) {
+      byDisplayName.set(normalizedName, {
+        filial: item.filial,
+        filialDisplayName: displayName,
+        currentRevenue: item.currentRevenue,
+        previousRevenue: item.previousRevenue,
+        changePercentage: item.changePercentage,
+      });
+      continue;
+    }
+
+    existing.currentRevenue += item.currentRevenue;
+    existing.previousRevenue += item.previousRevenue;
+    if (existing.previousRevenue > 0) {
+      existing.changePercentage = Number(
+        (((existing.currentRevenue - existing.previousRevenue) / existing.previousRevenue) * 100).toFixed(1)
+      );
+    } else if (existing.currentRevenue > 0) {
+      existing.changePercentage = null;
+    }
+  }
+
+  return Array.from(byDisplayName.values()).sort((a, b) => b.currentRevenue - a.currentRevenue);
+}
+
 async function fetchRevenue(
   company: string,
   startDate: Date,
@@ -125,7 +167,7 @@ export default function CompanyRevenueLists({
   // SCARFME: adicionar "VAREJO" agregado e agregar filiais com mesmo displayName (PAULISTA, E-COMMERCE)
   const filialPerformanceWithVarejo = useMemo(() => {
     if (companyKey !== "scarfme") {
-      return filialPerformanceProp;
+      return aggregateByDisplayName(filialPerformanceProp);
     }
 
     // Filtrar apenas filiais normais (não e-commerce) para o total VAREJO
@@ -164,42 +206,16 @@ export default function CompanyRevenueLists({
       changePercentage: varejoChangePercentage,
     };
 
-    // Agregar por filialDisplayName (ex.: duas PAULISTA → uma linha PAULISTA; dois E-COMMERCE → uma linha E-COMMERCE)
-    const byDisplayName = new Map<string, FilialPerformance>();
-    for (const item of filialPerformanceProp) {
-      const name = item.filialDisplayName;
-      const existing = byDisplayName.get(name);
-      if (!existing) {
-        byDisplayName.set(name, {
-          filial: item.filial,
-          filialDisplayName: name,
-          currentRevenue: item.currentRevenue,
-          previousRevenue: item.previousRevenue,
-          changePercentage: item.changePercentage,
-        });
-      } else {
-        existing.currentRevenue += item.currentRevenue;
-        existing.previousRevenue += item.previousRevenue;
-        // Recalcular VAR% com totais agregados
-        if (existing.previousRevenue > 0) {
-          existing.changePercentage = Number(
-            (((existing.currentRevenue - existing.previousRevenue) / existing.previousRevenue) * 100).toFixed(1)
-          );
-        } else if (existing.currentRevenue > 0) {
-          existing.changePercentage = null;
-        }
-      }
-    }
-
-    const aggregatedList = Array.from(byDisplayName.values()).sort(
-      (a, b) => b.currentRevenue - a.currentRevenue
-    );
+    // Agregar por filialDisplayName (ex.: duas PAULISTA -> uma linha PAULISTA; dois E-COMMERCE -> uma linha E-COMMERCE)
+    const aggregatedList = aggregateByDisplayName(filialPerformanceProp);
 
     return [varejoItem, ...aggregatedList];
   }, [filialPerformanceProp, companyKey]);
 
   const filialPerformanceTotals = useMemo(() => {
-    const list = filialPerformanceWithVarejo;
+    const list = filialPerformanceWithVarejo.filter(
+      (item) => normalizeDisplayName(item.filialDisplayName) !== "IBIRAPUERA"
+    );
     const sumAll = () => ({
       currentRevenue: list.reduce((sum, item) => sum + (item.currentRevenue ?? 0), 0),
       previousRevenue: list.reduce((sum, item) => sum + (item.previousRevenue ?? 0), 0),
@@ -236,6 +252,14 @@ export default function CompanyRevenueLists({
 
     return { currentRevenue, previousRevenue, changePercentage };
   }, [filialPerformanceWithVarejo, companyKey]);
+
+  const filialPerformanceDetalhada = useMemo(
+    () =>
+      filialPerformanceWithVarejo.filter(
+        (item) => normalizeDisplayName(item.filialDisplayName) !== "IBIRAPUERA"
+      ),
+    [filialPerformanceWithVarejo]
+  );
 
   return (
     <section className={styles.container}>
@@ -343,7 +367,7 @@ export default function CompanyRevenueLists({
               </div>
             </div>
             <ul className={styles.list}>
-              {filialPerformanceWithVarejo.map((item) => {
+              {filialPerformanceDetalhada.map((item) => {
                 const isPositive = item.changePercentage !== null && item.changePercentage > 0;
                 const isNegative = item.changePercentage !== null && item.changePercentage < 0;
                 const variationClass = isPositive
@@ -353,7 +377,7 @@ export default function CompanyRevenueLists({
                     : styles.variationNeutral;
 
                 return (
-                  <li key={item.filial} className={styles.listItem}>
+                  <li key={`${normalizeDisplayName(item.filialDisplayName)}-${item.filial}`} className={styles.listItem}>
                     <div className={styles.itemNameContainer}>
                       <strong className={styles.itemName}>{item.filialDisplayName}</strong>
                     </div>
@@ -392,7 +416,7 @@ export default function CompanyRevenueLists({
                 );
               })}
 
-              {filialPerformanceWithVarejo.length > 0 ? (
+              {filialPerformanceDetalhada.length > 0 ? (
                 <li className={styles.listItem}>
                   <div className={styles.itemNameContainer}>
                     <strong className={styles.itemName}>TOTAL</strong>
@@ -434,7 +458,7 @@ export default function CompanyRevenueLists({
                 </li>
               ) : null}
 
-              {filialPerformanceWithVarejo.length === 0 ? (
+              {filialPerformanceDetalhada.length === 0 ? (
                 <li className={styles.state}>Nenhuma filial encontrada.</li>
               ) : null}
             </ul>
