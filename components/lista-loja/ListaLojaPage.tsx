@@ -132,9 +132,16 @@ type FilialExportMetrics = {
 };
 
 type TransferenciaDestinoSugestao = {
-  label: string;
-  canonico: string;
+  origemLabel: string;
+  origemCanonico: string;
+  destinoLabel: string;
+  destinoCanonico: string;
   quantidade: number;
+  // Métricas do destino para o resumo no tooltip (extraídas de quantidadeExplicacao)
+  destinoCobertura?: number;
+  destinoDiaria?: number;
+  destinoEstoque?: number;
+  destinoVendas12m?: number;
 };
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
@@ -556,26 +563,6 @@ function transferenciaBadgeThemeForFilial(label: string) {
   return TRANSFERENCIA_BADGE_THEMES[Math.abs(h) % TRANSFERENCIA_BADGE_THEMES.length];
 }
 
-function TransferenciaDestinoBadges({ destinos }: { destinos: TransferenciaDestinoSugestao[] }) {
-  if (destinos.length === 0) return <span className={styles.cellMetric}>—</span>;
-  return (
-    <div className={styles.transferenciaBadges}>
-      {destinos.map((destino) => {
-        const theme = transferenciaBadgeThemeForFilial(destino.label);
-        return (
-          <span
-            key={destino.canonico || destino.label}
-            className={styles.transferenciaFilialBadge}
-            style={{ background: theme.bg, color: theme.fg, borderColor: theme.border }}
-          >
-            <span className={styles.transferenciaFilialBadgeName}>{destino.label}</span>
-            <span className={styles.transferenciaFilialBadgeNum}>{fmt(destino.quantidade)}</span>
-          </span>
-        );
-      })}
-    </div>
-  );
-}
 
 function buildExportHeaderToken(value: string) {
   const normalized = normalizeKey(value)
@@ -1305,7 +1292,7 @@ function ListaLojaItensTable({
   const [transferenciaTooltip, setTransferenciaTooltip] = useState<null | {
     x: number;
     y: number;
-    destinos: TransferenciaDestinoSugestao[];
+    rotas: TransferenciaDestinoSugestao[];
   }>(null);
 
   const [estoqueCache, setEstoqueCache] = useState<Record<string, Array<{ filial: string; estoque: number }>>>({});
@@ -2125,16 +2112,16 @@ function ListaLojaItensTable({
               {showTransferenciaColumn && (
                 <td>
                   {(() => {
-                    const destinos = transferenciasPorItem?.[buildItemKey(item.produto, item.corProduto)] ?? [];
-                    if (destinos.length === 0) return <span className={styles.cellMetric}>—</span>;
-                    const total = destinos.reduce((s, d) => s + d.quantidade, 0);
+                    const rotas = transferenciasPorItem?.[buildItemKey(item.produto, item.corProduto)] ?? [];
+                    if (rotas.length === 0) return <span className={styles.cellMetric}>—</span>;
+                    const total = rotas.reduce((s, r) => s + r.quantidade, 0);
                     return (
                       <span
-                        className={styles.reporAdd}
-                        style={{ cursor: "help" }}
-                        onMouseEnter={(e) => setTransferenciaTooltip({ x: e.clientX, y: e.clientY, destinos })}
+                        className={styles.transferenciaTotalBadge}
+                        onMouseEnter={(e) => setTransferenciaTooltip({ x: e.clientX, y: e.clientY, rotas })}
                         onMouseLeave={() => setTransferenciaTooltip(null)}
                       >
+                        <span className={styles.transferenciaTotalBadgeIcon}>⇄</span>
                         {fmt(total)}
                       </span>
                     );
@@ -2393,24 +2380,55 @@ function ListaLojaItensTable({
           <div className={styles.metricTooltipLine}><strong>Duração:</strong> {duracaoTooltip.duracaoDias} dias</div>
         </div>
       )}
-      {transferenciaTooltip && (
-        <div className={styles.metricTooltip} style={{ left: transferenciaTooltip.x + 12, top: transferenciaTooltip.y + 12 }}>
-          <div className={styles.metricTooltipTitle}>Sugestão de Transferência</div>
-          <div className={styles.metricTooltipDivider} />
-          {transferenciaTooltip.destinos.map((d) => (
-            <div key={d.canonico || d.label} className={styles.metricTooltipRow}>
-              <span>{d.label}</span>
-              <span>{fmt(d.quantidade)} un</span>
-            </div>
-          ))}
-          {transferenciaTooltip.destinos.length > 1 && (
-            <div className={styles.metricTooltipTotal}>
-              <span>Total</span>
-              <span>{fmt(transferenciaTooltip.destinos.reduce((s, d) => s + d.quantidade, 0))} un</span>
-            </div>
-          )}
-        </div>
-      )}
+      {transferenciaTooltip && (() => {
+        const rotas = transferenciaTooltip.rotas;
+        // Agrupa destinos únicos com métricas para o resumo, ordena por cobertura ASC (mais urgente primeiro)
+        const destinosMap = new Map<string, { label: string; cobertura: number; diaria: number; estoque: number; vendas12m: number }>();
+        rotas.forEach((r) => {
+          if (!destinosMap.has(r.destinoCanonico) && r.destinoCobertura != null) {
+            destinosMap.set(r.destinoCanonico, {
+              label: r.destinoLabel,
+              cobertura: r.destinoCobertura,
+              diaria: r.destinoDiaria ?? 0,
+              estoque: r.destinoEstoque ?? 0,
+              vendas12m: r.destinoVendas12m ?? 0,
+            });
+          }
+        });
+        const destinosSorted = Array.from(destinosMap.values()).sort((a, b) => a.cobertura - b.cobertura);
+        return (
+          <div className={styles.metricTooltip} style={{ left: transferenciaTooltip.x + 12, top: transferenciaTooltip.y + 12 }}>
+            <div className={styles.metricTooltipTitle}>Sugestão de Transferência</div>
+            <div className={styles.metricTooltipDivider} />
+            {rotas.map((r) => (
+              <div key={`${r.origemCanonico}|${r.destinoCanonico}`} className={styles.metricTooltipRow}>
+                <span>{r.origemLabel} → {r.destinoLabel}</span>
+                <span>{fmt(r.quantidade)} un</span>
+              </div>
+            ))}
+            {rotas.length > 1 && (
+              <div className={styles.metricTooltipTotal}>
+                <span>Total</span>
+                <span>{fmt(rotas.reduce((s, r) => s + r.quantidade, 0))} un</span>
+              </div>
+            )}
+            {destinosSorted.length > 0 && (
+              <>
+                <div className={styles.metricTooltipDivider} />
+                <div className={styles.metricTooltipMeta} style={{ marginBottom: 4 }}>Lojas destino (por urgência):</div>
+                {destinosSorted.map((d) => (
+                  <div key={d.label} className={styles.metricTooltipRow} style={{ alignItems: "flex-start" }}>
+                    <span style={{ minWidth: 80 }}>{d.label}</span>
+                    <span style={{ color: "#94a3b8", fontSize: 11, textAlign: "right" }}>
+                      {Math.round(d.cobertura)}d cob · {d.diaria.toFixed(1)}/dia · est. {fmt(d.estoque)}
+                    </span>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -2594,7 +2612,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
   }, [filialConsultaSelecionada, mode, companyKey, editingId]);
 
   useEffect(() => {
-    if (mode !== "editor" || !filialConsultaSelecionada || itensTransferenciaKey.length === 0) {
+    if (mode !== "editor" || itensTransferenciaKey.length === 0) {
       setTransferenciasPorItem({});
       return;
     }
@@ -2610,28 +2628,35 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
         const next: Record<string, TransferenciaDestinoSugestao[]> = {};
 
         for (const grupo of grupos) {
-          const origemCanonicaGrupo = grupo.items[0]?.origemCanonico ?? grupo.origem;
-          const origemEhLojaSelecionada =
-            matchFilialName(origemCanonicaGrupo, filialConsultaSelecionada) ||
-            matchFilialName(grupo.origem, filialSelecionada?.filial);
-          if (!origemEhLojaSelecionada) continue;
-
           for (const transferItem of grupo.items) {
             const key = getTransferenciaItemKeys(transferItem).find((k) => itemKeys.has(k));
             if (!key) continue;
-            const destinoKey = normalizeKey(transferItem.destinoCanonico || transferItem.destino);
+            // Chave única para a rota origem→destino deste item
+            const rotaKey = `${normalizeKey(transferItem.origemCanonico || transferItem.origem)}|${normalizeKey(transferItem.destinoCanonico || transferItem.destino)}`;
             const list = next[key] ?? [];
-            const existing = list.find((d) => normalizeKey(d.canonico || d.label) === destinoKey);
+            const existing = list.find(
+              (r) => `${normalizeKey(r.origemCanonico)}|${normalizeKey(r.destinoCanonico)}` === rotaKey
+            );
             if (existing) {
               existing.quantidade += Math.max(0, Math.round(transferItem.quantidade ?? 0));
             } else {
+              const chunk = transferItem.quantidadeExplicacao?.[0];
+              const filialDest = transferItem.itemOriginal.filiais.find(
+                (f) => (f.filial ?? "").trim().toUpperCase() === (transferItem.destinoCanonico ?? "").trim().toUpperCase()
+              );
               list.push({
-                label: transferItem.destino,
-                canonico: transferItem.destinoCanonico || transferItem.destino,
+                origemLabel: transferItem.origem,
+                origemCanonico: transferItem.origemCanonico || transferItem.origem,
+                destinoLabel: transferItem.destino,
+                destinoCanonico: transferItem.destinoCanonico || transferItem.destino,
                 quantidade: Math.max(0, Math.round(transferItem.quantidade ?? 0)),
+                destinoCobertura: chunk?.destino.coberturaDias,
+                destinoDiaria: chunk?.destino.diaria,
+                destinoEstoque: filialDest != null ? Math.max(0, filialDest.stock) : undefined,
+                destinoVendas12m: filialDest?.vendas12m,
               });
             }
-            next[key] = list.filter((d) => d.quantidade > 0);
+            next[key] = list.filter((r) => r.quantidade > 0);
           }
         }
 
@@ -2644,7 +2669,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     return () => {
       cancelled = true;
     };
-  }, [companyKey, filialConsultaSelecionada, filialSelecionada?.filial, itensTransferenciaKey, mode]);
+  }, [companyKey, itensTransferenciaKey, mode]);
 
   // ─── Load lists ─────────────────────────────────────────────────────────────
 
