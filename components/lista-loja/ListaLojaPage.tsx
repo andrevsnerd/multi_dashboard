@@ -532,11 +532,9 @@ function getTransferenciaItemKeys(transferItem: {
 
 function itemTemTransferenciaSugerida(
   item: ListaItem,
-  diasCorridosMes: number,
+  _diasCorridosMes: number,
   transferenciasPorItem: Record<string, TransferenciaDestinoSugestao[]>
 ): boolean {
-  const sugestao = getReposicaoCompraView(item, diasCorridosMes);
-  if (!sugestao.qtdSuficiente) return false;
   return (transferenciasPorItem[buildItemKey(item.produto, item.corProduto)] ?? []).length > 0;
 }
 
@@ -1303,6 +1301,11 @@ function ListaLojaItensTable({
     primeiraEntradaFilial: string | null;
     diasHistoricoFilial: number;
     mesesHistoricoFilial: number;
+  }>(null);
+  const [transferenciaTooltip, setTransferenciaTooltip] = useState<null | {
+    x: number;
+    y: number;
+    destinos: TransferenciaDestinoSugestao[];
   }>(null);
 
   const [estoqueCache, setEstoqueCache] = useState<Record<string, Array<{ filial: string; estoque: number }>>>({});
@@ -2122,22 +2125,19 @@ function ListaLojaItensTable({
               {showTransferenciaColumn && (
                 <td>
                   {(() => {
-                    const itemComMetricas = {
-                      ...item,
-                      vendasMesAtual,
-                      estoqueFilial,
-                      qtde12m,
-                      diasDesdeUltimaVenda,
-                      primeiraEntradaFilial,
-                      diasHistoricoFilial,
-                      mesesHistoricoFilial,
-                      historicoParcial,
-                    };
-                    const sugestao = getReposicaoCompraView(itemComMetricas, diasCorridosMes);
-                    const destinos = sugestao.qtdSuficiente
-                      ? transferenciasPorItem?.[buildItemKey(item.produto, item.corProduto)] ?? []
-                      : [];
-                    return <TransferenciaDestinoBadges destinos={destinos} />;
+                    const destinos = transferenciasPorItem?.[buildItemKey(item.produto, item.corProduto)] ?? [];
+                    if (destinos.length === 0) return <span className={styles.cellMetric}>—</span>;
+                    const total = destinos.reduce((s, d) => s + d.quantidade, 0);
+                    return (
+                      <span
+                        className={styles.reporAdd}
+                        style={{ cursor: "help" }}
+                        onMouseEnter={(e) => setTransferenciaTooltip({ x: e.clientX, y: e.clientY, destinos })}
+                        onMouseLeave={() => setTransferenciaTooltip(null)}
+                      >
+                        {fmt(total)}
+                      </span>
+                    );
                   })()}
                 </td>
               )}
@@ -2391,6 +2391,24 @@ function ListaLojaItensTable({
           <div className={styles.metricTooltipLine}><strong>Consumo/dia:</strong> {duracaoTooltip.consumoDiario.toFixed(2)} un</div>
           <div className={styles.metricTooltipLine}><strong>Estoque atual:</strong> {fmt(duracaoTooltip.estoqueAtual)} un</div>
           <div className={styles.metricTooltipLine}><strong>Duração:</strong> {duracaoTooltip.duracaoDias} dias</div>
+        </div>
+      )}
+      {transferenciaTooltip && (
+        <div className={styles.metricTooltip} style={{ left: transferenciaTooltip.x + 12, top: transferenciaTooltip.y + 12 }}>
+          <div className={styles.metricTooltipTitle}>Sugestão de Transferência</div>
+          <div className={styles.metricTooltipDivider} />
+          {transferenciaTooltip.destinos.map((d) => (
+            <div key={d.canonico || d.label} className={styles.metricTooltipRow}>
+              <span>{d.label}</span>
+              <span>{fmt(d.quantidade)} un</span>
+            </div>
+          ))}
+          {transferenciaTooltip.destinos.length > 1 && (
+            <div className={styles.metricTooltipTotal}>
+              <span>Total</span>
+              <span>{fmt(transferenciaTooltip.destinos.reduce((s, d) => s + d.quantidade, 0))} un</span>
+            </div>
+          )}
         </div>
       )}
     </div>

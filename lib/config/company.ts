@@ -39,6 +39,7 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
         'NERD HIGIENOPOLIS',
         'NERD LEBLON',
         'NERD MORUMBI RDRRRJ',
+        'NERD MORUMBI RDRX',
         'NERD MORUMBI RDRRX',
         'NERD ELDORADO',
         'NERD VILLA LOBOS',
@@ -48,6 +49,7 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
         'NERD HIGIENOPOLIS',
         'NERD LEBLON',
         'NERD MORUMBI RDRRRJ',
+        'NERD MORUMBI RDRX',
         'NERD MORUMBI RDRRX',
         'NERD ELDORADO',
         'NERD VILLA LOBOS',
@@ -58,13 +60,20 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
       'NERD CENTER NORTE': 'CENTER NORTE',
       'NERD HIGIENOPOLIS': 'HIGIENOPOLIS',
       'NERD LEBLON': 'LEBLON',
-      'NERD MORUMBI RDRRRJ': 'NERD MORUMBI 1 (RRJ)',
-      'NERD MORUMBI RDRRX': 'NERD MORUMBI 2 (RRX)',
+      'NERD MORUMBI RDRRRJ': 'MORUMBI 1',
+      'NERD MORUMBI RDRX': 'MORUMBI 1',
+      'NERD MORUMBI RDRRX': 'MORUMBI 2',
       'NERD ELDORADO': 'ELDORADO',
       'NERD VILLA LOBOS': 'VILLA LOBOS',
       'NERD': 'MATRIZ',
     },
-    estoqueFilialOrder: ['MATRIZ', 'NERD MORUMBI 1 (RRJ)', 'NERD MORUMBI 2 (RRX)', 'ELDORADO', 'VILLA LOBOS', 'HIGIENOPOLIS', 'LEBLON', 'CENTER NORTE'],
+    estoqueFilialOrder: ['MATRIZ', 'MORUMBI 1', 'MORUMBI 2', 'ELDORADO', 'VILLA LOBOS', 'HIGIENOPOLIS', 'LEBLON', 'CENTER NORTE'],
+    filialGroups: {
+      'NERD MORUMBI RDRRRJ': [
+        'NERD MORUMBI RDRRRJ',
+        'NERD MORUMBI RDRX',
+      ],
+    },
     leadTimeDays: {
       default: 2,
       byFilial: {
@@ -288,5 +297,4 @@ export function compareFilialDisplayOrder(
   if (fa !== fb) return fa - fb;
   return a.localeCompare(b, "pt-BR");
 }
-
 

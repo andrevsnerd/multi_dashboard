@@ -1,6 +1,6 @@
 import sql from 'mssql';
 
-import { resolveCompany, VAREJO_VALUE } from '@/lib/config/company';
+import { getFilialGroupMembers, resolveCompany, VAREJO_VALUE } from '@/lib/config/company';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import { normalizeRangeForQuery } from '@/lib/utils/date';
@@ -61,8 +61,19 @@ function buildFilialFilter(
   const filiais = company.filialFilters['inventory'] ?? [];
   const ecommerceFilials = company.ecommerceFilials ?? [];
 
-  // Se uma filial específica foi selecionada, usar apenas ela
+  // Se uma filial específica foi selecionada, usar ela ou o grupo que ela representa
   if (specificFilial && specificFilial !== VAREJO_VALUE) {
+    const members = getFilialGroupMembers(company, specificFilial);
+    if (members.length > 1) {
+      members.forEach((f, index) => {
+        request.input(`filial${prefix}Group${index}`, sql.VarChar, f);
+      });
+      const placeholders = members
+        .map((_, index) => `@filial${prefix}Group${index}`)
+        .join(', ');
+      return `AND ${prefix}.FILIAL IN (${placeholders})`;
+    }
+
     const filialParam = `filial${prefix}`;
     request.input(filialParam, sql.VarChar, specificFilial);
     return `AND ${prefix}.FILIAL = @${filialParam}`;
