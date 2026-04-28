@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import type { UserSession } from "@/types/auth";
+import { normalizePermissionKeys } from "@/lib/auth/permission-normalizer";
 
 const STORAGE_KEY = "dashboard-user";
 
@@ -32,7 +33,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (raw) {
         const parsed = JSON.parse(raw) as UserSession;
         if (parsed?.id && parsed?.username && parsed?.role) {
-          setUserState(parsed);
+          setUserState({
+            ...parsed,
+            permissions: normalizePermissionKeys(parsed.permissions),
+          });
         }
       }
     } catch {
@@ -61,7 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!res.ok) {
           return { ok: false, error: data.error ?? "Erro ao fazer login" };
         }
-        setUser(data.user);
+        setUser({
+          ...data.user,
+          permissions: normalizePermissionKeys(data.user?.permissions),
+        });
         return { ok: true };
       } catch (e) {
         return { ok: false, error: "Erro de conexão" };

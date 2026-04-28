@@ -1,5 +1,6 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { getNeonSql } from "@/lib/db/neon";
+import { normalizePermissionKeys } from "./permission-normalizer";
 import type { CompanyKey, PermissionKey, RoleKey, UserRecord } from "@/types/auth";
 
 let tableChecked = false;
@@ -57,7 +58,7 @@ function rowToUser(row: {
   allowed_companies?: string[] | null;
   nome_exibicao?: string | null;
 }): UserRecord {
-  const perms = Array.isArray(row.permissions) ? row.permissions : [];
+  const perms = normalizePermissionKeys(row.permissions);
   const raw = row.allowed_companies;
   const allowedCompanies =
     Array.isArray(raw) && raw.length > 0
@@ -68,7 +69,7 @@ function rowToUser(row: {
     username: row.username,
     passwordHash: row.password_hash,
     role: row.role as RoleKey,
-    permissions: perms as PermissionKey[],
+    permissions: perms,
     allowedCompanies,
     nomeExibicao: row.nome_exibicao ?? undefined,
   };
@@ -130,7 +131,7 @@ export async function createUser(
     .digest("hex")
     .slice(0, 12);
   const passwordHash = hashPassword(password);
-  const perms = role === "admin" ? [] : (permissions ?? []);
+  const perms = role === "admin" ? [] : normalizePermissionKeys(permissions ?? []);
   const allowedJson =
     allowedCompanies?.length ? JSON.stringify(allowedCompanies) : null;
   const nomeEx = nomeExibicao?.trim() || null;
@@ -187,10 +188,11 @@ export async function updateUser(
   }
   if (updates.role !== undefined) {
     role = updates.role;
-    permissions = role === "admin" ? [] : (updates.permissions ?? permissions);
+    permissions =
+      role === "admin" ? [] : normalizePermissionKeys(updates.permissions ?? permissions);
   }
   if (updates.permissions !== undefined && role !== "admin") {
-    permissions = updates.permissions;
+    permissions = normalizePermissionKeys(updates.permissions);
   }
   if (updates.allowedCompanies !== undefined) {
     allowedCompanies =

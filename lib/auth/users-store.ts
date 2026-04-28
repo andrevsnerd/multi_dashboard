@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { hasPostgres } from "@/lib/db/neon";
 import * as neonStore from "./users-store-neon";
+import { normalizePermissionKeys } from "./permission-normalizer";
 import type { CompanyKey, PermissionKey, RoleKey, UserRecord } from "@/types/auth";
 
 const USERS_FILE = path.join(process.cwd(), "data", "users.json");
@@ -37,7 +38,11 @@ function readUsersFile(): UserRecord[] {
   ensureDataDir();
   if (!fs.existsSync(USERS_FILE)) return [];
   try {
-    return JSON.parse(fs.readFileSync(USERS_FILE, "utf-8"));
+    const parsed = JSON.parse(fs.readFileSync(USERS_FILE, "utf-8")) as UserRecord[];
+    return parsed.map((user) => ({
+      ...user,
+      permissions: normalizePermissionKeys(user.permissions),
+    }));
   } catch {
     return [];
   }
@@ -95,7 +100,7 @@ export async function createUser(
     username: normalized,
     passwordHash: hashPassword(password),
     role,
-    permissions: role === "admin" ? [] : (permissions ?? []),
+    permissions: role === "admin" ? [] : normalizePermissionKeys(permissions ?? []),
     allowedCompanies:
       allowedCompanies?.length ? allowedCompanies : undefined,
     nomeExibicao: nomeExibicao?.trim() || undefined,
@@ -134,10 +139,12 @@ export async function updateUser(
   if (updates.role !== undefined) {
     current.role = updates.role;
     current.permissions =
-      updates.role === "admin" ? [] : (updates.permissions ?? current.permissions);
+      updates.role === "admin"
+        ? []
+        : normalizePermissionKeys(updates.permissions ?? current.permissions);
   }
   if (updates.permissions !== undefined && current.role !== "admin") {
-    current.permissions = updates.permissions;
+    current.permissions = normalizePermissionKeys(updates.permissions);
   }
   if (updates.allowedCompanies !== undefined) {
     current.allowedCompanies =
