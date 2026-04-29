@@ -7,12 +7,53 @@
 
 import { hasPostgres } from '@/lib/db/neon';
 import { getNeonSql } from '@/lib/db/neon';
+import { getActiveFilial, resolveCompany } from '@/lib/config/company';
 import fs from 'fs';
 import path from 'path';
 
 const PERMISSOES_FILE = path.join(process.cwd(), 'data', 'transferencia-permissoes.json');
 
 let tableChecked = false;
+
+function normalizeFilialAcrossCompanies(filial: string | null | undefined): string {
+  const raw = (filial || '').trim();
+  if (!raw || raw.toUpperCase() === 'TODAS') return raw;
+
+  for (const key of ['nerd', 'scarfme']) {
+    const company = resolveCompany(key);
+    const active = getActiveFilial(company, raw);
+    if (active !== raw) return active;
+  }
+
+  return raw;
+}
+
+function normalizeFilialList(filiais: string[] | null | undefined): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const filial of filiais ?? []) {
+    const active = normalizeFilialAcrossCompanies(filial);
+    const key = active.toUpperCase();
+    if (!active || seen.has(key)) continue;
+    seen.add(key);
+    result.push(active);
+  }
+
+  return result;
+}
+
+function normalizePermissao(permissao: TransferenciaPermissao): TransferenciaPermissao {
+  return {
+    ...permissao,
+    filiaisOrigem: normalizeFilialList(permissao.filiaisOrigem),
+    filiaisDestino: normalizeFilialList(permissao.filiaisDestino),
+    filiaisDestinoControle: normalizeFilialList(permissao.filiaisDestinoControle),
+    filialAtribuida: permissao.filialAtribuida
+      ? normalizeFilialAcrossCompanies(permissao.filialAtribuida)
+      : permissao.filialAtribuida ?? null,
+  };
+}
 
 // ---------- Store em arquivo (local, sem DATABASE_URL) ----------
 function ensureDataDir() {
@@ -87,7 +128,8 @@ export async function getPermissaoByUsername(username: string): Promise<Transfer
 
   if (!hasPostgres()) {
     const permissoes = readPermissoesFile();
-    return permissoes.find((p) => p.username.toLowerCase() === normalized) ?? null;
+    const permissao = permissoes.find((p) => p.username.toLowerCase() === normalized) ?? null;
+    return permissao ? normalizePermissao(permissao) : null;
   }
 
   const sql = getNeonSql();
@@ -115,13 +157,14 @@ export async function getPermissaoByUsername(username: string): Promise<Transfer
     // Em dev local: se a tabela estiver vazia (ex.: permissões só no JSON), usa o arquivo
     if (process.env.NODE_ENV === 'development') {
       const fromFile = readPermissoesFile();
-      return fromFile.find((p) => p.username.toLowerCase() === normalized) ?? null;
+      const permissao = fromFile.find((p) => p.username.toLowerCase() === normalized) ?? null;
+      return permissao ? normalizePermissao(permissao) : null;
     }
     return null;
   }
 
   const row = result[0];
-  return {
+  return normalizePermissao({
     username: row.username,
     filiaisOrigem: row.filiais_origem || [],
     filiaisDestino: row.filiais_destino || [],
@@ -133,22 +176,24 @@ export async function getPermissaoByUsername(username: string): Promise<Transfer
     tipoRomaneioFixo: row.tipo_romaneio_fixo || false,
     podeVerOutrasFiliais: row.pode_ver_outras_filiais === true,
     filialAtribuida: row.filial_atribuida != null ? String(row.filial_atribuida).trim() || null : null,
-  };
+  });
 }
 
 /**
  * Salva ou atualiza as permissões de um usuário
  */
 export async function savePermissao(permissao: TransferenciaPermissao): Promise<void> {
+  const permissaoNormalizada = normalizePermissao(permissao);
   if (!hasPostgres()) {
     const permissoes = readPermissoesFile();
-    const normalized = permissao.username.toLowerCase().trim();
+    const normalized = permissaoNormalizada.username.toLowerCase().trim();
     const index = permissoes.findIndex((p) => p.username.toLowerCase() === normalized);
     
     const permissaoAtualizada: TransferenciaPermissao = {
       ...permissao,
+      ...permissaoNormalizada,
       username: normalized,
-      filialAtribuida: (permissao.filialAtribuida && permissao.filialAtribuida.trim()) || null,
+      filialAtribuida: (permissaoNormalizada.filialAtribuida && permissaoNormalizada.filialAtribuida.trim()) || null,
     };
     
     if (index === -1) {
@@ -164,7 +209,7 @@ export async function savePermissao(permissao: TransferenciaPermissao): Promise<
   const sql = getNeonSql();
   await ensureTable(sql);
 
-  const username = permissao.username.toLowerCase().trim();
+  const username = permissaoNormalizada.username.toLowerCase().trim();
 
   await sql`
     INSERT INTO transferencia_permissoes (
@@ -183,16 +228,16 @@ export async function savePermissao(permissao: TransferenciaPermissao): Promise<
     )
     VALUES (
       ${username},
-      ${JSON.stringify(permissao.filiaisOrigem)}::jsonb,
-      ${JSON.stringify(permissao.filiaisDestino)}::jsonb,
-      ${JSON.stringify(permissao.filiaisDestinoControle || [])}::jsonb,
-      ${JSON.stringify(permissao.tiposRomaneioPermitidos || [])}::jsonb,
-      ${permissao.responsavelPadrao || null},
-      ${permissao.tipoRomaneioPadrao || null},
-      ${permissao.responsavelFixo || false},
-      ${permissao.tipoRomaneioFixo || false},
-      ${permissao.podeVerOutrasFiliais === true},
-      ${(permissao.filialAtribuida && permissao.filialAtribuida.trim()) || null},
+      ${JSON.stringify(permissaoNormalizada.filiaisOrigem)}::jsonb,
+      ${JSON.stringify(permissaoNormalizada.filiaisDestino)}::jsonb,
+      ${JSON.stringify(permissaoNormalizada.filiaisDestinoControle || [])}::jsonb,
+      ${JSON.stringify(permissaoNormalizada.tiposRomaneioPermitidos || [])}::jsonb,
+      ${permissaoNormalizada.responsavelPadrao || null},
+      ${permissaoNormalizada.tipoRomaneioPadrao || null},
+      ${permissaoNormalizada.responsavelFixo || false},
+      ${permissaoNormalizada.tipoRomaneioFixo || false},
+      ${permissaoNormalizada.podeVerOutrasFiliais === true},
+      ${(permissaoNormalizada.filialAtribuida && permissaoNormalizada.filialAtribuida.trim()) || null},
       NOW()
     )
     ON CONFLICT (username) DO UPDATE SET
@@ -215,7 +260,7 @@ export async function savePermissao(permissao: TransferenciaPermissao): Promise<
  */
 export async function listAllPermissoes(): Promise<TransferenciaPermissao[]> {
   if (!hasPostgres()) {
-    return readPermissoesFile();
+    return readPermissoesFile().map(normalizePermissao);
   }
 
   const sql = getNeonSql();
@@ -238,7 +283,7 @@ export async function listAllPermissoes(): Promise<TransferenciaPermissao[]> {
     ORDER BY username
   `;
 
-  return result.map((row) => ({
+  return result.map((row) => normalizePermissao({
     username: row.username,
     filiaisOrigem: row.filiais_origem || [],
     filiaisDestino: row.filiais_destino || [],

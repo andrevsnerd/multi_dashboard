@@ -6,6 +6,7 @@ import {
   type CompanyConfig,
   resolveCompany,
   getFilialLabelForDisplay,
+  getActiveFilial,
 } from "@/lib/config/company";
 import { useAuth } from "@/components/auth/AuthContext";
 
@@ -350,7 +351,8 @@ async function executarOperacaoLote(
   tipoRomaneio: string,
   responsavel: string,
   username?: string,
-  observacao?: string
+  observacao?: string,
+  companyKey?: string
 ): Promise<{ success: boolean; message: string; romaneio?: string }> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (username) headers["x-auth-username"] = username;
@@ -364,6 +366,7 @@ async function executarOperacaoLote(
       tipoRomaneio,
       responsavel,
       observacao: observacao || null,
+      companyKey,
     }),
   });
 
@@ -564,12 +567,12 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
           const resolveFiliais = (lista: string[]) => {
             if (lista.length > 0) {
               return data.filter(f =>
-                lista.some(cod => f.codFilial.trim() === (cod || "").trim())
+                lista.some(cod => getActiveFilial(companyConfig, cod || "").trim() === f.codFilial.trim())
               );
             }
             if (permissoes.filialAtribuida) {
               return data.filter(
-                f => f.codFilial.trim() === permissoes.filialAtribuida!.trim()
+                f => f.codFilial.trim() === getActiveFilial(companyConfig, permissoes.filialAtribuida).trim()
               );
             }
             return data;
@@ -589,7 +592,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
           // Usa filiaisDestinoControle (filiais destino visíveis do admin) — vazio = todas visíveis
           const controle = permissoes.filiaisDestinoControle ?? [];
           const destinos = controle.length > 0
-            ? data.filter(f => controle.some(cod => f.codFilial.trim() === (cod || "").trim()))
+            ? data.filter(f => controle.some(cod => getActiveFilial(companyConfig, cod || "").trim() === f.codFilial.trim()))
             : data;
           setFiliaisDestinoDisponiveis(destinos);
           if (destinos.length === 1) setFilialDestinoSaida(destinos[0]);
@@ -605,7 +608,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       }
     }
     loadFiliais();
-  }, [permissoes, permissoesCarregadas, tipoOperacao]);
+  }, [permissoes, permissoesCarregadas, tipoOperacao, companyConfig]);
 
   // Carregar tipos de romaneio e aplicar filtros de permissão
   useEffect(() => {
@@ -1158,7 +1161,8 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
         tipoRomaneioSelecionado,
         responsavelFinal || 'LOGISTICA',
         user?.username,
-        observacao.trim() || undefined
+        observacao.trim() || undefined,
+        companyKey
       );
 
       // Salvar filial destino do romaneio gerado (saída) — não aplicável para SAÍDA MKT

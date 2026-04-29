@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findUserByUsername } from "@/lib/auth/users-store";
 import { getDestinoRomaneio, setDestinoRomaneio } from "@/lib/utils/destino-romaneio-store";
+import { getActiveFilial } from "@/lib/config/company";
+import { resolveCompanyDynamic } from "@/lib/config/company-server";
 
 /**
  * GET /api/destino-romaneio?company=nerd&romaneio=029231&filialOrigem=X
@@ -19,8 +21,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const company = await resolveCompanyDynamic(companyKey);
     const filialDestino = await getDestinoRomaneio(companyKey, romaneioId, filialOrigem);
-    return NextResponse.json({ filialDestino });
+    const filialDestinoAtiva = filialDestino ? getActiveFilial(company, filialDestino) : filialDestino;
+    return NextResponse.json({ filialDestino: filialDestinoAtiva });
   } catch (error) {
     console.error("Erro ao buscar destino romaneio", error);
     return NextResponse.json(
@@ -65,8 +69,9 @@ export async function PUT(request: NextRequest) {
     }
     const companyKey = typeof body.companyKey === "string" ? body.companyKey.trim() : "";
     const romaneioId = typeof body.romaneioId === "string" ? body.romaneioId.trim() : "";
+    const company = await resolveCompanyDynamic(companyKey);
     const filialOrigem = typeof body.filialOrigem === "string" ? body.filialOrigem.trim() : "";
-    const filialDestino = typeof body.filialDestino === "string" ? body.filialDestino.trim() : "";
+    const filialDestino = typeof body.filialDestino === "string" ? getActiveFilial(company, body.filialDestino) : "";
 
     if (!companyKey || !romaneioId || !filialOrigem) {
       return NextResponse.json(

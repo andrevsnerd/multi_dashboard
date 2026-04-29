@@ -22,6 +22,7 @@ export interface CompanyConfig {
    * Quando a filial canônica é selecionada, todas do grupo são incluídas nas consultas.
    */
   filialGroups?: Record<string, string[]>;
+  activeFilials?: Record<string, string>;
   /** Lead time de reposição em dias (pode ser global e/ou por filial canônica). */
   leadTimeDays?: {
     default?: number;
@@ -73,6 +74,11 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
         'NERD MORUMBI RDRRRJ',
         'NERD MORUMBI RDRX',
       ],
+    },
+    activeFilials: {
+      'NERD MORUMBI RDRRRJ': 'NERD MORUMBI RDRX',
+      'NERD MORUMBI RDRX': 'NERD MORUMBI RDRX',
+      'NERD MORUMBI RDRRX': 'NERD MORUMBI RDRRX',
     },
     leadTimeDays: {
       default: 2,
@@ -150,6 +156,15 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
         'SCARF ME - PAULISTA FFFR',
       ],
     },
+    activeFilials: {
+      'SCARFME ME - PAULISTA FFF': 'SCARF ME - PAULISTA RSR',
+      'SCARF ME - PAULISTA RSR': 'SCARF ME - PAULISTA RSR',
+      'SCARF ME - PAULISTA FFFR': 'SCARF ME - PAULISTA RSR',
+      'SCARFME MATRIZ CMS': 'MSC COMERCIO DE LENCOS LT',
+      'SCARF ME - MATRIZ LLL': 'MSC COMERCIO DE LENCOS LT',
+      'SCARF ME MATRIZ - FFF': 'MSC COMERCIO DE LENCOS LT',
+      'MSC COMERCIO DE LENCOS LT': 'MSC COMERCIO DE LENCOS LT',
+    },
     excludedLines: [
       'PRIVATE LABEL',
       'GASTRONOMICA',
@@ -185,12 +200,19 @@ export function resolveCompany(company?: string): CompanyConfig | null {
  * Se a filial não pertencer a nenhum grupo, retorna [filial].
  */
 export function getFilialGroupMembers(company: CompanyConfig, filial: string): string[] {
+  const normalizedFilial = normalizeFilialNameForMatch(filial).toUpperCase();
   const groups = company.filialGroups ?? {};
   // É a filial canônica de um grupo?
-  if (filial in groups) return groups[filial];
+  for (const [canonical, members] of Object.entries(groups)) {
+    if (normalizeFilialNameForMatch(canonical).toUpperCase() === normalizedFilial) {
+      return members;
+    }
+  }
   // É membro não-canônico de algum grupo?
   for (const members of Object.values(groups)) {
-    if (members.includes(filial)) return members;
+    if (members.some((member) => normalizeFilialNameForMatch(member).toUpperCase() === normalizedFilial)) {
+      return members;
+    }
   }
   return [filial];
 }
@@ -221,6 +243,86 @@ function normalizeFilialNameForMatch(s: string): string {
 }
 
 /** Nome curto da filial como na dashboard (E-COMMERCE, PAULISTA, MATRIZ, …). */
+function findActiveRule(company: CompanyConfig, filial: string): string | null {
+  const normalizedFilial = normalizeFilialNameForMatch(filial).toUpperCase();
+  const rules = company.activeFilials ?? {};
+
+  for (const [from, to] of Object.entries(rules)) {
+    if (normalizeFilialNameForMatch(from).toUpperCase() === normalizedFilial) {
+      return to;
+    }
+  }
+
+  for (const [canonical, members] of Object.entries(company.filialGroups ?? {})) {
+    const isSameGroup =
+      normalizeFilialNameForMatch(canonical).toUpperCase() === normalizedFilial ||
+      members.some((member) => normalizeFilialNameForMatch(member).toUpperCase() === normalizedFilial);
+
+    if (isSameGroup) {
+      return rules[canonical] ?? canonical;
+    }
+  }
+
+  return null;
+}
+
+export function getActiveFilial(
+  company: CompanyConfig | null | undefined,
+  filial: string | null | undefined
+): string {
+  const raw = (filial || '').trim();
+  if (!company || !raw) return raw;
+  return findActiveRule(company, raw) ?? raw;
+}
+
+export function isActiveFilial(
+  company: CompanyConfig | null | undefined,
+  filial: string | null | undefined
+): boolean {
+  const raw = (filial || '').trim();
+  if (!company || !raw) return Boolean(raw);
+  return normalizeFilialNameForMatch(getActiveFilial(company, raw)).toUpperCase() ===
+    normalizeFilialNameForMatch(raw).toUpperCase();
+}
+
+export function getOperationalFilials(
+  company: CompanyConfig | null | undefined,
+  module: CompanyModule = 'inventory'
+): string[] {
+  if (!company) return [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const filial of company.filialFilters[module] ?? []) {
+    const active = getActiveFilial(company, filial);
+    const key = normalizeFilialNameForMatch(active).toUpperCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(active);
+  }
+
+  return result;
+}
+
+export function normalizeOperationalFilialList(
+  company: CompanyConfig | null | undefined,
+  filiais: string[]
+): string[] {
+  if (!company) return filiais;
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const filial of filiais) {
+    const active = getActiveFilial(company, filial);
+    const key = normalizeFilialNameForMatch(active).toUpperCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(active);
+  }
+
+  return result;
+}
+
 export function getFilialLabelForDisplay(
   company: CompanyConfig | null | undefined,
   rawFilial: string
@@ -297,4 +399,3 @@ export function compareFilialDisplayOrder(
   if (fa !== fb) return fa - fb;
   return a.localeCompare(b, "pt-BR");
 }
-

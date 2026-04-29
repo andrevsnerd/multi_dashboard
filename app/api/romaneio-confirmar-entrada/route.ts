@@ -8,6 +8,8 @@ import {
 } from "@/lib/utils/romaneio-confirmacao-store";
 import { withRequest } from "@/lib/db/connection";
 import sql from "mssql";
+import { getActiveFilial } from "@/lib/config/company";
+import { resolveCompanyDynamic } from "@/lib/config/company-server";
 
 /**
  * GET /api/romaneio-confirmar-entrada?company=X&romaneio=Y&filialDestino=Z
@@ -19,6 +21,7 @@ export async function GET(request: Request) {
     const company = searchParams.get("company") || "";
     const romaneio = searchParams.get("romaneio") || "";
     const filialDestino = searchParams.get("filialDestino") || "";
+    const companyConfig = await resolveCompanyDynamic(company);
 
     if (!company || !romaneio || !filialDestino) {
       return NextResponse.json(
@@ -27,7 +30,14 @@ export async function GET(request: Request) {
       );
     }
 
-    const map = await getConfirmados(company, romaneio, filialDestino);
+    const filialDestinoAtiva = getActiveFilial(companyConfig, filialDestino);
+    const map = await getConfirmados(company, romaneio, filialDestinoAtiva);
+    if (filialDestinoAtiva !== filialDestino.trim()) {
+      const legacyMap = await getConfirmados(company, romaneio, filialDestino);
+      for (const [chave, qtde] of legacyMap.entries()) {
+        if (!map.has(chave)) map.set(chave, qtde);
+      }
+    }
     // Serializa Map para objeto plain
     const data: Record<string, number> = {};
     for (const [chave, qtde] of map.entries()) {
@@ -70,6 +80,8 @@ export async function POST(request: Request) {
     };
 
     const { companyKey, romaneioId, filialDestino, produto, corProduto, qtdeConfirmada = 0, acao } = body;
+    const companyConfig = await resolveCompanyDynamic(companyKey);
+    const filialDestinoAtiva = getActiveFilial(companyConfig, filialDestino);
 
     if (!companyKey || !romaneioId || !filialDestino || !produto) {
       return NextResponse.json(
@@ -91,13 +103,13 @@ export async function POST(request: Request) {
       if (!permissao) {
         return NextResponse.json({ error: "Sem permissão configurada." }, { status: 403 });
       }
-      const fd = (filialDestino || "").trim();
+      const fd = (filialDestinoAtiva || "").trim();
       const filialOk =
         !permissao.filialAtribuida ||
         permissao.filialAtribuida === "TODAS" ||
         permissao.filialAtribuida === fd ||
         permissao.filiaisDestino.length === 0 ||
-        permissao.filiaisDestino.some((f) => (f || "").trim() === fd);
+        permissao.filiaisDestino.some((f) => getActiveFilial(companyConfig, f || "").trim() === fd);
       if (!filialOk) {
         return NextResponse.json({ error: "Sem permissão para esta filial." }, { status: 403 });
       }
@@ -105,15 +117,15 @@ export async function POST(request: Request) {
 
     if (acao === "desconfirmar") {
       // Busca a qtde confirmada antes de deletar para reverter o estoque
-      const confirmadosMap = await getConfirmados(companyKey, romaneioId, filialDestino);
+      const confirmadosMap = await getConfirmados(companyKey, romaneioId, filialDestinoAtiva);
       const chave = `${produto}|${(corProduto ?? "").trim()}`;
       const qtdeConfirmada = confirmadosMap.get(chave) ?? 0;
 
-      await desconfirmarItem(companyKey, romaneioId, filialDestino, produto, corProduto ?? "");
+      await desconfirmarItem(companyKey, romaneioId, filialDestinoAtiva, produto, corProduto ?? "");
 
       // Reverte o estoque do destino se havia quantidade confirmada
       if (qtdeConfirmada > 0) {
-        const fd = (filialDestino || "").trim();
+        const fd = (filialDestinoAtiva || "").trim();
         const p = (produto || "").trim();
         const cor = (corProduto ?? "").trim();
         await withRequest(async (req) => {
@@ -137,7 +149,7 @@ export async function POST(request: Request) {
       await confirmarItem(
         companyKey,
         romaneioId,
-        filialDestino,
+        filialDestinoAtiva,
         produto,
         corProduto ?? "",
         qtdeConfirmada,

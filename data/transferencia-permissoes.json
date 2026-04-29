@@ -101,5 +101,23 @@
     "tipoRomaneioFixo": false,
     "podeVerOutrasFiliais": true,
     "filialAtribuida": null
+  },
+  {
+    "username": "logistico",
+    "filiaisOrigem": [
+      "MSC COMERCIO DE LENCOS LT"
+    ],
+    "filiaisDestino": [
+      "MSC COMERCIO DE LENCOS LT"
+    ],
+    "filiaisDestinoControle": [],
+    "tiposRomaneioPermitidos": [
+      "TRANSFERENCIA ENTRE LOJAS"
+    ],
+    "responsavelPadrao": "LOGISTICA",
+    "responsavelFixo": false,
+    "tipoRomaneioFixo": false,
+    "podeVerOutrasFiliais": true,
+    "filialAtribuida": null
   }
 ]

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
-import { resolveCompany, type CompanyKey } from "@/lib/config/company";
+import { getActiveFilial, resolveCompany, type CompanyKey } from "@/lib/config/company";
 import type { ProdutoTransferencia, FilialData } from "@/lib/repositories/controleTransferencias";
 import type { DateRangeValue } from "@/components/filters/DateRangeFilter";
 import { useAuth } from "@/components/auth/AuthContext";
@@ -38,7 +38,8 @@ async function executarTransferencia(
   qtdeEntrada: number,
   tipoRomaneio: string,
   responsavel: string,
-  username?: string
+  username?: string,
+  companyKey?: CompanyKey
 ): Promise<{ success: boolean; message: string }> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (username) headers["x-auth-username"] = username;
@@ -54,6 +55,7 @@ async function executarTransferencia(
       qtdeEntrada,
       tipoRomaneio,
       responsavel,
+      companyKey,
     }),
   });
   if (!response.ok) {
@@ -1180,9 +1182,14 @@ export default function ControleTransferenciasTable({
   const getCodFilial = useCallback(
     (canonico: string): string | null => {
       const k = canonico.trim();
-      return filialToCodMap.get(k) ?? filialToCodMap.get(k.toUpperCase()) ?? null;
+      const active = getActiveFilial(company, k);
+      return filialToCodMap.get(active) ??
+        filialToCodMap.get(active.toUpperCase()) ??
+        filialToCodMap.get(k) ??
+        filialToCodMap.get(k.toUpperCase()) ??
+        null;
     },
-    [filialToCodMap]
+    [filialToCodMap, company]
   );
 
   /** Verifica se um valor de permissão corresponde à filial (origem ou destino).
@@ -1192,18 +1199,19 @@ export default function ControleTransferenciasTable({
   const permissaoMatchFilial = useCallback(
     (permValue: string, filialCanonico: string): boolean => {
       const perm = (permValue || "").trim();
-      const canon = (filialCanonico || "").trim();
+      const canon = getActiveFilial(company, (filialCanonico || "").trim());
       if (!perm || !canon) return false;
       const cod = getCodFilial(filialCanonico);
       if (cod && perm === cod) return true;
       const filialFromPerm = filiaisApi.find((f) => (f.codFilial || "").trim() === perm);
       if (filialFromPerm) {
-        const fn = (filialFromPerm.filial || "").trim();
+        const fn = getActiveFilial(company, (filialFromPerm.filial || "").trim());
         return fn === canon || fn.toUpperCase() === canon.toUpperCase();
       }
-      return false;
+      const activePerm = getActiveFilial(company, perm);
+      return activePerm === canon || activePerm.toUpperCase() === canon.toUpperCase();
     },
-    [getCodFilial, filiaisApi]
+    [getCodFilial, filiaisApi, company]
   );
 
   const canTransfer = useCallback(
@@ -1293,7 +1301,8 @@ export default function ControleTransferenciasTable({
             quantidade,
             tipoRomaneio,
             responsavel,
-            user?.username
+            user?.username,
+            companyKey
           );
           onTransferSuccess();
           return;
@@ -1314,7 +1323,7 @@ export default function ControleTransferenciasTable({
         }
       }
     },
-    [modalTransferItem, onTransferSuccess, getCodFilial, permissoes, user?.username]
+    [modalTransferItem, onTransferSuccess, getCodFilial, permissoes, user?.username, companyKey]
   );
 
   const codFilialOrigem = modalTransferItem ? getCodFilial(modalTransferItem.origemCanonico) : null;

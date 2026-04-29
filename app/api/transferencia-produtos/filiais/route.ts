@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server';
 import { withRequest } from '@/lib/db/connection';
-import { resolveCompany } from '@/lib/config/company';
+import { getOperationalFilials } from '@/lib/config/company';
+import { resolveCompanyDynamic } from '@/lib/config/company-server';
 
-// Lista canônica de filiais do dashboard (NERD + SCARF ME) para garantir que o select
-// mostre as mesmas filiais, incluindo e-commerce (MSC COMERCIO DE LENCOS LT) que
-// não bate no filtro NERD/SCARF/SCARFME.
-function getFiliaisCanonicas(companyKey?: string | null): string[] {
+// Lista canônica de filiais operacionais (ativas) para o select.
+// Usa resolveCompanyDynamic para incorporar grupos definidos no painel admin.
+async function getFiliaisCanonicas(companyKey?: string | null): Promise<string[]> {
   if (companyKey) {
-    const company = resolveCompany(companyKey);
+    const company = await resolveCompanyDynamic(companyKey);
     if (company) {
-      const inventory = company.filialFilters.inventory ?? [];
+      const inventory = getOperationalFilials(company, 'inventory');
       const semMatriz = inventory.filter((filial) => {
         const display = company.filialDisplayNames?.[filial] ?? filial;
         return display.trim().toUpperCase() !== 'MATRIZ';
@@ -17,8 +17,8 @@ function getFiliaisCanonicas(companyKey?: string | null): string[] {
       return [...new Set(semMatriz)];
     }
   }
-  const nerd = resolveCompany('nerd')?.filialFilters.inventory ?? [];
-  const scarfme = resolveCompany('scarfme')?.filialFilters.inventory ?? [];
+  const nerd = getOperationalFilials((await resolveCompanyDynamic('nerd')), 'inventory');
+  const scarfme = getOperationalFilials((await resolveCompanyDynamic('scarfme')), 'inventory');
   return [...new Set([...nerd, ...scarfme])];
 }
 
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const company = searchParams.get('company');
-    const filiaisCanonicas = getFiliaisCanonicas(company);
+    const filiaisCanonicas = await getFiliaisCanonicas(company);
 
     const filiais = await withRequest(async (req) => {
       const query = `

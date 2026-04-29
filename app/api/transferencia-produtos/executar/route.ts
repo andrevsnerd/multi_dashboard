@@ -4,6 +4,7 @@ import { shouldUseProxy, forwardTransferToProxy } from '@/lib/db/proxy';
 import { findUserByUsername } from '@/lib/auth/users-store';
 import { getPermissaoByUsername } from '@/lib/utils/transferencia-permissoes-store';
 import { executeTransfer } from '@/lib/transfer-executor';
+import { getActiveFilial, resolveCompany } from '@/lib/config/company';
 
 interface TransferenciaRequest {
   produto: string;
@@ -15,6 +16,22 @@ interface TransferenciaRequest {
   tipoRomaneio?: string;
   responsavel?: string;
   observacao?: string | null;
+  companyKey?: string;
+}
+
+function getActiveFilialForRequest(companyKey: string | undefined, filial: string): string {
+  const preferredCompany = resolveCompany(companyKey);
+  if (preferredCompany) {
+    return getActiveFilial(preferredCompany, filial);
+  }
+
+  for (const key of ['nerd', 'scarfme']) {
+    const company = resolveCompany(key);
+    const active = getActiveFilial(company, filial);
+    if (active !== filial.trim()) return active;
+  }
+
+  return filial.trim();
 }
 
 export async function POST(request: Request) {
@@ -31,6 +48,7 @@ export async function POST(request: Request) {
       tipoRomaneio = 'TRANSFERENCIA',
       responsavel = 'LOGISTICA',
       observacao = null,
+      companyKey,
     } = body;
 
     // Validar dados
@@ -41,8 +59,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const fo = filialOrigem.trim();
-    const fd = filialDestino.trim();
+    const fo = getActiveFilialForRequest(companyKey, filialOrigem.trim());
+    const fd = getActiveFilialForRequest(companyKey, filialDestino.trim());
 
     if (!username) {
       return NextResponse.json(
@@ -68,9 +86,9 @@ export async function POST(request: Request) {
           );
         }
         const origemOk = permissao.filiaisOrigem.length === 0 ||
-          permissao.filiaisOrigem.some((p) => (p || '').trim() === fo);
+          permissao.filiaisOrigem.some((p) => getActiveFilialForRequest(companyKey, (p || '').trim()) === fo);
         const destinoOk = permissao.filiaisDestino.length === 0 ||
-          permissao.filiaisDestino.some((p) => (p || '').trim() === fd);
+          permissao.filiaisDestino.some((p) => getActiveFilialForRequest(companyKey, (p || '').trim()) === fd);
         if (!origemOk || !destinoOk) {
           return NextResponse.json(
             { error: 'Sem permissão para esta origem ou destino.' },
@@ -85,8 +103,8 @@ export async function POST(request: Request) {
         {
           produto,
           corProduto,
-          filialOrigem,
-          filialDestino,
+          filialOrigem: fo,
+          filialDestino: fd,
           qtdeSaida,
           qtdeEntrada,
           tipoRomaneio,
@@ -106,8 +124,8 @@ export async function POST(request: Request) {
     const result = await executeTransfer(pool, {
       produto,
       corProduto,
-      filialOrigem,
-      filialDestino,
+      filialOrigem: fo,
+      filialDestino: fd,
       qtdeSaida,
       qtdeEntrada,
       tipoRomaneio,

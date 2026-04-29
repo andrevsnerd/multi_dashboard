@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { resolveCompany, type CompanyKey } from "@/lib/config/company";
+import { getActiveFilial, resolveCompany, type CompanyKey } from "@/lib/config/company";
 import { useAuth } from "@/components/auth/AuthContext";
 
 import styles from "./TransferenciaProdutosPage.module.css";
@@ -199,7 +199,8 @@ async function executarTransferencia(
   tipoRomaneio: string,
   responsavel: string,
   username?: string,
-  observacao?: string
+  observacao?: string,
+  companyKey?: string
 ): Promise<{ success: boolean; message: string; romaneioSaida?: string; romaneioEntrada?: string }> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (username) headers["x-auth-username"] = username;
@@ -216,6 +217,7 @@ async function executarTransferencia(
       tipoRomaneio,
       responsavel,
       observacao: observacao || null,
+      companyKey,
     }),
   });
 
@@ -285,6 +287,7 @@ export default function TransferenciaProdutosPage({
   companyName,
 }: TransferenciaProdutosPageProps) {
   const { user } = useAuth();
+  const companyConfig = resolveCompany(companyKey);
   const [filiais, setFiliais] = useState<Filial[]>([]);
   const [filiaisDisponiveis, setFiliaisDisponiveis] = useState<Filial[]>([]);
   const [filiaisDestinoDisponiveis, setFiliaisDestinoDisponiveis] = useState<Filial[]>([]);
@@ -351,10 +354,13 @@ export default function TransferenciaProdutosPage({
 
         // Aplicar filtros de permissão se existirem
         if (permissoes) {
+          const permissaoFilialMatches = (cod: string, filial: Filial) =>
+            getActiveFilial(companyConfig, cod || "").trim() === filial.codFilial.trim();
+
           // Filtrar filiais de origem (correspondência exata por codFilial)
           if (permissoes.filiaisOrigem.length > 0) {
             const filiaisOrigemPermitidas = data.filter(f =>
-              permissoes.filiaisOrigem.some(cod => f.codFilial.trim() === (cod || "").trim())
+              permissoes.filiaisOrigem.some(cod => permissaoFilialMatches(cod, f))
             );
             setFiliaisDisponiveis(filiaisOrigemPermitidas);
             
@@ -372,7 +378,7 @@ export default function TransferenciaProdutosPage({
           // Filtrar filiais de destino (correspondência exata por codFilial)
           if (permissoes.filiaisDestino.length > 0) {
             const filiaisDestinoPermitidas = data.filter(f =>
-              permissoes.filiaisDestino.some(cod => f.codFilial.trim() === (cod || "").trim())
+              permissoes.filiaisDestino.some(cod => permissaoFilialMatches(cod, f))
             );
             setFiliaisDestinoDisponiveis(filiaisDestinoPermitidas);
             
@@ -396,7 +402,7 @@ export default function TransferenciaProdutosPage({
       }
     }
     loadFiliais();
-  }, [permissoes, permissoesCarregadas]);
+  }, [permissoes, permissoesCarregadas, companyConfig]);
 
   // Atualizar filiais de destino quando origem mudar (considerando permissões)
   useEffect(() => {
@@ -405,13 +411,13 @@ export default function TransferenciaProdutosPage({
     // Se houver apenas uma filial de destino permitida, selecionar automaticamente
     if (permissoes?.filiaisDestino.length === 1) {
       const filialDestinoUnica = filiaisDestinoDisponiveis.find(f =>
-        permissoes.filiaisDestino.some(cod => f.codFilial.trim() === (cod || "").trim())
+        permissoes.filiaisDestino.some(cod => getActiveFilial(companyConfig, cod || "").trim() === f.codFilial.trim())
       );
       if (filialDestinoUnica && filialDestinoUnica.codFilial !== filialOrigem.codFilial) {
         setFilialDestino(filialDestinoUnica);
       }
     }
-  }, [filialOrigem, permissoes, filiaisDestinoDisponiveis]);
+  }, [filialOrigem, permissoes, filiaisDestinoDisponiveis, companyConfig]);
 
   // Carregar tipos de romaneio e aplicar filtros de permissão (aguardar permissões carregarem)
   useEffect(() => {
@@ -736,7 +742,8 @@ export default function TransferenciaProdutosPage({
           tipoRomaneioSelecionado,
           responsavelFinal || 'LOGISTICA',
           user?.username,
-          observacao.trim() || undefined
+          observacao.trim() || undefined,
+          companyKey
         );
 
         sucesso = true;

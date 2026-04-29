@@ -3,7 +3,8 @@ import { getPermissaoByUsername } from "@/lib/utils/transferencia-permissoes-sto
 import { getAllDestinosByCompany } from "@/lib/utils/destino-romaneio-store";
 import { fetchLogSaidas } from "@/lib/repositories/logSaidas";
 import { findUserByUsername } from "@/lib/auth/users-store";
-import { resolveCompany } from "@/lib/config/company";
+import { getActiveFilial } from "@/lib/config/company";
+import { resolveCompanyDynamic } from "@/lib/config/company-server";
 import { getContadorConfirmadosByCompany } from "@/lib/utils/romaneio-confirmacao-store";
 
 /**
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
     }
 
     const search = request.nextUrl.searchParams.get("search")?.trim() ?? "";
+    const companyConfig = await resolveCompanyDynamic(companyKey);
 
     const [saidas, destinosMap, confirmadosCounter] = await Promise.all([
       fetchLogSaidas(1000, 90, search),
@@ -35,9 +37,13 @@ export async function GET(request: NextRequest) {
 
     const saidasComDestino = saidas.map((s) => {
       const key = `${s.romaneio}|${s.filialOrigem}`;
-      const destinoCodigo = destinosMap.get(key)?.trim() || null;
+      const destinoOriginal = destinosMap.get(key)?.trim() || null;
+      const destinoCodigo = destinoOriginal
+        ? getActiveFilial(companyConfig, destinoOriginal)
+        : null;
       const qtdConfirmados = destinoCodigo
-        ? (confirmadosCounter.get(`${s.romaneio}|${destinoCodigo}`) ?? 0)
+        ? ((confirmadosCounter.get(`${s.romaneio}|${destinoCodigo}`) ?? 0) ||
+           (destinoOriginal ? (confirmadosCounter.get(`${s.romaneio}|${destinoOriginal}`) ?? 0) : 0))
         : 0;
       return { ...s, destinoCodigo, qtdConfirmados };
     });
@@ -49,7 +55,6 @@ export async function GET(request: NextRequest) {
     // Logística vê todos os romaneios da empresa, filtrado pelas filiais da empresa
     const userRecord = await findUserByUsername(username);
     if (userRecord?.role === "logistica") {
-      const companyConfig = resolveCompany(companyKey);
       if (!companyConfig) {
         return NextResponse.json({ data: saidasComDestino });
       }
@@ -63,7 +68,7 @@ export async function GET(request: NextRequest) {
     }
 
     const permissao = await getPermissaoByUsername(username);
-    const filialAtribuida = (permissao?.filialAtribuida ?? "").trim().toUpperCase();
+    const filialAtribuida = getActiveFilial(companyConfig, permissao?.filialAtribuida ?? "").trim().toUpperCase();
     const verTodas =
       !filialAtribuida || filialAtribuida === "" || filialAtribuida === "TODAS";
 
@@ -72,7 +77,7 @@ export async function GET(request: NextRequest) {
     }
 
     const filtered = saidasComDestino.filter((s) => {
-      const destino = (s.destinoCodigo ?? "").trim().toUpperCase();
+      const destino = getActiveFilial(companyConfig, s.destinoCodigo ?? "").trim().toUpperCase();
       return destino === filialAtribuida;
     });
 

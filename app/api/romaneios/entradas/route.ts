@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPermissaoByUsername } from "@/lib/utils/transferencia-permissoes-store";
 import { fetchLogEntradas } from "@/lib/repositories/logEntradas";
 import { findUserByUsername } from "@/lib/auth/users-store";
-import { resolveCompany } from "@/lib/config/company";
+import { getActiveFilial } from "@/lib/config/company";
+import { resolveCompanyDynamic } from "@/lib/config/company-server";
 import { getContadorConfirmadosByCompany } from "@/lib/utils/romaneio-confirmacao-store";
 
 /**
@@ -25,6 +26,7 @@ export async function GET(request: NextRequest) {
     }
 
     const search = request.nextUrl.searchParams.get("search")?.trim() ?? "";
+    const companyConfig = await resolveCompanyDynamic(companyKey);
 
     const [entradas, confirmadosCounter] = await Promise.all([
       fetchLogEntradas(1000, 90, search),
@@ -32,8 +34,10 @@ export async function GET(request: NextRequest) {
     ]);
 
     const entradasComConfirmacao = entradas.map((e) => {
+      const filialDestinoAtiva = getActiveFilial(companyConfig, e.filialDestino);
       const qtdConfirmados = e.filialDestino
-        ? (confirmadosCounter.get(`${e.romaneio}|${e.filialDestino}`) ?? 0)
+        ? ((confirmadosCounter.get(`${e.romaneio}|${filialDestinoAtiva}`) ?? 0) ||
+           (confirmadosCounter.get(`${e.romaneio}|${e.filialDestino}`) ?? 0))
         : 0;
       return { ...e, qtdConfirmados };
     });
@@ -45,7 +49,6 @@ export async function GET(request: NextRequest) {
     // Logística vê todos os romaneios da empresa, filtrado pelas filiais da empresa
     const userRecord = await findUserByUsername(username);
     if (userRecord?.role === "logistica") {
-      const companyConfig = resolveCompany(companyKey);
       if (!companyConfig) {
         return NextResponse.json({ data: entradasComConfirmacao });
       }
@@ -59,7 +62,7 @@ export async function GET(request: NextRequest) {
     }
 
     const permissao = await getPermissaoByUsername(username);
-    const filialAtribuida = (permissao?.filialAtribuida ?? "").trim().toUpperCase();
+    const filialAtribuida = getActiveFilial(companyConfig, permissao?.filialAtribuida ?? "").trim().toUpperCase();
     const verTodas =
       !filialAtribuida || filialAtribuida === "" || filialAtribuida === "TODAS";
 
@@ -68,7 +71,7 @@ export async function GET(request: NextRequest) {
     }
 
     const filtered = entradasComConfirmacao.filter((e) => {
-      const destino = (e.filialDestino ?? "").trim().toUpperCase();
+      const destino = getActiveFilial(companyConfig, e.filialDestino ?? "").trim().toUpperCase();
       return destino === filialAtribuida;
     });
 

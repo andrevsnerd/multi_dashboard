@@ -26,6 +26,7 @@
     "react-dom": "^19.2.3",
     "react-simple-maps": "^3.0.0",
     "recharts": "^3.4.1",
+    "server-only": "^0.0.1",
     "typescript": "^5",
     "xlsx": "^0.18.5"
   },

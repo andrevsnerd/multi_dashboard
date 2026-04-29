@@ -4,6 +4,8 @@ import { shouldUseProxy, forwardTransferToProxy, ProxyPool } from '@/lib/db/prox
 import { findUserByUsername } from '@/lib/auth/users-store';
 import { getPermissaoByUsername } from '@/lib/utils/transferencia-permissoes-store';
 import { executeSaidaLote, executeEntradaLote } from '@/lib/saida-entrada-executor';
+import { getActiveFilial } from '@/lib/config/company';
+import { resolveCompanyDynamic } from '@/lib/config/company-server';
 
 interface ItemOperacao {
   produto: string;
@@ -19,6 +21,22 @@ interface SaidaEntradaRequest {
   tipoRomaneio?: string;
   responsavel?: string;
   observacao?: string | null;
+  companyKey?: string;
+}
+
+async function getActiveFilialForRequest(companyKey: string | undefined, filial: string): Promise<string> {
+  const preferredCompany = await resolveCompanyDynamic(companyKey);
+  if (preferredCompany) {
+    return getActiveFilial(preferredCompany, filial);
+  }
+
+  for (const key of ['nerd', 'scarfme']) {
+    const company = await resolveCompanyDynamic(key);
+    const active = getActiveFilial(company, filial);
+    if (active !== filial.trim()) return active;
+  }
+
+  return filial.trim();
 }
 
 export async function POST(request: Request) {
@@ -33,6 +51,7 @@ export async function POST(request: Request) {
       tipoRomaneio = tipoOperacao === 'saida' ? 'TRANSFERENCIA' : 'ENTRADA AVULSA',
       responsavel = 'LOGISTICA',
       observacao = null,
+      companyKey,
     } = body;
 
     // Validar dados
@@ -59,7 +78,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const filialTrim = filial.trim();
+    const filialTrim = await getActiveFilialForRequest(companyKey, filial.trim());
+    const filialDestinoTrim = filialDestino
+      ? await getActiveFilialForRequest(companyKey, filialDestino.trim())
+      : filialDestino;
 
     if (!username) {
       return NextResponse.json(
@@ -87,9 +109,9 @@ export async function POST(request: Request) {
       }
       const filialOk = tipoOperacao === 'saida'
         ? (permissao.filiaisOrigem.length === 0 ||
-           permissao.filiaisOrigem.some((p) => (p || '').trim() === filialTrim))
+           (await Promise.all(permissao.filiaisOrigem.map((p) => getActiveFilialForRequest(companyKey, (p || '').trim())))).some((a) => a === filialTrim))
         : (permissao.filiaisDestino.length === 0 ||
-           permissao.filiaisDestino.some((p) => (p || '').trim() === filialTrim));
+           (await Promise.all(permissao.filiaisDestino.map((p) => getActiveFilialForRequest(companyKey, (p || '').trim())))).some((a) => a === filialTrim));
       if (!filialOk) {
         return NextResponse.json(
           { error: 'Sem permissão para esta filial.' },
@@ -105,8 +127,8 @@ export async function POST(request: Request) {
     const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
     const result = tipoOperacao === 'saida'
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ? await executeSaidaLote(pool, { itens, filial, filialDestino, tipoRomaneio, responsavel: responsavelFinal, observacao } as any)
-      : await executeEntradaLote(pool, { itens, filial, tipoRomaneio, responsavel: responsavelFinal, observacao });
+      ? await executeSaidaLote(pool, { itens, filial: filialTrim, filialDestino: filialDestinoTrim, tipoRomaneio, responsavel: responsavelFinal, observacao } as any)
+      : await executeEntradaLote(pool, { itens, filial: filialTrim, tipoRomaneio, responsavel: responsavelFinal, observacao });
 
     return NextResponse.json({
       success: true,

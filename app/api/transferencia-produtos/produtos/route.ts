@@ -2,11 +2,14 @@ import { NextResponse } from 'next/server';
 import { getPublicDatabaseErrorMessage, isDatabaseConnectionError, withRequest } from '@/lib/db/connection';
 import sql from 'mssql';
 import { getColorDescription } from '@/lib/utils/colorMapping';
+import { getActiveFilial, resolveCompany } from '@/lib/config/company';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const searchTerm = searchParams.get('q') || '';
   const filialOrigem = searchParams.get('filialOrigem');
+  const company = resolveCompany(searchParams.get('company') || undefined);
+  const filialOperacional = filialOrigem ? getActiveFilial(company, filialOrigem) : null;
   const corProduto = searchParams.get('corProduto'); // Para filtrar quando encontrado por código de barras
   const isEntrada = searchParams.get('entrada') === 'true';
 
@@ -94,13 +97,13 @@ export async function GET(request: Request) {
           SELECT DISTINCT TOP 200
             p.PRODUTO,
             bc.COR_PRODUTO,
-            ${filialOrigem ? `@filialOrigemParam` : `ISNULL(es.FILIAL, '')`} AS FILIAL,
+            ${filialOperacional ? `@filialOrigemParam` : `ISNULL(es.FILIAL, '')`} AS FILIAL,
             ISNULL(es.ESTOQUE, 0) AS ESTOQUE,
             p.DESC_PRODUTO,
             ISNULL(p.LINHA, '') AS LINHA,
             ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
             ISNULL(c.DESC_COR, '') AS DESC_COR,
-            ${filialOrigem ? `@filialOrigemParam` : `ISNULL(es.FILIAL, '')`} AS NOME_FILIAL,
+            ${filialOperacional ? `@filialOrigemParam` : `ISNULL(es.FILIAL, '')`} AS NOME_FILIAL,
             pb.CODIGO_BARRA
           FROM base_produtos bp
           INNER JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = bp.PRODUTO
@@ -111,7 +114,7 @@ export async function GET(request: Request) {
               (bc.COR_PRODUTO IS NULL AND es.COR_PRODUTO IS NULL)
               OR RTRIM(LTRIM(CAST(es.COR_PRODUTO AS VARCHAR(20)))) = ISNULL(bc.COR_PRODUTO, RTRIM(LTRIM(CAST(es.COR_PRODUTO AS VARCHAR(20)))))
             )
-            ${filialOrigem ? `AND RTRIM(LTRIM(CAST(es.FILIAL AS VARCHAR(100)))) = RTRIM(LTRIM(@filialOrigem))` : ``}
+            ${filialOperacional ? `AND RTRIM(LTRIM(CAST(es.FILIAL AS VARCHAR(100)))) = RTRIM(LTRIM(@filialOrigem))` : ``}
           LEFT JOIN PRODUTOS_BARRA pb WITH (NOLOCK)
             ON pb.PRODUTO = p.PRODUTO
             AND RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))) = ISNULL(bc.COR_PRODUTO, RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))))
@@ -119,9 +122,9 @@ export async function GET(request: Request) {
         `;
         req.input('searchPattern', sql.VarChar, searchPattern);
         req.input('searchTermExato', sql.VarChar, searchTermTrimmed);
-        req.input('filialOrigemParam', sql.VarChar, filialOrigem?.trim() || '');
-        if (filialOrigem) {
-          req.input('filialOrigem', sql.VarChar, filialOrigem.trim());
+        req.input('filialOrigemParam', sql.VarChar, filialOperacional?.trim() || '');
+        if (filialOperacional) {
+          req.input('filialOrigem', sql.VarChar, filialOperacional.trim());
         }
       } else {
         // Buscar por código de barras OU nome/código do produto
@@ -158,9 +161,9 @@ export async function GET(request: Request) {
         req.input('searchPattern', sql.VarChar, searchPattern);
         req.input('searchTermExato', sql.VarChar, searchTermTrimmed);
 
-        if (filialOrigem) {
+        if (filialOperacional) {
           query += ` AND RTRIM(LTRIM(CAST(e.FILIAL AS VARCHAR(100)))) = RTRIM(LTRIM(@filialOrigem))`;
-          req.input('filialOrigem', sql.VarChar, filialOrigem.trim());
+          req.input('filialOrigem', sql.VarChar, filialOperacional.trim());
         }
       }
 
@@ -170,7 +173,7 @@ export async function GET(request: Request) {
       console.log(`[PRODUTOS DEBUG] Params:`, { 
         searchTermTrimmed, 
         corProduto, 
-        filialOrigem,
+        filialOrigem: filialOperacional || filialOrigem,
         searchTermLen: searchTermTrimmed.length,
         corProdutoLen: corProduto?.length
       });
@@ -262,7 +265,7 @@ export async function GET(request: Request) {
       }
 
       const produtosArray = Array.from(produtosMap.values());
-      console.log(`[PRODUTOS] Busca: "${searchTermTrimmed}", corProduto: ${corProduto || 'null'}, filialOrigem: ${filialOrigem || 'null'}, encontrados: ${produtosArray.length}`);
+      console.log(`[PRODUTOS] Busca: "${searchTermTrimmed}", corProduto: ${corProduto || 'null'}, filialOrigem: ${filialOperacional || filialOrigem || 'null'}, encontrados: ${produtosArray.length}`);
       if (produtosArray.length > 0) {
         console.log(`[PRODUTOS] Primeiro produto:`, {
           produto: produtosArray[0].produto,

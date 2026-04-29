@@ -18,5 +18,19 @@
     "allowedCompanies": [
       "nerd"
     ]
+  },
+  {
+    "id": "0eca5d022163",
+    "username": "logistico",
+    "passwordHash": "aa16598be13c79d43cad61f75c056a3e:5e4b28516d2477330d479eb97e18e2a0d731e43aec552650d30d69774c456b556b716ccbbca181e52ffcc7406359321fdb54289c99e4e98e77fecd58b6749272",
+    "role": "gestor",
+    "permissions": [
+      "controle-transferencias",
+      "saidas-entradas-produtos"
+    ],
+    "allowedCompanies": [
+      "scarfme"
+    ],
+    "nomeExibicao": "logistico"
   }
 ]
