@@ -3,6 +3,7 @@ import { getConnectionPool } from '@/lib/db/connection';
 import { shouldUseProxy, forwardTransferToProxy, ProxyPool } from '@/lib/db/proxy';
 import { findUserByUsername } from '@/lib/auth/users-store';
 import { getPermissaoByUsername } from '@/lib/utils/transferencia-permissoes-store';
+import { setDestinoRomaneio } from '@/lib/utils/destino-romaneio-store';
 import { executeSaidaLote, executeEntradaLote } from '@/lib/saida-entrada-executor';
 import { getActiveFilial } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
@@ -144,6 +145,14 @@ export async function POST(request: Request) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ? await executeSaidaLote(pool, { itens, filial: filialTrim, filialDestino: filialDestinoTrim, tipoRomaneio, responsavel: responsavelFinal, observacao } as any)
       : await executeEntradaLote(pool, { itens, filial: filialTrim, tipoRomaneio, responsavel: responsavelFinal, observacao });
+
+    if (tipoOperacao === 'saida' && companyKey && filialDestinoTrim && result.romaneio) {
+      try {
+        await setDestinoRomaneio(companyKey, result.romaneio, filialTrim, filialDestinoTrim);
+      } catch (destinoError) {
+        console.error('Erro ao salvar destino auxiliar do romaneio', destinoError);
+      }
+    }
 
     return NextResponse.json({
       success: true,

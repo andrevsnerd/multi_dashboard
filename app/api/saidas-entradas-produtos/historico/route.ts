@@ -39,6 +39,32 @@ function matchFilial(logValue: string | null | undefined, filial: string): boole
   return parts.some((p) => normalizeDigits(p) === targetDigits && targetDigits !== "0");
 }
 
+function cleanDestino(value: string | null | undefined): string | null {
+  const trimmed = (value || "").trim();
+  if (!trimmed || trimmed === "—" || trimmed === "-") return null;
+  return trimmed;
+}
+
+function getDestinoSalvo(
+  destinosMap: Map<string, string>,
+  romaneio: string,
+  filialOrigem: string,
+  filialOrigemCodigo?: string
+): string | null {
+  const origem = cleanDestino(filialOrigem);
+  const origemCodigo = cleanDestino(filialOrigemCodigo);
+  const keys = [
+    origem ? `${romaneio}|${origem}` : null,
+    origemCodigo ? `${romaneio}|${origemCodigo}` : null,
+  ].filter(Boolean) as string[];
+
+  for (const key of keys) {
+    const destino = cleanDestino(destinosMap.get(key));
+    if (destino) return destino;
+  }
+  return null;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const companyKey = (searchParams.get("company") || "").trim();
@@ -71,8 +97,11 @@ export async function GET(request: Request) {
     const start = (page - 1) * perPage;
     const data = filtrados.slice(start, start + perPage).map((log) => {
       if (tipo !== "saida") return log;
-      const key = `${log.romaneio}|${log.filialOrigem}`;
-      const destinoOriginal = destinosMap.get(key)?.trim() || null;
+      const saidaLog = log as Awaited<ReturnType<typeof fetchLogSaidas>>[number];
+      const destinoOriginal =
+        getDestinoSalvo(destinosMap, saidaLog.romaneio, saidaLog.filialOrigem, saidaLog.filialOrigemCodigo) ||
+        cleanDestino(saidaLog.filialDestino) ||
+        cleanDestino(saidaLog.filialDestinoCodigo);
       const destinoCodigo = destinoOriginal ? getActiveFilial(companyConfig, destinoOriginal) : null;
       return {
         ...log,

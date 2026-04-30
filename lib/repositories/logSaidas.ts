@@ -5,6 +5,8 @@ export interface LogSaidaRow {
   romaneio: string;
   filialOrigem: string;
   filialDestino: string;
+  filialOrigemCodigo?: string;
+  filialDestinoCodigo?: string;
   dataEmissao: string;
   responsavel: string;
   observacao: string;
@@ -94,6 +96,8 @@ export async function fetchLogSaidas(
           es.ROMANEIO_PRODUTO,
           es.FILIAL AS FILIAL_ORIGEM,
           LTRIM(RTRIM(ISNULL(es.FILIAL_DESTINO, ''))) AS FILIAL_DESTINO,
+          LTRIM(RTRIM(ISNULL(fo.COD_FILIAL, es.FILIAL))) AS FILIAL_ORIGEM_CODIGO,
+          LTRIM(RTRIM(ISNULL(fd.COD_FILIAL, es.FILIAL_DESTINO))) AS FILIAL_DESTINO_CODIGO,
           es.EMISSAO,
           (CONVERT(VARCHAR(10), es.EMISSAO, 120) + 'T' + CONVERT(VARCHAR(8), es.EMISSAO, 108)) AS EMISSAO_STR,
           es.RESPONSAVEL,
@@ -120,6 +124,8 @@ export async function fetchLogSaidas(
           s.ROMANEIO_PRODUTO,
           s.FILIAL AS FILIAL_ORIGEM,
           LTRIM(RTRIM(ISNULL(s.FILIAL_DESTINO, ''))) AS FILIAL_DESTINO,
+          LTRIM(RTRIM(ISNULL(fo2.COD_FILIAL, s.FILIAL))) AS FILIAL_ORIGEM_CODIGO,
+          LTRIM(RTRIM(ISNULL(fd2.COD_FILIAL, s.FILIAL_DESTINO))) AS FILIAL_DESTINO_CODIGO,
           s.EMISSAO,
           (CONVERT(VARCHAR(10), s.EMISSAO, 120) + 'T' + CONVERT(VARCHAR(8), s.EMISSAO, 108)) AS EMISSAO_STR,
           s.RESPONSAVEL,
@@ -162,6 +168,8 @@ export async function fetchLogSaidas(
       ROMANEIO_PRODUTO: string;
       FILIAL_ORIGEM: string;
       FILIAL_DESTINO: string | null;
+      FILIAL_ORIGEM_CODIGO: string | null;
+      FILIAL_DESTINO_CODIGO: string | null;
       EMISSAO: Date;
       EMISSAO_STR: string;
       RESPONSAVEL: string | null;
@@ -176,6 +184,8 @@ export async function fetchLogSaidas(
       romaneio: row.ROMANEIO_PRODUTO?.toString().trim() || "",
       filialOrigem: row.FILIAL_ORIGEM?.toString().trim() || "",
       filialDestino: row.FILIAL_DESTINO?.toString().trim() || "—",
+      filialOrigemCodigo: row.FILIAL_ORIGEM_CODIGO?.toString().trim() || "",
+      filialDestinoCodigo: row.FILIAL_DESTINO_CODIGO?.toString().trim() || "",
       dataEmissao:
         row.EMISSAO_STR != null && String(row.EMISSAO_STR).trim() !== ""
           ? String(row.EMISSAO_STR).trim()

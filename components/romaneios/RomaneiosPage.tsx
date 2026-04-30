@@ -11,6 +11,8 @@ export interface RomaneioListItem {
   romaneio: string;
   filialOrigem: string;
   filialDestino: string;
+  filialOrigemCodigo?: string;
+  filialDestinoCodigo?: string;
   dataEmissao: string;
   responsavel: string;
   qtdProdutos: number;
@@ -21,6 +23,12 @@ export interface RomaneioListItem {
   tipoRomaneio?: string;
   /** Número de itens já confirmados na filial destino. */
   qtdConfirmados?: number;
+}
+
+function cleanDestinoValue(value: string | null | undefined): string {
+  const trimmed = (value || "").trim();
+  if (!trimmed || trimmed === "—" || trimmed === "â€”" || trimmed === "-") return "";
+  return trimmed;
 }
 
 interface FilialOption {
@@ -203,7 +211,10 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
       ) : (
         <div className={styles.list}>
           {romaneios.map((rom, index) => {
-            const detailUrl = `${basePath}/romaneios/${encodeURIComponent(rom.romaneio)}?tipo=${rom.tipo}&filialOrigem=${encodeURIComponent(rom.filialOrigem)}&filialDestino=${encodeURIComponent(rom.filialDestino)}&dataEmissao=${encodeURIComponent(rom.dataEmissao)}&responsavel=${encodeURIComponent(rom.responsavel || "")}&tipoRomaneio=${encodeURIComponent(rom.tipoRomaneio || "")}`;
+            const destinoEfetivo = rom.tipo === "saida"
+              ? cleanDestinoValue(rom.destinoCodigo) || cleanDestinoValue(rom.filialDestino)
+              : cleanDestinoValue(rom.filialDestino);
+            const detailUrl = `${basePath}/romaneios/${encodeURIComponent(rom.romaneio)}?tipo=${rom.tipo}&filialOrigem=${encodeURIComponent(rom.filialOrigem)}&filialDestino=${encodeURIComponent(destinoEfetivo)}&dataEmissao=${encodeURIComponent(rom.dataEmissao)}&responsavel=${encodeURIComponent(rom.responsavel || "")}&tipoRomaneio=${encodeURIComponent(rom.tipoRomaneio || "")}`;
             const confirmados = rom.qtdConfirmados ?? 0;
             const todosConfirmados = rom.qtdProdutos > 0 && confirmados >= rom.qtdProdutos;
             return (
@@ -213,17 +224,17 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
                   {rom.tipo === "saida" ? (
                     <span
                       className={`${styles.status} ${
-                        rom.destinoCodigo ? styles.statusConcluida : styles.statusVazio
+                        destinoEfetivo ? styles.statusConcluida : styles.statusVazio
                       }`}
                     >
-                      {rom.destinoCodigo
-                        ? getFilialDisplayName(rom.destinoCodigo)
+                      {destinoEfetivo
+                        ? getFilialDisplayName(destinoEfetivo)
                         : "—"}
                     </span>
                   ) : (
                     <span className={`${styles.status} ${styles.statusConcluida}`}>
-                      {rom.filialDestino
-                        ? getFilialDisplayName(rom.filialDestino)
+                      {destinoEfetivo
+                        ? getFilialDisplayName(destinoEfetivo)
                         : "—"}
                     </span>
                   )}

@@ -7,6 +7,32 @@ import { getActiveFilial } from "@/lib/config/company";
 import { resolveCompanyDynamic } from "@/lib/config/company-server";
 import { getContadorConfirmadosByCompany } from "@/lib/utils/romaneio-confirmacao-store";
 
+function cleanDestino(value: string | null | undefined): string | null {
+  const trimmed = (value || "").trim();
+  if (!trimmed || trimmed === "—" || trimmed === "-") return null;
+  return trimmed;
+}
+
+function getDestinoSalvo(
+  destinosMap: Map<string, string>,
+  romaneio: string,
+  filialOrigem: string,
+  filialOrigemCodigo?: string
+): string | null {
+  const origem = cleanDestino(filialOrigem);
+  const origemCodigo = cleanDestino(filialOrigemCodigo);
+  const keys = [
+    origem ? `${romaneio}|${origem}` : null,
+    origemCodigo ? `${romaneio}|${origemCodigo}` : null,
+  ].filter(Boolean) as string[];
+
+  for (const key of keys) {
+    const destino = cleanDestino(destinosMap.get(key));
+    if (destino) return destino;
+  }
+  return null;
+}
+
 /**
  * GET /api/romaneios/saidas?company=nerd
  * Retorna romaneios de saída filtrados pela filial atribuída do usuário.
@@ -36,8 +62,10 @@ export async function GET(request: NextRequest) {
     ]);
 
     const saidasComDestino = saidas.map((s) => {
-      const key = `${s.romaneio}|${s.filialOrigem}`;
-      const destinoOriginal = destinosMap.get(key)?.trim() || null;
+      const destinoOriginal =
+        getDestinoSalvo(destinosMap, s.romaneio, s.filialOrigem, s.filialOrigemCodigo) ||
+        cleanDestino(s.filialDestino) ||
+        cleanDestino(s.filialDestinoCodigo);
       const destinoCodigo = destinoOriginal
         ? getActiveFilial(companyConfig, destinoOriginal)
         : null;

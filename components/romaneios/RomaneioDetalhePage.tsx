@@ -204,6 +204,12 @@ const MATRIZ_EXCLUIDA_DESTINO: Record<string, string> = {
   scarfme: 'SCARF ME - MATRIZ',
 };
 
+function cleanDestinoValue(value: string | null | undefined): string {
+  const trimmed = (value || "").trim();
+  if (!trimmed || trimmed === "—" || trimmed === "â€”" || trimmed === "-") return "";
+  return trimmed;
+}
+
 function getFilialOptionLabel(filial: FilialOption): string {
   const displayName = (filial.displayName || filial.filial || filial.codFilial).trim();
   const activeFilial = (filial.activeFilial || filial.codFilial || filial.filial).trim();
@@ -320,9 +326,9 @@ export default function RomaneioDetalhePage({
     if (tipo !== "saida") return;
     setLoadingDestino(true);
     fetchDestinoRomaneio(companySlug, romaneioId, filialOrigem)
-      .then((val) => setDestinoSelected(val ?? ""))
+      .then((val) => setDestinoSelected(cleanDestinoValue(val) || cleanDestinoValue(filialDestino)))
       .finally(() => setLoadingDestino(false));
-  }, [companySlug, romaneioId, filialOrigem, tipo]);
+  }, [companySlug, romaneioId, filialOrigem, filialDestino, tipo]);
 
   useEffect(() => {
     let cancelled = false;
