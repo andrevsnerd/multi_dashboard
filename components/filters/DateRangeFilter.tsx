@@ -288,11 +288,10 @@ export default function DateRangeFilter({
       const gap = 12;
       const horizontalMargin = 12;
       const dropdownWidth = Math.min(520, vw - horizontalMargin * 2);
-      const maxHeight = Math.max(360, vh - 24);
-      const estHeight = Math.min(dropdownRef.current?.offsetHeight ?? 420, maxHeight);
-
       const top = rect.bottom + gap;
-      const fitsBelow = top + estHeight <= vh - gap;
+      const availableBelow = Math.max(220, vh - top - gap);
+      const contentHeight = dropdownRef.current?.offsetHeight ?? 420;
+      const maxHeight = Math.min(contentHeight, availableBelow);
 
       const next: React.CSSProperties = {
         position: "fixed",
@@ -300,15 +299,9 @@ export default function DateRangeFilter({
         width: dropdownWidth,
         maxHeight,
         overflowY: "auto",
+        top,
+        bottom: "auto",
       };
-
-      if (!fitsBelow) {
-        next.top = "auto";
-        next.bottom = vh - rect.top + gap;
-      } else {
-        next.top = top;
-        next.bottom = "auto";
-      }
 
       if (rect.right >= dropdownWidth) {
         next.right = vw - rect.right;
