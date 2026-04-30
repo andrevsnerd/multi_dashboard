@@ -62,7 +62,8 @@
       "Bash(ls -la data/*.json)",
       "Bash(node -e \"const fs=require\\('fs'\\); const d=JSON.parse\\(fs.readFileSync\\('data/compras-salvas.json','utf8'\\)\\); const c=d.find\\(x=>x.id==='403722ac-042e-442b-8107-8e92ce8ea4e4'\\); console.log\\(JSON.stringify\\({id:c?.id,sourceContextKey:c?.sourceContextKey,title:c?.title,items:c?.items?.map\\(i=>\\({produto:i.produto,cor:i.corProduto,qtd:i.qtdManual}\\)\\)},null,2\\)\\);\")",
       "Bash(node -e \"const fs=require\\('fs'\\); const d=JSON.parse\\(fs.readFileSync\\('data/compras-salvas.json','utf8'\\)\\); const c=d.find\\(x=>x.id==='707e26bf-0c3e-4202-ba67-fbf8408e4759'\\); console.log\\(JSON.stringify\\(c,null,2\\)\\);\")",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(node -e \"require.resolve\\('server-only'\\)\")"
     ]
   }
 }

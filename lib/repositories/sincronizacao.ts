@@ -54,6 +54,14 @@ export interface SincronizacaoFilial {
   nfSerie: string | null;
 }
 
+function parseSqlDateTime(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  // SQL returns "YYYY-MM-DD HH:mm:ss"; parse as local time to avoid UTC day shift.
+  const normalized = value.includes("T") ? value : value.replace(" ", "T");
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function normalizarFilial(valor: unknown): string {
   return String(valor ?? "")
     .replace(/\u00a0/g, " ")
@@ -160,7 +168,7 @@ export async function fetchSincronizacaoFiliais(): Promise<{
       const isEcommerce = ecommerceFiliais.has(filial.filialKey);
       const dataVendaQuery = isEcommerce
         ? `
-          SELECT MAX(f.EMISSAO) AS DATA_VENDA
+          SELECT CONVERT(VARCHAR(19), MAX(f.EMISSAO), 120) AS DATA_VENDA
           FROM FATURAMENTO f WITH (NOLOCK)
           WHERE RTRIM(LTRIM(ISNULL(f.FILIAL, ''))) = @filialNome
             AND f.NOTA_CANCELADA = 0
@@ -168,7 +176,7 @@ export async function fetchSincronizacaoFiliais(): Promise<{
         `
         : `
           SELECT TOP 1
-            v.DATA_VENDA
+            CONVERT(VARCHAR(19), v.DATA_VENDA, 120) AS DATA_VENDA
           FROM LOJA_VENDA v WITH (NOLOCK)
           WHERE v.CODIGO_FILIAL = @codFilial
           ORDER BY v.DATA_VENDA DESC
@@ -177,13 +185,13 @@ export async function fetchSincronizacaoFiliais(): Promise<{
       const ultimaVendaResult = isEcommerce
         ? await request
             .input("filialNome", sql.VarChar, filial.filial)
-            .query<{ DATA_VENDA: Date | null }>(dataVendaQuery)
+            .query<{ DATA_VENDA: string | null }>(dataVendaQuery)
         : await request
             .input(`codFilial${sufixo}`, sql.Int, filial.codFilial)
-            .query<{ DATA_VENDA: Date | null }>(dataVendaQuery.replace("@codFilial", `@codFilial${sufixo}`));
+            .query<{ DATA_VENDA: string | null }>(dataVendaQuery.replace("@codFilial", `@codFilial${sufixo}`));
 
       const venda = ultimaVendaResult.recordset[0];
-      const dataVenda = venda?.DATA_VENDA ? new Date(venda.DATA_VENDA) : null;
+      const dataVenda = parseSqlDateTime(venda?.DATA_VENDA);
       const ticket = null;
       const valorTicket = 0;
       const vendedor = null;

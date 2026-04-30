@@ -29,6 +29,7 @@ interface ProdutoRow {
   produto: string;
   descricao: string;
   categoria: string;
+  linha?: string;
   subgrupo?: string;
   grade?: string;
   cor?: string;
@@ -220,7 +221,6 @@ function getLimiteDiasReposicao(item: { linha?: string | null; subgrupo?: string
   const linha = normalizeKey(item.linha);
   const subgrupo = normalizeKey(item.subgrupo);
   if (linha === "INDIA") return 90;
-  if (linha === "ELETRONICOS") return 120;
   const subgrupos90 = new Set(["CETIM DE SEDA", "MOUSSELINE DE SEDA", "SEDA PREMIUM"]);
   if (subgrupos90.has(subgrupo)) return 90;
   return 60;
@@ -391,6 +391,7 @@ async function fetchVendasItemMetricas(
     qtde12m: number;
     qtdeMesAtual?: number;
     diasDesdeUltimaVenda?: number | null;
+    primeiraEntradaFilial?: string | null;
     mesesHistoricoFilial?: number | null;
   };
   const fetchRows = async (includeHistorico: boolean): Promise<Row[]> => {
@@ -411,15 +412,31 @@ async function fetchVendasItemMetricas(
       rows = await fetchRows(false);
     }
     const diasValidos = rows.map((r) => r.diasDesdeUltimaVenda).filter((d): d is number => d != null);
-    const mesesValidos = rows
-      .map((r) => Number(r.mesesHistoricoFilial ?? null))
-      .filter((m) => Number.isFinite(m) && m > 0);
-    const mesesHistoricoFilial = mesesValidos.length > 0 ? Math.min(...mesesValidos) : 12;
+
+    // Usa a data mais antiga de entrada entre todas as filiais para calcular meses,
+    // igual ao ListaLojaPage (mergeHistoricoFilialRows). Evita que uma filial nova
+    // com 1 mês de histórico contamine o cálculo via Math.min/Math.max.
+    let mesesHistoricoFilial = 12;
+    let primeiraEntrada: Date | null = null;
+    for (const row of rows) {
+      if (!row.primeiraEntradaFilial) continue;
+      const d = new Date(row.primeiraEntradaFilial);
+      if (Number.isNaN(d.getTime())) continue;
+      if (!primeiraEntrada || d < primeiraEntrada) primeiraEntrada = d;
+    }
+    if (primeiraEntrada) {
+      const dias = Math.min(365, Math.max(0, Math.floor((Date.now() - primeiraEntrada.getTime()) / 86400000)));
+      mesesHistoricoFilial = Math.min(12, Math.max(1, dias / 30));
+    } else {
+      const parcial = rows.find((r) => r.mesesHistoricoFilial != null);
+      if (parcial) mesesHistoricoFilial = Math.min(12, Math.max(1, Number(parcial.mesesHistoricoFilial)));
+    }
+
     return {
       qtde12m: Math.round(rows.reduce((s, r) => s + Number(r.qtde12m ?? 0), 0)),
       vendasMesAtual: Math.round(rows.reduce((s, r) => s + Number(r.qtdeMesAtual ?? 0), 0)),
       diasDesdeUltimaVenda: diasValidos.length > 0 ? Math.min(...diasValidos) : null,
-      mesesHistoricoFilial: Math.min(12, Math.max(1, mesesHistoricoFilial)),
+      mesesHistoricoFilial,
     };
   } catch {
     return null;
@@ -587,7 +604,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     if (produtosFiltrados.length === 0) return [];
     return calcularCurvas(produtosFiltrados);
   }, [produtosFiltrados]);
-  const diasCorridosMes = Math.max(1, data?.daysElapsed ?? 1);
+  const diasCorridosMes = Math.max(1, new Date().getDate());
 
   const produtosComCurvaExibidos = useMemo(() => {
     if (!filtrarSugeridos) return produtosComCurva;
@@ -604,7 +621,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       const compraItem = {
         vendasMesAtual: live?.vendasMesAtual ?? 0,
         estoqueFilial: live?.estoqueFilial ?? 0,
-        linha: p.categoria,
+        linha: p.linha ?? "",
         subgrupo: p.subgrupo ?? "",
         qtde12m: live?.qtde12m ?? 0,
         mesesHistoricoFilial: live?.mesesHistoricoFilial ?? 12,
@@ -1248,13 +1265,14 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                                     const compraItem = {
                                       vendasMesAtual: live?.vendasMesAtual ?? 0,
                                       estoqueFilial: live?.estoqueFilial ?? 0,
-                                      linha: p.categoria,
+                                      linha: p.linha ?? "",
                                       subgrupo: p.subgrupo ?? "",
                                       qtde12m: live?.qtde12m ?? 0,
                                       mesesHistoricoFilial: live?.mesesHistoricoFilial ?? 12,
                                       diasDesdeUltimaVenda: live?.diasDesdeUltimaVenda ?? null,
                                     };
                                     const sugestao = getReposicaoCompraView(compraItem, diasCorridosMes);
+                                    console.log("[reposicao]", { produto: p.produto, linha: compraItem.linha, limiteDias: getLimiteDiasReposicao(compraItem), consumoDiario: diasCorridosMes > 0 ? compraItem.vendasMesAtual / diasCorridosMes : 0, sugestao });
                                     if (sugestao.qtdFinal > 0) {
                                       const vendasMes = Number(compraItem.vendasMesAtual ?? 0);
                                       const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;

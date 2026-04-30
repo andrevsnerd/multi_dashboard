@@ -287,7 +287,7 @@ export async function GET(request: Request) {
       const produtosComFilial = produtos.map(p => {
         const k = produtoAggKey(p.produto, p.cor, porCor);
         const porFilial = estoquePorFilialMap.get(k) ?? [];
-        const estoque = porFilial.reduce((s, e) => s + e.qtde, 0);
+        const estoque = porFilial.reduce((s, e) => s + Math.max(0, e.qtde), 0);
         return {
           ...p,
           qtdePorFilial: qtdePorFilialMap.get(k) ?? [],
@@ -386,7 +386,7 @@ export async function GET(request: Request) {
     const produtosComEstoque = produtos.map(p => {
       const k = produtoAggKey(p.produto, p.cor, porCor);
       const porFilial = estoquePorFilialMap.get(k) ?? [];
-      const estoque = porFilial.reduce((s, e) => s + e.qtde, 0);
+      const estoque = porFilial.reduce((s, e) => s + Math.max(0, e.qtde), 0);
       return {
         ...p,
         estoque,
