@@ -358,6 +358,7 @@ async function executarOperacaoLote(
   responsavel: string,
   username?: string,
   observacao?: string,
+  filialDestino?: string | null,
   companyKey?: string
 ): Promise<{ success: boolean; message: string; romaneio?: string }> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -368,6 +369,7 @@ async function executarOperacaoLote(
     body: JSON.stringify({
       tipoOperacao,
       filial,
+      filialDestino: filialDestino || null,
       itens,
       tipoRomaneio,
       responsavel,
@@ -529,8 +531,13 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
 
   // Resetar filial destino ao mudar tipo de romaneio; auto-selecionar se só há uma opção
   useEffect(() => {
-    setFilialDestinoSaida(filiaisDestinoVisiveis.length === 1 ? filiaisDestinoVisiveis[0] : null);
-  }, [tipoRomaneioSelecionado]);
+    const nextDestino = !isTipoSemDestino(tipoRomaneioSelecionado) && filiaisDestinoVisiveis.length === 1
+      ? filiaisDestinoVisiveis[0]
+      : null;
+    setFilialDestinoSaida((prev) => (
+      prev?.codFilial === nextDestino?.codFilial ? prev : nextDestino
+    ));
+  }, [tipoRomaneioSelecionado, filiaisDestinoVisiveis]);
 
   // Carregar permissões do usuário PRIMEIRO (antes de tudo)
   useEffect(() => {
@@ -1168,6 +1175,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
         responsavelFinal || 'LOGISTICA',
         user?.username,
         observacao.trim() || undefined,
+        filialDestinoSaida?.codFilial || null,
         companyKey
       );
 
