@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import Link from "next/link";
 import {
   type CompanyKey,
   type CompanyConfig,
@@ -1393,6 +1394,9 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
   }
 
   const isBusy = processandoOperacao;
+  const historicoCompletoHref = `/${companyKey}/saidas-entradas-produtos/historico?tipo=${tipoOperacao}&filial=${encodeURIComponent(
+    filialSelecionada?.codFilial || ""
+  )}`;
 
   return (
     <div className={styles.wrapper}>
@@ -1685,6 +1689,11 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
               {logsFiltrados.length > 0 && (
                 <span className={styles.badgeMuted}>{logsFiltrados.length}</span>
               )}
+            </div>
+            <div className={styles.historicoActionRow}>
+              <Link href={historicoCompletoHref} className={styles.historicoActionLink}>
+                Ver histórico completo
+              </Link>
             </div>
 
             {loadingLogsAtivos ? (

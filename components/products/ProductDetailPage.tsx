@@ -32,10 +32,17 @@ interface ProductDetailData {
   stockProgress: ProductStockProgressDay[];
 }
 
+type ProductSearchResult = {
+  productId: string;
+  productName: string;
+  matchedColorCode?: string | null;
+  matchedColorName?: string | null;
+};
+
 async function searchProducts(
   company: string,
   searchTerm: string
-): Promise<Array<{ productId: string; productName: string }>> {
+): Promise<ProductSearchResult[]> {
   if (!searchTerm || searchTerm.trim().length < 2) {
     return [];
   }
@@ -52,7 +59,7 @@ async function searchProducts(
   }
 
   const json = (await response.json()) as {
-    data: Array<{ productId: string; productName: string }>;
+    data: ProductSearchResult[];
   };
 
   return json.data || [];
@@ -110,7 +117,7 @@ export default function ProductDetailPage({
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [selectedProductName, setSelectedProductName] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<
-    Array<{ productId: string; productName: string }>
+    ProductSearchResult[]
   >([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [data, setData] = useState<ProductDetailData | null>(null);
@@ -270,14 +277,16 @@ export default function ProductDetailPage({
     };
   }, [selectedProductId, companyKey, range, refreshTrigger, selectedColors]);
 
-  const handleProductSelect = useCallback((productId: string, productName: string) => {
-    const trimmedName = productName.trim();
-    setSelectedProductId(productId);
+  const handleProductSelect = useCallback((product: ProductSearchResult) => {
+    const trimmedName = product.productName.trim();
+    const preSelectedColor = product.matchedColorCode?.trim() || "";
+
+    setSelectedProductId(product.productId);
     setSelectedProductName(trimmedName);
     setSearchTerm(trimmedName);
     setShowSearchResults(false);
     setSearchResults([]);
-    setSelectedColors([]);
+    setSelectedColors(preSelectedColor ? [preSelectedColor] : []);
   }, []);
 
   const productContent = data ? (
@@ -354,7 +363,7 @@ export default function ProductDetailPage({
 
   const emptyContent = !data && !loading ? (
     <div className={styles.empty}>
-      <p>Digite o nome ou código do produto para começar</p>
+      <p>Digite o nome, código do produto ou código de barras para começar</p>
     </div>
   ) : null;
 
@@ -388,7 +397,7 @@ export default function ProductDetailPage({
             <input
               type="text"
               className={styles.searchInput}
-              placeholder="PASHMINA LISA VISCOSE"
+              placeholder="Nome, código ou código de barras"
               value={searchTerm}
               onChange={(e) => {
                 const value = e.target.value;
@@ -437,13 +446,18 @@ export default function ProductDetailPage({
             <div className={styles.searchResults}>
               {searchResults.slice(0, 10).map((product) => (
                 <button
-                  key={product.productId}
+                  key={`${product.productId}-${product.matchedColorCode ?? "all"}`}
                   type="button"
                   className={styles.searchResultItem}
-                  onClick={() => handleProductSelect(product.productId, product.productName)}
+                  onClick={() => handleProductSelect(product)}
                 >
                   <div className={styles.searchResultName}>{product.productName}</div>
-                  <div className={styles.searchResultId}>{product.productId}</div>
+                  <div className={styles.searchResultId}>
+                    {product.productId}
+                    {product.matchedColorCode
+                      ? ` • Cor: ${product.matchedColorName || product.matchedColorCode}`
+                      : ""}
+                  </div>
                 </button>
               ))}
             </div>

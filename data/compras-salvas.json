@@ -490,5 +490,27 @@
     "comprada": false,
     "savedAt": "2026-04-27T13:41:32.281Z",
     "updatedAt": "2026-04-27T13:41:32.281Z"
+  },
+  {
+    "id": "4bc4feda-7e55-4bac-afdf-f37eb6503e1b",
+    "companyKey": "nerd",
+    "sourceContextKey": "lista-loja:nerd:__TODAS__:novo",
+    "title": "[Lista Loja] TODAS (visão geral) 30/04/2026 11:30 · andre.sabetta",
+    "expandirPorCor": true,
+    "items": [
+      {
+        "itemKey": "X2.03.0023|S1",
+        "produto": "X2.03.0023",
+        "corProduto": "S1",
+        "corDescricao": "CAPUCCINO",
+        "descricao": "ALÇA  UNIVERSAL NERD IMP",
+        "qtdManual": 47,
+        "custoUnitario": 28.63,
+        "filialOrigem": null
+      }
+    ],
+    "comprada": false,
+    "savedAt": "2026-04-30T14:30:42.948Z",
+    "updatedAt": "2026-04-30T14:30:42.948Z"
   }
 ]

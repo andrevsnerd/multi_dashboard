@@ -16,20 +16,20 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 14px 18px;
-  border-radius: 16px;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
   border: 1px solid rgba(15, 23, 42, 0.12);
   background: #ffffff;
   cursor: pointer;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .button:hover,
 .buttonActive {
   border-color: rgba(14, 165, 233, 0.4);
-  box-shadow: 0 12px 28px rgba(14, 165, 233, 0.18);
+  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.16);
 }
 
 .buttonValue {
@@ -41,7 +41,7 @@
 .valuePrimary {
   font-weight: 600;
   color: #0f172a;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .valueSecondary {
@@ -56,14 +56,14 @@
   left: auto;
   z-index: 1000;
   display: grid;
-  grid-template-columns: 180px auto;
-  gap: 16px;
-  padding: 20px;
-  border-radius: 20px;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
   background: #ffffff;
   border: 1px solid rgba(15, 23, 42, 0.1);
-  box-shadow: 0 30px 60px rgba(15, 23, 42, 0.2);
-  min-width: 580px;
+  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.16);
+  min-width: 460px;
   visibility: visible;
   opacity: 1;
 }
@@ -71,13 +71,14 @@
 .calendarArea {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  min-width: 0;
 }
 
 .inputsRow {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 8px;
 }
 
 .field {
@@ -87,18 +88,18 @@
 }
 
 .fieldLabel {
-  font-size: 12px;
+  font-size: 11px;
   color: #475569;
   font-weight: 600;
 }
 
 .dateInput {
   width: 100%;
-  padding: 10px 12px;
-  border-radius: 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.55);
   background: #ffffff;
-  font-size: 13px;
+  font-size: 12px;
   color: #0f172a;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -112,13 +113,13 @@
 .actionsRow {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 8px;
 }
 
 .actionButton {
-  border-radius: 12px;
-  padding: 10px 12px;
-  font-size: 13px;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
   border: 1px solid rgba(148, 163, 184, 0.55);
   background: #ffffff;
   color: #0f172a;
@@ -145,7 +146,7 @@
 .presets {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .presetButton {
@@ -153,12 +154,26 @@
   text-align: left;
   border: 1px solid rgba(148, 163, 184, 0.4);
   background: none;
-  border-radius: 12px;
-  padding: 10px 12px;
-  font-size: 13px;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
   color: #0f172a;
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.dropdown :global(.rdrDateRangeWrapper) {
+  width: 100%;
+}
+
+.dropdown :global(.rdrMonthAndYearWrapper) {
+  padding-top: 0;
+  height: 36px;
+}
+
+.dropdown :global(.rdrMonth) {
+  width: 100%;
+  padding: 0;
 }
 
 .presetButton:hover {
@@ -176,9 +191,18 @@
 @media (max-width: 1024px) {
   .dropdown {
     grid-template-columns: 1fr;
-    min-width: auto;
-    width: max-content;
+    min-width: 0;
+    width: min(100%, 460px);
     max-width: calc(100vw - 32px);
+  }
+
+  .presets {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .presetButton {
+    text-align: center;
   }
 }
 
@@ -188,8 +212,8 @@
   }
 
   .button {
-    padding: 12px 16px;
-    font-size: 14px;
+    padding: 10px 12px;
+    font-size: 13px;
   }
 
   .label {
@@ -204,12 +228,12 @@
     right: auto;
     width: calc(100vw - 32px);
     max-width: 90vw;
-    max-height: 85vh;
+    max-height: min(85vh, 640px);
     overflow-y: auto;
     z-index: 1001;
     margin: 0;
     padding: 16px;
-    border-radius: 16px;
+    border-radius: 14px;
   }
 
   .backdrop {
@@ -230,13 +254,14 @@
   }
 
   .presets {
-    gap: 8px;
+    gap: 6px;
     margin-bottom: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .presetButton {
-    padding: 12px;
-    font-size: 14px;
+    padding: 8px 10px;
+    font-size: 12px;
   }
 
   /* Ajustar o calendário para mobile */

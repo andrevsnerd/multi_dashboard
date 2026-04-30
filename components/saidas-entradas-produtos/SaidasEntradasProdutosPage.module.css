@@ -368,6 +368,23 @@
   border-radius: 20px;
 }
 
+.historicoActionRow {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 16px 0;
+}
+
+.historicoActionLink {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.historicoActionLink:hover {
+  text-decoration: underline;
+}
+
 .badge {
   font-size: 14px;
   font-weight: 600;

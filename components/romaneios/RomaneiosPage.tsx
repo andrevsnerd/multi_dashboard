@@ -226,6 +226,9 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
                 <div className={styles.cardDetails}>
                   Responsável: {rom.responsavel || "—"}
                 </div>
+                <div className={styles.cardDetails}>
+                  Tipo de romaneio: {rom.tipoRomaneio?.trim() || "—"}
+                </div>
                 <div className={styles.cardFooter}>
                   <span className={styles.counts}>
                     <span className={styles.countIcon}>👁</span> {rom.qtdProdutos} produtos • {rom.qtdItens} itens
