@@ -101,6 +101,19 @@
   cursor: not-allowed;
 }
 
+.destinoMeta {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.destinoMeta span {
+  margin-left: 6px;
+  font-weight: 500;
+  color: rgba(55, 65, 81, 0.48);
+}
+
 .erroConfirmacao {
   margin-bottom: 16px;
   padding: 10px 16px;

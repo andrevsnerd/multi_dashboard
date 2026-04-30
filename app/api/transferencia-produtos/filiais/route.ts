@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { withRequest } from '@/lib/db/connection';
-import { getOperationalFilials } from '@/lib/config/company';
+import {
+  getActiveFilial,
+  getFilialLabelForDisplay,
+  getOperationalFilials,
+} from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
 
 // Lista canônica de filiais operacionais (ativas) para o select.
@@ -22,11 +26,72 @@ async function getFiliaisCanonicas(companyKey?: string | null): Promise<string[]
   return [...new Set([...nerd, ...scarfme])];
 }
 
+type FilialOption = {
+  codFilial: string;
+  filial: string;
+  displayName: string;
+  activeFilial: string;
+  aliases: string[];
+};
+
+function getFilialAliases(
+  company: Awaited<ReturnType<typeof resolveCompanyDynamic>>,
+  activeFilial: string
+): string[] {
+  const seen = new Set<string>();
+  const aliases: string[] = [];
+  const activeKey = activeFilial.trim().toUpperCase();
+  const add = (value?: string | null) => {
+    const filial = (value || '').trim();
+    const key = filial.toUpperCase();
+    if (!filial || seen.has(key)) return;
+    seen.add(key);
+    aliases.push(filial);
+  };
+
+  add(activeFilial);
+  if (!company) return aliases;
+
+  for (const filial of company.filialFilters.inventory) {
+    if (getActiveFilial(company, filial).trim().toUpperCase() === activeKey) {
+      add(filial);
+    }
+  }
+
+  for (const [canonical, members] of Object.entries(company.filialGroups ?? {})) {
+    if (getActiveFilial(company, canonical).trim().toUpperCase() === activeKey) {
+      add(canonical);
+    }
+    for (const member of members) {
+      if (getActiveFilial(company, member).trim().toUpperCase() === activeKey) {
+        add(member);
+      }
+    }
+  }
+
+  return aliases;
+}
+
+function toFilialOption(
+  filial: string,
+  company: Awaited<ReturnType<typeof resolveCompanyDynamic>>
+): FilialOption {
+  const activeFilial = getActiveFilial(company, filial);
+  return {
+    codFilial: activeFilial,
+    filial: activeFilial,
+    displayName: getFilialLabelForDisplay(company, activeFilial),
+    activeFilial,
+    aliases: getFilialAliases(company, activeFilial),
+  };
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const company = searchParams.get('company');
     const filiaisCanonicas = await getFiliaisCanonicas(company);
+    const companyConfig = company ? await resolveCompanyDynamic(company) : null;
 
     const filiais = await withRequest(async (req) => {
       const query = `
@@ -52,12 +117,12 @@ export async function GET(request: Request) {
       }));
 
       const matched = new Set<string>();
-      const mapped: Array<{ codFilial: string; filial: string }> = [];
+      const mapped: FilialOption[] = [];
 
       for (const f of fromDb) {
         if (filiaisCanonicas.includes(f.filial)) {
           matched.add(f.filial);
-          mapped.push({ codFilial: f.filial, filial: f.filial });
+          mapped.push(toFilialOption(f.filial, companyConfig));
         }
       }
 
@@ -65,11 +130,15 @@ export async function GET(request: Request) {
       // usando o nome como codFilial provisório para aparecer no select.
       for (const nome of filiaisCanonicas) {
         if (!matched.has(nome)) {
-          mapped.push({ codFilial: nome, filial: nome });
+          mapped.push(toFilialOption(nome, companyConfig));
         }
       }
 
-      return mapped.sort((a, b) => a.filial.localeCompare(b.filial));
+      return mapped.sort((a, b) => {
+        const byLabel = a.displayName.localeCompare(b.displayName, 'pt-BR');
+        if (byLabel !== 0) return byLabel;
+        return a.activeFilial.localeCompare(b.activeFilial, 'pt-BR');
+      });
     });
 
     return NextResponse.json({ data: filiais });

@@ -26,6 +26,9 @@ export interface RomaneioListItem {
 interface FilialOption {
   codFilial: string;
   filial: string;
+  displayName?: string;
+  activeFilial?: string;
+  aliases?: string[];
 }
 
 interface RomaneiosPageProps {
@@ -82,7 +85,14 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
   function getFilialDisplayName(filialValue: string | null | undefined) {
     const filial = (filialValue || "").trim();
     if (!filial) return "";
-    return filiais.find((f) => f.codFilial === filial || f.filial === filial)?.filial || filial;
+    const filialKey = filial.toUpperCase();
+    const option = filiais.find((f) =>
+      f.codFilial.trim().toUpperCase() === filialKey ||
+      f.filial.trim().toUpperCase() === filialKey ||
+      (f.activeFilial || "").trim().toUpperCase() === filialKey ||
+      (f.aliases ?? []).some((alias) => alias.trim().toUpperCase() === filialKey)
+    );
+    return option?.displayName || option?.filial || filial;
   }
 
   useEffect(() => {
@@ -91,7 +101,7 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
     Promise.all([
       fetchLogSaidas(companySlug, user?.username, deferredSearchTerm),
       fetchLogEntradas(companySlug, user?.username, deferredSearchTerm),
-      fetch("/api/transferencia-produtos/filiais", { cache: "no-store" }).then(async (r) => {
+      fetch(`/api/transferencia-produtos/filiais?${new URLSearchParams({ company: companySlug }).toString()}`, { cache: "no-store" }).then(async (r) => {
         if (!r.ok) return [];
         const j = (await r.json()) as { data: FilialOption[] };
         return j.data || [];
@@ -207,15 +217,13 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
                       }`}
                     >
                       {rom.destinoCodigo
-                        ? filiais.find((f) => f.codFilial === rom.destinoCodigo)?.filial ||
-                          rom.destinoCodigo
+                        ? getFilialDisplayName(rom.destinoCodigo)
                         : "—"}
                     </span>
                   ) : (
                     <span className={`${styles.status} ${styles.statusConcluida}`}>
                       {rom.filialDestino
-                        ? filiais.find((f) => f.codFilial === rom.filialDestino)?.filial ||
-                          rom.filialDestino
+                        ? getFilialDisplayName(rom.filialDestino)
                         : "—"}
                     </span>
                   )}

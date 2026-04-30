@@ -74,6 +74,7 @@ async function postConfirmacao(
 /** Registra entrada de estoque em lote (todos os itens no mesmo romaneio). */
 async function executarEntradaEstoqueLote(
   username: string,
+  companyKey: string,
   filialCod: string,
   itens: Array<{ produto: string; corProduto: string | null; quantidade: number }>,
   responsavel: string
@@ -83,6 +84,7 @@ async function executarEntradaEstoqueLote(
     headers: { "Content-Type": "application/json", "x-auth-username": username },
     body: JSON.stringify({
       tipoOperacao: "entrada",
+      companyKey,
       filial: filialCod,
       itens,
       tipoRomaneio: "TRANSFERENCIA ENTRE LOJAS",
@@ -119,6 +121,9 @@ export interface RomaneioDetalheItem {
 interface FilialOption {
   codFilial: string;
   filial: string;
+  displayName?: string;
+  activeFilial?: string;
+  aliases?: string[];
 }
 
 interface RomaneioDetalhePageProps {
@@ -150,8 +155,9 @@ async function fetchDetalhes(
   return json.data || [];
 }
 
-async function fetchFiliais(): Promise<FilialOption[]> {
-  const response = await fetch("/api/transferencia-produtos/filiais", { cache: "no-store" });
+async function fetchFiliais(companyKey: string): Promise<FilialOption[]> {
+  const params = new URLSearchParams({ company: companyKey });
+  const response = await fetch(`/api/transferencia-produtos/filiais?${params.toString()}`, { cache: "no-store" });
   if (!response.ok) return [];
   const json = (await response.json()) as { data: FilialOption[] };
   return json.data || [];
@@ -192,6 +198,24 @@ const DEFEITO_FILIAL_DESTINO: Record<string, string> = {
   nerd: 'NERD DEFEITOS',
   scarfme: 'BAZAR SCARF ME',
 };
+
+const MATRIZ_EXCLUIDA_DESTINO: Record<string, string> = {
+  nerd: 'NERD',
+  scarfme: 'SCARF ME - MATRIZ',
+};
+
+function getFilialOptionLabel(filial: FilialOption): string {
+  const displayName = (filial.displayName || filial.filial || filial.codFilial).trim();
+  const activeFilial = (filial.activeFilial || filial.codFilial || filial.filial).trim();
+  if (!activeFilial || displayName.toUpperCase() === activeFilial.toUpperCase()) {
+    return displayName || activeFilial;
+  }
+  return `${displayName} (${activeFilial})`;
+}
+
+function getFilialDisplay(filial: FilialOption | undefined, fallback: string): string {
+  return filial?.displayName || filial?.filial || fallback;
+}
 
 export default function RomaneioDetalhePage({
   companySlug,
@@ -310,11 +334,6 @@ export default function RomaneioDetalhePage({
     return () => { cancelled = true; };
   }, [tipo, romaneioId, filialOrigem, filialDestino, destinoSelected]);
 
-  const MATRIZ_EXCLUIDA_DESTINO: Record<string, string> = {
-    nerd: 'NERD',
-    scarfme: 'SCARF ME - MATRIZ',
-  };
-
   useEffect(() => {
     const matrizExcluida = MATRIZ_EXCLUIDA_DESTINO[companySlug];
     const defeitoFilial = DEFEITO_FILIAL_DESTINO[companySlug];
@@ -334,13 +353,13 @@ export default function RomaneioDetalhePage({
     };
 
     if (tipo === "saida") {
-      fetchFiliais().then(data => setFiliais(applyFilter(data)));
+      fetchFiliais(companySlug).then(data => setFiliais(applyFilter(data)));
       loadDestino();
     } else {
       // Entradas também precisam das filiais (para o modal "Dar Saída")
-      fetchFiliais().then(data => setFiliais(applyFilter(data)));
+      fetchFiliais(companySlug).then(data => setFiliais(applyFilter(data)));
     }
-  }, [tipo, tipoRomaneio, loadDestino]);
+  }, [tipo, tipoRomaneio, companySlug, loadDestino]);
 
   useEffect(() => {
     if (tipo === "entrada" && filialDestino) {
@@ -383,6 +402,7 @@ export default function RomaneioDetalhePage({
         // Registra entrada de estoque em lote (1 romaneio para todos)
         const result = await executarEntradaEstoqueLote(
           user.username,
+          companySlug,
           destinoSelected,
           itensParaConfirmar.map((i) => ({
             produto: i.produto,
@@ -425,7 +445,7 @@ export default function RomaneioDetalhePage({
     } finally {
       setConfirmandoTudo(false);
     }
-  }, [user?.username, itens, quantidades, tipo, destinoSelected, filialDestino, companySlug, romaneioId, responsavel, responsavelPadrao, filialOrigem]);
+  }, [user?.username, itens, quantidades, tipo, destinoSelected, filialDestino, companySlug, romaneioId, responsavelPadrao, filialOrigem]);
 
   // Desconfirma item individualmente (sem reverter estoque)
   const handleDesconfirmar = useCallback(async (produto: string, corProduto: string | null) => {
@@ -523,10 +543,18 @@ export default function RomaneioDetalhePage({
     await saveDestinoRomaneio(user.username, companySlug, romaneioId, filialOrigem, codFilial);
   }, [user?.username, companySlug, romaneioId, filialOrigem]);
 
-  const destinoDisplay =
-    destinoSelected && filiais.length > 0
-      ? filiais.find((f) => f.codFilial === destinoSelected)?.filial || destinoSelected
-      : null;
+  const destinoKey = destinoSelected.trim().toUpperCase();
+  const destinoOption = destinoSelected
+    ? filiais.find((f) =>
+        f.codFilial.trim().toUpperCase() === destinoKey ||
+        (f.activeFilial || "").trim().toUpperCase() === destinoKey ||
+        (f.aliases ?? []).some((alias) => alias.trim().toUpperCase() === destinoKey)
+      )
+    : undefined;
+  const destinoDisplay = destinoSelected
+    ? getFilialDisplay(destinoOption, destinoSelected)
+    : null;
+  const destinoActiveFilial = destinoOption?.activeFilial || destinoOption?.codFilial || destinoSelected;
 
   const qtdProdutos = itens.length;
   const qtdItens = itens.reduce((s, i) => s + i.qtde, 0);
@@ -563,6 +591,7 @@ export default function RomaneioDetalhePage({
         headers,
         body: JSON.stringify({
           tipoOperacao: "saida",
+          companyKey: companySlug,
           filial: filialDestino,
           filialDestino: darSaidaDestino,
           itens: itens.map((item) => ({
@@ -629,17 +658,29 @@ export default function RomaneioDetalhePage({
             disabled={loadingDestino}
           >
             <option value="">Nenhum destino definido</option>
-            {destinoSelected && !filiais.some((f) => f.codFilial === destinoSelected) && (
+            {destinoSelected && !filiais.some((f) =>
+              f.codFilial.trim().toUpperCase() === destinoKey ||
+              (f.activeFilial || "").trim().toUpperCase() === destinoKey ||
+              (f.aliases ?? []).some((alias) => alias.trim().toUpperCase() === destinoKey)
+            ) && (
               <option key={destinoSelected} value={destinoSelected}>
                 {destinoSelected}
               </option>
             )}
             {filiais.map((f) => (
               <option key={f.codFilial} value={f.codFilial}>
-                {f.filial} ({f.codFilial})
+                {getFilialOptionLabel(f)}
               </option>
             ))}
           </select>
+          {destinoDisplay && destinoActiveFilial && (
+            <div className={styles.destinoMeta}>
+              {destinoDisplay}
+              {destinoDisplay.toUpperCase() !== destinoActiveFilial.toUpperCase() && (
+                <span>({destinoActiveFilial})</span>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -858,7 +899,7 @@ export default function RomaneioDetalhePage({
                   .filter((f) => f.codFilial !== filialDestino && f.filial !== filialDestino)
                   .map((f) => (
                     <option key={f.codFilial} value={f.codFilial}>
-                      {f.filial}
+                      {getFilialOptionLabel(f)}
                     </option>
                   ))}
               </select>

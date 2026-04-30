@@ -22,10 +22,19 @@ export async function resolveCompanyDynamic(
     if (grupos.length === 0) return base;
 
     const { filialGroups, activeFilials } = buildDerivedFilialConfig(grupos);
+    const filialDisplayNames = grupos.reduce<Record<string, string>>((acc, grupo) => {
+      for (const member of grupo.members) {
+        acc[member] = grupo.label;
+      }
+      acc[grupo.active] = grupo.label;
+      return acc;
+    }, {});
+
     return {
       ...base,
       filialGroups: { ...base.filialGroups, ...filialGroups },
       activeFilials: { ...base.activeFilials, ...activeFilials },
+      filialDisplayNames: { ...base.filialDisplayNames, ...filialDisplayNames },
     };
   } catch {
     return base;
