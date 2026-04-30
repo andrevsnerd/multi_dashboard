@@ -83,6 +83,11 @@ function isTipoSemDestino(tipo: string): boolean {
   return TIPOS_SEM_FILIAL_DESTINO.some(t => norm.includes(t));
 }
 
+function isTransferenciaEntreLojas(tipo: string): boolean {
+  const norm = tipo.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return norm.includes('TRANSFERENCIA ENTRE LOJAS');
+}
+
 interface SaidasEntradasProdutosPageProps {
   companyKey: CompanyKey;
   companyName: string;
@@ -1345,9 +1350,16 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       mostrarNotificacao("Adicione pelo menos um produto", "error");
       return;
     }
-    if (tipoOperacao === "saida" && filiaisDestinoVisiveis.length > 1 && !filialDestinoSaida && !isTipoSemDestino(tipoRomaneioSelecionado)) {
-      mostrarNotificacao("Selecione uma filial de destino", "error");
-      return;
+    if (tipoOperacao === "saida") {
+      const tipoExigeDestino = isTransferenciaEntreLojas(tipoRomaneioSelecionado);
+      if (tipoExigeDestino && !filialDestinoSaida) {
+        mostrarNotificacao("Para 'TRANSFERENCIA ENTRE LOJAS' é obrigatório selecionar filial de destino", "error");
+        return;
+      }
+      if (!tipoExigeDestino && filiaisDestinoVisiveis.length > 1 && !filialDestinoSaida && !isTipoSemDestino(tipoRomaneioSelecionado)) {
+        mostrarNotificacao("Selecione uma filial de destino", "error");
+        return;
+      }
     }
     setMostrarConfirmacaoRegistro(true);
   }, [filialSelecionada, produtosSelecionados.length, tipoOperacao, filiaisDestinoVisiveis.length, filialDestinoSaida, tipoRomaneioSelecionado, mostrarNotificacao]);

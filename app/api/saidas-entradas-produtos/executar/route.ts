@@ -24,6 +24,14 @@ interface SaidaEntradaRequest {
   companyKey?: string;
 }
 
+function isTransferenciaEntreLojas(tipoRomaneio: string): boolean {
+  const normalized = (tipoRomaneio || '')
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  return normalized.includes('TRANSFERENCIA ENTRE LOJAS');
+}
+
 async function getActiveFilialForRequest(companyKey: string | undefined, filial: string): Promise<string> {
   const preferredCompany = await resolveCompanyDynamic(companyKey);
   if (preferredCompany) {
@@ -82,6 +90,13 @@ export async function POST(request: Request) {
     const filialDestinoTrim = filialDestino
       ? await getActiveFilialForRequest(companyKey, filialDestino.trim())
       : filialDestino;
+
+    if (tipoOperacao === 'saida' && isTransferenciaEntreLojas(tipoRomaneio) && !filialDestinoTrim) {
+      return NextResponse.json(
+        { error: 'Filial destino é obrigatória para romaneio do tipo TRANSFERENCIA ENTRE LOJAS.' },
+        { status: 400 }
+      );
+    }
 
     if (!username) {
       return NextResponse.json(
