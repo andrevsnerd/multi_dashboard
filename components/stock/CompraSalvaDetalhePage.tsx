@@ -102,7 +102,6 @@ function getLimiteDiasReposicao(p: { linha?: string; subgrupo?: string }) {
   const linha = normalizeKey(p.linha);
   const subgrupo = normalizeKey(p.subgrupo);
   if (linha === "INDIA") return 90;
-  if (linha === "ELETRONICOS") return 120;
   const subgrupos90 = new Set(["CETIM DE SEDA", "MOUSSELINE DE SEDA", "SEDA PREMIUM"]);
   if (subgrupos90.has(subgrupo)) return 90;
   return 60;

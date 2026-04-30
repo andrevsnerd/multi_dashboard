@@ -357,7 +357,6 @@ function filterEstoqueTooltipFiliais(filiais: Array<{ filial: string; estoque: n
 function getLimiteDiasReposicao(p: { linha?: string; subgrupo?: string }) {
   const linha = normalizeKey(p.linha);
   const subgrupo = normalizeKey(p.subgrupo);
-  if (linha === "ELETRONICOS") return { limiteDias: 120, regra: "Linha Eletronicos" };
 
   // Linha índia: regra exclusiva (subgrupo não conta)
   if (linha === "INDIA") return { limiteDias: 90, regra: "Linha Índia" };
