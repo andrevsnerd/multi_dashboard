@@ -276,6 +276,7 @@ export interface ProductDetailParams {
 
 export interface ProductAvailableColor {
   code: string;
+  description: string;
   displayName: string;
 }
 
@@ -292,27 +293,40 @@ export async function fetchProductAvailableColors(
     // Não restringimos por estoque positivo nem por filial para evitar perder cores válidas.
     const query = `
       WITH cores_produto AS (
-        SELECT ISNULL(e.COR_PRODUTO, '') AS COR
+        SELECT ISNULL(e.COR_PRODUTO, '') AS COR, '' AS DESC_ORIGEM
         FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
         WHERE e.PRODUTO = @productId
 
         UNION
 
-        SELECT ISNULL(vp.COR_PRODUTO, '') AS COR
+        SELECT ISNULL(vp.COR_PRODUTO, '') AS COR, ISNULL(vp.DESC_COR_PRODUTO, '') AS DESC_ORIGEM
         FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
         WHERE vp.PRODUTO = @productId
 
         UNION
 
-        SELECT ISNULL(fp.COR_PRODUTO, '') AS COR
+        SELECT ISNULL(fp.COR_PRODUTO, '') AS COR, '' AS DESC_ORIGEM
         FROM W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         WHERE fp.PRODUTO = @productId
+
+        UNION
+
+        SELECT ISNULL(pb.COR_PRODUTO, '') AS COR, '' AS DESC_ORIGEM
+        FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+        WHERE pb.PRODUTO = @productId
+
+        UNION
+
+        SELECT ISNULL(pc.COR_PRODUTO, '') AS COR, ISNULL(pc.DESC_COR_PRODUTO, '') AS DESC_ORIGEM
+        FROM PRODUTO_CORES pc WITH (NOLOCK)
+        WHERE pc.PRODUTO = @productId
       )
-      SELECT DISTINCT
+      SELECT
         cp.COR,
-        ISNULL(c.DESC_COR, '') AS DESC_COR
+        ISNULL(MAX(NULLIF(LTRIM(RTRIM(c.DESC_COR)), '')), MAX(NULLIF(LTRIM(RTRIM(cp.DESC_ORIGEM)), ''))) AS DESC_COR
       FROM cores_produto cp
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON cp.COR = c.COR
+      GROUP BY cp.COR
     `;
     const result = await request.query<{ COR: string; DESC_COR: string }>(query);
     return buildColorList(result.recordset);
@@ -350,11 +364,22 @@ function buildColorList(recordset: { COR: string; DESC_COR: string }[]): Product
     const code = (row.COR ?? '').trim();
     if (seen.has(code)) continue;
     seen.add(code);
-    const displayName = getColorDescription(code || undefined, row.DESC_COR ?? '') || (code || 'Sem cor');
-    list.push({ code: code || '', displayName });
+    const description = (row.DESC_COR ?? '').trim();
+    const displayName = getColorDescription(code || undefined, description) || description || (code || 'Sem cor');
+    list.push({ code: code || '', description, displayName });
   }
+  const descriptionsWithCode = new Set(
+    list
+      .filter((item) => item.code && item.description)
+      .map((item) => item.description.toUpperCase().trim())
+  );
+  const filtered = list.filter((item) => {
+    if (item.code) return true;
+    const descriptionKey = item.description.toUpperCase().trim();
+    return !descriptionKey || !descriptionsWithCode.has(descriptionKey);
+  });
   const norm = (s: string) => (s || '').toLowerCase().trim().replace(/-/g, ' ');
-  return list.sort((a, b) => {
+  return filtered.sort((a, b) => {
     const nameA = norm(a.displayName);
     const nameB = norm(b.displayName);
     const idxA = PRINCIPAL_COLORS_ORDER.findIndex((p) => nameA === p || nameA.startsWith(p + ' '));
@@ -367,6 +392,113 @@ function buildColorList(recordset: { COR: string; DESC_COR: string }[]): Product
 }
 
 /** Adiciona parâmetros de cor ao request uma vez; retorna função que gera o fragmento SQL por alias. */
+export interface UpdateProductColorParams {
+  productId: string;
+  currentCode: string;
+  newCode: string;
+  description: string;
+}
+
+export async function updateProductColorRegistration(
+  params: UpdateProductColorParams
+): Promise<{ code: string; description: string; updatedProductRows: number }> {
+  const productId = String(params.productId ?? '').trim();
+  const currentCode = String(params.currentCode ?? '').trim();
+  const newCode = String(params.newCode ?? '').trim().toUpperCase();
+  const description = String(params.description ?? '').trim().toUpperCase();
+
+  return withRequest(async (request) => {
+    request.input('productId', sql.VarChar, productId);
+    request.input('currentCode', sql.VarChar, currentCode);
+    request.input('newCode', sql.VarChar, newCode);
+    request.input('description', sql.VarChar, description);
+
+    const query = `
+      SET XACT_ABORT ON;
+      BEGIN TRAN;
+
+      IF EXISTS (
+        SELECT 1
+        FROM CORES_BASICAS WITH (UPDLOCK, HOLDLOCK)
+        WHERE LTRIM(RTRIM(COR)) = @newCode
+      )
+      BEGIN
+        UPDATE CORES_BASICAS
+        SET DESC_COR = @description
+        WHERE LTRIM(RTRIM(COR)) = @newCode;
+      END
+      ELSE
+      BEGIN
+        INSERT INTO CORES_BASICAS (COR, DESC_COR, USO_PRODUTOS, USO_MATERIAIS, GRUPO_CORES, COR_SORTIDA)
+        VALUES (@newCode, @description, 1, 0, ' ', 0);
+      END
+
+      DECLARE @updatedBarra int = 0;
+      DECLARE @updatedEstoque int = 0;
+      DECLARE @updatedProdutoCores int = 0;
+
+      IF @productId <> ''
+      BEGIN
+        IF EXISTS (
+          SELECT 1
+          FROM PRODUTO_CORES WITH (UPDLOCK, HOLDLOCK)
+          WHERE LTRIM(RTRIM(PRODUTO)) = @productId
+            AND LTRIM(RTRIM(COR_PRODUTO)) = @newCode
+        )
+        BEGIN
+          UPDATE PRODUTO_CORES
+          SET DESC_COR_PRODUTO = @description,
+              COR = @newCode
+          WHERE LTRIM(RTRIM(PRODUTO)) = @productId
+            AND LTRIM(RTRIM(COR_PRODUTO)) = @newCode;
+          SET @updatedProdutoCores = @@ROWCOUNT;
+        END
+        ELSE
+        BEGIN
+          INSERT INTO PRODUTO_CORES (PRODUTO, COR_PRODUTO, DESC_COR_PRODUTO, COR)
+          VALUES (@productId, @newCode, @description, @newCode);
+          SET @updatedProdutoCores = @@ROWCOUNT;
+        END
+      END
+
+      IF @productId <> '' AND @currentCode <> @newCode
+      BEGIN
+        UPDATE PRODUTOS_BARRA
+        SET COR_PRODUTO = @newCode
+        WHERE LTRIM(RTRIM(PRODUTO)) = @productId
+          AND LTRIM(RTRIM(ISNULL(COR_PRODUTO, ''))) = @currentCode;
+        SET @updatedBarra = @@ROWCOUNT;
+
+        UPDATE ESTOQUE_PRODUTOS
+        SET COR_PRODUTO = @newCode
+        WHERE LTRIM(RTRIM(PRODUTO)) = @productId
+          AND LTRIM(RTRIM(ISNULL(COR_PRODUTO, ''))) = @currentCode;
+        SET @updatedEstoque = @@ROWCOUNT;
+      END
+
+      COMMIT;
+
+      SELECT
+        @newCode AS code,
+        @description AS description,
+        (@updatedProdutoCores + @updatedBarra + @updatedEstoque) AS updatedProductRows;
+    `;
+
+    const result = await request.query<{
+      code: string;
+      description: string;
+      updatedProductRows: number;
+    }>(query);
+
+    const row = result.recordset[0];
+    return {
+      code: String(row?.code ?? newCode).trim(),
+      description: String(row?.description ?? description).trim(),
+      updatedProductRows: Number(row?.updatedProductRows ?? 0),
+    };
+  });
+}
+
 function buildColorFilter(
   request: sql.Request | RequestLike,
   colors: string[] | undefined

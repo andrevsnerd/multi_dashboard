@@ -12,13 +12,15 @@ import {
 } from '@/lib/repositories/productDetail';
 import { getCurrentMonthRange } from '@/lib/utils/date';
 
+const NO_COLOR_PARAM = '__SEM_COR__';
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const productId = searchParams.get('productId');
   const company = searchParams.get('company') ?? undefined;
   const colorsParam = searchParams.get('colors');
   const colors = colorsParam
-    ? colorsParam.split(',').map((c) => c.trim()).filter(Boolean)
+    ? colorsParam.split(',').map((c) => c.trim() === NO_COLOR_PARAM ? '' : c.trim())
     : undefined;
 
   // Usar período padrão (mês atual) se não for fornecido

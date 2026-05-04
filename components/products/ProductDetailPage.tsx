@@ -6,6 +6,7 @@ import DateRangeFilter, {
   type DateRangeValue,
 } from "@/components/filters/DateRangeFilter";
 import { getCurrentMonthRange } from "@/lib/utils/date";
+import { useAuth } from "@/components/auth/AuthContext";
 import type { CompanyKey } from "@/lib/config/company";
 import type {
   ProductDetailInfo,
@@ -17,6 +18,8 @@ import type {
 
 import styles from "./ProductDetailPage.module.css";
 import ProductDetailKPIs from "./ProductDetailKPIs";
+
+const NO_COLOR_VALUE = "__SEM_COR__";
 
 interface ProductDetailPageProps {
   companyKey: CompanyKey;
@@ -78,7 +81,7 @@ async function fetchProductDetail(
     end: range.endDate.toISOString(),
   });
   if (selectedColors.length > 0) {
-    searchParams.set("colors", selectedColors.join(","));
+    searchParams.set("colors", selectedColors.map((color) => color || NO_COLOR_VALUE).join(","));
   }
 
   const response = await fetch(`/api/product-detail?${searchParams.toString()}`, {
@@ -100,6 +103,8 @@ export default function ProductDetailPage({
   companyKey,
   companyName,
 }: ProductDetailPageProps) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const searchParams = useSearchParams();
   const lastUrlProductId = useRef<string | null>(null);
 
@@ -125,9 +130,18 @@ export default function ProductDetailPage({
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [colorModalOpen, setColorModalOpen] = useState(false);
+  const [colorForm, setColorForm] = useState({ code: "", description: "" });
+  const [colorModalError, setColorModalError] = useState<string | null>(null);
+  const [colorSaving, setColorSaving] = useState(false);
   const refetchDetail = useCallback(() => setRefreshTrigger((t) => t + 1), []);
 
-  const selectedColorValue = selectedColors[0] ?? "";
+  const selectedColorCode = selectedColors[0] ?? null;
+  const selectedColorValue = selectedColorCode === null ? "" : (selectedColorCode || NO_COLOR_VALUE);
+  const selectedColor = useMemo(() => {
+    if (!data || selectedColorCode === null) return null;
+    return (data.availableColors ?? []).find((color) => color.code === selectedColorCode) ?? null;
+  }, [data, selectedColorCode]);
 
   // Fechar dropdown ao clicar fora
   useEffect(() => {
@@ -160,7 +174,7 @@ export default function ProductDetailPage({
     const name = (searchParams.get("name") ?? id).trim();
     const colorsParam = searchParams.get("colors");
     const colors = colorsParam
-      ? colorsParam.split(",").map((c) => c.trim()).filter(Boolean)
+      ? colorsParam.split(",").map((c) => c.trim() === NO_COLOR_VALUE ? "" : c.trim()).filter((c) => c || c === "")
       : [];
     setSelectedProductId(id);
     setSelectedProductName(name);
@@ -197,7 +211,7 @@ export default function ProductDetailPage({
           setSearchResults(results);
           setShowSearchResults(results.length > 0);
         }
-      } catch (err) {
+      } catch {
         // Silenciosamente falhar
       }
     }
@@ -289,6 +303,76 @@ export default function ProductDetailPage({
     setSelectedColors(preSelectedColor ? [preSelectedColor] : []);
   }, []);
 
+  const openColorModal = useCallback(() => {
+    if (!selectedColor) return;
+    setColorForm({
+      code: selectedColor.code,
+      description: selectedColor.description || selectedColor.displayName,
+    });
+    setColorModalError(null);
+    setColorModalOpen(true);
+  }, [selectedColor]);
+
+  const closeColorModal = useCallback(() => {
+    if (colorSaving) return;
+    setColorModalOpen(false);
+    setColorModalError(null);
+  }, [colorSaving]);
+
+  const saveColor = useCallback(async () => {
+    if (!selectedProductId || !selectedColor || !user?.username) return;
+    const code = colorForm.code.trim().toUpperCase();
+    const description = colorForm.description.trim().toUpperCase();
+    if (!code) {
+      setColorModalError("Informe o codigo da cor.");
+      return;
+    }
+    if (code.length > 10) {
+      setColorModalError("Codigo da cor deve ter no maximo 10 caracteres.");
+      return;
+    }
+    if (!description) {
+      setColorModalError("Informe a descricao da cor.");
+      return;
+    }
+    if (description.length > 25) {
+      setColorModalError("Descricao da cor deve ter no maximo 25 caracteres.");
+      return;
+    }
+
+    setColorSaving(true);
+    setColorModalError(null);
+    try {
+      const response = await fetch("/api/product-detail/color", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-auth-username": user.username,
+        },
+        body: JSON.stringify({
+          productId: selectedProductId,
+          currentCode: selectedColor.code,
+          code,
+          description,
+        }),
+      });
+      const json = (await response.json()) as {
+        error?: string;
+        data?: { code?: string; description?: string };
+      };
+      if (!response.ok || json.error) {
+        throw new Error(json.error || "Erro ao salvar cor.");
+      }
+      setSelectedColors([json.data?.code || code]);
+      setColorModalOpen(false);
+      refetchDetail();
+    } catch (err) {
+      setColorModalError(err instanceof Error ? err.message : "Erro ao salvar cor.");
+    } finally {
+      setColorSaving(false);
+    }
+  }, [colorForm, refetchDetail, selectedColor, selectedProductId, user?.username]);
+
   const productContent = data ? (
     <>
       <div className={styles.productCard}>
@@ -308,23 +392,39 @@ export default function ProductDetailPage({
 
           <div className={styles.productMetaRow}>
             {(data.availableColors ?? []).length > 0 && (
-              <select
-                className={styles.colorSelectNative}
-                value={selectedColorValue}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setSelectedColors(value ? [value] : []);
-                }}
-                aria-label="Filtrar por cor"
-                title="Filtrar por cor"
-              >
-                <option value="">Todas as cores</option>
-                {(data.availableColors ?? []).map(({ code, displayName }) => (
-                  <option key={code || "sem-cor"} value={code}>
-                    {displayName}
-                  </option>
-                ))}
-              </select>
+              <div className={styles.colorSelectGroup}>
+                <select
+                  className={styles.colorSelectNative}
+                  value={selectedColorValue}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSelectedColors(value ? [value === NO_COLOR_VALUE ? "" : value] : []);
+                  }}
+                  aria-label="Filtrar por cor"
+                  title="Filtrar por cor"
+                >
+                  <option value="">Todas as cores</option>
+                  {(data.availableColors ?? []).map(({ code, displayName }) => (
+                    <option key={code || "sem-cor"} value={code || NO_COLOR_VALUE}>
+                      {code ? displayName : `${displayName} (sem codigo)`}
+                    </option>
+                  ))}
+                </select>
+                {isAdmin && selectedColor && (
+                  <button
+                    type="button"
+                    className={styles.colorEditButton}
+                    onClick={openColorModal}
+                    aria-label="Editar cadastro da cor"
+                    title="Editar cadastro da cor"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M12 20h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             )}
 
             {data.detail.lastEntryDate && (
@@ -478,7 +578,65 @@ export default function ProductDetailPage({
     <div className={styles.wrapper}>
       {headerSection}
       {renderBody()}
+      {colorModalOpen && selectedColor && (
+        <div className={styles.modalOverlay} onClick={closeColorModal}>
+          <div className={styles.modalContent} onClick={(event) => event.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>Cadastro da cor</h3>
+              <button
+                type="button"
+                className={styles.modalCloseButton}
+                onClick={closeColorModal}
+                aria-label="Fechar"
+                disabled={colorSaving}
+              >
+                x
+              </button>
+            </div>
+            <div className={styles.colorForm}>
+              <label className={styles.colorFormField}>
+                <span>Codigo cor</span>
+                <input
+                  className={styles.colorFormInput}
+                  value={colorForm.code}
+                  maxLength={10}
+                  onChange={(event) => setColorForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))}
+                  disabled={colorSaving}
+                />
+              </label>
+              <label className={styles.colorFormField}>
+                <span>Descricao cor</span>
+                <input
+                  className={styles.colorFormInput}
+                  value={colorForm.description}
+                  maxLength={25}
+                  onChange={(event) => setColorForm((current) => ({ ...current, description: event.target.value.toUpperCase() }))}
+                  disabled={colorSaving}
+                />
+              </label>
+              {colorModalError && <div className={styles.modalError}>{colorModalError}</div>}
+            </div>
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={`${styles.modalButton} ${styles.modalButtonSecondary}`}
+                onClick={closeColorModal}
+                disabled={colorSaving}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className={`${styles.modalButton} ${styles.modalButtonPrimary}`}
+                onClick={saveColor}
+                disabled={colorSaving}
+              >
+                {colorSaving ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
