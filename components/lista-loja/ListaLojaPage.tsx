@@ -173,6 +173,8 @@ async function fetchFiliais(companyKey?: string): Promise<Filial[]> {
   }
 }
 
+type BarcodeLookupRow = { produto: string; corProduto: string | null };
+
 async function buscarPorCodigoBarras(codigoBarras: string, companyKey?: string) {
   const params = new URLSearchParams({ codigoBarras: codigoBarras.trim() });
   if (companyKey) params.set("company", companyKey);
@@ -181,14 +183,44 @@ async function buscarPorCodigoBarras(codigoBarras: string, companyKey?: string) 
     { cache: "no-store" }
   );
   if (!res.ok) return null;
-  const json = (await res.json()) as { data: { produto: string; corProduto: string | null } | null };
+  const json = (await res.json()) as { data: BarcodeLookupRow | null };
   return json.data || null;
 }
 
-async function searchProdutos(term: string, companyKey?: string): Promise<Produto[]> {
+/** Somente dígitos (p.ex. código de barras interno): não usar busca por nome como fallback. */
+function isSomenteDigitosCodigoBarras(term: string): boolean {
+  const t = term.trim();
+  return t.length >= 4 && /^\d+$/.test(t);
+}
+
+/**
+ * Resolve PRODUTOS_BARRA → produto na API com filtro de cor. Sem cor na barra, só retorna se houver uma única variante.
+ */
+async function produtoFromBarcodeLookup(porBarra: BarcodeLookupRow, companyKey?: string): Promise<Produto | null> {
+  const list = await searchProdutos(
+    porBarra.produto,
+    companyKey,
+    porBarra.corProduto != null ? porBarra.corProduto : undefined
+  );
+  const want = (porBarra.corProduto ?? "").trim();
+  if (want !== "") {
+    return list.find((p) => (p.corProduto ?? "").trim() === want) ?? null;
+  }
+  if (list.length === 1) return list[0] ?? null;
+  return null;
+}
+
+async function searchProdutos(
+  term: string,
+  companyKey?: string,
+  corProduto?: string | null
+): Promise<Produto[]> {
   if (!term || term.trim().length < 2) return [];
   const params = new URLSearchParams({ q: term.trim(), entrada: "true" });
   if (companyKey) params.set("company", companyKey);
+  if (corProduto !== undefined && corProduto !== null) {
+    params.set("corProduto", String(corProduto).trim());
+  }
   const res = await fetch(`/api/transferencia-produtos/produtos?${params}`, { cache: "no-store" });
   if (!res.ok) return [];
   const json = (await res.json()) as { data: Produto[] };
@@ -2772,11 +2804,14 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
         if (term.length >= 3) {
           const porBarra = await buscarPorCodigoBarras(term, companyKey);
           if (porBarra) {
-            results = await searchProdutos(porBarra.produto, companyKey);
+            const matchBarra = await produtoFromBarcodeLookup(porBarra, companyKey);
+            if (matchBarra) results = [matchBarra];
+          } else if (isSomenteDigitosCodigoBarras(term)) {
+            results = [];
           }
         }
 
-        if (results.length === 0) {
+        if (results.length === 0 && !isSomenteDigitosCodigoBarras(term)) {
           results = await searchProdutos(term, companyKey);
         }
 
@@ -3006,16 +3041,12 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
           try {
             const porBarra = await buscarPorCodigoBarras(codigo, companyKey);
             if (porBarra) {
-              const candidatosBarra = await searchProdutos(porBarra.produto, companyKey);
-              const matchBarra =
-                candidatosBarra.find(
-                  (p) =>
-                    p.produto.trim() === porBarra.produto.trim() &&
-                    (p.corProduto ?? "") === (porBarra.corProduto ?? "")
-                ) ||
-                candidatosBarra.find((p) => p.produto.trim() === porBarra.produto.trim()) ||
-                null;
+              const matchBarra = await produtoFromBarcodeLookup(porBarra, companyKey);
               if (matchBarra) return { codigoOriginal, produto: matchBarra };
+              return { codigoOriginal, produto: null as Produto | null };
+            }
+            if (isSomenteDigitosCodigoBarras(codigo)) {
+              return { codigoOriginal, produto: null as Produto | null };
             }
 
             const candidatos = await searchProdutos(codigo, companyKey);
@@ -3027,7 +3058,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             const exactBarra = candidatos.find((p) => (p.codigoBarra || "").trim() === codigo);
             if (exactBarra) return { codigoOriginal, produto: exactBarra };
 
-            return { codigoOriginal, produto: candidatos[0] ?? null };
+            return { codigoOriginal, produto: null as Produto | null };
           } catch {
             return { codigoOriginal, produto: null as Produto | null };
           }

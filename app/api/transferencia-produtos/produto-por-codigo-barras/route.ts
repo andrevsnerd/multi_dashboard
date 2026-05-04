@@ -17,8 +17,9 @@ export async function GET(request: Request) {
       // Log para debug
       console.log(`[CÓDIGO BARRAS] Buscando: "${codigoLimpo}" (len=${codigoLimpo.length}, original="${codigoBarras}")`);
       
-      // Normalizar comparação: código no banco pode ser CHAR com espaços ou numérico
-      const query = `
+      // 1) Match exato do texto (evita colisão BIGINT: "035513" vs "35513" / múltiplas cores com mesmo valor numérico).
+      // 2) Só se não achar, tentar igualdade numérica; se mais de uma linha → ambíguo (null), nunca "primeiro por sorte".
+      const baseSelect = `
         SELECT DISTINCT
           pb.PRODUTO,
           p.DESC_PRODUTO,
@@ -30,17 +31,21 @@ export async function GET(request: Request) {
           pb.CODIGO_BARRA
         FROM PRODUTOS_BARRA pb WITH (NOLOCK)
         INNER JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = pb.PRODUTO
+      `;
+      const queryExato = `
+        ${baseSelect}
         WHERE LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) = LTRIM(RTRIM(@codigoBarras))
-          OR (
-            TRY_CONVERT(BIGINT, LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100))))) IS NOT NULL
-            AND TRY_CONVERT(BIGINT, LTRIM(RTRIM(@codigoBarras))) IS NOT NULL
-            AND TRY_CONVERT(BIGINT, LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100))))) = TRY_CONVERT(BIGINT, LTRIM(RTRIM(@codigoBarras)))
-          )
+      `;
+      const queryNum = `
+        ${baseSelect}
+        WHERE TRY_CONVERT(BIGINT, LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100))))) IS NOT NULL
+          AND TRY_CONVERT(BIGINT, LTRIM(RTRIM(@codigoBarras))) IS NOT NULL
+          AND TRY_CONVERT(BIGINT, LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100))))) = TRY_CONVERT(BIGINT, LTRIM(RTRIM(@codigoBarras)))
       `;
 
       req.input('codigoBarras', sql.VarChar, codigoLimpo.trim());
 
-      const result = await req.query<{
+      let result = await req.query<{
         PRODUTO: string;
         DESC_PRODUTO: string | null;
         GRUPO_PRODUTO: string | null;
@@ -49,7 +54,19 @@ export async function GET(request: Request) {
         COR_PRODUTO: string | null;
         TAMANHO: string | null;
         CODIGO_BARRA: string | null;
-      }>(query);
+      }>(queryExato);
+
+      if (result.recordset.length > 1) {
+        console.warn(`[CÓDIGO BARRAS] Ambíguo (match exato, ${result.recordset.length} linhas): "${codigoLimpo}"`);
+        return null;
+      }
+      if (result.recordset.length === 0) {
+        result = await req.query(queryNum);
+        if (result.recordset.length > 1) {
+          console.warn(`[CÓDIGO BARRAS] Ambíguo (match numérico, ${result.recordset.length} linhas): "${codigoLimpo}"`);
+          return null;
+        }
+      }
 
       if (result.recordset.length === 0) {
         // Debug: tentar buscar com LIKE para ver se o código existe de outra forma
@@ -93,7 +110,6 @@ export async function GET(request: Request) {
         return null;
       }
 
-      // Retornar o primeiro produto encontrado (igual ao script)
       const row = result.recordset[0];
       return {
         produto: row.PRODUTO?.toString().trim() || '',
