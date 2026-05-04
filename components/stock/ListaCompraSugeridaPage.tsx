@@ -360,6 +360,7 @@ function getLimiteDiasReposicao(p: { linha?: string; subgrupo?: string }) {
 
   // Linha índia: regra exclusiva (subgrupo não conta)
   if (linha === "INDIA") return { limiteDias: 90, regra: "Linha Índia" };
+  if (linha === "ELETRONICOS") return { limiteDias: 30, regra: "Padrão" };
 
   // 90 dias para subgrupos específicos de seda
   const subgrupos90 = new Set([
