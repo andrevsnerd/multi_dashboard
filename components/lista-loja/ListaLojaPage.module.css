@@ -913,6 +913,49 @@
 }
 .searchInput::placeholder { color: var(--ll-text-3); }
 
+.colecImportBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--ll-border);
+  margin-bottom: 4px;
+}
+
+.colecImportLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ll-text-2);
+}
+
+.colecImportRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.colecSelect {
+  flex: 1;
+  min-width: 180px;
+  border: 1px solid var(--ll-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--ll-text);
+  background: #fff;
+  outline: none;
+}
+
+.colecSelect:focus {
+  border-color: var(--ll-accent);
+}
+
+.colecSelect:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 .batchBox {
   display: flex;
   flex-direction: column;

@@ -227,6 +227,17 @@ async function searchProdutos(
   return json.data || [];
 }
 
+async function fetchProdutosPorColecao(colecao: string, companyKey?: string): Promise<Produto[]> {
+  const c = colecao.trim();
+  if (!c) return [];
+  const params = new URLSearchParams({ porColecao: "true", colecao: c });
+  if (companyKey) params.set("company", companyKey);
+  const res = await fetch(`/api/transferencia-produtos/produtos?${params}`, { cache: "no-store" });
+  if (!res.ok) return [];
+  const json = (await res.json()) as { data?: Produto[] };
+  return json.data || [];
+}
+
 async function fetchListas(company: string, username: string): Promise<ListaLoja[]> {
   const params = new URLSearchParams({ company });
   const res = await fetch(`/api/lista-loja?${params}`, {
@@ -2562,6 +2573,10 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
   const [loadingProdutos, setLoadingProdutos] = useState(false);
   const [batchCodes, setBatchCodes] = useState("");
   const [importandoBatch, setImportandoBatch] = useState(false);
+  const [colecoesDisponiveis, setColecoesDisponiveis] = useState<string[]>([]);
+  const [loadingColecoesOpcoes, setLoadingColecoesOpcoes] = useState(false);
+  const [colecaoParaImportar, setColecaoParaImportar] = useState("");
+  const [importandoColecao, setImportandoColecao] = useState(false);
 
   // Color picker (dentro do modal)
   const [colorPickerProduto, setColorPickerProduto] = useState<Produto | null>(null);
@@ -2827,6 +2842,32 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     return () => { active = false; clearTimeout(timeoutId); };
   }, [searchTerm, companyKey, modalAberto]);
 
+  useEffect(() => {
+    if (!modalAberto || companyKey !== "scarfme") {
+      return;
+    }
+    let active = true;
+    setLoadingColecoesOpcoes(true);
+    void fetch("/api/stock-by-filial?company=scarfme&filtersOnly=true", { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        return (await res.json()) as { filterOptions?: { colecoes?: string[] } };
+      })
+      .then((json) => {
+        if (!active) return;
+        setColecoesDisponiveis(json?.filterOptions?.colecoes ?? []);
+      })
+      .catch(() => {
+        if (active) setColecoesDisponiveis([]);
+      })
+      .finally(() => {
+        if (active) setLoadingColecoesOpcoes(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [modalAberto, companyKey]);
+
   // reset color picker quando search muda
   useEffect(() => {
     setColorPickerProduto(null);
@@ -2864,6 +2905,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     setItensModal(itens);
     setSearchTerm("");
     setProdutos([]);
+    setColecaoParaImportar("");
     setColorPickerProduto(null);
     setColorPickerOpcoes([]);
     setModalAberto(true);
@@ -2880,6 +2922,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     setItensModal(itens);
     setSearchTerm("");
     setProdutos([]);
+    setColecaoParaImportar("");
     setColorPickerProduto(null);
     setColorPickerOpcoes([]);
     setModalAberto(false);
@@ -2894,6 +2937,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     setModalAberto(false);
     setSearchTerm("");
     setProdutos([]);
+    setColecaoParaImportar("");
     setColorPickerProduto(null);
     setColorPickerOpcoes([]);
   }, [itensModal]);
@@ -3020,6 +3064,126 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
       return next;
     });
   }, []);
+
+  const importarColecaoProdutos = useCallback(async () => {
+    const colecao = colecaoParaImportar.trim();
+    if (!colecao) {
+      mostrarNotificacao("Selecione uma coleção", "error");
+      return;
+    }
+    if (companyKey !== "scarfme") return;
+
+    const filialCod = filialConsultaSelecionada;
+    setImportandoColecao(true);
+    try {
+      const lista = await fetchProdutosPorColecao(colecao, companyKey);
+      if (lista.length === 0) {
+        mostrarNotificacao("Nenhum item encontrado para esta coleção", "error");
+        return;
+      }
+
+      type BatchAgg = {
+        item: Omit<ListaItem, "quantidade" | "qtde12m" | "valor12m" | "qtde60d" | "vendasMesAtual" | "custoUnit" | "estoqueFilial">;
+        quantidade: number;
+      };
+      const agregados = new Map<string, BatchAgg>();
+      for (const p of lista) {
+        const key = buildItemKey(p.produto, p.corProduto);
+        if (agregados.has(key)) continue;
+        agregados.set(key, {
+          item: {
+            produto: p.produto,
+            descProduto: p.descProduto,
+            codigoBarra: p.codigoBarra ?? null,
+            corProduto: p.corProduto,
+            descCor: (p.descCor || "").trim(),
+            linha: p.linha ?? null,
+            subgrupo: p.subgrupo ?? null,
+          },
+          quantidade: 1,
+        });
+      }
+
+      const metricsEntries = await Promise.all(
+        Array.from(agregados.entries()).map(async ([key, agg]) => {
+          const [vendas, estoqueFilial] = await Promise.all([
+            fetchVendasItemMetricas(companyKey, filialCod, agg.item.produto, agg.item.corProduto),
+            fetchEstoqueFilialSum(companyKey, filialCod, agg.item.produto, agg.item.corProduto),
+          ]);
+          return [key, {
+            qtde12m: vendas?.qtde12m ?? null,
+            qtde60d: vendas?.qtde60d ?? null,
+            vendasMesAtual: vendas?.vendasMesAtual ?? null,
+            valor12m: vendas?.valor12m ?? null,
+            custoUnit: vendas?.custoUnit ?? null,
+            estoqueFilial,
+            diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
+            primeiraEntradaFilial: vendas?.primeiraEntradaFilial ?? null,
+            diasHistoricoFilial: vendas?.diasHistoricoFilial ?? null,
+            mesesHistoricoFilial: vendas?.mesesHistoricoFilial ?? null,
+            historicoParcial: vendas?.historicoParcial ?? null,
+          }] as const;
+        })
+      );
+      const metricsMap = new Map(metricsEntries);
+
+      setItensModal((prev) => {
+        const next = [...prev];
+        for (const [key, agg] of agregados.entries()) {
+          const idx = next.findIndex((i) => buildItemKey(i.produto, i.corProduto) === key);
+          if (idx >= 0) {
+            next[idx] = { ...next[idx], quantidade: next[idx].quantidade + agg.quantidade };
+            continue;
+          }
+          const metrics = metricsMap.get(key) || { qtde12m: null, valor12m: null, qtde60d: null, vendasMesAtual: null, custoUnit: null, estoqueFilial: null, diasDesdeUltimaVenda: null, primeiraEntradaFilial: null, diasHistoricoFilial: null, mesesHistoricoFilial: null, historicoParcial: null };
+          const suggested = getSuggestedQtyValue(
+            {
+              ...agg.item,
+              quantidade: 0,
+              qtde12m: metrics.qtde12m,
+              valor12m: metrics.valor12m,
+              qtde60d: metrics.qtde60d,
+              vendasMesAtual: metrics.vendasMesAtual,
+              custoUnit: metrics.custoUnit,
+              estoqueFilial: metrics.estoqueFilial,
+              diasDesdeUltimaVenda: metrics.diasDesdeUltimaVenda,
+              primeiraEntradaFilial: metrics.primeiraEntradaFilial,
+              diasHistoricoFilial: metrics.diasHistoricoFilial,
+              mesesHistoricoFilial: metrics.mesesHistoricoFilial,
+              historicoParcial: metrics.historicoParcial,
+            },
+            new Date().getDate()
+          );
+          next.push({
+            ...agg.item,
+            quantidade: Math.max(agg.quantidade, suggested),
+            qtde12m: metrics.qtde12m,
+            valor12m: metrics.valor12m,
+            qtde60d: metrics.qtde60d,
+            vendasMesAtual: metrics.vendasMesAtual,
+            custoUnit: metrics.custoUnit,
+            estoqueFilial: metrics.estoqueFilial,
+            diasDesdeUltimaVenda: metrics.diasDesdeUltimaVenda,
+            primeiraEntradaFilial: metrics.primeiraEntradaFilial,
+            diasHistoricoFilial: metrics.diasHistoricoFilial,
+            mesesHistoricoFilial: metrics.mesesHistoricoFilial,
+            historicoParcial: metrics.historicoParcial,
+          });
+        }
+        return next;
+      });
+
+      const n = agregados.size;
+      const limiteAviso = lista.length >= 2500;
+      mostrarNotificacao(
+        limiteAviso
+          ? `Importados ${n} itens da coleção ${colecao}. Atenção: a busca limita em 2500 variantes; pode haver mais no cadastro.`
+          : `Importados ${n} itens da coleção ${colecao}.`
+      );
+    } finally {
+      setImportandoColecao(false);
+    }
+  }, [colecaoParaImportar, companyKey, filialConsultaSelecionada, mostrarNotificacao]);
 
   const importarBatchProdutos = useCallback(async () => {
     const codigos = batchCodes
@@ -3899,6 +4063,42 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                   />
                 </div>
 
+                {companyKey === "scarfme" && (
+                  <div className={styles.colecImportBox}>
+                    <div className={styles.colecImportLabel}>Importar por coleção</div>
+                    <div className={styles.colecImportRow}>
+                      <select
+                        className={styles.colecSelect}
+                        value={colecaoParaImportar}
+                        onChange={(e) => setColecaoParaImportar(e.target.value)}
+                        disabled={loadingColecoesOpcoes || importandoColecao || importandoBatch}
+                      >
+                        <option value="">
+                          {loadingColecoesOpcoes ? "Carregando coleções..." : "Selecione a coleção"}
+                        </option>
+                        {colecoesDisponiveis.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        className={styles.batchBtn}
+                        onClick={() => void importarColecaoProdutos()}
+                        disabled={
+                          importandoColecao ||
+                          importandoBatch ||
+                          !colecaoParaImportar ||
+                          loadingColecoesOpcoes
+                        }
+                      >
+                        {importandoColecao ? "Importando..." : "Importar coleção"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className={styles.batchBox}>
                   <textarea
                     className={styles.batchInput}
@@ -3911,7 +4111,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                     type="button"
                     className={styles.batchBtn}
                     onClick={importarBatchProdutos}
-                    disabled={importandoBatch}
+                    disabled={importandoBatch || importandoColecao}
                   >
                     {importandoBatch ? "Importando..." : "Importar codigos"}
                   </button>

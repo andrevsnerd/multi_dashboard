@@ -4,6 +4,8 @@ import sql from 'mssql';
 import { getColorDescription } from '@/lib/utils/colorMapping';
 import { getActiveFilial, resolveCompany } from '@/lib/config/company';
 
+export const maxDuration = 60;
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const searchTerm = searchParams.get('q') || '';
@@ -12,20 +14,91 @@ export async function GET(request: Request) {
   const filialOperacional = filialOrigem ? getActiveFilial(company, filialOrigem) : null;
   const corProduto = searchParams.get('corProduto'); // Para filtrar quando encontrado por código de barras
   const isEntrada = searchParams.get('entrada') === 'true';
+  const porColecao = searchParams.get('porColecao') === 'true';
+  const colecaoFiltro = (searchParams.get('colecao') || '').trim();
 
-  if (!searchTerm || searchTerm.trim().length < 2) {
+  if (porColecao && company?.key !== 'scarfme') {
+    return NextResponse.json(
+      { error: 'Importação por coleção disponível apenas para ScarfMe.' },
+      { status: 400 }
+    );
+  }
+
+  if (porColecao && company?.key === 'scarfme' && !colecaoFiltro) {
+    return NextResponse.json({ data: [] });
+  }
+
+  if (!porColecao && (!searchTerm || searchTerm.trim().length < 2)) {
     return NextResponse.json({ data: [] });
   }
 
   try {
     const produtos = await withRequest(async (req) => {
       const searchTermTrimmed = searchTerm.trim();
+      const incluirEstoqueZero = isEntrada || porColecao;
       
       // Buscar por código de barras primeiro, depois por produto/nome
       // Igual ao Python: busca código de barras, depois busca estoques do produto encontrado
       let query: string;
       
-      if (corProduto) {
+      if (porColecao && company?.key === 'scarfme') {
+        query = `
+          ;WITH base_produtos AS (
+            SELECT DISTINCT p.PRODUTO
+            FROM PRODUTOS p WITH (NOLOCK)
+            WHERE UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = UPPER(LTRIM(RTRIM(@colecaoFiltro)))
+          ),
+          base_cores AS (
+            SELECT DISTINCT
+              pb.PRODUTO,
+              RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))) AS COR_PRODUTO
+            FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+            INNER JOIN base_produtos bp ON bp.PRODUTO = pb.PRODUTO
+            WHERE pb.COR_PRODUTO IS NOT NULL
+              AND RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))) <> ''
+
+            UNION
+
+            SELECT DISTINCT
+              e.PRODUTO,
+              RTRIM(LTRIM(CAST(e.COR_PRODUTO AS VARCHAR(20)))) AS COR_PRODUTO
+            FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+            INNER JOIN base_produtos bp ON bp.PRODUTO = e.PRODUTO
+            WHERE e.COR_PRODUTO IS NOT NULL
+              AND RTRIM(LTRIM(CAST(e.COR_PRODUTO AS VARCHAR(20)))) <> ''
+          )
+          SELECT DISTINCT TOP 2500
+            p.PRODUTO,
+            bc.COR_PRODUTO,
+            ${filialOperacional ? `@filialOrigemParam` : `ISNULL(es.FILIAL, '')`} AS FILIAL,
+            ISNULL(es.ESTOQUE, 0) AS ESTOQUE,
+            p.DESC_PRODUTO,
+            ISNULL(p.LINHA, '') AS LINHA,
+            ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
+            ISNULL(c.DESC_COR, '') AS DESC_COR,
+            ${filialOperacional ? `@filialOrigemParam` : `ISNULL(es.FILIAL, '')`} AS NOME_FILIAL,
+            pb.CODIGO_BARRA
+          FROM base_produtos bp
+          INNER JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = bp.PRODUTO
+          LEFT JOIN base_cores bc ON bc.PRODUTO = p.PRODUTO
+          LEFT JOIN ESTOQUE_PRODUTOS es WITH (NOLOCK)
+            ON es.PRODUTO = p.PRODUTO
+            AND (
+              (bc.COR_PRODUTO IS NULL AND es.COR_PRODUTO IS NULL)
+              OR RTRIM(LTRIM(CAST(es.COR_PRODUTO AS VARCHAR(20)))) = ISNULL(bc.COR_PRODUTO, RTRIM(LTRIM(CAST(es.COR_PRODUTO AS VARCHAR(20)))))
+            )
+            ${filialOperacional ? `AND RTRIM(LTRIM(CAST(es.FILIAL AS VARCHAR(100)))) = RTRIM(LTRIM(@filialOrigem))` : ``}
+          LEFT JOIN PRODUTOS_BARRA pb WITH (NOLOCK)
+            ON pb.PRODUTO = p.PRODUTO
+            AND RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))) = ISNULL(bc.COR_PRODUTO, RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))))
+          LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = bc.COR_PRODUTO
+        `;
+        req.input('colecaoFiltro', sql.VarChar, colecaoFiltro);
+        req.input('filialOrigemParam', sql.VarChar, filialOperacional?.trim() || '');
+        if (filialOperacional) {
+          req.input('filialOrigem', sql.VarChar, filialOperacional.trim());
+        }
+      } else if (corProduto) {
         // Quando tem cor (do código de barras), buscar direto por produto e cor (igual ao Python)
         // O Python mostra TODAS as filiais, não filtra por filial origem
         // Usar RTRIM para evitar falha quando PRODUTO/COR são CHAR com espaços
@@ -175,7 +248,9 @@ export async function GET(request: Request) {
         corProduto, 
         filialOrigem: filialOperacional || filialOrigem,
         searchTermLen: searchTermTrimmed.length,
-        corProdutoLen: corProduto?.length
+        corProdutoLen: corProduto?.length,
+        porColecao,
+        colecaoFiltro: porColecao ? colecaoFiltro : undefined,
       });
 
       const result = await req.query<{
@@ -252,7 +327,7 @@ export async function GET(request: Request) {
         // Quando não tem corProduto e não é entrada, só mostrar estoques > 0
         if (row.FILIAL) {
           const estoque = row.ESTOQUE !== null ? row.ESTOQUE : 0;
-          if (corProduto || isEntrada || estoque > 0) {
+          if (corProduto || incluirEstoqueZero || estoque > 0) {
             // Usar COD_FILIAL se disponível, senão usar FILIAL (que deve ser o código)
             const codFilial = row.FILIAL?.toString().trim() || '';
             produtoData.estoques.push({
