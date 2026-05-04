@@ -326,7 +326,12 @@ export default function RomaneioDetalhePage({
     if (tipo !== "saida") return;
     setLoadingDestino(true);
     fetchDestinoRomaneio(companySlug, romaneioId, filialOrigem)
-      .then((val) => setDestinoSelected(cleanDestinoValue(val) || cleanDestinoValue(filialDestino)))
+      .then((val) => {
+        const selected = val === null
+          ? cleanDestinoValue(filialDestino)
+          : cleanDestinoValue(val);
+        setDestinoSelected(selected);
+      })
       .finally(() => setLoadingDestino(false));
   }, [companySlug, romaneioId, filialOrigem, filialDestino, tipo]);
 
@@ -376,6 +381,8 @@ export default function RomaneioDetalhePage({
   useEffect(() => {
     if (tipo === "saida" && destinoSelected) {
       fetchConfirmados(companySlug, romaneioId, destinoSelected).then(setConfirmados);
+    } else if (tipo === "saida") {
+      setConfirmados(new Map());
     }
   }, [tipo, companySlug, romaneioId, destinoSelected]);
 

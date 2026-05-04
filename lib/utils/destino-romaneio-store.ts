@@ -114,7 +114,7 @@ export async function getAllDestinosByCompany(
     for (const r of records) {
       if (r.company_key.toLowerCase() !== c) continue;
       const key = `${r.romaneio_id}|${r.filial_origem}`;
-      if (r.filial_destino.trim()) map.set(key, r.filial_destino.trim());
+      map.set(key, r.filial_destino.trim());
     }
     return map;
   }
@@ -132,7 +132,7 @@ export async function getAllDestinosByCompany(
     const rId = row.romaneio_id != null ? String(row.romaneio_id).trim() : "";
     const fo = row.filial_origem != null ? String(row.filial_origem).trim() : "";
     const fd = row.filial_destino != null ? String(row.filial_destino).trim() : "";
-    if (rId && fd) map.set(`${rId}|${fo}`, fd);
+    if (rId) map.set(`${rId}|${fo}`, fd);
   }
   return map;
 }

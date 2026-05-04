@@ -59,8 +59,9 @@ function getDestinoSalvo(
   ].filter(Boolean) as string[];
 
   for (const key of keys) {
-    const destino = cleanDestino(destinosMap.get(key));
-    if (destino) return destino;
+    if (destinosMap.has(key)) {
+      return cleanDestino(destinosMap.get(key)) ?? "";
+    }
   }
   return null;
 }
@@ -98,13 +99,15 @@ export async function GET(request: Request) {
     const data = filtrados.slice(start, start + perPage).map((log) => {
       if (tipo !== "saida") return log;
       const saidaLog = log as Awaited<ReturnType<typeof fetchLogSaidas>>[number];
+      const destinoSalvo = getDestinoSalvo(destinosMap, saidaLog.romaneio, saidaLog.filialOrigem, saidaLog.filialOrigemCodigo);
       const destinoOriginal =
-        getDestinoSalvo(destinosMap, saidaLog.romaneio, saidaLog.filialOrigem, saidaLog.filialOrigemCodigo) ||
-        cleanDestino(saidaLog.filialDestino) ||
-        cleanDestino(saidaLog.filialDestinoCodigo);
+        destinoSalvo !== null
+          ? destinoSalvo
+          : cleanDestino(saidaLog.filialDestino) || cleanDestino(saidaLog.filialDestinoCodigo);
       const destinoCodigo = destinoOriginal ? getActiveFilial(companyConfig, destinoOriginal) : null;
       return {
         ...log,
+        filialDestino: destinoSalvo !== null ? destinoOriginal : log.filialDestino,
         destinoCodigo,
       };
     });

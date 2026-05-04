@@ -27,8 +27,9 @@ function getDestinoSalvo(
   ].filter(Boolean) as string[];
 
   for (const key of keys) {
-    const destino = cleanDestino(destinosMap.get(key));
-    if (destino) return destino;
+    if (destinosMap.has(key)) {
+      return cleanDestino(destinosMap.get(key)) ?? "";
+    }
   }
   return null;
 }
@@ -62,10 +63,11 @@ export async function GET(request: NextRequest) {
     ]);
 
     const saidasComDestino = saidas.map((s) => {
+      const destinoSalvo = getDestinoSalvo(destinosMap, s.romaneio, s.filialOrigem, s.filialOrigemCodigo);
       const destinoOriginal =
-        getDestinoSalvo(destinosMap, s.romaneio, s.filialOrigem, s.filialOrigemCodigo) ||
-        cleanDestino(s.filialDestino) ||
-        cleanDestino(s.filialDestinoCodigo);
+        destinoSalvo !== null
+          ? destinoSalvo
+          : cleanDestino(s.filialDestino) || cleanDestino(s.filialDestinoCodigo);
       const destinoCodigo = destinoOriginal
         ? getActiveFilial(companyConfig, destinoOriginal)
         : null;
@@ -73,7 +75,12 @@ export async function GET(request: NextRequest) {
         ? ((confirmadosCounter.get(`${s.romaneio}|${destinoCodigo}`) ?? 0) ||
            (destinoOriginal ? (confirmadosCounter.get(`${s.romaneio}|${destinoOriginal}`) ?? 0) : 0))
         : 0;
-      return { ...s, destinoCodigo, qtdConfirmados };
+      return {
+        ...s,
+        filialDestino: destinoSalvo !== null ? destinoOriginal : s.filialDestino,
+        destinoCodigo,
+        qtdConfirmados,
+      };
     });
 
     if (!username) {
