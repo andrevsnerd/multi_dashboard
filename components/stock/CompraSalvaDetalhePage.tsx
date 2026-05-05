@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useId, useMemo, useRef, useState } from "react";
-// @ts-ignore
+// @ts-expect-error xlsx package lacks the import shape expected here
 import * as XLSX from "xlsx";
 
 import {
@@ -54,6 +54,10 @@ function fmtBRL2(n: number) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function sumDistribuicaoManual(distribuicao?: Record<string, number>): number {
+  return Object.values(distribuicao ?? {}).reduce((total, value) => total + Math.max(0, Number(value) || 0), 0);
 }
 
 function resumirAjusteEntreDestinos(
@@ -485,6 +489,8 @@ export default function CompraSalvaDetalhePage({
   const compraSalvaExportRef = useRef<HTMLDivElement>(null);
   const [manualState, setManualState] = useState<Record<string, "editing" | "confirmed">>({});
   const [manualDistribuicao, setManualDistribuicao] = useState<Record<string, Record<string, number>>>({});
+  const manualDistribuicaoRef = useRef(manualDistribuicao);
+  manualDistribuicaoRef.current = manualDistribuicao;
   const filialOptions = useMemo(() => getFilialOptions(companyKey), [companyKey]);
   const manualStorageKey = `compra-manual:${compraId}`;
 
@@ -676,10 +682,23 @@ export default function CompraSalvaDetalhePage({
     });
   }, [doc, items, expandirPorCor, companyKey, vendasRefreshKey]);
 
+  const manualTotalByItemKey = useMemo(() => {
+    return Object.fromEntries(
+      Object.entries(manualDistribuicao).map(([itemKey, distribuicao]) => [itemKey, sumDistribuicaoManual(distribuicao)])
+    ) as Record<string, number>;
+  }, [manualDistribuicao]);
+
   const rowsComputed = useMemo(() => {
     return items.map((it) => {
       const produto = it.produto.trim();
       const corProduto = (it.corProduto ?? "").trim();
+      const itemManualState = manualState[it.itemKey];
+      const hasManualOverride =
+        (itemManualState === "editing" || itemManualState === "confirmed") &&
+        manualDistribuicao[it.itemKey] !== undefined;
+      const effectiveQtdManual = hasManualOverride
+        ? (manualTotalByItemKey[it.itemKey] ?? 0)
+        : Math.max(0, Number(it.qtdManual ?? 0));
       const match = listaRows.find((p) => {
         const pProd = (p.produto ?? "").trim();
         const pCor = (p.cor ?? "").trim();
@@ -689,22 +708,19 @@ export default function CompraSalvaDetalhePage({
       const live = liveMetrics[cacheKey];
       const estoque = live?.estoqueAtual ?? match?.estoqueAtual ?? null;
       const custoUnit = match?.custoUnitario ?? 0;
-      const custoTotal = custoUnit > 0 ? Math.round(it.qtdManual * custoUnit) : 0;
+      const custoTotal = custoUnit > 0 ? Math.round(effectiveQtdManual * custoUnit) : 0;
       const qtdSugerida = calcularSugestaoCompleto(match, live);
-      return { it, match, estoque, custoUnit, custoTotal, qtdSugerida };
+      return { it, match, estoque, custoUnit, custoTotal, qtdSugerida, effectiveQtdManual };
     });
-  }, [items, listaRows, expandirPorCor, liveMetrics]);
+  }, [items, listaRows, expandirPorCor, liveMetrics, manualDistribuicao, manualState, manualTotalByItemKey]);
 
   const totals = useMemo(() => {
-    const totalItens = items.length;
+    const totalItens = rowsComputed.length;
     // Usa qtdSugerida quando disponível, incorporando a diferença no total
-    const totalQtdManual = rowsComputed.reduce(
-      (s, r) => s + (r.qtdSugerida !== null ? r.qtdSugerida : (r.it.qtdManual ?? 0)),
-      0
-    );
+    const totalQtdManual = rowsComputed.reduce((s, r) => s + r.effectiveQtdManual, 0);
     const totalCusto = rowsComputed.reduce((s, r) => s + (r.custoTotal ?? 0), 0);
     return { totalItens, totalQtdManual, totalCusto };
-  }, [items, rowsComputed]);
+  }, [rowsComputed]);
 
   const [estoqueTooltip, setEstoqueTooltip] = useState<null | {
     x: number;
@@ -792,7 +808,7 @@ export default function CompraSalvaDetalhePage({
 
   const handleExportXlsx = () => {
     const fmt2 = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
-    const rowExcel = rowsComputed.map(({ it, estoque, custoUnit, custoTotal }) => {
+    const rowExcel = rowsComputed.map(({ it, estoque, custoUnit, custoTotal, effectiveQtdManual }) => {
       const produtoK = it.produto.trim();
       const corK = expandirPorCor ? ((it.corProduto ?? "").trim() || undefined) : undefined;
       const vendasKey = `${produtoK}||${corK ?? ""}`;
@@ -808,7 +824,7 @@ export default function CompraSalvaDetalhePage({
           .map(([label, qty]) => `${label}: ${fmt2(qty)}`)
           .join(" · ");
       } else {
-        destino = vendasRows !== undefined ? textoDestinoCompraFinal(it.qtdManual ?? 0, vendasRows, companyKey) : "";
+        destino = vendasRows !== undefined ? textoDestinoCompraFinal(effectiveQtdManual, vendasRows, companyKey) : "";
       }
       return {
         PRODUTO: it.produto,
@@ -817,7 +833,7 @@ export default function CompraSalvaDetalhePage({
         DESC_COR_PRODUTO: it.corDescricao ?? "",
         GRADE: it.grade ?? "",
         COLECAO: it.colecao ?? "",
-        QTD_MANUAL: it.qtdManual ?? 0,
+        QTD_MANUAL: effectiveQtdManual,
         DESTINO: destino,
         ESTOQUE_ATUAL: estoque ?? 0,
         CUSTO_UNIT: custoUnit ?? 0,
@@ -954,6 +970,7 @@ export default function CompraSalvaDetalhePage({
     if (!manualState[itemKey]) {
       const dist: Record<string, number> = {};
       (partesDestino ?? []).forEach((p) => { dist[p.label] = p.qtd; });
+      manualDistribuicaoRef.current = { ...manualDistribuicaoRef.current, [itemKey]: dist };
       setManualDistribuicao((prev) => ({ ...prev, [itemKey]: dist }));
     }
     setManualState((prev) => ({ ...prev, [itemKey]: "editing" }));
@@ -965,14 +982,21 @@ export default function CompraSalvaDetalhePage({
 
   const cancelManual = (itemKey: string) => {
     setManualState((prev) => { const next = { ...prev }; delete next[itemKey]; return next; });
-    setManualDistribuicao((prev) => { const next = { ...prev }; delete next[itemKey]; return next; });
+    setManualDistribuicao((prev) => {
+      const next = { ...prev };
+      delete next[itemKey];
+      manualDistribuicaoRef.current = next;
+      return next;
+    });
   };
 
   const handleManualFilialDelta = (itemKey: string, filial: string, delta: number) => {
-    const itemDist = { ...(manualDistribuicao[itemKey] ?? {}) };
+    const itemDist = { ...(manualDistribuicaoRef.current[itemKey] ?? {}) };
     itemDist[filial] = Math.max(0, (itemDist[filial] ?? 0) + delta);
-    const total = Object.values(itemDist).reduce((s, v) => s + v, 0);
+    const total = sumDistribuicaoManual(itemDist);
+    manualDistribuicaoRef.current = { ...manualDistribuicaoRef.current, [itemKey]: itemDist };
     setManualDistribuicao((prev) => ({ ...prev, [itemKey]: itemDist }));
+    setItems((prev) => prev.map((i) => (i.itemKey === itemKey ? { ...i, qtdManual: total } : i)));
     void handleUpdateQtd(itemKey, total);
   };
 
@@ -980,7 +1004,9 @@ export default function CompraSalvaDetalhePage({
     setManualDistribuicao((prev) => {
       const current = prev[itemKey] ?? {};
       if (filial in current) return prev;
-      return { ...prev, [itemKey]: { ...current, [filial]: 0 } };
+      const next = { ...prev, [itemKey]: { ...current, [filial]: 0 } };
+      manualDistribuicaoRef.current = next;
+      return next;
     });
   };
 
@@ -1092,7 +1118,7 @@ export default function CompraSalvaDetalhePage({
                   </tr>
                 </thead>
                 <tbody>
-                  {rowsComputed.map(({ it, estoque, custoUnit, custoTotal, qtdSugerida }) => {
+                  {rowsComputed.map(({ it, estoque, custoUnit, custoTotal, qtdSugerida, effectiveQtdManual }) => {
                     const itemManualState = manualState[it.itemKey] ?? "auto";
                     const isEditing = itemManualState === "editing";
                     const isConfirmed = itemManualState === "confirmed";
@@ -1104,7 +1130,7 @@ export default function CompraSalvaDetalhePage({
                     const partesDestino =
                       vendasRowsK === undefined
                         ? undefined
-                        : partesDestinoCompraFinal(it.qtdManual ?? 0, vendasRowsK, companyKey);
+                        : partesDestinoCompraFinal(effectiveQtdManual, vendasRowsK, companyKey);
                     const partesDestinoSugerido =
                       vendasRowsK === undefined || qtdSugerida === null
                         ? undefined
@@ -1120,18 +1146,18 @@ export default function CompraSalvaDetalhePage({
                         </td>
                         <td className={styles.right}>
                           {isManual ? (
-                            <span className={styles.qtyManualTotal}>{fmt(it.qtdManual)}</span>
+                            <span className={styles.qtyManualTotal}>{fmt(effectiveQtdManual)}</span>
                           ) : (
                             <input
                               className={styles.qtyInput}
                               type="number"
-                              value={it.qtdManual}
+                              value={effectiveQtdManual}
                               min={0}
                               onChange={(e) => {
                                 const v = Math.max(0, Math.round(Number(e.target.value ?? 0)));
                                 setItems((prev) => prev.map((x) => (x.itemKey === it.itemKey ? { ...x, qtdManual: v } : x)));
                               }}
-                              onBlur={() => { void handleUpdateQtd(it.itemKey, it.qtdManual); }}
+                              onBlur={() => { void handleUpdateQtd(it.itemKey, effectiveQtdManual); }}
                             />
                           )}
                         </td>
@@ -1204,8 +1230,8 @@ export default function CompraSalvaDetalhePage({
                                   : partesDestino === null
                                     ? "—"
                                     : <DestinoCompraFinalBadges partes={partesDestino} />}
-                                {qtdSugerida !== null && qtdSugerida !== it.qtdManual && (() => {
-                                  const diff = qtdSugerida - it.qtdManual;
+                                {qtdSugerida !== null && qtdSugerida !== effectiveQtdManual && (() => {
+                                  const diff = qtdSugerida - effectiveQtdManual;
                                   const diffFmt = `${diff > 0 ? "+" : ""}${diff}`;
                                   const explicacao =
                                     diff > 0
@@ -1237,7 +1263,7 @@ export default function CompraSalvaDetalhePage({
                                           diffFmt,
                                           explicacao,
                                           qtdSugerida,
-                                          qtdManual: it.qtdManual ?? 0,
+                                          qtdManual: effectiveQtdManual,
                                           mediaMensal12m,
                                           ritmoMensal60d,
                                           tendenciaTexto,
