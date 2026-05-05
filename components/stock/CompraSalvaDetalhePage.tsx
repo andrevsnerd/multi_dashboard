@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useId, useMemo, useRef, useState } from "react";
-// @ts-expect-error xlsx package lacks the import shape expected here
 import * as XLSX from "xlsx";
 
 import {
