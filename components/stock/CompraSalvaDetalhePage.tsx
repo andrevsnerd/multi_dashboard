@@ -9,6 +9,7 @@ import * as XLSX from "xlsx";
 import {
   aggregateVendasPorFilialByDisplayLabel,
   compareFilialDisplayOrder,
+  getFilialLabelForDisplay,
   resolveCompany,
   type CompanyKey,
 } from "@/lib/config/company";
@@ -233,13 +234,21 @@ function destinoBadgeThemeForFilial(label: string) {
 
 function getFilialOptions(companyKey: CompanyKey): string[] {
   const cfg = resolveCompany(companyKey);
-  const order = cfg?.estoqueFilialOrder ?? [];
-  return order.filter((label) => {
-    const k = label.toUpperCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
-    if (k === "MATRIZ") return false;
-    if (companyKey === "scarfme" && k.includes("IBIRAPUERA")) return false;
-    return true;
-  });
+  if (!cfg) return [];
+
+  const labels = new Map<string, string>();
+  const addLabel = (raw: string) => {
+    const label = getFilialLabelForDisplay(cfg, raw);
+    const key = normalizeKey(label);
+    if (!key || labels.has(key)) return;
+    labels.set(key, label);
+  };
+
+  (cfg.estoqueFilialOrder ?? []).forEach(addLabel);
+  (cfg.filialFilters.inventory ?? []).forEach(addLabel);
+  (cfg.filialFilters.sales ?? []).forEach(addLabel);
+
+  return [...labels.values()].sort((a, b) => compareFilialDisplayOrder(a, b, cfg));
 }
 
 function ManualDestinoEditor({
