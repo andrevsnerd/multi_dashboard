@@ -571,14 +571,27 @@ export default function CompraSalvaDetalhePage({
   };
 
   const handleRemove = async (itemKey: string) => {
-    const params = new URLSearchParams();
-    params.set("company", companyKey);
-    await fetch(`/api/controle-estoque/compras-salvas/${compraId}?${params}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ removeItemKey: itemKey }),
-    });
-    setItems((prev) => prev.filter((i) => i.itemKey !== itemKey));
+    try {
+      const params = new URLSearchParams();
+      params.set("company", companyKey);
+      const res = await fetch(`/api/controle-estoque/compras-salvas/${compraId}?${params}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ removeItemKey: itemKey }),
+      });
+      const json = await res.json() as { data?: CompraSalva; error?: string };
+      if (!res.ok) {
+        throw new Error(json.error ?? "Erro ao remover item");
+      }
+      if (json.data) {
+        setDoc(json.data);
+        setItems(json.data.items);
+        return;
+      }
+      setItems((prev) => prev.filter((i) => i.itemKey !== itemKey));
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Erro ao remover item");
+    }
   };
 
   const handleTitleBlur = async () => {

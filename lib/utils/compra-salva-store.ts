@@ -257,20 +257,20 @@ export async function updateCompraSalvaItemQtd(
 
 export async function removeCompraSalvaItem(companyKey: string, id: string, itemKey: string): Promise<CompraSalva | null> {
   const updatedAt = new Date().toISOString();
+  const normalizedItemKey = itemKey.trim();
 
   if (hasPostgres()) {
     await ensureTable();
     const sql = getNeonSql();
+    const current = await getCompraSalva(companyKey, id);
+    if (!current) return null;
+    const nextItems = current.items.filter((item) => String(item.itemKey ?? "").trim() !== normalizedItemKey);
     const rows = await sql`
       UPDATE compras_salvas
-      SET items = (
-        SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
-        FROM jsonb_array_elements(items) AS elem
-        WHERE (elem->>'itemKey') != ${itemKey}
-      ),
+      SET items = ${JSON.stringify(nextItems)}::jsonb,
       updated_at = ${updatedAt}
       WHERE id = ${id} AND company_key = ${companyKey}
-      RETURNING id, company_key, source_context_key, title, expandir_por_cor, items, saved_at, updated_at
+      RETURNING id, company_key, source_context_key, title, expandir_por_cor, items, comprada, saved_at, updated_at
     `;
     const row = rows[0] as Parameters<typeof rowToCompraSalva>[0] | undefined;
     return row ? rowToCompraSalva(row) : null;
@@ -281,7 +281,7 @@ export async function removeCompraSalvaItem(companyKey: string, id: string, item
   const i = all.findIndex((x) => x.id === id && x.companyKey === companyKey);
   if (i < 0) return null;
   const c = all[i];
-  const nextItems = c.items.filter((item) => item.itemKey !== itemKey);
+  const nextItems = c.items.filter((item) => String(item.itemKey ?? "").trim() !== normalizedItemKey);
   all[i] = { ...c, items: nextItems, updatedAt };
   await writeFileAll(all);
   return all[i];

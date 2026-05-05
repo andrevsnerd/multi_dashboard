@@ -1,4 +1,3 @@
-// @ts-expect-error - xlsx nao tem tipos perfeitos
 import * as XLSX from "xlsx";
 import type { VendedorItem } from "@/lib/repositories/vendedores-v2";
 import type { VendedorProdutoItem } from "@/lib/repositories/vendedores-v2";
