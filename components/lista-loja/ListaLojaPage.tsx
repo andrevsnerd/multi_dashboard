@@ -12,6 +12,7 @@ import {
   type CompanyConfig,
   type CompanyKey,
 } from "@/lib/config/company";
+import { fetchControleEstoqueItemMetricasClient } from "@/lib/client/controle-estoque-metricas";
 import { exportListaLojaToXlsx } from "@/lib/utils/exportListaLoja";
 import type { CompraSalvaItemRow } from "@/lib/types/compra-salva";
 import type { ProdutoTransferencia } from "@/lib/repositories/controleTransferencias";
@@ -398,15 +399,16 @@ async function fetchEstoqueFilialSum(
   corProduto: string | null
 ): Promise<number | null> {
   try {
-    const params = new URLSearchParams({ company: companyKey, produto: produto.trim() });
-    if (codFilial && codFilial.trim()) params.set("filial", codFilial.trim());
-    if (corProduto) params.set("corProduto", corProduto.trim());
-    const res = await fetch(`/api/controle-estoque/estoque-por-filial-item?${params}`, { cache: "no-store" });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { data?: Array<{ estoque: number }> };
-    const rows = json.data || [];
-    const sum = rows.reduce((s, r) => s + Math.max(0, Number(r.estoque ?? 0)), 0);
-    return Math.round(sum);
+    const metricas = await fetchControleEstoqueItemMetricasClient({
+      company: companyKey,
+      filial: codFilial,
+      includeHistorico: true,
+      item: {
+        produto: produto.trim(),
+        corProduto: corProduto?.trim() || null,
+      },
+    });
+    return metricas?.resumo.estoqueTotal ?? null;
   } catch {
     return null;
   }
@@ -443,6 +445,28 @@ async function fetchVendasItemMetricas(
   };
 
   try {
+    const metricas = await fetchControleEstoqueItemMetricasClient({
+      company: companyKey,
+      filial: codFilial,
+      includeHistorico: true,
+      item: {
+        produto: produto.trim(),
+        corProduto: corProduto?.trim() || null,
+      },
+    });
+    if (!metricas) return null;
+    return {
+      qtde12m: metricas.resumo.qtde12m,
+      qtde60d: metricas.resumo.qtde60d,
+      vendasMesAtual: metricas.resumo.vendasMesAtual,
+      valor12m: metricas.resumo.valor12m,
+      custoUnit: metricas.resumo.custoUnitario,
+      diasDesdeUltimaVenda: metricas.resumo.diasDesdeUltimaVenda,
+      primeiraEntradaFilial: metricas.resumo.primeiraEntradaFilial,
+      diasHistoricoFilial: metricas.resumo.diasHistoricoFilial,
+      mesesHistoricoFilial: metricas.resumo.mesesHistoricoFilial,
+      historicoParcial: metricas.resumo.historicoParcial,
+    };
     let rows: VendasItemMetricasApiRow[];
     try {
       rows = await fetchRows(true);
@@ -477,21 +501,16 @@ async function fetchVendasPorFilialItem(
   produto: string,
   corProduto: string | null
 ): Promise<FilialVendaRow[]> {
-  const params = new URLSearchParams({ company: companyKey, produto: produto.trim() });
-  if (codFilial && codFilial.trim()) params.set("filial", codFilial.trim());
-  if (corProduto) params.set("corProduto", corProduto.trim());
-  const res = await fetch(`/api/controle-estoque/vendas-por-filial-item?${params}`, { cache: "no-store" });
-  if (!res.ok) throw new Error("Erro ao carregar vendas por filial");
-  const json = (await res.json()) as {
-    data?: Array<{
-      filial: string;
-      qtde12m: number;
-      qtde60d: number;
-      qtdeMesAtual?: number | null;
-      valor12m?: number | null;
-    }>;
-  };
-  return (json.data || []).map((row) => ({
+  const metricas = await fetchControleEstoqueItemMetricasClient({
+    company: companyKey,
+    filial: codFilial,
+    includeHistorico: false,
+    item: {
+      produto: produto.trim(),
+      corProduto: corProduto?.trim() || null,
+    },
+  });
+  return (metricas?.vendasPorFilial ?? []).map((row) => ({
     filial: row.filial,
     qtde12m: Number(row.qtde12m ?? 0),
     qtde60d: Number(row.qtde60d ?? 0),
@@ -506,13 +525,16 @@ async function fetchEstoquePorFilialItem(
   produto: string,
   corProduto: string | null
 ): Promise<FilialEstoqueRow[]> {
-  const params = new URLSearchParams({ company: companyKey, produto: produto.trim() });
-  if (codFilial && codFilial.trim()) params.set("filial", codFilial.trim());
-  if (corProduto) params.set("corProduto", corProduto.trim());
-  const res = await fetch(`/api/controle-estoque/estoque-por-filial-item?${params}`, { cache: "no-store" });
-  if (!res.ok) throw new Error("Erro ao carregar estoque por filial");
-  const json = (await res.json()) as { data?: Array<{ filial: string; estoque: number | null }> };
-  return (json.data || []).map((row) => ({
+  const metricas = await fetchControleEstoqueItemMetricasClient({
+    company: companyKey,
+    filial: codFilial,
+    includeHistorico: false,
+    item: {
+      produto: produto.trim(),
+      corProduto: corProduto?.trim() || null,
+    },
+  });
+  return (metricas?.estoquePorFilial ?? []).map((row) => ({
     filial: row.filial,
     estoque: Number(row.estoque ?? 0),
   }));
@@ -1915,15 +1937,19 @@ function ListaLojaItensTable({
                       return;
                     }
                     try {
-                      const params = new URLSearchParams({
+                      const metricas = await fetchControleEstoqueItemMetricasClient({
                         company: companyKey,
-                        produto: item.produto.trim(),
+                        filial: filialCod,
+                        includeHistorico: false,
+                        item: {
+                          produto: item.produto.trim(),
+                          corProduto: item.corProduto?.trim() || null,
+                        },
                       });
-                      if (filialCod && filialCod.trim()) params.set("filial", filialCod.trim());
-                      if (item.corProduto) params.set("corProduto", item.corProduto.trim());
-                      const res = await fetch(`/api/controle-estoque/estoque-por-filial-item?${params}`, { cache: "no-store" });
-                      const json = (await res.json()) as { data?: Array<{ filial: string; estoque: number }> };
-                      const rows = (json.data || []).map((r) => ({ filial: r.filial, estoque: Number(r.estoque ?? 0) }));
+                      const rows = (metricas?.estoquePorFilial ?? []).map((r) => ({
+                        filial: r.filial,
+                        estoque: Number(r.estoque ?? 0),
+                      }));
                       if (estoqueHoverKeyRef.current !== cacheKey) return;
                       setEstoqueCache((prev) => ({ ...prev, [cacheKey]: rows }));
                       showTooltip(rows);

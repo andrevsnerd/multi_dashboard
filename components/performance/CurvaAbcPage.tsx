@@ -12,6 +12,7 @@ import {
 } from "@/lib/performance/outrosCategories";
 import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateRangeFilter";
 import FilialFilter from "@/components/filters/FilialFilter";
+import { fetchControleEstoqueItemMetricasClient } from "@/lib/client/controle-estoque-metricas";
 import { formatDateForQuery } from "@/lib/utils/date";
 import FilialVendedoresTab from "./FilialVendedoresTab";
 import { exportCurvaAbcSimpleXlsx, type CurvaAbcSimpleXlsxRow } from "@/lib/utils/exportCurvaAbcSimpleXlsx";
@@ -363,15 +364,16 @@ async function fetchEstoqueFilialSum(
   corProduto: string | null
 ): Promise<number | null> {
   try {
-    const params = new URLSearchParams({ company: companyKey, produto: produto.trim() });
-    if (codFilial && codFilial.trim()) params.set("filial", codFilial.trim());
-    if (corProduto) params.set("corProduto", corProduto.trim());
-    const res = await fetch(`/api/controle-estoque/estoque-por-filial-item?${params}`, { cache: "no-store" });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { data?: Array<{ estoque: number }> };
-    const rows = json.data || [];
-    const sum = rows.reduce((s, r) => s + Math.max(0, Number(r.estoque ?? 0)), 0);
-    return Math.round(sum);
+    const metricas = await fetchControleEstoqueItemMetricasClient({
+      company: companyKey,
+      filial: codFilial,
+      includeHistorico: true,
+      item: {
+        produto: produto.trim(),
+        corProduto: corProduto?.trim() || null,
+      },
+    });
+    return metricas?.resumo.estoqueTotal ?? null;
   } catch {
     return null;
   }
@@ -406,6 +408,22 @@ async function fetchVendasItemMetricas(
     return json.data || [];
   };
   try {
+    const metricas = await fetchControleEstoqueItemMetricasClient({
+      company: companyKey,
+      filial: codFilial,
+      includeHistorico: true,
+      item: {
+        produto: produto.trim(),
+        corProduto: corProduto?.trim() || null,
+      },
+    });
+    if (!metricas) return null;
+    return {
+      qtde12m: metricas.resumo.qtde12m,
+      vendasMesAtual: metricas.resumo.vendasMesAtual,
+      diasDesdeUltimaVenda: metricas.resumo.diasDesdeUltimaVenda,
+      mesesHistoricoFilial: metricas.resumo.mesesHistoricoFilial,
+    };
     let rows: Row[] = [];
     try {
       rows = await fetchRows(true);
@@ -421,16 +439,26 @@ async function fetchVendasItemMetricas(
     let primeiraEntrada: Date | null = null;
     for (const row of rows) {
       if (!row.primeiraEntradaFilial) continue;
-      const d = new Date(row.primeiraEntradaFilial);
+      const d = new Date(row.primeiraEntradaFilial!);
       if (Number.isNaN(d.getTime())) continue;
-      if (!primeiraEntrada || d < primeiraEntrada) primeiraEntrada = d;
+      const primeiraEntradaAtual = primeiraEntrada;
+      if (!primeiraEntradaAtual) {
+        primeiraEntrada = d;
+        continue;
+      }
+      if (d.getTime() < primeiraEntradaAtual!.getTime()) {
+        primeiraEntrada = d;
+      }
     }
     if (primeiraEntrada) {
-      const dias = Math.min(365, Math.max(0, Math.floor((Date.now() - primeiraEntrada.getTime()) / 86400000)));
+      const dias = Math.min(365, Math.max(0, Math.floor((Date.now() - primeiraEntrada!.getTime()) / 86400000)));
       mesesHistoricoFilial = Math.min(12, Math.max(1, dias / 30));
     } else {
       const parcial = rows.find((r) => r.mesesHistoricoFilial != null);
-      if (parcial) mesesHistoricoFilial = Math.min(12, Math.max(1, Number(parcial.mesesHistoricoFilial)));
+      const mesesParcial = parcial?.mesesHistoricoFilial;
+      if (mesesParcial != null) {
+        mesesHistoricoFilial = Math.min(12, Math.max(1, Number(mesesParcial)));
+      }
     }
 
     return {

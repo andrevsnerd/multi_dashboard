@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 // @ts-ignore
 import * as XLSX from "xlsx";
 
@@ -18,6 +18,7 @@ import {
   textoDestinoCompraFinal,
   type DestinoCompraFinalParte,
 } from "@/lib/utils/compra-final-destino";
+import { fetchControleEstoqueItemMetricasClient } from "@/lib/client/controle-estoque-metricas";
 
 import styles from "./ListaCompraSugeridaPage.module.css";
 
@@ -252,8 +253,19 @@ function ManualDestinoEditor({
   onDelta: (filial: string, delta: number) => void;
   onAddFilial: (filial: string) => void;
 }) {
+  const [novaFilial, setNovaFilial] = useState("");
+  const datalistId = useId();
   const filiaisPresentes = Object.keys(distribuicao);
-  const filiaisParaAdicionar = allFiliais.filter((f) => !(f in distribuicao));
+  const filiaisPresentesNormalizadas = new Set(filiaisPresentes.map((f) => normalizeKey(f)));
+  const filiaisParaAdicionar = allFiliais.filter((f) => !filiaisPresentesNormalizadas.has(normalizeKey(f)));
+
+  const handleAddFilial = () => {
+    const filialDigitada = novaFilial.trim();
+    if (!filialDigitada) return;
+    const filialExistente = filiaisPresentes.find((f) => normalizeKey(f) === normalizeKey(filialDigitada));
+    onAddFilial(filialExistente ?? filialDigitada);
+    setNovaFilial("");
+  };
 
   return (
     <div className={styles.manualDestinoEditor}>
@@ -274,23 +286,35 @@ function ManualDestinoEditor({
           </div>
         );
       })}
-      {filiaisParaAdicionar.length > 0 && (
-        <select
-          className={styles.manualAddFilialSelect}
-          defaultValue=""
-          onChange={(e) => {
-            if (e.target.value) {
-              onAddFilial(e.target.value);
-              e.target.value = "";
+      <div className={styles.manualAddFilialRow}>
+        <input
+          className={styles.manualAddFilialInput}
+          type="text"
+          list={datalistId}
+          value={novaFilial}
+          placeholder="+ Adicionar filial"
+          onChange={(e) => setNovaFilial(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleAddFilial();
             }
           }}
-        >
-          <option value="">+ Adicionar filial</option>
+        />
+        <datalist id={datalistId}>
           {filiaisParaAdicionar.map((f) => (
-            <option key={f} value={f}>{f}</option>
+            <option key={f} value={f} />
           ))}
-        </select>
-      )}
+        </datalist>
+        <button
+          type="button"
+          className={styles.manualAddFilialBtn}
+          onClick={handleAddFilial}
+          disabled={!novaFilial.trim()}
+        >
+          Adicionar
+        </button>
+      </div>
     </div>
   );
 }
@@ -322,20 +346,32 @@ async function fetchListaCompra(params: URLSearchParams): Promise<ProdutoSugesta
   return json.data ?? [];
 }
 
+async function fetchItemMetricas(params: URLSearchParams) {
+  return fetchControleEstoqueItemMetricasClient({
+    company: params.get("company") ?? undefined,
+    filial: params.get("filial") || null,
+    includeHistorico: params.get("includeHistorico") === "true",
+    item: {
+      produto: params.get("produto") || "",
+      corProduto: params.get("corProduto"),
+    },
+  });
+}
+
 async function fetchEstoquePorFilial(params: URLSearchParams): Promise<Array<{ filial: string; estoque: number }>> {
-  const res = await fetch(`/api/controle-estoque/estoque-por-filial-item?${params}`, { cache: "no-store" });
-  const json = await res.json() as { data?: Array<{ filial: string; estoque: number }>; error?: string };
-  if (!res.ok) throw new Error(json.error ?? "Erro ao carregar estoque por filial");
-  return json.data ?? [];
+  const metricas = await fetchItemMetricas(params);
+  return metricas?.estoquePorFilial ?? [];
 }
 
 async function fetchVendasPorFilialItem(
   params: URLSearchParams
 ): Promise<Array<{ filial: string; qtde12m: number; qtde60d: number }>> {
-  const res = await fetch(`/api/controle-estoque/vendas-por-filial-item?${params}`, { cache: "no-store" });
-  const json = await res.json() as { data?: Array<{ filial: string; qtde12m: number; qtde60d: number }>; error?: string };
-  if (!res.ok) throw new Error(json.error ?? "Erro ao carregar vendas por filial");
-  return json.data ?? [];
+  const metricas = await fetchItemMetricas(params);
+  return (metricas?.vendasPorFilial ?? []).map((row) => ({
+    filial: row.filial,
+    qtde12m: Number(row.qtde12m ?? 0),
+    qtde60d: Number(row.qtde60d ?? 0),
+  }));
 }
 
 async function fetchVendasItemMetricas(params: URLSearchParams): Promise<{
@@ -345,7 +381,28 @@ async function fetchVendasItemMetricas(params: URLSearchParams): Promise<{
   diasDesdeUltimaVenda: number | null;
   mesesHistoricoFilial: number | null;
 } | null> {
-  const res = await fetch(`/api/controle-estoque/vendas-por-filial-item?${params}`, { cache: "no-store" });
+  const res = null as unknown as {
+    ok: boolean;
+    json: () => Promise<{
+      data?: Array<{
+        qtde12m: number;
+        qtde60d: number;
+        qtdeMesAtual?: number;
+        diasDesdeUltimaVenda?: number | null;
+        mesesHistoricoFilial?: number;
+      }>;
+      error?: string;
+    }>;
+  };
+  const metricas = await fetchItemMetricas(params);
+  if (!metricas) return null;
+  return {
+    qtde12m: metricas.resumo.qtde12m,
+    qtde60d: metricas.resumo.qtde60d,
+    vendasMesAtual: metricas.resumo.vendasMesAtual,
+    diasDesdeUltimaVenda: metricas.resumo.diasDesdeUltimaVenda,
+    mesesHistoricoFilial: metricas.resumo.mesesHistoricoFilial,
+  };
   const json = await res.json() as {
     data?: Array<{
       qtde12m: number;
@@ -373,10 +430,12 @@ async function fetchVendasItemMetricas(params: URLSearchParams): Promise<{
 }
 
 async function fetchEstoqueFilialSum(params: URLSearchParams): Promise<number | null> {
-  const res = await fetch(`/api/controle-estoque/estoque-por-filial-item?${params}`, { cache: "no-store" });
-  const json = await res.json() as { data?: Array<{ estoque: number }>; error?: string };
-  if (!res.ok) return null;
-  const rows = json.data ?? [];
+  const metricas = await fetchItemMetricas(params);
+  return metricas?.resumo.estoqueTotal ?? null;
+  const legacyRes = await fetch(`/api/controle-estoque/estoque-por-filial-item?${params}`, { cache: "no-store" });
+  const legacyJson = await legacyRes.json() as { data?: Array<{ estoque: number }>; error?: string };
+  if (!legacyRes.ok) return null;
+  const rows = legacyJson.data ?? [];
   return Math.round(rows.reduce((s, r) => s + Math.max(0, Number(r.estoque ?? 0)), 0));
 }
 

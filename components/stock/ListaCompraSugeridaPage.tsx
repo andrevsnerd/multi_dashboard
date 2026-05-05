@@ -17,6 +17,7 @@ import {
   textoDestinoCompraFinal,
   type DestinoCompraFinalParte,
 } from "@/lib/utils/compra-final-destino";
+import { fetchControleEstoqueItemMetricasClient } from "@/lib/client/controle-estoque-metricas";
 import ComprasSalvasListPanel from "@/components/stock/ComprasSalvasListPanel";
 import styles from "./ListaCompraSugeridaPage.module.css";
 
@@ -147,18 +148,30 @@ async function fetchListaCompra(params: URLSearchParams): Promise<ProdutoSugesta
   return json.data ?? [];
 }
 
+async function fetchItemMetricas(params: URLSearchParams) {
+  return fetchControleEstoqueItemMetricasClient({
+    company: params.get("company") ?? undefined,
+    filial: params.get("filial") || null,
+    includeHistorico: params.get("includeHistorico") === "true",
+    item: {
+      produto: params.get("produto") || "",
+      corProduto: params.get("corProduto"),
+    },
+  });
+}
+
 async function fetchEstoquePorFilial(params: URLSearchParams): Promise<Array<{ filial: string; estoque: number }>> {
-  const res = await fetch(`/api/controle-estoque/estoque-por-filial-item?${params}`, { cache: "no-store" });
-  const json = await res.json() as { data?: Array<{ filial: string; estoque: number }>; error?: string };
-  if (!res.ok) throw new Error(json.error ?? "Erro ao carregar estoque por filial");
-  return json.data ?? [];
+  const metricas = await fetchItemMetricas(params);
+  return metricas?.estoquePorFilial ?? [];
 }
 
 async function fetchVendasPorFilialItem(params: URLSearchParams): Promise<Array<{ filial: string; qtde12m: number; qtde60d: number }>> {
-  const res = await fetch(`/api/controle-estoque/vendas-por-filial-item?${params}`, { cache: "no-store" });
-  const json = await res.json() as { data?: Array<{ filial: string; qtde12m: number; qtde60d: number }>; error?: string };
-  if (!res.ok) throw new Error(json.error ?? "Erro ao carregar vendas por filial");
-  return json.data ?? [];
+  const metricas = await fetchItemMetricas(params);
+  return (metricas?.vendasPorFilial ?? []).map((row) => ({
+    filial: row.filial,
+    qtde12m: Number(row.qtde12m ?? 0),
+    qtde60d: Number(row.qtde60d ?? 0),
+  }));
 }
 
 /** Hamilton/Largest Remainder distribution */

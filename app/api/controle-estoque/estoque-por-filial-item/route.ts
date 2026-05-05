@@ -1,32 +1,34 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
-import { fetchEstoqueProdutoPorFilial } from '@/lib/repositories/controleEstoque';
+import { getControleEstoqueItemMetricas } from "@/lib/server/controle-estoque-metricas";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const company = searchParams.get('company') ?? undefined;
-  const filial = searchParams.get('filial') || null;
-  const produto = searchParams.get('produto') || '';
-  const corProduto = searchParams.get('corProduto');
+  const company = searchParams.get("company") ?? undefined;
+  const filial = searchParams.get("filial") || null;
+  const produto = searchParams.get("produto") || "";
+  const corProduto = searchParams.get("corProduto");
 
   if (!produto.trim()) {
-    return NextResponse.json({ error: 'Parâmetro produto é obrigatório' }, { status: 400 });
+    return NextResponse.json({ error: "Parametro produto e obrigatorio" }, { status: 400 });
   }
 
   try {
-    const data = await fetchEstoqueProdutoPorFilial({
+    const metricas = await getControleEstoqueItemMetricas({
       company,
       filial,
-      produto,
-      corProduto: corProduto != null ? corProduto : null,
+      item: {
+        produto,
+        corProduto: corProduto != null ? corProduto : null,
+      },
     });
-    return NextResponse.json({ data });
+
+    return NextResponse.json({ data: metricas.estoquePorFilial });
   } catch (error) {
-    console.error('Erro ao carregar estoque por filial do item', error);
+    console.error("Erro ao carregar estoque por filial do item", error);
     return NextResponse.json(
-      { error: 'Erro ao carregar estoque por filial do item' },
+      { error: "Erro ao carregar estoque por filial do item" },
       { status: 500 }
     );
   }
 }
-

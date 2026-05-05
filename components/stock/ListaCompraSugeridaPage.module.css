@@ -1145,16 +1145,49 @@
   color: #0f172a;
 }
 
-.manualAddFilialSelect {
+.manualAddFilialRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  max-width: 280px;
+}
+
+.manualAddFilialInput {
+  flex: 1;
+  min-width: 0;
   font-size: 11px;
-  padding: 2px 6px;
+  padding: 4px 8px;
   border-radius: 6px;
   border: 1px dashed #94a3b8;
   background: #f8fafc;
-  color: #475569;
+  color: #334155;
+}
+
+.manualAddFilialInput::placeholder {
+  color: #64748b;
+}
+
+.manualAddFilialBtn {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
   cursor: pointer;
-  margin-top: 2px;
-  max-width: 180px;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+}
+
+.manualAddFilialBtn:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.manualAddFilialBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .qtyManualTotal {
