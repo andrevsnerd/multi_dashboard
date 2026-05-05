@@ -1446,6 +1446,22 @@ function ListaLojaItensTable({
     >
   >({});
 
+  function hasResolvedLiveMetrics(values: {
+    qtde12m: number | null;
+    qtde60d: number | null;
+    vendasMesAtual: number | null;
+    valor12m: number | null;
+    custoUnit: number | null;
+    estoqueFilial: number | null;
+    diasDesdeUltimaVenda: number | null;
+    primeiraEntradaFilial: string | null;
+    diasHistoricoFilial: number | null;
+    mesesHistoricoFilial: number | null;
+    historicoParcial: boolean | null;
+  }): boolean {
+    return Object.values(values).some((value) => value !== null && value !== undefined);
+  }
+
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setEstoqueCache({});
@@ -1510,7 +1526,10 @@ function ListaLojaItensTable({
         if (cancelled) return;
         setLiveMetrics((prev) => {
           const next = { ...prev };
-          for (const row of rows) next[row.key] = row.values;
+          for (const row of rows) {
+            if (!hasResolvedLiveMetrics(row.values)) continue;
+            next[row.key] = row.values;
+          }
           return next;
         });
       })

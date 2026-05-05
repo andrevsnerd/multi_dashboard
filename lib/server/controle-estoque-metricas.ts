@@ -168,14 +168,25 @@ export async function getControleEstoqueMetricasItens(
 ): Promise<Record<string, ControleEstoqueItemMetricas>> {
   const itens = dedupeControleEstoqueItens(input.itens ?? []);
   const results = await mapWithConcurrency(itens, SERVER_BATCH_CONCURRENCY, async (item) => {
-    const data = await getControleEstoqueItemMetricas({
-      company: input.company,
-      filial: input.filial ?? null,
-      includeHistorico: input.includeHistorico,
-      item,
-    });
-    return [buildControleEstoqueItemKey(item.produto, item.corProduto), data] as const;
+    try {
+      const data = await getControleEstoqueItemMetricas({
+        company: input.company,
+        filial: input.filial ?? null,
+        includeHistorico: input.includeHistorico,
+        item,
+      });
+      return [buildControleEstoqueItemKey(item.produto, item.corProduto), data] as const;
+    } catch (error) {
+      console.warn("[getControleEstoqueMetricasItens] Falha ao carregar item do lote", {
+        company: input.company ?? null,
+        filial: input.filial ?? null,
+        produto: item.produto,
+        corProduto: item.corProduto ?? null,
+        error,
+      });
+      return null;
+    }
   });
 
-  return Object.fromEntries(results);
+  return Object.fromEntries(results.filter((entry): entry is NonNullable<(typeof results)[number]> => entry != null));
 }
