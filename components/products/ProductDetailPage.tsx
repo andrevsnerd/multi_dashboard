@@ -544,7 +544,7 @@ export default function ProductDetailPage({
           </div>
           {showSearchResults && searchResults.length > 0 && (
             <div className={styles.searchResults}>
-              {searchResults.slice(0, 10).map((product) => (
+              {searchResults.map((product) => (
                 <button
                   key={`${product.productId}-${product.matchedColorCode ?? "all"}`}
                   type="button"

@@ -504,13 +504,13 @@
         "corProduto": "S1",
         "corDescricao": "CAPUCCINO",
         "descricao": "ALÇA  UNIVERSAL NERD IMP",
-        "qtdManual": 47,
+        "qtdManual": 66,
         "custoUnitario": 28.63,
         "filialOrigem": null
       }
     ],
     "comprada": false,
     "savedAt": "2026-04-30T14:30:42.948Z",
-    "updatedAt": "2026-04-30T14:30:42.948Z"
+    "updatedAt": "2026-05-05T17:24:25.816Z"
   }
 ]

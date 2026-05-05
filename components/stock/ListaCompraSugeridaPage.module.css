@@ -1052,3 +1052,168 @@
   background: #b45309;
   color: #ffffff;
 }
+
+/* ── Manual distribution toggle (compras salvas) ── */
+.manualToggleBtn {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #64748b;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  flex-shrink: 0;
+  line-height: 1.6;
+}
+
+.manualToggleBtn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #334155;
+}
+
+.manualToggleBtnActive {
+  background: #1e40af;
+  border-color: #1e40af;
+  color: #ffffff;
+}
+
+.manualToggleBtnActive:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.manualDestinoEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 2px;
+}
+
+.manualFilialRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.manualFilialBadge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 5px;
+  border: 1px solid;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  min-width: 64px;
+  flex-shrink: 0;
+}
+
+.manualQtyBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+  padding: 0;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.manualQtyBtn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.manualQtyVal {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 24px;
+  text-align: center;
+  color: #0f172a;
+}
+
+.manualAddFilialSelect {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px dashed #94a3b8;
+  background: #f8fafc;
+  color: #475569;
+  cursor: pointer;
+  margin-top: 2px;
+  max-width: 180px;
+}
+
+.qtyManualTotal {
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e40af;
+  display: block;
+  text-align: right;
+  padding: 6px 8px;
+}
+
+.manualEditActions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.manualConfirmedActions {
+  display: flex;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.manualConfirmBtn {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 10px;
+  border: 1px solid #16a34a;
+  background: #16a34a;
+  color: #ffffff;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+  line-height: 1.6;
+}
+
+.manualConfirmBtn:hover {
+  background: #15803d;
+  border-color: #15803d;
+}
+
+.manualCancelBtn {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #64748b;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+  line-height: 1.6;
+}
+
+.manualCancelBtn:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #dc2626;
+}

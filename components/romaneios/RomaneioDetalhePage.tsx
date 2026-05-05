@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import * as XLSX from "xlsx";
 
 import { useAuth } from "@/components/auth/AuthContext";
 import styles from "./RomaneioDetalhePage.module.css";
@@ -221,6 +222,16 @@ function getFilialOptionLabel(filial: FilialOption): string {
 
 function getFilialDisplay(filial: FilialOption | undefined, fallback: string): string {
   return filial?.displayName || filial?.filial || fallback;
+}
+
+function sanitizeFilenamePart(value: string): string {
+  return (value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w\-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 80);
 }
 
 export default function RomaneioDetalhePage({
@@ -573,6 +584,103 @@ export default function RomaneioDetalhePage({
   const qtdItens = itens.reduce((s, i) => s + i.qtde, 0);
   const backHref = `/${companySlug}/romaneios`;
 
+  const handleExportXlsx = useCallback(() => {
+    const destinoPlanilha =
+      tipo === "saida"
+        ? (destinoDisplay || "").trim() || "—"
+        : (filialDestino || "").trim() || "—";
+
+    const metaRows: Array<Array<string | number>> = [
+      ["Romaneio", romaneioId],
+      ["Tipo", tipo],
+      ["Filial origem", (filialOrigem || "").trim() || "—"],
+      ["Filial destino", destinoPlanilha],
+      ["Responsável", (responsavel || "").trim() || "—"],
+      ["Data emissão", (dataEmissao || "").trim() || "—"],
+      [],
+    ];
+
+    const headers: string[] = [
+      "PRODUTO",
+      "CÓD. BARRAS",
+      "SUBGRUPO",
+      "GRADE",
+      "DESCRIÇÃO",
+      "COR",
+      "DESTINO",
+      "QTD ROMANEIO",
+      "ESTOQUE ORIGEM",
+      "ESTOQUE DESTINO",
+      ...(tipo === "saida" ? ["QTD CONFIRMADA", "STATUS CONFIRMAÇÃO"] : []),
+    ];
+
+    const rows: Array<Array<string | number>> = itens.map((item) => {
+      const destinoCell =
+        tipo === "saida"
+          ? destinoPlanilha
+          : (item.destino && item.destino.trim()) || "—";
+
+      const chave = `${item.produto}|${item.corProduto ?? ""}`;
+      const qtdeConfirmada = confirmados.get(chave) ?? 0;
+      const statusConfirmacao = confirmados.has(chave)
+        ? qtdeConfirmada === item.qtde
+          ? "CONFIRMADO"
+          : "CONFIRMADO (DIVERGENTE)"
+        : "NÃO CONFIRMADO";
+
+      const base: Array<string | number> = [
+        item.produto,
+        item.codigoBarra ?? "—",
+        item.subgrupo || "—",
+        item.grade || "—",
+        item.descProduto || "—",
+        item.descCor || item.corProduto || "—",
+        destinoCell,
+        item.qtde,
+        item.estoqueOrigem,
+        item.estoqueDestino,
+      ];
+
+      if (tipo === "saida") {
+        base.push(qtdeConfirmada, statusConfirmacao);
+      }
+      return base;
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(metaRows);
+    XLSX.utils.sheet_add_aoa(ws, [headers, ...rows], { origin: -1 });
+
+    // Larguras (aproximadas) para ficar legível
+    (ws as XLSX.WorkSheet)["!cols"] = headers.map((h) => {
+      if (h === "DESCRIÇÃO") return { wch: 38 };
+      if (h === "DESTINO") return { wch: 26 };
+      if (h === "CÓD. BARRAS") return { wch: 18 };
+      if (h === "SUBGRUPO") return { wch: 16 };
+      if (h === "STATUS CONFIRMAÇÃO") return { wch: 22 };
+      return { wch: 14 };
+    });
+
+    XLSX.utils.book_append_sheet(wb, ws, "Itens");
+
+    const today = new Date();
+    const yyyymmdd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(
+      today.getDate()
+    ).padStart(2, "0")}`;
+    const filename = [
+      "romaneio",
+      romaneioId,
+      tipo,
+      sanitizeFilenamePart(destinoPlanilha),
+      yyyymmdd,
+    ]
+      .filter(Boolean)
+      .join("_")
+      .concat(".xlsx");
+
+    XLSX.writeFile(wb, filename, { compression: true });
+  }, [tipo, destinoDisplay, filialDestino, filialOrigem, responsavel, dataEmissao, romaneioId, itens, confirmados]);
+
   // Itens ainda não confirmados com qty > 0 (serão enviados no próximo "Confirmar Tudo")
   const itensParaConfirmar = itens.filter((item) => {
     const chave = `${item.produto}|${item.corProduto ?? ""}`;
@@ -639,23 +747,40 @@ export default function RomaneioDetalhePage({
     <div className={styles.wrapper}>
       <header className={styles.header}>
         <Link href={backHref} className={styles.backLink}>← Voltar</Link>
-        <h1 className={styles.title}>
-          Romaneio #{romaneioId}
-          {user?.role === "admin" && (
+
+        <div className={styles.headerRow}>
+          <div className={styles.headerLeft}>
+            <h1 className={styles.title}>
+              Romaneio #{romaneioId}
+              {user?.role === "admin" && (
+                <button
+                  type="button"
+                  className={styles.editRomaneioTitleBtn}
+                  title="Editar número do romaneio"
+                  onClick={() => abrirEditRomaneio(romaneioId)}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </button>
+              )}
+            </h1>
+            <p className={styles.meta}>{responsavel || "—"} • {dataEmissao || "—"}</p>
+          </div>
+
+          <div className={styles.headerActions}>
             <button
               type="button"
-              className={styles.editRomaneioTitleBtn}
-              title="Editar número do romaneio"
-              onClick={() => abrirEditRomaneio(romaneioId)}
+              className={styles.exportXlsxBtn}
+              onClick={handleExportXlsx}
+              disabled={itens.length === 0}
+              title={itens.length === 0 ? "Sem itens para exportar" : "Exportar itens para Excel"}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
+              Exportar XLSX
             </button>
-          )}
-        </h1>
-        <p className={styles.meta}>{responsavel || "—"} • {dataEmissao || "—"}</p>
+          </div>
+        </div>
       </header>
 
       {tipo === "saida" && canSetDestino && (

@@ -230,6 +230,71 @@ function destinoBadgeThemeForFilial(label: string) {
   return DESTINO_FILIAL_BADGE_THEMES[idx];
 }
 
+function getFilialOptions(companyKey: CompanyKey): string[] {
+  const cfg = resolveCompany(companyKey);
+  const order = cfg?.estoqueFilialOrder ?? [];
+  return order.filter((label) => {
+    const k = label.toUpperCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+    if (k === "MATRIZ") return false;
+    if (companyKey === "scarfme" && k.includes("IBIRAPUERA")) return false;
+    return true;
+  });
+}
+
+function ManualDestinoEditor({
+  distribuicao,
+  allFiliais,
+  onDelta,
+  onAddFilial,
+}: {
+  distribuicao: Record<string, number>;
+  allFiliais: string[];
+  onDelta: (filial: string, delta: number) => void;
+  onAddFilial: (filial: string) => void;
+}) {
+  const filiaisPresentes = Object.keys(distribuicao);
+  const filiaisParaAdicionar = allFiliais.filter((f) => !(f in distribuicao));
+
+  return (
+    <div className={styles.manualDestinoEditor}>
+      {filiaisPresentes.map((filial) => {
+        const qty = distribuicao[filial] ?? 0;
+        const t = destinoBadgeThemeForFilial(filial);
+        return (
+          <div key={filial} className={styles.manualFilialRow}>
+            <span
+              className={styles.manualFilialBadge}
+              style={{ background: t.bg, color: t.fg, borderColor: t.border }}
+            >
+              {filial}
+            </span>
+            <button type="button" className={styles.manualQtyBtn} onClick={() => onDelta(filial, -1)}>−</button>
+            <span className={styles.manualQtyVal}>{qty}</span>
+            <button type="button" className={styles.manualQtyBtn} onClick={() => onDelta(filial, +1)}>+</button>
+          </div>
+        );
+      })}
+      {filiaisParaAdicionar.length > 0 && (
+        <select
+          className={styles.manualAddFilialSelect}
+          defaultValue=""
+          onChange={(e) => {
+            if (e.target.value) {
+              onAddFilial(e.target.value);
+              e.target.value = "";
+            }
+          }}
+        >
+          <option value="">+ Adicionar filial</option>
+          {filiaisParaAdicionar.map((f) => (
+            <option key={f} value={f}>{f}</option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
+}
+
 function DestinoCompraFinalBadges({ partes }: { partes: DestinoCompraFinalParte[] }) {
   return (
     <div className={styles.destinoBadges}>
@@ -350,6 +415,41 @@ export default function CompraSalvaDetalhePage({
   const [vendasRefreshKey, setVendasRefreshKey] = useState(0);
   const [exportingPdf, setExportingPdf] = useState(false);
   const compraSalvaExportRef = useRef<HTMLDivElement>(null);
+  const [manualState, setManualState] = useState<Record<string, "editing" | "confirmed">>({});
+  const [manualDistribuicao, setManualDistribuicao] = useState<Record<string, Record<string, number>>>({});
+  const filialOptions = useMemo(() => getFilialOptions(companyKey), [companyKey]);
+  const manualStorageKey = `compra-manual:${compraId}`;
+
+  // Restaura itens confirmados manualmente do localStorage ao carregar
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(manualStorageKey);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as Record<string, Record<string, number>>;
+      if (typeof saved !== "object" || saved === null) return;
+      const stateInit: Record<string, "editing" | "confirmed"> = {};
+      Object.keys(saved).forEach((key) => { stateInit[key] = "confirmed"; });
+      setManualState(stateInit);
+      setManualDistribuicao(saved);
+    } catch { /* ignora dados corrompidos */ }
+  }, [manualStorageKey]);
+
+  // Persiste itens confirmados no localStorage sempre que o estado mudar
+  useEffect(() => {
+    try {
+      const toPersist: Record<string, Record<string, number>> = {};
+      Object.entries(manualState).forEach(([key, state]) => {
+        if (state === "confirmed" && manualDistribuicao[key]) {
+          toPersist[key] = manualDistribuicao[key];
+        }
+      });
+      if (Object.keys(toPersist).length > 0) {
+        localStorage.setItem(manualStorageKey, JSON.stringify(toPersist));
+      } else {
+        localStorage.removeItem(manualStorageKey);
+      }
+    } catch { /* ignora erros de storage */ }
+  }, [manualState, manualDistribuicao, manualStorageKey]);
 
   const expandirPorCor = doc?.expandirPorCor ?? true;
 
@@ -623,13 +723,25 @@ export default function CompraSalvaDetalhePage({
   };
 
   const handleExportXlsx = () => {
+    const fmt2 = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
     const rowExcel = rowsComputed.map(({ it, estoque, custoUnit, custoTotal }) => {
       const produtoK = it.produto.trim();
       const corK = expandirPorCor ? ((it.corProduto ?? "").trim() || undefined) : undefined;
       const vendasKey = `${produtoK}||${corK ?? ""}`;
       const vendasRows = vendasPorFilialCache[vendasKey];
-      const destino =
-        vendasRows !== undefined ? textoDestinoCompraFinal(it.qtdManual ?? 0, vendasRows, companyKey) : "";
+      const itemState = manualState[it.itemKey] ?? "auto";
+      let destino: string;
+      if (itemState === "confirmed") {
+        const dist = manualDistribuicao[it.itemKey] ?? {};
+        const cfg = resolveCompany(companyKey);
+        destino = Object.entries(dist)
+          .filter(([, qty]) => qty > 0)
+          .sort(([a], [b]) => compareFilialDisplayOrder(a, b, cfg))
+          .map(([label, qty]) => `${label}: ${fmt2(qty)}`)
+          .join(" · ");
+      } else {
+        destino = vendasRows !== undefined ? textoDestinoCompraFinal(it.qtdManual ?? 0, vendasRows, companyKey) : "";
+      }
       return {
         PRODUTO: it.produto,
         DESC_PRODUTO: it.descricao,
@@ -672,12 +784,45 @@ export default function CompraSalvaDetalhePage({
       ]);
 
       const target = compraSalvaExportRef.current;
+
+      // Coleta valores dos inputs ANTES do clone (cloneNode não copia .value de inputs React)
+      const originalInputs = Array.from(target.querySelectorAll("input")) as HTMLInputElement[];
+      const inputValues = originalInputs.map((inp) => inp.value);
+
       const canvas = await html2canvas(target, {
         backgroundColor: "#ffffff",
         scale: 2,
         useCORS: true,
-        windowWidth: target.scrollWidth,
-        windowHeight: target.scrollHeight,
+        logging: false,
+        // onclone: html2canvas renderiza o clone num iframe isolado,
+        // fora de qualquer container scrollável do layout — isso garante
+        // captura do conteúdo COMPLETO, não só a porção visível na tela.
+        onclone: (cloneDoc, cloneEl) => {
+          // Ocultar elementos de UI que não devem aparecer no PDF
+          cloneEl.querySelectorAll("[data-pdf-hide]").forEach((el) => {
+            (el as HTMLElement).style.display = "none";
+          });
+
+          // Substituir inputs por spans com o valor correto
+          const cloneInputs = Array.from(cloneEl.querySelectorAll("input")) as HTMLInputElement[];
+          cloneInputs.forEach((cloneInp, i) => {
+            const span = cloneDoc.createElement("span");
+            span.style.cssText = "display:block;text-align:right;font-weight:700;font-size:14px;font-variant-numeric:tabular-nums;padding:6px 8px;";
+            span.textContent = inputValues[i] ?? "";
+            cloneInp.replaceWith(span);
+          });
+
+          // Corrigir overflow:clip e position:sticky no clone
+          const cloneWin = cloneDoc.defaultView;
+          if (cloneWin) {
+            cloneEl.querySelectorAll("*").forEach((el) => {
+              const htmlEl = el as HTMLElement;
+              const cs = cloneWin.getComputedStyle(htmlEl);
+              if (cs.overflow === "clip") htmlEl.style.overflow = "visible";
+              if (cs.position === "sticky") htmlEl.style.position = "relative";
+            });
+          }
+        },
       });
 
       const pageWidthMm = 210;
@@ -735,6 +880,40 @@ export default function CompraSalvaDetalhePage({
     } finally {
       setExportingPdf(false);
     }
+  };
+
+  const startManualEdit = (itemKey: string, partesDestino: DestinoCompraFinalParte[] | null | undefined) => {
+    if (!manualState[itemKey]) {
+      const dist: Record<string, number> = {};
+      (partesDestino ?? []).forEach((p) => { dist[p.label] = p.qtd; });
+      setManualDistribuicao((prev) => ({ ...prev, [itemKey]: dist }));
+    }
+    setManualState((prev) => ({ ...prev, [itemKey]: "editing" }));
+  };
+
+  const confirmManual = (itemKey: string) => {
+    setManualState((prev) => ({ ...prev, [itemKey]: "confirmed" }));
+  };
+
+  const cancelManual = (itemKey: string) => {
+    setManualState((prev) => { const next = { ...prev }; delete next[itemKey]; return next; });
+    setManualDistribuicao((prev) => { const next = { ...prev }; delete next[itemKey]; return next; });
+  };
+
+  const handleManualFilialDelta = (itemKey: string, filial: string, delta: number) => {
+    const itemDist = { ...(manualDistribuicao[itemKey] ?? {}) };
+    itemDist[filial] = Math.max(0, (itemDist[filial] ?? 0) + delta);
+    const total = Object.values(itemDist).reduce((s, v) => s + v, 0);
+    setManualDistribuicao((prev) => ({ ...prev, [itemKey]: itemDist }));
+    void handleUpdateQtd(itemKey, total);
+  };
+
+  const handleManualAddFilial = (itemKey: string, filial: string) => {
+    setManualDistribuicao((prev) => {
+      const current = prev[itemKey] ?? {};
+      if (filial in current) return prev;
+      return { ...prev, [itemKey]: { ...current, [filial]: 0 } };
+    });
   };
 
   return (
@@ -813,7 +992,7 @@ export default function CompraSalvaDetalhePage({
                 <span className={styles.summaryValue}>{fmtBRL(totals.totalCusto)}</span>
               </div>
             </div>
-            <div className={styles.exportActions}>
+            <div className={styles.exportActions} data-pdf-hide="">
               <button type="button" className={styles.exportBtn} onClick={handleExportXlsx}>
                 Exportar XLSX
               </button>
@@ -841,11 +1020,15 @@ export default function CompraSalvaDetalhePage({
                     <th className={styles.right}>Estoque</th>
                     <th className={styles.right}>Custo Unit.</th>
                     <th className={styles.right}>Custo Total</th>
-                    <th style={{ width: 60 }} />
+                    <th style={{ width: 60 }} data-pdf-hide="" />
                   </tr>
                 </thead>
                 <tbody>
                   {rowsComputed.map(({ it, estoque, custoUnit, custoTotal, qtdSugerida }) => {
+                    const itemManualState = manualState[it.itemKey] ?? "auto";
+                    const isEditing = itemManualState === "editing";
+                    const isConfirmed = itemManualState === "confirmed";
+                    const isManual = isEditing || isConfirmed;
                     const produtoK = it.produto.trim();
                     const corK = expandirPorCor ? ((it.corProduto ?? "").trim() || undefined) : undefined;
                     const vendasKey = `${produtoK}||${corK ?? ""}`;
@@ -868,72 +1051,150 @@ export default function CompraSalvaDetalhePage({
                           {it.colecao && <div className={styles.productCode}>Coleção: {it.colecao}</div>}
                         </td>
                         <td className={styles.right}>
-                          <input
-                            className={styles.qtyInput}
-                            type="number"
-                            value={it.qtdManual}
-                            min={0}
-                            onChange={(e) => {
-                              const v = Math.max(0, Math.round(Number(e.target.value ?? 0)));
-                              setItems((prev) => prev.map((x) => (x.itemKey === it.itemKey ? { ...x, qtdManual: v } : x)));
-                            }}
-                            onBlur={() => { void handleUpdateQtd(it.itemKey, it.qtdManual); }}
-                          />
+                          {isManual ? (
+                            <span className={styles.qtyManualTotal}>{fmt(it.qtdManual)}</span>
+                          ) : (
+                            <input
+                              className={styles.qtyInput}
+                              type="number"
+                              value={it.qtdManual}
+                              min={0}
+                              onChange={(e) => {
+                                const v = Math.max(0, Math.round(Number(e.target.value ?? 0)));
+                                setItems((prev) => prev.map((x) => (x.itemKey === it.itemKey ? { ...x, qtdManual: v } : x)));
+                              }}
+                              onBlur={() => { void handleUpdateQtd(it.itemKey, it.qtdManual); }}
+                            />
+                          )}
                         </td>
                         <td className={styles.destinoCell}>
-                          <div className={styles.destinoCellInner}>
-                            {partesDestino === undefined
-                              ? "…"
-                              : partesDestino === null
-                                ? "—"
-                                : <DestinoCompraFinalBadges partes={partesDestino} />}
-                            {qtdSugerida !== null && qtdSugerida !== it.qtdManual && (() => {
-                              const diff = qtdSugerida - it.qtdManual;
-                              const diffFmt = `${diff > 0 ? "+" : ""}${diff}`;
-                              const explicacao =
-                                diff > 0
-                                  ? "Sugestão atual maior que a quantidade salva"
-                                  : "Sugestão atual menor que a quantidade salva";
-                              const total12m = (vendasRowsK ?? []).reduce((s, r) => s + (r.qtde12m ?? 0), 0);
-                              const total60d = (vendasRowsK ?? []).reduce((s, r) => s + (r.qtde60d ?? 0), 0);
-                              const mediaMensal12m = total12m / 12;
-                              const ritmoMensal60d = total60d / 2;
-                              const tendenciaTexto =
-                                mediaMensal12m <= 0
-                                  ? "Sem base de vendas para tendência."
-                                  : ritmoMensal60d >= mediaMensal12m
-                                    ? `Ritmo recente acima/igual da média (${ritmoMensal60d.toFixed(1)} vs ${mediaMensal12m.toFixed(1)} un/mês).`
-                                    : `Ritmo recente abaixo da média (${ritmoMensal60d.toFixed(1)} vs ${mediaMensal12m.toFixed(1)} un/mês).`;
-                              const ajusteDestinoTexto =
-                                partesDestinoSugerido === undefined
-                                  ? "Destino: aguardando dados de vendas por filial."
-                                  : resumirAjusteEntreDestinos(partesDestino ?? null, partesDestinoSugerido);
-                              return (
-                                <span
-                                  className={`${styles.badgeS} ${diff > 0 ? styles.badgeSDiffUp : styles.badgeSDiffDown}`}
-                                  style={{ width: "auto", padding: "0 6px" }}
-                                  aria-label={`Delta sugestão ${diffFmt}`}
-                                  onMouseEnter={(e) => {
-                                    setSugestaoDiffTooltip({
-                                      x: e.clientX,
-                                      y: e.clientY,
-                                      diffFmt,
-                                      explicacao,
-                                      qtdSugerida,
-                                      qtdManual: it.qtdManual ?? 0,
-                                      mediaMensal12m,
-                                      ritmoMensal60d,
-                                      tendenciaTexto,
-                                      ajusteDestinoTexto,
-                                    });
-                                  }}
-                                  onMouseLeave={() => setSugestaoDiffTooltip(null)}
+                          {isEditing ? (
+                            /* ── Estado: editando ── */
+                            <div>
+                              <ManualDestinoEditor
+                                distribuicao={manualDistribuicao[it.itemKey] ?? {}}
+                                allFiliais={filialOptions}
+                                onDelta={(filial, delta) => handleManualFilialDelta(it.itemKey, filial, delta)}
+                                onAddFilial={(filial) => handleManualAddFilial(it.itemKey, filial)}
+                              />
+                              <div className={styles.manualEditActions} data-pdf-hide="">
+                                <button
+                                  type="button"
+                                  className={styles.manualConfirmBtn}
+                                  onClick={() => confirmManual(it.itemKey)}
                                 >
-                                  Sug {diffFmt}
-                                </span>
-                              );
-                            })()}
-                          </div>
+                                  Confirmar ✓
+                                </button>
+                                <button
+                                  type="button"
+                                  className={styles.manualCancelBtn}
+                                  onClick={() => cancelManual(it.itemKey)}
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            </div>
+                          ) : isConfirmed ? (
+                            /* ── Estado: manual confirmado — visual igual ao auto ── */
+                            <div>
+                              <div className={styles.destinoCellInner}>
+                                {(() => {
+                                  const cfg = resolveCompany(companyKey);
+                                  const manualPartes: DestinoCompraFinalParte[] = Object.entries(manualDistribuicao[it.itemKey] ?? {})
+                                    .filter(([, qty]) => qty > 0)
+                                    .map(([label, qtd]) => ({ label, qtd }))
+                                    .sort((a, b) => compareFilialDisplayOrder(a.label, b.label, cfg));
+                                  return manualPartes.length > 0
+                                    ? <DestinoCompraFinalBadges partes={manualPartes} />
+                                    : <span style={{ color: "#94a3b8", fontSize: 12 }}>Sem distribuição</span>;
+                                })()}
+                              </div>
+                              <div className={styles.manualConfirmedActions} data-pdf-hide="">
+                                <button
+                                  type="button"
+                                  className={styles.manualToggleBtn}
+                                  onClick={() => startManualEdit(it.itemKey, partesDestino)}
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  type="button"
+                                  className={styles.manualToggleBtn}
+                                  onClick={() => cancelManual(it.itemKey)}
+                                  title="Voltar ao modo automático"
+                                >
+                                  → Auto
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            /* ── Estado: automático (padrão) ── */
+                            <div>
+                              <div className={styles.destinoCellInner}>
+                                {partesDestino === undefined
+                                  ? "…"
+                                  : partesDestino === null
+                                    ? "—"
+                                    : <DestinoCompraFinalBadges partes={partesDestino} />}
+                                {qtdSugerida !== null && qtdSugerida !== it.qtdManual && (() => {
+                                  const diff = qtdSugerida - it.qtdManual;
+                                  const diffFmt = `${diff > 0 ? "+" : ""}${diff}`;
+                                  const explicacao =
+                                    diff > 0
+                                      ? "Sugestão atual maior que a quantidade salva"
+                                      : "Sugestão atual menor que a quantidade salva";
+                                  const total12m = (vendasRowsK ?? []).reduce((s, r) => s + (r.qtde12m ?? 0), 0);
+                                  const total60d = (vendasRowsK ?? []).reduce((s, r) => s + (r.qtde60d ?? 0), 0);
+                                  const mediaMensal12m = total12m / 12;
+                                  const ritmoMensal60d = total60d / 2;
+                                  const tendenciaTexto =
+                                    mediaMensal12m <= 0
+                                      ? "Sem base de vendas para tendência."
+                                      : ritmoMensal60d >= mediaMensal12m
+                                        ? `Ritmo recente acima/igual da média (${ritmoMensal60d.toFixed(1)} vs ${mediaMensal12m.toFixed(1)} un/mês).`
+                                        : `Ritmo recente abaixo da média (${ritmoMensal60d.toFixed(1)} vs ${mediaMensal12m.toFixed(1)} un/mês).`;
+                                  const ajusteDestinoTexto =
+                                    partesDestinoSugerido === undefined
+                                      ? "Destino: aguardando dados de vendas por filial."
+                                      : resumirAjusteEntreDestinos(partesDestino ?? null, partesDestinoSugerido);
+                                  return (
+                                    <span
+                                      className={`${styles.badgeS} ${diff > 0 ? styles.badgeSDiffUp : styles.badgeSDiffDown}`}
+                                      style={{ width: "auto", padding: "0 6px" }}
+                                      aria-label={`Delta sugestão ${diffFmt}`}
+                                      onMouseEnter={(e) => {
+                                        setSugestaoDiffTooltip({
+                                          x: e.clientX,
+                                          y: e.clientY,
+                                          diffFmt,
+                                          explicacao,
+                                          qtdSugerida,
+                                          qtdManual: it.qtdManual ?? 0,
+                                          mediaMensal12m,
+                                          ritmoMensal60d,
+                                          tendenciaTexto,
+                                          ajusteDestinoTexto,
+                                        });
+                                      }}
+                                      onMouseLeave={() => setSugestaoDiffTooltip(null)}
+                                    >
+                                      Sug {diffFmt}
+                                    </span>
+                                  );
+                                })()}
+                              </div>
+                              <div className={styles.manualConfirmedActions} data-pdf-hide="">
+                                <button
+                                  type="button"
+                                  className={styles.manualToggleBtn}
+                                  onClick={() => startManualEdit(it.itemKey, partesDestino)}
+                                  title="Editar distribuição por filial manualmente"
+                                >
+                                  Manual
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </td>
                         <td
                           className={styles.right}
@@ -979,7 +1240,7 @@ export default function CompraSalvaDetalhePage({
                         <td className={`${styles.right} ${custoTotal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
                           {custoTotal > 0 ? fmtBRL(custoTotal) : "—"}
                         </td>
-                        <td className={styles.right}>
+                        <td className={styles.right} data-pdf-hide="">
                           <button
                             type="button"
                             className={styles.removeBtn}
