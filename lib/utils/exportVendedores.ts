@@ -1,11 +1,19 @@
-// @ts-ignore - xlsx não tem tipos perfeitos
+// @ts-expect-error - xlsx nao tem tipos perfeitos
 import * as XLSX from "xlsx";
 import type { VendedorItem } from "@/lib/repositories/vendedores-v2";
 import type { VendedorProdutoItem } from "@/lib/repositories/vendedores-v2";
 
 function formatDateRange(start: Date, end: Date): string {
-  const s = start.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-  const e = end.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const s = start.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  const e = end.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
   return `${s}_${e}`;
 }
 
@@ -15,7 +23,7 @@ export function exportVendedoresToExcel(
   range: { startDate: Date; endDate: Date }
 ): void {
   if (data.length === 0) {
-    alert("Não há dados para exportar");
+    alert("Nao ha dados para exportar");
     return;
   }
 
@@ -25,11 +33,11 @@ export function exportVendedoresToExcel(
     Faturamento: v.faturamento,
     "Quantidade Vendida": v.quantidadeVendida,
     Tickets: v.tickets,
-    "Ticket Médio": v.ticketMedio,
-    "Quantidade por Ticket": v.quantidadePorTicket,
-    "Participação Filial (%)": v.participacaoFilial,
-    "Grupo Mais Vendido": v.grupoMaisVendido ?? "",
-    "Subgrupo Mais Vendido": v.subgrupoMaisVendido ?? "",
+    "Ticket Medio": v.ticketMedio,
+    "Peças por Atendimento": v.quantidadePorTicket,
+    "Participacao Filial (%)": v.participacaoFilial,
+    "Categoria Mais Vendida":
+      v.categoriaMaisVendida ?? v.subgrupoMaisVendido ?? v.grupoMaisVendido ?? "",
   }));
 
   const worksheet = XLSX.utils.json_to_sheet(rows);
@@ -46,7 +54,7 @@ export function exportVendedorProdutosToExcel(
   range: { startDate: Date; endDate: Date }
 ): void {
   if (data.length === 0) {
-    alert("Não há dados para exportar");
+    alert("Nao ha dados para exportar");
     return;
   }
 
@@ -66,6 +74,7 @@ export function exportVendedorProdutosToExcel(
         Quantidade: p.quantidade,
       };
     }
+
     return {
       Grupo: p.grupo ?? "",
       Descricao: p.descricao,

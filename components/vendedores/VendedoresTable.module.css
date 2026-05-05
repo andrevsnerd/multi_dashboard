@@ -85,6 +85,10 @@
   text-align: right !important;
 }
 
+.categoryHeader {
+  text-align: left !important;
+}
+
 .percentageHeader {
   text-align: center !important;
 }
@@ -113,6 +117,12 @@
 
 .table th.numberHeader,
 .table td.numberCell {
+  padding-left: 12px;
+  padding-right: 16px;
+}
+
+.table th.categoryHeader,
+.table td.categoryCell {
   padding-left: 12px;
   padding-right: 16px;
 }
@@ -263,6 +273,13 @@
   font-weight: 500;
   color: #1f2937;
   min-width: 80px;
+}
+
+.categoryCell {
+  text-align: left !important;
+  font-weight: 500;
+  color: #1f2937;
+  min-width: 160px;
 }
 
 .percentageCell {
@@ -861,4 +878,3 @@
   font-size: 13px;
   font-weight: 500;
 }
-

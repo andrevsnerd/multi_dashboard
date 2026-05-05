@@ -24,7 +24,9 @@ export interface VendedorItem {
   ticketMedio: number;
   quantidadePorTicket: number;
   participacaoFilial: number;
+  categoriaMaisVendida?: string;
   grupoMaisVendido?: string;
+  linhaMaisVendida?: string;
   subgrupoMaisVendido?: string;
 }
 
@@ -288,6 +290,94 @@ export async function fetchVendedoresList(
         participacaoFilial,
       };
     });
+
+    if (!light && company) {
+      const categoriaExpr =
+        company === 'scarfme'
+          ? `UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, ''))))`
+          : `UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, ''))))`;
+
+      const categoriaResult = await request.query<{
+        vendedorCodigo: string;
+        filial: string;
+        categoria: string;
+      }>(`
+        WITH BaseCategoria AS (
+          SELECT
+            f.FILIAL,
+            LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR))) AS vendedorCodigo,
+            ${categoriaExpr} AS categoria,
+            valor = CASE
+              WHEN vp.QTDE_CANCELADA > 0 THEN 0
+              ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - (vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0))
+            END
+          FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+          INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+            ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
+          LEFT JOIN FILIAIS f WITH (NOLOCK)
+            ON f.COD_FILIAL = vp.CODIGO_FILIAL
+          LEFT JOIN PRODUTOS p WITH (NOLOCK)
+            ON p.PRODUTO = vp.PRODUTO
+          WHERE vp.DATA_VENDA >= @startDate
+            AND vp.DATA_VENDA < @endDate
+            AND vp.QTDE > 0
+            ${filialFilter}
+            ${grupoFilter}
+            ${linhaFilter}
+            ${colecaoFilter}
+            ${subgrupoFilter}
+            ${gradeFilter}
+            ${produtoFilter}
+        ),
+        AggCategoria AS (
+          SELECT
+            FILIAL,
+            vendedorCodigo,
+            categoria,
+            SUM(valor) AS faturamentoCategoria
+          FROM BaseCategoria
+          WHERE categoria <> ''
+          GROUP BY FILIAL, vendedorCodigo, categoria
+        ),
+        RankedCategoria AS (
+          SELECT
+            FILIAL,
+            vendedorCodigo,
+            categoria,
+            ROW_NUMBER() OVER (
+              PARTITION BY FILIAL, vendedorCodigo
+              ORDER BY faturamentoCategoria DESC, categoria ASC
+            ) AS rn
+          FROM AggCategoria
+        )
+        SELECT
+          vendedorCodigo,
+          FILIAL AS filial,
+          categoria
+        FROM RankedCategoria
+        WHERE rn = 1
+      `);
+
+      const categoriaMap = new Map<string, string>();
+      categoriaResult.recordset.forEach((row) => {
+        categoriaMap.set(
+          `${(row.vendedorCodigo ?? '').trim()}|${row.filial}`,
+          (row.categoria ?? '').trim()
+        );
+      });
+
+      rawRows.forEach((raw, index) => {
+        const categoria = categoriaMap.get(`${raw.codigo}|${raw.filial}`);
+        if (!categoria) return;
+
+        items[index].categoriaMaisVendida = categoria;
+        if (company === 'scarfme') {
+          items[index].subgrupoMaisVendido = categoria;
+        } else {
+          items[index].grupoMaisVendido = categoria;
+        }
+      });
+    }
 
     return { items, rawRows };
   });

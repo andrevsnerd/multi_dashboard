@@ -93,6 +93,8 @@ async function fetchVendedores(
     searchParams.set("produtoSearchTerm", produtoSearchTerm.trim());
   }
 
+  searchParams.set("light", "0");
+
   const response = await fetch(`/api/vendedores?${searchParams.toString()}`, {
     cache: "no-store",
   });
