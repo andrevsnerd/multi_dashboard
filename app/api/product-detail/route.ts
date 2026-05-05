@@ -5,6 +5,7 @@ import {
   fetchProductDetail,
   fetchProductStockByFilial,
   fetchProductSaleHistory,
+  fetchProductSaleHistoryComparison,
   fetchProductAvailableColors,
   fetchProductStockProgressSeries,
   type ProductDetailInfo,
@@ -19,6 +20,9 @@ export async function GET(request: Request) {
   const productId = searchParams.get('productId');
   const company = searchParams.get('company') ?? undefined;
   const colorsParam = searchParams.get('colors');
+  const includeColors = searchParams.get('includeColors') !== '0';
+  const includeComparison = searchParams.get('includeComparison') !== '0';
+  const includeStockProgress = searchParams.get('includeStockProgress') !== '0';
   const colors = colorsParam
     ? colorsParam.split(',').map((c) => c.trim() === NO_COLOR_PARAM ? '' : c.trim())
     : undefined;
@@ -64,20 +68,22 @@ export async function GET(request: Request) {
     const comparisonRangeStart = startOfMonth(subMonths(startD, 1));
     const comparisonRangeEnd = endOfMonth(subMonths(endD, 1));
 
-    const saleHistoryComparisonFetch = fetchProductSaleHistory({
-      ...baseParams,
-      range: {
-        start: comparisonRangeStart.toISOString(),
-        end: comparisonRangeEnd.toISOString(),
-      },
-    });
+    const saleHistoryComparisonFetch = includeComparison
+      ? fetchProductSaleHistoryComparison({
+          ...baseParams,
+          range: {
+            start: comparisonRangeStart.toISOString(),
+            end: comparisonRangeEnd.toISOString(),
+          },
+        })
+      : Promise.resolve([]);
 
     const [detail, stockByFilial, saleHistory, availableColors, saleHistoryComparison] =
       await Promise.all([
         fetchProductDetail(baseParams),
         fetchProductStockByFilial(baseParams),
         fetchProductSaleHistory(baseParams),
-        fetchProductAvailableColors(productId, company),
+        includeColors ? fetchProductAvailableColors(productId, company) : Promise.resolve([]),
         saleHistoryComparisonFetch,
       ]);
 
@@ -91,10 +97,9 @@ export async function GET(request: Request) {
       totalStock: totalStockFromFilials,
     };
 
-    const stockProgress: ProductStockProgressDay[] = await fetchProductStockProgressSeries(
-      baseParams,
-      stockByFilial
-    );
+    const stockProgress: ProductStockProgressDay[] = includeStockProgress
+      ? await fetchProductStockProgressSeries(baseParams, stockByFilial)
+      : [];
 
     return NextResponse.json({
       data: {

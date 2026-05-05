@@ -217,6 +217,214 @@
   border-radius: 6px;
 }
 
+.contentShell {
+  position: relative;
+}
+
+.contentDimmed {
+  opacity: 0.42;
+  filter: saturate(0.88);
+  pointer-events: none;
+  user-select: none;
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+.contentLoadingOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 16px;
+  pointer-events: none;
+}
+
+.loadingOverlayCard {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.1);
+  backdrop-filter: blur(8px);
+}
+
+.loadingSpinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #dbe4ee;
+  border-top-color: #334155;
+  border-radius: 999px;
+  flex-shrink: 0;
+  animation: spin 0.8s linear infinite;
+}
+
+.loadingTextBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.loadingOverlayTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.loadingOverlayHint {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.inlineLoadingTag {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.loadingSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.skeletonSurface {
+  position: relative;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
+  padding: 18px;
+}
+
+.skeletonHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.skeletonHeaderLeft {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeletonHeaderRight {
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.skeletonInlineRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.skeletonLine {
+  position: relative;
+  overflow: hidden;
+  display: block;
+  height: 12px;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.skeletonLine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.72), transparent);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeletonLineTitle {
+  width: min(440px, 100%);
+  height: 28px;
+}
+
+.skeletonLineCode {
+  width: 132px;
+}
+
+.skeletonLinePill {
+  width: 128px;
+  height: 28px;
+}
+
+.skeletonLineMeta {
+  width: 180px;
+}
+
+.skeletonLineLabel {
+  width: 96px;
+}
+
+.skeletonLineNumber {
+  width: 104px;
+  height: 32px;
+}
+
+.skeletonLineUnit {
+  width: 74px;
+}
+
+.skeletonGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.9fr);
+  gap: 16px;
+}
+
+.skeletonLineSectionTitle {
+  width: 180px;
+  margin-bottom: 16px;
+}
+
+.skeletonMetricGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.skeletonMetricCard {
+  padding: 14px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeletonLineMetricLabel {
+  width: 72%;
+}
+
+.skeletonLineMetricValue {
+  width: 44%;
+  height: 22px;
+}
+
+.skeletonChart {
+  min-height: 220px;
+}
+
 .productHeaderContainer {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -371,6 +579,11 @@
   background: #f8fafc;
   border-color: #cbd5e1;
   color: #0f172a;
+}
+
+.colorEditButton:disabled {
+  cursor: wait;
+  opacity: 0.7;
 }
 
 .productCard {
@@ -636,6 +849,18 @@
   opacity: 0.65;
 }
 
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 @media (max-width: 768px) {
   .wrapper {
     gap: 16px;
@@ -694,6 +919,35 @@
     align-items: stretch;
     gap: 12px;
     padding: 16px;
+  }
+
+  .loadingOverlayCard {
+    width: 100%;
+    border-radius: 16px;
+    align-items: flex-start;
+  }
+
+  .contentLoadingOverlay {
+    padding: 12px;
+  }
+
+  .skeletonHeader {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .skeletonHeaderRight {
+    min-width: 0;
+    align-items: flex-start;
+  }
+
+  .skeletonGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .skeletonMetricGrid {
+    grid-template-columns: 1fr;
   }
 
   .productCardRight {

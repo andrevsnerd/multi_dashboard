@@ -35,6 +35,8 @@ interface ProductDetailData {
   stockProgress: ProductStockProgressDay[];
 }
 
+type LoadingPhase = "initial" | "product" | "color" | "period";
+
 type ProductSearchResult = {
   productId: string;
   productName: string;
@@ -72,7 +74,11 @@ async function fetchProductDetail(
   productId: string,
   company: string,
   range: DateRangeValue,
-  selectedColors: string[]
+  selectedColors: string[],
+  options?: {
+    includeColors?: boolean;
+    includeStockProgress?: boolean;
+  }
 ): Promise<ProductDetailData | null> {
   const searchParams = new URLSearchParams({
     productId,
@@ -80,6 +86,12 @@ async function fetchProductDetail(
     start: range.startDate.toISOString(),
     end: range.endDate.toISOString(),
   });
+  if (options?.includeColors === false) {
+    searchParams.set("includeColors", "0");
+  }
+  if (options?.includeStockProgress === false) {
+    searchParams.set("includeStockProgress", "0");
+  }
   if (selectedColors.length > 0) {
     searchParams.set("colors", selectedColors.map((color) => color || NO_COLOR_VALUE).join(","));
   }
@@ -97,6 +109,42 @@ async function fetchProductDetail(
   };
 
   return json.data;
+}
+
+async function fetchProductStockProgress(
+  productId: string,
+  company: string,
+  range: DateRangeValue,
+  selectedColors: string[],
+  stockByFilial: ProductStockByFilial[]
+): Promise<ProductStockProgressDay[]> {
+  const response = await fetch("/api/product-detail/stock-progress", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+    body: JSON.stringify({
+      productId,
+      company,
+      colors: selectedColors,
+      range: {
+        start: range.startDate.toISOString(),
+        end: range.endDate.toISOString(),
+      },
+      stockByFilial,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Erro ao carregar progresso de estoque");
+  }
+
+  const json = (await response.json()) as {
+    data: ProductStockProgressDay[];
+  };
+
+  return json.data ?? [];
 }
 
 export default function ProductDetailPage({
@@ -117,6 +165,13 @@ export default function ProductDetailPage({
   }, []);
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const hasVisibleDataRef = useRef(false);
+  const colorOptionsCacheRef = useRef<Record<string, ProductAvailableColor[]>>({});
+  const lastLoadedSignatureRef = useRef<{
+    productId: string;
+    colorsKey: string;
+    rangeKey: string;
+  } | null>(null);
   const [range, setRange] = useState<DateRangeValue>(initialRange);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
@@ -127,6 +182,7 @@ export default function ProductDetailPage({
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [data, setData] = useState<ProductDetailData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>("initial");
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
@@ -138,10 +194,17 @@ export default function ProductDetailPage({
 
   const selectedColorCode = selectedColors[0] ?? null;
   const selectedColorValue = selectedColorCode === null ? "" : (selectedColorCode || NO_COLOR_VALUE);
+  const colorsKey = selectedColors.join("|");
+  const rangeKey = `${range.startDate.toISOString()}|${range.endDate.toISOString()}`;
+  const colorCacheKey = `${companyKey}:${selectedProductId ?? ""}`;
   const selectedColor = useMemo(() => {
     if (!data || selectedColorCode === null) return null;
     return (data.availableColors ?? []).find((color) => color.code === selectedColorCode) ?? null;
   }, [data, selectedColorCode]);
+
+  useEffect(() => {
+    hasVisibleDataRef.current = data !== null;
+  }, [data]);
 
   // Fechar dropdown ao clicar fora
   useEffect(() => {
@@ -228,20 +291,42 @@ export default function ProductDetailPage({
   useEffect(() => {
     if (!selectedProductId) {
       setData(null);
+      setLoadingPhase("initial");
+      lastLoadedSignatureRef.current = null;
       return;
     }
 
     let active = true;
 
     async function load() {
+      const productIdForLoad = selectedProductId;
+      if (!productIdForLoad) {
+        return;
+      }
+      const nextSignature = {
+        productId: productIdForLoad,
+        colorsKey,
+        rangeKey,
+      };
+      const previousSignature = lastLoadedSignatureRef.current;
+      const nextPhase: LoadingPhase = !hasVisibleDataRef.current
+        ? "initial"
+        : previousSignature?.productId !== productIdForLoad
+          ? "product"
+          : previousSignature?.colorsKey !== colorsKey
+            ? "color"
+            : "period";
+      const cachedColors = colorOptionsCacheRef.current[colorCacheKey] ?? [];
+      const shouldFetchColors = cachedColors.length === 0;
+
+      setLoadingPhase(nextPhase);
       setLoading(true);
       setError(null);
       try {
-        // Verificação adicional para garantir que selectedProductId não é null
-        if (!selectedProductId) {
-          return;
-        }
-        const productData = await fetchProductDetail(selectedProductId, companyKey, range, selectedColors);
+        const productData = await fetchProductDetail(productIdForLoad, companyKey, range, selectedColors, {
+          includeColors: shouldFetchColors,
+          includeStockProgress: false,
+        });
         if (active) {
           // Converter datas de strings para Date objects se necessário
           if (productData) {
@@ -250,8 +335,14 @@ export default function ProductDetailPage({
                 ...sale,
                 date: sale.date instanceof Date ? sale.date : new Date(sale.date),
               }));
+            const availableColors =
+              productData.availableColors?.length > 0 ? productData.availableColors : cachedColors;
+            if (availableColors.length > 0) {
+              colorOptionsCacheRef.current[colorCacheKey] = availableColors;
+            }
             const processedData = {
               ...productData,
+              availableColors,
               detail: {
                 ...productData.detail,
                 lastEntryDate: productData.detail.lastEntryDate
@@ -262,12 +353,36 @@ export default function ProductDetailPage({
               },
               saleHistory: mapSaleDates(productData.saleHistory),
               saleHistoryComparison: mapSaleDates(productData.saleHistoryComparison ?? []),
-              stockProgress: productData.stockProgress ?? [],
+              stockProgress: [],
             };
             setData(processedData);
+            void fetchProductStockProgress(
+              productIdForLoad,
+              companyKey,
+              range,
+              selectedColors,
+              processedData.stockByFilial
+            )
+              .then((stockProgress) => {
+                if (!active) return;
+                setData((current) => {
+                  if (!current || current.detail.productId !== processedData.detail.productId) {
+                    return current;
+                  }
+                  return {
+                    ...current,
+                    stockProgress,
+                  };
+                });
+              })
+              .catch((progressError) => {
+                if (!active) return;
+                console.error("Erro ao carregar progresso de estoque", progressError);
+              });
           } else {
             setData(null);
           }
+          lastLoadedSignatureRef.current = nextSignature;
         }
       } catch (err) {
         if (active) {
@@ -289,7 +404,7 @@ export default function ProductDetailPage({
     return () => {
       active = false;
     };
-  }, [selectedProductId, companyKey, range, refreshTrigger, selectedColors]);
+  }, [selectedProductId, companyKey, range, refreshTrigger, selectedColors, colorsKey, rangeKey, colorCacheKey]);
 
   const handleProductSelect = useCallback((product: ProductSearchResult) => {
     const trimmedName = product.productName.trim();
@@ -363,6 +478,7 @@ export default function ProductDetailPage({
       if (!response.ok || json.error) {
         throw new Error(json.error || "Erro ao salvar cor.");
       }
+      delete colorOptionsCacheRef.current[colorCacheKey];
       setSelectedColors([json.data?.code || code]);
       setColorModalOpen(false);
       refetchDetail();
@@ -371,7 +487,24 @@ export default function ProductDetailPage({
     } finally {
       setColorSaving(false);
     }
-  }, [colorForm, refetchDetail, selectedColor, selectedProductId, user?.username]);
+  }, [colorCacheKey, colorForm, refetchDetail, selectedColor, selectedProductId, user?.username]);
+
+  const loadingTitle =
+    loadingPhase === "color"
+      ? "Atualizando cor"
+      : loadingPhase === "period"
+        ? "Atualizando período"
+        : loadingPhase === "product"
+          ? "Carregando produto"
+          : "Carregando dados";
+
+  const loadingHint =
+    loadingPhase === "color"
+      ? "Os dados estão sendo recalculados para a cor selecionada."
+      : "Isso pode levar alguns segundos.";
+
+  const showLoadingSkeleton = loading && !data;
+  const showLoadingOverlay = loading && !!data;
 
   const productContent = data ? (
     <>
@@ -396,6 +529,7 @@ export default function ProductDetailPage({
                 <select
                   className={styles.colorSelectNative}
                   value={selectedColorValue}
+                  disabled={loading}
                   onChange={(e) => {
                     const value = e.target.value;
                     setSelectedColors(value ? [value === NO_COLOR_VALUE ? "" : value] : []);
@@ -410,11 +544,15 @@ export default function ProductDetailPage({
                     </option>
                   ))}
                 </select>
+                {showLoadingOverlay && loadingPhase === "color" && (
+                  <span className={styles.inlineLoadingTag}>Atualizando...</span>
+                )}
                 {isAdmin && selectedColor && (
                   <button
                     type="button"
                     className={styles.colorEditButton}
                     onClick={openColorModal}
+                    disabled={loading}
                     aria-label="Editar cadastro da cor"
                     title="Editar cadastro da cor"
                   >
@@ -467,8 +605,75 @@ export default function ProductDetailPage({
     </div>
   ) : null;
 
+  const loadingSkeleton = (
+    <div className={styles.loadingSkeleton} aria-live="polite" aria-busy="true">
+      <div className={`${styles.skeletonSurface} ${styles.skeletonHeader}`}>
+        <div className={styles.skeletonHeaderLeft}>
+          <div className={`${styles.skeletonLine} ${styles.skeletonLineTitle}`} />
+          <div className={`${styles.skeletonLine} ${styles.skeletonLineCode}`} />
+          <div className={styles.skeletonInlineRow}>
+            <div className={`${styles.skeletonLine} ${styles.skeletonLinePill}`} />
+            <div className={`${styles.skeletonLine} ${styles.skeletonLineMeta}`} />
+          </div>
+        </div>
+        <div className={styles.skeletonHeaderRight}>
+          <div className={`${styles.skeletonLine} ${styles.skeletonLineLabel}`} />
+          <div className={`${styles.skeletonLine} ${styles.skeletonLineNumber}`} />
+          <div className={`${styles.skeletonLine} ${styles.skeletonLineUnit}`} />
+        </div>
+      </div>
+
+      <div className={styles.loadingOverlayCard}>
+        <span className={styles.loadingSpinner} aria-hidden />
+        <div className={styles.loadingTextBlock}>
+          <strong className={styles.loadingOverlayTitle}>{loadingTitle}</strong>
+          <span className={styles.loadingOverlayHint}>{loadingHint}</span>
+        </div>
+      </div>
+
+      <div className={styles.skeletonGrid}>
+        <div className={styles.skeletonSurface}>
+          <div className={`${styles.skeletonLine} ${styles.skeletonLineSectionTitle}`} />
+          <div className={styles.skeletonMetricGrid}>
+            <div className={styles.skeletonMetricCard}>
+              <div className={`${styles.skeletonLine} ${styles.skeletonLineMetricLabel}`} />
+              <div className={`${styles.skeletonLine} ${styles.skeletonLineMetricValue}`} />
+            </div>
+            <div className={styles.skeletonMetricCard}>
+              <div className={`${styles.skeletonLine} ${styles.skeletonLineMetricLabel}`} />
+              <div className={`${styles.skeletonLine} ${styles.skeletonLineMetricValue}`} />
+            </div>
+            <div className={styles.skeletonMetricCard}>
+              <div className={`${styles.skeletonLine} ${styles.skeletonLineMetricLabel}`} />
+              <div className={`${styles.skeletonLine} ${styles.skeletonLineMetricValue}`} />
+            </div>
+          </div>
+        </div>
+        <div className={`${styles.skeletonSurface} ${styles.skeletonChart}`} />
+      </div>
+    </div>
+  );
+
   function renderBody() {
-    if (data) return productContent;
+    if (showLoadingSkeleton) return loadingSkeleton;
+    if (data) {
+      return (
+        <div className={styles.contentShell} aria-busy={loading}>
+          <div className={showLoadingOverlay ? styles.contentDimmed : undefined}>{productContent}</div>
+          {showLoadingOverlay && (
+            <div className={styles.contentLoadingOverlay} aria-live="polite">
+              <div className={styles.loadingOverlayCard}>
+                <span className={styles.loadingSpinner} aria-hidden />
+                <div className={styles.loadingTextBlock}>
+                  <strong className={styles.loadingOverlayTitle}>{loadingTitle}</strong>
+                  <span className={styles.loadingOverlayHint}>{loadingHint}</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
     return emptyContent;
   }
 
@@ -565,9 +770,8 @@ export default function ProductDetailPage({
         </div>
 
       </div>
-      {(loading || error) && (
+      {error && (
         <div className={styles.controlsStatus}>
-          {loading ? <span className={styles.loading}>Carregando dados…</span> : null}
           {error ? <span className={styles.error}>{error}</span> : null}
         </div>
       )}

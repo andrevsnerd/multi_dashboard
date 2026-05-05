@@ -200,6 +200,8 @@ export interface ProductSaleHistory {
   colorDisplayName: string | null;
 }
 
+const vendorAliasCache = new Map<string, string>();
+
 /** Série diária: entradas, saídas (vendas + movimentações de estoque) e saldo estimado ao fim de cada dia. */
 export interface ProductStockProgressDay {
   dateIso: string;
@@ -389,6 +391,46 @@ function buildColorList(recordset: { COR: string; DESC_COR: string }[]): Product
     if (idxB >= 0) return 1;
     return a.displayName.localeCompare(b.displayName);
   });
+}
+
+async function resolveVendorAliasMap(
+  request: sql.Request | RequestLike,
+  codes: string[]
+): Promise<Map<string, string>> {
+  const uniqueCodes = [...new Set(codes.map((code) => String(code ?? '').trim()).filter(Boolean))];
+  const aliases = new Map<string, string>();
+  const missingCodes = uniqueCodes.filter((code) => !vendorAliasCache.has(code));
+
+  if (missingCodes.length > 0) {
+    missingCodes.forEach((code, index) => request.input(`vend${index}`, sql.VarChar, code));
+    const inList = missingCodes.map((_, index) => `@vend${index}`).join(', ');
+    const aliasQuery = `
+      SELECT
+        LTRIM(RTRIM(CAST(VENDEDOR AS VARCHAR))) AS codigo,
+        LTRIM(RTRIM(ISNULL(VENDEDOR_APELIDO, ISNULL(NOME_VENDEDOR, VENDEDOR)))) AS apelido
+      FROM LOJA_VENDEDORES WITH (NOLOCK)
+      WHERE LTRIM(RTRIM(CAST(VENDEDOR AS VARCHAR))) IN (${inList})
+    `;
+    const aliasResult = await request.query<{ codigo: string; apelido: string }>(aliasQuery);
+    (aliasResult.recordset ?? []).forEach((row) => {
+      const codigo = String(row.codigo ?? '').trim();
+      const apelido = String(row.apelido ?? row.codigo ?? '').trim();
+      if (codigo) {
+        vendorAliasCache.set(codigo, apelido || codigo);
+      }
+    });
+    missingCodes.forEach((code) => {
+      if (!vendorAliasCache.has(code)) {
+        vendorAliasCache.set(code, code);
+      }
+    });
+  }
+
+  uniqueCodes.forEach((code) => {
+    aliases.set(code, vendorAliasCache.get(code) ?? code);
+  });
+
+  return aliases;
 }
 
 /** Adiciona parâmetros de cor ao request uma vez; retorna função que gera o fragmento SQL por alias. */
@@ -1603,10 +1645,10 @@ async function fetchProductSaleHistoryEcommerce({
 
     const query = `
       SELECT 
-        f.EMISSAO AS date,
+        CAST(f.EMISSAO AS DATE) AS date,
         f.FILIAL,
-        fp.QTDE AS quantity,
-        ISNULL(fp.VALOR_LIQUIDO, 0) AS revenue,
+        SUM(fp.QTDE) AS quantity,
+        SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS revenue,
         NULL AS vendedor,
         fp.COR_PRODUTO AS color,
         ISNULL(c.DESC_COR, '') AS corBanco
@@ -1622,7 +1664,14 @@ async function fetchProductSaleHistoryEcommerce({
         AND fp.QTDE > 0
         ${filialFilter}
         ${colorFilterFp}
-      ORDER BY f.EMISSAO DESC, f.FILIAL
+      GROUP BY
+        CAST(f.EMISSAO AS DATE),
+        f.FILIAL,
+        fp.COR_PRODUTO,
+        ISNULL(c.DESC_COR, '')
+      ORDER BY
+        CAST(f.EMISSAO AS DATE) DESC,
+        f.FILIAL
     `;
 
     const result = await request.query<{
@@ -1753,15 +1802,26 @@ export async function fetchProductSaleHistory({
         FROM vendas_com_troca
       )
       SELECT 
-        vf.DATA_VENDA AS date,
+        CAST(vf.DATA_VENDA AS DATE) AS date,
         vf.FILIAL,
-        (vf.TOTAL_QTDE_VENDA - vf.QTDE_TROCA) AS quantity,
-        (vf.TOTAL_VENDA - vf.VALOR_TROCA) AS revenue,
+        SUM(vf.TOTAL_QTDE_VENDA - vf.QTDE_TROCA) AS quantity,
+        SUM(vf.TOTAL_VENDA - vf.VALOR_TROCA) AS revenue,
         vf.VENDEDOR AS vendedor,
         vf.COR_PRODUTO AS color,
         ISNULL(vf.DESC_COR, '') AS corBanco
       FROM vendas_finais vf
-      ORDER BY vf.DATA_VENDA DESC, vf.FILIAL
+      GROUP BY
+        CAST(vf.DATA_VENDA AS DATE),
+        vf.FILIAL,
+        vf.VENDEDOR,
+        vf.COR_PRODUTO,
+        ISNULL(vf.DESC_COR, '')
+      HAVING
+        SUM(vf.TOTAL_QTDE_VENDA - vf.QTDE_TROCA) <> 0
+        OR SUM(vf.TOTAL_VENDA - vf.VALOR_TROCA) <> 0
+      ORDER BY
+        CAST(vf.DATA_VENDA AS DATE) DESC,
+        vf.FILIAL
     `;
 
     const result = await request.query<{
@@ -1782,25 +1842,10 @@ export async function fetchProductSaleHistory({
           .filter(Boolean)
       ),
     ];
-    const apelidoByCodigo = new Map<string, string>();
-
-    if (codigosVendedor.length > 0) {
-      codigosVendedor.forEach((cod, i) => request.input(`vend${i}`, sql.VarChar, cod));
-      const inList = codigosVendedor.map((_, i) => `@vend${i}`).join(', ');
-      const apelidoQuery = `
-        SELECT
-          LTRIM(RTRIM(CAST(VENDEDOR AS VARCHAR))) AS codigo,
-          LTRIM(RTRIM(ISNULL(VENDEDOR_APELIDO, ISNULL(NOME_VENDEDOR, VENDEDOR)))) AS apelido
-        FROM LOJA_VENDEDORES WITH (NOLOCK)
-        WHERE LTRIM(RTRIM(CAST(VENDEDOR AS VARCHAR))) IN (${inList})
-      `;
-      const apelidoResult = await request.query<{ codigo: string; apelido: string }>(apelidoQuery);
-      (apelidoResult.recordset ?? []).forEach((r) => {
-        const codigo = String(r.codigo ?? '').trim();
-        const apelido = String(r.apelido ?? r.codigo ?? '').trim();
-        if (codigo) apelidoByCodigo.set(codigo, apelido);
-      });
-    }
+    const apelidoByCodigo =
+      codigosVendedor.length > 0
+        ? await resolveVendorAliasMap(request, codigosVendedor)
+        : new Map<string, string>();
 
     return result.recordset.map((row) => {
       const date = row.date instanceof Date ? row.date : new Date(row.date);
@@ -1826,6 +1871,193 @@ export async function fetchProductSaleHistory({
         colorDisplayName,
       };
     });
+  });
+}
+
+async function fetchProductSaleHistoryComparisonEcommerce({
+  productId,
+  company,
+  range,
+  filial,
+  colors,
+}: ProductDetailParams): Promise<ProductSaleHistory[]> {
+  const { start, end } = resolveRange(range);
+
+  return withRequest(async (request) => {
+    request.input('productId', sql.VarChar, productId);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+
+    const companyConfig = resolveCompany(company);
+    if (!companyConfig) {
+      return [];
+    }
+
+    const filialFilter = buildEcommerceFilialFilter(request, company, filial, 'f');
+    const colorFilterFp = buildColorFilter(request, colors)('fp');
+
+    const query = `
+      SELECT
+        CAST(f.EMISSAO AS DATE) AS date,
+        f.FILIAL,
+        SUM(fp.QTDE) AS quantity,
+        SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS revenue
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE fp.PRODUTO = @productId
+        AND CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND fp.QTDE > 0
+        ${filialFilter}
+        ${colorFilterFp}
+      GROUP BY CAST(f.EMISSAO AS DATE), f.FILIAL
+      ORDER BY CAST(f.EMISSAO AS DATE) DESC, f.FILIAL
+    `;
+
+    const result = await request.query<{
+      date: Date;
+      FILIAL: string;
+      quantity: number;
+      revenue: number;
+    }>(query);
+
+    const displayNames = companyConfig.filialDisplayNames ?? {};
+
+    return result.recordset.map((row) => ({
+      date: row.date instanceof Date ? row.date : new Date(row.date),
+      filial: row.FILIAL,
+      filialDisplayName: (() => {
+        const normalizedFilial = (row.FILIAL || '').trim();
+        return displayNames[normalizedFilial] ?? displayNames[row.FILIAL] ?? row.FILIAL;
+      })(),
+      quantity: Number(row.quantity ?? 0),
+      revenue: Number(row.revenue ?? 0),
+      vendedor: null,
+      color: null,
+      colorDisplayName: null,
+    }));
+  });
+}
+
+export async function fetchProductSaleHistoryComparison(
+  params: ProductDetailParams
+): Promise<ProductSaleHistory[]> {
+  const { productId, company, range, filial, colors } = params;
+
+  if (shouldAggregateEcommerce(company, filial)) {
+    const [salesResult, ecommerceResult] = await Promise.all([
+      fetchProductSaleHistoryComparison({ productId, company, range, filial: VAREJO_VALUE, colors }),
+      fetchProductSaleHistoryComparisonEcommerce({ productId, company, range, filial: null, colors }),
+    ]);
+
+    return [...salesResult, ...ecommerceResult].sort((a, b) => b.date.getTime() - a.date.getTime());
+  }
+
+  const { start, end } = resolveRange(range);
+
+  return withRequest(async (request) => {
+    request.input('productId', sql.VarChar, productId);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+
+    const companyConfig = resolveCompany(company);
+    if (!companyConfig) {
+      return [];
+    }
+
+    const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+    const colorFilterVp = buildColorFilter(request, colors)('vp');
+
+    const query = `
+      WITH vendas_base AS (
+        SELECT
+          vp.*,
+          CASE
+            WHEN vp.QTDE_CANCELADA > 0 THEN 0
+            ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
+          END AS TOTAL_VENDA,
+          CASE
+            WHEN vp.QTDE_CANCELADA > 0 THEN 0
+            ELSE vp.QTDE
+          END AS TOTAL_QTDE_VENDA
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        WHERE vp.PRODUTO = @productId
+          AND vp.DATA_VENDA >= @startDate
+          AND vp.DATA_VENDA < @endDate
+          AND vp.QTDE > 0
+          ${filialFilter}
+          ${colorFilterVp}
+      ),
+      trocas_item AS (
+        SELECT
+          TICKET,
+          CODIGO_FILIAL,
+          PRODUTO,
+          COR_PRODUTO,
+          TAMANHO,
+          SUM(QTDE) AS QTDE_TROCA,
+          SUM(PRECO_LIQUIDO * QTDE) AS VALOR_TROCA
+        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
+        WHERE QTDE_CANCELADA = 0
+        GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
+      ),
+      vendas_com_troca AS (
+        SELECT
+          vb.*,
+          ISNULL(ti.QTDE_TROCA, 0) AS QTDE_TROCA_ITEM,
+          ISNULL(ti.VALOR_TROCA, 0) AS VALOR_TROCA_ITEM
+        FROM vendas_base vb
+        LEFT JOIN trocas_item ti ON ti.TICKET = vb.TICKET
+          AND ti.CODIGO_FILIAL = vb.CODIGO_FILIAL
+          AND ti.PRODUTO = vb.PRODUTO
+          AND ISNULL(ti.COR_PRODUTO, '') = ISNULL(vb.COR_PRODUTO, '')
+          AND ISNULL(ti.TAMANHO, 0) = ISNULL(vb.TAMANHO, 0)
+      ),
+      vendas_finais AS (
+        SELECT
+          *,
+          ISNULL(QTDE_TROCA_ITEM, 0) AS QTDE_TROCA,
+          ISNULL(VALOR_TROCA_ITEM, 0) AS VALOR_TROCA
+        FROM vendas_com_troca
+      )
+      SELECT
+        CAST(vf.DATA_VENDA AS DATE) AS date,
+        vf.FILIAL,
+        SUM(vf.TOTAL_QTDE_VENDA - vf.QTDE_TROCA) AS quantity,
+        SUM(vf.TOTAL_VENDA - vf.VALOR_TROCA) AS revenue
+      FROM vendas_finais vf
+      GROUP BY CAST(vf.DATA_VENDA AS DATE), vf.FILIAL
+      HAVING
+        SUM(vf.TOTAL_QTDE_VENDA - vf.QTDE_TROCA) <> 0
+        OR SUM(vf.TOTAL_VENDA - vf.VALOR_TROCA) <> 0
+      ORDER BY CAST(vf.DATA_VENDA AS DATE) DESC, vf.FILIAL
+    `;
+
+    const result = await request.query<{
+      date: Date;
+      FILIAL: string;
+      quantity: number;
+      revenue: number;
+    }>(query);
+
+    const displayNames = companyConfig.filialDisplayNames ?? {};
+
+    return result.recordset.map((row) => ({
+      date: row.date instanceof Date ? row.date : new Date(row.date),
+      filial: row.FILIAL,
+      filialDisplayName: (() => {
+        const normalizedFilial = (row.FILIAL || '').trim();
+        return displayNames[normalizedFilial] ?? displayNames[row.FILIAL] ?? row.FILIAL;
+      })(),
+      quantity: Number(row.quantity ?? 0),
+      revenue: Number(row.revenue ?? 0),
+      vendedor: null,
+      color: null,
+      colorDisplayName: null,
+    }));
   });
 }
 
