@@ -26,6 +26,7 @@ async function fetchVendedores(
     end: range.endDate.toISOString(),
     filial,
     compare: comparisonMode,
+    light: "0",
   });
   const response = await fetch(`/api/vendedores?${searchParams.toString()}`, { cache: "no-store" });
   if (!response.ok) throw new Error("Erro ao carregar vendedores");
