@@ -2,9 +2,11 @@ import sql from 'mssql';
 
 import { getFilialGroupMembers, resolveCompany, VAREJO_VALUE } from '@/lib/config/company';
 import { withRequest } from '@/lib/db/connection';
+import { syncProdutoNovoLabels } from '@/lib/repositories/produtosNovos';
 import { RequestLike } from '@/lib/db/proxy';
 import { normalizeRangeForQuery } from '@/lib/utils/date';
-import { getColorDescription, normalizeColor } from '@/lib/utils/colorMapping';
+import { getColorDescription } from '@/lib/utils/colorMapping';
+import { buildProdutoLabelLookupKey } from '@/lib/utils/produto-labels-store';
 
 export interface ControleTransferenciasParams {
   company?: string;
@@ -123,6 +125,15 @@ export async function fetchControleTransferencias({
   filial,
   range,
 }: ControleTransferenciasParams = {}): Promise<ProdutoTransferencia[]> {
+  const resolvedCompany = resolveCompany(company);
+  const blockedLabelKeys = resolvedCompany
+    ? new Set(
+        (await syncProdutoNovoLabels(resolvedCompany.key)).produtos.map((item) =>
+          buildProdutoLabelLookupKey(item.produto, item.corCodigo)
+        )
+      )
+    : null;
+
   return withRequest(async (request) => {
     const { start, end } = normalizeRangeForQuery({
       start: range?.start,
@@ -644,6 +655,9 @@ export async function fetchControleTransferencias({
 
     allChaves.forEach(chave => {
       const [produto, corProduto] = chave.split('|');
+      if (blockedLabelKeys?.has(buildProdutoLabelLookupKey(produto, corProduto))) {
+        return;
+      }
       const produtoInfo = produtoInfoMap.get(chave) || {
         descricao: '',
         cor: getColorDescription(corProduto, ''),

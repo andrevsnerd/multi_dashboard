@@ -1,24 +1,30 @@
 import { NextResponse } from 'next/server';
-import { withRequest } from '@/lib/db/connection';
 import sql from 'mssql';
+
+import { resolveCompany } from '@/lib/config/company';
+import { withRequest } from '@/lib/db/connection';
+import { PRODUTO_NOVO_LABEL } from '@/lib/repositories/produtosNovos';
+import { buildProdutoLabelLookupKey, listProdutoLabelLookupKeys } from '@/lib/utils/produto-labels-store';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const codigoBarras = searchParams.get('codigoBarras');
+  const company = resolveCompany(searchParams.get('company') || undefined);
 
   if (!codigoBarras || !codigoBarras.trim()) {
     return NextResponse.json({ data: null });
   }
 
   try {
+    const blockedLabelKeys = company?.key
+      ? await listProdutoLabelLookupKeys(company.key, PRODUTO_NOVO_LABEL)
+      : null;
+
     const produto = await withRequest(async (req) => {
       const codigoLimpo = codigoBarras.trim();
-      
-      // Log para debug
-      console.log(`[CÓDIGO BARRAS] Buscando: "${codigoLimpo}" (len=${codigoLimpo.length}, original="${codigoBarras}")`);
-      
-      // 1) Match exato do texto (evita colisão BIGINT: "035513" vs "35513" / múltiplas cores com mesmo valor numérico).
-      // 2) Só se não achar, tentar igualdade numérica; se mais de uma linha → ambíguo (null), nunca "primeiro por sorte".
+
+      console.log(`[CODIGO BARRAS] Buscando: "${codigoLimpo}" (len=${codigoLimpo.length}, original="${codigoBarras}")`);
+
       const baseSelect = `
         SELECT DISTINCT
           pb.PRODUTO,
@@ -57,23 +63,23 @@ export async function GET(request: Request) {
       }>(queryExato);
 
       if (result.recordset.length > 1) {
-        console.warn(`[CÓDIGO BARRAS] Ambíguo (match exato, ${result.recordset.length} linhas): "${codigoLimpo}"`);
+        console.warn(`[CODIGO BARRAS] Ambiguo (match exato, ${result.recordset.length} linhas): "${codigoLimpo}"`);
         return null;
       }
+
       if (result.recordset.length === 0) {
         result = await req.query(queryNum);
         if (result.recordset.length > 1) {
-          console.warn(`[CÓDIGO BARRAS] Ambíguo (match numérico, ${result.recordset.length} linhas): "${codigoLimpo}"`);
+          console.warn(`[CODIGO BARRAS] Ambiguo (match numerico, ${result.recordset.length} linhas): "${codigoLimpo}"`);
           return null;
         }
       }
 
       if (result.recordset.length === 0) {
-        // Debug: tentar buscar com LIKE para ver se o código existe de outra forma
         const queryDebug = `
           SELECT TOP 10 
-            pb.CODIGO_BARRA, 
-            LEN(pb.CODIGO_BARRA) as LEN_CODIGO, 
+            pb.CODIGO_BARRA,
+            LEN(pb.CODIGO_BARRA) as LEN_CODIGO,
             pb.PRODUTO,
             p.DESC_PRODUTO,
             ASCII(LEFT(pb.CODIGO_BARRA, 1)) as FIRST_CHAR_ASCII,
@@ -91,37 +97,46 @@ export async function GET(request: Request) {
               ELSE 4
             END
         `;
+
         try {
           const debugResult = await req.query(queryDebug);
           if (debugResult.recordset.length > 0) {
-            console.log(`[DEBUG CÓDIGO BARRAS] Busca exata não encontrou: "${codigoLimpo}" (len=${codigoLimpo.length})`);
-            console.log(`[DEBUG CÓDIGO BARRAS] Códigos similares encontrados (${debugResult.recordset.length}):`);
+            console.log(`[DEBUG CODIGO BARRAS] Busca exata nao encontrou: "${codigoLimpo}" (len=${codigoLimpo.length})`);
+            console.log(`[DEBUG CODIGO BARRAS] Codigos similares encontrados (${debugResult.recordset.length}):`);
             debugResult.recordset.forEach((r, idx) => {
               const codigo = r.CODIGO_BARRA?.toString() || '';
-              console.log(`  ${idx + 1}. Código: "${codigo}" (len=${r.LEN_CODIGO}) | Produto: ${r.PRODUTO} | Desc: ${r.DESC_PRODUTO?.substring(0, 30)}`);
-              console.log(`     Primeiro char ASCII: ${r.FIRST_CHAR_ASCII}, Último char ASCII: ${r.LAST_CHAR_ASCII}`);
+              console.log(`  ${idx + 1}. Codigo: "${codigo}" (len=${r.LEN_CODIGO}) | Produto: ${r.PRODUTO} | Desc: ${r.DESC_PRODUTO?.substring(0, 30)}`);
+              console.log(`     Primeiro char ASCII: ${r.FIRST_CHAR_ASCII}, Ultimo char ASCII: ${r.LAST_CHAR_ASCII}`);
             });
           } else {
-            console.log(`[DEBUG CÓDIGO BARRAS] Nenhum código similar encontrado para: "${codigoLimpo}"`);
+            console.log(`[DEBUG CODIGO BARRAS] Nenhum codigo similar encontrado para: "${codigoLimpo}"`);
           }
         } catch (e) {
-          console.error('[DEBUG CÓDIGO BARRAS] Erro ao fazer debug:', e);
+          console.error('[DEBUG CODIGO BARRAS] Erro ao fazer debug:', e);
         }
+
         return null;
       }
 
       const row = result.recordset[0];
+      const produtoCodigo = row.PRODUTO?.toString().trim() || '';
+      const corCodigo = row.COR_PRODUTO?.toString().trim() || '';
+
+      if (blockedLabelKeys?.has(buildProdutoLabelLookupKey(produtoCodigo, corCodigo))) {
+        return null;
+      }
+
       return {
-        produto: row.PRODUTO?.toString().trim() || '',
+        produto: produtoCodigo,
         descProduto: row.DESC_PRODUTO?.toString().trim() || '',
         grupoProduto: row.GRUPO_PRODUTO?.toString().trim() || null,
         subgrupoProduto: row.SUBGRUPO_PRODUTO?.toString().trim() || null,
         linha: row.LINHA?.toString().trim() || null,
-        corProduto: row.COR_PRODUTO?.toString().trim() || null,
+        corProduto: corCodigo || null,
         tamanho: row.TAMANHO?.toString().trim() || null,
         codigoBarra: row.CODIGO_BARRA?.toString().trim() || null,
-        produtosEncontrados: result.recordset.length, // Para avisar se há múltiplos
-        todosProdutos: result.recordset.map(r => ({
+        produtosEncontrados: result.recordset.length,
+        todosProdutos: result.recordset.map((r) => ({
           produto: r.PRODUTO?.toString().trim() || '',
           cor: r.COR_PRODUTO?.toString().trim() || '(sem cor)',
           tamanho: r.TAMANHO?.toString().trim() || '(sem tamanho)',
@@ -131,9 +146,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ data: produto });
   } catch (error) {
-    console.error('Erro ao buscar produto por código de barras', error);
+    console.error('Erro ao buscar produto por codigo de barras', error);
     return NextResponse.json(
-      { error: 'Erro ao buscar produto por código de barras' },
+      { error: 'Erro ao buscar produto por codigo de barras' },
       { status: 500 }
     );
   }

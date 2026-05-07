@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
+
+import { findUserByUsername } from '@/lib/auth/users-store';
+import { getActiveFilial, resolveCompany } from '@/lib/config/company';
 import { getConnectionPool } from '@/lib/db/connection';
 import { shouldUseProxy, forwardTransferToProxy } from '@/lib/db/proxy';
-import { findUserByUsername } from '@/lib/auth/users-store';
-import { getPermissaoByUsername } from '@/lib/utils/transferencia-permissoes-store';
+import { PRODUTO_NOVO_LABEL } from '@/lib/repositories/produtosNovos';
 import { executeTransfer } from '@/lib/transfer-executor';
-import { getActiveFilial, resolveCompany } from '@/lib/config/company';
+import { buildProdutoLabelLookupKey, listProdutoLabelLookupKeys } from '@/lib/utils/produto-labels-store';
+import { getPermissaoByUsername } from '@/lib/utils/transferencia-permissoes-store';
 
 interface TransferenciaRequest {
   produto: string;
@@ -51,10 +54,11 @@ export async function POST(request: Request) {
       companyKey,
     } = body;
 
-    // Validar dados
+    const company = resolveCompany(companyKey);
+
     if (!produto || !filialOrigem || !filialDestino || qtdeSaida <= 0 || qtdeEntrada <= 0) {
       return NextResponse.json(
-        { error: 'Dados inválidos para transferência' },
+        { error: 'Dados invalidos para transferencia' },
         { status: 400 }
       );
     }
@@ -64,7 +68,7 @@ export async function POST(request: Request) {
 
     if (!username) {
       return NextResponse.json(
-        { error: 'Usuário não identificado. Faça login novamente.' },
+        { error: 'Usuario nao identificado. Faca login novamente.' },
         { status: 401 }
       );
     }
@@ -73,28 +77,43 @@ export async function POST(request: Request) {
       const user = await findUserByUsername(username);
       if (!user) {
         return NextResponse.json(
-          { error: 'Usuário não encontrado' },
+          { error: 'Usuario nao encontrado' },
           { status: 403 }
         );
       }
+
       if (user.role !== 'admin') {
         const permissao = await getPermissaoByUsername(user.username);
         if (!permissao) {
           return NextResponse.json(
-            { error: 'Sem permissão para transferir. Configure o perfil em Admin.' },
+            { error: 'Sem permissao para transferir. Configure o perfil em Admin.' },
             { status: 403 }
           );
         }
-        const origemOk = permissao.filiaisOrigem.length === 0 ||
+
+        const origemOk =
+          permissao.filiaisOrigem.length === 0 ||
           permissao.filiaisOrigem.some((p) => getActiveFilialForRequest(companyKey, (p || '').trim()) === fo);
-        const destinoOk = permissao.filiaisDestino.length === 0 ||
+        const destinoOk =
+          permissao.filiaisDestino.length === 0 ||
           permissao.filiaisDestino.some((p) => getActiveFilialForRequest(companyKey, (p || '').trim()) === fd);
+
         if (!origemOk || !destinoOk) {
           return NextResponse.json(
-            { error: 'Sem permissão para esta origem ou destino.' },
+            { error: 'Sem permissao para esta origem ou destino.' },
             { status: 403 }
           );
         }
+      }
+    }
+
+    if (company?.key) {
+      const blockedLabelKeys = await listProdutoLabelLookupKeys(company.key, PRODUTO_NOVO_LABEL);
+      if (blockedLabelKeys.has(buildProdutoLabelLookupKey(produto, corProduto))) {
+        return NextResponse.json(
+          { error: 'Produto bloqueado para transferencia enquanto possuir a label produto novo.' },
+          { status: 403 }
+        );
       }
     }
 
@@ -113,9 +132,10 @@ export async function POST(request: Request) {
         },
         request.headers
       );
+
       const proxyJson = await proxyResponse.json().catch(() => ({}));
       return NextResponse.json(
-        proxyJson.success ? proxyJson : { error: proxyJson.error || 'Erro ao executar transferência via proxy' },
+        proxyJson.success ? proxyJson : { error: proxyJson.error || 'Erro ao executar transferencia via proxy' },
         { status: proxyResponse.ok ? 200 : proxyResponse.status }
       );
     }
@@ -139,10 +159,10 @@ export async function POST(request: Request) {
       romaneioEntrada: result.romaneioEntrada,
       message: result.message,
     });
-  } catch (error: any) {
-    console.error('Erro ao executar transferência', error);
+  } catch (error: unknown) {
+    console.error('Erro ao executar transferencia', error);
     return NextResponse.json(
-      { error: error.message || 'Erro ao executar transferência' },
+      { error: error instanceof Error ? error.message : 'Erro ao executar transferencia' },
       { status: 500 }
     );
   }

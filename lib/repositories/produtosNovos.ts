@@ -14,6 +14,7 @@ export interface ProdutoNovoItem {
   descricao: string;
   cor: string;
   corCodigo: string;
+  linha?: string | null;
   dataCadastro: string | null;
 }
 
@@ -22,26 +23,27 @@ interface ProdutoNovoRow {
   descricao: string;
   corCodigo: string;
   cor: string;
+  linha: string | null;
   dataCadastro: string | null;
 }
 
 function buildCompanyScopeFilter(request: sql.Request, company: CompanyKey): string {
   if (company === "nerd") {
     return `
-      AND UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) <> ''
-      AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) <> 'ASSISTENCIA'
+      AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = 'ELETRONICOS'
     `;
   }
 
   const excludedLines = (resolveCompany(company)?.excludedLines ?? [])
     .map((line) => line.trim().toUpperCase())
+    .filter((line) => line !== "ELETRONICOS")
     .filter(Boolean);
 
   excludedLines.forEach((line, index) => {
     request.input(`excludedLine${index}`, sql.VarChar, line);
   });
 
-  const notInExcluded =
+  const notInExcludedLine =
     excludedLines.length > 0
       ? `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) NOT IN (${excludedLines
           .map((_, index) => `@excludedLine${index}`)
@@ -50,7 +52,7 @@ function buildCompanyScopeFilter(request: sql.Request, company: CompanyKey): str
 
   return `
     AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) <> ''
-    ${notInExcluded}
+    ${notInExcludedLine}
   `;
 }
 
@@ -78,8 +80,11 @@ export async function fetchProdutosNovosRecentes(
         bp.descricao,
         ISNULL(color_source.corCodigo, '') AS corCodigo,
         ISNULL(c.DESC_COR, '') AS cor,
+        ISNULL(p.LINHA, '') AS linha,
         CONVERT(VARCHAR(19), bp.dataCadastro, 120) AS dataCadastro
       FROM base_produtos bp
+      INNER JOIN PRODUTOS p WITH (NOLOCK)
+        ON RTRIM(LTRIM(CAST(p.PRODUTO AS VARCHAR(50)))) = bp.produto
       OUTER APPLY (
         SELECT DISTINCT src.corCodigo
         FROM (
@@ -127,13 +132,16 @@ export async function fetchProdutosNovosRecentes(
 
     const result = await request.query<ProdutoNovoRow>(query);
 
-    return result.recordset.map((row) => ({
-      produto: String(row.produto ?? "").trim(),
-      descricao: String(row.descricao ?? "").trim(),
-      corCodigo: String(row.corCodigo ?? "").trim(),
-      cor: String(row.cor ?? "").trim() || "-",
-      dataCadastro: row.dataCadastro ? String(row.dataCadastro) : null,
-    }));
+    return result.recordset
+      .map((row) => ({
+        produto: String(row.produto ?? "").trim(),
+        descricao: String(row.descricao ?? "").trim(),
+        corCodigo: String(row.corCodigo ?? "").trim(),
+        cor: String(row.cor ?? "").trim() || "-",
+        linha: String(row.linha ?? "").trim() || null,
+        dataCadastro: row.dataCadastro ? String(row.dataCadastro) : null,
+      }))
+      .filter((row) => !(company === "scarfme" && (row.linha ?? "").toUpperCase() === "ELETRONICOS"));
   });
 }
 

@@ -3,6 +3,8 @@ import { getPublicDatabaseErrorMessage, isDatabaseConnectionError, withRequest }
 import sql from 'mssql';
 import { getColorDescription } from '@/lib/utils/colorMapping';
 import { getActiveFilial, resolveCompany } from '@/lib/config/company';
+import { PRODUTO_NOVO_LABEL } from '@/lib/repositories/produtosNovos';
+import { buildProdutoLabelLookupKey, listProdutoLabelLookupKeys } from '@/lib/utils/produto-labels-store';
 
 export const maxDuration = 60;
 
@@ -39,6 +41,10 @@ export async function GET(request: Request) {
   }
 
   try {
+    const blockedLabelKeys = company?.key
+      ? await listProdutoLabelLookupKeys(company.key, PRODUTO_NOVO_LABEL)
+      : null;
+
     const produtos = await withRequest(async (req) => {
       const searchTermTrimmed = searchTerm.trim();
       const incluirEstoqueZero = isEntrada || porColecao || porGrade;
@@ -375,6 +381,9 @@ export async function GET(request: Request) {
       for (const row of result.recordset) {
         const produto = row.PRODUTO?.toString().trim() || '';
         const cor = row.COR_PRODUTO?.toString().trim() || '';
+        if (blockedLabelKeys?.has(buildProdutoLabelLookupKey(produto, cor))) {
+          continue;
+        }
         const key = `${produto}::${cor}`;
 
         if (!produtosMap.has(key)) {

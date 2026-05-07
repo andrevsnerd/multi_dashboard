@@ -59,6 +59,10 @@ function makeCompositeKey(produto: string, cor: string, label: string): string {
   return `${produto}::${cor}::${label}`.toUpperCase();
 }
 
+export function buildProdutoLabelLookupKey(produto: string | null | undefined, cor: string | null | undefined): string {
+  return `${normalizeValue(produto)}::${normalizeValue(cor)}`.toUpperCase();
+}
+
 function normalizeIncomingKeys(items: ProdutoLabelKeyInput[]): Array<{ produto: string; cor: string }> {
   const seen = new Set<string>();
   const normalized: Array<{ produto: string; cor: string }> = [];
@@ -127,6 +131,14 @@ export async function listProdutoLabels(
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
   }));
+}
+
+export async function listProdutoLabelLookupKeys(
+  company: CompanyKey,
+  label: string
+): Promise<Set<string>> {
+  const rows = await listProdutoLabels(company, label);
+  return new Set(rows.map((row) => buildProdutoLabelLookupKey(row.produto, row.cor)));
 }
 
 export async function syncProdutoLabelSet(
