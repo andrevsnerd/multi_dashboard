@@ -18,6 +18,13 @@ import {
   type DestinoCompraFinalParte,
 } from "@/lib/utils/compra-final-destino";
 import { fetchControleEstoqueItemMetricasClient } from "@/lib/client/controle-estoque-metricas";
+import {
+  buildCompraTransitoIndex,
+  fetchComprasTransitoClient,
+  getCompraTransitoEntries,
+  type CompraTransitoIndex,
+} from "@/lib/client/compras-transito";
+import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
 import ComprasSalvasListPanel from "@/components/stock/ComprasSalvasListPanel";
 import styles from "./ListaCompraSugeridaPage.module.css";
 
@@ -47,6 +54,8 @@ interface ReposicaoItem {
   suggestionType?: string;
   /** Dados para tooltip do critério S */
   suggestionSData?: { mediaVendasMes: number; mesesHistoricoFilial: number; estoqueAtual: number; limiteDias: number };
+  suggestionTransitTotal?: number;
+  suggestionTransitDates?: string[];
 }
 
 interface ReposicaoData {
@@ -92,6 +101,7 @@ interface ProdutoComCurva extends ProdutoSugestao {
   qtdFinal: number;
   percCumulativa: number;
   qtdSuficiente?: boolean;
+  sugestaoView?: SuggestionView;
 }
 
 type SuggestionType = "COMPRA" | "S" | "E" | "SUFICIENTE" | "SEM_SUGESTAO";
@@ -102,6 +112,9 @@ interface SuggestionView {
   qtdFinal: number;
   qtdS: number;
   qtdE: number;
+  transitTotal?: number;
+  transitDates?: string[];
+  suppressedByTransit?: boolean;
 }
 
 function buildSuggestionKey(produto?: string | null, cor?: string | null): string {
@@ -461,6 +474,37 @@ function getSuggestionViewFromListaCompraRule(item: ProdutoSugestao, diasCorrido
   return { type: "SEM_SUGESTAO", qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0 };
 }
 
+function applyTransitToListaCompraSuggestion(
+  item: ProdutoSugestao,
+  diasCorridosMes: number,
+  comprasTransitoIndex: CompraTransitoIndex
+): SuggestionView {
+  const base = getSuggestionViewFromListaCompraRule(item, diasCorridosMes);
+  const { limiteDias } = getLimiteDiasReposicao(item);
+  const transit = applyTransitToSuggestion({
+    baseType: base.type,
+    baseQty: base.qty,
+    entries: getCompraTransitoEntries(comprasTransitoIndex, item.produto, item.cor ?? null),
+    estoqueAtual: item.estoqueAtual,
+    vendasMesAtual: item.vendasMesAtual,
+    diasCorridosMes,
+    limiteDias,
+  });
+
+  return {
+    type: transit.type,
+    qty: transit.qty,
+    qtdFinal: transit.type === "COMPRA" ? transit.qty : 0,
+    qtdS: transit.type === "S" ? transit.qty : 0,
+    qtdE: transit.type === "E" ? transit.qty : 0,
+    transitTotal: transit.totalTransit || undefined,
+    transitDates: transit.entries.map(
+      (entry) => `${new Date(`${entry.dataRecebimento}T00:00:00`).toLocaleDateString("pt-BR")} (+${fmt(entry.quantidade)})`
+    ),
+    suppressedByTransit: transit.suppressedByTransit,
+  };
+}
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function ListaCompraSugeridaPage({
@@ -508,7 +552,22 @@ export default function ListaCompraSugeridaPage({
   const [reposicaoData, setReposicaoData] = useState<ReposicaoData | null>(null);
   const [reposicaoSuggestionMap, setReposicaoSuggestionMap] = useState<Record<string, ProdutoSugestao>>({});
   const [reposicaoSuggestionLoading, setReposicaoSuggestionLoading] = useState(false);
+  const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
   const diasCorridosMes = useMemo(() => new Date().getDate(), []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchComprasTransitoClient(companyKey)
+      .then((docs) => {
+        if (!cancelled) setComprasTransitoIndex(buildCompraTransitoIndex(docs));
+      })
+      .catch(() => {
+        if (!cancelled) setComprasTransitoIndex(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyKey]);
 
   useEffect(() => {
     try {
@@ -645,12 +704,21 @@ export default function ListaCompraSugeridaPage({
           const sugestaoQtd = item.suggestionQty;
           const sugestaoTipo = item.suggestionType as SuggestionType;
           if (sugestaoQtd <= 0 || (sugestaoTipo !== "COMPRA" && sugestaoTipo !== "S" && sugestaoTipo !== "E")) {
-            return { ...item, sugestaoTipo: (sugestaoTipo || "SEM_SUGESTAO") as SuggestionType, sugestaoQtd: 0, custoTotal: 0 };
+            return {
+              ...item,
+              sugestaoTipo: (sugestaoTipo || "SEM_SUGESTAO") as SuggestionType,
+              sugestaoQtd: 0,
+              sugestaoTransitTotal: item.suggestionTransitTotal ?? 0,
+              sugestaoTransitDates: item.suggestionTransitDates ?? [],
+              custoTotal: 0,
+            };
           }
           return {
             ...item,
             sugestaoTipo,
             sugestaoQtd,
+            sugestaoTransitTotal: item.suggestionTransitTotal ?? 0,
+            sugestaoTransitDates: item.suggestionTransitDates ?? [],
             custoTotal: sugestaoQtd * (item.custoUnit ?? 0),
           };
         }
@@ -658,19 +726,21 @@ export default function ListaCompraSugeridaPage({
         const key = buildSuggestionKey(item.produto, expandirPorCor ? (item.cor ?? "") : "");
         const suggestionSource = reposicaoSuggestionMap[key] ?? null;
         const suggestion = suggestionSource
-          ? getSuggestionViewFromListaCompraRule(suggestionSource, diasCorridosMes)
+          ? applyTransitToListaCompraSuggestion(suggestionSource, diasCorridosMes, comprasTransitoIndex)
           : { type: "SEM_SUGESTAO" as SuggestionType, qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0 };
         const sugestaoQtd = suggestion.qty;
         return {
           ...item,
           sugestaoTipo: suggestion.type,
           sugestaoQtd,
+          sugestaoTransitTotal: suggestion.transitTotal ?? 0,
+          sugestaoTransitDates: suggestion.transitDates ?? [],
           custoTotal: sugestaoQtd * (item.custoUnit ?? 0),
         };
       })
       .filter((item) => item.sugestaoTipo === "COMPRA" || item.sugestaoTipo === "S" || item.sugestaoTipo === "E")
       .sort((a, b) => (b.sugestaoQtd ?? 0) - (a.sugestaoQtd ?? 0));
-  }, [expandirPorCor, reposicaoComCusto, reposicaoAgrupadaPorProduto, reposicaoSuggestionMap, diasCorridosMes]);
+  }, [expandirPorCor, reposicaoComCusto, reposicaoAgrupadaPorProduto, reposicaoSuggestionMap, diasCorridosMes, comprasTransitoIndex]);
 
   const totalCustoReposicao = reposicaoExibidaComCusto.reduce((s, i) => s + (i.custoTotal ?? 0), 0);
   const totalQtdReposicao = reposicaoExibidaComCusto.reduce((s, i) => s + (i.sugestaoQtd ?? 0), 0);
@@ -721,6 +791,8 @@ export default function ListaCompraSugeridaPage({
     estoqueAtual: number;
     limiteDias: number;
     qtdS: number;
+    transitTotal?: number;
+    transitDates?: string[];
   }>(null);
 
   const [historicoTooltip, setHistoricoTooltip] = useState<null | {
@@ -883,7 +955,7 @@ export default function ListaCompraSugeridaPage({
       descricao: p.descricao || produto,
       grade: p.grade,
       colecao: p.colecao,
-      qtdManual: Math.max(0, Math.round(p.qtdFinal > 0 ? p.qtdFinal : temSugestaoS(p) ? calcQtdS(p) : 0)),
+      qtdManual: Math.max(0, Math.round(p.sugestaoView?.qty ?? 0)),
     };
     await fetch(`/api/controle-estoque/compra-final`, {
       method: "POST",
@@ -1110,46 +1182,40 @@ export default function ListaCompraSugeridaPage({
         p.curva === "A" ||
         (p.curva === "B" && incluirCurvaB) ||
         (p.curva === "C" && incluirCurvaC);
-      if (!curvaAtiva) return { ...p, qtdFinal: 0, qtdSuficiente: false };
-      const consumoDiario = consumoDiarioMesAtual(p);
-      if (consumoDiario <= 0) return { ...p, qtdFinal: 0, qtdSuficiente: false };
-      const { limiteDias } = getLimiteDiasReposicao(p);
-      const estoqueAtual = p.estoqueAtual ?? 0;
-      const duracaoAtual = estoqueAtual / consumoDiario;
-      if (duracaoAtual >= limiteDias) return { ...p, qtdFinal: 0, qtdSuficiente: true };
-      const qtd = Math.ceil(consumoDiario * (limiteDias - duracaoAtual));
-      return { ...p, qtdFinal: qtd, qtdSuficiente: false };
+      if (!curvaAtiva) {
+        return {
+          ...p,
+          qtdFinal: 0,
+          qtdSuficiente: false,
+          sugestaoView: { type: "SEM_SUGESTAO" as SuggestionType, qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0 },
+        };
+      }
+      const sugestaoView = applyTransitToListaCompraSuggestion(p, diasCorridosMes, comprasTransitoIndex);
+      return {
+        ...p,
+        qtdFinal: sugestaoView.type === "COMPRA" ? sugestaoView.qty : 0,
+        qtdSuficiente: sugestaoView.type === "SUFICIENTE",
+        sugestaoView,
+      };
     });
-  }, [produtosComCurva, modoReposicao, incluirCurvaB, incluirCurvaC, diasCorridosMes]);
-
-  const temSugestaoS = (p: ProdutoComCurva) => {
-    if (p.qtdFinal > 0 || p.qtdSuficiente) return false;
-    const mediaVendasMes = p.vendas3meses / getMesesHistoricoFilial(p);
-    // Dispara S se vende ≥ 2/mês em média e tem < 2 meses de cobertura de estoque
-    return mediaVendasMes >= 2 && (p.estoqueAtual ?? 0) <= mediaVendasMes * 2;
-  };
-
-  const calcQtdS = (p: ProdutoComCurva) => {
-    const mediaVendasMes = p.vendas3meses / getMesesHistoricoFilial(p);
-    const { limiteDias } = getLimiteDiasReposicao(p);
-    return Math.ceil((limiteDias / 30) * mediaVendasMes);
-  };
+  }, [produtosComCurva, modoReposicao, incluirCurvaB, incluirCurvaC, diasCorridosMes, comprasTransitoIndex]);
 
   const totalCustoABC = produtosComCurvaFinal.reduce((s, p) => {
     const cu = p.custoUnitario ?? 0;
     if (cu <= 0) return s;
-    if (p.qtdFinal > 0) return s + p.qtdFinal * cu;
-    if (temSugestaoS(p)) return s + calcQtdS(p) * cu;
+    if (p.sugestaoView != null && p.sugestaoView.qty > 0) return s + p.sugestaoView.qty * cu;
     return s;
   }, 0);
   const totalQtdABC = produtosComCurvaFinal.reduce((s, p) => {
-    if (p.qtdFinal > 0) return s + p.qtdFinal;
-    if (temSugestaoS(p)) return s + calcQtdS(p);
+    if (p.sugestaoView != null && p.sugestaoView.qty > 0) return s + p.sugestaoView.qty;
     return s;
   }, 0);
 
   const produtosTabelaABC = useMemo(
-    () => (apenasCompras ? produtosComCurvaFinal.filter((p) => p.qtdFinal > 0 || temSugestaoS(p)) : produtosComCurvaFinal),
+    () =>
+      apenasCompras
+        ? produtosComCurvaFinal.filter((p) => p.sugestaoView != null && p.sugestaoView.qty > 0)
+        : produtosComCurvaFinal,
     [apenasCompras, produtosComCurvaFinal]
   );
 
@@ -1162,7 +1228,7 @@ export default function ListaCompraSugeridaPage({
         const pCor = (p.cor ?? "").trim();
         return pProd === produto && (expandirPorCor ? pCor === corProduto : true);
       });
-      const qtdSugerida = match?.qtdFinal ?? 0;
+      const qtdSugerida = match?.sugestaoView?.qty ?? 0;
       const estoque = match?.estoqueAtual ?? null;
       const custoUnit = match?.custoUnitario ?? 0;
       const custoTotal = custoUnit > 0 ? Math.round(it.qtdManual * custoUnit) : 0;
@@ -1455,6 +1521,11 @@ export default function ListaCompraSugeridaPage({
                       <td className={styles.vendas}>{item.consumoDiario.toFixed(1)}/dia</td>
                       <td className={item.sugestaoTipo === "S" ? styles.qtdSugeridaS : styles.qtdSugerida}>
                         <span className={item.sugestaoTipo === "S" ? styles.qtdSugeridaSInner : undefined}>
+                          {(() => {
+                            const transitTotal = "sugestaoTransitTotal" in item ? item.sugestaoTransitTotal ?? 0 : 0;
+                            const transitDates = "sugestaoTransitDates" in item ? item.sugestaoTransitDates ?? [] : [];
+                            return (
+                              <>
                           {fmt(item.sugestaoQtd ?? 0)}
                           {item.sugestaoTipo === "S" && (
                             <span
@@ -1462,7 +1533,17 @@ export default function ListaCompraSugeridaPage({
                               style={{ marginLeft: 6 }}
                               onMouseEnter={(e) => {
                                 const sd = item.suggestionSData;
-                                if (sd) setSugestaoSTooltip({ x: e.clientX, y: e.clientY, mediaVendasMes: sd.mediaVendasMes, mesesHistoricoFilial: sd.mesesHistoricoFilial, estoqueAtual: sd.estoqueAtual, limiteDias: sd.limiteDias, qtdS: item.sugestaoQtd ?? 0 });
+                                if (sd) setSugestaoSTooltip({
+                                  x: e.clientX,
+                                  y: e.clientY,
+                                  mediaVendasMes: sd.mediaVendasMes,
+                                  mesesHistoricoFilial: sd.mesesHistoricoFilial,
+                                  estoqueAtual: sd.estoqueAtual,
+                                  limiteDias: sd.limiteDias,
+                                  qtdS: item.sugestaoQtd ?? 0,
+                                  transitTotal,
+                                  transitDates,
+                                });
                               }}
                               onMouseLeave={() => setSugestaoSTooltip(null)}
                             >S</span>
@@ -1470,6 +1551,14 @@ export default function ListaCompraSugeridaPage({
                           {item.sugestaoTipo === "E" && (
                             <span className={styles.badgeE} style={{ marginLeft: 6 }}>E</span>
                           )}
+                          {transitTotal > 0 && (
+                            <span className={styles.badgeT} style={{ marginLeft: 6 }}>
+                              T {fmt(transitTotal)}
+                            </span>
+                          )}
+                              </>
+                            );
+                          })()}
                         </span>
                       </td>
                       <td className={`${styles.right} ${item.custoUnit > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
@@ -1905,43 +1994,87 @@ export default function ListaCompraSugeridaPage({
                                 </div>
                               </td>
                               {(() => {
-                                if (p.qtdFinal > 0) {
+                                const sugestaoView = p.sugestaoView
+                                  ?? { type: "SEM_SUGESTAO" as SuggestionType, qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0 };
+                                if (sugestaoView.type === "COMPRA" && sugestaoView.qty > 0) {
                                   return (
-                                    <td className={styles.qtdSugerida}>{fmt(p.qtdFinal)}</td>
+                                    <td className={styles.qtdSugerida}>
+                                      {fmt(sugestaoView.qty)}
+                                      {sugestaoView.transitTotal ? (
+                                        <span className={styles.badgeT} style={{ marginLeft: 6 }}>
+                                          T {fmt(sugestaoView.transitTotal)}
+                                        </span>
+                                      ) : null}
+                                    </td>
                                   );
                                 }
-                                if (p.qtdSuficiente) {
+                                if (sugestaoView.type === "SUFICIENTE") {
                                   return (
-                                    <td className={styles.qtdSuficienteTag}>quantidade suficiente</td>
+                                    <td className={styles.qtdSuficienteTag}>
+                                      quantidade suficiente
+                                      {sugestaoView.transitTotal ? (
+                                        <span className={styles.badgeT} style={{ marginLeft: 6 }}>
+                                          T {fmt(sugestaoView.transitTotal)}
+                                        </span>
+                                      ) : null}
+                                    </td>
                                   );
                                 }
-                                if (temSugestaoS(p)) {
-                                  const qtdS = calcQtdS(p);
+                                if (sugestaoView.type === "S" && sugestaoView.qty > 0) {
                                   const mesesHistoricoFilial = getMesesHistoricoFilial(p);
                                   const mediaVendasMes = p.vendas3meses / mesesHistoricoFilial;
                                   const { limiteDias } = getLimiteDiasReposicao(p);
                                   return (
                                     <td className={styles.qtdSugeridaS}>
                                       <span className={styles.qtdSugeridaSInner}>
-                                        {fmt(qtdS)}
+                                        {fmt(sugestaoView.qty)}
                                         <span
                                           className={styles.badgeS}
-                                          onMouseEnter={(e) => setSugestaoSTooltip({ x: e.clientX, y: e.clientY, mediaVendasMes, mesesHistoricoFilial, estoqueAtual: p.estoqueAtual ?? 0, limiteDias, qtdS })}
+                                          onMouseEnter={(e) =>
+                                            setSugestaoSTooltip({
+                                              x: e.clientX,
+                                              y: e.clientY,
+                                              mediaVendasMes,
+                                              mesesHistoricoFilial,
+                                              estoqueAtual: p.estoqueAtual ?? 0,
+                                              limiteDias,
+                                              qtdS: sugestaoView.qty,
+                                              transitTotal: sugestaoView.transitTotal,
+                                              transitDates: sugestaoView.transitDates,
+                                            })
+                                          }
                                           onMouseLeave={() => setSugestaoSTooltip(null)}
                                         >S</span>
+                                        {sugestaoView.transitTotal ? (
+                                          <span className={styles.badgeT}>T {fmt(sugestaoView.transitTotal)}</span>
+                                        ) : null}
                                       </span>
+                                    </td>
+                                  );
+                                }
+                                if (sugestaoView.type === "E" && sugestaoView.qty > 0) {
+                                  return (
+                                    <td className={styles.qtdSugerida}>
+                                      {fmt(sugestaoView.qty)}
+                                      <span className={styles.badgeE} style={{ marginLeft: 6 }}>E</span>
+                                      {sugestaoView.transitTotal ? (
+                                        <span className={styles.badgeT} style={{ marginLeft: 6 }}>
+                                          T {fmt(sugestaoView.transitTotal)}
+                                        </span>
+                                      ) : null}
                                     </td>
                                   );
                                 }
                                 return <td className={styles.qtdSugeridaZero}>—</td>;
                               })()}
                               {(() => {
+                                const sugestaoView = p.sugestaoView
+                                  ?? { type: "SEM_SUGESTAO" as SuggestionType, qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0 };
                                 const cu = p.custoUnitario ?? 0;
-                                const hasS = p.qtdFinal <= 0 && !p.qtdSuficiente && temSugestaoS(p);
-                                const qtdParaCusto = p.qtdFinal > 0 ? p.qtdFinal : hasS ? calcQtdS(p) : 0;
+                                const qtdParaCusto = sugestaoView.qty;
                                 const showCost = qtdParaCusto > 0 && cu > 0;
                                 const cellClass = showCost
-                                  ? hasS ? styles.qtdSugeridaS : styles.qtdSugerida
+                                  ? sugestaoView.type === "S" ? styles.qtdSugeridaS : styles.qtdSugerida
                                   : styles.qtdSugeridaZero;
                                 return (
                                   <>
@@ -2162,6 +2295,19 @@ export default function ListaCompraSugeridaPage({
           <div className={styles.tooltipLine} style={{ color: "#94a3b8", marginTop: 4, fontSize: 11 }}>
             = {sugestaoSTooltip.limiteDias / 30} meses × {sugestaoSTooltip.mediaVendasMes.toFixed(1)} un/mês
           </div>
+          {sugestaoSTooltip.transitTotal ? (
+            <>
+              <div className={styles.tooltipDivider} />
+              <div className={styles.tooltipLine}>
+                <strong style={{ color: "#5eead4" }}>+{fmt(sugestaoSTooltip.transitTotal)} em trânsito</strong>
+              </div>
+              {sugestaoSTooltip.transitDates?.map((label) => (
+                <div key={label} className={styles.tooltipLine} style={{ color: "#99f6e4", fontSize: 11 }}>
+                  {label}
+                </div>
+              ))}
+            </>
+          ) : null}
         </div>
       )}
 

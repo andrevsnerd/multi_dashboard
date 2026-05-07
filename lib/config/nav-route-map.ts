@@ -49,6 +49,7 @@ export const NAV_ROUTE_MAP: Record<string, PermissionKey | "admin"> = {
   // ── Relatórios / Extras ────────────────────────────────────────
   "exportar-relatorios": "exportar-relatorios",
   "lista-loja": "lista-loja",
+  "compras-transito": "lista-loja",
   "mapa-clientes": "mapa-clientes",
   sincronizacao: "sincronizacao",
   blackfriday: "blackfriday",

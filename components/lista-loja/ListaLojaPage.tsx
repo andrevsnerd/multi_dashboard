@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthContext";
@@ -13,7 +14,14 @@ import {
   type CompanyKey,
 } from "@/lib/config/company";
 import { fetchControleEstoqueItemMetricasClient } from "@/lib/client/controle-estoque-metricas";
+import {
+  buildCompraTransitoIndex,
+  fetchComprasTransitoClient,
+  getCompraTransitoEntries,
+  type CompraTransitoIndex,
+} from "@/lib/client/compras-transito";
 import { exportListaLojaToXlsx } from "@/lib/utils/exportListaLoja";
+import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
 import type { CompraSalvaItemRow } from "@/lib/types/compra-salva";
 import type { ProdutoTransferencia } from "@/lib/repositories/controleTransferencias";
 
@@ -35,6 +43,7 @@ interface Produto {
   codigoBarra: string | null;
   corProduto: string | null;
   descCor: string;
+  grade?: string | null;
   linha?: string | null;
   subgrupo?: string | null;
   estoques: Array<{ filial: string; nomeFilial: string; estoque: number }>;
@@ -232,6 +241,17 @@ async function fetchProdutosPorColecao(colecao: string, companyKey?: string): Pr
   const c = colecao.trim();
   if (!c) return [];
   const params = new URLSearchParams({ porColecao: "true", colecao: c });
+  if (companyKey) params.set("company", companyKey);
+  const res = await fetch(`/api/transferencia-produtos/produtos?${params}`, { cache: "no-store" });
+  if (!res.ok) return [];
+  const json = (await res.json()) as { data?: Produto[] };
+  return json.data || [];
+}
+
+async function fetchProdutosPorGrade(grade: string, companyKey?: string): Promise<Produto[]> {
+  const g = grade.trim();
+  if (!g) return [];
+  const params = new URLSearchParams({ porGrade: "true", grade: g });
   if (companyKey) params.set("company", companyKey);
   const res = await fetch(`/api/transferencia-produtos/produtos?${params}`, { cache: "no-store" });
   if (!res.ok) return [];
@@ -1019,6 +1039,19 @@ function itemEhBarrado(item: ListaItem, diasCorridosMes: number): boolean {
   );
 }
 
+function getReposicaoBaseType(sugestao: {
+  qtdFinal: number;
+  qtdS: number;
+  qtdE: number;
+  qtdSuficiente: boolean;
+}): "COMPRA" | "S" | "E" | "SUFICIENTE" | "SEM_SUGESTAO" {
+  if (sugestao.qtdFinal > 0) return "COMPRA";
+  if (sugestao.qtdS > 0) return "S";
+  if (sugestao.qtdE > 0) return "E";
+  if (sugestao.qtdSuficiente) return "SUFICIENTE";
+  return "SEM_SUGESTAO";
+}
+
 function formatFixed(value: number, digits = 1): string {
   if (!Number.isFinite(value)) return "0";
   return value.toLocaleString("pt-BR", {
@@ -1288,6 +1321,7 @@ type ListaLojaItensTableProps = {
   itens: ListaItem[];
   compraView: boolean;
   abcMap: Map<string, CurvaInfo>;
+  enableAbc?: boolean;
   transferenciasPorItem?: Record<string, TransferenciaDestinoSugestao[]>;
   onMoveItem?: (fromIndex: number, toIndex: number) => void;
   onIncrement: (index: number) => void;
@@ -1310,6 +1344,7 @@ function ListaLojaItensTable({
   itens,
   compraView,
   abcMap,
+  enableAbc = true,
   transferenciasPorItem,
   onMoveItem,
   onIncrement,
@@ -1380,6 +1415,8 @@ function ListaLojaItensTable({
     blendAplicado?: boolean;
     qtdFinalPuro?: number;
     qtdSBlend?: number;
+    transitTotal?: number;
+    transitDates?: string[];
   }>(null);
   const [duracaoTooltip, setDuracaoTooltip] = useState<null | {
     x: number;
@@ -1400,6 +1437,8 @@ function ListaLojaItensTable({
     estoqueAtual: number;
     limiteDias: number;
     qtdS: number;
+    transitTotal?: number;
+    transitDates?: string[];
   }>(null);
   const [sugestaoETooltip, setSugestaoETooltip] = useState<null | {
     x: number;
@@ -1411,6 +1450,8 @@ function ListaLojaItensTable({
     velocidadeAjustada: number;
     limiteDias: number;
     qtdE: number;
+    transitTotal?: number;
+    transitDates?: string[];
   }>(null);
   const [historicoTooltip, setHistoricoTooltip] = useState<null | {
     x: number;
@@ -1427,6 +1468,7 @@ function ListaLojaItensTable({
 
   const [estoqueCache, setEstoqueCache] = useState<Record<string, Array<{ filial: string; estoque: number }>>>({});
   const [vendasCache, setVendasCache] = useState<Record<string, FilialVendaRow[]>>({});
+  const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
   const [liveMetrics, setLiveMetrics] = useState<
     Record<
       string,
@@ -1445,6 +1487,20 @@ function ListaLojaItensTable({
       }
     >
   >({});
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchComprasTransitoClient(companyKey)
+      .then((docs) => {
+        if (!cancelled) setComprasTransitoIndex(buildCompraTransitoIndex(docs));
+      })
+      .catch(() => {
+        if (!cancelled) setComprasTransitoIndex(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyKey]);
 
   function hasResolvedLiveMetrics(values: {
     qtde12m: number | null;
@@ -1474,9 +1530,12 @@ function ListaLojaItensTable({
   const companyConfig = useMemo(() => resolveCompany(companyKey), [companyKey]);
   const [abcFullMap, setAbcFullMap] = useState<Map<string, CurvaInfo> | null>(null);
   const [abcFullLoadFailed, setAbcFullLoadFailed] = useState(false);
-  const abcDisplayMap = abcFullMap ?? (abcFullLoadFailed ? abcMap : new Map<string, CurvaInfo>());
+  const abcDisplayMap = enableAbc
+    ? (abcFullMap ?? (abcFullLoadFailed ? abcMap : new Map<string, CurvaInfo>()))
+    : new Map<string, CurvaInfo>();
 
   useEffect(() => {
+    if (!enableAbc) return;
     let cancelled = false;
     fetchCurvaAbcScope(companyKey, filialCod)
       .then((data) => {
@@ -1492,7 +1551,7 @@ function ListaLojaItensTable({
     return () => {
       cancelled = true;
     };
-  }, [companyKey, filialCod, filialScopeKey]);
+  }, [companyKey, filialCod, filialScopeKey, enableAbc]);
 
   useEffect(() => {
     if (itens.length === 0) return;
@@ -1721,6 +1780,13 @@ function ListaLojaItensTable({
               <td className={styles.colNumeric}>
                 {(() => {
                   const k = buildItemKey(item.produto, item.corProduto);
+                  if (!enableAbc) {
+                    return (
+                      <span className={`${styles.abcBadge} ${styles.abcBadgeEmpty}`} title="Curva ABC desativada no modal">
+                        —
+                      </span>
+                    );
+                  }
                   const abc = abcDisplayMap.get(k);
                   const curva = abc?.curva ?? null;
                   if (!curva) {
@@ -1734,6 +1800,7 @@ function ListaLojaItensTable({
                     <span
                       className={`${styles.abcBadge} ${styles[`abcBadge${curva}`]}`}
                       onMouseEnter={async (e) => {
+                        if (!enableAbc) return;
                         const k = buildItemKey(item.produto, item.corProduto);
                         const abc = abcDisplayMap.get(k);
                         if (!abc) return;
@@ -2081,7 +2148,7 @@ function ListaLojaItensTable({
               </td>
               <td className={styles.colNumeric}>
                 {(() => {
-                  const sugestao = getReposicaoCompraView(
+                  const sugestaoBase = getReposicaoCompraView(
                     {
                       ...item,
                       vendasMesAtual,
@@ -2095,7 +2162,32 @@ function ListaLojaItensTable({
                     },
                     diasCorridosMes
                   );
-                  if (sugestao.qtdFinal > 0) {
+                  const limiteDias = getLimiteDiasReposicao(item);
+                  const baseType = getReposicaoBaseType(sugestaoBase);
+                  const baseQty =
+                    sugestaoBase.qtdFinal > 0
+                      ? sugestaoBase.qtdFinal
+                      : sugestaoBase.qtdS > 0
+                        ? sugestaoBase.qtdS
+                        : sugestaoBase.qtdE;
+                  const transit = applyTransitToSuggestion({
+                    baseType,
+                    baseQty,
+                    entries: getCompraTransitoEntries(comprasTransitoIndex, item.produto, item.corProduto),
+                    estoqueAtual: estoqueFilial,
+                    vendasMesAtual,
+                    diasCorridosMes,
+                    limiteDias,
+                  });
+                  const transitDates = transit.entries.map(
+                    (entry) => `${formatDate(entry.dataRecebimento)} (+${fmt(entry.quantidade)})`
+                  );
+                  const transitBadge = transit.totalTransit > 0 ? (
+                    <span className={styles.badgeT} style={{ marginLeft: 6 }}>
+                      T {fmt(transit.totalTransit)}
+                    </span>
+                  ) : null;
+                  if (baseType === "COMPRA" && transit.qty > 0) {
                     const vendasMes = Number(vendasMesAtual ?? 0);
                     const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
                     const estoqueAtual = Number(estoqueFilial ?? 0);
@@ -2127,24 +2219,25 @@ function ListaLojaItensTable({
                             consumoDiario,
                             estoqueAtual,
                             duracaoAtual,
-                            qtdCalculada: sugestao.qtdFinal,
+                            qtdCalculada: transit.qty,
                             blendAplicado,
                             qtdFinalPuro,
                             qtdSBlend,
+                            transitTotal: transit.totalTransit || undefined,
+                            transitDates,
                           })
                         }
                         onMouseLeave={() => setSugestaoTooltip(null)}
                       >
-                        {fmt(sugestao.qtdFinal)}{blendAplicado && <>{" "}<span style={{ display: "inline-flex", width: 16, height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#0f172a", background: "#fde047", border: "1px solid #facc15", verticalAlign: "middle", cursor: "help" }}>⚡</span></>}
+                        {fmt(transit.qty)}{blendAplicado && <>{" "}<span style={{ display: "inline-flex", width: 16, height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#0f172a", background: "#fde047", border: "1px solid #facc15", verticalAlign: "middle", cursor: "help" }}>⚡</span></>}{transitBadge}
                       </span>
                     );
                   }
-                  if (sugestao.qtdS > 0) {
+                  if (baseType === "S" && transit.qty > 0) {
                     const mediaVendasMes = Number(qtde12m ?? 0) / getMesesHistoricoFilial({ mesesHistoricoFilial });
-                    const limiteDias = getLimiteDiasReposicao(item);
                     return (
                       <span className={styles.reporAdd}>
-                        {fmt(sugestao.qtdS)}{" "}
+                        {fmt(transit.qty)}{" "}
                         <span
                           onMouseEnter={(e) =>
                             setSugestaoSTooltip({
@@ -2154,7 +2247,9 @@ function ListaLojaItensTable({
                               mesesHistoricoFilial: getMesesHistoricoFilial({ mesesHistoricoFilial }),
                               estoqueAtual: Number(estoqueFilial ?? 0),
                               limiteDias,
-                              qtdS: sugestao.qtdS,
+                              qtdS: transit.qty,
+                              transitTotal: transit.totalTransit || undefined,
+                              transitDates,
                             })
                           }
                           onMouseLeave={() => setSugestaoSTooltip(null)}
@@ -2176,10 +2271,11 @@ function ListaLojaItensTable({
                         >
                           S
                         </span>
+                        {transitBadge}
                       </span>
                     );
                   }
-                  if (sugestao.qtdE > 0) {
+                  if (baseType === "E" && transit.qty > 0) {
                     const eInfo = calcQtdSugestaoEInfo({
                       ...item,
                       qtde12m,
@@ -2192,7 +2288,7 @@ function ListaLojaItensTable({
                     const limiteDias = getLimiteDiasReposicao(item);
                     return (
                       <span className={styles.reporAdd}>
-                        {fmt(sugestao.qtdE)}{" "}
+                        {fmt(transit.qty)}{" "}
                         <span
                           onMouseEnter={(e) =>
                             eInfo && setSugestaoETooltip({
@@ -2204,7 +2300,9 @@ function ListaLojaItensTable({
                               mesesAtivos: eInfo.mesesAtivos,
                               velocidadeAjustada: eInfo.velocidadeAjustada,
                               limiteDias,
-                              qtdE: sugestao.qtdE,
+                              qtdE: transit.qty,
+                              transitTotal: transit.totalTransit || undefined,
+                              transitDates,
                             })
                           }
                           onMouseLeave={() => setSugestaoETooltip(null)}
@@ -2226,16 +2324,43 @@ function ListaLojaItensTable({
                         >
                           E
                         </span>
+                        {transitBadge}
                       </span>
                     );
                   }
-                  if (sugestao.semSugestao) {
-                    return <span className={styles.cellMetric}>—</span>;
+                  if (baseType === "SEM_SUGESTAO") {
+                    if (transit.totalTransit <= 0) {
+                      return <span className={styles.cellMetric}>—</span>;
+                    }
+                    return (
+                      <span
+                        className={styles.reporOk}
+                        onMouseEnter={(e) =>
+                          setSugestaoTooltip({
+                            x: e.clientX,
+                            y: e.clientY,
+                            titulo: "Em trânsito",
+                            regra: "Sem sugestão de compra no momento, mas existem unidades já compradas em trânsito.",
+                            limiteDias,
+                            vendasMesAtual: Number(vendasMesAtual ?? 0),
+                            diasCorridos: diasCorridosMes,
+                            consumoDiario: diasCorridosMes > 0 ? Number(vendasMesAtual ?? 0) / diasCorridosMes : 0,
+                            estoqueAtual: Number(estoqueFilial ?? 0),
+                            duracaoAtual: 0,
+                            qtdCalculada: 0,
+                            transitTotal: transit.totalTransit || undefined,
+                            transitDates,
+                          })
+                        }
+                        onMouseLeave={() => setSugestaoTooltip(null)}
+                      >
+                        {transitBadge}
+                      </span>
+                    );
                   }
                   const vendasMes = Number(vendasMesAtual ?? 0);
                   const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
                   const estoqueAtual = Number(estoqueFilial ?? 0);
-                  const limiteDias = getLimiteDiasReposicao(item);
                   const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
                   return (
                     <span
@@ -2245,7 +2370,9 @@ function ListaLojaItensTable({
                           x: e.clientX,
                           y: e.clientY,
                           titulo: "Quantidade suficiente",
-                          regra: "Sem reposição: duração atual já atende o limite de cobertura.",
+                          regra: transit.suppressedByTransit
+                            ? "Sem reposição adicional: a compra em trânsito cobre a necessidade antes do estoque acabar."
+                            : "Sem reposição: duração atual já atende o limite de cobertura.",
                           limiteDias,
                           vendasMesAtual: vendasMes,
                           diasCorridos: diasCorridosMes,
@@ -2253,11 +2380,13 @@ function ListaLojaItensTable({
                           estoqueAtual,
                           duracaoAtual,
                           qtdCalculada: 0,
+                          transitTotal: transit.totalTransit || undefined,
+                          transitDates,
                         })
                       }
                       onMouseLeave={() => setSugestaoTooltip(null)}
                     >
-                      Quantidade suficiente
+                      Quantidade suficiente{transitBadge}
                     </span>
                   );
                 })()}
@@ -2304,9 +2433,21 @@ function ListaLojaItensTable({
                       },
                       diasCorridosMes
                     );
-                    const qtdBase = sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS > 0 ? sugestao.qtdS : sugestao.qtdE;
-                    if (!qtdBase || qtdBase <= 0) return "—";
-                    return fmtBRL(qtdBase * custoUnit);
+                    const limiteDias = getLimiteDiasReposicao(item);
+                    const baseType = getReposicaoBaseType(sugestao);
+                    const baseQty =
+                      sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS > 0 ? sugestao.qtdS : sugestao.qtdE;
+                    const transit = applyTransitToSuggestion({
+                      baseType,
+                      baseQty,
+                      entries: getCompraTransitoEntries(comprasTransitoIndex, item.produto, item.corProduto),
+                      estoqueAtual: estoqueFilial,
+                      vendasMesAtual,
+                      diasCorridosMes,
+                      limiteDias,
+                    });
+                    if (!transit.qty || transit.qty <= 0) return "—";
+                    return fmtBRL(transit.qty * custoUnit);
                   })()}
                 </span>
               </td>
@@ -2465,6 +2606,19 @@ function ListaLojaItensTable({
           )}
           <div className={styles.metricTooltipDivider} />
           <div className={styles.metricTooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoTooltip.qtdCalculada)} un</div>
+          {sugestaoTooltip.transitTotal ? (
+            <>
+              <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine}>
+                <strong style={{ color: "#0f766e" }}>+{fmt(sugestaoTooltip.transitTotal)} em trânsito</strong>
+              </div>
+              {sugestaoTooltip.transitDates?.map((label) => (
+                <div key={label} className={styles.metricTooltipLine} style={{ color: "#5b7c78", fontSize: 11 }}>
+                  {label}
+                </div>
+              ))}
+            </>
+          ) : null}
         </div>
       )}
       {sugestaoSTooltip && (
@@ -2479,6 +2633,19 @@ function ListaLojaItensTable({
           <div className={styles.metricTooltipLine}>
             = {(sugestaoSTooltip.limiteDias / 30).toFixed(1)} meses × {sugestaoSTooltip.mediaVendasMes.toFixed(1)} un/mês
           </div>
+          {sugestaoSTooltip.transitTotal ? (
+            <>
+              <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine}>
+                <strong style={{ color: "#0f766e" }}>+{fmt(sugestaoSTooltip.transitTotal)} em trânsito</strong>
+              </div>
+              {sugestaoSTooltip.transitDates?.map((label) => (
+                <div key={label} className={styles.metricTooltipLine} style={{ color: "#5b7c78", fontSize: 11 }}>
+                  {label}
+                </div>
+              ))}
+            </>
+          ) : null}
         </div>
       )}
       {sugestaoETooltip && (
@@ -2506,6 +2673,19 @@ function ListaLojaItensTable({
           <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
             = ⌈{sugestaoETooltip.velocidadeAjustada.toFixed(2)} × {(sugestaoETooltip.limiteDias / 30).toFixed(1)}⌉ = {fmt(sugestaoETooltip.qtdE)}
           </div>
+          {sugestaoETooltip.transitTotal ? (
+            <>
+              <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine}>
+                <strong style={{ color: "#0f766e" }}>+{fmt(sugestaoETooltip.transitTotal)} em trânsito</strong>
+              </div>
+              {sugestaoETooltip.transitDates?.map((label) => (
+                <div key={label} className={styles.metricTooltipLine} style={{ color: "#5b7c78", fontSize: 11 }}>
+                  {label}
+                </div>
+              ))}
+            </>
+          ) : null}
         </div>
       )}
       {historicoTooltip && (
@@ -2620,8 +2800,18 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
   const [importandoBatch, setImportandoBatch] = useState(false);
   const [colecoesDisponiveis, setColecoesDisponiveis] = useState<string[]>([]);
   const [loadingColecoesOpcoes, setLoadingColecoesOpcoes] = useState(false);
-  const [colecaoParaImportar, setColecaoParaImportar] = useState("");
+  const [gradesDisponiveis, setGradesDisponiveis] = useState<string[]>([]);
+  const [loadingGradesOpcoes, setLoadingGradesOpcoes] = useState(false);
   const [importandoColecao, setImportandoColecao] = useState(false);
+  const [importandoGrade, setImportandoGrade] = useState(false);
+
+  const [importacaoQuery, setImportacaoQuery] = useState("");
+  const [importacaoSelecionada, setImportacaoSelecionada] = useState<
+    | { tipo: "colecao"; valor: string }
+    | { tipo: "grade"; valor: string }
+    | null
+  >(null);
+  const [importacaoDropdownAberto, setImportacaoDropdownAberto] = useState(false);
 
   // Color picker (dentro do modal)
   const [colorPickerProduto, setColorPickerProduto] = useState<Produto | null>(null);
@@ -2893,20 +3083,28 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     }
     let active = true;
     setLoadingColecoesOpcoes(true);
+    setLoadingGradesOpcoes(true);
     void fetch("/api/stock-by-filial?company=scarfme&filtersOnly=true", { cache: "no-store" })
       .then(async (res) => {
         if (!res.ok) return null;
-        return (await res.json()) as { filterOptions?: { colecoes?: string[] } };
+        return (await res.json()) as { filterOptions?: { colecoes?: string[]; grades?: string[] } };
       })
       .then((json) => {
         if (!active) return;
         setColecoesDisponiveis(json?.filterOptions?.colecoes ?? []);
+        setGradesDisponiveis(json?.filterOptions?.grades ?? []);
       })
       .catch(() => {
-        if (active) setColecoesDisponiveis([]);
+        if (active) {
+          setColecoesDisponiveis([]);
+          setGradesDisponiveis([]);
+        }
       })
       .finally(() => {
-        if (active) setLoadingColecoesOpcoes(false);
+        if (active) {
+          setLoadingColecoesOpcoes(false);
+          setLoadingGradesOpcoes(false);
+        }
       });
     return () => {
       active = false;
@@ -2950,7 +3148,9 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     setItensModal(itens);
     setSearchTerm("");
     setProdutos([]);
-    setColecaoParaImportar("");
+    setImportacaoQuery("");
+    setImportacaoSelecionada(null);
+    setImportacaoDropdownAberto(false);
     setColorPickerProduto(null);
     setColorPickerOpcoes([]);
     setModalAberto(true);
@@ -2967,7 +3167,9 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     setItensModal(itens);
     setSearchTerm("");
     setProdutos([]);
-    setColecaoParaImportar("");
+    setImportacaoQuery("");
+    setImportacaoSelecionada(null);
+    setImportacaoDropdownAberto(false);
     setColorPickerProduto(null);
     setColorPickerOpcoes([]);
     setModalAberto(false);
@@ -2978,11 +3180,21 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
   }, []);
 
   const confirmarModal = useCallback(() => {
-    setItens(itensModal);
+    const dias = new Date().getDate();
+    setItens(
+      itensModal.map((item) => {
+        const sugestao = getSuggestedQtyValue(item, dias);
+        // Ao confirmar: itens "sem sugestão" ficam com qtd 0 na lista
+        if (sugestao <= 0) return { ...item, quantidade: 0 };
+        return item;
+      })
+    );
     setModalAberto(false);
     setSearchTerm("");
     setProdutos([]);
-    setColecaoParaImportar("");
+    setImportacaoQuery("");
+    setImportacaoSelecionada(null);
+    setImportacaoDropdownAberto(false);
     setColorPickerProduto(null);
     setColorPickerOpcoes([]);
   }, [itensModal]);
@@ -3110,8 +3322,8 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     });
   }, []);
 
-  const importarColecaoProdutos = useCallback(async () => {
-    const colecao = colecaoParaImportar.trim();
+  const importarColecaoProdutos = useCallback(async (colecaoInput?: string) => {
+    const colecao = (colecaoInput ?? "").trim();
     if (!colecao) {
       mostrarNotificacao("Selecione uma coleção", "error");
       return;
@@ -3228,7 +3440,170 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     } finally {
       setImportandoColecao(false);
     }
-  }, [colecaoParaImportar, companyKey, filialConsultaSelecionada, mostrarNotificacao]);
+  }, [companyKey, filialConsultaSelecionada, mostrarNotificacao]);
+
+  const importarGradeProdutos = useCallback(async (gradeInput?: string) => {
+    const grade = (gradeInput ?? "").trim();
+    if (!grade) {
+      mostrarNotificacao("Selecione uma grade", "error");
+      return;
+    }
+    if (companyKey !== "scarfme") return;
+
+    const filialCod = filialConsultaSelecionada;
+    setImportandoGrade(true);
+    try {
+      const lista = await fetchProdutosPorGrade(grade, companyKey);
+      if (lista.length === 0) {
+        mostrarNotificacao("Nenhum item encontrado para esta grade", "error");
+        return;
+      }
+
+      type BatchAgg = {
+        item: Omit<ListaItem, "quantidade" | "qtde12m" | "valor12m" | "qtde60d" | "vendasMesAtual" | "custoUnit" | "estoqueFilial">;
+        quantidade: number;
+      };
+      const agregados = new Map<string, BatchAgg>();
+      for (const p of lista) {
+        const key = buildItemKey(p.produto, p.corProduto);
+        if (agregados.has(key)) continue;
+        agregados.set(key, {
+          item: {
+            produto: p.produto,
+            descProduto: p.descProduto,
+            codigoBarra: p.codigoBarra ?? null,
+            corProduto: p.corProduto,
+            descCor: (p.descCor || "").trim(),
+            linha: p.linha ?? null,
+            subgrupo: p.subgrupo ?? null,
+          },
+          quantidade: 1,
+        });
+      }
+
+      const metricsEntries = await Promise.all(
+        Array.from(agregados.entries()).map(async ([key, agg]) => {
+          const [vendas, estoqueFilial] = await Promise.all([
+            fetchVendasItemMetricas(companyKey, filialCod, agg.item.produto, agg.item.corProduto),
+            fetchEstoqueFilialSum(companyKey, filialCod, agg.item.produto, agg.item.corProduto),
+          ]);
+          return [key, {
+            qtde12m: vendas?.qtde12m ?? null,
+            qtde60d: vendas?.qtde60d ?? null,
+            vendasMesAtual: vendas?.vendasMesAtual ?? null,
+            valor12m: vendas?.valor12m ?? null,
+            custoUnit: vendas?.custoUnit ?? null,
+            estoqueFilial,
+            diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
+            primeiraEntradaFilial: vendas?.primeiraEntradaFilial ?? null,
+            diasHistoricoFilial: vendas?.diasHistoricoFilial ?? null,
+            mesesHistoricoFilial: vendas?.mesesHistoricoFilial ?? null,
+            historicoParcial: vendas?.historicoParcial ?? null,
+          }] as const;
+        })
+      );
+      const metricsMap = new Map(metricsEntries);
+
+      setItensModal((prev) => {
+        const next = [...prev];
+        for (const [key, agg] of agregados.entries()) {
+          const idx = next.findIndex((i) => buildItemKey(i.produto, i.corProduto) === key);
+          if (idx >= 0) {
+            next[idx] = { ...next[idx], quantidade: next[idx].quantidade + agg.quantidade };
+            continue;
+          }
+          const metrics = metricsMap.get(key) || { qtde12m: null, valor12m: null, qtde60d: null, vendasMesAtual: null, custoUnit: null, estoqueFilial: null, diasDesdeUltimaVenda: null, primeiraEntradaFilial: null, diasHistoricoFilial: null, mesesHistoricoFilial: null, historicoParcial: null };
+          const suggested = getSuggestedQtyValue(
+            {
+              ...agg.item,
+              quantidade: 0,
+              qtde12m: metrics.qtde12m,
+              valor12m: metrics.valor12m,
+              qtde60d: metrics.qtde60d,
+              vendasMesAtual: metrics.vendasMesAtual,
+              custoUnit: metrics.custoUnit,
+              estoqueFilial: metrics.estoqueFilial,
+              diasDesdeUltimaVenda: metrics.diasDesdeUltimaVenda,
+              primeiraEntradaFilial: metrics.primeiraEntradaFilial,
+              diasHistoricoFilial: metrics.diasHistoricoFilial,
+              mesesHistoricoFilial: metrics.mesesHistoricoFilial,
+              historicoParcial: metrics.historicoParcial,
+            },
+            new Date().getDate()
+          );
+          next.push({
+            ...agg.item,
+            quantidade: Math.max(agg.quantidade, suggested),
+            qtde12m: metrics.qtde12m,
+            valor12m: metrics.valor12m,
+            qtde60d: metrics.qtde60d,
+            vendasMesAtual: metrics.vendasMesAtual,
+            custoUnit: metrics.custoUnit,
+            estoqueFilial: metrics.estoqueFilial,
+            diasDesdeUltimaVenda: metrics.diasDesdeUltimaVenda,
+            primeiraEntradaFilial: metrics.primeiraEntradaFilial,
+            diasHistoricoFilial: metrics.diasHistoricoFilial,
+            mesesHistoricoFilial: metrics.mesesHistoricoFilial,
+            historicoParcial: metrics.historicoParcial,
+          });
+        }
+        return next;
+      });
+
+      const n = agregados.size;
+      const limiteAviso = lista.length >= 2500;
+      mostrarNotificacao(
+        limiteAviso
+          ? `Importados ${n} itens da grade ${grade}. Atenção: a busca limita em 2500 variantes; pode haver mais no cadastro.`
+          : `Importados ${n} itens da grade ${grade}.`
+      );
+    } finally {
+      setImportandoGrade(false);
+    }
+  }, [companyKey, filialConsultaSelecionada, mostrarNotificacao]);
+
+  const opcoesImportacao = useMemo(() => {
+    if (companyKey !== "scarfme") return [];
+    const colecoes = (colecoesDisponiveis || []).map((c) => ({
+      key: `colecao:${c}`,
+      tipo: "colecao" as const,
+      valor: c,
+      label: `Coleção: ${c}`,
+    }));
+    const grades = (gradesDisponiveis || []).map((g) => ({
+      key: `grade:${g}`,
+      tipo: "grade" as const,
+      valor: g,
+      label: `Grade: ${g}`,
+    }));
+    return [...colecoes, ...grades];
+  }, [colecoesDisponiveis, gradesDisponiveis, companyKey]);
+
+  const opcoesImportacaoFiltradas = useMemo(() => {
+    const q = importacaoQuery.trim().toUpperCase();
+    if (!q) return opcoesImportacao.slice(0, 30);
+    return opcoesImportacao
+      .filter((o) => o.valor.toUpperCase().includes(q) || o.label.toUpperCase().includes(q))
+      .slice(0, 30);
+  }, [opcoesImportacao, importacaoQuery]);
+
+  const selecionarOpcaoImportacao = useCallback((opt: { tipo: "colecao" | "grade"; valor: string; label: string }) => {
+    setImportacaoSelecionada(opt.tipo === "colecao" ? { tipo: "colecao", valor: opt.valor } : { tipo: "grade", valor: opt.valor });
+    setImportacaoQuery(opt.label);
+    setImportacaoDropdownAberto(false);
+  }, []);
+
+  const importarSelecionado = useCallback(async () => {
+    if (!importacaoSelecionada) {
+      mostrarNotificacao("Selecione uma coleção ou grade", "error");
+      return;
+    }
+    if (importacaoSelecionada.tipo === "colecao") {
+      await importarColecaoProdutos(importacaoSelecionada.valor);
+      return;
+    }
+    await importarGradeProdutos(importacaoSelecionada.valor);
+  }, [importacaoSelecionada, importarColecaoProdutos, importarGradeProdutos, mostrarNotificacao]);
 
   const importarBatchProdutos = useCallback(async () => {
     const codigos = batchCodes
@@ -4110,35 +4485,73 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
 
                 {companyKey === "scarfme" && (
                   <div className={styles.colecImportBox}>
-                    <div className={styles.colecImportLabel}>Importar por coleção</div>
-                    <div className={styles.colecImportRow}>
-                      <select
+                    <div className={styles.colecImportLabel}>Importar por coleção ou grade</div>
+                    <div className={styles.colecImportRow} style={{ position: "relative" }}>
+                      <input
+                        type="text"
                         className={styles.colecSelect}
-                        value={colecaoParaImportar}
-                        onChange={(e) => setColecaoParaImportar(e.target.value)}
-                        disabled={loadingColecoesOpcoes || importandoColecao || importandoBatch}
-                      >
-                        <option value="">
-                          {loadingColecoesOpcoes ? "Carregando coleções..." : "Selecione a coleção"}
-                        </option>
-                        {colecoesDisponiveis.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
+                        value={importacaoQuery}
+                        onChange={(e) => {
+                          setImportacaoQuery(e.target.value);
+                          setImportacaoSelecionada(null);
+                          setImportacaoDropdownAberto(true);
+                        }}
+                        onFocus={() => setImportacaoDropdownAberto(true)}
+                        onBlur={() => {
+                          // permitir clique na sugestão
+                          setTimeout(() => setImportacaoDropdownAberto(false), 120);
+                        }}
+                        placeholder={
+                          loadingColecoesOpcoes || loadingGradesOpcoes
+                            ? "Carregando opções..."
+                            : "Digite uma coleção ou grade..."
+                        }
+                        disabled={
+                          loadingColecoesOpcoes ||
+                          loadingGradesOpcoes ||
+                          importandoColecao ||
+                          importandoGrade ||
+                          importandoBatch
+                        }
+                      />
+                      {importacaoDropdownAberto &&
+                        !(
+                          loadingColecoesOpcoes ||
+                          loadingGradesOpcoes ||
+                          importandoColecao ||
+                          importandoGrade ||
+                          importandoBatch
+                        ) && (
+                          <div className={styles.importSuggestList}>
+                            {opcoesImportacaoFiltradas.length === 0 ? (
+                              <div className={styles.importSuggestEmpty}>Nenhuma opção encontrada</div>
+                            ) : (
+                              opcoesImportacaoFiltradas.map((opt) => (
+                                <button
+                                  key={opt.key}
+                                  type="button"
+                                  className={styles.importSuggestItem}
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={() => selecionarOpcaoImportacao(opt)}
+                                >
+                                  {opt.label}
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        )}
                       <button
                         type="button"
                         className={styles.batchBtn}
-                        onClick={() => void importarColecaoProdutos()}
+                        onClick={() => void importarSelecionado()}
                         disabled={
                           importandoColecao ||
+                          importandoGrade ||
                           importandoBatch ||
-                          !colecaoParaImportar ||
-                          loadingColecoesOpcoes
+                          !importacaoSelecionada
                         }
                       >
-                        {importandoColecao ? "Importando..." : "Importar coleção"}
+                        {importandoColecao || importandoGrade ? "Importando..." : "Importar"}
                       </button>
                     </div>
                   </div>
@@ -4156,7 +4569,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                     type="button"
                     className={styles.batchBtn}
                     onClick={importarBatchProdutos}
-                    disabled={importandoBatch || importandoColecao}
+                    disabled={importandoBatch || importandoColecao || importandoGrade}
                   >
                     {importandoBatch ? "Importando..." : "Importar codigos"}
                   </button>
@@ -4243,44 +4656,58 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                       </span>
                     </div>
                     <div className={styles.modalCartList}>
-                      <ListaLojaItensTable
-                        companyKey={companyKey}
-                        filialCod={filialConsultaSelecionada}
-                        filialNome={filialConsultaSelecionada ? (filialSelecionada?.filial ?? null) : null}
-                        itens={itensModal}
-                        compraView={true}
-                        abcMap={abcMapModal}
-                        onMoveItem={moverItemModal}
-                        onIncrement={(idx) =>
-                          atualizarQuantidadeModal(
-                            idx,
-                            (itensModal[idx]?.quantidade ?? 1) + 1
-                          )
-                        }
-                        onDecrement={(idx) =>
-                          atualizarQuantidadeModal(
-                            idx,
-                            (itensModal[idx]?.quantidade ?? 1) - 1
-                          )
-                        }
-                        onQtyChange={(idx, q) => atualizarQuantidadeModal(idx, q)}
-                        onRemove={removerItemModal}
-                        onOpenColorPicker={(idx, mode) => {
-                          void abrirColorPickerItem(idx, true, mode);
-                        }}
-                        activeColorPickerIndex={modalColorPickerIndex}
-                        activeColorPickerMode={modalColorPickerMode}
-                        colorPickerOptions={modalColorPickerOpcoes}
-                        colorPickerLoading={modalColorPickerLoading}
-                        onApplyColor={(idx, produtoComCor) => {
-                          void trocarCorItem(idx, produtoComCor, true);
-                        }}
-                        onCancelColorPicker={() => {
-                          setModalColorPickerIndex(null);
-                          setModalColorPickerMode(null);
-                          setModalColorPickerOpcoes([]);
-                        }}
-                      />
+                      {itensModal.map((item, idx) => (
+                        <div
+                          key={`${item.produto}-${item.corProduto ?? ""}-${idx}`}
+                          className={styles.produtoItem}
+                        >
+                          <div className={styles.produtoInfo}>
+                            <div className={styles.produtoName}>{item.descProduto}</div>
+                            <div className={styles.produtoSku}>
+                              {item.produto}
+                              {item.descCor ? ` · ${item.descCor}` : item.corProduto ? ` · ${item.corProduto}` : ""}
+                              {item.codigoBarra ? ` · ${item.codigoBarra}` : ""}
+                            </div>
+                          </div>
+                          <div className={styles.produtoControls}>
+                            <div className={styles.qtyControl}>
+                              <button
+                                type="button"
+                                className={styles.qtyBtn}
+                                onClick={() => atualizarQuantidadeModal(idx, (item.quantidade ?? 0) - 1)}
+                                disabled={(item.quantidade ?? 0) <= 0}
+                              >
+                                −
+                              </button>
+                              <input
+                                type="number"
+                                className={styles.qtyInput}
+                                value={item.quantidade ?? 0}
+                                min={0}
+                                onChange={(e) => {
+                                  const v = Number.parseInt(e.target.value || "0", 10);
+                                  atualizarQuantidadeModal(idx, Number.isFinite(v) ? v : 0);
+                                }}
+                              />
+                              <button
+                                type="button"
+                                className={styles.qtyBtn}
+                                onClick={() => atualizarQuantidadeModal(idx, (item.quantidade ?? 0) + 1)}
+                              >
+                                +
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              className={styles.removeBtn}
+                              onClick={() => removerItemModal(idx)}
+                              title="Remover"
+                            >
+                              🗑
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -4356,6 +4783,9 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             <button type="button" className={styles.backBtn} onClick={() => setMode("list")}>
               Ver Listas
             </button>
+            <Link href={`/${companySlug}/compras-transito`} className={styles.backBtn}>
+              Compras em Trânsito
+            </Link>
             <button type="button" className={styles.saveBtn} onClick={abrirNovaLista}>
               + Nova Lista
             </button>
@@ -4386,6 +4816,9 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
           <button type="button" className={styles.backBtn} onClick={() => setMode("saved-purchases")}>
             Compras Salvas
           </button>
+          <Link href={`/${companySlug}/compras-transito`} className={styles.backBtn}>
+            Compras em Trânsito
+          </Link>
           <button type="button" className={styles.saveBtn} onClick={abrirNovaLista}>
             + Nova Lista
           </button>

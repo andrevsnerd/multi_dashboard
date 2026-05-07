@@ -10,6 +10,13 @@ import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
 import type { CompanyKey } from "@/lib/config/company";
 import { resolveCompany } from "@/lib/config/company";
 import { useAuth } from "@/components/auth/AuthContext";
+import {
+  buildCompraTransitoIndex,
+  fetchComprasTransitoClient,
+  getCompraTransitoEntries,
+  type CompraTransitoIndex,
+} from "@/lib/client/compras-transito";
+import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
 
 import styles from "./ProjecaoEstoquePage.module.css";
 
@@ -202,6 +209,8 @@ type SuggestionResult = {
   type: "COMPRA" | "S" | "E" | "SUFICIENTE" | "SEM_SUGESTAO";
   /** Dados para tooltip do critério S */
   sData?: { mediaVendasMes: number; mesesHistoricoFilial: number; estoqueAtual: number; limiteDias: number };
+  transitTotal?: number;
+  transitDates?: string[];
 };
 
 function getSuggestionListaLojaRule(item: ProdutoSugestaoMin): SuggestionResult {
@@ -248,6 +257,33 @@ function getSuggestionListaLojaRule(item: ProdutoSugestaoMin): SuggestionResult 
   }
 
   return { qty: 0, type: "SEM_SUGESTAO" };
+}
+
+function applyTransitToProjectionSuggestion(
+  item: ProdutoSugestaoMin,
+  comprasTransitoIndex: CompraTransitoIndex
+): SuggestionResult {
+  const base = getSuggestionListaLojaRule(item);
+  const limiteDias = getLimiteDiasReposicao(item);
+  const transit = applyTransitToSuggestion({
+    baseType: base.type,
+    baseQty: base.qty,
+    entries: getCompraTransitoEntries(comprasTransitoIndex, item.produto, item.cor ?? null),
+    estoqueAtual: item.estoqueAtual,
+    vendasMesAtual: item.vendasMesAtual,
+    diasCorridosMes: new Date().getDate(),
+    limiteDias,
+  });
+
+  return {
+    qty: transit.qty,
+    type: transit.type,
+    sData: base.sData,
+    transitTotal: transit.totalTransit || undefined,
+    transitDates: transit.entries.map(
+      (entry) => `${new Date(`${entry.dataRecebimento}T00:00:00`).toLocaleDateString("pt-BR")} (+${fmt(entry.quantidade)})`
+    ),
+  };
 }
 
 /** Mantido para compatibilidade com chamadas que só precisam do número */
@@ -713,7 +749,7 @@ export default function ProjecaoEstoquePage({
       return result;
     }
 
-    let base = projecoes.filter((p) => {
+    const base = projecoes.filter((p) => {
       const cat = p.categoria.toUpperCase().trim();
       if (companyKey === "scarfme" && excludedLines.has(cat)) return false;
       if (companyKey === "nerd" && grupos.length > 0 && !grupos.includes(p.categoria)) return false;
@@ -1099,6 +1135,22 @@ export default function ProjecaoEstoquePage({
   const [suggestionQtyMap, setSuggestionQtyMap] = useState<Record<string, number>>({});
   const [suggestionResultMap, setSuggestionResultMap] = useState<Record<string, SuggestionResult>>({});
   const [suggestionQtyLoading, setSuggestionQtyLoading] = useState(false);
+  const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchComprasTransitoClient(companyKey)
+      .then((docs) => {
+        if (!cancelled) setComprasTransitoIndex(buildCompraTransitoIndex(docs));
+      })
+      .catch(() => {
+        if (!cancelled) setComprasTransitoIndex(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyKey]);
+
   useEffect(() => {
     if (allProdutosReposicao.length === 0) {
       setSuggestionQtyLoading(false);
@@ -1125,7 +1177,7 @@ export default function ProjecaoEstoquePage({
           prices[p.produto] = Number(p.custoUnitario ?? 0);
           const kCor = buildProdutoCorKey(p.produto, p.cor ?? "");
           const kCorDesc = buildProdutoCorKey(p.produto, (p as { corDescricao?: string }).corDescricao ?? "");
-          const result = getSuggestionListaLojaRule(p);
+          const result = applyTransitToProjectionSuggestion(p, comprasTransitoIndex);
           sugestoes[kCor] = result.qty;
           results[kCor] = result;
           if (kCorDesc !== kCor) {
@@ -1142,7 +1194,7 @@ export default function ProjecaoEstoquePage({
         setSuggestionResultMap({});
       })
       .finally(() => setSuggestionQtyLoading(false));
-  }, [allProdutosReposicao, companyKey, filial]);
+  }, [allProdutosReposicao, companyKey, filial, comprasTransitoIndex]);
 
   const getSuggestedTotalForItems = useCallback((items: ReposicaoItem[]) => {
     return items.reduce((s, item) => {
@@ -2103,6 +2155,8 @@ export default function ProjecaoEstoquePage({
                                   suggestionQty: sg.qty,
                                   suggestionType: sg.type,
                                   suggestionSData: sg.sData,
+                                  suggestionTransitTotal: sg.transitTotal,
+                                  suggestionTransitDates: sg.transitDates,
                                 };
                               }),
                               timestamp: Date.now(),
@@ -2168,6 +2222,8 @@ export default function ProjecaoEstoquePage({
                               custoUnit: unitPrices[p.produto?.trim() ?? ''] ?? 0,
                               suggestionQty: c.qtd,
                               suggestionType: "COMPRA",
+                              suggestionTransitTotal: 0,
+                              suggestionTransitDates: [],
                             }];
                           });
                           try {

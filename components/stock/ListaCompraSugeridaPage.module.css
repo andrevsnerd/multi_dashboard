@@ -774,6 +774,25 @@
   cursor: default;
 }
 
+.badgeT {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 6px;
+  background: rgba(20, 184, 166, 0.12);
+  color: #0f766e;
+  border: 1px solid rgba(13, 148, 136, 0.28);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  flex-shrink: 0;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+
 /* ── "quantidade suficiente" tag ── */
 .qtdSuficienteTag {
   text-align: right;

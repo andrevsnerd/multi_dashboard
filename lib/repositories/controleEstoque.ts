@@ -3748,6 +3748,12 @@ export interface ProdutoDetalhesParams {
   giroDias?: number;
   /** Quando presente (ex: do cache/sessionStorage do giro), filtra por estes códigos e pula toda a lógica de giro (CTE/EXISTS/NOT EXISTS). */
   produtosPermitidos?: string[];
+  /** Termos da busca (ex.: SKU, trecho do nome ou grade), combinados com OR. */
+  buscaItens?: string[];
+  /** Incluir linhas cuja soma de estoque nas filiais visíveis é zero. */
+  mostrarZerados?: boolean;
+  /** Incluir linhas cuja soma de estoque nas filiais visíveis é negativa. */
+  mostrarNegativos?: boolean;
 }
 
 /**
@@ -4159,9 +4165,31 @@ export async function fetchProdutoDetalhesPorFilial({
   colecao,
   cor,
   produtosPermitidos: produtosPermitidosParam,
+  buscaItens: buscaItensParam,
+  mostrarZerados = false,
+  mostrarNegativos = false,
 }: ProdutoDetalhesParams): Promise<ProdutoDetalhesCompletoPorFilial> {
   return withRequest(async (request) => {
     const useProdutosPermitidos = Array.isArray(produtosPermitidosParam) && produtosPermitidosParam.length > 0;
+    const buscaItens = (buscaItensParam ?? [])
+      .map((t) => String(t).trim())
+      .filter(Boolean)
+      .slice(0, 30);
+
+    const hasBusca = buscaItens.length > 0 || !!produtoNome?.trim();
+    const hasCategoria =
+      (company === 'nerd' && !!grupo) ||
+      !!linha ||
+      !!subgrupo ||
+      !!grade ||
+      !!colecao;
+
+    if (!useProdutosPermitidos && !hasBusca && !hasCategoria) {
+      throw new Error(
+        'Informe itens na busca ou selecione grupo, linha, subgrupo, grade ou coleção.',
+      );
+    }
+
     const now = new Date();
     const currentMonth = {
       start: new Date(now.getFullYear(), now.getMonth(), 1),
@@ -4173,41 +4201,59 @@ export async function fetchProdutoDetalhesPorFilial({
 
     const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
     const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
-    
-    // Construir filtros baseados nos parâmetros - IGUAL AO DETALHADO 01
+
     let produtoFilter = '';
-    
-    // Se produtoNome (código do produto) for fornecido, filtrar pelo código do produto diretamente
-    if (produtoNome) {
-      // Normalizar o código do produto (remover todos os espaços e converter para maiúsculo)
+
+    if (!useProdutosPermitidos && buscaItens.length > 0) {
+      const orParts: string[] = [];
+      buscaItens.forEach((token, i) => {
+        const norm = token.toUpperCase().replace(/\s+/g, '');
+        const like = `%${token.toUpperCase()}%`;
+        request.input(`buscaNorm${i}`, sql.VarChar, norm);
+        request.input(`buscaLike${i}`, sql.VarChar, like);
+        orParts.push(`(
+          UPPER(REPLACE(LTRIM(RTRIM(e.PRODUTO)), ' ', '')) = @buscaNorm${i}
+          OR UPPER(ISNULL(p.DESC_PRODUTO, '')) LIKE @buscaLike${i}
+          OR UPPER(LTRIM(RTRIM(CONVERT(VARCHAR, p.GRADE)))) = @buscaNorm${i}
+        )`);
+      });
+      produtoFilter = `AND (${orParts.join(' OR ')})`;
+      if (company === 'nerd' && grupo) {
+        request.input('grupoFiltro', sql.VarChar, grupo.toUpperCase().trim());
+        produtoFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupoFiltro`;
+      } else if (linha) {
+        request.input('linhaFiltro', sql.VarChar, linha.toUpperCase().trim());
+        produtoFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linhaFiltro`;
+      }
+    } else if (!useProdutosPermitidos && produtoNome) {
       const produtoCodigoNormalizado = produtoNome.toUpperCase().trim().replace(/\s+/g, '');
       request.input('produtoCodigoEstoque', sql.VarChar, produtoCodigoNormalizado);
       produtoFilter = `AND UPPER(REPLACE(LTRIM(RTRIM(e.PRODUTO)), ' ', '')) = @produtoCodigoEstoque`;
-    } else {
-      // Para NERD: usar grupo, para SCARFME: usar linha
+    } else if (!useProdutosPermitidos) {
       if (company === 'nerd' && grupo) {
         request.input('grupoFiltro', sql.VarChar, grupo.toUpperCase().trim());
         produtoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupoFiltro`;
       } else if (linha) {
-        // SCARFME: Se não tiver produtoNome mas tiver linha, usar linha
         request.input('linhaFiltro', sql.VarChar, linha.toUpperCase().trim());
         produtoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linhaFiltro`;
       }
     }
-    
-    if (subgrupo) {
-      request.input('subgrupo', sql.VarChar, subgrupo.toUpperCase().trim());
-      produtoFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupo`;
-    }
-    
-    if (grade) {
-      request.input('grade', sql.VarChar, grade.toUpperCase().trim());
-      produtoFilter += ` AND UPPER(LTRIM(RTRIM(CONVERT(VARCHAR, p.GRADE)))) = @grade`;
-    }
-    
-    if (colecao) {
-      request.input('colecao', sql.VarChar, colecao.toUpperCase().trim());
-      produtoFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao`;
+
+    if (!useProdutosPermitidos) {
+      if (subgrupo) {
+        request.input('subgrupo', sql.VarChar, subgrupo.toUpperCase().trim());
+        produtoFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupo`;
+      }
+
+      if (grade) {
+        request.input('grade', sql.VarChar, grade.toUpperCase().trim());
+        produtoFilter += ` AND UPPER(LTRIM(RTRIM(CONVERT(VARCHAR, p.GRADE)))) = @grade`;
+      }
+
+      if (colecao) {
+        request.input('colecao', sql.VarChar, colecao.toUpperCase().trim());
+        produtoFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao`;
+      }
     }
 
     const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
@@ -4239,7 +4285,7 @@ export async function fetchProdutoDetalhesPorFilial({
       corFilter = `AND UPPER(LTRIM(RTRIM(REPLACE(ISNULL(COALESCE(c.DESC_COR, e.COR_PRODUTO), ''), ' ', '')))) = UPPER(REPLACE(LTRIM(RTRIM(@corFiltro)), ' ', ''))`;
     }
 
-    // Buscar todas as variações do produto com estoque por filial
+    // Buscar todas as variações do produto com estoque por filial (valores reais; filtro positivo/zero/negativo no fim)
     const variacoesQuery = `
       SELECT 
         e.PRODUTO AS produto,
@@ -4250,10 +4296,10 @@ export async function fetchProdutoDetalhesPorFilial({
         ISNULL(p.COLECAO, '') AS colecao,
         ISNULL(COALESCE(c.DESC_COR, e.COR_PRODUTO), '') AS cor,
         e.FILIAL AS filial,
-        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoque,
+        SUM(e.ESTOQUE) AS estoque,
         ISNULL(COALESCE(p.PRECO_REPOSICAO_1, p.PRECO_A_VISTA_REPOSICAO_1, p.REVENDA), 0) AS preco,
         ISNULL(p.CUSTO_REPOSICAO1, 0) AS custoUnitario,
-        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0) ELSE 0 END) AS custoTotal
+        SUM(e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0)) AS custoTotal
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
@@ -4262,7 +4308,6 @@ export async function fetchProdutoDetalhesPorFilial({
         ${useProdutosPermitidos ? produtoFilterPermitidosPorFilial : produtoFilter}
         ${corFilter}
         ${nerdOnlyEletronicosFilter}
-        AND e.ESTOQUE > 0
         ${company === 'nerd' ? `AND ISNULL(p.GRUPO_PRODUTO, '') <> ''` : `AND ISNULL(p.LINHA, '') <> ''`}
       GROUP BY 
         e.PRODUTO,
@@ -4277,8 +4322,7 @@ export async function fetchProdutoDetalhesPorFilial({
         p.PRECO_A_VISTA_REPOSICAO_1,
         p.REVENDA,
         e.FILIAL
-      HAVING SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) > 0
-      ORDER BY SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) DESC, e.PRODUTO, COALESCE(c.DESC_COR, e.COR_PRODUTO), e.FILIAL
+      ORDER BY SUM(e.ESTOQUE) DESC, e.PRODUTO, COALESCE(c.DESC_COR, e.COR_PRODUTO), e.FILIAL
     `;
 
     const variacoesResult = await request.query<{
@@ -4301,8 +4345,42 @@ export async function fetchProdutoDetalhesPorFilial({
     let vendasFilter = '';
     let usarFiltroFilialVendas = true;
     let vendasCorFilter = '';
-    
-    if (produtoNome) {
+
+    if (!useProdutosPermitidos && buscaItens.length > 0) {
+      const orPartsV: string[] = [];
+      buscaItens.forEach((token, i) => {
+        const norm = token.toUpperCase().replace(/\s+/g, '');
+        const like = `%${token.toUpperCase()}%`;
+        request.input(`buscaVNorm${i}`, sql.VarChar, norm);
+        request.input(`buscaVLike${i}`, sql.VarChar, like);
+        orPartsV.push(`(
+          UPPER(REPLACE(LTRIM(RTRIM(vp.PRODUTO)), ' ', '')) = @buscaVNorm${i}
+          OR UPPER(ISNULL(p.DESC_PRODUTO, '')) LIKE @buscaVLike${i}
+          OR UPPER(LTRIM(RTRIM(CONVERT(VARCHAR, p.GRADE)))) = @buscaVNorm${i}
+        )`);
+      });
+      vendasFilter = `AND (${orPartsV.join(' OR ')})`;
+      if (company === 'nerd' && grupo) {
+        request.input('grupoFiltroVendas', sql.VarChar, grupo.toUpperCase().trim());
+        vendasFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupoFiltroVendas`;
+      } else if (linha) {
+        request.input('linhaFiltroVendas', sql.VarChar, linha.toUpperCase().trim());
+        vendasFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linhaFiltroVendas`;
+      }
+      if (subgrupo) {
+        request.input('subgrupoVendas', sql.VarChar, subgrupo.toUpperCase().trim());
+        vendasFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupoVendas`;
+      }
+      if (grade) {
+        request.input('gradeVendas', sql.VarChar, grade.toUpperCase().trim());
+        vendasFilter += ` AND UPPER(LTRIM(RTRIM(CONVERT(VARCHAR, p.GRADE)))) = @gradeVendas`;
+      }
+      if (colecao) {
+        request.input('colecaoVendas', sql.VarChar, colecao.toUpperCase().trim());
+        vendasFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecaoVendas`;
+      }
+      usarFiltroFilialVendas = false;
+    } else if (produtoNome) {
       // Quando temos código do produto específico, buscar vendas em TODAS as filiais
       // Normalizar o código do produto (remover espaços e converter para maiúsculo)
       const produtoCodigoNormalizado = produtoNome.toUpperCase().trim().replace(/\s+/g, '');
@@ -4329,6 +4407,7 @@ export async function fetchProdutoDetalhesPorFilial({
         vp.FILIAL AS filial,
         SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.QTDE END) AS vendasTotais
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
       WHERE vp.DATA_VENDA >= @startDate
         AND vp.DATA_VENDA < @endDate
@@ -4432,16 +4511,35 @@ export async function fetchProdutoDetalhesPorFilial({
       }
     });
 
+    const variationTotals = new Map<string, number>();
+    for (const v of variacoes) {
+      const k = `${normalizeString(v.produto)}|${normalizeString(v.cor)}`;
+      variationTotals.set(k, (variationTotals.get(k) ?? 0) + v.estoque);
+    }
+
+    const keepVariationKey = (k: string) => {
+      const t = variationTotals.get(k) ?? 0;
+      if (t > 0) return true;
+      if (t === 0 && mostrarZerados) return true;
+      if (t < 0 && mostrarNegativos) return true;
+      return false;
+    };
+
+    const variacoesFiltradas = variacoes.filter((v) => {
+      const k = `${normalizeString(v.produto)}|${normalizeString(v.cor)}`;
+      return keepVariationKey(k);
+    });
+
     // Calcular resumo
-    const filiaisUnicas = new Set(variacoes.map(v => v.filial));
+    const filiaisUnicas = new Set(variacoesFiltradas.map((v) => v.filial));
     const totalFiliais = filiaisUnicas.size;
-    const estoqueTotal = variacoes.reduce((sum, v) => sum + v.estoque, 0);
-    const custoTotal = variacoes.reduce((sum, v) => sum + v.custoTotal, 0);
-    const vendasTotais = variacoes.reduce((sum, v) => sum + v.vendasTotais, 0);
+    const estoqueTotal = variacoesFiltradas.reduce((sum, v) => sum + v.estoque, 0);
+    const custoTotal = variacoesFiltradas.reduce((sum, v) => sum + v.custoTotal, 0);
+    const vendasTotais = variacoesFiltradas.reduce((sum, v) => sum + v.vendasTotais, 0);
 
     // Determinar nome do produto (usar linha se disponível, senão usar produtoNome ou linha do parâmetro)
-    const nomeProduto = variacoes.length > 0 
-      ? variacoes[0].linha || linha || produtoNome || 'Produto'
+    const nomeProduto = variacoesFiltradas.length > 0
+      ? variacoesFiltradas[0].linha || linha || produtoNome || 'Produto'
       : linha || produtoNome || 'Produto';
 
     return {
@@ -4452,7 +4550,7 @@ export async function fetchProdutoDetalhesPorFilial({
         custoTotal,
         vendasTotais,
       },
-      variacoes,
+      variacoes: variacoesFiltradas,
     };
   });
 }

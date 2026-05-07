@@ -16,10 +16,12 @@ export async function GET(request: Request) {
   const isEntrada = searchParams.get('entrada') === 'true';
   const porColecao = searchParams.get('porColecao') === 'true';
   const colecaoFiltro = (searchParams.get('colecao') || '').trim();
+  const porGrade = searchParams.get('porGrade') === 'true';
+  const gradeFiltro = (searchParams.get('grade') || '').trim();
 
-  if (porColecao && company?.key !== 'scarfme') {
+  if ((porColecao || porGrade) && company?.key !== 'scarfme') {
     return NextResponse.json(
-      { error: 'Importação por coleção disponível apenas para ScarfMe.' },
+      { error: 'Importação por coleção/grade disponível apenas para ScarfMe.' },
       { status: 400 }
     );
   }
@@ -28,14 +30,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ data: [] });
   }
 
-  if (!porColecao && (!searchTerm || searchTerm.trim().length < 2)) {
+  if (porGrade && company?.key === 'scarfme' && !gradeFiltro) {
+    return NextResponse.json({ data: [] });
+  }
+
+  if (!porColecao && !porGrade && (!searchTerm || searchTerm.trim().length < 2)) {
     return NextResponse.json({ data: [] });
   }
 
   try {
     const produtos = await withRequest(async (req) => {
       const searchTermTrimmed = searchTerm.trim();
-      const incluirEstoqueZero = isEntrada || porColecao;
+      const incluirEstoqueZero = isEntrada || porColecao || porGrade;
       
       // Buscar por código de barras primeiro, depois por produto/nome
       // Igual ao Python: busca código de barras, depois busca estoques do produto encontrado
@@ -75,6 +81,7 @@ export async function GET(request: Request) {
             p.DESC_PRODUTO,
             ISNULL(p.LINHA, '') AS LINHA,
             ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
+            ISNULL(CONVERT(VARCHAR(50), p.GRADE), '') AS GRADE,
             ISNULL(c.DESC_COR, '') AS DESC_COR,
             ${filialOperacional ? `@filialOrigemParam` : `ISNULL(es.FILIAL, '')`} AS NOME_FILIAL,
             pb.CODIGO_BARRA
@@ -98,6 +105,64 @@ export async function GET(request: Request) {
         if (filialOperacional) {
           req.input('filialOrigem', sql.VarChar, filialOperacional.trim());
         }
+      } else if (porGrade && company?.key === 'scarfme') {
+        query = `
+          ;WITH base_produtos AS (
+            SELECT DISTINCT p.PRODUTO
+            FROM PRODUTOS p WITH (NOLOCK)
+            WHERE UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR(50), p.GRADE), '')))) = UPPER(LTRIM(RTRIM(@gradeFiltro)))
+          ),
+          base_cores AS (
+            SELECT DISTINCT
+              pb.PRODUTO,
+              RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))) AS COR_PRODUTO
+            FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+            INNER JOIN base_produtos bp ON bp.PRODUTO = pb.PRODUTO
+            WHERE pb.COR_PRODUTO IS NOT NULL
+              AND RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))) <> ''
+
+            UNION
+
+            SELECT DISTINCT
+              e.PRODUTO,
+              RTRIM(LTRIM(CAST(e.COR_PRODUTO AS VARCHAR(20)))) AS COR_PRODUTO
+            FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+            INNER JOIN base_produtos bp ON bp.PRODUTO = e.PRODUTO
+            WHERE e.COR_PRODUTO IS NOT NULL
+              AND RTRIM(LTRIM(CAST(e.COR_PRODUTO AS VARCHAR(20)))) <> ''
+          )
+          SELECT DISTINCT TOP 2500
+            p.PRODUTO,
+            bc.COR_PRODUTO,
+            ${filialOperacional ? `@filialOrigemParam` : `ISNULL(es.FILIAL, '')`} AS FILIAL,
+            ISNULL(es.ESTOQUE, 0) AS ESTOQUE,
+            p.DESC_PRODUTO,
+            ISNULL(p.LINHA, '') AS LINHA,
+            ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
+            ISNULL(CONVERT(VARCHAR(50), p.GRADE), '') AS GRADE,
+            ISNULL(c.DESC_COR, '') AS DESC_COR,
+            ${filialOperacional ? `@filialOrigemParam` : `ISNULL(es.FILIAL, '')`} AS NOME_FILIAL,
+            pb.CODIGO_BARRA
+          FROM base_produtos bp
+          INNER JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = bp.PRODUTO
+          LEFT JOIN base_cores bc ON bc.PRODUTO = p.PRODUTO
+          LEFT JOIN ESTOQUE_PRODUTOS es WITH (NOLOCK)
+            ON es.PRODUTO = p.PRODUTO
+            AND (
+              (bc.COR_PRODUTO IS NULL AND es.COR_PRODUTO IS NULL)
+              OR RTRIM(LTRIM(CAST(es.COR_PRODUTO AS VARCHAR(20)))) = ISNULL(bc.COR_PRODUTO, RTRIM(LTRIM(CAST(es.COR_PRODUTO AS VARCHAR(20)))))
+            )
+            ${filialOperacional ? `AND RTRIM(LTRIM(CAST(es.FILIAL AS VARCHAR(100)))) = RTRIM(LTRIM(@filialOrigem))` : ``}
+          LEFT JOIN PRODUTOS_BARRA pb WITH (NOLOCK)
+            ON pb.PRODUTO = p.PRODUTO
+            AND RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))) = ISNULL(bc.COR_PRODUTO, RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))))
+          LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = bc.COR_PRODUTO
+        `;
+        req.input('gradeFiltro', sql.VarChar, gradeFiltro);
+        req.input('filialOrigemParam', sql.VarChar, filialOperacional?.trim() || '');
+        if (filialOperacional) {
+          req.input('filialOrigem', sql.VarChar, filialOperacional.trim());
+        }
       } else if (corProduto) {
         // Quando tem cor (do código de barras), buscar direto por produto e cor (igual ao Python)
         // O Python mostra TODAS as filiais, não filtra por filial origem
@@ -111,6 +176,7 @@ export async function GET(request: Request) {
             p.DESC_PRODUTO,
             ISNULL(p.LINHA, '') AS LINHA,
             ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
+            ISNULL(CONVERT(VARCHAR(50), p.GRADE), '') AS GRADE,
             ISNULL(c.DESC_COR, '') AS DESC_COR,
             e.FILIAL AS NOME_FILIAL,
             pb.CODIGO_BARRA
@@ -175,6 +241,7 @@ export async function GET(request: Request) {
             p.DESC_PRODUTO,
             ISNULL(p.LINHA, '') AS LINHA,
             ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
+            ISNULL(CONVERT(VARCHAR(50), p.GRADE), '') AS GRADE,
             ISNULL(c.DESC_COR, '') AS DESC_COR,
             ${filialOperacional ? `@filialOrigemParam` : `ISNULL(es.FILIAL, '')`} AS NOME_FILIAL,
             pb.CODIGO_BARRA
@@ -212,6 +279,7 @@ export async function GET(request: Request) {
             p.DESC_PRODUTO,
             ISNULL(p.LINHA, '') AS LINHA,
             ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
+            ISNULL(CONVERT(VARCHAR(50), p.GRADE), '') AS GRADE,
             ISNULL(c.DESC_COR, '') AS DESC_COR,
             e.FILIAL AS NOME_FILIAL,
             pb.CODIGO_BARRA
@@ -258,6 +326,7 @@ export async function GET(request: Request) {
         DESC_PRODUTO: string | null;
         LINHA: string | null;
         SUBGRUPO: string | null;
+        GRADE: string | null;
         CODIGO_BARRA: string | null;
         COR_PRODUTO: string | null;
         FILIAL: string | null;
@@ -292,12 +361,13 @@ export async function GET(request: Request) {
         descProduto: string;
         linha: string | null;
         subgrupo: string | null;
-        codigoBarra: string | null;
-        corProduto: string | null;
-        descCor: string;
-        estoques: Array<{
-          filial: string;
-          nomeFilial: string;
+          codigoBarra: string | null;
+          corProduto: string | null;
+          descCor: string;
+          grade: string | null;
+          estoques: Array<{
+            filial: string;
+            nomeFilial: string;
           estoque: number;
         }>;
       }>();
@@ -318,6 +388,7 @@ export async function GET(request: Request) {
             codigoBarra: row.CODIGO_BARRA?.toString().trim() || null,
             corProduto: cor || null,
             descCor: descCorResolvida || descCorBanco,
+            grade: row.GRADE?.toString().trim() || null,
             estoques: [],
           });
         }

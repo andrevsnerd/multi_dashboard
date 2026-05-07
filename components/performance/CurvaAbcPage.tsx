@@ -13,7 +13,14 @@ import {
 import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateRangeFilter";
 import FilialFilter from "@/components/filters/FilialFilter";
 import { fetchControleEstoqueItemMetricasClient } from "@/lib/client/controle-estoque-metricas";
+import {
+  buildCompraTransitoIndex,
+  fetchComprasTransitoClient,
+  getCompraTransitoEntries,
+  type CompraTransitoIndex,
+} from "@/lib/client/compras-transito";
 import { formatDateForQuery } from "@/lib/utils/date";
+import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
 import FilialVendedoresTab from "./FilialVendedoresTab";
 import { exportCurvaAbcSimpleXlsx, type CurvaAbcSimpleXlsxRow } from "@/lib/utils/exportCurvaAbcSimpleXlsx";
 import styles from "./FilialPerformancePage.module.css";
@@ -357,6 +364,19 @@ function getReposicaoCompraView(
   return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdSuficiente: false, semSugestao: true };
 }
 
+function getReposicaoBaseType(sugestao: {
+  qtdFinal: number;
+  qtdS: number;
+  qtdE: number;
+  qtdSuficiente: boolean;
+}): "COMPRA" | "S" | "E" | "SUFICIENTE" | "SEM_SUGESTAO" {
+  if (sugestao.qtdFinal > 0) return "COMPRA";
+  if (sugestao.qtdS > 0) return "S";
+  if (sugestao.qtdE > 0) return "E";
+  if (sugestao.qtdSuficiente) return "SUFICIENTE";
+  return "SEM_SUGESTAO";
+}
+
 async function fetchEstoqueFilialSum(
   companyKey: string,
   codFilial: string | null,
@@ -530,6 +550,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       }
     >
   >({});
+  const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
   const [sugestaoTooltip, setSugestaoTooltip] = useState<null | {
     x: number;
     y: number;
@@ -545,6 +566,8 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     blendAplicado?: boolean;
     qtdFinalPuro?: number;
     qtdSBlend?: number;
+    transitTotal?: number;
+    transitDates?: string[];
   }>(null);
   const [sugestaoSTooltip, setSugestaoSTooltip] = useState<null | {
     x: number;
@@ -554,6 +577,8 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     estoqueAtual: number;
     limiteDias: number;
     qtdS: number;
+    transitTotal?: number;
+    transitDates?: string[];
   }>(null);
   const [sugestaoETooltip, setSugestaoETooltip] = useState<null | {
     x: number;
@@ -565,6 +590,8 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     velocidadeAjustada: number;
     limiteDias: number;
     qtdE: number;
+    transitTotal?: number;
+    transitDates?: string[];
   }>(null);
 
   // Quando filial muda, voltar para aba de produtos
@@ -572,6 +599,20 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     setActiveTab("produtos");
     setSelectedCategory(null);
   }, [selectedFilial]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchComprasTransitoClient(companyKey)
+      .then((docs) => {
+        if (!cancelled) setComprasTransitoIndex(buildCompraTransitoIndex(docs));
+      })
+      .catch(() => {
+        if (!cancelled) setComprasTransitoIndex(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyKey]);
 
   useEffect(() => {
     setLoading(true);
@@ -657,9 +698,21 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
         diasDesdeUltimaVenda: live?.diasDesdeUltimaVenda ?? null,
       };
       const sugestao = getReposicaoCompraView(compraItem, diasCorridosMes);
-      return sugestao.qtdFinal > 0 || sugestao.qtdS > 0 || sugestao.qtdE > 0;
+      const baseType = getReposicaoBaseType(sugestao);
+      const baseQty =
+        sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS > 0 ? sugestao.qtdS : sugestao.qtdE;
+      const transit = applyTransitToSuggestion({
+        baseType,
+        baseQty,
+        entries: getCompraTransitoEntries(comprasTransitoIndex, p.produto, porCor ? (p.cor ?? null) : null),
+        estoqueAtual: compraItem.estoqueFilial,
+        vendasMesAtual: compraItem.vendasMesAtual,
+        diasCorridosMes,
+        limiteDias: getLimiteDiasReposicao(compraItem),
+      });
+      return transit.qty > 0;
     });
-  }, [filtrarSugeridos, produtosComCurva, compraMetrics, diasCorridosMes]);
+  }, [filtrarSugeridos, produtosComCurva, compraMetrics, comprasTransitoIndex, diasCorridosMes, porCor]);
 
   const maxPerc = produtosComCurvaExibidos.length > 0 ? produtosComCurvaExibidos[0].percParticipacao : 1;
   const countA = produtosComCurvaExibidos.filter(p => p.curva === "A").length;
@@ -1301,12 +1354,31 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                                       diasDesdeUltimaVenda: live?.diasDesdeUltimaVenda ?? null,
                                     };
                                     const sugestao = getReposicaoCompraView(compraItem, diasCorridosMes);
-                                    console.log("[reposicao]", { produto: p.produto, linha: compraItem.linha, limiteDias: getLimiteDiasReposicao(compraItem), consumoDiario: diasCorridosMes > 0 ? compraItem.vendasMesAtual / diasCorridosMes : 0, sugestao });
-                                    if (sugestao.qtdFinal > 0) {
+                                    const limiteDias = getLimiteDiasReposicao(compraItem);
+                                    const baseType = getReposicaoBaseType(sugestao);
+                                    const baseQty =
+                                      sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS > 0 ? sugestao.qtdS : sugestao.qtdE;
+                                    const transit = applyTransitToSuggestion({
+                                      baseType,
+                                      baseQty,
+                                      entries: getCompraTransitoEntries(comprasTransitoIndex, p.produto, porCor ? (p.cor ?? null) : null),
+                                      estoqueAtual: compraItem.estoqueFilial,
+                                      vendasMesAtual: compraItem.vendasMesAtual,
+                                      diasCorridosMes,
+                                      limiteDias,
+                                    });
+                                    const transitDates = transit.entries.map(
+                                      (entry) => `${new Date(`${entry.dataRecebimento}T00:00:00`).toLocaleDateString("pt-BR")} (+${fmt(entry.quantidade)})`
+                                    );
+                                    const transitBadge = transit.totalTransit > 0 ? (
+                                      <span className={styles.badgeT} style={{ marginLeft: 6 }}>
+                                        T {fmt(transit.totalTransit)}
+                                      </span>
+                                    ) : null;
+                                    if (baseType === "COMPRA" && transit.qty > 0) {
                                       const vendasMes = Number(compraItem.vendasMesAtual ?? 0);
                                       const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
                                       const estoqueAtual = Number(compraItem.estoqueFilial ?? 0);
-                                      const limiteDias = getLimiteDiasReposicao(compraItem);
                                       const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
                                       const qtdFinalPuro = consumoDiario > 0 && duracaoAtual < limiteDias
                                         ? Math.ceil(consumoDiario * (limiteDias - duracaoAtual))
@@ -1333,23 +1405,24 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                                             consumoDiario,
                                             estoqueAtual,
                                             duracaoAtual,
-                                            qtdCalculada: sugestao.qtdFinal,
+                                            qtdCalculada: transit.qty,
                                             blendAplicado,
                                             qtdFinalPuro,
                                             qtdSBlend,
+                                            transitTotal: transit.totalTransit || undefined,
+                                            transitDates,
                                           })}
                                           onMouseLeave={() => setSugestaoTooltip(null)}
                                         >
-                                          {fmt(sugestao.qtdFinal)}{blendAplicado && <>{" "}<span style={{ display: "inline-flex", width: 16, height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#0f172a", background: "#fde047", border: "1px solid #facc15", verticalAlign: "middle", cursor: "help" }}>⚡</span></>}
+                                          {fmt(transit.qty)}{blendAplicado && <>{" "}<span style={{ display: "inline-flex", width: 16, height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#0f172a", background: "#fde047", border: "1px solid #facc15", verticalAlign: "middle", cursor: "help" }}>⚡</span></>}{transitBadge}
                                         </span>
                                       );
                                     }
-                                    if (sugestao.qtdS > 0) {
+                                    if (baseType === "S" && transit.qty > 0) {
                                       const mediaVendasMes = Number(compraItem.qtde12m ?? 0) / getMesesHistoricoFilial(compraItem);
-                                      const limiteDias = getLimiteDiasReposicao(compraItem);
                                       return (
                                         <span className={styles.reporAdd}>
-                                          {fmt(sugestao.qtdS)}{" "}
+                                          {fmt(transit.qty)}{" "}
                                           <span
                                             onMouseEnter={(e) => setSugestaoSTooltip({
                                               x: e.clientX,
@@ -1358,7 +1431,9 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                                               mesesHistoricoFilial: getMesesHistoricoFilial(compraItem),
                                               estoqueAtual: Number(compraItem.estoqueFilial ?? 0),
                                               limiteDias,
-                                              qtdS: sugestao.qtdS,
+                                              qtdS: transit.qty,
+                                              transitTotal: transit.totalTransit || undefined,
+                                              transitDates,
                                             })}
                                             onMouseLeave={() => setSugestaoSTooltip(null)}
                                             style={{
@@ -1379,15 +1454,15 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                                           >
                                             S
                                           </span>
+                                          {transitBadge}
                                         </span>
                                       );
                                     }
-                                    if (sugestao.qtdE > 0) {
+                                    if (baseType === "E" && transit.qty > 0) {
                                       const eInfo = calcQtdSugestaoEInfo(compraItem);
-                                      const limiteDias = getLimiteDiasReposicao(compraItem);
                                       return (
                                         <span className={styles.reporAdd}>
-                                          {fmt(sugestao.qtdE)}{" "}
+                                          {fmt(transit.qty)}{" "}
                                           <span
                                             onMouseEnter={(e) => eInfo && setSugestaoETooltip({
                                               x: e.clientX,
@@ -1398,7 +1473,9 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                                               mesesAtivos: eInfo.mesesAtivos,
                                               velocidadeAjustada: eInfo.velocidadeAjustada,
                                               limiteDias,
-                                              qtdE: sugestao.qtdE,
+                                              qtdE: transit.qty,
+                                              transitTotal: transit.totalTransit || undefined,
+                                              transitDates,
                                             })}
                                             onMouseLeave={() => setSugestaoETooltip(null)}
                                             style={{
@@ -1419,16 +1496,41 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                                           >
                                             E
                                           </span>
+                                          {transitBadge}
                                         </span>
                                       );
                                     }
-                                    if (sugestao.semSugestao) {
+                                    if (baseType === "SEM_SUGESTAO") {
+                                      if (transit.totalTransit > 0) {
+                                        return (
+                                          <span
+                                            className={styles.reporOk}
+                                            onMouseEnter={(e) => setSugestaoTooltip({
+                                              x: e.clientX,
+                                              y: e.clientY,
+                                              titulo: "Em trânsito",
+                                              regra: "Sem sugestão de compra no momento, mas existem unidades já compradas em trânsito.",
+                                              limiteDias,
+                                              vendasMesAtual: Number(compraItem.vendasMesAtual ?? 0),
+                                              diasCorridos: diasCorridosMes,
+                                              consumoDiario: diasCorridosMes > 0 ? Number(compraItem.vendasMesAtual ?? 0) / diasCorridosMes : 0,
+                                              estoqueAtual: Number(compraItem.estoqueFilial ?? 0),
+                                              duracaoAtual: 0,
+                                              qtdCalculada: 0,
+                                              transitTotal: transit.totalTransit || undefined,
+                                              transitDates,
+                                            })}
+                                            onMouseLeave={() => setSugestaoTooltip(null)}
+                                          >
+                                            {transitBadge}
+                                          </span>
+                                        );
+                                      }
                                       return <span className={styles.cellMetric}>—</span>;
                                     }
                                     const vendasMes = Number(compraItem.vendasMesAtual ?? 0);
                                     const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
                                     const estoqueAtual = Number(compraItem.estoqueFilial ?? 0);
-                                    const limiteDias = getLimiteDiasReposicao(compraItem);
                                     const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
                                     return (
                                       <span
@@ -1437,7 +1539,9 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                                           x: e.clientX,
                                           y: e.clientY,
                                           titulo: "Quantidade suficiente",
-                                          regra: "Sem reposição: duração atual já atende o limite de cobertura.",
+                                          regra: transit.suppressedByTransit
+                                            ? "Sem reposição adicional: a compra em trânsito cobre a necessidade antes do estoque acabar."
+                                            : "Sem reposição: duração atual já atende o limite de cobertura.",
                                           limiteDias,
                                           vendasMesAtual: vendasMes,
                                           diasCorridos: diasCorridosMes,
@@ -1445,10 +1549,12 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                                           estoqueAtual,
                                           duracaoAtual,
                                           qtdCalculada: 0,
+                                          transitTotal: transit.totalTransit || undefined,
+                                          transitDates,
                                         })}
                                         onMouseLeave={() => setSugestaoTooltip(null)}
                                       >
-                                        Quantidade suficiente
+                                        Quantidade suficiente{transitBadge}
                                       </span>
                                     );
                                   })()}
@@ -1495,6 +1601,19 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
           )}
           <div className={styles.metricTooltipDivider} />
           <div className={styles.metricTooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoTooltip.qtdCalculada)} un</div>
+          {sugestaoTooltip.transitTotal ? (
+            <>
+              <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine}>
+                <strong style={{ color: "#5eead4" }}>+{fmt(sugestaoTooltip.transitTotal)} em trânsito</strong>
+              </div>
+              {sugestaoTooltip.transitDates?.map((label) => (
+                <div key={label} className={styles.metricTooltipLine} style={{ color: "#99f6e4", fontSize: 11 }}>
+                  {label}
+                </div>
+              ))}
+            </>
+          ) : null}
         </div>
       )}
       {sugestaoSTooltip && (
@@ -1512,6 +1631,19 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
           <div className={styles.metricTooltipLine}>
             = {(sugestaoSTooltip.limiteDias / 30).toFixed(1)} meses × {sugestaoSTooltip.mediaVendasMes.toFixed(1)} un/mês
           </div>
+          {sugestaoSTooltip.transitTotal ? (
+            <>
+              <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine}>
+                <strong style={{ color: "#5eead4" }}>+{fmt(sugestaoSTooltip.transitTotal)} em trânsito</strong>
+              </div>
+              {sugestaoSTooltip.transitDates?.map((label) => (
+                <div key={label} className={styles.metricTooltipLine} style={{ color: "#99f6e4", fontSize: 11 }}>
+                  {label}
+                </div>
+              ))}
+            </>
+          ) : null}
         </div>
       )}
       {sugestaoETooltip && (
@@ -1542,6 +1674,19 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
           <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
             = ⌈{sugestaoETooltip.velocidadeAjustada.toFixed(2)} × {(sugestaoETooltip.limiteDias / 30).toFixed(1)}⌉ = {fmt(sugestaoETooltip.qtdE)}
           </div>
+          {sugestaoETooltip.transitTotal ? (
+            <>
+              <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine}>
+                <strong style={{ color: "#5eead4" }}>+{fmt(sugestaoETooltip.transitTotal)} em trânsito</strong>
+              </div>
+              {sugestaoETooltip.transitDates?.map((label) => (
+                <div key={label} className={styles.metricTooltipLine} style={{ color: "#99f6e4", fontSize: 11 }}>
+                  {label}
+                </div>
+              ))}
+            </>
+          ) : null}
         </div>
       )}
     </div>

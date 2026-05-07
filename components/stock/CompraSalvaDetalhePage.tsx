@@ -19,6 +19,13 @@ import {
   type DestinoCompraFinalParte,
 } from "@/lib/utils/compra-final-destino";
 import { fetchControleEstoqueItemMetricasClient } from "@/lib/client/controle-estoque-metricas";
+import {
+  buildCompraTransitoIndex,
+  fetchComprasTransitoClient,
+  getCompraTransitoEntries,
+  type CompraTransitoIndex,
+} from "@/lib/client/compras-transito";
+import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
 
 import styles from "./ListaCompraSugeridaPage.module.css";
 
@@ -138,6 +145,7 @@ function getMesesHistorico(item: Pick<SugestaoItemInput, "mesesHistoricoFilial">
   return Math.min(12, Math.max(1, meses));
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 // Replica a lógica completa de getReposicaoCompraView da Lista Loja (regras Compra, S e E).
 // Só calcula quando liveData estiver carregado — nunca usa match para vendas/estoque
 // pois lista-compra-sugerida usa query diferente (sem e-commerce para isProdutoLookup).
@@ -208,6 +216,97 @@ function calcularSugestaoCompleto(
   }
 
   return null;
+}
+
+function calcularSugestaoCompletoComTransito(
+  match: ProdutoSugestao | null | undefined,
+  liveData: {
+    qtde12m: number | null;
+    vendasMesAtual: number | null;
+    estoqueAtual: number | null;
+    diasDesdeUltimaVenda: number | null;
+    mesesHistoricoFilial: number | null;
+  } | undefined,
+  comprasTransitoIndex: CompraTransitoIndex
+): { qty: number | null; transitTotal: number; transitDates: string[] } {
+  if (!match || liveData === undefined) {
+    return { qty: null, transitTotal: 0, transitDates: [] };
+  }
+
+  const diasCorridosMes = new Date().getDate();
+  const item: SugestaoItemInput = {
+    vendasMesAtual: liveData.vendasMesAtual,
+    estoqueFilial: liveData.estoqueAtual,
+    qtde12m: liveData.qtde12m,
+    mesesHistoricoFilial: liveData.mesesHistoricoFilial,
+    diasDesdeUltimaVenda: liveData.diasDesdeUltimaVenda,
+    linha: match.linha,
+    subgrupo: match.subgrupo,
+  };
+
+  const vendasMes = Number(item.vendasMesAtual ?? 0);
+  const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
+  const estoqueAtual = Number(item.estoqueFilial ?? 0);
+  const limiteDias = getLimiteDiasReposicao({ linha: item.linha ?? undefined, subgrupo: item.subgrupo ?? undefined });
+  const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
+  const mesesHistorico = getMesesHistorico(item);
+  const mediaVendasMes = Number(item.qtde12m ?? 0) / mesesHistorico;
+  const sEligivel = mediaVendasMes >= 1 && estoqueAtual <= mediaVendasMes * 2;
+  const qtdS = sEligivel ? Math.max(0, Math.ceil((limiteDias / 30) * mediaVendasMes)) : 0;
+
+  let baseType: "COMPRA" | "S" | "E" | "SUFICIENTE" | "SEM_SUGESTAO" = "SEM_SUGESTAO";
+  let baseQty = 0;
+
+  if (consumoDiario > 0 && duracaoAtual < limiteDias) {
+    const qtdFinal = Math.ceil(consumoDiario * (limiteDias - duracaoAtual));
+    if (qtdFinal > 0) {
+      baseType = "COMPRA";
+      baseQty = qtdS > 0 && qtdFinal < 0.6 * qtdS
+        ? Math.round(0.8 * qtdS + 0.4 * qtdFinal)
+        : qtdFinal;
+    }
+  }
+
+  if (baseQty <= 0 && consumoDiario > 0 && duracaoAtual >= limiteDias) {
+    baseType = "SUFICIENTE";
+  }
+
+  if (baseQty <= 0 && qtdS > 0) {
+    baseType = "S";
+    baseQty = qtdS;
+  }
+
+  const qtde12m = Number(item.qtde12m ?? 0);
+  const diasSemVenda = item.diasDesdeUltimaVenda;
+  if (baseQty <= 0 && qtde12m > 0 && estoqueAtual <= 0 && diasSemVenda != null && diasSemVenda >= 30) {
+    const mesesSemVenda = diasSemVenda / 30;
+    const mesesAtivos = mesesHistorico - mesesSemVenda;
+    if (mesesAtivos >= 1) {
+      const velocidadeAjustada = qtde12m / mesesAtivos;
+      if (velocidadeAjustada >= 0.5) {
+        baseType = "E";
+        baseQty = Math.max(1, Math.ceil((limiteDias / 30) * velocidadeAjustada));
+      }
+    }
+  }
+
+  const transit = applyTransitToSuggestion({
+    baseType,
+    baseQty,
+    entries: getCompraTransitoEntries(comprasTransitoIndex, match.produto, match.cor ?? null),
+    estoqueAtual: liveData.estoqueAtual,
+    vendasMesAtual: liveData.vendasMesAtual,
+    diasCorridosMes,
+    limiteDias,
+  });
+
+  return {
+    qty: transit.qty > 0 ? transit.qty : null,
+    transitTotal: transit.totalTransit,
+    transitDates: transit.entries.map(
+      (entry) => `${new Date(`${entry.dataRecebimento}T00:00:00`).toLocaleDateString("pt-BR")} (+${fmt(entry.quantidade)})`
+    ),
+  };
 }
 
 const DESTINO_FILIAL_BADGE_THEMES = [
@@ -473,6 +572,7 @@ export default function CompraSalvaDetalhePage({
   const [error, setError] = useState<string | null>(null);
   const [listaRows, setListaRows] = useState<ProdutoSugestao[]>([]);
   const [liveMetrics, setLiveMetrics] = useState<Record<string, { qtde12m: number | null; vendasMesAtual: number | null; estoqueAtual: number | null; diasDesdeUltimaVenda: number | null; mesesHistoricoFilial: number | null }>>({});
+  const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
   const [estoquePorFilialCache, setEstoquePorFilialCache] = useState<
     Record<string, Array<{ filial: string; estoque: number }>>
   >({});
@@ -492,6 +592,20 @@ export default function CompraSalvaDetalhePage({
   manualDistribuicaoRef.current = manualDistribuicao;
   const filialOptions = useMemo(() => getFilialOptions(companyKey), [companyKey]);
   const manualStorageKey = `compra-manual:${compraId}`;
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchComprasTransitoClient(companyKey)
+      .then((docs) => {
+        if (!cancelled) setComprasTransitoIndex(buildCompraTransitoIndex(docs));
+      })
+      .catch(() => {
+        if (!cancelled) setComprasTransitoIndex(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyKey]);
 
   // Restaura itens confirmados manualmente do localStorage ao carregar
   useEffect(() => {
@@ -708,10 +822,11 @@ export default function CompraSalvaDetalhePage({
       const estoque = live?.estoqueAtual ?? match?.estoqueAtual ?? null;
       const custoUnit = match?.custoUnitario ?? 0;
       const custoTotal = custoUnit > 0 ? Math.round(effectiveQtdManual * custoUnit) : 0;
-      const qtdSugerida = calcularSugestaoCompleto(match, live);
-      return { it, match, estoque, custoUnit, custoTotal, qtdSugerida, effectiveQtdManual };
+      const sugestaoAtual = calcularSugestaoCompletoComTransito(match, live, comprasTransitoIndex);
+      const qtdSugerida = sugestaoAtual.qty;
+      return { it, match, estoque, custoUnit, custoTotal, qtdSugerida, sugestaoAtual, effectiveQtdManual };
     });
-  }, [items, listaRows, expandirPorCor, liveMetrics, manualDistribuicao, manualState, manualTotalByItemKey]);
+  }, [items, listaRows, expandirPorCor, liveMetrics, manualDistribuicao, manualState, manualTotalByItemKey, comprasTransitoIndex]);
 
   const totals = useMemo(() => {
     const totalItens = rowsComputed.length;
@@ -740,6 +855,8 @@ export default function CompraSalvaDetalhePage({
     ritmoMensal60d: number;
     tendenciaTexto: string;
     ajusteDestinoTexto: string;
+    transitTotal?: number;
+    transitDates?: string[];
   }>(null);
 
   const handleUpdateQtd = async (itemKey: string, qtdManual: number) => {
@@ -1117,7 +1234,7 @@ export default function CompraSalvaDetalhePage({
                   </tr>
                 </thead>
                 <tbody>
-                  {rowsComputed.map(({ it, estoque, custoUnit, custoTotal, qtdSugerida, effectiveQtdManual }) => {
+                  {rowsComputed.map(({ it, estoque, custoUnit, custoTotal, qtdSugerida, sugestaoAtual, effectiveQtdManual }) => {
                     const itemManualState = manualState[it.itemKey] ?? "auto";
                     const isEditing = itemManualState === "editing";
                     const isConfirmed = itemManualState === "confirmed";
@@ -1267,6 +1384,8 @@ export default function CompraSalvaDetalhePage({
                                           ritmoMensal60d,
                                           tendenciaTexto,
                                           ajusteDestinoTexto,
+                                          transitTotal: sugestaoAtual.transitTotal || undefined,
+                                          transitDates: sugestaoAtual.transitDates,
                                         });
                                       }}
                                       onMouseLeave={() => setSugestaoDiffTooltip(null)}
@@ -1416,6 +1535,19 @@ export default function CompraSalvaDetalhePage({
             <strong>Como ajustar por filial:</strong>
           </div>
           <div className={styles.tooltipLine}>{sugestaoDiffTooltip.ajusteDestinoTexto}</div>
+          {sugestaoDiffTooltip.transitTotal ? (
+            <>
+              <div className={styles.tooltipDivider} />
+              <div className={styles.tooltipLine}>
+                <strong style={{ color: "#0f766e" }}>+{fmt(sugestaoDiffTooltip.transitTotal)} em trânsito</strong>
+              </div>
+              {sugestaoDiffTooltip.transitDates?.map((label) => (
+                <div key={label} className={styles.tooltipLine} style={{ color: "#0f766e", fontSize: 11 }}>
+                  {label}
+                </div>
+              ))}
+            </>
+          ) : null}
         </div>
       )}
     </div>
