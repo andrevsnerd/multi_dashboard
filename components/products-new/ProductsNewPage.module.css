@@ -1,0 +1,109 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.title {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.1;
+  color: #111827;
+}
+
+.subtitle {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.95rem;
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table thead {
+  background: #f8fafc;
+}
+
+.table th,
+.table td {
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.95rem;
+}
+
+.table th {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.produto {
+  font-weight: 700;
+  color: #111827;
+  white-space: nowrap;
+}
+
+.dataCadastro {
+  color: #374151;
+  white-space: nowrap;
+}
+
+.descricao {
+  color: #1f2937;
+}
+
+.cor {
+  color: #374151;
+  white-space: nowrap;
+}
+
+.dias {
+  color: #0f172a;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.empty {
+  padding: 36px 20px;
+  text-align: center;
+  color: #6b7280;
+}
+
+@media (max-width: 768px) {
+  .title {
+    font-size: 1.65rem;
+  }
+
+  .table th,
+  .table td {
+    padding: 12px 14px;
+    font-size: 0.9rem;
+  }
+}

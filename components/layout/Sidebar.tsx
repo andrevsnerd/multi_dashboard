@@ -65,6 +65,10 @@ export default function Sidebar({ companyName }: SidebarProps) {
     ? `${basePath}/produto-detalhado`
     : "/produto-detalhado";
 
+  const produtosNovosHref = basePath && basePath !== "/"
+    ? `${basePath}/produtos-novos`
+    : "/produtos-novos";
+
   // Construir o link para vendedores baseado no caminho base
   const vendedoresHref = basePath && basePath !== "/" 
     ? `${basePath}/vendedores`
@@ -149,8 +153,19 @@ export default function Sidebar({ companyName }: SidebarProps) {
   const isScarfme = basePath === "/scarfme";
 
   // Verificar se está em alguma página relacionada a produtos
-  const isProdutosSubItemActive = pathname?.includes("/produto-detalhado") || pathname?.includes("/produtos-recentes") || (pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado"));
-  const isProdutosPageActive = pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado");
+  const isProdutosSubItemActive =
+    pathname?.includes("/produto-detalhado") ||
+    pathname?.includes("/produtos-recentes") ||
+    pathname?.includes("/produtos-novos") ||
+    (pathname?.includes("/produtos") &&
+      !pathname?.includes("/produtos-recentes") &&
+      !pathname?.includes("/produto-detalhado") &&
+      !pathname?.includes("/produtos-novos"));
+  const isProdutosPageActive =
+    pathname?.includes("/produtos") &&
+    !pathname?.includes("/produtos-recentes") &&
+    !pathname?.includes("/produto-detalhado") &&
+    !pathname?.includes("/produtos-novos");
   const isAnyProdutosPage = isProdutosSubItemActive || isProdutosPageActive;
   const produtosExpandedEffective = produtosExpanded || isAnyProdutosPage;
 
@@ -164,6 +179,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
       subItems: [
         { label: "Produtos por Venda", href: produtosHref, permission: "produtos" as const },
         { label: "Produto Detalhado", href: produtoDetalhadoHref, permission: "produto-detalhado" as const },
+        { label: "Produtos Novos", href: produtosNovosHref, permission: "produtos" as const },
       ],
     },
     { label: "Vendedores", href: vendedoresHref, permission: "vendedores" },
@@ -281,6 +297,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
                 !pathname.includes("/compras-transito") &&
                 !pathname.includes("/produtos") &&
                 !pathname.includes("/produtos-recentes") &&
+                !pathname.includes("/produtos-novos") &&
                 !pathname.includes("/produto-detalhado") &&
                 !pathname.includes("/vendedores") &&
                 !pathname.includes("/clientes") &&
@@ -294,9 +311,11 @@ export default function Sidebar({ companyName }: SidebarProps) {
               // Verificar se algum subitem está ativo
               hasActiveSubItem = item.subItems?.some(subItem => {
                 if (subItem.label === "Produtos por Venda") {
-                  return pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado");
+                  return pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado") && !pathname?.includes("/produtos-novos");
                 } else if (subItem.label === "Produto Detalhado") {
                   return pathname?.includes("/produto-detalhado");
+                } else if (subItem.label === "Produtos Novos") {
+                  return pathname?.includes("/produtos-novos");
                 }
                 return false;
               }) || false;
@@ -401,9 +420,11 @@ export default function Sidebar({ companyName }: SidebarProps) {
                         }).map((subItem) => {
                           let isSubItemActive = false;
                           if (subItem.label === "Produtos por Venda") {
-                            isSubItemActive = pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado");
+                            isSubItemActive = pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado") && !pathname?.includes("/produtos-novos");
                           } else if (subItem.label === "Produto Detalhado") {
                             isSubItemActive = pathname?.includes("/produto-detalhado") || pathname === subItem.href;
+                          } else if (subItem.label === "Produtos Novos") {
+                            isSubItemActive = pathname?.includes("/produtos-novos") || pathname === subItem.href;
                           }
                           
                           return (
