@@ -241,11 +241,35 @@
   },
   {
     "company": "nerd",
+    "produto": "N4.7H.0106",
+    "cor": "01",
+    "label": "produto novo",
+    "createdAt": "2026-05-07T17:09:30.878Z",
+    "updatedAt": "2026-05-07T18:38:04.683Z"
+  },
+  {
+    "company": "nerd",
+    "produto": "N4.7H.0106",
+    "cor": "11",
+    "label": "produto novo",
+    "createdAt": "2026-05-07T17:09:30.878Z",
+    "updatedAt": "2026-05-07T18:38:04.683Z"
+  },
+  {
+    "company": "nerd",
+    "produto": "N4.7H.0106",
+    "cor": "C9",
+    "label": "produto novo",
+    "createdAt": "2026-05-07T17:09:30.878Z",
+    "updatedAt": "2026-05-07T18:38:04.683Z"
+  },
+  {
+    "company": "nerd",
     "produto": "N5.16.0011",
     "cor": "K9",
     "label": "produto novo",
     "createdAt": "2026-05-07T14:20:41.261Z",
-    "updatedAt": "2026-05-07T14:53:23.076Z"
+    "updatedAt": "2026-05-07T18:38:04.683Z"
   },
   {
     "company": "nerd",
@@ -253,7 +277,7 @@
     "cor": "C9",
     "label": "produto novo",
     "createdAt": "2026-05-07T14:20:41.261Z",
-    "updatedAt": "2026-05-07T14:53:23.076Z"
+    "updatedAt": "2026-05-07T18:38:04.683Z"
   },
   {
     "company": "nerd",
@@ -261,7 +285,7 @@
     "cor": "06",
     "label": "produto novo",
     "createdAt": "2026-05-07T14:24:01.833Z",
-    "updatedAt": "2026-05-07T14:53:23.076Z"
+    "updatedAt": "2026-05-07T18:38:04.683Z"
   },
   {
     "company": "nerd",
@@ -269,7 +293,7 @@
     "cor": "C9",
     "label": "produto novo",
     "createdAt": "2026-05-07T14:20:41.261Z",
-    "updatedAt": "2026-05-07T14:53:23.076Z"
+    "updatedAt": "2026-05-07T18:38:04.683Z"
   },
   {
     "company": "nerd",
@@ -277,7 +301,7 @@
     "cor": "C9",
     "label": "produto novo",
     "createdAt": "2026-05-07T14:20:41.261Z",
-    "updatedAt": "2026-05-07T14:53:23.076Z"
+    "updatedAt": "2026-05-07T18:38:04.683Z"
   },
   {
     "company": "nerd",
@@ -285,7 +309,7 @@
     "cor": "01",
     "label": "produto novo",
     "createdAt": "2026-05-07T14:20:41.261Z",
-    "updatedAt": "2026-05-07T14:53:23.076Z"
+    "updatedAt": "2026-05-07T18:38:04.683Z"
   },
   {
     "company": "nerd",
@@ -293,7 +317,7 @@
     "cor": "08",
     "label": "produto novo",
     "createdAt": "2026-05-07T14:20:41.261Z",
-    "updatedAt": "2026-05-07T14:53:23.076Z"
+    "updatedAt": "2026-05-07T18:38:04.683Z"
   },
   {
     "company": "nerd",
@@ -301,7 +325,7 @@
     "cor": "09",
     "label": "produto novo",
     "createdAt": "2026-05-07T14:20:41.261Z",
-    "updatedAt": "2026-05-07T14:53:23.076Z"
+    "updatedAt": "2026-05-07T18:38:04.683Z"
   },
   {
     "company": "nerd",
@@ -309,7 +333,7 @@
     "cor": "K9",
     "label": "produto novo",
     "createdAt": "2026-05-07T14:20:41.261Z",
-    "updatedAt": "2026-05-07T14:53:23.076Z"
+    "updatedAt": "2026-05-07T18:38:04.683Z"
   },
   {
     "company": "nerd",
@@ -317,7 +341,7 @@
     "cor": "06",
     "label": "produto novo",
     "createdAt": "2026-05-07T14:20:41.261Z",
-    "updatedAt": "2026-05-07T14:53:23.076Z"
+    "updatedAt": "2026-05-07T18:38:04.683Z"
   },
   {
     "company": "nerd",
@@ -325,7 +349,7 @@
     "cor": "07",
     "label": "produto novo",
     "createdAt": "2026-05-07T14:20:41.261Z",
-    "updatedAt": "2026-05-07T14:53:23.076Z"
+    "updatedAt": "2026-05-07T18:38:04.683Z"
   },
   {
     "company": "nerd",
@@ -333,7 +357,7 @@
     "cor": "11",
     "label": "produto novo",
     "createdAt": "2026-05-07T14:20:41.261Z",
-    "updatedAt": "2026-05-07T14:53:23.076Z"
+    "updatedAt": "2026-05-07T18:38:04.683Z"
   },
   {
     "company": "nerd",
@@ -341,7 +365,7 @@
     "cor": "C9",
     "label": "produto novo",
     "createdAt": "2026-05-07T14:20:41.261Z",
-    "updatedAt": "2026-05-07T14:53:23.076Z"
+    "updatedAt": "2026-05-07T18:38:04.683Z"
   },
   {
     "company": "nerd",
@@ -349,7 +373,7 @@
     "cor": "11",
     "label": "produto novo",
     "createdAt": "2026-05-07T14:20:41.261Z",
-    "updatedAt": "2026-05-07T14:53:23.076Z"
+    "updatedAt": "2026-05-07T18:38:04.683Z"
   },
   {
     "company": "nerd",
@@ -357,7 +381,7 @@
     "cor": "C9",
     "label": "produto novo",
     "createdAt": "2026-05-07T14:20:41.261Z",
-    "updatedAt": "2026-05-07T14:53:23.076Z"
+    "updatedAt": "2026-05-07T18:38:04.683Z"
   },
   {
     "company": "nerd",
@@ -365,6 +389,6 @@
     "cor": "K9",
     "label": "produto novo",
     "createdAt": "2026-05-07T14:20:41.261Z",
-    "updatedAt": "2026-05-07T14:53:23.076Z"
+    "updatedAt": "2026-05-07T18:38:04.683Z"
   }
 ]

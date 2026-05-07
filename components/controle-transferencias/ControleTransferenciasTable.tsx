@@ -28,6 +28,7 @@ export interface ControleTransferenciasPermissao {
   filialAtribuida?: string | null;
 }
 type CurvaABC = 'A' | 'B' | 'C';
+type UrgenciaDestinoStatus = "CRITICO" | "ALTO" | "MEDIO" | "OK";
 
 interface TransferByOrigin {
   origem: string;
@@ -42,7 +43,7 @@ interface ControleTransferenciasTableProps {
   loading?: boolean;
   dateRange?: DateRangeValue;
   selectedFilial?: string | null;
-  /** Carregados uma vez na pÃ¡gina â€” evita GET duplicado em /permissoes e /filiais */
+  /** Carregados uma vez na página — evita GET duplicado em /permissoes e /filiais */
   permissoes: ControleTransferenciasPermissao | null;
   filiaisApi: ControleTransferenciasFilialApi[];
 }
@@ -55,7 +56,7 @@ export interface RoteiroDestinoAlocacao {
   quantidade: number;
 }
 
-/** Trecho de alocaÃ§Ã£o (origem â†’ destino); vÃ¡rios podem ser somados na mesma linha apÃ³s consolidaÃ§Ã£o. */
+/** Trecho de alocação (origem → destino); vários podem ser somados na mesma linha após consolidação. */
 export interface QuantidadeExplicacaoChunk {
   curva: CurvaABC;
   destino: {
@@ -68,23 +69,30 @@ export interface QuantidadeExplicacaoChunk {
   };
   origem: {
     coberturaDias: number;
-    /** Excedente ainda livre no mapa neste ponto (apÃ³s outros destinos do mesmo produto). */
+    /** Excedente ainda livre no mapa neste ponto (após outros destinos do mesmo produto). */
     excedenteDisponivel: number;
-    /** Excedente ao comeÃ§ar o rateamento deste produto para esta origem (= filiaisComEstoque.excedente). */
+    /** Excedente ao começar o rateamento deste produto para esta origem (= filiaisComEstoque.excedente). */
     excedenteInicialNaRodada: number;
-    /** Estoque fÃ­sico na origem (mesma base da coluna da tabela). */
+    /** Estoque físico na origem (mesma base da coluna da tabela). */
     estoqueNaOrigem: number;
     isMatrizPrincipal: boolean;
   };
   regra: {
     zonaNeutraDias: number;
     folgaCoberturaDias: number;
+    statusDestino?: UrgenciaDestinoStatus;
+    reservaOrigem?: number;
+    diasDesdeEntrada?: number | null;
+    janelaProtecaoDias?: number;
+    protecaoAtiva?: boolean;
+    quebraProtecao?: boolean;
+    origemTemPotencial?: boolean;
   };
   esteEnvio: {
     faltava: number;
     enviado: number;
   };
-  /** Filas de destinos nesta origem, na ordem de prioridade do algoritmo (preenchido apÃ³s o rateio do item). */
+  /** Filas de destinos nesta origem, na ordem de prioridade do algoritmo (preenchido após o rateio do item). */
   roteiroDestinosParaEstaOrigem?: RoteiroDestinoAlocacao[];
 }
 
@@ -98,9 +106,9 @@ interface TransferItem {
   cor: string;
   origem: string;
   destino: string;
-  /** Nome canÃ´nico da filial de origem (para API) */
+  /** Nome canônico da filial de origem (para API) */
   origemCanonico: string;
-  /** Nome canÃ´nico da filial de destino (para API) */
+  /** Nome canônico da filial de destino (para API) */
   destinoCanonico: string;
   quantidade: number;
   curva: CurvaABC;
@@ -109,7 +117,7 @@ interface TransferItem {
   quantidadeExplicacao?: QuantidadeExplicacaoChunk[];
 }
 
-/** Chave estÃ¡vel do item para marcar como "realizada" (persiste sÃ³ em produÃ§Ã£o). */
+/** Chave estável do item para marcar como "realizada" (persiste só em produção). */
 function getTransferItemKey(item: TransferItem): string {
   return `${item.produto}|${item.cor}|${item.origem}|${item.destino}`;
 }
@@ -166,7 +174,7 @@ function aggregateLogicalStock(filiais: FilialData[]): number {
 }
 
 /**
- * Formata a descriÃ§Ã£o do produto com cÃ³digo
+ * Formata a descrição do produto com código
  */
 function formatProductDescription(descricao: string, produto: string): {
   name: string;
@@ -180,26 +188,28 @@ function formatProductDescription(descricao: string, produto: string): {
     };
   }
   return {
-    name: descricao.trim() || "Sem descriÃ§Ã£o",
+    name: descricao.trim() || "Sem descrição",
     code: produto,
   };
 }
 
 // --- Constantes de cobertura ---
-/** Dias mÃ­nimos que uma origem ativa deve manter (nÃ£o parada) */
-const DIAS_COBERTURA_MIN  = 3;
-/** Cobertura acima deste valor + sem vendas 60d â†’ loja classificada como "parada" */
+/** Cobertura acima deste valor + sem vendas 60d → loja classificada como "parada" */
 const DIAS_PARADA_COBERTURA = 15;
+const JANELA_PROTECAO_COM_POTENCIAL = 15;
+const JANELA_PROTECAO_SEM_POTENCIAL = 7;
+const DIAS_RESERVA_COM_POTENCIAL = 7;
+const DIAS_RESERVA_SEM_POTENCIAL = 3;
 
 /**
- * Cobertura alvo dinÃ¢mica com curva contÃ­nua: elimina cliffs bruscos nas fronteiras 0.3 e 1.0.
+ * Cobertura alvo dinâmica com curva contínua: elimina cliffs bruscos nas fronteiras 0.3 e 1.0.
  *
- *   diaria = 0   â†’ 10 dias  (mÃ­nimo giro)
- *   diaria = 1   â†’  5 dias  (alto giro)
- *   diaria > 1   â†’ clamp em 5 (floor)
- *   faixa mÃ¡x   â†’ 12 dias (cap para produtos muito lentos/sazonais)
+ *   diaria = 0   → 10 dias  (mínimo giro)
+ *   diaria = 1   →  5 dias  (alto giro)
+ *   diaria > 1   → clamp em 5 (floor)
+ *   faixa máx   → 12 dias (cap para produtos muito lentos/sazonais)
  *
- * FÃ³rmula: clamp(5, 12, 10 - diaria Ã— 5)
+ * Fórmula: clamp(5, 12, 10 - diaria × 5)
  */
 function calcDiasCobertura(demandaDiaria: number): number {
   return Math.max(5, Math.min(12, 10 - demandaDiaria * 5));
@@ -207,7 +217,7 @@ function calcDiasCobertura(demandaDiaria: number): number {
 
 /**
  * Cobertura alvo com boost para Curva A.
- * Produtos campeÃµes (curva A) mantÃªm mÃ­nimo de 7 dias â€” nunca podem faltar.
+ * Produtos campeões (curva A) mantêm mínimo de 7 dias — nunca podem faltar.
  */
 function calcDiasAlvo(demandaDiaria: number, curva: CurvaABC): number {
   const base = calcDiasCobertura(demandaDiaria);
@@ -242,6 +252,56 @@ function getCurvaPeso(curva: CurvaABC): number {
   return 1;
 }
 
+function getUrgenciaDestinoStatus(coberturaDias: number): UrgenciaDestinoStatus {
+  if (coberturaDias <= 0) return "CRITICO";
+  if (coberturaDias <= 2) return "ALTO";
+  if (coberturaDias <= 5) return "MEDIO";
+  return "OK";
+}
+
+function getUrgenciaDestinoPeso(status: UrgenciaDestinoStatus): number {
+  if (status === "CRITICO") return 3;
+  if (status === "ALTO") return 2;
+  if (status === "MEDIO") return 1;
+  return 0;
+}
+
+function origemTemPotencial(filial: FilialData): boolean {
+  return filial.salesLast30Days > 0 || filial.vendas60d > 0 || filial.vendas12m > 0;
+}
+
+function getJanelaProtecaoDias(temPotencial: boolean): number {
+  return temPotencial ? JANELA_PROTECAO_COM_POTENCIAL : JANELA_PROTECAO_SEM_POTENCIAL;
+}
+
+function getDiasDesdeEntrada(
+  ultimaEntrada: Date | string | null | undefined,
+  dataReferencia: Date
+): number | null {
+  if (!ultimaEntrada) return null;
+
+  const dataEntrada = new Date(ultimaEntrada);
+  if (Number.isNaN(dataEntrada.getTime())) return null;
+
+  const diffMs = dataReferencia.getTime() - dataEntrada.getTime();
+  return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+}
+
+function getReservaMinimaOrigem(diaria: number, temPotencial: boolean): number {
+  const diasReserva = temPotencial ? DIAS_RESERVA_COM_POTENCIAL : DIAS_RESERVA_SEM_POTENCIAL;
+  return Math.max(1, Math.ceil(diaria * diasReserva));
+}
+
+function origemClaramenteParada(filial: FilialData, coberturaDias: number): boolean {
+  return (
+    Math.max(0, filial.stock) > 0 &&
+    filial.salesLast30Days === 0 &&
+    filial.vendas60d <= 1 &&
+    filial.vendas12m <= 3 &&
+    coberturaDias >= 7
+  );
+}
+
 function fmtDiasPt(n: number): string {
   const r = Math.round(n * 10) / 10;
   return r.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
@@ -268,9 +328,9 @@ function textoEstoqueDestino(coberturaDias: number): string {
   return `estoque ~${fmtDiasPt(coberturaDias)} dias`;
 }
 
-/** RÃ³tulo curto para o cabeÃ§alho do tooltip de quantidade. */
+/** Rótulo curto para o cabeçalho do tooltip de quantidade. */
 function curvaLabelCurto(curva: CurvaABC): string {
-  if (curva === "A") return "PrioritÃ¡rio";
+  if (curva === "A") return "Prioritário";
   if (curva === "B") return "Normal";
   return "Menor prioridade";
 }
@@ -278,12 +338,12 @@ function curvaLabelCurto(curva: CurvaABC): string {
 type StoreCluster = "alto" | "medio" | "baixo";
 
 /**
- * Demanda diÃ¡ria com piso adaptativo ao histÃ³rico anual.
+ * Demanda diária com piso adaptativo ao histórico anual.
  * Evita cobertura explosiva para produtos de cauda longa sem travar com valor fixo.
  *
  *   piso = max(mensal/30, m12/60, 0.05)
- *   â†’ m12/60: adapta ao ritmo histÃ³rico real (nÃ£o forÃ§a 0.1 para produto que vende 1x/mÃªs)
- *   â†’ 0.05: floor absoluto contra divisÃ£o por zero
+ *   → m12/60: adapta ao ritmo histórico real (não força 0.1 para produto que vende 1x/mês)
+ *   → 0.05: floor absoluto contra divisão por zero
  */
 function calcDiaria(demandaMensal: number, vendas12m: number): number {
   if (demandaMensal <= 0) return 0;
@@ -292,15 +352,15 @@ function calcDiaria(demandaMensal: number, vendas12m: number): number {
 }
 
 /**
- * Demanda mensal ponderada: combina mÃ©dia anual (estabilidade) com tendÃªncia recente (reatividade).
+ * Demanda mensal ponderada: combina média anual (estabilidade) com tendência recente (reatividade).
  *
  * m12     = vendas12m / 12
- * recente = vendas60d / 2        (mÃ©dia mensal dos Ãºltimos 60 dias)
+ * recente = vendas60d / 2        (média mensal dos últimos 60 dias)
  * peso    = clamp(recente/m12, 0.5, 1.5)
- * demanda = m12 Ã— (0.5 + 0.5 Ã— peso)
+ * demanda = m12 × (0.5 + 0.5 × peso)
  *
- * ProteÃ§Ã£o de ruptura: se stock â‰¤ 0 e m12 > 0, eleva demanda para â‰¥ 70% da mÃ©dia anual
- * para nÃ£o penalizar filiais que ficaram sem estoque.
+ * Proteção de ruptura: se stock ≤ 0 e m12 > 0, eleva demanda para ≥ 70% da média anual
+ * para não penalizar filiais que ficaram sem estoque.
  */
 function calcDemandaPonderada(
   vendas30d: number,
@@ -312,15 +372,15 @@ function calcDemandaPonderada(
   const recente = vendas60d / 2;
 
   if (m12 <= 0) {
-    // sem histÃ³rico anual: usa vendas recentes como estimativa
+    // sem histórico anual: usa vendas recentes como estimativa
     return Math.max(recente, vendas30d);
   }
 
   const peso  = Math.max(0.5, Math.min(recente / m12, 1.5));
   let demanda = m12 * (0.5 + 0.5 * peso);
 
-  // Ruptura detectada: stock zerado com histÃ³rico â†’ piso de 80% do anual OU tendÃªncia recente (maior).
-  // max(recente, m12*0.8): garante recuperaÃ§Ã£o mesmo se recente caiu por falta de produto (nÃ£o queda real).
+  // Ruptura detectada: stock zerado com histórico → piso de 80% do anual OU tendência recente (maior).
+  // max(recente, m12*0.8): garante recuperação mesmo se recente caiu por falta de produto (não queda real).
   // Evita tanto inflar produto morto (< m12) quanto subestimar produto forte que esvaziou (â‰¥ m12*0.8).
   if (stock <= 0 && m12 > 0) {
     demanda = Math.max(demanda, recente, m12 * 0.8);
@@ -330,7 +390,7 @@ function calcDemandaPonderada(
 }
 
 /**
- * Organiza as filiais baseado na configuraÃ§Ã£o da empresa
+ * Organiza as filiais baseado na configuração da empresa
  */
 function organizeFiliais(
   companyKey: CompanyKey,
@@ -368,8 +428,8 @@ function organizeFiliais(
 }
 
 /**
- * Calcula as transferÃªncias necessÃ¡rias
- * Mesma lÃ³gica da versÃ£o antiga, mas otimizada
+ * Calcula as transferências necessárias
+ * Mesma lógica da versão antiga, mas otimizada
  */
 export function calculateTransfers(
   data: ProdutoTransferencia[],
@@ -382,84 +442,119 @@ export function calculateTransfers(
   }
 
   const { matriz, ecommerce } = organizeFiliais(companyKey, data);
+  // Janela de proteção é sempre relativa ao "agora" — independe do período de vendas filtrado.
+  const dataReferenciaProtecao = new Date();
 
   const transfers: TransferItem[] = [];
 
-  // --- Curva ABC global: top 20% por vendas anuais â†’ A | prÃ³ximos 30% â†’ B | restante â†’ C ---
-  const curvaMap = new Map<string, CurvaABC>();
+  // --- Curva ABC por filial: top 20% por vendas12m dentro de cada loja ---
+  // Cada loja tem seu próprio ranking — um produto pode ser A em uma loja e C em outra.
+  const curvaMapPorFilial = new Map<string, CurvaABC>(); // key: `${filial}|${produto}|${cor}`
   {
-    const ranked = data
-      .map(item => ({
-        key: `${item.produto}|${item.cor}`,
-        totalVendas12m: item.filiais.reduce((s, f) => s + f.vendas12m, 0),
-      }))
-      .sort((a, b) => b.totalVendas12m - a.totalVendas12m);
-    const n = ranked.length;
-    ranked.forEach(({ key }, i) => {
-      const pct = i / n;
-      curvaMap.set(key, pct < 0.2 ? 'A' : pct < 0.5 ? 'B' : 'C');
+    const porFilial = new Map<string, Array<{ key: string; vendas12m: number }>>();
+    data.forEach(item => {
+      item.filiais.forEach(f => {
+        if (!porFilial.has(f.filial)) porFilial.set(f.filial, []);
+        porFilial.get(f.filial)!.push({ key: `${item.produto}|${item.cor}`, vendas12m: f.vendas12m });
+      });
+    });
+    porFilial.forEach((produtos, filial) => {
+      const sorted = [...produtos].sort((a, b) => b.vendas12m - a.vendas12m);
+      const n = sorted.length;
+      sorted.forEach(({ key }, i) => {
+        const pct = i / n;
+        curvaMapPorFilial.set(`${filial}|${key}`, pct < 0.2 ? 'A' : pct < 0.5 ? 'B' : 'C');
+      });
     });
   }
 
-  // Mapa para rastrear quantidades jÃ¡ transferidas para cada destino (produto+cor+destino)
+  // Mapa para rastrear quantidades já transferidas para cada destino (produto+cor+destino)
   const quantidadeTransferidaPorDestino = new Map<string, number>();
 
+  // Pré-computado uma vez (constantes da empresa) — evita refazer a cada produto.
+  const ecommerceFilialsList = company.ecommerceFilials ?? [];
+  const ecommerceFilialsSet = new Set(
+    ecommerceFilialsList.map(ec => (ec || '').trim().toUpperCase())
+  );
+  const isEcommerceFilial = (filial: string): boolean =>
+    ecommerceFilialsSet.has((filial || '').trim().toUpperCase());
+
   data.forEach((item) => {
-    const ecommerceFilialsList = company.ecommerceFilials ?? [];
 
     // --- 1. Calcular demanda ponderada e cobertura por filial ---
     const demandaPorFilial  = new Map<string, number>();
     const coberturaPorFilial = new Map<string, number>();
+    const contextoOrigemPorFilial = new Map<string, {
+      temPotencial: boolean;
+      diasDesdeEntrada: number | null;
+      janelaProtecaoDias: number;
+      dentroDaProtecao: boolean;
+      reservaMinima: number;
+      origemParadaSemHistoricoForte: boolean;
+    }>();
 
     item.filiais.forEach(f => {
       const demanda = calcDemandaPonderada(f.salesLast30Days, f.vendas60d, f.vendas12m, f.stock);
       demandaPorFilial.set(f.filial, demanda);
-      // Piso adaptativo: max(mensal/30, m12/60, 0.05) â€” evita cobertura explosiva
+      // Piso adaptativo: max(mensal/30, m12/60, 0.05) — evita cobertura explosiva
       const diaria    = calcDiaria(demanda, f.vendas12m);
       const estPos    = Math.max(0, f.stock);
       const cobertura = diaria > 0 ? estPos / diaria : (estPos > 0 ? 999 : 0);
       coberturaPorFilial.set(f.filial, cobertura);
+
+      const temPotencial = origemTemPotencial(f);
+      const janelaProtecaoDias = getJanelaProtecaoDias(temPotencial);
+      const diasDesdeEntrada = getDiasDesdeEntrada(f.ultimaEntrada, dataReferenciaProtecao);
+      const dentroDaProtecao =
+        diasDesdeEntrada !== null && diasDesdeEntrada < janelaProtecaoDias;
+
+      contextoOrigemPorFilial.set(f.filial, {
+        temPotencial,
+        diasDesdeEntrada,
+        janelaProtecaoDias,
+        dentroDaProtecao,
+        reservaMinima: getReservaMinimaOrigem(diaria, temPotencial),
+        origemParadaSemHistoricoForte: origemClaramenteParada(f, cobertura),
+      });
     });
 
     // FILTRO 1: produto deve ter demanda em pelo menos uma filial
     const totalDemanda = Array.from(demandaPorFilial.values()).reduce((s, v) => s + v, 0);
     if (totalDemanda <= 0) return;
 
-    // Curva ABC deste produto (A = campeÃ£o, B = relevante, C = cauda)
-    const curva = curvaMap.get(`${item.produto}|${item.cor}`) ?? 'C';
+    // Helper curva por filial
+    const getCurvaFilial = (filial: string): CurvaABC =>
+      curvaMapPorFilial.get(`${filial}|${item.produto}|${item.cor}`) ?? 'C';
 
-    // Helper: mÃ­nimo de dias que esta origem deve manter antes de ceder estoque
-    const minDiasOrigem = (f: FilialData): number => {
-      const cobertura = coberturaPorFilial.get(f.filial) || 0;
-      const isParada  = cobertura > DIAS_PARADA_COBERTURA && f.vendas60d === 0;
-      return (isMainMatrizFilial(companyKey, f.filial) || isParada) ? 0 : DIAS_COBERTURA_MIN;
-    };
-
-    // Helper: demanda diÃ¡ria com piso adaptativo
+    // Helper: demanda diária com piso adaptativo
     const getDiaria = (demanda: number, vendas12m: number): number =>
       calcDiaria(demanda, vendas12m);
 
+    // Cache da curva por filial (evita reconstruir a chave duas vezes no filter+map).
+    const curvaPorFilial = new Map<string, CurvaABC>();
+    item.filiais.forEach(f => curvaPorFilial.set(f.filial, getCurvaFilial(f.filial)));
+
     // --- 2. Destinos: filiais com necessidade > 0 ---
     const estoqueAgregadoEcommerce = item.filiais
-      .filter(f => ecommerceFilialsList.some(ec => (ec||'').trim().toUpperCase() === (f.filial||'').trim().toUpperCase()))
+      .filter(f => isEcommerceFilial(f.filial))
       .reduce((sum, f) => sum + Math.max(0, f.stock), 0);
 
     const filiaisQuePrecisam = item.filiais
       .filter(f => {
         if (isBlockedDestinationFilial(f.filial)) return false;
-        const isEcommerce = ecommerceFilialsList.some(ec => (ec||'').trim().toUpperCase() === (f.filial||'').trim().toUpperCase());
-        if (isEcommerce && estoqueAgregadoEcommerce >= 1) return false;
+        if (isEcommerceFilial(f.filial) && estoqueAgregadoEcommerce >= 1) return false;
         const demanda = demandaPorFilial.get(f.filial) || 0;
         if (demanda <= 0) return false;
-        // Ultra-low sellers: < 1 unidade/mÃªs â€” custo logÃ­stico nÃ£o justifica movimentaÃ§Ã£o
+        // Ultra-low sellers: < 1 unidade/mês — custo logístico não justifica movimentação
         if (demanda < 1) return false;
         const diaria      = calcDiaria(demanda, f.vendas12m);
         const estPos      = Math.max(0, f.stock);
-        const diasAlvo    = calcDiasAlvo(diaria, curva);
+        const diasAlvo    = calcDiasAlvo(diaria, curvaPorFilial.get(f.filial) ?? 'C');
         const necessidade = (diaria * diasAlvo) - estPos;
         return necessidade > 0;
       })
       .map(f => {
+        const curva       = curvaPorFilial.get(f.filial) ?? 'C';
         const demanda     = demandaPorFilial.get(f.filial) || 0;
         const diaria      = calcDiaria(demanda, f.vendas12m);
         const estPos      = Math.max(0, f.stock);
@@ -470,13 +565,20 @@ export function calculateTransfers(
         const diasAlvo = diasAlvoCluster + leadTimeDays;
         const necessidade = Math.max(0, (diaria * diasAlvo) - estPos);
         const cobertura   = coberturaPorFilial.get(f.filial) || 0;
+        const statusDestino = getUrgenciaDestinoStatus(cobertura);
+        if (statusDestino === "OK") return null;
         const urgencia    = Math.max(0, diasAlvo - cobertura);
         const pesoCurva = getCurvaPeso(curva);
         const prioridade  = (urgencia * 2 + diaria) * pesoCurva;
+        const prioridadeUrgencia = getUrgenciaDestinoPeso(statusDestino);
         return { filial: f.filial, stock: estPos, sales: f.sales, salesLast30Days: f.salesLast30Days,
-                 demanda, diaria, diasAlvo, necessidade, cobertura, prioridade };
+                 curva, demanda, diaria, diasAlvo, necessidade, cobertura, prioridade, statusDestino, prioridadeUrgencia };
       })
+      .filter((f): f is NonNullable<typeof f> => f !== null)
       .sort((a, b) => {
+        if (b.prioridadeUrgencia !== a.prioridadeUrgencia) {
+          return b.prioridadeUrgencia - a.prioridadeUrgencia;
+        }
         if (b.prioridade !== a.prioridade) return b.prioridade - a.prioridade;
         return a.cobertura - b.cobertura; // fallback: menor cobertura = mais urgente
       });
@@ -490,26 +592,34 @@ export function calculateTransfers(
         const diaria    = getDiaria(demanda, f.vendas12m);
         const estPos    = Math.max(0, f.stock);
         if (estPos < 1) return false;
-        const minDias   = minDiasOrigem(f);
-        const excedente = estPos - (diaria * minDias);
-        return Math.floor(excedente) >= 1;
+        const contextoOrigem = contextoOrigemPorFilial.get(f.filial);
+        const reservaMinima = contextoOrigem?.reservaMinima ?? getReservaMinimaOrigem(diaria, false);
+        const disponivel = estPos - reservaMinima;
+        return Math.floor(disponivel) >= 1;
       })
       .map(f => {
         const demanda    = demandaPorFilial.get(f.filial) || 0;
         const diaria     = getDiaria(demanda, f.vendas12m);
         const estPos     = Math.max(0, f.stock);
         const cobertura  = coberturaPorFilial.get(f.filial) || 0;
+        const contextoOrigem = contextoOrigemPorFilial.get(f.filial);
         const isParada   = cobertura > DIAS_PARADA_COBERTURA && f.vendas60d === 0;
-        const minDias    = minDiasOrigem(f);
-        const excedente  = Math.floor(Math.max(0, estPos - (diaria * minDias)));
+        const reservaMinima = contextoOrigem?.reservaMinima ?? getReservaMinimaOrigem(diaria, false);
+        const excedente  = Math.floor(Math.max(0, estPos - reservaMinima));
         return { filial: f.filial, stock: estPos, sales: f.sales, salesLast30Days: f.salesLast30Days,
-                 demanda, diaria, cobertura, isParada,
+                 isMatriz: isMainMatrizFilial(companyKey, f.filial),
+                 curva: curvaPorFilial.get(f.filial) ?? 'C', demanda, diaria, cobertura, isParada,
                  isEcommerceParado: isParada && f.filial === ecommerce,
-                 excedente };
+                 excedente,
+                 temPotencial: contextoOrigem?.temPotencial ?? false,
+                 diasDesdeEntrada: contextoOrigem?.diasDesdeEntrada ?? null,
+                 janelaProtecaoDias: contextoOrigem?.janelaProtecaoDias ?? JANELA_PROTECAO_SEM_POTENCIAL,
+                 dentroDaProtecao: contextoOrigem?.dentroDaProtecao ?? false,
+                 reservaMinima,
+                 origemParadaSemHistoricoForte: contextoOrigem?.origemParadaSemHistoricoForte ?? false };
       })
       .sort((a, b) => {
-        if (isMainMatrizFilial(companyKey, a.filial)) return -1;
-        if (isMainMatrizFilial(companyKey, b.filial)) return 1;
+        if (a.isMatriz !== b.isMatriz) return a.isMatriz ? -1 : 1;
         const aP = a.isParada || a.isEcommerceParado;
         const bP = b.isParada || b.isEcommerceParado;
         if (aP !== bP) return aP ? -1 : 1;
@@ -520,13 +630,13 @@ export function calculateTransfers(
 
     if (filiaisComEstoque.length === 0) return;
 
-    // Excedente disponÃ­vel por origem (decrementado a cada sugestÃ£o gerada)
+    // Excedente disponível por origem (decrementado a cada sugestão gerada)
     const excedenteDisponivel = new Map<string, number>(
       filiaisComEstoque.map(f => [f.filial, f.excedente])
     );
 
-    // VisÃ£o global do produto: quando o excedente total nÃ£o cobre toda necessidade,
-    // priorizamos filiais de maior impacto (curva + urgÃªncia + demanda).
+    // Visão global do produto: quando o excedente total não cobre toda necessidade,
+    // priorizamos filiais de maior impacto (curva + urgência + demanda).
     const necessidadeTotalGlobal = filiaisQuePrecisam.reduce((s, f) => s + Math.ceil(f.necessidade), 0);
     const excedenteTotalGlobal = Array.from(excedenteDisponivel.values()).reduce((s, v) => s + v, 0);
     const fatorAtendimentoGlobal =
@@ -542,7 +652,7 @@ export function calculateTransfers(
       let necessidadeTotal = Math.ceil(filialDestino.necessidade);
       if (fatorAtendimentoGlobal < 1) {
         const necessidadeAjustada = Math.floor(necessidadeTotal * fatorAtendimentoGlobal);
-        necessidadeTotal = curva === "A"
+        necessidadeTotal = filialDestino.curva === "A"
           ? Math.max(1, necessidadeAjustada)
           : Math.max(0, necessidadeAjustada);
       }
@@ -553,10 +663,9 @@ export function calculateTransfers(
       let totalTransferido = jaTransferido;
       const destinoDisplayName = company.filialDisplayNames?.[filialDestino.filial] || filialDestino.filial;
 
-      // Ordenar origens: matriz â†’ paradas (maior excedente) â†’ ativas (maior cobertura)
+      // Ordenar origens: matriz → paradas (maior excedente) → ativas (maior cobertura)
       const origensOrdenadas = [...filiaisComEstoque].sort((a, b) => {
-        if (isMainMatrizFilial(companyKey, a.filial)) return -1;
-        if (isMainMatrizFilial(companyKey, b.filial)) return 1;
+        if (a.isMatriz !== b.isMatriz) return a.isMatriz ? -1 : 1;
         const aP = a.isParada || a.isEcommerceParado;
         const bP = b.isParada || b.isEcommerceParado;
         if (aP !== bP) return aP ? -1 : 1;
@@ -571,11 +680,23 @@ export function calculateTransfers(
         const excDisponivel = Math.floor(excedenteDisponivel.get(origem.filial) || 0);
         if (excDisponivel < 1) continue;
 
-        // Zona neutra dinÃ¢mica: sÃ³ move se a origem tiver folga de cobertura vs destino.
-        // max(2, diasAlvo * 0.3): para diaria>=1 â†’ 2 dias; para diaria<0.3 â†’ ~3 dias
+        const destinoUrgente = filialDestino.statusDestino === "ALTO" || filialDestino.statusDestino === "CRITICO";
+        const podeQuebrarProtecao =
+          (origem.curva === "A" && destinoUrgente) ||
+          (!origem.temPotencial && filialDestino.statusDestino === "CRITICO") ||
+          (origem.origemParadaSemHistoricoForte && destinoUrgente);
+
+        if (origem.dentroDaProtecao && !podeQuebrarProtecao) continue;
+
+        // Zona neutra dinâmica: só move se a origem tiver folga de cobertura vs destino.
+        // max(2, diasAlvo * 0.3): para diaria>=1 → 2 dias; para diaria<0.3 → ~3 dias
         const zonaNeutra = Math.max(2, filialDestino.diasAlvo * 0.3);
         const diffCobertura = origem.cobertura - filialDestino.cobertura;
-        if (diffCobertura < zonaNeutra) continue;
+        if (filialDestino.statusDestino === "MEDIO") {
+          if (diffCobertura < zonaNeutra) continue;
+        } else if (diffCobertura < 0) {
+          continue;
+        }
 
         const quantidade = Math.min(
           aindaNecessario,
@@ -588,7 +709,7 @@ export function calculateTransfers(
 
         const qtdEnvio = quantidade;
         const explicacaoChunk: QuantidadeExplicacaoChunk = {
-          curva,
+          curva: origem.curva,
           destino: {
             coberturaDias: filialDestino.cobertura,
             diasAlvo: filialDestino.diasAlvo,
@@ -602,11 +723,18 @@ export function calculateTransfers(
             excedenteDisponivel: excDisponivel,
             excedenteInicialNaRodada: origem.excedente,
             estoqueNaOrigem: origem.stock,
-            isMatrizPrincipal: isMainMatrizFilial(companyKey, origem.filial),
+            isMatrizPrincipal: origem.isMatriz,
           },
           regra: {
-            zonaNeutraDias: zonaNeutra,
+            zonaNeutraDias: filialDestino.statusDestino === "MEDIO" ? zonaNeutra : 0,
             folgaCoberturaDias: diffCobertura,
+            statusDestino: filialDestino.statusDestino,
+            reservaOrigem: origem.reservaMinima,
+            diasDesdeEntrada: origem.diasDesdeEntrada,
+            janelaProtecaoDias: origem.janelaProtecaoDias,
+            protecaoAtiva: origem.dentroDaProtecao,
+            quebraProtecao: origem.dentroDaProtecao && podeQuebrarProtecao,
+            origemTemPotencial: origem.temPotencial,
           },
           esteEnvio: {
             faltava: Math.ceil(aindaNecessario),
@@ -627,7 +755,7 @@ export function calculateTransfers(
           origemCanonico:  origem.filial,
           destinoCanonico: filialDestino.filial,
           quantidade:      qtdEnvio,
-          curva,
+          curva:           origem.curva,
           itemOriginal:    item,
           quantidadeExplicacao: [explicacaoChunk],
         };
@@ -676,50 +804,39 @@ export function calculateTransfers(
     });
   });
 
-  // --- 5. Ordenar por score estratÃ©gico ---
+  // --- 5. Ordenar por score estratégico ---
   // score = gap_cobertura * quantidade * peso_curva * demanda_destino
   // Maior score = maior impacto de venda/ruptura.
-  transfers.sort((a, b) => {
-    const filialDestA = a.itemOriginal.filiais.find(f => f.filial === a.destinoCanonico);
-    const filialOrigA = a.itemOriginal.filiais.find(f => f.filial === a.origemCanonico);
-    const filialDestB = b.itemOriginal.filiais.find(f => f.filial === b.destinoCanonico);
-    const filialOrigB = b.itemOriginal.filiais.find(f => f.filial === b.origemCanonico);
+  // Pré-computa o score uma vez por transfer (Schwartzian transform): O(N) ao invés de O(N²).
+  const cobFilial = (f: FilialData | undefined): number => {
+    if (!f) return 999;
+    const dem = calcDemandaPonderada(f.salesLast30Days, f.vendas60d, f.vendas12m, f.stock);
+    const dia = calcDiaria(dem, f.vendas12m);
+    return dia > 0 ? Math.max(0, f.stock) / dia : (f.stock > 0 ? 999 : 0);
+  };
 
-    const cobFilial = (f: FilialData | undefined): number => {
-      if (!f) return 999;
-      const dem = calcDemandaPonderada(f.salesLast30Days, f.vendas60d, f.vendas12m, f.stock);
-      const dia = calcDiaria(dem, f.vendas12m);
-      return dia > 0 ? Math.max(0, f.stock) / dia : (f.stock > 0 ? 999 : 0);
-    };
-
-    const demandaDestA = calcDemandaPonderada(
-      filialDestA?.salesLast30Days ?? 0,
-      filialDestA?.vendas60d ?? 0,
-      filialDestA?.vendas12m ?? 0,
-      filialDestA?.stock ?? 0
+  const transfersComScore = transfers.map(t => {
+    const filialDest = t.itemOriginal.filiais.find(f => f.filial === t.destinoCanonico);
+    const filialOrig = t.itemOriginal.filiais.find(f => f.filial === t.origemCanonico);
+    const demandaDest = calcDemandaPonderada(
+      filialDest?.salesLast30Days ?? 0,
+      filialDest?.vendas60d ?? 0,
+      filialDest?.vendas12m ?? 0,
+      filialDest?.stock ?? 0
     );
-    const demandaDestB = calcDemandaPonderada(
-      filialDestB?.salesLast30Days ?? 0,
-      filialDestB?.vendas60d ?? 0,
-      filialDestB?.vendas12m ?? 0,
-      filialDestB?.stock ?? 0
-    );
-    const gapA = Math.max(0, cobFilial(filialOrigA) - cobFilial(filialDestA));
-    const gapB = Math.max(0, cobFilial(filialOrigB) - cobFilial(filialDestB));
-    const dkA = (a.destinoCanonico || "").trim().toUpperCase();
-    const dkB = (b.destinoCanonico || "").trim().toUpperCase();
-    const pesoDestA = getCurvaPeso(a.curva);
-    const pesoDestB = getCurvaPeso(b.curva);
-    const scoreA = gapA * a.quantidade * pesoDestA * Math.max(1, demandaDestA);
-    const scoreB = gapB * b.quantidade * pesoDestB * Math.max(1, demandaDestB);
-    return scoreB - scoreA;
+    const gap = Math.max(0, cobFilial(filialOrig) - cobFilial(filialDest));
+    const score = gap * t.quantidade * getCurvaPeso(t.curva) * Math.max(1, demandaDest);
+    return { t, score };
   });
+
+  transfersComScore.sort((a, b) => b.score - a.score);
+  const transfersOrdenados = transfersComScore.map(({ t }) => t);
 
   // Consolidar itens duplicados (mesmo produto+cor+origem+destino): somar quantidades
   const transferKey = (t: TransferItem) =>
     `${t.produto}|${t.cor}|${t.origem}|${t.destino}`;
   const consolidatedMap = new Map<string, TransferItem>();
-  transfers.forEach((t) => {
+  transfersOrdenados.forEach((t) => {
     const k = transferKey(t);
     const existente = consolidatedMap.get(k);
     if (existente) {
@@ -776,6 +893,20 @@ interface TransferByDestinationGroup {
   totalQuantidade: number;
 }
 
+const QTT_STATUS_LABEL: Record<UrgenciaDestinoStatus, string> = {
+  CRITICO: "Crítico",
+  ALTO: "Alto",
+  MEDIO: "Médio",
+  OK: "OK",
+};
+
+const QTT_STATUS_STYLE: Record<UrgenciaDestinoStatus, string> = {
+  CRITICO: "qttStatusCritico",
+  ALTO: "qttStatusAlto",
+  MEDIO: "qttStatusMedio",
+  OK: "qttStatusOk",
+};
+
 function QuantidadeTransferenciaTooltipBody({
   chunks,
   quantidadeSugerida,
@@ -789,33 +920,30 @@ function QuantidadeTransferenciaTooltipBody({
   ajustadaPorEstoqueReal: boolean;
   destinoCanonicoAtual?: string;
 }) {
-  const [detalhesAberto, setDetalhesAberto] = useState(false);
   const first = chunks?.[0];
 
   if (!first) {
     return (
       <div className={styles.qttSimple}>
+        <div className={styles.qttHeaderRow}>
+          <span className={styles.qttEnviarPrincipal}>
+            Enviar <strong>{unidadesPt(quantidadeSugerida)}</strong>
+          </span>
+        </div>
         <p className={styles.qttLeadMuted}>Estimativa a partir de estoque e vendas por loja.</p>
-        <p className={styles.qttEnviar}>
-          <span className={styles.qttEnviarArrow} aria-hidden>
-            {"\u2192"}
-          </span>{" "}
-          Enviar: <strong>{unidadesPt(quantidadeSugerida)}</strong>
-        </p>
-        {ajustadaPorEstoqueReal ? (
+        {ajustadaPorEstoqueReal && (
           <footer className={styles.qttCardFooter}>
-            Estoque real na cÃ©lula: <strong>{unidadesPt(quantidadeExibida)}</strong>
+            Estoque real: <strong>{unidadesPt(quantidadeExibida)}</strong>
           </footer>
-        ) : null}
+        )}
       </div>
     );
   }
 
   const d = first.destino;
-  const escassez =
-    d.fatorEscassez < 0.999 && d.metaTransferencia < d.necessidadeIntegral;
-  const roteiro = chunks.find((c) => c.roteiroDestinosParaEstaOrigem?.length)
-    ?.roteiroDestinosParaEstaOrigem;
+  const regra = first.regra;
+  const escassez = d.fatorEscassez < 0.999 && d.metaTransferencia < d.necessidadeIntegral;
+  const roteiro = chunks.find((c) => c.roteiroDestinosParaEstaOrigem?.length)?.roteiroDestinosParaEstaOrigem;
   const canonAtual = (destinoCanonicoAtual || "").trim().toUpperCase();
   const enviaTotalLinha = chunks.reduce((s, c) => s + c.esteEnvio.enviado, 0);
 
@@ -829,151 +957,143 @@ function QuantidadeTransferenciaTooltipBody({
             prev.quantidade += r.quantidade;
             prev.isAtual = prev.isAtual || isAtual;
           } else {
-            acc.set(k, {
-              ordem: r.ordem,
-              destinoLabel: r.destinoLabel,
-              quantidade: r.quantidade,
-              isAtual,
-            });
+            acc.set(k, { ordem: r.ordem, destinoLabel: r.destinoLabel, quantidade: r.quantidade, isAtual });
           }
           return acc;
         }, new Map<string, { ordem: number; destinoLabel: string; quantidade: number; isAtual: boolean }>())
-          .values()
+        .values()
       )
-        .sort((a, b) => a.ordem - b.ordem)
-        .map((r, i) => ({ ...r, ordem: i + 1 }))
+      .sort((a, b) => a.ordem - b.ordem)
+      .map((r, i) => ({ ...r, ordem: i + 1 }))
     : [];
 
-  const kicker = `CURVA ${first.curva} Â· ${curvaLabelCurto(first.curva)}`;
-  const destinoLinha = `Destino: ${textoEstoqueDestino(d.coberturaDias)} (~${fmtDiasPt(d.diasAlvo)} dias alvo)`;
-
+  const statusDestino = regra.statusDestino ?? "MEDIO";
+  const reservaOrigem = regra.reservaOrigem ?? 1;
   const estoqueOrigem = first.origem.estoqueNaOrigem;
-  const jaAlocadoSobra = Math.max(
-    0,
-    Math.ceil(first.origem.excedenteInicialNaRodada - first.origem.excedenteDisponivel)
-  );
   const disponivelLinha = Math.ceil(first.origem.excedenteDisponivel);
-
-  const necessidadeExibir =
-    chunks.length === 1 ? chunks[0].esteEnvio.faltava : null;
-  const disponivelExibir = chunks.length === 1 ? disponivelLinha : null;
-  const resultadoExibir = enviaTotalLinha;
 
   return (
     <div className={styles.qttSimple}>
-      <header className={styles.qttDecision}>
-        <p className={styles.qttKicker}>{kicker}</p>
-        <p className={styles.qttDestino}>{destinoLinha}</p>
-        <p className={styles.qttEnviar}>
-          <span className={styles.qttEnviarArrow} aria-hidden>
-            {"\u2192"}
-          </span>{" "}
-          Enviar: <strong>{unidadesPt(enviaTotalLinha)}</strong>
-        </p>
-      </header>
 
-      <div className={styles.qttMotivo}>
-        <p className={styles.qttFormulaTitulo}>Envio = min(necessidade, disponÃ­vel)</p>
-        {chunks.length === 1 && necessidadeExibir != null && disponivelExibir != null ? (
-          <dl className={styles.qttFormulaDl}>
-            <div className={styles.qttFormulaRow}>
-              <dt>necessidade</dt>
-              <dd>{fmtUnPt(necessidadeExibir)}</dd>
-            </div>
-            <div className={styles.qttFormulaRow}>
-              <dt>disponÃ­vel</dt>
-              <dd>{fmtUnPt(disponivelExibir)}</dd>
-            </div>
-            <div className={`${styles.qttFormulaRow} ${styles.qttFormulaRowResult}`}>
-              <dt>resultado</dt>
-              <dd>{fmtUnPt(resultadoExibir)}</dd>
-            </div>
-          </dl>
-        ) : (
-          <>
-            <p className={styles.qttLeadMuted}>
-              VÃ¡rios trechos â€” cada um: min(necessidade, disponÃ­vel). Veja a quebra em{" "}
-              <strong>Ver detalhes</strong>.
-            </p>
-            <dl className={styles.qttFormulaDl}>
-              <div className={`${styles.qttFormulaRow} ${styles.qttFormulaRowResult}`}>
-                <dt>resultado</dt>
-                <dd>{fmtUnPt(resultadoExibir)}</dd>
-              </div>
-            </dl>
-          </>
-        )}
+      {/* Cabeçalho */}
+      <div className={styles.qttHeaderRow}>
+        <span className={styles.qttCurvaTag}>Curva {first.curva} · {curvaLabelCurto(first.curva)}</span>
+        <span className={styles.qttEnviarPrincipal}>
+          {"→"} <strong>{unidadesPt(enviaTotalLinha)}</strong>
+        </span>
       </div>
 
-      <button
-        type="button"
-        className={styles.qttDetailsBtn}
-        aria-expanded={detalhesAberto}
-        onClick={() => setDetalhesAberto((v) => !v)}
-      >
-        {detalhesAberto ? "Ocultar detalhes" : "Ver detalhes"}
-      </button>
-
-      {detalhesAberto ? (
-        <div className={styles.qttDetailsPanel}>
-          <p className={styles.qttDetailsLine}>
-            <span className={styles.qttDetailsK}>Origem</span>{" "}
-            <span className={styles.qttDetailsV}>{fmtUnPt(estoqueOrigem)} em estoque</span>
-          </p>
-          {jaAlocadoSobra > 0 ? (
-            <p className={styles.qttDetailsLine}>
-              <span className={styles.qttDetailsK}>JÃ¡ alocado (outros destinos)</span>{" "}
-              <span className={styles.qttDetailsV}>{fmtUnPt(jaAlocadoSobra)}</span>
-            </p>
-          ) : null}
-          <p className={styles.qttDetailsLine}>
-            <span className={styles.qttDetailsK}>DisponÃ­vel p/ esta linha</span>{" "}
-            <span className={styles.qttDetailsV}>{fmtUnPt(disponivelLinha)}</span>
-          </p>
-          {roteiroPorLabel.length > 0 ? (
-            <>
-              <p className={styles.qttDetailsSubtit}>Outros destinos (esta origem)</p>
-              <ul className={styles.qttDetailsUl}>
-                {roteiroPorLabel.map((r) => (
-                  <li key={`${r.destinoLabel}-${r.ordem}`}>
-                    {r.destinoLabel} â†’ {r.quantidade} un.
-                    {r.isAtual ? (
-                      <span className={styles.qttDetailsBadge}>esta linha</span>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
-          {chunks.length > 1 ? (
-            <>
-              <p className={styles.qttDetailsSubtit}>Trechos (min por etapa)</p>
-              <ul className={styles.qttDetailsUl}>
-                {chunks.map((c, i) => (
-                  <li key={`trecho-${i}-${c.esteEnvio.enviado}`}>
-                    min({fmtUnPt(c.esteEnvio.faltava)},{" "}
-                    {fmtUnPt(Math.ceil(c.origem.excedenteDisponivel))}) = {fmtUnPt(c.esteEnvio.enviado)}
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
-          {escassez ? (
-            <p className={styles.qttDetailsNota}>
-              Meta deste destino reduzida pelo rateio do grupo:{" "}
-              <strong>{Math.round(d.fatorEscassez * 100)}%</strong> da necessidade integral.
-            </p>
-          ) : null}
+      {/* Destino */}
+      <section className={styles.qttSection}>
+        <div className={styles.qttSectionHead}>
+          <span className={styles.qttSectionTitle}>Destino</span>
+          <span className={`${styles.qttStatusBadge} ${styles[QTT_STATUS_STYLE[statusDestino]]}`}>
+            {QTT_STATUS_LABEL[statusDestino]}
+          </span>
         </div>
-      ) : null}
+        <div className={styles.qttRow}>
+          <span>Cobertura atual</span>
+          <span>{fmtDiasPt(d.coberturaDias)} dias</span>
+        </div>
+        <div className={styles.qttRow}>
+          <span>Alvo</span>
+          <span>{fmtDiasPt(d.diasAlvo)} dias</span>
+        </div>
+        <div className={`${styles.qttRow} ${styles.qttRowStrong}`}>
+          <span>Precisa</span>
+          <strong>{fmtUnPt(Math.ceil(d.necessidadeIntegral))} un.</strong>
+        </div>
+      </section>
 
-      {ajustadaPorEstoqueReal ? (
+      {/* Origem */}
+      <section className={styles.qttSection}>
+        <div className={styles.qttSectionHead}>
+          <span className={styles.qttSectionTitle}>Origem</span>
+          {regra.origemTemPotencial !== undefined && (
+            <span className={styles.qttPotencialTag}>
+              {regra.origemTemPotencial ? "com histórico" : "sem histórico"}
+            </span>
+          )}
+        </div>
+        <div className={styles.qttRow}>
+          <span>Em estoque</span>
+          <span>{fmtUnPt(estoqueOrigem)} un.</span>
+        </div>
+        <div className={styles.qttRow}>
+          <span>Reserva mínima</span>
+          <span>{fmtUnPt(reservaOrigem)} un.</span>
+        </div>
+        <div className={`${styles.qttRow} ${styles.qttRowStrong}`}>
+          <span>Disponível</span>
+          <strong>{fmtUnPt(disponivelLinha)} un.</strong>
+        </div>
+        {regra.diasDesdeEntrada != null && (
+          <div className={`${styles.qttRow} ${styles.qttRowNote}`}>
+            <span>
+              {regra.quebraProtecao
+                ? "Proteção quebrada"
+                : regra.protecaoAtiva
+                ? "Dentro da janela"
+                : "Janela expirada"}
+            </span>
+            <span>{regra.diasDesdeEntrada}d / {regra.janelaProtecaoDias}d</span>
+          </div>
+        )}
+      </section>
+
+      {/* Roteiro desta origem */}
+      {roteiroPorLabel.length > 0 && (
+        <section className={styles.qttSection}>
+          <div className={styles.qttSectionHead}>
+            <span className={styles.qttSectionTitle}>Destinos desta origem</span>
+          </div>
+          {roteiroPorLabel.map((rot) => (
+            <div
+              key={`${rot.destinoLabel}-${rot.ordem}`}
+              className={`${styles.qttRow} ${rot.isAtual ? styles.qttRowAtual : ""}`}
+            >
+              <span>{rot.destinoLabel}</span>
+              <span>
+                {rot.quantidade} un.
+                {rot.isAtual && <span className={styles.qttAtualTag}>esta linha</span>}
+              </span>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* Múltiplos trechos */}
+      {chunks.length > 1 && (
+        <section className={styles.qttSection}>
+          <div className={styles.qttSectionHead}>
+            <span className={styles.qttSectionTitle}>Trechos</span>
+          </div>
+          {chunks.map((c, i) => (
+            <div key={`trecho-${i}`} className={styles.qttRow}>
+              <span>Trecho {i + 1}</span>
+              <span>
+                min({fmtUnPt(c.esteEnvio.faltava)}, {fmtUnPt(Math.ceil(c.origem.excedenteDisponivel))}) = {fmtUnPt(c.esteEnvio.enviado)}
+              </span>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* Rateio por escassez */}
+      {escassez && (
+        <div className={styles.qttNota}>
+          Rateio: <strong>{Math.round(d.fatorEscassez * 100)}%</strong> da necessidade — estoque insuficiente para cobrir todos os destinos.
+        </div>
+      )}
+
+      {/* Estoque real sobreposto */}
+      {ajustadaPorEstoqueReal && (
         <footer className={styles.qttCardFooter}>
-          Estoque real na cÃ©lula: <strong>{unidadesPt(quantidadeExibida)}</strong>
-          <span className={styles.qttFooterSep}>Â·</span>
-          sugestÃ£o antes: <strong>{unidadesPt(quantidadeSugerida)}</strong>
+          Estoque real: <strong>{unidadesPt(quantidadeExibida)}</strong>
+          <span className={styles.qttFooterSep}>·</span>
+          sugestão: <strong>{unidadesPt(quantidadeSugerida)}</strong>
         </footer>
-      ) : null}
+      )}
     </div>
   );
 }
@@ -989,7 +1109,7 @@ export default function ControleTransferenciasTable({
 }: ControleTransferenciasTableProps) {
   const company = resolveCompany(companyKey);
 
-  /** SÃ³ depende de dados + perÃ­odo â€” evita recalcular algoritmo inteiro ao trocar sÃ³ a filial de origem na UI. */
+  /** Só depende de dados + período — evita recalcular algoritmo inteiro ao trocar só a filial de origem na UI. */
   const transfersAllOrigins = useMemo(
     () => calculateTransfers(data, companyKey, dateRange),
     [data, companyKey, dateRange]
@@ -1145,9 +1265,9 @@ export default function ControleTransferenciasTable({
     [filialToCodMap, company]
   );
 
-  /** Verifica se um valor de permissÃ£o corresponde Ã  filial (origem ou destino).
-   * permValue = codFilial (ex: "000001") armazenado nas permissÃµes.
-   * filialCanonico = nome canÃ´nico da filial no item (ex: "NERD", "NERD CENTER NORTE").
+  /** Verifica se um valor de permissão corresponde à filial (origem ou destino).
+   * permValue = codFilial (ex: "000001") armazenado nas permissões.
+   * filialCanonico = nome canônico da filial no item (ex: "NERD", "NERD CENTER NORTE").
    */
   const permissaoMatchFilial = useCallback(
     (permValue: string, filialCanonico: string): boolean => {
@@ -1171,11 +1291,11 @@ export default function ControleTransferenciasTable({
     if (user?.role === "admin") return transfersByOriginAndDestination;
     if (!permissoes || filiaisApi.length === 0) return [];
     if (permissoes.podeVerOutrasFiliais) return transfersByOriginAndDestination;
-    // Destinos visÃ­veis: usa filiaisDestinoControle (visualizaÃ§Ã£o no controle de transferÃªncias).
-    // Vazio = todos os destinos visÃ­veis.
+    // Destinos visíveis: usa filiaisDestinoControle (visualização no controle de transferências).
+    // Vazio = todos os destinos visíveis.
     const destinosVisiveis = permissoes.filiaisDestinoControle ?? [];
-    // Origem visÃ­vel: apenas a filial atribuÃ­da ao usuÃ¡rio (filialAtribuida).
-    // filiaisOrigem Ã© para permissÃ£o de execuÃ§Ã£o de saÃ­das, nÃ£o para filtrar origens no controle.
+    // Origem visível: apenas a filial atribuída ao usuário (filialAtribuida).
+    // filiaisOrigem é para permissão de execução de saídas, não para filtrar origens no controle.
     const filialAtribuida = permissoes.filialAtribuida?.trim() || null;
     return transfersByOriginAndDestination
       .filter((group) => {
@@ -1216,10 +1336,10 @@ export default function ControleTransferenciasTable({
   }, [filteredTransfersByOriginAndDestination]);
 
 
-  // Carregar marcaÃ§Ãµes da API (Neon + Redis com migraÃ§Ã£o automÃ¡tica)
-  // IMPORTANTE: Carregamos TODOS os dados salvos, nÃ£o apenas os visÃ­veis.
-  // Isso garante que dados nÃ£o sejam perdidos quando itens saem da lista.
-  // Apenas mostramos como marcados os itens que estÃ£o visÃ­veis E salvos.
+  // Carregar marcações da API (Neon + Redis com migração automática)
+  // IMPORTANTE: Carregamos TODOS os dados salvos, não apenas os visíveis.
+  // Isso garante que dados não sejam perdidos quando itens saem da lista.
+  // Apenas mostramos como marcados os itens que estão visíveis E salvos.
   useEffect(() => {
     let active = true;
     (async () => {
@@ -1229,7 +1349,7 @@ export default function ControleTransferenciasTable({
         if (!res.ok) return;
         const json = await res.json();
         const stored: string[] = Array.isArray(json.markedKeys) ? json.markedKeys : [];
-        // Filtrar apenas os visÃ­veis para exibiÃ§Ã£o, mas manter todos salvos no backend
+        // Filtrar apenas os visíveis para exibição, mas manter todos salvos no backend
         const visible = visibleItemKeys;
         const filtered = stored.filter((k) => visible.has(k));
         setMarkedKeys(new Set(filtered));
@@ -1296,14 +1416,14 @@ export default function ControleTransferenciasTable({
     
     setSavingMarked(true);
     try {
-      // Usar a nova API que faz merge - adiciona/remove apenas este item especÃ­fico
-      // Isso preserva todos os outros dados, mesmo os que nÃ£o estÃ£o visÃ­veis
+      // Usar a nova API que faz merge - adiciona/remove apenas este item específico
+      // Isso preserva todos os outros dados, mesmo os que não estão visíveis
       await fetch("/api/transferencias-realizadas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           companyKey, 
-          markedKeys: isCurrentlyMarked ? [] : [key], // Adicionar apenas se nÃ£o estava marcado
+          markedKeys: isCurrentlyMarked ? [] : [key], // Adicionar apenas se não estava marcado
           removeKeys: isCurrentlyMarked ? [key] : []  // Remover apenas se estava marcado
         }),
       });
@@ -1341,16 +1461,16 @@ export default function ControleTransferenciasTable({
       <div className={styles.wrapper}>
         <div className={styles.empty}>
           {selectedFilial 
-            ? `Nenhuma transferÃªncia necessÃ¡ria para ${company?.filialDisplayNames?.[selectedFilial] || selectedFilial} no momento.`
-            : "Nenhuma transferÃªncia necessÃ¡ria no momento."}
+            ? `Nenhuma transferência necessária para ${company?.filialDisplayNames?.[selectedFilial] || selectedFilial} no momento.`
+            : "Nenhuma transferência necessária no momento."}
         </div>
       </div>
     );
   }
 
-  // FunÃ§Ã£o para exportar PDF
+  // Função para exportar PDF
   const handleExportPDF = () => {
-    // Preparar dados para exportaÃ§Ã£o incluindo estoqueOrigem
+    // Preparar dados para exportação incluindo estoqueOrigem
     const dataForExport = filteredTransfersByOriginAndDestination.map((group) => ({
       origem: group.origem,
       totalQuantidade: group.totalQuantidade,
@@ -1387,7 +1507,7 @@ export default function ControleTransferenciasTable({
 
   return (
     <div className={styles.wrapper}>
-      {/* BotÃ£o de exportar PDF */}
+      {/* Botão de exportar PDF */}
       <div className={styles.exportButtonContainer}>
         <button onClick={handleExportPDF} className={styles.exportButton}>
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1445,11 +1565,11 @@ export default function ControleTransferenciasTable({
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th className={styles.realizadaHeader} title="Marcar como jÃ¡ realizada (pendente de atualizaÃ§Ã£o no sistema)">
+                    <th className={styles.realizadaHeader} title="Marcar como já realizada (pendente de atualização no sistema)">
                       Realizada
                     </th>
                     <th className={styles.produtoHeader}>Produto</th>
-                    <th className={styles.codigoBarraHeader}>CÃ³digo de Barras</th>
+                    <th className={styles.codigoBarraHeader}>Código de Barras</th>
                     <th className={styles.estoqueHeader}>Estoque {group.origem}</th>
                     <th className={styles.quantidadeRealHeader}>Estoque real</th>
                     {companyKey === 'scarfme' && (
@@ -1458,7 +1578,7 @@ export default function ControleTransferenciasTable({
                         <th className={styles.gradeHeader}>Grade</th>
                       </>
                     )}
-                    <th className={styles.descricaoHeader}>DescriÃ§Ã£o</th>
+                    <th className={styles.descricaoHeader}>Descrição</th>
                     <th className={styles.corHeader}>Cor</th>
                     <th className={styles.destinoHeader}>Destino</th>
                     <th className={styles.quantidadeHeader}>Quantidade</th>
@@ -1475,7 +1595,7 @@ export default function ControleTransferenciasTable({
                     );
                     const estoqueOrigem = filialOrigemData?.stock || 0;
                     
-                    // Calcular altura do tooltip baseada no nÃºmero de filiais deste item
+                    // Calcular altura do tooltip baseada no número de filiais deste item
                     const numFiliais = item.itemOriginal.filiais.length;
                     const tooltipHeightEstimate = Math.min(700, 100 + (numFiliais * 28));
                     const itemKey = getTransferItemKey(item);
@@ -1491,7 +1611,7 @@ export default function ControleTransferenciasTable({
                       isMainMatrizFilial(companyKey, filialOrigemData?.filial ?? "") ||
                       isMainMatrizFilial(companyKey, item.origem);
                     
-                    // Verificar se estÃ¡ parada hÃ¡ 14+ dias
+                    // Verificar se está parada há 14+ dias
                     let isParada = false;
                     if (filialOrigemData) {
                       const estoquePositivo = Math.max(0, filialOrigemData.stock);
@@ -1504,13 +1624,13 @@ export default function ControleTransferenciasTable({
                             isParada = true;
                           }
                         } else {
-                          // Se nÃ£o hÃ¡ data de entrada, considerar parada (comportamento antigo)
+                          // Se não há data de entrada, considerar parada (comportamento antigo)
                           isParada = true;
                         }
                       }
                     }
                     
-                    // Verificar se pode enviar tudo (matriz ou loja parada hÃ¡ 14+ dias sem vendas)
+                    // Verificar se pode enviar tudo (matriz ou loja parada há 14+ dias sem vendas)
                     const podeEnviarTudo = isMatriz || (isParada && filialOrigemData?.sales === 0);
                     
                     // Calcular quantidade ajustada baseada no estoque real
@@ -1525,29 +1645,31 @@ export default function ControleTransferenciasTable({
                       } else if (estoqueReal === 1) {
                         // Se estoque real = 1
                         if (!podeEnviarTudo) {
-                          // Loja nÃ£o pode enviar tudo: quantidade = 0
+                          // Loja não pode enviar tudo: quantidade = 0
                           quantidadeAjustada = 0;
                           quantidadeAfetada = true;
                         } else {
-                          // Se pode enviar tudo, quantidade = 1 (sempre limita ao estoque real disponÃ­vel)
+                          // Se pode enviar tudo, quantidade = 1 (sempre limita ao estoque real disponível)
                           quantidadeAjustada = 1;
-                          quantidadeAfetada = true; // Sempre afetada quando hÃ¡ estoque real
+                          quantidadeAfetada = true; // Sempre afetada quando há estoque real
                         }
                       } else if (estoqueReal < item.quantidade) {
                         // Se estoque real < quantidade original: quantidade = estoque real
                         quantidadeAjustada = estoqueReal;
                         quantidadeAfetada = true;
                       }
-                      // Se estoque real >= quantidade original, quantidade mantÃ©m igual (nÃ£o afetada)
+                      // Se estoque real >= quantidade original, quantidade mantém igual (não afetada)
                     }
-                    
+
+                    const urgenciaStatus = item.quantidadeExplicacao?.[0]?.regra?.statusDestino;
+
                     return (
                 <tr
                   key={`${item.produto}-${item.cor}-${item.destino}-${index}`}
                   className={isMarkedRealizada ? styles.rowRealizada : undefined}
                 >
                   <td className={styles.realizadaCell}>
-                    <label className={styles.realizadaCheckboxLabel} title="JÃ¡ realizada, pendente de atualizaÃ§Ã£o no sistema">
+                    <label className={styles.realizadaCheckboxLabel} title="Já realizada, pendente de atualização no sistema">
                       <input
                         type="checkbox"
                         checked={isMarkedRealizada}
@@ -1778,7 +1900,7 @@ export default function ControleTransferenciasTable({
                       onMouseEnter={() =>
                         setHoveredCorTooltip({
                           itemKey,
-                          codigoCor: item.itemOriginal.codigoCor ?? "â€”",
+                          codigoCor: item.itemOriginal.codigoCor ?? "—",
                         })
                       }
                       onMouseLeave={() => setHoveredCorTooltip(null)}
@@ -1786,7 +1908,7 @@ export default function ControleTransferenciasTable({
                       <span className={styles.corBadge}>{item.cor}</span>
                       {hoveredCorTooltip?.itemKey === itemKey && (
                         <span className={styles.corCodigoTooltip}>
-                          CÃ³digo: {item.itemOriginal.codigoCor ?? "â€”"}
+                          Código: {item.itemOriginal.codigoCor ?? "—"}
                         </span>
                       )}
                     </span>
@@ -1842,7 +1964,7 @@ export default function ControleTransferenciasTable({
 
           <div className={styles.footer}>
             <div className={styles.footerLeft}>
-              {group.totalItens} itens para transferÃªncia
+              {group.totalItens} itens para transferência
             </div>
             <div className={styles.footerRight}>
               Total: <span className={styles.footerTotal}>{group.totalQuantidade}</span>
@@ -1901,7 +2023,7 @@ export default function ControleTransferenciasTable({
           <div className={styles.tooltipHeader}>
             <div className={styles.tooltipTitle}>{hoveredItem.descricao}</div>
             <div className={styles.tooltipSubtitle}>
-              {hoveredItem.codigo} â€¢ {hoveredItem.cor}
+              {hoveredItem.codigo} • {hoveredItem.cor}
             </div>
           </div>
           <div className={styles.tooltipContent}>
@@ -1938,7 +2060,7 @@ export default function ControleTransferenciasTable({
                     .map(f => f.ultimaEntrada)
                     .filter(date => date !== null && date !== undefined)
                     .map(date => new Date(date as Date | string))
-                    .filter(date => !isNaN(date.getTime())) // Filtrar datas invÃ¡lidas
+                    .filter(date => !isNaN(date.getTime())) // Filtrar datas inválidas
                     .sort((a, b) => b.getTime() - a.getTime())[0] || null;
                   
                   ecommerceAggregated = {
@@ -1952,7 +2074,7 @@ export default function ControleTransferenciasTable({
                   };
                 }
                 
-                // Agrupar filiais que tÃªm o mesmo display name (ex: PAULISTA pode vir de mÃºltiplas filiais)
+                // Agrupar filiais que têm o mesmo display name (ex: PAULISTA pode vir de múltiplas filiais)
                 const filiaisPorDisplayName = new Map<string, typeof hoveredItem.itemOriginal.filiais>();
                 
                 normalFiliais.forEach(filial => {
@@ -1966,13 +2088,13 @@ export default function ControleTransferenciasTable({
                 // Agregar filiais com mesmo display name
                 const filiaisAgregadas: FilialTooltipItem[] = Array.from(filiaisPorDisplayName.entries()).map(([displayName, filiais]) => {
                   if (filiais.length === 1) {
-                    // Se sÃ³ tem uma filial, retornar como estÃ¡
+                    // Se só tem uma filial, retornar como está
                     return {
                       ...filiais[0],
                       displayName,
                     };
                   } else {
-                    // Se tem mÃºltiplas filiais com mesmo display name, agregar
+                    // Se tem múltiplas filiais com mesmo display name, agregar
                     const totalStock = aggregateLogicalStock(filiais);
                     const totalSales = filiais.reduce((sum, f) => sum + f.sales, 0);
                     const totalSalesLast30Days = filiais.reduce((sum, f) => sum + f.salesLast30Days, 0);
@@ -2014,40 +2136,40 @@ export default function ControleTransferenciasTable({
                   const displayName = filial.filial === 'E-COMMERCE' 
                     ? 'E-COMMERCE'
                     : (filial.displayName || company?.filialDisplayNames?.[filial.filial] || filial.filial);
-                  // Verificar se estÃ¡ parada hÃ¡ pelo menos 14 dias desde a Ãºltima entrada
+                  // Verificar se está parada há pelo menos 14 dias desde a última entrada
                   let isParada = false;
                   let diasParado: number | null = null;
                   let dataUltimaEntradaFormatada: string | null = null;
                   
-                  // SEMPRE formatar a data da Ãºltima entrada se existir (independente de estar parada ou nÃ£o)
+                  // SEMPRE formatar a data da última entrada se existir (independente de estar parada ou não)
                   if (filial.ultimaEntrada) {
                     const hoje = new Date();
                     const dataUltimaEntrada = new Date(filial.ultimaEntrada);
                     const diasDesdeUltimaEntrada = Math.floor((hoje.getTime() - dataUltimaEntrada.getTime()) / (1000 * 60 * 60 * 24));
                     
-                    // Formatar data da Ãºltima entrada
+                    // Formatar data da última entrada
                     dataUltimaEntradaFormatada = dataUltimaEntrada.toLocaleDateString('pt-BR', {
                       day: '2-digit',
                       month: '2-digit',
                       year: 'numeric'
                     });
                     
-                    // Verificar se estÃ¡ parada (estoque >= 1, sem vendas, e Ãºltima entrada hÃ¡ 14+ dias)
+                    // Verificar se está parada (estoque >= 1, sem vendas, e última entrada há 14+ dias)
                     if (filial.stock >= 1 && filial.sales === 0 && filial.salesLast30Days === 0 && diasDesdeUltimaEntrada >= 14) {
                       isParada = true;
                       diasParado = diasDesdeUltimaEntrada;
                     }
                   } else if (filial.stock >= 1 && filial.sales === 0 && filial.salesLast30Days === 0) {
-                    // Se nÃ£o hÃ¡ data de entrada, usar o perÃ­odo selecionado como fallback
+                    // Se não há data de entrada, usar o período selecionado como fallback
                     const daysInPeriod = dateRange ? 
                       Math.max(1, Math.ceil((new Date(dateRange.endDate).getTime() - new Date(dateRange.startDate).getTime()) / (1000 * 60 * 60 * 24))) : 30;
-                    // Se o perÃ­odo for >= 14 dias, considerar parado
+                    // Se o período for >= 14 dias, considerar parado
                     if (daysInPeriod >= 14) {
                       isParada = true;
                       diasParado = Math.max(14, daysInPeriod);
                     }
                   } else if (filial.stock > 0 && filial.sales === 0 && filial.salesLast30Days > 0) {
-                    // Teve vendas nos Ãºltimos 30 dias, mas nÃ£o no perÃ­odo: mostrar dias do perÃ­odo
+                    // Teve vendas nos últimos 30 dias, mas não no período: mostrar dias do período
                     const daysInPeriod = dateRange ? 
                       Math.max(1, Math.ceil((new Date(dateRange.endDate).getTime() - new Date(dateRange.startDate).getTime()) / (1000 * 60 * 60 * 24))) : 30;
                     if (daysInPeriod >= 14) {
@@ -2067,7 +2189,7 @@ export default function ControleTransferenciasTable({
                         </span>
                         {dataUltimaEntradaFormatada && (
                           <span className={styles.tooltipUltimaEntrada}>
-                            Ãšlt. Entrada: <strong>{dataUltimaEntradaFormatada}</strong>
+                            Últ. Entrada: <strong>{dataUltimaEntradaFormatada}</strong>
                           </span>
                         )}
                         {isParada && diasParado !== null && (
@@ -2087,5 +2209,4 @@ export default function ControleTransferenciasTable({
     </div>
   );
 }
-
 

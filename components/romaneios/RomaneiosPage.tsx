@@ -27,7 +27,7 @@ export interface RomaneioListItem {
 
 function cleanDestinoValue(value: string | null | undefined): string {
   const trimmed = (value || "").trim();
-  if (!trimmed || trimmed === "—" || trimmed === "â€”" || trimmed === "-") return "";
+  if (!trimmed || trimmed === "—" || trimmed === "-" || trimmed === "\u2014") return "";
   return trimmed;
 }
 
