@@ -2796,6 +2796,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
   const [searchTerm, setSearchTerm] = useState("");
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [loadingProdutos, setLoadingProdutos] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [batchCodes, setBatchCodes] = useState("");
   const [importandoBatch, setImportandoBatch] = useState(false);
   const [colecoesDisponiveis, setColecoesDisponiveis] = useState<string[]>([]);
@@ -2812,6 +2813,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     | null
   >(null);
   const [importacaoDropdownAberto, setImportacaoDropdownAberto] = useState(false);
+  const importacaoInputRef = useRef<HTMLInputElement | null>(null);
 
   // Color picker (dentro do modal)
   const [colorPickerProduto, setColorPickerProduto] = useState<Produto | null>(null);
@@ -4474,6 +4476,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                 <div className={styles.searchBox}>
                   <span className={styles.searchIcon}>🔍</span>
                   <input
+                    ref={searchInputRef}
                     type="text"
                     className={styles.searchInput}
                     placeholder="Buscar por nome, código ou código de barras..."
@@ -4481,39 +4484,80 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                     onChange={(e) => setSearchTerm(e.target.value)}
                     autoFocus
                   />
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      className={styles.searchClearBtn}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setSearchTerm("");
+                        setProdutos([]);
+                        setColorPickerProduto(null);
+                        setColorPickerOpcoes([]);
+                        searchInputRef.current?.focus();
+                      }}
+                      title="Limpar"
+                      aria-label="Limpar busca"
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
 
                 {companyKey === "scarfme" && (
                   <div className={styles.colecImportBox}>
-                    <div className={styles.colecImportLabel}>Importar por coleção ou grade</div>
-                    <div className={styles.colecImportRow} style={{ position: "relative" }}>
-                      <input
-                        type="text"
-                        className={styles.colecSelect}
-                        value={importacaoQuery}
-                        onChange={(e) => {
-                          setImportacaoQuery(e.target.value);
-                          setImportacaoSelecionada(null);
-                          setImportacaoDropdownAberto(true);
-                        }}
-                        onFocus={() => setImportacaoDropdownAberto(true)}
-                        onBlur={() => {
-                          // permitir clique na sugestão
-                          setTimeout(() => setImportacaoDropdownAberto(false), 120);
-                        }}
-                        placeholder={
-                          loadingColecoesOpcoes || loadingGradesOpcoes
-                            ? "Carregando opções..."
-                            : "Digite uma coleção ou grade..."
-                        }
-                        disabled={
-                          loadingColecoesOpcoes ||
-                          loadingGradesOpcoes ||
-                          importandoColecao ||
-                          importandoGrade ||
-                          importandoBatch
-                        }
-                      />
+                    <div className={styles.sectionLabel}>Importar por coleção ou grade</div>
+                    <div className={styles.colecImportRow}>
+                      <div className={styles.importacaoInputWrap}>
+                        <div className={styles.groupBox}>
+                          <span className={styles.groupIcon} aria-hidden="true">🏷️</span>
+                          <input
+                            ref={importacaoInputRef}
+                            type="text"
+                            className={styles.groupInput}
+                            value={importacaoQuery}
+                            onChange={(e) => {
+                              setImportacaoQuery(e.target.value);
+                              setImportacaoSelecionada(null);
+                              setImportacaoDropdownAberto(true);
+                            }}
+                            onFocus={() => setImportacaoDropdownAberto(true)}
+                            onBlur={() => {
+                              // permitir clique na sugestão
+                              setTimeout(() => setImportacaoDropdownAberto(false), 120);
+                            }}
+                            placeholder={
+                              loadingColecoesOpcoes || loadingGradesOpcoes
+                                ? "Carregando opções..."
+                                : "Digite uma coleção ou grade..."
+                            }
+                            disabled={
+                              loadingColecoesOpcoes ||
+                              loadingGradesOpcoes ||
+                              importandoColecao ||
+                              importandoGrade ||
+                              importandoBatch
+                            }
+                          />
+                        {importacaoQuery && (
+                          <button
+                            type="button"
+                            className={styles.groupClearBtn}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              setImportacaoQuery("");
+                              setImportacaoSelecionada(null);
+                              setImportacaoDropdownAberto(true);
+                              importacaoInputRef.current?.focus();
+                            }}
+                            title="Limpar"
+                            aria-label="Limpar"
+                          >
+                            ×
+                          </button>
+                        )}
+                        </div>
+                      </div>
                       {importacaoDropdownAberto &&
                         !(
                           loadingColecoesOpcoes ||
@@ -4558,13 +4602,30 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                 )}
 
                 <div className={styles.batchBox}>
-                  <textarea
-                    className={styles.batchInput}
-                    placeholder="Importacao em lote: cole um codigo por linha"
-                    value={batchCodes}
-                    onChange={(e) => setBatchCodes(e.target.value)}
-                    rows={4}
-                  />
+                  <div className={styles.sectionLabel}>Importação em lote</div>
+                  <div className={styles.groupBox} style={{ alignItems: "flex-start", paddingTop: 10, paddingBottom: 10 }}>
+                    <span className={styles.groupIcon} aria-hidden="true" style={{ marginTop: 2 }}>🧾</span>
+                    <textarea
+                      className={styles.groupTextarea}
+                      placeholder="Cole um código por linha"
+                      value={batchCodes}
+                      onChange={(e) => setBatchCodes(e.target.value)}
+                      rows={3}
+                    />
+                    {batchCodes.trim().length > 0 && (
+                      <button
+                        type="button"
+                        className={styles.groupClearBtn}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => setBatchCodes("")}
+                        title="Limpar"
+                        aria-label="Limpar lote"
+                        style={{ marginTop: 2 }}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
                   <button
                     type="button"
                     className={styles.batchBtn}

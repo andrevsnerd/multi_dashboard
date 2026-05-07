@@ -929,19 +929,43 @@
 }
 .searchInput::placeholder { color: var(--ll-text-3); }
 
+.searchClearBtn {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--ll-border);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ll-text-3);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.searchClearBtn:hover {
+  background: #f1f5f9;
+  color: var(--ll-text);
+}
+
 .colecImportBox {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding-bottom: 4px;
+  margin-top: 10px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--ll-border);
-  margin-bottom: 4px;
+  margin-bottom: 10px;
 }
 
-.colecImportLabel {
+.colecImportLabel,
+.sectionLabel {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--ll-text-2);
+  letter-spacing: 0.02em;
 }
 
 .colecImportRow {
@@ -949,6 +973,81 @@
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
+  position: relative;
+}
+
+.groupBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--ll-border);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #f8fafc;
+  transition: border-color 150ms, background 150ms;
+}
+
+.groupBox:focus-within {
+  border-color: var(--ll-accent);
+  background: #fff;
+}
+
+.groupIcon {
+  font-size: 16px;
+  opacity: 0.55;
+  flex-shrink: 0;
+}
+
+.groupInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 10px 0;
+  font-size: 16px;
+  color: var(--ll-text);
+  outline: none;
+  min-width: 0;
+}
+
+.groupInput::placeholder {
+  color: var(--ll-text-3);
+}
+
+.groupTextarea {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 16px;
+  color: var(--ll-text);
+  outline: none;
+  resize: none;
+  min-height: 68px;
+}
+
+.groupTextarea::placeholder {
+  color: var(--ll-text-3);
+}
+
+.groupClearBtn {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--ll-border);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ll-text-3);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.groupClearBtn:hover {
+  background: #f1f5f9;
+  color: var(--ll-text);
 }
 
 .colecSelect {
@@ -957,19 +1056,32 @@
   border: 1px solid var(--ll-border);
   border-radius: 8px;
   padding: 10px 12px;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--ll-text);
-  background: #fff;
+  background: #f8fafc;
   outline: none;
+  transition: border-color 150ms, background 150ms;
 }
 
 .colecSelect:focus {
   border-color: var(--ll-accent);
+  background: #fff;
 }
 
 .colecSelect:disabled {
   opacity: 0.65;
   cursor: not-allowed;
+}
+
+.importacaoInputWrap {
+  position: relative;
+  flex: 1;
+  min-width: 180px;
+}
+
+.importacaoInputWrap > .colecSelect {
+  width: 100%;
+  padding-right: 42px; /* espaço pro X */
 }
 
 .importSuggestList {
@@ -1020,27 +1132,29 @@
   border: 1px solid var(--ll-border);
   border-radius: 8px;
   padding: 10px 12px;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--ll-text);
-  background: #fff;
+  background: #f8fafc;
   resize: vertical;
-  min-height: 88px;
+  min-height: 76px;
   outline: none;
+  transition: border-color 150ms, background 150ms;
 }
 
 .batchInput:focus {
   border-color: var(--ll-accent);
+  background: #fff;
 }
 
 .batchBtn {
   align-self: flex-end;
-  padding: 8px 12px;
+  padding: 10px 14px;
   border: 1px solid var(--ll-accent-bdr);
   border-radius: 8px;
   background: var(--ll-accent-bg);
   color: var(--ll-accent);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
   transition: background 120ms, border-color 120ms, opacity 120ms;
 }
