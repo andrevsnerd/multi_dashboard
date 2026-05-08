@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import type { CompanyKey } from "@/lib/config/company";
 
 export interface CurvaPorProdutoXlsxRow {
+  "Periodo da analise": string;
   Curva: string;
   Descricao: string;
   Codigo: string;
@@ -18,10 +19,10 @@ export interface CurvaPorProdutoXlsxRow {
   "Var. vs periodo anterior": number | string;
 }
 
-function formatDateRange(start: Date, end: Date): string {
+export function formatCurvaPorProdutoDateRange(start: Date, end: Date): string {
   const s = start.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
   const e = end.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-  return `${s}_${e}`;
+  return `${s} a ${e}`;
 }
 
 function safeFilenamePart(value: string): string {
@@ -46,10 +47,10 @@ export function exportCurvaPorProdutoXlsx(
   XLSX.utils.book_append_sheet(workbook, worksheet, "Curva por Produto");
 
   const filialPart = options.filialLabel ? `-${safeFilenamePart(options.filialLabel)}` : "";
-  const filename = `curva-por-produto-${options.companyKey}${filialPart}-${formatDateRange(
+  const filename = `curva-por-produto-${options.companyKey}${filialPart}-${safeFilenamePart(formatCurvaPorProdutoDateRange(
     options.range.startDate,
     options.range.endDate
-  )}.xlsx`;
+  ))}.xlsx`;
 
   XLSX.writeFile(workbook, filename);
 }

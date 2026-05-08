@@ -22,6 +22,7 @@ import {
 } from "@/lib/performance/curvaPorProduto";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
 import { formatDateForQuery } from "@/lib/utils/date";
+import { exportCurvaPorProdutoCsv } from "@/lib/utils/exportCurvaPorProdutoCsv";
 import { exportCurvaPorProdutoXlsx } from "@/lib/utils/exportCurvaPorProdutoXlsx";
 
 import CurvaPorProdutoPickerModal from "./CurvaPorProdutoPickerModal";
@@ -391,31 +392,43 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
   const countC = representedRows.filter((row) => row.curva === "C").length;
 
   const handleExportXlsx = () => {
-    exportCurvaPorProdutoXlsx(
-      representedRows.map((row) => {
-        const badge = getComparisonBadge(row.vendas, row.vendasPrevious);
-        return {
-          Curva: row.curva ?? "",
-          Descricao: row.descricao || row.produto,
-          Codigo: row.produto,
-          "Codigo de Barras": row.codigoBarra ?? "",
-          Categoria: row.categoria || row.linha || "",
-          Grade: row.grade ?? "",
-          Cor: row.corDescricao || row.corProduto || "",
-          "Participacao %": Number(row.percParticipacao.toFixed(2)),
-          Faturamento: row.vendas,
-          Qtd: row.qtde,
-          Estoque: row.estoque,
-          "Sugestao de compra": row.suggestion.text,
-          "Var. vs periodo anterior": badge == null ? "" : badge.kind === "new" ? "NOVO" : Number(badge.value.toFixed(2)),
-        };
-      }),
-      {
-        companyKey,
-        range,
-        filialLabel: data?.displayName ?? selectedFilial,
-      }
-    );
+    exportCurvaPorProdutoXlsx(exportRows, exportOptions);
+  };
+
+  const handleExportCsv = () => {
+    exportCurvaPorProdutoCsv(exportRows, exportOptions);
+  };
+
+  const exportRows = displayRows
+    .slice()
+    .sort((a, b) => {
+      if (a.represented !== b.represented) return a.represented ? -1 : 1;
+      return b.vendas - a.vendas;
+    })
+    .map((row) => {
+      const badge = getComparisonBadge(row.vendas, row.vendasPrevious);
+      return {
+        "Periodo da analise": `${range.startDate.toLocaleDateString("pt-BR")} a ${range.endDate.toLocaleDateString("pt-BR")}`,
+        Curva: row.curva ?? "SEM REPRESENTACAO",
+        Descricao: row.descricao || row.produto,
+        Codigo: row.produto,
+        "Codigo de Barras": row.codigoBarra ?? "",
+        Categoria: row.categoria || row.linha || "",
+        Grade: row.grade ?? "",
+        Cor: row.corDescricao || row.corProduto || "",
+        "Participacao %": Number(row.percParticipacao.toFixed(2)),
+        Faturamento: row.vendas,
+        Qtd: row.qtde,
+        Estoque: row.estoque,
+        "Sugestao de compra": row.suggestion.text,
+        "Var. vs periodo anterior": badge == null ? "" : badge.kind === "new" ? "NOVO" : Number(badge.value.toFixed(2)),
+      };
+    });
+
+  const exportOptions = {
+    companyKey,
+    range,
+    filialLabel: data?.displayName ?? selectedFilial,
   };
 
   return (
@@ -433,8 +446,16 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
             <button
               type="button"
               className={styles.primaryButton}
+              onClick={handleExportCsv}
+              disabled={displayRows.length === 0}
+            >
+              Exportar CSV
+            </button>
+            <button
+              type="button"
+              className={styles.secondaryButton}
               onClick={handleExportXlsx}
-              disabled={representedRows.length === 0}
+              disabled={displayRows.length === 0}
             >
               Exportar XLSX
             </button>
