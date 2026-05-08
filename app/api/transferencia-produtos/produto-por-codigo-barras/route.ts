@@ -1,25 +1,17 @@
 import { NextResponse } from 'next/server';
 import sql from 'mssql';
 
-import { resolveCompany } from '@/lib/config/company';
 import { withRequest } from '@/lib/db/connection';
-import { PRODUTO_NOVO_LABEL } from '@/lib/repositories/produtosNovos';
-import { buildProdutoLabelLookupKey, listProdutoLabelLookupKeys } from '@/lib/utils/produto-labels-store';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const codigoBarras = searchParams.get('codigoBarras');
-  const company = resolveCompany(searchParams.get('company') || undefined);
 
   if (!codigoBarras || !codigoBarras.trim()) {
     return NextResponse.json({ data: null });
   }
 
   try {
-    const blockedLabelKeys = company?.key
-      ? await listProdutoLabelLookupKeys(company.key, PRODUTO_NOVO_LABEL)
-      : null;
-
     const produto = await withRequest(async (req) => {
       const codigoLimpo = codigoBarras.trim();
 
@@ -121,10 +113,6 @@ export async function GET(request: Request) {
       const row = result.recordset[0];
       const produtoCodigo = row.PRODUTO?.toString().trim() || '';
       const corCodigo = row.COR_PRODUTO?.toString().trim() || '';
-
-      if (blockedLabelKeys?.has(buildProdutoLabelLookupKey(produtoCodigo, corCodigo))) {
-        return null;
-      }
 
       return {
         produto: produtoCodigo,

@@ -3,14 +3,35 @@ import { getPublicDatabaseErrorMessage, isDatabaseConnectionError, withRequest }
 import sql from 'mssql';
 import { getColorDescription } from '@/lib/utils/colorMapping';
 import { getActiveFilial, resolveCompany } from '@/lib/config/company';
-import { PRODUTO_NOVO_LABEL } from '@/lib/repositories/produtosNovos';
-import { buildProdutoLabelLookupKey, listProdutoLabelLookupKeys } from '@/lib/utils/produto-labels-store';
 
 export const maxDuration = 60;
+
+function normalizeBarcode(value: string | null | undefined): string {
+  return String(value ?? '').trim();
+}
+
+function barcodeMatchesSearch(barcode: string | null | undefined, searchTerm: string): boolean {
+  const barcodeNorm = normalizeBarcode(barcode);
+  const searchNorm = normalizeBarcode(searchTerm);
+
+  if (!barcodeNorm || !searchNorm) {
+    return false;
+  }
+
+  if (barcodeNorm === searchNorm) {
+    return true;
+  }
+
+  const barcodeNum = Number(barcodeNorm);
+  const searchNum = Number(searchNorm);
+
+  return Number.isFinite(barcodeNum) && Number.isFinite(searchNum) && barcodeNum === searchNum;
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const searchTerm = searchParams.get('q') || '';
+  const barcodeHint = searchParams.get('barcodeHint') || '';
   const filialOrigem = searchParams.get('filialOrigem');
   const company = resolveCompany(searchParams.get('company') || undefined);
   const filialOperacional = filialOrigem ? getActiveFilial(company, filialOrigem) : null;
@@ -41,12 +62,9 @@ export async function GET(request: Request) {
   }
 
   try {
-    const blockedLabelKeys = company?.key
-      ? await listProdutoLabelLookupKeys(company.key, PRODUTO_NOVO_LABEL)
-      : null;
-
     const produtos = await withRequest(async (req) => {
       const searchTermTrimmed = searchTerm.trim();
+      const barcodePriorityTerm = normalizeBarcode(barcodeHint) || searchTermTrimmed;
       const incluirEstoqueZero = isEntrada || porColecao || porGrade;
       
       // Buscar por código de barras primeiro, depois por produto/nome
@@ -367,13 +385,13 @@ export async function GET(request: Request) {
         descProduto: string;
         linha: string | null;
         subgrupo: string | null;
-          codigoBarra: string | null;
-          corProduto: string | null;
-          descCor: string;
-          grade: string | null;
-          estoques: Array<{
-            filial: string;
-            nomeFilial: string;
+        codigoBarra: string | null;
+        corProduto: string | null;
+        descCor: string;
+        grade: string | null;
+        estoquesMap: Map<string, {
+          filial: string;
+          nomeFilial: string;
           estoque: number;
         }>;
       }>();
@@ -381,9 +399,6 @@ export async function GET(request: Request) {
       for (const row of result.recordset) {
         const produto = row.PRODUTO?.toString().trim() || '';
         const cor = row.COR_PRODUTO?.toString().trim() || '';
-        if (blockedLabelKeys?.has(buildProdutoLabelLookupKey(produto, cor))) {
-          continue;
-        }
         const key = `${produto}::${cor}`;
 
         if (!produtosMap.has(key)) {
@@ -394,15 +409,24 @@ export async function GET(request: Request) {
             descProduto: row.DESC_PRODUTO?.toString().trim() || '',
             linha: row.LINHA?.toString().trim() || null,
             subgrupo: row.SUBGRUPO?.toString().trim() || null,
-            codigoBarra: row.CODIGO_BARRA?.toString().trim() || null,
+            codigoBarra: normalizeBarcode(row.CODIGO_BARRA) || null,
             corProduto: cor || null,
             descCor: descCorResolvida || descCorBanco,
             grade: row.GRADE?.toString().trim() || null,
-            estoques: [],
+            estoquesMap: new Map(),
           });
         }
 
         const produtoData = produtosMap.get(key)!;
+        const codigoBarraLinha = normalizeBarcode(row.CODIGO_BARRA) || null;
+        if (
+          codigoBarraLinha &&
+          (!produtoData.codigoBarra ||
+            (barcodeMatchesSearch(codigoBarraLinha, barcodePriorityTerm) &&
+              !barcodeMatchesSearch(produtoData.codigoBarra, barcodePriorityTerm)))
+        ) {
+          produtoData.codigoBarra = codigoBarraLinha;
+        }
         // Quando tem corProduto (do código de barras) ou é entrada, mostrar TODOS os estoques (incluindo 0)
         // Quando não tem corProduto e não é entrada, só mostrar estoques > 0
         if (row.FILIAL) {
@@ -410,16 +434,27 @@ export async function GET(request: Request) {
           if (corProduto || incluirEstoqueZero || estoque > 0) {
             // Usar COD_FILIAL se disponível, senão usar FILIAL (que deve ser o código)
             const codFilial = row.FILIAL?.toString().trim() || '';
-            produtoData.estoques.push({
+            const estoqueExistente = produtoData.estoquesMap.get(codFilial);
+            produtoData.estoquesMap.set(codFilial, {
               filial: codFilial,
-              nomeFilial: row.NOME_FILIAL?.toString().trim() || codFilial,
-              estoque: estoque,
+              nomeFilial: row.NOME_FILIAL?.toString().trim() || estoqueExistente?.nomeFilial || codFilial,
+              estoque: estoqueExistente ? Math.max(estoqueExistente.estoque, estoque) : estoque,
             });
           }
         }
       }
 
-      const produtosArray = Array.from(produtosMap.values());
+      const produtosArray = Array.from(produtosMap.values()).map((produto) => ({
+        produto: produto.produto,
+        descProduto: produto.descProduto,
+        linha: produto.linha,
+        subgrupo: produto.subgrupo,
+        codigoBarra: produto.codigoBarra,
+        corProduto: produto.corProduto,
+        descCor: produto.descCor,
+        grade: produto.grade,
+        estoques: Array.from(produto.estoquesMap.values()),
+      }));
       console.log(`[PRODUTOS] Busca: "${searchTermTrimmed}", corProduto: ${corProduto || 'null'}, filialOrigem: ${filialOperacional || filialOrigem || 'null'}, encontrados: ${produtosArray.length}`);
       if (produtosArray.length > 0) {
         console.log(`[PRODUTOS] Primeiro produto:`, {

@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server';
 
 import { findUserByUsername } from '@/lib/auth/users-store';
-import { getActiveFilial, resolveCompany } from '@/lib/config/company';
+import { getActiveFilial } from '@/lib/config/company';
 import { getConnectionPool } from '@/lib/db/connection';
 import { shouldUseProxy, forwardTransferToProxy } from '@/lib/db/proxy';
-import { PRODUTO_NOVO_LABEL } from '@/lib/repositories/produtosNovos';
 import { executeTransfer } from '@/lib/transfer-executor';
-import { buildProdutoLabelLookupKey, listProdutoLabelLookupKeys } from '@/lib/utils/produto-labels-store';
 import { getPermissaoByUsername } from '@/lib/utils/transferencia-permissoes-store';
 
 interface TransferenciaRequest {
@@ -53,8 +51,6 @@ export async function POST(request: Request) {
       observacao = null,
       companyKey,
     } = body;
-
-    const company = resolveCompany(companyKey);
 
     if (!produto || !filialOrigem || !filialDestino || qtdeSaida <= 0 || qtdeEntrada <= 0) {
       return NextResponse.json(
@@ -104,16 +100,6 @@ export async function POST(request: Request) {
             { status: 403 }
           );
         }
-      }
-    }
-
-    if (company?.key) {
-      const blockedLabelKeys = await listProdutoLabelLookupKeys(company.key, PRODUTO_NOVO_LABEL);
-      if (blockedLabelKeys.has(buildProdutoLabelLookupKey(produto, corProduto))) {
-        return NextResponse.json(
-          { error: 'Produto bloqueado para transferencia enquanto possuir a label produto novo.' },
-          { status: 403 }
-        );
       }
     }
 

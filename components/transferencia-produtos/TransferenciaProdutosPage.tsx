@@ -112,6 +112,7 @@ async function fetchFiliais(): Promise<Filial[]> {
 async function buscarProdutoPorCodigoBarras(codigoBarras: string, companyKey?: string): Promise<{
   produto: string;
   descProduto: string;
+  codigoBarra: string | null;
   corProduto: string | null;
   produtosEncontrados: number;
   todosProdutos: Array<{ produto: string; cor: string; tamanho: string }>;
@@ -130,7 +131,13 @@ async function buscarProdutoPorCodigoBarras(codigoBarras: string, companyKey?: s
   return json.data || null;
 }
 
-async function searchProdutos(searchTerm: string, filialOrigem?: string, corProduto?: string | null, companyKey?: string): Promise<Produto[]> {
+async function searchProdutos(
+  searchTerm: string,
+  filialOrigem?: string,
+  corProduto?: string | null,
+  companyKey?: string,
+  barcodeHint?: string | null
+): Promise<Produto[]> {
   if (!searchTerm || searchTerm.trim().length < 2) {
     return [];
   }
@@ -149,6 +156,10 @@ async function searchProdutos(searchTerm: string, filialOrigem?: string, corProd
 
   if (companyKey) {
     params.set("company", companyKey);
+  }
+
+  if (barcodeHint && barcodeHint.trim()) {
+    params.set("barcodeHint", barcodeHint.trim());
   }
 
   const response = await fetch(`/api/transferencia-produtos/produtos?${params.toString()}`, {
@@ -595,7 +606,8 @@ export default function TransferenciaProdutosPage({
               produtoCodigoBarras.produto,
               filialOrigem?.codFilial,
               corProdutoCodigoBarras,
-              companyKey
+              companyKey,
+              produtoCodigoBarras.codigoBarra || searchTermTrimmed
             );
             
             // Se encontrou múltiplos produtos com mesmo código de barras, avisar
@@ -612,7 +624,8 @@ export default function TransferenciaProdutosPage({
                 produtoCodigoBarras.produto,
                 filialOrigem?.codFilial,
                 null,
-                companyKey
+                companyKey,
+                produtoCodigoBarras.codigoBarra || searchTermTrimmed
               );
             }
           }
