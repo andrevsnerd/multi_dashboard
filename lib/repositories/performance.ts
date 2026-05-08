@@ -346,10 +346,14 @@ export async function fetchFilialProdutoSales(
     : `''`;
   // SQL Server rejects GROUP BY on a literal constant — only include gradeExpr if it references a column
   const gradeGroupBy = gradeExpr === `''` ? '' : `, ${gradeExpr}`;
-  const requestedLimit = Number(options?.limit ?? NaN);
-  const topN = Number.isFinite(requestedLimit) && requestedLimit > 0
-    ? Math.floor(requestedLimit)
+  const requestedLimitRaw = Number(options?.limit ?? NaN);
+  const requestedLimit = Number.isFinite(requestedLimitRaw)
+    ? Math.floor(requestedLimitRaw)
+    : null;
+  const topN = requestedLimit != null && requestedLimit > 0
+    ? requestedLimit
     : groupByCor ? 2000 : 500;
+  const topClause = requestedLimit === 0 ? '' : `TOP ${topN}`;
 
   type RawRow = {
     PRODUTO: string;
@@ -403,7 +407,7 @@ export async function fetchFilialProdutoSales(
         : '';
       const corGroupBy = groupByCor ? ', ISNULL(vp.COR_PRODUTO, \'\')' : '';
       const query = `
-        SELECT TOP ${topN}
+        SELECT ${topClause}
           ISNULL(vp.PRODUTO, '') AS PRODUTO,
           UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
           ${categoriaExpr} AS CATEGORIA,
@@ -456,7 +460,7 @@ export async function fetchFilialProdutoSales(
         : '';
       const corGroupBy = groupByCor ? ', ISNULL(fp.COR_PRODUTO, \'\')' : '';
       const query = `
-        SELECT TOP ${topN}
+        SELECT ${topClause}
           ISNULL(fp.PRODUTO, '') AS PRODUTO,
           UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
           ${categoriaExpr} AS CATEGORIA,

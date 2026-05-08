@@ -107,6 +107,10 @@ export default function Sidebar({ companyName }: SidebarProps) {
     ? `${basePath}/curva-abc`
     : "/curva-abc";
 
+  const curvaPorProdutoHref = basePath && basePath !== "/"
+    ? `${basePath}/curva-por-produto`
+    : "/curva-por-produto";
+
   const novaFilialHref = basePath && basePath !== "/"
     ? `${basePath}/nova-filial`
     : "/nova-filial";
@@ -189,6 +193,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     { label: "Controle de Giro", href: controleGiroHref, permission: "controle-giro" },
     { label: "Controle de Performance", href: controlePerformanceHref, permission: "controle-performance" },
     { label: "Curva A,B,C", href: curvaAbcHref, permission: "curva-abc" },
+    { label: "Curva por Produto", href: curvaPorProdutoHref, permission: "curva-abc" },
     { label: "Nova Filial", href: novaFilialHref, permission: "curva-abc" },
     { label: "Controle de Transferências", href: controleTransferenciasHref, permission: "controle-transferencias" },
     { label: "Transferência de Produtos", href: transferenciaProdutosHref, permission: "transferencia-produtos" },
@@ -289,6 +294,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
                 !pathname.includes("/estoque-consulta") &&
                 !pathname.includes("/controle-giro") &&
                 !pathname.includes("/controle-performance") &&
+                !pathname.includes("/curva-abc") &&
+                !pathname.includes("/curva-por-produto") &&
                 !pathname.includes("/controle-transferencias") &&
                 !pathname.includes("/transferencia-produtos") &&
                 !pathname.includes("/romaneios") &&
@@ -336,6 +343,10 @@ export default function Sidebar({ companyName }: SidebarProps) {
             } else if (item.label === "Controle de Performance") {
               // Controle de Performance está ativo quando o pathname inclui /controle-performance
               isActive = pathname?.includes("/controle-performance") || pathname === item.href;
+            } else if (item.label === "Curva A,B,C") {
+              isActive = pathname?.includes("/curva-abc") || pathname === item.href;
+            } else if (item.label === "Curva por Produto") {
+              isActive = pathname?.includes("/curva-por-produto") || pathname === item.href;
             } else if (item.label === "Controle de Transferências") {
               // Controle de Transferências está ativo quando o pathname inclui /controle-transferencias
               isActive = pathname?.includes("/controle-transferencias") || pathname === item.href;

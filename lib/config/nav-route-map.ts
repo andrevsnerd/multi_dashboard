@@ -45,6 +45,7 @@ export const NAV_ROUTE_MAP: Record<string, PermissionKey | "admin"> = {
 
   // ── Curva ABC ──────────────────────────────────────────────────
   "curva-abc": "curva-abc",
+  "curva-por-produto": "curva-abc",
   "nova-filial": "curva-abc",
 
   // ── Relatórios / Extras ────────────────────────────────────────
