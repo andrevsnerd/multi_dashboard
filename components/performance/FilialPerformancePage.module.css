@@ -64,6 +64,14 @@
   flex-wrap: wrap;
 }
 
+.abcFiltersRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: -8px 0 20px;
+  flex-wrap: wrap;
+}
+
 .compraModeRow {
   display: flex;
   align-items: center;
@@ -701,6 +709,13 @@
   background: #e2e8f0;
   padding: 3px 10px;
   border-radius: 10px;
+}
+
+.activeFilterBadges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 /* ── Table header filter label ── */

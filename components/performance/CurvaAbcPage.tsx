@@ -12,6 +12,7 @@ import {
 } from "@/lib/performance/outrosCategories";
 import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateRangeFilter";
 import FilialFilter from "@/components/filters/FilialFilter";
+import SelectFilter from "@/components/filters/SelectFilter";
 import { fetchControleEstoqueItemMetricasClient } from "@/lib/client/controle-estoque-metricas";
 import {
   buildCompraTransitoIndex,
@@ -535,6 +536,8 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedSubgrupo, setSelectedSubgrupo] = useState<string | null>(null);
+  const [selectedGrade, setSelectedGrade] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"produtos" | "vendedores">("produtos");
   const [porCor, setPorCor] = useState(true);
   const [filtrarSugeridos, setFiltrarSugeridos] = useState(false);
@@ -598,6 +601,8 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   useEffect(() => {
     setActiveTab("produtos");
     setSelectedCategory(null);
+    setSelectedSubgrupo(null);
+    setSelectedGrade(null);
   }, [selectedFilial]);
 
   useEffect(() => {
@@ -618,6 +623,8 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     setLoading(true);
     setError(null);
     setSelectedCategory(null);
+    setSelectedSubgrupo(null);
+    setSelectedGrade(null);
     const params = new URLSearchParams({
       company: companyKey,
       month: String(selectedMonth),
@@ -664,11 +671,56 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     return new Set([selectedCategory]);
   }, [selectedCategory, data, companyKey]);
 
-  const produtosFiltrados = useMemo(() => {
+  const produtosBaseFiltro = useMemo(() => {
     if (!data) return [];
-    if (!activeCategorias) return data.produtos;
-    return data.produtos.filter(p => activeCategorias.has(p.categoria));
+    return activeCategorias ? data.produtos.filter(p => activeCategorias.has(p.categoria)) : data.produtos;
   }, [data, activeCategorias]);
+
+  const availableSubgrupos = useMemo(() => {
+    return Array.from(
+      new Set(
+        produtosBaseFiltro
+          .map((p) => (p.subgrupo ?? "").trim())
+          .filter((value) => value !== "")
+      )
+    ).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [produtosBaseFiltro]);
+
+  const availableGrades = useMemo(() => {
+    return Array.from(
+      new Set(
+        produtosBaseFiltro
+          .map((p) => (p.grade ?? "").trim())
+          .filter((value) => value !== "")
+      )
+    ).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [produtosBaseFiltro]);
+
+  const effectiveSelectedSubgrupo = selectedSubgrupo && availableSubgrupos.includes(selectedSubgrupo)
+    ? selectedSubgrupo
+    : null;
+  const effectiveSelectedGrade = selectedGrade && availableGrades.includes(selectedGrade)
+    ? selectedGrade
+    : null;
+
+  const produtosFiltrados = useMemo(() => {
+    let produtos = produtosBaseFiltro;
+    if (effectiveSelectedSubgrupo) {
+      produtos = produtos.filter((p) => (p.subgrupo ?? "").trim() === effectiveSelectedSubgrupo);
+    }
+    if (effectiveSelectedGrade) {
+      produtos = produtos.filter((p) => (p.grade ?? "").trim() === effectiveSelectedGrade);
+    }
+    return produtos;
+  }, [produtosBaseFiltro, effectiveSelectedSubgrupo, effectiveSelectedGrade]);
+
+  const activeFilterLabels = [
+    selectedCategory ? getCategoryHeaderLabel(selectedCategory) : null,
+    effectiveSelectedSubgrupo ? `Subgrupo: ${effectiveSelectedSubgrupo}` : null,
+    effectiveSelectedGrade ? `Grade: ${effectiveSelectedGrade}` : null,
+  ].filter((value): value is string => Boolean(value));
+
+  const hasStructuredFilters = activeFilterLabels.length > 0;
 
   const produtosComCurva = useMemo(() => {
     if (produtosFiltrados.length === 0) return [];
@@ -720,17 +772,17 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const countC = produtosComCurvaExibidos.filter(p => p.curva === "C").length;
   const groups: Curva[] = ["A", "B", "C"];
 
-  const displayVendas = selectedCategory
+  const displayVendas = hasStructuredFilters
     ? produtosFiltrados.reduce((s, p) => s + p.vendas, 0)
     : data?.vendas ?? 0;
-  const displayQtde = selectedCategory
+  const displayQtde = hasStructuredFilters
     ? produtosFiltrados.reduce((s, p) => s + p.qtde, 0)
     : data?.qtde ?? 0;
   const displayCMV = produtosFiltrados.reduce((s, p) => s + p.custo * p.qtde, 0);
 
   useEffect(() => {
     setCompraMetrics({});
-  }, [companyKey, selectedFilial, porCor, selectedCategory, range.startDate, range.endDate]);
+  }, [companyKey, selectedFilial, porCor, selectedCategory, effectiveSelectedSubgrupo, effectiveSelectedGrade, range.startDate, range.endDate]);
 
   useEffect(() => {
     if (produtosComCurva.length === 0) return;
@@ -867,8 +919,8 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     ? "Performance de vendas"
     : "Visão geral — todas as filiais e e-commerce";
 
-  const abcTitleSuffix = selectedCategory
-    ? ` — ${getCategoryHeaderLabel(selectedCategory)}`
+  const abcTitleSuffix = activeFilterLabels.length > 0
+    ? ` - ${activeFilterLabels.join(" | ")}`
     : "";
 
   return (
@@ -904,7 +956,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
               <div className={styles.kpiCard}>
                 <span className={styles.kpiLabel}>VENDAS</span>
                 <span className={styles.kpiValue}>{fmtCurrency(displayVendas)}</span>
-                {!selectedCategory && <span className={styles.kpiProjecao}>Projeção: {fmtCurrency(data.projecao)}</span>}
+                {!hasStructuredFilters && <span className={styles.kpiProjecao}>Projeção: {fmtCurrency(data.projecao)}</span>}
                 {variation && (
                   <span
                     className={`${styles.variationBadge} ${
@@ -1085,12 +1137,16 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                 <span className={styles.summaryLabel}>Curva C</span>
                 <span className={`${styles.summaryValueSmall} ${styles.textC}`}>{countC} produtos</span>
               </div>
-              {selectedCategory && (
+              {activeFilterLabels.length > 0 && (
                 <>
                   <div className={styles.summaryDivider} />
                   <div className={styles.summaryItem}>
-                    <span className={styles.summaryLabel}>Filtro ativo</span>
-                    <span className={styles.filterActiveBadge}>{getCategoryHeaderLabel(selectedCategory)}</span>
+                    <span className={styles.summaryLabel}>Filtros ativos</span>
+                    <div className={styles.activeFilterBadges}>
+                      {activeFilterLabels.map((label) => (
+                        <span key={label} className={styles.filterActiveBadge}>{label}</span>
+                      ))}
+                    </div>
                   </div>
                 </>
               )}
@@ -1155,14 +1211,35 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
             )}
           </div>
 
+          {(availableSubgrupos.length > 0 || availableGrades.length > 0) && (
+            <div className={styles.abcFiltersRow}>
+              {availableSubgrupos.length > 0 && (
+                <SelectFilter
+                  label="Subgrupo"
+                  value={effectiveSelectedSubgrupo}
+                  options={availableSubgrupos}
+                  onChange={setSelectedSubgrupo}
+                />
+              )}
+              {availableGrades.length > 0 && (
+                <SelectFilter
+                  label="Grade"
+                  value={effectiveSelectedGrade}
+                  options={availableGrades}
+                  onChange={setSelectedGrade}
+                />
+              )}
+            </div>
+          )}
+
           {/* ABC Table */}
           <div className={styles.tableCard}>
-            {produtosComCurvaExibidos.length === 0 && selectedCategory && (
+            {produtosComCurvaExibidos.length === 0 && hasStructuredFilters && (
               <div className={styles.empty}>
-                Nenhum produto encontrado para a categoria <strong>{getCategoryHeaderLabel(selectedCategory)}</strong> neste período.
+                Nenhum produto encontrado nos filtros selecionados neste período.
               </div>
             )}
-            {produtosComCurvaExibidos.length === 0 && !selectedCategory && (
+            {produtosComCurvaExibidos.length === 0 && !hasStructuredFilters && (
               <div className={styles.empty}>
                 {filtrarSugeridos
                   ? "Nenhum produto com sugestão de compra neste filtro."

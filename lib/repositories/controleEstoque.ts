@@ -4296,10 +4296,18 @@ export async function fetchProdutoDetalhesPorFilial({
         ISNULL(p.COLECAO, '') AS colecao,
         ISNULL(COALESCE(c.DESC_COR, e.COR_PRODUTO), '') AS cor,
         e.FILIAL AS filial,
-        SUM(e.ESTOQUE) AS estoque,
+        CASE
+          WHEN COUNT(CASE WHEN e.ESTOQUE > 0 THEN 1 END) > 0
+            THEN SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END)
+          ELSE SUM(e.ESTOQUE)
+        END AS estoque,
         ISNULL(COALESCE(p.PRECO_REPOSICAO_1, p.PRECO_A_VISTA_REPOSICAO_1, p.REVENDA), 0) AS preco,
         ISNULL(p.CUSTO_REPOSICAO1, 0) AS custoUnitario,
-        SUM(e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0)) AS custoTotal
+        CASE
+          WHEN COUNT(CASE WHEN e.ESTOQUE > 0 THEN 1 END) > 0
+            THEN SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0) ELSE 0 END)
+          ELSE SUM(e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0))
+        END AS custoTotal
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
@@ -4455,6 +4463,13 @@ export async function fetchProdutoDetalhesPorFilial({
     });
 
     // Criar lista de variações: incluir todas do estoque + filiais com vendas mas sem estoque
+    const shouldKeepRow = (estoque: number) => {
+      if (estoque > 0) return true;
+      if (estoque === 0 && mostrarZerados) return true;
+      if (estoque < 0 && mostrarNegativos) return true;
+      return false;
+    };
+
     const variacoes: ProdutoVariacaoDetalhesPorFilial[] = [];
     
     // Primeiro, adicionar todas as variações do estoque com suas vendas
@@ -4465,6 +4480,11 @@ export async function fetchProdutoDetalhesPorFilial({
       const key = `${produtoNorm}|${corNorm}|${filialNorm}`;
       const vendas = vendasMap.get(key) || 0;
 
+      const estoque = Math.round(Number(row.estoque ?? 0));
+      if (!shouldKeepRow(estoque)) {
+        return;
+      }
+
       variacoes.push({
         produto: row.produto?.trim() || '',
         descricao: row.descricao?.trim() || '',
@@ -4474,7 +4494,7 @@ export async function fetchProdutoDetalhesPorFilial({
         colecao: row.colecao?.trim() || '',
         cor: row.cor?.trim() || '',
         filial: row.filial?.trim() || '',
-        estoque: Math.round(Number(row.estoque ?? 0)),
+        estoque,
         preco: Number(row.preco ?? 0),
         custoUnitario: Number(row.custoUnitario ?? 0),
         custoTotal: Number(row.custoTotal ?? 0),
@@ -4490,7 +4510,7 @@ export async function fetchProdutoDetalhesPorFilial({
       const key = `${produtoNorm}|${corNorm}|${filialNorm}`;
       
       // Se não existe no estoque, adicionar com estoque 0
-      if (!variacoesMap.has(key)) {
+      if (!variacoesMap.has(key) && shouldKeepRow(0)) {
         // Buscar dados do produto de uma variação existente para pegar descrição, linha, etc
         const primeiraVariacao = variacoesResult.recordset[0];
         variacoes.push({
@@ -4511,35 +4531,16 @@ export async function fetchProdutoDetalhesPorFilial({
       }
     });
 
-    const variationTotals = new Map<string, number>();
-    for (const v of variacoes) {
-      const k = `${normalizeString(v.produto)}|${normalizeString(v.cor)}`;
-      variationTotals.set(k, (variationTotals.get(k) ?? 0) + v.estoque);
-    }
-
-    const keepVariationKey = (k: string) => {
-      const t = variationTotals.get(k) ?? 0;
-      if (t > 0) return true;
-      if (t === 0 && mostrarZerados) return true;
-      if (t < 0 && mostrarNegativos) return true;
-      return false;
-    };
-
-    const variacoesFiltradas = variacoes.filter((v) => {
-      const k = `${normalizeString(v.produto)}|${normalizeString(v.cor)}`;
-      return keepVariationKey(k);
-    });
-
     // Calcular resumo
-    const filiaisUnicas = new Set(variacoesFiltradas.map((v) => v.filial));
+    const filiaisUnicas = new Set(variacoes.map((v) => v.filial));
     const totalFiliais = filiaisUnicas.size;
-    const estoqueTotal = variacoesFiltradas.reduce((sum, v) => sum + v.estoque, 0);
-    const custoTotal = variacoesFiltradas.reduce((sum, v) => sum + v.custoTotal, 0);
-    const vendasTotais = variacoesFiltradas.reduce((sum, v) => sum + v.vendasTotais, 0);
+    const estoqueTotal = variacoes.reduce((sum, v) => sum + v.estoque, 0);
+    const custoTotal = variacoes.reduce((sum, v) => sum + v.custoTotal, 0);
+    const vendasTotais = variacoes.reduce((sum, v) => sum + v.vendasTotais, 0);
 
     // Determinar nome do produto (usar linha se disponível, senão usar produtoNome ou linha do parâmetro)
-    const nomeProduto = variacoesFiltradas.length > 0
-      ? variacoesFiltradas[0].linha || linha || produtoNome || 'Produto'
+    const nomeProduto = variacoes.length > 0
+      ? variacoes[0].linha || linha || produtoNome || 'Produto'
       : linha || produtoNome || 'Produto';
 
     return {
@@ -4550,7 +4551,7 @@ export async function fetchProdutoDetalhesPorFilial({
         custoTotal,
         vendasTotais,
       },
-      variacoes: variacoesFiltradas,
+      variacoes,
     };
   });
 }
