@@ -601,8 +601,6 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   useEffect(() => {
     setActiveTab("produtos");
     setSelectedCategory(null);
-    setSelectedSubgrupo(null);
-    setSelectedGrade(null);
   }, [selectedFilial]);
 
   useEffect(() => {
@@ -623,8 +621,6 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     setLoading(true);
     setError(null);
     setSelectedCategory(null);
-    setSelectedSubgrupo(null);
-    setSelectedGrade(null);
     const params = new URLSearchParams({
       company: companyKey,
       month: String(selectedMonth),
@@ -696,28 +692,21 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     ).sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [produtosBaseFiltro]);
 
-  const effectiveSelectedSubgrupo = selectedSubgrupo && availableSubgrupos.includes(selectedSubgrupo)
-    ? selectedSubgrupo
-    : null;
-  const effectiveSelectedGrade = selectedGrade && availableGrades.includes(selectedGrade)
-    ? selectedGrade
-    : null;
-
   const produtosFiltrados = useMemo(() => {
     let produtos = produtosBaseFiltro;
-    if (effectiveSelectedSubgrupo) {
-      produtos = produtos.filter((p) => (p.subgrupo ?? "").trim() === effectiveSelectedSubgrupo);
+    if (selectedSubgrupo) {
+      produtos = produtos.filter((p) => (p.subgrupo ?? "").trim() === selectedSubgrupo);
     }
-    if (effectiveSelectedGrade) {
-      produtos = produtos.filter((p) => (p.grade ?? "").trim() === effectiveSelectedGrade);
+    if (selectedGrade) {
+      produtos = produtos.filter((p) => (p.grade ?? "").trim() === selectedGrade);
     }
     return produtos;
-  }, [produtosBaseFiltro, effectiveSelectedSubgrupo, effectiveSelectedGrade]);
+  }, [produtosBaseFiltro, selectedSubgrupo, selectedGrade]);
 
   const activeFilterLabels = [
     selectedCategory ? getCategoryHeaderLabel(selectedCategory) : null,
-    effectiveSelectedSubgrupo ? `Subgrupo: ${effectiveSelectedSubgrupo}` : null,
-    effectiveSelectedGrade ? `Grade: ${effectiveSelectedGrade}` : null,
+    selectedSubgrupo ? `Subgrupo: ${selectedSubgrupo}` : null,
+    selectedGrade ? `Grade: ${selectedGrade}` : null,
   ].filter((value): value is string => Boolean(value));
 
   const hasStructuredFilters = activeFilterLabels.length > 0;
@@ -782,7 +771,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
 
   useEffect(() => {
     setCompraMetrics({});
-  }, [companyKey, selectedFilial, porCor, selectedCategory, effectiveSelectedSubgrupo, effectiveSelectedGrade, range.startDate, range.endDate]);
+  }, [companyKey, selectedFilial, porCor, selectedCategory, selectedSubgrupo, selectedGrade, range.startDate, range.endDate]);
 
   useEffect(() => {
     if (produtosComCurva.length === 0) return;
@@ -1251,7 +1240,7 @@ const handleBadgeClick = (cat: string) => {
               {availableSubgrupos.length > 0 && (
                 <SelectFilter
                   label="Subgrupo"
-                  value={effectiveSelectedSubgrupo}
+                  value={selectedSubgrupo}
                   options={availableSubgrupos}
                   onChange={setSelectedSubgrupo}
                 />
@@ -1259,7 +1248,7 @@ const handleBadgeClick = (cat: string) => {
               {availableGrades.length > 0 && (
                 <SelectFilter
                   label="Grade"
-                  value={effectiveSelectedGrade}
+                  value={selectedGrade}
                   options={availableGrades}
                   onChange={setSelectedGrade}
                 />
