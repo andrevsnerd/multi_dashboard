@@ -866,8 +866,42 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     return typeof d === "number" && Number.isFinite(d) ? d : null;
   };
 
-  const handleBadgeClick = (cat: string) => {
+const handleBadgeClick = (cat: string) => {
     setSelectedCategory(prev => prev === cat ? null : cat);
+  };
+
+  const getSugestaoCompraExportValue = (p: ProdutoComCurva): number | "" => {
+    const metricKey = `${(p.produto ?? "").trim()}||${((p.cor ?? "") || "").trim()}`;
+    const live = compraMetrics[metricKey];
+    const hasLive = Object.prototype.hasOwnProperty.call(compraMetrics, metricKey);
+    if (!hasLive) return "";
+
+    const compraItem = {
+      vendasMesAtual: live?.vendasMesAtual ?? 0,
+      estoqueFilial: live?.estoqueFilial ?? 0,
+      linha: p.linha ?? "",
+      subgrupo: p.subgrupo ?? "",
+      qtde12m: live?.qtde12m ?? 0,
+      mesesHistoricoFilial: live?.mesesHistoricoFilial ?? 12,
+      diasDesdeUltimaVenda: live?.diasDesdeUltimaVenda ?? null,
+    };
+    const sugestao = getReposicaoCompraView(compraItem, diasCorridosMes);
+    const baseType = getReposicaoBaseType(sugestao);
+    const baseQty =
+      sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS > 0 ? sugestao.qtdS : sugestao.qtdE;
+    const transit = applyTransitToSuggestion({
+      baseType,
+      baseQty,
+      entries: getCompraTransitoEntries(comprasTransitoIndex, p.produto, porCor ? (p.cor ?? null) : null),
+      estoqueAtual: compraItem.estoqueFilial,
+      vendasMesAtual: compraItem.vendasMesAtual,
+      diasCorridosMes,
+      limiteDias: getLimiteDiasReposicao(compraItem),
+    });
+
+    if (baseType === "SUFICIENTE") return "";
+    if (transit.qty <= 0) return "";
+    return transit.qty;
   };
 
   const handleExportSimpleXlsx = () => {
@@ -898,6 +932,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
           Qtd: p.qtde,
           Estoque: p.estoque ?? 0,
           Markup: markup !== null ? Math.round(markup * 100) / 100 : "",
+          "Sugestão de compra": getSugestaoCompraExportValue(p),
           "Var. vs período anterior": variacao,
         });
       }

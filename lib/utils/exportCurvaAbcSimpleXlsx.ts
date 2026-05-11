@@ -16,6 +16,7 @@ export interface CurvaAbcSimpleXlsxRow {
   Qtd: number;
   Estoque: number;
   Markup: number | "";
+  "Sugestão de compra": number | "";
   "Var. vs período anterior": number | string;
 }
 
