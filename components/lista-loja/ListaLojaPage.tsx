@@ -125,6 +125,12 @@ type FilialEstoqueRow = {
   estoque: number;
 };
 
+type EstoqueTooltipRow = {
+  key: string;
+  filial: string;
+  estoque: number;
+};
+
 type FilialVendaRow = {
   filial: string;
   qtde12m: number;
@@ -656,7 +662,7 @@ function buildExportHeaderToken(value: string) {
   return normalized || "SEM_FILIAL";
 }
 
-function aggregateEstoqueRowsForExport(
+function aggregateEstoqueRowsByDisplayLabel(
   rows: FilialEstoqueRow[],
   company: CompanyConfig | null
 ): FilialEstoqueRow[] {
@@ -670,7 +676,7 @@ function aggregateEstoqueRowsForExport(
     .sort((a, b) => compareFilialDisplayOrder(a.filial, b.filial, company));
 }
 
-function aggregateVendasRowsForExport(
+function aggregateVendasRowsByDisplayLabel(
   rows: FilialVendaRow[],
   company: CompanyConfig | null
 ): FilialVendaRow[] {
@@ -696,24 +702,69 @@ function aggregateVendasRowsForExport(
   return Array.from(acc.values()).sort((a, b) => compareFilialDisplayOrder(a.filial, b.filial, company));
 }
 
+function buildEstoqueTooltipRows(
+  rows: FilialEstoqueRow[],
+  company: CompanyConfig | null
+): EstoqueTooltipRow[] {
+  const positivos = new Map<string, number>();
+  const negativos: Array<{ key: string; filial: string; estoque: number; sortLabel: string }> = [];
+
+  for (const row of rows) {
+    const estoque = Math.round(Number(row.estoque ?? 0));
+    if (estoque === 0) continue;
+
+    const rawFilial = (row.filial ?? "").trim();
+    const displayLabel = getFilialLabelForDisplay(company, rawFilial);
+
+    if (estoque < 0) {
+      const detalharRaw = rawFilial && normalizeKey(rawFilial) !== normalizeKey(displayLabel);
+      negativos.push({
+        key: `neg:${rawFilial || displayLabel}:${negativos.length}`,
+        filial: detalharRaw ? `${displayLabel} (${rawFilial})` : displayLabel,
+        estoque,
+        sortLabel: displayLabel,
+      });
+      continue;
+    }
+
+    positivos.set(displayLabel, (positivos.get(displayLabel) ?? 0) + estoque);
+  }
+
+  return [
+    ...Array.from(positivos.entries()).map(([filial, estoque]) => ({
+      key: `pos:${filial}`,
+      filial,
+      estoque: Math.round(estoque),
+      sortLabel: filial,
+    })),
+    ...negativos,
+  ]
+    .sort((a, b) => {
+      const byDisplay = compareFilialDisplayOrder(a.sortLabel, b.sortLabel, company);
+      if (byDisplay !== 0) return byDisplay;
+      return a.filial.localeCompare(b.filial, "pt-BR");
+    })
+    .map(({ key, filial, estoque }) => ({ key, filial, estoque }));
+}
+
 function buildExportListText(values: string[]): string {
   return values.filter((value) => value.trim().length > 0).join(" | ");
 }
 
-function buildEstoqueTooltipText(rows: FilialEstoqueRow[]): string {
+function buildEstoqueTooltipText(rows: FilialEstoqueRow[], company: CompanyConfig | null): string {
   return buildExportListText(
-    rows
-      .filter((row) => Number(row.estoque ?? 0) !== 0)
+    buildEstoqueTooltipRows(rows, company)
       .map((row) => `${row.filial}: ${fmt(Number(row.estoque ?? 0))}`)
   );
 }
 
 function buildVendasTooltipText(
   rows: FilialVendaRow[],
-  mode: "12m" | "60d" | "mesAtual" | "valor12m"
+  mode: "12m" | "60d" | "mesAtual" | "valor12m",
+  company: CompanyConfig | null
 ): string {
   return buildExportListText(
-    rows
+    aggregateVendasRowsByDisplayLabel(rows, company)
       .filter((row) => {
         if (mode === "12m") return Number(row.qtde12m ?? 0) > 0;
         if (mode === "60d") return Number(row.qtde60d ?? 0) > 0;
@@ -736,17 +787,28 @@ function buildVendasTooltipText(
   );
 }
 
-function buildFiliaisComEstoqueText(rows: FilialEstoqueRow[]): string {
+function filterVendasTooltipRows(
+  rows: FilialVendaRow[],
+  mode: "12m" | "60d" | "valor12m"
+): FilialVendaRow[] {
+  return rows.filter((row) => {
+    if (mode === "valor12m") return Number(row.valor12m ?? 0) > 0;
+    if (mode === "12m") return Number(row.qtde12m ?? 0) > 0;
+    return Number(row.qtde60d ?? 0) > 0;
+  });
+}
+
+function buildFiliaisComEstoqueText(rows: FilialEstoqueRow[], company: CompanyConfig | null): string {
   return buildExportListText(
-    rows
+    aggregateEstoqueRowsByDisplayLabel(rows, company)
       .filter((row) => Number(row.estoque ?? 0) > 0)
       .map((row) => row.filial)
   );
 }
 
-function buildFiliaisQueVenderamText(rows: FilialVendaRow[]): string {
+function buildFiliaisQueVenderamText(rows: FilialVendaRow[], company: CompanyConfig | null): string {
   return buildExportListText(
-    rows
+    aggregateVendasRowsByDisplayLabel(rows, company)
       .filter((row) =>
         Number(row.qtde12m ?? 0) > 0 ||
         Number(row.qtde60d ?? 0) > 0 ||
@@ -839,7 +901,7 @@ async function buildListaLojaExportRows(
 
     const byFilial = new Map<string, FilialExportMetrics>();
 
-    for (const row of aggregateEstoqueRowsForExport(estoqueRowsRaw, company)) {
+    for (const row of aggregateEstoqueRowsByDisplayLabel(estoqueRowsRaw, company)) {
       byFilial.set(row.filial, {
         estoque: Number(row.estoque ?? 0),
         qtde12m: 0,
@@ -849,7 +911,7 @@ async function buildListaLojaExportRows(
       });
     }
 
-    for (const row of aggregateVendasRowsForExport(vendasRowsRaw, company)) {
+    for (const row of aggregateVendasRowsByDisplayLabel(vendasRowsRaw, company)) {
       const prev = byFilial.get(row.filial);
       byFilial.set(row.filial, {
         estoque: prev?.estoque ?? 0,
@@ -862,13 +924,13 @@ async function buildListaLojaExportRows(
 
     return {
       byFilial,
-      filiaisComEstoque: buildFiliaisComEstoqueText(estoqueRowsRaw),
-      filiaisQueVenderam: buildFiliaisQueVenderamText(vendasRowsRaw),
-      detalheEstoqueTooltip: buildEstoqueTooltipText(estoqueRowsRaw),
-      detalheVendas12mTooltip: buildVendasTooltipText(vendasRowsRaw, "12m"),
-      detalheVendas60dTooltip: buildVendasTooltipText(vendasRowsRaw, "60d"),
-      detalheVendasMesAtualTooltip: buildVendasTooltipText(vendasRowsRaw, "mesAtual"),
-      detalheValor12mTooltip: buildVendasTooltipText(vendasRowsRaw, "valor12m"),
+      filiaisComEstoque: buildFiliaisComEstoqueText(estoqueRowsRaw, company),
+      filiaisQueVenderam: buildFiliaisQueVenderamText(vendasRowsRaw, company),
+      detalheEstoqueTooltip: buildEstoqueTooltipText(estoqueRowsRaw, company),
+      detalheVendas12mTooltip: buildVendasTooltipText(vendasRowsRaw, "12m", company),
+      detalheVendas60dTooltip: buildVendasTooltipText(vendasRowsRaw, "60d", company),
+      detalheVendasMesAtualTooltip: buildVendasTooltipText(vendasRowsRaw, "mesAtual", company),
+      detalheValor12mTooltip: buildVendasTooltipText(vendasRowsRaw, "valor12m", company),
     };
   });
 
@@ -1370,7 +1432,7 @@ function ListaLojaItensTable({
     y: number;
     produto: string;
     cor: string;
-    filiais: Array<{ filial: string; estoque: number }>;
+    filiais: EstoqueTooltipRow[];
     total: number;
   }>(null);
   const [vendasTooltip, setVendasTooltip] = useState<null | {
@@ -1379,7 +1441,7 @@ function ListaLojaItensTable({
     produto: string;
     cor: string;
     mode: "12m" | "60d" | "valor12m";
-    filiais: Array<{ filial: string; qtde12m: number; qtde60d: number; valor12m: number }>;
+    filiais: FilialVendaRow[];
     loading: boolean;
   }>(null);
   const [abcTooltip, setAbcTooltip] = useState<null | {
@@ -1466,7 +1528,7 @@ function ListaLojaItensTable({
     rotas: TransferenciaDestinoSugestao[];
   }>(null);
 
-  const [estoqueCache, setEstoqueCache] = useState<Record<string, Array<{ filial: string; estoque: number }>>>({});
+  const [estoqueCache, setEstoqueCache] = useState<Record<string, EstoqueTooltipRow[]>>({});
   const [vendasCache, setVendasCache] = useState<Record<string, FilialVendaRow[]>>({});
   const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
   const [liveMetrics, setLiveMetrics] = useState<
@@ -1907,7 +1969,10 @@ function ListaLojaItensTable({
                       loading: true,
                     });
                     try {
-                      const rows = await fetchVendasPorFilialItem(companyKey, filialCod, item.produto, item.corProduto);
+                      const rows = aggregateVendasRowsByDisplayLabel(
+                        await fetchVendasPorFilialItem(companyKey, filialCod, item.produto, item.corProduto),
+                        companyConfig
+                      );
                       if (vendasHoverKeyRef.current !== `${cacheKey}::12m`) return;
                       setVendasCache((prev) => ({ ...prev, [cacheKey]: rows }));
                       setVendasTooltip((prev) =>
@@ -1958,7 +2023,10 @@ function ListaLojaItensTable({
                       loading: true,
                     });
                     try {
-                      const rows = await fetchVendasPorFilialItem(companyKey, filialCod, item.produto, item.corProduto);
+                      const rows = aggregateVendasRowsByDisplayLabel(
+                        await fetchVendasPorFilialItem(companyKey, filialCod, item.produto, item.corProduto),
+                        companyConfig
+                      );
                       if (vendasHoverKeyRef.current !== `${cacheKey}::valor12m`) return;
                       setVendasCache((prev) => ({ ...prev, [cacheKey]: rows }));
                       setVendasTooltip((prev) =>
@@ -2007,7 +2075,7 @@ function ListaLojaItensTable({
                     const cacheKey = `${filialScopeKey}::${buildItemKey(item.produto, item.corProduto)}`;
                     estoqueHoverKeyRef.current = cacheKey;
                     const cached = estoqueCache[cacheKey];
-                    const showTooltip = (rows: Array<{ filial: string; estoque: number }>) => {
+                    const showTooltip = (rows: EstoqueTooltipRow[]) => {
                       if (estoqueHoverKeyRef.current !== cacheKey) return;
                       setEstoqueTooltip({
                         x: e.clientX,
@@ -2032,10 +2100,13 @@ function ListaLojaItensTable({
                           corProduto: item.corProduto?.trim() || null,
                         },
                       });
-                      const rows = (metricas?.estoquePorFilial ?? []).map((r) => ({
-                        filial: r.filial,
-                        estoque: Number(r.estoque ?? 0),
-                      }));
+                      const rows = buildEstoqueTooltipRows(
+                        (metricas?.estoquePorFilial ?? []).map((r) => ({
+                          filial: r.filial,
+                          estoque: Number(r.estoque ?? 0),
+                        })),
+                        companyConfig
+                      );
                       if (estoqueHoverKeyRef.current !== cacheKey) return;
                       setEstoqueCache((prev) => ({ ...prev, [cacheKey]: rows }));
                       showTooltip(rows);
@@ -2081,7 +2152,10 @@ function ListaLojaItensTable({
                       loading: true,
                     });
                     try {
-                      const rows = await fetchVendasPorFilialItem(companyKey, filialCod, item.produto, item.corProduto);
+                      const rows = aggregateVendasRowsByDisplayLabel(
+                        await fetchVendasPorFilialItem(companyKey, filialCod, item.produto, item.corProduto),
+                        companyConfig
+                      );
                       if (vendasHoverKeyRef.current !== `${cacheKey}::60d`) return;
                       setVendasCache((prev) => ({ ...prev, [cacheKey]: rows }));
                       setVendasTooltip((prev) =>
@@ -2469,7 +2543,7 @@ function ListaLojaItensTable({
           ) : (
             <>
               {estoqueTooltip.filiais.map((row) => (
-                <div key={row.filial} className={styles.metricTooltipRow}>
+                <div key={row.key} className={styles.metricTooltipRow}>
                   <span>{row.filial}</span>
                   <span>{fmt(row.estoque)}</span>
                 </div>
@@ -2496,12 +2570,12 @@ function ListaLojaItensTable({
           <div className={styles.metricTooltipDivider} />
           {vendasTooltip.loading ? (
             <div className={styles.metricTooltipLine}>Carregando...</div>
-          ) : vendasTooltip.filiais.length === 0 ? (
+          ) : filterVendasTooltipRows(vendasTooltip.filiais, vendasTooltip.mode).length === 0 ? (
             <div className={styles.metricTooltipLine}>Sem vendas no período.</div>
           ) : (
             <>
-              {vendasTooltip.filiais.map((row) => (
-                <div key={row.filial} className={styles.metricTooltipRow}>
+              {filterVendasTooltipRows(vendasTooltip.filiais, vendasTooltip.mode).map((row, index) => (
+                <div key={`${row.filial}-${index}`} className={styles.metricTooltipRow}>
                   <span>{row.filial}</span>
                   <span>
                     {vendasTooltip.mode === "valor12m"
@@ -2514,9 +2588,14 @@ function ListaLojaItensTable({
                 <span>Total</span>
                 <span>
                   {vendasTooltip.mode === "valor12m"
-                    ? fmtBRL(vendasTooltip.filiais.reduce((s, row) => s + Number(row.valor12m ?? 0), 0))
+                    ? fmtBRL(
+                        filterVendasTooltipRows(vendasTooltip.filiais, vendasTooltip.mode).reduce(
+                          (s, row) => s + Number(row.valor12m ?? 0),
+                          0
+                        )
+                      )
                     : fmt(
-                        vendasTooltip.filiais.reduce(
+                        filterVendasTooltipRows(vendasTooltip.filiais, vendasTooltip.mode).reduce(
                           (s, row) => s + Number(vendasTooltip.mode === "12m" ? row.qtde12m : row.qtde60d),
                           0
                         )
