@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { findUserByUsername } from '@/lib/auth/users-store';
-import { getActiveFilial } from '@/lib/config/company';
+import { getActiveFilial, resolveCompany } from '@/lib/config/company';
 import { getConnectionPool } from '@/lib/db/connection';
 import { shouldUseProxy, forwardTransferToProxy } from '@/lib/db/proxy';
 import { executeTransfer } from '@/lib/transfer-executor';

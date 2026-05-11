@@ -1352,6 +1352,9 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                                   {porCor && (p.corDescricao || p.cor) && (
                                     <div className={styles.productCode} style={{ marginTop: 4 }}>
                                       Cor: {p.corDescricao || p.cor}
+                                      {companyKey === "scarfme" && p.subgrupo
+                                        ? ` | ${p.subgrupo.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}`
+                                        : ""}
                                     </div>
                                   )}
                                 </Link>
