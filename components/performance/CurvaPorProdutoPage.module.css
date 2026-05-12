@@ -306,6 +306,18 @@
   color: #0f172a;
 }
 
+.colorBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .compareBadge {
   display: inline-flex;
   align-items: center;
@@ -326,15 +338,15 @@
 }
 
 .productMeta,
-.productColor,
+.productSubMeta,
 .missingMeta {
   margin-top: 6px;
   font-size: 14px;
   color: #64748b;
 }
 
-.productColor {
-  color: #94a3b8;
+.productSubMeta {
+  color: #475569;
 }
 
 .suggestionBadge {
@@ -413,6 +425,13 @@
   font-size: 15px;
   font-weight: 800;
   color: #0f172a;
+}
+
+.missingNameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 1180px) {

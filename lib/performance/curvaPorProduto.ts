@@ -9,6 +9,9 @@ export interface CurvaPorProdutoSelectedItem {
   grade?: string | null;
   linha?: string | null;
   subgrupo?: string | null;
+  tipoProduto?: string | null;
+  colecao?: string | null;
+  descColecao?: string | null;
 }
 
 export interface CurvaPorProdutoApiRow extends CurvaPorProdutoSelectedItem {

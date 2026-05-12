@@ -48,6 +48,8 @@ type DisplayRow = CurvaPorProdutoApiResponse["rows"][number] & {
   suggestion: SuggestionView;
 };
 
+const METRICAS_CHUNK_SIZE = 40;
+
 interface Props {
   companyKey: CompanyKey;
   month: number;
@@ -228,6 +230,30 @@ function buildCurveBadgeLabel(curva: CurvaPorProdutoClassificacao | null): strin
   return curva ?? "—";
 }
 
+function buildProductInfoLine(row: Pick<DisplayRow, "subgrupo" | "tipoProduto" | "colecao" | "descColecao">) {
+  const parts: string[] = [];
+  const subgrupo = row.subgrupo?.trim();
+  const tipoProduto = row.tipoProduto?.trim();
+  const colecao = row.colecao?.trim();
+  const descColecao = row.descColecao?.trim();
+
+  if (subgrupo) parts.push(subgrupo);
+  if (tipoProduto) parts.push(tipoProduto);
+
+  const colecaoValue = [colecao, descColecao].filter(Boolean).join(" - ");
+  if (colecaoValue) parts.push(colecaoValue);
+
+  return parts.join(" | ");
+}
+
+function extractSuggestionNumber(value: string): number | "" {
+  const match = value.match(/-?\d+(?:[.,]\d+)?/);
+  if (!match) return "";
+  const normalized = match[0].replace(".", "").replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : "";
+}
+
 export default function CurvaPorProdutoPage({ companyKey, month, year, compare }: Props) {
   const [range, setRange] = useState<DateRangeValue>(() => getInitialRange(month, year));
   const [comparisonMode, setComparisonMode] = useState<ComparisonMode>(compare);
@@ -295,32 +321,53 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
     if (!data || data.rows.length === 0) return;
 
     let cancelled = false;
-    void fetchControleEstoqueMetricasItensClient({
-      company: companyKey,
-      filial: selectedFilial,
-      includeHistorico: true,
-      itens: data.rows.map((row) => ({
+
+    const prioritizedItems = data.rows
+      .slice()
+      .sort((a, b) => {
+        if (a.represented !== b.represented) return a.represented ? -1 : 1;
+        return b.vendas - a.vendas;
+      })
+      .map((row) => ({
         produto: row.produto,
         corProduto: row.corProduto ?? null,
-      })),
-    })
-      .then((rows) => {
+      }));
+
+    const loadInChunks = async () => {
+      for (let start = 0; start < prioritizedItems.length; start += METRICAS_CHUNK_SIZE) {
         if (cancelled) return;
-        const next: Record<string, MetricasRow> = {};
-        Object.entries(rows).forEach(([key, value]) => {
-          next[key] = {
-            qtde12m: value.resumo.qtde12m,
-            vendasMesAtual: value.resumo.vendasMesAtual,
-            estoqueFilial: value.resumo.estoqueTotal,
-            diasDesdeUltimaVenda: value.resumo.diasDesdeUltimaVenda,
-            mesesHistoricoFilial: value.resumo.mesesHistoricoFilial,
-          };
-        });
-        setMetricas(next);
-      })
-      .catch(() => {
-        if (!cancelled) setMetricas({});
-      });
+
+        const chunk = prioritizedItems.slice(start, start + METRICAS_CHUNK_SIZE);
+        try {
+          const rows = await fetchControleEstoqueMetricasItensClient({
+            company: companyKey,
+            filial: selectedFilial,
+            includeHistorico: true,
+            itens: chunk,
+          });
+
+          if (cancelled) return;
+
+          setMetricas((prev) => {
+            const next = { ...prev };
+            Object.entries(rows).forEach(([key, value]) => {
+              next[key] = {
+                qtde12m: value.resumo.qtde12m,
+                vendasMesAtual: value.resumo.vendasMesAtual,
+                estoqueFilial: value.resumo.estoqueTotal,
+                diasDesdeUltimaVenda: value.resumo.diasDesdeUltimaVenda,
+                mesesHistoricoFilial: value.resumo.mesesHistoricoFilial,
+              };
+            });
+            return next;
+          });
+        } catch {
+          if (!cancelled && start === 0) setMetricas({});
+        }
+      }
+    };
+
+    void loadInChunks();
 
     return () => {
       cancelled = true;
@@ -392,7 +439,13 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
   const countC = representedRows.filter((row) => row.curva === "C").length;
 
   const handleExportXlsx = () => {
-    exportCurvaPorProdutoXlsx(exportRows, exportOptions);
+    exportCurvaPorProdutoXlsx(
+      exportRows.map((row) => ({
+        ...row,
+        "Sugestao de compra": extractSuggestionNumber(String(row["Sugestao de compra"] ?? "")),
+      })),
+      exportOptions
+    );
   };
 
   const handleExportCsv = () => {
@@ -414,7 +467,11 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
         Codigo: row.produto,
         "Codigo de Barras": row.codigoBarra ?? "",
         Categoria: row.categoria || row.linha || "",
+        Subgrupo: row.subgrupo ?? "",
+        "Tipo Produto": row.tipoProduto ?? "",
         Grade: row.grade ?? "",
+        Colecao: row.colecao ?? "",
+        "Desc Colecao": row.descColecao ?? "",
         Cor: row.corDescricao || row.corProduto || "",
         "Participacao %": Number(row.percParticipacao.toFixed(2)),
         Faturamento: row.vendas,
@@ -469,6 +526,7 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
             onChange={(nextRange) => {
               setLoading(selectedItems.length > 0);
               setError(null);
+              setMetricas({});
               setRange(nextRange);
             }}
           />
@@ -478,6 +536,7 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
             onChange={(value) => {
               setLoading(selectedItems.length > 0);
               setError(null);
+              setMetricas({});
               setSelectedFilial(value);
             }}
             label=""
@@ -491,6 +550,7 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
                 onClick={() => {
                   setLoading(selectedItems.length > 0);
                   setError(null);
+                  setMetricas({});
                   setComparisonMode("month");
                 }}
               >
@@ -502,6 +562,7 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
                 onClick={() => {
                   setLoading(selectedItems.length > 0);
                   setError(null);
+                  setMetricas({});
                   setComparisonMode("year");
                 }}
               >
@@ -601,6 +662,7 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
                 <tbody>
                   {representedRows.map((row) => {
                     const comparison = getComparisonBadge(row.vendas, row.vendasPrevious);
+                    const productInfoLine = buildProductInfoLine(row);
                     return (
                       <tr key={buildCurvaPorProdutoKey(row.produto, row.corProduto)}>
                         <td>
@@ -610,6 +672,9 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
                                 {buildCurveBadgeLabel(row.curva)}
                               </span>
                               <span className={styles.productName}>{row.descricao || row.produto}</span>
+                              {(row.corDescricao || row.corProduto) && (
+                                <span className={styles.colorBadge}>{row.corDescricao || row.corProduto}</span>
+                              )}
                               <Link
                                 href={buildProductDetalhadoHref(companyKey, row)}
                                 className={styles.productDetailIcon}
@@ -643,8 +708,8 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
                               {row.categoria ? ` | ${row.categoria}` : row.linha ? ` | ${row.linha}` : ""}
                               {row.grade ? ` · ${row.grade}` : ""}
                             </div>
-                            {(row.corDescricao || row.corProduto) && (
-                              <div className={styles.productColor}>Cor: {row.corDescricao || row.corProduto}</div>
+                            {productInfoLine && (
+                              <div className={styles.productSubMeta}>{productInfoLine}</div>
                             )}
                           </div>
                         </td>
@@ -672,17 +737,25 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
                 <span className={styles.missingCount}>{missingRows.length} item(ns)</span>
               </div>
               <div className={styles.missingList}>
-                {missingRows.map((row) => (
-                  <div key={buildCurvaPorProdutoKey(row.produto, row.corProduto)} className={styles.missingItem}>
-                    <div className={styles.missingName}>{row.descricao || row.produto}</div>
-                    <div className={styles.missingMeta}>
+                {missingRows.map((row) => {
+                  const infoLine = buildProductInfoLine(row);
+                  return (
+                    <div key={buildCurvaPorProdutoKey(row.produto, row.corProduto)} className={styles.missingItem}>
+                      <div className={styles.missingNameRow}>
+                        <div className={styles.missingName}>{row.descricao || row.produto}</div>
+                        {(row.corDescricao || row.corProduto) && (
+                          <span className={styles.colorBadge}>{row.corDescricao || row.corProduto}</span>
+                        )}
+                      </div>
+                      <div className={styles.missingMeta}>
                       {row.produto}
-                      {row.corDescricao ? ` · ${row.corDescricao}` : row.corProduto ? ` · ${row.corProduto}` : ""}
                       {row.estoque > 0 ? ` · Estoque: ${fmt(row.estoque)}` : ""}
                       {row.suggestion.text !== "—" ? ` · ${row.suggestion.text}` : ""}
+                      </div>
+                      {infoLine && <div className={styles.productSubMeta}>{infoLine}</div>}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

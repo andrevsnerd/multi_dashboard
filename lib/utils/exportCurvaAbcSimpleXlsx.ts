@@ -2,25 +2,28 @@ import * as XLSX from "xlsx";
 import type { CompanyKey } from "@/lib/config/company";
 
 export interface CurvaAbcSimpleXlsxRow {
-  "#": number;
-  Curva: string;
-  Descrição: string;
-  Código: string;
-  "Codigo de Barras": string;
-  Categoria: string;
-  Grade: string;
-  Cor: string;
-  "Participação %": number;
-  "% acumulado": number;
-  Faturamento: number;
-  Qtd: number;
-  Estoque: number;
-  Markup: number | "";
-  "Sugestão de compra": number | "";
-  "Var. vs período anterior": number | string;
+  RANK: number;
+  CURVA: string;
+  DESCRICAO: string;
+  PRODUTO: string;
+  CODIGO_BARRA: string;
+  LINHA: string;
+  SUBGRUPO: string;
+  TIPO_PRODUTO: string;
+  COLECAO: string;
+  GRADE: string;
+  COR_DESCRICAO: string;
+  PERC_PARTICIPACAO: number;
+  PERC_ACUMULADA: number;
+  VENDAS: number;
+  QTDE: number;
+  ESTOQUE: number;
+  MARKUP: number | "";
+  SUGESTAO_COMPRA: number | "";
+  VAR_VS_PERIODO_ANTERIOR: number | string;
 }
 
-function formatDateRange(start: Date, end: Date): string {
+export function formatCurvaAbcSimpleDateRange(start: Date, end: Date): string {
   const s = start.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
   const e = end.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
   return `${s}_${e}`;
@@ -49,7 +52,7 @@ export function exportCurvaAbcSimpleXlsx(
   XLSX.utils.book_append_sheet(workbook, worksheet, "Curva ABC");
 
   const filialPart = options.filialLabel ? `-${safeFilenamePart(options.filialLabel)}` : "";
-  const filename = `curva-abc-visao-simples-${options.companyKey}${filialPart}-${formatDateRange(
+  const filename = `curva-abc-visao-simples-${options.companyKey}${filialPart}-${formatCurvaAbcSimpleDateRange(
     options.range.startDate,
     options.range.endDate
   )}.xlsx`;

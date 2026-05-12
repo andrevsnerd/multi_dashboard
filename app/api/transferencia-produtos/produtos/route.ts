@@ -105,6 +105,9 @@ export async function GET(request: Request) {
             p.DESC_PRODUTO,
             ISNULL(p.LINHA, '') AS LINHA,
             ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
+            ISNULL(p.TIPO_PRODUTO, '') AS TIPO_PRODUTO,
+            ISNULL(p.COLECAO, '') AS COLECAO,
+            '' AS DESC_COLECAO,
             ISNULL(CONVERT(VARCHAR(50), p.GRADE), '') AS GRADE,
             ISNULL(c.DESC_COR, '') AS DESC_COR,
             ${filialOperacional ? `@filialOrigemParam` : `ISNULL(es.FILIAL, '')`} AS NOME_FILIAL,
@@ -163,6 +166,9 @@ export async function GET(request: Request) {
             p.DESC_PRODUTO,
             ISNULL(p.LINHA, '') AS LINHA,
             ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
+            ISNULL(p.TIPO_PRODUTO, '') AS TIPO_PRODUTO,
+            ISNULL(p.COLECAO, '') AS COLECAO,
+            '' AS DESC_COLECAO,
             ISNULL(CONVERT(VARCHAR(50), p.GRADE), '') AS GRADE,
             ISNULL(c.DESC_COR, '') AS DESC_COR,
             ${filialOperacional ? `@filialOrigemParam` : `ISNULL(es.FILIAL, '')`} AS NOME_FILIAL,
@@ -200,6 +206,9 @@ export async function GET(request: Request) {
             p.DESC_PRODUTO,
             ISNULL(p.LINHA, '') AS LINHA,
             ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
+            ISNULL(p.TIPO_PRODUTO, '') AS TIPO_PRODUTO,
+            ISNULL(p.COLECAO, '') AS COLECAO,
+            '' AS DESC_COLECAO,
             ISNULL(CONVERT(VARCHAR(50), p.GRADE), '') AS GRADE,
             ISNULL(c.DESC_COR, '') AS DESC_COR,
             e.FILIAL AS NOME_FILIAL,
@@ -265,6 +274,9 @@ export async function GET(request: Request) {
             p.DESC_PRODUTO,
             ISNULL(p.LINHA, '') AS LINHA,
             ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
+            ISNULL(p.TIPO_PRODUTO, '') AS TIPO_PRODUTO,
+            ISNULL(p.COLECAO, '') AS COLECAO,
+            '' AS DESC_COLECAO,
             ISNULL(CONVERT(VARCHAR(50), p.GRADE), '') AS GRADE,
             ISNULL(c.DESC_COR, '') AS DESC_COR,
             ${filialOperacional ? `@filialOrigemParam` : `ISNULL(es.FILIAL, '')`} AS NOME_FILIAL,
@@ -303,6 +315,9 @@ export async function GET(request: Request) {
             p.DESC_PRODUTO,
             ISNULL(p.LINHA, '') AS LINHA,
             ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
+            ISNULL(p.TIPO_PRODUTO, '') AS TIPO_PRODUTO,
+            ISNULL(p.COLECAO, '') AS COLECAO,
+            '' AS DESC_COLECAO,
             ISNULL(CONVERT(VARCHAR(50), p.GRADE), '') AS GRADE,
             ISNULL(c.DESC_COR, '') AS DESC_COR,
             e.FILIAL AS NOME_FILIAL,
@@ -350,6 +365,9 @@ export async function GET(request: Request) {
         DESC_PRODUTO: string | null;
         LINHA: string | null;
         SUBGRUPO: string | null;
+        TIPO_PRODUTO: string | null;
+        COLECAO: string | null;
+        DESC_COLECAO: string | null;
         GRADE: string | null;
         CODIGO_BARRA: string | null;
         COR_PRODUTO: string | null;
@@ -385,6 +403,9 @@ export async function GET(request: Request) {
         descProduto: string;
         linha: string | null;
         subgrupo: string | null;
+        tipoProduto: string | null;
+        colecao: string | null;
+        descColecao: string | null;
         codigoBarra: string | null;
         corProduto: string | null;
         descCor: string;
@@ -409,6 +430,9 @@ export async function GET(request: Request) {
             descProduto: row.DESC_PRODUTO?.toString().trim() || '',
             linha: row.LINHA?.toString().trim() || null,
             subgrupo: row.SUBGRUPO?.toString().trim() || null,
+            tipoProduto: row.TIPO_PRODUTO?.toString().trim() || null,
+            colecao: row.COLECAO?.toString().trim() || null,
+            descColecao: row.DESC_COLECAO?.toString().trim() || null,
             codigoBarra: normalizeBarcode(row.CODIGO_BARRA) || null,
             corProduto: cor || null,
             descCor: descCorResolvida || descCorBanco,
@@ -449,6 +473,9 @@ export async function GET(request: Request) {
         descProduto: produto.descProduto,
         linha: produto.linha,
         subgrupo: produto.subgrupo,
+        tipoProduto: produto.tipoProduto,
+        colecao: produto.colecao,
+        descColecao: produto.descColecao,
         codigoBarra: produto.codigoBarra,
         corProduto: produto.corProduto,
         descCor: produto.descCor,

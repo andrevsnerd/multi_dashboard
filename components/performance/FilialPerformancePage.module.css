@@ -137,6 +137,58 @@
   cursor: not-allowed;
 }
 
+.exportMenuWrap {
+  position: relative;
+  margin-left: auto;
+}
+
+.exportMenuTrigger {
+  padding: 8px 14px;
+  background: #fff;
+  border: 1px solid #0f172a;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.exportMenuTrigger:hover {
+  background: #0f172a;
+  color: #fff;
+}
+
+.exportMenuDropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 150px;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid #dbe2ea;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  z-index: 20;
+}
+
+.exportMenuItem {
+  width: 100%;
+  padding: 9px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.exportMenuItem:hover {
+  background: #f8fafc;
+}
+
 .comparisonLabel {
   font-size: 13px;
   font-weight: 600;

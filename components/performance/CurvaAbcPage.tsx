@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { startOfMonth, endOfMonth } from "date-fns";
 import type { CompanyKey } from "@/lib/config/company";
@@ -12,7 +12,7 @@ import {
 } from "@/lib/performance/outrosCategories";
 import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateRangeFilter";
 import FilialFilter from "@/components/filters/FilialFilter";
-import SelectFilter from "@/components/filters/SelectFilter";
+import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
 import { fetchControleEstoqueItemMetricasClient } from "@/lib/client/controle-estoque-metricas";
 import {
   buildCompraTransitoIndex,
@@ -23,6 +23,7 @@ import {
 import { formatDateForQuery } from "@/lib/utils/date";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
 import FilialVendedoresTab from "./FilialVendedoresTab";
+import { exportCurvaAbcSimpleCsv } from "@/lib/utils/exportCurvaAbcSimpleCsv";
 import { exportCurvaAbcSimpleXlsx, type CurvaAbcSimpleXlsxRow } from "@/lib/utils/exportCurvaAbcSimpleXlsx";
 import styles from "./FilialPerformancePage.module.css";
 
@@ -40,6 +41,8 @@ interface ProdutoRow {
   categoria: string;
   linha?: string;
   subgrupo?: string;
+  tipoProduto?: string;
+  colecao?: string;
   grade?: string;
   cor?: string;
   corDescricao?: string;
@@ -177,6 +180,16 @@ function getCombinedCategoryMetrics(
 }
 
 // ─── ABC helpers ──────────────────────────────────────────────────────────────
+
+function formatProductInfoValue(value?: string | null): string {
+  const trimmed = value?.trim();
+  if (!trimmed) return "";
+  return trimmed.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatCollectionCode(value?: string | null): string {
+  return value?.trim() ?? "";
+}
 
 function calcularCurvas(produtos: ProdutoRow[]): ProdutoComCurva[] {
   const totalGeral = produtos.reduce((s, p) => s + p.vendas, 0);
@@ -535,9 +548,11 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [data, setData] = useState<FilialData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedSubgrupo, setSelectedSubgrupo] = useState<string | null>(null);
-  const [selectedGrade, setSelectedGrade] = useState<string | null>(null);
+  const [selectedSubgrupos, setSelectedSubgrupos] = useState<string[]>([]);
+  const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
+  const [selectedColecoes, setSelectedColecoes] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<"produtos" | "vendedores">("produtos");
   const [porCor, setPorCor] = useState(true);
   const [filtrarSugeridos, setFiltrarSugeridos] = useState(false);
@@ -596,6 +611,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     transitTotal?: number;
     transitDates?: string[];
   }>(null);
+  const exportMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Quando filial muda, voltar para aba de produtos
   useEffect(() => {
@@ -645,6 +661,21 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       .finally(() => setLoading(false));
   }, [companyKey, selectedFilial, selectedMonth, selectedYear, comparisonMode, range.startDate, range.endDate, porCor]);
 
+  useEffect(() => {
+    if (!exportMenuOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setExportMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [exportMenuOpen]);
+
   const outrosTooltip = useMemo(() => getOutrosTooltip(companyKey), [companyKey]);
 
   const outrosKeys = useMemo(
@@ -692,21 +723,47 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     ).sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [produtosBaseFiltro]);
 
+  const availableColecoes = useMemo(() => {
+    return Array.from(
+      new Set(
+        produtosBaseFiltro
+          .map((p) => (p.colecao ?? "").trim())
+          .filter((value) => value !== "")
+      )
+    ).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [produtosBaseFiltro]);
+
+  useEffect(() => {
+    setSelectedSubgrupos((prev) => prev.filter((value) => availableSubgrupos.includes(value)));
+  }, [availableSubgrupos]);
+
+  useEffect(() => {
+    setSelectedGrades((prev) => prev.filter((value) => availableGrades.includes(value)));
+  }, [availableGrades]);
+
+  useEffect(() => {
+    setSelectedColecoes((prev) => prev.filter((value) => availableColecoes.includes(value)));
+  }, [availableColecoes]);
+
   const produtosFiltrados = useMemo(() => {
     let produtos = produtosBaseFiltro;
-    if (selectedSubgrupo) {
-      produtos = produtos.filter((p) => (p.subgrupo ?? "").trim() === selectedSubgrupo);
+    if (selectedSubgrupos.length > 0) {
+      produtos = produtos.filter((p) => selectedSubgrupos.includes((p.subgrupo ?? "").trim()));
     }
-    if (selectedGrade) {
-      produtos = produtos.filter((p) => (p.grade ?? "").trim() === selectedGrade);
+    if (selectedGrades.length > 0) {
+      produtos = produtos.filter((p) => selectedGrades.includes((p.grade ?? "").trim()));
+    }
+    if (selectedColecoes.length > 0) {
+      produtos = produtos.filter((p) => selectedColecoes.includes((p.colecao ?? "").trim()));
     }
     return produtos;
-  }, [produtosBaseFiltro, selectedSubgrupo, selectedGrade]);
+  }, [produtosBaseFiltro, selectedSubgrupos, selectedGrades, selectedColecoes]);
 
   const activeFilterLabels = [
     selectedCategory ? getCategoryHeaderLabel(selectedCategory) : null,
-    selectedSubgrupo ? `Subgrupo: ${selectedSubgrupo}` : null,
-    selectedGrade ? `Grade: ${selectedGrade}` : null,
+    selectedSubgrupos.length > 0 ? `Subgrupos: ${selectedSubgrupos.join(", ")}` : null,
+    selectedGrades.length > 0 ? `Grades: ${selectedGrades.join(", ")}` : null,
+    selectedColecoes.length > 0 ? `Coleções: ${selectedColecoes.join(", ")}` : null,
   ].filter((value): value is string => Boolean(value));
 
   const hasStructuredFilters = activeFilterLabels.length > 0;
@@ -771,7 +828,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
 
   useEffect(() => {
     setCompraMetrics({});
-  }, [companyKey, selectedFilial, porCor, selectedCategory, selectedSubgrupo, selectedGrade, range.startDate, range.endDate]);
+  }, [companyKey, selectedFilial, porCor, selectedCategory, selectedSubgrupos, selectedGrades, selectedColecoes, range.startDate, range.endDate]);
 
   useEffect(() => {
     if (produtosComCurva.length === 0) return;
@@ -893,8 +950,8 @@ const handleBadgeClick = (cat: string) => {
     return transit.qty;
   };
 
-  const handleExportSimpleXlsx = () => {
-    if (produtosComCurva.length === 0) return;
+  const buildExportSimpleRows = (): CurvaAbcSimpleXlsxRow[] => {
+    if (produtosComCurva.length === 0) return [];
     const rows: CurvaAbcSimpleXlsxRow[] = [];
     for (const curva of groups) {
       const grupo = produtosComCurva.filter(p => p.curva === curva);
@@ -907,30 +964,51 @@ const handleBadgeClick = (cat: string) => {
         if (cmp?.kind === "new") variacao = "NOVO";
         else if (cmp?.kind === "pct") variacao = Math.round(cmp.value * 10) / 10;
         rows.push({
-          "#": rankGlobal,
-          Curva: curva,
-          Descrição: p.descricao || p.produto,
-          Código: p.produto,
-          "Codigo de Barras": p.codigoBarra || "",
-          Categoria: p.categoria ? getCategoryHeaderLabel(p.categoria) : "",
-          Grade: companyKey === "scarfme" ? (p.grade ?? "") : "",
-          Cor: porCor ? (p.corDescricao || p.cor || "") : "",
-          "Participação %": Math.round(p.percParticipacao * 10) / 10,
-          "% acumulado": Math.round(p.percCumulativa * 1000) / 10,
-          Faturamento: Math.round(p.vendas * 100) / 100,
-          Qtd: p.qtde,
-          Estoque: p.estoque ?? 0,
-          Markup: markup !== null ? Math.round(markup * 100) / 100 : "",
-          "Sugestão de compra": getSugestaoCompraExportValue(p),
-          "Var. vs período anterior": variacao,
+          RANK: rankGlobal,
+          CURVA: curva,
+          DESCRICAO: p.descricao || p.produto,
+          PRODUTO: p.produto,
+          CODIGO_BARRA: p.codigoBarra || "",
+          LINHA: p.linha?.trim() || "",
+          SUBGRUPO: p.subgrupo?.trim() || "",
+          TIPO_PRODUTO: p.tipoProduto?.trim() || "",
+          COLECAO: p.colecao?.trim() || "",
+          GRADE: companyKey === "scarfme" ? (p.grade ?? "") : "",
+          COR_DESCRICAO: porCor ? (p.corDescricao || p.cor || "") : "",
+          PERC_PARTICIPACAO: Math.round(p.percParticipacao * 10) / 10,
+          PERC_ACUMULADA: Math.round(p.percCumulativa * 1000) / 10,
+          VENDAS: Math.round(p.vendas * 100) / 100,
+          QTDE: p.qtde,
+          ESTOQUE: p.estoque ?? 0,
+          MARKUP: markup !== null ? Math.round(markup * 100) / 100 : "",
+          SUGESTAO_COMPRA: getSugestaoCompraExportValue(p),
+          VAR_VS_PERIODO_ANTERIOR: variacao,
         });
       }
     }
+    return rows;
+  };
+
+  const exportOptions = {
+    companyKey,
+    range: { startDate: range.startDate, endDate: range.endDate },
+    filialLabel: selectedFilial ? (data?.displayName ?? selectedFilial) : null,
+  };
+
+  const handleExportSimpleXlsx = () => {
+    const rows = buildExportSimpleRows();
+    if (rows.length === 0) return;
+    setExportMenuOpen(false);
     exportCurvaAbcSimpleXlsx(rows, {
-      companyKey,
-      range: { startDate: range.startDate, endDate: range.endDate },
-      filialLabel: selectedFilial ? (data?.displayName ?? selectedFilial) : null,
+      ...exportOptions,
     });
+  };
+
+  const handleExportSimpleCsv = () => {
+    const rows = buildExportSimpleRows();
+    if (rows.length === 0) return;
+    setExportMenuOpen(false);
+    exportCurvaAbcSimpleCsv(rows, exportOptions);
   };
 
   const comparisonLabel = comparisonMode === "month" ? "mês anterior" : "mesmo período do ano anterior";
@@ -1224,33 +1302,65 @@ const handleBadgeClick = (cat: string) => {
               Sugeridos
             </label>
             {produtosComCurva.length > 0 && (
-              <button
-                type="button"
-                className={styles.exportXlsxBtn}
-                onClick={handleExportSimpleXlsx}
-                title="Exporta a tabela atual (uma linha por produto) em Excel"
-              >
-                Exportar XLSX
-              </button>
+              <div className={styles.exportMenuWrap} ref={exportMenuRef}>
+                <button
+                  type="button"
+                  className={styles.exportMenuTrigger}
+                  onClick={() => setExportMenuOpen((prev) => !prev)}
+                  title="Escolher formato de exportacao"
+                  aria-haspopup="menu"
+                  aria-expanded={exportMenuOpen}
+                >
+                  Exportar ▼
+                </button>
+                {exportMenuOpen && (
+                  <div className={styles.exportMenuDropdown} role="menu" aria-label="Opcoes de exportacao">
+                    <button
+                      type="button"
+                      className={styles.exportMenuItem}
+                      onClick={handleExportSimpleCsv}
+                      title="Exporta a tabela atual em CSV"
+                    >
+                      Exportar CSV
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.exportMenuItem}
+                      onClick={handleExportSimpleXlsx}
+                      title="Exporta a tabela atual em Excel"
+                    >
+                      Exportar XLSX
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
-          {(availableSubgrupos.length > 0 || availableGrades.length > 0) && (
+          {(availableSubgrupos.length > 0 || availableGrades.length > 0 || availableColecoes.length > 0) && (
             <div className={styles.abcFiltersRow}>
               {availableSubgrupos.length > 0 && (
-                <SelectFilter
+                <MultiSelectFilter
                   label="Subgrupo"
-                  value={selectedSubgrupo}
+                  value={selectedSubgrupos}
                   options={availableSubgrupos}
-                  onChange={setSelectedSubgrupo}
+                  onChange={setSelectedSubgrupos}
                 />
               )}
               {availableGrades.length > 0 && (
-                <SelectFilter
+                <MultiSelectFilter
                   label="Grade"
-                  value={selectedGrade}
+                  value={selectedGrades}
                   options={availableGrades}
-                  onChange={setSelectedGrade}
+                  onChange={setSelectedGrades}
+                />
+              )}
+              {availableColecoes.length > 0 && (
+                <MultiSelectFilter
+                  label="Coleção"
+                  value={selectedColecoes}
+                  options={availableColecoes}
+                  onChange={setSelectedColecoes}
                 />
               )}
             </div>
@@ -1376,8 +1486,15 @@ const handleBadgeClick = (cat: string) => {
                                   {porCor && (p.corDescricao || p.cor) && (
                                     <div className={styles.productCode} style={{ marginTop: 4 }}>
                                       Cor: {p.corDescricao || p.cor}
-                                      {companyKey === "scarfme" && p.subgrupo
-                                        ? ` | ${p.subgrupo.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}`
+                                      {companyKey === "scarfme"
+                                        ? [
+                                            formatProductInfoValue(p.subgrupo),
+                                            formatProductInfoValue(p.tipoProduto),
+                                            formatCollectionCode(p.colecao),
+                                          ]
+                                            .filter(Boolean)
+                                            .map((value) => ` | ${value}`)
+                                            .join("")
                                         : ""}
                                     </div>
                                   )}

@@ -9,13 +9,17 @@ export interface CurvaPorProdutoXlsxRow {
   Codigo: string;
   "Codigo de Barras": string;
   Categoria: string;
+  Subgrupo: string;
+  "Tipo Produto": string;
   Grade: string;
+  Colecao: string;
+  "Desc Colecao": string;
   Cor: string;
   "Participacao %": number;
   Faturamento: number;
   Qtd: number;
   Estoque: number;
-  "Sugestao de compra": string;
+  "Sugestao de compra": string | number;
   "Var. vs periodo anterior": number | string;
 }
 

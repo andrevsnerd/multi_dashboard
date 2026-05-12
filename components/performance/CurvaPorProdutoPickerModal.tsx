@@ -19,6 +19,9 @@ interface Produto {
   grade?: string | null;
   linha?: string | null;
   subgrupo?: string | null;
+  tipoProduto?: string | null;
+  colecao?: string | null;
+  descColecao?: string | null;
 }
 
 type ImportacaoOption = {
@@ -110,6 +113,9 @@ function toSelectedItem(produto: Produto): CurvaPorProdutoSelectedItem {
     grade: produto.grade ?? null,
     linha: produto.linha ?? null,
     subgrupo: produto.subgrupo ?? null,
+    tipoProduto: produto.tipoProduto ?? null,
+    colecao: produto.colecao ?? null,
+    descColecao: produto.descColecao ?? null,
   };
 }
 

@@ -18,6 +18,9 @@ interface CurvaRankedRow {
   categoria: string;
   linha?: string;
   subgrupo?: string;
+  tipoProduto?: string;
+  colecao?: string;
+  descColecao?: string;
   grade?: string;
   codigoBarra?: string;
   cor?: string;
@@ -83,6 +86,9 @@ function calcularCurvas(produtos: Array<{
   categoria: string;
   linha?: string;
   subgrupo?: string;
+  tipoProduto?: string;
+  colecao?: string;
+  descColecao?: string;
   grade?: string;
   codigoBarra?: string;
   cor?: string;
@@ -235,6 +241,9 @@ export async function POST(request: Request) {
           return {
             ...item,
             categoria: item.linha ?? "",
+            tipoProduto: item.tipoProduto ?? null,
+            colecao: item.colecao ?? null,
+            descColecao: item.descColecao ?? null,
             vendas: 0,
             qtde: 0,
             custo: 0,
@@ -255,6 +264,9 @@ export async function POST(request: Request) {
           grade: matched.grade || item.grade || null,
           linha: matched.linha || item.linha || null,
           subgrupo: matched.subgrupo || item.subgrupo || null,
+          tipoProduto: matched.tipoProduto || item.tipoProduto || null,
+          colecao: matched.colecao || item.colecao || null,
+          descColecao: matched.descColecao || item.descColecao || null,
           categoria: matched.categoria,
           vendas: matched.vendas,
           qtde: matched.qtde,
