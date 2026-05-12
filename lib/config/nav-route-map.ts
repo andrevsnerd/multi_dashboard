@@ -22,6 +22,7 @@ export const NAV_ROUTE_MAP: Record<string, PermissionKey | "admin"> = {
   "produto-detalhado": "produto-detalhado",
   "produtos-recentes": "produtos",
   "produtos-novos": "produtos",
+  "relatorio-colecao": "produtos",
 
   // ── Vendas / CRM ───────────────────────────────────────────────
   vendedores: "vendedores",

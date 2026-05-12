@@ -69,6 +69,10 @@ export default function Sidebar({ companyName }: SidebarProps) {
     ? `${basePath}/produtos-novos`
     : "/produtos-novos";
 
+  const relatorioColecaoHref = basePath && basePath !== "/"
+    ? `${basePath}/relatorio-colecao`
+    : "/relatorio-colecao";
+
   // Construir o link para vendedores baseado no caminho base
   const vendedoresHref = basePath && basePath !== "/" 
     ? `${basePath}/vendedores`
@@ -188,6 +192,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     },
     { label: "Vendedores", href: vendedoresHref, permission: "vendedores" },
     { label: "Clientes", href: clientesHref, permission: "clientes" },
+    ...(isScarfme ? [{ label: "Relatório Coleção", href: relatorioColecaoHref, permission: "produtos" as const }] : []),
     { label: "Controle de Estoque", href: controleEstoqueHref, permission: "controle-estoque" },
     { label: "Estoque consulta", href: estoqueConsultaHref, permission: "controle-estoque" },
     { label: "Controle de Giro", href: controleGiroHref, permission: "controle-giro" },
@@ -305,6 +310,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
                 !pathname.includes("/produtos") &&
                 !pathname.includes("/produtos-recentes") &&
                 !pathname.includes("/produtos-novos") &&
+                !pathname.includes("/relatorio-colecao") &&
                 !pathname.includes("/produto-detalhado") &&
                 !pathname.includes("/vendedores") &&
                 !pathname.includes("/clientes") &&
@@ -332,6 +338,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
             } else if (item.label === "Clientes") {
               // Clientes está ativo quando o pathname inclui /clientes
               isActive = pathname?.includes("/clientes") || pathname === item.href;
+            } else if (item.label === "Relatório Coleção") {
+              isActive = pathname?.includes("/relatorio-colecao") || pathname === item.href;
             } else if (item.label === "Controle de Estoque") {
               // Controle de Estoque está ativo quando o pathname inclui /controle-estoque
               isActive = pathname?.includes("/controle-estoque") || pathname === item.href;
