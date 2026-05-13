@@ -17,8 +17,18 @@ import {
   textoDestinoCompraFinal,
   type DestinoCompraFinalParte,
 } from "@/lib/utils/compra-final-destino";
-import { calcNecessidadeMinimaQty } from "@/lib/utils/necessidade-minima";
-import { fetchControleEstoqueItemMetricasClient } from "@/lib/client/controle-estoque-metricas";
+import {
+  calcNecessidadeMinimaQty,
+  calcTotalNecessidadeMinimaPorFilial,
+  combineBaseSuggestionWithNecessidadeMinima,
+  getCombinedNecessidadeMinimaTooltip,
+  getNecessidadeMinimaRuleDescription,
+  getSuggestionPrincipalBadgeLabel,
+} from "@/lib/utils/necessidade-minima";
+import {
+  fetchControleEstoqueItemMetricasClient,
+  fetchControleEstoqueMetricasItensClient,
+} from "@/lib/client/controle-estoque-metricas";
 import {
   buildCompraTransitoIndex,
   fetchComprasTransitoClient,
@@ -26,6 +36,7 @@ import {
   type CompraTransitoIndex,
 } from "@/lib/client/compras-transito";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
+import { buildControleEstoqueItemKey, type ControleEstoqueItemMetricas } from "@/lib/utils/controle-estoque-metricas";
 import ComprasSalvasListPanel from "@/components/stock/ComprasSalvasListPanel";
 import styles from "./ListaCompraSugeridaPage.module.css";
 
@@ -57,6 +68,11 @@ interface ReposicaoItem {
   suggestionSData?: { mediaVendasMes: number; mesesHistoricoFilial: number; estoqueAtual: number; limiteDias: number };
   suggestionTransitTotal?: number;
   suggestionTransitDates?: string[];
+  suggestionBaseType?: string;
+  suggestionBaseQty?: number;
+  suggestionNmTotalQty?: number;
+  suggestionNmExtraQty?: number;
+  suggestionHasCombinedNm?: boolean;
 }
 
 interface ReposicaoData {
@@ -116,6 +132,11 @@ interface SuggestionView {
   transitTotal?: number;
   transitDates?: string[];
   suppressedByTransit?: boolean;
+  baseType?: SuggestionType;
+  baseQty?: number;
+  totalNmQty?: number;
+  nmExtraQty?: number;
+  hasCombinedNm?: boolean;
 }
 
 function buildSuggestionKey(produto?: string | null, cor?: string | null): string {
@@ -484,13 +505,23 @@ function getSuggestionViewFromListaCompraRule(item: ProdutoSugestao, diasCorrido
 function applyTransitToListaCompraSuggestion(
   item: ProdutoSugestao,
   diasCorridosMes: number,
-  comprasTransitoIndex: CompraTransitoIndex
+  comprasTransitoIndex: CompraTransitoIndex,
+  totalNmQtyOverride?: number
 ): SuggestionView {
   const base = getSuggestionViewFromListaCompraRule(item, diasCorridosMes);
-  const { limiteDias } = getLimiteDiasReposicao(item);
-  const transit = applyTransitToSuggestion({
+  const fallbackNmQty = calcNecessidadeMinimaQty({
+    estoqueAtual: item.estoqueAtual,
+    qtde12m: getQtde12mBase(item),
+  });
+  const combined = combineBaseSuggestionWithNecessidadeMinima({
     baseType: base.type,
     baseQty: base.qty,
+    totalNmQty: totalNmQtyOverride ?? fallbackNmQty,
+  });
+  const { limiteDias } = getLimiteDiasReposicao(item);
+  const transit = applyTransitToSuggestion({
+    baseType: combined.effectiveType,
+    baseQty: combined.totalQty,
     entries: getCompraTransitoEntries(comprasTransitoIndex, item.produto, item.cor ?? null),
     estoqueAtual: item.estoqueAtual,
     vendasMesAtual: item.vendasMesAtual,
@@ -509,6 +540,11 @@ function applyTransitToListaCompraSuggestion(
       (entry) => `${new Date(`${entry.dataRecebimento}T00:00:00`).toLocaleDateString("pt-BR")} (+${fmt(entry.quantidade)})`
     ),
     suppressedByTransit: transit.suppressedByTransit,
+    baseType: base.type,
+    baseQty: combined.baseQty,
+    totalNmQty: combined.totalNmQty,
+    nmExtraQty: combined.nmExtraQty,
+    hasCombinedNm: combined.hasCombinedNm,
   };
 }
 
@@ -558,6 +594,7 @@ export default function ListaCompraSugeridaPage({
   // ── Aba Reposição ──────────────────────────────────────────────────────────
   const [reposicaoData, setReposicaoData] = useState<ReposicaoData | null>(null);
   const [reposicaoSuggestionMap, setReposicaoSuggestionMap] = useState<Record<string, ProdutoSugestao>>({});
+  const [reposicaoNmTotalQtyMap, setReposicaoNmTotalQtyMap] = useState<Record<string, number>>({});
   const [reposicaoSuggestionLoading, setReposicaoSuggestionLoading] = useState(false);
   const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
   const diasCorridosMes = useMemo(() => new Date().getDate(), []);
@@ -602,12 +639,14 @@ export default function ListaCompraSugeridaPage({
   useEffect(() => {
     if (!reposicaoData || reposicaoData.itens.length === 0) {
       setReposicaoSuggestionMap({});
+      setReposicaoNmTotalQtyMap({});
       setReposicaoSuggestionLoading(false);
       return;
     }
     // Se todos os itens já têm suggestionQty pré-computada, não precisa buscar
     if (reposicaoData.itens.every(item => item.suggestionQty != null)) {
       setReposicaoSuggestionMap({});
+      setReposicaoNmTotalQtyMap({});
       setReposicaoSuggestionLoading(false);
       return;
     }
@@ -616,6 +655,7 @@ export default function ListaCompraSugeridaPage({
     );
     if (produtos.length === 0) {
       setReposicaoSuggestionMap({});
+      setReposicaoNmTotalQtyMap({});
       setReposicaoSuggestionLoading(false);
       return;
     }
@@ -633,22 +673,49 @@ export default function ListaCompraSugeridaPage({
     produtos.forEach((p) => params.append("produtos", p));
 
     fetchListaCompra(params)
-      .then((rows) => {
+      .then(async (rows) => {
+        const metricasItens: Record<string, ControleEstoqueItemMetricas> =
+          rows.length > 0
+            ? await fetchControleEstoqueMetricasItensClient({
+              company: companyKey,
+              filial: filial || null,
+              includeHistorico: true,
+              itens: rows.map((row) => ({
+                produto: row.produto,
+                corProduto: row.cor ?? null,
+              })),
+            }).catch((): Record<string, ControleEstoqueItemMetricas> => ({}))
+            : {};
         const next: Record<string, ProdutoSugestao> = {};
+        const nextNmTotal: Record<string, number> = {};
         rows.forEach((r) => {
           r.qtde12m = getQtde12mBase(r);
           const produto = (r.produto ?? "").trim();
           if (!produto) return;
+          const metricas = metricasItens[buildControleEstoqueItemKey(produto, r.cor ?? null)];
+          const totalNmQty = metricas
+            ? calcTotalNecessidadeMinimaPorFilial({
+              company: resolveCompany(companyKey),
+              vendasPorFilial: metricas.vendasPorFilial,
+              estoquePorFilial: metricas.estoquePorFilial,
+            })
+            : 0;
           const keyCorCodigo = buildSuggestionKey(produto, r.cor ?? "");
           next[keyCorCodigo] = r;
+          nextNmTotal[keyCorCodigo] = totalNmQty;
           if ((r.corDescricao ?? "").trim()) {
             const keyCorDescricao = buildSuggestionKey(produto, r.corDescricao ?? "");
             next[keyCorDescricao] = r;
+            nextNmTotal[keyCorDescricao] = totalNmQty;
           }
         });
         setReposicaoSuggestionMap(next);
+        setReposicaoNmTotalQtyMap(nextNmTotal);
       })
-      .catch(() => setReposicaoSuggestionMap({}))
+      .catch(() => {
+        setReposicaoSuggestionMap({});
+        setReposicaoNmTotalQtyMap({});
+      })
       .finally(() => setReposicaoSuggestionLoading(false));
   }, [reposicaoData, companyKey, filial, categoria, searchParams, expandirPorCor]);
 
@@ -674,6 +741,12 @@ export default function ListaCompraSugeridaPage({
       const sumSuggestionQty = allHaveSuggestion ? items.reduce((s, i) => s + (i.suggestionQty ?? 0), 0) : undefined;
       const suggestionType = allHaveSuggestion ? (items[0].suggestionType ?? "SEM_SUGESTAO") : undefined;
       const sItem = items.find(i => i.suggestionType === "S");
+      const sumBaseQty = allHaveSuggestion
+        ? items.reduce((s, i) => s + Math.max(0, Number(i.suggestionBaseQty ?? ((i.suggestionQty ?? 0) - (i.suggestionNmExtraQty ?? 0)))), 0)
+        : undefined;
+      const sumNmTotalQty = allHaveSuggestion ? items.reduce((s, i) => s + Math.max(0, Number(i.suggestionNmTotalQty ?? 0)), 0) : undefined;
+      const sumNmExtraQty = allHaveSuggestion ? items.reduce((s, i) => s + Math.max(0, Number(i.suggestionNmExtraQty ?? 0)), 0) : undefined;
+      const hasCombinedNm = allHaveSuggestion ? items.some((i) => Boolean(i.suggestionHasCombinedNm)) : undefined;
       merged.push({
         produto: base.produto,
         descricao: base.descricao,
@@ -691,6 +764,11 @@ export default function ListaCompraSugeridaPage({
         suggestionQty: sumSuggestionQty,
         suggestionType,
         suggestionSData: sItem?.suggestionSData,
+        suggestionBaseType: items[0].suggestionBaseType ?? suggestionType,
+        suggestionBaseQty: sumBaseQty,
+        suggestionNmTotalQty: sumNmTotalQty,
+        suggestionNmExtraQty: sumNmExtraQty,
+        suggestionHasCombinedNm: hasCombinedNm,
       });
     });
     // ordena por suggestionQty (ou qtdCompra como fallback) desc
@@ -710,6 +788,11 @@ export default function ListaCompraSugeridaPage({
         if (item.suggestionQty != null && item.suggestionType != null) {
           const sugestaoQtd = item.suggestionQty;
           const sugestaoTipo = item.suggestionType as SuggestionType;
+          const sugestaoBaseTipo = (item.suggestionBaseType ?? item.suggestionType ?? "SEM_SUGESTAO") as SuggestionType;
+          const sugestaoBaseQtd = Math.max(0, Number(item.suggestionBaseQty ?? (sugestaoQtd - (item.suggestionNmExtraQty ?? 0))));
+          const sugestaoNmTotalQty = Math.max(0, Number(item.suggestionNmTotalQty ?? 0));
+          const sugestaoNmExtraQty = Math.max(0, Number(item.suggestionNmExtraQty ?? 0));
+          const sugestaoHasCombinedNm = Boolean(item.suggestionHasCombinedNm);
           if (sugestaoQtd <= 0 || (sugestaoTipo !== "COMPRA" && sugestaoTipo !== "S" && sugestaoTipo !== "E")) {
             return {
               ...item,
@@ -717,6 +800,11 @@ export default function ListaCompraSugeridaPage({
               sugestaoQtd: 0,
               sugestaoTransitTotal: item.suggestionTransitTotal ?? 0,
               sugestaoTransitDates: item.suggestionTransitDates ?? [],
+              sugestaoBaseTipo,
+              sugestaoBaseQtd,
+              sugestaoNmTotalQty,
+              sugestaoNmExtraQty,
+              sugestaoHasCombinedNm,
               custoTotal: 0,
             };
           }
@@ -726,6 +814,11 @@ export default function ListaCompraSugeridaPage({
             sugestaoQtd,
             sugestaoTransitTotal: item.suggestionTransitTotal ?? 0,
             sugestaoTransitDates: item.suggestionTransitDates ?? [],
+            sugestaoBaseTipo,
+            sugestaoBaseQtd,
+            sugestaoNmTotalQty,
+            sugestaoNmExtraQty,
+            sugestaoHasCombinedNm,
             custoTotal: sugestaoQtd * (item.custoUnit ?? 0),
           };
         }
@@ -733,8 +826,8 @@ export default function ListaCompraSugeridaPage({
         const key = buildSuggestionKey(item.produto, expandirPorCor ? (item.cor ?? "") : "");
         const suggestionSource = reposicaoSuggestionMap[key] ?? null;
         const suggestion = suggestionSource
-          ? applyTransitToListaCompraSuggestion(suggestionSource, diasCorridosMes, comprasTransitoIndex)
-          : { type: "SEM_SUGESTAO" as SuggestionType, qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0 };
+          ? applyTransitToListaCompraSuggestion(suggestionSource, diasCorridosMes, comprasTransitoIndex, reposicaoNmTotalQtyMap[key] ?? 0)
+          : { type: "SEM_SUGESTAO" as SuggestionType, qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0, baseType: "SEM_SUGESTAO" as SuggestionType, baseQty: 0, totalNmQty: 0, nmExtraQty: 0, hasCombinedNm: false };
         const sugestaoQtd = suggestion.qty;
         return {
           ...item,
@@ -742,12 +835,17 @@ export default function ListaCompraSugeridaPage({
           sugestaoQtd,
           sugestaoTransitTotal: suggestion.transitTotal ?? 0,
           sugestaoTransitDates: suggestion.transitDates ?? [],
+          sugestaoBaseTipo: suggestion.baseType ?? suggestion.type,
+          sugestaoBaseQtd: suggestion.baseQty ?? suggestion.qty,
+          sugestaoNmTotalQty: suggestion.totalNmQty ?? 0,
+          sugestaoNmExtraQty: suggestion.nmExtraQty ?? 0,
+          sugestaoHasCombinedNm: suggestion.hasCombinedNm ?? false,
           custoTotal: sugestaoQtd * (item.custoUnit ?? 0),
         };
       })
       .filter((item) => item.sugestaoTipo === "COMPRA" || item.sugestaoTipo === "S" || item.sugestaoTipo === "E" || item.sugestaoTipo === "NM")
       .sort((a, b) => (b.sugestaoQtd ?? 0) - (a.sugestaoQtd ?? 0));
-  }, [expandirPorCor, reposicaoComCusto, reposicaoAgrupadaPorProduto, reposicaoSuggestionMap, diasCorridosMes, comprasTransitoIndex]);
+  }, [expandirPorCor, reposicaoComCusto, reposicaoAgrupadaPorProduto, reposicaoSuggestionMap, reposicaoNmTotalQtyMap, diasCorridosMes, comprasTransitoIndex]);
 
   const totalCustoReposicao = reposicaoExibidaComCusto.reduce((s, i) => s + (i.custoTotal ?? 0), 0);
   const totalQtdReposicao = reposicaoExibidaComCusto.reduce((s, i) => s + (i.sugestaoQtd ?? 0), 0);
@@ -757,6 +855,7 @@ export default function ListaCompraSugeridaPage({
   const [loadingABC, setLoadingABC] = useState(false);
   const [errorABC, setErrorABC] = useState<string | null>(null);
   const [abcLoadedKey, setAbcLoadedKey] = useState<string | null>(null);
+  const [abcNmTotalQtyMap, setAbcNmTotalQtyMap] = useState<Record<string, number>>({});
   const [modoReposicao, setModoReposicao] = useState(true);
   const [incluirCurvaB, setIncluirCurvaB] = useState(false);
   const [incluirCurvaC, setIncluirCurvaC] = useState(false);
@@ -1170,7 +1269,42 @@ export default function ListaCompraSugeridaPage({
     setLoadingABC(true);
     setErrorABC(null);
     fetchListaCompra(params)
-      .then(data => { setProdutosABC(data); setAbcLoadedKey(abcFetchKey); })
+      .then(async (data) => {
+        const metricasItens: Record<string, ControleEstoqueItemMetricas> =
+          data.length > 0
+            ? await fetchControleEstoqueMetricasItensClient({
+              company: companyKey,
+              filial: filial || null,
+              includeHistorico: true,
+              itens: data.map((row) => ({
+                produto: row.produto,
+                corProduto: row.cor ?? null,
+              })),
+            }).catch((): Record<string, ControleEstoqueItemMetricas> => ({}))
+            : {};
+        const nextNmTotal: Record<string, number> = {};
+        data.forEach((row) => {
+          const produto = (row.produto ?? "").trim();
+          if (!produto) return;
+          const metricas = metricasItens[buildControleEstoqueItemKey(produto, row.cor ?? null)];
+          const totalNmQty = metricas
+            ? calcTotalNecessidadeMinimaPorFilial({
+              company: resolveCompany(companyKey),
+              vendasPorFilial: metricas.vendasPorFilial,
+              estoquePorFilial: metricas.estoquePorFilial,
+            })
+            : 0;
+          const keyCorCodigo = buildSuggestionKey(produto, expandirPorCor ? (row.cor ?? "") : "");
+          nextNmTotal[keyCorCodigo] = totalNmQty;
+          if (expandirPorCor && (row.corDescricao ?? "").trim()) {
+            const keyCorDescricao = buildSuggestionKey(produto, row.corDescricao ?? "");
+            nextNmTotal[keyCorDescricao] = totalNmQty;
+          }
+        });
+        setProdutosABC(data);
+        setAbcNmTotalQtyMap(nextNmTotal);
+        setAbcLoadedKey(abcFetchKey);
+      })
       .catch((e) => setErrorABC(e instanceof Error ? e.message : "Erro"))
       .finally(() => setLoadingABC(false));
   }, [activeTab, abcLoadedKey, abcFetchKey, companyKey, searchParams, categoria, qtdCompra, filial, expandirPorCor]);
@@ -1197,7 +1331,13 @@ export default function ListaCompraSugeridaPage({
           sugestaoView: { type: "SEM_SUGESTAO" as SuggestionType, qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0 },
         };
       }
-      const sugestaoView = applyTransitToListaCompraSuggestion(p, diasCorridosMes, comprasTransitoIndex);
+      const suggestionKey = buildSuggestionKey(p.produto, expandirPorCor ? (p.cor ?? p.corDescricao ?? "") : "");
+      const sugestaoView = applyTransitToListaCompraSuggestion(
+        p,
+        diasCorridosMes,
+        comprasTransitoIndex,
+        abcNmTotalQtyMap[suggestionKey] ?? 0
+      );
       return {
         ...p,
         qtdFinal: sugestaoView.type === "COMPRA" ? sugestaoView.qty : 0,
@@ -1205,7 +1345,7 @@ export default function ListaCompraSugeridaPage({
         sugestaoView,
       };
     });
-  }, [produtosComCurva, modoReposicao, incluirCurvaB, incluirCurvaC, diasCorridosMes, comprasTransitoIndex]);
+  }, [produtosComCurva, modoReposicao, incluirCurvaB, incluirCurvaC, diasCorridosMes, comprasTransitoIndex, expandirPorCor, abcNmTotalQtyMap]);
 
   const totalCustoABC = produtosComCurvaFinal.reduce((s, p) => {
     const cu = p.custoUnitario ?? 0;
@@ -1529,12 +1669,34 @@ export default function ListaCompraSugeridaPage({
                       <td className={item.sugestaoTipo === "S" ? styles.qtdSugeridaS : styles.qtdSugerida}>
                         <span className={item.sugestaoTipo === "S" ? styles.qtdSugeridaSInner : undefined}>
                           {(() => {
-                            const transitTotal = "sugestaoTransitTotal" in item ? item.sugestaoTransitTotal ?? 0 : 0;
-                            const transitDates = "sugestaoTransitDates" in item ? item.sugestaoTransitDates ?? [] : [];
+                            const transitTotal = item.sugestaoTransitTotal ?? 0;
+                            const transitDates = item.sugestaoTransitDates ?? [];
+                            const baseType = (item.sugestaoBaseTipo ?? item.sugestaoTipo) as SuggestionType;
+                            const baseQty = Math.max(0, Number(item.sugestaoBaseQtd ?? item.sugestaoQtd ?? 0));
+                            const nmExtraQty = Math.max(0, Number(item.sugestaoNmExtraQty ?? 0));
+                            const hasCombinedNm = Boolean(item.sugestaoHasCombinedNm);
+                            const combinedNmTitle = hasCombinedNm
+                              ? getCombinedNecessidadeMinimaTooltip({
+                                baseType,
+                                baseQty,
+                                nmExtraQty,
+                                totalQty: Math.max(0, Number(item.sugestaoQtd ?? 0)),
+                              })
+                              : getNecessidadeMinimaRuleDescription();
+                            const principalBadgeLabel = getSuggestionPrincipalBadgeLabel(baseType);
                             return (
                               <>
                           {fmt(item.sugestaoQtd ?? 0)}
-                          {item.sugestaoTipo === "S" && (
+                          {baseType === "COMPRA" && hasCombinedNm && principalBadgeLabel && (
+                            <span
+                              className={styles.badgeT}
+                              style={{ marginLeft: 6, background: "#1d4ed8", borderColor: "#1e40af", color: "#fff" }}
+                              title={combinedNmTitle}
+                            >
+                              {principalBadgeLabel}
+                            </span>
+                          )}
+                          {baseType === "S" && (
                             <span
                               className={styles.badgeS}
                               style={{ marginLeft: 6 }}
@@ -1547,7 +1709,7 @@ export default function ListaCompraSugeridaPage({
                                   mesesHistoricoFilial: sd.mesesHistoricoFilial,
                                   estoqueAtual: sd.estoqueAtual,
                                   limiteDias: sd.limiteDias,
-                                  qtdS: item.sugestaoQtd ?? 0,
+                                  qtdS: baseQty,
                                   transitTotal,
                                   transitDates,
                                 });
@@ -1555,8 +1717,26 @@ export default function ListaCompraSugeridaPage({
                               onMouseLeave={() => setSugestaoSTooltip(null)}
                             >S</span>
                           )}
-                          {item.sugestaoTipo === "E" && (
+                          {baseType === "E" && (
                             <span className={styles.badgeE} style={{ marginLeft: 6 }}>E</span>
+                          )}
+                          {hasCombinedNm && (
+                            <span
+                              className={styles.badgeT}
+                              style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}
+                              title={combinedNmTitle}
+                            >
+                              NM +{fmt(nmExtraQty)}
+                            </span>
+                          )}
+                          {item.sugestaoTipo === "NM" && !hasCombinedNm && (
+                            <span
+                              className={styles.badgeT}
+                              style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}
+                              title={getNecessidadeMinimaRuleDescription()}
+                            >
+                              NM
+                            </span>
                           )}
                           {transitTotal > 0 && (
                             <span className={styles.badgeT} style={{ marginLeft: 6 }}>
@@ -2003,10 +2183,40 @@ export default function ListaCompraSugeridaPage({
                               {(() => {
                                 const sugestaoView = p.sugestaoView
                                   ?? { type: "SEM_SUGESTAO" as SuggestionType, qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0 };
+                                const baseType = (sugestaoView.baseType ?? sugestaoView.type) as SuggestionType;
+                                const baseQty = Math.max(0, Number(sugestaoView.baseQty ?? sugestaoView.qty));
+                                const nmExtraQty = Math.max(0, Number(sugestaoView.nmExtraQty ?? 0));
+                                const hasCombinedNm = Boolean(sugestaoView.hasCombinedNm);
+                                const combinedNmTitle = hasCombinedNm
+                                  ? getCombinedNecessidadeMinimaTooltip({
+                                    baseType,
+                                    baseQty,
+                                    nmExtraQty,
+                                    totalQty: sugestaoView.qty,
+                                  })
+                                  : getNecessidadeMinimaRuleDescription();
                                 if (sugestaoView.type === "COMPRA" && sugestaoView.qty > 0) {
                                   return (
                                     <td className={styles.qtdSugerida}>
                                       {fmt(sugestaoView.qty)}
+                                      {baseType === "COMPRA" && hasCombinedNm ? (
+                                        <span
+                                          className={styles.badgeT}
+                                          style={{ marginLeft: 6, background: "#1d4ed8", borderColor: "#1e40af", color: "#fff" }}
+                                          title={combinedNmTitle}
+                                        >
+                                          COMPRA
+                                        </span>
+                                      ) : null}
+                                      {hasCombinedNm ? (
+                                        <span
+                                          className={styles.badgeT}
+                                          style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}
+                                          title={combinedNmTitle}
+                                        >
+                                          NM +{fmt(nmExtraQty)}
+                                        </span>
+                                      ) : null}
                                       {sugestaoView.transitTotal ? (
                                         <span className={styles.badgeT} style={{ marginLeft: 6 }}>
                                           T {fmt(sugestaoView.transitTotal)}
@@ -2045,13 +2255,22 @@ export default function ListaCompraSugeridaPage({
                                               mesesHistoricoFilial,
                                               estoqueAtual: p.estoqueAtual ?? 0,
                                               limiteDias,
-                                              qtdS: sugestaoView.qty,
+                                              qtdS: baseQty,
                                               transitTotal: sugestaoView.transitTotal,
                                               transitDates: sugestaoView.transitDates,
                                             })
                                           }
                                           onMouseLeave={() => setSugestaoSTooltip(null)}
                                         >S</span>
+                                        {hasCombinedNm ? (
+                                          <span
+                                            className={styles.badgeT}
+                                            style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}
+                                            title={combinedNmTitle}
+                                          >
+                                            NM +{fmt(nmExtraQty)}
+                                          </span>
+                                        ) : null}
                                         {sugestaoView.transitTotal ? (
                                           <span className={styles.badgeT}>T {fmt(sugestaoView.transitTotal)}</span>
                                         ) : null}
@@ -2064,6 +2283,15 @@ export default function ListaCompraSugeridaPage({
                                     <td className={styles.qtdSugerida}>
                                       {fmt(sugestaoView.qty)}
                                       <span className={styles.badgeE} style={{ marginLeft: 6 }}>E</span>
+                                      {hasCombinedNm ? (
+                                        <span
+                                          className={styles.badgeT}
+                                          style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}
+                                          title={combinedNmTitle}
+                                        >
+                                          NM +{fmt(nmExtraQty)}
+                                        </span>
+                                      ) : null}
                                       {sugestaoView.transitTotal ? (
                                         <span className={styles.badgeT} style={{ marginLeft: 6 }}>
                                           T {fmt(sugestaoView.transitTotal)}

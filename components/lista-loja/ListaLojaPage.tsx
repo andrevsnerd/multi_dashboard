@@ -24,7 +24,7 @@ import {
 } from "@/lib/client/compras-transito";
 import { exportListaLojaToXlsx } from "@/lib/utils/exportListaLoja";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
-import { calcNecessidadeMinimaQty } from "@/lib/utils/necessidade-minima";
+import { calcNecessidadeMinimaQty, combineBaseSuggestionWithNecessidadeMinima } from "@/lib/utils/necessidade-minima";
 import type { CompraSalvaItemRow } from "@/lib/types/compra-salva";
 import type { ProdutoTransferencia } from "@/lib/repositories/controleTransferencias";
 
@@ -1241,10 +1241,11 @@ function buildListaLojaExportRow(
   const diasHistoricoFilial = Math.min(365, Math.max(0, Number(item.diasHistoricoFilial ?? 365)));
   const mesesHistoricoFilial = getMesesHistoricoFilial(item);
   const historicoParcial = Boolean(item.historicoParcial ?? false);
-  const mediaVendasMes = Number(item.qtde12m ?? 0) / mesesHistoricoFilial;
+  const qtde12m = Number(item.qtde12m ?? 0);
+  const mediaVendasMes = qtde12m / mesesHistoricoFilial;
   const mesesSemVenda = item.diasDesdeUltimaVenda != null ? item.diasDesdeUltimaVenda / 30 : null;
   const mesesAtivos = mesesSemVenda != null ? mesesHistoricoFilial - mesesSemVenda : null;
-  const velocidadeAjustada = mesesAtivos != null && mesesAtivos > 0 ? Number(item.qtde12m ?? 0) / mesesAtivos : null;
+  const velocidadeAjustada = mesesAtivos != null && mesesAtivos > 0 ? qtde12m / mesesAtivos : null;
   const qtdCalculada =
     sugestao.qtdFinal > 0
       ? sugestao.qtdFinal
@@ -1280,7 +1281,7 @@ function buildListaLojaExportRow(
     resumo = `Sugestão E de ${qtdCalculada} un. porque o item ficou cerca de ${formatFixed(mesesSemVenda ?? 0, 1)} meses sem venda e a velocidade ajustada é ${formatFixed(velocidadeAjustada ?? 0)} un./mês.`;
   } else if (sugestao.qtdNM > 0) {
     regra = "Necessidade Mínima: estoque zerado e 1 unidade a cada 5 vendas nos últimos 12 meses.";
-    resumo = `Sugestão NM de ${qtdCalculada} un. porque o estoque está zerado e o item teve ${fmt(qtde12m ?? 0)} vendas nos últimos 12 meses.`;
+    resumo = `Sugestão NM de ${qtdCalculada} un. porque o estoque está zerado e o item teve ${fmt(qtde12m)} vendas nos últimos 12 meses.`;
   } else if (sugestao.qtdSuficiente) {
     regra = `Estoque atual já cobre o limite de ${limiteDias} dias.`;
     resumo = `Barrado porque o estoque atual já cobre o limite de ${limiteDias} dias.`;
@@ -2355,9 +2356,19 @@ function ListaLojaItensTable({
                         : sugestaoBase.qtdE > 0
                           ? sugestaoBase.qtdE
                           : sugestaoBase.qtdNM;
-                  const transit = applyTransitToSuggestion({
+                  const filiaisNmDisplay = filiaisNMAgregado.map((f) => ({
+                    filial: getFilialLabelForDisplay(companyConfig, f.filial),
+                    qtd: f.qtd,
+                  }));
+                  const totalNmQtyAgregado = filiaisNmDisplay.reduce((sum, filial) => sum + filial.qtd, 0);
+                  const combinedSuggestion = combineBaseSuggestionWithNecessidadeMinima({
                     baseType,
                     baseQty,
+                    totalNmQty: totalNmQtyAgregado,
+                  });
+                  const transit = applyTransitToSuggestion({
+                    baseType: combinedSuggestion.effectiveType,
+                    baseQty: combinedSuggestion.totalQty,
                     entries: getCompraTransitoEntries(comprasTransitoIndex, item.produto, item.corProduto),
                     estoqueAtual: estoqueFilial,
                     vendasMesAtual,
@@ -2414,7 +2425,7 @@ function ListaLojaItensTable({
                         }
                         onMouseLeave={() => setSugestaoTooltip(null)}
                       >
-                        {fmt(transit.qty)}{blendAplicado && <>{" "}<span style={{ display: "inline-flex", width: 16, height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#0f172a", background: "#fde047", border: "1px solid #facc15", verticalAlign: "middle", cursor: "help" }}>⚡</span></>}{transitBadge}{filiaisNMAgregado.length > 0 && <NmBadgeAgregado filiais={filiaisNMAgregado.map((f) => ({ filial: getFilialLabelForDisplay(companyConfig, f.filial), qtd: f.qtd }))} comCompra onEnter={(e, filiais) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiais, total: filiais.reduce((sum, filial) => sum + filial.qtd, 0), comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
+                        {fmt(transit.qty)}{blendAplicado && <>{" "}<span style={{ display: "inline-flex", width: 16, height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#0f172a", background: "#fde047", border: "1px solid #facc15", verticalAlign: "middle", cursor: "help" }}>⚡</span></>}{combinedSuggestion.hasCombinedNm && <> <span className={styles.badgeT} style={{ background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }} title={`Sugestão final = regra principal (${fmt(combinedSuggestion.baseQty)}) + NM não coberta (+${fmt(combinedSuggestion.nmExtraQty)}).`}>NM +{fmt(combinedSuggestion.nmExtraQty)}</span></>}{transitBadge}{filiaisNmDisplay.length > 0 && <NmBadgeAgregado filiais={filiaisNmDisplay} comCompra onEnter={(e, filiais) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiais, total: filiais.reduce((sum, filial) => sum + filial.qtd, 0), comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
                       </span>
                     );
                   }
@@ -2456,7 +2467,7 @@ function ListaLojaItensTable({
                         >
                           S
                         </span>
-                        {transitBadge}{filiaisNMAgregado.length > 0 && <NmBadgeAgregado filiais={filiaisNMAgregado.map((f) => ({ filial: getFilialLabelForDisplay(companyConfig, f.filial), qtd: f.qtd }))} comCompra onEnter={(e, filiais) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiais, total: filiais.reduce((sum, filial) => sum + filial.qtd, 0), comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
+                        {combinedSuggestion.hasCombinedNm && <span className={styles.badgeT} style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }} title={`Sugestão final = regra principal (${fmt(combinedSuggestion.baseQty)}) + NM não coberta (+${fmt(combinedSuggestion.nmExtraQty)}).`}>NM +{fmt(combinedSuggestion.nmExtraQty)}</span>}{transitBadge}{filiaisNmDisplay.length > 0 && <NmBadgeAgregado filiais={filiaisNmDisplay} comCompra onEnter={(e, filiais) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiais, total: filiais.reduce((sum, filial) => sum + filial.qtd, 0), comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
                       </span>
                     );
                   }
@@ -2509,7 +2520,7 @@ function ListaLojaItensTable({
                         >
                           E
                         </span>
-                        {transitBadge}{filiaisNMAgregado.length > 0 && <NmBadgeAgregado filiais={filiaisNMAgregado.map((f) => ({ filial: getFilialLabelForDisplay(companyConfig, f.filial), qtd: f.qtd }))} comCompra onEnter={(e, filiais) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiais, total: filiais.reduce((sum, filial) => sum + filial.qtd, 0), comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
+                        {combinedSuggestion.hasCombinedNm && <span className={styles.badgeT} style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }} title={`Sugestão final = regra principal (${fmt(combinedSuggestion.baseQty)}) + NM não coberta (+${fmt(combinedSuggestion.nmExtraQty)}).`}>NM +{fmt(combinedSuggestion.nmExtraQty)}</span>}{transitBadge}{filiaisNmDisplay.length > 0 && <NmBadgeAgregado filiais={filiaisNmDisplay} comCompra onEnter={(e, filiais) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiais, total: filiais.reduce((sum, filial) => sum + filial.qtd, 0), comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
                       </span>
                     );
                   }
@@ -2575,8 +2586,8 @@ function ListaLojaItensTable({
                       </span>
                     );
                   }
-                  if (filiaisNMAgregado.length > 0 && baseType !== "COMPRA" && baseType !== "S" && baseType !== "E") {
-                    const filiais = filiaisNMAgregado.map((f) => ({ filial: getFilialLabelForDisplay(companyConfig, f.filial), qtd: f.qtd }));
+                  if (filiaisNmDisplay.length > 0 && baseType !== "COMPRA" && baseType !== "S" && baseType !== "E") {
+                    const filiais = filiaisNmDisplay;
                     const totalNM = filiais.reduce((sum, filial) => sum + filial.qtd, 0);
                     const nmVendasMes = Number(vendasMesAtual ?? 0);
                     const nmConsumoDiario = diasCorridosMes > 0 ? nmVendasMes / diasCorridosMes : 0;

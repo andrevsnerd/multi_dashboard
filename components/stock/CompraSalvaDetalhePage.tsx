@@ -18,7 +18,11 @@ import {
   textoDestinoCompraFinal,
   type DestinoCompraFinalParte,
 } from "@/lib/utils/compra-final-destino";
-import { calcNecessidadeMinimaQty } from "@/lib/utils/necessidade-minima";
+import {
+  calcNecessidadeMinimaQty,
+  calcTotalNecessidadeMinimaPorFilial,
+  combineBaseSuggestionWithNecessidadeMinima,
+} from "@/lib/utils/necessidade-minima";
 import { fetchControleEstoqueItemMetricasClient } from "@/lib/client/controle-estoque-metricas";
 import {
   buildCompraTransitoIndex,
@@ -232,6 +236,7 @@ function calcularSugestaoCompletoComTransito(
     estoqueAtual: number | null;
     diasDesdeUltimaVenda: number | null;
     mesesHistoricoFilial: number | null;
+    totalNmQty: number | null;
   } | undefined,
   comprasTransitoIndex: CompraTransitoIndex
 ): { qty: number | null; transitTotal: number; transitDates: string[] } {
@@ -302,10 +307,15 @@ function calcularSugestaoCompletoComTransito(
     baseType = "NM";
     baseQty = qtdNM;
   }
-
-  const transit = applyTransitToSuggestion({
+  const combined = combineBaseSuggestionWithNecessidadeMinima({
     baseType,
     baseQty,
+    totalNmQty: liveData.totalNmQty ?? qtdNM,
+  });
+
+  const transit = applyTransitToSuggestion({
+    baseType: combined.effectiveType,
+    baseQty: combined.totalQty,
     entries: getCompraTransitoEntries(comprasTransitoIndex, match.produto, match.cor ?? null),
     estoqueAtual: liveData.estoqueAtual,
     vendasMesAtual: liveData.vendasMesAtual,
@@ -514,20 +524,8 @@ async function fetchVendasItemMetricas(params: URLSearchParams): Promise<{
   vendasMesAtual: number;
   diasDesdeUltimaVenda: number | null;
   mesesHistoricoFilial: number | null;
+  totalNmQty: number;
 } | null> {
-  const res = null as unknown as {
-    ok: boolean;
-    json: () => Promise<{
-      data?: Array<{
-        qtde12m: number;
-        qtde60d: number;
-        qtdeMesAtual?: number;
-        diasDesdeUltimaVenda?: number | null;
-        mesesHistoricoFilial?: number;
-      }>;
-      error?: string;
-    }>;
-  };
   const metricas = await fetchItemMetricas(params);
   if (!metricas) return null;
   return {
@@ -536,30 +534,11 @@ async function fetchVendasItemMetricas(params: URLSearchParams): Promise<{
     vendasMesAtual: metricas.resumo.vendasMesAtual,
     diasDesdeUltimaVenda: metricas.resumo.diasDesdeUltimaVenda,
     mesesHistoricoFilial: metricas.resumo.mesesHistoricoFilial,
-  };
-  const json = await res.json() as {
-    data?: Array<{
-      qtde12m: number;
-      qtde60d: number;
-      qtdeMesAtual?: number;
-      diasDesdeUltimaVenda?: number | null;
-      mesesHistoricoFilial?: number;
-    }>;
-    error?: string;
-  };
-  if (!res.ok) return null;
-  const rows = json.data ?? [];
-  if (rows.length === 0) return null;
-
-  // Quando vem uma única filial, usa direto; quando agrega múltiplas usa max de histórico e min de dias
-  const diasVals = rows.map((r) => r.diasDesdeUltimaVenda ?? null).filter((v): v is number => v !== null);
-  const mesesVals = rows.map((r) => Number(r.mesesHistoricoFilial ?? 0)).filter((v) => v > 0);
-  return {
-    qtde12m: Math.round(rows.reduce((s, r) => s + Number(r.qtde12m ?? 0), 0)),
-    qtde60d: Math.round(rows.reduce((s, r) => s + Number(r.qtde60d ?? 0), 0)),
-    vendasMesAtual: Math.round(rows.reduce((s, r) => s + Number(r.qtdeMesAtual ?? 0), 0)),
-    diasDesdeUltimaVenda: diasVals.length > 0 ? Math.min(...diasVals) : null,
-    mesesHistoricoFilial: mesesVals.length > 0 ? Math.max(...mesesVals) : null,
+    totalNmQty: calcTotalNecessidadeMinimaPorFilial({
+      company: resolveCompany(params.get("company") ?? undefined),
+      vendasPorFilial: metricas.vendasPorFilial,
+      estoquePorFilial: metricas.estoquePorFilial,
+    }),
   };
 }
 
@@ -600,7 +579,7 @@ export default function CompraSalvaDetalhePage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [listaRows, setListaRows] = useState<ProdutoSugestao[]>([]);
-  const [liveMetrics, setLiveMetrics] = useState<Record<string, { qtde12m: number | null; vendasMesAtual: number | null; estoqueAtual: number | null; diasDesdeUltimaVenda: number | null; mesesHistoricoFilial: number | null }>>({});
+  const [liveMetrics, setLiveMetrics] = useState<Record<string, { qtde12m: number | null; vendasMesAtual: number | null; estoqueAtual: number | null; diasDesdeUltimaVenda: number | null; mesesHistoricoFilial: number | null; totalNmQty: number | null }>>({});
   const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
   const [estoquePorFilialCache, setEstoquePorFilialCache] = useState<
     Record<string, Array<{ filial: string; estoque: number }>>
@@ -780,6 +759,7 @@ export default function CompraSalvaDetalhePage({
             estoqueAtual: estoque,
             diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
             mesesHistoricoFilial: vendas?.mesesHistoricoFilial ?? null,
+            totalNmQty: vendas?.totalNmQty ?? null,
           },
         };
       })

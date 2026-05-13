@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { startOfMonth, endOfMonth } from "date-fns";
-import type { CompanyKey } from "@/lib/config/company";
+import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 import {
   OUTROS_LABEL,
   filterOutrosKeys,
@@ -22,7 +22,12 @@ import {
 } from "@/lib/client/compras-transito";
 import { formatDateForQuery } from "@/lib/utils/date";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
-import { calcNecessidadeMinimaQty } from "@/lib/utils/necessidade-minima";
+import {
+  calcNecessidadeMinimaQty,
+  calcTotalNecessidadeMinimaPorFilial,
+  combineBaseSuggestionWithNecessidadeMinima,
+  getCombinedNecessidadeMinimaTooltip,
+} from "@/lib/utils/necessidade-minima";
 import FilialVendedoresTab from "./FilialVendedoresTab";
 import { exportCurvaAbcSimpleCsv } from "@/lib/utils/exportCurvaAbcSimpleCsv";
 import { exportCurvaAbcSimpleXlsx, type CurvaAbcSimpleXlsxRow } from "@/lib/utils/exportCurvaAbcSimpleXlsx";
@@ -428,6 +433,7 @@ async function fetchVendasItemMetricas(
   vendasMesAtual: number;
   diasDesdeUltimaVenda: number | null;
   mesesHistoricoFilial: number;
+  totalNmQty: number;
 } | null> {
   type Row = {
     qtde12m: number;
@@ -456,13 +462,20 @@ async function fetchVendasItemMetricas(
         corProduto: corProduto?.trim() || null,
       },
     });
-    if (!metricas) return null;
-    return {
-      qtde12m: metricas.resumo.qtde12m,
-      vendasMesAtual: metricas.resumo.vendasMesAtual,
-      diasDesdeUltimaVenda: metricas.resumo.diasDesdeUltimaVenda,
-      mesesHistoricoFilial: metricas.resumo.mesesHistoricoFilial,
-    };
+    if (metricas) {
+      return {
+        qtde12m: metricas.resumo.qtde12m,
+        vendasMesAtual: metricas.resumo.vendasMesAtual,
+        diasDesdeUltimaVenda: metricas.resumo.diasDesdeUltimaVenda,
+        mesesHistoricoFilial: metricas.resumo.mesesHistoricoFilial,
+        totalNmQty: calcTotalNecessidadeMinimaPorFilial({
+          company: resolveCompany(companyKey),
+          vendasPorFilial: metricas.vendasPorFilial,
+          estoquePorFilial: metricas.estoquePorFilial,
+        }),
+      };
+    }
+
     let rows: Row[] = [];
     try {
       rows = await fetchRows(true);
@@ -505,6 +518,8 @@ async function fetchVendasItemMetricas(
       vendasMesAtual: Math.round(rows.reduce((s, r) => s + Number(r.qtdeMesAtual ?? 0), 0)),
       diasDesdeUltimaVenda: diasValidos.length > 0 ? Math.min(...diasValidos) : null,
       mesesHistoricoFilial,
+      // Fallback não traz vendas/estoque por filial no formato de NM; evita superestimar.
+      totalNmQty: 0,
     };
   } catch {
     return null;
@@ -570,6 +585,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
         estoqueFilial: number | null;
         diasDesdeUltimaVenda: number | null;
         mesesHistoricoFilial: number | null;
+        totalNmQty: number | null;
       }
     >
   >({});
@@ -810,9 +826,14 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
             : sugestao.qtdE > 0
               ? sugestao.qtdE
               : sugestao.qtdNM;
-      const transit = applyTransitToSuggestion({
+      const combined = combineBaseSuggestionWithNecessidadeMinima({
         baseType,
         baseQty,
+        totalNmQty: live?.totalNmQty ?? sugestao.qtdNM,
+      });
+      const transit = applyTransitToSuggestion({
+        baseType: combined.effectiveType,
+        baseQty: combined.totalQty,
         entries: getCompraTransitoEntries(comprasTransitoIndex, p.produto, porCor ? (p.cor ?? null) : null),
         estoqueAtual: compraItem.estoqueFilial,
         vendasMesAtual: compraItem.vendasMesAtual,
@@ -864,6 +885,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                 estoqueFilial: estoque,
                 diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
                 mesesHistoricoFilial: vendas?.mesesHistoricoFilial ?? null,
+                totalNmQty: vendas?.totalNmQty ?? null,
               },
             };
           })
@@ -952,9 +974,14 @@ const handleBadgeClick = (cat: string) => {
           : sugestao.qtdE > 0
             ? sugestao.qtdE
             : sugestao.qtdNM;
-    const transit = applyTransitToSuggestion({
+    const combined = combineBaseSuggestionWithNecessidadeMinima({
       baseType,
       baseQty,
+      totalNmQty: live?.totalNmQty ?? sugestao.qtdNM,
+    });
+    const transit = applyTransitToSuggestion({
+      baseType: combined.effectiveType,
+      baseQty: combined.totalQty,
       entries: getCompraTransitoEntries(comprasTransitoIndex, p.produto, porCor ? (p.cor ?? null) : null),
       estoqueAtual: compraItem.estoqueFilial,
       vendasMesAtual: compraItem.vendasMesAtual,
@@ -1602,9 +1629,14 @@ const handleBadgeClick = (cat: string) => {
                                           : sugestao.qtdE > 0
                                             ? sugestao.qtdE
                                             : sugestao.qtdNM;
-                                    const transit = applyTransitToSuggestion({
+                                    const combined = combineBaseSuggestionWithNecessidadeMinima({
                                       baseType,
                                       baseQty,
+                                      totalNmQty: live?.totalNmQty ?? sugestao.qtdNM,
+                                    });
+                                    const transit = applyTransitToSuggestion({
+                                      baseType: combined.effectiveType,
+                                      baseQty: combined.totalQty,
                                       entries: getCompraTransitoEntries(comprasTransitoIndex, p.produto, porCor ? (p.cor ?? null) : null),
                                       estoqueAtual: compraItem.estoqueFilial,
                                       vendasMesAtual: compraItem.vendasMesAtual,
@@ -1617,6 +1649,20 @@ const handleBadgeClick = (cat: string) => {
                                     const transitBadge = transit.totalTransit > 0 ? (
                                       <span className={styles.badgeT} style={{ marginLeft: 6 }}>
                                         T {fmt(transit.totalTransit)}
+                                      </span>
+                                    ) : null;
+                                    const combinedNmBadge = combined.hasCombinedNm ? (
+                                      <span
+                                        className={styles.badgeT}
+                                        style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}
+                                        title={getCombinedNecessidadeMinimaTooltip({
+                                          baseType,
+                                          baseQty: combined.baseQty,
+                                          nmExtraQty: combined.nmExtraQty,
+                                          totalQty: transit.qty,
+                                        })}
+                                      >
+                                        NM +{fmt(combined.nmExtraQty)}
                                       </span>
                                     ) : null;
                                     if (baseType === "COMPRA" && transit.qty > 0) {
@@ -1698,7 +1744,18 @@ const handleBadgeClick = (cat: string) => {
                                           >
                                             S
                                           </span>
+                                          {combinedNmBadge}
                                           {transitBadge}
+                                          {combined.hasCombinedNm ? (
+                                            <span
+                                              className={styles.badgeT}
+                                              style={{ marginLeft: 6, background: "#1d4ed8", borderColor: "#1e40af", color: "#fff" }}
+                                              title={getCombinedNecessidadeMinimaTooltip({ baseType, baseQty: combined.baseQty, nmExtraQty: combined.nmExtraQty, totalQty: transit.qty })}
+                                            >
+                                              COMPRA
+                                            </span>
+                                          ) : null}
+                                          {combinedNmBadge}
                                         </span>
                                       );
                                     }
@@ -1740,6 +1797,7 @@ const handleBadgeClick = (cat: string) => {
                                           >
                                             E
                                           </span>
+                                          {combinedNmBadge}
                                           {transitBadge}
                                         </span>
                                       );
@@ -1768,6 +1826,7 @@ const handleBadgeClick = (cat: string) => {
                                           >
                                             NM
                                           </span>
+                                          {combinedNmBadge}
                                           {transitBadge}
                                         </span>
                                       );

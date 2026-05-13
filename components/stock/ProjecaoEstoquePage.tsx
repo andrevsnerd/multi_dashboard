@@ -16,8 +16,14 @@ import {
   getCompraTransitoEntries,
   type CompraTransitoIndex,
 } from "@/lib/client/compras-transito";
+import { fetchControleEstoqueMetricasItensClient } from "@/lib/client/controle-estoque-metricas";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
-import { calcNecessidadeMinimaQty } from "@/lib/utils/necessidade-minima";
+import { buildControleEstoqueItemKey, type ControleEstoqueItemMetricas } from "@/lib/utils/controle-estoque-metricas";
+import {
+  calcNecessidadeMinimaQty,
+  calcTotalNecessidadeMinimaPorFilial,
+  combineBaseSuggestionWithNecessidadeMinima,
+} from "@/lib/utils/necessidade-minima";
 
 import styles from "./ProjecaoEstoquePage.module.css";
 
@@ -212,6 +218,11 @@ type SuggestionResult = {
   sData?: { mediaVendasMes: number; mesesHistoricoFilial: number; estoqueAtual: number; limiteDias: number };
   transitTotal?: number;
   transitDates?: string[];
+  baseType?: "COMPRA" | "S" | "E" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
+  baseQty?: number;
+  totalNmQty?: number;
+  nmExtraQty?: number;
+  hasCombinedNm?: boolean;
 };
 
 function getSuggestionListaLojaRule(item: ProdutoSugestaoMin): SuggestionResult {
@@ -266,13 +277,23 @@ function getSuggestionListaLojaRule(item: ProdutoSugestaoMin): SuggestionResult 
 
 function applyTransitToProjectionSuggestion(
   item: ProdutoSugestaoMin,
-  comprasTransitoIndex: CompraTransitoIndex
+  comprasTransitoIndex: CompraTransitoIndex,
+  totalNmQtyOverride?: number
 ): SuggestionResult {
   const base = getSuggestionListaLojaRule(item);
-  const limiteDias = getLimiteDiasReposicao(item);
-  const transit = applyTransitToSuggestion({
+  const fallbackNmQty = calcNecessidadeMinimaQty({
+    estoqueAtual: item.estoqueAtual,
+    qtde12m: getQtde12mBaseMin(item),
+  });
+  const combined = combineBaseSuggestionWithNecessidadeMinima({
     baseType: base.type,
     baseQty: base.qty,
+    totalNmQty: totalNmQtyOverride ?? fallbackNmQty,
+  });
+  const limiteDias = getLimiteDiasReposicao(item);
+  const transit = applyTransitToSuggestion({
+    baseType: combined.effectiveType,
+    baseQty: combined.totalQty,
     entries: getCompraTransitoEntries(comprasTransitoIndex, item.produto, item.cor ?? null),
     estoqueAtual: item.estoqueAtual,
     vendasMesAtual: item.vendasMesAtual,
@@ -288,6 +309,11 @@ function applyTransitToProjectionSuggestion(
     transitDates: transit.entries.map(
       (entry) => `${new Date(`${entry.dataRecebimento}T00:00:00`).toLocaleDateString("pt-BR")} (+${fmt(entry.quantidade)})`
     ),
+    baseType: base.type,
+    baseQty: combined.baseQty,
+    totalNmQty: combined.totalNmQty,
+    nmExtraQty: combined.nmExtraQty,
+    hasCombinedNm: combined.hasCombinedNm,
   };
 }
 
@@ -1174,15 +1200,35 @@ export default function ProjecaoEstoquePage({
     allProdutosReposicao.forEach(p => params.append("produtos", p));
     fetch(`/api/controle-estoque/lista-compra-sugerida?${params}`, { cache: "no-store" })
       .then(r => r.json())
-      .then((json: { data?: ProdutoSugestaoMin[] }) => {
+      .then(async (json: { data?: ProdutoSugestaoMin[] }) => {
+        const rows = json.data ?? [];
+        const metricasItens = rows.length > 0
+          ? await fetchControleEstoqueMetricasItensClient({
+            company: companyKey,
+            filial: filial || null,
+            includeHistorico: true,
+            itens: rows.map((row) => ({
+              produto: row.produto,
+              corProduto: row.cor ?? null,
+            })),
+          }).catch(() => ({} as Record<string, ControleEstoqueItemMetricas>))
+          : {};
         const prices: Record<string, number> = {};
         const sugestoes: Record<string, number> = {};
         const results: Record<string, SuggestionResult> = {};
-        (json.data ?? []).forEach(p => {
+        rows.forEach(p => {
           prices[p.produto] = Number(p.custoUnitario ?? 0);
           const kCor = buildProdutoCorKey(p.produto, p.cor ?? "");
           const kCorDesc = buildProdutoCorKey(p.produto, (p as { corDescricao?: string }).corDescricao ?? "");
-          const result = applyTransitToProjectionSuggestion(p, comprasTransitoIndex);
+          const metricas = metricasItens[buildControleEstoqueItemKey(p.produto, p.cor ?? null)];
+          const totalNmQty = metricas
+            ? calcTotalNecessidadeMinimaPorFilial({
+              company: resolveCompany(companyKey),
+              vendasPorFilial: metricas.vendasPorFilial,
+              estoquePorFilial: metricas.estoquePorFilial,
+            })
+            : undefined;
+          const result = applyTransitToProjectionSuggestion(p, comprasTransitoIndex, totalNmQty);
           sugestoes[kCor] = result.qty;
           results[kCor] = result;
           if (kCorDesc !== kCor) {
@@ -2162,6 +2208,11 @@ export default function ProjecaoEstoquePage({
                                   suggestionSData: sg.sData,
                                   suggestionTransitTotal: sg.transitTotal,
                                   suggestionTransitDates: sg.transitDates,
+                                  suggestionBaseType: sg.baseType,
+                                  suggestionBaseQty: sg.baseQty,
+                                  suggestionNmTotalQty: sg.totalNmQty,
+                                  suggestionNmExtraQty: sg.nmExtraQty,
+                                  suggestionHasCombinedNm: sg.hasCombinedNm,
                                 };
                               }),
                               timestamp: Date.now(),
@@ -2229,6 +2280,11 @@ export default function ProjecaoEstoquePage({
                               suggestionType: "COMPRA",
                               suggestionTransitTotal: 0,
                               suggestionTransitDates: [],
+                              suggestionBaseType: "COMPRA",
+                              suggestionBaseQty: c.qtd,
+                              suggestionNmTotalQty: 0,
+                              suggestionNmExtraQty: 0,
+                              suggestionHasCombinedNm: false,
                             }];
                           });
                           try {

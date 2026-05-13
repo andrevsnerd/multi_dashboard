@@ -1,12 +1,11 @@
 import {
-  aggregateEstoquePorFilialByDisplayLabel,
   aggregateVendasPorFilialByDisplayLabel,
   compareFilialDisplayOrder,
   normalizeFilialLookupKey,
   resolveCompany,
   type CompanyKey,
 } from "@/lib/config/company";
-import { calcNecessidadeMinimaQty } from "@/lib/utils/necessidade-minima";
+import { calcNecessidadeMinimaPorFilial } from "@/lib/utils/necessidade-minima";
 
 export type DestinoCompraFinalParte = { label: string; qtd: number; isNM?: boolean; nmQty?: number };
 
@@ -41,19 +40,15 @@ export function partesDestinoCompraFinal(
   });
 
   // Identifica filiais NM: a cada 5 vendas em 12m reserva +1 com estoque zerado
-  const estoqueAgregado = aggregateEstoquePorFilialByDisplayLabel(estoquePorFilial ?? [], cfg);
-  const estoqueMap = new Map<string, number>(
-    estoqueAgregado.map((e) => [normalizeFilialLookupKey(e.filial), e.estoque])
-  );
-  const nmReservas: Array<{ filial: string; qty: number }> = [];
-  if (estoquePorFilial) {
-    for (const f of filiais) {
-      const key = normalizeFilialLookupKey(f.filial);
-      const estoque = estoqueMap.get(key) ?? 0;
-      const qty = calcNecessidadeMinimaQty({ estoqueAtual: estoque, qtde12m: f.qtde12m });
-      if (qty > 0) nmReservas.push({ filial: f.filial, qty });
-    }
-  }
+  const nmReservas = estoquePorFilial
+    ? calcNecessidadeMinimaPorFilial({
+        company: cfg,
+        vendasPorFilial,
+        estoquePorFilial,
+      })
+        .filter((row) => filiais.some((filial) => normalizeFilialLookupKey(filial.filial) === normalizeFilialLookupKey(row.filial)))
+        .map((row) => ({ filial: row.filial, qty: row.qtd }))
+    : [];
 
   // Reserva a quantidade NM por filial até o limite da compra manual.
   let qtdReservadaNM = 0;
