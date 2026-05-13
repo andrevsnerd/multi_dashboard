@@ -7,6 +7,7 @@ export type PermissionKey =
   | "dashboard"
   | "produtos"
   | "produto-detalhado"
+  | "relatorio-colecao"
   | "vendedores"
   | "clientes"
   | "controle-estoque"
@@ -57,6 +58,7 @@ export const ALL_PERMISSION_KEYS: { key: PermissionKey; label: string }[] = [
   { key: "dashboard", label: "Dashboard" },
   { key: "produtos", label: "Produtos" },
   { key: "produto-detalhado", label: "Produto Detalhado" },
+  { key: "relatorio-colecao", label: "Relatório Coleção" },
   { key: "vendedores", label: "Vendedores" },
   { key: "clientes", label: "Clientes" },
   { key: "controle-estoque", label: "Controle de Estoque" },

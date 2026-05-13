@@ -32,6 +32,20 @@ export function pathnameToPermission(pathname: string | null): PermissionKey | "
   return NAV_ROUTE_MAP[segment] ?? null;
 }
 
+/**
+ * Verifica se o usuário tem permissão explícita para uma página.
+ * Inclui compatibilidade: "Relatório Coleção" era coberto por "Produtos" antes da permissão dedicada.
+ */
+export function userHasPagePermission(user: UserSession | null, key: PermissionKey): boolean {
+  if (!user) return false;
+  if (user.role === "admin") return true;
+  if ((user.role === "gestor" || user.role === "logistica") && !user.permissions?.length) return true;
+  const perms = user.permissions ?? [];
+  if (perms.includes(key)) return true;
+  if (key === "relatorio-colecao" && perms.includes("produtos")) return true;
+  return false;
+}
+
 export function canAccessPath(user: UserSession | null, pathname: string | null): boolean {
   if (!user) return false;
   const perm = pathnameToPermission(pathname);
@@ -44,12 +58,7 @@ export function canAccessPath(user: UserSession | null, pathname: string | null)
     if (!canAccessCompany(user, companySegment)) return false;
   }
   if (user.role === "admin") return true;
-  if (user.role === "gestor" || user.role === "logistica") {
-    // gestor/logistica com permissions vazias = acesso total (exceto /admin)
-    if (!user.permissions?.length) return true;
-    return user.permissions.includes(perm as PermissionKey);
-  }
-  return user.permissions.includes(perm as PermissionKey);
+  return userHasPagePermission(user, perm as PermissionKey);
 }
 
 /** Primeira rota permitida para o usuário em uma empresa (ex: /nerd/controle-transferencias). */

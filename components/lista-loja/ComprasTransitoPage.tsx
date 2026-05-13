@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { fetchControleEstoqueItemMetricasClient } from "@/lib/client/controle-estoque-metricas";
 import type { CompanyKey } from "@/lib/config/company";
 import type {
   CompraTransito,
@@ -10,25 +9,12 @@ import type {
   CompraTransitoListEntry,
   CompraTransitoStatus,
 } from "@/lib/types/compra-transito";
-import { buildControleEstoqueItemKey } from "@/lib/utils/controle-estoque-metricas";
-import {
-  getCompraTransitoItemStatus,
-  getCompraTransitoStatusFromItems,
-} from "@/lib/utils/compra-transito-status";
+import { getCompraTransitoItemStatus } from "@/lib/utils/compra-transito-status";
 
+import ComprasTransitoPickerModal from "./ComprasTransitoPickerModal";
 import styles from "./ComprasTransitoPage.module.css";
 
 type ViewMode = "list" | "editor" | "detail";
-
-type ProdutoBusca = {
-  produto: string;
-  descProduto: string;
-  codigoBarra: string | null;
-  corProduto: string | null;
-  descCor: string;
-  grade?: string | null;
-  estoques: Array<{ filial: string; nomeFilial: string; estoque: number }>;
-};
 
 type ToastState = {
   tipo: "success" | "error";
@@ -39,7 +25,7 @@ async function fetchCompras(companyKey: CompanyKey): Promise<CompraTransitoListE
   const params = new URLSearchParams({ company: companyKey });
   const res = await fetch(`/api/compras-transito?${params.toString()}`, { cache: "no-store" });
   const json = (await res.json()) as { data?: CompraTransitoListEntry[]; error?: string };
-  if (!res.ok) throw new Error(json.error ?? "Erro ao carregar compras em trânsito");
+  if (!res.ok) throw new Error(json.error ?? "Erro ao carregar compras em transito");
   return json.data ?? [];
 }
 
@@ -49,21 +35,6 @@ async function fetchCompra(companyKey: CompanyKey, id: string): Promise<CompraTr
   const json = (await res.json()) as { data?: CompraTransito; error?: string };
   if (!res.ok || !json.data) throw new Error(json.error ?? "Erro ao carregar compra");
   return json.data;
-}
-
-async function searchProdutos(term: string, companyKey: CompanyKey): Promise<ProdutoBusca[]> {
-  if (term.trim().length < 2) return [];
-  const params = new URLSearchParams({
-    q: term.trim(),
-    entrada: "true",
-    company: companyKey,
-  });
-  const res = await fetch(`/api/transferencia-produtos/produtos?${params.toString()}`, {
-    cache: "no-store",
-  });
-  const json = (await res.json()) as { data?: ProdutoBusca[]; error?: string };
-  if (!res.ok) throw new Error(json.error ?? "Erro ao buscar produtos");
-  return json.data ?? [];
 }
 
 function fmt(n: number) {
@@ -88,14 +59,14 @@ function fmtBRL2(n: number) {
 }
 
 function fmtDate(value?: string | null) {
-  if (!value) return "—";
+  if (!value) return "-";
   const d = new Date(`${value.slice(0, 10)}T00:00:00`);
   if (Number.isNaN(d.getTime())) return value;
   return d.toLocaleDateString("pt-BR");
 }
 
 function fmtDateTime(value?: string | null) {
-  if (!value) return "—";
+  if (!value) return "-";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return value;
   return d.toLocaleString("pt-BR", {
@@ -108,19 +79,12 @@ function fmtDateTime(value?: string | null) {
 }
 
 function getStatusLabel(status: CompraTransitoStatus) {
-  return status === "em_transito" ? "Em trânsito" : "Recebida";
-}
-
-function sumEstoque(produto: ProdutoBusca): number {
-  return Math.round(
-    (produto.estoques ?? []).reduce((sum, row) => sum + Math.max(0, Number(row.estoque ?? 0)), 0)
-  );
+  return status === "em_transito" ? "Em transito" : "Recebida";
 }
 
 export default function ComprasTransitoPage({
   companyKey,
   companyName,
-  companySlug,
 }: {
   companyKey: CompanyKey;
   companyName: string;
@@ -136,18 +100,7 @@ export default function ComprasTransitoPage({
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
   const [draftItems, setDraftItems] = useState<CompraTransitoItemRow[]>([]);
-
   const [modalOpen, setModalOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchResults, setSearchResults] = useState<ProdutoBusca[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [addingKeys, setAddingKeys] = useState<Set<string>>(new Set());
-
-  const draftKeys = useMemo(
-    () => new Set(draftItems.map((item) => item.itemKey)),
-    [draftItems]
-  );
 
   const loadCompras = useCallback(async () => {
     setLoading(true);
@@ -156,7 +109,7 @@ export default function ComprasTransitoPage({
       const data = await fetchCompras(companyKey);
       setCompras(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao carregar compras em trânsito");
+      setError(err instanceof Error ? err.message : "Erro ao carregar compras em transito");
     } finally {
       setLoading(false);
     }
@@ -171,49 +124,6 @@ export default function ComprasTransitoPage({
     const timer = window.setTimeout(() => setToast(null), 3500);
     return () => window.clearTimeout(timer);
   }, [toast]);
-
-  useEffect(() => {
-    if (!modalOpen) {
-      setSearchTerm("");
-      setSearchResults([]);
-      setSearchError(null);
-      setSearching(false);
-      return;
-    }
-
-    const term = searchTerm.trim();
-    if (term.length < 2) {
-      setSearchResults([]);
-      setSearchError(null);
-      setSearching(false);
-      return;
-    }
-
-    let cancelled = false;
-    setSearching(true);
-    setSearchError(null);
-
-    const timer = window.setTimeout(() => {
-      searchProdutos(term, companyKey)
-        .then((data) => {
-          if (!cancelled) setSearchResults(data);
-        })
-        .catch((err) => {
-          if (!cancelled) {
-            setSearchResults([]);
-            setSearchError(err instanceof Error ? err.message : "Erro ao buscar produtos");
-          }
-        })
-        .finally(() => {
-          if (!cancelled) setSearching(false);
-        });
-    }, 250);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [modalOpen, searchTerm, companyKey]);
 
   const totals = useMemo(() => {
     const totalItens = draftItems.length;
@@ -291,57 +201,6 @@ export default function ComprasTransitoPage({
     setDraftItems((prev) => prev.filter((item) => item.itemKey !== itemKey));
   }, []);
 
-  const addProduto = useCallback(
-    async (produto: ProdutoBusca) => {
-      const itemKey = buildControleEstoqueItemKey(produto.produto, produto.corProduto);
-      if (draftKeys.has(itemKey) || addingKeys.has(itemKey)) return;
-
-      setAddingKeys((prev) => new Set(prev).add(itemKey));
-
-      try {
-        const metricas = await fetchControleEstoqueItemMetricasClient({
-          company: companyKey,
-          filial: null,
-          includeHistorico: false,
-          item: {
-            produto: produto.produto,
-            corProduto: produto.corProduto,
-          },
-        });
-
-        setDraftItems((prev) => [
-          {
-            itemKey,
-            produto: produto.produto,
-            descricao: produto.descProduto || produto.produto,
-            corProduto: produto.corProduto ?? undefined,
-            corDescricao: produto.descCor || undefined,
-            grade: produto.grade ?? undefined,
-            dataRecebimento: new Date().toISOString().slice(0, 10),
-            quantidade: 1,
-            custoUnitario: metricas?.resumo.custoUnitario ?? undefined,
-            estoqueAtual: metricas?.resumo.estoqueTotal ?? sumEstoque(produto),
-            status: "em_transito",
-          },
-          ...prev,
-        ]);
-        setToast({ tipo: "success", mensagem: `${produto.produto} adicionado à compra.` });
-      } catch (err) {
-        setToast({
-          tipo: "error",
-          mensagem: err instanceof Error ? err.message : "Erro ao adicionar produto",
-        });
-      } finally {
-        setAddingKeys((prev) => {
-          const next = new Set(prev);
-          next.delete(itemKey);
-          return next;
-        });
-      }
-    },
-    [addingKeys, companyKey, draftKeys]
-  );
-
   const confirmCompra = useCallback(async () => {
     if (!canConfirm || saving) return;
     setSaving(true);
@@ -365,7 +224,7 @@ export default function ComprasTransitoPage({
       setView("list");
       setToast({
         tipo: "success",
-        mensagem: "Compra confirmada e marcada como em trânsito.",
+        mensagem: "Compra confirmada e marcada como em transito.",
       });
     } catch (err) {
       setToast({
@@ -379,7 +238,7 @@ export default function ComprasTransitoPage({
 
   const cancelCompra = useCallback(async () => {
     if (!selectedCompra || deleting) return;
-    if (!window.confirm("Cancelar e remover esta compra? Essa ação não pode ser desfeita.")) return;
+    if (!window.confirm("Cancelar e remover esta compra? Essa acao nao pode ser desfeita.")) return;
     setDeleting(true);
     try {
       const res = await fetch(
@@ -411,7 +270,7 @@ export default function ComprasTransitoPage({
           <tr>
             <th>Data Recebimento</th>
             <th>Produto</th>
-            <th>Descrição</th>
+            <th>Descricao</th>
             <th>Cor</th>
             <th className={styles.right}>Qtd</th>
             <th>Grade</th>
@@ -470,7 +329,7 @@ export default function ComprasTransitoPage({
                 <td>
                   <div className={styles.descriptionCell}>{item.descricao}</div>
                 </td>
-                <td>{item.corDescricao || item.corProduto || "—"}</td>
+                <td>{item.corDescricao || item.corProduto || "-"}</td>
                 <td className={styles.right}>
                   {readOnly ? (
                     fmt(qtd)
@@ -488,9 +347,9 @@ export default function ComprasTransitoPage({
                     />
                   )}
                 </td>
-                <td>{item.grade || "—"}</td>
-                <td className={styles.right}>{custo > 0 ? fmtBRL2(custo) : "—"}</td>
-                <td className={styles.right}>{custoTotal > 0 ? fmtBRL(custoTotal) : "—"}</td>
+                <td>{item.grade || "-"}</td>
+                <td className={styles.right}>{custo > 0 ? fmtBRL2(custo) : "-"}</td>
+                <td className={styles.right}>{custoTotal > 0 ? fmtBRL(custoTotal) : "-"}</td>
                 <td className={styles.right}>{fmt(estoque)}</td>
                 <td className={styles.right}>{fmt(estoqueFinal)}</td>
                 {!readOnly && (
@@ -526,7 +385,7 @@ export default function ComprasTransitoPage({
 
       <div className={styles.topBar}>
         <div>
-          <h1 className={styles.title}>Compras em Trânsito</h1>
+          <h1 className={styles.title}>Compras em Transito</h1>
           <p className={styles.subtitle}>{companyName}</p>
         </div>
         <div className={styles.topBarActions}>
@@ -541,7 +400,7 @@ export default function ComprasTransitoPage({
                 Ver Compras
               </button>
               <button type="button" className={styles.secondaryBtn} onClick={() => setModalOpen(true)}>
-                Adicionar Produto
+                {draftItems.length > 0 ? "Editar produtos" : "Adicionar produtos"}
               </button>
               <button
                 type="button"
@@ -564,7 +423,7 @@ export default function ComprasTransitoPage({
               <strong className={styles.summaryValue}>{fmt(compras.length)}</strong>
             </div>
             <div className={styles.summaryItem}>
-              <span className={styles.summaryLabel}>Em trânsito</span>
+              <span className={styles.summaryLabel}>Em transito</span>
               <strong className={styles.summaryValueGreen}>{fmt(statusCounts.emTransito)}</strong>
             </div>
             <div className={styles.summaryItem}>
@@ -573,11 +432,11 @@ export default function ComprasTransitoPage({
             </div>
           </div>
 
-          {loading && <div className={styles.emptyState}>Carregando compras em trânsito...</div>}
+          {loading && <div className={styles.emptyState}>Carregando compras em transito...</div>}
           {!loading && error && <div className={styles.errorBox}>{error}</div>}
           {!loading && !error && compras.length === 0 && (
             <div className={styles.emptyState}>
-              <p>Nenhuma compra em trânsito confirmada ainda.</p>
+              <p>Nenhuma compra em transito confirmada ainda.</p>
               <button type="button" className={styles.primaryBtn} onClick={startNew}>
                 Criar primeira compra
               </button>
@@ -590,7 +449,7 @@ export default function ComprasTransitoPage({
                   compra.minDataRecebimento && compra.maxDataRecebimento
                     ? compra.minDataRecebimento === compra.maxDataRecebimento
                       ? fmtDate(compra.minDataRecebimento)
-                      : `${fmtDate(compra.minDataRecebimento)} até ${fmtDate(compra.maxDataRecebimento)}`
+                      : `${fmtDate(compra.minDataRecebimento)} ate ${fmtDate(compra.maxDataRecebimento)}`
                     : "Sem data";
                 const isTransit = compra.status === "em_transito";
 
@@ -648,9 +507,9 @@ export default function ComprasTransitoPage({
 
           {draftItems.length === 0 ? (
             <div className={styles.emptyState}>
-              <p>Adicione produtos para montar a compra em trânsito.</p>
+              <p>Adicione produtos para montar a compra em transito.</p>
               <button type="button" className={styles.primaryBtn} onClick={() => setModalOpen(true)}>
-                Adicionar Produto
+                Adicionar produtos
               </button>
               <button type="button" className={styles.ghostBtn} onClick={openList}>
                 Voltar para lista
@@ -728,69 +587,16 @@ export default function ComprasTransitoPage({
         </>
       )}
 
-      {modalOpen && (
-        <div className={styles.modalOverlay} onClick={() => setModalOpen(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>Adicionar Produto</h2>
-              <button type="button" className={styles.modalCloseBtn} onClick={() => setModalOpen(false)}>
-                ×
-              </button>
-            </div>
-
-            <div className={styles.searchBox}>
-              <input
-                type="text"
-                className={styles.searchInput}
-                placeholder="Buscar por nome, código ou código de barras..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                autoFocus
-              />
-            </div>
-
-            {searching && <div className={styles.modalMessage}>Buscando produtos...</div>}
-            {!searching && searchError && <div className={styles.modalError}>{searchError}</div>}
-            {!searching && !searchError && searchTerm.trim().length < 2 && (
-              <div className={styles.modalMessage}>
-                Digite ao menos 2 caracteres para buscar produtos.
-              </div>
-            )}
-            {!searching && !searchError && searchTerm.trim().length >= 2 && searchResults.length === 0 && (
-              <div className={styles.modalMessage}>Nenhum produto encontrado.</div>
-            )}
-
-            <div className={styles.modalList}>
-              {searchResults.map((produto) => {
-                const itemKey = buildControleEstoqueItemKey(produto.produto, produto.corProduto);
-                const alreadyAdded = draftKeys.has(itemKey);
-                const isAdding = addingKeys.has(itemKey);
-                return (
-                  <div key={itemKey} className={styles.modalItem}>
-                    <div className={styles.modalItemInfo}>
-                      <div className={styles.modalItemTitle}>{produto.descProduto}</div>
-                      <div className={styles.modalItemMeta}>
-                        {produto.produto}
-                        {produto.descCor ? ` · ${produto.descCor}` : ""}
-                        {produto.grade ? ` · Grade ${produto.grade}` : ""}
-                        {produto.codigoBarra ? ` · ${produto.codigoBarra}` : ""}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className={alreadyAdded ? styles.modalAddedBtn : styles.modalAddBtn}
-                      onClick={() => void addProduto(produto)}
-                      disabled={alreadyAdded || isAdding}
-                    >
-                      {alreadyAdded ? "Adicionado" : isAdding ? "..." : "+"}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+      <ComprasTransitoPickerModal
+        companyKey={companyKey}
+        open={modalOpen}
+        draftItems={draftItems}
+        onClose={() => setModalOpen(false)}
+        onApply={(items) => {
+          setDraftItems(items);
+          setModalOpen(false);
+        }}
+      />
     </div>
   );
 }

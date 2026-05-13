@@ -4,6 +4,7 @@ const VALID_PERMISSION_KEYS: ReadonlySet<PermissionKey> = new Set([
   "dashboard",
   "produtos",
   "produto-detalhado",
+  "relatorio-colecao",
   "vendedores",
   "clientes",
   "controle-estoque",

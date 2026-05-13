@@ -60,7 +60,9 @@ function parseYmdToLocalDate(value: string): Date | null {
   if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
   if (month < 1 || month > 12) return null;
   if (day < 1 || day > 31) return null;
-  const d = new Date(year, month - 1, day);
+  const d = new Date(0);
+  d.setFullYear(year, month - 1, day);
+  d.setHours(0, 0, 0, 0);
   if (Number.isNaN(d.getTime())) return null;
   return d;
 }
@@ -506,5 +508,4 @@ export default function DateRangeFilter({
     </div>
   );
 }
-
 

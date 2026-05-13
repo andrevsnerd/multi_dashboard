@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "./SidebarContext";
 import { useAuth } from "@/components/auth/AuthContext";
+import { userHasPagePermission } from "@/lib/auth/permissions";
 import type { PermissionKey } from "@/types/auth";
 
 import styles from "./Sidebar.module.css";
@@ -13,11 +14,27 @@ interface SidebarProps {
   companyName: string;
 }
 
+type NavSubItem = {
+  key: string;
+  label: string;
+  href: string;
+  permission?: PermissionKey;
+  isActive: (pathname: string | null) => boolean;
+};
+
 type NavItemBase = {
+  key: string;
   label: string;
   permission?: PermissionKey | "admin" | "home";
   href?: string;
-  subItems?: { label: string; href: string; permission?: PermissionKey }[];
+  subItems?: NavSubItem[];
+  isActive?: (pathname: string | null) => boolean;
+};
+
+type NavSection = {
+  key: string;
+  label: string;
+  items: NavItemBase[];
 };
 
 export default function Sidebar({ companyName }: SidebarProps) {
@@ -26,234 +43,457 @@ export default function Sidebar({ companyName }: SidebarProps) {
   const { isOpen, toggle, close } = useSidebar();
   const [isMobile, setIsMobile] = useState(false);
   const [produtosExpanded, setProdutosExpanded] = useState(false);
+  const [sectionOverrides, setSectionOverrides] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 1024);
     };
-    
+
     checkMobile();
     window.addEventListener("resize", checkMobile);
-    
+
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Extrair apenas o segmento da empresa do pathname (ex: /nerd/vendedores/detalhe → /nerd)
   const getBasePath = () => {
     const parts = (pathname || "").split("/").filter(Boolean);
     if (parts.length === 0) return "/";
+
     const company = parts[0];
     if (company === "nerd" || company === "scarfme") return `/${company}`;
+
     return "/";
   };
 
   const basePath = getBasePath();
-  
-  // Construir o link para estoque por filial baseado no caminho base
-  // TODO: Descomentar quando estoque por filial estiver pronto
-  // const stockByFilialHref = basePath && basePath !== "/" 
-  //   ? `${basePath}/estoque-por-filial`
-  //   : "/estoque-por-filial";
 
-  // Construir o link para produtos baseado no caminho base
-  const produtosHref = basePath && basePath !== "/" 
-    ? `${basePath}/produtos`
-    : "/produtos";
-
-  // Construir o link para produto detalhado baseado no caminho base
-  const produtoDetalhadoHref = basePath && basePath !== "/" 
-    ? `${basePath}/produto-detalhado`
-    : "/produto-detalhado";
-
-  const produtosNovosHref = basePath && basePath !== "/"
-    ? `${basePath}/produtos-novos`
-    : "/produtos-novos";
-
-  const relatorioColecaoHref = basePath && basePath !== "/"
-    ? `${basePath}/relatorio-colecao`
-    : "/relatorio-colecao";
-
-  // Construir o link para vendedores baseado no caminho base
-  const vendedoresHref = basePath && basePath !== "/" 
-    ? `${basePath}/vendedores`
-    : "/vendedores";
-
-  // Construir o link para clientes baseado no caminho base
-  const clientesHref = basePath && basePath !== "/" 
-    ? `${basePath}/clientes`
-    : "/clientes";
-
-  // Construir o link para exportar relatórios baseado no caminho base
-  const exportarRelatoriosHref = basePath && basePath !== "/" 
-    ? `${basePath}/exportar-relatorios`
-    : "/exportar-relatorios";
-
-  // Construir o link para controle de estoque baseado no caminho base
-  const controleEstoqueHref = basePath && basePath !== "/" 
-    ? `${basePath}/controle-estoque`
-    : "/controle-estoque";
-
+  const produtosHref = basePath && basePath !== "/" ? `${basePath}/produtos` : "/produtos";
+  const produtoDetalhadoHref =
+    basePath && basePath !== "/" ? `${basePath}/produto-detalhado` : "/produto-detalhado";
+  const produtosNovosHref =
+    basePath && basePath !== "/" ? `${basePath}/produtos-novos` : "/produtos-novos";
+  const relatorioColecaoHref =
+    basePath && basePath !== "/" ? `${basePath}/relatorio-colecao` : "/relatorio-colecao";
+  const relatorioClaudeHref =
+    basePath && basePath !== "/" ? `${basePath}/relatorio-claude` : "/relatorio-claude";
+  const vendedoresHref =
+    basePath && basePath !== "/" ? `${basePath}/vendedores` : "/vendedores";
+  const clientesHref = basePath && basePath !== "/" ? `${basePath}/clientes` : "/clientes";
+  const exportarRelatoriosHref =
+    basePath && basePath !== "/" ? `${basePath}/exportar-relatorios` : "/exportar-relatorios";
+  const controleEstoqueHref =
+    basePath && basePath !== "/" ? `${basePath}/controle-estoque` : "/controle-estoque";
   const estoqueConsultaHref =
     basePath && basePath !== "/" ? `${basePath}/estoque-consulta` : "/estoque-consulta";
+  const controleGiroHref =
+    basePath && basePath !== "/" ? `${basePath}/controle-giro` : "/controle-giro";
+  const controlePerformanceHref =
+    basePath && basePath !== "/" ? `${basePath}/controle-performance` : "/controle-performance";
+  const curvaAbcHref = basePath && basePath !== "/" ? `${basePath}/curva-abc` : "/curva-abc";
+  const curvaPorProdutoHref =
+    basePath && basePath !== "/" ? `${basePath}/curva-por-produto` : "/curva-por-produto";
+  const novaFilialHref =
+    basePath && basePath !== "/" ? `${basePath}/nova-filial` : "/nova-filial";
+  const controleTransferenciasHref =
+    basePath && basePath !== "/"
+      ? `${basePath}/controle-transferencias`
+      : "/controle-transferencias";
+  const transferenciaProdutosHref =
+    basePath && basePath !== "/"
+      ? `${basePath}/transferencia-produtos`
+      : "/transferencia-produtos";
+  const romaneiosHref =
+    basePath && basePath !== "/" ? `${basePath}/romaneios` : "/romaneios";
+  const saidasEntradasProdutosHref =
+    basePath && basePath !== "/"
+      ? `${basePath}/saidas-entradas-produtos`
+      : "/saidas-entradas-produtos";
+  const listaLojaHref =
+    basePath && basePath !== "/" ? `${basePath}/lista-loja` : "/lista-loja";
+  const comprasTransitoHref =
+    basePath && basePath !== "/" ? `${basePath}/compras-transito` : "/compras-transito";
+  const comprasSalvasHref =
+    basePath && basePath !== "/" ? `${basePath}/compras-salvas` : "/compras-salvas";
+  const mapaClientesHref =
+    basePath && basePath !== "/" ? `${basePath}/mapa-clientes` : "/mapa-clientes";
+  const sincronizacaoHref =
+    basePath && basePath !== "/" ? `${basePath}/sincronizacao` : "/sincronizacao";
 
-  // Construir o link para controle de giro baseado no caminho base
-  const controleGiroHref = basePath && basePath !== "/"
-    ? `${basePath}/controle-giro`
-    : "/controle-giro";
-
-  // Construir o link para controle de performance baseado no caminho base
-  const controlePerformanceHref = basePath && basePath !== "/"
-    ? `${basePath}/controle-performance`
-    : "/controle-performance";
-
-  // Construir o link para curva ABC baseado no caminho base
-  const curvaAbcHref = basePath && basePath !== "/"
-    ? `${basePath}/curva-abc`
-    : "/curva-abc";
-
-  const curvaPorProdutoHref = basePath && basePath !== "/"
-    ? `${basePath}/curva-por-produto`
-    : "/curva-por-produto";
-
-  const novaFilialHref = basePath && basePath !== "/"
-    ? `${basePath}/nova-filial`
-    : "/nova-filial";
-
-  // Construir o link para controle de transferências baseado no caminho base
-  const controleTransferenciasHref = basePath && basePath !== "/"
-    ? `${basePath}/controle-transferencias`
-    : "/controle-transferencias";
-
-  // Construir o link para transferência de produtos baseado no caminho base
-  const transferenciaProdutosHref = basePath && basePath !== "/" 
-    ? `${basePath}/transferencia-produtos`
-    : "/transferencia-produtos";
-
-  // Construir o link para saídas e entradas de produtos baseado no caminho base
-  const saidasEntradasProdutosHref = basePath && basePath !== "/" 
-    ? `${basePath}/saidas-entradas-produtos`
-    : "/saidas-entradas-produtos";
-
-  // Construir o link para romaneios baseado no caminho base
-  const romaneiosHref = basePath && basePath !== "/"
-    ? `${basePath}/romaneios`
-    : "/romaneios";
-
-  // Construir o link para lista loja baseado no caminho base
-  const listaLojaHref = basePath && basePath !== "/"
-    ? `${basePath}/lista-loja`
-    : "/lista-loja";
-
-  const comprasTransitoHref = basePath && basePath !== "/"
-    ? `${basePath}/compras-transito`
-    : "/compras-transito";
-
-  // Construir o link para mapa de clientes baseado no caminho base
-  const mapaClientesHref = basePath && basePath !== "/"
-    ? `${basePath}/mapa-clientes`
-    : "/mapa-clientes";
-
-  const sincronizacaoHref = basePath && basePath !== "/"
-    ? `${basePath}/sincronizacao`
-    : "/sincronizacao";
-
-  // Verificar se é scarfme (apenas scarfme tem e-commerce)
   const isScarfme = basePath === "/scarfme";
 
-  // Verificar se está em alguma página relacionada a produtos
-  const isProdutosSubItemActive =
-    pathname?.includes("/produto-detalhado") ||
-    pathname?.includes("/produtos-recentes") ||
-    pathname?.includes("/produtos-novos") ||
-    (pathname?.includes("/produtos") &&
-      !pathname?.includes("/produtos-recentes") &&
-      !pathname?.includes("/produto-detalhado") &&
-      !pathname?.includes("/produtos-novos"));
-  const isProdutosPageActive =
-    pathname?.includes("/produtos") &&
-    !pathname?.includes("/produtos-recentes") &&
-    !pathname?.includes("/produto-detalhado") &&
-    !pathname?.includes("/produtos-novos");
-  const isAnyProdutosPage = isProdutosSubItemActive || isProdutosPageActive;
-  const produtosExpandedEffective = produtosExpanded || isAnyProdutosPage;
+  const matchesSegment = (currentPathname: string | null, segment: string, href?: string) =>
+    currentPathname?.includes(segment) || currentPathname === href;
 
-  const allNavItems: NavItemBase[] = [
-    { label: "Home", href: "/", permission: "home" },
-    { label: "Dashboard", href: basePath, permission: "dashboard" },
+  const produtosSubItems: NavSubItem[] = [
     {
-      label: "Produtos",
-      href: undefined,
+      key: "produtos-venda",
+      label: "Produtos por Venda",
+      href: produtosHref,
       permission: "produtos",
-      subItems: [
-        { label: "Produtos por Venda", href: produtosHref, permission: "produtos" as const },
-        { label: "Produto Detalhado", href: produtoDetalhadoHref, permission: "produto-detalhado" as const },
-        { label: "Produtos Novos", href: produtosNovosHref, permission: "produtos" as const },
-      ],
+      isActive: (currentPathname) =>
+        !!currentPathname &&
+        currentPathname.includes("/produtos") &&
+        !currentPathname.includes("/produtos-recentes") &&
+        !currentPathname.includes("/produto-detalhado") &&
+        !currentPathname.includes("/produtos-novos"),
     },
-    { label: "Vendedores", href: vendedoresHref, permission: "vendedores" },
-    { label: "Clientes", href: clientesHref, permission: "clientes" },
-    ...(isScarfme ? [{ label: "Relatório Coleção", href: relatorioColecaoHref, permission: "produtos" as const }] : []),
-    { label: "Controle de Estoque", href: controleEstoqueHref, permission: "controle-estoque" },
-    { label: "Estoque consulta", href: estoqueConsultaHref, permission: "controle-estoque" },
-    { label: "Controle de Giro", href: controleGiroHref, permission: "controle-giro" },
-    { label: "Controle de Performance", href: controlePerformanceHref, permission: "controle-performance" },
-    { label: "Curva A,B,C", href: curvaAbcHref, permission: "curva-abc" },
-    { label: "Curva por Produto", href: curvaPorProdutoHref, permission: "curva-abc" },
-    { label: "Nova Filial", href: novaFilialHref, permission: "curva-abc" },
-    { label: "Controle de Transferências", href: controleTransferenciasHref, permission: "controle-transferencias" },
-    { label: "Transferência de Produtos", href: transferenciaProdutosHref, permission: "transferencia-produtos" },
-    { label: "Romaneios", href: romaneiosHref, permission: "romaneios" },
-    { label: "Saídas e Entradas de Produtos", href: saidasEntradasProdutosHref, permission: "saidas-entradas-produtos" },
-    { label: "Lista Loja", href: listaLojaHref, permission: "lista-loja" },
-    { label: "Compras em Trânsito", href: comprasTransitoHref, permission: "lista-loja" },
-    { label: "Exportar Relatórios", href: exportarRelatoriosHref, permission: "exportar-relatorios" },
-    ...(isScarfme ? [{ label: "Mapa de Clientes", href: mapaClientesHref, permission: "mapa-clientes" as const }] : []),
-    { label: "Sincronização", href: sincronizacaoHref, permission: "sincronizacao" },
+    {
+      key: "produto-detalhado",
+      label: "Produto Detalhado",
+      href: produtoDetalhadoHref,
+      permission: "produto-detalhado",
+      isActive: (currentPathname) => !!currentPathname && currentPathname.includes("/produto-detalhado"),
+    },
+    {
+      key: "produtos-novos",
+      label: "Produtos Novos",
+      href: produtosNovosHref,
+      permission: "produtos",
+      isActive: (currentPathname) => !!currentPathname && currentPathname.includes("/produtos-novos"),
+    },
   ];
 
-  const navItems =
-    !user
-      ? allNavItems
-      : user.role === "admin"
-        ? [
-            ...allNavItems,
-            { label: "Admin", href: "/admin", permission: "admin" as const },
-          ]
-        : (user.role === "gestor" || user.role === "logistica") && (!user.permissions?.length)
-          ? allNavItems
-          : allNavItems.filter((item) => {
-              if (item.permission === "home") return true;
-              if (item.permission === "admin") return false;
-              if (!item.permission) return false;
-              if (user.permissions?.includes(item.permission)) return true;
-              // Mostrar item pai se o usuário tiver permissão em algum sub-item
-              if (item.subItems) {
-                return item.subItems.some((sub) => sub.permission && user.permissions?.includes(sub.permission));
-              }
-              return false;
-            });
+  const dashboardBlockedSegments = [
+    "/estoque-por-filial",
+    "/controle-estoque",
+    "/estoque-consulta",
+    "/controle-giro",
+    "/controle-performance",
+    "/curva-abc",
+    "/curva-por-produto",
+    "/controle-transferencias",
+    "/transferencia-produtos",
+    "/romaneios",
+    "/saidas-entradas-produtos",
+    "/lista-loja",
+    "/compras-transito",
+    "/compras-salvas",
+    "/produtos",
+    "/produtos-recentes",
+    "/produtos-novos",
+    "/relatorio-colecao",
+    "/relatorio-claude",
+    "/produto-detalhado",
+    "/vendedores",
+    "/clientes",
+    "/exportar-relatorios",
+    "/mapa-clientes",
+    "/sincronizacao",
+    "/admin",
+  ];
+
+  const navSections: NavSection[] = [
+    {
+      key: "overview",
+      label: "Visão geral",
+      items: [
+        {
+          key: "home",
+          label: "Home",
+          href: "/",
+          permission: "home",
+          isActive: (currentPathname) => currentPathname === "/",
+        },
+        {
+          key: "dashboard",
+          label: "Dashboard",
+          href: basePath,
+          permission: "dashboard",
+          isActive: (currentPathname) =>
+            currentPathname === basePath &&
+            !dashboardBlockedSegments.some((segment) => currentPathname.includes(segment)),
+        },
+      ],
+    },
+    {
+      key: "comercial",
+      label: "Comercial",
+      items: [
+        {
+          key: "produtos",
+          label: "Produtos",
+          permission: "produtos",
+          subItems: produtosSubItems,
+        },
+        {
+          key: "vendedores",
+          label: "Vendedores",
+          href: vendedoresHref,
+          permission: "vendedores",
+          isActive: (currentPathname) => matchesSegment(currentPathname, "/vendedores", vendedoresHref),
+        },
+        {
+          key: "clientes",
+          label: "Clientes",
+          href: clientesHref,
+          permission: "clientes",
+          isActive: (currentPathname) => matchesSegment(currentPathname, "/clientes", clientesHref),
+        },
+        ...(isScarfme
+          ? [
+              {
+                key: "relatorio-colecao",
+                label: "Relatório Coleção",
+                href: relatorioColecaoHref,
+                permission: "relatorio-colecao" as const,
+                isActive: (currentPathname: string | null) =>
+                  matchesSegment(currentPathname, "/relatorio-colecao", relatorioColecaoHref),
+              },
+              {
+                key: "relatorio-claude",
+                label: "Relatório Claude",
+                href: relatorioClaudeHref,
+                permission: "produtos" as const,
+                isActive: (currentPathname: string | null) =>
+                  matchesSegment(currentPathname, "/relatorio-claude", relatorioClaudeHref),
+              },
+              {
+                key: "mapa-clientes",
+                label: "Mapa de Clientes",
+                href: mapaClientesHref,
+                permission: "mapa-clientes" as const,
+                isActive: (currentPathname: string | null) =>
+                  matchesSegment(currentPathname, "/mapa-clientes", mapaClientesHref),
+              },
+            ]
+          : []),
+      ],
+    },
+    {
+      key: "estoque-performance",
+      label: "Estoque e performance",
+      items: [
+        {
+          key: "controle-estoque",
+          label: "Controle de Estoque",
+          href: controleEstoqueHref,
+          permission: "controle-estoque",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/controle-estoque", controleEstoqueHref),
+        },
+        {
+          key: "estoque-consulta",
+          label: "Estoque Consulta",
+          href: estoqueConsultaHref,
+          permission: "controle-estoque",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/estoque-consulta", estoqueConsultaHref),
+        },
+        {
+          key: "controle-giro",
+          label: "Controle de Giro",
+          href: controleGiroHref,
+          permission: "controle-giro",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/controle-giro", controleGiroHref),
+        },
+        {
+          key: "controle-performance",
+          label: "Controle de Performance",
+          href: controlePerformanceHref,
+          permission: "controle-performance",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/controle-performance", controlePerformanceHref),
+        },
+        {
+          key: "curva-abc",
+          label: "Curva A, B, C",
+          href: curvaAbcHref,
+          permission: "curva-abc",
+          isActive: (currentPathname) => matchesSegment(currentPathname, "/curva-abc", curvaAbcHref),
+        },
+        {
+          key: "curva-por-produto",
+          label: "Curva por Produto",
+          href: curvaPorProdutoHref,
+          permission: "curva-abc",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/curva-por-produto", curvaPorProdutoHref),
+        },
+        {
+          key: "nova-filial",
+          label: "Nova Filial",
+          href: novaFilialHref,
+          permission: "curva-abc",
+          isActive: (currentPathname) => matchesSegment(currentPathname, "/nova-filial", novaFilialHref),
+        },
+      ],
+    },
+    {
+      key: "operacoes",
+      label: "Operações",
+      items: [
+        {
+          key: "controle-transferencias",
+          label: "Controle de Transferências",
+          href: controleTransferenciasHref,
+          permission: "controle-transferencias",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/controle-transferencias", controleTransferenciasHref),
+        },
+        {
+          key: "transferencia-produtos",
+          label: "Transferência de Produtos",
+          href: transferenciaProdutosHref,
+          permission: "transferencia-produtos",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/transferencia-produtos", transferenciaProdutosHref),
+        },
+        {
+          key: "romaneios",
+          label: "Romaneios",
+          href: romaneiosHref,
+          permission: "romaneios",
+          isActive: (currentPathname) => matchesSegment(currentPathname, "/romaneios", romaneiosHref),
+        },
+        {
+          key: "saidas-entradas-produtos",
+          label: "Saídas e Entradas de Produtos",
+          href: saidasEntradasProdutosHref,
+          permission: "saidas-entradas-produtos",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/saidas-entradas-produtos", saidasEntradasProdutosHref),
+        },
+        {
+          key: "lista-loja",
+          label: "Lista Loja",
+          href: listaLojaHref,
+          permission: "lista-loja",
+          isActive: (currentPathname) => matchesSegment(currentPathname, "/lista-loja", listaLojaHref),
+        },
+        {
+          key: "compras-transito",
+          label: "Compras em Trânsito",
+          href: comprasTransitoHref,
+          permission: "lista-loja",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/compras-transito", comprasTransitoHref),
+        },
+        {
+          key: "compras-salvas",
+          label: "Compras Salvas",
+          href: comprasSalvasHref,
+          permission: "lista-loja",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/compras-salvas", comprasSalvasHref),
+        },
+      ],
+    },
+    {
+      key: "ferramentas",
+      label: "Ferramentas",
+      items: [
+        {
+          key: "exportar-relatorios",
+          label: "Exportar Relatórios",
+          href: exportarRelatoriosHref,
+          permission: "exportar-relatorios",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/exportar-relatorios", exportarRelatoriosHref),
+        },
+        {
+          key: "sincronizacao",
+          label: "Sincronização",
+          href: sincronizacaoHref,
+          permission: "sincronizacao",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/sincronizacao", sincronizacaoHref),
+        },
+      ],
+    },
+    ...(user?.role === "admin"
+      ? [
+          {
+            key: "administracao",
+            label: "Administração",
+            items: [
+              {
+                key: "admin",
+                label: "Admin",
+                href: "/admin",
+                permission: "admin" as const,
+                isActive: (currentPathname: string | null) =>
+                  !!currentPathname && currentPathname.startsWith("/admin"),
+              },
+            ],
+          },
+        ]
+      : []),
+  ];
+
+  const canSeePermission = (permission?: PermissionKey | "admin" | "home") => {
+    if (permission === "home") return true;
+
+    if (!user) return permission !== "admin";
+
+    if (permission === "admin") return user.role === "admin";
+
+    if (user.role === "admin") return true;
+
+    if ((user.role === "gestor" || user.role === "logistica") && !user.permissions?.length) {
+      return true;
+    }
+
+    if (!permission) return false;
+
+    return userHasPagePermission(user, permission);
+  };
+
+  const canSeeItem = (item: NavItemBase) => {
+    if (canSeePermission(item.permission)) return true;
+    if (!item.subItems?.length) return false;
+
+    return item.subItems.some((subItem) => canSeePermission(subItem.permission));
+  };
+
+  const visibleSections = navSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter(canSeeItem),
+    }))
+    .filter((section) => section.items.length > 0);
+
+  const sectionHasActiveItem = (section: NavSection) =>
+    section.items.some((item) => {
+      if (item.subItems?.length) {
+        return item.subItems
+          .filter((subItem) => canSeePermission(subItem.permission))
+          .some((subItem) => subItem.isActive(pathname));
+      }
+
+      return item.isActive?.(pathname) ?? false;
+    });
+
+  const isSectionExpanded = (section: NavSection) => {
+    if (section.key in sectionOverrides) {
+      return sectionOverrides[section.key];
+    }
+
+    return visibleSections[0]?.key === section.key || sectionHasActiveItem(section);
+  };
 
   const handleLinkClick = () => {
-    // Fechar sidebar no mobile ao clicar em um link
     if (isMobile) {
       close();
     }
   };
 
+  const produtosExpandedEffective =
+    produtosExpanded || produtosSubItems.some((subItem) => subItem.isActive(pathname));
+
   return (
     <>
-      {/* Overlay para mobile - só aparece quando sidebar está aberta no mobile */}
       {isOpen && isMobile && (
-        <div 
-          className={styles.overlay} 
-          onClick={close} 
+        <div
+          className={styles.overlay}
+          onClick={close}
           aria-hidden="true"
           role="button"
           tabIndex={-1}
         />
       )}
-      
-      {/* Botão toggle - sempre visível, fora do aside */}
+
       <button
         type="button"
         className={`${styles.toggleButton} ${!isOpen ? styles.toggleButtonFloating : styles.toggleButtonInside}`}
@@ -278,202 +518,161 @@ export default function Sidebar({ companyName }: SidebarProps) {
           />
         </svg>
       </button>
-      
+
       <aside className={`${styles.sidebar} ${isOpen ? styles.sidebarOpen : styles.sidebarClosed}`}>
         <div className={styles.logo}>
-          <strong className={`${styles.logoText} ${companyName === "SCARF ME" ? styles.logoTextScarfme : ""}`}>{companyName}</strong>
+          <strong
+            className={`${styles.logoText} ${companyName === "SCARF ME" ? styles.logoTextScarfme : ""}`}
+          >
+            {companyName}
+          </strong>
         </div>
-        <nav className={styles.nav}>
-          {navItems.map((item) => {
-            let isActive = false;
-            let hasActiveSubItem = false;
-            
-            if (item.label === "Home") {
-              // Home só está ativo na raiz
-              isActive = pathname === "/";
-            } else if (item.label === "Dashboard") {
-              // Dashboard está ativo quando está no caminho base (não em estoque-por-filial, controle-estoque, produtos, produtos-recentes, produto-detalhado, vendedores ou clientes)
-              isActive = pathname === item.href && 
-                !pathname.includes("/estoque-por-filial") && 
-                !pathname.includes("/controle-estoque") &&
-                !pathname.includes("/estoque-consulta") &&
-                !pathname.includes("/controle-giro") &&
-                !pathname.includes("/controle-performance") &&
-                !pathname.includes("/curva-abc") &&
-                !pathname.includes("/curva-por-produto") &&
-                !pathname.includes("/controle-transferencias") &&
-                !pathname.includes("/transferencia-produtos") &&
-                !pathname.includes("/romaneios") &&
-                !pathname.includes("/saidas-entradas-produtos") &&
-                !pathname.includes("/lista-loja") &&
-                !pathname.includes("/compras-transito") &&
-                !pathname.includes("/produtos") &&
-                !pathname.includes("/produtos-recentes") &&
-                !pathname.includes("/produtos-novos") &&
-                !pathname.includes("/relatorio-colecao") &&
-                !pathname.includes("/produto-detalhado") &&
-                !pathname.includes("/vendedores") &&
-                !pathname.includes("/clientes") &&
-                !pathname.includes("/exportar-relatorios") &&
-                !pathname.includes("/mapa-clientes") &&
-                !pathname.includes("/sincronizacao");
-            } else if (item.label === "Produtos") {
-              // Produtos não tem href próprio, apenas expande/recolhe o submenu
-              isActive = false;
-              
-              // Verificar se algum subitem está ativo
-              hasActiveSubItem = item.subItems?.some(subItem => {
-                if (subItem.label === "Produtos por Venda") {
-                  return pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado") && !pathname?.includes("/produtos-novos");
-                } else if (subItem.label === "Produto Detalhado") {
-                  return pathname?.includes("/produto-detalhado");
-                } else if (subItem.label === "Produtos Novos") {
-                  return pathname?.includes("/produtos-novos");
-                }
-                return false;
-              }) || false;
-            } else if (item.label === "Vendedores") {
-              // Vendedores está ativo quando o pathname inclui /vendedores
-              isActive = pathname?.includes("/vendedores") || pathname === item.href;
-            } else if (item.label === "Clientes") {
-              // Clientes está ativo quando o pathname inclui /clientes
-              isActive = pathname?.includes("/clientes") || pathname === item.href;
-            } else if (item.label === "Relatório Coleção") {
-              isActive = pathname?.includes("/relatorio-colecao") || pathname === item.href;
-            } else if (item.label === "Controle de Estoque") {
-              // Controle de Estoque está ativo quando o pathname inclui /controle-estoque
-              isActive = pathname?.includes("/controle-estoque") || pathname === item.href;
-            } else if (item.label === "Estoque consulta") {
-              isActive = pathname?.includes("/estoque-consulta") || pathname === item.href;
-            } else if (item.label === "Controle de Giro") {
-              // Controle de Giro está ativo quando o pathname inclui /controle-giro
-              isActive = pathname?.includes("/controle-giro") || pathname === item.href;
-            } else if (item.label === "Controle de Performance") {
-              // Controle de Performance está ativo quando o pathname inclui /controle-performance
-              isActive = pathname?.includes("/controle-performance") || pathname === item.href;
-            } else if (item.label === "Curva A,B,C") {
-              isActive = pathname?.includes("/curva-abc") || pathname === item.href;
-            } else if (item.label === "Curva por Produto") {
-              isActive = pathname?.includes("/curva-por-produto") || pathname === item.href;
-            } else if (item.label === "Controle de Transferências") {
-              // Controle de Transferências está ativo quando o pathname inclui /controle-transferencias
-              isActive = pathname?.includes("/controle-transferencias") || pathname === item.href;
-            } else if (item.label === "Transferência de Produtos") {
-              // Transferência de Produtos está ativo quando o pathname inclui /transferencia-produtos
-              isActive = pathname?.includes("/transferencia-produtos") || pathname === item.href;
-            } else if (item.label === "Romaneios") {
-              // Romaneios está ativo quando o pathname inclui /romaneios
-              isActive = pathname?.includes("/romaneios") || pathname === item.href;
-            } else if (item.label === "Saídas e Entradas de Produtos") {
-              // Saídas e Entradas de Produtos está ativo quando o pathname inclui /saidas-entradas-produtos
-              isActive = pathname?.includes("/saidas-entradas-produtos") || pathname === item.href;
-            } else if (item.label === "Lista Loja") {
-              isActive = pathname?.includes("/lista-loja") || pathname === item.href;
-            } else if (item.label === "Compras em Trânsito") {
-              isActive = pathname?.includes("/compras-transito") || pathname === item.href;
-            } else if (item.label === "Exportar Relatórios") {
-              // Exportar Relatórios está ativo quando o pathname inclui /exportar-relatorios
-              isActive = pathname?.includes("/exportar-relatorios") || pathname === item.href;
-            } else if (item.label === "Mapa de Clientes") {
-              isActive = pathname?.includes("/mapa-clientes") || pathname === item.href;
-            } else if (item.label === "Sincronização") {
-              isActive = pathname?.includes("/sincronizacao") || pathname === item.href;
-            }
-            // TODO: Descomentar quando estoque por filial estiver pronto
-            // else if (item.label === "Estoque por Filial") {
-            //   // Estoque por Filial está ativo quando o pathname inclui /estoque-por-filial
-            //   isActive = pathname?.includes("/estoque-por-filial") || pathname === item.href;
-            // }
-            
-            const isProdutosItem = item.label === "Produtos" && item.subItems;
-            const isExpanded = isProdutosItem && produtosExpandedEffective;
-            
+
+        <div className={styles.navScroll}>
+          {visibleSections.map((section) => {
+            const sectionExpanded = isSectionExpanded(section);
+
             return (
-              <div key={item.href || item.label}>
-                {isProdutosItem ? (
-                  <div className={styles.navGroup}>
-                    <div className={`${styles.navItem} ${styles.navItemWithSubmenu} ${hasActiveSubItem ? styles.navItemActive : ""}`}>
-                      <button
-                        type="button"
-                        className={styles.navLabel}
-                        onClick={() => {
-                          setProdutosExpanded(!produtosExpanded);
-                        }}
-                      >
-                        {item.label}
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.submenuToggle}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setProdutosExpanded(!produtosExpanded);
-                        }}
-                        aria-label={isExpanded ? "Recolher submenu" : "Expandir submenu"}
-                      >
-                        <svg
-                          className={`${styles.submenuIcon} ${isExpanded ? styles.submenuIconExpanded : ""}`}
-                          width="16"
-                          height="16"
-                          viewBox="0 0 16 16"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            d="M6 12L10 8L6 4"
-                            stroke="currentColor"
-                            strokeWidth="1.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </button>
-                    </div>
-                    {isExpanded && item.subItems && (
-                      <div className={styles.submenu}>
-                        {item.subItems.filter((subItem) => {
-                          if (!subItem.permission) return true;
-                          if (!user) return true;
-                          if (user.role === "admin" || ((user.role === "gestor" || user.role === "logistica") && !user.permissions?.length)) return true;
-                          return user.permissions?.includes(subItem.permission);
-                        }).map((subItem) => {
-                          let isSubItemActive = false;
-                          if (subItem.label === "Produtos por Venda") {
-                            isSubItemActive = pathname?.includes("/produtos") && !pathname?.includes("/produtos-recentes") && !pathname?.includes("/produto-detalhado") && !pathname?.includes("/produtos-novos");
-                          } else if (subItem.label === "Produto Detalhado") {
-                            isSubItemActive = pathname?.includes("/produto-detalhado") || pathname === subItem.href;
-                          } else if (subItem.label === "Produtos Novos") {
-                            isSubItemActive = pathname?.includes("/produtos-novos") || pathname === subItem.href;
-                          }
-                          
-                          return (
-                            <Link
-                              key={subItem.href}
-                              href={subItem.href}
-                              className={`${styles.submenuItem} ${isSubItemActive ? styles.submenuItemActive : ""}`}
-                              onClick={handleLinkClick}
-                            >
-                              <span className={styles.submenuLabel}>{subItem.label}</span>
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <Link
-                    href={item.href!}
-                    className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
-                    onClick={handleLinkClick}
-                    replace={item.label === "Controle de Estoque" && pathname?.includes("/controle-estoque")}
+              <section
+                key={section.key}
+                className={`${styles.section} ${sectionHasActiveItem(section) ? styles.sectionActive : ""}`}
+              >
+                <button
+                  type="button"
+                  className={styles.sectionHeader}
+                  onClick={() =>
+                    setSectionOverrides((currentState) => ({
+                      ...currentState,
+                      [section.key]: !sectionExpanded,
+                    }))
+                  }
+                  aria-expanded={sectionExpanded}
+                >
+                  <span className={styles.sectionHeaderText}>
+                    <span className={styles.sectionLabel}>{section.label}</span>
+                    <span className={styles.sectionMeta}>
+                      {section.items.length} {section.items.length === 1 ? "item" : "itens"}
+                    </span>
+                  </span>
+
+                  <svg
+                    className={`${styles.sectionIcon} ${sectionExpanded ? styles.sectionIconExpanded : ""}`}
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
                   >
-                    <span className={styles.navLabel}>{item.label}</span>
-                  </Link>
+                    <path
+                      d="M4 6L8 10L12 6"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+
+                {sectionExpanded && (
+                  <div className={styles.sectionContent}>
+                    <div className={styles.nav}>
+                      {section.items.map((item) => {
+                        const visibleSubItems =
+                          item.subItems?.filter((subItem) => canSeePermission(subItem.permission)) ?? [];
+                        const hasActiveSubItem = visibleSubItems.some((subItem) =>
+                          subItem.isActive(pathname)
+                        );
+                        const isExpanded = item.key === "produtos" && produtosExpandedEffective;
+                        const isActive = item.subItems?.length
+                          ? hasActiveSubItem
+                          : item.isActive?.(pathname) ?? false;
+
+                        if (item.subItems?.length) {
+                          return (
+                            <div key={item.key} className={styles.navGroup}>
+                              <div
+                                className={`${styles.navItem} ${styles.navItemWithSubmenu} ${isActive ? styles.navItemActive : ""}`}
+                              >
+                                <button
+                                  type="button"
+                                  className={styles.navLabel}
+                                  onClick={() => setProdutosExpanded((currentValue) => !currentValue)}
+                                >
+                                  {item.label}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  className={styles.submenuToggle}
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    setProdutosExpanded((currentValue) => !currentValue);
+                                  }}
+                                  aria-label={isExpanded ? "Recolher submenu" : "Expandir submenu"}
+                                >
+                                  <svg
+                                    className={`${styles.submenuIcon} ${isExpanded ? styles.submenuIconExpanded : ""}`}
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 16 16"
+                                    fill="none"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                  >
+                                    <path
+                                      d="M6 12L10 8L6 4"
+                                      stroke="currentColor"
+                                      strokeWidth="1.5"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />
+                                  </svg>
+                                </button>
+                              </div>
+
+                              {isExpanded && (
+                                <div className={styles.submenu}>
+                                  {visibleSubItems.map((subItem) => {
+                                    const isSubItemActive = subItem.isActive(pathname);
+
+                                    return (
+                                      <Link
+                                        key={subItem.key}
+                                        href={subItem.href}
+                                        className={`${styles.submenuItem} ${isSubItemActive ? styles.submenuItemActive : ""}`}
+                                        onClick={handleLinkClick}
+                                      >
+                                        <span className={styles.submenuLabel}>{subItem.label}</span>
+                                      </Link>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <Link
+                            key={item.key}
+                            href={item.href!}
+                            className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
+                            onClick={handleLinkClick}
+                            replace={
+                              item.key === "controle-estoque" &&
+                              pathname?.includes("/controle-estoque")
+                            }
+                          >
+                            <span className={styles.navLabel}>{item.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
-              </div>
+              </section>
             );
           })}
-        </nav>
+        </div>
       </aside>
     </>
   );

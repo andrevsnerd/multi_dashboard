@@ -14,11 +14,36 @@ function resolveRange(range?: DateRangeInput) {
   });
 }
 
+function normalizeFilialListForMatch(filiais?: string[] | null): Set<string> | null {
+  if (!filiais || filiais.length === 0) {
+    return null;
+  }
+
+  return new Set(
+    filiais
+      .map((filial) => filial.trim().toUpperCase())
+      .filter(Boolean)
+  );
+}
+
+function restrictFiliaisToAllowed(
+  filiais: string[],
+  allowedFiliais?: string[] | null
+): string[] {
+  const allowedSet = normalizeFilialListForMatch(allowedFiliais);
+  if (!allowedSet) {
+    return filiais;
+  }
+
+  return filiais.filter((filial) => allowedSet.has(filial.trim().toUpperCase()));
+}
+
 function buildFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   specificFilial?: string | null,
-  prefix: string = 'e'
+  prefix: string = 'e',
+  allowedFiliais?: string[] | null
 ): string {
   if (!companySlug) {
     return '';
@@ -36,7 +61,10 @@ function buildFilialFilter(
 
   // Se uma filial específica foi selecionada, usar ela ou o grupo que ela representa
   if (specificFilial && specificFilial !== VAREJO_VALUE) {
-    const members = getFilialGroupMembers(company, specificFilial);
+    const members = restrictFiliaisToAllowed(getFilialGroupMembers(company, specificFilial), allowedFiliais);
+    if (members.length === 0) {
+      return 'AND 1=0';
+    }
     if (members.length > 1) {
       members.forEach((f, i) => request.input(`estoqueFilialGroup${i}`, sql.VarChar, f));
       const placeholders = members.map((_, i) => `@estoqueFilialGroup${i}`).join(', ');
@@ -49,7 +77,10 @@ function buildFilialFilter(
 
   // Para scarfme: se for "VAREJO", mostrar apenas filiais normais (sem ecommerce)
   if (isScarfme && specificFilial === VAREJO_VALUE) {
-    const normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
+    const normalFiliais = restrictFiliaisToAllowed(
+      filiais.filter(f => !ecommerceFilials.includes(f)),
+      allowedFiliais
+    );
     
     if (normalFiliais.length === 0) {
       return '';
@@ -71,7 +102,10 @@ function buildFilialFilter(
   if (isScarfme && specificFilial === null) {
     // Incluir todas as filiais (normais + e-commerce)
     // Combinar filiais normais com filiais de e-commerce para garantir que todas sejam incluídas
-    const allFiliais = [...new Set([...filiais, ...ecommerceFilials])];
+    const allFiliais = restrictFiliaisToAllowed(
+      [...new Set([...filiais, ...ecommerceFilials])],
+      allowedFiliais
+    );
     
     if (allFiliais.length === 0) {
       return '';
@@ -89,7 +123,10 @@ function buildFilialFilter(
   }
 
   // Para outras empresas (ou comportamento padrão): usar apenas filiais normais (sem ecommerce)
-  const normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
+  const normalFiliais = restrictFiliaisToAllowed(
+    filiais.filter(f => !ecommerceFilials.includes(f)),
+    allowedFiliais
+  );
 
   if (normalFiliais.length === 0) {
     return '';
@@ -111,7 +148,8 @@ function buildEntradaFilialFilter(
   companySlug: string | undefined,
   specificFilial: string | null | undefined,
   alias: string,
-  paramPrefix: string
+  paramPrefix: string,
+  allowedFiliais?: string[] | null
 ): string {
   if (!companySlug) {
     return '';
@@ -128,7 +166,10 @@ function buildEntradaFilialFilter(
   const ecommerceFilials = company.ecommerceFilials ?? [];
 
   if (specificFilial && specificFilial !== VAREJO_VALUE) {
-    const members = getFilialGroupMembers(company, specificFilial);
+    const members = restrictFiliaisToAllowed(getFilialGroupMembers(company, specificFilial), allowedFiliais);
+    if (members.length === 0) {
+      return 'AND 1=0';
+    }
     if (members.length > 1) {
       members.forEach((f, i) => request.input(`${paramPrefix}Group${i}`, sql.VarChar, f));
       const placeholders = members.map((_, i) => `@${paramPrefix}Group${i}`).join(', ');
@@ -139,7 +180,10 @@ function buildEntradaFilialFilter(
   }
 
   if (isScarfme && specificFilial === VAREJO_VALUE) {
-    const normalFiliais = filiais.filter((f) => !ecommerceFilials.includes(f));
+    const normalFiliais = restrictFiliaisToAllowed(
+      filiais.filter((f) => !ecommerceFilials.includes(f)),
+      allowedFiliais
+    );
     if (normalFiliais.length === 0) {
       return '';
     }
@@ -150,10 +194,12 @@ function buildEntradaFilialFilter(
     return `AND ${alias}.FILIAL IN (${placeholders})`;
   }
 
-  const filiaisBase =
+  const filiaisBase = restrictFiliaisToAllowed(
     isScarfme && specificFilial === null
       ? Array.from(new Set([...filiais, ...ecommerceFilials]))
-      : filiais.filter((f) => !ecommerceFilials.includes(f));
+      : filiais.filter((f) => !ecommerceFilials.includes(f)),
+    allowedFiliais
+  );
 
   if (filiaisBase.length === 0) {
     return '';
@@ -170,7 +216,8 @@ function buildVendasFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   specificFilial?: string | null,
-  prefix: string = 'vp'
+  prefix: string = 'vp',
+  allowedFiliais?: string[] | null
 ): string {
   if (!companySlug) {
     return '';
@@ -187,7 +234,10 @@ function buildVendasFilialFilter(
   const ecommerceFilials = company.ecommerceFilials ?? [];
 
   if (specificFilial && specificFilial !== VAREJO_VALUE) {
-    const members = getFilialGroupMembers(company, specificFilial);
+    const members = restrictFiliaisToAllowed(getFilialGroupMembers(company, specificFilial), allowedFiliais);
+    if (members.length === 0) {
+      return 'AND 1=0';
+    }
     if (members.length > 1) {
       members.forEach((f, i) => request.input(`vendasFilialGroup${i}`, sql.VarChar, f));
       const placeholders = members.map((_, i) => `@vendasFilialGroup${i}`).join(', ');
@@ -198,7 +248,10 @@ function buildVendasFilialFilter(
   }
 
   if (isScarfme && specificFilial === VAREJO_VALUE) {
-    const normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
+    const normalFiliais = restrictFiliaisToAllowed(
+      filiais.filter(f => !ecommerceFilials.includes(f)),
+      allowedFiliais
+    );
     
     if (normalFiliais.length === 0) {
       return '';
@@ -217,7 +270,10 @@ function buildVendasFilialFilter(
 
   if (isScarfme && specificFilial === null) {
     // Todas as filiais: só varejo em W_CTB_LOJA_* (e-commerce ScarfMe vem de FATURAMENTO nas telas que unem as duas fontes).
-    const normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
+    const normalFiliais = restrictFiliaisToAllowed(
+      filiais.filter(f => !ecommerceFilials.includes(f)),
+      allowedFiliais
+    );
 
     if (normalFiliais.length === 0) {
       return '';
@@ -234,7 +290,10 @@ function buildVendasFilialFilter(
     return `AND ${prefix}.FILIAL IN (${placeholders})`;
   }
 
-  const normalFiliais = filiais.filter(f => !ecommerceFilials.includes(f));
+  const normalFiliais = restrictFiliaisToAllowed(
+    filiais.filter(f => !ecommerceFilials.includes(f)),
+    allowedFiliais
+  );
 
   if (normalFiliais.length === 0) {
     return '';
@@ -259,14 +318,18 @@ function buildVendasFilialFilter(
 function buildScarfmeEcommerceFaturamentoFilialFilter(
   request: sql.Request | RequestLike,
   filial: string | null,
-  paramPrefix: string
+  paramPrefix: string,
+  allowedFiliais?: string[] | null
 ): string {
   const companyConfig = resolveCompany('scarfme');
   if (!companyConfig) {
     return '';
   }
 
-  const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
+  const ecommerceFilials = restrictFiliaisToAllowed(
+    companyConfig.ecommerceFilials ?? [],
+    allowedFiliais
+  );
 
   if (filial && filial !== VAREJO_VALUE) {
     if (ecommerceFilials.includes(filial)) {
@@ -5676,6 +5739,7 @@ export async function fetchProjecaoMensal({
 
 export interface ProdutoVendaUltimos3Meses {
   produto: string;
+  codigoBarra?: string;
   cor?: string;
   corDescricao?: string;
   descricao: string;
@@ -5714,6 +5778,7 @@ export async function fetchTopProdutosUltimos3Meses({
   qtdCompra,
   porCor = false,
   limit = 50,
+  allowedFiliais,
 }: {
   company?: string;
   filial?: string | null;
@@ -5727,6 +5792,7 @@ export async function fetchTopProdutosUltimos3Meses({
   qtdCompra: number;
   porCor?: boolean;
   limit?: number;
+  allowedFiliais?: string[] | null;
 }): Promise<ProdutoVendaUltimos3Meses[]> {
   return withRequest(async (request) => {
     const filialSel = filial ?? null;
@@ -5754,11 +5820,11 @@ export async function fetchTopProdutosUltimos3Meses({
 
     const vendasFilialFilter = isProdutoLookup
       ? ''
-      : buildVendasFilialFilter(request, company, filialSel, 'vp');
-    const estoqueFilialFilter = isProdutoLookup ? '' : buildFilialFilter(request, company, filialSel, 'e2');
+      : buildVendasFilialFilter(request, company, filialSel, 'vp', allowedFiliais);
+    const estoqueFilialFilter = isProdutoLookup ? '' : buildFilialFilter(request, company, filialSel, 'e2', allowedFiliais);
     // Filtros de histórico sempre respeitam filial (preço ignora filial, mas período histórico não)
-    const entradaEstoqueFilialFilter = buildEntradaFilialFilter(request, company, filialSel, 'E', 'lcHistEntradaEstoque');
-    const entradaLojaFilialFilter = buildEntradaFilialFilter(request, company, filialSel, 'LE', 'lcHistEntradaLoja');
+    const entradaEstoqueFilialFilter = buildEntradaFilialFilter(request, company, filialSel, 'E', 'lcHistEntradaEstoque', allowedFiliais);
+    const entradaLojaFilialFilter = buildEntradaFilialFilter(request, company, filialSel, 'LE', 'lcHistEntradaLoja', allowedFiliais);
     const grupoFilter = isProdutoLookup ? '' : buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilter = isProdutoLookup ? '' : buildLinhaFilter(request, company, linhas, 'p');
     const colecaoFilter = isProdutoLookup ? '' : buildColecaoFilter(request, company, colecoes, 'p');
@@ -5794,7 +5860,7 @@ export async function fetchTopProdutosUltimos3Meses({
     const produtosFilterEc = produtosFilter.replace(/vp\./g, 'fp.');
     const ecommerceFatFilialFilter =
       company === 'scarfme' && !isProdutoLookup
-        ? buildScarfmeEcommerceFaturamentoFilialFilter(request, filialSel, 'lcEcFil')
+        ? buildScarfmeEcommerceFaturamentoFilialFilter(request, filialSel, 'lcEcFil', allowedFiliais)
         : '';
     const mergeScarfmeEcommerce =
       company === 'scarfme' &&
@@ -5826,6 +5892,14 @@ export async function fetchTopProdutosUltimos3Meses({
     const innerListaVarejo = `
       SELECT
         ISNULL(vp.PRODUTO, '') AS produto,
+        MAX(ISNULL((
+          SELECT TOP 1 pb.CODIGO_BARRA
+          FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+          WHERE pb.PRODUTO = vp.PRODUTO
+            ${porCor ? "AND ISNULL(pb.COR_PRODUTO, '') = ISNULL(vp.COR_PRODUTO, '')" : ""}
+            AND ISNULL(pb.CODIGO_BARRA, '') <> ''
+          ORDER BY pb.CODIGO_BARRA
+        ), '')) AS codigoBarra,
         ${porCor ? "ISNULL(vp.COR_PRODUTO, '') AS cor," : ""}
         ${porCor ? `MAX(ISNULL(${corDescricaoExpr}, '')) AS corDescricao,` : ""}
         UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS descricao,
@@ -5864,6 +5938,14 @@ export async function fetchTopProdutosUltimos3Meses({
     const innerListaEcommerce = `
       SELECT
         ISNULL(fp.PRODUTO, '') AS produto,
+        MAX(ISNULL((
+          SELECT TOP 1 pb.CODIGO_BARRA
+          FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+          WHERE pb.PRODUTO = fp.PRODUTO
+            ${porCor ? "AND ISNULL(pb.COR_PRODUTO, '') = ISNULL(fp.COR_PRODUTO, '')" : ""}
+            AND ISNULL(pb.CODIGO_BARRA, '') <> ''
+          ORDER BY pb.CODIGO_BARRA
+        ), '')) AS codigoBarra,
         ${porCor ? "ISNULL(fp.COR_PRODUTO, '') AS cor," : ""}
         ${porCor ? "MAX(ISNULL(COALESCE(cb.DESC_COR, fp.COR_PRODUTO), '')) AS corDescricao," : ""}
         UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS descricao,
@@ -5903,6 +5985,7 @@ export async function fetchTopProdutosUltimos3Meses({
       ? `
       SELECT TOP (@lc_limit)
         u.produto,
+        MAX(ISNULL(u.codigoBarra, '')) AS codigoBarra,
         ${porCor ? "u.cor," : ""}
         ${porCor ? "MAX(u.corDescricao) AS corDescricao," : ""}
         u.descricao,
@@ -5929,6 +6012,14 @@ export async function fetchTopProdutosUltimos3Meses({
       : `
       SELECT TOP (@lc_limit)
         ISNULL(vp.PRODUTO, '') AS produto,
+        MAX(ISNULL((
+          SELECT TOP 1 pb.CODIGO_BARRA
+          FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+          WHERE pb.PRODUTO = vp.PRODUTO
+            ${porCor ? "AND ISNULL(pb.COR_PRODUTO, '') = ISNULL(vp.COR_PRODUTO, '')" : ""}
+            AND ISNULL(pb.CODIGO_BARRA, '') <> ''
+          ORDER BY pb.CODIGO_BARRA
+        ), '')) AS codigoBarra,
         ${porCor ? "ISNULL(vp.COR_PRODUTO, '') AS cor," : ""}
         ${porCor ? `MAX(ISNULL(${corDescricaoExpr}, '')) AS corDescricao,` : ""}
         UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS descricao,
@@ -5975,6 +6066,7 @@ export async function fetchTopProdutosUltimos3Meses({
 
     const result = await request.query<{
       produto: string;
+      codigoBarra?: string;
       cor?: string;
       corDescricao?: string;
       descricao: string;
@@ -5992,6 +6084,7 @@ export async function fetchTopProdutosUltimos3Meses({
 
     const rows = result.recordset.map(r => ({
       produto: r.produto?.trim() ?? '',
+      codigoBarra: (r.codigoBarra ?? '').trim() || undefined,
       ...(porCor ? { cor: (r.cor ?? "").trim() } : {}),
       ...(porCor ? { corDescricao: (r.corDescricao ?? "").trim() || undefined } : {}),
       descricao: r.descricao?.trim() ?? '',
@@ -6044,7 +6137,7 @@ export async function fetchTopProdutosUltimos3Meses({
         // Chama buildVendasFilialFilter com alias VH (primeira vez — sem colisão de params).
         // No modo normal, reutiliza o filtro já construído apenas trocando o alias.
         const vendasFilialHistoricoFilter = isProdutoLookup
-          ? buildVendasFilialFilter(request, company, filialSel, 'VH')
+          ? buildVendasFilialFilter(request, company, filialSel, 'VH', allowedFiliais)
           : vendasFilialFilter.replace(/vp\./g, 'VH.');
         const keyVarejo = historicoKeySql('VH.PRODUTO', 'VH.COR_PRODUTO');
         const keyEcommerce = historicoKeySql('FP.PRODUTO', 'FP.COR_PRODUTO');
@@ -6190,6 +6283,7 @@ export async function fetchTopProdutosUltimos3Meses({
     const comSugestao = withExact
       .map((r, i) => ({
         produto: r.produto,
+        codigoBarra: r.codigoBarra,
         ...(porCor ? { cor: (r.cor ?? "").trim() } : {}),
         ...(porCor ? { corDescricao: (r.corDescricao ?? "").trim() || undefined } : {}),
         descricao: r.descricao,

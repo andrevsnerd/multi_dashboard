@@ -48,7 +48,7 @@ export default function ComprasSalvasListPanel({
 }: {
   companyKey: CompanyKey;
   companySlug: string;
-  source?: "lista-compra" | "lista-loja";
+  source?: "lista-compra" | "lista-loja" | "operacoes";
 }) {
   const [items, setItems] = useState<CompraSalvaListEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,8 +153,12 @@ export default function ComprasSalvasListPanel({
     [companyKey, toggling]
   );
 
-  const base = `/${companySlug}/controle-estoque/projecao/lista-compra/compras-salvas`;
-  const detailQuery = source === "lista-loja" ? "?from=lista-loja" : "";
+  const base =
+    source === "operacoes"
+      ? `/${companySlug}/compras-salvas`
+      : `/${companySlug}/controle-estoque/projecao/lista-compra/compras-salvas`;
+  const detailQuery =
+    source === "lista-loja" ? "?from=lista-loja" : source === "operacoes" ? "?from=operacoes" : "";
 
   return (
     <div className={styles.wrapper}>

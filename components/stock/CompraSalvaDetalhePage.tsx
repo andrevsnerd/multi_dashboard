@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 
@@ -31,6 +31,7 @@ import styles from "./ListaCompraSugeridaPage.module.css";
 
 interface ProdutoSugestao {
   produto: string;
+  codigoBarra?: string;
   cor?: string;
   corDescricao?: string;
   descricao: string;
@@ -560,10 +561,16 @@ export default function CompraSalvaDetalhePage({
   compraId: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const fromListaLoja = searchParams.get("from") === "lista-loja";
+  const fromOperacoes =
+    searchParams.get("from") === "operacoes" ||
+    (!!pathname && pathname.includes(`/${companySlug}/compras-salvas/`));
   const listBack = fromListaLoja
     ? `/${companySlug}/lista-loja?view=compras-salvas`
+    : fromOperacoes
+      ? `/${companySlug}/compras-salvas`
     : `/${companySlug}/controle-estoque/projecao/lista-compra?tab=compras-salvas`;
   const [doc, setDoc] = useState<CompraSalva | null>(null);
   const [items, setItems] = useState<CompraSalvaItemRow[]>([]);
@@ -924,7 +931,7 @@ export default function CompraSalvaDetalhePage({
 
   const handleExportXlsx = () => {
     const fmt2 = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
-    const rowExcel = rowsComputed.map(({ it, estoque, custoUnit, custoTotal, effectiveQtdManual }) => {
+    const rowExcel = rowsComputed.map(({ it, match, estoque, custoUnit, custoTotal, effectiveQtdManual }) => {
       const produtoK = it.produto.trim();
       const corK = expandirPorCor ? ((it.corProduto ?? "").trim() || undefined) : undefined;
       const vendasKey = `${produtoK}||${corK ?? ""}`;
@@ -944,6 +951,7 @@ export default function CompraSalvaDetalhePage({
       }
       return {
         PRODUTO: it.produto,
+        CODIGO_BARRA: match?.codigoBarra ?? "",
         DESC_PRODUTO: it.descricao,
         COR_PRODUTO: it.corProduto ?? "",
         DESC_COR_PRODUTO: it.corDescricao ?? "",

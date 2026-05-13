@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { fetchAvailableColecoes } from '@/lib/repositories/products';
+import { fetchAvailableColecoes, fetchAvailableColecoesWithDescriptions } from '@/lib/repositories/products';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -8,6 +8,7 @@ export async function GET(request: Request) {
   const filial = searchParams.get('filial');
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
+  const includeDescriptions = searchParams.get('includeDescriptions') === '1';
 
   // Extrair filtros dependentes
   const linhas = searchParams.getAll('linhas').filter(Boolean);
@@ -27,14 +28,23 @@ export async function GET(request: Request) {
   };
 
   try {
-    const data = await fetchAvailableColecoes({
-      company,
-      range,
-      filial: filial || null,
-      linhas: linhas.length > 0 ? linhas : null,
-      subgrupos: subgrupos.length > 0 ? subgrupos : null,
-      grades: grades.length > 0 ? grades : null,
-    });
+    const data = includeDescriptions
+      ? await fetchAvailableColecoesWithDescriptions({
+          company,
+          range,
+          filial: filial || null,
+          linhas: linhas.length > 0 ? linhas : null,
+          subgrupos: subgrupos.length > 0 ? subgrupos : null,
+          grades: grades.length > 0 ? grades : null,
+        })
+      : await fetchAvailableColecoes({
+          company,
+          range,
+          filial: filial || null,
+          linhas: linhas.length > 0 ? linhas : null,
+          subgrupos: subgrupos.length > 0 ? subgrupos : null,
+          grades: grades.length > 0 ? grades : null,
+        });
 
     return NextResponse.json({ data });
   } catch (error) {

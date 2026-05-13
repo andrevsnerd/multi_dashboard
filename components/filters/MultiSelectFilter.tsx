@@ -1,17 +1,29 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import styles from "./MultiSelectFilter.module.css";
+
+export interface MultiSelectOption {
+  value: string;
+  label: string;
+}
 
 interface MultiSelectFilterProps {
   label: string;
   value: string[];
-  options: string[];
+  options: Array<string | MultiSelectOption>;
   onChange: (value: string[]) => void;
-  /** Chamado quando o usuário abre o dropdown (para lazy load das opções) */
   onOpen?: () => void;
   loading?: boolean;
+}
+
+function normalizeOption(option: string | MultiSelectOption): MultiSelectOption {
+  if (typeof option === "string") {
+    return { value: option, label: option };
+  }
+
+  return option;
 }
 
 export default function MultiSelectFilter({
@@ -27,6 +39,12 @@ export default function MultiSelectFilter({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  const normalizedOptions = useMemo(() => options.map(normalizeOption), [options]);
+  const labelByValue = useMemo(
+    () => new Map(normalizedOptions.map((option) => [option.value, option.label] as const)),
+    [normalizedOptions]
+  );
+
   const handleToggleOpen = () => {
     if (!isOpen) {
       onOpen?.();
@@ -34,62 +52,54 @@ export default function MultiSelectFilter({
     setIsOpen((prev) => !prev);
   };
 
-  // Filtrar opções baseado no termo de pesquisa
   const filteredOptions = useMemo(() => {
     if (!searchTerm.trim()) {
-      return options;
+      return normalizedOptions;
     }
-    const term = searchTerm.toLowerCase();
-    return options.filter((option) =>
-      option.toLowerCase().includes(term)
-    );
-  }, [options, searchTerm]);
 
-  // Separar opções filtradas em selecionadas e não selecionadas
+    const term = searchTerm.toLowerCase();
+    return normalizedOptions.filter(
+      (option) =>
+        option.label.toLowerCase().includes(term) || option.value.toLowerCase().includes(term)
+    );
+  }, [normalizedOptions, searchTerm]);
+
   const { selectedFiltered, unselectedFiltered } = useMemo(() => {
-    const selected: string[] = [];
-    const unselected: string[] = [];
-    
+    const selected: MultiSelectOption[] = [];
+    const unselected: MultiSelectOption[] = [];
+
     filteredOptions.forEach((option) => {
-      if (value.includes(option)) {
+      if (value.includes(option.value)) {
         selected.push(option);
       } else {
         unselected.push(option);
       }
     });
-    
+
     return {
       selectedFiltered: selected,
       unselectedFiltered: unselected,
     };
   }, [filteredOptions, value]);
 
-
-  // Verificar se todos os itens filtrados estão selecionados
   const allFilteredSelected = useMemo(() => {
     if (filteredOptions.length === 0) return false;
-    return filteredOptions.every((option) => value.includes(option));
+    return filteredOptions.every((option) => value.includes(option.value));
   }, [filteredOptions, value]);
 
-  // Verificar se algum item filtrado está selecionado
   const someFilteredSelected = useMemo(() => {
-    return filteredOptions.some((option) => value.includes(option));
+    return filteredOptions.some((option) => value.includes(option.value));
   }, [filteredOptions, value]);
 
-  // Focar no campo de pesquisa quando abrir
   useEffect(() => {
     if (isOpen && searchInputRef.current) {
       searchInputRef.current.focus();
     }
   }, [isOpen]);
 
-  // Fechar dropdown ao clicar fora
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
         setSearchTerm("");
       }
@@ -105,33 +115,28 @@ export default function MultiSelectFilter({
 
   const handleToggleAll = () => {
     if (allFilteredSelected) {
-      // Remover todos os itens filtrados
-      const newValue = value.filter((item) => !filteredOptions.includes(item));
-      onChange(newValue);
-    } else {
-      // Adicionar todos os itens filtrados
-      const newValue = [...new Set([...value, ...filteredOptions])];
-      onChange(newValue);
+      const filteredValues = new Set(filteredOptions.map((option) => option.value));
+      onChange(value.filter((item) => !filteredValues.has(item)));
+      return;
     }
+
+    onChange([...new Set([...value, ...filteredOptions.map((option) => option.value)])]);
   };
 
-  const handleToggleOption = (option: string) => {
-    if (value.includes(option)) {
-      onChange(value.filter((item) => item !== option));
-    } else {
-      onChange([...value, option]);
+  const handleToggleOption = (optionValue: string) => {
+    if (value.includes(optionValue)) {
+      onChange(value.filter((item) => item !== optionValue));
+      return;
     }
-  };
 
-  const handleClearAll = () => {
-    onChange([]);
+    onChange([...value, optionValue]);
   };
 
   const displayValue =
     value.length === 0
       ? "Todos"
       : value.length === 1
-      ? value[0]
+      ? (labelByValue.get(value[0]) ?? value[0])
       : `${value.length} selecionados`;
 
   return (
@@ -196,7 +201,7 @@ export default function MultiSelectFilter({
                 <button
                   type="button"
                   className={styles.clearAllButton}
-                  onClick={handleClearAll}
+                  onClick={() => onChange([])}
                   title="Limpar todas as seleções"
                 >
                   Limpar tudo
@@ -205,41 +210,37 @@ export default function MultiSelectFilter({
             </div>
 
             {loading ? (
-              <div className={styles.noResults}>Carregando…</div>
+              <div className={styles.noResults}>Carregando...</div>
             ) : filteredOptions.length === 0 ? (
               <div className={styles.noResults}>Nenhum resultado encontrado</div>
             ) : (
               <>
-                {/* Mostrar itens selecionados primeiro */}
                 {selectedFiltered.length > 0 && (
                   <>
                     {selectedFiltered.map((option) => (
                       <button
-                        key={option}
+                        key={option.value}
                         type="button"
                         className={`${styles.option} ${styles.optionActive} ${styles.optionSelected}`}
-                        onClick={() => handleToggleOption(option)}
+                        onClick={() => handleToggleOption(option.value)}
                       >
                         <span className={styles.checkbox}>✓</span>
-                        <span>{option}</span>
+                        <span>{option.label}</span>
                       </button>
                     ))}
-                    {unselectedFiltered.length > 0 && (
-                      <div className={styles.separator}></div>
-                    )}
+                    {unselectedFiltered.length > 0 && <div className={styles.separator}></div>}
                   </>
                 )}
-                
-                {/* Mostrar itens não selecionados */}
+
                 {unselectedFiltered.map((option) => (
                   <button
-                    key={option}
+                    key={option.value}
                     type="button"
                     className={styles.option}
-                    onClick={() => handleToggleOption(option)}
+                    onClick={() => handleToggleOption(option.value)}
                   >
                     <span className={styles.checkbox}></span>
-                    <span>{option}</span>
+                    <span>{option.label}</span>
                   </button>
                 ))}
               </>
@@ -250,4 +251,3 @@ export default function MultiSelectFilter({
     </div>
   );
 }
-

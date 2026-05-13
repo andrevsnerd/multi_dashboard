@@ -54,11 +54,94 @@ export interface ProductsQueryParams {
   filterByRegistrationDate?: boolean; // Se true, filtra produtos pela data de cadastramento ao invés da data de venda
 }
 
+export interface SelectOption {
+  value: string;
+  label: string;
+}
+
 function resolveRange(range?: { start?: string | Date; end?: string | Date }) {
   return normalizeRangeForQuery({
     start: range?.start,
     end: range?.end,
   });
+}
+
+function normalizeUniqueUpper(values: string[] | null | undefined): string[] {
+  return Array.from(
+    new Set(
+      (values ?? [])
+        .map((value) => value.trim().toUpperCase())
+        .filter(Boolean)
+    )
+  );
+}
+
+function buildInFilter(
+  request: sql.Request | RequestLike,
+  values: string[] | null | undefined,
+  paramBase: string,
+  sqlExpression: string
+): string {
+  const normalizedValues = normalizeUniqueUpper(values);
+  if (normalizedValues.length === 0) {
+    return '';
+  }
+
+  if (normalizedValues.length === 1) {
+    request.input(paramBase, sql.VarChar, normalizedValues[0]);
+    return `AND UPPER(LTRIM(RTRIM(ISNULL(${sqlExpression}, '')))) = @${paramBase}`;
+  }
+
+  normalizedValues.forEach((value, index) => {
+    request.input(`${paramBase}${index}`, sql.VarChar, value);
+  });
+
+  const placeholders = normalizedValues
+    .map((_, index) => `@${paramBase}${index}`)
+    .join(', ');
+
+  return `AND UPPER(LTRIM(RTRIM(ISNULL(${sqlExpression}, '')))) IN (${placeholders})`;
+}
+
+function buildScarfmeEcommerceFilialFilterForProducts(
+  request: sql.Request | RequestLike,
+  filial: string | null | undefined,
+  tableAlias: string = 'f',
+  paramBase: string = 'ecomFilial'
+): string {
+  const company = resolveCompany('scarfme');
+  if (!company) {
+    return '';
+  }
+
+  const ecommerceFilials = company.ecommerceFilials ?? [];
+
+  if (filial && filial !== VAREJO_VALUE) {
+    if (!ecommerceFilials.includes(filial)) {
+      return 'AND 1=0';
+    }
+
+    request.input(`${paramBase}Single`, sql.VarChar, filial);
+    return `AND ${tableAlias}.FILIAL = @${paramBase}Single`;
+  }
+
+  if (filial === VAREJO_VALUE) {
+    return 'AND 1=0';
+  }
+
+  if (ecommerceFilials.length === 0) {
+    return '';
+  }
+
+  ecommerceFilials.forEach((filialNome, index) => {
+    request.input(`${paramBase}${index}`, sql.VarChar, filialNome);
+  });
+
+  const placeholders = ecommerceFilials
+    .map((_, index) => `@${paramBase}${index}`)
+    .join(', ');
+
+  return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
 }
 
 function buildFilialFilter(
@@ -1742,6 +1825,120 @@ export async function fetchAvailableColecoes({
       console.error('Erro ao buscar coleções:', error);
       return [];
     }
+  });
+}
+
+export async function fetchAvailableColecoesWithDescriptions({
+  company,
+  range,
+  filial,
+  linhas,
+  subgrupos,
+  grades,
+}: Omit<ProductsQueryParams, 'colecao'> & {
+  linhas?: string[] | null;
+  subgrupos?: string[] | null;
+  grades?: string[] | null;
+} = {}): Promise<SelectOption[]> {
+  if (company !== 'scarfme') {
+    return [];
+  }
+
+  return withRequest(async (request) => {
+    const { start, end } = resolveRange(range);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+
+    const retailFilialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+    const retailLinhaFilter = buildLinhaFilterForProducts(request, company, null, linhas);
+    const retailSubgrupoFilter = buildSubgrupoFilterForProducts(request, company, null, subgrupos);
+    const retailGradeFilter = buildGradeFilterForProducts(request, company, null, grades);
+
+    const retailResult = await request.query<{ colecao: string | null }>(`
+      SELECT DISTINCT
+        UPPER(LTRIM(RTRIM(COALESCE(vp.COLECAO, p.COLECAO, '')))) AS colecao
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      WHERE vp.DATA_VENDA >= @startDate
+        AND vp.DATA_VENDA < @endDate
+        AND vp.QTDE > 0
+        AND COALESCE(vp.COLECAO, p.COLECAO, '') <> ''
+        ${retailFilialFilter}
+        ${retailLinhaFilter}
+        ${retailSubgrupoFilter}
+        ${retailGradeFilter}
+      ORDER BY colecao
+    `);
+
+    const ecommerceFilialFilter = buildScarfmeEcommerceFilialFilterForProducts(
+      request,
+      filial,
+      'f',
+      'availableColecoesEcomFilial'
+    );
+    const ecommerceLinhaFilter = buildInFilter(request, linhas, 'availableColecoesEcomLinha', 'p.LINHA');
+    const ecommerceSubgrupoFilter = buildInFilter(
+      request,
+      subgrupos,
+      'availableColecoesEcomSubgrupo',
+      'p.SUBGRUPO_PRODUTO'
+    );
+    const ecommerceGradeFilter = buildInFilter(
+      request,
+      grades,
+      'availableColecoesEcomGrade',
+      'CONVERT(VARCHAR, p.GRADE)'
+    );
+
+    const ecommerceResult = await request.query<{ colecao: string | null; descricao: string | null }>(`
+      SELECT
+        UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) AS colecao,
+        MAX(NULLIF(LTRIM(RTRIM(ISNULL(fp.DESC_COLECAO, ''))), '')) AS descricao
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO
+      WHERE f.EMISSAO >= @startDate
+        AND f.EMISSAO < @endDate
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND CAST(fp.QTDE AS FLOAT) > 0
+        AND ISNULL(p.COLECAO, '') <> ''
+        ${ecommerceFilialFilter}
+        ${ecommerceLinhaFilter}
+        ${ecommerceSubgrupoFilter}
+        ${ecommerceGradeFilter}
+      GROUP BY UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, ''))))
+    `);
+
+    const labelByCollection = new Map<string, string>();
+
+    retailResult.recordset.forEach((row) => {
+      const value = row.colecao?.trim().toUpperCase() || '';
+      if (!value || labelByCollection.has(value)) {
+        return;
+      }
+      labelByCollection.set(value, value);
+    });
+
+    ecommerceResult.recordset.forEach((row) => {
+      const value = row.colecao?.trim().toUpperCase() || '';
+      if (!value) {
+        return;
+      }
+
+      const descricao = row.descricao?.trim() || '';
+      labelByCollection.set(
+        value,
+        descricao && descricao.toUpperCase() !== value
+          ? `${descricao} (${value})`
+          : value
+      );
+    });
+
+    return Array.from(labelByCollection.entries())
+      .sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'))
+      .map(([value, label]) => ({ value, label }));
   });
 }
 

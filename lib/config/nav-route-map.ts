@@ -22,7 +22,8 @@ export const NAV_ROUTE_MAP: Record<string, PermissionKey | "admin"> = {
   "produto-detalhado": "produto-detalhado",
   "produtos-recentes": "produtos",
   "produtos-novos": "produtos",
-  "relatorio-colecao": "produtos",
+  "relatorio-colecao": "relatorio-colecao",
+  "relatorio-claude": "produtos",
 
   // ── Vendas / CRM ───────────────────────────────────────────────
   vendedores: "vendedores",
@@ -30,6 +31,7 @@ export const NAV_ROUTE_MAP: Record<string, PermissionKey | "admin"> = {
 
   // ── Controles ──────────────────────────────────────────────────
   "controle-estoque": "controle-estoque",
+  "estoque-consulta": "controle-estoque",
   "controle-giro": "controle-giro",
   "controle-performance": "controle-performance",
   "controle-movimento": "controle-movimento",
@@ -53,6 +55,7 @@ export const NAV_ROUTE_MAP: Record<string, PermissionKey | "admin"> = {
   "exportar-relatorios": "exportar-relatorios",
   "lista-loja": "lista-loja",
   "compras-transito": "lista-loja",
+  "compras-salvas": "lista-loja",
   "mapa-clientes": "mapa-clientes",
   sincronizacao: "sincronizacao",
   blackfriday: "blackfriday",

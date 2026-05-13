@@ -30,6 +30,23 @@ export function formatDateForQuery(date: Date): string {
   return format(date, 'yyyy-MM-dd');
 }
 
+function parseDateInput(value: Date | string): Date {
+  if (value instanceof Date) {
+    return new Date(value.getTime());
+  }
+
+  const dateOnlyMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    const parsed = new Date(0);
+    parsed.setFullYear(Number(year), Number(month) - 1, Number(day));
+    parsed.setHours(0, 0, 0, 0);
+    return parsed;
+  }
+
+  return new Date(value);
+}
+
 export function normalizeRange(
   start?: Date | string,
   end?: Date | string
@@ -38,8 +55,8 @@ export function normalizeRange(
     return getCurrentMonthRange();
   }
 
-  const startDate = start instanceof Date ? start : new Date(start);
-  const endDate = end instanceof Date ? end : new Date(end);
+  const startDate = parseDateInput(start);
+  const endDate = parseDateInput(end);
 
   if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
     return getCurrentMonthRange();
@@ -150,4 +167,3 @@ export function shiftRangeByMonths(
     end: previousEnd,
   };
 }
-
