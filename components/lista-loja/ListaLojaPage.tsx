@@ -445,7 +445,7 @@ async function fetchVendasItemMetricas(
   codFilial: string | null,
   produto: string,
   corProduto: string | null
-): Promise<{ qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null; diasDesdeUltimaVenda: number | null; primeiraEntradaFilial: string | null; diasHistoricoFilial: number; mesesHistoricoFilial: number; historicoParcial: boolean } | null> {
+): Promise<{ qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null; diasDesdeUltimaVenda: number | null; primeiraEntradaFilial: string | null; diasHistoricoFilial: number; mesesHistoricoFilial: number; historicoParcial: boolean; filiaisNM: string[] } | null> {
   type VendasItemMetricasApiRow = {
     qtde12m: number;
     qtde60d: number;
@@ -481,6 +481,12 @@ async function fetchVendasItemMetricas(
       },
     });
     if (!metricas) return null;
+    const estoqueMap = new Map<string, number>(
+      metricas.estoquePorFilial.map(e => [e.filial.trim(), e.estoque])
+    );
+    const filiaisNM = metricas.vendasPorFilial
+      .filter(v => (estoqueMap.get(v.filial.trim()) ?? 0) <= 0 && v.qtde12m >= 3)
+      .map(v => v.filial);
     return {
       qtde12m: metricas.resumo.qtde12m,
       qtde60d: metricas.resumo.qtde60d,
@@ -492,6 +498,7 @@ async function fetchVendasItemMetricas(
       diasHistoricoFilial: metricas.resumo.diasHistoricoFilial,
       mesesHistoricoFilial: metricas.resumo.mesesHistoricoFilial,
       historicoParcial: metricas.resumo.historicoParcial,
+      filiaisNM,
     };
     let rows: VendasItemMetricasApiRow[];
     try {
@@ -515,6 +522,7 @@ async function fetchVendasItemMetricas(
       custoUnit: maxCusto > 0 ? maxCusto : null,
       diasDesdeUltimaVenda,
       ...historicoFilial,
+      filiaisNM: [],
     };
   } catch {
     return null;
@@ -1040,10 +1048,15 @@ function hasSugestaoE(item: ListaItem): boolean {
   return calcQtdSugestaoEInfo(item) !== null;
 }
 
+function needsNecessidadeMinima(item: { estoqueFilial?: number | null; qtde12m?: number | null }): boolean {
+  return Number(item.estoqueFilial ?? 0) <= 0 && Number(item.qtde12m ?? 0) >= 3;
+}
+
 function getReposicaoCompraView(item: ListaItem, diasCorridosMes: number): {
   qtdFinal: number;
   qtdS: number;
   qtdE: number;
+  qtdNM: number;
   qtdSuficiente: boolean;
   semSugestao: boolean;
 } {
@@ -1061,21 +1074,22 @@ function getReposicaoCompraView(item: ListaItem, diasCorridosMes: number): {
 
   if (qtdFinal > 0) {
     if (qtdS > 0 && qtdFinal < 0.6 * qtdS) {
-      return { qtdFinal: Math.round(0.8 * qtdS + 0.4 * qtdFinal), qtdS: 0, qtdE: 0, qtdSuficiente: false, semSugestao: false };
+      return { qtdFinal: Math.round(0.8 * qtdS + 0.4 * qtdFinal), qtdS: 0, qtdE: 0, qtdNM: 0, qtdSuficiente: false, semSugestao: false };
     }
-    return { qtdFinal, qtdS: 0, qtdE: 0, qtdSuficiente: false, semSugestao: false };
+    return { qtdFinal, qtdS: 0, qtdE: 0, qtdNM: 0, qtdSuficiente: false, semSugestao: false };
   }
   if (qtdSuficiente) {
-    return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdSuficiente: true, semSugestao: false };
+    return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdNM: 0, qtdSuficiente: true, semSugestao: false };
   }
   if (sEligivel && qtdS > 0) {
-    return { qtdFinal: 0, qtdS, qtdE: 0, qtdSuficiente: false, semSugestao: false };
+    return { qtdFinal: 0, qtdS, qtdE: 0, qtdNM: 0, qtdSuficiente: false, semSugestao: false };
   }
   const eInfo = hasSugestaoE(item) ? calcQtdSugestaoEInfo(item) : null;
   if (eInfo) {
-    return { qtdFinal: 0, qtdS: 0, qtdE: eInfo.qtd, qtdSuficiente: false, semSugestao: false };
+    return { qtdFinal: 0, qtdS: 0, qtdE: eInfo.qtd, qtdNM: 0, qtdSuficiente: false, semSugestao: false };
   }
-  return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdSuficiente: false, semSugestao: true };
+  const qtdNM = needsNecessidadeMinima(item) ? 1 : 0;
+  return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdNM, qtdSuficiente: false, semSugestao: qtdNM === 0 };
 }
 
 function getSuggestedQtyValue(item: ListaItem, diasCorridosMes: number): number {
@@ -1083,12 +1097,13 @@ function getSuggestedQtyValue(item: ListaItem, diasCorridosMes: number): number 
   if (sugestao.qtdFinal > 0) return sugestao.qtdFinal;
   if (sugestao.qtdS > 0) return sugestao.qtdS;
   if (sugestao.qtdE > 0) return sugestao.qtdE;
+  if (sugestao.qtdNM > 0) return sugestao.qtdNM;
   return 0;
 }
 
 function itemTemSugestaoCompra(item: ListaItem, diasCorridosMes: number): boolean {
   const sugestao = getReposicaoCompraView(item, diasCorridosMes);
-  return sugestao.qtdFinal > 0 || sugestao.qtdS > 0 || sugestao.qtdE > 0;
+  return sugestao.qtdFinal > 0 || sugestao.qtdS > 0 || sugestao.qtdE > 0 || sugestao.qtdNM > 0;
 }
 
 function itemEhBarrado(item: ListaItem, diasCorridosMes: number): boolean {
@@ -1097,6 +1112,7 @@ function itemEhBarrado(item: ListaItem, diasCorridosMes: number): boolean {
     sugestao.qtdFinal === 0 &&
     sugestao.qtdS === 0 &&
     sugestao.qtdE === 0 &&
+    sugestao.qtdNM === 0 &&
     (sugestao.qtdSuficiente || sugestao.semSugestao)
   );
 }
@@ -1105,11 +1121,13 @@ function getReposicaoBaseType(sugestao: {
   qtdFinal: number;
   qtdS: number;
   qtdE: number;
+  qtdNM?: number;
   qtdSuficiente: boolean;
-}): "COMPRA" | "S" | "E" | "SUFICIENTE" | "SEM_SUGESTAO" {
+}): "COMPRA" | "S" | "E" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO" {
   if (sugestao.qtdFinal > 0) return "COMPRA";
   if (sugestao.qtdS > 0) return "S";
   if (sugestao.qtdE > 0) return "E";
+  if ((sugestao.qtdNM ?? 0) > 0) return "NM";
   if (sugestao.qtdSuficiente) return "SUFICIENTE";
   return "SEM_SUGESTAO";
 }
@@ -1199,7 +1217,14 @@ function buildListaLojaExportRow(
   const mesesSemVenda = item.diasDesdeUltimaVenda != null ? item.diasDesdeUltimaVenda / 30 : null;
   const mesesAtivos = mesesSemVenda != null ? mesesHistoricoFilial - mesesSemVenda : null;
   const velocidadeAjustada = mesesAtivos != null && mesesAtivos > 0 ? Number(item.qtde12m ?? 0) / mesesAtivos : null;
-  const qtdCalculada = sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS > 0 ? sugestao.qtdS : sugestao.qtdE;
+  const qtdCalculada =
+    sugestao.qtdFinal > 0
+      ? sugestao.qtdFinal
+      : sugestao.qtdS > 0
+        ? sugestao.qtdS
+        : sugestao.qtdE > 0
+          ? sugestao.qtdE
+          : sugestao.qtdNM;
   const status = qtdCalculada > 0 ? "Sugerido" : "Barrado";
   const tipo = sugestao.qtdFinal > 0
     ? "Final"
@@ -1207,9 +1232,11 @@ function buildListaLojaExportRow(
       ? "S"
       : sugestao.qtdE > 0
         ? "E"
-        : sugestao.qtdSuficiente
-          ? "Suficiente"
-          : "Sem sugestão";
+        : sugestao.qtdNM > 0
+          ? "NM"
+          : sugestao.qtdSuficiente
+            ? "Suficiente"
+            : "Sem sugestão";
 
   let regra = "";
   let resumo = "";
@@ -1223,6 +1250,9 @@ function buildListaLojaExportRow(
   } else if (sugestao.qtdE > 0) {
     regra = "Qtd E = teto((limite de reposição em meses x velocidade ajustada)).";
     resumo = `Sugestão E de ${qtdCalculada} un. porque o item ficou cerca de ${formatFixed(mesesSemVenda ?? 0, 1)} meses sem venda e a velocidade ajustada é ${formatFixed(velocidadeAjustada ?? 0)} un./mês.`;
+  } else if (sugestao.qtdNM > 0) {
+    regra = "Necessidade Mínima: estoque zerado com pelo menos 3 vendas nos últimos 12 meses.";
+    resumo = "Sugestão NM de 1 un. porque o estoque está zerado e o item teve vendas nos últimos 12 meses.";
   } else if (sugestao.qtdSuficiente) {
     regra = `Estoque atual já cobre o limite de ${limiteDias} dias.`;
     resumo = `Barrado porque o estoque atual já cobre o limite de ${limiteDias} dias.`;
@@ -1376,6 +1406,43 @@ interface ListaLojaPageProps {
 
 type Mode = "list" | "editor" | "saved-purchases";
 
+function NmBadgeAgregado({
+  filiaisLabels,
+  comCompra,
+  onEnter,
+  onLeave,
+}: {
+  filiaisLabels: string[];
+  comCompra: boolean;
+  onEnter: (e: React.MouseEvent, labels: string[]) => void;
+  onLeave: () => void;
+}) {
+  return (
+    <span
+      onMouseEnter={(e) => { e.stopPropagation(); onEnter(e, filiaisLabels); }}
+      onMouseLeave={onLeave}
+      style={{
+        display: "inline-flex",
+        padding: "0 5px",
+        height: 16,
+        borderRadius: "999px",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 10,
+        fontWeight: 800,
+        color: "#fff",
+        background: "#7c3aed",
+        border: "1px solid #6d28d9",
+        verticalAlign: "middle",
+        cursor: "help",
+        marginLeft: comCompra ? 6 : 0,
+      }}
+    >
+      NM
+    </span>
+  );
+}
+
 type ListaLojaItensTableProps = {
   companyKey: CompanyKey;
   filialCod: string | null;
@@ -1527,6 +1594,15 @@ function ListaLojaItensTable({
     y: number;
     rotas: TransferenciaDestinoSugestao[];
   }>(null);
+  const [nmTooltipAgregado, setNmTooltipAgregado] = useState<null | {
+    x: number;
+    y: number;
+    filiaisLabels: string[];
+    total: number;
+    comCompra: boolean;
+    limiteDias?: number;
+    duracaoAtual?: number;
+  }>(null);
 
   const [estoqueCache, setEstoqueCache] = useState<Record<string, EstoqueTooltipRow[]>>({});
   const [vendasCache, setVendasCache] = useState<Record<string, FilialVendaRow[]>>({});
@@ -1546,6 +1622,7 @@ function ListaLojaItensTable({
         diasHistoricoFilial: number | null;
         mesesHistoricoFilial: number | null;
         historicoParcial: boolean | null;
+        filiaisNM: string[] | null;
       }
     >
   >({});
@@ -1576,6 +1653,7 @@ function ListaLojaItensTable({
     diasHistoricoFilial: number | null;
     mesesHistoricoFilial: number | null;
     historicoParcial: boolean | null;
+    filiaisNM: string[] | null;
   }): boolean {
     return Object.values(values).some((value) => value !== null && value !== undefined);
   }
@@ -1639,6 +1717,7 @@ function ListaLojaItensTable({
             diasHistoricoFilial: vendas?.diasHistoricoFilial ?? null,
             mesesHistoricoFilial: vendas?.mesesHistoricoFilial ?? null,
             historicoParcial: vendas?.historicoParcial ?? null,
+            filiaisNM: vendas?.filiaisNM ?? null,
           },
         };
       })
@@ -1732,6 +1811,8 @@ function ListaLojaItensTable({
                 const diasHistoricoFilial = hasLive ? (live?.diasHistoricoFilial ?? null) : (item.diasHistoricoFilial ?? null);
                 const mesesHistoricoFilial = hasLive ? (live?.mesesHistoricoFilial ?? null) : (item.mesesHistoricoFilial ?? null);
                 const historicoParcial = hasLive ? (live?.historicoParcial ?? false) : (item.historicoParcial ?? false);
+                // filiaisNM só faz sentido na visão agregada (sem filial específica)
+                const filiaisNMAgregado = (!filialCod || !filialCod.trim()) ? (live?.filiaisNM ?? []) : [];
                 return (
                   <>
               <td>
@@ -2243,7 +2324,9 @@ function ListaLojaItensTable({
                       ? sugestaoBase.qtdFinal
                       : sugestaoBase.qtdS > 0
                         ? sugestaoBase.qtdS
-                        : sugestaoBase.qtdE;
+                        : sugestaoBase.qtdE > 0
+                          ? sugestaoBase.qtdE
+                          : sugestaoBase.qtdNM;
                   const transit = applyTransitToSuggestion({
                     baseType,
                     baseQty,
@@ -2303,7 +2386,7 @@ function ListaLojaItensTable({
                         }
                         onMouseLeave={() => setSugestaoTooltip(null)}
                       >
-                        {fmt(transit.qty)}{blendAplicado && <>{" "}<span style={{ display: "inline-flex", width: 16, height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#0f172a", background: "#fde047", border: "1px solid #facc15", verticalAlign: "middle", cursor: "help" }}>⚡</span></>}{transitBadge}
+                        {fmt(transit.qty)}{blendAplicado && <>{" "}<span style={{ display: "inline-flex", width: 16, height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#0f172a", background: "#fde047", border: "1px solid #facc15", verticalAlign: "middle", cursor: "help" }}>⚡</span></>}{transitBadge}{filiaisNMAgregado.length > 0 && <NmBadgeAgregado filiaisLabels={filiaisNMAgregado.map(f => getFilialLabelForDisplay(companyConfig, f))} comCompra onEnter={(e, labels) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiaisLabels: labels, total: labels.length, comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
                       </span>
                     );
                   }
@@ -2345,7 +2428,7 @@ function ListaLojaItensTable({
                         >
                           S
                         </span>
-                        {transitBadge}
+                        {transitBadge}{filiaisNMAgregado.length > 0 && <NmBadgeAgregado filiaisLabels={filiaisNMAgregado.map(f => getFilialLabelForDisplay(companyConfig, f))} comCompra onEnter={(e, labels) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiaisLabels: labels, total: labels.length, comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
                       </span>
                     );
                   }
@@ -2398,6 +2481,38 @@ function ListaLojaItensTable({
                         >
                           E
                         </span>
+                        {transitBadge}{filiaisNMAgregado.length > 0 && <NmBadgeAgregado filiaisLabels={filiaisNMAgregado.map(f => getFilialLabelForDisplay(companyConfig, f))} comCompra onEnter={(e, labels) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiaisLabels: labels, total: labels.length, comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
+                      </span>
+                    );
+                  }
+                  if (baseType === "NM") {
+                    const rotasNM = transferenciasPorItem?.[buildItemKey(item.produto, item.corProduto)] ?? [];
+                    if (rotasNM.length > 0) {
+                      return <span className={styles.cellMetric}>—</span>;
+                    }
+                    return (
+                      <span className={styles.reporAdd}>
+                        1{" "}
+                        <span
+                          title="Necessidade Mínima: estoque zerado com vendas nos últimos 12 meses. Sugestão: comprar 1 unidade."
+                          style={{
+                            display: "inline-flex",
+                            padding: "0 5px",
+                            height: 16,
+                            borderRadius: "999px",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 10,
+                            fontWeight: 800,
+                            color: "#fff",
+                            background: "#7c3aed",
+                            border: "1px solid #6d28d9",
+                            verticalAlign: "middle",
+                            cursor: "help",
+                          }}
+                        >
+                          NM
+                        </span>
                         {transitBadge}
                       </span>
                     );
@@ -2428,6 +2543,43 @@ function ListaLojaItensTable({
                         }
                         onMouseLeave={() => setSugestaoTooltip(null)}
                       >
+                        {transitBadge}
+                      </span>
+                    );
+                  }
+                  if (filiaisNMAgregado.length > 0 && baseType !== "COMPRA" && baseType !== "S" && baseType !== "E") {
+                    const filiaisLabels = filiaisNMAgregado.map(f => getFilialLabelForDisplay(companyConfig, f));
+                    const totalNM = filiaisNMAgregado.length;
+                    const nmVendasMes = Number(vendasMesAtual ?? 0);
+                    const nmConsumoDiario = diasCorridosMes > 0 ? nmVendasMes / diasCorridosMes : 0;
+                    const nmEstoque = Number(estoqueFilial ?? 0);
+                    const nmDuracao = nmConsumoDiario > 0 ? nmEstoque / nmConsumoDiario : 0;
+                    return (
+                      <span
+                        className={styles.reporAdd}
+                        onMouseEnter={(e) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiaisLabels, total: totalNM, comCompra: false, limiteDias, duracaoAtual: nmDuracao })}
+                        onMouseLeave={() => setNmTooltipAgregado(null)}
+                      >
+                        {fmt(totalNM)}{" "}
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            padding: "0 5px",
+                            height: 16,
+                            borderRadius: "999px",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 10,
+                            fontWeight: 800,
+                            color: "#fff",
+                            background: "#7c3aed",
+                            border: "1px solid #6d28d9",
+                            verticalAlign: "middle",
+                            cursor: "help",
+                          }}
+                        >
+                          NM
+                        </span>
                         {transitBadge}
                       </span>
                     );
@@ -2510,7 +2662,13 @@ function ListaLojaItensTable({
                     const limiteDias = getLimiteDiasReposicao(item);
                     const baseType = getReposicaoBaseType(sugestao);
                     const baseQty =
-                      sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS > 0 ? sugestao.qtdS : sugestao.qtdE;
+                      sugestao.qtdFinal > 0
+                        ? sugestao.qtdFinal
+                        : sugestao.qtdS > 0
+                          ? sugestao.qtdS
+                          : sugestao.qtdE > 0
+                            ? sugestao.qtdE
+                            : sugestao.qtdNM;
                     const transit = applyTransitToSuggestion({
                       baseType,
                       baseQty,
@@ -2765,6 +2923,39 @@ function ListaLojaItensTable({
               ))}
             </>
           ) : null}
+        </div>
+      )}
+      {nmTooltipAgregado && (
+        <div className={styles.metricTooltip} style={{ left: nmTooltipAgregado.x + 12, top: nmTooltipAgregado.y + 12 }}>
+          <div className={styles.metricTooltipTitle}>Necessidade Mínima por filial</div>
+          {!nmTooltipAgregado.comCompra && nmTooltipAgregado.limiteDias != null && (
+            <div className={styles.metricTooltipLine} style={{ color: "#22c55e", fontSize: 11 }}>
+              ✓ Rede com quantidade suficiente pela regra de {nmTooltipAgregado.limiteDias} dias
+              {nmTooltipAgregado.duracaoAtual != null && nmTooltipAgregado.duracaoAtual > 0
+                ? ` (duração atual: ${Math.round(nmTooltipAgregado.duracaoAtual)} dias)`
+                : ""}
+            </div>
+          )}
+          {nmTooltipAgregado.comCompra && (
+            <div className={styles.metricTooltipLine} style={{ color: "#94a3b8", fontSize: 11 }}>
+              A sugestão de compra cobre a rede. As filiais abaixo têm estoque zerado e precisam de prioridade na reposição.
+            </div>
+          )}
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine} style={{ color: "#94a3b8", fontSize: 11 }}>
+            Filiais com estoque zerado e ≥ 3 vendas nos últimos 12 meses:
+          </div>
+          {nmTooltipAgregado.filiaisLabels.map((label) => (
+            <div key={label} className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 24 }}>
+              <span>{label}</span>
+              <span style={{ fontWeight: 600 }}>1 un</span>
+            </div>
+          ))}
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 24 }}>
+            <strong>Total NM</strong>
+            <strong>{nmTooltipAgregado.total} un</strong>
+          </div>
         </div>
       )}
       {historicoTooltip && (

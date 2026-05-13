@@ -344,6 +344,7 @@ function getReposicaoCompraView(
   qtdFinal: number;
   qtdS: number;
   qtdE: number;
+  qtdNM: number;
   qtdSuficiente: boolean;
   semSugestao: boolean;
 } {
@@ -361,32 +362,35 @@ function getReposicaoCompraView(
 
   if (qtdFinal > 0) {
     if (qtdS > 0 && qtdFinal < 0.6 * qtdS) {
-      return { qtdFinal: Math.round(0.8 * qtdS + 0.4 * qtdFinal), qtdS: 0, qtdE: 0, qtdSuficiente: false, semSugestao: false };
+      return { qtdFinal: Math.round(0.8 * qtdS + 0.4 * qtdFinal), qtdS: 0, qtdE: 0, qtdNM: 0, qtdSuficiente: false, semSugestao: false };
     }
-    return { qtdFinal, qtdS: 0, qtdE: 0, qtdSuficiente: false, semSugestao: false };
+    return { qtdFinal, qtdS: 0, qtdE: 0, qtdNM: 0, qtdSuficiente: false, semSugestao: false };
   }
   if (qtdSuficiente) {
-    return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdSuficiente: true, semSugestao: false };
+    return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdNM: 0, qtdSuficiente: true, semSugestao: false };
   }
   if (sEligivel && qtdS > 0) {
-    return { qtdFinal: 0, qtdS, qtdE: 0, qtdSuficiente: false, semSugestao: false };
+    return { qtdFinal: 0, qtdS, qtdE: 0, qtdNM: 0, qtdSuficiente: false, semSugestao: false };
   }
   const eInfo = hasSugestaoE(item) ? calcQtdSugestaoEInfo(item) : null;
   if (eInfo) {
-    return { qtdFinal: 0, qtdS: 0, qtdE: eInfo.qtd, qtdSuficiente: false, semSugestao: false };
+    return { qtdFinal: 0, qtdS: 0, qtdE: eInfo.qtd, qtdNM: 0, qtdSuficiente: false, semSugestao: false };
   }
-  return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdSuficiente: false, semSugestao: true };
+  const qtdNM = estoqueAtual <= 0 && Number(item.qtde12m ?? 0) >= 3 ? 1 : 0;
+  return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdNM, qtdSuficiente: false, semSugestao: qtdNM === 0 };
 }
 
 function getReposicaoBaseType(sugestao: {
   qtdFinal: number;
   qtdS: number;
   qtdE: number;
+  qtdNM?: number;
   qtdSuficiente: boolean;
-}): "COMPRA" | "S" | "E" | "SUFICIENTE" | "SEM_SUGESTAO" {
+}): "COMPRA" | "S" | "E" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO" {
   if (sugestao.qtdFinal > 0) return "COMPRA";
   if (sugestao.qtdS > 0) return "S";
   if (sugestao.qtdE > 0) return "E";
+  if ((sugestao.qtdNM ?? 0) > 0) return "NM";
   if (sugestao.qtdSuficiente) return "SUFICIENTE";
   return "SEM_SUGESTAO";
 }
@@ -798,7 +802,13 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       const sugestao = getReposicaoCompraView(compraItem, diasCorridosMes);
       const baseType = getReposicaoBaseType(sugestao);
       const baseQty =
-        sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS > 0 ? sugestao.qtdS : sugestao.qtdE;
+        sugestao.qtdFinal > 0
+          ? sugestao.qtdFinal
+          : sugestao.qtdS > 0
+            ? sugestao.qtdS
+            : sugestao.qtdE > 0
+              ? sugestao.qtdE
+              : sugestao.qtdNM;
       const transit = applyTransitToSuggestion({
         baseType,
         baseQty,
@@ -934,7 +944,13 @@ const handleBadgeClick = (cat: string) => {
     const sugestao = getReposicaoCompraView(compraItem, diasCorridosMes);
     const baseType = getReposicaoBaseType(sugestao);
     const baseQty =
-      sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS > 0 ? sugestao.qtdS : sugestao.qtdE;
+      sugestao.qtdFinal > 0
+        ? sugestao.qtdFinal
+        : sugestao.qtdS > 0
+          ? sugestao.qtdS
+          : sugestao.qtdE > 0
+            ? sugestao.qtdE
+            : sugestao.qtdNM;
     const transit = applyTransitToSuggestion({
       baseType,
       baseQty,
@@ -1578,7 +1594,13 @@ const handleBadgeClick = (cat: string) => {
                                     const limiteDias = getLimiteDiasReposicao(compraItem);
                                     const baseType = getReposicaoBaseType(sugestao);
                                     const baseQty =
-                                      sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS > 0 ? sugestao.qtdS : sugestao.qtdE;
+                                      sugestao.qtdFinal > 0
+                                        ? sugestao.qtdFinal
+                                        : sugestao.qtdS > 0
+                                          ? sugestao.qtdS
+                                          : sugestao.qtdE > 0
+                                            ? sugestao.qtdE
+                                            : sugestao.qtdNM;
                                     const transit = applyTransitToSuggestion({
                                       baseType,
                                       baseQty,
@@ -1716,6 +1738,34 @@ const handleBadgeClick = (cat: string) => {
                                             }}
                                           >
                                             E
+                                          </span>
+                                          {transitBadge}
+                                        </span>
+                                      );
+                                    }
+                                    if (baseType === "NM" && transit.qty > 0) {
+                                      return (
+                                        <span className={styles.reporAdd}>
+                                          {fmt(transit.qty)}{" "}
+                                          <span
+                                            title="Necessidade Mínima: estoque zerado com vendas nos últimos 12 meses."
+                                            style={{
+                                              display: "inline-flex",
+                                              padding: "0 5px",
+                                              height: 16,
+                                              borderRadius: "999px",
+                                              alignItems: "center",
+                                              justifyContent: "center",
+                                              fontSize: 10,
+                                              fontWeight: 800,
+                                              color: "#fff",
+                                              background: "#7c3aed",
+                                              border: "1px solid #6d28d9",
+                                              verticalAlign: "middle",
+                                              cursor: "help",
+                                            }}
+                                          >
+                                            NM
                                           </span>
                                           {transitBadge}
                                         </span>

@@ -4,6 +4,7 @@ export type TransitAwareSuggestionType =
   | "COMPRA"
   | "S"
   | "E"
+  | "NM"
   | "SUFICIENTE"
   | "SEM_SUGESTAO";
 

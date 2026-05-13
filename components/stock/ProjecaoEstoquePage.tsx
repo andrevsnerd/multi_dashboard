@@ -206,7 +206,7 @@ function getMesesHistoricoFilial(item: { mesesHistoricoFilial?: number | null })
 
 type SuggestionResult = {
   qty: number;
-  type: "COMPRA" | "S" | "E" | "SUFICIENTE" | "SEM_SUGESTAO";
+  type: "COMPRA" | "S" | "E" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
   /** Dados para tooltip do critério S */
   sData?: { mediaVendasMes: number; mesesHistoricoFilial: number; estoqueAtual: number; limiteDias: number };
   transitTotal?: number;
@@ -255,6 +255,9 @@ function getSuggestionListaLojaRule(item: ProdutoSugestaoMin): SuggestionResult 
       }
     }
   }
+
+  // Regra NM: necessidade mínima — estoque zerado com pelo menos 3 vendas nos últimos 12 meses
+  if (estoqueAtual <= 0 && getQtde12mBaseMin(item) >= 3) return { qty: 1, type: "NM" };
 
   return { qty: 0, type: "SEM_SUGESTAO" };
 }

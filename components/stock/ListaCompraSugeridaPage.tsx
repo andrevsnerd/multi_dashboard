@@ -104,7 +104,7 @@ interface ProdutoComCurva extends ProdutoSugestao {
   sugestaoView?: SuggestionView;
 }
 
-type SuggestionType = "COMPRA" | "S" | "E" | "SUFICIENTE" | "SEM_SUGESTAO";
+type SuggestionType = "COMPRA" | "S" | "E" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
 
 interface SuggestionView {
   type: SuggestionType;
@@ -471,6 +471,11 @@ function getSuggestionViewFromListaCompraRule(item: ProdutoSugestao, diasCorrido
     return { type: "E", qty: eInfo.qtd, qtdFinal: 0, qtdS: 0, qtdE: eInfo.qtd };
   }
 
+  // Regra NM: necessidade mínima — estoque zerado com pelo menos 3 vendas nos últimos 12 meses
+  if (estoqueAtual <= 0 && getQtde12mBase(item) >= 3) {
+    return { type: "NM", qty: 1, qtdFinal: 0, qtdS: 0, qtdE: 0 };
+  }
+
   return { type: "SEM_SUGESTAO", qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0 };
 }
 
@@ -738,7 +743,7 @@ export default function ListaCompraSugeridaPage({
           custoTotal: sugestaoQtd * (item.custoUnit ?? 0),
         };
       })
-      .filter((item) => item.sugestaoTipo === "COMPRA" || item.sugestaoTipo === "S" || item.sugestaoTipo === "E")
+      .filter((item) => item.sugestaoTipo === "COMPRA" || item.sugestaoTipo === "S" || item.sugestaoTipo === "E" || item.sugestaoTipo === "NM")
       .sort((a, b) => (b.sugestaoQtd ?? 0) - (a.sugestaoQtd ?? 0));
   }, [expandirPorCor, reposicaoComCusto, reposicaoAgrupadaPorProduto, reposicaoSuggestionMap, diasCorridosMes, comprasTransitoIndex]);
 
@@ -2057,6 +2062,37 @@ export default function ListaCompraSugeridaPage({
                                     <td className={styles.qtdSugerida}>
                                       {fmt(sugestaoView.qty)}
                                       <span className={styles.badgeE} style={{ marginLeft: 6 }}>E</span>
+                                      {sugestaoView.transitTotal ? (
+                                        <span className={styles.badgeT} style={{ marginLeft: 6 }}>
+                                          T {fmt(sugestaoView.transitTotal)}
+                                        </span>
+                                      ) : null}
+                                    </td>
+                                  );
+                                }
+                                if (sugestaoView.type === "NM" && sugestaoView.qty > 0) {
+                                  return (
+                                    <td className={styles.qtdSugerida}>
+                                      {fmt(sugestaoView.qty)}
+                                      <span
+                                        title="Necessidade Mínima: estoque zerado com vendas nos últimos 12 meses."
+                                        style={{
+                                          marginLeft: 6,
+                                          display: "inline-flex",
+                                          padding: "0 5px",
+                                          height: 16,
+                                          borderRadius: "999px",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          fontSize: 10,
+                                          fontWeight: 800,
+                                          color: "#fff",
+                                          background: "#7c3aed",
+                                          border: "1px solid #6d28d9",
+                                          verticalAlign: "middle",
+                                          cursor: "help",
+                                        }}
+                                      >NM</span>
                                       {sugestaoView.transitTotal ? (
                                         <span className={styles.badgeT} style={{ marginLeft: 6 }}>
                                           T {fmt(sugestaoView.transitTotal)}

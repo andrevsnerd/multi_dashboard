@@ -190,26 +190,29 @@ function getReposicaoCompraView(
 
   if (qtdFinal > 0) {
     if (qtdS > 0 && qtdFinal < 0.6 * qtdS) {
-      return { qtdFinal: Math.round(0.8 * qtdS + 0.4 * qtdFinal), qtdS: 0, qtdE: 0, qtdSuficiente: false };
+      return { qtdFinal: Math.round(0.8 * qtdS + 0.4 * qtdFinal), qtdS: 0, qtdE: 0, qtdNM: 0, qtdSuficiente: false };
     }
-    return { qtdFinal, qtdS: 0, qtdE: 0, qtdSuficiente: false };
+    return { qtdFinal, qtdS: 0, qtdE: 0, qtdNM: 0, qtdSuficiente: false };
   }
-  if (qtdSuficiente) return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdSuficiente: true };
-  if (sEligivel && qtdS > 0) return { qtdFinal: 0, qtdS, qtdE: 0, qtdSuficiente: false };
+  if (qtdSuficiente) return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdNM: 0, qtdSuficiente: true };
+  if (sEligivel && qtdS > 0) return { qtdFinal: 0, qtdS, qtdE: 0, qtdNM: 0, qtdSuficiente: false };
   const eInfo = calcQtdSugestaoEInfo(item);
-  if (eInfo) return { qtdFinal: 0, qtdS: 0, qtdE: eInfo.qtd, qtdSuficiente: false };
-  return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdSuficiente: false };
+  if (eInfo) return { qtdFinal: 0, qtdS: 0, qtdE: eInfo.qtd, qtdNM: 0, qtdSuficiente: false };
+  const qtdNM = estoqueAtual <= 0 && Number(item.qtde12m ?? 0) >= 3 ? 1 : 0;
+  return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdNM, qtdSuficiente: false };
 }
 
 function getReposicaoBaseType(sugestao: {
   qtdFinal: number;
   qtdS: number;
   qtdE: number;
+  qtdNM?: number;
   qtdSuficiente: boolean;
-}): "COMPRA" | "S" | "E" | "SUFICIENTE" | "SEM_SUGESTAO" {
+}): "COMPRA" | "S" | "E" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO" {
   if (sugestao.qtdFinal > 0) return "COMPRA";
   if (sugestao.qtdS > 0) return "S";
   if (sugestao.qtdE > 0) return "E";
+  if ((sugestao.qtdNM ?? 0) > 0) return "NM";
   if (sugestao.qtdSuficiente) return "SUFICIENTE";
   return "SEM_SUGESTAO";
 }
@@ -393,7 +396,13 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
       const sugestao = getReposicaoCompraView(compraItem, diasCorridosMes);
       const baseType = getReposicaoBaseType(sugestao);
       const baseQty =
-        sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS > 0 ? sugestao.qtdS : sugestao.qtdE;
+        sugestao.qtdFinal > 0
+          ? sugestao.qtdFinal
+          : sugestao.qtdS > 0
+            ? sugestao.qtdS
+            : sugestao.qtdE > 0
+              ? sugestao.qtdE
+              : sugestao.qtdNM;
       const transit = applyTransitToSuggestion({
         baseType,
         baseQty,
@@ -408,6 +417,7 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
       if (transit.qty > 0) {
         if (baseType === "S") suggestion = { text: `S ${fmt(transit.qty)}`, tone: "s" };
         else if (baseType === "E") suggestion = { text: `E ${fmt(transit.qty)}`, tone: "e" };
+        else if (baseType === "NM") suggestion = { text: `NM ${fmt(transit.qty)}`, tone: "buy" };
         else suggestion = { text: fmt(transit.qty), tone: "buy" };
       } else if (baseType === "SUFICIENTE" || transit.suppressedByTransit) {
         suggestion = { text: "Quantidade suficiente", tone: "ok" };

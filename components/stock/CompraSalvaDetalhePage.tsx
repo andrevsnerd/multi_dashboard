@@ -216,6 +216,9 @@ function calcularSugestaoCompleto(
     }
   }
 
+  // Regra NM: necessidade mínima — estoque zerado com pelo menos 3 vendas nos últimos 12 meses
+  if (estoqueAtual <= 0 && qtde12m >= 3) return 1;
+
   return null;
 }
 
@@ -255,7 +258,7 @@ function calcularSugestaoCompletoComTransito(
   const sEligivel = mediaVendasMes >= 1 && estoqueAtual <= mediaVendasMes * 2;
   const qtdS = sEligivel ? Math.max(0, Math.ceil((limiteDias / 30) * mediaVendasMes)) : 0;
 
-  let baseType: "COMPRA" | "S" | "E" | "SUFICIENTE" | "SEM_SUGESTAO" = "SEM_SUGESTAO";
+  let baseType: "COMPRA" | "S" | "E" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO" = "SEM_SUGESTAO";
   let baseQty = 0;
 
   if (consumoDiario > 0 && duracaoAtual < limiteDias) {
@@ -289,6 +292,12 @@ function calcularSugestaoCompletoComTransito(
         baseQty = Math.max(1, Math.ceil((limiteDias / 30) * velocidadeAjustada));
       }
     }
+  }
+
+  // Regra NM: necessidade mínima — estoque zerado com pelo menos 3 vendas nos últimos 12 meses
+  if (baseQty <= 0 && estoqueAtual <= 0 && qtde12m >= 3) {
+    baseType = "NM";
+    baseQty = 1;
   }
 
   const transit = applyTransitToSuggestion({
@@ -793,12 +802,18 @@ export default function CompraSalvaDetalhePage({
       params.set("company", companyKey);
       params.set("produto", produto);
       if (cor) params.set("corProduto", cor);
-      void fetchVendasPorFilialItem(params)
-        .then((data) => {
-          const norm = normalizeVendasPorFilialParaExibicao(companyKey, data);
+      void Promise.all([
+        fetchVendasPorFilialItem(params),
+        fetchEstoquePorFilial(params),
+      ])
+        .then(([vendasData, estoqueData]) => {
+          const norm = normalizeVendasPorFilialParaExibicao(companyKey, vendasData);
           setVendasPorFilialCache((p) => ({ ...p, [cacheKey]: norm }));
+          setEstoquePorFilialCache((p) => ({ ...p, [cacheKey]: estoqueData }));
         })
-        .catch(() => setVendasPorFilialCache((p) => ({ ...p, [cacheKey]: [] })));
+        .catch(() => {
+          setVendasPorFilialCache((p) => ({ ...p, [cacheKey]: [] }));
+        });
     });
   }, [doc, items, expandirPorCor, companyKey, vendasRefreshKey]);
 
@@ -947,7 +962,7 @@ export default function CompraSalvaDetalhePage({
           .map(([label, qty]) => `${label}: ${fmt2(qty)}`)
           .join(" · ");
       } else {
-        destino = vendasRows !== undefined ? textoDestinoCompraFinal(effectiveQtdManual, vendasRows, companyKey) : "";
+        destino = vendasRows !== undefined ? textoDestinoCompraFinal(effectiveQtdManual, vendasRows, companyKey, estoquePorFilialCache[vendasKey]) : "";
       }
       return {
         PRODUTO: it.produto,
@@ -1251,14 +1266,15 @@ export default function CompraSalvaDetalhePage({
                     const corK = expandirPorCor ? ((it.corProduto ?? "").trim() || undefined) : undefined;
                     const vendasKey = `${produtoK}||${corK ?? ""}`;
                     const vendasRowsK = vendasPorFilialCache[vendasKey];
+                    const estoqueRowsK = estoquePorFilialCache[vendasKey];
                     const partesDestino =
                       vendasRowsK === undefined
                         ? undefined
-                        : partesDestinoCompraFinal(effectiveQtdManual, vendasRowsK, companyKey);
+                        : partesDestinoCompraFinal(effectiveQtdManual, vendasRowsK, companyKey, estoqueRowsK);
                     const partesDestinoSugerido =
                       vendasRowsK === undefined || qtdSugerida === null
                         ? undefined
-                        : partesDestinoCompraFinal(qtdSugerida, vendasRowsK, companyKey);
+                        : partesDestinoCompraFinal(qtdSugerida, vendasRowsK, companyKey, estoqueRowsK);
                     return (
                       <tr key={it.itemKey}>
                         <td>
