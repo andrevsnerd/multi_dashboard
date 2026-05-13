@@ -5,7 +5,7 @@ import {
   type CompanyKey,
 } from "@/lib/config/company";
 
-export type DestinoCompraFinalParte = { label: string; qtd: number };
+export type DestinoCompraFinalParte = { label: string; qtd: number; isNM?: boolean };
 
 function normalizeFilialKey(s?: string | null) {
   return (s ?? "")
@@ -64,8 +64,10 @@ export function partesDestinoCompraFinal(
   const qtdReservadaNM = Math.min(nmFiliais.length, qtdManual);
   const qtdRestante = qtdManual - qtdReservadaNM;
 
-  // Acumulador final: começa com as reservas NM
-  const resultado = new Map<string, number>(nmFiliais.map((f) => [f, 1]));
+  // Acumulador final: começa com as reservas NM (marcadas)
+  const resultado = new Map<string, { qtd: number; isNM: boolean }>(
+    nmFiliais.map((f) => [f, { qtd: 1, isNM: true }])
+  );
 
   // Distribui o restante proporcionalmente por demanda entre todas as filiais
   if (qtdRestante > 0) {
@@ -91,7 +93,10 @@ export function partesDestinoCompraFinal(
       );
       for (const p of pisos) {
         const qtdExtra = p.piso + (boost.has(p.filial) ? 1 : 0);
-        if (qtdExtra > 0) resultado.set(p.filial, (resultado.get(p.filial) ?? 0) + qtdExtra);
+        if (qtdExtra > 0) {
+          const prev = resultado.get(p.filial);
+          resultado.set(p.filial, { qtd: (prev?.qtd ?? 0) + qtdExtra, isNM: prev?.isNM ?? false });
+        }
       }
     }
   } else if (qtdReservadaNM === 0) {
@@ -99,7 +104,7 @@ export function partesDestinoCompraFinal(
   }
 
   const partes: DestinoCompraFinalParte[] = Array.from(resultado.entries())
-    .map(([label, qtd]) => ({ label, qtd }))
+    .map(([label, { qtd, isNM }]) => ({ label, qtd, isNM: isNM || undefined }))
     .filter((r) => r.qtd > 0);
 
   partes.sort((a, b) => compareFilialDisplayOrder(a.label, b.label, cfg));
