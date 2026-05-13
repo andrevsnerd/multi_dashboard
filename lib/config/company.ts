@@ -242,6 +242,13 @@ function normalizeFilialNameForMatch(s: string): string {
     .replace(/\s+/g, ' ');
 }
 
+export function normalizeFilialLookupKey(rawFilial: string): string {
+  return normalizeFilialNameForMatch(rawFilial)
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 /** Nome curto da filial como na dashboard (E-COMMERCE, PAULISTA, MATRIZ, …). */
 function findActiveRule(company: CompanyConfig, filial: string): string | null {
   const normalizedFilial = normalizeFilialNameForMatch(filial).toUpperCase();
@@ -383,6 +390,20 @@ export function aggregateVendasPorFilialByDisplayLabel<
     filial,
     qtde12m: v.qtde12m,
     qtde60d: v.qtde60d,
+  })) as T[];
+}
+
+export function aggregateEstoquePorFilialByDisplayLabel<
+  T extends { filial: string; estoque: number },
+>(rows: T[], company: CompanyConfig | null | undefined): T[] {
+  const acc = new Map<string, number>();
+  for (const row of rows) {
+    const label = getFilialLabelForDisplay(company, row.filial);
+    acc.set(label, (acc.get(label) ?? 0) + Number(row.estoque ?? 0));
+  }
+  return Array.from(acc.entries()).map(([filial, estoque]) => ({
+    filial,
+    estoque,
   })) as T[];
 }
 

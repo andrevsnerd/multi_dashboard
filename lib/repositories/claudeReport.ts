@@ -576,20 +576,23 @@ async function querySalesRows(
               MAX(UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), ''))))) AS GRADE,
               ISNULL(vp.COR_PRODUTO, '') AS COR,
               MAX(ISNULL(COALESCE(cb.DESC_COR, vp.DESC_COR_PRODUTO), '')) AS COR_DESCRICAO,
-              MAX(ISNULL(pbsel.CODIGO_BARRA, '')) AS CODIGO_BARRA,
+              ISNULL(pbsel.CODIGO_BARRA, '') AS CODIGO_BARRA,
               SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS QTDE,
               SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) AS RECEITA
             FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
             LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO
             LEFT JOIN CORES_BASICAS cb WITH (NOLOCK) ON cb.COR = vp.COR_PRODUTO
-            OUTER APPLY (
-              SELECT TOP 1 pb.CODIGO_BARRA
+            LEFT JOIN (
+              SELECT
+                pb.PRODUTO,
+                ISNULL(pb.COR_PRODUTO, '') AS COR_PRODUTO,
+                MIN(pb.CODIGO_BARRA) AS CODIGO_BARRA
               FROM PRODUTOS_BARRA pb WITH (NOLOCK)
-              WHERE pb.PRODUTO = vp.PRODUTO
-                AND ISNULL(pb.CODIGO_BARRA, '') <> ''
-                AND ISNULL(pb.COR_PRODUTO, '') = ISNULL(vp.COR_PRODUTO, '')
-              ORDER BY pb.CODIGO_BARRA
+              WHERE ISNULL(pb.CODIGO_BARRA, '') <> ''
+              GROUP BY pb.PRODUTO, ISNULL(pb.COR_PRODUTO, '')
             ) pbsel
+              ON pbsel.PRODUTO = vp.PRODUTO
+             AND pbsel.COR_PRODUTO = ISNULL(vp.COR_PRODUTO, '')
             WHERE vp.DATA_VENDA >= @posStart
               AND vp.DATA_VENDA < @posEnd
               AND vp.QTDE > 0
@@ -602,7 +605,8 @@ async function querySalesRows(
               ISNULL(vp.FILIAL, ''),
               ISNULL(vp.PRODUTO, ''),
               UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))),
-              ISNULL(vp.COR_PRODUTO, '')
+              ISNULL(vp.COR_PRODUTO, ''),
+              ISNULL(pbsel.CODIGO_BARRA, '')
             HAVING SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) > 0
           `;
 
@@ -652,7 +656,7 @@ async function querySalesRows(
               MAX(UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), ''))))) AS GRADE,
               ISNULL(fp.COR_PRODUTO, '') AS COR,
               MAX(ISNULL(cb.DESC_COR, '')) AS COR_DESCRICAO,
-              MAX(ISNULL(pbsel.CODIGO_BARRA, '')) AS CODIGO_BARRA,
+              ISNULL(pbsel.CODIGO_BARRA, '') AS CODIGO_BARRA,
               SUM(CASE WHEN fp.QTDE > 0 THEN fp.QTDE ELSE 0 END) AS QTDE,
               SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS RECEITA
             FROM FATURAMENTO f WITH (NOLOCK)
@@ -660,14 +664,17 @@ async function querySalesRows(
               ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
             LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
             LEFT JOIN CORES_BASICAS cb WITH (NOLOCK) ON cb.COR = fp.COR_PRODUTO
-            OUTER APPLY (
-              SELECT TOP 1 pb.CODIGO_BARRA
+            LEFT JOIN (
+              SELECT
+                pb.PRODUTO,
+                ISNULL(pb.COR_PRODUTO, '') AS COR_PRODUTO,
+                MIN(pb.CODIGO_BARRA) AS CODIGO_BARRA
               FROM PRODUTOS_BARRA pb WITH (NOLOCK)
-              WHERE pb.PRODUTO = fp.PRODUTO
-                AND ISNULL(pb.CODIGO_BARRA, '') <> ''
-                AND ISNULL(pb.COR_PRODUTO, '') = ISNULL(fp.COR_PRODUTO, '')
-              ORDER BY pb.CODIGO_BARRA
+              WHERE ISNULL(pb.CODIGO_BARRA, '') <> ''
+              GROUP BY pb.PRODUTO, ISNULL(pb.COR_PRODUTO, '')
             ) pbsel
+              ON pbsel.PRODUTO = fp.PRODUTO
+             AND pbsel.COR_PRODUTO = ISNULL(fp.COR_PRODUTO, '')
             WHERE CAST(f.EMISSAO AS DATE) >= CAST(@ecomStart AS DATE)
               AND CAST(f.EMISSAO AS DATE) < CAST(@ecomEnd AS DATE)
               AND f.NOTA_CANCELADA = 0
@@ -682,7 +689,8 @@ async function querySalesRows(
               ISNULL(f.FILIAL, ''),
               ISNULL(fp.PRODUTO, ''),
               UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))),
-              ISNULL(fp.COR_PRODUTO, '')
+              ISNULL(fp.COR_PRODUTO, ''),
+              ISNULL(pbsel.CODIGO_BARRA, '')
             HAVING SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) > 0
           `;
 
@@ -1082,6 +1090,32 @@ export async function fetchClaudeReport({
   const selectedGrades = uniqueValues(grades);
   const gradeLabel = selectedGrades[0] ?? "MIX";
 
+  const suggestionRowsPromise = fetchTopProdutosUltimos3Meses({
+    company: "scarfme",
+    filial: filial ?? null,
+    colecoes: selectedColecoes,
+    subgrupos: selectedSubgrupos,
+    grades: selectedGrades,
+    qtdCompra: 100000,
+    porCor: true,
+    limit: 5000,
+    allowedFiliais: [...scope.posMembers, ...scope.ecommerceMembers],
+  }).catch((error) => {
+    console.warn("[fetchClaudeReport] Falha ao carregar sugestoes de compra; seguindo sem sugestoes.", error);
+    return [];
+  });
+
+  const collectionOptionsPromise = fetchAvailableColecoesWithDescriptions({
+    company: "scarfme",
+    range: normalizedRange,
+    filial: filial ?? null,
+    subgrupos: selectedSubgrupos,
+    grades: selectedGrades,
+  }).catch((error) => {
+    console.warn("[fetchClaudeReport] Falha ao carregar rotulos de colecao; usando valores crus.", error);
+    return [];
+  });
+
   const [salesRows, previousStoreRows, stockMap, suggestionRows, collectionOptions] = await Promise.all([
     querySalesRows(
       normalizedRange,
@@ -1100,24 +1134,8 @@ export async function fetchClaudeReport({
       scope.maps
     ),
     queryCurrentStock([...scope.posMembers, ...scope.ecommerceMembers], company),
-    fetchTopProdutosUltimos3Meses({
-      company: "scarfme",
-      filial: filial ?? null,
-      colecoes: selectedColecoes,
-      subgrupos: selectedSubgrupos,
-      grades: selectedGrades,
-      qtdCompra: 100000,
-      porCor: true,
-      limit: 5000,
-      allowedFiliais: [...scope.posMembers, ...scope.ecommerceMembers],
-    }),
-    fetchAvailableColecoesWithDescriptions({
-      company: "scarfme",
-      range: normalizedRange,
-      filial: filial ?? null,
-      subgrupos: selectedSubgrupos,
-      grades: selectedGrades,
-    }),
+    suggestionRowsPromise,
+    collectionOptionsPromise,
   ]);
 
   const collectionLabelMap = buildCollectionLabelMap(collectionOptions);

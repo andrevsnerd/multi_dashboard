@@ -22,6 +22,7 @@ import {
 } from "@/lib/client/compras-transito";
 import { formatDateForQuery } from "@/lib/utils/date";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
+import { calcNecessidadeMinimaQty } from "@/lib/utils/necessidade-minima";
 import FilialVendedoresTab from "./FilialVendedoresTab";
 import { exportCurvaAbcSimpleCsv } from "@/lib/utils/exportCurvaAbcSimpleCsv";
 import { exportCurvaAbcSimpleXlsx, type CurvaAbcSimpleXlsxRow } from "@/lib/utils/exportCurvaAbcSimpleXlsx";
@@ -376,7 +377,7 @@ function getReposicaoCompraView(
   if (eInfo) {
     return { qtdFinal: 0, qtdS: 0, qtdE: eInfo.qtd, qtdNM: 0, qtdSuficiente: false, semSugestao: false };
   }
-  const qtdNM = estoqueAtual <= 0 && Number(item.qtde12m ?? 0) >= 3 ? 1 : 0;
+  const qtdNM = calcNecessidadeMinimaQty({ estoqueAtual, qtde12m: Number(item.qtde12m ?? 0) });
   return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdNM, qtdSuficiente: false, semSugestao: qtdNM === 0 };
 }
 
@@ -1748,7 +1749,7 @@ const handleBadgeClick = (cat: string) => {
                                         <span className={styles.reporAdd}>
                                           {fmt(transit.qty)}{" "}
                                           <span
-                                            title="Necessidade Mínima: estoque zerado com vendas nos últimos 12 meses."
+                                            title={`Necessidade Mínima: estoque zerado e 1 unidade a cada 5 vendas nos últimos 12 meses. Sugestão atual: ${fmt(transit.qty)} unidade(s).`}
                                             style={{
                                               display: "inline-flex",
                                               padding: "0 5px",

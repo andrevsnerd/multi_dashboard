@@ -17,6 +17,7 @@ import {
   type CompraTransitoIndex,
 } from "@/lib/client/compras-transito";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
+import { calcNecessidadeMinimaQty } from "@/lib/utils/necessidade-minima";
 
 import styles from "./ProjecaoEstoquePage.module.css";
 
@@ -256,8 +257,9 @@ function getSuggestionListaLojaRule(item: ProdutoSugestaoMin): SuggestionResult 
     }
   }
 
-  // Regra NM: necessidade mínima — estoque zerado com pelo menos 3 vendas nos últimos 12 meses
-  if (estoqueAtual <= 0 && getQtde12mBaseMin(item) >= 3) return { qty: 1, type: "NM" };
+  // Regra NM: a cada 5 vendas em 12 meses = +1 com estoque zerado
+  const qtdNM = calcNecessidadeMinimaQty({ estoqueAtual, qtde12m: getQtde12mBaseMin(item) });
+  if (qtdNM > 0) return { qty: qtdNM, type: "NM" };
 
   return { qty: 0, type: "SEM_SUGESTAO" };
 }

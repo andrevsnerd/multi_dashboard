@@ -7,8 +7,10 @@ import { useAuth } from "@/components/auth/AuthContext";
 import { calculateTransfers } from "@/components/controle-transferencias/ControleTransferenciasTable";
 import ComprasSalvasListPanel from "@/components/stock/ComprasSalvasListPanel";
 import {
+  aggregateEstoquePorFilialByDisplayLabel,
   compareFilialDisplayOrder,
   getFilialLabelForDisplay,
+  normalizeFilialLookupKey,
   resolveCompany,
   type CompanyConfig,
   type CompanyKey,
@@ -22,6 +24,7 @@ import {
 } from "@/lib/client/compras-transito";
 import { exportListaLojaToXlsx } from "@/lib/utils/exportListaLoja";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
+import { calcNecessidadeMinimaQty } from "@/lib/utils/necessidade-minima";
 import type { CompraSalvaItemRow } from "@/lib/types/compra-salva";
 import type { ProdutoTransferencia } from "@/lib/repositories/controleTransferencias";
 
@@ -81,6 +84,11 @@ interface ListaItem {
   linha?: string | null;
   subgrupo?: string | null;
 }
+
+type FilialNecessidadeMinima = {
+  filial: string;
+  qtd: number;
+};
 
 type Curva = "A" | "B" | "C";
 
@@ -445,7 +453,7 @@ async function fetchVendasItemMetricas(
   codFilial: string | null,
   produto: string,
   corProduto: string | null
-): Promise<{ qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null; diasDesdeUltimaVenda: number | null; primeiraEntradaFilial: string | null; diasHistoricoFilial: number; mesesHistoricoFilial: number; historicoParcial: boolean; filiaisNM: string[] } | null> {
+): Promise<{ qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null; diasDesdeUltimaVenda: number | null; primeiraEntradaFilial: string | null; diasHistoricoFilial: number; mesesHistoricoFilial: number; historicoParcial: boolean; filiaisNM: FilialNecessidadeMinima[] } | null> {
   type VendasItemMetricasApiRow = {
     qtde12m: number;
     qtde60d: number;
@@ -481,12 +489,29 @@ async function fetchVendasItemMetricas(
       },
     });
     if (!metricas) return null;
+    const companyConfig = resolveCompany(companyKey);
     const estoqueMap = new Map<string, number>(
-      metricas.estoquePorFilial.map(e => [e.filial.trim(), e.estoque])
+      aggregateEstoquePorFilialByDisplayLabel(metricas.estoquePorFilial, companyConfig).map((e) => [
+        normalizeFilialLookupKey(e.filial),
+        e.estoque,
+      ])
     );
-    const filiaisNM = metricas.vendasPorFilial
-      .filter(v => (estoqueMap.get(v.filial.trim()) ?? 0) <= 0 && v.qtde12m >= 3)
-      .map(v => v.filial);
+    const filiaisNMMap = new Map<string, number>();
+    metricas.vendasPorFilial
+      .map((v) => {
+        const filialLabel = getFilialLabelForDisplay(companyConfig, v.filial);
+        const filialKey = normalizeFilialLookupKey(filialLabel);
+        const qtd = calcNecessidadeMinimaQty({
+          estoqueAtual: estoqueMap.get(filialKey) ?? 0,
+          qtde12m: v.qtde12m,
+        });
+        return qtd > 0 ? { filial: filialLabel, qtd } : null;
+      })
+      .filter((value): value is FilialNecessidadeMinima => value != null)
+      .forEach((value) => {
+        filiaisNMMap.set(value.filial, (filiaisNMMap.get(value.filial) ?? 0) + value.qtd);
+      });
+    const filiaisNM = Array.from(filiaisNMMap.entries()).map(([filial, qtd]) => ({ filial, qtd }));
     return {
       qtde12m: metricas.resumo.qtde12m,
       qtde60d: metricas.resumo.qtde60d,
@@ -1048,8 +1073,11 @@ function hasSugestaoE(item: ListaItem): boolean {
   return calcQtdSugestaoEInfo(item) !== null;
 }
 
-function needsNecessidadeMinima(item: { estoqueFilial?: number | null; qtde12m?: number | null }): boolean {
-  return Number(item.estoqueFilial ?? 0) <= 0 && Number(item.qtde12m ?? 0) >= 3;
+function getNecessidadeMinimaQty(item: { estoqueFilial?: number | null; qtde12m?: number | null }): number {
+  return calcNecessidadeMinimaQty({
+    estoqueAtual: item.estoqueFilial,
+    qtde12m: item.qtde12m,
+  });
 }
 
 function getReposicaoCompraView(item: ListaItem, diasCorridosMes: number): {
@@ -1088,7 +1116,7 @@ function getReposicaoCompraView(item: ListaItem, diasCorridosMes: number): {
   if (eInfo) {
     return { qtdFinal: 0, qtdS: 0, qtdE: eInfo.qtd, qtdNM: 0, qtdSuficiente: false, semSugestao: false };
   }
-  const qtdNM = needsNecessidadeMinima(item) ? 1 : 0;
+  const qtdNM = getNecessidadeMinimaQty(item);
   return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdNM, qtdSuficiente: false, semSugestao: qtdNM === 0 };
 }
 
@@ -1251,8 +1279,8 @@ function buildListaLojaExportRow(
     regra = "Qtd E = teto((limite de reposição em meses x velocidade ajustada)).";
     resumo = `Sugestão E de ${qtdCalculada} un. porque o item ficou cerca de ${formatFixed(mesesSemVenda ?? 0, 1)} meses sem venda e a velocidade ajustada é ${formatFixed(velocidadeAjustada ?? 0)} un./mês.`;
   } else if (sugestao.qtdNM > 0) {
-    regra = "Necessidade Mínima: estoque zerado com pelo menos 3 vendas nos últimos 12 meses.";
-    resumo = "Sugestão NM de 1 un. porque o estoque está zerado e o item teve vendas nos últimos 12 meses.";
+    regra = "Necessidade Mínima: estoque zerado e 1 unidade a cada 5 vendas nos últimos 12 meses.";
+    resumo = `Sugestão NM de ${qtdCalculada} un. porque o estoque está zerado e o item teve ${fmt(qtde12m ?? 0)} vendas nos últimos 12 meses.`;
   } else if (sugestao.qtdSuficiente) {
     regra = `Estoque atual já cobre o limite de ${limiteDias} dias.`;
     resumo = `Barrado porque o estoque atual já cobre o limite de ${limiteDias} dias.`;
@@ -1407,19 +1435,19 @@ interface ListaLojaPageProps {
 type Mode = "list" | "editor" | "saved-purchases";
 
 function NmBadgeAgregado({
-  filiaisLabels,
+  filiais,
   comCompra,
   onEnter,
   onLeave,
 }: {
-  filiaisLabels: string[];
+  filiais: FilialNecessidadeMinima[];
   comCompra: boolean;
-  onEnter: (e: React.MouseEvent, labels: string[]) => void;
+  onEnter: (e: React.MouseEvent, filiais: FilialNecessidadeMinima[]) => void;
   onLeave: () => void;
 }) {
   return (
     <span
-      onMouseEnter={(e) => { e.stopPropagation(); onEnter(e, filiaisLabels); }}
+      onMouseEnter={(e) => { e.stopPropagation(); onEnter(e, filiais); }}
       onMouseLeave={onLeave}
       style={{
         display: "inline-flex",
@@ -1597,7 +1625,7 @@ function ListaLojaItensTable({
   const [nmTooltipAgregado, setNmTooltipAgregado] = useState<null | {
     x: number;
     y: number;
-    filiaisLabels: string[];
+    filiais: FilialNecessidadeMinima[];
     total: number;
     comCompra: boolean;
     limiteDias?: number;
@@ -1622,7 +1650,7 @@ function ListaLojaItensTable({
         diasHistoricoFilial: number | null;
         mesesHistoricoFilial: number | null;
         historicoParcial: boolean | null;
-        filiaisNM: string[] | null;
+        filiaisNM: FilialNecessidadeMinima[] | null;
       }
     >
   >({});
@@ -1653,7 +1681,7 @@ function ListaLojaItensTable({
     diasHistoricoFilial: number | null;
     mesesHistoricoFilial: number | null;
     historicoParcial: boolean | null;
-    filiaisNM: string[] | null;
+    filiaisNM: FilialNecessidadeMinima[] | null;
   }): boolean {
     return Object.values(values).some((value) => value !== null && value !== undefined);
   }
@@ -2386,7 +2414,7 @@ function ListaLojaItensTable({
                         }
                         onMouseLeave={() => setSugestaoTooltip(null)}
                       >
-                        {fmt(transit.qty)}{blendAplicado && <>{" "}<span style={{ display: "inline-flex", width: 16, height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#0f172a", background: "#fde047", border: "1px solid #facc15", verticalAlign: "middle", cursor: "help" }}>⚡</span></>}{transitBadge}{filiaisNMAgregado.length > 0 && <NmBadgeAgregado filiaisLabels={filiaisNMAgregado.map(f => getFilialLabelForDisplay(companyConfig, f))} comCompra onEnter={(e, labels) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiaisLabels: labels, total: labels.length, comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
+                        {fmt(transit.qty)}{blendAplicado && <>{" "}<span style={{ display: "inline-flex", width: 16, height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#0f172a", background: "#fde047", border: "1px solid #facc15", verticalAlign: "middle", cursor: "help" }}>⚡</span></>}{transitBadge}{filiaisNMAgregado.length > 0 && <NmBadgeAgregado filiais={filiaisNMAgregado.map((f) => ({ filial: getFilialLabelForDisplay(companyConfig, f.filial), qtd: f.qtd }))} comCompra onEnter={(e, filiais) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiais, total: filiais.reduce((sum, filial) => sum + filial.qtd, 0), comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
                       </span>
                     );
                   }
@@ -2428,7 +2456,7 @@ function ListaLojaItensTable({
                         >
                           S
                         </span>
-                        {transitBadge}{filiaisNMAgregado.length > 0 && <NmBadgeAgregado filiaisLabels={filiaisNMAgregado.map(f => getFilialLabelForDisplay(companyConfig, f))} comCompra onEnter={(e, labels) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiaisLabels: labels, total: labels.length, comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
+                        {transitBadge}{filiaisNMAgregado.length > 0 && <NmBadgeAgregado filiais={filiaisNMAgregado.map((f) => ({ filial: getFilialLabelForDisplay(companyConfig, f.filial), qtd: f.qtd }))} comCompra onEnter={(e, filiais) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiais, total: filiais.reduce((sum, filial) => sum + filial.qtd, 0), comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
                       </span>
                     );
                   }
@@ -2481,7 +2509,7 @@ function ListaLojaItensTable({
                         >
                           E
                         </span>
-                        {transitBadge}{filiaisNMAgregado.length > 0 && <NmBadgeAgregado filiaisLabels={filiaisNMAgregado.map(f => getFilialLabelForDisplay(companyConfig, f))} comCompra onEnter={(e, labels) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiaisLabels: labels, total: labels.length, comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
+                        {transitBadge}{filiaisNMAgregado.length > 0 && <NmBadgeAgregado filiais={filiaisNMAgregado.map((f) => ({ filial: getFilialLabelForDisplay(companyConfig, f.filial), qtd: f.qtd }))} comCompra onEnter={(e, filiais) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiais, total: filiais.reduce((sum, filial) => sum + filial.qtd, 0), comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
                       </span>
                     );
                   }
@@ -2492,9 +2520,9 @@ function ListaLojaItensTable({
                     }
                     return (
                       <span className={styles.reporAdd}>
-                        1{" "}
+                        {fmt(transit.qty)}{" "}
                         <span
-                          title="Necessidade Mínima: estoque zerado com vendas nos últimos 12 meses. Sugestão: comprar 1 unidade."
+                          title={`Necessidade Mínima: estoque zerado e 1 unidade a cada 5 vendas nos últimos 12 meses. Sugestão atual: ${fmt(transit.qty)} unidade(s).`}
                           style={{
                             display: "inline-flex",
                             padding: "0 5px",
@@ -2548,8 +2576,8 @@ function ListaLojaItensTable({
                     );
                   }
                   if (filiaisNMAgregado.length > 0 && baseType !== "COMPRA" && baseType !== "S" && baseType !== "E") {
-                    const filiaisLabels = filiaisNMAgregado.map(f => getFilialLabelForDisplay(companyConfig, f));
-                    const totalNM = filiaisNMAgregado.length;
+                    const filiais = filiaisNMAgregado.map((f) => ({ filial: getFilialLabelForDisplay(companyConfig, f.filial), qtd: f.qtd }));
+                    const totalNM = filiais.reduce((sum, filial) => sum + filial.qtd, 0);
                     const nmVendasMes = Number(vendasMesAtual ?? 0);
                     const nmConsumoDiario = diasCorridosMes > 0 ? nmVendasMes / diasCorridosMes : 0;
                     const nmEstoque = Number(estoqueFilial ?? 0);
@@ -2557,7 +2585,7 @@ function ListaLojaItensTable({
                     return (
                       <span
                         className={styles.reporAdd}
-                        onMouseEnter={(e) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiaisLabels, total: totalNM, comCompra: false, limiteDias, duracaoAtual: nmDuracao })}
+                        onMouseEnter={(e) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiais, total: totalNM, comCompra: false, limiteDias, duracaoAtual: nmDuracao })}
                         onMouseLeave={() => setNmTooltipAgregado(null)}
                       >
                         {fmt(totalNM)}{" "}
@@ -2943,12 +2971,12 @@ function ListaLojaItensTable({
           )}
           <div className={styles.metricTooltipDivider} />
           <div className={styles.metricTooltipLine} style={{ color: "#94a3b8", fontSize: 11 }}>
-            Filiais com estoque zerado e ≥ 3 vendas nos últimos 12 meses:
+            Filiais com estoque zerado e reserva de 1 unidade a cada 5 vendas nos últimos 12 meses:
           </div>
-          {nmTooltipAgregado.filiaisLabels.map((label) => (
-            <div key={label} className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 24 }}>
-              <span>{label}</span>
-              <span style={{ fontWeight: 600 }}>1 un</span>
+          {nmTooltipAgregado.filiais.map((filial) => (
+            <div key={filial.filial} className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 24 }}>
+              <span>{filial.filial}</span>
+              <span style={{ fontWeight: 600 }}>{fmt(filial.qtd)} un</span>
             </div>
           ))}
           <div className={styles.metricTooltipDivider} />

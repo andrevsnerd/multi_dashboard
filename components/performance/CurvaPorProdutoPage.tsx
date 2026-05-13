@@ -22,6 +22,7 @@ import {
 } from "@/lib/performance/curvaPorProduto";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
 import { formatDateForQuery } from "@/lib/utils/date";
+import { calcNecessidadeMinimaQty } from "@/lib/utils/necessidade-minima";
 import { exportCurvaPorProdutoCsv } from "@/lib/utils/exportCurvaPorProdutoCsv";
 import { exportCurvaPorProdutoXlsx } from "@/lib/utils/exportCurvaPorProdutoXlsx";
 
@@ -198,7 +199,7 @@ function getReposicaoCompraView(
   if (sEligivel && qtdS > 0) return { qtdFinal: 0, qtdS, qtdE: 0, qtdNM: 0, qtdSuficiente: false };
   const eInfo = calcQtdSugestaoEInfo(item);
   if (eInfo) return { qtdFinal: 0, qtdS: 0, qtdE: eInfo.qtd, qtdNM: 0, qtdSuficiente: false };
-  const qtdNM = estoqueAtual <= 0 && Number(item.qtde12m ?? 0) >= 3 ? 1 : 0;
+  const qtdNM = calcNecessidadeMinimaQty({ estoqueAtual, qtde12m: Number(item.qtde12m ?? 0) });
   return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdNM, qtdSuficiente: false };
 }
 

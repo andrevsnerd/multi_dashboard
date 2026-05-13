@@ -18,6 +18,7 @@ import {
   textoDestinoCompraFinal,
   type DestinoCompraFinalParte,
 } from "@/lib/utils/compra-final-destino";
+import { calcNecessidadeMinimaQty } from "@/lib/utils/necessidade-minima";
 import { fetchControleEstoqueItemMetricasClient } from "@/lib/client/controle-estoque-metricas";
 import {
   buildCompraTransitoIndex,
@@ -216,8 +217,9 @@ function calcularSugestaoCompleto(
     }
   }
 
-  // Regra NM: necessidade mínima — estoque zerado com pelo menos 3 vendas nos últimos 12 meses
-  if (estoqueAtual <= 0 && qtde12m >= 3) return 1;
+  // Regra NM: a cada 5 vendas em 12 meses = +1 com estoque zerado
+  const qtdNM = calcNecessidadeMinimaQty({ estoqueAtual, qtde12m });
+  if (qtdNM > 0) return qtdNM;
 
   return null;
 }
@@ -294,10 +296,11 @@ function calcularSugestaoCompletoComTransito(
     }
   }
 
-  // Regra NM: necessidade mínima — estoque zerado com pelo menos 3 vendas nos últimos 12 meses
-  if (baseQty <= 0 && estoqueAtual <= 0 && qtde12m >= 3) {
+  // Regra NM: a cada 5 vendas em 12 meses = +1 com estoque zerado
+  const qtdNM = calcNecessidadeMinimaQty({ estoqueAtual, qtde12m });
+  if (baseQty <= 0 && qtdNM > 0) {
     baseType = "NM";
-    baseQty = 1;
+    baseQty = qtdNM;
   }
 
   const transit = applyTransitToSuggestion({
@@ -450,7 +453,7 @@ function DestinoCompraFinalBadges({ partes }: { partes: DestinoCompraFinalParte[
             key={p.label}
             className={styles.destinoFilialBadge}
             style={{ background: t.bg, color: t.fg, borderColor: t.border }}
-            title={p.isNM ? "Necessidade Mínima: 1 unidade reservada para esta filial (estoque zerado com vendas nos últimos 12 meses)" : undefined}
+            title={p.isNM ? `Necessidade Mínima: ${fmt(p.nmQty ?? 0)} unidade(s) reservada(s) para esta filial (1 a cada 5 vendas nos últimos 12 meses, com estoque zerado)` : undefined}
           >
             <span className={styles.destinoFilialBadgeName}>{p.label}</span>
             <span className={styles.destinoFilialBadgeNum}>{fmt(p.qtd)}</span>

@@ -17,6 +17,7 @@ import {
   textoDestinoCompraFinal,
   type DestinoCompraFinalParte,
 } from "@/lib/utils/compra-final-destino";
+import { calcNecessidadeMinimaQty } from "@/lib/utils/necessidade-minima";
 import { fetchControleEstoqueItemMetricasClient } from "@/lib/client/controle-estoque-metricas";
 import {
   buildCompraTransitoIndex,
@@ -471,9 +472,10 @@ function getSuggestionViewFromListaCompraRule(item: ProdutoSugestao, diasCorrido
     return { type: "E", qty: eInfo.qtd, qtdFinal: 0, qtdS: 0, qtdE: eInfo.qtd };
   }
 
-  // Regra NM: necessidade mínima — estoque zerado com pelo menos 3 vendas nos últimos 12 meses
-  if (estoqueAtual <= 0 && getQtde12mBase(item) >= 3) {
-    return { type: "NM", qty: 1, qtdFinal: 0, qtdS: 0, qtdE: 0 };
+  // Regra NM: a cada 5 vendas em 12 meses = +1 com estoque zerado
+  const qtdNM = calcNecessidadeMinimaQty({ estoqueAtual, qtde12m: getQtde12mBase(item) });
+  if (qtdNM > 0) {
+    return { type: "NM", qty: qtdNM, qtdFinal: 0, qtdS: 0, qtdE: 0 };
   }
 
   return { type: "SEM_SUGESTAO", qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0 };
@@ -2075,7 +2077,7 @@ export default function ListaCompraSugeridaPage({
                                     <td className={styles.qtdSugerida}>
                                       {fmt(sugestaoView.qty)}
                                       <span
-                                        title="Necessidade Mínima: estoque zerado com vendas nos últimos 12 meses."
+                                        title={`Necessidade Mínima: estoque zerado e 1 unidade a cada 5 vendas nos últimos 12 meses. Sugestão atual: ${fmt(sugestaoView.qty)} unidade(s).`}
                                         style={{
                                           marginLeft: 6,
                                           display: "inline-flex",

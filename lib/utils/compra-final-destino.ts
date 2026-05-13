@@ -1,25 +1,19 @@
 import {
+  aggregateEstoquePorFilialByDisplayLabel,
   aggregateVendasPorFilialByDisplayLabel,
   compareFilialDisplayOrder,
+  normalizeFilialLookupKey,
   resolveCompany,
   type CompanyKey,
 } from "@/lib/config/company";
+import { calcNecessidadeMinimaQty } from "@/lib/utils/necessidade-minima";
 
-export type DestinoCompraFinalParte = { label: string; qtd: number; isNM?: boolean };
-
-function normalizeFilialKey(s?: string | null) {
-  return (s ?? "")
-    .toString()
-    .trim()
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "");
-}
+export type DestinoCompraFinalParte = { label: string; qtd: number; isNM?: boolean; nmQty?: number };
 
 /**
  * Demanda por filial com ajuste 60d; distribui apenas para filiais (exclui MATRIZ); sobra pelo maior resto.
- * Quando `estoquePorFilial` é fornecido, filiais com estoque ≤ 0 e qtde12m ≥ 3 (NM) recebem
- * garantidamente 1 unidade cada antes da distribuição proporcional do restante.
+ * Quando `estoquePorFilial` é fornecido, filiais com estoque zerado e NM positivo recebem
+ * a reserva mínima antes da distribuição proporcional do restante.
  */
 export function partesDestinoCompraFinal(
   qtdManual: number,
@@ -40,34 +34,39 @@ export function partesDestinoCompraFinal(
 
   // Exclui MATRIZ e, para ScarfMe, não distribui para Ibirapuera.
   const filiais = agregadas.filter((r) => {
-    const filialKey = normalizeFilialKey(r.filial);
+    const filialKey = normalizeFilialLookupKey(r.filial);
     if (filialKey === "MATRIZ") return false;
     if (companyKey === "scarfme" && filialKey.includes("IBIRAPUERA")) return false;
     return true;
   });
 
-  // Identifica filiais NM: estoque ≤ 0 E qtde12m ≥ 3
+  // Identifica filiais NM: a cada 5 vendas em 12m reserva +1 com estoque zerado
+  const estoqueAgregado = aggregateEstoquePorFilialByDisplayLabel(estoquePorFilial ?? [], cfg);
   const estoqueMap = new Map<string, number>(
-    (estoquePorFilial ?? []).map((e) => [normalizeFilialKey(e.filial), e.estoque])
+    estoqueAgregado.map((e) => [normalizeFilialLookupKey(e.filial), e.estoque])
   );
-  const nmSet = new Set<string>();
+  const nmReservas: Array<{ filial: string; qty: number }> = [];
   if (estoquePorFilial) {
     for (const f of filiais) {
-      const key = normalizeFilialKey(f.filial);
+      const key = normalizeFilialLookupKey(f.filial);
       const estoque = estoqueMap.get(key) ?? 0;
-      if (estoque <= 0 && f.qtde12m >= 3) nmSet.add(f.filial);
+      const qty = calcNecessidadeMinimaQty({ estoqueAtual: estoque, qtde12m: f.qtde12m });
+      if (qty > 0) nmReservas.push({ filial: f.filial, qty });
     }
   }
 
-  // Reserva 1 unidade para cada filial NM (se qtdManual comportar)
-  const nmFiliais = Array.from(nmSet);
-  const qtdReservadaNM = Math.min(nmFiliais.length, qtdManual);
+  // Reserva a quantidade NM por filial até o limite da compra manual.
+  let qtdReservadaNM = 0;
+  const resultado = new Map<string, { qtd: number; isNM: boolean; nmQty: number }>();
+  for (const reserva of nmReservas) {
+    const disponivel = qtdManual - qtdReservadaNM;
+    if (disponivel <= 0) break;
+    const alocada = Math.min(reserva.qty, disponivel);
+    if (alocada <= 0) continue;
+    resultado.set(reserva.filial, { qtd: alocada, isNM: true, nmQty: alocada });
+    qtdReservadaNM += alocada;
+  }
   const qtdRestante = qtdManual - qtdReservadaNM;
-
-  // Acumulador final: começa com as reservas NM (marcadas)
-  const resultado = new Map<string, { qtd: number; isNM: boolean }>(
-    nmFiliais.map((f) => [f, { qtd: 1, isNM: true }])
-  );
 
   // Distribui o restante proporcionalmente por demanda entre todas as filiais
   if (qtdRestante > 0) {
@@ -95,7 +94,11 @@ export function partesDestinoCompraFinal(
         const qtdExtra = p.piso + (boost.has(p.filial) ? 1 : 0);
         if (qtdExtra > 0) {
           const prev = resultado.get(p.filial);
-          resultado.set(p.filial, { qtd: (prev?.qtd ?? 0) + qtdExtra, isNM: prev?.isNM ?? false });
+          resultado.set(p.filial, {
+            qtd: (prev?.qtd ?? 0) + qtdExtra,
+            isNM: prev?.isNM ?? false,
+            nmQty: prev?.nmQty ?? 0,
+          });
         }
       }
     }
@@ -104,7 +107,12 @@ export function partesDestinoCompraFinal(
   }
 
   const partes: DestinoCompraFinalParte[] = Array.from(resultado.entries())
-    .map(([label, { qtd, isNM }]) => ({ label, qtd, isNM: isNM || undefined }))
+    .map(([label, { qtd, isNM, nmQty }]) => ({
+      label,
+      qtd,
+      isNM: isNM || undefined,
+      nmQty: nmQty > 0 ? nmQty : undefined,
+    }))
     .filter((r) => r.qtd > 0);
 
   partes.sort((a, b) => compareFilialDisplayOrder(a.label, b.label, cfg));
