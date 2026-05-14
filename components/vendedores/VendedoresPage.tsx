@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useSearchParams } from "next/navigation";
 
 import DateRangeFilter, {
   type DateRangeValue,
@@ -110,10 +118,29 @@ async function fetchVendedores(
   return json.data;
 }
 
+function parseDateRangeFromSearchParams(sp: {
+  get(name: string): string | null;
+}): DateRangeValue | null {
+  const startRaw = sp.get("start");
+  const endRaw = sp.get("end");
+  if (!startRaw || !endRaw) return null;
+  const startDate = new Date(startRaw);
+  const endDate = new Date(endRaw);
+  if (
+    Number.isNaN(startDate.getTime()) ||
+    Number.isNaN(endDate.getTime())
+  ) {
+    return null;
+  }
+  return { startDate, endDate };
+}
+
 export default function VendedoresPage({
   companyKey,
   companyName,
 }: VendedoresPageProps) {
+  const searchParams = useSearchParams();
+
   const initialRange = useMemo(() => {
     const end = new Date();
     const start = new Date();
@@ -122,7 +149,17 @@ export default function VendedoresPage({
   }, []);
 
   const [range, setRange] = useState<DateRangeValue>(initialRange);
+
   const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
+
+  useLayoutEffect(() => {
+    const fromUrl = parseDateRangeFromSearchParams(searchParams);
+    if (fromUrl) setRange(fromUrl);
+    if (searchParams.has("filial")) {
+      const f = searchParams.get("filial");
+      setSelectedFilial(f && f.trim() !== "" ? f.trim() : null);
+    }
+  }, [searchParams]);
   const [selectedGrupos, setSelectedGrupos] = useState<string[]>([]);
   const [selectedLinhas, setSelectedLinhas] = useState<string[]>([]);
   const [selectedColecoes, setSelectedColecoes] = useState<string[]>([]);

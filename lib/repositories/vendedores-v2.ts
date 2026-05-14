@@ -7,6 +7,10 @@
 import sql from 'mssql';
 import {
   resolveCompany,
+  getActiveFilial,
+  getFilialGroupMembers,
+  getFilialLabelForDisplay,
+  type CompanyConfig,
   type CompanyModule,
   VAREJO_VALUE,
 } from '@/lib/config/company';
@@ -16,7 +20,13 @@ import { normalizeRangeForQuery } from '@/lib/utils/date';
 
 export interface VendedorItem {
   vendedor: string;
+  /** Rótulo da filial (ex.: grupo "MORUMBI 1"); após agregação, é o nome do grupo. */
   filial: string;
+  /**
+   * Código ERP da filial para drill-down (detalhe do vendedor).
+   * Quando há agregação por grupo lógico, aponta para a filial ativa do grupo.
+   */
+  filialConsulta?: string;
   faturamento: number;
   faturamentoPrevious?: number;
   quantidadeVendida: number;
@@ -28,6 +38,124 @@ export interface VendedorItem {
   grupoMaisVendido?: string;
   linhaMaisVendida?: string;
   subgrupoMaisVendido?: string;
+}
+
+/**
+ * Une linhas do mesmo vendedor quando várias filiais ERP pertencem ao mesmo rótulo
+ * (grupos em filialDisplayNames / filialGroups). Soma métricas e recalcula participação
+ * na filial lógica; `filial` vira o rótulo e `filialConsulta` a filial ativa para detalhe.
+ */
+export function aggregateVendedoresByFilialLabel(
+  items: VendedorItem[],
+  company: CompanyConfig | null
+): VendedorItem[] {
+  if (!company || items.length === 0) return items;
+
+  type Bucket = {
+    vendedor: string;
+    label: string;
+    consulta: string;
+    faturamento: number;
+    quantidadeVendida: number;
+    tickets: number;
+    faturamentoPrevious: number;
+    hasPrev: boolean;
+    bestFat: number;
+    categoriaMaisVendida?: string;
+    grupoMaisVendido?: string;
+    linhaMaisVendida?: string;
+    subgrupoMaisVendido?: string;
+  };
+
+  const buckets = new Map<string, Bucket>();
+
+  for (const item of items) {
+    const rawFilial = (item.filial ?? '').trim();
+    const label = getFilialLabelForDisplay(company, rawFilial);
+    const consulta = (getActiveFilial(company, rawFilial) || rawFilial).trim();
+    const key = `${item.vendedor}\u0000${label}`;
+
+    const fat = item.faturamento ?? 0;
+    const prev = item.faturamentoPrevious;
+    const hasPrev = prev !== undefined && !Number.isNaN(prev);
+
+    const existing = buckets.get(key);
+    if (!existing) {
+      buckets.set(key, {
+        vendedor: item.vendedor,
+        label,
+        consulta,
+        faturamento: fat,
+        quantidadeVendida: item.quantidadeVendida ?? 0,
+        tickets: item.tickets ?? 0,
+        faturamentoPrevious: hasPrev ? (prev as number) : 0,
+        hasPrev,
+        bestFat: fat,
+        categoriaMaisVendida: item.categoriaMaisVendida,
+        grupoMaisVendido: item.grupoMaisVendido,
+        linhaMaisVendida: item.linhaMaisVendida,
+        subgrupoMaisVendido: item.subgrupoMaisVendido,
+      });
+      continue;
+    }
+
+    existing.faturamento += fat;
+    existing.quantidadeVendida += item.quantidadeVendida ?? 0;
+    existing.tickets += item.tickets ?? 0;
+    if (hasPrev) {
+      existing.faturamentoPrevious += prev as number;
+      existing.hasPrev = true;
+    }
+    if (fat > existing.bestFat) {
+      existing.bestFat = fat;
+      existing.categoriaMaisVendida = item.categoriaMaisVendida;
+      existing.grupoMaisVendido = item.grupoMaisVendido;
+      existing.linhaMaisVendida = item.linhaMaisVendida;
+      existing.subgrupoMaisVendido = item.subgrupoMaisVendido;
+    }
+  }
+
+  const merged: VendedorItem[] = Array.from(buckets.values()).map((b) => {
+    const tickets = b.tickets;
+    const ticketMedio = tickets > 0 ? b.faturamento / tickets : 0;
+    const quantidadePorTicket =
+      tickets > 0 ? b.quantidadeVendida / tickets : 0;
+
+    const row: VendedorItem = {
+      vendedor: b.vendedor,
+      filial: b.label,
+      filialConsulta: b.consulta,
+      faturamento: b.faturamento,
+      quantidadeVendida: b.quantidadeVendida,
+      tickets,
+      ticketMedio,
+      quantidadePorTicket,
+      participacaoFilial: 0,
+      categoriaMaisVendida: b.categoriaMaisVendida,
+      grupoMaisVendido: b.grupoMaisVendido,
+      linhaMaisVendida: b.linhaMaisVendida,
+      subgrupoMaisVendido: b.subgrupoMaisVendido,
+    };
+    if (b.hasPrev) {
+      row.faturamentoPrevious = b.faturamentoPrevious;
+    }
+    return row;
+  });
+
+  const totalByLabel = new Map<string, number>();
+  for (const m of merged) {
+    totalByLabel.set(
+      m.filial,
+      (totalByLabel.get(m.filial) ?? 0) + m.faturamento
+    );
+  }
+  for (const m of merged) {
+    const tot = totalByLabel.get(m.filial) ?? 0;
+    m.participacaoFilial = tot > 0 ? (m.faturamento / tot) * 100 : 0;
+  }
+
+  merged.sort((a, b) => b.faturamento - a.faturamento);
+  return merged;
 }
 
 export interface VendedorProdutoItem {
@@ -109,6 +237,38 @@ function buildListFilter(
   if (!nonEmpty.length) return '';
   nonEmpty.forEach((v, i) => request.input(`${paramBase}${i}`, sql.VarChar, v));
   return `AND ${fieldExpression} IN (${nonEmpty.map((_, i) => `@${paramBase}${i}`).join(', ')})`;
+}
+
+function buildDetailFilialFilter(
+  request: sql.Request | RequestLike,
+  companySlug: string | undefined,
+  filial: string,
+  fieldExpression: string,
+  paramBase: string
+): string {
+  const filialTrim = filial.trim();
+  if (!filialTrim) return '';
+
+  const company = resolveCompany(companySlug);
+  const filiais = company
+    ? Array.from(
+        new Set(
+          getFilialGroupMembers(company, filialTrim)
+            .map((item) => item.trim())
+            .filter(Boolean)
+        )
+      )
+    : [filialTrim];
+
+  filiais.forEach((item, index) => {
+    request.input(`${paramBase}${index}`, sql.VarChar, item);
+  });
+
+  if (filiais.length === 1) {
+    return `AND ${fieldExpression} = @${paramBase}0`;
+  }
+
+  return `AND ${fieldExpression} IN (${filiais.map((_, index) => `@${paramBase}${index}`).join(', ')})`;
 }
 
 /**
@@ -480,13 +640,19 @@ export async function fetchVendedorProdutoVendas(
   params: VendedorProdutoVendasParams
 ): Promise<VendedorProdutoVendaItem[]> {
   return withRequest(async (request) => {
-    const { vendedor, filial, produto, range } = params;
+    const { company, vendedor, filial, produto, range } = params;
 
     const { start, end } = normalizeRangeForQuery(range);
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
-    request.input('filial', sql.VarChar, filial);
     request.input('produto', sql.VarChar, produto);
+    const filialFilter = buildDetailFilialFilter(
+      request,
+      company,
+      filial,
+      'vp.FILIAL',
+      'filialVenda'
+    );
 
     // Resolve vendedor code(s) from LOJA_VENDEDORES (small table, fast)
     request.input('vendedorApelido', sql.VarChar, vendedor);
@@ -511,7 +677,7 @@ export async function fetchVendedorProdutoVendas(
       WHERE vp.DATA_VENDA >= @startDate
         AND vp.DATA_VENDA < @endDate
         AND vp.QTDE > 0
-        AND vp.FILIAL = @filial
+        ${filialFilter}
         AND vp.PRODUTO = @produto
         ${vendedorFilter}
       GROUP BY CONVERT(VARCHAR(10), vp.DATA_VENDA, 23), vp.COR_PRODUTO
@@ -559,12 +725,18 @@ export async function fetchVendedorClientesList(
   params: VendedorClientesListParams
 ): Promise<VendedorClienteItem[]> {
   return withRequest(async (request) => {
-    const { vendedor, filial, range } = params;
+    const { company, vendedor, filial, range } = params;
 
     const { start, end } = normalizeRangeForQuery(range);
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
-    request.input('filial', sql.VarChar, filial);
+    const filialFilter = buildDetailFilialFilter(
+      request,
+      company,
+      filial,
+      'LTRIM(RTRIM(cv.FILIAL))',
+      'filialCliente'
+    );
 
     // Resolve vendedor code(s) from LOJA_VENDEDORES
     request.input('vendedorApelido', sql.VarChar, vendedor);
@@ -593,7 +765,7 @@ export async function fetchVendedorClientesList(
       FROM CLIENTES_VAREJO cv WITH (NOLOCK)
       WHERE cv.CADASTRAMENTO >= @startDate
         AND cv.CADASTRAMENTO < @endDate
-        AND LTRIM(RTRIM(cv.FILIAL)) = @filial
+        ${filialFilter}
         ${vendedorFilter}
       ORDER BY cv.CADASTRAMENTO ASC, cv.CLIENTE_VAREJO ASC
     `;
@@ -647,12 +819,17 @@ export async function fetchClienteProdutosList(
 ): Promise<ClienteProdutoItem[]> {
   return withRequest(async (request) => {
     const { company, clienteNome, filial, range } = params;
-    void company;
 
     const { start, end } = normalizeRangeForQuery(range);
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
-    request.input('filial', sql.VarChar, filial);
+    const filialFilter = buildDetailFilialFilter(
+      request,
+      company,
+      filial,
+      'vp.FILIAL',
+      'filialClienteProduto'
+    );
     // W_CTB_LOJA_VENDA_PEDIDO.CLIENTE_VAREJO = nome do cliente (confirmado no script Python)
     request.input('clienteNome', sql.VarChar, clienteNome);
 
@@ -676,7 +853,7 @@ export async function fetchClienteProdutosList(
       WHERE vp.DATA_VENDA >= @startDate
         AND vp.DATA_VENDA < @endDate
         AND vp.QTDE > 0
-        AND vp.FILIAL = @filial
+        ${filialFilter}
         AND v.CLIENTE_VAREJO = @clienteNome
       GROUP BY vp.PRODUTO, vp.DESC_PRODUTO
       HAVING SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) END) > 0
@@ -735,7 +912,13 @@ export async function fetchVendedorProdutosList(
     const { start, end } = normalizeRangeForQuery(range);
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
-    request.input('filial', sql.VarChar, filial);
+    const filialFilter = buildDetailFilialFilter(
+      request,
+      company,
+      filial,
+      'vp.FILIAL',
+      'filialProduto'
+    );
 
     // Resolve vendedor code(s) from LOJA_VENDEDORES (small table, fast)
     request.input('vendedorApelido', sql.VarChar, vendedor);
@@ -808,7 +991,7 @@ export async function fetchVendedorProdutosList(
       WHERE vp.DATA_VENDA >= @startDate
         AND vp.DATA_VENDA < @endDate
         AND vp.QTDE > 0
-        AND vp.FILIAL = @filial
+        ${filialFilter}
         ${vendedorFilter}
         ${grupoFilter}
         ${linhaFilter}

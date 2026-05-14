@@ -148,12 +148,18 @@ export default function VendedoresTable({
     return `${parts[0]} ${parts[1]}`;
   };
 
-  const goToDetalhe = (vendedor: string, filial: string) => {
+  const filialParaDetalhe = (v: { filial: string; filialConsulta?: string }) =>
+    v.filialConsulta ?? v.filial;
+
+  const filialRotulo = (v: { filial: string; filialConsulta?: string }) =>
+    v.filialConsulta != null ? v.filial : getFilialDisplayName(v.filial);
+
+  const goToDetalhe = (vendedor: string, filialCodigo: string) => {
     if (!companyKey) return;
     const url = buildDetalheUrl(
       companyKey,
       vendedor,
-      filial,
+      filialCodigo,
       range.startDate,
       range.endDate
     );
@@ -282,11 +288,13 @@ export default function VendedoresTable({
                   className={styles.vendedorRow}
                   role="button"
                   tabIndex={0}
-                  onClick={() => goToDetalhe(vendedor.vendedor, vendedor.filial)}
+                  onClick={() =>
+                    goToDetalhe(vendedor.vendedor, filialParaDetalhe(vendedor))
+                  }
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      goToDetalhe(vendedor.vendedor, vendedor.filial);
+                      goToDetalhe(vendedor.vendedor, filialParaDetalhe(vendedor));
                     }
                   }}
                 >
@@ -321,7 +329,7 @@ export default function VendedoresTable({
                             })()}
                         </div>
                         <div className={styles.vendedorFilial}>
-                          {getFilialDisplayName(vendedor.filial)}
+                          {filialRotulo(vendedor)}
                         </div>
                       </div>
                     </div>
@@ -363,11 +371,13 @@ export default function VendedoresTable({
                 className={styles.card}
                 role="button"
                 tabIndex={0}
-                onClick={() => goToDetalhe(vendedor.vendedor, vendedor.filial)}
+                onClick={() =>
+                  goToDetalhe(vendedor.vendedor, filialParaDetalhe(vendedor))
+                }
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
-                    goToDetalhe(vendedor.vendedor, vendedor.filial);
+                    goToDetalhe(vendedor.vendedor, filialParaDetalhe(vendedor));
                   }
                 }}
               >
@@ -404,7 +414,7 @@ export default function VendedoresTable({
                           })()}
                       </div>
                       <div className={styles.cardVendedorFilial}>
-                        {getFilialDisplayName(vendedor.filial)}
+                        {filialRotulo(vendedor)}
                       </div>
                     </div>
                   </div>

@@ -8,6 +8,7 @@ export async function GET(
   { params }: { params: Promise<{ vendedor: string }> }
 ) {
   const { searchParams } = new URL(request.url);
+  const company = searchParams.get('company') ?? undefined;
   const filial = searchParams.get('filial');
   const produto = searchParams.get('produto');
   const startParam = searchParams.get('start');
@@ -29,6 +30,7 @@ export async function GET(
 
   try {
     const data = await fetchVendedorProdutoVendas({
+      company,
       vendedor,
       filial,
       produto,

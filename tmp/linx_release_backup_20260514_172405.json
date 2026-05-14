@@ -1,0 +1,482 @@
+{
+  "targets": [
+    [
+      "832149",
+      "NERD MORUMBI RDRX"
+    ],
+    [
+      "832151",
+      "NERD MORUMBI RDRX"
+    ],
+    [
+      "832154",
+      "NERD HIGIENOPOLIS"
+    ],
+    [
+      "832156",
+      "NERD HIGIENOPOLIS"
+    ],
+    [
+      "832157",
+      "NERD HIGIENOPOLIS"
+    ],
+    [
+      "832171",
+      "NERD ELDORADO"
+    ],
+    [
+      "832181",
+      "NERD MORUMBI RDRRX"
+    ],
+    [
+      "832182",
+      "NERD MORUMBI RDRRX"
+    ],
+    [
+      "832183",
+      "NERD MORUMBI RDRRX"
+    ],
+    [
+      "832184",
+      "NERD MORUMBI RDRRX"
+    ],
+    [
+      "832195",
+      "NERD HIGIENOPOLIS"
+    ],
+    [
+      "832196",
+      "NERD HIGIENOPOLIS"
+    ],
+    [
+      "832197",
+      "NERD HIGIENOPOLIS"
+    ],
+    [
+      "832217",
+      "NERD MORUMBI RDRX"
+    ],
+    [
+      "832218",
+      "NERD MORUMBI RDRX"
+    ],
+    [
+      "832255",
+      "NERD ELDORADO"
+    ],
+    [
+      "832309",
+      "NERD MORUMBI RDRRX"
+    ],
+    [
+      "832310",
+      "NERD MORUMBI RDRRX"
+    ],
+    [
+      "832311",
+      "NERD MORUMBI RDRRX"
+    ],
+    [
+      "832312",
+      "NERD MORUMBI RDRRX"
+    ],
+    [
+      "832313",
+      "NERD MORUMBI RDRRX"
+    ],
+    [
+      "832314",
+      "NERD MORUMBI RDRX"
+    ],
+    [
+      "832329",
+      "NERD VILLA LOBOS"
+    ],
+    [
+      "832330",
+      "NERD MORUMBI RDRX"
+    ],
+    [
+      "832340",
+      "NERD MORUMBI RDRX"
+    ],
+    [
+      "832343",
+      "NERD MORUMBI RDRX"
+    ],
+    [
+      "832348",
+      "NERD VILLA LOBOS"
+    ],
+    [
+      "832349",
+      "NERD VILLA LOBOS"
+    ]
+  ],
+  "pre": [
+    {
+      "romaneio": "832149",
+      "filial": "NERD MORUMBI RDRX",
+      "EMISSAO": "2026-05-08 14:19:43",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-08 14:19:43",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "2"
+    },
+    {
+      "romaneio": "832151",
+      "filial": "NERD MORUMBI RDRX",
+      "EMISSAO": "2026-05-08 14:20:21",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-08 14:20:21",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "2"
+    },
+    {
+      "romaneio": "832154",
+      "filial": "NERD HIGIENOPOLIS",
+      "EMISSAO": "2026-05-08 16:03:00",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-08 16:03:00",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "3"
+    },
+    {
+      "romaneio": "832156",
+      "filial": "NERD HIGIENOPOLIS",
+      "EMISSAO": "2026-05-08 16:03:41",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-08 16:03:41",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832157",
+      "filial": "NERD HIGIENOPOLIS",
+      "EMISSAO": "2026-05-08 16:03:53",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-08 16:03:53",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832171",
+      "filial": "NERD ELDORADO",
+      "EMISSAO": "2026-05-08 17:48:31",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-08 17:48:31",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "4"
+    },
+    {
+      "romaneio": "832181",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-09 00:50:55",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-09 00:50:55",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "15"
+    },
+    {
+      "romaneio": "832182",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-09 00:51:10",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-09 00:51:10",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "5"
+    },
+    {
+      "romaneio": "832183",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-09 00:51:27",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-09 00:51:27",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "2"
+    },
+    {
+      "romaneio": "832184",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-09 00:51:44",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-09 00:51:44",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "6"
+    },
+    {
+      "romaneio": "832195",
+      "filial": "NERD HIGIENOPOLIS",
+      "EMISSAO": "2026-05-09 19:42:49",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-09 19:42:49",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "3"
+    },
+    {
+      "romaneio": "832196",
+      "filial": "NERD HIGIENOPOLIS",
+      "EMISSAO": "2026-05-09 19:43:03",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-09 19:43:03",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "2"
+    },
+    {
+      "romaneio": "832197",
+      "filial": "NERD HIGIENOPOLIS",
+      "EMISSAO": "2026-05-09 19:43:52",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-09 19:43:52",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "2"
+    },
+    {
+      "romaneio": "832217",
+      "filial": "NERD MORUMBI RDRX",
+      "EMISSAO": "2026-05-11 17:13:22",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-11 17:13:22",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832218",
+      "filial": "NERD MORUMBI RDRX",
+      "EMISSAO": "2026-05-11 17:22:53",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-11 17:22:53",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832255",
+      "filial": "NERD ELDORADO",
+      "EMISSAO": "2026-05-12 19:53:10",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-12 19:53:10",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "5"
+    },
+    {
+      "romaneio": "832309",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-13 22:45:05",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-13 22:45:05",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "5"
+    },
+    {
+      "romaneio": "832310",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-13 22:45:20",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-13 22:45:20",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832311",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-13 22:47:08",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-13 22:47:08",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "7"
+    },
+    {
+      "romaneio": "832312",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-13 22:47:39",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-13 22:47:39",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "3"
+    },
+    {
+      "romaneio": "832313",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-13 22:48:47",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-13 22:48:47",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "8"
+    },
+    {
+      "romaneio": "832314",
+      "filial": "NERD MORUMBI RDRX",
+      "EMISSAO": "2026-05-13 23:43:48",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-13 23:43:48",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "6"
+    },
+    {
+      "romaneio": "832329",
+      "filial": "NERD VILLA LOBOS",
+      "EMISSAO": "2026-05-14 16:33:42",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 16:33:42",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "2"
+    },
+    {
+      "romaneio": "832330",
+      "filial": "NERD MORUMBI RDRX",
+      "EMISSAO": "2026-05-14 16:41:10",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 16:41:10",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "2"
+    },
+    {
+      "romaneio": "832340",
+      "filial": "NERD MORUMBI RDRX",
+      "EMISSAO": "2026-05-14 17:42:10",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:42:10",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "4"
+    },
+    {
+      "romaneio": "832343",
+      "filial": "NERD MORUMBI RDRX",
+      "EMISSAO": "2026-05-14 17:45:39",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:45:39",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832348",
+      "filial": "NERD VILLA LOBOS",
+      "EMISSAO": "2026-05-14 19:25:12",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 19:25:12",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832349",
+      "filial": "NERD VILLA LOBOS",
+      "EMISSAO": "2026-05-14 19:25:21",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 19:25:21",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "1"
+    }
+  ]
+}

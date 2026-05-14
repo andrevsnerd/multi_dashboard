@@ -18,13 +18,14 @@ interface VendedorProdutoDetalhePageProps {
 }
 
 async function fetchVendas(
+  company: string,
   vendedor: string,
   filial: string,
   produto: string,
   start: string,
   end: string
 ): Promise<VendedorProdutoVendaItem[]> {
-  const searchParams = new URLSearchParams({ filial, produto, start, end });
+  const searchParams = new URLSearchParams({ company, filial, produto, start, end });
   const vendedorEncoded = encodeURIComponent(vendedor);
   const response = await fetch(
     `/api/vendedores/${vendedorEncoded}/produto-vendas?${searchParams.toString()}`,
@@ -68,7 +69,7 @@ export default function VendedorProdutoDetalhePage({
     let active = true;
     setLoading(true);
     setError(null);
-    fetchVendas(vendedorNome, filial, produtoCodigo, initialStart, initialEnd)
+    fetchVendas(companyKey, vendedorNome, filial, produtoCodigo, initialStart, initialEnd)
       .then((list) => {
         if (active) setData(list);
       })
@@ -79,7 +80,7 @@ export default function VendedorProdutoDetalhePage({
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [vendedorNome, filial, produtoCodigo, initialStart, initialEnd]);
+  }, [companyKey, vendedorNome, filial, produtoCodigo, initialStart, initialEnd]);
 
   const formatCurrency = (value: number) =>
     value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });

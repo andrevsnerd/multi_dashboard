@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
-import { fetchVendedoresList } from '@/lib/repositories/vendedores-v2';
-import { resolveCompany, getFilialGroupMembers } from '@/lib/config/company';
+import {
+  fetchVendedoresList,
+  aggregateVendedoresByFilialLabel,
+} from '@/lib/repositories/vendedores-v2';
+import { getFilialGroupMembers } from '@/lib/config/company';
+import { resolveCompanyDynamic } from '@/lib/config/company-server';
 
 /** Timeout menor: queries otimizadas com CTEs. */
 export const maxDuration = 120;
@@ -30,18 +34,17 @@ export async function GET(request: Request) {
   const comparisonMode: 'month' | 'year' | undefined =
     compareParam === 'year' ? 'year' : compareParam === 'month' ? 'month' : undefined;
 
+  const companyConfig = await resolveCompanyDynamic(company);
+
   // Expande grupo de filiais (ex: PAULISTA FFF → [FFF, RSR, FFFR])
   let filials: string[] | undefined;
-  if (filial && company) {
-    const companyConfig = resolveCompany(company);
-    if (companyConfig) {
-      const members = getFilialGroupMembers(companyConfig, filial);
-      if (members.length > 1) filials = members;
-    }
+  if (filial && companyConfig) {
+    const members = getFilialGroupMembers(companyConfig, filial);
+    if (members.length > 1) filials = members;
   }
 
   try {
-    const data = await fetchVendedoresList({
+    const rawList = await fetchVendedoresList({
       company,
       filial: filials ? null : (filial || null),
       filials,
@@ -56,6 +59,7 @@ export async function GET(request: Request) {
       light,
       comparisonMode,
     });
+    const data = aggregateVendedoresByFilialLabel(rawList, companyConfig);
     return NextResponse.json({ data });
   } catch (error) {
     console.error('Erro ao carregar vendedores', error);

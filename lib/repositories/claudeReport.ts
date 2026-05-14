@@ -300,6 +300,35 @@ function normalizeFilialKey(value: string): string {
     .trim();
 }
 
+function normalizeFilialFilterValue(value: string): string {
+  return cleanText(value)
+    .replace(/[\u2010-\u2015\u2212]/g, "-")
+    .toUpperCase();
+}
+
+function buildNormalizedFilialSqlExpr(column: string): string {
+  return `
+    UPPER(
+      REPLACE(
+        REPLACE(
+          REPLACE(
+            REPLACE(
+              REPLACE(
+                REPLACE(LTRIM(RTRIM(ISNULL(${column}, ''))), NCHAR(0x00A0), ' '),
+                CHAR(9), ' '
+              ),
+              NCHAR(0x2010), '-'
+            ),
+            NCHAR(0x2011), '-'
+          ),
+          NCHAR(0x2013), '-'
+        ),
+        '  ', ' '
+      )
+    )
+  `;
+}
+
 function normalizeOperator(rawName: string): { display: string; operator: string } {
   let raw = cleanText(rawName).toUpperCase();
   let operator = "";
@@ -711,8 +740,9 @@ async function queryCurrentStock(
     return new Map();
   }
 
-  const normalizedMembers = Array.from(new Set(members.map(normalizeFilialKey)));
+  const normalizedMembers = Array.from(new Set(members.map(normalizeFilialFilterValue)));
   const rows = await withRequest(async (request) => {
+    const filialExpr = buildNormalizedFilialSqlExpr("e.FILIAL");
     normalizedMembers.forEach((filial, index) => {
       request.input(`stockFilial${index}`, sql.VarChar, filial);
     });
@@ -725,7 +755,7 @@ async function queryCurrentStock(
         CAST(SUM(CASE WHEN ISNULL(e.ESTOQUE, 0) < 0 THEN e.ESTOQUE ELSE 0 END) AS FLOAT) AS NEGATIVE_STOCK,
         COUNT(CASE WHEN ISNULL(e.ESTOQUE, 0) > 0 THEN 1 END) AS POSITIVE_COUNT
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
-      WHERE UPPER(REPLACE(REPLACE(REPLACE(LTRIM(RTRIM(ISNULL(e.FILIAL, ''))), CHAR(9), ' '), NCHAR(0x00A0), ' '), '  ', ' ')) IN (${placeholders})
+      WHERE ${filialExpr} IN (${placeholders})
       GROUP BY ISNULL(e.PRODUTO, ''), ISNULL(e.COR_PRODUTO, '')
       HAVING ABS(SUM(ISNULL(e.ESTOQUE, 0))) > 0
     `;

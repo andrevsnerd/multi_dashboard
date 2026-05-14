@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateRangeFilter";
 import FilialFilter from "@/components/filters/FilialFilter";
@@ -311,15 +311,16 @@ function Donut({
   centerLabel: string;
 }) {
   const total = items.reduce((sum, item) => sum + Math.max(item.value, 0), 0);
-  let cursor = 0;
   const gradient = items
-    .map((item) => {
+    .reduce<{ cursor: number; slices: string[] }>((acc, item) => {
       const share = total > 0 ? (item.value / total) * 100 : 0;
-      const slice = `${item.color} ${cursor}% ${cursor + share}%`;
-      cursor += share;
-      return slice;
-    })
-    .join(", ");
+      const slice = `${item.color} ${acc.cursor}% ${acc.cursor + share}%`;
+      return {
+        cursor: acc.cursor + share,
+        slices: [...acc.slices, slice],
+      };
+    }, { cursor: 0, slices: [] })
+    .slices.join(", ");
 
   return (
     <div className={styles.donutWrap}>
@@ -341,7 +342,13 @@ function Donut({
   );
 }
 
-function ReportView({ report }: { report: ClaudeReportPayload }) {
+function ReportView({
+  report,
+  deckRef,
+}: {
+  report: ClaudeReportPayload;
+  deckRef?: RefObject<HTMLDivElement | null>;
+}) {
   const curveAShare = report.curveSummary.find((row) => row.curve === "A")?.share ?? 0;
   const curveASkus = report.curveSummary.find((row) => row.curve === "A")?.skus ?? 0;
   const curveBPlusCUnits = report.curveSummary
@@ -403,8 +410,8 @@ function ReportView({ report }: { report: ClaudeReportPayload }) {
     : `${report.summary.activeStoreCount} ${report.summary.activeStoreCount === 1 ? "loja ativa" : "lojas ativas"}`;
 
   return (
-    <div className={styles.deck}>
-      <section className={`${styles.slide} ${styles.cover}`}>
+    <div ref={deckRef} className={styles.deck}>
+      <section className={`${styles.slide} ${styles.cover}`} data-pdf-slide="">
         <div className={styles.coverLeft}>
           <div className={styles.coverLeftTop}>
             <CoverIcon />
@@ -441,7 +448,7 @@ function ReportView({ report }: { report: ClaudeReportPayload }) {
         </div>
       </section>
 
-      <section className={styles.slide}>
+      <section className={styles.slide} data-pdf-slide="">
         <div className={styles.eyebrow}>Resumo executivo</div>
         <h1>O que dizem os {report.range.months} meses da rede</h1>
         <p className={styles.subtitle}>
@@ -474,7 +481,7 @@ function ReportView({ report }: { report: ClaudeReportPayload }) {
         </div>
       </section>
 
-      <section className={styles.slide}>
+      <section className={styles.slide} data-pdf-slide="">
         <div className={styles.eyebrow}>Curva ABC</div>
         <h1>A concentracao se mantem - em escala maior</h1>
         <p className={styles.subtitle}>
@@ -527,7 +534,7 @@ function ReportView({ report }: { report: ClaudeReportPayload }) {
         </div>
       </section>
 
-      <section className={styles.slide}>
+      <section className={styles.slide} data-pdf-slide="">
         <div className={styles.eyebrow}>Top 10 Curva A</div>
         <h1>Os SKUs que sustentam o catalogo</h1>
         <p className={styles.subtitle}>Ranking por faturamento no periodo {report.range.label}.</p>
@@ -568,7 +575,7 @@ function ReportView({ report }: { report: ClaudeReportPayload }) {
         </div>
       </section>
 
-      <section className={styles.slide}>
+      <section className={styles.slide} data-pdf-slide="">
         <div className={styles.eyebrow}>Comparativo anual</div>
         <h1>2024 vs 2025 vs 2026 - a tendencia da rede</h1>
         <p className={styles.subtitle}>
@@ -622,7 +629,7 @@ function ReportView({ report }: { report: ClaudeReportPayload }) {
         </div>
       </section>
 
-      <section className={styles.slide}>
+      <section className={styles.slide} data-pdf-slide="">
         <div className={styles.eyebrow}>Ranking por tipo</div>
         <h1>Quais estampas puxam o catalogo</h1>
         <p className={styles.subtitle}>A leitura abaixo combina participacao total e movimento na janela recente {report.range.recentLabel}.</p>
@@ -648,7 +655,7 @@ function ReportView({ report }: { report: ClaudeReportPayload }) {
         </div>
       </section>
 
-      <section className={styles.slide}>
+      <section className={styles.slide} data-pdf-slide="">
         <div className={styles.eyebrow}>Ranking por colecao</div>
         <h1>Quais lancamentos sustentam a receita</h1>
         <p className={styles.subtitle}>A curva recente mostra quais colecoes ainda carregam caixa e quais comecam a perder folego.</p>
@@ -674,7 +681,7 @@ function ReportView({ report }: { report: ClaudeReportPayload }) {
         </div>
       </section>
 
-      <section className={styles.slide}>
+      <section className={styles.slide} data-pdf-slide="">
         <div className={styles.eyebrow}>Ranking por cor</div>
         <h1>A paleta que move a rede</h1>
         <p className={styles.subtitle}>As cores abaixo mostram onde a grade aceita profundidade e onde vale reduzir risco de compra.</p>
@@ -701,7 +708,7 @@ function ReportView({ report }: { report: ClaudeReportPayload }) {
       </section>
 
       {showSubgroupSlide ? (
-        <section className={styles.slide}>
+        <section className={styles.slide} data-pdf-slide="">
           <div className={styles.eyebrow}>Ranking por subgrupo</div>
           <h1>A composicao material da rede</h1>
           <p className={styles.subtitle}>Subgrupos ajudam a separar o que sustenta volume, o que sustenta ticket e onde existe risco de concentracao.</p>
@@ -748,7 +755,7 @@ function ReportView({ report }: { report: ClaudeReportPayload }) {
       ) : null}
 
       {hasChannelView ? (
-        <section className={styles.slide}>
+        <section className={styles.slide} data-pdf-slide="">
           <div className={styles.eyebrow}>Escopo e canais</div>
           <h1>Loja fisica e e-commerce contam historias diferentes</h1>
           <p className={styles.subtitle}>
@@ -777,7 +784,7 @@ function ReportView({ report }: { report: ClaudeReportPayload }) {
         </section>
       ) : null}
 
-      <section className={styles.slide}>
+      <section className={styles.slide} data-pdf-slide="">
         <div className={styles.eyebrow}>{rankingLabel}</div>
         <h1>{rankingTitle}</h1>
         <p className={styles.subtitle}>{rankingSubtitle}</p>
@@ -816,7 +823,7 @@ function ReportView({ report }: { report: ClaudeReportPayload }) {
         </div>
       </section>
 
-      <section className={styles.slide}>
+      <section className={styles.slide} data-pdf-slide="">
         <div className={styles.eyebrow}>{profileEyebrow}</div>
         <h1>{profileTitle}</h1>
         <p className={styles.subtitle}>{profileSubtitle}</p>
@@ -838,7 +845,7 @@ function ReportView({ report }: { report: ClaudeReportPayload }) {
         </div>
       </section>
 
-      <section className={styles.slide}>
+      <section className={styles.slide} data-pdf-slide="">
         <div className={styles.eyebrow}>Estoque atual</div>
         <h1>O total da rede e suficiente?</h1>
         <p className={styles.subtitle}>A rede tem {fmtInt(report.summary.stockTotal)} unidades em estoque ativo. O desafio nao e volume agregado; e distribuicao.</p>
@@ -878,7 +885,7 @@ function ReportView({ report }: { report: ClaudeReportPayload }) {
         </div>
       </section>
 
-      <section className={styles.slide}>
+      <section className={styles.slide} data-pdf-slide="">
         <div className={styles.eyebrow}>Gargalos de reposicao</div>
         <h1>{fmtInt(report.summary.openPurchaseCount)} SKUs com sugestao de compra aberta</h1>
         <p className={styles.subtitle}>Os alertas abaixo separam o problema por curva e destacam os itens mais sensiveis da rede.</p>
@@ -923,7 +930,7 @@ function ReportView({ report }: { report: ClaudeReportPayload }) {
         </table>
       </section>
 
-      <section className={styles.slide}>
+      <section className={styles.slide} data-pdf-slide="">
         <div className={styles.eyebrow}>Detalhamento de rupturas</div>
         <h1>O mapa completo do estoque em risco</h1>
         <p className={styles.subtitle}>{fmtInt(report.summary.ruptureCount)} SKUs ativos em ruptura e {fmtInt(curveASkus)} itens A exigem leitura de impacto.</p>
@@ -985,7 +992,7 @@ function ReportView({ report }: { report: ClaudeReportPayload }) {
         </div>
       </section>
 
-      <section className={styles.slide}>
+      <section className={styles.slide} data-pdf-slide="">
         <div className={styles.eyebrow}>Drift de curva</div>
         <h1>Como o catalogo se move entre janelas</h1>
         <p className={styles.subtitle}>So {fmtPct(report.summary.retention)} dos itens Curva A do periodo total permanecem A na janela recente {report.range.recentLabel}.</p>
@@ -1029,7 +1036,7 @@ function ReportView({ report }: { report: ClaudeReportPayload }) {
         </table>
       </section>
 
-      <section className={styles.slide}>
+      <section className={styles.slide} data-pdf-slide="">
         <div className={styles.eyebrow}>A historia em 5 atos</div>
         <h1>O que os dados realmente contam</h1>
         <p className={styles.subtitle}>Sintese executiva para leitura rapida do negocio.</p>
@@ -1046,7 +1053,7 @@ function ReportView({ report }: { report: ClaudeReportPayload }) {
         </div>
       </section>
 
-      <section className={`${styles.slide} ${styles.closing}`}>
+      <section className={`${styles.slide} ${styles.closing}`} data-pdf-slide="">
         <div className={styles.closingLeft}>
           <div className={styles.eyebrow}>Conclusao</div>
           <h2>{report.closing.headline}</h2>
@@ -1089,6 +1096,8 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeReportIndex, setActiveReportIndex] = useState(0);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const deckRef = useRef<HTMLDivElement | null>(null);
   const allowedFiliais = useMemo(() => {
     const company = resolveCompany(companyKey);
     if (!company) {
@@ -1206,6 +1215,93 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
     }
   }
 
+  async function handleExportPdf() {
+    const activeReport = reports[activeReportIndex];
+    const deckElement = deckRef.current;
+    if (!activeReport || !deckElement) {
+      return;
+    }
+
+    const slideElements = Array.from(deckElement.querySelectorAll<HTMLElement>("[data-pdf-slide]"));
+    if (slideElements.length === 0) {
+      return;
+    }
+
+    setExportingPdf(true);
+
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+
+      const canvases: HTMLCanvasElement[] = [];
+
+      for (const slideElement of slideElements) {
+        const canvas = await html2canvas(slideElement, {
+          backgroundColor: "#ffffff",
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          windowWidth: 1440,
+          windowHeight: 900,
+          onclone: (cloneDoc) => {
+            cloneDoc.querySelectorAll("[data-pdf-hide]").forEach((element) => {
+              (element as HTMLElement).style.display = "none";
+            });
+
+            cloneDoc.querySelectorAll<HTMLElement>("[data-pdf-slide]").forEach((element) => {
+              element.style.width = "1280px";
+              element.style.minHeight = "720px";
+              element.style.margin = "0";
+            });
+          },
+        });
+
+        canvases.push(canvas);
+      }
+
+      const firstCanvas = canvases[0];
+      if (!firstCanvas) {
+        return;
+      }
+
+      const pageWidthMm = 297;
+      const pageHeightMm = (firstCanvas.height * pageWidthMm) / firstCanvas.width;
+      const doc = new jsPDF({
+        orientation: pageWidthMm >= pageHeightMm ? "landscape" : "portrait",
+        unit: "mm",
+        format: [pageWidthMm, pageHeightMm],
+      });
+
+      canvases.forEach((canvas, index) => {
+        if (index > 0) {
+          doc.addPage([pageWidthMm, pageHeightMm], pageWidthMm >= pageHeightMm ? "landscape" : "portrait");
+        }
+
+        doc.addImage(
+          canvas.toDataURL("image/png"),
+          "PNG",
+          0,
+          0,
+          pageWidthMm,
+          pageHeightMm,
+          undefined,
+          "FAST",
+        );
+      });
+
+      const safeName = `relatorio-claude-${activeReport.range.start}-${activeReport.range.end}`
+        .replace(/[^\w\-]+/g, "_")
+        .slice(0, 100);
+      doc.save(`${safeName}.pdf`);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Erro ao exportar PDF");
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
   useEffect(() => {
     void generateReport();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1250,9 +1346,19 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
               Mesmo espirito visual do HTML gerado no Python, agora direto na dashboard com filtros dinamicos e multiplos periodos.
             </p>
           </div>
-          <button type="button" className={styles.generateButton} onClick={() => void generateReport()} disabled={loading}>
-            {loading ? "Gerando..." : "Gerar analise"}
-          </button>
+          <div className={styles.headerActions}>
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              onClick={() => void handleExportPdf()}
+              disabled={loading || exportingPdf || !reports[activeReportIndex]}
+            >
+              {exportingPdf ? "Exportando PDF..." : "Exportar PDF"}
+            </button>
+            <button type="button" className={styles.generateButton} onClick={() => void generateReport()} disabled={loading}>
+              {loading ? "Gerando..." : "Gerar analise"}
+            </button>
+          </div>
         </div>
 
         <div className={styles.filtersGrid}>
@@ -1351,7 +1457,7 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
         </div>
       ) : null}
 
-      {reports[activeReportIndex] ? <ReportView report={reports[activeReportIndex]} /> : null}
+      {reports[activeReportIndex] ? <ReportView report={reports[activeReportIndex]} deckRef={deckRef} /> : null}
     </div>
   );
 }

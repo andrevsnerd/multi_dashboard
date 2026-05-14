@@ -39,12 +39,13 @@ async function fetchProdutos(
 }
 
 async function fetchClientes(
+  company: string,
   vendedor: string,
   filial: string,
   start: string,
   end: string
 ): Promise<VendedorClienteItem[]> {
-  const searchParams = new URLSearchParams({ filial, start, end });
+  const searchParams = new URLSearchParams({ company, filial, start, end });
   const vendedorEncoded = encodeURIComponent(vendedor);
   const response = await fetch(
     `/api/vendedores/${vendedorEncoded}/clientes?${searchParams.toString()}`,
@@ -121,6 +122,7 @@ export default function VendedorDetalhePage({
     setLoadingClientes(true);
     setErrorClientes(null);
     fetchClientes(
+      companyKey,
       vendedorNome,
       filial,
       range.startDate.toISOString(),
@@ -130,7 +132,7 @@ export default function VendedorDetalhePage({
       .catch((err) => { if (active) setErrorClientes(err instanceof Error ? err.message : "Erro ao carregar"); })
       .finally(() => { if (active) setLoadingClientes(false); });
     return () => { active = false; };
-  }, [activeTab, clientesFetched, vendedorNome, filial, range.startDate, range.endDate]);
+  }, [activeTab, clientesFetched, companyKey, vendedorNome, filial, range.startDate, range.endDate]);
 
   const formatCurrency = (value: number) =>
     value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -161,15 +163,32 @@ export default function VendedorDetalhePage({
     [companyKey, vendedorNome, filial, range]
   );
 
+  const vendedoresListHref = useMemo(() => {
+    const params = new URLSearchParams({
+      start: initialStart,
+      end: initialEnd,
+    });
+    const filialTrim = filial.trim();
+    if (filialTrim) {
+      params.set("filial", filialTrim);
+    }
+    return `/${companyKey}/vendedores?${params.toString()}`;
+  }, [companyKey, initialStart, initialEnd, filial]);
+
   return (
     <div className={styles.wrapper}>
-      <nav className={styles.breadcrumb}>
-        <Link href={`/${companyKey}/vendedores`} className={styles.breadcrumbLink}>
-          Vendedores
+      <div className={styles.topNav}>
+        <Link href={vendedoresListHref} className={styles.backButton}>
+          ← Voltar
         </Link>
-        <span className={styles.breadcrumbSep}>/</span>
-        <span className={styles.breadcrumbCurrent}>{vendedorNome}</span>
-      </nav>
+        <nav className={styles.breadcrumb}>
+          <Link href={vendedoresListHref} className={styles.breadcrumbLink}>
+            Vendedores
+          </Link>
+          <span className={styles.breadcrumbSep}>/</span>
+          <span className={styles.breadcrumbCurrent}>{vendedorNome}</span>
+        </nav>
+      </div>
 
       <div className={styles.header}>
         <div className={styles.headerLeft}>

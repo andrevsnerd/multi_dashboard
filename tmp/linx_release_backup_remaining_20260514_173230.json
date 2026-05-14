@@ -1,0 +1,1178 @@
+{
+  "targets": [
+    [
+      "832150",
+      "NERD MORUMBI RDRX"
+    ],
+    [
+      "832152",
+      "NERD VILLA LOBOS"
+    ],
+    [
+      "832155",
+      "NERD HIGIENOPOLIS"
+    ],
+    [
+      "832159",
+      "NERD HIGIENOPOLIS"
+    ],
+    [
+      "832162",
+      "NERD MORUMBI RDRX"
+    ],
+    [
+      "832170",
+      "NERD ELDORADO"
+    ],
+    [
+      "832177",
+      "NERD ELDORADO"
+    ],
+    [
+      "832178",
+      "NERD ELDORADO"
+    ],
+    [
+      "832180",
+      "NERD CENTER NORTE"
+    ],
+    [
+      "832185",
+      "NERD MORUMBI RDRRX"
+    ],
+    [
+      "832192",
+      "NERD MORUMBI RDRX"
+    ],
+    [
+      "832193",
+      "NERD VILLA LOBOS"
+    ],
+    [
+      "832194",
+      "NERD MORUMBI RDRRX"
+    ],
+    [
+      "832198",
+      "NERD CENTER NORTE"
+    ],
+    [
+      "832206",
+      "NERD LEBLON"
+    ],
+    [
+      "832207",
+      "NERD LEBLON"
+    ],
+    [
+      "832208",
+      "NERD LEBLON"
+    ],
+    [
+      "832209",
+      "NERD LEBLON"
+    ],
+    [
+      "832210",
+      "NERD LEBLON"
+    ],
+    [
+      "832211",
+      "NERD LEBLON"
+    ],
+    [
+      "832212",
+      "NERD LEBLON"
+    ],
+    [
+      "832213",
+      "NERD LEBLON"
+    ],
+    [
+      "832214",
+      "NERD LEBLON"
+    ],
+    [
+      "832215",
+      "NERD LEBLON"
+    ],
+    [
+      "832249",
+      "NERD VILLA LOBOS"
+    ],
+    [
+      "832256",
+      "NERD MORUMBI RDRX"
+    ],
+    [
+      "832257",
+      "NERD MORUMBI RDRRX"
+    ],
+    [
+      "832279",
+      "NERD ELDORADO"
+    ],
+    [
+      "832284",
+      "NERD ELDORADO"
+    ],
+    [
+      "832295",
+      "NERD CENTER NORTE"
+    ],
+    [
+      "832296",
+      "NERD HIGIENOPOLIS"
+    ],
+    [
+      "832297",
+      "NERD HIGIENOPOLIS"
+    ],
+    [
+      "832315",
+      "NERD MORUMBI RDRRX"
+    ],
+    [
+      "832331",
+      "NERD VILLA LOBOS"
+    ],
+    [
+      "832337",
+      "NERD MORUMBI RDRRX"
+    ],
+    [
+      "832339",
+      "NERD LEBLON"
+    ],
+    [
+      "832341",
+      "NERD MORUMBI RDRRX"
+    ],
+    [
+      "832342",
+      "NERD MORUMBI RDRX"
+    ],
+    [
+      "832347",
+      "NERD MORUMBI RDRX"
+    ]
+  ],
+  "pre": [
+    {
+      "romaneio": "832150",
+      "filial": "NERD MORUMBI RDRX",
+      "EMISSAO": "2026-05-08 14:20:06",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-08 14:20:06",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832152",
+      "filial": "NERD VILLA LOBOS",
+      "EMISSAO": "2026-05-08 15:57:04",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-08 15:57:04",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "67"
+    },
+    {
+      "romaneio": "832155",
+      "filial": "NERD HIGIENOPOLIS",
+      "EMISSAO": "2026-05-08 16:03:33",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-08 16:03:33",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "10"
+    },
+    {
+      "romaneio": "832159",
+      "filial": "NERD HIGIENOPOLIS",
+      "EMISSAO": "2026-05-08 16:30:21",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-08 16:30:21",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "123"
+    },
+    {
+      "romaneio": "832162",
+      "filial": "NERD MORUMBI RDRX",
+      "EMISSAO": "2026-05-08 17:11:14",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-08 17:11:14",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "99"
+    },
+    {
+      "romaneio": "832170",
+      "filial": "NERD ELDORADO",
+      "EMISSAO": "2026-05-08 17:48:18",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-08 17:48:18",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "2"
+    },
+    {
+      "romaneio": "832177",
+      "filial": "NERD ELDORADO",
+      "EMISSAO": "2026-05-08 20:55:37",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-08 20:55:37",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "93"
+    },
+    {
+      "romaneio": "832178",
+      "filial": "NERD ELDORADO",
+      "EMISSAO": "2026-05-08 20:55:57",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-08 20:55:57",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "93"
+    },
+    {
+      "romaneio": "832180",
+      "filial": "NERD CENTER NORTE",
+      "EMISSAO": "2026-05-09 00:20:38",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-09 00:20:38",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "17"
+    },
+    {
+      "romaneio": "832185",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-09 00:52:08",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-09 00:52:08",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "20"
+    },
+    {
+      "romaneio": "832192",
+      "filial": "NERD MORUMBI RDRX",
+      "EMISSAO": "2026-05-09 16:47:43",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-09 16:47:43",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "17"
+    },
+    {
+      "romaneio": "832193",
+      "filial": "NERD VILLA LOBOS",
+      "EMISSAO": "2026-05-09 17:27:55",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-09 17:27:55",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "15"
+    },
+    {
+      "romaneio": "832194",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-09 19:18:36",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-09 19:18:36",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "85"
+    },
+    {
+      "romaneio": "832198",
+      "filial": "NERD CENTER NORTE",
+      "EMISSAO": "2026-05-09 22:59:09",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-09 22:59:09",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "64"
+    },
+    {
+      "romaneio": "832206",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-11 15:13:51",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-11 15:13:51",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "99"
+    },
+    {
+      "romaneio": "832207",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-11 15:14:20",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-11 15:14:20",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "8"
+    },
+    {
+      "romaneio": "832208",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-11 15:14:43",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-11 15:14:43",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832209",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-11 15:15:00",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-11 15:15:00",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832210",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-11 15:24:36",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-11 15:24:36",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "19"
+    },
+    {
+      "romaneio": "832211",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-11 15:24:53",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-11 15:24:53",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "2"
+    },
+    {
+      "romaneio": "832212",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-11 15:25:18",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-11 15:25:18",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "10"
+    },
+    {
+      "romaneio": "832213",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-11 15:25:38",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-11 15:25:38",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "12"
+    },
+    {
+      "romaneio": "832214",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-11 15:25:57",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-11 15:25:57",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "4"
+    },
+    {
+      "romaneio": "832215",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-11 15:26:13",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-11 15:26:13",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "11"
+    },
+    {
+      "romaneio": "832249",
+      "filial": "NERD VILLA LOBOS",
+      "EMISSAO": "2026-05-12 17:59:59",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-12 17:59:59",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "15"
+    },
+    {
+      "romaneio": "832256",
+      "filial": "NERD MORUMBI RDRX",
+      "EMISSAO": "2026-05-12 21:13:57",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-12 21:13:57",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "16"
+    },
+    {
+      "romaneio": "832257",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-12 21:58:36",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-12 21:58:36",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "18"
+    },
+    {
+      "romaneio": "832279",
+      "filial": "NERD ELDORADO",
+      "EMISSAO": "2026-05-13 15:24:09",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-13 15:24:09",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "19"
+    },
+    {
+      "romaneio": "832284",
+      "filial": "NERD ELDORADO",
+      "EMISSAO": "2026-05-13 16:32:29",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-13 16:32:29",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832295",
+      "filial": "NERD CENTER NORTE",
+      "EMISSAO": "2026-05-13 16:50:57",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-13 16:50:57",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "17"
+    },
+    {
+      "romaneio": "832296",
+      "filial": "NERD HIGIENOPOLIS",
+      "EMISSAO": "2026-05-13 16:57:37",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-13 16:57:37",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "2"
+    },
+    {
+      "romaneio": "832297",
+      "filial": "NERD HIGIENOPOLIS",
+      "EMISSAO": "2026-05-13 17:02:30",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-13 17:02:30",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "19"
+    },
+    {
+      "romaneio": "832315",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-14 00:13:26",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 00:13:26",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832331",
+      "filial": "NERD VILLA LOBOS",
+      "EMISSAO": "2026-05-14 16:43:19",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 16:43:19",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "24"
+    },
+    {
+      "romaneio": "832337",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-14 17:31:27",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:31:27",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832339",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-14 17:36:56",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:36:56",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "35"
+    },
+    {
+      "romaneio": "832341",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-14 17:44:08",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:44:08",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "23"
+    },
+    {
+      "romaneio": "832342",
+      "filial": "NERD MORUMBI RDRX",
+      "EMISSAO": "2026-05-14 17:44:24",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:44:24",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832347",
+      "filial": "NERD MORUMBI RDRX",
+      "EMISSAO": "2026-05-14 19:05:59",
+      "STATUS_TRANSITO": null,
+      "ENTRADA_CONFERIDA": "False",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 19:05:59",
+      "DATA_ENTRADA_CONFERIDA": null,
+      "OBS": null,
+      "lep_count": "0",
+      "ent_count": "30"
+    }
+  ],
+  "post": [
+    {
+      "romaneio": "832150",
+      "filial": "NERD MORUMBI RDRX",
+      "EMISSAO": "2026-05-08 14:20:06",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832152",
+      "filial": "NERD VILLA LOBOS",
+      "EMISSAO": "2026-05-08 15:57:04",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "67"
+    },
+    {
+      "romaneio": "832155",
+      "filial": "NERD HIGIENOPOLIS",
+      "EMISSAO": "2026-05-08 16:03:33",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "10"
+    },
+    {
+      "romaneio": "832159",
+      "filial": "NERD HIGIENOPOLIS",
+      "EMISSAO": "2026-05-08 16:30:21",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "123"
+    },
+    {
+      "romaneio": "832162",
+      "filial": "NERD MORUMBI RDRX",
+      "EMISSAO": "2026-05-08 17:11:14",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "99"
+    },
+    {
+      "romaneio": "832170",
+      "filial": "NERD ELDORADO",
+      "EMISSAO": "2026-05-08 17:48:18",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "2"
+    },
+    {
+      "romaneio": "832177",
+      "filial": "NERD ELDORADO",
+      "EMISSAO": "2026-05-08 20:55:37",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "93"
+    },
+    {
+      "romaneio": "832178",
+      "filial": "NERD ELDORADO",
+      "EMISSAO": "2026-05-08 20:55:57",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "93"
+    },
+    {
+      "romaneio": "832180",
+      "filial": "NERD CENTER NORTE",
+      "EMISSAO": "2026-05-09 00:20:38",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "17"
+    },
+    {
+      "romaneio": "832185",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-09 00:52:08",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "20"
+    },
+    {
+      "romaneio": "832192",
+      "filial": "NERD MORUMBI RDRX",
+      "EMISSAO": "2026-05-09 16:47:43",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "17"
+    },
+    {
+      "romaneio": "832193",
+      "filial": "NERD VILLA LOBOS",
+      "EMISSAO": "2026-05-09 17:27:55",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "15"
+    },
+    {
+      "romaneio": "832194",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-09 19:18:36",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "85"
+    },
+    {
+      "romaneio": "832198",
+      "filial": "NERD CENTER NORTE",
+      "EMISSAO": "2026-05-09 22:59:09",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "64"
+    },
+    {
+      "romaneio": "832206",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-11 15:13:51",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "99"
+    },
+    {
+      "romaneio": "832207",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-11 15:14:20",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "8"
+    },
+    {
+      "romaneio": "832208",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-11 15:14:43",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832209",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-11 15:15:00",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832210",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-11 15:24:36",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "19"
+    },
+    {
+      "romaneio": "832211",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-11 15:24:53",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "2"
+    },
+    {
+      "romaneio": "832212",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-11 15:25:18",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "10"
+    },
+    {
+      "romaneio": "832213",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-11 15:25:38",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "12"
+    },
+    {
+      "romaneio": "832214",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-11 15:25:57",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "4"
+    },
+    {
+      "romaneio": "832215",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-11 15:26:13",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "11"
+    },
+    {
+      "romaneio": "832249",
+      "filial": "NERD VILLA LOBOS",
+      "EMISSAO": "2026-05-12 17:59:59",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "15"
+    },
+    {
+      "romaneio": "832256",
+      "filial": "NERD MORUMBI RDRX",
+      "EMISSAO": "2026-05-12 21:13:57",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "16"
+    },
+    {
+      "romaneio": "832257",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-12 21:58:36",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "18"
+    },
+    {
+      "romaneio": "832279",
+      "filial": "NERD ELDORADO",
+      "EMISSAO": "2026-05-13 15:24:09",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "19"
+    },
+    {
+      "romaneio": "832284",
+      "filial": "NERD ELDORADO",
+      "EMISSAO": "2026-05-13 16:32:29",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832295",
+      "filial": "NERD CENTER NORTE",
+      "EMISSAO": "2026-05-13 16:50:57",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "17"
+    },
+    {
+      "romaneio": "832296",
+      "filial": "NERD HIGIENOPOLIS",
+      "EMISSAO": "2026-05-13 16:57:37",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "2"
+    },
+    {
+      "romaneio": "832297",
+      "filial": "NERD HIGIENOPOLIS",
+      "EMISSAO": "2026-05-13 17:02:30",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "19"
+    },
+    {
+      "romaneio": "832315",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-14 00:13:26",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832331",
+      "filial": "NERD VILLA LOBOS",
+      "EMISSAO": "2026-05-14 16:43:19",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "24"
+    },
+    {
+      "romaneio": "832337",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-14 17:31:27",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832339",
+      "filial": "NERD LEBLON",
+      "EMISSAO": "2026-05-14 17:36:56",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "35"
+    },
+    {
+      "romaneio": "832341",
+      "filial": "NERD MORUMBI RDRRX",
+      "EMISSAO": "2026-05-14 17:44:08",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "23"
+    },
+    {
+      "romaneio": "832342",
+      "filial": "NERD MORUMBI RDRX",
+      "EMISSAO": "2026-05-14 17:44:24",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "1"
+    },
+    {
+      "romaneio": "832347",
+      "filial": "NERD MORUMBI RDRX",
+      "EMISSAO": "2026-05-14 19:05:59",
+      "STATUS_TRANSITO": "4",
+      "ENTRADA_CONFERIDA": "True",
+      "ENTRADA_ENCERRADA": "1",
+      "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:32:32.657000",
+      "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+      "OBS": "Retirado do Transito pela Tela de Libera??o",
+      "lep_count": "0",
+      "ent_count": "30"
+    }
+  ]
+}
