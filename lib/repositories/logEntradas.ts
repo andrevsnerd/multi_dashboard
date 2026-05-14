@@ -6,6 +6,7 @@ export interface LogEntradaRow {
   filialOrigem: string;
   filialDestino: string;
   dataEmissao: string;
+  dataDigitacao?: string;
   tipoRomaneio: string;
   responsavel: string;
   observacao: string;
@@ -97,7 +98,13 @@ export async function fetchLogEntradas(
           e.FILIAL AS FILIAL_DESTINO,
           LTRIM(RTRIM(ISNULL(e.FILIAL_ORIGEM, ''))) AS FILIAL_ORIGEM,
           e.EMISSAO,
+          e.DATA_DIGITACAO,
           (CONVERT(VARCHAR(10), e.EMISSAO, 120) + 'T' + CONVERT(VARCHAR(8), e.EMISSAO, 108)) AS EMISSAO_STR,
+          CASE
+            WHEN e.DATA_DIGITACAO IS NOT NULL
+            THEN (CONVERT(VARCHAR(10), e.DATA_DIGITACAO, 120) + 'T' + CONVERT(VARCHAR(8), e.DATA_DIGITACAO, 108))
+            ELSE NULL
+          END AS DATA_DIGITACAO_STR,
           e.TIPO_ROMANEIO,
           e.RESPONSAVEL,
           ISNULL(e.OBS, '') AS OBS,
@@ -123,7 +130,9 @@ export async function fetchLogEntradas(
           le.FILIAL AS FILIAL_DESTINO,
           LTRIM(RTRIM(ISNULL(le.FILIAL_ORIGEM, ''))) AS FILIAL_ORIGEM,
           le.EMISSAO,
+          NULL AS DATA_DIGITACAO,
           (CONVERT(VARCHAR(10), le.EMISSAO, 120) + 'T' + CONVERT(VARCHAR(8), le.EMISSAO, 108)) AS EMISSAO_STR,
+          NULL AS DATA_DIGITACAO_STR,
           NULL AS TIPO_ROMANEIO,
           le.RESPONSAVEL,
           ISNULL(le.OBS, '') AS OBS,
@@ -155,7 +164,9 @@ export async function fetchLogEntradas(
       FILIAL_DESTINO: string;
       FILIAL_ORIGEM: string | null;
       EMISSAO: Date;
+      DATA_DIGITACAO: Date | null;
       EMISSAO_STR: string;
+      DATA_DIGITACAO_STR: string | null;
       TIPO_ROMANEIO: string | null;
       RESPONSAVEL: string | null;
       OBS: string | null;
@@ -174,6 +185,12 @@ export async function fetchLogEntradas(
           : row.EMISSAO
             ? new Date(row.EMISSAO).toISOString()
             : "",
+      dataDigitacao:
+        row.DATA_DIGITACAO_STR != null && String(row.DATA_DIGITACAO_STR).trim() !== ""
+          ? String(row.DATA_DIGITACAO_STR).trim()
+          : row.DATA_DIGITACAO
+            ? new Date(row.DATA_DIGITACAO).toISOString()
+            : undefined,
       tipoRomaneio: row.TIPO_ROMANEIO?.toString().trim() || "",
       responsavel: row.RESPONSAVEL?.toString().trim() || "",
       observacao: row.OBS?.toString().trim() || "",

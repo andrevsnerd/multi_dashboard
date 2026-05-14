@@ -1,0 +1,28 @@
+{
+  "pre": {
+    "ROMANEIO_PRODUTO": "832350",
+    "FILIAL": "NERD CENTER NORTE",
+    "EMISSAO": "2026-05-14 19:54:55",
+    "STATUS_TRANSITO": null,
+    "ENTRADA_CONFERIDA": "False",
+    "ENTRADA_ENCERRADA": "1",
+    "DATA_PARA_TRANSFERENCIA": "2026-05-14 19:54:55",
+    "DATA_ENTRADA_CONFERIDA": null,
+    "OBS": null,
+    "lep_count": "0",
+    "ent_count": "2"
+  },
+  "post": {
+    "ROMANEIO_PRODUTO": "832350",
+    "FILIAL": "NERD CENTER NORTE",
+    "EMISSAO": "2026-05-14 19:54:55",
+    "STATUS_TRANSITO": "4",
+    "ENTRADA_CONFERIDA": "True",
+    "ENTRADA_ENCERRADA": "1",
+    "DATA_PARA_TRANSFERENCIA": "2026-05-14 17:37:10.943000",
+    "DATA_ENTRADA_CONFERIDA": "2026-05-14 00:00:00",
+    "OBS": "Retirado do Transito pela Tela de Libera??o",
+    "lep_count": "0",
+    "ent_count": "2"
+  }
+}

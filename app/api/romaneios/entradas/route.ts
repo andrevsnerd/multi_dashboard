@@ -39,7 +39,11 @@ export async function GET(request: NextRequest) {
         ? ((confirmadosCounter.get(`${e.romaneio}|${filialDestinoAtiva}`) ?? 0) ||
            (confirmadosCounter.get(`${e.romaneio}|${e.filialDestino}`) ?? 0))
         : 0;
-      return { ...e, qtdConfirmados };
+      return {
+        ...e,
+        dataEmissao: e.dataDigitacao || e.dataEmissao,
+        qtdConfirmados,
+      };
     });
 
     if (!username) {

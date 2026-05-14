@@ -221,6 +221,7 @@
 
 .date {
   color: #9ca3af;
+  white-space: nowrap;
 }
 
 .chevron {

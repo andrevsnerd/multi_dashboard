@@ -5,6 +5,7 @@ import Link from "next/link";
 import * as XLSX from "xlsx";
 
 import { useAuth } from "@/components/auth/AuthContext";
+import { formatRomaneioDateTimeBrasilia } from "@/lib/utils/romaneios-date";
 import styles from "./RomaneioDetalhePage.module.css";
 
 // ---------- helpers de API ----------
@@ -265,7 +266,7 @@ export default function RomaneioDetalhePage({
 
   const dataEmissao = dataEmissaoProp
     ? (() => {
-        try { return new Date(dataEmissaoProp).toLocaleString("pt-BR"); }
+        try { return formatRomaneioDateTimeBrasilia(dataEmissaoProp); }
         catch { return dataEmissaoProp; }
       })()
     : "";

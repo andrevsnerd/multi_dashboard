@@ -8,6 +8,7 @@ export interface LogSaidaRow {
   filialOrigemCodigo?: string;
   filialDestinoCodigo?: string;
   dataEmissao: string;
+  dataDigitacao?: string;
   responsavel: string;
   observacao: string;
   qtdProdutos: number;
@@ -99,7 +100,13 @@ export async function fetchLogSaidas(
           LTRIM(RTRIM(ISNULL(fo.COD_FILIAL, es.FILIAL))) AS FILIAL_ORIGEM_CODIGO,
           LTRIM(RTRIM(ISNULL(fd.COD_FILIAL, es.FILIAL_DESTINO))) AS FILIAL_DESTINO_CODIGO,
           es.EMISSAO,
+          es.DATA_DIGITACAO,
           (CONVERT(VARCHAR(10), es.EMISSAO, 120) + 'T' + CONVERT(VARCHAR(8), es.EMISSAO, 108)) AS EMISSAO_STR,
+          CASE
+            WHEN es.DATA_DIGITACAO IS NOT NULL
+            THEN (CONVERT(VARCHAR(10), es.DATA_DIGITACAO, 120) + 'T' + CONVERT(VARCHAR(8), es.DATA_DIGITACAO, 108))
+            ELSE NULL
+          END AS DATA_DIGITACAO_STR,
           es.RESPONSAVEL,
           ISNULL(es.OBS, '') AS OBS,
           ISNULL(es.TIPO_ROMANEIO, '') AS TIPO_ROMANEIO,
@@ -127,7 +134,9 @@ export async function fetchLogSaidas(
           LTRIM(RTRIM(ISNULL(fo2.COD_FILIAL, s.FILIAL))) AS FILIAL_ORIGEM_CODIGO,
           LTRIM(RTRIM(ISNULL(fd2.COD_FILIAL, s.FILIAL_DESTINO))) AS FILIAL_DESTINO_CODIGO,
           s.EMISSAO,
+          NULL AS DATA_DIGITACAO,
           (CONVERT(VARCHAR(10), s.EMISSAO, 120) + 'T' + CONVERT(VARCHAR(8), s.EMISSAO, 108)) AS EMISSAO_STR,
+          NULL AS DATA_DIGITACAO_STR,
           s.RESPONSAVEL,
           ISNULL(s.OBS, '') AS OBS,
           '' AS TIPO_ROMANEIO,
@@ -171,7 +180,9 @@ export async function fetchLogSaidas(
       FILIAL_ORIGEM_CODIGO: string | null;
       FILIAL_DESTINO_CODIGO: string | null;
       EMISSAO: Date;
+      DATA_DIGITACAO: Date | null;
       EMISSAO_STR: string;
+      DATA_DIGITACAO_STR: string | null;
       RESPONSAVEL: string | null;
       OBS: string | null;
       QTD_PRODUTOS: number;
@@ -192,6 +203,12 @@ export async function fetchLogSaidas(
           : row.EMISSAO
             ? new Date(row.EMISSAO).toISOString()
             : "",
+      dataDigitacao:
+        row.DATA_DIGITACAO_STR != null && String(row.DATA_DIGITACAO_STR).trim() !== ""
+          ? String(row.DATA_DIGITACAO_STR).trim()
+          : row.DATA_DIGITACAO
+            ? new Date(row.DATA_DIGITACAO).toISOString()
+            : undefined,
       responsavel: row.RESPONSAVEL?.toString().trim() || "",
       observacao: row.OBS?.toString().trim() || "",
       qtdProdutos: row.QTD_PRODUTOS || 0,

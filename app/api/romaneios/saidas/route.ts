@@ -77,6 +77,7 @@ export async function GET(request: NextRequest) {
         : 0;
       return {
         ...s,
+        dataEmissao: s.dataDigitacao || s.dataEmissao,
         filialDestino: destinoSalvo !== null ? destinoOriginal : s.filialDestino,
         destinoCodigo,
         qtdConfirmados,

@@ -4,6 +4,10 @@ import { useState, useEffect, useDeferredValue } from "react";
 import Link from "next/link";
 
 import { useAuth } from "@/components/auth/AuthContext";
+import {
+  formatRomaneioDateTimeBrasilia,
+  parseRomaneioDateTime,
+} from "@/lib/utils/romaneios-date";
 import styles from "./RomaneiosPage.module.css";
 
 export interface RomaneioListItem {
@@ -118,10 +122,10 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
       .then(([saidasData, entradasData, filiaisData]) => {
         if (cancelled) return;
         const saidasSorted = [...saidasData].sort((a, b) => {
-          return new Date(b.dataEmissao).getTime() - new Date(a.dataEmissao).getTime();
+          return parseRomaneioDateTime(b.dataEmissao).getTime() - parseRomaneioDateTime(a.dataEmissao).getTime();
         });
         const entradasSorted = [...entradasData].sort((a, b) => {
-          return new Date(b.dataEmissao).getTime() - new Date(a.dataEmissao).getTime();
+          return parseRomaneioDateTime(b.dataEmissao).getTime() - parseRomaneioDateTime(a.dataEmissao).getTime();
         });
         setSaidas(saidasSorted);
         setEntradas(entradasSorted);
@@ -256,7 +260,7 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
                     )}
                   </span>
                   <span className={styles.date}>
-                    {new Date(rom.dataEmissao).toLocaleString("pt-BR")}
+                    {formatRomaneioDateTimeBrasilia(rom.dataEmissao)}
                   </span>
                 </div>
                 <span className={styles.chevron}>›</span>
