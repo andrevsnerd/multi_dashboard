@@ -182,36 +182,44 @@ interface ClaudeReportPageProps {
 
 const DONUT_COLORS = ["#6D2E46", "#A86A74", "#ECE2D0", "#D4A373"];
 
+function toFiniteNumber(value: number, fallback = 0) {
+  return Number.isFinite(value) ? value : fallback;
+}
+
 function fmtCurrency(value: number, compact = false) {
+  const safeValue = toFiniteNumber(value);
+
   if (!compact) {
-    return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+    return safeValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
   }
 
-  const abs = Math.abs(value);
+  const abs = Math.abs(safeValue);
   if (abs >= 1_000_000) {
-    return `R$ ${(value / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}M`;
+    return `R$ ${(safeValue / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}M`;
   }
   if (abs >= 1_000) {
-    return `R$ ${(value / 1_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}K`;
+    return `R$ ${(safeValue / 1_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}K`;
   }
   return fmtCurrency(value);
 }
 
 function fmtInt(value: number) {
-  return Math.round(value).toLocaleString("pt-BR");
+  return Math.round(toFiniteNumber(value)).toLocaleString("pt-BR");
 }
 
 function fmtPct(value: number, digits = 1, signed = false) {
-  const signal = signed && value > 0 ? "+" : "";
-  return `${signal}${value.toLocaleString("pt-BR", {
+  const safeValue = toFiniteNumber(value);
+  const signal = signed && safeValue > 0 ? "+" : "";
+  return `${signal}${safeValue.toLocaleString("pt-BR", {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   })}%`;
 }
 
 function fmtPp(value: number) {
-  const signal = value > 0 ? "+" : "";
-  return `${signal}${value.toLocaleString("pt-BR", {
+  const safeValue = toFiniteNumber(value);
+  const signal = safeValue > 0 ? "+" : "";
+  return `${signal}${safeValue.toLocaleString("pt-BR", {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   })}pp`;
@@ -284,11 +292,15 @@ function BarList({
   rows: Array<{ label: string; value: number }>;
   formatter: (value: number) => string;
 }) {
-  const maxValue = Math.max(...rows.map((row) => row.value), 1);
+  const safeRows = rows.map((row) => ({
+    ...row,
+    value: toFiniteNumber(row.value),
+  }));
+  const maxValue = Math.max(...safeRows.map((row) => row.value), 1);
 
   return (
     <div className={styles.barList}>
-      {rows.map((row) => (
+      {safeRows.map((row) => (
         <div key={row.label} className={styles.barRow}>
           <div className={styles.barLabel}>{row.label}</div>
           <div className={styles.barTrack}>
@@ -310,28 +322,60 @@ function Donut({
   centerValue: string;
   centerLabel: string;
 }) {
-  const total = items.reduce((sum, item) => sum + Math.max(item.value, 0), 0);
-  const gradient = items
-    .reduce<{ cursor: number; slices: string[] }>((acc, item) => {
-      const share = total > 0 ? (item.value / total) * 100 : 0;
-      const slice = `${item.color} ${acc.cursor}% ${acc.cursor + share}%`;
-      return {
-        cursor: acc.cursor + share,
-        slices: [...acc.slices, slice],
-      };
-    }, { cursor: 0, slices: [] })
-    .slices.join(", ");
+  const safeItems = items.map((item) => ({
+    ...item,
+    value: Math.max(toFiniteNumber(item.value), 0),
+  }));
+  const total = safeItems.reduce((sum, item) => sum + item.value, 0);
+
+  // SVG donut via stroke-dasharray — conic-gradient is not supported by html2canvas
+  const r = 139;
+  const cx = 170;
+  const cy = 170;
+  const strokeWidth = 63;
+  const circumference = 2 * Math.PI * r;
+
+  let cumulative = 0;
+  const slices = safeItems.map((item) => {
+    const share = total > 0 ? item.value / total : 0;
+    const dashLength = toFiniteNumber(share * circumference);
+    const dashOffset = toFiniteNumber(circumference * (0.25 - cumulative));
+    cumulative += share;
+    return { ...item, dashLength, dashOffset };
+  });
 
   return (
     <div className={styles.donutWrap}>
-      <div className={styles.donut} style={{ background: `conic-gradient(${gradient || "#6D2E46"})` }}>
+      <div className={styles.donut}>
+        <svg
+          viewBox="0 0 340 340"
+          aria-hidden="true"
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0 }}
+        >
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e8e2d6" strokeWidth={strokeWidth} />
+          {total > 0
+            ? slices.map((slice) => (
+                <circle
+                  key={slice.label}
+                  cx={cx}
+                  cy={cy}
+                  r={r}
+                  fill="none"
+                  stroke={slice.color}
+                  strokeWidth={strokeWidth}
+                  strokeDasharray={`${slice.dashLength} ${circumference}`}
+                  strokeDashoffset={slice.dashOffset}
+                />
+              ))
+            : null}
+        </svg>
         <div className={styles.donutCenter}>
           <strong>{centerValue}</strong>
           <span>{centerLabel}</span>
         </div>
       </div>
       <div className={styles.legend}>
-        {items.map((item) => (
+        {safeItems.map((item) => (
           <div key={item.label} className={styles.legendItem}>
             <span className={styles.legendDot} style={{ background: item.color }} />
             {item.label} - {item.valueLabel}
@@ -629,7 +673,7 @@ function ReportView({
                     className={`${styles.compareFill} ${styles.compareMuted}`}
                     style={{
                       width: `${report.summary.monthProjected > 0
-                        ? (report.summary.monthPrevious / report.summary.monthProjected) * 100
+                        ? toFiniteNumber((toFiniteNumber(report.summary.monthPrevious) / toFiniteNumber(report.summary.monthProjected)) * 100)
                         : 0}%`,
                     }}
                   />
@@ -824,7 +868,13 @@ function ReportView({
                 <td>{fmtPct(row.share)}</td>
                 <td>
                   <div className={styles.microBar}>
-                    <span style={{ width: `${topStore ? (row.share / topStore.share) * 100 : 0}%` }} />
+                    <span
+                      style={{
+                        width: `${topStore && topStore.share > 0
+                          ? toFiniteNumber((toFiniteNumber(row.share) / toFiniteNumber(topStore.share)) * 100)
+                          : 0}%`,
+                      }}
+                    />
                   </div>
                 </td>
               </tr>
@@ -869,7 +919,12 @@ function ReportView({
             <div className={styles.statNote}>itens com historico de venda</div>
           </div>
           <div className={styles.statCard}>
-            <div className={styles.statValue}>{report.summary.coverageMonths.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}m</div>
+            <div className={styles.statValue}>
+              {toFiniteNumber(report.summary.coverageMonths).toLocaleString("pt-BR", {
+                minimumFractionDigits: 1,
+                maximumFractionDigits: 1,
+              })}m
+            </div>
             <div className={styles.statLabel}>Cobertura media</div>
             <div className={styles.statNote}>ritmo medio do periodo</div>
           </div>
@@ -884,7 +939,14 @@ function ReportView({
             {report.curveSummary.map((row) => (
               <div key={row.curve} className={styles.vbarCol}>
                 <div className={styles.vbarValue}>{fmtInt(row.stock)}</div>
-                <div className={styles.vbarBar} style={{ height: `${report.summary.stockTotal > 0 ? (row.stock / report.summary.stockTotal) * 180 : 12}px` }} />
+                <div
+                  className={styles.vbarBar}
+                  style={{
+                    height: `${report.summary.stockTotal > 0
+                      ? toFiniteNumber((toFiniteNumber(row.stock) / toFiniteNumber(report.summary.stockTotal)) * 180, 12)
+                      : 12}px`,
+                  }}
+                />
                 <div className={styles.vbarLabel}>Curva {row.curve}</div>
               </div>
             ))}
@@ -955,7 +1017,7 @@ function ReportView({
                   <div className={styles.bucketLabel}>{row.label}</div>
                   <div>{fmtInt(row.count)}</div>
                   <div className={styles.bucketTrack}>
-                    <div className={styles.bucketFill} style={{ width: `${row.pct}%` }} />
+                    <div className={styles.bucketFill} style={{ width: `${toFiniteNumber(row.pct)}%` }} />
                   </div>
                   <div className={styles.bucketPct}>{fmtPct(row.pct)}</div>
                 </div>
@@ -1243,21 +1305,37 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
     setExportingPdf(true);
 
     try {
+      await document.fonts.ready;
+
       const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
         import("html2canvas"),
         import("jspdf"),
       ]);
+      const doc = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+      });
+      const pageWidthMm = doc.internal.pageSize.getWidth();
+      const pageHeightMm = doc.internal.pageSize.getHeight();
+      const marginMm = 8;
+      const usableWidthMm = pageWidthMm - marginMm * 2;
+      const usableHeightMm = pageHeightMm - marginMm * 2;
 
-      const canvases: HTMLCanvasElement[] = [];
+      for (const [index, slideElement] of slideElements.entries()) {
+        if (index > 0) {
+          doc.addPage();
+        }
 
-      for (const slideElement of slideElements) {
         const canvas = await html2canvas(slideElement, {
           backgroundColor: "#ffffff",
-          scale: 2,
+          scale: Math.min(window.devicePixelRatio || 1, 2),
           useCORS: true,
           logging: false,
-          windowWidth: 1440,
-          windowHeight: 900,
+          scrollX: 0,
+          scrollY: -window.scrollY,
+          windowWidth: Math.max(slideElement.scrollWidth, 1440),
+          windowHeight: Math.max(slideElement.scrollHeight, 900),
           onclone: (cloneDoc) => {
             cloneDoc.querySelectorAll("[data-pdf-hide]").forEach((element) => {
               (element as HTMLElement).style.display = "none";
@@ -1266,43 +1344,48 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
             cloneDoc.querySelectorAll<HTMLElement>("[data-pdf-slide]").forEach((element) => {
               element.style.width = "1280px";
               element.style.minHeight = "720px";
+              element.style.height = "auto";
               element.style.margin = "0";
+              element.style.boxShadow = "none";
+            });
+
+            // html2canvas divides stop positions by the gradient vector length.
+            // Zero or negative inline dimensions → vector length 0 → NaN → addColorStop throws.
+            cloneDoc.querySelectorAll<HTMLElement>("*[style]").forEach((el) => {
+              const inlineW = el.style.width;
+              const inlineH = el.style.height;
+              const wVal = inlineW ? parseFloat(inlineW) : null;
+              const hVal = inlineH ? parseFloat(inlineH) : null;
+              if ((wVal !== null && wVal <= 0) || (hVal !== null && hVal <= 0)) {
+                el.style.backgroundImage = "none";
+                el.style.background = "transparent";
+              }
             });
           },
         });
 
-        canvases.push(canvas);
-      }
-
-      const firstCanvas = canvases[0];
-      if (!firstCanvas) {
-        return;
-      }
-
-      const pageWidthMm = 297;
-      const pageHeightMm = (firstCanvas.height * pageWidthMm) / firstCanvas.width;
-      const doc = new jsPDF({
-        orientation: pageWidthMm >= pageHeightMm ? "landscape" : "portrait",
-        unit: "mm",
-        format: [pageWidthMm, pageHeightMm],
-      });
-
-      canvases.forEach((canvas, index) => {
-        if (index > 0) {
-          doc.addPage([pageWidthMm, pageHeightMm], pageWidthMm >= pageHeightMm ? "landscape" : "portrait");
-        }
+        const widthRatio = usableWidthMm / canvas.width;
+        const heightRatio = usableHeightMm / canvas.height;
+        const drawRatio = Math.min(widthRatio, heightRatio);
+        const drawWidthMm = canvas.width * drawRatio;
+        const drawHeightMm = canvas.height * drawRatio;
+        const offsetXmm = (pageWidthMm - drawWidthMm) / 2;
+        const offsetYmm = (pageHeightMm - drawHeightMm) / 2;
 
         doc.addImage(
           canvas.toDataURL("image/png"),
           "PNG",
-          0,
-          0,
-          pageWidthMm,
-          pageHeightMm,
+          offsetXmm,
+          offsetYmm,
+          drawWidthMm,
+          drawHeightMm,
           undefined,
           "FAST",
         );
-      });
+
+        canvas.width = 0;
+        canvas.height = 0;
+      }
 
       const safeName = `relatorio-claude-${activeReport.range.start}-${activeReport.range.end}`
         .replace(/[^\w\-]+/g, "_")
