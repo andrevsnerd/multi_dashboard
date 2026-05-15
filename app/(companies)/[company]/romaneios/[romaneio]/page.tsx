@@ -33,14 +33,14 @@ export default async function RomaneioDetalheRoute({
     notFound();
   }
 
-  const tipo = (typeof sp.tipo === "string" ? sp.tipo : "") as "saida" | "entrada";
+  const tipo = (typeof sp.tipo === "string" ? sp.tipo : "") as "saida" | "entrada" | "transito";
   const filialOrigem = typeof sp.filialOrigem === "string" ? sp.filialOrigem : "";
   const filialDestino = typeof sp.filialDestino === "string" ? sp.filialDestino : "";
   const dataEmissao = typeof sp.dataEmissao === "string" ? sp.dataEmissao : "";
   const responsavel = typeof sp.responsavel === "string" ? sp.responsavel : "";
   const tipoRomaneio = typeof sp.tipoRomaneio === "string" ? sp.tipoRomaneio : "";
 
-  if (!tipo || (tipo === "saida" && !filialOrigem) || (tipo === "entrada" && !filialDestino)) {
+  if (!tipo || (tipo === "saida" && !filialOrigem) || ((tipo === "entrada" || tipo === "transito") && !filialDestino)) {
     notFound();
   }
 

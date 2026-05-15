@@ -652,6 +652,14 @@
   background: #15803d;
 }
 
+.confirmarTudoBtnTransit {
+  background: #ea580c;
+}
+
+.confirmarTudoBtnTransit:hover:not(:disabled) {
+  background: #c2410c;
+}
+
 .confirmarTudoBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;

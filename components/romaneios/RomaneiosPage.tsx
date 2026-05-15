@@ -11,7 +11,7 @@ import {
 import styles from "./RomaneiosPage.module.css";
 
 export interface RomaneioListItem {
-  tipo: "saida" | "entrada";
+  tipo: "saida" | "entrada" | "transito";
   romaneio: string;
   filialOrigem: string;
   filialDestino: string;
@@ -22,16 +22,14 @@ export interface RomaneioListItem {
   qtdProdutos: number;
   qtdItens: number;
   status: string;
-  /** Código da filial destino (apenas saídas, quando definido no detalhe). */
   destinoCodigo?: string | null;
   tipoRomaneio?: string;
-  /** Número de itens já confirmados na filial destino. */
   qtdConfirmados?: number;
 }
 
 function cleanDestinoValue(value: string | null | undefined): string {
   const trimmed = (value || "").trim();
-  if (!trimmed || trimmed === "—" || trimmed === "-" || trimmed === "\u2014") return "";
+  if (!trimmed || trimmed === "-" || trimmed === "\u2014") return "";
   return trimmed;
 }
 
@@ -82,12 +80,30 @@ async function fetchLogEntradas(
   return (json.data || []).map((row) => ({ ...row, tipo: "entrada" as const }));
 }
 
-type TabType = "saida" | "entrada";
+async function fetchLogTransito(
+  companySlug: string,
+  username?: string | null,
+  searchTerm = ""
+): Promise<RomaneioListItem[]> {
+  const params = new URLSearchParams({ company: companySlug });
+  const search = searchTerm.trim();
+  if (search) params.set("search", search);
+  const url = `/api/romaneios/transito?${params.toString()}`;
+  const headers: Record<string, string> = {};
+  if (username) headers["x-auth-username"] = username;
+  const response = await fetch(url, { headers, cache: "no-store" });
+  if (!response.ok) return [];
+  const json = (await response.json()) as { data: Omit<RomaneioListItem, "tipo">[] };
+  return (json.data || []).map((row) => ({ ...row, tipo: "transito" as const }));
+}
+
+type TabType = "saida" | "entrada" | "transito";
 
 export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
   const { user, isLoading: authLoading } = useAuth();
   const [saidas, setSaidas] = useState<RomaneioListItem[]>([]);
   const [entradas, setEntradas] = useState<RomaneioListItem[]>([]);
+  const [transitos, setTransitos] = useState<RomaneioListItem[]>([]);
   const [filiais, setFiliais] = useState<FilialOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("saida");
@@ -108,27 +124,28 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
   }
 
   useEffect(() => {
-    if (authLoading) return; // Aguardar auth terminar antes de buscar dados do usuário
+    if (authLoading) return;
     let cancelled = false;
     Promise.all([
       fetchLogSaidas(companySlug, user?.username, deferredSearchTerm),
       fetchLogEntradas(companySlug, user?.username, deferredSearchTerm),
-      fetch(`/api/transferencia-produtos/filiais?${new URLSearchParams({ company: companySlug }).toString()}`, { cache: "no-store" }).then(async (r) => {
+      fetchLogTransito(companySlug, user?.username, deferredSearchTerm),
+      fetch(
+        `/api/transferencia-produtos/filiais?${new URLSearchParams({ company: companySlug }).toString()}`,
+        { cache: "no-store" }
+      ).then(async (r) => {
         if (!r.ok) return [];
         const j = (await r.json()) as { data: FilialOption[] };
         return j.data || [];
       }),
     ])
-      .then(([saidasData, entradasData, filiaisData]) => {
+      .then(([saidasData, entradasData, transitosData, filiaisData]) => {
         if (cancelled) return;
-        const saidasSorted = [...saidasData].sort((a, b) => {
-          return parseRomaneioDateTime(b.dataEmissao).getTime() - parseRomaneioDateTime(a.dataEmissao).getTime();
-        });
-        const entradasSorted = [...entradasData].sort((a, b) => {
-          return parseRomaneioDateTime(b.dataEmissao).getTime() - parseRomaneioDateTime(a.dataEmissao).getTime();
-        });
-        setSaidas(saidasSorted);
-        setEntradas(entradasSorted);
+        const byDateDesc = (a: RomaneioListItem, b: RomaneioListItem) =>
+          parseRomaneioDateTime(b.dataEmissao).getTime() - parseRomaneioDateTime(a.dataEmissao).getTime();
+        setSaidas([...saidasData].sort(byDateDesc));
+        setEntradas([...entradasData].sort(byDateDesc));
+        setTransitos([...transitosData].sort(byDateDesc));
         setFiliais(filiaisData);
       })
       .finally(() => {
@@ -140,7 +157,8 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
   }, [companySlug, user?.username, authLoading, deferredSearchTerm]);
 
   const basePath = `/${companySlug}`;
-  const romaneiosBase = activeTab === "saida" ? saidas : entradas;
+  const romaneiosBase =
+    activeTab === "saida" ? saidas : activeTab === "entrada" ? entradas : transitos;
   const romaneios = (() => {
     const q = searchTerm.trim().toLowerCase();
     if (!q) return romaneiosBase;
@@ -160,14 +178,14 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
     <div className={styles.wrapper}>
       <div className={styles.header}>
         <h1 className={styles.title}>Romaneios</h1>
-        {(user?.role === "admin" || user?.username === "ed") && (
+        {(user?.role === "admin" || user?.role === "logistica" || user?.username === "ed") && (
           <div className={styles.tabs}>
             <button
               type="button"
               className={`${styles.tab} ${activeTab === "saida" ? styles.tabActive : ""}`}
               onClick={() => setActiveTab("saida")}
             >
-              Saída
+              Saida
             </button>
             <button
               type="button"
@@ -175,6 +193,13 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
               onClick={() => setActiveTab("entrada")}
             >
               Entrada
+            </button>
+            <button
+              type="button"
+              className={`${styles.tab} ${activeTab === "transito" ? styles.tabActiveTransit : ""}`}
+              onClick={() => setActiveTab("transito")}
+            >
+              Transito
             </button>
           </div>
         )}
@@ -186,7 +211,7 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
           <input
             type="text"
             className={styles.searchInput}
-            placeholder="Buscar por romaneio, responsável, filial, tipo..."
+            placeholder="Buscar por romaneio, responsavel, filial, tipo..."
             value={searchTerm}
             onChange={(e) => {
               setLoading(true);
@@ -194,74 +219,74 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
             }}
           />
           {searchTerm && (
-            <button className={styles.searchClear} onClick={() => setSearchTerm("")} aria-label="Limpar">×</button>
+            <button className={styles.searchClear} onClick={() => setSearchTerm("")} aria-label="Limpar">
+              x
+            </button>
           )}
         </div>
-        <p className={styles.subtitle}>
-          {loading ? "Carregando..." : `${romaneios.length} registros`}
-        </p>
+        <p className={styles.subtitle}>{loading ? "Carregando..." : `${romaneios.length} registros`}</p>
       </div>
 
       {loading ? (
         <div className={styles.emptyState}>
-          <div className={styles.emptyIcon}>📄</div>
           <div>Carregando romaneios...</div>
         </div>
       ) : romaneios.length === 0 ? (
         <div className={styles.emptyState}>
-          <div className={styles.emptyIcon}>📄</div>
-          <div>Nenhum romaneio de {activeTab === "saida" ? "saída" : "entrada"} encontrado</div>
+          <div>
+            Nenhum romaneio de {activeTab === "saida" ? "saida" : activeTab === "entrada" ? "entrada" : "transito"} encontrado
+          </div>
         </div>
       ) : (
         <div className={styles.list}>
           {romaneios.map((rom, index) => {
-            const destinoEfetivo = rom.tipo === "saida"
-              ? cleanDestinoValue(rom.destinoCodigo) || cleanDestinoValue(rom.filialDestino)
-              : cleanDestinoValue(rom.filialDestino);
+            const destinoEfetivo =
+              rom.tipo === "saida"
+                ? cleanDestinoValue(rom.destinoCodigo) || cleanDestinoValue(rom.filialDestino)
+                : cleanDestinoValue(rom.filialDestino);
             const detailUrl = `${basePath}/romaneios/${encodeURIComponent(rom.romaneio)}?tipo=${rom.tipo}&filialOrigem=${encodeURIComponent(rom.filialOrigem)}&filialDestino=${encodeURIComponent(destinoEfetivo)}&dataEmissao=${encodeURIComponent(rom.dataEmissao)}&responsavel=${encodeURIComponent(rom.responsavel || "")}&tipoRomaneio=${encodeURIComponent(rom.tipoRomaneio || "")}`;
             const confirmados = rom.qtdConfirmados ?? 0;
             const todosConfirmados = rom.qtdProdutos > 0 && confirmados >= rom.qtdProdutos;
+            const isTransito = rom.tipo === "transito";
+            const isTransitoLiberado = rom.tipo === "entrada" && rom.status === "Transito liberado";
+            const destinoBadge = destinoEfetivo ? getFilialDisplayName(destinoEfetivo) : "-";
+
             return (
-              <Link key={`${rom.tipo}-${rom.romaneio}-${rom.filialOrigem}-${rom.filialDestino}-${index}`} href={detailUrl} className={`${styles.card} ${todosConfirmados ? styles.cardConfirmado : ""}`}>
+              <Link
+                key={`${rom.tipo}-${rom.romaneio}-${rom.filialOrigem}-${rom.filialDestino}-${index}`}
+                href={detailUrl}
+                className={`${styles.card} ${todosConfirmados ? styles.cardConfirmado : ""} ${isTransito ? styles.cardTransit : ""}`}
+              >
                 <div className={styles.cardHeader}>
                   <span className={styles.romaneioId}>#{rom.romaneio}</span>
-                  {rom.tipo === "saida" ? (
-                    <span
-                      className={`${styles.status} ${
-                        destinoEfetivo ? styles.statusConcluida : styles.statusVazio
-                      }`}
-                    >
-                      {destinoEfetivo
-                        ? getFilialDisplayName(destinoEfetivo)
-                        : "—"}
-                    </span>
-                  ) : (
-                    <span className={`${styles.status} ${styles.statusConcluida}`}>
-                      {destinoEfetivo
-                        ? getFilialDisplayName(destinoEfetivo)
-                        : "—"}
-                    </span>
-                  )}
-                  {todosConfirmados && (
-                    <span className={styles.badgeConfirmado}>✓ Confirmado</span>
-                  )}
+                  <span className={`${styles.status} ${destinoEfetivo ? styles.statusConcluida : styles.statusVazio}`}>
+                    {destinoBadge}
+                  </span>
+                  {isTransito ? (
+                    <span className={`${styles.status} ${styles.statusTransito}`}>Em transito</span>
+                  ) : isTransitoLiberado ? (
+                    <span className={`${styles.status} ${styles.statusTransitoLiberado}`}>Transito liberado</span>
+                  ) : !isTransito && todosConfirmados ? (
+                    <span className={styles.badgeConfirmado}>Confirmado</span>
+                  ) : null}
                 </div>
-                <div className={styles.cardDetails}>
-                  Responsável: {rom.responsavel || "—"}
-                </div>
-                <div className={styles.cardDetails}>
-                  Tipo de romaneio: {rom.tipoRomaneio?.trim() || "—"}
-                </div>
+
+                <div className={styles.cardDetails}>Responsavel: {rom.responsavel || "-"}</div>
+                {isTransito && (
+                  <div className={styles.cardDetails}>
+                    Origem: {getFilialDisplayName(rom.filialOrigem) || "-"}
+                  </div>
+                )}
+                <div className={styles.cardDetails}>Tipo de romaneio: {rom.tipoRomaneio?.trim() || "-"}</div>
+
                 <div className={styles.cardFooter}>
                   <span className={styles.counts}>
-                    <span className={styles.countIcon}>👁</span> {rom.qtdProdutos} produtos • {rom.qtdItens} itens
-                    {!todosConfirmados && confirmados > 0 && (
+                    <span className={styles.countIcon}>Itens</span> {rom.qtdProdutos} produtos • {rom.qtdItens} itens
+                    {!isTransito && !todosConfirmados && confirmados > 0 && (
                       <span className={styles.confirmadosParcial}>{confirmados}/{rom.qtdProdutos} confirmados</span>
                     )}
                   </span>
-                  <span className={styles.date}>
-                    {formatRomaneioDateTimeBrasilia(rom.dataEmissao)}
-                  </span>
+                  <span className={styles.date}>{formatRomaneioDateTimeBrasilia(rom.dataEmissao)}</span>
                 </div>
                 <span className={styles.chevron}>›</span>
               </Link>

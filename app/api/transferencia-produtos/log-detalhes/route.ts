@@ -20,7 +20,7 @@ interface LogDetalheItem {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const tipo = searchParams.get('tipo'); // 'saida' | 'entrada'
+  const tipo = searchParams.get('tipo'); // 'saida' | 'entrada' | 'transito'
   const romaneio = searchParams.get('romaneio')?.trim();
   const filialOrigem = searchParams.get('filialOrigem')?.trim();
   const filialDestino = searchParams.get('filialDestino')?.trim();
@@ -34,11 +34,12 @@ export async function GET(request: Request) {
   
   // Para entradas isoladas, filialOrigem pode estar vazio
   // Para saídas isoladas, filialDestino pode estar vazio (representado como '—')
-  const isEntradaIsolada = tipo === 'entrada' && (!filialOrigem || filialOrigem.trim() === '' || filialOrigem === '—');
+  const isEntradaLike = tipo === 'entrada' || tipo === 'transito';
+  const isEntradaIsolada = isEntradaLike && (!filialOrigem || filialOrigem.trim() === '' || filialOrigem === '—');
   const isSaidaIsolada = tipo === 'saida' && (!filialDestino || filialDestino.trim() === '' || filialDestino === '—');
   
   // Validação: para entradas, filialDestino é obrigatório; para saídas, filialOrigem é obrigatório
-  if (tipo === 'entrada' && !filialDestino) {
+  if (isEntradaLike && !filialDestino) {
     return NextResponse.json(
       { error: 'Parâmetro obrigatório para entrada: filialDestino' },
       { status: 400 }
@@ -51,8 +52,8 @@ export async function GET(request: Request) {
     );
   }
 
-  if (tipo !== 'saida' && tipo !== 'entrada') {
-    return NextResponse.json({ error: 'tipo deve ser "saida" ou "entrada"' }, { status: 400 });
+  if (tipo !== 'saida' && tipo !== 'entrada' && tipo !== 'transito') {
+    return NextResponse.json({ error: 'tipo deve ser "saida", "entrada" ou "transito"' }, { status: 400 });
   }
 
   try {

@@ -104,6 +104,26 @@ async function executarEntradaEstoqueLote(
   return { ok: true, romaneio: json.romaneio };
 }
 
+async function liberarTransitoLinx(
+  username: string,
+  romaneio: string,
+  filialDestino: string,
+  filialOrigem: string
+): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch("/api/romaneios/liberar-transito", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-auth-username": username },
+    body: JSON.stringify({
+      romaneio,
+      filialDestino,
+      filialOrigem,
+    }),
+  });
+  if (res.ok) return { ok: true };
+  const json = await res.json().catch(() => ({}));
+  return { ok: false, error: (json as { error?: string }).error || "Erro ao liberar trânsito" };
+}
+
 // ---------- tipos ----------
 
 export interface RomaneioDetalheItem {
@@ -134,7 +154,7 @@ interface RomaneioDetalhePageProps {
   companySlug: string;
   companyName: string;
   romaneioId: string;
-  tipo: "saida" | "entrada";
+  tipo: "saida" | "entrada" | "transito";
   filialOrigem: string;
   filialDestino: string;
   dataEmissao?: string;
@@ -145,12 +165,17 @@ interface RomaneioDetalhePageProps {
 // ---------- fetch helpers ----------
 
 async function fetchDetalhes(
-  tipo: "saida" | "entrada",
+  tipo: "saida" | "entrada" | "transito",
   romaneio: string,
   filialOrigem: string,
   filialDestino: string
 ): Promise<RomaneioDetalheItem[]> {
-  const params = new URLSearchParams({ tipo, romaneio, filialOrigem, filialDestino });
+  const params = new URLSearchParams({
+    tipo: tipo === "transito" ? "entrada" : tipo,
+    romaneio,
+    filialOrigem,
+    filialDestino,
+  });
   const response = await fetch(`/api/transferencia-produtos/log-detalhes?${params.toString()}`, {
     cache: "no-store",
   });
@@ -248,6 +273,10 @@ export default function RomaneioDetalhePage({
   tipoRomaneio = "",
 }: RomaneioDetalhePageProps) {
   const { user } = useAuth();
+  const isSaida = tipo === "saida";
+  const isEntrada = tipo === "entrada";
+  const isTransito = tipo === "transito";
+  const isEntradaLike = isEntrada || isTransito;
   const [itens, setItens] = useState<RomaneioDetalheItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [responsavelPadrao, setResponsavelPadrao] = useState<string | null>(null);
@@ -311,6 +340,7 @@ export default function RomaneioDetalhePage({
   const [editRomaneioSaving, setEditRomaneioSaving] = useState(false);
   const [editRomaneioErro, setEditRomaneioErro] = useState<string | null>(null);
   const [editRomaneioSucesso, setEditRomaneioSucesso] = useState<string | null>(null);
+  const [liberacaoTransitoMsg, setLiberacaoTransitoMsg] = useState<string | null>(null);
 
   // Inicializa quantidades quando itens carregam
   useEffect(() => {
@@ -337,7 +367,7 @@ export default function RomaneioDetalhePage({
 
   // --- load destino ---
   const loadDestino = useCallback(() => {
-    if (tipo !== "saida") return;
+    if (!isSaida) return;
     setLoadingDestino(true);
     fetchDestinoRomaneio(companySlug, romaneioId, filialOrigem)
       .then((val) => {
@@ -347,17 +377,17 @@ export default function RomaneioDetalhePage({
         setDestinoSelected(selected);
       })
       .finally(() => setLoadingDestino(false));
-  }, [companySlug, romaneioId, filialOrigem, filialDestino, tipo]);
+  }, [companySlug, romaneioId, filialOrigem, filialDestino, isSaida]);
 
   useEffect(() => {
     let cancelled = false;
-    const fd = tipo === "saida" ? destinoSelected : filialDestino;
+    const fd = isSaida ? destinoSelected : filialDestino;
     setLoading(true);
     fetchDetalhes(tipo, romaneioId, filialOrigem, fd).then((data) => {
       if (!cancelled) { setItens(data); setLoading(false); }
     });
     return () => { cancelled = true; };
-  }, [tipo, romaneioId, filialOrigem, filialDestino, destinoSelected]);
+  }, [tipo, romaneioId, filialOrigem, filialDestino, destinoSelected, isSaida]);
 
   useEffect(() => {
     const matrizExcluida = MATRIZ_EXCLUIDA_DESTINO[companySlug];
@@ -377,36 +407,36 @@ export default function RomaneioDetalhePage({
       return filtered;
     };
 
-    if (tipo === "saida") {
+    if (isSaida) {
       fetchFiliais(companySlug).then(data => setFiliais(applyFilter(data)));
       loadDestino();
-    } else {
+    } else if (isEntrada) {
       // Entradas também precisam das filiais (para o modal "Dar Saída")
       fetchFiliais(companySlug).then(data => setFiliais(applyFilter(data)));
     }
-  }, [tipo, tipoRomaneio, companySlug, loadDestino]);
+  }, [isEntrada, isSaida, tipoRomaneio, companySlug, loadDestino]);
 
   useEffect(() => {
-    if (tipo === "entrada" && filialDestino) {
+    if (isEntradaLike && filialDestino) {
       fetchConfirmados(companySlug, romaneioId, filialDestino).then(setConfirmados);
     }
-  }, [tipo, companySlug, romaneioId, filialDestino]);
+  }, [isEntradaLike, companySlug, romaneioId, filialDestino]);
 
   useEffect(() => {
-    if (tipo === "saida" && destinoSelected) {
+    if (isSaida && destinoSelected) {
       fetchConfirmados(companySlug, romaneioId, destinoSelected).then(setConfirmados);
-    } else if (tipo === "saida") {
+    } else if (isSaida) {
       setConfirmados(new Map());
     }
-  }, [tipo, companySlug, romaneioId, destinoSelected]);
+  }, [isSaida, companySlug, romaneioId, destinoSelected]);
 
   // Confirmar tudo de uma vez
   const handleConfirmarTudo = useCallback(async () => {
     if (!user?.username) return;
 
-    const filialRef = tipo === "saida" ? destinoSelected : filialDestino;
+    const filialRef = isSaida ? destinoSelected : filialDestino;
 
-    if (tipo === "saida" && !destinoSelected) {
+    if (isSaida && !destinoSelected) {
       setErroConfirmacao("Destino não definido. Peça ao administrador para definir a filial destino.");
       return;
     }
@@ -425,7 +455,28 @@ export default function RomaneioDetalhePage({
     setErroConfirmacao(null);
 
     try {
-      if (tipo === "saida") {
+      if (isTransito) {
+        const possuiDivergencia = itens.some((item) => {
+          const chave = `${item.produto}|${item.corProduto ?? ""}`;
+          return (quantidades.get(chave) ?? item.qtde) !== item.qtde;
+        });
+        if (possuiDivergencia) {
+          setErroConfirmacao("Romaneios em trÃ¢nsito do Linx devem ser confirmados com a quantidade integral do faturamento.");
+          return;
+        }
+
+        const result = await liberarTransitoLinx(
+          user.username,
+          romaneioId,
+          filialDestino,
+          filialOrigem
+        );
+        if (!result.ok) {
+          setErroConfirmacao(result.error ?? "Erro ao liberar trÃ¢nsito do Linx.");
+          return;
+        }
+        setLiberacaoTransitoMsg(`TrÃ¢nsito liberado com sucesso para ${filialDestino}.`);
+      } else if (isSaida) {
         // Registra entrada de estoque em lote (1 romaneio para todos)
         const result = await executarEntradaEstoqueLote(
           user.username,
@@ -464,7 +515,7 @@ export default function RomaneioDetalhePage({
       });
 
       // Rebusca os itens para refletir o estoque atualizado após a entrada
-      const fd = tipo === "saida" ? destinoSelected : filialDestino;
+      const fd = isSaida ? destinoSelected : filialDestino;
       fetchDetalhes(tipo, romaneioId, filialOrigem, fd).then((data) => {
         if (data.length > 0) setItens(data);
       });
@@ -473,7 +524,7 @@ export default function RomaneioDetalhePage({
     } finally {
       setConfirmandoTudo(false);
     }
-  }, [user?.username, itens, quantidades, tipo, destinoSelected, filialDestino, companySlug, romaneioId, responsavelPadrao, filialOrigem]);
+  }, [user?.username, isSaida, itens, quantidades, isTransito, romaneioId, filialDestino, filialOrigem, companySlug, destinoSelected, responsavelPadrao, tipo]);
 
   // Desconfirma item individualmente (sem reverter estoque)
   const handleDesconfirmar = useCallback(async (produto: string, corProduto: string | null) => {
@@ -481,7 +532,7 @@ export default function RomaneioDetalhePage({
     const cor = corProduto ?? "";
     const chave = `${produto}|${cor}`;
     setConfirmandoKey(chave);
-    const filialRef = tipo === "saida" ? destinoSelected : filialDestino;
+    const filialRef = isSaida ? destinoSelected : filialDestino;
     const ok = await postConfirmacao(
       user.username, companySlug, romaneioId, filialRef,
       produto, cor, 0, "desconfirmar"
@@ -494,7 +545,7 @@ export default function RomaneioDetalhePage({
       });
     }
     setConfirmandoKey(null);
-  }, [user?.username, companySlug, romaneioId, filialDestino, destinoSelected, tipo]);
+  }, [user?.username, companySlug, romaneioId, filialDestino, destinoSelected, isSaida]);
 
   const handleEditRomaneio = useCallback(async () => {
     if (!editRomaneioAlvo || !editRomaneioValor.trim() || !user?.username) return;
@@ -541,9 +592,10 @@ export default function RomaneioDetalhePage({
     if (novaQtd === item.qtde) { setEditQtdModal(null); return; }
     setEditQtdSaving(true);
     setEditQtdErro(null);
-    const filialDestinoRef = tipo === "saida" ? destinoSelected : filialDestino;
+    const filialDestinoRef = isSaida ? destinoSelected : filialDestino;
+    const tipoEdicao = isTransito ? "entrada" : tipo;
     const result = await editarQtdRomaneio(
-      user.username, tipo, romaneioId,
+      user.username, tipoEdicao, romaneioId,
       filialOrigem, filialDestinoRef,
       item.produto, item.corProduto, item.qtde, novaQtd
     );
@@ -554,8 +606,8 @@ export default function RomaneioDetalhePage({
         return {
           ...i,
           qtde: novaQtd,
-          estoqueOrigem: tipo === "saida" ? i.estoqueOrigem - diff : i.estoqueOrigem,
-          estoqueDestino: tipo === "entrada" ? i.estoqueDestino + diff : i.estoqueDestino,
+          estoqueOrigem: isSaida ? i.estoqueOrigem - diff : i.estoqueOrigem,
+          estoqueDestino: isEntradaLike ? i.estoqueDestino + diff : i.estoqueDestino,
         };
       }));
       setEditQtdModal(null);
@@ -563,7 +615,7 @@ export default function RomaneioDetalhePage({
       setEditQtdErro(result.error ?? "Erro ao salvar");
     }
     setEditQtdSaving(false);
-  }, [editQtdModal, user?.username, tipo, romaneioId, filialOrigem, filialDestino, destinoSelected]);
+  }, [editQtdModal, user?.username, tipo, romaneioId, filialOrigem, filialDestino, destinoSelected, isEntradaLike, isSaida, isTransito]);
 
   const handleDestinoChange = useCallback(async (codFilial: string) => {
     setDestinoSelected(codFilial);
@@ -590,7 +642,7 @@ export default function RomaneioDetalhePage({
 
   const handleExportXlsx = useCallback(() => {
     const destinoPlanilha =
-      tipo === "saida"
+      isSaida
         ? (destinoDisplay || "").trim() || "—"
         : (filialDestino || "").trim() || "—";
 
@@ -615,12 +667,12 @@ export default function RomaneioDetalhePage({
       "QTD ROMANEIO",
       "ESTOQUE ORIGEM",
       "ESTOQUE DESTINO",
-      ...(tipo === "saida" ? ["QTD CONFIRMADA", "STATUS CONFIRMAÇÃO"] : []),
+      ...((isSaida || isTransito) ? ["QTD CONFIRMADA", "STATUS CONFIRMAÇÃO"] : []),
     ];
 
     const rows: Array<Array<string | number>> = itens.map((item) => {
       const destinoCell =
-        tipo === "saida"
+        isSaida
           ? destinoPlanilha
           : (item.destino && item.destino.trim()) || "—";
 
@@ -645,7 +697,7 @@ export default function RomaneioDetalhePage({
         item.estoqueDestino,
       ];
 
-      if (tipo === "saida") {
+      if (isSaida || isTransito) {
         base.push(qtdeConfirmada, statusConfirmacao);
       }
       return base;
@@ -683,7 +735,7 @@ export default function RomaneioDetalhePage({
       .concat(".xlsx");
 
     XLSX.writeFile(wb, filename, { compression: true });
-  }, [tipo, destinoDisplay, filialDestino, filialOrigem, responsavel, dataEmissao, romaneioId, itens, confirmados]);
+  }, [tipo, destinoDisplay, filialDestino, filialOrigem, responsavel, dataEmissao, romaneioId, itens, confirmados, isSaida, isTransito]);
 
   // Itens ainda não confirmados com qty > 0 (serão enviados no próximo "Confirmar Tudo")
   const itensParaConfirmar = itens.filter((item) => {
@@ -700,7 +752,7 @@ export default function RomaneioDetalhePage({
     !todosConfirmados &&
     itensParaConfirmar.length > 0 &&
     !confirmandoTudo &&
-    (tipo !== "saida" || !!destinoSelected);
+    (!isSaida || !!destinoSelected);
 
   async function handleDarSaidaTodos() {
     if (!darSaidaDestino || !user?.username) return;
@@ -787,7 +839,7 @@ export default function RomaneioDetalhePage({
         </div>
       </header>
 
-      {tipo === "saida" && canSetDestino && (
+      {isSaida && canSetDestino && (
         <div className={styles.destinoSection}>
           <label htmlFor="destino-romaneio-detalhe" className={styles.destinoLabel}>
             Filial destino
@@ -826,12 +878,33 @@ export default function RomaneioDetalhePage({
         </div>
       )}
 
-      {tipo === "saida" && !canSetDestino && destinoDisplay && (
+      {isSaida && !canSetDestino && destinoDisplay && (
         <p className={styles.destinoReadOnly}>Destino: {destinoDisplay}</p>
+      )}
+
+      {isTransito && (
+        <>
+          <p className={styles.destinoReadOnly}>Origem: {filialOrigem || "â€”"}</p>
+          <p className={styles.destinoReadOnly}>Destino: {filialDestino || "â€”"}</p>
+        </>
       )}
 
       {erroConfirmacao && (
         <div className={styles.erroConfirmacao}>{erroConfirmacao}</div>
+      )}
+
+      {liberacaoTransitoMsg && (
+        <div className={styles.romaneioGeradoBanner}>
+          <span>{liberacaoTransitoMsg}</span>
+          <button
+            type="button"
+            className={styles.fecharBannerBtn}
+            onClick={() => setLiberacaoTransitoMsg(null)}
+            title="Fechar"
+          >
+            âœ•
+          </button>
+        </div>
       )}
 
       <div className={styles.cards}>
@@ -854,10 +927,10 @@ export default function RomaneioDetalhePage({
       {/* Barra de ações */}
       {user && (
         <div className={styles.confirmarTudoBar}>
-          {tipo === "saida" && !todosConfirmados && (
+          {(isSaida || isTransito) && !todosConfirmados && (
             <button
               type="button"
-              className={styles.confirmarTudoBtn}
+              className={`${styles.confirmarTudoBtn} ${isTransito ? styles.confirmarTudoBtnTransit : ""}`}
               onClick={() => setConfirmarTudoModalAberto(true)}
               disabled={!podeConfirmar}
             >
@@ -866,7 +939,7 @@ export default function RomaneioDetalhePage({
                 : `Confirmar Tudo (${itensParaConfirmar.length} produto${itensParaConfirmar.length !== 1 ? "s" : ""})`}
             </button>
           )}
-          {tipo === "entrada" && itens.length > 0 && (
+          {isEntrada && itens.length > 0 && (
             <button
               type="button"
               className={styles.darSaidaTodosBtn}
@@ -1092,12 +1165,12 @@ export default function RomaneioDetalhePage({
       {editQtdModal && (() => {
         const { item, novaQtd } = editQtdModal;
         const diff = novaQtd - item.qtde;
-        const estoqueAfetadoAtual = tipo === "saida" ? item.estoqueOrigem : item.estoqueDestino;
-        const estoqueAfetadoNovo = tipo === "saida" ? estoqueAfetadoAtual - diff : estoqueAfetadoAtual + diff;
-        const filialAfetada = tipo === "saida"
+        const estoqueAfetadoAtual = isSaida ? item.estoqueOrigem : item.estoqueDestino;
+        const estoqueAfetadoNovo = isSaida ? estoqueAfetadoAtual - diff : estoqueAfetadoAtual + diff;
+        const filialAfetada = isSaida
           ? (item.filialOrigem || filialOrigem)
           : (item.filialDestino || filialDestino);
-        const labelEstoque = tipo === "saida" ? "Estoque origem" : "Estoque destino";
+        const labelEstoque = isSaida ? "Estoque origem" : "Estoque destino";
         const semAlteracao = novaQtd === item.qtde;
         return (
           <div
@@ -1194,15 +1267,15 @@ export default function RomaneioDetalhePage({
               <th>COR</th>
               <th>DESTINO</th>
               <th>QTD ROMANEIO</th>
-              {tipo === "saida" && destinoSelected && <th>ESTOQUE ({destinoDisplay})</th>}
-              {tipo === "entrada" && <th>ESTOQUE ({itens[0]?.filialDestino || filialDestino})</th>}
-              {tipo === "saida" && <th>CONFIRMAR ENTRADA</th>}
+              {isSaida && destinoSelected && <th>ESTOQUE ({destinoDisplay})</th>}
+              {isEntradaLike && <th>ESTOQUE ({itens[0]?.filialDestino || filialDestino})</th>}
+              {(isSaida || isTransito) && <th>{isTransito ? "LIBERAR TRÂNSITO" : "CONFIRMAR ENTRADA"}</th>}
             </tr>
           </thead>
           <tbody>
             {itens.map((item, idx) => {
               const destinoCell =
-                tipo === "saida"
+                isSaida
                   ? destinoDisplay || "—"
                   : (item.destino && item.destino.trim()) || "—";
 
@@ -1233,7 +1306,7 @@ export default function RomaneioDetalhePage({
                   <td>
                     <div className={styles.qtdCell}>
                       <span className={styles.qtdValue}>{item.qtde}</span>
-                      {(user?.role === "admin" || user?.role === "logistica") && (
+                      {!isTransito && (user?.role === "admin" || user?.role === "logistica") && (
                         <button
                           type="button"
                           className={styles.editQtdBtn}
@@ -1250,7 +1323,7 @@ export default function RomaneioDetalhePage({
                   </td>
 
                   {/* Estoque da filial destino (saídas — só quando destino definido) */}
-                  {tipo === "saida" && destinoSelected && (
+                  {isSaida && destinoSelected && (
                     <td>
                       <span className={item.estoqueDestino === 0 ? styles.estoqueZero : styles.estoqueValor}>
                         {item.estoqueDestino}
@@ -1259,7 +1332,7 @@ export default function RomaneioDetalhePage({
                   )}
 
                   {/* Estoque da filial de entrada (entradas) */}
-                  {tipo === "entrada" && (
+                  {isEntradaLike && (
                     <td>
                       <span className={item.estoqueDestino === 0 ? styles.estoqueZero : styles.estoqueValor}>
                         {item.estoqueDestino}
@@ -1268,7 +1341,7 @@ export default function RomaneioDetalhePage({
                   )}
 
                   {/* Coluna de confirmação — apenas saídas */}
-                  {tipo === "saida" && (
+                  {(isSaida || isTransito) && (
                     <td className={styles.recebidoCell}>
                       {isZerando || confirmandoTudo ? (
                         <span className={styles.loadingDots}>...</span>

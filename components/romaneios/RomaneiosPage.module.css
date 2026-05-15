@@ -50,6 +50,17 @@
   color: #fff;
 }
 
+.tabActiveTransit {
+  background: #ea580c;
+  color: #fff;
+  border-color: #ea580c;
+}
+
+.tabActiveTransit:hover {
+  background: #c2410c;
+  color: #fff;
+}
+
 .searchBox {
   display: flex;
   align-items: center;
@@ -129,6 +140,15 @@
   background: #dcfce7;
 }
 
+.cardTransit {
+  border-left: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+.cardTransit:hover {
+  background: #f9fafb;
+}
+
 .cardHeader {
   display: flex;
   align-items: center;
@@ -169,6 +189,17 @@
 .statusVazio {
   background: #f3f4f6;
   color: #6b7280;
+}
+
+.statusTransito {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.statusTransitoLiberado {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fdba74;
 }
 
 .badgeConfirmado {

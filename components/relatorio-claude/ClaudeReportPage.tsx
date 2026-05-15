@@ -398,13 +398,22 @@ function ReportView({
     : report.summary.activeStoreCount > 0
       ? `${report.summary.activeStoreCount} ${report.summary.activeStoreCount === 1 ? "loja" : "lojas"}`
       : "rede";
-  const coverTitle = `${dominantFamily}\nem ${coverScopeLabel}.`;
-  const coverMeta = [
-    report.scopeLabel.toUpperCase(),
-    `GRADE ${gradeLabel}`,
-    dominantFamily.toUpperCase(),
-    hasChannelView ? "LOJA + E-COMMERCE" : "LOJA",
-  ].join(" · ");
+  const hasFilters = report.appliedFilters.grades.length > 0 || report.appliedFilters.subgrupos.length > 0 || report.appliedFilters.colecoes.length > 0;
+  const coverTitle = hasFilters
+    ? `${dominantFamily}\nem ${coverScopeLabel}.`
+    : `Performance Geral\nem ${coverScopeLabel}.`;
+  const coverGradeDisplay = report.appliedFilters.grades.length === 0 ? "GERAL" : gradeLabel;
+  const coverMeta = hasFilters
+    ? [
+        report.scopeLabel.toUpperCase(),
+        `GRADE ${gradeLabel}`,
+        dominantFamily.toUpperCase(),
+        hasChannelView ? "LOJA + E-COMMERCE" : "LOJA",
+      ].join(" · ")
+    : [
+        report.scopeLabel.toUpperCase(),
+        hasChannelView ? "LOJA + E-COMMERCE" : "LOJA",
+      ].join(" · ");
   const coverStatsLabel = hasChannelView
     ? `${physicalStoreLabel} + e-commerce`
     : `${report.summary.activeStoreCount} ${report.summary.activeStoreCount === 1 ? "loja ativa" : "lojas ativas"}`;
@@ -420,15 +429,19 @@ function ReportView({
           <div className={styles.coverLeftCards}>
             <div className={styles.coverInfoCard}>
               <div className={styles.coverInfoLabel}>Categoria</div>
-              <div className={styles.coverInfoValue}>{gradeLabel}</div>
+              <div className={styles.coverInfoValue}>{coverGradeDisplay}</div>
             </div>
             <div className={styles.coverSubgroupGroup}>
               <div className={styles.coverInfoLabel}>Subgrupo</div>
-              {coverSubgroups.map((label) => (
-                <div key={label} className={styles.coverSubgroupCard}>
-                  {formatCoverSubgroupLabel(label)}
-                </div>
-              ))}
+              {report.appliedFilters.subgrupos.length === 0 ? (
+                <div className={styles.coverSubgroupCard}>GERAL</div>
+              ) : (
+                coverSubgroups.map((label) => (
+                  <div key={label} className={styles.coverSubgroupCard}>
+                    {formatCoverSubgroupLabel(label)}
+                  </div>
+                ))
+              )}
             </div>
           </div>
           <div className={styles.coverBottom}>Buying · Inventory Analytics</div>

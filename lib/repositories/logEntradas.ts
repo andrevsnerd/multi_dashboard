@@ -53,6 +53,7 @@ export async function fetchLogEntradas(
   const dateFilterLoja = useDateFilter
     ? `AND le.EMISSAO >= DATEADD(DAY, -${diasClamp}, GETDATE())`
     : "";
+
   const searchFilterEstoque = searchConfig.hasSearch
     ? `
           AND (
@@ -70,6 +71,7 @@ export async function fetchLogEntradas(
           )
         `
     : "";
+
   const searchFilterLoja = searchConfig.hasSearch
     ? `
           AND (
@@ -77,6 +79,8 @@ export async function fetchLogEntradas(
             OR LTRIM(RTRIM(le.ROMANEIO_PRODUTO)) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(le.FILIAL, ''))) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(le.FILIAL_ORIGEM, ''))) LIKE @searchLike
+            OR LTRIM(RTRIM(ISNULL(le.ROMANEIO_NF_SAIDA, ''))) = @searchExactRomaneio
+            OR LTRIM(RTRIM(ISNULL(le.ROMANEIO_NF_SAIDA, ''))) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(fd2.FILIAL, ''))) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(fo2.FILIAL, ''))) LIKE @searchLike
             OR LTRIM(RTRIM(ISNULL(le.RESPONSAVEL, ''))) LIKE @searchLike
@@ -108,6 +112,8 @@ export async function fetchLogEntradas(
           e.TIPO_ROMANEIO,
           e.RESPONSAVEL,
           ISNULL(e.OBS, '') AS OBS,
+          CAST(NULL AS INT) AS STATUS_TRANSITO,
+          CAST('' AS VARCHAR(30)) AS ROMANEIO_NF_SAIDA,
           (SELECT COUNT(*) FROM ESTOQUE_PROD1_ENT ep WITH (NOLOCK)
            WHERE ep.ROMANEIO_PRODUTO = e.ROMANEIO_PRODUTO AND ep.FILIAL = e.FILIAL) AS QTD_PRODUTOS,
           (SELECT ISNULL(SUM(ep.QTDE), 0) FROM ESTOQUE_PROD1_ENT ep WITH (NOLOCK)
@@ -136,6 +142,8 @@ export async function fetchLogEntradas(
           NULL AS TIPO_ROMANEIO,
           le.RESPONSAVEL,
           ISNULL(le.OBS, '') AS OBS,
+          le.STATUS_TRANSITO,
+          LTRIM(RTRIM(ISNULL(le.ROMANEIO_NF_SAIDA, ''))) AS ROMANEIO_NF_SAIDA,
           (SELECT COUNT(*) FROM LOJA_ENTRADAS_PRODUTO lep WITH (NOLOCK)
            WHERE lep.ROMANEIO_PRODUTO = le.ROMANEIO_PRODUTO AND lep.FILIAL = le.FILIAL) AS QTD_PRODUTOS,
           (SELECT ISNULL(SUM(ISNULL(lep.QTDE_ENTRADA, 0)), 0) FROM LOJA_ENTRADAS_PRODUTO lep WITH (NOLOCK)
@@ -170,34 +178,42 @@ export async function fetchLogEntradas(
       TIPO_ROMANEIO: string | null;
       RESPONSAVEL: string | null;
       OBS: string | null;
+      STATUS_TRANSITO: number | null;
+      ROMANEIO_NF_SAIDA: string | null;
       QTD_PRODUTOS: number;
       QTD_ITENS: number | null;
     }>(query);
 
-    const rows = result.recordset;
-    return rows.map((row) => ({
-      romaneio: row.ROMANEIO_PRODUTO?.toString().trim() || "",
-      filialOrigem: row.FILIAL_ORIGEM?.toString().trim() || "",
-      filialDestino: row.FILIAL_DESTINO?.toString().trim() || "",
-      dataEmissao:
-        row.EMISSAO_STR != null && String(row.EMISSAO_STR).trim() !== ""
-          ? String(row.EMISSAO_STR).trim()
-          : row.EMISSAO
-            ? new Date(row.EMISSAO).toISOString()
-            : "",
-      dataDigitacao:
-        row.DATA_DIGITACAO_STR != null && String(row.DATA_DIGITACAO_STR).trim() !== ""
-          ? String(row.DATA_DIGITACAO_STR).trim()
-          : row.DATA_DIGITACAO
-            ? new Date(row.DATA_DIGITACAO).toISOString()
-            : undefined,
-      tipoRomaneio: row.TIPO_ROMANEIO?.toString().trim() || "",
-      responsavel: row.RESPONSAVEL?.toString().trim() || "",
-      observacao: row.OBS?.toString().trim() || "",
-      qtdProdutos: row.QTD_PRODUTOS || 0,
-      qtdItens: row.QTD_ITENS ?? 0,
-      status: "Concluída",
-    }));
+    return result.recordset.map((row) => {
+      const possuiVinculoTransito =
+        (row.FILIAL_ORIGEM?.toString().trim() || "") !== "" &&
+        (row.ROMANEIO_NF_SAIDA?.toString().trim() || "") !== "";
+      const statusTransito = row.STATUS_TRANSITO == null ? null : Number(row.STATUS_TRANSITO);
+
+      return {
+        romaneio: row.ROMANEIO_PRODUTO?.toString().trim() || "",
+        filialOrigem: row.FILIAL_ORIGEM?.toString().trim() || "",
+        filialDestino: row.FILIAL_DESTINO?.toString().trim() || "",
+        dataEmissao:
+          row.EMISSAO_STR != null && String(row.EMISSAO_STR).trim() !== ""
+            ? String(row.EMISSAO_STR).trim()
+            : row.EMISSAO
+              ? new Date(row.EMISSAO).toISOString()
+              : "",
+        dataDigitacao:
+          row.DATA_DIGITACAO_STR != null && String(row.DATA_DIGITACAO_STR).trim() !== ""
+            ? String(row.DATA_DIGITACAO_STR).trim()
+            : row.DATA_DIGITACAO
+              ? new Date(row.DATA_DIGITACAO).toISOString()
+              : undefined,
+        tipoRomaneio: row.TIPO_ROMANEIO?.toString().trim() || "",
+        responsavel: row.RESPONSAVEL?.toString().trim() || "",
+        observacao: row.OBS?.toString().trim() || "",
+        qtdProdutos: row.QTD_PRODUTOS || 0,
+        qtdItens: row.QTD_ITENS ?? 0,
+        status: possuiVinculoTransito && statusTransito === 4 ? "Transito liberado" : "Concluida",
+      };
+    });
   });
 
   return entradas;
