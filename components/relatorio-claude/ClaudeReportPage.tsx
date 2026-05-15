@@ -19,6 +19,7 @@ interface ShareRankingRow {
   recentRevenue: number;
   recentShare: number;
   deltaPp: number;
+  generalShare?: number;
 }
 
 interface CurveSummaryRow {
@@ -153,6 +154,7 @@ interface ClaudeReportPayload {
     year: number;
     revenue: number;
     quantity: number;
+    note: string;
   }>;
   typeRanking: ShareRankingRow[];
   collectionRanking: ShareRankingRow[];
@@ -225,6 +227,26 @@ function fmtPp(value: number) {
   })}pp`;
 }
 
+function rangeDurationLabel(months: number, start: string, end: string): string {
+  const days = Math.max(1, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86_400_000));
+  if (days < 31) return `${days} ${days === 1 ? "dia" : "dias"}`;
+  if (months < 2) return `${months.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} meses`;
+  return `${Math.round(months)} meses`;
+}
+
+function formatPeriodHeadline(months: number, start: string, end: string): string {
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const days = Math.max(1, Math.round((new Date(end).getTime() - new Date(start).getTime()) / msPerDay));
+  if (days < 31) {
+    return `O que dizem os ${days} ${days === 1 ? "dia" : "dias"} da rede`;
+  }
+  if (months < 2) {
+    const formatted = months.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    return `O que diz esse ${formatted} mês da rede`;
+  }
+  return `O que dizem os ${Math.round(months)} meses da rede`;
+}
+
 function createEmptyRange(): DateRangeValue {
   const current = getCurrentMonthRange();
   return {
@@ -254,14 +276,14 @@ function inferSubgroupFamily(value: string) {
   const normalized = normalizeCoverText(value);
 
   if (normalized.includes("SEDA")) return "Seda";
-  if (normalized.includes("POLIESTER")) return "Poliester";
+  if (normalized.includes("POLIESTER")) return "Poliéster";
   if (normalized.includes("VISCOSE")) return "Viscose";
-  if (normalized.includes("ALGOD")) return "Algodao";
+  if (normalized.includes("ALGOD")) return "Algodão";
   if (normalized.includes("LINHO")) return "Linho";
   if (normalized.includes("CASHMERE")) return "Cashmere";
   if (normalized.includes("MODAL")) return "Modal";
-  if (normalized.includes("ACRIL")) return "Acrilico";
-  if (normalized.includes("LA ") || normalized.startsWith("LA") || normalized.includes(" LÃ")) return "La";
+  if (normalized.includes("ACRIL")) return "Acrílico";
+  if (normalized.includes("LA ") || normalized.startsWith("LA") || normalized.includes(" LÃ")) return "Lã";
   if (normalized.includes("TRICOT")) return "Tricot";
   if (normalized.includes("MALHA")) return "Malha";
   if (normalized.includes("JERSEY")) return "Jersey";
@@ -281,6 +303,42 @@ function CoverIcon() {
       <svg viewBox="0 0 64 64" className={styles.coverIconSvg}>
         <path d="M22 24v-5c0-5.5 4.5-10 10-10s10 4.5 10 10v5h3c2.2 0 4 1.8 4 4v22c0 2.2-1.8 4-4 4H19c-2.2 0-4-1.8-4-4V28c0-2.2 1.8-4 4-4h3zm4 0h12v-5c0-3.3-2.7-6-6-6s-6 2.7-6 6v5zm-2 12a3 3 0 1 0 0 .1zm16 0a3 3 0 1 0 0 .1z" fill="currentColor" />
       </svg>
+    </div>
+  );
+}
+
+function StatCardIcon({ type, positive = true }: { type: "revenue" | "sku" | "curveA" | "yoy"; positive?: boolean }) {
+  return (
+    <div className={styles.statIcon}>
+      {type === "revenue" && (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+          <polyline points="16 7 22 7 22 13" />
+        </svg>
+      )}
+      {type === "sku" && (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+          <circle cx="7" cy="7" r="1" fill="currentColor" stroke="none" />
+        </svg>
+      )}
+      {type === "curveA" && (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="8" r="6" />
+          <path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11" />
+        </svg>
+      )}
+      {type === "yoy" && (positive ? (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="12" y1="19" x2="12" y2="5" />
+          <polyline points="5 12 12 5 19 12" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <polyline points="19 12 12 19 5 12" />
+        </svg>
+      ))}
     </div>
   );
 }
@@ -407,8 +465,8 @@ function ReportView({
   const showSubgroupSlide = report.appliedFilters.subgrupos.length !== 1;
   const coverEyebrow = hasChannelView ? "Analise de produto - rede + e-com" : "Analise de produto - rede";
   const coverSubtitle = hasChannelView
-    ? `Performance, curva ABC, tipos, colecoes, cores, ranking de filiais e desempenho do e-commerce - ${report.range.months} meses de dados (${report.range.label}).`
-    : `Performance, curva ABC, tipos, colecoes, cores e ranking de filiais - ${report.range.months} meses de dados (${report.range.label}).`;
+    ? `Performance, curva ABC, tipos, colecoes, cores, ranking de filiais e desempenho do e-commerce - ${rangeDurationLabel(report.range.months, report.range.start, report.range.end)} de dados (${report.range.label}).`
+    : `Performance, curva ABC, tipos, colecoes, cores e ranking de filiais - ${rangeDurationLabel(report.range.months, report.range.start, report.range.end)} de dados (${report.range.label}).`;
   const rankingLabel = hasChannelView ? "Ranking de canais" : "Ranking de filiais";
   const rankingTitle = hasChannelView
     ? `Onde ${report.presentation.performanceLead} mais performa`
@@ -506,89 +564,144 @@ function ReportView({
       </section>
 
       <section className={styles.slide} data-pdf-slide="">
-        <div className={styles.eyebrow}>Resumo executivo</div>
-        <h1>O que dizem os {report.range.months} meses da rede</h1>
-        <p className={styles.subtitle}>
-          {report.presentation.summaryLead} soma {fmtCurrency(report.summary.totalRevenue)} no periodo {report.range.label}. A rede cresce, mas o catalogo gira mais do que parece.
-        </p>
-        <div className={`${styles.statGrid} ${styles.four}`}>
-          <div className={styles.statCard}>
-            <div className={styles.statValue}>{fmtCurrency(report.summary.totalRevenue, true)}</div>
-            <div className={styles.statLabel}>Faturamento - {report.range.months} meses</div>
-            <div className={styles.statNote}>{fmtInt(report.summary.totalUnits)} unidades vendidas</div>
-          </div>
-          <div className={styles.statCard}>
-            <div className={styles.statValue}>{fmtInt(report.summary.skuCount)}</div>
-            <div className={styles.statLabel}>SKUs com venda no periodo</div>
-            <div className={styles.statNote}>{fmtInt(curveASkus)} SKUs em Curva A</div>
-          </div>
-          <div className={styles.statCard}>
-            <div className={styles.statValue}>{fmtPct(curveAShare)}</div>
-            <div className={styles.statLabel}>do faturamento vem da Curva A</div>
-            <div className={styles.statNote}>{fmtInt(curveASkus)} SKUs lideres</div>
-          </div>
-          <div className={`${styles.statCard} ${styles.accentGreen}`}>
-            <div className={styles.statValue}>{fmtPct(report.summary.yoyNetwork, 1, true)}</div>
-            <div className={styles.statLabel}>{report.summary.yoyLabel}</div>
-            <div className={styles.statNote}>retencao Curva A: {fmtPct(report.summary.retention)}</div>
-          </div>
-        </div>
-        <div className={styles.insightStrip}>
-          A rede vende bem, mas so {fmtPct(report.summary.retention)} dos itens Curva A do periodo total permanecem A na janela recente {report.range.recentLabel}.
-        </div>
+        {(() => {
+          const periodFull = formatPeriodHeadline(report.range.months, report.range.start, report.range.end);
+          const periodShort = periodFull.replace(/ da rede$/, "");
+          const summaryHeadline = hasFilters && dominantFamily
+            ? `${dominantFamily} — ${periodShort.charAt(0).toLowerCase()}${periodShort.slice(1)}`
+            : periodFull;
+          const summarySubtitle = report.presentation.summaryLead.length > 40
+            ? report.presentation.summaryLead
+            : `${report.presentation.summaryLead} soma ${fmtCurrency(report.summary.totalRevenue)} em ${rangeDurationLabel(report.range.months, report.range.start, report.range.end)} (${report.range.label}), com ${fmtInt(report.summary.skuCount)} SKUs ativos. Variacao YoY: ${fmtPct(report.summary.yoyNetwork, 1, true)}.`;
+          // Card 4: use YoY only when meaningful; fall back to monthly projection
+          const days = Math.max(1, Math.round((new Date(report.range.end).getTime() - new Date(report.range.start).getTime()) / 86_400_000));
+          const yoyAbs = Math.abs(toFiniteNumber(report.summary.yoyNetwork));
+          const yoyMeaningful = yoyAbs > 0.05 && toFiniteNumber(report.summary.retention) < 99.9;
+          const useMonthly = !yoyMeaningful || days < 31;
+          const monthYoyPositive = toFiniteNumber(report.summary.monthProjectionYoy) >= 0;
+          const card4Positive = useMonthly ? monthYoyPositive : report.summary.yoyNetwork >= 0;
+          const card4Accent = card4Positive ? styles.accentGreen : styles.accentTerracotta;
+          const card4Value = useMonthly
+            ? fmtPct(report.summary.monthProjectionYoy, 1, true)
+            : fmtPct(report.summary.yoyNetwork, 1, true);
+          const card4Label = useMonthly
+            ? `${report.summary.monthCurrentLabel} vs ${report.summary.monthPreviousLabel} (proj.)`
+            : report.summary.yoyLabel;
+          const card4Note = useMonthly
+            ? `proj. ${fmtCurrency(report.summary.monthProjected, true)}`
+            : `${fmtPct(report.summary.retention)} dos top SKUs mantiveram posicao`;
+          const insightText = useMonthly
+            ? (monthYoyPositive
+                ? `${report.summary.monthCurrentLabel} projeta ${fmtCurrency(report.summary.monthProjected, true)} — alta de ${fmtPct(report.summary.monthProjectionYoy, 1, true)} sobre o mesmo mes do ano anterior (${report.summary.monthPreviousLabel}).`
+                : `${report.summary.monthCurrentLabel} projeta ${fmtCurrency(report.summary.monthProjected, true)} — queda de ${fmtPct(Math.abs(toFiniteNumber(report.summary.monthProjectionYoy)), 1)} vs ${report.summary.monthPreviousLabel}. Ritmo recente abaixo do ano anterior.`)
+            : (report.summary.yoyNetwork >= 0
+                ? `Crescimento YoY de ${fmtPct(report.summary.yoyNetwork, 1, true)} no periodo. ${toFiniteNumber(report.summary.retention) >= 90 ? "Mix estavel — top SKUs mantiveram posicao." : `${fmtPct(100 - toFiniteNumber(report.summary.retention))} dos lideres perderam ritmo na janela recente (${report.range.recentLabel}).`}`
+                : `Queda de ${fmtPct(Math.abs(toFiniteNumber(report.summary.yoyNetwork)), 1)} YoY. Projecao de ${report.summary.monthCurrentLabel}: ${fmtCurrency(report.summary.monthProjected, true)}.`);
+          return (
+            <>
+              <div className={styles.eyebrow}>Resumo executivo</div>
+              <h1>{summaryHeadline}</h1>
+              <p className={styles.subtitle}>{summarySubtitle}</p>
+              <div className={`${styles.statGrid} ${styles.four}`}>
+                <div className={styles.statCard}>
+                  <StatCardIcon type="revenue" />
+                  <div className={styles.statValue}>{fmtCurrency(report.summary.totalRevenue, true)}</div>
+                  <div className={styles.statLabel}>Faturamento — {rangeDurationLabel(report.range.months, report.range.start, report.range.end)}</div>
+                  <div className={styles.statNote}>{fmtInt(report.summary.totalUnits)} unidades vendidas</div>
+                </div>
+                <div className={styles.statCard}>
+                  <StatCardIcon type="sku" />
+                  <div className={styles.statValue}>{fmtInt(report.summary.skuCount)}</div>
+                  <div className={styles.statLabel}>SKUs ativos no periodo</div>
+                  <div className={styles.statNote}>{fmtInt(curveASkus)} em Curva A</div>
+                </div>
+                <div className={styles.statCard}>
+                  <StatCardIcon type="curveA" />
+                  <div className={styles.statValue}>{fmtPct(curveAShare)}</div>
+                  <div className={styles.statLabel}>do faturamento vem da Curva A</div>
+                  <div className={styles.statNote}>{fmtInt(curveASkus)} SKUs lideres</div>
+                </div>
+                <div className={`${styles.statCard} ${card4Accent}`}>
+                  <StatCardIcon type="yoy" positive={card4Positive} />
+                  <div className={styles.statValue}>{card4Value}</div>
+                  <div className={styles.statLabel}>{card4Label}</div>
+                  <div className={styles.statNote}>{card4Note}</div>
+                </div>
+              </div>
+              <div className={styles.insightStrip}>
+                <span className={styles.insightBulb} aria-hidden="true">&#128161;</span>
+                {insightText}
+              </div>
+            </>
+          );
+        })()}
       </section>
 
       <section className={styles.slide} data-pdf-slide="">
-        <div className={styles.eyebrow}>Curva ABC</div>
-        <h1>A concentracao se mantem - em escala maior</h1>
-        <p className={styles.subtitle}>
-          No periodo {report.range.label}, a Curva A responde por {fmtPct(curveAShare)} do faturamento.
-        </p>
-        <div className={styles.twoCol}>
-          <Donut
-            items={report.curveSummary.map((row, index) => ({
-              label: `Curva ${row.curve}`,
-              value: row.share,
-              valueLabel: fmtPct(row.share),
-              color: DONUT_COLORS[index] ?? DONUT_COLORS[0],
-            }))}
-            centerValue={fmtPct(curveAShare, 0)}
-            centerLabel="Curva A"
-          />
-          <div>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Curva</th>
-                  <th>SKUs</th>
-                  <th>Qtd</th>
-                  <th>Faturamento</th>
-                  <th>% Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.curveSummary.map((row) => (
-                  <tr key={row.curve}>
-                    <td>{row.curve}</td>
-                    <td>{fmtInt(row.skus)}</td>
-                    <td>{fmtInt(row.quantity)}</td>
-                    <td>{fmtCurrency(row.revenue)}</td>
-                    <td>{fmtPct(row.share)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className={styles.miniCallout}>
-              <strong>{fmtInt(curveASkus)} SKUs Curva A</strong> concentram {fmtPct(curveAShare)} das vendas.
-            </div>
-            <div className={styles.miniCallout}>
-              <strong>{fmtInt(report.curveSummary.find((row) => row.curve === "A")?.quantity ?? 0)} unidades</strong> vendidas em Curva A no periodo.
-            </div>
-            <div className={styles.miniCallout}>
-              <strong>{fmtInt(curveBPlusCUnits)} unidades B+C</strong> confirmam cauda longa ativa.
-            </div>
-          </div>
-        </div>
+        {(() => {
+          const curveARow = report.curveSummary.find((r) => r.curve === "A");
+          const curveAQty = curveARow?.quantity ?? 0;
+          const curveARevenue = curveARow?.revenue ?? 0;
+          const curveATicket = curveAQty > 0 ? curveARevenue / curveAQty : 0;
+          const curveBCSkus = report.curveSummary.filter((r) => r.curve !== "A").reduce((s, r) => s + r.skus, 0);
+          const subj = hasFilters ? dominantFamily.toLowerCase() : "a rede";
+          const motor = curveAShare >= 78 ? "motor enxuto" : curveAShare >= 65 ? "base concentrada" : "distribuição equilibrada";
+          const abcHeadline = `Concentração — ${subj} tem ${motor}`;
+          const abcSubtitle = `Em ${rangeDurationLabel(report.range.months, report.range.start, report.range.end)}, ${fmtInt(curveASkus)} produtos Curva A respondem por ${fmtPct(curveAShare)} do faturamento.`;
+          const tailAdj = curveBPlusCUnits > curveAQty * 0.25 ? "cauda relevante" : "cauda reduzida";
+          return (
+            <>
+              <div className={styles.eyebrow}>Curva ABC</div>
+              <h1>{abcHeadline}</h1>
+              <p className={styles.subtitle}>{abcSubtitle}</p>
+              <div className={`${styles.twoCol} ${styles.abcCol}`}>
+                <Donut
+                  items={report.curveSummary.map((row, index) => ({
+                    label: `Curva ${row.curve}`,
+                    value: row.share,
+                    valueLabel: fmtPct(row.share),
+                    color: DONUT_COLORS[index] ?? DONUT_COLORS[0],
+                  }))}
+                  centerValue={fmtPct(curveAShare, 0)}
+                  centerLabel="Curva A"
+                />
+                <div>
+                  <table className={styles.table}>
+                    <thead>
+                      <tr>
+                        <th>Curva</th>
+                        <th>SKUs</th>
+                        <th>Qtd</th>
+                        <th>Faturamento</th>
+                        <th>% Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {report.curveSummary.map((row) => (
+                        <tr key={row.curve}>
+                          <td>{row.curve}</td>
+                          <td>{fmtInt(row.skus)}</td>
+                          <td>{fmtInt(row.quantity)}</td>
+                          <td>{fmtCurrency(row.revenue)}</td>
+                          <td>{fmtPct(row.share)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className={styles.miniCallout}>
+                    <strong>{fmtInt(curveASkus)} SKUs Curva A</strong> — concentram {fmtPct(curveAShare)} das vendas — {motor}.
+                  </div>
+                  <div className={styles.miniCallout}>
+                    <strong>{fmtInt(curveAQty)} unidades</strong> — em Curva A{curveATicket > 0 ? `, ticket medio de ${fmtCurrency(curveATicket)}` : ""}.
+                  </div>
+                  <div className={styles.miniCallout}>
+                    <strong>{fmtInt(curveBCSkus)} SKUs B+C</strong> — vendem {fmtInt(curveBPlusCUnits)} unidades — {tailAdj}.
+                  </div>
+                </div>
+              </div>
+            </>
+          );
+        })()}
       </section>
 
       <section className={styles.slide} data-pdf-slide="">
@@ -627,115 +740,283 @@ function ReportView({
             ))}
           </tbody>
         </table>
-        <div className={styles.warningNote}>
-          {fmtInt(report.summary.ruptureCount)} SKUs ativos estao em ruptura no consolidado.
-        </div>
+        {(() => {
+          const top10 = report.topCurveA.slice(0, 10);
+          const rupturedTop = top10.filter((r) => r.stock <= 0);
+          const atRisk = top10.filter((r) => r.stock <= 2);
+          const sortedByStock = [...top10].sort((a, b) => a.stock - b.stock);
+          const worstItem = sortedByStock[0];
+
+          const line1 = atRisk.length > 0
+            ? `${atRisk.length} dos ${top10.length} SKUs do Top têm estoque ≤ 2 unidades.`
+            : `${top10.filter((r) => r.stock > 10).length} dos ${top10.length} SKUs do Top com estoque saudável (> 10 unidades).`;
+
+          let line2: string | null = null;
+          if (worstItem) {
+            if (worstItem.stock <= 0) {
+              line2 = `${worstItem.description} está em ruptura total.`;
+            } else if (worstItem.stock <= 2) {
+              line2 = `${worstItem.description} é o mais crítico — apenas ${fmtInt(worstItem.stock)} ${worstItem.stock === 1 ? "unidade" : "unidades"}.`;
+            } else if (worstItem.stock <= 5) {
+              line2 = `${worstItem.description} merece atenção — ${fmtInt(worstItem.stock)} unidades restantes.`;
+            }
+          }
+
+          const line3 = report.summary.ruptureCount > 0
+            ? `${fmtInt(report.summary.ruptureCount)} SKUs ativos estão em ruptura no consolidado.`
+            : null;
+
+          const line4 = rupturedTop.length >= 3 || atRisk.length >= 6
+            ? "Reposição é urgente."
+            : rupturedTop.length > 0 || atRisk.length >= 2
+              ? "Atenção ao reabastecimento dos itens críticos."
+              : report.summary.ruptureCount > 0
+                ? "Monitorar reposição — ruptura na rede impacta receita."
+                : "Posição de estoque confortável para o período.";
+
+          return (
+            <div className={styles.warningNote}>
+              <p>{line1}</p>
+              {line2 ? <p>{line2}</p> : null}
+              {line3 ? <p>{line3}</p> : null}
+              <p>{line4}</p>
+            </div>
+          );
+        })()}
       </section>
 
       <section className={styles.slide} data-pdf-slide="">
-        <div className={styles.eyebrow}>Comparativo anual</div>
-        <h1>2024 vs 2025 vs 2026 - a tendencia da rede</h1>
-        <p className={styles.subtitle}>
-          O comparativo anual mostra ritmo de crescimento, enquanto {report.summary.monthCurrentLabel} ajuda a ler a velocidade mais recente desse recorte.
-        </p>
-        <div className={styles.yearGrid}>
-          {report.yearSummary.slice(-3).map((row, index) => (
-            <div
-              key={row.year}
-              className={`${styles.yearCard} ${
-                index === 0 ? styles.yearSoft : index === 1 ? styles.yearLight : styles.yearDark
-              }`}
-            >
-              <div className={styles.yearLabel}>{row.year}</div>
-              <div className={styles.yearNote}>ano consolidado</div>
-              <div className={styles.yearValue}>{fmtCurrency(row.revenue, true)}</div>
-              <div className={styles.yearUnits}>{fmtInt(row.quantity)} unidades</div>
-            </div>
-          ))}
-        </div>
-        <div className={styles.compareBox}>
-          <div>
-            <div className={styles.compareTitle}>
-              {report.summary.monthPreviousLabel} vs {report.summary.monthCurrentLabel}
-            </div>
-            <div className={styles.compareBars}>
-              <div className={styles.compareBarRow}>
-                <span>{report.summary.monthCurrentLabel} projetado</span>
-                <div className={styles.compareTrack}>
-                  <div className={styles.compareFill} style={{ width: "100%" }} />
-                </div>
-                <strong>{fmtCurrency(report.summary.monthProjected)}</strong>
+        {(() => {
+          const years = report.yearSummary.slice(-3);
+          const endDate = new Date(`${report.range.end}T00:00:00Z`);
+          const endYear = endDate.getUTCFullYear();
+          const endMonth = endDate.getUTCMonth();
+          const endDay = endDate.getUTCDate();
+          const isComplete = (year: number) =>
+            year < endYear || (year === endYear && endMonth === 11 && endDay >= 28);
+          const channelSuffix = hasChannelView ? "loja + e-com somados" : "rede consolidada";
+          const yearTitles = years.map((y) => y.year).join(" vs ");
+          const annualTitle = `${yearTitles} — ${channelSuffix}`;
+          const lastFullIdx = [...years].reverse().findIndex((y) => isComplete(y.year));
+          const lastFull = lastFullIdx >= 0 ? [...years].reverse()[lastFullIdx] : null;
+          const prevOfLastFull = lastFull ? years[years.indexOf(lastFull) - 1] : null;
+          const bigYoy = lastFull && prevOfLastFull && prevOfLastFull.revenue > 0
+            ? (lastFull.revenue - prevOfLastFull.revenue) / prevOfLastFull.revenue * 100 : null;
+          const monthYoy = toFiniteNumber(report.summary.monthProjectionYoy);
+          const subj = hasFilters ? dominantFamily : "A rede";
+          const annualSubtitle = (() => {
+            const yoyPart = bigYoy !== null
+              ? `${subj} ${bigYoy >= 0 ? `cresceu ${fmtPct(bigYoy, 0, true)}` : `caiu ${fmtPct(Math.abs(bigYoy), 0)}`} em ${lastFull!.year} vs ${prevOfLastFull!.year}.`
+              : `${subj} — comparativo anual disponível.`;
+            const monthPart = monthYoy >= 0
+              ? `${report.summary.monthCurrentLabel} projeta alta de ${fmtPct(monthYoy, 1, true)} vs ${report.summary.monthPreviousLabel}.`
+              : `${report.summary.monthCurrentLabel} projeta queda de ${fmtPct(Math.abs(monthYoy), 1)} vs ${report.summary.monthPreviousLabel} — sinal de desaceleração recente.`;
+            return `${yoyPart} ${monthPart}`;
+          })();
+          const compareMax = Math.max(
+            toFiniteNumber(report.summary.monthProjected),
+            toFiniteNumber(report.summary.monthPrevious), 1
+          );
+          const projW = toFiniteNumber((report.summary.monthProjected / compareMax) * 100);
+          const prevW = toFiniteNumber((report.summary.monthPrevious / compareMax) * 100);
+          const monthYoyPositive = monthYoy >= 0;
+          const unitSuffix = hasChannelView ? "loja+ecom" : "rede";
+          const compareTitle = `${report.summary.monthPreviousLabel.toUpperCase()} vs ${report.summary.monthCurrentLabel.toUpperCase()} · ${hasChannelView ? "LOJA + E-COM" : "REDE"}`;
+          return (
+            <>
+              <div className={styles.eyebrow}>Comparativo ano anterior</div>
+              <h1>{annualTitle}</h1>
+              <p className={styles.subtitle}>{annualSubtitle}</p>
+              <div className={styles.yearGrid}>
+                {years.flatMap((row, index) => {
+                  const prev = years[index - 1];
+                  const growth = prev && prev.revenue > 0
+                    ? (row.revenue - prev.revenue) / prev.revenue * 100 : null;
+                  const cardClass = index === 0 ? styles.yearSoft : index === 1 ? styles.yearLight : styles.yearDark;
+                  const items = [];
+                  if (index > 0) {
+                    items.push(
+                      <div
+                        key={`arrow-${index}`}
+                        className={`${styles.yearArrow} ${growth !== null && growth >= 0 ? styles.yearArrowGreen : styles.yearArrowGray}`}
+                      >
+                        {growth !== null ? <span>{fmtPct(growth, 0, true)}</span> : null}
+                        <span>{"→"}</span>
+                      </div>
+                    );
+                  }
+                  items.push(
+                    <div key={row.year} className={`${styles.yearCard} ${cardClass}`}>
+                      <div className={styles.yearLabel}>{row.year}</div>
+                      <div className={styles.yearNote}>{row.note}</div>
+                      <div className={styles.yearValue}>{fmtCurrency(row.revenue, true)}</div>
+                      <div className={styles.yearUnits}>{fmtInt(row.quantity)} un. · {unitSuffix}</div>
+                    </div>
+                  );
+                  return items;
+                })}
               </div>
-              <div className={styles.compareBarRow}>
-                <span>{report.summary.monthPreviousLabel} realizado</span>
-                <div className={styles.compareTrack}>
-                  <div
-                    className={`${styles.compareFill} ${styles.compareMuted}`}
-                    style={{
-                      width: `${report.summary.monthProjected > 0
-                        ? toFiniteNumber((toFiniteNumber(report.summary.monthPrevious) / toFiniteNumber(report.summary.monthProjected)) * 100)
-                        : 0}%`,
-                    }}
-                  />
-                </div>
-                <strong>{fmtCurrency(report.summary.monthPrevious)}</strong>
-              </div>
-            </div>
-          </div>
-          <div className={styles.compareBadge}>{fmtPct(report.summary.monthProjectionYoy, 1, true)} YoY</div>
-        </div>
-      </section>
-
-      <section className={styles.slide} data-pdf-slide="">
-        <div className={styles.eyebrow}>Ranking por tipo</div>
-        <h1>Quais estampas puxam o catalogo</h1>
-        <p className={styles.subtitle}>A leitura abaixo combina participacao total e movimento na janela recente {report.range.recentLabel}.</p>
-        <div className={`${styles.twoCol} ${styles.wideRight}`}>
-          <BarList rows={report.typeRanking.slice(0, 14).map((row) => ({ label: row.label, value: row.revenue }))} formatter={(value) => fmtCurrency(value)} />
-          <div>
-            <div className={styles.podiumList}>
-              {report.typeRanking.slice(0, 3).map((row, index) => (
-                <div key={row.label} className={styles.podiumCard}>
-                  <div className={styles.podiumRank}>#{index + 1}</div>
-                  <div className={styles.podiumBody}>
-                    <div className={styles.podiumTitle}>{row.label}</div>
-                    <div className={styles.podiumSubtitle}>{fmtCurrency(row.revenue)} - {fmtInt(row.skus)} SKUs</div>
-                    <div className={styles.podiumNote}>{fmtPct(row.share)} da rede</div>
+              <div className={styles.compareBox}>
+                <div>
+                  <div className={styles.compareTitle}>{compareTitle}</div>
+                  <div className={styles.compareBars}>
+                    <div className={styles.compareBarRow}>
+                      <span>{report.summary.monthCurrentLabel} (projetado)</span>
+                      <div className={styles.compareTrack}>
+                        <div className={styles.compareFill} style={{ width: `${projW}%` }} />
+                      </div>
+                      <strong>{fmtCurrency(report.summary.monthProjected)}</strong>
+                    </div>
+                    <div className={styles.compareBarRow}>
+                      <span>{report.summary.monthPreviousLabel} (realizado)</span>
+                      <div className={styles.compareTrack}>
+                        <div className={`${styles.compareFill} ${styles.compareMuted}`} style={{ width: `${prevW}%` }} />
+                      </div>
+                      <strong>{fmtCurrency(report.summary.monthPrevious)}</strong>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-            <div className={styles.insightBox}>
-              Top 3 tipos somam {fmtPct(report.typeRanking.slice(0, 3).reduce((sum, row) => sum + row.share, 0))} do faturamento da rede.
-            </div>
-          </div>
-        </div>
+                <div className={`${styles.compareBadge} ${monthYoyPositive ? "" : styles.compareBadgeNeg}`}>
+                  <div className={styles.compareBadgeLabel}>Variação YoY</div>
+                  <div className={styles.compareBadgeValue}>{fmtPct(monthYoy, 1, true)}</div>
+                  <div className={styles.compareBadgeSub}>{report.summary.monthCurrentLabel} proj. vs {report.summary.monthPreviousLabel}</div>
+                </div>
+              </div>
+            </>
+          );
+        })()}
       </section>
 
       <section className={styles.slide} data-pdf-slide="">
-        <div className={styles.eyebrow}>Ranking por colecao</div>
-        <h1>Quais lancamentos sustentam a receita</h1>
-        <p className={styles.subtitle}>A curva recente mostra quais colecoes ainda carregam caixa e quais comecam a perder folego.</p>
-        <div className={`${styles.twoCol} ${styles.wideRight}`}>
-          <BarList rows={report.collectionRanking.slice(0, 12).map((row) => ({ label: row.label, value: row.revenue }))} formatter={(value) => fmtCurrency(value)} />
-          <div>
-            <div className={styles.podiumList}>
-              {report.collectionRanking.slice(0, 3).map((row, index) => (
-                <div key={row.label} className={styles.podiumCard}>
-                  <div className={styles.podiumRank}>#{index + 1}</div>
-                  <div className={styles.podiumBody}>
-                    <div className={styles.podiumTitle}>{row.label}</div>
-                    <div className={styles.podiumSubtitle}>{fmtCurrency(row.revenue)} - {fmtInt(row.skus)} SKUs</div>
-                    <div className={styles.podiumNote}>{fmtPct(row.share)} da rede</div>
+        {(() => {
+          const top = report.typeRanking;
+          const leader = top[0];
+          const second = top[1];
+          const risingOutsideTop3 = top.slice(3).find((r) => r.deltaPp >= 0.5);
+          const losingLeader = leader && toFiniteNumber(leader.deltaPp) < -1.5;
+          const gainLeader = leader && toFiniteNumber(leader.deltaPp) >= 0.8;
+          const top3Sum = top.slice(0, 3).reduce((s, r) => s + r.share, 0);
+          const tc = (s: string) => { const l = s.toLowerCase(); return l.charAt(0).toUpperCase() + l.slice(1); };
+          const typeSubtitle = (() => {
+            const parts: string[] = [];
+            if (leader) {
+              const hasGeneral = leader.generalShare !== undefined && leader.generalShare > 0;
+              const subjectCtx = hasFilters ? ` no ${dominantFamily.toLowerCase()}` : "";
+              const generalCtx = hasGeneral
+                ? ` (${fmtPct(leader.share)} vs ${fmtPct(leader.generalShare!)} no total)`
+                : ` com ${fmtPct(leader.share)} do faturamento`;
+              const dominance = hasGeneral && leader.share > leader.generalShare! + 2
+                ? "domina ainda mais"
+                : "lidera";
+              const momentum = gainLeader
+                ? `, ganhando ${fmtPp(leader.deltaPp)} na janela recente`
+                : losingLeader
+                  ? `, mas perde ${fmtPp(Math.abs(toFiniteNumber(leader.deltaPp)))} de participação`
+                  : "";
+              parts.push(`${tc(leader.label)} ${dominance}${subjectCtx}${generalCtx}${momentum}.`);
+            }
+            if (second) {
+              const secondMomentum = second.deltaPp > 0.5
+                ? ` acelera — ${fmtPp(second.deltaPp)} na janela recente`
+                : second.deltaPp < -1
+                  ? ` perde força (${fmtPp(second.deltaPp)})`
+                  : " mantém o pódio";
+              parts.push(`${tc(second.label)}${secondMomentum}.`);
+            }
+            if (risingOutsideTop3) {
+              const pos = top.indexOf(risingOutsideTop3) + 1;
+              parts.push(`${tc(risingOutsideTop3.label)} entra forte como ${pos}º — sinal de tendência.`);
+            }
+            return parts.join(" ");
+          })();
+          return (
+            <>
+              <div className={styles.eyebrow}>Ranking por tipo</div>
+              <h1>Quais estampas puxam o catalogo</h1>
+              <p className={styles.subtitle}>{typeSubtitle || `A leitura combina participacao total e movimento na janela recente ${report.range.recentLabel}.`}</p>
+              <div className={`${styles.twoCol} ${styles.wideRight}`}>
+                <BarList rows={top.slice(0, 14).map((row) => ({ label: row.label, value: row.revenue }))} formatter={(v) => fmtCurrency(v)} />
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  <div className={styles.podiumList}>
+                    {top.slice(0, 3).map((row, index) => (
+                      <div key={row.label} className={styles.podiumCard}>
+                        <div className={styles.podiumRank}>#{index + 1}</div>
+                        <div className={styles.podiumBody}>
+                          <div className={styles.podiumTitle}>{row.label}</div>
+                          <div className={styles.podiumSubtitle}>{fmtCurrency(row.revenue)} · {fmtInt(row.skus)} SKUs</div>
+                          <div className={styles.podiumNote}>{fmtPct(row.share)} da rede {row.deltaPp !== 0 ? `· ${fmtPp(row.deltaPp)} recente` : ""}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className={styles.insightBox} style={{ marginTop: "auto", paddingTop: "14px" }}>
+                    Top 3 somam <strong>{fmtPct(top3Sum)}</strong> do faturamento — {top3Sum >= 60 ? "concentracao alta" : top3Sum >= 45 ? "mix equilibrado" : "cauda longa relevante"}.
                   </div>
                 </div>
-              ))}
-            </div>
-            <div className={`${styles.insightStrip} ${styles.small}`}>
-              Esquentando: {warmingCollections.map((row) => `${row.label} (${fmtPp(row.deltaPp)})`).join(", ") || "sem destaque claro"}.
-            </div>
-          </div>
-        </div>
+              </div>
+            </>
+          );
+        })()}
+      </section>
+
+      <section className={styles.slide} data-pdf-slide="">
+        {(() => {
+          const cols = report.collectionRanking;
+          const colLeader = cols[0];
+          const warming = cols.filter((r) => toFiniteNumber(r.deltaPp) > 0.5).slice(0, 2);
+          const cooling = cols.filter((r) => toFiniteNumber(r.deltaPp) < -1.5).slice(0, 1);
+          const colTop3Sum = cols.slice(0, 3).reduce((s, r) => s + r.share, 0);
+          const colSubtitle = (() => {
+            const parts: string[] = [];
+            if (colLeader) {
+              const hasGeneral = colLeader.generalShare !== undefined && colLeader.generalShare > 0;
+              const subjectCtx = hasFilters ? ` no ${dominantFamily.toLowerCase()}` : "";
+              const generalCtx = hasGeneral
+                ? ` (${fmtPct(colLeader.share)} vs ${fmtPct(colLeader.generalShare!)} no total)`
+                : ` com ${fmtPct(colLeader.share)} do faturamento`;
+              const momentum = toFiniteNumber(colLeader.deltaPp) > 0.8
+                ? `, ainda acelerando (${fmtPp(colLeader.deltaPp)})`
+                : toFiniteNumber(colLeader.deltaPp) < -1.5
+                  ? `, mas perdendo fôlego (${fmtPp(colLeader.deltaPp)})`
+                  : "";
+              parts.push(`${colLeader.label} lidera${subjectCtx}${generalCtx}${momentum}.`);
+            }
+            if (warming.length > 0) {
+              parts.push(`Esquentando: ${warming.map((r) => `${r.label} (${fmtPp(r.deltaPp)})`).join(", ")}.`);
+            }
+            if (cooling.length > 0) {
+              parts.push(`${cooling[0].label} esfria — hora de queimar estoque.`);
+            }
+            return parts.join(" ") || `A curva recente mostra quais coleções carregam caixa e quais perdem fôlego.`;
+          })();
+          return (
+            <>
+              <div className={styles.eyebrow}>Ranking por coleção</div>
+              <h1>Quais lançamentos sustentam a receita</h1>
+              <p className={styles.subtitle}>{colSubtitle}</p>
+              <div className={`${styles.twoCol} ${styles.wideRight}`}>
+                <BarList rows={cols.slice(0, 12).map((r) => ({ label: r.label, value: r.revenue }))} formatter={(v) => fmtCurrency(v)} />
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  <div className={styles.podiumList}>
+                    {cols.slice(0, 3).map((row, index) => (
+                      <div key={row.label} className={styles.podiumCard}>
+                        <div className={styles.podiumRank}>#{index + 1}</div>
+                        <div className={styles.podiumBody}>
+                          <div className={styles.podiumTitle}>{row.label}</div>
+                          <div className={styles.podiumSubtitle}>{fmtCurrency(row.revenue)} · {fmtInt(row.skus)} SKUs</div>
+                          <div className={styles.podiumNote}>{fmtPct(row.share)} da rede {toFiniteNumber(row.deltaPp) !== 0 ? `· ${fmtPp(row.deltaPp)} recente` : ""}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className={styles.insightBox} style={{ marginTop: "auto" }}>
+                    Top 3 somam <strong>{fmtPct(colTop3Sum)}</strong> — {warming.length > 0 ? `${warming[0].label} lidera a aceleração` : "estabilidade no topo"}.
+                  </div>
+                </div>
+              </div>
+            </>
+          );
+        })()}
       </section>
 
       <section className={styles.slide} data-pdf-slide="">
@@ -822,7 +1103,7 @@ function ReportView({
             <div className={styles.scopeHero}>
               <div className={styles.scopeAmount}>{fmtCurrency(report.summary.totalRevenue, true)}</div>
               <div className={styles.scopeLabel}>Loja + e-com no recorte</div>
-              <div className={styles.scopeMeta}>{fmtInt(report.summary.totalUnits)} unidades - {report.range.months} meses</div>
+              <div className={styles.scopeMeta}>{fmtInt(report.summary.totalUnits)} unidades · {rangeDurationLabel(report.range.months, report.range.start, report.range.end)} ({report.range.label})</div>
               <div className={styles.scopeNarrative}>{report.channelMix.note}</div>
             </div>
             <div className={styles.scopeCard}>
@@ -887,77 +1168,174 @@ function ReportView({
       </section>
 
       <section className={styles.slide} data-pdf-slide="">
-        <div className={styles.eyebrow}>{profileEyebrow}</div>
-        <h1>{profileTitle}</h1>
-        <p className={styles.subtitle}>{profileSubtitle}</p>
-        <div className={styles.profileGrid}>
-          {report.branchProfiles.map((row) => (
-            <div key={row.filial} className={styles.profileCard}>
-              <div className={styles.profileTop}>
-                <div className={styles.profileStore}>{row.filial}</div>
-                <div className={styles.profileValue}>{fmtCurrency(row.revenue, true)}</div>
+        {(() => {
+          const profiles = report.branchProfiles;
+          const isEcom = (name: string) => /e.?com/i.test(name);
+          const fmtCols = (cols: string) =>
+            cols.split(/[,|]/).map((s) => s.trim().toUpperCase()).filter(Boolean).join(" · ");
+          const topGrowth = [...profiles].sort((a, b) => b.growth - a.growth)[0];
+          const ecomProfile = profiles.find((r) => isEcom(r.filial));
+          const profileInsight = (() => {
+            const parts: string[] = [];
+            if (topGrowth) {
+              parts.push(`${topGrowth.filial} é a operação mais acelerada (${fmtPct(topGrowth.growth, 1, true)}).`);
+            }
+            if (ecomProfile && ecomProfile.growth > 0) {
+              parts.push(`E-commerce cresce ${fmtPct(ecomProfile.growth, 1, true)} — canal digital em expansão.`);
+            }
+            return parts.join(" ");
+          })();
+          const dynSubtitle = (() => {
+            const ecom = ecomProfile;
+            const top = profiles[0];
+            if (ecom && top) {
+              return `${top.filial} lidera em faturamento. ${ecom.filial} com crescimento de ${fmtPct(ecom.growth, 1, true)}.`;
+            }
+            return profileSubtitle;
+          })();
+          return (
+            <>
+              <div className={styles.eyebrow}>{profileEyebrow}</div>
+              <h1>{profileTitle}</h1>
+              <p className={styles.subtitle}>{dynSubtitle}</p>
+              <div className={styles.profileGrid}>
+                {profiles.map((row) => {
+                  const ecom = isEcom(row.filial);
+                  const growthPositive = row.growth >= 0;
+                  return (
+                    <div
+                      key={row.filial}
+                      className={`${styles.profileCard} ${ecom ? styles.profileCardEcom : ""}`}
+                    >
+                      <div className={styles.profileHeader}>
+                        <div className={styles.profileNameRow}>
+                          <div className={styles.profileIcon} aria-hidden="true">
+                            {ecom ? (
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="2" y1="12" x2="22" y2="12" />
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                              </svg>
+                            ) : (
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                                <circle cx="12" cy="10" r="3" />
+                              </svg>
+                            )}
+                          </div>
+                          <div className={styles.profileStore}>{row.filial}</div>
+                        </div>
+                        <div className={`${styles.profileGrowthBadge} ${growthPositive ? "" : styles.profileGrowthBadgeNeg}`}>
+                          {fmtPct(row.growth, 1, true)}
+                        </div>
+                      </div>
+                      <div className={styles.profileValue}>{fmtCurrency(row.revenue, true)}</div>
+                      <div className={styles.profileMetaLabel}>Coleções principais</div>
+                      <div className={styles.profileMeta}>{fmtCols(row.collections)}</div>
+                      <div className={styles.profileMetaLabel}>Cor líder</div>
+                      <div className={`${styles.profileMeta} ${styles.profileColor}`}>{row.color.toUpperCase()}</div>
+                    </div>
+                  );
+                })}
               </div>
-              <div className={styles.profileMetaLabel}>Crescimento</div>
-              <div className={styles.profileMeta}>{fmtPct(row.growth, 1, true)}</div>
-              <div className={styles.profileMetaLabel}>Colecoes lideres</div>
-              <div className={styles.profileMeta}>{row.collections}</div>
-              <div className={styles.profileMetaLabel}>Cor lider</div>
-              <div className={`${styles.profileMeta} ${styles.profileColor}`}>{row.color}</div>
-            </div>
-          ))}
-        </div>
+              {profileInsight ? (
+                <div className={styles.insightStrip} style={{ marginTop: 16 }}>
+                  <span className={styles.insightBulb} aria-hidden="true">&#128161;</span>
+                  <strong>{profileInsight}</strong>
+                </div>
+              ) : null}
+            </>
+          );
+        })()}
       </section>
 
       <section className={styles.slide} data-pdf-slide="">
-        <div className={styles.eyebrow}>Estoque atual</div>
-        <h1>O total da rede e suficiente?</h1>
-        <p className={styles.subtitle}>A rede tem {fmtInt(report.summary.stockTotal)} unidades em estoque ativo. O desafio nao e volume agregado; e distribuicao.</p>
-        <div className={`${styles.statGrid} ${styles.three}`}>
-          <div className={styles.statCard}>
-            <div className={styles.statValue}>{fmtInt(report.summary.stockTotal)}</div>
-            <div className={styles.statLabel}>Unidades em estoque ativo</div>
-            <div className={styles.statNote}>itens com historico de venda</div>
-          </div>
-          <div className={styles.statCard}>
-            <div className={styles.statValue}>
-              {toFiniteNumber(report.summary.coverageMonths).toLocaleString("pt-BR", {
-                minimumFractionDigits: 1,
-                maximumFractionDigits: 1,
-              })}m
-            </div>
-            <div className={styles.statLabel}>Cobertura media</div>
-            <div className={styles.statNote}>ritmo medio do periodo</div>
-          </div>
-          <div className={`${styles.statCard} ${styles.accentTerracotta}`}>
-            <div className={styles.statValue}>{fmtInt(report.summary.ruptureCount)}</div>
-            <div className={styles.statLabel}>SKUs ativos em ruptura</div>
-            <div className={styles.statNote}>estoque 0 com venda historica</div>
-          </div>
-        </div>
-        <div className={styles.stockLayout}>
-          <div className={styles.vbarChart}>
-            {report.curveSummary.map((row) => (
-              <div key={row.curve} className={styles.vbarCol}>
-                <div className={styles.vbarValue}>{fmtInt(row.stock)}</div>
-                <div
-                  className={styles.vbarBar}
-                  style={{
-                    height: `${report.summary.stockTotal > 0
-                      ? toFiniteNumber((toFiniteNumber(row.stock) / toFiniteNumber(report.summary.stockTotal)) * 180, 12)
-                      : 12}px`,
-                  }}
-                />
-                <div className={styles.vbarLabel}>Curva {row.curve}</div>
+        {(() => {
+          const subj = hasFilters ? `o ${dominantFamily.toLowerCase()}` : "a rede";
+          const stockTitle = `O total é suficiente para ${subj}?`;
+          const ruptPct = report.summary.skuCount > 0
+            ? toFiniteNumber((report.summary.ruptureCount / report.summary.skuCount) * 100)
+            : 0;
+          const coverOk = toFiniteNumber(report.summary.coverageMonths) >= 1.5;
+          const stockSubtitle = `A rede tem ${fmtInt(report.summary.stockTotal)} unidades em estoque ativo${hasFilters ? ` de ${dominantFamily.toLowerCase()}` : ""} — ${coverOk ? "cobertura razoável" : "número compacto"} frente ao volume vendido. ${report.summary.ruptureCount > 0 ? `Distribuição preocupante: ${fmtInt(report.summary.ruptureCount)} SKUs já em ruptura.` : "Sem rupturas ativas no momento."}`;
+          const ruptureACount = report.ruptureTable.length;
+          const ruptureARevenue = report.ruptureTable.reduce((s, r) => s + r.revenue, 0);
+          const diagConclusion = coverOk && ruptureACount < 5
+            ? "Volume e distribuição adequados para o ritmo atual."
+            : ruptureACount >= 10
+              ? "Estoque enxuto demais para o ritmo de venda — reposição urgente."
+              : "Reposição seletiva necessária para manter o ritmo.";
+
+          // SVG bar chart
+          const barRows = report.curveSummary.map((r, i) => ({
+            ...r,
+            label: i === 0 ? `Curva A (motor)` : `Curva ${r.curve}`,
+          }));
+          const maxStock = Math.max(...barRows.map((r) => r.stock), 1);
+          const chartH = 160;
+          const barW = 80;
+          const barGap = 50;
+          const svgW = barRows.length * (barW + barGap);
+
+          return (
+            <>
+              <div className={styles.eyebrow}>Estoque atual</div>
+              <h1>{stockTitle}</h1>
+              <p className={styles.subtitle}>{stockSubtitle}</p>
+              <div className={`${styles.statGrid} ${styles.three}`} style={{ margin: "16px 0 14px" }}>
+                <div className={styles.statCard}>
+                  <StatCardIcon type="sku" />
+                  <div className={styles.statValue}>{fmtInt(report.summary.stockTotal)}</div>
+                  <div className={styles.statLabel}>Unidades em estoque ativo</div>
+                  <div className={styles.statNote}>produtos vendidos em {rangeDurationLabel(report.range.months, report.range.start, report.range.end)}</div>
+                </div>
+                <div className={styles.statCard}>
+                  <StatCardIcon type="revenue" />
+                  <div className={styles.statValue}>{toFiniteNumber(report.summary.coverageMonths).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}m</div>
+                  <div className={styles.statLabel}>Cobertura média</div>
+                  <div className={styles.statNote}>ritmo dos últimos {rangeDurationLabel(report.range.months, report.range.start, report.range.end)}</div>
+                </div>
+                <div className={`${styles.statCard} ${styles.accentTerracotta}`}>
+                  <StatCardIcon type="yoy" positive={false} />
+                  <div className={`${styles.statValue} ${styles.accentTerracottaText}`}>{fmtInt(report.summary.ruptureCount)}</div>
+                  <div className={styles.statLabel}>SKUs ativos em <strong>RUPTURA</strong></div>
+                  <div className={styles.statNote}>{fmtPct(ruptPct, 0)} da carteira ativa</div>
+                </div>
               </div>
-            ))}
-          </div>
-          <div className={styles.diagnosticBox}>
-            <div className={styles.diagTitle}>Diagnostico</div>
-            <p><strong>{fmtPct(stockCurveAShare, 0)}</strong> do estoque esta em Curva A.</p>
-            <p>Mas <strong>{fmtInt(report.summary.ruptureCount)} SKUs</strong> seguem em ruptura, pressionando venda real.</p>
-            <p><strong>Conclusao:</strong> volume agregado existe; o mix operacional precisa de reposicao mais fina.</p>
-          </div>
-        </div>
+              <div className={styles.stockLayout}>
+                <div>
+                  <div className={styles.compareTitle} style={{ marginBottom: 16 }}>Distribuição do estoque por curva</div>
+                  <svg
+                    viewBox={`0 0 ${svgW} ${chartH + 40}`}
+                    style={{ width: "100%", maxWidth: 420 }}
+                    aria-hidden="true"
+                  >
+                    {barRows.map((row, i) => {
+                      const barH = Math.max(toFiniteNumber((row.stock / maxStock) * chartH), 6);
+                      const x = i * (barW + barGap);
+                      const y = chartH - barH;
+                      return (
+                        <g key={row.curve}>
+                          <rect x={x} y={y} width={barW} height={barH} fill="#6d2e46" rx="3" />
+                          <text x={x + barW / 2} y={y - 6} textAnchor="middle" fontSize="13" fontWeight="700" fill="#2b1a1f">{fmtInt(row.stock)}</text>
+                          <text x={x + barW / 2} y={chartH + 20} textAnchor="middle" fontSize="11" fill="#6d2e46">{row.label}</text>
+                        </g>
+                      );
+                    })}
+                  </svg>
+                </div>
+                <div className={styles.diagnosticBox}>
+                  <div className={styles.diagTitle}>Diagnóstico</div>
+                  <p><strong>{fmtPct(stockCurveAShare, 0)} do estoque</strong><br />está em Curva A — {stockCurveAShare >= 55 ? "alocação OK." : "alocação baixa."}</p>
+                  {ruptureACount > 0 ? (
+                    <p>Mas: <strong>{fmtInt(ruptureACount)} SKUs em ruptura</strong><br />({report.ruptureTable.filter((r) => r.curve === "A").length} são Curva A) — {fmtCurrency(ruptureARevenue, true)} de venda histórica.</p>
+                  ) : null}
+                  <p><strong style={{ color: "#d4a373" }}>Conclusão:</strong><br /><em>{diagConclusion}</em></p>
+                </div>
+              </div>
+            </>
+          );
+        })()}
       </section>
 
       <section className={styles.slide} data-pdf-slide="">

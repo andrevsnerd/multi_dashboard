@@ -71,6 +71,7 @@ interface ShareRankingRow {
   recentRevenue: number;
   recentShare: number;
   deltaPp: number;
+  generalShare?: number;
 }
 
 interface CurveSummaryRow {
@@ -194,6 +195,7 @@ export interface ClaudeReportPayload {
     year: number;
     revenue: number;
     quantity: number;
+    note: string;
   }>;
   typeRanking: ShareRankingRow[];
   collectionRanking: ShareRankingRow[];
@@ -265,13 +267,30 @@ function monthLabelFromDate(date: Date): string {
 }
 
 function dateRangeLabel(start: Date, endInclusive: Date): string {
-  return `${monthLabelFromDate(start)} a ${monthLabelFromDate(endInclusive)}`;
+  const sYear = start.getUTCFullYear();
+  const eYear = endInclusive.getUTCFullYear();
+  const sMonth = start.getUTCMonth();
+  const eMonth = endInclusive.getUTCMonth();
+  const eLabel = `${MONTHS_PT[eMonth]}/${String(eYear).slice(-2)}`;
+
+  if (sYear === eYear && sMonth === eMonth) {
+    const startDay = start.getUTCDate();
+    const endDay = endInclusive.getUTCDate();
+    const lastDay = new Date(Date.UTC(eYear, eMonth + 1, 0)).getUTCDate();
+    if (startDay === 1 && endDay === lastDay) return eLabel;
+    return `${startDay}–${endDay} de ${eLabel}`;
+  }
+
+  if (sYear === eYear) {
+    return `${MONTHS_PT[sMonth]} a ${eLabel}`;
+  }
+
+  return `${monthLabelFromDate(start)} a ${eLabel}`;
 }
 
 function monthsBetween(start: Date, endInclusive: Date): number {
-  return (endInclusive.getUTCFullYear() - start.getUTCFullYear()) * 12
-    + (endInclusive.getUTCMonth() - start.getUTCMonth())
-    + 1;
+  const days = Math.round((endInclusive.getTime() - start.getTime()) / 86_400_000) + 1;
+  return parseFloat((days / 30.44).toFixed(1));
 }
 
 function shiftRangeByDays(range: NormalizedRange, days: number): NormalizedRange {
@@ -280,6 +299,14 @@ function shiftRangeByDays(range: NormalizedRange, days: number): NormalizedRange
     start: new Date(range.start.getTime() + delta),
     end: new Date(range.end.getTime() + delta),
   };
+}
+
+function shiftRangeByYears(range: NormalizedRange, years: number): NormalizedRange {
+  const start = new Date(range.start);
+  const end = new Date(range.end);
+  start.setUTCFullYear(start.getUTCFullYear() + years);
+  end.setUTCFullYear(end.getUTCFullYear() + years);
+  return { start, end };
 }
 
 function previousEquivalentRange(range: NormalizedRange): NormalizedRange {
@@ -1146,23 +1173,16 @@ export async function fetchClaudeReport({
     return [];
   });
 
-  const [salesRows, previousStoreRows, stockMap, suggestionRows, collectionOptions] = await Promise.all([
-    querySalesRows(
-      normalizedRange,
-      scope.posMembers,
-      scope.ecommerceMembers,
-      { colecoes: selectedColecoes, subgrupos: selectedSubgrupos, grades: selectedGrades },
-      company,
-      scope.maps
-    ),
-    querySalesRows(
-      previousEquivalentRange(normalizedRange),
-      scope.posMembers,
-      scope.ecommerceMembers,
-      { colecoes: selectedColecoes, subgrupos: selectedSubgrupos, grades: selectedGrades },
-      company,
-      scope.maps
-    ),
+  const salesFilters = { colecoes: selectedColecoes, subgrupos: selectedSubgrupos, grades: selectedGrades };
+  const hasTypeFilters = selectedSubgrupos.length > 0 || selectedGrades.length > 0;
+  const [salesRows, previousStoreRows, priorYear1Rows, priorYear2Rows, generalTypeRows, stockMap, suggestionRows, collectionOptions] = await Promise.all([
+    querySalesRows(normalizedRange, scope.posMembers, scope.ecommerceMembers, salesFilters, company, scope.maps),
+    querySalesRows(previousEquivalentRange(normalizedRange), scope.posMembers, scope.ecommerceMembers, salesFilters, company, scope.maps),
+    querySalesRows(shiftRangeByYears(normalizedRange, -1), scope.posMembers, scope.ecommerceMembers, salesFilters, company, scope.maps),
+    querySalesRows(shiftRangeByYears(normalizedRange, -2), scope.posMembers, scope.ecommerceMembers, salesFilters, company, scope.maps),
+    hasTypeFilters
+      ? querySalesRows(normalizedRange, scope.posMembers, scope.ecommerceMembers, { colecoes: selectedColecoes }, company, scope.maps)
+      : Promise.resolve([] as typeof salesRows),
     queryCurrentStock([...scope.posMembers, ...scope.ecommerceMembers], company),
     suggestionRowsPromise,
     collectionOptionsPromise,
@@ -1272,8 +1292,22 @@ export async function fetchClaudeReport({
   });
   const curveSummary = Array.from(curveSummaryMap.values());
 
-  const typeRanking = buildShareRanking(labeledSalesRows, recentWindow.start, (row) => row.tipoProduto);
-  const collectionRanking = buildShareRanking(labeledSalesRows, recentWindow.start, (row) => row.colecao);
+  const typeRankingRaw = buildShareRanking(labeledSalesRows, recentWindow.start, (row) => row.tipoProduto);
+  const generalShareMap = hasTypeFilters && generalTypeRows.length > 0
+    ? new Map(buildShareRanking(generalTypeRows.map((r) => ({ ...r, colecao: resolveCollectionLabel(r.colecao, collectionLabelMap) })), recentWindow.start, (row) => row.tipoProduto).map((r) => [r.label, r.share]))
+    : null;
+  const typeRanking = typeRankingRaw.map((r) => ({
+    ...r,
+    generalShare: generalShareMap?.get(r.label),
+  }));
+  const collectionRankingRaw = buildShareRanking(labeledSalesRows, recentWindow.start, (row) => row.colecao);
+  const generalColShareMap = hasTypeFilters && generalTypeRows.length > 0
+    ? new Map(buildShareRanking(generalTypeRows.map((r) => ({ ...r, colecao: resolveCollectionLabel(r.colecao, collectionLabelMap) })), recentWindow.start, (row) => row.colecao).map((r) => [r.label, r.share]))
+    : null;
+  const collectionRanking = collectionRankingRaw.map((r) => ({
+    ...r,
+    generalShare: generalColShareMap?.get(r.label),
+  }));
   const colorRanking = buildShareRanking(labeledSalesRows, recentWindow.start, (row) => row.corDescricao || row.cor);
   const subgroupRanking = buildShareRanking(labeledSalesRows, recentWindow.start, (row) => row.subgrupo);
 
@@ -1372,17 +1406,23 @@ export async function fetchClaudeReport({
       : "O recorte atual esta concentrado nas operacoes fisicas.",
   };
 
-  const yearSummaryMap = new Map<number, { revenue: number; quantity: number }>();
-  labeledSalesRows.forEach((row) => {
-    const year = toUtcDate(row.date).getUTCFullYear();
-    const current = yearSummaryMap.get(year) ?? { revenue: 0, quantity: 0 };
-    current.revenue += row.revenue;
-    current.quantity += row.quantity;
-    yearSummaryMap.set(year, current);
-  });
-  const yearSummary = Array.from(yearSummaryMap.entries())
-    .sort((a, b) => a[0] - b[0])
-    .map(([year, values]) => ({ year, revenue: values.revenue, quantity: values.quantity }));
+  const currentYear = endInclusive.getUTCFullYear();
+  const sumRows = (rows: typeof labeledSalesRows) => rows.reduce(
+    (acc, r) => { acc.revenue += r.revenue; acc.quantity += r.quantity; return acc; },
+    { revenue: 0, quantity: 0 }
+  );
+  const prior2Range = shiftRangeByYears(normalizedRange, -2);
+  const prior1Range = shiftRangeByYears(normalizedRange, -1);
+  const prior2End = new Date(prior2Range.end.getTime() - 86_400_000);
+  const prior1End = new Date(prior1Range.end.getTime() - 86_400_000);
+  const prior2 = sumRows(priorYear2Rows);
+  const prior1 = sumRows(priorYear1Rows);
+  const current = sumRows(labeledSalesRows);
+  const yearSummary = [
+    ...(prior2.revenue > 0 ? [{ year: currentYear - 2, ...prior2, note: dateRangeLabel(prior2Range.start, prior2End) }] : []),
+    ...(prior1.revenue > 0 ? [{ year: currentYear - 1, ...prior1, note: dateRangeLabel(prior1Range.start, prior1End) }] : []),
+    { year: currentYear, ...current, note: dateRangeLabel(normalizedRange.start, endInclusive) },
+  ];
 
   const [lastFullYear, previousFullYear] = comparableFullYears(labeledSalesRows);
   let yoyNetwork = 0;
@@ -1403,22 +1443,9 @@ export async function fetchClaudeReport({
   const daysInMonth = new Date(Date.UTC(maxDate.getUTCFullYear(), maxDate.getUTCMonth() + 1, 0)).getUTCDate();
   const monthActual = currentMonthRows.reduce((sum, row) => sum + row.revenue, 0);
   const monthProjected = observedDays > 0 ? (monthActual / observedDays) * daysInMonth : monthActual;
-  const previousSameMonth = shiftRangeByMonths(
-    normalizeRangeForQuery({
-      start: new Date(Date.UTC(maxDate.getUTCFullYear(), maxDate.getUTCMonth(), 1)),
-      end: maxDate,
-    }),
-    -12
-  );
-  const monthPreviousRows = await querySalesRows(
-    previousSameMonth,
-    scope.posMembers,
-    scope.ecommerceMembers,
-    { colecoes, subgrupos, grades },
-    company,
-    scope.maps
-  );
-  const monthPrevious = monthPreviousRows.reduce((sum, row) => sum + row.revenue, 0);
+  // Project prior period (same days in prior year) to a full month — same logic as monthProjected
+  const priorObservedDays = new Set(priorYear1Rows.map((row) => row.date)).size || observedDays;
+  const monthPrevious = priorObservedDays > 0 ? (prior1.revenue / priorObservedDays) * daysInMonth : prior1.revenue;
   const monthProjectionYoy = monthPrevious > 0 ? ((monthProjected / monthPrevious) - 1) * 100 : 0;
 
   const stockTotal = abcItems.reduce((sum, item) => sum + Math.max(0, item.stock), 0);

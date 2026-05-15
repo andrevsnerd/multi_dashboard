@@ -408,6 +408,8 @@
   border-top: 12px solid #6d2e46;
   padding: 24px 22px;
   box-shadow: 0 6px 16px rgba(78, 48, 57, 0.12);
+  display: flex;
+  flex-direction: column;
 }
 
 .accentGreen {
@@ -435,8 +437,15 @@
   font-weight: 700;
 }
 
+.statIcon {
+  width: 34px;
+  height: 34px;
+  color: #d4a373;
+  margin-bottom: 14px;
+}
+
 .statValue {
-  font-size: 54px;
+  font-size: 44px;
   line-height: 1;
 }
 
@@ -449,17 +458,37 @@
 .statNote {
   color: #8b6f7a;
   font-style: italic;
-  margin-top: 24px;
+  margin-top: auto;
+  padding-top: 16px;
   font-size: 14px;
 }
 
+.insightBulb {
+  margin-right: 8px;
+  opacity: 0.7;
+}
+
 .insightStrip,
-.miniCallout,
 .insightBox,
 .driftBanner {
   background: rgba(212, 163, 115, 0.18);
   border-left: 6px solid #d4a373;
   padding: 14px 18px;
+}
+
+.miniCallout {
+  background: #fff;
+  border-left: 5px solid #d4a373;
+  padding: 13px 16px;
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.55;
+  box-shadow: 0 2px 8px rgba(78, 48, 57, 0.07);
+}
+
+.miniCallout strong {
+  color: #6d2e46;
+  font-weight: 700;
 }
 
 .small {
@@ -468,10 +497,25 @@
 }
 
 .warningNote {
-  margin-top: 12px;
-  color: #c4622d;
-  font-style: italic;
+  margin-top: 16px;
+  background: rgba(196, 98, 45, 0.08);
+  border-left: 5px solid #c4622d;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.warningNote p {
+  margin: 0;
+  color: #7a3018;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.warningNote p:last-child {
   font-weight: 700;
+  margin-top: 4px;
 }
 
 .twoCol {
@@ -483,6 +527,12 @@
 
 .wideRight {
   grid-template-columns: 58% 42%;
+}
+
+.abcCol {
+  grid-template-columns: 40% 60%;
+  align-items: center;
+  margin-top: 48px;
 }
 
 .donutWrap {
@@ -637,6 +687,7 @@
 .compareFill,
 .microBar span,
 .bucketFill {
+  display: block;
   height: 100%;
   background-color: #6d2e46;
 }
@@ -696,17 +747,36 @@
 }
 
 .yearGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
   margin: 28px 0 24px;
 }
 
 .yearCard {
-  min-height: 250px;
-  padding: 26px 28px;
+  flex: 1;
+  min-height: 210px;
+  padding: 24px 28px;
   box-shadow: 0 6px 16px rgba(78, 48, 57, 0.12);
+  display: flex;
+  flex-direction: column;
 }
+
+.yearArrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 2px;
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.yearArrowGreen { color: #5a8c5c; }
+.yearArrowGray  { color: #b09a9a; }
 
 .yearSoft {
   background: #efe2cd;
@@ -765,8 +835,7 @@
 
 .compareTitle,
 .diagTitle,
-.driftTitle,
-.profileMetaLabel {
+.driftTitle {
   text-transform: uppercase;
   letter-spacing: 0.28em;
   font-size: 12px;
@@ -798,11 +867,35 @@
 .compareBadge {
   background: #5a8c5c;
   color: white;
-  padding: 18px;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 28px;
-  text-align: center;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-self: stretch;
+  justify-content: center;
+}
+
+.compareBadgeNeg { background: #c4622d; }
+
+.compareBadgeLabel {
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 11px;
   font-weight: 700;
+  opacity: 0.85;
+}
+
+.compareBadgeValue {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.compareBadgeSub {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-top: 2px;
 }
 
 .microBar {
@@ -821,8 +914,50 @@
   background: white;
   border-top: 8px solid #6d2e46;
   box-shadow: 0 6px 16px rgba(78, 48, 57, 0.12);
+  display: flex;
+  flex-direction: column;
   padding: 18px 20px;
   min-height: 204px;
+}
+
+.profileCardEcom {
+  background: rgba(212, 163, 115, 0.1);
+  border-top-color: #d4a373;
+}
+
+.profileHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.profileNameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profileIcon {
+  width: 18px;
+  height: 18px;
+  color: #6d2e46;
+  flex-shrink: 0;
+}
+
+.profileGrowthBadge {
+  background: #5a8c5c;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.profileGrowthBadgeNeg {
+  background: #c4622d;
 }
 
 .profileTop {
@@ -835,28 +970,43 @@
 
 .profileStore {
   text-transform: uppercase;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.1em;
   font-weight: 700;
-  font-size: 18px;
+  font-size: 13px;
+  color: #2b1a1f;
 }
 
 .profileValue {
-  font-size: 28px;
+  font-size: 32px;
+  margin: 10px 0 14px;
+}
+
+.profileMetaLabel {
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 10px;
+  font-weight: 600;
+  color: #9c7a6a;
+  margin-top: 10px;
 }
 
 .profileMeta {
-  margin-top: 10px;
-  font-weight: 700;
-  line-height: 1.4;
+  margin-top: 3px;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #3a2026;
+  letter-spacing: 0.02em;
 }
 
 .profileColor {
   color: #b96b56;
+  font-weight: 600;
 }
 
 .scopeGrid {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr;
+  grid-template-columns: 1.6fr 1fr 1fr;
   gap: 18px;
   margin-top: 26px;
   align-items: stretch;
@@ -870,7 +1020,7 @@
 .scopeHero {
   background: linear-gradient(180deg, #6d2e46 0%, #8b5161 100%);
   color: #fff7ee;
-  padding: 28px;
+  padding: 36px 32px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -879,9 +1029,10 @@
 
 .scopeAmount {
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 72px;
-  line-height: 0.96;
+  font-size: 62px;
+  line-height: 1;
   font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .scopeLabel {
@@ -941,7 +1092,7 @@
 
 .stockLayout {
   display: grid;
-  grid-template-columns: 62% 38%;
+  grid-template-columns: 58% 42%;
   gap: 26px;
   margin-top: 26px;
   align-items: end;
@@ -983,16 +1134,32 @@
   font-size: 12px;
 }
 
+.accentTerracottaText {
+  color: #c4622d;
+}
+
 .diagnosticBox {
   background: #6d2e46;
   color: #fbf2e7;
-  padding: 24px;
-  min-height: 240px;
+  padding: 26px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.diagnosticBox p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.diagnosticBox strong {
+  font-size: 15px;
 }
 
 .diagTitle {
   color: #d4a373;
-  margin-bottom: 24px;
+  margin-bottom: 4px;
 }
 
 .riskLayout {
