@@ -1182,7 +1182,7 @@ export async function fetchClaudeReport({
     querySalesRows(shiftRangeByYears(normalizedRange, -2), scope.posMembers, scope.ecommerceMembers, salesFilters, company, scope.maps),
     hasTypeFilters
       ? querySalesRows(normalizedRange, scope.posMembers, scope.ecommerceMembers, { colecoes: selectedColecoes }, company, scope.maps)
-      : Promise.resolve([] as typeof salesRows),
+      : Promise.resolve([] as SalesRow[]),
     queryCurrentStock([...scope.posMembers, ...scope.ecommerceMembers], company),
     suggestionRowsPromise,
     collectionOptionsPromise,

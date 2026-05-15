@@ -42,6 +42,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
   const { user } = useAuth();
   const { isOpen, toggle, close } = useSidebar();
   const [isMobile, setIsMobile] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const [produtosExpanded, setProdutosExpanded] = useState(false);
   const [sectionOverrides, setSectionOverrides] = useState<Record<string, boolean>>({});
 
@@ -454,6 +455,48 @@ export default function Sidebar({ companyName }: SidebarProps) {
     }))
     .filter((section) => section.items.length > 0);
 
+  const normalizedSearch = searchTerm.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const isSearching = normalizedSearch.length > 0;
+  const normalizeForSearch = (value: string) =>
+    value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+  const filteredSections = visibleSections
+    .map((section) => {
+      if (!isSearching) {
+        return section;
+      }
+
+      const sectionMatches = normalizeForSearch(section.label).includes(normalizedSearch);
+      const filteredItems = section.items
+        .map((item) => {
+          if (!item.subItems?.length) {
+            return normalizeForSearch(item.label).includes(normalizedSearch) || sectionMatches ? item : null;
+          }
+
+          const visibleSubItems = item.subItems.filter((subItem) => canSeePermission(subItem.permission));
+          const itemMatches = normalizeForSearch(item.label).includes(normalizedSearch) || sectionMatches;
+          const matchingSubItems = visibleSubItems.filter((subItem) =>
+            normalizeForSearch(subItem.label).includes(normalizedSearch)
+          );
+
+          if (!itemMatches && matchingSubItems.length === 0) {
+            return null;
+          }
+
+          return {
+            ...item,
+            subItems: itemMatches ? visibleSubItems : matchingSubItems,
+          };
+        })
+        .filter((item): item is NavItemBase => item !== null);
+
+      return {
+        ...section,
+        items: filteredItems,
+      };
+    })
+    .filter((section) => section.items.length > 0);
+
   const sectionHasActiveItem = (section: NavSection) =>
     section.items.some((item) => {
       if (item.subItems?.length) {
@@ -466,11 +509,15 @@ export default function Sidebar({ companyName }: SidebarProps) {
     });
 
   const isSectionExpanded = (section: NavSection) => {
+    if (isSearching) {
+      return true;
+    }
+
     if (section.key in sectionOverrides) {
       return sectionOverrides[section.key];
     }
 
-    return visibleSections[0]?.key === section.key || sectionHasActiveItem(section);
+    return filteredSections[0]?.key === section.key || sectionHasActiveItem(section);
   };
 
   const handleLinkClick = () => {
@@ -480,7 +527,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
   };
 
   const produtosExpandedEffective =
-    produtosExpanded || produtosSubItems.some((subItem) => subItem.isActive(pathname));
+    isSearching || produtosExpanded || produtosSubItems.some((subItem) => subItem.isActive(pathname));
 
   return (
     <>
@@ -529,7 +576,22 @@ export default function Sidebar({ companyName }: SidebarProps) {
         </div>
 
         <div className={styles.navScroll}>
-          {visibleSections.map((section) => {
+          <div className={styles.searchBox}>
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              className={styles.searchInput}
+              placeholder="Buscar menu..."
+              aria-label="Buscar menu"
+            />
+          </div>
+
+          {filteredSections.length === 0 && (
+            <div className={styles.emptyState}>Nenhum menu encontrado.</div>
+          )}
+
+          {filteredSections.map((section) => {
             const sectionExpanded = isSectionExpanded(section);
 
             return (

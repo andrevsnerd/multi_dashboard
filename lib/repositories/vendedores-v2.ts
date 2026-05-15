@@ -307,12 +307,14 @@ export async function fetchVendedoresList(
       filialFilter = buildFilialFilter(request, company, 'sales', filial, 'f');
     }
 
+    const hasProdutoSearchTerm = (produtoSearchTerm?.trim() ?? '').length >= 2;
     const needProdutoJoin =
       (grupos?.length ?? 0) > 0 ||
       (linhas?.length ?? 0) > 0 ||
       (colecoes?.length ?? 0) > 0 ||
       (subgrupos?.length ?? 0) > 0 ||
-      (grades?.length ?? 0) > 0;
+      (grades?.length ?? 0) > 0 ||
+      hasProdutoSearchTerm;
 
     const grupoFilter = buildListFilter(
       request,
@@ -349,9 +351,9 @@ export async function fetchVendedoresList(
     if (produtoId) {
       request.input('produtoId', sql.VarChar, produtoId);
       produtoFilter = 'AND vp.PRODUTO = @produtoId';
-    } else if ((produtoSearchTerm?.trim() ?? '').length >= 2) {
+    } else if (hasProdutoSearchTerm) {
       request.input('produtoSearchTerm', sql.VarChar, `%${(produtoSearchTerm ?? '').trim()}%`);
-      produtoFilter = 'AND vp.DESC_PRODUTO LIKE @produtoSearchTerm';
+      produtoFilter = "AND COALESCE(p.DESC_PRODUTO, '') LIKE @produtoSearchTerm";
     }
 
     const produtoJoin =
