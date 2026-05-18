@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { fetchCustosPorProdutos } from "@/lib/repositories/controleEstoque";
 import {
   deleteCompraSalva,
   getCompraSalva,
@@ -24,6 +25,26 @@ export async function GET(
     if (!data) {
       return NextResponse.json({ error: "Compra salva não encontrada" }, { status: 404 });
     }
+
+    // Enriquece itens sem custoUnitario salvo buscando do ERP
+    const semCusto = data.items.filter((i) => !(i.custoUnitario && i.custoUnitario > 0));
+    if (semCusto.length > 0) {
+      const produtos = [...new Set(semCusto.map((i) => i.produto.trim()).filter(Boolean))];
+      let custoMap = new Map<string, number>();
+      try {
+        custoMap = await fetchCustosPorProdutos(produtos);
+      } catch {
+        // fallback silencioso — retorna sem custo enriquecido
+      }
+      if (custoMap.size > 0) {
+        data.items = data.items.map((i) => {
+          if (i.custoUnitario && i.custoUnitario > 0) return i;
+          const custo = custoMap.get(i.produto.trim());
+          return custo && custo > 0 ? { ...i, custoUnitario: custo } : i;
+        });
+      }
+    }
+
     return NextResponse.json({ data });
   } catch (error) {
     console.error("Erro ao carregar compra salva", error);

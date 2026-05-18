@@ -61,6 +61,41 @@ export interface ExportEstoqueConsultaOptions {
   colecoes: string[];
   grupos: string[];
   categorias: CategoriaEstoque[];
+  giroDias?: number | null;
+}
+
+interface ProdutoParado {
+  produto: string;
+  codigoBarra: string;
+  descricao: string;
+  cor: string;
+  grade: string;
+  linha: string;
+  subgrupo: string;
+  colecao: string;
+  estoque: number;
+}
+
+async function fetchProdutosParados(
+  options: ExportEstoqueConsultaOptions,
+  diasGiro: number
+): Promise<ProdutoParado[]> {
+  const params = new URLSearchParams({
+    company: options.companyKey,
+    dataType: 'giro-produtos',
+    diasGiro: String(diasGiro),
+  });
+  if (options.filial) params.set('filial', options.filial);
+  options.grupos.forEach(g => params.append('grupos', g));
+  options.linhas.forEach(l => params.append('linhas', l));
+  options.colecoes.forEach(c => params.append('colecoes', c));
+  options.subgrupos.forEach(s => params.append('subgrupos', s));
+  options.grades.forEach(g => params.append('grades', g));
+
+  const res = await fetch(`/api/controle-estoque?${params.toString()}`, { cache: 'no-store' });
+  if (!res.ok) return [];
+  const json = await res.json() as { data: ProdutoParado[] };
+  return json.data ?? [];
 }
 
 async function fetchProdutosPorFilial(
@@ -266,6 +301,38 @@ export async function exportEstoqueConsultaXlsx(
     const wsResumo = XLSX.utils.aoa_to_sheet([resumoHeaders, ...resumoRows]);
     autoWidth(wsResumo);
     XLSX.utils.book_append_sheet(workbook, wsResumo, 'Estoque Linha x Filial');
+  }
+
+  // ─── ABA PARADOS: lista plana de produtos parados ─────────────────────────
+  if (options.giroDias && options.giroDias > 0) {
+    const produtosParados = await fetchProdutosParados(options, options.giroDias);
+    if (produtosParados.length > 0) {
+      const paradosHeaders = [
+        'Produto',
+        'Código de Barras',
+        'Descrição',
+        'Cor',
+        'Grade',
+        'Linha',
+        'Subgrupo',
+        'Coleção',
+        'Estoque',
+      ];
+      const paradosRows = produtosParados.map(p => [
+        p.produto,
+        p.codigoBarra,
+        p.descricao,
+        p.cor,
+        p.grade,
+        p.linha,
+        p.subgrupo,
+        p.colecao,
+        p.estoque,
+      ]);
+      const wsParados = XLSX.utils.aoa_to_sheet([paradosHeaders, ...paradosRows]);
+      autoWidth(wsParados);
+      XLSX.utils.book_append_sheet(workbook, wsParados, `Parados ${options.giroDias}d`);
+    }
   }
 
   // ─── Download ─────────────────────────────────────────────────────────────

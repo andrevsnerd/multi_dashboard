@@ -835,7 +835,7 @@ export default function CompraSalvaDetalhePage({
       const cacheKey = `${produto}||${expandirPorCor ? corProduto : ""}`;
       const live = liveMetrics[cacheKey];
       const estoque = live?.estoqueAtual ?? match?.estoqueAtual ?? null;
-      const custoUnit = match?.custoUnitario ?? 0;
+      const custoUnit = it.custoUnitario || match?.custoUnitario || 0;
       const custoTotal = custoUnit > 0 ? Math.round(effectiveQtdManual * custoUnit) : 0;
       const sugestaoAtual = calcularSugestaoCompletoComTransito(match, live, comprasTransitoIndex);
       const qtdSugerida = sugestaoAtual.qty;

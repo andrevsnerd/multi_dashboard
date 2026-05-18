@@ -512,5 +512,367 @@
     "comprada": false,
     "savedAt": "2026-04-30T14:30:42.948Z",
     "updatedAt": "2026-05-05T17:24:25.816Z"
+  },
+  {
+    "id": "4517a36b-877a-4962-b04a-03db8d497900",
+    "companyKey": "nerd",
+    "sourceContextKey": "lista-loja:nerd:__TODAS__:novo",
+    "title": "[Lista Loja] TODAS (visão geral) 18/05/2026 14:41 · andre.sabetta",
+    "expandirPorCor": true,
+    "items": [
+      {
+        "itemKey": "N4.7I.0019|C9",
+        "produto": "N4.7I.0019",
+        "corProduto": "C9",
+        "corDescricao": "AZUL MARINHO",
+        "descricao": "CP SILICONE IP 17",
+        "qtdManual": 4,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7H.0080|03",
+        "produto": "N4.7H.0080",
+        "corProduto": "03",
+        "corDescricao": "AZUL",
+        "descricao": "CP SILICONE IP 17 PRO MAX",
+        "qtdManual": 4,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7P.0073|11",
+        "produto": "N4.7P.0073",
+        "corProduto": "11",
+        "corDescricao": "LARANJA",
+        "descricao": "CP SILICONE IP 17 PRO",
+        "qtdManual": 1,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7I.0019|Z3",
+        "produto": "N4.7I.0019",
+        "corProduto": "Z3",
+        "corDescricao": "AVELÃ",
+        "descricao": "CP SILICONE IP 17",
+        "qtdManual": 4,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7I.0019|06",
+        "produto": "N4.7I.0019",
+        "corProduto": "06",
+        "corDescricao": "PRETO",
+        "descricao": "CP SILICONE IP 17",
+        "qtdManual": 2,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7H.0080|06",
+        "produto": "N4.7H.0080",
+        "corProduto": "06",
+        "corDescricao": "PRETO",
+        "descricao": "CP SILICONE IP 17 PRO MAX",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7E.0080|06",
+        "produto": "N4.7E.0080",
+        "corProduto": "06",
+        "corDescricao": "PRETO",
+        "descricao": "CP SILICONE IP 17 AIR",
+        "qtdManual": 0,
+        "custoUnitario": 10.24,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7H.0080|07",
+        "produto": "N4.7H.0080",
+        "corProduto": "07",
+        "corDescricao": "CINZA",
+        "descricao": "CP SILICONE IP 17 PRO MAX",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7H.0080|09",
+        "produto": "N4.7H.0080",
+        "corProduto": "09",
+        "corDescricao": "MARROM",
+        "descricao": "CP SILICONE IP 17 PRO MAX",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7I.0019|07",
+        "produto": "N4.7I.0019",
+        "corProduto": "07",
+        "corDescricao": "CINZA",
+        "descricao": "CP SILICONE IP 17",
+        "qtdManual": 1,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7I.0019|09",
+        "produto": "N4.7I.0019",
+        "corProduto": "09",
+        "corDescricao": "MARROM",
+        "descricao": "CP SILICONE IP 17",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7P.0073|07",
+        "produto": "N4.7P.0073",
+        "corProduto": "07",
+        "corDescricao": "CINZA",
+        "descricao": "CP SILICONE IP 17 PRO",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7P.0073|09",
+        "produto": "N4.7P.0073",
+        "corProduto": "09",
+        "corDescricao": "MARROM",
+        "descricao": "CP SILICONE IP 17 PRO",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7P.0073|04",
+        "produto": "N4.7P.0073",
+        "corProduto": "04",
+        "corDescricao": "VERDE",
+        "descricao": "CP SILICONE IP 17 PRO",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7E.0080|03",
+        "produto": "N4.7E.0080",
+        "corProduto": "03",
+        "corDescricao": "AZUL",
+        "descricao": "CP SILICONE IP 17 AIR",
+        "qtdManual": 0,
+        "custoUnitario": 10.24,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7E.0080|75",
+        "produto": "N4.7E.0080",
+        "corProduto": "75",
+        "corDescricao": "CINZA CHUMBO",
+        "descricao": "CP SILICONE IP 17 AIR",
+        "qtdManual": 0,
+        "custoUnitario": 10.24,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7E.0080|09",
+        "produto": "N4.7E.0080",
+        "corProduto": "09",
+        "corDescricao": "MARROM",
+        "descricao": "CP SILICONE IP 17 AIR",
+        "qtdManual": 1,
+        "custoUnitario": 10.24,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7E.0080|42",
+        "produto": "N4.7E.0080",
+        "corProduto": "42",
+        "corDescricao": "NUDE",
+        "descricao": "CP SILICONE IP 17 AIR",
+        "qtdManual": 0,
+        "custoUnitario": 10.24,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7E.0080|04",
+        "produto": "N4.7E.0080",
+        "corProduto": "04",
+        "corDescricao": "VERDE",
+        "descricao": "CP SILICONE IP 17 AIR",
+        "qtdManual": 0,
+        "custoUnitario": 10.24,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7H.0080|66",
+        "produto": "N4.7H.0080",
+        "corProduto": "66",
+        "corDescricao": "AZUL PETROLEO",
+        "descricao": "CP SILICONE IP 17 PRO MAX",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7H.0080|04",
+        "produto": "N4.7H.0080",
+        "corProduto": "04",
+        "corDescricao": "VERDE",
+        "descricao": "CP SILICONE IP 17 PRO MAX",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7H.0080|C9",
+        "produto": "N4.7H.0080",
+        "corProduto": "C9",
+        "corDescricao": "AZUL MARINHO",
+        "descricao": "CP SILICONE IP 17 PRO MAX",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7H.0080|11",
+        "produto": "N4.7H.0080",
+        "corProduto": "11",
+        "corDescricao": "LARANJA",
+        "descricao": "CP SILICONE IP 17 PRO MAX",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7H.0080|40",
+        "produto": "N4.7H.0080",
+        "corProduto": "40",
+        "corDescricao": "MARINHO",
+        "descricao": "CP SILICONE IP 17 PRO MAX",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7H.0080|42",
+        "produto": "N4.7H.0080",
+        "corProduto": "42",
+        "corDescricao": "NUDE",
+        "descricao": "CP SILICONE IP 17 PRO MAX",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7I.0019|S1",
+        "produto": "N4.7I.0019",
+        "corProduto": "S1",
+        "corDescricao": "CAPUCCINO",
+        "descricao": "CP SILICONE IP 17",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7I.0019|41",
+        "produto": "N4.7I.0019",
+        "corProduto": "41",
+        "corDescricao": "CARAMELO",
+        "descricao": "CP SILICONE IP 17",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7I.0019|75",
+        "produto": "N4.7I.0019",
+        "corProduto": "75",
+        "corDescricao": "CINZA CHUMBO",
+        "descricao": "CP SILICONE IP 17",
+        "qtdManual": 1,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7I.0019|42",
+        "produto": "N4.7I.0019",
+        "corProduto": "42",
+        "corDescricao": "NUDE",
+        "descricao": "CP SILICONE IP 17",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7P.0073|Z3",
+        "produto": "N4.7P.0073",
+        "corProduto": "Z3",
+        "corDescricao": "AVELÃ",
+        "descricao": "CP SILICONE IP 17 PRO",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7P.0073|03",
+        "produto": "N4.7P.0073",
+        "corProduto": "03",
+        "corDescricao": "AZUL",
+        "descricao": "CP SILICONE IP 17 PRO",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7P.0073|C9",
+        "produto": "N4.7P.0073",
+        "corProduto": "C9",
+        "corDescricao": "AZUL MARINHO",
+        "descricao": "CP SILICONE IP 17 PRO",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7P.0073|66",
+        "produto": "N4.7P.0073",
+        "corProduto": "66",
+        "corDescricao": "AZUL PETROLEO",
+        "descricao": "CP SILICONE IP 17 PRO",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7P.0073|42",
+        "produto": "N4.7P.0073",
+        "corProduto": "42",
+        "corDescricao": "NUDE",
+        "descricao": "CP SILICONE IP 17 PRO",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      },
+      {
+        "itemKey": "N4.7P.0073|06",
+        "produto": "N4.7P.0073",
+        "corProduto": "06",
+        "corDescricao": "PRETO",
+        "descricao": "CP SILICONE IP 17 PRO",
+        "qtdManual": 0,
+        "custoUnitario": 10.4,
+        "filialOrigem": null
+      }
+    ],
+    "comprada": false,
+    "savedAt": "2026-05-18T17:41:17.404Z",
+    "updatedAt": "2026-05-18T17:41:37.585Z"
   }
 ]

@@ -369,10 +369,7 @@ export default function ControleEstoquePage({
   const [loadingGiro, setLoadingGiro] = useState(false);
   const [exportando, setExportando] = useState(false);
 
-  // Faixas de giro (mesma ordem do backend): cada uma = janela exclusiva em dias atrás
-  const GIRO_BUCKETS = useMemo(() => [30, 60, 90, 120, 150, 300] as const, []);
-
-  // Quando o giro é ativado: período do dashboard = janela do giro (Obsoleto = últimos 300 dias para contexto)
+  // Quando o giro é ativado: período do dashboard = últimos X dias (limiar do filtro)
   useEffect(() => {
     if (!selectedGiro) {
       if (rangeBeforeGiroRef.current) {
@@ -385,19 +382,9 @@ export default function ControleEstoquePage({
     const hoje = new Date();
     const startDate = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
     const endDate = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
-
-    if (selectedGiro === "0") {
-      // Obsoleto: sem venda nos últimos 300 dias; range de contexto = 300 dias
-      startDate.setDate(startDate.getDate() - 300);
-      endDate.setDate(endDate.getDate() + 1);
-    } else {
-      const diasGiro = parseInt(selectedGiro, 10);
-      const idx = GIRO_BUCKETS.indexOf(diasGiro as (typeof GIRO_BUCKETS)[number]);
-      const diasInicio = idx > 0 ? GIRO_BUCKETS[idx - 1] : 0;
-      const diasFim = idx >= 0 ? diasGiro : 30;
-      startDate.setDate(startDate.getDate() - diasFim);
-      endDate.setDate(endDate.getDate() - diasInicio);
-    }
+    const diasGiro = parseInt(selectedGiro, 10);
+    startDate.setDate(startDate.getDate() - diasGiro);
+    endDate.setDate(endDate.getDate() + 1);
     setRange({ startDate, endDate });
   }, [selectedGiro]); // eslint-disable-line react-hooks/exhaustive-deps -- só reagir à mudança de giro, não ao range
   const [selectedCategorias, setSelectedCategorias] = useState<Set<string>>(new Set());
@@ -1335,6 +1322,7 @@ export default function ControleEstoquePage({
         colecoes: selectedColecoes,
         grupos: selectedGrupos,
         categorias: categoriasFiltradas,
+        giroDias: selectedGiro ? parseInt(selectedGiro, 10) : null,
       });
     } finally {
       setExportando(false);
@@ -1721,22 +1709,21 @@ export default function ControleEstoquePage({
         </button>
       </div>
 
-      {/* Giro: faixas exclusivas — 30 = 0–30 dias, 60 = 30–60, 90 = 60–90, 120 = 90–120, 150 = 120–150, 300 = 150–300 */}
+      {/* Giro: limiar acumulado — sem venda há pelo menos X dias */}
       <div className={styles.filterRow}>
         <span
           style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #888)', marginRight: '8px', alignSelf: 'center' }}
-          title="Cada faixa é exclusiva: 30 = vendeu há 0–30 dias, 60 = 30–60 dias, 120 = 90–120 dias, etc. Quem levou 120 dias não aparece em 60."
+          title="Filtra produtos sem venda há pelo menos X dias. 120 dias = sem venda nos últimos 120 dias (inclui 150, 300 etc.)."
         >
-          Giro (faixa):
+          Parado há:
         </span>
         {[
-          { label: '30 dias', value: '30', title: 'Vendeu entre 0 e 30 dias atrás (ativos)' },
-          { label: '60 dias', value: '60', title: 'Vendeu entre 30 e 60 dias atrás' },
-          { label: '90 dias', value: '90', title: 'Vendeu entre 60 e 90 dias atrás' },
-          { label: '120 dias', value: '120', title: 'Vendeu entre 90 e 120 dias atrás' },
-          { label: '150 dias', value: '150', title: 'Vendeu entre 120 e 150 dias atrás' },
-          { label: '300 dias', value: '300', title: 'Vendeu entre 150 e 300 dias atrás' },
-          { label: 'Obsoleto', value: '0', title: 'Sem venda nos últimos 300 dias' },
+          { label: '30 dias', value: '30', title: 'Sem venda nos últimos 30 dias' },
+          { label: '60 dias', value: '60', title: 'Sem venda nos últimos 60 dias' },
+          { label: '90 dias', value: '90', title: 'Sem venda nos últimos 90 dias' },
+          { label: '120 dias', value: '120', title: 'Sem venda nos últimos 120 dias' },
+          { label: '150 dias', value: '150', title: 'Sem venda nos últimos 150 dias' },
+          { label: '300 dias', value: '300', title: 'Sem venda nos últimos 300 dias (obsoleto)' },
         ].map(({ label, value, title }) => (
           <button
             key={value}

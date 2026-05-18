@@ -11,6 +11,7 @@ import {
   fetchDetalhesEcommerceSemana,
   fetchProjecaoMensal,
   fetchCategoriasComGiro,
+  fetchProdutosParados,
 } from '@/lib/repositories/controleEstoque';
 
 export async function GET(request: Request) {
@@ -179,9 +180,9 @@ export async function GET(request: Request) {
       case 'giro': {
         const diasGiroParam = searchParams.get('diasGiro');
         const diasGiro = diasGiroParam ? parseInt(diasGiroParam, 10) : NaN;
-        if (!Number.isFinite(diasGiro) || diasGiro < 0) {
+        if (!Number.isFinite(diasGiro) || diasGiro <= 0) {
           return NextResponse.json(
-            { error: 'diasGiro é obrigatório e deve ser 0 (obsoleto) ou um número positivo' },
+            { error: 'diasGiro é obrigatório e deve ser um número positivo' },
             { status: 400 }
           );
         }
@@ -201,9 +202,21 @@ export async function GET(request: Request) {
           produtosPorChave: produtosPorChaveObj,
         });
       }
+      case 'giro-produtos': {
+        const diasGiroParam = searchParams.get('diasGiro');
+        const diasGiro = diasGiroParam ? parseInt(diasGiroParam, 10) : NaN;
+        if (!Number.isFinite(diasGiro) || diasGiro <= 0) {
+          return NextResponse.json(
+            { error: 'diasGiro é obrigatório e deve ser um número positivo' },
+            { status: 400 }
+          );
+        }
+        const produtos = await fetchProdutosParados({ company, filial, ...filters, diasGiro });
+        return NextResponse.json({ data: produtos });
+      }
       default:
         return NextResponse.json(
-          { error: 'Tipo de dados inválido. Use: kpis, categorias, evolucao, vendas, previsoes, detalhes-entradas, detalhes-vendas, detalhes-ecommerce, projecao-mensal ou giro' },
+          { error: 'Tipo de dados inválido. Use: kpis, categorias, evolucao, vendas, previsoes, detalhes-entradas, detalhes-vendas, detalhes-ecommerce, projecao-mensal, giro ou giro-produtos' },
           { status: 400 }
         );
     }

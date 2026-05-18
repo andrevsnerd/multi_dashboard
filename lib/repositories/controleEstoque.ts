@@ -572,11 +572,6 @@ export interface ControleEstoqueParams {
   giroDias?: number;
 }
 
-/** Faixas de giro em dias; cada uma é uma janela exclusiva (não sobrepõe a outra). */
-const GIRO_BUCKETS = [30, 60, 90, 120, 150, 300] as const;
-
-/** Dias para considerar "obsoleto": sem venda nos últimos 300 dias. */
-const GIRO_OBSOLETO_DIAS = 300;
 
 export interface FetchCategoriasComGiroResult {
   chaves: Set<string>;
@@ -621,8 +616,6 @@ export async function fetchCategoriasComGiro({
   }
 
   return withRequest(async (request) => {
-    const isObsoleto = diasGiro === 0;
-
     const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
     const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vg');
     const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
@@ -637,14 +630,10 @@ export async function fetchCategoriasComGiro({
       ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')'
       : 'ISNULL(p.LINHA, \'SEM LINHA\')';
 
-    // Pré-calcula a última data de venda (com QTDE > 0) por PRODUTO+COR em uma CTE.
-    // Giro por cor: só consideramos estoque da cor que vendeu; cores sem venda no período não entram.
-    let giroQuery: string;
+    // Limiar acumulado: sem venda nos últimos X dias (ou nunca vendeu).
+    request.input('giroDias', sql.Int, diasGiro);
 
-    if (isObsoleto) {
-      request.input('giroObsoletoDias', sql.Int, GIRO_OBSOLETO_DIAS);
-
-      giroQuery = `
+    const giroQuery = `
       ;WITH UltimaVenda AS (
         SELECT
           vg.PRODUTO,
@@ -679,65 +668,8 @@ export async function fetchCategoriasComGiro({
         AND ${categoriaField} <> 'SEM GRUPO'
         AND ${categoriaField} <> 'SEM LINHA'
         ${buildCategoriaExcludeNerd(company, categoriaField)}
-        AND (
-          uv.ultimaVenda IS NULL
-          OR uv.ultimaVenda < DATEADD(DAY, -@giroObsoletoDias, CAST(GETDATE() AS DATE))
-        )
+        AND (uv.ultimaVenda IS NULL OR uv.ultimaVenda < DATEADD(DAY, -@giroDias, CAST(GETDATE() AS DATE)))
     `;
-    } else {
-      const idx = GIRO_BUCKETS.indexOf(diasGiro as (typeof GIRO_BUCKETS)[number]);
-      const diasInicio = idx > 0 ? GIRO_BUCKETS[idx - 1] : 0;
-      const diasFim = idx >= 0 ? diasGiro : 30;
-
-      request.input('giroDiasInicio', sql.Int, diasInicio);
-      request.input('giroDiasFim', sql.Int, diasFim);
-
-      // CTE com a data da última venda por produto+cor.
-      // Para faixas exclusivas (ex.: 60d), a condição é:
-      //   ultimaVenda entre [hoje - diasFim, hoje - diasInicio)
-      giroQuery = `
-      ;WITH UltimaVenda AS (
-        SELECT
-          vg.PRODUTO,
-          ISNULL(vg.COR_PRODUTO, '') AS COR_PRODUTO,
-          MAX(vg.DATA_VENDA) AS ultimaVenda
-        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vg WITH (NOLOCK)
-        WHERE vg.QTDE > 0
-          ${vendasFilialFilter}
-        GROUP BY vg.PRODUTO, ISNULL(vg.COR_PRODUTO, '')
-      )
-      SELECT DISTINCT
-        e.PRODUTO AS produto,
-        ISNULL(e.COR_PRODUTO, '') AS cor,
-        ${categoriaField} AS categoria,
-        ISNULL(p.LINHA, '') AS linha,
-        ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
-        ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
-        ISNULL(p.COLECAO, '') AS colecao
-      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
-      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
-      INNER JOIN UltimaVenda uv ON uv.PRODUTO = e.PRODUTO AND ISNULL(uv.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')
-      WHERE e.ESTOQUE > 0
-        ${estoqueFilialFilter}
-        ${grupoFilter}
-        ${linhaFilter}
-        ${colecaoFilter}
-        ${subgrupoFilter}
-        ${gradeFilter}
-        ${exclusionFilter}
-        ${nerdOnlyEletronicosFilter}
-        AND ${categoriaField} <> ''
-        AND ${categoriaField} <> 'SEM GRUPO'
-        AND ${categoriaField} <> 'SEM LINHA'
-        ${buildCategoriaExcludeNerd(company, categoriaField)}
-        ${diasInicio > 0
-          ? `AND uv.ultimaVenda >= DATEADD(DAY, -@giroDiasFim, CAST(GETDATE() AS DATE))
-             AND uv.ultimaVenda < DATEADD(DAY, -@giroDiasInicio, CAST(GETDATE() AS DATE))`
-          : `AND uv.ultimaVenda >= DATEADD(DAY, -@giroDiasFim, CAST(GETDATE() AS DATE))
-             AND uv.ultimaVenda < DATEADD(DAY, 1, CAST(GETDATE() AS DATE))`
-        }
-    `;
-    }
 
     const result = await request.query<{
       produto: string;
@@ -773,6 +705,126 @@ export async function fetchCategoriasComGiro({
     );
 
     return { chaves, produtosPorChave, todosProdutos };
+  });
+}
+
+export interface ProdutoParado {
+  produto: string;
+  codigoBarra: string;
+  descricao: string;
+  cor: string;
+  grade: string;
+  linha: string;
+  subgrupo: string;
+  colecao: string;
+  estoque: number;
+}
+
+/**
+ * Retorna lista plana de produtos em estoque sem venda nos últimos diasGiro dias.
+ * Inclui código de barras. Usado para export XLSX do filtro "Parado há".
+ */
+export async function fetchProdutosParados({
+  company,
+  filial,
+  grupos,
+  linhas,
+  colecoes,
+  subgrupos,
+  grades,
+  diasGiro,
+}: ControleEstoqueParams & { diasGiro: number }): Promise<ProdutoParado[]> {
+  return withRequest(async (request) => {
+    const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
+    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vg');
+    const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
+    const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
+    const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
+    const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
+    const gradeFilter = buildGradeFilter(request, company, grades, 'p');
+    const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineGiro');
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
+
+    request.input('giroDiasParados', sql.Int, diasGiro);
+
+    const query = `
+      ;WITH UltimaVenda AS (
+        SELECT
+          vg.PRODUTO,
+          ISNULL(vg.COR_PRODUTO, '') AS COR_PRODUTO,
+          MAX(vg.DATA_VENDA) AS ultimaVenda
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vg WITH (NOLOCK)
+        WHERE vg.QTDE > 0
+          ${vendasFilialFilter}
+        GROUP BY vg.PRODUTO, ISNULL(vg.COR_PRODUTO, '')
+      )
+      SELECT
+        e.PRODUTO AS produto,
+        ISNULL((
+          SELECT TOP 1 pb.CODIGO_BARRA
+          FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+          WHERE pb.PRODUTO = e.PRODUTO
+            AND ISNULL(pb.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')
+            AND ISNULL(pb.CODIGO_BARRA, '') <> ''
+          ORDER BY pb.CODIGO_BARRA
+        ), '') AS codigoBarra,
+        ISNULL(p.DESC_PRODUTO, '') AS descricao,
+        ISNULL(COALESCE(cb.DESC_COR, e.COR_PRODUTO), '') AS cor,
+        ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
+        ISNULL(p.LINHA, '') AS linha,
+        ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
+        ISNULL(p.COLECAO, '') AS colecao,
+        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoque
+      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+      LEFT JOIN CORES_BASICAS cb WITH (NOLOCK) ON e.COR_PRODUTO = cb.COR
+      LEFT JOIN UltimaVenda uv ON uv.PRODUTO = e.PRODUTO AND ISNULL(uv.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')
+      WHERE e.ESTOQUE > 0
+        ${estoqueFilialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
+        AND (uv.ultimaVenda IS NULL OR uv.ultimaVenda < DATEADD(DAY, -@giroDiasParados, CAST(GETDATE() AS DATE)))
+      GROUP BY
+        e.PRODUTO,
+        e.COR_PRODUTO,
+        p.DESC_PRODUTO,
+        cb.DESC_COR,
+        p.GRADE,
+        p.LINHA,
+        p.SUBGRUPO_PRODUTO,
+        p.COLECAO
+      HAVING SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) > 0
+      ORDER BY p.LINHA, p.SUBGRUPO_PRODUTO, e.PRODUTO, e.COR_PRODUTO
+    `;
+
+    const result = await request.query<{
+      produto: string;
+      codigoBarra: string;
+      descricao: string;
+      cor: string;
+      grade: string;
+      linha: string;
+      subgrupo: string;
+      colecao: string;
+      estoque: number;
+    }>(query);
+
+    return result.recordset.map(r => ({
+      produto: r.produto ?? '',
+      codigoBarra: r.codigoBarra ?? '',
+      descricao: r.descricao ?? '',
+      cor: r.cor ?? '',
+      grade: r.grade ?? '',
+      linha: r.linha ?? '',
+      subgrupo: r.subgrupo ?? '',
+      colecao: r.colecao ?? '',
+      estoque: Number(r.estoque) || 0,
+    }));
   });
 }
 
@@ -1367,9 +1419,6 @@ export async function fetchEstoquePorCategoria({
 }: ControleEstoqueParams): Promise<CategoriaEstoque[]> {
   return withRequest(async (request) => {
     const now = new Date();
-    const isGiroObsoleto = filtrarEstoquePorGiro && giroDias === 0;
-    const idxGiro = typeof giroDias === 'number' && giroDias > 0 ? GIRO_BUCKETS.indexOf(giroDias as (typeof GIRO_BUCKETS)[number]) : -1;
-    const diasInicioGiro = idxGiro > 0 ? GIRO_BUCKETS[idxGiro - 1] : 0;
     const currentYear = now.getFullYear();
     const currentMonthNum = now.getMonth() + 1; // 1-12
     const currentMonth = {
@@ -1441,11 +1490,8 @@ export async function fetchEstoquePorCategoria({
     // usamos um CTE pre-materializado com MAX(DATA_VENDA) por PRODUTO + JOIN.
     // O filtroGiroEstoque agora é uma condição simples no WHERE sobre o campo uv.ultimaVenda.
     // O CTE (giroCtePreamble) é injetado antes do SELECT principal.
-    if (filtrarEstoquePorGiro && diasInicioGiro > 0) {
-      request.input('giroExcluirDias', sql.Int, diasInicioGiro);
-    }
-    if (isGiroObsoleto) {
-      request.input('giroObsoletoDiasCat', sql.Int, GIRO_OBSOLETO_DIAS);
+    if (filtrarEstoquePorGiro && typeof giroDias === 'number' && Number.isFinite(giroDias)) {
+      request.input('giroDiasCat', sql.Int, giroDias);
     }
 
     // Determinar se precisamos do CTE de giro
@@ -1467,24 +1513,11 @@ export async function fetchEstoquePorCategoria({
 
     // JOIN adicional: por produto e cor
     const giroJoinClause = needsGiroCte
-      ? isGiroObsoleto
-        ? `LEFT JOIN GiroUltimaVenda guv ON guv.PRODUTO = e.PRODUTO AND ISNULL(guv.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')`
-        : `INNER JOIN GiroUltimaVenda guv ON guv.PRODUTO = e.PRODUTO AND ISNULL(guv.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')`
+      ? `LEFT JOIN GiroUltimaVenda guv ON guv.PRODUTO = e.PRODUTO AND ISNULL(guv.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')`
       : '';
 
-    // Condição WHERE simples em vez de subqueries correlacionadas
     const filtroGiroEstoque = needsGiroCte
-      ? isGiroObsoleto
-        ? ` AND (
-              guv.ultimaVenda IS NULL
-              OR guv.ultimaVenda < DATEADD(DAY, -@giroObsoletoDiasCat, CAST(GETDATE() AS DATE))
-            )`
-        : diasInicioGiro > 0
-          ? ` AND guv.ultimaVenda >= @periodoStart
-              AND guv.ultimaVenda < @periodoEnd
-              AND guv.ultimaVenda < DATEADD(DAY, -@giroExcluirDias, CAST(GETDATE() AS DATE))`
-          : ` AND guv.ultimaVenda >= @periodoStart
-              AND guv.ultimaVenda < @periodoEnd`
+      ? ` AND (guv.ultimaVenda IS NULL OR guv.ultimaVenda < DATEADD(DAY, -@giroDiasCat, CAST(GETDATE() AS DATE)))`
       : '';
 
     const estoqueQuery = `
@@ -3840,8 +3873,6 @@ export async function fetchProdutoDetalhes({
   return withRequest(async (request) => {
     const useProdutosPermitidos = Array.isArray(produtosPermitidosParam) && produtosPermitidosParam.length > 0;
     const now = new Date();
-    const idxGiroDetalhe = typeof giroDiasParam === 'number' ? GIRO_BUCKETS.indexOf(giroDiasParam as (typeof GIRO_BUCKETS)[number]) : -1;
-    const diasInicioGiroDetalhe = idxGiroDetalhe > 0 ? GIRO_BUCKETS[idxGiroDetalhe - 1] : 0;
     const currentMonth = {
       start: new Date(now.getFullYear(), now.getMonth(), 1),
       end: new Date(now.getFullYear(), now.getMonth() + 1, 1),
@@ -3928,16 +3959,11 @@ export async function fetchProdutoDetalhes({
       }
     }
 
-    // Detalhe por categoria + giro: MESMA regra do card. Obsoleto (giroDiasParam=0): só NOT EXISTS nos últimos 300 dias.
-    // Para faixas 60–300d: CTE "produtos que venderam na faixa" + INNER JOIN evita EXISTS por linha (muito mais rápido).
+    // Detalhe por categoria + giro: limiar acumulado — sem venda nos últimos X dias (ou nunca vendeu).
     // Ignorado quando useProdutosPermitidos (detalhado usa lista do cache).
     const detalheCategoriaComGiro = !useProdutosPermitidos && (filtrarApenasComVendas || (startDateParam != null && endDateParam != null)) && company === 'nerd' && grupo && !subgrupo && !grade && !colecao;
-    const detalheGiroObsoleto = detalheCategoriaComGiro && giroDiasParam === 0;
     let filtroGiroNaQueryDetalhe = '';
-    let useCteGiroDetalhe = false;
-    let cteGiroDetalheSql = '';
-    let filtroGiroApenasNotExistsDetalhe = '';
-    if (detalheCategoriaComGiro && company) {
+    if (detalheCategoriaComGiro && typeof giroDiasParam === 'number' && company) {
       const companyConfig = resolveCompany(company);
       if (companyConfig) {
         const todasFiliaisVenda = new Set([
@@ -3948,75 +3974,16 @@ export async function fetchProdutoDetalhes({
           const arr = Array.from(todasFiliaisVenda);
           arr.forEach((f, i) => request.input(`varGiroFilial${i}`, sql.VarChar, f));
           const ph = arr.map((_, i) => `@varGiroFilial${i}`).join(', ');
-          if (detalheGiroObsoleto) {
-            request.input('giroObsoletoDiasDetalhe', sql.Int, GIRO_OBSOLETO_DIAS);
-            filtroGiroNaQueryDetalhe = ` AND NOT EXISTS (
+          request.input('giroDiasDetalhe', sql.Int, giroDiasParam);
+          filtroGiroNaQueryDetalhe = ` AND NOT EXISTS (
               SELECT 1 FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
               WHERE vp.PRODUTO = e.PRODUTO
                 AND ISNULL(vp.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')
                 AND vp.QTDE > 0
-                AND vp.DATA_VENDA >= DATEADD(DAY, -@giroObsoletoDiasDetalhe, CAST(GETDATE() AS DATE))
+                AND vp.DATA_VENDA >= DATEADD(DAY, -@giroDiasDetalhe, CAST(GETDATE() AS DATE))
                 AND vp.DATA_VENDA < DATEADD(DAY, 1, CAST(GETDATE() AS DATE))
                 AND vp.FILIAL IN (${ph})
             )`;
-          } else {
-            if (diasInicioGiroDetalhe > 0) {
-              const periodoExcluirStart = new Date(now);
-              periodoExcluirStart.setUTCDate(periodoExcluirStart.getUTCDate() - diasInicioGiroDetalhe);
-              periodoExcluirStart.setUTCHours(0, 0, 0, 0);
-              const periodoExcluirEnd = new Date(now);
-              periodoExcluirEnd.setUTCDate(periodoExcluirEnd.getUTCDate() + 1);
-              periodoExcluirEnd.setUTCHours(0, 0, 0, 0);
-              request.input('periodoExcluirStartDetalhe', sql.DateTime, periodoExcluirStart);
-              request.input('periodoExcluirEndDetalhe', sql.DateTime, periodoExcluirEnd);
-            }
-            useCteGiroDetalhe = true;
-            // Duas CTEs: (1) produtos que venderam na faixa [startDate,endDate]; (2) produtos que venderam no período a excluir [0, diasInicio].
-            // Anti-join com (2) em vez de NOT EXISTS por linha — uma varredura em vendas por período, sem subquery correlacionada.
-            const cteExcluir =
-              diasInicioGiroDetalhe > 0
-                ? `,
-      ProdutosVenderamPeriodoExcluir AS (
-        SELECT DISTINCT vp.PRODUTO, ISNULL(vp.COR_PRODUTO, '') AS COR_PRODUTO
-        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-        WHERE vp.QTDE > 0
-          AND vp.DATA_VENDA >= @periodoExcluirStartDetalhe
-          AND vp.DATA_VENDA < @periodoExcluirEndDetalhe
-          AND vp.FILIAL IN (${ph})
-      )`
-                : '';
-            cteGiroDetalheSql = `WITH ProdutosNaFaixaGiro AS (
-        SELECT DISTINCT vp.PRODUTO, ISNULL(vp.COR_PRODUTO, '') AS COR_PRODUTO
-        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-        WHERE vp.DATA_VENDA >= @startDate
-          AND vp.DATA_VENDA < @endDate
-          AND vp.QTDE > 0
-          AND vp.FILIAL IN (${ph})
-      )${cteExcluir}
-      `;
-            // Anti-join por produto+cor
-            filtroGiroApenasNotExistsDetalhe =
-              diasInicioGiroDetalhe > 0 ? ` AND ex.PRODUTO IS NULL` : '';
-            filtroGiroNaQueryDetalhe = ` AND EXISTS (
-              SELECT 1 FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-              WHERE vp.PRODUTO = e.PRODUTO
-                AND ISNULL(vp.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')
-                AND vp.DATA_VENDA >= @startDate
-                AND vp.DATA_VENDA < @endDate
-                AND vp.QTDE > 0
-                AND vp.FILIAL IN (${ph})
-            )
-            ${diasInicioGiroDetalhe > 0 ? `
-            AND NOT EXISTS (
-              SELECT 1 FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vpExcl WITH (NOLOCK)
-              WHERE vpExcl.PRODUTO = e.PRODUTO
-                AND ISNULL(vpExcl.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')
-                AND vpExcl.QTDE > 0
-                AND vpExcl.DATA_VENDA >= @periodoExcluirStartDetalhe
-                AND vpExcl.DATA_VENDA < @periodoExcluirEndDetalhe
-                AND vpExcl.FILIAL IN (${ph})
-            )` : ''}`;
-          }
         }
       }
     }
@@ -4024,20 +3991,12 @@ export async function fetchProdutoDetalhes({
     const categoriaFieldDetalhe = company === 'nerd' ? 'ISNULL(p.GRUPO_PRODUTO, \'SEM GRUPO\')' : '';
     const excludeNerdDetalhe = company === 'nerd' ? buildCategoriaExcludeNerd(company, categoriaFieldDetalhe) : '';
 
-    // Buscar variações: quando detalhe por categoria + giro, CTE(s) + JOIN. Faixas 60–300d: segunda CTE materializa
-    // "produtos que venderam no período a excluir" e anti-join (LEFT JOIN ex WHERE ex.PRODUTO IS NULL) — uma varredura, sem NOT EXISTS por linha.
-    const variacoesFromJoin = useCteGiroDetalhe
-      ? `FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
-      INNER JOIN ProdutosNaFaixaGiro g ON g.PRODUTO = e.PRODUTO AND ISNULL(g.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')
-      ${diasInicioGiroDetalhe > 0 ? "LEFT JOIN ProdutosVenderamPeriodoExcluir ex ON ex.PRODUTO = e.PRODUTO AND ISNULL(ex.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')" : ''}
-      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
-      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR`
-      : `FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+    const variacoesFromJoin = `FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR`;
-    const variacoesGiroFilter = useCteGiroDetalhe ? filtroGiroApenasNotExistsDetalhe : filtroGiroNaQueryDetalhe;
+    const variacoesGiroFilter = filtroGiroNaQueryDetalhe;
     const variacoesQuery = `
-      ${useCteGiroDetalhe ? cteGiroDetalheSql : ''}SELECT 
+      SELECT
         e.PRODUTO AS produto,
         ISNULL(p.DESC_PRODUTO, '') AS descricao,
         ${company === 'nerd' ? 'ISNULL(p.GRUPO_PRODUTO, \'\') AS linha,' : 'ISNULL(p.LINHA, \'\') AS linha,'}

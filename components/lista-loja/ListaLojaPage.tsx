@@ -1291,6 +1291,7 @@ function buildListaLojaExportRow(
   }
 
   return {
+    CURVA_ABC_REDE: exportData?.curvaAbc ?? "",
     PRODUTO: item.produto,
     DESC_PRODUTO: item.descProduto,
     CODIGO_BARRA: item.codigoBarra || "",
@@ -1310,7 +1311,6 @@ function buildListaLojaExportRow(
     HISTORICO_PARCIAL: historicoParcial ? "Sim" : "Nao",
     LINHA: item.linha || "",
     SUBGRUPO: item.subgrupo || "",
-    CURVA_ABC_REDE: exportData?.curvaAbc ?? "",
     STATUS: status,
     TIPO_SUGESTAO: tipo,
     REGRA_REPOSICAO: regra,
@@ -3144,6 +3144,8 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
   const [filtrarSugeridos, setFiltrarSugeridos] = useState(false);
   const [filtrarBarrados, setFiltrarBarrados] = useState(false);
   const [filtrarTransferencias, setFiltrarTransferencias] = useState(false);
+  const [filtrarCurvas, setFiltrarCurvas] = useState<Set<string>>(new Set());
+  const [curvaMapEditor, setCurvaMapEditor] = useState<Map<string, CurvaInfo>>(new Map());
   const [transferenciasPorItem, setTransferenciasPorItem] = useState<Record<string, TransferenciaDestinoSugestao[]>>({});
   const [permissoes, setPermissoes] = useState<TransferenciaPermissao | null>(null);
   const [permissoesCarregadas, setPermissoesCarregadas] = useState(false);
@@ -3154,6 +3156,18 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     [itens]
   );
 
+  useEffect(() => {
+    let cancelled = false;
+    fetchCurvaAbcScope(companyKey as CompanyKey, filialConsultaSelecionada)
+      .then((data) => {
+        if (cancelled) return;
+        setCurvaMapEditor(calcularCurvasAbcProdutos(data.produtos ?? []));
+      })
+      .catch(() => {
+        if (cancelled) return;
+      });
+    return () => { cancelled = true; };
+  }, [companyKey, filialConsultaSelecionada]);
 
   const notifTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -4295,6 +4309,10 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
   const enviarParaComprasSalvas = useCallback(async (customTitle?: string, stayInEditor: boolean = false) => {
     const diasCorridosMesLocal = new Date().getDate();
     const itensBase = itens.filter((item) => {
+      if (filtrarCurvas.size > 0) {
+        const curva = curvaMapEditor.get(buildItemKey(item.produto, item.corProduto))?.curva ?? null;
+        if (!curva || !filtrarCurvas.has(curva)) return false;
+      }
       if (!filtrarSugeridos && !filtrarBarrados && !filtrarTransferencias) return true;
       if (filtrarTransferencias) return itemTemTransferenciaSugerida(item, diasCorridosMesLocal, transferenciasPorItem);
       const sugerido = itemTemSugestaoCompra(item, diasCorridosMesLocal);
@@ -4342,12 +4360,16 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     } catch (err: unknown) {
       mostrarNotificacao(err instanceof Error ? err.message : "Erro ao enviar para Compras Salvas", "error");
     }
-  }, [companyKey, editingId, filtrarBarrados, filtrarSugeridos, filtrarTransferencias, filialSelecionada, itens, mostrarNotificacao, nomeLista, transferenciasPorItem, user?.username]);
+  }, [companyKey, curvaMapEditor, editingId, filtrarBarrados, filtrarCurvas, filtrarSugeridos, filtrarTransferencias, filialSelecionada, itens, mostrarNotificacao, nomeLista, transferenciasPorItem, user?.username]);
 
   const salvar = useCallback(async () => {
     if (!user?.username) return;
     const diasCorridosMesLocal = new Date().getDate();
     const itensBase = itens.filter((item) => {
+      if (filtrarCurvas.size > 0) {
+        const curva = curvaMapEditor.get(buildItemKey(item.produto, item.corProduto))?.curva ?? null;
+        if (!curva || !filtrarCurvas.has(curva)) return false;
+      }
       if (!filtrarSugeridos && !filtrarBarrados && !filtrarTransferencias) return true;
       if (filtrarTransferencias) return itemTemTransferenciaSugerida(item, diasCorridosMesLocal, transferenciasPorItem);
       const sugerido = itemTemSugestaoCompra(item, diasCorridosMesLocal);
@@ -4382,7 +4404,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     } finally {
       setSalvando(false);
     }
-  }, [companyKey, editingId, filtrarBarrados, filtrarSugeridos, filtrarTransferencias, filialSelecionada?.filial, itens, mostrarNotificacao, nomeLista, transferenciasPorItem, user?.username, enviarParaComprasSalvas]);
+  }, [companyKey, curvaMapEditor, editingId, filtrarBarrados, filtrarCurvas, filtrarSugeridos, filtrarTransferencias, filialSelecionada?.filial, itens, mostrarNotificacao, nomeLista, transferenciasPorItem, user?.username, enviarParaComprasSalvas]);
 
   // ─── Delete ─────────────────────────────────────────────────────────────────
 
@@ -4411,10 +4433,14 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
 
   const totalItensModal = itensModal.reduce((s, i) => s + i.quantidade, 0);
   const diasCorridosMes = new Date().getDate();
-  const filtrosAtivos = filtrarSugeridos || filtrarBarrados || filtrarTransferencias;
+  const filtrosAtivos = filtrarSugeridos || filtrarBarrados || filtrarTransferencias || filtrarCurvas.size > 0;
   const itensVisiveis = useMemo(() => {
     return itens.filter((item) => {
-      if (!filtrosAtivos) return true;
+      if (filtrarCurvas.size > 0) {
+        const curva = curvaMapEditor.get(buildItemKey(item.produto, item.corProduto))?.curva ?? null;
+        if (!curva || !filtrarCurvas.has(curva)) return false;
+      }
+      if (!filtrarSugeridos && !filtrarBarrados && !filtrarTransferencias) return true;
       if (filtrarTransferencias) return itemTemTransferenciaSugerida(item, diasCorridosMes, transferenciasPorItem);
       const sugerido = itemTemSugestaoCompra(item, diasCorridosMes);
       const barrado = itemEhBarrado(item, diasCorridosMes);
@@ -4423,13 +4449,17 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
       if (filtrarBarrados) return barrado;
       return true;
     });
-  }, [diasCorridosMes, filtrarBarrados, filtrarSugeridos, filtrarTransferencias, filtrosAtivos, itens, transferenciasPorItem]);
+  }, [curvaMapEditor, diasCorridosMes, filtrarBarrados, filtrarCurvas, filtrarSugeridos, filtrarTransferencias, itens, transferenciasPorItem]);
   const indicesItensVisiveis = useMemo(
     () =>
       itens
         .map((item, index) => ({ item, index }))
         .filter(({ item }) => {
-          if (!filtrosAtivos) return true;
+          if (filtrarCurvas.size > 0) {
+            const curva = curvaMapEditor.get(buildItemKey(item.produto, item.corProduto))?.curva ?? null;
+            if (!curva || !filtrarCurvas.has(curva)) return false;
+          }
+          if (!filtrarSugeridos && !filtrarBarrados && !filtrarTransferencias) return true;
           if (filtrarTransferencias) return itemTemTransferenciaSugerida(item, diasCorridosMes, transferenciasPorItem);
           const sugerido = itemTemSugestaoCompra(item, diasCorridosMes);
           const barrado = itemEhBarrado(item, diasCorridosMes);
@@ -4439,7 +4469,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
           return true;
         })
         .map(({ index }) => index),
-    [diasCorridosMes, filtrarBarrados, filtrarSugeridos, filtrarTransferencias, filtrosAtivos, itens, transferenciasPorItem]
+    [curvaMapEditor, diasCorridosMes, filtrarBarrados, filtrarCurvas, filtrarSugeridos, filtrarTransferencias, itens, transferenciasPorItem]
   );
   const kpisLista = useMemo(() => {
     const totalQtdSugerida = itensVisiveis.reduce((s, item) => {
@@ -4474,7 +4504,9 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
         ? "Sugeridos"
         : filtrarBarrados
           ? "Barrados"
-          : "Todos";
+          : filtrarCurvas.size > 0
+            ? `Curva ${[...filtrarCurvas].sort().join("+")}`
+            : "Todos";
 
   const exportarListaXlsx = useCallback(async () => {
     if (itensVisiveis.length === 0) {
@@ -4484,9 +4516,12 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
 
     setExportandoXlsx(true);
     try {
+      const filialParaExport = filialSelecionada?.codFilial === TODAS_FILIAIS_VALUE
+        ? null
+        : (filialSelecionada?.codFilial?.trim() || null);
       const rows = await buildListaLojaExportRows(
         companyKey,
-        filialSelecionada?.codFilial ?? null,
+        filialParaExport,
         itensVisiveis,
         diasCorridosMes,
         transferenciasPorItem
@@ -4660,6 +4695,23 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
               />
               <span>Transferências</span>
             </label>
+            {(["A", "B", "C"] as const).map((curva) => (
+              <label key={curva} className={styles.filtroToggle}>
+                <input
+                  type="checkbox"
+                  checked={filtrarCurvas.has(curva)}
+                  onChange={(e) => {
+                    setFiltrarCurvas((prev) => {
+                      const next = new Set(prev);
+                      if (e.target.checked) next.add(curva);
+                      else next.delete(curva);
+                      return next;
+                    });
+                  }}
+                />
+                <span className={`${styles.abcBadgeMini} ${styles[`abcBadge${curva}`]}`}>{curva}</span>
+              </label>
+            ))}
             {filtrosAtivos && (
               <button
                 type="button"
@@ -4668,6 +4720,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                   setFiltrarSugeridos(false);
                   setFiltrarBarrados(false);
                   setFiltrarTransferencias(false);
+                  setFiltrarCurvas(new Set());
                 }}
               >
                 Limpar filtros
