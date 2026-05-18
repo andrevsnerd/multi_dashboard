@@ -75,6 +75,8 @@ export async function PUT(
     const updated = await updateCompraTransito(String(companyKey), id, {
       title: typeof title === "string" ? title : undefined,
       items: items as CompraTransitoItemRow[],
+      forceStatus: draft ? "rascunho" : undefined,
+      reconfirm: !draft,
     });
 
     if (!updated) {

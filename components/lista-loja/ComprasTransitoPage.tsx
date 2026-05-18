@@ -203,6 +203,10 @@ export default function ComprasTransitoPage({
     setDraftItems((prev) => prev.map((item) => ({ ...item, dataRecebimento: date })));
   }, []);
 
+  const clearAllDates = useCallback(() => {
+    setDraftItems((prev) => prev.map((item) => ({ ...item, dataRecebimento: "" })));
+  }, []);
+
   const openList = useCallback(() => {
     setSelectedCompra(null);
     setEditingId(null);
@@ -278,16 +282,25 @@ export default function ComprasTransitoPage({
         if (!res.ok || !json.data) {
           throw new Error(json.error ?? "Erro ao salvar compra");
         }
+        const savedId = json.data.id;
+        const wasEditing = !!editingId;
         setDraftItems([]);
         setDraftTitle("");
         setEditingId(null);
+        setBulkDate("");
         setModalOpen(false);
         await loadCompras();
-        setView("list");
+        if (!isDraft && wasEditing) {
+          await openDetail(savedId);
+        } else {
+          setView("list");
+        }
         setToast({
           tipo: "success",
           mensagem: isDraft
             ? "Rascunho salvo. Você pode editar as datas depois."
+            : wasEditing
+            ? "Compra atualizada e reconfirmada."
             : "Compra confirmada e marcada como em trânsito.",
         });
       } catch (err) {
@@ -631,7 +644,7 @@ export default function ComprasTransitoPage({
             <>
               <div className={styles.bulkDateBar}>
                 <label className={styles.bulkDateLabel} htmlFor="bulk-date">
-                  Definir data para todos os itens:
+                  Data para todos:
                 </label>
                 <div className={styles.bulkDateControls}>
                   <input
@@ -651,6 +664,13 @@ export default function ComprasTransitoPage({
                     }}
                   >
                     Aplicar a todos
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.ghostBtn}
+                    onClick={clearAllDates}
+                  >
+                    Limpar todas as datas
                   </button>
                 </div>
               </div>

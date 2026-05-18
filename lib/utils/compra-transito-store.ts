@@ -7,6 +7,7 @@ import type {
   CompraTransito,
   CompraTransitoItemRow,
   CompraTransitoListEntry,
+  CompraTransitoStatus,
 } from "@/lib/types/compra-transito";
 import {
   getCompraTransitoItemStatus,
@@ -226,6 +227,7 @@ export async function createCompraTransito(input: {
   companyKey: string;
   title: string;
   items: CompraTransitoItemRow[];
+  forceStatus?: CompraTransitoStatus;
 }): Promise<CompraTransito> {
   const id = randomUUID();
   const now = new Date().toISOString();
@@ -233,7 +235,7 @@ export async function createCompraTransito(input: {
     id,
     companyKey: input.companyKey,
     title: input.title.trim(),
-    status: getCompraTransitoStatusFromItems(input.items),
+    status: input.forceStatus ?? getCompraTransitoStatusFromItems(input.items),
     items: input.items.map(normalizeItem),
     createdAt: now,
     updatedAt: now,
@@ -269,7 +271,7 @@ export async function createCompraTransito(input: {
 export async function updateCompraTransito(
   companyKey: string,
   id: string,
-  input: { title?: string; items?: CompraTransitoItemRow[] }
+  input: { title?: string; items?: CompraTransitoItemRow[]; forceStatus?: CompraTransitoStatus; reconfirm?: boolean }
 ): Promise<CompraTransito | null> {
   const now = new Date().toISOString();
 
@@ -280,16 +282,18 @@ export async function updateCompraTransito(
     if (!existing) return null;
     const newTitle = input.title?.trim() || existing.title;
     const normalizedItems = (input.items ?? existing.items).map(normalizeItem);
-    const newStatus = getCompraTransitoStatusFromItems(normalizedItems);
+    const newStatus = input.forceStatus ?? getCompraTransitoStatusFromItems(normalizedItems);
+    const newConfirmedAt = input.reconfirm ? now : existing.confirmedAt;
     await sql`
       UPDATE compras_transito
       SET title = ${newTitle},
           items = ${JSON.stringify(normalizedItems)}::jsonb,
           status = ${newStatus},
-          updated_at = ${now}
+          updated_at = ${now},
+          confirmed_at = ${newConfirmedAt}
       WHERE id = ${id} AND company_key = ${companyKey}
     `;
-    return { ...existing, title: newTitle, items: normalizedItems, status: newStatus, updatedAt: now };
+    return { ...existing, title: newTitle, items: normalizedItems, status: newStatus, updatedAt: now, confirmedAt: newConfirmedAt };
   }
 
   const all = await readFileAll();
@@ -298,8 +302,9 @@ export async function updateCompraTransito(
   const existing = all[idx];
   const newTitle = input.title?.trim() || existing.title;
   const normalizedItems = (input.items ?? existing.items).map(normalizeItem);
-  const newStatus = getCompraTransitoStatusFromItems(normalizedItems);
-  const updated: CompraTransito = { ...existing, title: newTitle, items: normalizedItems, status: newStatus, updatedAt: now };
+  const newStatus = input.forceStatus ?? getCompraTransitoStatusFromItems(normalizedItems);
+  const newConfirmedAt = input.reconfirm ? now : existing.confirmedAt;
+  const updated: CompraTransito = { ...existing, title: newTitle, items: normalizedItems, status: newStatus, updatedAt: now, confirmedAt: newConfirmedAt };
   all[idx] = updated;
   await writeFileAll(all);
   return updated;

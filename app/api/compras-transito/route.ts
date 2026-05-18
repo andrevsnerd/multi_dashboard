@@ -96,6 +96,7 @@ export async function POST(request: Request) {
       title:
         typeof title === "string" && title.trim() ? title.trim() : formatDefaultTitle(),
       items: normalizedItems,
+      forceStatus: draft ? "rascunho" : undefined,
     });
 
     return NextResponse.json({ data: created });
