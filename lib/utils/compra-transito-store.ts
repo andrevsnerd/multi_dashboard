@@ -84,7 +84,7 @@ function normalizeItem(row: CompraTransitoItemRow): CompraTransitoItemRow {
       row.estoqueAtual != null && Number.isFinite(Number(row.estoqueAtual))
         ? Number(row.estoqueAtual)
         : undefined,
-    status: getCompraTransitoItemStatus(dataRecebimento),
+    status: dataRecebimento ? getCompraTransitoItemStatus(dataRecebimento) : "rascunho",
   };
 }
 
@@ -264,6 +264,45 @@ export async function createCompraTransito(input: {
   all.push(row);
   await writeFileAll(all);
   return row;
+}
+
+export async function updateCompraTransito(
+  companyKey: string,
+  id: string,
+  input: { title?: string; items?: CompraTransitoItemRow[] }
+): Promise<CompraTransito | null> {
+  const now = new Date().toISOString();
+
+  if (hasPostgres()) {
+    await ensureTable();
+    const sql = getNeonSql();
+    const existing = await getCompraTransito(companyKey, id);
+    if (!existing) return null;
+    const newTitle = input.title?.trim() || existing.title;
+    const normalizedItems = (input.items ?? existing.items).map(normalizeItem);
+    const newStatus = getCompraTransitoStatusFromItems(normalizedItems);
+    await sql`
+      UPDATE compras_transito
+      SET title = ${newTitle},
+          items = ${JSON.stringify(normalizedItems)}::jsonb,
+          status = ${newStatus},
+          updated_at = ${now}
+      WHERE id = ${id} AND company_key = ${companyKey}
+    `;
+    return { ...existing, title: newTitle, items: normalizedItems, status: newStatus, updatedAt: now };
+  }
+
+  const all = await readFileAll();
+  const idx = all.findIndex((c) => c.id === id && c.companyKey === companyKey);
+  if (idx === -1) return null;
+  const existing = all[idx];
+  const newTitle = input.title?.trim() || existing.title;
+  const normalizedItems = (input.items ?? existing.items).map(normalizeItem);
+  const newStatus = getCompraTransitoStatusFromItems(normalizedItems);
+  const updated: CompraTransito = { ...existing, title: newTitle, items: normalizedItems, status: newStatus, updatedAt: now };
+  all[idx] = updated;
+  await writeFileAll(all);
+  return updated;
 }
 
 export async function deleteCompraTransito(companyKey: string, id: string): Promise<boolean> {

@@ -1,4 +1,4 @@
-export type CompraTransitoStatus = "em_transito" | "recebido";
+export type CompraTransitoStatus = "rascunho" | "em_transito" | "recebido";
 
 export interface CompraTransitoItemRow {
   itemKey: string;

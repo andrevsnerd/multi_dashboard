@@ -43,7 +43,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { companyKey, title, items } = body ?? {};
+    const { companyKey, title, items, draft } = body ?? {};
 
     if (!companyKey) {
       return NextResponse.json({ error: "companyKey é obrigatório" }, { status: 400 });
@@ -71,22 +71,24 @@ export async function POST(request: Request) {
       status: "em_transito",
     }));
 
-    const hasInvalidItem = normalizedItems.some(
-      (item) =>
-        !item.itemKey.trim() ||
-        !item.produto.trim() ||
-        !item.dataRecebimento.trim() ||
-        Math.round(item.quantidade) <= 0
-    );
-
-    if (hasInvalidItem) {
-      return NextResponse.json(
-        {
-          error:
-            "Todos os itens precisam ter produto, data de recebimento e quantidade maior que zero.",
-        },
-        { status: 400 }
+    if (!draft) {
+      const hasInvalidItem = normalizedItems.some(
+        (item) =>
+          !item.itemKey.trim() ||
+          !item.produto.trim() ||
+          !item.dataRecebimento.trim() ||
+          Math.round(item.quantidade) <= 0
       );
+
+      if (hasInvalidItem) {
+        return NextResponse.json(
+          {
+            error:
+              "Todos os itens precisam ter produto, data de recebimento e quantidade maior que zero.",
+          },
+          { status: 400 }
+        );
+      }
     }
 
     const created = await createCompraTransito({

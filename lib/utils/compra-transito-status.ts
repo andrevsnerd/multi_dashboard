@@ -30,6 +30,7 @@ export function getCompraTransitoStatusFromItems(
   items: Array<Pick<CompraTransitoItemRow, "dataRecebimento">>,
   today = new Date()
 ): CompraTransitoStatus {
+  if (items.some((item) => !normalizeDate(item.dataRecebimento))) return "rascunho";
   return items.some((item) => isCompraTransitoDateActive(item.dataRecebimento, today))
     ? "em_transito"
     : "recebido";

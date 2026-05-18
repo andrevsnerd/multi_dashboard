@@ -104,6 +104,13 @@
     linear-gradient(180deg, #ffffff, #f8fafc);
 }
 
+.summaryCardDraft {
+  border-color: #fde68a;
+  background:
+    radial-gradient(circle at top left, rgba(251, 191, 36, 0.14), transparent 45%),
+    linear-gradient(180deg, #fffbeb, #fef9c3);
+}
+
 .summaryItem {
   display: flex;
   flex-direction: column;
@@ -125,6 +132,11 @@
 
 .summaryValueGreen {
   color: #15803d;
+}
+
+.summaryValueDraft {
+  color: #92400e;
+  font-size: 1.3rem;
 }
 
 .cardsGrid {
@@ -153,6 +165,12 @@
   box-shadow: 0 14px 28px rgba(100, 116, 139, 0.12);
 }
 
+.cardDraft {
+  border-color: #fde68a;
+  background: linear-gradient(180deg, rgba(255, 251, 235, 0.98), rgba(254, 243, 199, 0.92));
+  box-shadow: 0 14px 28px rgba(161, 98, 7, 0.12);
+}
+
 .cardHeader {
   display: flex;
   justify-content: space-between;
@@ -164,6 +182,10 @@
   color: #14532d;
   font-size: 1rem;
   font-weight: 700;
+}
+
+.cardTitleDraft {
+  color: #78350f;
 }
 
 .statusBadge {
@@ -184,6 +206,11 @@
   background: rgba(148, 163, 184, 0.18);
 }
 
+.statusBadgeDraft {
+  color: #92400e;
+  background: rgba(251, 191, 36, 0.22);
+}
+
 .cardMeta,
 .cardSubmeta {
   display: flex;
@@ -196,6 +223,14 @@
 .cardSubmeta {
   color: #3f6212;
   font-size: 0.85rem;
+}
+
+.cardMetaDraft {
+  color: #92400e;
+}
+
+.cardSubmetaDraft {
+  color: #78350f;
 }
 
 .tableWrap {
@@ -235,6 +270,10 @@
   background: rgba(248, 250, 252, 0.86);
 }
 
+.rowDraft {
+  background: rgba(255, 251, 235, 0.72);
+}
+
 .readOnlyDateCell {
   display: flex;
   flex-direction: column;
@@ -257,6 +296,11 @@
 .inlineStatusBadgeReceived {
   color: #475569;
   background: rgba(148, 163, 184, 0.18);
+}
+
+.inlineStatusBadgeDraft {
+  color: #92400e;
+  background: rgba(251, 191, 36, 0.2);
 }
 
 .right {
@@ -362,6 +406,88 @@
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
+}
+
+.draftBtn {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: #fef9c3;
+  color: #92400e;
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.draftBtn:hover {
+  background: #fef08a;
+  transform: translateY(-1px);
+}
+
+.draftBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.titleInputWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.titleInputLabel {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.titleInput {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  background: #fff;
+  color: #0f172a;
+}
+
+.durationChip {
+  font-size: 0.7rem;
+  color: #64748b;
+  font-style: italic;
+}
+
+.bulkDateBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.bulkDateLabel {
+  font-size: 0.88rem;
+  color: #475569;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.bulkDateControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bulkDateControls .input {
+  width: auto;
 }
 
 .detailTitleBox {

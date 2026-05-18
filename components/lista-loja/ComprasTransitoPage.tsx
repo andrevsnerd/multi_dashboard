@@ -79,7 +79,24 @@ function fmtDateTime(value?: string | null) {
 }
 
 function getStatusLabel(status: CompraTransitoStatus) {
-  return status === "em_transito" ? "Em transito" : "Recebida";
+  if (status === "em_transito") return "Em trânsito";
+  if (status === "rascunho") return "Rascunho";
+  return "Recebida";
+}
+
+function calcDurationDays(createdAt: string, dataRecebimento: string): number | null {
+  if (!dataRecebimento) return null;
+  const created = new Date(createdAt);
+  const received = new Date(`${dataRecebimento.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(created.getTime()) || Number.isNaN(received.getTime())) return null;
+  return Math.round((received.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function fmtDuration(days: number | null): string | null {
+  if (days === null) return null;
+  if (days === 0) return "chegou hoje";
+  if (days < 0) return `levou ${Math.abs(days)} dia${Math.abs(days) !== 1 ? "s" : ""}`;
+  return `em ${days} dia${days !== 1 ? "s" : ""}`;
 }
 
 export default function ComprasTransitoPage({
@@ -100,6 +117,9 @@ export default function ComprasTransitoPage({
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
   const [draftItems, setDraftItems] = useState<CompraTransitoItemRow[]>([]);
+  const [draftTitle, setDraftTitle] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [bulkDate, setBulkDate] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
 
   const loadCompras = useCallback(async () => {
@@ -141,11 +161,13 @@ export default function ComprasTransitoPage({
   const statusCounts = useMemo(() => {
     let emTransito = 0;
     let recebidas = 0;
+    let rascunhos = 0;
     compras.forEach((compra) => {
       if (compra.status === "em_transito") emTransito += 1;
+      else if (compra.status === "rascunho") rascunhos += 1;
       else recebidas += 1;
     });
-    return { emTransito, recebidas };
+    return { emTransito, recebidas, rascunhos };
   }, [compras]);
 
   const canConfirm = useMemo(
@@ -157,14 +179,34 @@ export default function ComprasTransitoPage({
     [draftItems]
   );
 
+  const canSaveDraft = draftItems.length > 0;
+
   const startNew = useCallback(() => {
     setDraftItems([]);
+    setDraftTitle("");
+    setEditingId(null);
+    setBulkDate("");
     setSelectedCompra(null);
     setView("editor");
   }, []);
 
+  const startEdit = useCallback((compra: CompraTransito) => {
+    setDraftItems(compra.items);
+    setDraftTitle(compra.title);
+    setEditingId(compra.id);
+    setBulkDate("");
+    setView("editor");
+  }, []);
+
+  const applyBulkDate = useCallback((date: string) => {
+    if (!date) return;
+    setDraftItems((prev) => prev.map((item) => ({ ...item, dataRecebimento: date })));
+  }, []);
+
   const openList = useCallback(() => {
     setSelectedCompra(null);
+    setEditingId(null);
+    setBulkDate("");
     setView("list");
   }, []);
 
@@ -201,40 +243,64 @@ export default function ComprasTransitoPage({
     setDraftItems((prev) => prev.filter((item) => item.itemKey !== itemKey));
   }, []);
 
-  const confirmCompra = useCallback(async () => {
-    if (!canConfirm || saving) return;
-    setSaving(true);
-    try {
-      const res = await fetch("/api/compras-transito", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyKey,
-          items: draftItems,
-        }),
-      });
-      const json = (await res.json()) as { data?: CompraTransito; error?: string };
-      if (!res.ok || !json.data) {
-        throw new Error(json.error ?? "Erro ao confirmar compra");
+  const saveCompra = useCallback(
+    async (isDraft: boolean) => {
+      if (saving) return;
+      if (!isDraft && !canConfirm) return;
+      if (isDraft && !canSaveDraft) return;
+      setSaving(true);
+      try {
+        let res: Response;
+        if (editingId) {
+          res = await fetch(`/api/compras-transito/${editingId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              companyKey,
+              title: draftTitle.trim() || undefined,
+              items: draftItems,
+              draft: isDraft,
+            }),
+          });
+        } else {
+          res = await fetch("/api/compras-transito", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              companyKey,
+              title: draftTitle.trim() || undefined,
+              items: draftItems,
+              draft: isDraft,
+            }),
+          });
+        }
+        const json = (await res.json()) as { data?: CompraTransito; error?: string };
+        if (!res.ok || !json.data) {
+          throw new Error(json.error ?? "Erro ao salvar compra");
+        }
+        setDraftItems([]);
+        setDraftTitle("");
+        setEditingId(null);
+        setModalOpen(false);
+        await loadCompras();
+        setView("list");
+        setToast({
+          tipo: "success",
+          mensagem: isDraft
+            ? "Rascunho salvo. Você pode editar as datas depois."
+            : "Compra confirmada e marcada como em trânsito.",
+        });
+      } catch (err) {
+        setToast({
+          tipo: "error",
+          mensagem: err instanceof Error ? err.message : "Erro ao salvar compra",
+        });
+      } finally {
+        setSaving(false);
       }
-
-      setDraftItems([]);
-      setModalOpen(false);
-      await loadCompras();
-      setView("list");
-      setToast({
-        tipo: "success",
-        mensagem: "Compra confirmada e marcada como em transito.",
-      });
-    } catch (err) {
-      setToast({
-        tipo: "error",
-        mensagem: err instanceof Error ? err.message : "Erro ao confirmar compra",
-      });
-    } finally {
-      setSaving(false);
-    }
-  }, [canConfirm, companyKey, draftItems, loadCompras, saving]);
+    },
+    [canConfirm, canSaveDraft, companyKey, draftItems, draftTitle, editingId, loadCompras, saving]
+  );
 
   const cancelCompra = useCallback(async () => {
     if (!selectedCompra || deleting) return;
@@ -263,7 +329,7 @@ export default function ComprasTransitoPage({
     }
   }, [selectedCompra, deleting, companyKey, loadCompras]);
 
-  const renderTableRows = (items: CompraTransitoItemRow[], readOnly: boolean) => (
+  const renderTableRows = (items: CompraTransitoItemRow[], readOnly: boolean, createdAt?: string) => (
     <div className={styles.tableWrap}>
       <table className={styles.table}>
         <thead>
@@ -288,7 +354,13 @@ export default function ComprasTransitoPage({
             const qtd = Math.max(0, Math.round(item.quantidade ?? 0));
             const custoTotal = custo > 0 ? Math.round(custo * qtd) : 0;
             const estoqueFinal = estoque + qtd;
-            const itemStatus = getCompraTransitoItemStatus(item.dataRecebimento);
+            const itemStatus = item.dataRecebimento
+              ? getCompraTransitoItemStatus(item.dataRecebimento)
+              : "rascunho";
+            const durationLabel =
+              readOnly && createdAt && item.dataRecebimento
+                ? fmtDuration(calcDurationDays(createdAt, item.dataRecebimento))
+                : null;
             return (
               <tr
                 key={item.itemKey}
@@ -296,6 +368,8 @@ export default function ComprasTransitoPage({
                   readOnly
                     ? itemStatus === "em_transito"
                       ? styles.rowConfirmed
+                      : itemStatus === "rascunho"
+                      ? styles.rowDraft
                       : styles.rowReceived
                     : undefined
                 }
@@ -303,16 +377,21 @@ export default function ComprasTransitoPage({
                 <td>
                   {readOnly ? (
                     <div className={styles.readOnlyDateCell}>
-                      <span>{fmtDate(item.dataRecebimento)}</span>
+                      <span>{item.dataRecebimento ? fmtDate(item.dataRecebimento) : "Sem data"}</span>
                       <span
                         className={`${styles.inlineStatusBadge} ${
                           itemStatus === "em_transito"
                             ? styles.inlineStatusBadgeTransit
+                            : itemStatus === "rascunho"
+                            ? styles.inlineStatusBadgeDraft
                             : styles.inlineStatusBadgeReceived
                         }`}
                       >
                         {getStatusLabel(itemStatus)}
                       </span>
+                      {durationLabel && (
+                        <span className={styles.durationChip}>{durationLabel}</span>
+                      )}
                     </div>
                   ) : (
                     <input
@@ -385,7 +464,7 @@ export default function ComprasTransitoPage({
 
       <div className={styles.topBar}>
         <div>
-          <h1 className={styles.title}>Compras em Transito</h1>
+          <h1 className={styles.title}>Compras em Trânsito</h1>
           <p className={styles.subtitle}>{companyName}</p>
         </div>
         <div className={styles.topBarActions}>
@@ -404,8 +483,16 @@ export default function ComprasTransitoPage({
               </button>
               <button
                 type="button"
+                className={styles.draftBtn}
+                onClick={() => void saveCompra(true)}
+                disabled={!canSaveDraft || saving}
+              >
+                {saving ? "Salvando..." : "Salvar rascunho"}
+              </button>
+              <button
+                type="button"
                 className={styles.primaryBtn}
-                onClick={() => void confirmCompra()}
+                onClick={() => void saveCompra(false)}
                 disabled={!canConfirm || saving}
               >
                 {saving ? "Confirmando..." : "Confirmar Compra"}
@@ -423,20 +510,26 @@ export default function ComprasTransitoPage({
               <strong className={styles.summaryValue}>{fmt(compras.length)}</strong>
             </div>
             <div className={styles.summaryItem}>
-              <span className={styles.summaryLabel}>Em transito</span>
+              <span className={styles.summaryLabel}>Em trânsito</span>
               <strong className={styles.summaryValueGreen}>{fmt(statusCounts.emTransito)}</strong>
             </div>
             <div className={styles.summaryItem}>
               <span className={styles.summaryLabel}>Recebidas</span>
               <strong className={styles.summaryValue}>{fmt(statusCounts.recebidas)}</strong>
             </div>
+            {statusCounts.rascunhos > 0 && (
+              <div className={styles.summaryItem}>
+                <span className={styles.summaryLabel}>Rascunhos</span>
+                <strong className={styles.summaryValueDraft}>{fmt(statusCounts.rascunhos)}</strong>
+              </div>
+            )}
           </div>
 
-          {loading && <div className={styles.emptyState}>Carregando compras em transito...</div>}
+          {loading && <div className={styles.emptyState}>Carregando compras em trânsito...</div>}
           {!loading && error && <div className={styles.errorBox}>{error}</div>}
           {!loading && !error && compras.length === 0 && (
             <div className={styles.emptyState}>
-              <p>Nenhuma compra em transito confirmada ainda.</p>
+              <p>Nenhuma compra em trânsito confirmada ainda.</p>
               <button type="button" className={styles.primaryBtn} onClick={startNew}>
                 Criar primeira compra
               </button>
@@ -452,33 +545,38 @@ export default function ComprasTransitoPage({
                       : `${fmtDate(compra.minDataRecebimento)} ate ${fmtDate(compra.maxDataRecebimento)}`
                     : "Sem data";
                 const isTransit = compra.status === "em_transito";
+                const isDraft = compra.status === "rascunho";
 
                 return (
                   <button
                     key={compra.id}
                     type="button"
-                    className={`${styles.card} ${!isTransit ? styles.cardReceived : ""}`}
+                    className={`${styles.card} ${isDraft ? styles.cardDraft : !isTransit ? styles.cardReceived : ""}`}
                     onClick={() => void openDetail(compra.id)}
                     disabled={loadingDetail}
                   >
                     <div className={styles.cardHeader}>
-                      <span className={styles.cardTitle}>{compra.title}</span>
+                      <span className={`${styles.cardTitle} ${isDraft ? styles.cardTitleDraft : ""}`}>{compra.title}</span>
                       <span
                         className={`${styles.statusBadge} ${
-                          isTransit ? styles.statusBadgeTransit : styles.statusBadgeReceived
+                          isDraft
+                            ? styles.statusBadgeDraft
+                            : isTransit
+                            ? styles.statusBadgeTransit
+                            : styles.statusBadgeReceived
                         }`}
                       >
                         {getStatusLabel(compra.status)}
                       </span>
                     </div>
-                    <div className={styles.cardMeta}>
+                    <div className={`${styles.cardMeta} ${isDraft ? styles.cardMetaDraft : ""}`}>
                       <span>{compra.itemCount} item(ns)</span>
                       <span>{fmt(compra.totalQuantidade)} un.</span>
                       <span>{fmtBRL(compra.totalValor)}</span>
                     </div>
-                    <div className={styles.cardSubmeta}>
+                    <div className={`${styles.cardSubmeta} ${isDraft ? styles.cardSubmetaDraft : ""}`}>
                       <span>Recebimento: {periodoRecebimento}</span>
-                      <span>Confirmada em {fmtDateTime(compra.confirmedAt)}</span>
+                      <span>Criada em {fmtDateTime(compra.confirmedAt)}</span>
                     </div>
                   </button>
                 );
@@ -490,6 +588,20 @@ export default function ComprasTransitoPage({
 
       {view === "editor" && (
         <>
+          <div className={styles.titleInputWrap}>
+            <label className={styles.titleInputLabel} htmlFor="draft-title">
+              Nome da compra
+            </label>
+            <input
+              id="draft-title"
+              type="text"
+              className={styles.titleInput}
+              placeholder="Ex: Compra fornecedor X – maio 2026 (opcional)"
+              value={draftTitle}
+              onChange={(e) => setDraftTitle(e.target.value)}
+            />
+          </div>
+
           <div className={styles.summaryCard}>
             <div className={styles.summaryItem}>
               <span className={styles.summaryLabel}>Itens</span>
@@ -507,7 +619,7 @@ export default function ComprasTransitoPage({
 
           {draftItems.length === 0 ? (
             <div className={styles.emptyState}>
-              <p>Adicione produtos para montar a compra em transito.</p>
+              <p>Adicione produtos para montar a compra em trânsito.</p>
               <button type="button" className={styles.primaryBtn} onClick={() => setModalOpen(true)}>
                 Adicionar produtos
               </button>
@@ -517,10 +629,35 @@ export default function ComprasTransitoPage({
             </div>
           ) : (
             <>
+              <div className={styles.bulkDateBar}>
+                <label className={styles.bulkDateLabel} htmlFor="bulk-date">
+                  Definir data para todos os itens:
+                </label>
+                <div className={styles.bulkDateControls}>
+                  <input
+                    id="bulk-date"
+                    type="date"
+                    className={styles.input}
+                    value={bulkDate}
+                    onChange={(e) => setBulkDate(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className={styles.secondaryBtn}
+                    disabled={!bulkDate}
+                    onClick={() => {
+                      applyBulkDate(bulkDate);
+                      setBulkDate("");
+                    }}
+                  >
+                    Aplicar a todos
+                  </button>
+                </div>
+              </div>
               {renderTableRows(draftItems, false)}
               {!canConfirm && (
                 <div className={styles.helperText}>
-                  Preencha a data de recebimento e deixe a quantidade maior que zero em todos os itens.
+                  Para confirmar, preencha a data de recebimento e a quantidade em todos os itens. Ou salve como rascunho para definir as datas depois.
                 </div>
               )}
             </>
@@ -535,6 +672,22 @@ export default function ComprasTransitoPage({
               Voltar para lista
             </button>
             <div className={styles.detailHeaderRight}>
+              {selectedCompra && (
+                <button
+                  type="button"
+                  className={
+                    selectedCompra.status === "rascunho"
+                      ? styles.draftBtn
+                      : styles.secondaryBtn
+                  }
+                  onClick={() => startEdit(selectedCompra)}
+                  disabled={loadingDetail}
+                >
+                  {selectedCompra.status === "rascunho"
+                    ? "Editar rascunho"
+                    : "Editar / Reabrir"}
+                </button>
+              )}
               <button
                 type="button"
                 className={styles.dangerBtn}
@@ -556,6 +709,8 @@ export default function ComprasTransitoPage({
                 className={`${styles.summaryCard} ${
                   selectedCompra.status === "em_transito"
                     ? styles.summaryCardConfirmed
+                    : selectedCompra.status === "rascunho"
+                    ? styles.summaryCardDraft
                     : styles.summaryCardReceived
                 }`}
               >
@@ -563,14 +718,18 @@ export default function ComprasTransitoPage({
                   <span className={styles.summaryLabel}>Status</span>
                   <strong
                     className={
-                      selectedCompra.status === "em_transito" ? styles.summaryValueGreen : styles.summaryValue
+                      selectedCompra.status === "em_transito"
+                        ? styles.summaryValueGreen
+                        : selectedCompra.status === "rascunho"
+                        ? styles.summaryValueDraft
+                        : styles.summaryValue
                     }
                   >
                     {getStatusLabel(selectedCompra.status)}
                   </strong>
                 </div>
                 <div className={styles.summaryItem}>
-                  <span className={styles.summaryLabel}>Confirmada em</span>
+                  <span className={styles.summaryLabel}>Criada em</span>
                   <strong className={styles.summaryValue}>{fmtDateTime(selectedCompra.confirmedAt)}</strong>
                 </div>
                 <div className={styles.summaryItem}>
@@ -581,7 +740,7 @@ export default function ComprasTransitoPage({
               <div className={styles.detailTitleBox}>
                 <h2 className={styles.detailTitle}>{selectedCompra.title}</h2>
               </div>
-              {renderTableRows(selectedCompra.items, true)}
+              {renderTableRows(selectedCompra.items, true, selectedCompra.createdAt)}
             </>
           )}
         </>
