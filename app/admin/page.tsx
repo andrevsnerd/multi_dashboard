@@ -12,8 +12,8 @@ import {
 } from "@/types/auth";
 import styles from "./page.module.css";
 const _filialLabelOverrides: Record<string, string> = {
-  'NERD MORUMBI RDRRRJ': 'MORUMBI 1',
-  'NERD MORUMBI RDRX': 'MORUMBI 1',
+  'NERD MORUMBI RDRRRJ': 'NERD MORUMBI RDRRRJ',
+  'NERD MORUMBI RDRX': 'NERD MORUMBI RDRRRJ',
   'NERD MORUMBI RDRRX': 'NERD MORUMBI 2 (RRX)',
 };
 function getFilialLabel(filial: string): string {

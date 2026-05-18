@@ -36,7 +36,7 @@ export interface FilialGrupo {
 export const DEFAULT_GRUPOS: FilialGrupo[] = [
   {
     id: 'morumbi-1',
-    label: 'MORUMBI 1',
+    label: 'NERD MORUMBI RDRRRJ',
     company: 'nerd',
     members: ['NERD MORUMBI RDRRRJ', 'NERD MORUMBI RDRX'],
     active: 'NERD MORUMBI RDRX',

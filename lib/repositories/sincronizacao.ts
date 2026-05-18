@@ -1,6 +1,7 @@
 import sql from "mssql";
 
-import { resolveCompany } from "@/lib/config/company";
+import { resolveCompany, getFilialLabelForDisplay } from "@/lib/config/company";
+import { resolveCompanyDynamic } from "@/lib/config/company-server";
 import { withRequest } from "@/lib/db/connection";
 
 const SINCRONIZACAO_FILIAIS = [
@@ -42,6 +43,7 @@ export type SincronizacaoStatus = "OK" | "ATENCAO" | "ATRASADO" | "SEM_VENDAS";
 export interface SincronizacaoFilial {
   codFilial: number;
   filial: string;
+  displayName: string;
   status: SincronizacaoStatus;
   ultimaVenda: string | null;
   deltaDescricao: string;
@@ -116,6 +118,16 @@ export async function fetchSincronizacaoFiliais(): Promise<{
   totalFiliais: number;
   filiais: SincronizacaoFilial[];
 }> {
+  const [nerdConfig, scarfmeConfig] = await Promise.all([
+    resolveCompanyDynamic('nerd'),
+    resolveCompanyDynamic('scarfme'),
+  ]);
+
+  function getDisplayName(filialName: string): string {
+    const config = filialName.toUpperCase().startsWith('NERD') ? nerdConfig : scarfmeConfig;
+    return getFilialLabelForDisplay(config, filialName);
+  }
+
   return withRequest(async (request) => {
     const agora = new Date();
     const consideradas = new Set(SINCRONIZACAO_FILIAIS_NORMALIZADAS);
@@ -330,6 +342,7 @@ export async function fetchSincronizacaoFiliais(): Promise<{
       resultado.push({
         codFilial: filial.codFilial,
         filial: filial.filial,
+        displayName: getDisplayName(filial.filial),
         status,
         ultimaVenda: dataVenda ? dataVenda.toISOString() : null,
         deltaDescricao: formatarDelta(dataVenda, agora),

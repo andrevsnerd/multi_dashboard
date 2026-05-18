@@ -111,7 +111,7 @@ export default function SincronizacaoPage() {
                       title={STATUS_LABEL[filial.status]}
                     />
                     <div>
-                      <div className={styles.filialName}>{filial.filial}</div>
+                      <div className={styles.filialName}>{filial.displayName}</div>
                       <div className={styles.statusText}>{STATUS_LABEL[filial.status]}</div>
                     </div>
                   </div>
