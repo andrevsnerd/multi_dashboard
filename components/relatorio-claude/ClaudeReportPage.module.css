@@ -90,6 +90,11 @@
   font-weight: 700;
 }
 
+.auditButtonActive {
+  background: #6d2e46;
+  color: #fff7ee;
+}
+
 .filtersGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -256,14 +261,84 @@
   line-height: 1.45;
 }
 
+.auditPanel {
+  margin: 14px 0 18px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.72);
+  border-left: 4px solid #d4a373;
+  box-shadow: 0 4px 12px rgba(78, 48, 57, 0.08);
+}
+
+.coverRight .auditPanel,
+.closingLeft .auditPanel,
+.closingRight .auditPanel {
+  background: rgba(255, 248, 238, 0.12);
+}
+
+.auditTitle {
+  text-transform: uppercase;
+  letter-spacing: 0.26em;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6d2e46;
+  margin-bottom: 10px;
+}
+
+.coverRight .auditTitle,
+.closingLeft .auditTitle,
+.closingRight .auditTitle {
+  color: #f6e9dc;
+}
+
+.auditGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+}
+
+.auditItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #5b434d;
+}
+
+.coverRight .auditItem,
+.closingLeft .auditItem,
+.closingRight .auditItem {
+  color: #f6e9dc;
+}
+
+.auditItem strong {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: #8b6f7a;
+}
+
+.coverRight .auditItem strong,
+.closingLeft .auditItem strong,
+.closingRight .auditItem strong {
+  color: rgba(246, 233, 220, 0.76);
+}
+
+.auditWide {
+  grid-column: 1 / -1;
+}
+
 .brand {
   font-size: 54px;
   font-weight: 700;
   letter-spacing: 0.18em;
 }
 
-.brand span {
+.brandDot {
   color: #f2898d;
+}
+
+.brandMe {
+  font-weight: 200;
 }
 
 .coverBadge {
@@ -1165,6 +1240,7 @@
 .riskLayout {
   grid-template-columns: 44% 56%;
   gap: 18px;
+  margin-top: 20px;
 }
 
 .bucketList {
@@ -1313,66 +1389,100 @@
 .closingLeft {
   color: #6d2e46;
   justify-content: flex-start;
-  gap: 52px;
+  gap: 44px;
+  padding: 58px 50px 54px;
+  border-right: 6px solid #c86d34;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0) 22%),
+    #efe2cc;
 }
 
 .closingLeft p {
-  color: #2e1d22;
+  color: #341f25;
   font-style: italic;
-  max-width: 280px;
-  font-size: 20px;
+  max-width: 340px;
+  font-size: 17px;
+  line-height: 1.55;
+  margin: 0;
 }
 
-.validated {
-  margin-top: auto;
-  width: 170px;
-  height: 170px;
-  border-radius: 50%;
-  background: #5a8c5c;
-  color: #fff7ec;
+.closingHeader {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 30px;
-  font-weight: 700;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.closingEyebrow {
+  color: #d09a60;
+}
+
+.closingLeft h2 {
+  max-width: 260px;
+  font-size: 50px;
+  line-height: 1.02;
+}
+
+.closingRight {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0) 100%),
+    #6f2d48;
+  color: #fff7ee;
+  padding: 52px 46px 48px;
+}
+
+.closingRight h1 {
+  color: #fff3e4;
+  font-size: 56px;
+  line-height: 0.98;
+  max-width: 540px;
 }
 
 .recommendList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 26px;
+  gap: 10px;
+  margin-top: 22px;
 }
 
 .recommendCard {
-  background: white;
+  background: #fffaf5;
   display: grid;
-  grid-template-columns: 70px 1fr;
-  gap: 18px;
-  padding: 16px 18px;
+  grid-template-columns: 64px 1fr;
+  gap: 20px;
+  padding: 16px 18px 16px 14px;
   color: #6d2e46;
+  border-left: 6px solid #cf6b32;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.08);
+  align-items: start;
 }
 
 .recommendIndex {
-  color: #d4a373;
+  color: #cf8c53;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 34px;
+  font-size: 18px;
   font-weight: 700;
   text-align: center;
-  padding-top: 10px;
+  padding-top: 2px;
+  letter-spacing: 0.04em;
+}
+
+.recommendBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .recommendTitle {
-  font-size: 26px;
-  margin-bottom: 10px;
+  font-size: 24px;
+  margin-bottom: 0;
+  color: #6d2e46;
 }
 
 .recommendText {
-  color: #2e1d22;
+  color: #3a232a;
   font-style: italic;
-  font-size: 17px;
+  font-size: 15px;
+  line-height: 1.35;
 }
 
 @media (max-width: 1100px) {
@@ -1448,6 +1558,11 @@
     grid-template-columns: 1fr;
   }
 
+  .closingLeft h2,
+  .closingRight h1 {
+    max-width: none;
+  }
+
   .donut {
     width: 280px;
     height: 280px;
@@ -1460,6 +1575,10 @@
 }
 
 @media (max-width: 768px) {
+  .auditGrid {
+    grid-template-columns: 1fr;
+  }
+
   .brand {
     font-size: 38px;
   }

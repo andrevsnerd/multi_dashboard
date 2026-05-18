@@ -106,6 +106,25 @@ interface ClosingSummary {
   badge: string;
 }
 
+interface SlideAuditMeta {
+  source: string;
+  queryBase: string;
+  effectiveRange: string;
+  appliedFilters: string;
+  formula: string;
+  checks: string;
+}
+
+interface ReportAudit {
+  flags: {
+    comparableRecentWindow: boolean;
+    equivalentWindowComparison: boolean;
+    stockTotalUsesScopeInventory: boolean;
+    ruptureScopeUsesSoldSkus: boolean;
+  };
+  slides: Record<string, SlideAuditMeta>;
+}
+
 interface ClaudeReportPayload {
   scopeLabel: string;
   gradeLabel: string;
@@ -127,6 +146,7 @@ interface ClaudeReportPayload {
     end: string;
     label: string;
     recentLabel: string;
+    previousEquivalentLabel: string;
     months: number;
   };
   summary: {
@@ -144,9 +164,12 @@ interface ClaudeReportPayload {
     monthCurrentLabel: string;
     monthPreviousLabel: string;
     stockTotal: number;
+    activeStockTotal: number;
+    stockScopeSkuCount: number;
     coverageMonths: number;
     ruptureCount: number;
     openPurchaseCount: number;
+    retentionComparable: boolean;
   };
   curveSummary: CurveSummaryRow[];
   topCurveA: AbcItem[];
@@ -166,16 +189,13 @@ interface ClaudeReportPayload {
   channelMix: ChannelMixSummary;
   stockBuckets: StockBucketRow[];
   ruptureTable: AbcItem[];
-  purchaseByCurve: Array<{
-    curve: "A" | "B" | "C";
-    count: number;
-  }>;
   warmingTypes: ShareRankingRow[];
   coolingCollections: ShareRankingRow[];
   movementTable: ShareRankingRow[];
   story: StoryRow[];
   closing: ClosingSummary;
   recommendations: RecommendationRow[];
+  audit: ReportAudit;
 }
 
 interface ClaudeReportPageProps {
@@ -227,8 +247,29 @@ function fmtPp(value: number) {
   })}pp`;
 }
 
+function hasMeaningfulDrift(value: number) {
+  return Math.abs(toFiniteNumber(value)) >= 0.25;
+}
+
+function fmtDriftPp(value: number) {
+  const safeValue = toFiniteNumber(value);
+  const digits = Math.abs(safeValue) < 1 ? 2 : 1;
+  const signal = safeValue > 0 ? "+" : "";
+  return `${signal}${safeValue.toLocaleString("pt-BR", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })}pp`;
+}
+
+function fmtDriftSignal(value: number) {
+  const safeValue = toFiniteNumber(value);
+  if (!hasMeaningfulDrift(safeValue)) return `estável (${fmtDriftPp(safeValue)})`;
+  const magnitude = fmtPp(Math.abs(safeValue));
+  return safeValue > 0 ? `\u25B2 ganhou ${magnitude}` : `\u25BC perdeu ${magnitude}`;
+}
+
 function rangeDurationLabel(months: number, start: string, end: string): string {
-  const days = Math.max(1, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86_400_000));
+  const days = Math.max(1, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86_400_000) + 1);
   if (days < 31) return `${days} ${days === 1 ? "dia" : "dias"}`;
   if (months < 2) return `${months.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} meses`;
   return `${Math.round(months)} meses`;
@@ -236,7 +277,7 @@ function rangeDurationLabel(months: number, start: string, end: string): string 
 
 function formatPeriodHeadline(months: number, start: string, end: string): string {
   const msPerDay = 1000 * 60 * 60 * 24;
-  const days = Math.max(1, Math.round((new Date(end).getTime() - new Date(start).getTime()) / msPerDay));
+  const days = Math.max(1, Math.round((new Date(end).getTime() - new Date(start).getTime()) / msPerDay) + 1);
   if (days < 31) {
     return `O que dizem os ${days} ${days === 1 ? "dia" : "dias"} da rede`;
   }
@@ -283,7 +324,7 @@ function inferSubgroupFamily(value: string) {
   if (normalized.includes("CASHMERE")) return "Cashmere";
   if (normalized.includes("MODAL")) return "Modal";
   if (normalized.includes("ACRIL")) return "Acrílico";
-  if (normalized.includes("LA ") || normalized.startsWith("LA") || normalized.includes(" LÃ")) return "Lã";
+  if (normalized.includes("LA ") || normalized.startsWith("LA") || normalized.includes(" LA")) return "Lã";
   if (normalized.includes("TRICOT")) return "Tricot";
   if (normalized.includes("MALHA")) return "Malha";
   if (normalized.includes("JERSEY")) return "Jersey";
@@ -444,12 +485,50 @@ function Donut({
   );
 }
 
+function AuditPanel({ audit }: { audit?: SlideAuditMeta }) {
+  if (!audit) return null;
+
+  return (
+    <div className={styles.auditPanel}>
+      <div className={styles.auditTitle}>Modo auditoria</div>
+      <div className={styles.auditGrid}>
+        <div className={styles.auditItem}>
+          <strong>Fonte</strong>
+          <span>{audit.source}</span>
+        </div>
+        <div className={styles.auditItem}>
+          <strong>Range efetivo</strong>
+          <span>{audit.effectiveRange}</span>
+        </div>
+        <div className={`${styles.auditItem} ${styles.auditWide}`}>
+          <strong>Query base</strong>
+          <span>{audit.queryBase}</span>
+        </div>
+        <div className={`${styles.auditItem} ${styles.auditWide}`}>
+          <strong>Filtros aplicados</strong>
+          <span>{audit.appliedFilters}</span>
+        </div>
+        <div className={`${styles.auditItem} ${styles.auditWide}`}>
+          <strong>Fórmula</strong>
+          <span>{audit.formula}</span>
+        </div>
+        <div className={`${styles.auditItem} ${styles.auditWide}`}>
+          <strong>Cheque de coerência</strong>
+          <span>{audit.checks}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ReportView({
   report,
   deckRef,
+  auditMode,
 }: {
   report: ClaudeReportPayload;
   deckRef?: RefObject<HTMLDivElement | null>;
+  auditMode?: boolean;
 }) {
   const curveAShare = report.curveSummary.find((row) => row.curve === "A")?.share ?? 0;
   const curveASkus = report.curveSummary.find((row) => row.curve === "A")?.skus ?? 0;
@@ -457,28 +536,28 @@ function ReportView({
     .filter((row) => row.curve !== "A")
     .reduce((sum, row) => sum + row.quantity, 0);
   const stockCurveA = report.curveSummary.find((row) => row.curve === "A")?.stock ?? 0;
-  const stockCurveAShare = report.summary.stockTotal > 0 ? (stockCurveA / report.summary.stockTotal) * 100 : 0;
-  const purchaseCurve = Object.fromEntries(report.purchaseByCurve.map((item) => [item.curve, item.count])) as Record<string, number>;
+  const stockCurveAShare = report.summary.activeStockTotal > 0 ? (stockCurveA / report.summary.activeStockTotal) * 100 : 0;
   const topStore = report.branchRanking[0] ?? null;
-  const warmingCollections = report.collectionRanking.filter((row) => row.deltaPp > 0).slice(0, 2);
   const hasChannelView = report.channelMix.hasEcommerce && report.channelMix.ecommerceRevenue > 0 && report.channelMix.physicalRevenue > 0;
   const showSubgroupSlide = report.appliedFilters.subgrupos.length !== 1;
-  const coverEyebrow = hasChannelView ? "Analise de produto - rede + e-com" : "Analise de produto - rede";
+  const slideAudit = report.audit.slides;
+  const hasComparableRecentWindow = report.summary.retentionComparable;
+  const coverEyebrow = hasChannelView ? "Análise de produto - rede + e-com" : "Análise de produto - rede";
   const coverSubtitle = hasChannelView
-    ? `Performance, curva ABC, tipos, colecoes, cores, ranking de filiais e desempenho do e-commerce - ${rangeDurationLabel(report.range.months, report.range.start, report.range.end)} de dados (${report.range.label}).`
-    : `Performance, curva ABC, tipos, colecoes, cores e ranking de filiais - ${rangeDurationLabel(report.range.months, report.range.start, report.range.end)} de dados (${report.range.label}).`;
+    ? `Performance, curva ABC, tipos, coleções, cores, ranking de filiais e desempenho do e-commerce - ${rangeDurationLabel(report.range.months, report.range.start, report.range.end)} de dados (${report.range.label}).`
+    : `Performance, curva ABC, tipos, coleções, cores e ranking de filiais - ${rangeDurationLabel(report.range.months, report.range.start, report.range.end)} de dados (${report.range.label}).`;
   const rankingLabel = hasChannelView ? "Ranking de canais" : "Ranking de filiais";
   const rankingTitle = hasChannelView
     ? `Onde ${report.presentation.performanceLead} mais performa`
     : `Onde ${report.presentation.performanceLead} mais performa`;
   const rankingSubtitle = hasChannelView
     ? "A leitura consolidada mostra o peso relativo de lojas e e-commerce dentro do recorte."
-    : "A leitura fisica da rede mostra concentracao de faturamento e onde o mix tem maior alavanca comercial.";
+    : "A leitura física da rede mostra concentração de faturamento e onde o mix tem maior alavanca comercial.";
   const profileEyebrow = hasChannelView ? "Perfil dos canais" : "Perfil das filiais";
-  const profileTitle = hasChannelView ? "Cada operacao vende um mix diferente" : "Cada loja tem cara propria";
+  const profileTitle = hasChannelView ? "Cada operação vende um mix diferente" : "Cada loja tem cara própria";
   const profileSubtitle = hasChannelView
-    ? `Top 6 operacoes com suas colecoes e cores lideres - ${report.growthLabel}.`
-    : `Top 6 filiais com suas colecoes e cores lideres - ${report.growthLabel}.`;
+    ? `Top 6 operações com suas coleções e cores líderes - ${report.growthLabel}.`
+    : `Top 6 filiais com suas coleções e cores líderes - ${report.growthLabel}.`;
   const coverSubgroupsSource = (report.subgroupRanking.length > 0
     ? report.subgroupRanking.map((row) => row.label)
     : report.appliedFilters.subgrupos
@@ -550,11 +629,14 @@ function ReportView({
         </div>
         <div className={styles.coverRight}>
           <div className={styles.coverHeader}>
-            <div className={styles.brand}>SCARF<span>.</span>ME</div>
+            <div className={styles.brand}>
+              SCARF<span className={styles.brandDot}>.</span><span className={styles.brandMe}>ME</span>
+            </div>
             <div className={styles.eyebrow}>{coverEyebrow}</div>
           </div>
           <h1>{coverTitle}</h1>
           <p className={styles.subtitle}>{coverSubtitle}</p>
+          {auditMode ? <AuditPanel audit={slideAudit.cover} /> : null}
           <div className={styles.coverLine} />
           <div className={styles.coverMeta}>{coverMeta}</div>
           <div className={styles.coverStats}>
@@ -568,15 +650,15 @@ function ReportView({
           const periodFull = formatPeriodHeadline(report.range.months, report.range.start, report.range.end);
           const periodShort = periodFull.replace(/ da rede$/, "");
           const summaryHeadline = hasFilters && dominantFamily
-            ? `${dominantFamily} — ${periodShort.charAt(0).toLowerCase()}${periodShort.slice(1)}`
+            ? `${dominantFamily} - ${periodShort.charAt(0).toLowerCase()}${periodShort.slice(1)}`
             : periodFull;
           const summarySubtitle = report.presentation.summaryLead.length > 40
             ? report.presentation.summaryLead
-            : `${report.presentation.summaryLead} soma ${fmtCurrency(report.summary.totalRevenue)} em ${rangeDurationLabel(report.range.months, report.range.start, report.range.end)} (${report.range.label}), com ${fmtInt(report.summary.skuCount)} SKUs ativos. Variacao YoY: ${fmtPct(report.summary.yoyNetwork, 1, true)}.`;
+            : `${report.presentation.summaryLead} soma ${fmtCurrency(report.summary.totalRevenue)} em ${rangeDurationLabel(report.range.months, report.range.start, report.range.end)} (${report.range.label}), com ${fmtInt(report.summary.skuCount)} SKUs ativos. Variação YoY: ${fmtPct(report.summary.yoyNetwork, 1, true)}.`;
           // Card 4: use YoY only when meaningful; fall back to monthly projection
-          const days = Math.max(1, Math.round((new Date(report.range.end).getTime() - new Date(report.range.start).getTime()) / 86_400_000));
+          const days = Math.max(1, Math.round((new Date(report.range.end).getTime() - new Date(report.range.start).getTime()) / 86_400_000) + 1);
           const yoyAbs = Math.abs(toFiniteNumber(report.summary.yoyNetwork));
-          const yoyMeaningful = yoyAbs > 0.05 && toFiniteNumber(report.summary.retention) < 99.9;
+          const yoyMeaningful = yoyAbs > 0.05 && hasComparableRecentWindow && toFiniteNumber(report.summary.retention) < 99.9;
           const useMonthly = !yoyMeaningful || days < 31;
           const monthYoyPositive = toFiniteNumber(report.summary.monthProjectionYoy) >= 0;
           const card4Positive = useMonthly ? monthYoyPositive : report.summary.yoyNetwork >= 0;
@@ -589,37 +671,40 @@ function ReportView({
             : report.summary.yoyLabel;
           const card4Note = useMonthly
             ? `proj. ${fmtCurrency(report.summary.monthProjected, true)}`
-            : `${fmtPct(report.summary.retention)} dos top SKUs mantiveram posicao`;
+            : hasComparableRecentWindow
+              ? `${fmtPct(report.summary.retention)} dos top SKUs mantiveram posição`
+              : "sem janela recente comparável";
           const insightText = useMonthly
             ? (monthYoyPositive
-                ? `${report.summary.monthCurrentLabel} projeta ${fmtCurrency(report.summary.monthProjected, true)} — alta de ${fmtPct(report.summary.monthProjectionYoy, 1, true)} sobre o mesmo mes do ano anterior (${report.summary.monthPreviousLabel}).`
-                : `${report.summary.monthCurrentLabel} projeta ${fmtCurrency(report.summary.monthProjected, true)} — queda de ${fmtPct(Math.abs(toFiniteNumber(report.summary.monthProjectionYoy)), 1)} vs ${report.summary.monthPreviousLabel}. Ritmo recente abaixo do ano anterior.`)
+                ? `${report.summary.monthCurrentLabel} projeta ${fmtCurrency(report.summary.monthProjected, true)} - alta de ${fmtPct(report.summary.monthProjectionYoy, 1, true)} sobre o mesmo mês do ano anterior (${report.summary.monthPreviousLabel}).`
+                : `${report.summary.monthCurrentLabel} projeta ${fmtCurrency(report.summary.monthProjected, true)} - queda de ${fmtPct(Math.abs(toFiniteNumber(report.summary.monthProjectionYoy)), 1)} vs ${report.summary.monthPreviousLabel}. Ritmo recente abaixo do ano anterior.`)
             : (report.summary.yoyNetwork >= 0
-                ? `Crescimento YoY de ${fmtPct(report.summary.yoyNetwork, 1, true)} no periodo. ${toFiniteNumber(report.summary.retention) >= 90 ? "Mix estavel — top SKUs mantiveram posicao." : `${fmtPct(100 - toFiniteNumber(report.summary.retention))} dos lideres perderam ritmo na janela recente (${report.range.recentLabel}).`}`
-                : `Queda de ${fmtPct(Math.abs(toFiniteNumber(report.summary.yoyNetwork)), 1)} YoY. Projecao de ${report.summary.monthCurrentLabel}: ${fmtCurrency(report.summary.monthProjected, true)}.`);
+                ? `Crescimento YoY de ${fmtPct(report.summary.yoyNetwork, 1, true)} no período. ${hasComparableRecentWindow ? (toFiniteNumber(report.summary.retention) >= 90 ? "Mix estável - top SKUs mantiveram posição." : `${fmtPct(100 - toFiniteNumber(report.summary.retention))} dos líderes perderam ritmo na janela recente (${report.range.recentLabel}).`) : "Sem janela recente distinta para medir drift com confiabilidade."}`
+                : `Queda de ${fmtPct(Math.abs(toFiniteNumber(report.summary.yoyNetwork)), 1)} YoY. Projeção de ${report.summary.monthCurrentLabel}: ${fmtCurrency(report.summary.monthProjected, true)}.`);
           return (
             <>
               <div className={styles.eyebrow}>Resumo executivo</div>
               <h1>{summaryHeadline}</h1>
               <p className={styles.subtitle}>{summarySubtitle}</p>
+              {auditMode ? <AuditPanel audit={slideAudit.summary} /> : null}
               <div className={`${styles.statGrid} ${styles.four}`}>
                 <div className={styles.statCard}>
                   <StatCardIcon type="revenue" />
                   <div className={styles.statValue}>{fmtCurrency(report.summary.totalRevenue, true)}</div>
-                  <div className={styles.statLabel}>Faturamento — {rangeDurationLabel(report.range.months, report.range.start, report.range.end)}</div>
+                  <div className={styles.statLabel}>Faturamento - {rangeDurationLabel(report.range.months, report.range.start, report.range.end)}</div>
                   <div className={styles.statNote}>{fmtInt(report.summary.totalUnits)} unidades vendidas</div>
                 </div>
                 <div className={styles.statCard}>
                   <StatCardIcon type="sku" />
                   <div className={styles.statValue}>{fmtInt(report.summary.skuCount)}</div>
-                  <div className={styles.statLabel}>SKUs ativos no periodo</div>
+                  <div className={styles.statLabel}>SKUs ativos no período</div>
                   <div className={styles.statNote}>{fmtInt(curveASkus)} em Curva A</div>
                 </div>
                 <div className={styles.statCard}>
                   <StatCardIcon type="curveA" />
                   <div className={styles.statValue}>{fmtPct(curveAShare)}</div>
                   <div className={styles.statLabel}>do faturamento vem da Curva A</div>
-                  <div className={styles.statNote}>{fmtInt(curveASkus)} SKUs lideres</div>
+                  <div className={styles.statNote}>{fmtInt(curveASkus)} SKUs líderes</div>
                 </div>
                 <div className={`${styles.statCard} ${card4Accent}`}>
                   <StatCardIcon type="yoy" positive={card4Positive} />
@@ -654,6 +739,7 @@ function ReportView({
               <div className={styles.eyebrow}>Curva ABC</div>
               <h1>{abcHeadline}</h1>
               <p className={styles.subtitle}>{abcSubtitle}</p>
+              {auditMode ? <AuditPanel audit={slideAudit.curveAbc} /> : null}
               <div className={`${styles.twoCol} ${styles.abcCol}`}>
                 <Donut
                   items={report.curveSummary.map((row, index) => ({
@@ -706,8 +792,9 @@ function ReportView({
 
       <section className={styles.slide} data-pdf-slide="">
         <div className={styles.eyebrow}>Top 10 Curva A</div>
-        <h1>Os SKUs que sustentam o catalogo</h1>
-        <p className={styles.subtitle}>Ranking por faturamento no periodo {report.range.label}.</p>
+        <h1>Os SKUs que sustentam o catálogo</h1>
+        <p className={styles.subtitle}>Ranking por faturamento no período {report.range.label}.</p>
+        {auditMode ? <AuditPanel audit={slideAudit.topCurveA} /> : null}
         <table className={styles.table}>
           <thead>
             <tr>
@@ -795,8 +882,7 @@ function ReportView({
           const isComplete = (year: number) =>
             year < endYear || (year === endYear && endMonth === 11 && endDay >= 28);
           const channelSuffix = hasChannelView ? "loja + e-com somados" : "rede consolidada";
-          const yearTitles = years.map((y) => y.year).join(" vs ");
-          const annualTitle = `${yearTitles} — ${channelSuffix}`;
+          const annualTitle = `Janelas equivalentes - ${channelSuffix}`;
           const lastFullIdx = [...years].reverse().findIndex((y) => isComplete(y.year));
           const lastFull = lastFullIdx >= 0 ? [...years].reverse()[lastFullIdx] : null;
           const prevOfLastFull = lastFull ? years[years.indexOf(lastFull) - 1] : null;
@@ -806,11 +892,11 @@ function ReportView({
           const subj = hasFilters ? dominantFamily : "A rede";
           const annualSubtitle = (() => {
             const yoyPart = bigYoy !== null
-              ? `${subj} ${bigYoy >= 0 ? `cresceu ${fmtPct(bigYoy, 0, true)}` : `caiu ${fmtPct(Math.abs(bigYoy), 0)}`} em ${lastFull!.year} vs ${prevOfLastFull!.year}.`
-              : `${subj} — comparativo anual disponível.`;
+              ? `${subj} ${bigYoy >= 0 ? `cresceu ${fmtPct(bigYoy, 0, true)}` : `caiu ${fmtPct(Math.abs(bigYoy), 0)}`} na janela equivalente de ${lastFull!.year} vs ${prevOfLastFull!.year}.`
+              : `${subj} - comparativo por janelas equivalentes disponível.`;
             const monthPart = monthYoy >= 0
               ? `${report.summary.monthCurrentLabel} projeta alta de ${fmtPct(monthYoy, 1, true)} vs ${report.summary.monthPreviousLabel}.`
-              : `${report.summary.monthCurrentLabel} projeta queda de ${fmtPct(Math.abs(monthYoy), 1)} vs ${report.summary.monthPreviousLabel} — sinal de desaceleração recente.`;
+              : `${report.summary.monthCurrentLabel} projeta queda de ${fmtPct(Math.abs(monthYoy), 1)} vs ${report.summary.monthPreviousLabel} - sinal de desaceleração recente.`;
             return `${yoyPart} ${monthPart}`;
           })();
           const compareMax = Math.max(
@@ -821,12 +907,13 @@ function ReportView({
           const prevW = toFiniteNumber((report.summary.monthPrevious / compareMax) * 100);
           const monthYoyPositive = monthYoy >= 0;
           const unitSuffix = hasChannelView ? "loja+ecom" : "rede";
-          const compareTitle = `${report.summary.monthPreviousLabel.toUpperCase()} vs ${report.summary.monthCurrentLabel.toUpperCase()} · ${hasChannelView ? "LOJA + E-COM" : "REDE"}`;
+          const compareTitle = `Janela equivalente: ${report.summary.monthPreviousLabel.toUpperCase()} vs ${report.summary.monthCurrentLabel.toUpperCase()} - ${hasChannelView ? "LOJA + E-COM" : "REDE"}`;
           return (
             <>
-              <div className={styles.eyebrow}>Comparativo ano anterior</div>
+              <div className={styles.eyebrow}>Janelas equivalentes</div>
               <h1>{annualTitle}</h1>
               <p className={styles.subtitle}>{annualSubtitle}</p>
+              {auditMode ? <AuditPanel audit={slideAudit.timeCompare} /> : null}
               <div className={styles.yearGrid}>
                 {years.flatMap((row, index) => {
                   const prev = years[index - 1];
@@ -925,15 +1012,16 @@ function ReportView({
             }
             if (risingOutsideTop3) {
               const pos = top.indexOf(risingOutsideTop3) + 1;
-              parts.push(`${tc(risingOutsideTop3.label)} entra forte como ${pos}º — sinal de tendência.`);
+              parts.push(`${tc(risingOutsideTop3.label)} entra forte como ${pos}º - sinal de tendência.`);
             }
             return parts.join(" ");
           })();
           return (
             <>
               <div className={styles.eyebrow}>Ranking por tipo</div>
-              <h1>Quais estampas puxam o catalogo</h1>
-              <p className={styles.subtitle}>{typeSubtitle || `A leitura combina participacao total e movimento na janela recente ${report.range.recentLabel}.`}</p>
+              <h1>Quais estampas puxam o catálogo</h1>
+              <p className={styles.subtitle}>{typeSubtitle || `A leitura combina participação total e movimento na janela recente ${report.range.recentLabel}.`}</p>
+              {auditMode ? <AuditPanel audit={slideAudit.typeRanking} /> : null}
               <div className={`${styles.twoCol} ${styles.wideRight}`}>
                 <BarList rows={top.slice(0, 14).map((row) => ({ label: row.label, value: row.revenue }))} formatter={(v) => fmtCurrency(v)} />
                 <div style={{ display: "flex", flexDirection: "column" }}>
@@ -950,7 +1038,7 @@ function ReportView({
                     ))}
                   </div>
                   <div className={styles.insightBox} style={{ marginTop: "auto", paddingTop: "14px" }}>
-                    Top 3 somam <strong>{fmtPct(top3Sum)}</strong> do faturamento — {top3Sum >= 60 ? "concentracao alta" : top3Sum >= 45 ? "mix equilibrado" : "cauda longa relevante"}.
+                    Top 3 somam <strong>{fmtPct(top3Sum)}</strong> do faturamento - {top3Sum >= 60 ? "concentração alta" : top3Sum >= 45 ? "mix equilibrado" : "cauda longa relevante"}.
                   </div>
                 </div>
               </div>
@@ -994,6 +1082,7 @@ function ReportView({
               <div className={styles.eyebrow}>Ranking por coleção</div>
               <h1>Quais lançamentos sustentam a receita</h1>
               <p className={styles.subtitle}>{colSubtitle}</p>
+              {auditMode ? <AuditPanel audit={slideAudit.collectionRanking} /> : null}
               <div className={`${styles.twoCol} ${styles.wideRight}`}>
                 <BarList rows={cols.slice(0, 12).map((r) => ({ label: r.label, value: r.revenue }))} formatter={(v) => fmtCurrency(v)} />
                 <div style={{ display: "flex", flexDirection: "column" }}>
@@ -1010,7 +1099,7 @@ function ReportView({
                     ))}
                   </div>
                   <div className={styles.insightBox} style={{ marginTop: "auto" }}>
-                    Top 3 somam <strong>{fmtPct(colTop3Sum)}</strong> — {warming.length > 0 ? `${warming[0].label} lidera a aceleração` : "estabilidade no topo"}.
+                    Top 3 somam <strong>{fmtPct(colTop3Sum)}</strong> - {warming.length > 0 ? `${warming[0].label} lidera a aceleração` : "estabilidade no topo"}.
                   </div>
                 </div>
               </div>
@@ -1023,6 +1112,7 @@ function ReportView({
         <div className={styles.eyebrow}>Ranking por cor</div>
         <h1>A paleta que move a rede</h1>
         <p className={styles.subtitle}>As cores abaixo mostram onde a grade aceita profundidade e onde vale reduzir risco de compra.</p>
+        {auditMode ? <AuditPanel audit={slideAudit.colorRanking} /> : null}
         <div className={`${styles.twoCol} ${styles.wideRight}`}>
           <BarList rows={report.colorRanking.slice(0, 14).map((row) => ({ label: row.label, value: row.revenue }))} formatter={(value) => fmtCurrency(value)} />
           <div>
@@ -1048,8 +1138,9 @@ function ReportView({
       {showSubgroupSlide ? (
         <section className={styles.slide} data-pdf-slide="">
           <div className={styles.eyebrow}>Ranking por subgrupo</div>
-          <h1>A composicao material da rede</h1>
-          <p className={styles.subtitle}>Subgrupos ajudam a separar o que sustenta volume, o que sustenta ticket e onde existe risco de concentracao.</p>
+          <h1>A composição material da rede</h1>
+          <p className={styles.subtitle}>Subgrupos ajudam a separar o que sustenta volume, o que sustenta ticket e onde existe risco de concentração.</p>
+          {auditMode ? <AuditPanel audit={slideAudit.subgroupRanking} /> : null}
           <div className={styles.twoCol}>
             <Donut
               items={report.subgroupRanking.slice(0, 4).map((row, index) => ({
@@ -1085,7 +1176,7 @@ function ReportView({
                 </tbody>
               </table>
               <div className={`${styles.insightStrip} ${styles.small}`}>
-                Leitura de negocio: combinar subgrupos de volume com subgrupos de ticket e o que sustenta margem sem perder giro.
+                Leitura de negócio: combinar subgrupos de volume com subgrupos de ticket e o que sustenta margem sem perder giro.
               </div>
             </div>
           </div>
@@ -1095,10 +1186,11 @@ function ReportView({
       {hasChannelView ? (
         <section className={styles.slide} data-pdf-slide="">
           <div className={styles.eyebrow}>Escopo e canais</div>
-          <h1>Loja fisica e e-commerce contam historias diferentes</h1>
+          <h1>Loja física e e-commerce contam histórias diferentes</h1>
           <p className={styles.subtitle}>
-            Este recorte soma rede fisica e digital. O bloco abaixo separa peso, ticket e relevancia operacional de cada canal antes de abrir o ranking.
+            Este recorte soma rede física e digital. O bloco abaixo separa peso, ticket e relevância operacional de cada canal antes de abrir o ranking.
           </p>
+          {auditMode ? <AuditPanel audit={slideAudit.channelMix} /> : null}
           <div className={styles.scopeGrid}>
             <div className={styles.scopeHero}>
               <div className={styles.scopeAmount}>{fmtCurrency(report.summary.totalRevenue, true)}</div>
@@ -1107,16 +1199,16 @@ function ReportView({
               <div className={styles.scopeNarrative}>{report.channelMix.note}</div>
             </div>
             <div className={styles.scopeCard}>
-              <div className={styles.scopeCardTitle}>Loja fisica</div>
+              <div className={styles.scopeCardTitle}>Loja física</div>
               <div className={styles.scopeCardValue}>{fmtCurrency(report.channelMix.physicalRevenue, true)}</div>
               <div className={styles.scopeCardLine}>{fmtInt(report.channelMix.physicalUnits)} un. - {fmtPct(report.channelMix.physicalShare)} do total</div>
-              <div className={styles.scopeCardLine}>Ticket medio {fmtCurrency(report.channelMix.physicalTicket)} - {report.channelMix.physicalActiveCount} filiais ativas</div>
+              <div className={styles.scopeCardLine}>Ticket médio {fmtCurrency(report.channelMix.physicalTicket)} - {report.channelMix.physicalActiveCount} filiais ativas</div>
             </div>
             <div className={`${styles.scopeCard} ${styles.scopeCardAccent}`}>
               <div className={styles.scopeCardTitle}>E-commerce</div>
               <div className={styles.scopeCardValue}>{fmtCurrency(report.channelMix.ecommerceRevenue, true)}</div>
               <div className={styles.scopeCardLine}>{fmtInt(report.channelMix.ecommerceUnits)} un. - {fmtPct(report.channelMix.ecommerceShare)} do total</div>
-              <div className={styles.scopeCardLine}>Ticket medio {fmtCurrency(report.channelMix.ecommerceTicket)} - variacao {fmtPct(report.channelMix.ecommerceGrowth, 1, true)}</div>
+              <div className={styles.scopeCardLine}>Ticket médio {fmtCurrency(report.channelMix.ecommerceTicket)} - variação {fmtPct(report.channelMix.ecommerceGrowth, 1, true)}</div>
             </div>
           </div>
         </section>
@@ -1126,11 +1218,12 @@ function ReportView({
         <div className={styles.eyebrow}>{rankingLabel}</div>
         <h1>{rankingTitle}</h1>
         <p className={styles.subtitle}>{rankingSubtitle}</p>
+        {auditMode ? <AuditPanel audit={slideAudit.branchRanking} /> : null}
         <table className={styles.table}>
           <thead>
             <tr>
               <th>#</th>
-              <th>{hasChannelView ? "Canal / operacao" : "Filial"}</th>
+              <th>{hasChannelView ? "Canal / operação" : "Filial"}</th>
               <th>Operador</th>
               <th>Faturamento</th>
               <th>Unidades</th>
@@ -1163,7 +1256,7 @@ function ReportView({
           </tbody>
         </table>
         <div className={`${styles.insightStrip} ${styles.small}`}>
-          Top 3 operacoes concentram {fmtPct(report.branchRanking.slice(0, 3).reduce((sum, row) => sum + row.share, 0))} da rede consolidada.
+          Top 3 operações concentram {fmtPct(report.branchRanking.slice(0, 3).reduce((sum, row) => sum + row.share, 0))} da rede consolidada.
         </div>
       </section>
 
@@ -1198,6 +1291,7 @@ function ReportView({
               <div className={styles.eyebrow}>{profileEyebrow}</div>
               <h1>{profileTitle}</h1>
               <p className={styles.subtitle}>{dynSubtitle}</p>
+              {auditMode ? <AuditPanel audit={slideAudit.branchProfile} /> : null}
               <div className={styles.profileGrid}>
                 {profiles.map((row) => {
                   const ecom = isEcom(row.filial);
@@ -1257,7 +1351,7 @@ function ReportView({
             ? toFiniteNumber((report.summary.ruptureCount / report.summary.skuCount) * 100)
             : 0;
           const coverOk = toFiniteNumber(report.summary.coverageMonths) >= 1.5;
-          const stockSubtitle = `A rede tem ${fmtInt(report.summary.stockTotal)} unidades em estoque ativo${hasFilters ? ` de ${dominantFamily.toLowerCase()}` : ""} — ${coverOk ? "cobertura razoável" : "número compacto"} frente ao volume vendido. ${report.summary.ruptureCount > 0 ? `Distribuição preocupante: ${fmtInt(report.summary.ruptureCount)} SKUs já em ruptura.` : "Sem rupturas ativas no momento."}`;
+          const stockSubtitle = `O escopo filtrado soma ${fmtInt(report.summary.stockTotal)} unidades em estoque atual${hasFilters ? ` de ${dominantFamily.toLowerCase()}` : ""}. Para cobertura e ruptura, a base comparável usa ${fmtInt(report.summary.activeStockTotal)} unidades dos SKUs que venderam no período. ${report.summary.ruptureCount > 0 ? `${fmtInt(report.summary.ruptureCount)} desses SKUs vendidos já estão em ruptura.` : "Sem rupturas entre os SKUs vendidos no recorte."}`;
           const ruptureACount = report.ruptureTable.length;
           const ruptureARevenue = report.ruptureTable.reduce((s, r) => s + r.revenue, 0);
           const diagConclusion = coverOk && ruptureACount < 5
@@ -1282,18 +1376,19 @@ function ReportView({
               <div className={styles.eyebrow}>Estoque atual</div>
               <h1>{stockTitle}</h1>
               <p className={styles.subtitle}>{stockSubtitle}</p>
+              {auditMode ? <AuditPanel audit={slideAudit.stockCurrent} /> : null}
               <div className={`${styles.statGrid} ${styles.three}`} style={{ margin: "16px 0 14px" }}>
                 <div className={styles.statCard}>
                   <StatCardIcon type="sku" />
                   <div className={styles.statValue}>{fmtInt(report.summary.stockTotal)}</div>
-                  <div className={styles.statLabel}>Unidades em estoque ativo</div>
-                  <div className={styles.statNote}>produtos vendidos em {rangeDurationLabel(report.range.months, report.range.start, report.range.end)}</div>
+                  <div className={styles.statLabel}>Unidades em estoque no escopo</div>
+                  <div className={styles.statNote}>{fmtInt(report.summary.stockScopeSkuCount)} SKUs com saldo atual</div>
                 </div>
                 <div className={styles.statCard}>
                   <StatCardIcon type="revenue" />
                   <div className={styles.statValue}>{toFiniteNumber(report.summary.coverageMonths).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}m</div>
                   <div className={styles.statLabel}>Cobertura média</div>
-                  <div className={styles.statNote}>ritmo dos últimos {rangeDurationLabel(report.range.months, report.range.start, report.range.end)}</div>
+                  <div className={styles.statNote}>base comparável dos SKUs vendidos em {rangeDurationLabel(report.range.months, report.range.start, report.range.end)}</div>
                 </div>
                 <div className={`${styles.statCard} ${styles.accentTerracotta}`}>
                   <StatCardIcon type="yoy" positive={false} />
@@ -1304,7 +1399,7 @@ function ReportView({
               </div>
               <div className={styles.stockLayout}>
                 <div>
-                  <div className={styles.compareTitle} style={{ marginBottom: 16 }}>Distribuição do estoque por curva</div>
+                  <div className={styles.compareTitle} style={{ marginBottom: 16 }}>Distribuição do estoque comparável por curva</div>
                   <svg
                     viewBox={`0 0 ${svgW} ${chartH + 40}`}
                     style={{ width: "100%", maxWidth: 420 }}
@@ -1326,9 +1421,9 @@ function ReportView({
                 </div>
                 <div className={styles.diagnosticBox}>
                   <div className={styles.diagTitle}>Diagnóstico</div>
-                  <p><strong>{fmtPct(stockCurveAShare, 0)} do estoque</strong><br />está em Curva A — {stockCurveAShare >= 55 ? "alocação OK." : "alocação baixa."}</p>
+                  <p><strong>{fmtPct(stockCurveAShare, 0)} do estoque comparável</strong><br />está em Curva A - {stockCurveAShare >= 55 ? "alocação OK." : "alocação baixa."}</p>
                   {ruptureACount > 0 ? (
-                    <p>Mas: <strong>{fmtInt(ruptureACount)} SKUs em ruptura</strong><br />({report.ruptureTable.filter((r) => r.curve === "A").length} são Curva A) — {fmtCurrency(ruptureARevenue, true)} de venda histórica.</p>
+                    <p>Mas: <strong>{fmtInt(ruptureACount)} SKUs em ruptura</strong><br />({report.ruptureTable.filter((r) => r.curve === "A").length} são Curva A) - {fmtCurrency(ruptureARevenue, true)} de venda histórica no recorte.</p>
                   ) : null}
                   <p><strong style={{ color: "#d4a373" }}>Conclusão:</strong><br /><em>{diagConclusion}</em></p>
                 </div>
@@ -1339,24 +1434,25 @@ function ReportView({
       </section>
 
       <section className={styles.slide} data-pdf-slide="">
-        <div className={styles.eyebrow}>Gargalos de reposicao</div>
-        <h1>{fmtInt(report.summary.openPurchaseCount)} SKUs com sugestao de compra aberta</h1>
-        <p className={styles.subtitle}>Os alertas abaixo separam o problema por curva e destacam os itens mais sensiveis da rede.</p>
+        <div className={styles.eyebrow}>Gargalos de reposição</div>
+        <h1>{fmtInt(report.summary.ruptureCount)} SKUs ativos em ruptura</h1>
+        <p className={styles.subtitle}>Aqui o foco fica só no que já rompeu estoque e concentra mais risco de venda no recorte.</p>
+        {auditMode ? <AuditPanel audit={slideAudit.ruptureFocus} /> : null}
         <div className={`${styles.statGrid} ${styles.three}`}>
           <div className={`${styles.statCard} ${styles.accentTerracotta}`}>
-            <div className={styles.statValue}>{fmtInt(purchaseCurve.A ?? 0)}</div>
-            <div className={styles.statLabel}>Curva A com sugestao</div>
-            <div className={styles.statNote}>prioridade maxima</div>
+            <div className={styles.statValue}>{fmtInt(report.ruptureTable.length)}</div>
+            <div className={styles.statLabel}>Curva A em ruptura</div>
+            <div className={styles.statNote}>maior risco imediato</div>
           </div>
           <div className={`${styles.statCard} ${styles.accentGold}`}>
-            <div className={styles.statValue}>{fmtInt(purchaseCurve.B ?? 0)}</div>
-            <div className={styles.statLabel}>Curva B com sugestao</div>
-            <div className={styles.statNote}>alertas de continuidade</div>
+            <div className={styles.statValue}>{fmtCurrency(report.ruptureTable.reduce((sum, row) => sum + row.revenue, 0), true)}</div>
+            <div className={styles.statLabel}>Faturamento em risco</div>
+            <div className={styles.statNote}>histórico dos itens A rompidos</div>
           </div>
           <div className={`${styles.statCard} ${styles.accentRose}`}>
-            <div className={styles.statValue}>{fmtInt(purchaseCurve.C ?? 0)}</div>
-            <div className={styles.statLabel}>Curva C com sugestao</div>
-            <div className={styles.statNote}>cauda com demanda</div>
+            <div className={styles.statValue}>{fmtInt(report.ruptureTable.reduce((sum, row) => sum + row.quantity, 0))}</div>
+            <div className={styles.statLabel}>Unidades vendidas</div>
+            <div className={styles.statNote}>volume histórico em ruptura A</div>
           </div>
         </div>
         <table className={styles.table}>
@@ -1364,21 +1460,27 @@ function ReportView({
             <tr>
               <th>Produto</th>
               <th>Cor</th>
-              <th>Tipo</th>
-              <th>Colecao</th>
-              <th>Vendeu periodo</th>
+              <th>Curva</th>
+              <th>Estoque</th>
+              <th>Vendeu período</th>
             </tr>
           </thead>
           <tbody>
-            {report.ruptureTable.slice(0, 6).map((row) => (
-              <tr key={row.skuKey}>
-                <td>{row.description}</td>
-                <td>{row.corDescricao || row.cor || "-"}</td>
-                <td>{row.tipoProduto || "-"}</td>
-                <td>{row.colecao || "-"}</td>
-                <td>{fmtInt(row.quantity)}</td>
+            {report.ruptureTable.length > 0 ? (
+              report.ruptureTable.slice(0, 8).map((row) => (
+                <tr key={row.skuKey}>
+                  <td>{row.description}</td>
+                  <td>{row.corDescricao || row.cor || "-"}</td>
+                  <td>{row.curve}</td>
+                  <td>{fmtInt(row.stock)}</td>
+                  <td>{fmtInt(row.quantity)}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={5}>Nenhuma ruptura relevante neste recorte.</td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </section>
@@ -1387,6 +1489,7 @@ function ReportView({
         <div className={styles.eyebrow}>Detalhamento de rupturas</div>
         <h1>O mapa completo do estoque em risco</h1>
         <p className={styles.subtitle}>{fmtInt(report.summary.ruptureCount)} SKUs ativos em ruptura e {fmtInt(curveASkus)} itens A exigem leitura de impacto.</p>
+        {auditMode ? <AuditPanel audit={slideAudit.ruptureDetail} /> : null}
         <div className={`${styles.twoCol} ${styles.riskLayout}`}>
           <div>
             <div className={styles.bucketList}>
@@ -1408,7 +1511,7 @@ function ReportView({
               </div>
               <div className={styles.impactItem}>
                 <strong>{fmtCurrency(report.ruptureTable.reduce((sum, row) => sum + row.revenue, 0), true)}</strong>
-                <span>faturamento historico</span>
+                <span>faturamento histórico</span>
               </div>
               <div className={styles.impactItem}>
                 <strong>{fmtInt(report.ruptureTable.reduce((sum, row) => sum + row.quantity, 0))}</strong>
@@ -1425,7 +1528,6 @@ function ReportView({
                   <th>Cor</th>
                   <th>Qtd</th>
                   <th>Fat R$</th>
-                  <th>Sug</th>
                 </tr>
               </thead>
               <tbody>
@@ -1436,7 +1538,6 @@ function ReportView({
                     <td>{row.corDescricao || row.cor || "-"}</td>
                     <td>{fmtInt(row.quantity)}</td>
                     <td>{fmtCurrency(row.revenue)}</td>
-                    <td>{fmtInt(row.suggestion)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1447,52 +1548,74 @@ function ReportView({
 
       <section className={styles.slide} data-pdf-slide="">
         <div className={styles.eyebrow}>Drift de curva</div>
-        <h1>Como o catalogo se move entre janelas</h1>
-        <p className={styles.subtitle}>So {fmtPct(report.summary.retention)} dos itens Curva A do periodo total permanecem A na janela recente {report.range.recentLabel}.</p>
+        <h1>Como o catálogo se move entre janelas</h1>
+        <p className={styles.subtitle}>
+          {hasComparableRecentWindow
+            ? `Só ${fmtPct(report.summary.retention)} dos itens Curva A do período total permanecem A na janela recente ${report.range.recentLabel}. Variações abaixo de 0,25pp entram como estabilidade.`
+            : `O recorte ${report.range.label} é curto demais para formar uma janela recente distinta. Por isso, este slide não calcula drift material e fica apenas como apoio de ranking.`}
+        </p>
+        {auditMode ? <AuditPanel audit={slideAudit.drift} /> : null}
         <div className={styles.driftBanner}>
-          <div className={styles.driftHero}>Rotacao alta no topo</div>
-          <div>A retencao da Curva A ajuda a separar sazonalidade saudavel de perda de forca estrutural.</div>
+          <div className={styles.driftHero}>
+            {hasComparableRecentWindow
+              ? (toFiniteNumber(report.summary.retention) < 70 ? "Rotação forte no topo" : toFiniteNumber(report.summary.retention) < 85 ? "Top mix em transição" : "Top mix mais estável")
+              : "Janela recente indisponível"}
+          </div>
+          <div>
+            PP significa pontos percentuais. Exemplo: sair de 10% para 12% = +2pp. {hasComparableRecentWindow
+              ? "O resumo destaca movimentos materiais, e a tabela abaixo mostra os principais tipos mesmo quando a oscilação é pequena."
+              : "Como não existe uma janela recente distinta dentro do recorte, não faz sentido afirmar ganho ou perda de participação aqui."}
+          </div>
         </div>
         <div className={styles.driftGrid}>
           <div className={styles.driftCard}>
             <div className={styles.driftTitle}>Esquentando - tipos</div>
-            <div className={styles.driftMain}>{report.warmingTypes.map((row) => row.label).join(" · ") || "Sem destaque"}</div>
-            <div className={styles.driftNote}>{report.warmingTypes.map((row) => fmtPp(row.deltaPp)).join(" · ") || "0,0pp"}</div>
+            <div className={styles.driftMain}>{report.warmingTypes.length > 0 ? report.warmingTypes.map((row) => `${row.label} (${fmtPp(row.deltaPp)})`).join(" · ") : "Sem alta material"}</div>
+            <div className={styles.driftNote}>{report.warmingTypes.length > 0 ? `Tipos que ganharam participação em ${report.range.recentLabel}.` : "Nenhum tipo ganhou pelo menos 0,25pp na janela recente."}</div>
           </div>
           <div className={`${styles.driftCard} ${styles.terracotta}`}>
-            <div className={styles.driftTitle}>Esfriando - colecoes</div>
-            <div className={styles.driftMain}>{report.coolingCollections.map((row) => row.label).join(" · ") || "Sem destaque"}</div>
-            <div className={styles.driftNote}>{report.coolingCollections.map((row) => fmtPp(row.deltaPp)).join(" · ") || "0,0pp"}</div>
+            <div className={styles.driftTitle}>Esfriando - coleções</div>
+            <div className={styles.driftMain}>{report.coolingCollections.length > 0 ? report.coolingCollections.map((row) => `${row.label} (${fmtPp(row.deltaPp)})`).join(" · ") : "Sem queda material"}</div>
+            <div className={styles.driftNote}>{report.coolingCollections.length > 0 ? "Coleções que perderam relevância recente no mix." : "Nenhuma coleção perdeu pelo menos 0,25pp na janela recente."}</div>
           </div>
         </div>
         <table className={styles.table}>
           <thead>
             <tr>
               <th>Tipo</th>
-              <th>Periodo total</th>
-              <th>Recente</th>
-              <th>Variacao</th>
-              <th>Tendencia</th>
+              <th>Part. total</th>
+              <th>Part. recente</th>
+              <th>Delta</th>
+              <th>Sinal</th>
             </tr>
           </thead>
           <tbody>
-            {report.movementTable.map((row) => (
+            {report.movementTable.length > 0 ? report.movementTable.map((row) => (
               <tr key={row.label}>
                 <td>{row.label}</td>
                 <td>{fmtPct(row.share)}</td>
                 <td>{fmtPct(row.recentShare)}</td>
-                <td>{fmtPp(row.deltaPp)}</td>
-                <td>{row.deltaPp > 0 ? "▲" : "▼"}</td>
+                <td>{fmtDriftPp(row.deltaPp)}</td>
+                <td>{fmtDriftSignal(row.deltaPp)}</td>
               </tr>
-            ))}
+            )) : (
+              <tr>
+                <td colSpan={5}>
+                  {hasComparableRecentWindow
+                    ? "Sem movimentos relevantes entre o período total e a janela recente."
+                    : "Sem leitura de drift: o recorte não forma uma janela recente distinta."}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </section>
 
       <section className={styles.slide} data-pdf-slide="">
-        <div className={styles.eyebrow}>A historia em 5 atos</div>
+        <div className={styles.eyebrow}>A história em 5 atos</div>
         <h1>O que os dados realmente contam</h1>
-        <p className={styles.subtitle}>Sintese executiva para leitura rapida do negocio.</p>
+        <p className={styles.subtitle}>Síntese executiva para leitura rápida do negócio.</p>
+        {auditMode ? <AuditPanel audit={slideAudit.story} /> : null}
         <div className={styles.storyList}>
           {report.story.map((row, index) => (
             <div key={row.title} className={styles.storyRow}>
@@ -1508,19 +1631,23 @@ function ReportView({
 
       <section className={`${styles.slide} ${styles.closing}`} data-pdf-slide="">
         <div className={styles.closingLeft}>
-          <div className={styles.eyebrow}>Conclusao</div>
-          <h2>{report.closing.headline}</h2>
+          <div className={styles.closingHeader}>
+            <div className={`${styles.eyebrow} ${styles.closingEyebrow}`}>Conclusão</div>
+            <h2>{report.closing.headline}</h2>
+          </div>
           <p>{report.closing.body}</p>
-          <div className={styles.validated}>{report.closing.badge}</div>
+          {auditMode ? <AuditPanel audit={slideAudit.closing} /> : null}
         </div>
         <div className={styles.closingRight}>
-          <div className={styles.eyebrow}>Proximos passos</div>
-          <h1>Recomendacoes praticas</h1>
+          <div className={styles.closingHeader}>
+            <div className={`${styles.eyebrow} ${styles.closingEyebrow}`}>Próximos passos</div>
+            <h1>Recomendações práticas</h1>
+          </div>
           <div className={styles.recommendList}>
             {report.recommendations.map((row, index) => (
               <div key={row.title} className={styles.recommendCard}>
                 <div className={styles.recommendIndex}>{String(index + 1).padStart(2, "0")}</div>
-                <div>
+                <div className={styles.recommendBody}>
                   <div className={styles.recommendTitle}>{row.title}</div>
                   <div className={styles.recommendText}>{row.text}</div>
                 </div>
@@ -1550,6 +1677,7 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
   const [error, setError] = useState<string | null>(null);
   const [activeReportIndex, setActiveReportIndex] = useState(0);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [auditMode, setAuditMode] = useState(false);
   const deckRef = useRef<HTMLDivElement | null>(null);
   const allowedFiliais = useMemo(() => {
     const company = resolveCompany(companyKey);
@@ -1655,13 +1783,13 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
 
       const json = (await response.json()) as { data?: ClaudeReportPayload[]; error?: string };
       if (!response.ok) {
-        throw new Error(json.error ?? "Erro ao carregar Relatorio Claude.");
+        throw new Error(json.error ?? "Erro ao carregar Relatório Claude.");
       }
 
       setReports(json.data ?? []);
       setActiveReportIndex(0);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao carregar Relatorio Claude.");
+      setError(err instanceof Error ? err.message : "Erro ao carregar Relatório Claude.");
       setReports([]);
     } finally {
       setLoading(false);
@@ -1814,13 +1942,20 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
       <div className={styles.controlsCard}>
         <div className={styles.headerRow}>
           <div>
-            <div className={styles.pageEyebrow}>ScarfMe - Analise nativa</div>
-            <h1 className={styles.pageTitle}>Relatorio Claude</h1>
+            <div className={styles.pageEyebrow}>ScarfMe - Análise nativa</div>
+            <h1 className={styles.pageTitle}>Relatório Claude</h1>
             <p className={styles.pageSubtitle}>
-              Mesmo espirito visual do HTML gerado no Python, agora direto na dashboard com filtros dinamicos e multiplos periodos.
+              Mesmo espírito visual do HTML gerado no Python, agora direto na dashboard com filtros dinâmicos e múltiplos períodos.
             </p>
           </div>
           <div className={styles.headerActions}>
+            <button
+              type="button"
+              className={`${styles.secondaryButton} ${auditMode ? styles.auditButtonActive : ""}`}
+              onClick={() => setAuditMode((current) => !current)}
+            >
+              {auditMode ? "Ocultar auditoria" : "Modo auditoria"}
+            </button>
             <button
               type="button"
               className={styles.secondaryButton}
@@ -1830,7 +1965,7 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
               {exportingPdf ? "Exportando PDF..." : "Exportar PDF"}
             </button>
             <button type="button" className={styles.generateButton} onClick={() => void generateReport()} disabled={loading}>
-              {loading ? "Gerando..." : "Gerar analise"}
+              {loading ? "Gerando..." : "Gerar análise"}
             </button>
           </div>
         </div>
@@ -1843,7 +1978,7 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
             allowedFiliais={allowedFiliais}
           />
           <MultiSelectFilter
-            label="Colecoes"
+            label="Coleções"
             value={selectedColecoes}
             options={availableColecoes}
             onChange={setSelectedColecoes}
@@ -1871,7 +2006,7 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
         <div className={styles.rangesSection}>
           <div className={styles.rangesHeader}>
             <div>
-              <div className={styles.sectionTitle}>Periodos</div>
+              <div className={styles.sectionTitle}>Períodos</div>
               <div className={styles.sectionSubtitle}>Adicione mais de um range quando quiser comparar leituras diferentes do mix.</div>
             </div>
             <button
@@ -1879,14 +2014,14 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
               className={styles.secondaryButton}
               onClick={() => setRanges((current) => [...current, createEmptyRange()])}
             >
-              + Adicionar periodo
+              + Adicionar período
             </button>
           </div>
           <div className={styles.rangesGrid}>
             {ranges.map((range, index) => (
               <div key={`${index}-${range.startDate.toISOString()}-${range.endDate.toISOString()}`} className={styles.rangeCard}>
                 <div className={styles.rangeCardTop}>
-                  <strong>Periodo {index + 1}</strong>
+                  <strong>Período {index + 1}</strong>
                   {ranges.length > 1 ? (
                     <button
                       type="button"
@@ -1931,7 +2066,7 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
         </div>
       ) : null}
 
-      {reports[activeReportIndex] ? <ReportView report={reports[activeReportIndex]} deckRef={deckRef} /> : null}
+      {reports[activeReportIndex] ? <ReportView report={reports[activeReportIndex]} deckRef={deckRef} auditMode={auditMode} /> : null}
     </div>
   );
 }

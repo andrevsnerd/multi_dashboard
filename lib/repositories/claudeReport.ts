@@ -3,7 +3,6 @@ import sql from "mssql";
 import { resolveCompany, VAREJO_VALUE, type CompanyConfig } from "@/lib/config/company";
 import { withRequest } from "@/lib/db/connection";
 import { RequestLike } from "@/lib/db/proxy";
-import { fetchTopProdutosUltimos3Meses } from "@/lib/repositories/controleEstoque";
 import { fetchAvailableColecoesWithDescriptions } from "@/lib/repositories/products";
 import {
   formatDateForQuery,
@@ -136,6 +135,25 @@ interface ClosingSummary {
   badge: string;
 }
 
+interface SlideAuditMeta {
+  source: string;
+  queryBase: string;
+  effectiveRange: string;
+  appliedFilters: string;
+  formula: string;
+  checks: string;
+}
+
+interface ReportAudit {
+  flags: {
+    comparableRecentWindow: boolean;
+    equivalentWindowComparison: boolean;
+    stockTotalUsesScopeInventory: boolean;
+    ruptureScopeUsesSoldSkus: boolean;
+  };
+  slides: Record<string, SlideAuditMeta>;
+}
+
 export interface ClaudeReportRequest {
   filial?: string | null;
   range: {
@@ -168,6 +186,7 @@ export interface ClaudeReportPayload {
     end: string;
     label: string;
     recentLabel: string;
+    previousEquivalentLabel: string;
     months: number;
   };
   summary: {
@@ -185,9 +204,12 @@ export interface ClaudeReportPayload {
     monthCurrentLabel: string;
     monthPreviousLabel: string;
     stockTotal: number;
+    activeStockTotal: number;
+    stockScopeSkuCount: number;
     coverageMonths: number;
     ruptureCount: number;
     openPurchaseCount: number;
+    retentionComparable: boolean;
   };
   curveSummary: CurveSummaryRow[];
   topCurveA: AbcItem[];
@@ -207,20 +229,18 @@ export interface ClaudeReportPayload {
   channelMix: ChannelMixSummary;
   stockBuckets: StockBucketRow[];
   ruptureTable: AbcItem[];
-  purchaseByCurve: Array<{
-    curve: "A" | "B" | "C";
-    count: number;
-  }>;
   warmingTypes: ShareRankingRow[];
   coolingCollections: ShareRankingRow[];
   movementTable: ShareRankingRow[];
   story: StoryRow[];
   closing: ClosingSummary;
   recommendations: RecommendationRow[];
+  audit: ReportAudit;
 }
 
 const MONTHS_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-const REPORT_EXCLUDED_FILIAIS = new Set(["SCARF ME - MATRIZ", "SCARFME - IBIRAPUERA LLL"]);
+const REPORT_EXCLUDED_FILIAIS = new Set(["SCARF ME - MATRIZ"]);
+const DRIFT_MIN_PP = 0.25;
 
 function cleanText(value: unknown): string {
   return String(value ?? "")
@@ -260,6 +280,10 @@ function resolveCollectionLabel(value: string, labelMap: Map<string, string>): s
 function formatPctText(value: number): string {
   const signal = value > 0 ? "+" : "";
   return `${signal}${value.toFixed(1).replace(".", ",")}%`;
+}
+
+function hasMeaningfulDrift(value: number): boolean {
+  return Math.abs(Number(value ?? 0)) >= DRIFT_MIN_PP;
 }
 
 function monthLabelFromDate(date: Date): string {
@@ -574,7 +598,7 @@ function buildSalesRows(
         revenue: Number(row.RECEITA ?? 0),
       };
     })
-    .filter((row) => row.product && row.revenue > 0);
+    .filter((row) => row.product && row.revenue !== 0);
 }
 
 async function querySalesRows(
@@ -603,13 +627,13 @@ async function querySalesRows(
             request,
             filters.colecoes,
             "posColecao",
-            "COALESCE(vp.COLECAO, p.COLECAO, '')"
+            "COALESCE(p.COLECAO, '')"
           );
           const subgrupoFilter = addArrayFilter(
             request,
             filters.subgrupos,
             "posSubgrupo",
-            "COALESCE(vp.SUBGRUPO_PRODUTO, p.SUBGRUPO_PRODUTO, '')"
+            "COALESCE(p.SUBGRUPO_PRODUTO, '')"
           );
           const gradeFilter = addArrayFilter(
             request,
@@ -617,53 +641,123 @@ async function querySalesRows(
             "posGrade",
             "CONVERT(VARCHAR, p.GRADE)"
           );
+          const trocaColecaoFilter = addArrayFilter(
+            request,
+            filters.colecoes,
+            "troColecao",
+            "COALESCE(p.COLECAO, '')"
+          );
+          const trocaSubgrupoFilter = addArrayFilter(
+            request,
+            filters.subgrupos,
+            "troSubgrupo",
+            "COALESCE(p.SUBGRUPO_PRODUTO, '')"
+          );
+          const trocaGradeFilter = addArrayFilter(
+            request,
+            filters.grades,
+            "troGrade",
+            "CONVERT(VARCHAR, p.GRADE)"
+          );
 
           const query = `
-            SELECT
-              CAST(vp.DATA_VENDA AS DATE) AS DATA,
-              'LOJA' AS CANAL,
-              ISNULL(vp.FILIAL, '') AS FILIAL,
-              ISNULL(vp.PRODUTO, '') AS PRODUTO,
-              UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
-              MAX(UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, ''))))) AS LINHA,
-              MAX(UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, ''))))) AS SUBGRUPO,
-              MAX(UPPER(LTRIM(RTRIM(ISNULL(p.TIPO_PRODUTO, ''))))) AS TIPO_PRODUTO,
-              MAX(UPPER(LTRIM(RTRIM(ISNULL(COALESCE(vp.COLECAO, p.COLECAO), ''))))) AS COLECAO,
-              MAX(UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), ''))))) AS GRADE,
-              ISNULL(vp.COR_PRODUTO, '') AS COR,
-              MAX(ISNULL(COALESCE(cb.DESC_COR, vp.DESC_COR_PRODUTO), '')) AS COR_DESCRICAO,
-              ISNULL(pbsel.CODIGO_BARRA, '') AS CODIGO_BARRA,
-              SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS QTDE,
-              SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) AS RECEITA
-            FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-            LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO
-            LEFT JOIN CORES_BASICAS cb WITH (NOLOCK) ON cb.COR = vp.COR_PRODUTO
-            LEFT JOIN (
+            WITH vendas_cte AS (
               SELECT
-                pb.PRODUTO,
-                ISNULL(pb.COR_PRODUTO, '') AS COR_PRODUTO,
-                MIN(pb.CODIGO_BARRA) AS CODIGO_BARRA
-              FROM PRODUTOS_BARRA pb WITH (NOLOCK)
-              WHERE ISNULL(pb.CODIGO_BARRA, '') <> ''
-              GROUP BY pb.PRODUTO, ISNULL(pb.COR_PRODUTO, '')
-            ) pbsel
-              ON pbsel.PRODUTO = vp.PRODUTO
-             AND pbsel.COR_PRODUTO = ISNULL(vp.COR_PRODUTO, '')
-            WHERE vp.DATA_VENDA >= @posStart
-              AND vp.DATA_VENDA < @posEnd
-              AND vp.QTDE > 0
-              AND vp.FILIAL IN (${filialPlaceholders})
-              ${colecaoFilter}
-              ${subgrupoFilter}
-              ${gradeFilter}
-            GROUP BY
-              CAST(vp.DATA_VENDA AS DATE),
-              ISNULL(vp.FILIAL, ''),
-              ISNULL(vp.PRODUTO, ''),
-              UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))),
-              ISNULL(vp.COR_PRODUTO, ''),
-              ISNULL(pbsel.CODIGO_BARRA, '')
-            HAVING SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) > 0
+                CAST(vp.DATA_VENDA AS DATE) AS DATA,
+                ISNULL(f.FILIAL, '') AS FILIAL,
+                ISNULL(vp.PRODUTO, '') AS PRODUTO,
+                UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
+                UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) AS LINHA,
+                UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) AS SUBGRUPO,
+                UPPER(LTRIM(RTRIM(ISNULL(p.TIPO_PRODUTO, '')))) AS TIPO_PRODUTO,
+                UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) AS COLECAO,
+                UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) AS GRADE,
+                ISNULL(vp.COR_PRODUTO, '') AS COR,
+                ISNULL(cb.DESC_COR, '') AS COR_DESCRICAO,
+                ISNULL(pbsel.CODIGO_BARRA, '') AS CODIGO_BARRA,
+                vp.QTDE AS QTDE,
+                CAST((vp.PRECO_LIQUIDO * vp.QTDE) - (vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) AS DECIMAL(38,6)) AS RECEITA
+              FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+              INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+                ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
+              LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.COD_FILIAL = vp.CODIGO_FILIAL
+              LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO
+              LEFT JOIN CORES_BASICAS cb WITH (NOLOCK) ON cb.COR = vp.COR_PRODUTO
+              LEFT JOIN (
+                SELECT pb.PRODUTO, ISNULL(pb.COR_PRODUTO, '') AS COR_PRODUTO, MIN(pb.CODIGO_BARRA) AS CODIGO_BARRA
+                FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+                WHERE ISNULL(pb.CODIGO_BARRA, '') <> ''
+                GROUP BY pb.PRODUTO, ISNULL(pb.COR_PRODUTO, '')
+              ) pbsel ON pbsel.PRODUTO = vp.PRODUTO AND pbsel.COR_PRODUTO = ISNULL(vp.COR_PRODUTO, '')
+              WHERE vp.DATA_VENDA >= @posStart
+                AND vp.DATA_VENDA < @posEnd
+                AND vp.QTDE_CANCELADA = 0
+                AND vp.QTDE > 0
+                AND f.FILIAL IN (${filialPlaceholders})
+                ${colecaoFilter}
+                ${subgrupoFilter}
+                ${gradeFilter}
+            ),
+            trocas_cte AS (
+              SELECT
+                CAST(v.DATA_VENDA AS DATE) AS DATA,
+                ISNULL(f.FILIAL, '') AS FILIAL,
+                ISNULL(vt.PRODUTO, '') AS PRODUTO,
+                UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
+                UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) AS LINHA,
+                UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) AS SUBGRUPO,
+                UPPER(LTRIM(RTRIM(ISNULL(p.TIPO_PRODUTO, '')))) AS TIPO_PRODUTO,
+                UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) AS COLECAO,
+                UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) AS GRADE,
+                ISNULL(vt.COR_PRODUTO, '') AS COR,
+                ISNULL(cb.DESC_COR, '') AS COR_DESCRICAO,
+                ISNULL(pbsel.CODIGO_BARRA, '') AS CODIGO_BARRA,
+                -vt.QTDE AS QTDE,
+                CAST(-(vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS RECEITA
+              FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+              INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+                ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
+              LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.COD_FILIAL = vt.CODIGO_FILIAL
+              LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vt.PRODUTO
+              LEFT JOIN CORES_BASICAS cb WITH (NOLOCK) ON cb.COR = vt.COR_PRODUTO
+              LEFT JOIN (
+                SELECT pb.PRODUTO, ISNULL(pb.COR_PRODUTO, '') AS COR_PRODUTO, MIN(pb.CODIGO_BARRA) AS CODIGO_BARRA
+                FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+                WHERE ISNULL(pb.CODIGO_BARRA, '') <> ''
+                GROUP BY pb.PRODUTO, ISNULL(pb.COR_PRODUTO, '')
+              ) pbsel ON pbsel.PRODUTO = vt.PRODUTO AND pbsel.COR_PRODUTO = ISNULL(vt.COR_PRODUTO, '')
+              WHERE vt.QTDE_CANCELADA = 0
+                AND v.DATA_VENDA >= @posStart
+                AND v.DATA_VENDA < @posEnd
+                AND f.FILIAL IN (${filialPlaceholders})
+                ${trocaColecaoFilter}
+                ${trocaSubgrupoFilter}
+                ${trocaGradeFilter}
+            )
+            SELECT
+              DATA,
+              'LOJA' AS CANAL,
+              FILIAL,
+              PRODUTO,
+              MAX(DESCRICAO) AS DESCRICAO,
+              MAX(LINHA) AS LINHA,
+              MAX(SUBGRUPO) AS SUBGRUPO,
+              MAX(TIPO_PRODUTO) AS TIPO_PRODUTO,
+              MAX(COLECAO) AS COLECAO,
+              MAX(GRADE) AS GRADE,
+              COR,
+              MAX(COR_DESCRICAO) AS COR_DESCRICAO,
+              MAX(CODIGO_BARRA) AS CODIGO_BARRA,
+              SUM(QTDE) AS QTDE,
+              SUM(RECEITA) AS RECEITA
+            FROM (
+              SELECT * FROM vendas_cte
+              UNION ALL
+              SELECT * FROM trocas_cte
+            ) combined
+            WHERE PRODUTO <> '' AND FILIAL <> ''
+            GROUP BY DATA, FILIAL, PRODUTO, COR
+            HAVING SUM(RECEITA) <> 0
           `;
 
           const result = await request.query(query);
@@ -815,12 +909,11 @@ function toUtcDate(value: string): Date {
   return new Date(`${value}T00:00:00.000Z`);
 }
 
-function computeRecentWindow(rows: SalesRow[]): { start: Date; end: Date } {
-  const maxDate = rows.length > 0
-    ? rows.map((row) => toUtcDate(row.date)).sort((a, b) => a.getTime() - b.getTime())[rows.length - 1]
-    : new Date();
-  const start = new Date(Date.UTC(maxDate.getUTCFullYear(), maxDate.getUTCMonth() - 5, 1));
-  return { start, end: maxDate };
+function computeRecentWindow(range: NormalizedRange): { start: Date; end: Date } {
+  const endInclusive = new Date(range.end.getTime() - 86_400_000);
+  const rollingStart = new Date(Date.UTC(endInclusive.getUTCFullYear(), endInclusive.getUTCMonth() - 5, 1));
+  const start = rollingStart.getTime() < range.start.getTime() ? range.start : rollingStart;
+  return { start, end: endInclusive };
 }
 
 function buildShareRanking(
@@ -912,8 +1005,8 @@ function buildEmptyPayload(range: NormalizedRange, scopeLabel: string, gradeLabe
       grades: [],
     },
     presentation: {
-      badge: "VISAO GERAL",
-      coverTitle: "A historia do mix geral em 0 filiais.",
+      badge: "VISÃO GERAL",
+      coverTitle: "A história do mix geral em 0 filiais.",
       metaLine: `${scopeLabel} - SEM FILTROS`,
       summaryLead: "O mix geral",
       performanceLead: "o mix geral",
@@ -924,6 +1017,7 @@ function buildEmptyPayload(range: NormalizedRange, scopeLabel: string, gradeLabe
       end: formatDateForQuery(endInclusive),
       label: dateRangeLabel(range.start, endInclusive),
       recentLabel: dateRangeLabel(range.start, endInclusive),
+      previousEquivalentLabel: dateRangeLabel(range.start, endInclusive),
       months: monthsBetween(range.start, endInclusive),
     },
     summary: {
@@ -933,7 +1027,7 @@ function buildEmptyPayload(range: NormalizedRange, scopeLabel: string, gradeLabe
       activeStoreCount: 0,
       retention: 0,
       yoyNetwork: 0,
-      yoyLabel: "var. comparavel",
+      yoyLabel: "var. comparável",
       monthProjected: 0,
       monthProjectionYoy: 0,
       monthActual: 0,
@@ -941,9 +1035,12 @@ function buildEmptyPayload(range: NormalizedRange, scopeLabel: string, gradeLabe
       monthCurrentLabel: monthLabelFromDate(endInclusive),
       monthPreviousLabel: `${MONTHS_PT[endInclusive.getUTCMonth()]}/${String(endInclusive.getUTCFullYear() - 1).slice(-2)}`,
       stockTotal: 0,
+      activeStockTotal: 0,
+      stockScopeSkuCount: 0,
       coverageMonths: 0,
       ruptureCount: 0,
       openPurchaseCount: 0,
+      retentionComparable: false,
     },
     curveSummary: [],
     topCurveA: [],
@@ -971,27 +1068,38 @@ function buildEmptyPayload(range: NormalizedRange, scopeLabel: string, gradeLabe
     },
     stockBuckets: [],
     ruptureTable: [],
-    purchaseByCurve: [
-      { curve: "A", count: 0 },
-      { curve: "B", count: 0 },
-      { curve: "C", count: 0 },
-    ],
     warmingTypes: [],
     coolingCollections: [],
     movementTable: [],
     story: [],
     closing: {
-      headline: "Leitura indisponivel para o recorte.",
-      body: "Nao houve vendas suficientes no periodo para fechar uma conclusao executiva.",
+      headline: "Leitura indisponível para o recorte.",
+      body: "Não houve vendas suficientes no período para fechar uma conclusão executiva.",
       badge: "Sem leitura",
     },
     recommendations: [],
+    audit: {
+      flags: {
+        comparableRecentWindow: false,
+        equivalentWindowComparison: true,
+        stockTotalUsesScopeInventory: true,
+        ruptureScopeUsesSoldSkus: true,
+      },
+      slides: buildAuditSlides({
+        scopeLabel,
+        filterSummary: `Escopo ${scopeLabel} | Sem filtros específicos`,
+        rangeLabel: dateRangeLabel(range.start, endInclusive),
+        recentLabel: dateRangeLabel(range.start, endInclusive),
+        previousEquivalentLabel: dateRangeLabel(range.start, endInclusive),
+        comparableRecentWindow: false,
+      }),
+    },
   };
 }
 
 function singularOrPluralLabel(kind: "colecao" | "subgrupo" | "grade", values: string[]): string {
   if (kind === "colecao") {
-    return values.length === 1 ? `Colecao ${values[0]}` : `${values.length} colecoes`;
+    return values.length === 1 ? `Coleção ${values[0]}` : `${values.length} coleções`;
   }
   if (kind === "subgrupo") {
     return values.length === 1 ? `Subgrupo ${values[0]}` : `${values.length} subgrupos`;
@@ -1019,6 +1127,192 @@ function formatSelectionPreview(
   return `${pluralLabel} ${values.slice(0, 2).join(", ")} +${values.length - 2}`;
 }
 
+function formatAuditFilters(scopeLabel: string, colecoes: string[], subgrupos: string[], grades: string[]): string {
+  const parts = [`Escopo ${scopeLabel}`];
+  if (colecoes.length > 0) parts.push(`Coleções ${colecoes.join(", ")}`);
+  if (subgrupos.length > 0) parts.push(`Subgrupos ${subgrupos.join(", ")}`);
+  if (grades.length > 0) parts.push(`Grades ${grades.join(", ")}`);
+  return parts.join(" | ");
+}
+
+function buildAuditSlides({
+  scopeLabel,
+  filterSummary,
+  rangeLabel,
+  recentLabel,
+  previousEquivalentLabel,
+  comparableRecentWindow,
+}: {
+  scopeLabel: string;
+  filterSummary: string;
+  rangeLabel: string;
+  recentLabel: string;
+  previousEquivalentLabel: string;
+  comparableRecentWindow: boolean;
+}): Record<string, SlideAuditMeta> {
+  const salesSource = "W_CTB_LOJA_VENDA_PEDIDO_PRODUTO (lojas) + FATURAMENTO/W_FATURAMENTO_PROD_02 (e-commerce)";
+  const salesQuery = "Vendas líquidas agregadas por produto/cor, filial, coleção, tipo, subgrupo e cor dentro do range filtrado.";
+  const stockSource = "ESTOQUE_PRODUTOS";
+  const stockQuery = "Saldo atual consolidado por produto/cor nas filiais do escopo filtrado.";
+  const salesRange = `Período principal ${rangeLabel}. Janela equivalente anterior ${previousEquivalentLabel}.`;
+  const driftRange = comparableRecentWindow
+    ? `Período total ${rangeLabel}. Janela recente comparável ${recentLabel}.`
+    : `Período total ${rangeLabel}. Sem janela recente comparável distinta dentro do recorte.`;
+
+  return {
+    cover: {
+      source: salesSource,
+      queryBase: salesQuery,
+      effectiveRange: salesRange,
+      appliedFilters: filterSummary,
+      formula: "Receita, unidades e escopo consolidados do recorte ativo.",
+      checks: "Slide introdutório; não adiciona cálculo próprio além do consolidado do relatório.",
+    },
+    summary: {
+      source: salesSource,
+      queryBase: salesQuery,
+      effectiveRange: salesRange,
+      appliedFilters: filterSummary,
+      formula: "Faturamento total, unidades, SKUs ativos, Curva A e comparativos YoY/projeção mensal do recorte.",
+      checks: "SKUs ativos significam SKUs com venda no período filtrado.",
+    },
+    curveAbc: {
+      source: salesSource,
+      queryBase: "Classificação ABC por participação acumulada de receita dos SKUs vendidos no período.",
+      effectiveRange: `Período total ${rangeLabel}.`,
+      appliedFilters: filterSummary,
+      formula: "Curva A até 80 por cento da receita acumulada; Curva B até 95 por cento; Curva C acima disso.",
+      checks: "A curva considera apenas SKUs com venda no período filtrado.",
+    },
+    topCurveA: {
+      source: `${salesSource} + ${stockSource}`,
+      queryBase: "Ranking dos SKUs Curva A por faturamento, com saldo atual por produto/cor.",
+      effectiveRange: `Período de vendas ${rangeLabel}; estoque no instante da consulta.`,
+      appliedFilters: filterSummary,
+      formula: "Top 10 SKUs Curva A por receita do período; estoque é o saldo atual do mesmo SKU.",
+      checks: "Estoque é fotografia atual; vendas pertencem ao período filtrado.",
+    },
+    timeCompare: {
+      source: salesSource,
+      queryBase: "Mesma janela do calendário deslocada em 1 e 2 anos; projeção do mês corrente pelos dias observados.",
+      effectiveRange: `Janela atual ${rangeLabel}. Janelas equivalentes ${previousEquivalentLabel} e ano anterior correspondente.`,
+      appliedFilters: filterSummary,
+      formula: "Compara recortes equivalentes no tempo, não necessariamente anos fechados.",
+      checks: "O slide não deve ser lido como ano calendário cheio quando o range é parcial.",
+    },
+    typeRanking: {
+      source: salesSource,
+      queryBase: "Share por tipo_produto com participação total e participação na janela recente.",
+      effectiveRange: driftRange,
+      appliedFilters: filterSummary,
+      formula: "Share total = receita do tipo / receita total; delta pp = share recente menos share total.",
+      checks: comparableRecentWindow
+        ? "A janela recente é comparável e distinta do período total."
+        : "Sem janela recente distinta; use o slide como ranking, não como leitura de drift.",
+    },
+    collectionRanking: {
+      source: salesSource,
+      queryBase: "Share por coleção rotulada, com comparação da janela recente.",
+      effectiveRange: driftRange,
+      appliedFilters: filterSummary,
+      formula: "Share e delta pp por coleção sobre o faturamento do recorte.",
+      checks: comparableRecentWindow
+        ? "Coleções aquecendo/esfriando usam somente movimentos acima do piso material configurado."
+        : "Sem janela recente distinta; a leitura é descritiva, não de aceleração.",
+    },
+    colorRanking: {
+      source: salesSource,
+      queryBase: "Share por cor_descricao ou cor sobre o faturamento do período.",
+      effectiveRange: `Período total ${rangeLabel}.`,
+      appliedFilters: filterSummary,
+      formula: "Receita da cor / receita total do recorte.",
+      checks: "Não há componente temporal adicional além do período filtrado.",
+    },
+    subgroupRanking: {
+      source: salesSource,
+      queryBase: "Share por subgrupo com leitura de volume, ticket e quantidade de SKUs.",
+      effectiveRange: `Período total ${rangeLabel}.`,
+      appliedFilters: filterSummary,
+      formula: "Ticket médio = receita do subgrupo / unidades do subgrupo.",
+      checks: "Subgrupos refletem somente SKUs com venda no período.",
+    },
+    channelMix: {
+      source: salesSource,
+      queryBase: "Separação das vendas por canal LOJA versus E-COMMERCE.",
+      effectiveRange: salesRange,
+      appliedFilters: filterSummary,
+      formula: "Share do canal = receita do canal / receita total do recorte.",
+      checks: "Ticket do canal usa receita dividida por unidades do próprio canal.",
+    },
+    branchRanking: {
+      source: salesSource,
+      queryBase: "Agrupamento por filialDisplay consolidando receita, unidades e participação relativa.",
+      effectiveRange: `Período total ${rangeLabel}.`,
+      appliedFilters: filterSummary,
+      formula: `Participação da filial = receita da filial / receita ${scopeLabel === "Rede Geral" ? "física" : "do escopo"} consolidada.`,
+      checks: "No ranking consolidado, o e-commerce entra como uma operação própria quando existe.",
+    },
+    branchProfile: {
+      source: salesSource,
+      queryBase: "Top filiais/operações com mix de coleções, cor líder e crescimento contra janela equivalente anterior.",
+      effectiveRange: salesRange,
+      appliedFilters: filterSummary,
+      formula: "Crescimento = receita atual / receita da janela equivalente anterior menos 1.",
+      checks: "A composição do mix é calculada pela própria receita da filial no período.",
+    },
+    stockCurrent: {
+      source: `${stockSource} + ${salesSource}`,
+      queryBase: `${stockQuery} Cobertura e rupturas são cruzadas com os SKUs que venderam no período.`,
+      effectiveRange: `Estoque atual no instante da consulta; vendas do período ${rangeLabel}.`,
+      appliedFilters: filterSummary,
+      formula: "Estoque total = soma dos saldos positivos do escopo. Cobertura comparável = estoque atual dos SKUs vendidos / venda média mensal dos SKUs vendidos.",
+      checks: "Ruptura considera somente SKUs com venda no período e estoque menor ou igual a zero.",
+    },
+    ruptureFocus: {
+      source: `${stockSource} + ${salesSource}`,
+      queryBase: "Lista de SKUs Curva A com venda no período e saldo atual menor ou igual a zero.",
+      effectiveRange: `Vendas ${rangeLabel}; estoque no instante da consulta.`,
+      appliedFilters: filterSummary,
+      formula: "Ruptura A = SKU Curva A vendido no período com estoque atual menor ou igual a zero.",
+      checks: "Faturamento em risco reflete venda histórica do período, não perda futura projetada.",
+    },
+    ruptureDetail: {
+      source: `${stockSource} + ${salesSource}`,
+      queryBase: "Buckets de saldo atual dos SKUs vendidos e tabela dos SKUs Curva A em ruptura.",
+      effectiveRange: `Vendas ${rangeLabel}; estoque no instante da consulta.`,
+      appliedFilters: filterSummary,
+      formula: "Buckets classificam saldo atual; a tabela detalha somente os SKUs Curva A já em ruptura.",
+      checks: "O total de rupturas pode ser maior do que a tabela, porque a tabela prioriza Curva A.",
+    },
+    drift: {
+      source: salesSource,
+      queryBase: "Comparação entre share total do período e share da janela recente por tipo e coleção.",
+      effectiveRange: driftRange,
+      appliedFilters: filterSummary,
+      formula: "Delta em pp = participação recente menos participação total; piso material de 0,25 pp.",
+      checks: comparableRecentWindow
+        ? "Drift habilitado: existe janela recente distinta dentro do período."
+        : "Drift desabilitado: o recorte é curto demais para formar uma janela recente distinta.",
+    },
+    story: {
+      source: `${salesSource} + ${stockSource}`,
+      queryBase: "Síntese textual montada sobre os agregados principais do recorte.",
+      effectiveRange: `${salesRange} Estoque atual consultado no momento da geração.`,
+      appliedFilters: filterSummary,
+      formula: "Cada ato reaproveita as métricas já auditadas em vendas, curva, canais, estoque e rupturas.",
+      checks: "A narrativa não cria números novos; apenas interpreta os blocos anteriores.",
+    },
+    closing: {
+      source: `${salesSource} + ${stockSource}`,
+      queryBase: "Conclusão e recomendações derivadas dos agregados principais do relatório.",
+      effectiveRange: `${salesRange} Estoque atual consultado no momento da geração.`,
+      appliedFilters: filterSummary,
+      formula: "Headline e texto final mudam conforme projeção mensal, pressão de ruptura, crescimento e drift material.",
+      checks: "As recomendações dependem diretamente das métricas anteriores; não são inferências fora do payload.",
+    },
+  };
+}
+
 function buildPresentationContext({
   scopeLabel,
   activeStoreCount,
@@ -1034,7 +1328,7 @@ function buildPresentationContext({
 }) {
   const parts: string[] = [];
   if (colecoes.length > 0) {
-    parts.push(`COLECAO ${colecoes.length === 1 ? colecoes[0] : `${colecoes.length} SELECIONADAS`}`);
+    parts.push(`COLEÇÃO ${colecoes.length === 1 ? colecoes[0] : `${colecoes.length} SELECIONADAS`}`);
   }
   if (subgrupos.length > 0) {
     parts.push(`SUBGRUPO ${subgrupos.length === 1 ? subgrupos[0] : `${subgrupos.length} SELECIONADOS`}`);
@@ -1051,8 +1345,8 @@ function buildPresentationContext({
 
   if (filterKinds.length === 0) {
     return {
-      badge: "VISAO GERAL",
-      coverTitle: `A historia do mix geral em ${activeStoreCount} filiais.`,
+      badge: "VISÃO GERAL",
+      coverTitle: `A história do mix geral em ${activeStoreCount} filiais.`,
       metaLine: `${scopeLabel} - SEM FILTROS`,
       summaryLead: "O mix geral",
       performanceLead: "o mix geral",
@@ -1070,12 +1364,12 @@ function buildPresentationContext({
       return {
         badge,
         coverTitle: values.length === 1
-          ? `A historia da colecao ${singleValue} em ${activeStoreCount} filiais.`
-          : `A historia das colecoes selecionadas em ${activeStoreCount} filiais.`,
+          ? `A história da coleção ${singleValue} em ${activeStoreCount} filiais.`
+          : `A história das coleções selecionadas em ${activeStoreCount} filiais.`,
         metaLine: `${scopeLabel} - ${parts.join(" - ")}`,
-        summaryLead: values.length === 1 ? `A colecao ${singleValue}` : "As colecoes selecionadas",
-        performanceLead: values.length === 1 ? `a colecao ${singleValue}` : "as colecoes selecionadas",
-        closingLead: values.length === 1 ? `A colecao ${singleValue}` : "As colecoes selecionadas",
+        summaryLead: values.length === 1 ? `A coleção ${singleValue}` : "As coleções selecionadas",
+        performanceLead: values.length === 1 ? `a coleção ${singleValue}` : "as coleções selecionadas",
+        closingLead: values.length === 1 ? `A coleção ${singleValue}` : "As coleções selecionadas",
       };
     }
 
@@ -1083,8 +1377,8 @@ function buildPresentationContext({
       return {
         badge,
         coverTitle: values.length === 1
-          ? `A historia do subgrupo ${singleValue} em ${activeStoreCount} filiais.`
-          : `A historia dos subgrupos selecionados em ${activeStoreCount} filiais.`,
+          ? `A história do subgrupo ${singleValue} em ${activeStoreCount} filiais.`
+          : `A história dos subgrupos selecionados em ${activeStoreCount} filiais.`,
         metaLine: `${scopeLabel} - ${parts.join(" - ")}`,
         summaryLead: values.length === 1 ? `O subgrupo ${singleValue}` : "Os subgrupos selecionados",
         performanceLead: values.length === 1 ? `o subgrupo ${singleValue}` : "os subgrupos selecionados",
@@ -1095,8 +1389,8 @@ function buildPresentationContext({
     return {
       badge,
       coverTitle: values.length === 1
-        ? `A historia da grade ${singleValue} em ${activeStoreCount} filiais.`
-        : `A historia das grades selecionadas em ${activeStoreCount} filiais.`,
+        ? `A história da grade ${singleValue} em ${activeStoreCount} filiais.`
+        : `A história das grades selecionadas em ${activeStoreCount} filiais.`,
       metaLine: `${scopeLabel} - ${parts.join(" - ")}`,
       summaryLead: values.length === 1 ? `A grade ${singleValue}` : "As grades selecionadas",
       performanceLead: values.length === 1 ? `a grade ${singleValue}` : "as grades selecionadas",
@@ -1113,13 +1407,13 @@ function buildPresentationContext({
   const titleFocusParts = [
     grades.length > 0 ? formatSelectionPreview(grades, "Grade", "Grades") : "",
     subgrupos.length > 0 ? formatSelectionPreview(subgrupos, "Subgrupo", "Subgrupos") : "",
-    colecoes.length > 0 ? formatSelectionPreview(colecoes, "Colecao", "Colecoes") : "",
+    colecoes.length > 0 ? formatSelectionPreview(colecoes, "Coleção", "Coleções") : "",
   ].filter(Boolean);
   const readableFocus = titleFocusParts.join(" | ");
 
   return {
     badge: joinedBadge && joinedBadge.length <= 26 ? joinedBadge : "RECORTE",
-    coverTitle: `${readableFocus}: historia em ${activeStoreCount} filiais.`,
+    coverTitle: `${readableFocus}: história em ${activeStoreCount} filiais.`,
     metaLine: `${scopeLabel} - ${parts.join(" - ")}`,
     summaryLead: readableFocus ? `O mix de ${readableFocus}` : "O mix filtrado",
     performanceLead: readableFocus ? `o mix de ${readableFocus}` : "o mix filtrado",
@@ -1136,31 +1430,17 @@ export async function fetchClaudeReport({
 }: ClaudeReportRequest): Promise<ClaudeReportPayload> {
   const company = resolveCompany("scarfme");
   if (!company) {
-    throw new Error("Empresa scarfme nao encontrada.");
+    throw new Error("Empresa scarfme não encontrada.");
   }
 
   const normalizedRange = normalizeRangeForQuery(range);
+  const previousRange = previousEquivalentRange(normalizedRange);
   const endInclusive = new Date(normalizedRange.end.getTime() - 24 * 60 * 60 * 1000);
   const scope = resolveScope(filial ?? null, company);
   const selectedColecoes = uniqueValues(colecoes);
   const selectedSubgrupos = uniqueValues(subgrupos);
   const selectedGrades = uniqueValues(grades);
   const gradeLabel = selectedGrades[0] ?? "MIX";
-
-  const suggestionRowsPromise = fetchTopProdutosUltimos3Meses({
-    company: "scarfme",
-    filial: filial ?? null,
-    colecoes: selectedColecoes,
-    subgrupos: selectedSubgrupos,
-    grades: selectedGrades,
-    qtdCompra: 100000,
-    porCor: true,
-    limit: 5000,
-    allowedFiliais: [...scope.posMembers, ...scope.ecommerceMembers],
-  }).catch((error) => {
-    console.warn("[fetchClaudeReport] Falha ao carregar sugestoes de compra; seguindo sem sugestoes.", error);
-    return [];
-  });
 
   const collectionOptionsPromise = fetchAvailableColecoesWithDescriptions({
     company: "scarfme",
@@ -1175,16 +1455,15 @@ export async function fetchClaudeReport({
 
   const salesFilters = { colecoes: selectedColecoes, subgrupos: selectedSubgrupos, grades: selectedGrades };
   const hasTypeFilters = selectedSubgrupos.length > 0 || selectedGrades.length > 0;
-  const [salesRows, previousStoreRows, priorYear1Rows, priorYear2Rows, generalTypeRows, stockMap, suggestionRows, collectionOptions] = await Promise.all([
+  const [salesRows, previousStoreRows, priorYear1Rows, priorYear2Rows, generalTypeRows, stockMap, collectionOptions] = await Promise.all([
     querySalesRows(normalizedRange, scope.posMembers, scope.ecommerceMembers, salesFilters, company, scope.maps),
-    querySalesRows(previousEquivalentRange(normalizedRange), scope.posMembers, scope.ecommerceMembers, salesFilters, company, scope.maps),
+    querySalesRows(previousRange, scope.posMembers, scope.ecommerceMembers, salesFilters, company, scope.maps),
     querySalesRows(shiftRangeByYears(normalizedRange, -1), scope.posMembers, scope.ecommerceMembers, salesFilters, company, scope.maps),
     querySalesRows(shiftRangeByYears(normalizedRange, -2), scope.posMembers, scope.ecommerceMembers, salesFilters, company, scope.maps),
     hasTypeFilters
       ? querySalesRows(normalizedRange, scope.posMembers, scope.ecommerceMembers, { colecoes: selectedColecoes }, company, scope.maps)
       : Promise.resolve([] as SalesRow[]),
     queryCurrentStock([...scope.posMembers, ...scope.ecommerceMembers], company),
-    suggestionRowsPromise,
     collectionOptionsPromise,
   ]);
 
@@ -1211,16 +1490,10 @@ export async function fetchClaudeReport({
     return emptyPayload;
   }
 
-  const suggestionMap = new Map<string, number>();
-  suggestionRows.forEach((row) => {
-    suggestionMap.set(
-      buildSkuKey(cleanText(row.produto), cleanText(row.cor ?? "")),
-      Math.max(0, Math.round(Number(row.qtdSugerida ?? 0)))
-    );
-  });
-
-  const recentWindow = computeRecentWindow(labeledSalesRows);
+  const recentWindow = computeRecentWindow(normalizedRange);
   const recentLabel = dateRangeLabel(recentWindow.start, recentWindow.end);
+  const previousEquivalentLabel = dateRangeLabel(previousRange.start, new Date(previousRange.end.getTime() - 86_400_000));
+  const retentionComparable = recentWindow.start.getTime() > normalizedRange.start.getTime();
 
   const abcMap = new Map<string, Omit<AbcItem, "curve" | "rank" | "share" | "cumulativeShare">>();
   labeledSalesRows.forEach((row) => {
@@ -1240,7 +1513,7 @@ export async function fetchClaudeReport({
       revenue: 0,
       quantity: 0,
       stock: stockMap.get(skuKey) ?? 0,
-      suggestion: suggestionMap.get(skuKey) ?? 0,
+      suggestion: 0,
     };
 
     current.revenue += row.revenue;
@@ -1402,8 +1675,8 @@ export async function fetchClaudeReport({
     note: ecommerceRevenue > 0
       ? ecommercePreviousRevenue > 0
         ? `E-commerce responde por ${formatPctText(totalRevenue > 0 ? (ecommerceRevenue / totalRevenue) * 100 : 0)} do faturamento do recorte e varia ${formatPctText(ecommerceGrowth)} contra o range anterior equivalente.`
-        : `E-commerce responde por ${formatPctText(totalRevenue > 0 ? (ecommerceRevenue / totalRevenue) * 100 : 0)} do faturamento do recorte e ja merece leitura propria de mix.`
-      : "O recorte atual esta concentrado nas operacoes fisicas.",
+        : `E-commerce responde por ${formatPctText(totalRevenue > 0 ? (ecommerceRevenue / totalRevenue) * 100 : 0)} do faturamento do recorte e já merece leitura própria de mix.`
+      : "O recorte atual está concentrado nas operações físicas.",
   };
 
   const currentYear = endInclusive.getUTCFullYear();
@@ -1426,7 +1699,7 @@ export async function fetchClaudeReport({
 
   const [lastFullYear, previousFullYear] = comparableFullYears(labeledSalesRows);
   let yoyNetwork = 0;
-  let yoyLabel = "var. comparavel";
+  let yoyLabel = "var. comparável";
   if (lastFullYear && previousFullYear) {
     const currentTotal = yearSummary.find((row) => row.year === lastFullYear)?.revenue ?? 0;
     const previousTotal = yearSummary.find((row) => row.year === previousFullYear)?.revenue ?? 0;
@@ -1448,78 +1721,76 @@ export async function fetchClaudeReport({
   const monthPrevious = priorObservedDays > 0 ? (prior1.revenue / priorObservedDays) * daysInMonth : prior1.revenue;
   const monthProjectionYoy = monthPrevious > 0 ? ((monthProjected / monthPrevious) - 1) * 100 : 0;
 
-  const stockTotal = abcItems.reduce((sum, item) => sum + Math.max(0, item.stock), 0);
+  const stockTotal = Array.from(stockMap.values()).reduce((sum, stock) => sum + Math.max(0, stock), 0);
+  const activeStockTotal = abcItems.reduce((sum, item) => sum + Math.max(0, item.stock), 0);
+  const stockScopeSkuCount = Array.from(stockMap.values()).filter((stock) => stock > 0).length;
   const months = monthsBetween(normalizedRange.start, endInclusive);
   const averageMonthlyUnits = abcItems.reduce((sum, item) => sum + item.quantity, 0) / Math.max(months, 1);
-  const coverageMonths = averageMonthlyUnits > 0 ? stockTotal / averageMonthlyUnits : 0;
+  const coverageMonths = averageMonthlyUnits > 0 ? activeStockTotal / averageMonthlyUnits : 0;
   const ruptureTable = abcItems
     .filter((item) => item.curve === "A" && item.stock <= 0)
     .sort((a, b) => b.quantity - a.quantity);
   const ruptureCount = abcItems.filter((item) => item.stock <= 0 && item.quantity > 0).length;
-  const openPurchaseCount = abcItems.filter((item) => item.suggestion > 0).length;
-
-  const purchaseByCurveMap = new Map<"A" | "B" | "C", number>([
-    ["A", 0],
-    ["B", 0],
-    ["C", 0],
-  ]);
-  abcItems.forEach((item) => {
-    if (item.suggestion > 0) {
-      purchaseByCurveMap.set(item.curve, (purchaseByCurveMap.get(item.curve) ?? 0) + 1);
-    }
-  });
-  const purchaseByCurve = (["A", "B", "C"] as const).map((curve) => ({
-    curve,
-    count: purchaseByCurveMap.get(curve) ?? 0,
-  }));
+  const openPurchaseCount = 0;
 
   const stockBuckets: StockBucketRow[] = [
     { label: "Em ruptura", count: abcItems.filter((item) => item.stock <= 0).length, pct: 0 },
-    { label: "Critico", count: abcItems.filter((item) => item.stock >= 1 && item.stock <= 2).length, pct: 0 },
+    { label: "Crítico", count: abcItems.filter((item) => item.stock >= 1 && item.stock <= 2).length, pct: 0 },
     { label: "Baixo", count: abcItems.filter((item) => item.stock >= 3 && item.stock <= 5).length, pct: 0 },
-    { label: "Razoavel", count: abcItems.filter((item) => item.stock >= 6 && item.stock <= 10).length, pct: 0 },
-    { label: "Confortavel", count: abcItems.filter((item) => item.stock >= 11 && item.stock <= 30).length, pct: 0 },
+    { label: "Razoável", count: abcItems.filter((item) => item.stock >= 6 && item.stock <= 10).length, pct: 0 },
+    { label: "Confortável", count: abcItems.filter((item) => item.stock >= 11 && item.stock <= 30).length, pct: 0 },
     { label: "Elevado", count: abcItems.filter((item) => item.stock >= 31).length, pct: 0 },
   ].map((row) => ({
     ...row,
     pct: abcItems.length > 0 ? (row.count / abcItems.length) * 100 : 0,
   }));
 
-  const fullAbcSet = new Set(
-    abcItems.filter((item) => item.curve === "A").map((item) => item.skuKey)
-  );
-  const recentSalesRows = labeledSalesRows.filter((row) => toUtcDate(row.date).getTime() >= recentWindow.start.getTime());
-  const recentAbc = classifyAbc(
-    Array.from(
-      recentSalesRows.reduce((acc, row) => {
-        const skuKey = buildSkuKey(row.product, row.cor);
-        acc.set(skuKey, (acc.get(skuKey) ?? 0) + row.revenue);
-        return acc;
-      }, new Map<string, number>())
-    ).map(([skuKey, revenue]) => ({ skuKey, revenue }))
-  );
-  const recentA = new Set(
-    Array.from(recentAbc.entries())
-      .filter(([, value]) => value.curve === "A")
-      .map(([skuKey]) => skuKey)
-  );
-  const retention = fullAbcSet.size > 0
+  const fullAbcSet = new Set(abcItems.filter((item) => item.curve === "A").map((item) => item.skuKey));
+  const recentSalesRows = retentionComparable
+    ? labeledSalesRows.filter((row) => toUtcDate(row.date).getTime() >= recentWindow.start.getTime())
+    : [];
+  const recentAbc = retentionComparable
+    ? classifyAbc(
+        Array.from(
+          recentSalesRows.reduce((acc, row) => {
+            const skuKey = buildSkuKey(row.product, row.cor);
+            acc.set(skuKey, (acc.get(skuKey) ?? 0) + row.revenue);
+            return acc;
+          }, new Map<string, number>())
+        ).map(([skuKey, revenue]) => ({ skuKey, revenue }))
+      )
+    : new Map<string, { curve: "A" | "B" | "C" }>();
+  const recentA = retentionComparable
+    ? new Set(
+        Array.from(recentAbc.entries())
+          .filter(([, value]) => value.curve === "A")
+          .map(([skuKey]) => skuKey)
+      )
+    : new Set<string>();
+  const retention = retentionComparable && fullAbcSet.size > 0
     ? (Array.from(fullAbcSet).filter((skuKey) => recentA.has(skuKey)).length / fullAbcSet.size) * 100
     : 0;
 
-  const warmingTypes = [...typeRanking].sort((a, b) => b.deltaPp - a.deltaPp).slice(0, 3);
-  const coolingCollections = [...collectionRanking].sort((a, b) => a.deltaPp - b.deltaPp).slice(0, 3);
-  const movementTable = [...typeRanking]
-    .sort((a, b) => Math.abs(b.deltaPp) - Math.abs(a.deltaPp))
-    .slice(0, 5);
-  const warmingCollections = [...collectionRanking]
-    .filter((row) => row.deltaPp > 0)
-    .sort((a, b) => b.deltaPp - a.deltaPp)
-    .slice(0, 2);
-
+  const warmingTypes = retentionComparable
+    ? [...typeRanking]
+      .filter((row) => row.deltaPp >= DRIFT_MIN_PP)
+      .sort((a, b) => b.deltaPp - a.deltaPp)
+      .slice(0, 3)
+    : [];
+  const coolingCollections = retentionComparable
+    ? [...collectionRanking]
+      .filter((row) => row.deltaPp <= -DRIFT_MIN_PP)
+      .sort((a, b) => a.deltaPp - b.deltaPp)
+      .slice(0, 3)
+    : [];
+  const movementTable = retentionComparable
+    ? [...typeRanking]
+      .sort((a, b) => Math.abs(b.deltaPp) - Math.abs(a.deltaPp) || b.revenue - a.revenue)
+      .slice(0, 5)
+    : [];
   const topCurve = curveSummary.sort((a, b) => b.share - a.share)[0]?.curve ?? "A";
   const hottestType = warmingTypes[0]?.label ?? "sortimento";
-  const coolingCollection = coolingCollections[0]?.label ?? "colecoes legadas";
+  const coolingCollection = coolingCollections[0]?.label ?? "coleções legadas";
   const topStore = branchRanking[0] ?? null;
 
   const story: StoryRow[] = [
@@ -1528,47 +1799,47 @@ export async function fetchClaudeReport({
       text: `${months} meses somam ${totalRevenue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} e ${Math.round(abcItems.reduce((sum, item) => sum + item.quantity, 0)).toLocaleString("pt-BR")} unidades. ${yoyLabel} ficou em ${yoyNetwork.toFixed(1).replace(".", ",")}%`,
     },
     {
-      title: `${topCurve} e o motor do mix`,
-      text: `Curva A concentra ${(curveSummary.find((row) => row.curve === "A")?.share ?? 0).toFixed(1).replace(".", ",")}% do faturamento e segue como ancora comercial.`,
+      title: `${topCurve} é o motor do mix`,
+      text: `Curva A concentra ${(curveSummary.find((row) => row.curve === "A")?.share ?? 0).toFixed(1).replace(".", ",")}% do faturamento e segue como âncora comercial.`,
     },
     {
       title: `${hottestType} ganha peso recente`,
       text: warmingTypes[0]
-        ? `Na janela ${recentLabel}, ${hottestType.toLowerCase()} acelerou ${warmingTypes[0].deltaPp.toFixed(1).replace(".", ",")}pp de participacao sobre o periodo total.`
-        : "A composicao recente indica mudancas de demanda importantes.",
+        ? `Na janela ${recentLabel}, ${hottestType.toLowerCase()} acelerou ${warmingTypes[0].deltaPp.toFixed(1).replace(".", ",")}pp de participação sobre o período total.`
+        : "A composição recente indica mudanças de demanda importantes.",
     },
     {
-      title: channelMix.hasEcommerce ? "Canais lideres concentram a alavanca" : "Filiais lideres concentram a alavanca",
+      title: channelMix.hasEcommerce ? "Canais líderes concentram a alavanca" : "Filiais líderes concentram a alavanca",
       text: topStore
         ? `${topStore.filial} responde por ${topStore.share.toFixed(1).replace(".", ",")}% da rede consolidada.`
-        : "A distribuicao entre filiais precisa de leitura dedicada.",
+        : "A distribuição entre filiais precisa de leitura dedicada.",
     },
     {
-      title: "Estoque total existe, mas a execucao pressiona",
-      text: `${ruptureCount} SKUs ativos estao em ruptura e ${openPurchaseCount} itens pedem reposicao. O gargalo e operacional, nao comercial.`,
+      title: "Estoque total existe, mas a execução pressiona",
+      text: `${ruptureCount} SKUs ativos estão em ruptura e os gargalos estão concentrados em disponibilidade imediata, não em falta de demanda.`,
     },
   ];
 
   const recommendations: RecommendationRow[] = [
     {
-      title: "Acelerar reposicao dos itens Curva A",
-      text: `${purchaseByCurveMap.get("A") ?? 0} SKUs A com alerta e ${ruptureCount} rupturas ativas exigem prioridade imediata.`,
+      title: "Priorizar as rupturas de Curva A",
+      text: `${ruptureTable.length} itens A já romperam estoque e concentram o maior risco de perda de venda no curto prazo.`,
     },
     {
       title: `Apostar nos tipos em aquecimento: ${warmingTypes.map((item) => item.label).slice(0, 2).join(", ") || "mix emergente"}`,
-      text: "Direcionar compras e profundidade de estoque para o que vem ganhando participacao na janela recente.",
+      text: "Direcionar compras e profundidade de estoque para o que vem ganhando participação na janela recente.",
     },
     {
-      title: `Replicar aprendizados de ${topStore?.filial ?? (channelMix.hasEcommerce ? "operacoes lideres" : "lojas lideres")}`,
-      text: "Usar o perfil comercial da lider como referencia para mix, sortimento e transferencia entre filiais.",
+      title: `Replicar aprendizados de ${topStore?.filial ?? (channelMix.hasEcommerce ? "operações líderes" : "lojas líderes")}`,
+      text: "Usar o perfil comercial da líder como referência para mix, sortimento e transferência entre filiais.",
     },
     {
-      title: "Monitorar filiais em maior variacao",
-      text: "O comparativo com o range anterior equivalente ajuda a separar aceleracao saudavel de ruido de base pequena.",
+      title: "Monitorar filiais em maior variação",
+      text: "O comparativo com o range anterior equivalente ajuda a separar aceleração saudável de ruído de base pequena.",
     },
     {
-      title: `Revisar colecoes em desaceleracao como ${coolingCollection}`,
-      text: "Decidir cedo entre aprofundar, reduzir ou substituir exposicao para liberar caixa e espaco.",
+      title: `Revisar coleções em desaceleração como ${coolingCollection}`,
+      text: "Decidir cedo entre aprofundar, reduzir ou substituir exposição para liberar caixa e espaço.",
     },
   ];
 
@@ -1584,24 +1855,24 @@ export async function fetchClaudeReport({
   const closing: ClosingSummary = monthProjectionYoy <= -10
     ? {
         headline: `${presentation.closingLead} em dois ritmos.`,
-        body: `O historico segue relevante, mas ${monthLabelFromDate(maxDate)} desacelera ${formatPctText(monthProjectionYoy)} contra a base anterior e pede leitura imediata de demanda, estoque e execucao comercial.`,
-        badge: "Atencao imediata",
+        body: `O histórico segue relevante, mas ${monthLabelFromDate(maxDate)} desacelera ${formatPctText(monthProjectionYoy)} contra a base anterior e pede leitura imediata de demanda, estoque e execução comercial.`,
+        badge: "Atenção imediata",
       }
     : ruptureShare >= 25
       ? {
-          headline: `${presentation.closingLead} cresce com pressao operacional.`,
-          body: `${formatPctText(ruptureShare)} da carteira ativa esta em ruptura e a rede precisa priorizar reposicao, profundidade e redistribuicao entre operacoes para sustentar venda real.`,
-          badge: "Pressao operacional",
+          headline: `${presentation.closingLead} cresce com pressão operacional.`,
+          body: `${formatPctText(ruptureShare)} da carteira ativa está em ruptura e a rede precisa priorizar reposição, profundidade e redistribuição entre operações para sustentar venda real.`,
+          badge: "Pressão operacional",
         }
       : yoyNetwork >= 10
         ? {
             headline: `${presentation.closingLead} segue forte.`,
-            body: `O recorte sustenta ${formatPctText(yoyNetwork)} em ${yoyLabel}, com base de venda consistente e gargalos concentrados em execucao fina de mix e reposicao.`,
+            body: `O recorte sustenta ${formatPctText(yoyNetwork)} em ${yoyLabel}, com base de venda consistente e gargalos concentrados em execução fina de mix e reposição.`,
             badge: "Crescimento forte",
           }
         : {
             headline: `${presentation.closingLead} pede calibragem fina.`,
-            body: `A leitura consolidada nao aponta ruptura estrutural, mas o recorte pede ajustes de mix, priorizacao comercial e monitoramento da janela recente para ganhar tracao.`,
+            body: `O recorte soma ${totalRevenue.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })}, com cobertura média de ${coverageMonths.toFixed(1).replace(".", ",")} meses e ${ruptureCount} SKUs em ruptura (${formatPctText(ruptureShare)} da carteira ativa). ${topStore ? `${topStore.filial} lidera ${topStore.share.toFixed(1).replace(".", ",")}% da receita do recorte.` : "A distribuição entre operações segue pulverizada."} ${warmingTypes[0] ? `${warmingTypes[0].label} ganhou ${warmingTypes[0].deltaPp.toFixed(1).replace(".", ",")}pp na janela recente.` : "O mix recente ficou estável, sem acelerações relevantes."} ${coolingCollections[0] ? `${coolingCollections[0].label} perdeu ${Math.abs(coolingCollections[0].deltaPp).toFixed(1).replace(".", ",")}pp e merece revisão de exposição.` : "Nenhuma coleção perdeu participação de forma material."}`,
             badge: "Calibragem",
           };
 
@@ -1615,6 +1886,23 @@ export async function fetchClaudeReport({
   const resolvedGradeLabel = dominantGrade
     ? Array.from(dominantGrade.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? gradeLabel
     : gradeLabel;
+  const filterSummary = formatAuditFilters(scope.displayName, selectedCollectionLabels, selectedSubgrupos, selectedGrades);
+  const audit: ReportAudit = {
+    flags: {
+      comparableRecentWindow: retentionComparable,
+      equivalentWindowComparison: true,
+      stockTotalUsesScopeInventory: true,
+      ruptureScopeUsesSoldSkus: true,
+    },
+    slides: buildAuditSlides({
+      scopeLabel: scope.displayName,
+      filterSummary,
+      rangeLabel: dateRangeLabel(normalizedRange.start, endInclusive),
+      recentLabel,
+      previousEquivalentLabel,
+      comparableRecentWindow: retentionComparable,
+    }),
+  };
 
   return {
     scopeLabel: scope.displayName,
@@ -1630,6 +1918,7 @@ export async function fetchClaudeReport({
       end: formatDateForQuery(endInclusive),
       label: dateRangeLabel(normalizedRange.start, endInclusive),
       recentLabel,
+      previousEquivalentLabel,
       months,
     },
     summary: {
@@ -1647,9 +1936,12 @@ export async function fetchClaudeReport({
       monthCurrentLabel: monthLabelFromDate(maxDate),
       monthPreviousLabel: `${MONTHS_PT[maxDate.getUTCMonth()]}/${String(maxDate.getUTCFullYear() - 1).slice(-2)}`,
       stockTotal,
+      activeStockTotal,
+      stockScopeSkuCount,
       coverageMonths,
       ruptureCount,
       openPurchaseCount,
+      retentionComparable,
     },
     curveSummary,
     topCurveA: abcItems.filter((item) => item.curve === "A").slice(0, 10),
@@ -1664,12 +1956,12 @@ export async function fetchClaudeReport({
     channelMix,
     stockBuckets,
     ruptureTable,
-    purchaseByCurve,
     warmingTypes,
     coolingCollections,
     movementTable,
     story,
     closing,
     recommendations,
+    audit,
   };
 }
