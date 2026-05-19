@@ -233,9 +233,11 @@ export default function CompanyDashboard({
     if (!dashboardData) return DEFAULT_SUMMARY;
     return {
       ...dashboardData.summary,
-      totalRevenue: computeFilialKpi(dashboardData.filialPerformance),
+      totalRevenue: selectedFilial
+        ? dashboardData.summary.totalRevenue
+        : computeFilialKpi(dashboardData.filialPerformance),
     };
-  }, [dashboardData]);
+  }, [dashboardData, selectedFilial]);
 
   const currentGoal = useMemo(() => {
     if (!dashboardData) return 0;
@@ -361,6 +363,7 @@ export default function CompanyDashboard({
             endDate={range.endDate}
             filial={selectedFilial}
             filialPerformance={dashboardData?.filialPerformance ?? []}
+            summaryRevenue={summary.totalRevenue}
             initialProducts={dashboardData?.topProducts}
             initialCategories={dashboardData?.topCategories}
           />

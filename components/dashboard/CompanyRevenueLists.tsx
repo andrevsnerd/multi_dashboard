@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import type { CategoryRevenue, ProductRevenue, FilialPerformance } from "@/types/dashboard";
+import type { CategoryRevenue, ProductRevenue, FilialPerformance, MetricSummary } from "@/types/dashboard";
 import { isEcommerceFilial, VAREJO_VALUE } from "@/lib/config/company";
 
 import styles from "./RevenueDashboard.module.css";
@@ -13,6 +13,7 @@ export interface CompanyRevenueListsProps {
   endDate: Date;
   filial?: string | null | undefined;
   filialPerformance?: FilialPerformance[];
+  summaryRevenue?: MetricSummary | null;
   title?: string;
   subtitle?: string;
   initialProducts?: ProductRevenue[];
@@ -113,6 +114,7 @@ export default function CompanyRevenueLists({
   endDate,
   filial = null,
   filialPerformance: filialPerformanceProp = [],
+  summaryRevenue = null,
   title = "Top faturamento",
   subtitle = "Produtos e categorias com maior faturamento no período selecionado.",
   initialProducts,
@@ -213,53 +215,44 @@ export default function CompanyRevenueLists({
   }, [filialPerformanceProp, companyKey]);
 
   const filialPerformanceTotals = useMemo(() => {
+    if (summaryRevenue) {
+      return {
+        currentRevenue: summaryRevenue.currentValue,
+        previousRevenue: summaryRevenue.previousValue,
+        changePercentage: summaryRevenue.changePercentage,
+      };
+    }
+
     const list = filialPerformanceWithVarejo.filter(
       (item) => normalizeDisplayName(item.filialDisplayName) !== "IBIRAPUERA"
     );
-    const sumAll = () => ({
-      currentRevenue: list.reduce((sum, item) => sum + (item.currentRevenue ?? 0), 0),
-      previousRevenue: list.reduce((sum, item) => sum + (item.previousRevenue ?? 0), 0),
-    });
-
-    const sumVarejoPlusEcommerce = () => {
-      const varejo = list.find((item) => item.filial === VAREJO_VALUE);
-      const varejoCurrent = varejo?.currentRevenue ?? 0;
-      const varejoPrevious = varejo?.previousRevenue ?? 0;
-
-      // E-COMMERCE pode aparecer mais de uma vez (ex.: duas filiais agregadas),
-      // então somamos por displayName e excluímos o próprio VAREJO.
-      const ecommerceItems = list.filter(
-        (item) => item.filial !== VAREJO_VALUE && item.filialDisplayName === "E-COMMERCE"
-      );
-      const ecommerceCurrent = ecommerceItems.reduce((s, item) => s + (item.currentRevenue ?? 0), 0);
-      const ecommercePrevious = ecommerceItems.reduce((s, item) => s + (item.previousRevenue ?? 0), 0);
-
-      return {
-        currentRevenue: varejoCurrent + ecommerceCurrent,
-        previousRevenue: varejoPrevious + ecommercePrevious,
-      };
-    };
-
-    const { currentRevenue, previousRevenue } =
-      companyKey === "scarfme" ? sumVarejoPlusEcommerce() : sumAll();
-
+    const fallbackCurrent = list.reduce((sum, item) => sum + (item.currentRevenue ?? 0), 0);
+    const fallbackPrevious = list.reduce((sum, item) => sum + (item.previousRevenue ?? 0), 0);
     let changePercentage: number | null = null;
-    if (previousRevenue > 0) {
-      changePercentage = Number((((currentRevenue - previousRevenue) / previousRevenue) * 100).toFixed(1));
-    } else if (currentRevenue > 0) {
+    if (fallbackPrevious > 0) {
+      changePercentage = Number((((fallbackCurrent - fallbackPrevious) / fallbackPrevious) * 100).toFixed(1));
+    } else if (fallbackCurrent > 0) {
       changePercentage = null;
     }
+    return { currentRevenue: fallbackCurrent, previousRevenue: fallbackPrevious, changePercentage };
+  }, [summaryRevenue, filialPerformanceWithVarejo]);
 
-    return { currentRevenue, previousRevenue, changePercentage };
-  }, [filialPerformanceWithVarejo, companyKey]);
+  const filialPerformanceDetalhada = useMemo(() => {
+    const withoutIbirapuera = filialPerformanceWithVarejo.filter(
+      (item) => normalizeDisplayName(item.filialDisplayName) !== "IBIRAPUERA"
+    );
 
-  const filialPerformanceDetalhada = useMemo(
-    () =>
-      filialPerformanceWithVarejo.filter(
-        (item) => normalizeDisplayName(item.filialDisplayName) !== "IBIRAPUERA"
-      ),
-    [filialPerformanceWithVarejo]
-  );
+    if (filial === VAREJO_VALUE) {
+      // Mostrar apenas lojas físicas — sem linha "VAREJO" (redundante com TOTAL) e sem E-COMMERCE
+      return withoutIbirapuera.filter(
+        (item) =>
+          item.filial !== VAREJO_VALUE &&
+          !isEcommerceFilial(companyKey, item.filial)
+      );
+    }
+
+    return withoutIbirapuera;
+  }, [filial, companyKey, filialPerformanceWithVarejo]);
 
   return (
     <section className={styles.container}>
