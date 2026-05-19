@@ -8,9 +8,10 @@ import {
   fetchDailyEcommerceRevenue,
   fetchEcommerceFilialPerformance,
 } from '@/lib/repositories/ecommerce';
+import { fetchEstoqueKPIs } from '@/lib/repositories/controleEstoque';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
-import { fetchMultipleProductsStock, fetchStockSummary } from '@/lib/repositories/inventory';
+import { fetchMultipleProductsStock } from '@/lib/repositories/inventory';
 import type {
   CategoryRevenue,
   ProductRevenue,
@@ -336,6 +337,7 @@ export async function fetchTopProducts({
               AND vp.PRODUTO = vt.PRODUTO
               AND ISNULL(vp.COR_PRODUTO, '') = ISNULL(vt.COR_PRODUTO, '')
               AND ISNULL(vp.TAMANHO, 0) = ISNULL(vt.TAMANHO, 0)
+              AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
           )
           ${filialFilter}
       ),
@@ -462,27 +464,21 @@ export async function fetchSalesSummary({
   // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
   if (shouldAggregateEcommerce(company, filial)) {
     // Buscar vendas normais (varejo), ecommerce e estoque em paralelo
-    const [salesResult, ecommerceResult, stockSummaryForAll] = await Promise.all([
+    const [salesResult, ecommerceResult, stockKpisForAll] = await Promise.all([
       fetchSalesSummary({ company, range, filial: VAREJO_VALUE, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, produtoId, produtoSearchTerm, acimaDoTicket, filterByRegistrationDate }),
       fetchEcommerceSummary({ company, range, filial: null, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, produtoId, produtoSearchTerm, acimaDoTicket, filterByRegistrationDate }),
-      // IMPORTANTE: O estoque deve ser calculado para TODAS as filiais (varejo + ecommerce)
-      fetchStockSummary({
+      fetchEstoqueKPIs({
         company,
         filial: null, // Todas as filiais (varejo + ecommerce)
-        grupo,
         grupos,
-        linha,
         linhas,
-        colecao,
         colecoes,
-        subgrupo,
         subgrupos,
-        filterByRegistrationDate,
-        registrationDateRange: filterByRegistrationDate ? currentRange : undefined,
-        grade,
         grades,
         produtoId,
         produtoSearchTerm,
+        filterByRegistrationDate,
+        range: currentRange,
       }),
     ]);
 
@@ -555,13 +551,13 @@ export async function fetchSalesSummary({
         changePercentage: null, // Será calculado abaixo
       },
       totalStockQuantity: {
-        currentValue: stockSummaryForAll.totalQuantity,
-        previousValue: stockSummaryForAll.totalQuantity, // Estoque não tem histórico temporal
+        currentValue: stockKpisForAll.estoqueTotal,
+        previousValue: stockKpisForAll.estoqueTotal, // Estoque não tem histórico temporal
         changePercentage: null,
       },
       totalStockValue: {
-        currentValue: stockSummaryForAll.totalValue,
-        previousValue: stockSummaryForAll.totalValue, // Estoque não tem histórico temporal
+        currentValue: stockKpisForAll.valorEmEstoque,
+        previousValue: stockKpisForAll.valorEmEstoque, // Estoque não tem histórico temporal
         changePercentage: null,
       },
     };
@@ -831,7 +827,6 @@ export async function fetchSalesSummary({
             (vp.DATA_VENDA >= @startDate AND vp.DATA_VENDA < @endDate)
             OR (vp.DATA_VENDA >= @prevStartDate AND vp.DATA_VENDA < @prevEndDate)
           )
-          AND vp.QTDE > 0
           AND (ISNULL(vp.QTDE_CANCELADA, 0) = 0)
           ${filialFilter}
       ),
@@ -880,6 +875,7 @@ export async function fetchSalesSummary({
               AND vp.PRODUTO = vt.PRODUTO
               AND ISNULL(vp.COR_PRODUTO, '') = ISNULL(vt.COR_PRODUTO, '')
               AND ISNULL(vp.TAMANHO, 0) = ISNULL(vt.TAMANHO, 0)
+              AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
           )
           ${filialFilter.replace(/f\.FILIAL/g, 'f.FILIAL')}
       ),
@@ -1037,6 +1033,7 @@ export async function fetchSalesSummary({
               AND vp.PRODUTO = vt.PRODUTO
               AND ISNULL(vp.COR_PRODUTO, '') = ISNULL(vt.COR_PRODUTO, '')
               AND ISNULL(vp.TAMANHO, 0) = ISNULL(vt.TAMANHO, 0)
+              AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
           )
           ${filialFilter.replace(/f\.FILIAL/g, 'f.FILIAL')}
           ${grupoFilter.replace(/vp\.GRUPO_PRODUTO/g, 'p.GRUPO_PRODUTO')}
@@ -1149,23 +1146,18 @@ export async function fetchSalesSummary({
       previousTickets: number | null;
       currentLastSaleDate: Date | null;
     }>(query);
-    const stockSummary = await fetchStockSummary({
+    const stockKpis = await fetchEstoqueKPIs({
       company,
       filial,
-      grupo,
       grupos,
-      linha,
       linhas,
-      colecao,
       colecoes,
-      subgrupo,
       subgrupos,
-      grade,
       grades,
       produtoId,
       produtoSearchTerm,
       filterByRegistrationDate,
-      registrationDateRange: filterByRegistrationDate ? currentRange : undefined,
+      range: currentRange,
     });
 
     const row = result.recordset[0] ?? {
@@ -1221,13 +1213,13 @@ export async function fetchSalesSummary({
       totalTickets: buildMetric(currentTickets, previousTickets),
       averageTicket: buildMetric(averageTicketCurrent, averageTicketPrevious),
       totalStockQuantity: {
-        currentValue: stockSummary.totalQuantity,
-        previousValue: stockSummary.totalQuantity, // Estoque não tem histórico temporal
+        currentValue: stockKpis.estoqueTotal,
+        previousValue: stockKpis.estoqueTotal, // Estoque não tem histórico temporal
         changePercentage: null,
       },
       totalStockValue: {
-        currentValue: stockSummary.totalValue,
-        previousValue: stockSummary.totalValue, // Estoque não tem histórico temporal
+        currentValue: stockKpis.valorEmEstoque,
+        previousValue: stockKpis.valorEmEstoque, // Estoque não tem histórico temporal
         changePercentage: null,
       },
     };
@@ -1438,6 +1430,7 @@ export async function fetchTopCategories({
               AND vp.PRODUTO = vt.PRODUTO
               AND ISNULL(vp.COR_PRODUTO, '') = ISNULL(vt.COR_PRODUTO, '')
               AND ISNULL(vp.TAMANHO, 0) = ISNULL(vt.TAMANHO, 0)
+              AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
           )
           ${filialFilter.replace(/f\.FILIAL/g, 'f.FILIAL')}
       ),
@@ -1808,6 +1801,7 @@ export async function fetchFilialPerformance({
               AND vp.PRODUTO = vt.PRODUTO
               AND ISNULL(vp.COR_PRODUTO, '') = ISNULL(vt.COR_PRODUTO, '')
               AND ISNULL(vp.TAMANHO, 0) = ISNULL(vt.TAMANHO, 0)
+              AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
           )
           AND f.FILIAL IN (${placeholders})
       ),
@@ -1932,5 +1926,3 @@ export async function fetchFilialPerformance({
   // Ordenar por revenue atual (maior primeiro)
   return combined.sort((a, b) => b.currentRevenue - a.currentRevenue);
 }
-
-

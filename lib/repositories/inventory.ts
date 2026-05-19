@@ -5,6 +5,8 @@ import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import type { MetricSummary } from '@/types/dashboard';
 
+const ENABLE_STOCK_SUMMARY_DEBUG = false;
+
 function buildFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
@@ -27,6 +29,18 @@ function buildFilialFilter(
 
   // Se uma filial específica foi selecionada, usar apenas ela
   if (specificFilial && specificFilial !== VAREJO_VALUE) {
+    if (isScarfme && ecommerceFilials.includes(specificFilial)) {
+      ecommerceFilials.forEach((filial, index) => {
+        request.input(`estoqueFilialGroup${index}`, sql.VarChar, filial);
+      });
+
+      const placeholders = ecommerceFilials
+        .map((_, index) => `@estoqueFilialGroup${index}`)
+        .join(', ');
+
+      return `AND ${prefix}.FILIAL IN (${placeholders})`;
+    }
+
     const filialParam = `estoqueFilial`;
     request.input(filialParam, sql.VarChar, specificFilial);
     return `AND ${prefix}.FILIAL = @${filialParam}`;
@@ -597,7 +611,7 @@ export async function fetchStockSummary({
     const joinType = hasProductFilter ? 'INNER' : 'LEFT';
     
     // DEBUG: Log quando filial é VAREJO ou quando há filtros de produto
-    if (filial === VAREJO_VALUE || hasProductFilter) {
+    if (ENABLE_STOCK_SUMMARY_DEBUG && (filial === VAREJO_VALUE || hasProductFilter)) {
       console.log(`[fetchStockSummary] DEBUG - Filtros aplicados:`, {
         filial: filial || 'null',
         filialType: filial === VAREJO_VALUE ? 'VAREJO' : (filial ? 'ESPECIFICA' : 'TODAS'),
@@ -660,7 +674,7 @@ export async function fetchStockSummary({
     const hasProductFilters = !!(colecao || linha || subgrupo || grade || grupo);
     
     // DEBUG ESPECÍFICO PARA FILTROS DE PRODUTO
-    if (hasProductFilters) {
+    if (ENABLE_STOCK_SUMMARY_DEBUG && hasProductFilters) {
       console.log(`[fetchStockSummary] DEBUG FILTROS - Filtros aplicados:`, {
         colecao,
         colecoes,
@@ -765,7 +779,7 @@ export async function fetchStockSummary({
     }
     
     // DEBUG ESPECÍFICO PARA GRADE (mantido para compatibilidade)
-    if (grade || (grades && grades.length > 0)) {
+    if (ENABLE_STOCK_SUMMARY_DEBUG && (grade || (grades && grades.length > 0))) {
       console.log(`[fetchStockSummary] DEBUG GRADE - Filtro aplicado:`, {
         grade,
         grades,
@@ -852,7 +866,7 @@ export async function fetchStockSummary({
         });
       }
     }
-    if (hasProductFilters || company === 'scarfme') {
+    if (ENABLE_STOCK_SUMMARY_DEBUG && (hasProductFilters || company === 'scarfme')) {
       const filterInfo = [
         colecao && `colecao=${colecao}`,
         linha && `linha=${linha}`,
@@ -922,7 +936,7 @@ export async function fetchStockSummary({
     
     // DEBUG: Log do resultado final
     // DIAGNÓSTICO ESPECIAL PARA NERD: Verificar diferença entre planilha e sistema
-    if (company === 'nerd' && !filial) {
+    if (ENABLE_STOCK_SUMMARY_DEBUG && company === 'nerd' && !filial) {
       // Query para verificar estoque total sem agrupamento (como na planilha)
       const queryTotalSemAgrupamento = `
         SELECT 
@@ -1014,7 +1028,7 @@ export async function fetchStockSummary({
       }
     }
     
-    if (hasProductFilters || company === 'scarfme' || filial === VAREJO_VALUE) {
+    if (ENABLE_STOCK_SUMMARY_DEBUG && (hasProductFilters || company === 'scarfme' || filial === VAREJO_VALUE)) {
       const filterInfo = [
         colecao && `colecao=${colecao}`,
         linha && `linha=${linha}`,
@@ -1072,4 +1086,3 @@ export async function fetchStockSummary({
     };
   });
 }
-

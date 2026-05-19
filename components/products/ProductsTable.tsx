@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import type { ProductDetail } from "@/lib/repositories/products";
 
 import styles from "./ProductsTable.module.css";
@@ -13,6 +13,46 @@ interface ProductsTableProps {
   acimaDoTicket?: boolean;
 }
 
+interface ProductStockByFilialTooltipItem {
+  filial: string;
+  filialDisplayName: string;
+  stock: number;
+}
+
+const NO_COLOR_PARAM = "__SEM_COR__";
+type SortableColumn =
+  | "productName"
+  | "totalRevenue"
+  | "totalQuantity"
+  | "averagePrice"
+  | "cost"
+  | "markup"
+  | "stock"
+  | "estoqueRede";
+
+function getSortableValue(product: ProductDetail, column: SortableColumn): number | string {
+  switch (column) {
+    case "productName":
+      return product.productName ?? "";
+    case "totalRevenue":
+      return Number(product.totalRevenue ?? 0);
+    case "totalQuantity":
+      return Number(product.totalQuantity ?? 0);
+    case "averagePrice":
+      return Number(product.averagePrice ?? 0);
+    case "cost":
+      return Number(product.cost ?? 0);
+    case "markup":
+      return Number(product.markup ?? 0);
+    case "stock":
+      return Number(product.stock ?? 0);
+    case "estoqueRede":
+      return Number(product.estoqueRede ?? 0);
+    default:
+      return 0;
+  }
+}
+
 export default function ProductsTable({
   data,
   loading,
@@ -20,10 +60,86 @@ export default function ProductsTable({
   companyKey,
   acimaDoTicket = false,
 }: ProductsTableProps) {
-  const [sortColumn, setSortColumn] = useState<keyof ProductDetail>("totalRevenue");
+  const [sortColumn, setSortColumn] = useState<SortableColumn>("totalRevenue");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [hoveredStockKey, setHoveredStockKey] = useState<string | null>(null);
+  const [stockTooltipCache, setStockTooltipCache] = useState<
+    Record<string, ProductStockByFilialTooltipItem[]>
+  >({});
+  const [loadingStockTooltipKey, setLoadingStockTooltipKey] = useState<string | null>(null);
+  const [stockTooltipErrors, setStockTooltipErrors] = useState<Record<string, string>>({});
 
-  const handleSort = (column: keyof ProductDetail) => {
+  const buildStockTooltipKey = useCallback(
+    (product: ProductDetail) =>
+      `${product.productId}::${groupByColor ? product.corProduto ?? NO_COLOR_PARAM : "all"}`,
+    [groupByColor]
+  );
+
+  const loadStockTooltip = useCallback(
+    async (product: ProductDetail) => {
+      if (companyKey !== "scarfme") {
+        return;
+      }
+
+      const key = buildStockTooltipKey(product);
+      if (stockTooltipCache[key] || loadingStockTooltipKey === key) {
+        return;
+      }
+
+      setLoadingStockTooltipKey(key);
+      setStockTooltipErrors((prev) => {
+        if (!prev[key]) return prev;
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+
+      try {
+        const searchParams = new URLSearchParams({
+          productId: product.productId,
+          company: companyKey,
+        });
+
+        if (groupByColor) {
+          searchParams.set("colors", product.corProduto ?? NO_COLOR_PARAM);
+        }
+
+        const response = await fetch(`/api/products/stock-by-filial?${searchParams.toString()}`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error("Nao foi possivel carregar as filiais");
+        }
+
+        const json = (await response.json()) as {
+          data?: ProductStockByFilialTooltipItem[];
+        };
+
+        const rows = (json.data ?? [])
+          .filter((item) => Number(item.stock ?? 0) > 0)
+          .sort((a, b) => Number(b.stock ?? 0) - Number(a.stock ?? 0));
+
+        setStockTooltipCache((prev) => ({
+          ...prev,
+          [key]: rows,
+        }));
+      } catch (error) {
+        setStockTooltipErrors((prev) => ({
+          ...prev,
+          [key]:
+            error instanceof Error && error.message
+              ? error.message
+              : "Nao foi possivel carregar as filiais",
+        }));
+      } finally {
+        setLoadingStockTooltipKey((current) => (current === key ? null : current));
+      }
+    },
+    [buildStockTooltipKey, companyKey, groupByColor, loadingStockTooltipKey, stockTooltipCache]
+  );
+
+  const handleSort = (column: SortableColumn) => {
     if (sortColumn === column) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
@@ -34,8 +150,8 @@ export default function ProductsTable({
 
   const sortedData = useMemo(() => {
     const sorted = [...data].sort((a, b) => {
-      const aValue = a[sortColumn];
-      const bValue = b[sortColumn];
+      const aValue = getSortableValue(a, sortColumn);
+      const bValue = getSortableValue(b, sortColumn);
       
       if (aValue === null || aValue === undefined) return 1;
       if (bValue === null || bValue === undefined) return -1;
@@ -43,8 +159,10 @@ export default function ProductsTable({
       if (typeof aValue === "number" && typeof bValue === "number") {
         return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
       }
-      
-      return 0;
+
+      return sortDirection === "asc"
+        ? String(aValue).localeCompare(String(bValue), "pt-BR")
+        : String(bValue).localeCompare(String(aValue), "pt-BR");
     });
     
     return sorted;
@@ -64,59 +182,6 @@ export default function ProductsTable({
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     });
-  };
-
-  const formatVariance = (value: number | null, currentRevenue: number): {
-    text: string;
-    isPositive: boolean;
-    isNegative: boolean;
-    isNeutral: boolean;
-  } => {
-    if (value === null) {
-      if (currentRevenue > 0) {
-        return {
-          text: "Novo",
-          isPositive: true,
-          isNegative: false,
-          isNeutral: false,
-        };
-      } else {
-        return {
-          text: "--",
-          isPositive: false,
-          isNegative: false,
-          isNeutral: true,
-        };
-      }
-    }
-
-    if (value === 0) {
-      return {
-        text: "0%",
-        isPositive: false,
-        isNegative: false,
-        isNeutral: true,
-      };
-    }
-
-    const isPositive = value > 0;
-    const isNegative = value < 0;
-    
-    if (value === -100) {
-      return {
-        text: "Parou",
-        isPositive: false,
-        isNegative: true,
-        isNeutral: false,
-      };
-    }
-
-    return {
-      text: `${isPositive ? "+" : ""}${value.toFixed(1)}%`,
-      isPositive,
-      isNegative,
-      isNeutral: false,
-    };
   };
 
   const formatMarkup = (value: number) => {
@@ -150,10 +215,10 @@ export default function ProductsTable({
                 className={`${styles.sortable} ${styles.descriptionHeader}`}
                 onClick={() => handleSort("productName")}
               >
-                DESCRIÇÃO
+                DESCRICAO
                 {sortColumn === "productName" && (
                   <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "↑" : "↓"}
+                    {sortDirection === "asc" ? "^" : "v"}
                   </span>
                 )}
               </th>
@@ -174,7 +239,7 @@ export default function ProductsTable({
                 FATURAMENTO
                 {sortColumn === "totalRevenue" && (
                   <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "↑" : "↓"}
+                    {sortDirection === "asc" ? "^" : "v"}
                   </span>
                 )}
               </th>
@@ -185,7 +250,7 @@ export default function ProductsTable({
                 QTD
                 {sortColumn === "totalQuantity" && (
                   <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "↑" : "↓"}
+                    {sortDirection === "asc" ? "^" : "v"}
                   </span>
                 )}
               </th>
@@ -193,23 +258,23 @@ export default function ProductsTable({
                 className={`${styles.sortable} ${styles.currencyHeader}`}
                 onClick={() => handleSort("averagePrice")}
               >
-                PREÇO MÉDIO
+                PRECO MEDIO
                 {sortColumn === "averagePrice" && (
                   <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "↑" : "↓"}
+                    {sortDirection === "asc" ? "^" : "v"}
                   </span>
                 )}
               </th>
               {acimaDoTicket ? (
                 <>
                   <th className={styles.currencyHeader}>
-                    PREÇO SUGERIDO
+                    PRECO SUGERIDO
                   </th>
                   <th className={styles.currencyHeader}>
-                    DIFERENÇA
+                    DIFERENCA
                   </th>
                   <th className={styles.currencyHeader}>
-                    DIFERENÇA TOTAL
+                    DIFERENCA TOTAL
                   </th>
                 </>
               ) : null}
@@ -220,7 +285,7 @@ export default function ProductsTable({
                 CUSTO
                 {sortColumn === "cost" && (
                   <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "↑" : "↓"}
+                    {sortDirection === "asc" ? "^" : "v"}
                   </span>
                 )}
               </th>
@@ -232,7 +297,7 @@ export default function ProductsTable({
                   MARKUP
                   {sortColumn === "markup" && (
                     <span className={styles.sortIndicator}>
-                      {sortDirection === "asc" ? "↑" : "↓"}
+                      {sortDirection === "asc" ? "^" : "v"}
                     </span>
                   )}
                 </th>
@@ -244,7 +309,7 @@ export default function ProductsTable({
                 ESTOQUE
                 {sortColumn === "stock" && (
                   <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "↑" : "↓"}
+                    {sortDirection === "asc" ? "^" : "v"}
                   </span>
                 )}
               </th>
@@ -256,7 +321,7 @@ export default function ProductsTable({
                   ESTOQUE REDE
                   {sortColumn === "estoqueRede" && (
                     <span className={styles.sortIndicator}>
-                      {sortDirection === "asc" ? "↑" : "↓"}
+                      {sortDirection === "asc" ? "^" : "v"}
                     </span>
                   )}
                 </th>
@@ -265,6 +330,16 @@ export default function ProductsTable({
           </thead>
           <tbody>
             {sortedData.map((product, index) => {
+              const stockTooltipKey = buildStockTooltipKey(product);
+              const stockTooltipRows = stockTooltipCache[stockTooltipKey] ?? [];
+              const stockTooltipTotal = stockTooltipRows.reduce(
+                (sum, item) => sum + Number(item.stock ?? 0),
+                0
+              );
+              const stockTooltipVisible = hoveredStockKey === stockTooltipKey;
+              const stockTooltipLoading = loadingStockTooltipKey === stockTooltipKey;
+              const stockTooltipError = stockTooltipErrors[stockTooltipKey];
+
               return (
                 <tr key={`${product.productId}-${product.corProduto || ''}-${index}`}>
                   <td className={styles.descriptionCell}>
@@ -309,8 +384,57 @@ export default function ProductsTable({
                   )}
                   <td className={styles.numberCell}>{formatNumber(product.stock)}</td>
                   {companyKey === "scarfme" && (
-                    <td className={styles.numberCell}>
-                      {product.estoqueRede !== undefined ? formatNumber(product.estoqueRede) : '--'}
+                    <td className={`${styles.numberCell} ${styles.stockRedeCell}`}>
+                      <div
+                        className={styles.stockTooltipAnchor}
+                        onMouseEnter={() => {
+                          setHoveredStockKey(stockTooltipKey);
+                          void loadStockTooltip(product);
+                        }}
+                        onMouseLeave={() => {
+                          setHoveredStockKey((current) =>
+                            current === stockTooltipKey ? null : current
+                          );
+                        }}
+                      >
+                        <span className={styles.stockRedeValue}>
+                          {product.estoqueRede !== undefined ? formatNumber(product.estoqueRede) : '--'}
+                        </span>
+
+                        {stockTooltipVisible && (
+                          <div className={styles.stockTooltipPanel}>
+                            <div className={styles.stockTooltipHeader}>Estoque na rede</div>
+                            {stockTooltipLoading ? (
+                              <div className={styles.stockTooltipEmpty}>Carregando filiais...</div>
+                            ) : stockTooltipError ? (
+                              <div className={styles.stockTooltipEmpty}>{stockTooltipError}</div>
+                            ) : stockTooltipRows.length > 0 ? (
+                              <>
+                                <div className={styles.stockTooltipSubtitle}>
+                                  {stockTooltipRows.length} filiais · {formatNumber(stockTooltipTotal)} unidades
+                                </div>
+                                <div className={styles.stockTooltipList}>
+                                  {stockTooltipRows.map((item) => (
+                                    <div
+                                      key={`${item.filial}-${item.filialDisplayName}`}
+                                      className={styles.stockTooltipRow}
+                                    >
+                                      <span className={styles.stockTooltipFilial}>
+                                        {item.filialDisplayName}
+                                      </span>
+                                      <span className={styles.stockTooltipQty}>
+                                        {formatNumber(item.stock)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
+                            ) : (
+                              <div className={styles.stockTooltipEmpty}>Sem estoque distribuído nas filiais.</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -322,8 +446,6 @@ export default function ProductsTable({
         {/* Mobile: Cards */}
         <div className={styles.mobileCards}>
           {sortedData.map((product, index) => {
-            const variance = formatVariance(product.revenueVariance, product.totalRevenue);
-
             return (
               <div key={`${product.productId}-${product.corProduto || ''}-${index}`} className={styles.card}>
                 <div className={styles.cardMain}>
@@ -366,15 +488,15 @@ export default function ProductsTable({
                       </div>
                       <div className={styles.cardPriceInfo}>
                         <span className={styles.cardPriceItem}>
-                          <span className={styles.cardPriceLabel}>Preço:</span> {formatCurrency(product.averagePrice)}
+                          <span className={styles.cardPriceLabel}>Preco:</span> {formatCurrency(product.averagePrice)}
                         </span>
                         {acimaDoTicket && product.suggestedPrice ? (
                           <>
                             <span className={styles.cardPriceItem}>
-                              <span className={styles.cardPriceLabel}>Preço Sugerido:</span> {formatCurrency(product.suggestedPrice)}
+                              <span className={styles.cardPriceLabel}>Preco Sugerido:</span> {formatCurrency(product.suggestedPrice)}
                             </span>
                             <span className={styles.cardPriceItem}>
-                              <span className={styles.cardPriceLabel}>Diferença:</span> {formatCurrency((product.averagePrice - product.suggestedPrice) * product.totalQuantity)}
+                              <span className={styles.cardPriceLabel}>Diferenca:</span> {formatCurrency((product.averagePrice - product.suggestedPrice) * product.totalQuantity)}
                             </span>
                           </>
                         ) : (
@@ -394,4 +516,3 @@ export default function ProductsTable({
     </div>
   );
 }
-

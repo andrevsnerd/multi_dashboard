@@ -61,7 +61,11 @@ function buildFilialFilter(
 
   // Se uma filial específica foi selecionada, usar ela ou o grupo que ela representa
   if (specificFilial && specificFilial !== VAREJO_VALUE) {
-    const members = restrictFiliaisToAllowed(getFilialGroupMembers(company, specificFilial), allowedFiliais);
+    const baseMembers =
+      isScarfme && ecommerceFilials.includes(specificFilial)
+        ? ecommerceFilials
+        : getFilialGroupMembers(company, specificFilial);
+    const members = restrictFiliaisToAllowed(baseMembers, allowedFiliais);
     if (members.length === 0) {
       return 'AND 1=0';
     }
@@ -166,7 +170,11 @@ function buildEntradaFilialFilter(
   const ecommerceFilials = company.ecommerceFilials ?? [];
 
   if (specificFilial && specificFilial !== VAREJO_VALUE) {
-    const members = restrictFiliaisToAllowed(getFilialGroupMembers(company, specificFilial), allowedFiliais);
+    const baseMembers =
+      isScarfme && ecommerceFilials.includes(specificFilial)
+        ? ecommerceFilials
+        : getFilialGroupMembers(company, specificFilial);
+    const members = restrictFiliaisToAllowed(baseMembers, allowedFiliais);
     if (members.length === 0) {
       return 'AND 1=0';
     }
@@ -234,7 +242,11 @@ function buildVendasFilialFilter(
   const ecommerceFilials = company.ecommerceFilials ?? [];
 
   if (specificFilial && specificFilial !== VAREJO_VALUE) {
-    const members = restrictFiliaisToAllowed(getFilialGroupMembers(company, specificFilial), allowedFiliais);
+    const baseMembers =
+      isScarfme && ecommerceFilials.includes(specificFilial)
+        ? ecommerceFilials
+        : getFilialGroupMembers(company, specificFilial);
+    const members = restrictFiliaisToAllowed(baseMembers, allowedFiliais);
     if (members.length === 0) {
       return 'AND 1=0';
     }
@@ -570,6 +582,9 @@ export interface ControleEstoqueParams {
   filtrarEstoquePorGiro?: boolean;
   /** Faixa de giro em dias (30, 60, 90, …). Quando > 30, exclui produtos que venderam em [0, diasInicio] (faixas disjuntas). */
   giroDias?: number;
+  produtoId?: string;
+  produtoSearchTerm?: string | null;
+  filterByRegistrationDate?: boolean;
 }
 
 
@@ -937,6 +952,9 @@ export async function fetchEstoqueKPIs({
   colecoes,
   subgrupos,
   grades,
+  produtoId,
+  produtoSearchTerm,
+  filterByRegistrationDate = false,
 }: ControleEstoqueParams): Promise<EstoqueKPI> {
   return withRequest(async (request) => {
     // Usar o período selecionado pelo usuário (range) para calcular vendas
@@ -980,6 +998,22 @@ export async function fetchEstoqueKPIs({
     const gradeFilter = buildGradeFilter(request, company, grades, 'p');
     const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineKPI');
     const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
+    let produtoFilter = '';
+    if (produtoId) {
+      request.input('produtoIdKPI', sql.VarChar, produtoId);
+      produtoFilter = `AND e.PRODUTO = @produtoIdKPI`;
+    } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
+      request.input('produtoSearchTermKPI', sql.VarChar, `%${produtoSearchTerm.trim()}%`);
+      produtoFilter = `AND p.DESC_PRODUTO LIKE @produtoSearchTermKPI`;
+    }
+    let registrationDateFilter = '';
+    if (filterByRegistrationDate) {
+      request.input('registrationStartDateKPI', sql.DateTime, periodoStartKPI);
+      request.input('registrationEndDateKPI', sql.DateTime, periodoEndKPI);
+      registrationDateFilter = `AND p.DATA_CADASTRAMENTO >= @registrationStartDateKPI
+        AND p.DATA_CADASTRAMENTO < @registrationEndDateKPI
+        AND p.DATA_CADASTRAMENTO IS NOT NULL`;
+    }
 
     // Estoque atual
     // Para categorias ativas, usar o campo correto baseado na empresa
@@ -1001,6 +1035,8 @@ export async function fetchEstoqueKPIs({
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
+        ${produtoFilter}
+        ${registrationDateFilter}
         ${exclusionFilter}
         ${nerdOnlyEletronicosFilter}
         AND e.ESTOQUE > 0

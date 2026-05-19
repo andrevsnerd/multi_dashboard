@@ -120,12 +120,7 @@ function buildScarfmeEcommerceFilialFilterForProducts(
     if (!ecommerceFilials.includes(filial)) {
       return 'AND 1=0';
     }
-
-    request.input(`${paramBase}Single`, sql.VarChar, filial);
-    return `AND ${tableAlias}.FILIAL = @${paramBase}Single`;
-  }
-
-  if (filial === VAREJO_VALUE) {
+  } else if (filial === VAREJO_VALUE) {
     return 'AND 1=0';
   }
 
@@ -149,7 +144,8 @@ function buildFilialFilter(
   companySlug: string | undefined,
   module: CompanyModule,
   specificFilial?: string | null,
-  tableAlias: string = 'vp'
+  tableAlias: string = 'vp',
+  paramBase: string = 'filial'
 ): string {
   if (!companySlug) {
     return '';
@@ -167,8 +163,8 @@ function buildFilialFilter(
 
   // Se uma filial específica foi selecionada, usar apenas ela
   if (specificFilial && specificFilial !== VAREJO_VALUE) {
-    request.input('filial', sql.VarChar, specificFilial);
-    return `AND ${tableAlias}.FILIAL = @filial`;
+    request.input(paramBase, sql.VarChar, specificFilial);
+    return `AND ${tableAlias}.FILIAL = @${paramBase}`;
   }
 
   // Para scarfme: se for "VAREJO", mostrar apenas filiais normais (sem ecommerce)
@@ -180,11 +176,11 @@ function buildFilialFilter(
     }
 
     normalFiliais.forEach((filial, index) => {
-      request.input(`filial${index}`, sql.VarChar, filial);
+      request.input(`${paramBase}${index}`, sql.VarChar, filial);
     });
 
     const placeholders = normalFiliais
-      .map((_, index) => `@filial${index}`)
+      .map((_, index) => `@${paramBase}${index}`)
       .join(', ');
 
     return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
@@ -201,11 +197,11 @@ function buildFilialFilter(
     }
 
     allFiliais.forEach((filial, index) => {
-      request.input(`filial${index}`, sql.VarChar, filial);
+      request.input(`${paramBase}${index}`, sql.VarChar, filial);
     });
 
     const placeholders = allFiliais
-      .map((_, index) => `@filial${index}`)
+      .map((_, index) => `@${paramBase}${index}`)
       .join(', ');
 
     return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
@@ -219,11 +215,11 @@ function buildFilialFilter(
   }
 
   normalFiliais.forEach((filial, index) => {
-    request.input(`filial${index}`, sql.VarChar, filial);
+    request.input(`${paramBase}${index}`, sql.VarChar, filial);
   });
 
   const placeholders = normalFiliais
-    .map((_, index) => `@filial${index}`)
+    .map((_, index) => `@${paramBase}${index}`)
     .join(', ');
 
   return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
@@ -621,7 +617,9 @@ async function fetchProductsWithDetailsSales({
     request.input('previousStartDate', sql.DateTime, previousRange.start);
     request.input('previousEndDate', sql.DateTime, previousRange.end);
 
-    const filialFilter = buildFilialFilter(request, company, 'sales', filial);
+    const salesFilialFilter = buildFilialFilter(request, company, 'sales', filial, 'f', 'salesFilial');
+    const salesCheckFilialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp_check', 'salesCheckFilial');
+    const historicalFilialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp', 'historicalFilial');
     const grupoFilter = buildGrupoFilterForProducts(request, company, grupo, grupos);
     const linhaFilter = buildLinhaFilterForProducts(request, company, linha, linhas);
     const colecaoFilter = buildColecaoFilterForProducts(request, company, colecao, colecoes);
@@ -638,14 +636,23 @@ async function fetchProductsWithDetailsSales({
       produtoFilter = `AND vp.DESC_PRODUTO LIKE @produtoSearchTerm`;
     }
 
+    const posGrupoFilter = grupoFilter.replace(/vp\.GRUPO_PRODUTO/g, 'p.GRUPO_PRODUTO');
+    const posLinhaFilter = linhaFilter.replace(/vp\.LINHA/g, 'p.LINHA');
+    const posColecaoFilter = colecaoFilter.replace(/vp\.COLECAO/g, 'p.COLECAO');
+    const posSubgrupoFilter = subgrupoFilter.replace(/vp\.SUBGRUPO_PRODUTO/g, 'p.SUBGRUPO_PRODUTO');
+    const posProdutoFilter = produtoFilter
+      .replace(/vp\.DESC_PRODUTO/g, 'p.DESC_PRODUTO')
+      .replace(/vp\.PRODUTO/g, 'vp.PRODUTO');
+    const pureTradeProdutoFilter = posProdutoFilter.replace(/vp\.PRODUTO/g, 'vt.PRODUTO');
+
     // Definir campos de agrupamento e seleção baseado em groupByColor
-    const groupByFields = groupByColor 
-      ? 'vp.PRODUTO, vp.COR_PRODUTO'
-      : 'vp.PRODUTO';
+    const groupByFields = groupByColor
+      ? 'vf.PRODUTO, vf.COR_PRODUTO'
+      : 'vf.PRODUTO';
     
     const colorSelectFields = groupByColor
-      ? `vp.COR_PRODUTO AS corProduto,
-         MAX(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO, '')) AS descCorProduto,`
+      ? `NULLIF(vf.COR_PRODUTO, '') AS corProduto,
+         MAX(COALESCE(c.DESC_COR, '')) AS descCorProduto,`
       : '';
 
     // Adicionar campo grade apenas para scarfme
@@ -670,63 +677,202 @@ async function fetchProductsWithDetailsSales({
          AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) <> 'ASSISTENCIA'`;
       }
     }
+    const pureTradeAcimaDoTicketFilter = acimaDoTicketFilter
+      .replace(/vp\.PRECO_LIQUIDO/g, 'vt.PRECO_LIQUIDO')
+      .replace(/vp\.LINHA/g, 'p.LINHA');
     
     // Se filterByRegistrationDate for true, filtrar produtos pela data de cadastramento no período
     // e ainda filtrar vendas pelo período também
-    const dateFilter = filterByRegistrationDate
-      ? `vp.DATA_VENDA >= @startDate
-        AND vp.DATA_VENDA < @endDate
-        AND p.DATA_CADASTRAMENTO >= @startDate
+    const currentRegistrationDateFilter = filterByRegistrationDate
+      ? `AND p.DATA_CADASTRAMENTO >= @startDate
         AND p.DATA_CADASTRAMENTO < @endDate
         AND p.DATA_CADASTRAMENTO IS NOT NULL`
-      : `vp.DATA_VENDA >= @startDate
-        AND vp.DATA_VENDA < @endDate`;
-    
-    // Query base para produtos com vendas
-    let currentQuery = `
-      SELECT 
-        vp.PRODUTO AS productId,
-        MAX(vp.DESC_PRODUTO) AS productName,
-        MAX(COALESCE(vp.GRUPO_PRODUTO, p.GRUPO_PRODUTO, '')) AS grupo,
+      : '';
+
+    const buildNetProductsQuery = ({
+      startParam,
+      endParam,
+      revenueAlias,
+      quantityAlias,
+      applyRegistrationDateFilter = false,
+    }: {
+      startParam: string;
+      endParam: string;
+      revenueAlias: string;
+      quantityAlias: string;
+      applyRegistrationDateFilter?: boolean;
+    }) => `
+      WITH vendas_base AS (
+        SELECT
+          vp.TICKET,
+          vp.CODIGO_FILIAL,
+          vp.PRODUTO,
+          ISNULL(vp.COR_PRODUTO, '') AS COR_PRODUTO,
+          vp.TAMANHO,
+          vp.QTDE,
+          vp.PRECO_LIQUIDO,
+          vp.CUSTO,
+          CAST((vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) AS DECIMAL(38,6)) AS DESCONTO_VENDA
+        FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+          ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL
+          AND v.TICKET = vp.TICKET
+        LEFT JOIN FILIAIS f WITH (NOLOCK)
+          ON f.COD_FILIAL = vp.CODIGO_FILIAL
+        LEFT JOIN PRODUTOS p WITH (NOLOCK)
+          ON p.PRODUTO = vp.PRODUTO
+        WHERE vp.DATA_VENDA >= @${startParam}
+          AND vp.DATA_VENDA < @${endParam}
+          AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
+          ${salesFilialFilter}
+          ${posGrupoFilter}
+          ${posLinhaFilter}
+          ${posColecaoFilter}
+          ${posSubgrupoFilter}
+          ${gradeFilter}
+          ${posProdutoFilter}
+          ${acimaDoTicketFilter}
+          ${applyRegistrationDateFilter ? currentRegistrationDateFilter : ''}
+      ),
+      trocas_item AS (
+        SELECT
+          vt.TICKET,
+          vt.CODIGO_FILIAL,
+          vt.PRODUTO,
+          ISNULL(vt.COR_PRODUTO, '') AS COR_PRODUTO,
+          vt.TAMANHO,
+          SUM(vt.QTDE) AS QTDE_TROCA,
+          CAST(SUM(vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS VALOR_TROCA
+        FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+          ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL
+          AND v.TICKET = vt.TICKET
+        LEFT JOIN FILIAIS f WITH (NOLOCK)
+          ON f.COD_FILIAL = vt.CODIGO_FILIAL
+        LEFT JOIN PRODUTOS p WITH (NOLOCK)
+          ON p.PRODUTO = vt.PRODUTO
+        WHERE vt.QTDE_CANCELADA = 0
+          AND v.DATA_VENDA >= @${startParam}
+          AND v.DATA_VENDA < @${endParam}
+          ${salesFilialFilter}
+          ${posGrupoFilter}
+          ${posLinhaFilter}
+          ${posColecaoFilter}
+          ${posSubgrupoFilter}
+          ${gradeFilter}
+          ${pureTradeProdutoFilter}
+          ${pureTradeAcimaDoTicketFilter}
+          ${applyRegistrationDateFilter ? currentRegistrationDateFilter : ''}
+        GROUP BY vt.TICKET, vt.CODIGO_FILIAL, vt.PRODUTO, ISNULL(vt.COR_PRODUTO, ''), vt.TAMANHO
+      ),
+      TrocasPuras AS (
+        SELECT
+          vt.PRODUTO,
+          ISNULL(vt.COR_PRODUTO, '') AS COR_PRODUTO,
+          CAST((0 - vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS VALOR_LIQUIDO_CALC,
+          (0 - vt.QTDE) AS QTDE_LIQUIDA_CALC,
+          CAST(NULL AS DECIMAL(18, 6)) AS CUSTO
+        FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+          ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL
+          AND v.TICKET = vt.TICKET
+        LEFT JOIN FILIAIS f WITH (NOLOCK)
+          ON f.COD_FILIAL = vt.CODIGO_FILIAL
+        LEFT JOIN PRODUTOS p WITH (NOLOCK)
+          ON p.PRODUTO = vt.PRODUTO
+        WHERE vt.QTDE_CANCELADA = 0
+          AND v.DATA_VENDA >= @${startParam}
+          AND v.DATA_VENDA < @${endParam}
+          AND NOT EXISTS (
+            SELECT 1
+            FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+            WHERE vp.TICKET = vt.TICKET
+              AND vp.CODIGO_FILIAL = vt.CODIGO_FILIAL
+              AND vp.PRODUTO = vt.PRODUTO
+              AND ISNULL(vp.COR_PRODUTO, '') = ISNULL(vt.COR_PRODUTO, '')
+              AND ISNULL(vp.TAMANHO, 0) = ISNULL(vt.TAMANHO, 0)
+              AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
+          )
+          ${salesFilialFilter}
+          ${posGrupoFilter}
+          ${posLinhaFilter}
+          ${posColecaoFilter}
+          ${posSubgrupoFilter}
+          ${gradeFilter}
+          ${pureTradeProdutoFilter}
+          ${pureTradeAcimaDoTicketFilter}
+          ${applyRegistrationDateFilter ? currentRegistrationDateFilter : ''}
+      ),
+      VendasComNumero AS (
+        SELECT
+          vb.PRODUTO,
+          vb.COR_PRODUTO,
+          vb.TAMANHO,
+          vb.QTDE,
+          vb.PRECO_LIQUIDO,
+          vb.CUSTO,
+          vb.DESCONTO_VENDA,
+          vb.TICKET,
+          vb.CODIGO_FILIAL,
+          ROW_NUMBER() OVER (
+            PARTITION BY vb.TICKET, vb.CODIGO_FILIAL, vb.PRODUTO, vb.COR_PRODUTO, vb.TAMANHO
+            ORDER BY vb.TICKET, vb.CODIGO_FILIAL, vb.PRODUTO, vb.COR_PRODUTO, vb.TAMANHO
+          ) AS RN
+        FROM vendas_base vb
+      ),
+      vendas_finais AS (
+        SELECT
+          vcn.PRODUTO,
+          vcn.COR_PRODUTO,
+          CAST(
+            CAST(vcn.PRECO_LIQUIDO * vcn.QTDE AS DECIMAL(38,6))
+            - CAST(vcn.DESCONTO_VENDA AS DECIMAL(38,6))
+            - CAST(CASE WHEN vcn.RN = 1 THEN ISNULL(ti.VALOR_TROCA, 0) ELSE 0 END AS DECIMAL(38,6))
+          AS DECIMAL(38,6)) AS VALOR_LIQUIDO_CALC,
+          (vcn.QTDE - CASE WHEN vcn.RN = 1 THEN ISNULL(ti.QTDE_TROCA, 0) ELSE 0 END) AS QTDE_LIQUIDA_CALC,
+          CAST(vcn.CUSTO AS DECIMAL(18,6)) AS CUSTO
+        FROM VendasComNumero vcn
+        LEFT JOIN trocas_item ti
+          ON ti.TICKET = vcn.TICKET
+          AND ti.CODIGO_FILIAL = vcn.CODIGO_FILIAL
+          AND ti.PRODUTO = vcn.PRODUTO
+          AND ti.COR_PRODUTO = vcn.COR_PRODUTO
+          AND ISNULL(ti.TAMANHO, 0) = ISNULL(vcn.TAMANHO, 0)
+        UNION ALL
+        SELECT
+          tp.PRODUTO,
+          tp.COR_PRODUTO,
+          tp.VALOR_LIQUIDO_CALC,
+          tp.QTDE_LIQUIDA_CALC,
+          tp.CUSTO
+        FROM TrocasPuras tp
+      )
+      SELECT
+        vf.PRODUTO AS productId,
+        MAX(ISNULL(p.DESC_PRODUTO, '')) AS productName,
+        MAX(COALESCE(p.GRUPO_PRODUTO, '')) AS grupo,
         ${gradeSelectField}
         ${colorSelectFields}
         MAX(p.DATA_CADASTRAMENTO) AS registrationDate,
-        SUM(
-          CASE
-            WHEN vp.QTDE_CANCELADA > 0 THEN 0
-            ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
-          END
-        ) AS totalRevenue,
-        SUM(vp.QTDE) AS totalQuantity,
-        AVG(
-          CASE
-            WHEN vp.QTDE_CANCELADA > 0 THEN NULL
-            ELSE vp.CUSTO
-          END
-        ) AS cost,
+        SUM(vf.VALOR_LIQUIDO_CALC) AS ${revenueAlias},
+        SUM(vf.QTDE_LIQUIDA_CALC) AS ${quantityAlias},
+        AVG(vf.CUSTO) AS cost,
         MAX(${suggestedPriceField}) AS suggestedPrice
-      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-      ${groupByColor ? 'LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR' : ''}
-      WHERE ${dateFilter}
-        AND vp.QTDE > 0
-        ${filialFilter}
-        ${grupoFilter}
-        ${linhaFilter}
-        ${colecaoFilter}
-        ${subgrupoFilter}
-        ${gradeFilter}
-        ${produtoFilter}
-        ${acimaDoTicketFilter}
+      FROM vendas_finais vf
+      LEFT JOIN PRODUTOS p WITH (NOLOCK)
+        ON vf.PRODUTO = p.PRODUTO
+      ${groupByColor ? 'LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vf.COR_PRODUTO = c.COR' : ''}
       GROUP BY ${groupByFields}
-      ${acimaDoTicket ? `HAVING MAX(${suggestedPriceField}) IS NOT NULL 
-        AND (SUM(
-          CASE
-            WHEN vp.QTDE_CANCELADA > 0 THEN 0
-            ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
-          END
-        ) / NULLIF(SUM(vp.QTDE), 0)) > MAX(${suggestedPriceField})` : ''}
     `;
+    
+    // Query base para produtos com vendas
+    let currentQuery = buildNetProductsQuery({
+      startParam: 'startDate',
+      endParam: 'endDate',
+      revenueAlias: 'totalRevenue',
+      quantityAlias: 'totalQuantity',
+      applyRegistrationDateFilter: filterByRegistrationDate,
+    });
 
     // Se filterByRegistrationDate estiver ativo, adicionar produtos sem venda no final
     if (filterByRegistrationDate && !acimaDoTicket) {
@@ -779,8 +925,7 @@ async function fetchProductsWithDetailsSales({
           ON p.PRODUTO = vp_check.PRODUTO
           AND vp_check.DATA_VENDA >= @startDate
           AND vp_check.DATA_VENDA < @endDate
-          AND vp_check.QTDE > 0
-          ${filialFilter.replace(/vp\./g, 'vp_check.')}
+          ${salesCheckFilialFilter}
         WHERE p.DATA_CADASTRAMENTO >= @startDate
           AND p.DATA_CADASTRAMENTO < @endDate
           AND p.DATA_CADASTRAMENTO IS NOT NULL
@@ -797,39 +942,20 @@ async function fetchProductsWithDetailsSales({
     }
 
     // Query para período anterior
-    const previousColorSelectFields = groupByColor
-      ? 'vp.COR_PRODUTO AS corProduto,'
-      : '';
-
-    const previousQuery = `
-      SELECT 
-        vp.PRODUTO AS productId,
-        ${previousColorSelectFields}
-        SUM(
-          CASE
-            WHEN vp.QTDE_CANCELADA > 0 THEN 0
-            ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
-          END
-        ) AS previousRevenue,
-        SUM(vp.QTDE) AS previousQuantity
-      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-      WHERE vp.DATA_VENDA >= @previousStartDate
-        AND vp.DATA_VENDA < @previousEndDate
-        AND vp.QTDE > 0
-        ${filialFilter}
-        ${grupoFilter}
-        ${linhaFilter}
-        ${colecaoFilter}
-        ${subgrupoFilter}
-        ${gradeFilter}
-      GROUP BY ${groupByFields}
-    `;
+    const previousQuery = buildNetProductsQuery({
+      startParam: 'previousStartDate',
+      endParam: 'previousEndDate',
+      revenueAlias: 'previousRevenue',
+      quantityAlias: 'previousQuantity',
+    });
 
     // Query para verificar se o produto já teve vendas em algum momento antes do período atual
     const hasEverSoldColorSelectFields = groupByColor
       ? 'vp.COR_PRODUTO AS corProduto,'
       : '';
+    const historicalGroupByFields = groupByColor
+      ? 'vp.PRODUTO, vp.COR_PRODUTO'
+      : 'vp.PRODUTO';
 
     const hasEverSoldQuery = `
       SELECT 
@@ -839,15 +965,14 @@ async function fetchProductsWithDetailsSales({
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       WHERE vp.DATA_VENDA < @startDate
-        AND vp.QTDE > 0
-        ${filialFilter}
+        ${historicalFilialFilter}
         ${grupoFilter}
         ${linhaFilter}
         ${colecaoFilter}
         ${subgrupoFilter}
         ${gradeFilter}
         ${produtoFilter}
-      GROUP BY ${groupByFields}
+      GROUP BY ${historicalGroupByFields}
     `;
 
     const [currentResult, previousResult, hasEverSoldResult] = await Promise.all([
@@ -1125,8 +1250,17 @@ async function fetchProductsWithDetailsEcommerce({
       const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
       
       if (filial && filial !== VAREJO_VALUE) {
-        request.input('filial', sql.VarChar, filial);
-        filialFilter = `AND f.FILIAL = @filial`;
+        if (!ecommerceFilials.includes(filial)) {
+          filialFilter = 'AND 1=0';
+        } else {
+          ecommerceFilials.forEach((ecommerceFilial, index) => {
+            request.input(`filial${index}`, sql.VarChar, ecommerceFilial);
+          });
+          const placeholders = ecommerceFilials
+            .map((_, index) => `@filial${index}`)
+            .join(', ');
+          filialFilter = `AND f.FILIAL IN (${placeholders})`;
+        }
       } else if (ecommerceFilials.length > 0) {
         ecommerceFilials.forEach((filial, index) => {
           request.input(`filial${index}`, sql.VarChar, filial);

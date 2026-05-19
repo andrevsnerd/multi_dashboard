@@ -167,6 +167,7 @@ export async function fetchPerformanceData(
                 AND vp2.PRODUTO = vt.PRODUTO
                 AND ISNULL(vp2.COR_PRODUTO, '') = ISNULL(vt.COR_PRODUTO, '')
                 AND ISNULL(vp2.TAMANHO, 0) = ISNULL(vt.TAMANHO, 0)
+                AND ISNULL(vp2.QTDE_CANCELADA, 0) = 0
             )
             AND f.FILIAL IN (${filialPlaceholders})
         ),
@@ -387,8 +388,8 @@ export async function fetchFilialProdutoSales(
       grade: r.GRADE?.trim() ?? '',
       codigoBarra: r.CODIGO_BARRA?.trim() ?? '',
       custo: Number(r.CUSTO_UNIT ?? 0),
-      vendas: Math.round(Number(r.VENDAS ?? 0)),
-      qtde: Math.round(Number(r.QTDE ?? 0)),
+      vendas: Number(r.VENDAS ?? 0),
+      qtde: Number(r.QTDE ?? 0),
       vendasPrevious: 0,
     };
     if (groupByCor) {
@@ -406,16 +407,127 @@ export async function fetchFilialProdutoSales(
       posFilialNames.forEach((f, i) => request.input(`${prefix}F${i}`, sql.VarChar, f));
       const placeholders = posFilialNames.map((_, i) => `@${prefix}F${i}`).join(', ');
       const corSelect = groupByCor
-        ? `ISNULL(vp.COR_PRODUTO, '') AS COR_PRODUTO,
-          MAX(ISNULL(COALESCE(cor_ref.DESC_COR, vp.DESC_COR_PRODUTO), '')) AS COR_DESCRICAO,`
+        ? `ISNULL(m.COR_PRODUTO, '') AS COR_PRODUTO,
+          MAX(ISNULL(cor_ref.DESC_COR, '')) AS COR_DESCRICAO,`
         : '';
       const corJoin = groupByCor
-        ? 'LEFT JOIN CORES_BASICAS cor_ref WITH (NOLOCK) ON cor_ref.COR = vp.COR_PRODUTO'
+        ? 'LEFT JOIN CORES_BASICAS cor_ref WITH (NOLOCK) ON cor_ref.COR = m.COR_PRODUTO'
         : '';
-      const corGroupBy = groupByCor ? ', ISNULL(vp.COR_PRODUTO, \'\')' : '';
+      const corGroupBy = groupByCor ? ', ISNULL(m.COR_PRODUTO, \'\')' : '';
       const query = `
+        WITH vendas_base AS (
+          SELECT
+            vp.TICKET,
+            vp.CODIGO_FILIAL,
+            vp.PRODUTO,
+            ISNULL(vp.COR_PRODUTO, '') AS COR_PRODUTO,
+            vp.TAMANHO,
+            vp.QTDE,
+            vp.PRECO_LIQUIDO,
+            CAST((vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) AS DECIMAL(38,6)) AS DESCONTO_VENDA,
+            f.FILIAL
+          FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+          INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+            ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
+          LEFT JOIN FILIAIS f WITH (NOLOCK)
+            ON f.COD_FILIAL = vp.CODIGO_FILIAL
+          WHERE vp.DATA_VENDA >= @${prefix}Start
+            AND vp.DATA_VENDA < @${prefix}End
+            AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
+            AND f.FILIAL IN (${placeholders})
+        ),
+        trocas_item AS (
+          SELECT
+            vt.TICKET,
+            vt.CODIGO_FILIAL,
+            vt.PRODUTO,
+            ISNULL(vt.COR_PRODUTO, '') AS COR_PRODUTO,
+            vt.TAMANHO,
+            SUM(vt.QTDE) AS QTDE_TROCA,
+            CAST(SUM(vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS VALOR_TROCA
+          FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+          INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+            ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
+          LEFT JOIN FILIAIS f WITH (NOLOCK)
+            ON f.COD_FILIAL = vt.CODIGO_FILIAL
+          WHERE vt.QTDE_CANCELADA = 0
+            AND v.DATA_VENDA >= @${prefix}Start
+            AND v.DATA_VENDA < @${prefix}End
+            AND f.FILIAL IN (${placeholders})
+          GROUP BY vt.TICKET, vt.CODIGO_FILIAL, vt.PRODUTO, ISNULL(vt.COR_PRODUTO, ''), vt.TAMANHO
+        ),
+        TrocasPuras AS (
+          SELECT
+            vt.PRODUTO,
+            ISNULL(vt.COR_PRODUTO, '') AS COR_PRODUTO,
+            f.FILIAL,
+            CAST((0 - vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS VALOR_LIQUIDO_CALC,
+            (0 - vt.QTDE) AS QTDE_LIQUIDA_CALC
+          FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+          INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+            ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
+          LEFT JOIN FILIAIS f WITH (NOLOCK)
+            ON f.COD_FILIAL = vt.CODIGO_FILIAL
+          WHERE vt.QTDE_CANCELADA = 0
+            AND v.DATA_VENDA >= @${prefix}Start
+            AND v.DATA_VENDA < @${prefix}End
+            AND f.FILIAL IN (${placeholders})
+            AND NOT EXISTS (
+              SELECT 1 FROM LOJA_VENDA_PRODUTO vp2 WITH (NOLOCK)
+              WHERE vp2.TICKET = vt.TICKET
+                AND vp2.CODIGO_FILIAL = vt.CODIGO_FILIAL
+                AND vp2.PRODUTO = vt.PRODUTO
+                AND ISNULL(vp2.COR_PRODUTO, '') = ISNULL(vt.COR_PRODUTO, '')
+                AND ISNULL(vp2.TAMANHO, 0) = ISNULL(vt.TAMANHO, 0)
+                AND ISNULL(vp2.QTDE_CANCELADA, 0) = 0
+            )
+        ),
+        VendasComNumero AS (
+          SELECT
+            vb.FILIAL,
+            vb.PRODUTO,
+            vb.COR_PRODUTO,
+            vb.TAMANHO,
+            vb.QTDE,
+            vb.PRECO_LIQUIDO,
+            vb.DESCONTO_VENDA,
+            vb.TICKET,
+            vb.CODIGO_FILIAL,
+            ROW_NUMBER() OVER (
+              PARTITION BY vb.TICKET, vb.CODIGO_FILIAL, vb.PRODUTO, vb.COR_PRODUTO, vb.TAMANHO
+              ORDER BY vb.TICKET, vb.CODIGO_FILIAL, vb.PRODUTO, vb.COR_PRODUTO, vb.TAMANHO
+            ) AS RN
+          FROM vendas_base vb
+        ),
+        movimentos AS (
+          SELECT
+            vcn.FILIAL,
+            vcn.PRODUTO,
+            vcn.COR_PRODUTO,
+            CAST(
+              CAST(vcn.PRECO_LIQUIDO * vcn.QTDE AS DECIMAL(38,6))
+              - CAST(vcn.DESCONTO_VENDA AS DECIMAL(38,6))
+              - CAST(CASE WHEN vcn.RN = 1 THEN ISNULL(ti.VALOR_TROCA, 0) ELSE 0 END AS DECIMAL(38,6))
+            AS DECIMAL(38,6)) AS VALOR_LIQUIDO_CALC,
+            (vcn.QTDE - CASE WHEN vcn.RN = 1 THEN ISNULL(ti.QTDE_TROCA, 0) ELSE 0 END) AS QTDE_LIQUIDA_CALC
+          FROM VendasComNumero vcn
+          LEFT JOIN trocas_item ti
+            ON ti.TICKET = vcn.TICKET
+            AND ti.CODIGO_FILIAL = vcn.CODIGO_FILIAL
+            AND ti.PRODUTO = vcn.PRODUTO
+            AND ti.COR_PRODUTO = vcn.COR_PRODUTO
+            AND ISNULL(ti.TAMANHO, 0) = ISNULL(vcn.TAMANHO, 0)
+          UNION ALL
+          SELECT
+            tp.FILIAL,
+            tp.PRODUTO,
+            tp.COR_PRODUTO,
+            tp.VALOR_LIQUIDO_CALC,
+            tp.QTDE_LIQUIDA_CALC
+          FROM TrocasPuras tp
+        )
         SELECT ${topClause}
-          ISNULL(vp.PRODUTO, '') AS PRODUTO,
+          ISNULL(m.PRODUTO, '') AS PRODUTO,
           UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
           ${categoriaExpr} AS CATEGORIA,
           MAX(UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, ''))))) AS SUBGRUPO,
@@ -425,27 +537,23 @@ export async function fetchFilialProdutoSales(
           ${gradeExpr} AS GRADE,
           MAX(ISNULL(pbsel.CODIGO_BARRA, '')) AS CODIGO_BARRA,
           ${corSelect}
-          ISNULL(p.CUSTO_REPOSICAO1, 0) AS CUSTO_UNIT,
-          SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS QTDE,
-          SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) AS VENDAS
-        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO
+          MAX(ISNULL(p.CUSTO_REPOSICAO1, 0)) AS CUSTO_UNIT,
+          SUM(m.QTDE_LIQUIDA_CALC) AS QTDE,
+          SUM(m.VALOR_LIQUIDO_CALC) AS VENDAS
+        FROM movimentos m
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = m.PRODUTO
         OUTER APPLY (
           SELECT TOP 1 pb.CODIGO_BARRA
           FROM PRODUTOS_BARRA pb WITH (NOLOCK)
-          WHERE pb.PRODUTO = vp.PRODUTO
+          WHERE pb.PRODUTO = m.PRODUTO
             AND pb.CODIGO_BARRA IS NOT NULL
             AND pb.CODIGO_BARRA <> ''
-            ${groupByCor ? "AND ISNULL(pb.COR_PRODUTO, '') = ISNULL(vp.COR_PRODUTO, '')" : ''}
+            ${groupByCor ? "AND ISNULL(pb.COR_PRODUTO, '') = ISNULL(m.COR_PRODUTO, '')" : ''}
           ORDER BY pb.CODIGO_BARRA
         ) pbsel
         ${corJoin}
-        WHERE vp.DATA_VENDA >= @${prefix}Start
-          AND vp.DATA_VENDA < @${prefix}End
-          AND vp.QTDE > 0
-          AND vp.FILIAL IN (${placeholders})
-        GROUP BY ISNULL(vp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}${gradeGroupBy}, ISNULL(p.CUSTO_REPOSICAO1, 0)${corGroupBy}
-        HAVING SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) ELSE 0 END) > 0
+        WHERE m.FILIAL IS NOT NULL
+        GROUP BY ISNULL(m.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}${gradeGroupBy}${corGroupBy}
         ORDER BY VENDAS DESC
       `;
       const result = await request.query<RawRow>(query);
@@ -481,7 +589,7 @@ export async function fetchFilialProdutoSales(
           MAX(ISNULL(pbsel.CODIGO_BARRA, '')) AS CODIGO_BARRA,
           ${corSelect}
           ISNULL(p.CUSTO_REPOSICAO1, 0) AS CUSTO_UNIT,
-          SUM(CASE WHEN fp.QTDE > 0 THEN fp.QTDE ELSE 0 END) AS QTDE,
+          SUM(fp.QTDE) AS QTDE,
           SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS VENDAS
         FROM FATURAMENTO f WITH (NOLOCK)
         JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
@@ -500,10 +608,8 @@ export async function fetchFilialProdutoSales(
           AND CAST(f.EMISSAO AS DATE) < CAST(@${prefix}EcomEnd AS DATE)
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-          AND fp.QTDE > 0
           AND f.FILIAL IN (${placeholders})
         GROUP BY ISNULL(fp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}${gradeGroupBy}, ISNULL(p.CUSTO_REPOSICAO1, 0)${corGroupBy}
-        HAVING SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) > 0
         ORDER BY VENDAS DESC
       `;
       const result = await request.query<RawRow>(query);
@@ -576,21 +682,116 @@ export async function fetchProdutoQtdePorFilial(
       request.input('qtdEnd', sql.DateTime, end);
       posFilialNames.forEach((f, i) => request.input(`qtdF${i}`, sql.VarChar, f));
       const placeholders = posFilialNames.map((_, i) => `@qtdF${i}`).join(', ');
-      const corSelect = groupByCor ? 'ISNULL(vp.COR_PRODUTO, \'\') AS COR_PRODUTO,' : '';
-      const corGroup = groupByCor ? ', ISNULL(vp.COR_PRODUTO, \'\')' : '';
+      const corSelect = groupByCor ? 'ISNULL(m.COR_PRODUTO, \'\') AS COR_PRODUTO,' : '';
+      const corGroup = groupByCor ? ', ISNULL(m.COR_PRODUTO, \'\')' : '';
       const query = `
+        WITH vendas_base AS (
+          SELECT
+            vp.TICKET,
+            vp.CODIGO_FILIAL,
+            vp.PRODUTO,
+            ISNULL(vp.COR_PRODUTO, '') AS COR_PRODUTO,
+            vp.TAMANHO,
+            vp.QTDE,
+            f.FILIAL
+          FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+          INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+            ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
+          LEFT JOIN FILIAIS f WITH (NOLOCK)
+            ON f.COD_FILIAL = vp.CODIGO_FILIAL
+          WHERE vp.DATA_VENDA >= @qtdStart
+            AND vp.DATA_VENDA < @qtdEnd
+            AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
+            AND f.FILIAL IN (${placeholders})
+        ),
+        trocas_item AS (
+          SELECT
+            vt.TICKET,
+            vt.CODIGO_FILIAL,
+            vt.PRODUTO,
+            ISNULL(vt.COR_PRODUTO, '') AS COR_PRODUTO,
+            vt.TAMANHO,
+            SUM(vt.QTDE) AS QTDE_TROCA
+          FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+          INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+            ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
+          LEFT JOIN FILIAIS f WITH (NOLOCK)
+            ON f.COD_FILIAL = vt.CODIGO_FILIAL
+          WHERE vt.QTDE_CANCELADA = 0
+            AND v.DATA_VENDA >= @qtdStart
+            AND v.DATA_VENDA < @qtdEnd
+            AND f.FILIAL IN (${placeholders})
+          GROUP BY vt.TICKET, vt.CODIGO_FILIAL, vt.PRODUTO, ISNULL(vt.COR_PRODUTO, ''), vt.TAMANHO
+        ),
+        TrocasPuras AS (
+          SELECT
+            vt.PRODUTO,
+            ISNULL(vt.COR_PRODUTO, '') AS COR_PRODUTO,
+            f.FILIAL,
+            (0 - vt.QTDE) AS QTDE_LIQUIDA_CALC
+          FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+          INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+            ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
+          LEFT JOIN FILIAIS f WITH (NOLOCK)
+            ON f.COD_FILIAL = vt.CODIGO_FILIAL
+          WHERE vt.QTDE_CANCELADA = 0
+            AND v.DATA_VENDA >= @qtdStart
+            AND v.DATA_VENDA < @qtdEnd
+            AND f.FILIAL IN (${placeholders})
+            AND NOT EXISTS (
+              SELECT 1 FROM LOJA_VENDA_PRODUTO vp2 WITH (NOLOCK)
+              WHERE vp2.TICKET = vt.TICKET
+                AND vp2.CODIGO_FILIAL = vt.CODIGO_FILIAL
+                AND vp2.PRODUTO = vt.PRODUTO
+                AND ISNULL(vp2.COR_PRODUTO, '') = ISNULL(vt.COR_PRODUTO, '')
+                AND ISNULL(vp2.TAMANHO, 0) = ISNULL(vt.TAMANHO, 0)
+                AND ISNULL(vp2.QTDE_CANCELADA, 0) = 0
+            )
+        ),
+        VendasComNumero AS (
+          SELECT
+            vb.FILIAL,
+            vb.PRODUTO,
+            vb.COR_PRODUTO,
+            vb.TAMANHO,
+            vb.QTDE,
+            vb.TICKET,
+            vb.CODIGO_FILIAL,
+            ROW_NUMBER() OVER (
+              PARTITION BY vb.TICKET, vb.CODIGO_FILIAL, vb.PRODUTO, vb.COR_PRODUTO, vb.TAMANHO
+              ORDER BY vb.TICKET, vb.CODIGO_FILIAL, vb.PRODUTO, vb.COR_PRODUTO, vb.TAMANHO
+            ) AS RN
+          FROM vendas_base vb
+        ),
+        movimentos AS (
+          SELECT
+            vcn.FILIAL,
+            vcn.PRODUTO,
+            vcn.COR_PRODUTO,
+            (vcn.QTDE - CASE WHEN vcn.RN = 1 THEN ISNULL(ti.QTDE_TROCA, 0) ELSE 0 END) AS QTDE_LIQUIDA_CALC
+          FROM VendasComNumero vcn
+          LEFT JOIN trocas_item ti
+            ON ti.TICKET = vcn.TICKET
+            AND ti.CODIGO_FILIAL = vcn.CODIGO_FILIAL
+            AND ti.PRODUTO = vcn.PRODUTO
+            AND ti.COR_PRODUTO = vcn.COR_PRODUTO
+            AND ISNULL(ti.TAMANHO, 0) = ISNULL(vcn.TAMANHO, 0)
+          UNION ALL
+          SELECT
+            tp.FILIAL,
+            tp.PRODUTO,
+            tp.COR_PRODUTO,
+            tp.QTDE_LIQUIDA_CALC
+          FROM TrocasPuras tp
+        )
         SELECT
-          ISNULL(vp.PRODUTO, '') AS PRODUTO,
+          ISNULL(m.PRODUTO, '') AS PRODUTO,
           ${corSelect}
-          ISNULL(vp.FILIAL, '') AS FILIAL,
-          SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) AS QTDE
-        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-        WHERE vp.DATA_VENDA >= @qtdStart
-          AND vp.DATA_VENDA < @qtdEnd
-          AND vp.QTDE > 0
-          AND vp.FILIAL IN (${placeholders})
-        GROUP BY ISNULL(vp.PRODUTO, ''), ISNULL(vp.FILIAL, '')${corGroup}
-        HAVING SUM(CASE WHEN vp.QTDE_CANCELADA = 0 THEN vp.QTDE ELSE 0 END) > 0
+          ISNULL(m.FILIAL, '') AS FILIAL,
+          SUM(m.QTDE_LIQUIDA_CALC) AS QTDE
+        FROM movimentos m
+        WHERE m.FILIAL IS NOT NULL
+        GROUP BY ISNULL(m.PRODUTO, ''), ISNULL(m.FILIAL, '')${corGroup}
       `;
       const result = await request.query<RawRow>(query);
       return result.recordset
@@ -598,7 +799,7 @@ export async function fetchProdutoQtdePorFilial(
           produto: r.PRODUTO?.trim() ?? '',
           cor: groupByCor ? (r.COR_PRODUTO?.trim() ?? '') : '',
           filial: r.FILIAL?.trim() ?? '',
-          qtde: Math.round(Number(r.QTDE ?? 0)),
+          qtde: Number(r.QTDE ?? 0),
         }))
         .filter(r => r.produto !== '');
     });
@@ -618,7 +819,7 @@ export async function fetchProdutoQtdePorFilial(
           ISNULL(fp.PRODUTO, '') AS PRODUTO,
           ${corSelect}
           ISNULL(f.FILIAL, '') AS FILIAL,
-          SUM(CASE WHEN fp.QTDE > 0 THEN fp.QTDE ELSE 0 END) AS QTDE
+          SUM(fp.QTDE) AS QTDE
         FROM FATURAMENTO f WITH (NOLOCK)
         JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
           ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
@@ -626,10 +827,8 @@ export async function fetchProdutoQtdePorFilial(
           AND CAST(f.EMISSAO AS DATE) < CAST(@qtdEcomEnd AS DATE)
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-          AND fp.QTDE > 0
           AND f.FILIAL IN (${placeholders})
         GROUP BY ISNULL(fp.PRODUTO, ''), ISNULL(f.FILIAL, '')${corGroup}
-        HAVING SUM(CASE WHEN fp.QTDE > 0 THEN fp.QTDE ELSE 0 END) > 0
       `;
       const result = await request.query<RawRow>(query);
       return result.recordset
@@ -637,7 +836,7 @@ export async function fetchProdutoQtdePorFilial(
           produto: r.PRODUTO?.trim() ?? '',
           cor: groupByCor ? (r.COR_PRODUTO?.trim() ?? '') : '',
           filial: r.FILIAL?.trim() ?? '',
-          qtde: Math.round(Number(r.QTDE ?? 0)),
+          qtde: Number(r.QTDE ?? 0),
         }))
         .filter(r => r.produto !== '');
     });

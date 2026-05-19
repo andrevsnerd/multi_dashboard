@@ -3,7 +3,8 @@ import sql from 'mssql';
 import { resolveCompany, type CompanyModule } from '@/lib/config/company';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
-import { fetchMultipleProductsStock, fetchStockSummary } from '@/lib/repositories/inventory';
+import { fetchEstoqueKPIs } from '@/lib/repositories/controleEstoque';
+import { fetchMultipleProductsStock } from '@/lib/repositories/inventory';
 import type {
   CategoryRevenue,
   ProductRevenue,
@@ -15,6 +16,7 @@ import type {
 import { normalizeRangeForQuery, shiftRangeByMonths } from '@/lib/utils/date';
 
 const DEFAULT_LIMIT = 5;
+const ENABLE_ECOMMERCE_SUMMARY_DEBUG = false;
 
 function resolveRange(range?: DateRangeInput) {
   return normalizeRangeForQuery({
@@ -41,8 +43,24 @@ function buildEcommerceFilialFilter(
     return '';
   }
 
+  const ecommerceFilials = company.ecommerceFilials ?? [];
+
   // Se uma filial específica foi selecionada
   if (specificFilial) {
+    if (ecommerceFilials.includes(specificFilial)) {
+      ecommerceFilials.forEach((filial, index) => {
+        request.input(`ecommerceFilial${index}`, sql.VarChar, filial);
+      });
+
+      const placeholders = ecommerceFilials
+        .map((_, index) => `@ecommerceFilial${index}`)
+        .join(', ');
+
+      const filter = `AND ${tableAlias}.FILIAL IN (${placeholders})`;
+      console.log('[buildEcommerceFilialFilter] DEBUG - Grupo e-commerce selecionado:', specificFilial, 'Filter:', filter);
+      return filter;
+    }
+
     request.input('ecommerceFilial', sql.VarChar, specificFilial);
     const filter = `AND ${tableAlias}.FILIAL = @ecommerceFilial`;
     console.log('[buildEcommerceFilialFilter] DEBUG - Filial específica:', specificFilial, 'Filter:', filter);
@@ -50,7 +68,6 @@ function buildEcommerceFilialFilter(
   }
 
   // Caso contrário, usar todas as filiais de e-commerce da empresa
-  const ecommerceFilials = company.ecommerceFilials ?? [];
   
   console.log('[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce:', ecommerceFilials);
   
@@ -133,7 +150,7 @@ export async function fetchTopProductsEcommerce({
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO
       WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         ${filialFilter}
@@ -367,7 +384,7 @@ export async function fetchEcommerceSummary({
           ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
         ${produtoJoin}
         WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-          AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+          AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
           ${filialFilter}
@@ -417,6 +434,25 @@ export async function fetchEcommerceSummary({
       totalRows: number | null;
     }>(query);
 
+    const currentRow =
+      result.recordset.find((row) => row.period === 'current') ?? {
+        totalRevenue: 0,
+        totalQuantity: 0,
+        totalTickets: 0,
+        lastSaleDate: null,
+        totalRows: 0,
+      };
+    const previousRow =
+      result.recordset.find((row) => row.period === 'previous') ?? {
+        totalRevenue: 0,
+        totalQuantity: 0,
+        totalTickets: 0,
+        lastSaleDate: null,
+        totalRows: 0,
+      };
+
+    if (ENABLE_ECOMMERCE_SUMMARY_DEBUG) {
+
     // DEBUG: Log do resultado da query
     console.log('[fetchEcommerceSummary] DEBUG - Resultado da query:', {
       current: result.recordset.find(r => r.period === 'current'),
@@ -463,7 +499,7 @@ export async function fetchEcommerceSummary({
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         ${filialFilter}
@@ -497,7 +533,7 @@ export async function fetchEcommerceSummary({
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
     `;
@@ -965,6 +1001,8 @@ export async function fetchEcommerceSummary({
       console.error('[fetchEcommerceSummary] DEBUG - Erro na query de análise de NULLs:', error);
     }
 
+    }
+
     const currentRevenue = Number(currentRow.totalRevenue ?? 0);
     const previousRevenue = Number(previousRow.totalRevenue ?? 0);
 
@@ -1000,28 +1038,16 @@ export async function fetchEcommerceSummary({
       };
     };
 
-    // Buscar resumo de estoque
-    // IMPORTANTE: Passar todos os filtros (valores únicos e arrays) para garantir que o estoque seja filtrado corretamente
-    // IMPORTANTE: Para e-commerce, quando filial é null, significa "todas as filiais de e-commerce"
-    // Mas fetchStockSummary com filial=null busca todas as filiais (varejo + ecommerce)
-    // Solução: quando filial é null em contexto de e-commerce, devemos buscar estoque apenas das filiais de e-commerce
-    // Vamos modificar fetchStockSummary para aceitar um parâmetro adicional "ecommerceOnly"
-    const stockSummary = await fetchStockSummary({
+    const stockKpis = await fetchEstoqueKPIs({
       company,
-      filial, // Se for null, buscará todas as filiais (mas precisamos ajustar para buscar apenas e-commerce)
-      grupo,
+      filial,
       grupos,
-      linha,
       linhas,
-      colecao,
       colecoes,
-      subgrupo,
       subgrupos,
-      grade,
       grades,
-      ecommerceOnly: !filial, // Se filial é null, buscar apenas filiais de e-commerce
       filterByRegistrationDate,
-      registrationDateRange: filterByRegistrationDate ? currentRange : undefined,
+      range: currentRange,
     });
 
     const summary: SalesSummary = {
@@ -1030,13 +1056,13 @@ export async function fetchEcommerceSummary({
       totalTickets: buildMetric(currentTickets, previousTickets),
       averageTicket: buildMetric(averageTicketCurrent, averageTicketPrevious),
       totalStockQuantity: {
-        currentValue: stockSummary.totalQuantity,
-        previousValue: stockSummary.totalQuantity, // Estoque não tem histórico temporal
+        currentValue: stockKpis.estoqueTotal,
+        previousValue: stockKpis.estoqueTotal, // Estoque não tem histórico temporal
         changePercentage: null,
       },
       totalStockValue: {
-        currentValue: stockSummary.totalValue,
-        previousValue: stockSummary.totalValue, // Estoque não tem histórico temporal
+        currentValue: stockKpis.valorEmEstoque,
+        previousValue: stockKpis.valorEmEstoque, // Estoque não tem histórico temporal
         changePercentage: null,
       },
     };
@@ -1282,4 +1308,3 @@ export async function fetchEcommerceFilialPerformance({
     });
   });
 }
-
