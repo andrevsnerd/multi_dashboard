@@ -108,6 +108,7 @@ export interface ProductStockParams {
   company?: string;
   filial?: string | null;
   ecommerceOnly?: boolean; // Se true e filial é null, buscar apenas filiais de e-commerce
+  skipFilialFilter?: boolean; // Se true, não aplica filtro de filial no SQL (busca em todas as filiais do banco)
 }
 
 export interface ProductStock {
@@ -185,7 +186,7 @@ export async function fetchProductStock(
  */
 export async function fetchMultipleProductsStock(
   productIds: string[],
-  { company, filial, ecommerceOnly = false }: ProductStockParams = {}
+  { company, filial, ecommerceOnly = false, skipFilialFilter = false }: ProductStockParams = {}
 ): Promise<Map<string, number>> {
   if (productIds.length === 0) {
     return new Map();
@@ -193,7 +194,9 @@ export async function fetchMultipleProductsStock(
 
   return withRequest(async (request) => {
     let filialFilter = '';
-    if (ecommerceOnly && !filial && company) {
+    if (skipFilialFilter) {
+      // Não aplica filtro de filial — busca em todas as filiais do banco
+    } else if (ecommerceOnly && !filial && company) {
       // Buscar apenas filiais de e-commerce
       const companyConfig = resolveCompany(company);
       const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
@@ -220,42 +223,40 @@ export async function fetchMultipleProductsStock(
       .join(', ');
 
     const query = `
-      SELECT 
+      SELECT
         e.PRODUTO AS productId,
+        e.FILIAL AS filial,
         SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS positiveStock,
         SUM(CASE WHEN e.ESTOQUE < 0 THEN e.ESTOQUE ELSE 0 END) AS negativeStock,
         COUNT(CASE WHEN e.ESTOQUE > 0 THEN 1 END) AS positiveCount
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       WHERE e.PRODUTO IN (${productPlaceholders})
         ${filialFilter}
-      GROUP BY e.PRODUTO
+      GROUP BY e.PRODUTO, e.FILIAL
     `;
 
     const result = await request.query<{
       productId: string;
+      filial: string | null;
       positiveStock: number | null;
       negativeStock: number | null;
       positiveCount: number | null;
     }>(query);
 
+    // Somar apenas filiais com estoque positivo (nunca somar negativos)
     const stockMap = new Map<string, number>();
-    const rowToKey = (row: Record<string, unknown>) =>
-      String((row as { productId?: string; productid?: string; PRODUTO?: string }).productId ?? (row as { productId?: string; productid?: string; PRODUTO?: string }).productid ?? (row as { productId?: string; productid?: string; PRODUTO?: string }).PRODUTO ?? '').trim();
-
     result.recordset.forEach((row) => {
-      const dbKey = rowToKey(row as Record<string, unknown>);
-      const positiveStock = Number((row as { positiveStock?: number }).positiveStock ?? (row as { positivestock?: number }).positivestock ?? 0);
-      const negativeStock = Number((row as { negativeStock?: number }).negativeStock ?? (row as { negativestock?: number }).negativestock ?? 0);
-      const positiveCount = Number((row as { positiveCount?: number }).positiveCount ?? (row as { positivecount?: number }).positivecount ?? 0);
-      const finalStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
-      // Usar a chave do chamador (productIds) para garantir match na busca
+      const positiveStock = Number(row.positiveStock ?? 0);
+      const negativeStock = Number(row.negativeStock ?? 0);
+      const positiveCount = Number(row.positiveCount ?? 0);
+      const filialStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
+      if (filialStock <= 0) return;
+
+      const dbKey = String(row.productId ?? '').trim();
       const callerKey = productIds.find((id) => id != null && String(id).trim() === dbKey)
         ?? productIds.find((id) => id != null && String(id).trim().toLowerCase() === dbKey.toLowerCase());
-      if (callerKey != null) {
-        stockMap.set(String(callerKey).trim(), finalStock);
-      } else {
-        stockMap.set(dbKey, finalStock);
-      }
+      const key = callerKey != null ? String(callerKey).trim() : dbKey;
+      stockMap.set(key, (stockMap.get(key) ?? 0) + filialStock);
     });
 
     // Garantir que todos os produtos tenham entrada no mapa (mesmo que com 0)
@@ -278,7 +279,7 @@ export async function fetchMultipleProductsStock(
  */
 export async function fetchMultipleProductsStockByColor(
   products: Array<{ productId: string; corProduto?: string | null }>,
-  { company, filial, ecommerceOnly = false }: ProductStockParams = {}
+  { company, filial, ecommerceOnly = false, skipFilialFilter = false }: ProductStockParams = {}
 ): Promise<Map<string, number>> {
   if (products.length === 0) {
     return new Map();
@@ -287,13 +288,15 @@ export async function fetchMultipleProductsStockByColor(
   // Agrupar produtos por (productId, corProduto) e remover duplicatas
   const productColorPairs = new Map<string, { productId: string; corProduto: string | null }>();
   products.forEach((product) => {
-    const key = product.corProduto 
-      ? `${product.productId}-${product.corProduto}` 
-      : `${product.productId}-null`;
+    const productId = String(product.productId ?? '').trim();
+    const corProduto = product.corProduto != null ? String(product.corProduto).trim() : null;
+    const key = corProduto
+      ? `${productId}-${corProduto}`
+      : `${productId}-null`;
     if (!productColorPairs.has(key)) {
       productColorPairs.set(key, {
-        productId: product.productId,
-        corProduto: product.corProduto || null,
+        productId,
+        corProduto,
       });
     }
   });
@@ -312,21 +315,23 @@ export async function fetchMultipleProductsStockByColor(
     
     const batchResult = await withRequest(async (request) => {
       let filialFilter = '';
-      if (ecommerceOnly && !filial && company) {
-        // Buscar apenas filiais de e-commerce
-        const companyConfig = resolveCompany(company);
-        const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
-        if (ecommerceFilials.length > 0) {
-          ecommerceFilials.forEach((filial, index) => {
-            request.input(`estoqueEcommerceFilial${index}`, sql.VarChar, filial);
-          });
-          const placeholders = ecommerceFilials
-            .map((_, index) => `@estoqueEcommerceFilial${index}`)
-            .join(', ');
-          filialFilter = `AND e.FILIAL IN (${placeholders})`;
+      if (!skipFilialFilter) {
+        if (ecommerceOnly && !filial && company) {
+          // Buscar apenas filiais de e-commerce
+          const companyConfig = resolveCompany(company);
+          const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
+          if (ecommerceFilials.length > 0) {
+            ecommerceFilials.forEach((filial, index) => {
+              request.input(`estoqueEcommerceFilial${index}`, sql.VarChar, filial);
+            });
+            const placeholders = ecommerceFilials
+              .map((_, index) => `@estoqueEcommerceFilial${index}`)
+              .join(', ');
+            filialFilter = `AND e.FILIAL IN (${placeholders})`;
+          }
+        } else {
+          filialFilter = buildFilialFilter(request, company, filial);
         }
-      } else {
-        filialFilter = buildFilialFilter(request, company, filial);
       }
 
       // Criar condições WHERE para cada combinação de produto e cor no lote
@@ -361,20 +366,22 @@ export async function fetchMultipleProductsStockByColor(
       }
 
       const query = `
-        SELECT 
+        SELECT
           e.PRODUTO AS productId,
           e.COR_PRODUTO AS corProduto,
+          e.FILIAL AS filial,
           SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS positiveStock,
           SUM(CASE WHEN e.ESTOQUE < 0 THEN e.ESTOQUE ELSE 0 END) AS negativeStock,
           COUNT(CASE WHEN e.ESTOQUE > 0 THEN 1 END) AS positiveCount
         FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
         ${whereClause}
-        GROUP BY e.PRODUTO, e.COR_PRODUTO
+        GROUP BY e.PRODUTO, e.COR_PRODUTO, e.FILIAL
       `;
 
       const result = await request.query<{
         productId: string;
         corProduto: string | null;
+        filial: string | null;
         positiveStock: number | null;
         negativeStock: number | null;
         positiveCount: number | null;
@@ -383,29 +390,28 @@ export async function fetchMultipleProductsStockByColor(
       return result.recordset;
     });
 
-    // Processar resultados do lote
+    // Processar resultados do lote: somar apenas filiais com estoque positivo (nunca somar negativos)
     batchResult.forEach((row) => {
       const positiveStock = Number(row.positiveStock ?? 0);
       const negativeStock = Number(row.negativeStock ?? 0);
       const positiveCount = Number(row.positiveCount ?? 0);
-      
-      // Se houver estoque positivo, usar apenas a soma dos positivos
-      // Caso contrário, usar a soma dos negativos
-      const finalStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
-      
-      // Chave: "productId-corProduto" ou "productId-null" se corProduto for null
-      const key = row.corProduto 
-        ? `${row.productId}-${row.corProduto}` 
-        : `${row.productId}-null`;
-      stockMap.set(key, finalStock);
+      const filialStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
+      if (filialStock <= 0) return;
+
+      const productId = String(row.productId ?? '').trim();
+      const corProduto = row.corProduto != null ? String(row.corProduto).trim() : null;
+      const key = corProduto ? `${productId}-${corProduto}` : `${productId}-null`;
+      stockMap.set(key, (stockMap.get(key) ?? 0) + filialStock);
     });
   }
 
   // Garantir que todos os produtos tenham entrada no mapa (mesmo que com 0)
   products.forEach((product) => {
-    const key = product.corProduto 
-      ? `${product.productId}-${product.corProduto}` 
-      : `${product.productId}-null`;
+    const productId = String(product.productId ?? '').trim();
+    const corProduto = product.corProduto != null ? String(product.corProduto).trim() : null;
+    const key = corProduto
+      ? `${productId}-${corProduto}`
+      : `${productId}-null`;
     if (!stockMap.has(key)) {
       stockMap.set(key, 0);
     }

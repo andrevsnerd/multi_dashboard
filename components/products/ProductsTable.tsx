@@ -11,6 +11,7 @@ interface ProductsTableProps {
   groupByColor?: boolean;
   companyKey?: string;
   acimaDoTicket?: boolean;
+  selectedFilial?: string | null;
 }
 
 interface ProductStockByFilialTooltipItem {
@@ -59,6 +60,7 @@ export default function ProductsTable({
   groupByColor = false,
   companyKey,
   acimaDoTicket = false,
+  selectedFilial = null,
 }: ProductsTableProps) {
   const [sortColumn, setSortColumn] = useState<SortableColumn>("totalRevenue");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -68,6 +70,7 @@ export default function ProductsTable({
   >({});
   const [loadingStockTooltipKey, setLoadingStockTooltipKey] = useState<string | null>(null);
   const [stockTooltipErrors, setStockTooltipErrors] = useState<Record<string, string>>({});
+  const [tooltipAnchorRect, setTooltipAnchorRect] = useState<DOMRect | null>(null);
 
   const buildStockTooltipKey = useCallback(
     (product: ProductDetail) =>
@@ -188,6 +191,9 @@ export default function ProductsTable({
     return `${value.toFixed(2)}x`;
   };
 
+  const showStockColumn = companyKey !== "scarfme" || Boolean(selectedFilial);
+  const showStockRedeColumn = companyKey === "scarfme";
+
   if (loading) {
     return (
       <div className={styles.wrapper}>
@@ -302,18 +308,20 @@ export default function ProductsTable({
                   )}
                 </th>
               )}
-              <th
-                className={`${styles.sortable} ${styles.numberHeader}`}
-                onClick={() => handleSort("stock")}
-              >
-                ESTOQUE
-                {sortColumn === "stock" && (
-                  <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "^" : "v"}
-                  </span>
-                )}
-              </th>
-              {companyKey === "scarfme" && (
+              {showStockColumn && (
+                <th
+                  className={`${styles.sortable} ${styles.numberHeader}`}
+                  onClick={() => handleSort("stock")}
+                >
+                  ESTOQUE
+                  {sortColumn === "stock" && (
+                    <span className={styles.sortIndicator}>
+                      {sortDirection === "asc" ? "^" : "v"}
+                    </span>
+                  )}
+                </th>
+              )}
+              {showStockRedeColumn && (
                 <th
                   className={`${styles.sortable} ${styles.numberHeader}`}
                   onClick={() => handleSort("estoqueRede")}
@@ -382,12 +390,15 @@ export default function ProductsTable({
                       <span className={styles.markupValue}>{formatMarkup(product.markup)}</span>
                     </td>
                   )}
-                  <td className={styles.numberCell}>{formatNumber(product.stock)}</td>
-                  {companyKey === "scarfme" && (
+                  {showStockColumn && (
+                    <td className={styles.numberCell}>{formatNumber(product.stock)}</td>
+                  )}
+                  {showStockRedeColumn && (
                     <td className={`${styles.numberCell} ${styles.stockRedeCell}`}>
                       <div
                         className={styles.stockTooltipAnchor}
-                        onMouseEnter={() => {
+                        onMouseEnter={(e) => {
+                          setTooltipAnchorRect((e.currentTarget as HTMLElement).getBoundingClientRect());
                           setHoveredStockKey(stockTooltipKey);
                           void loadStockTooltip(product);
                         }}
@@ -395,14 +406,23 @@ export default function ProductsTable({
                           setHoveredStockKey((current) =>
                             current === stockTooltipKey ? null : current
                           );
+                          setTooltipAnchorRect(null);
                         }}
                       >
                         <span className={styles.stockRedeValue}>
                           {product.estoqueRede !== undefined ? formatNumber(product.estoqueRede) : '--'}
                         </span>
 
-                        {stockTooltipVisible && (
-                          <div className={styles.stockTooltipPanel}>
+                        {stockTooltipVisible && tooltipAnchorRect && (
+                          <div
+                            className={styles.stockTooltipPanel}
+                            style={{
+                              position: "fixed",
+                              bottom: window.innerHeight - tooltipAnchorRect.top + 8,
+                              right: window.innerWidth - tooltipAnchorRect.right,
+                              top: "unset",
+                            }}
+                          >
                             <div className={styles.stockTooltipHeader}>Estoque na rede</div>
                             {stockTooltipLoading ? (
                               <div className={styles.stockTooltipEmpty}>Carregando filiais...</div>
@@ -477,10 +497,12 @@ export default function ProductsTable({
                         <span className={styles.cardNewBadge}>NOVO</span>
                       )}
                       <div className={styles.cardStockBadges}>
-                        <span className={styles.cardStock}>
-                          {formatNumber(product.stock)} estoque
-                        </span>
-                        {companyKey === "scarfme" && product.estoqueRede !== undefined && (
+                        {showStockColumn && (
+                          <span className={styles.cardStock}>
+                            {formatNumber(product.stock)} estoque
+                          </span>
+                        )}
+                        {showStockRedeColumn && product.estoqueRede !== undefined && (
                           <span className={styles.cardStockRede}>
                             {formatNumber(product.estoqueRede)} rede
                           </span>

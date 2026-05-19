@@ -10,6 +10,7 @@ interface ProductsRecentTableProps {
   loading?: boolean;
   groupByColor?: boolean;
   companyKey?: string;
+  selectedFilial?: string | null;
 }
 
 export default function ProductsRecentTable({
@@ -17,6 +18,7 @@ export default function ProductsRecentTable({
   loading,
   groupByColor = false,
   companyKey,
+  selectedFilial = null,
 }: ProductsRecentTableProps) {
   const [sortColumn, setSortColumn] = useState<keyof ProductDetail | "registrationDate">("registrationDate");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -26,15 +28,15 @@ export default function ProductsRecentTable({
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
       setSortColumn(column);
-      setSortDirection(column === "registrationDate" ? "desc" : "desc");
+      setSortDirection("desc");
     }
   };
 
   const sortedData = useMemo(() => {
     const sorted = [...data].sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
-      
+      let aValue: unknown;
+      let bValue: unknown;
+
       if (sortColumn === "registrationDate") {
         aValue = a.registrationDate ? new Date(a.registrationDate).getTime() : 0;
         bValue = b.registrationDate ? new Date(b.registrationDate).getTime() : 0;
@@ -42,38 +44,36 @@ export default function ProductsRecentTable({
         aValue = a[sortColumn as keyof ProductDetail];
         bValue = b[sortColumn as keyof ProductDetail];
       }
-      
+
       if (aValue === null || aValue === undefined) return 1;
       if (bValue === null || bValue === undefined) return -1;
-      
+
       if (typeof aValue === "number" && typeof bValue === "number") {
         return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
       }
-      
+
       return 0;
     });
-    
+
     return sorted;
   }, [data, sortColumn, sortDirection]);
 
-  const formatCurrency = (value: number) => {
-    return value.toLocaleString("pt-BR", {
+  const formatCurrency = (value: number) =>
+    value.toLocaleString("pt-BR", {
       style: "currency",
       currency: "BRL",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
-  };
 
-  const formatNumber = (value: number) => {
-    return value.toLocaleString("pt-BR", {
+  const formatNumber = (value: number) =>
+    value.toLocaleString("pt-BR", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     });
-  };
 
   const formatDate = (dateString: string | null | undefined) => {
-    if (!dateString) return '--';
+    if (!dateString) return "--";
     try {
       const date = new Date(dateString);
       return date.toLocaleDateString("pt-BR", {
@@ -82,13 +82,14 @@ export default function ProductsRecentTable({
         year: "numeric",
       });
     } catch {
-      return '--';
+      return "--";
     }
   };
 
-  const formatMarkup = (value: number) => {
-    return `${value.toFixed(2)}x`;
-  };
+  const formatMarkup = (value: number) => `${value.toFixed(2)}x`;
+
+  const showStockColumn = companyKey !== "scarfme" || Boolean(selectedFilial);
+  const showStockRedeColumn = companyKey === "scarfme";
 
   if (loading) {
     return (
@@ -109,7 +110,6 @@ export default function ProductsRecentTable({
   return (
     <div className={styles.wrapper}>
       <div className={styles.container}>
-        {/* Desktop: Tabela tradicional */}
         <table className={styles.table}>
           <thead>
             <tr>
@@ -119,41 +119,27 @@ export default function ProductsRecentTable({
               >
                 DATA CADASTRO
                 {sortColumn === "registrationDate" && (
-                  <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "↑" : "↓"}
-                  </span>
+                  <span className={styles.sortIndicator}>{sortDirection === "asc" ? "^" : "v"}</span>
                 )}
               </th>
               <th
                 className={`${styles.sortable} ${styles.descriptionHeader}`}
                 onClick={() => handleSort("productName")}
               >
-                DESCRIÇÃO
+                DESCRICAO
                 {sortColumn === "productName" && (
-                  <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "↑" : "↓"}
-                  </span>
+                  <span className={styles.sortIndicator}>{sortDirection === "asc" ? "^" : "v"}</span>
                 )}
               </th>
-              {companyKey === "scarfme" && (
-                <th className={styles.gradeHeader}>
-                  GRADE
-                </th>
-              )}
-              {groupByColor && (
-                <th className={styles.descriptionHeader}>
-                  COR
-                </th>
-              )}
+              {companyKey === "scarfme" && <th className={styles.gradeHeader}>GRADE</th>}
+              {groupByColor && <th className={styles.descriptionHeader}>COR</th>}
               <th
                 className={`${styles.sortable} ${styles.currencyHeader}`}
                 onClick={() => handleSort("totalRevenue")}
               >
                 FATURAMENTO
                 {sortColumn === "totalRevenue" && (
-                  <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "↑" : "↓"}
-                  </span>
+                  <span className={styles.sortIndicator}>{sortDirection === "asc" ? "^" : "v"}</span>
                 )}
               </th>
               <th
@@ -162,20 +148,16 @@ export default function ProductsRecentTable({
               >
                 QTD
                 {sortColumn === "totalQuantity" && (
-                  <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "↑" : "↓"}
-                  </span>
+                  <span className={styles.sortIndicator}>{sortDirection === "asc" ? "^" : "v"}</span>
                 )}
               </th>
               <th
                 className={`${styles.sortable} ${styles.currencyHeader}`}
                 onClick={() => handleSort("averagePrice")}
               >
-                PREÇO MÉDIO
+                PRECO MEDIO
                 {sortColumn === "averagePrice" && (
-                  <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "↑" : "↓"}
-                  </span>
+                  <span className={styles.sortIndicator}>{sortDirection === "asc" ? "^" : "v"}</span>
                 )}
               </th>
               <th
@@ -184,9 +166,7 @@ export default function ProductsRecentTable({
               >
                 CUSTO
                 {sortColumn === "cost" && (
-                  <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "↑" : "↓"}
-                  </span>
+                  <span className={styles.sortIndicator}>{sortDirection === "asc" ? "^" : "v"}</span>
                 )}
               </th>
               <th
@@ -195,32 +175,28 @@ export default function ProductsRecentTable({
               >
                 MARKUP
                 {sortColumn === "markup" && (
-                  <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "↑" : "↓"}
-                  </span>
+                  <span className={styles.sortIndicator}>{sortDirection === "asc" ? "^" : "v"}</span>
                 )}
               </th>
-              <th
-                className={`${styles.sortable} ${styles.numberHeader}`}
-                onClick={() => handleSort("stock")}
-              >
-                ESTOQUE
-                {sortColumn === "stock" && (
-                  <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "↑" : "↓"}
-                  </span>
-                )}
-              </th>
-              {companyKey === "scarfme" && (
+              {showStockColumn && (
+                <th
+                  className={`${styles.sortable} ${styles.numberHeader}`}
+                  onClick={() => handleSort("stock")}
+                >
+                  ESTOQUE
+                  {sortColumn === "stock" && (
+                    <span className={styles.sortIndicator}>{sortDirection === "asc" ? "^" : "v"}</span>
+                  )}
+                </th>
+              )}
+              {showStockRedeColumn && (
                 <th
                   className={`${styles.sortable} ${styles.numberHeader}`}
                   onClick={() => handleSort("estoqueRede")}
                 >
                   ESTOQUE REDE
                   {sortColumn === "estoqueRede" && (
-                    <span className={styles.sortIndicator}>
-                      {sortDirection === "asc" ? "↑" : "↓"}
-                    </span>
+                    <span className={styles.sortIndicator}>{sortDirection === "asc" ? "^" : "v"}</span>
                   )}
                 </th>
               )}
@@ -229,50 +205,43 @@ export default function ProductsRecentTable({
           <tbody>
             {sortedData.map((product, index) => {
               const hasNoSale = product.totalRevenue === 0 && product.totalQuantity === 0;
+
               return (
-                <tr 
-                  key={`${product.productId}-${product.corProduto || ''}-${index}`}
-                  className={hasNoSale ? styles.noSaleRow : ''}
+                <tr
+                  key={`${product.productId}-${product.corProduto || ""}-${index}`}
+                  className={hasNoSale ? styles.noSaleRow : ""}
                 >
+                  <td className={styles.descriptionCell}>{formatDate(product.registrationDate)}</td>
                   <td className={styles.descriptionCell}>
-                    {formatDate(product.registrationDate)}
-                  </td>
-                  <td className={styles.descriptionCell}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", flexWrap: "wrap" }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div className={styles.productName}>{product.productName}</div>
                         <div className={styles.productCode}>{product.productId}</div>
                       </div>
                       {hasNoSale && (
-                        <span style={{
-                          fontSize: '9px',
-                          fontWeight: 600,
-                          color: '#991b1b',
-                          background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                          letterSpacing: '0.5px',
-                          textTransform: 'uppercase',
-                          whiteSpace: 'nowrap',
-                          boxShadow: '0 1px 2px rgba(220, 38, 38, 0.1)',
-                          alignSelf: 'flex-start',
-                          marginTop: '2px'
-                        }}>
+                        <span
+                          style={{
+                            fontSize: "9px",
+                            fontWeight: 600,
+                            color: "#991b1b",
+                            background: "linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)",
+                            padding: "3px 8px",
+                            borderRadius: "6px",
+                            letterSpacing: "0.5px",
+                            textTransform: "uppercase",
+                            whiteSpace: "nowrap",
+                            boxShadow: "0 1px 2px rgba(220, 38, 38, 0.1)",
+                            alignSelf: "flex-start",
+                            marginTop: "2px",
+                          }}
+                        >
                           Sem venda
                         </span>
                       )}
                     </div>
                   </td>
-                  {companyKey === "scarfme" && (
-                    <td className={styles.gradeCell}>
-                      {product.grade || '--'}
-                    </td>
-                  )}
-                  {groupByColor && (
-                    <td className={styles.descriptionCell}>
-                      {product.descCorProduto || '--'}
-                    </td>
-                  )}
+                  {companyKey === "scarfme" && <td className={styles.gradeCell}>{product.grade || "--"}</td>}
+                  {groupByColor && <td className={styles.descriptionCell}>{product.descCorProduto || "--"}</td>}
                   <td className={styles.currencyCell}>{formatCurrency(product.totalRevenue)}</td>
                   <td className={styles.numberCell}>{formatNumber(product.totalQuantity)}</td>
                   <td className={styles.currencyCell}>{formatCurrency(product.averagePrice)}</td>
@@ -280,10 +249,10 @@ export default function ProductsRecentTable({
                   <td className={styles.markupCell}>
                     <span className={styles.markupValue}>{formatMarkup(product.markup)}</span>
                   </td>
-                  <td className={styles.numberCell}>{formatNumber(product.stock)}</td>
-                  {companyKey === "scarfme" && (
+                  {showStockColumn && <td className={styles.numberCell}>{formatNumber(product.stock)}</td>}
+                  {showStockRedeColumn && (
                     <td className={styles.numberCell}>
-                      {product.estoqueRede !== undefined ? formatNumber(product.estoqueRede) : '--'}
+                      {product.estoqueRede !== undefined ? formatNumber(product.estoqueRede) : "--"}
                     </td>
                   )}
                 </tr>
@@ -292,14 +261,14 @@ export default function ProductsRecentTable({
           </tbody>
         </table>
 
-        {/* Mobile: Cards */}
         <div className={styles.mobileCards}>
           {sortedData.map((product, index) => {
             const hasNoSale = product.totalRevenue === 0 && product.totalQuantity === 0;
+
             return (
-              <div 
-                key={`${product.productId}-${product.corProduto || ''}-${index}`} 
-                className={`${styles.card} ${hasNoSale ? styles.noSaleCard : ''}`}
+              <div
+                key={`${product.productId}-${product.corProduto || ""}-${index}`}
+                className={`${styles.card} ${hasNoSale ? styles.noSaleCard : ""}`}
               >
                 <div className={styles.cardMain}>
                   <div className={styles.cardHeader}>
@@ -308,9 +277,7 @@ export default function ProductsRecentTable({
                         <div className={styles.cardProductMeta}>
                           <span className={styles.cardDate}>{formatDate(product.registrationDate)}</span>
                         </div>
-                        <h4 className={styles.cardProductName}>
-                          {product.productName}
-                        </h4>
+                        <h4 className={styles.cardProductName}>{product.productName}</h4>
                         <div className={styles.cardProductMeta}>
                           <span className={styles.cardProductCode}>{product.productId}</span>
                           {companyKey === "scarfme" && product.grade && (
@@ -329,22 +296,18 @@ export default function ProductsRecentTable({
                       </div>
                     </div>
                     <div className={styles.cardRight}>
-                      {product.isNew && (
-                        <span className={styles.cardNewBadge}>NOVO</span>
-                      )}
+                      {product.isNew && <span className={styles.cardNewBadge}>NOVO</span>}
                       <div className={styles.cardStockBadges}>
-                        <span className={styles.cardStock}>
-                          {formatNumber(product.stock)} estoque
-                        </span>
-                        {companyKey === "scarfme" && product.estoqueRede !== undefined && (
-                          <span className={styles.cardStockRede}>
-                            {formatNumber(product.estoqueRede)} rede
-                          </span>
+                        {showStockColumn && (
+                          <span className={styles.cardStock}>{formatNumber(product.stock)} estoque</span>
+                        )}
+                        {showStockRedeColumn && product.estoqueRede !== undefined && (
+                          <span className={styles.cardStockRede}>{formatNumber(product.estoqueRede)} rede</span>
                         )}
                       </div>
                       <div className={styles.cardPriceInfo}>
                         <span className={styles.cardPriceItem}>
-                          <span className={styles.cardPriceLabel}>Preço:</span> {formatCurrency(product.averagePrice)}
+                          <span className={styles.cardPriceLabel}>Preco:</span> {formatCurrency(product.averagePrice)}
                         </span>
                         <span className={styles.cardPriceItem}>
                           <span className={styles.cardPriceLabel}>Custo:</span> {formatCurrency(product.cost)}
@@ -361,4 +324,3 @@ export default function ProductsRecentTable({
     </div>
   );
 }
-

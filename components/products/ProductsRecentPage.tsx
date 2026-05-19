@@ -792,6 +792,7 @@ export default function ProductsRecentPage({
           loading={loading} 
           groupByColor={groupByColor} 
           companyKey={companyKey}
+          selectedFilial={selectedFilial}
         />
       </div>
     </div>

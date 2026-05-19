@@ -6,7 +6,7 @@ import {
   fetchProdutoEstoquePorFilial,
 } from '@/lib/repositories/performance';
 import { readGoals } from '@/lib/utils/goals-storage';
-import { resolveCompany, type CompanyKey } from '@/lib/config/company';
+import { resolveCompany, type CompanyKey, VAREJO_VALUE } from '@/lib/config/company';
 import { normalizeRangeForQuery, formatDateForQuery } from '@/lib/utils/date';
 
 export const maxDuration = 300;
@@ -30,11 +30,18 @@ function normalizeFilialKey(value: string): string {
 function resolveCanonicalFilial(
   rawFilial: string,
   memberToCanonical: Map<string, string>,
-  canonicalToMemberNorms: Array<{ canonical: string; members: string[] }>
+  canonicalToMemberNorms: Array<{ canonical: string; members: string[] }>,
+  configuredFiliais: string[]
 ): string {
   const norm = normalizeFilialKey(rawFilial);
   const direct = memberToCanonical.get(norm);
   if (direct) return direct;
+
+  for (const filial of configuredFiliais) {
+    if (normalizeFilialKey(filial) === norm) {
+      return filial;
+    }
+  }
 
   let bestCanonical: string | null = null;
   let bestLen = 0;
@@ -147,6 +154,8 @@ export async function GET(request: Request) {
       canonical,
       members: Array.from(new Set([canonical, ...members])).map(normalizeFilialKey),
     }));
+    const regularFiliais = filiais.filter(f => !nonCanonicalFilials.has(f) && !ecommerceFilials.has(f));
+    const allPosMembers = filiais.filter(f => !ecommerceFilials.has(f));
 
     const currentByFilial = new Map<string, Map<string, { vendas: number; qtde: number }>>();
     const previousByFilial = new Map<string, Map<string, { vendas: number; qtde: number }>>();
@@ -156,7 +165,12 @@ export async function GET(request: Request) {
       target: Map<string, Map<string, { vendas: number; qtde: number }>>
     ) => {
       rows.forEach(row => {
-        const canonicalFilial = resolveCanonicalFilial(row.filial, memberToCanonical, canonicalToMemberNorms);
+        const canonicalFilial = resolveCanonicalFilial(
+          row.filial,
+          memberToCanonical,
+          canonicalToMemberNorms,
+          filiais
+        );
         if (!target.has(canonicalFilial)) target.set(canonicalFilial, new Map());
         const filialMap = target.get(canonicalFilial)!;
         if (!filialMap.has(row.categoria)) filialMap.set(row.categoria, { vendas: 0, qtde: 0 });
@@ -321,10 +335,38 @@ export async function GET(request: Request) {
     }
 
     // ── Modo FILIAL ESPECÍFICA ──────────────────────────────────────────────────
-    const groupMembers = canonicalToMembers.get(filialParam) ?? [filialParam];
-    const isEcommerceFilial = filialParam === ecommerceCanonical;
+    const selectedFilialKey = resolveCanonicalFilial(
+      filialParam,
+      memberToCanonical,
+      canonicalToMemberNorms,
+      filiais
+    );
+    const isVarejo = selectedFilialKey === VAREJO_VALUE;
+    const aggregationKeys = isVarejo ? regularFiliais : [selectedFilialKey];
+    const groupMembers = isVarejo
+      ? allPosMembers
+      : (canonicalToMembers.get(selectedFilialKey) ?? [selectedFilialKey]);
+    const isEcommerceFilial = selectedFilialKey === ecommerceCanonical;
     const posMembers = isEcommerceFilial ? [] : groupMembers.filter(f => !ecommerceFilials.has(f));
     const ecomMembers = isEcommerceFilial ? groupMembers : [];
+
+    const mergeCategoryMaps = (
+      source: Map<string, Map<string, { vendas: number; qtde: number }>>,
+      keys: string[]
+    ) => {
+      const merged = new Map<string, { vendas: number; qtde: number }>();
+      keys.forEach((key) => {
+        const filialMap = source.get(key);
+        if (!filialMap) return;
+        filialMap.forEach((data, cat) => {
+          const current = merged.get(cat) ?? { vendas: 0, qtde: 0 };
+          current.vendas += data.vendas;
+          current.qtde += data.qtde;
+          merged.set(cat, current);
+        });
+      });
+      return merged;
+    };
 
     const categoryTotals = new Map<string, number>();
     currentByFilial.forEach(filialMap => {
@@ -337,8 +379,8 @@ export async function GET(request: Request) {
       .sort((a, b) => b[1] - a[1])
       .map(([cat]) => cat);
 
-    const currentData = currentByFilial.get(filialParam) ?? new Map();
-    const previousData = previousByFilial.get(filialParam) ?? new Map();
+    const currentData = mergeCategoryMaps(currentByFilial, aggregationKeys);
+    const previousData = mergeCategoryMaps(previousByFilial, aggregationKeys);
 
     const vendas = Array.from(currentData.values()).reduce((s, d) => s + d.vendas, 0);
     const vendasPrevious = Array.from(previousData.values()).reduce((s, d) => s + d.vendas, 0);
@@ -395,8 +437,8 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({
-      filial: filialParam,
-      displayName: company.filialDisplayNames?.[filialParam] ?? filialParam,
+      filial: selectedFilialKey,
+      displayName: isVarejo ? 'Varejo' : (company.filialDisplayNames?.[selectedFilialKey] ?? selectedFilialKey),
       vendas,
       vendasPrevious,
       qtde,

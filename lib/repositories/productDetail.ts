@@ -1590,7 +1590,7 @@ export async function fetchProductStockByFilial({
 
       const filialDisplayName = displayNames[filialName] ?? filialName;
       const existing = aggByDisplayName.get(filialDisplayName) ?? { stock: 0, revenue: 0, quantity: 0, previousRevenue: 0 };
-      existing.stock += stockMap.get(filialName) ?? 0;
+      existing.stock += Math.max(0, stockMap.get(filialName) ?? 0);
       existing.revenue += currentRevenueMap.get(filialName) ?? 0;
       existing.quantity += currentQuantityMap.get(filialName) ?? 0;
       existing.previousRevenue += previousRevenueMap.get(filialName) ?? 0;

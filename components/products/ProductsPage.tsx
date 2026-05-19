@@ -849,6 +849,7 @@ export default function ProductsPage({
           groupByColor={groupByColor} 
           companyKey={companyKey}
           acimaDoTicket={acimaDoTicket}
+          selectedFilial={selectedFilial}
         />
       </div>
     </div>

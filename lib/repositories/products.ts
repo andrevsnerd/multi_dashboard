@@ -530,48 +530,38 @@ export async function fetchProductsWithDetails({
     // Converter para array
     const aggregatedProducts = Array.from(productMap.values());
 
-    // Quando filial é null (sem filtros), recalcular estoque de todas as filiais
-    // porque o estoque normal veio apenas de VAREJO (sem e-commerce) ou apenas de e-commerce
-    // O estoque rede sempre deve ser o estoque de todas as filiais (correto)
+    // Recalcular estoque por cor/produto para todas as filiais da empresa
     if (aggregatedProducts.length > 0) {
       if (groupByColor) {
-        // Quando groupByColor está ativo, buscar estoque por produto e cor
         const productsWithColor = aggregatedProducts.map((p) => ({
           productId: p.productId,
           corProduto: p.corProduto || null,
         }));
-        const stockMapAllFiliais = await fetchMultipleProductsStockByColor(productsWithColor, {
+        const stockMap = await fetchMultipleProductsStockByColor(productsWithColor, {
           company,
-          filial: null, // Todas as filiais
+          filial: null,
         });
 
-        // Atualizar estoque normal e estoque rede com o valor correto (todas as filiais)
         aggregatedProducts.forEach((product) => {
-          const key = product.corProduto 
-            ? `${product.productId}-${product.corProduto}` 
-            : `${product.productId}-null`;
-          const stockAllFiliais = stockMapAllFiliais.get(key) ?? 0;
-          // Estoque normal = estoque de todas as filiais quando não há filtros
-          product.stock = stockAllFiliais;
-          // Estoque rede = sempre estoque de todas as filiais (correto)
-          product.estoqueRede = stockAllFiliais;
+          const pid = String(product.productId ?? '').trim();
+          const cor = product.corProduto ? String(product.corProduto).trim() : null;
+          const key = cor ? `${pid}-${cor}` : `${pid}-null`;
+          const s = stockMap.get(key) ?? 0;
+          product.stock = s;
+          product.estoqueRede = s;
         });
       } else {
-        const productIds = aggregatedProducts.map((p) => p.productId);
-        
-        // Buscar estoque de todas as filiais para o estoque rede (este é o correto)
-        const stockMapAllFiliais = await fetchMultipleProductsStock(productIds, {
+        const productIds = Array.from(new Set(aggregatedProducts.map((p) => p.productId)));
+        const stockMap = await fetchMultipleProductsStock(productIds, {
           company,
-          filial: null, // Todas as filiais
+          filial: null,
         });
 
-        // Atualizar estoque normal e estoque rede com o valor correto (todas as filiais)
         aggregatedProducts.forEach((product) => {
-          const stockAllFiliais = stockMapAllFiliais.get(product.productId) ?? 0;
-          // Estoque normal = estoque de todas as filiais quando não há filtros
-          product.stock = stockAllFiliais;
-          // Estoque rede = sempre estoque de todas as filiais (correto)
-          product.estoqueRede = stockAllFiliais;
+          const pid = String(product.productId ?? '').trim();
+          const s = stockMap.get(pid) ?? 0;
+          product.stock = s;
+          product.estoqueRede = s;
         });
       }
     }
@@ -1115,35 +1105,35 @@ async function fetchProductsWithDetailsSales({
           filial,
         });
 
-        // Adicionar estoque a cada produto usando a chave "productId-corProduto"
+        // Adicionar estoque a cada produto usando a chave "productId-corProduto" (trim para garantir match)
         products.forEach((product) => {
-          const key = product.corProduto 
-            ? `${product.productId}-${product.corProduto}` 
-            : `${product.productId}-null`;
+          const pid = String(product.productId ?? '').trim();
+          const cor = product.corProduto ? String(product.corProduto).trim() : null;
+          const key = cor ? `${pid}-${cor}` : `${pid}-null`;
           product.stock = stockMap.get(key) ?? 0;
         });
 
-        // Para scarfme, sempre buscar estoque rede (de todas as filiais)
-        // O estoque rede sempre deve ser o estoque de todas as filiais (correto)
+        // Para scarfme, buscar estoque rede por cor em todas as filiais (sem filtro de filial no SQL)
         if (company === 'scarfme') {
+          const productsWithColor = products.map((p) => ({
+            productId: p.productId,
+            corProduto: p.corProduto || null,
+          }));
           const stockRedeMap = await fetchMultipleProductsStockByColor(productsWithColor, {
             company,
-            filial: null, // null = todas as filiais (correto)
+            filial: null,
           });
 
-          // Adicionar estoque rede a cada produto (sempre de todas as filiais)
           products.forEach((product) => {
-            const key = product.corProduto 
-              ? `${product.productId}-${product.corProduto}` 
-              : `${product.productId}-null`;
+            const pid = String(product.productId ?? '').trim();
+            const cor = product.corProduto ? String(product.corProduto).trim() : null;
+            const key = cor ? `${pid}-${cor}` : `${pid}-null`;
             product.estoqueRede = stockRedeMap.get(key) ?? 0;
           });
 
-          // Se não houver filtro de filial (filial === null), o estoque normal também deve ser de todas as filiais
-          // (igual ao estoque rede, que está correto)
           if (filial === null) {
             products.forEach((product) => {
-              product.stock = product.estoqueRede; // Estoque normal = estoque rede quando não há filtros
+              product.stock = product.estoqueRede;
             });
           }
         }
@@ -1157,27 +1147,25 @@ async function fetchProductsWithDetailsSales({
 
         // Adicionar estoque a cada produto
         products.forEach((product) => {
-          product.stock = stockMap.get(product.productId) ?? 0;
+          const pid = String(product.productId ?? '').trim();
+          product.stock = stockMap.get(pid) ?? 0;
         });
 
-        // Para scarfme, sempre buscar estoque rede (de todas as filiais)
-        // O estoque rede sempre deve ser o estoque de todas as filiais (correto)
+        // Para scarfme, buscar estoque rede em todas as filiais (sem filtro de filial no SQL)
         if (company === 'scarfme') {
           const stockRedeMap = await fetchMultipleProductsStock(productIds, {
             company,
-            filial: null, // null = todas as filiais (correto)
+            filial: null,
           });
 
-          // Adicionar estoque rede a cada produto (sempre de todas as filiais)
           products.forEach((product) => {
-            product.estoqueRede = stockRedeMap.get(product.productId) ?? 0;
+            const pid = String(product.productId ?? '').trim();
+            product.estoqueRede = stockRedeMap.get(pid) ?? 0;
           });
 
-          // Se não houver filtro de filial (filial === null), o estoque normal também deve ser de todas as filiais
-          // (igual ao estoque rede, que está correto)
           if (filial === null) {
             products.forEach((product) => {
-              product.stock = product.estoqueRede; // Estoque normal = estoque rede quando não há filtros
+              product.stock = product.estoqueRede;
             });
           }
         }
@@ -1672,35 +1660,35 @@ async function fetchProductsWithDetailsEcommerce({
           ecommerceOnly: !filial, // Se filial é null, buscar apenas filiais de e-commerce
         });
 
-        // Adicionar estoque a cada produto usando a chave "productId-corProduto"
+        // Adicionar estoque a cada produto usando a chave "productId-corProduto" (trim para garantir match)
         products.forEach((product) => {
-          const key = product.corProduto 
-            ? `${product.productId}-${product.corProduto}` 
-            : `${product.productId}-null`;
+          const pid = String(product.productId ?? '').trim();
+          const cor = product.corProduto ? String(product.corProduto).trim() : null;
+          const key = cor ? `${pid}-${cor}` : `${pid}-null`;
           product.stock = stockMap.get(key) ?? 0;
         });
 
-        // Para scarfme, sempre buscar estoque rede (de todas as filiais)
-        // O estoque rede sempre deve ser o estoque de todas as filiais (correto)
+        // Para scarfme, buscar estoque rede por cor em todas as filiais (sem filtro de filial no SQL)
         if (company === 'scarfme') {
+          const productsWithColor = products.map((p) => ({
+            productId: p.productId,
+            corProduto: p.corProduto || null,
+          }));
           const stockRedeMap = await fetchMultipleProductsStockByColor(productsWithColor, {
             company,
-            filial: null, // null = todas as filiais (correto)
+            filial: null,
           });
 
-          // Adicionar estoque rede a cada produto (sempre de todas as filiais)
           products.forEach((product) => {
-            const key = product.corProduto 
-              ? `${product.productId}-${product.corProduto}` 
-              : `${product.productId}-null`;
+            const pid = String(product.productId ?? '').trim();
+            const cor = product.corProduto ? String(product.corProduto).trim() : null;
+            const key = cor ? `${pid}-${cor}` : `${pid}-null`;
             product.estoqueRede = stockRedeMap.get(key) ?? 0;
           });
 
-          // Se não houver filtro de filial (filial === null), o estoque normal também deve ser de todas as filiais
-          // (igual ao estoque rede, que está correto)
           if (filial === null) {
             products.forEach((product) => {
-              product.stock = product.estoqueRede; // Estoque normal = estoque rede quando não há filtros
+              product.stock = product.estoqueRede;
             });
           }
         }
@@ -1710,32 +1698,30 @@ async function fetchProductsWithDetailsEcommerce({
         const stockMap = await fetchMultipleProductsStock(productIds, {
           company,
           filial,
-          ecommerceOnly: !filial, // Se filial é null, buscar apenas filiais de e-commerce
+          ecommerceOnly: !filial,
         });
 
         // Adicionar estoque a cada produto
         products.forEach((product) => {
-          product.stock = stockMap.get(product.productId) ?? 0;
+          const pid = String(product.productId ?? '').trim();
+          product.stock = stockMap.get(pid) ?? 0;
         });
 
-        // Para scarfme, sempre buscar estoque rede (de todas as filiais)
-        // O estoque rede sempre deve ser o estoque de todas as filiais (correto)
+        // Para scarfme, buscar estoque rede em todas as filiais (sem filtro de filial no SQL)
         if (company === 'scarfme') {
           const stockRedeMap = await fetchMultipleProductsStock(productIds, {
             company,
-            filial: null, // null = todas as filiais (correto)
+            filial: null,
           });
 
-          // Adicionar estoque rede a cada produto (sempre de todas as filiais)
           products.forEach((product) => {
-            product.estoqueRede = stockRedeMap.get(product.productId) ?? 0;
+            const pid = String(product.productId ?? '').trim();
+            product.estoqueRede = stockRedeMap.get(pid) ?? 0;
           });
 
-          // Se não houver filtro de filial (filial === null), o estoque normal também deve ser de todas as filiais
-          // (igual ao estoque rede, que está correto)
           if (filial === null) {
             products.forEach((product) => {
-              product.stock = product.estoqueRede; // Estoque normal = estoque rede quando não há filtros
+              product.stock = product.estoqueRede;
             });
           }
         }

@@ -254,19 +254,16 @@
 }
 
 .stockTooltipPanel {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  width: 280px;
-  max-width: min(280px, 70vw);
-  padding: 14px 14px 12px;
-  border-radius: 16px;
+  width: 210px;
+  max-width: min(210px, 70vw);
+  padding: 10px 10px 8px;
+  border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.22);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.98) 100%);
   box-shadow:
-    0 24px 44px rgba(15, 23, 42, 0.16),
-    0 10px 20px rgba(37, 99, 235, 0.08);
+    0 8px 24px rgba(15, 23, 42, 0.14),
+    0 4px 10px rgba(37, 99, 235, 0.07);
   backdrop-filter: blur(10px);
   z-index: 40;
 }
@@ -274,47 +271,44 @@
 .stockTooltipPanel::before {
   content: "";
   position: absolute;
-  top: -7px;
-  right: 20px;
-  width: 14px;
-  height: 14px;
-  background: #ffffff;
-  border-left: 1px solid rgba(148, 163, 184, 0.22);
-  border-top: 1px solid rgba(148, 163, 184, 0.22);
+  bottom: -7px;
+  right: 16px;
+  width: 12px;
+  height: 12px;
+  background: rgba(248, 250, 252, 0.98);
+  border-right: 1px solid rgba(148, 163, 184, 0.22);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.22);
   transform: rotate(45deg);
 }
 
 .stockTooltipHeader {
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #1e3a8a;
 }
 
 .stockTooltipSubtitle {
-  margin-top: 4px;
-  font-size: 12px;
+  margin-top: 2px;
+  font-size: 11px;
   color: #64748b;
 }
 
 .stockTooltipList {
-  margin-top: 12px;
+  margin-top: 8px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  max-height: 240px;
-  overflow-y: auto;
-  padding-right: 2px;
+  gap: 4px;
 }
 
 .stockTooltipRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
-  padding: 8px 10px;
-  border-radius: 12px;
+  padding: 5px 8px;
+  border-radius: 7px;
   background: rgba(241, 245, 249, 0.8);
 }
 
@@ -324,24 +318,24 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: left;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 600;
   color: #0f172a;
 }
 
 .stockTooltipQty {
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 11px;
+  font-weight: 700;
   color: #1d4ed8;
   font-variant-numeric: tabular-nums;
 }
 
 .stockTooltipEmpty {
-  margin-top: 10px;
-  font-size: 12px;
+  margin-top: 6px;
+  font-size: 11px;
   color: #64748b;
   text-align: left;
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
 .varianceCell {
