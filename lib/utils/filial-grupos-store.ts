@@ -21,6 +21,21 @@ function invalidateCache() {
   _cache = null;
 }
 
+function normalizeGrupoLabel(grupo: FilialGrupo): FilialGrupo {
+  const label = (grupo.label || '').trim();
+  const upper = label.toUpperCase();
+
+  if (
+    grupo.company === 'nerd' &&
+    grupo.id === 'morumbi-1' &&
+    (upper === 'NERD MORUMBI RDRRRJ' || upper === 'NERD MORUMBI RDRX')
+  ) {
+    return { ...grupo, label: 'MORUMBI 1' };
+  }
+
+  return grupo;
+}
+
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
 export interface FilialGrupo {
@@ -36,7 +51,7 @@ export interface FilialGrupo {
 export const DEFAULT_GRUPOS: FilialGrupo[] = [
   {
     id: 'morumbi-1',
-    label: 'NERD MORUMBI RDRRRJ',
+    label: 'MORUMBI 1',
     company: 'nerd',
     members: ['NERD MORUMBI RDRRRJ', 'NERD MORUMBI RDRX'],
     active: 'NERD MORUMBI RDRX',
@@ -80,7 +95,7 @@ function readGruposFile(): FilialGrupo[] {
   ensureDataDir();
   if (!fs.existsSync(GRUPOS_FILE)) return [];
   try {
-    return JSON.parse(fs.readFileSync(GRUPOS_FILE, 'utf-8'));
+    return JSON.parse(fs.readFileSync(GRUPOS_FILE, 'utf-8')).map(normalizeGrupoLabel);
   } catch {
     return [];
   }
@@ -126,13 +141,15 @@ export async function listFilialGrupos(): Promise<FilialGrupo[]> {
       FROM filial_grupos
       ORDER BY company, label
     `;
-    grupos = rows.map((r) => ({
-      id: r.id,
-      label: r.label,
-      company: r.company,
-      members: r.members || [],
-      active: r.active,
-    }));
+    grupos = rows.map((r) =>
+      normalizeGrupoLabel({
+        id: r.id,
+        label: r.label,
+        company: r.company,
+        members: r.members || [],
+        active: r.active,
+      })
+    );
   }
 
   _cache = grupos;
@@ -151,12 +168,13 @@ export async function listFilialGruposByCompany(company: string): Promise<Filial
 
 export async function saveFilialGrupo(grupo: FilialGrupo): Promise<void> {
   invalidateCache();
+  const normalizedGrupo = normalizeGrupoLabel(grupo);
 
   if (!hasPostgres()) {
     const grupos = readGruposFile();
-    const idx = grupos.findIndex((g) => g.id === grupo.id);
-    if (idx === -1) grupos.push(grupo);
-    else grupos[idx] = grupo;
+    const idx = grupos.findIndex((g) => g.id === normalizedGrupo.id);
+    if (idx === -1) grupos.push(normalizedGrupo);
+    else grupos[idx] = normalizedGrupo;
     writeGruposFile(grupos);
     return;
   }
@@ -166,11 +184,11 @@ export async function saveFilialGrupo(grupo: FilialGrupo): Promise<void> {
   await sql`
     INSERT INTO filial_grupos (id, label, company, members, active, updated_at)
     VALUES (
-      ${grupo.id},
-      ${grupo.label},
-      ${grupo.company},
-      ${JSON.stringify(grupo.members)}::jsonb,
-      ${grupo.active},
+      ${normalizedGrupo.id},
+      ${normalizedGrupo.label},
+      ${normalizedGrupo.company},
+      ${JSON.stringify(normalizedGrupo.members)}::jsonb,
+      ${normalizedGrupo.active},
       NOW()
     )
     ON CONFLICT (id) DO UPDATE SET

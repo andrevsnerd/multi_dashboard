@@ -7,7 +7,6 @@ import {
   type CompanyConfig,
   resolveCompany,
   getFilialLabelForDisplay,
-  getActiveFilial,
 } from "@/lib/config/company";
 import { useAuth } from "@/components/auth/AuthContext";
 
@@ -16,6 +15,9 @@ import styles from "./SaidasEntradasProdutosPage.module.css";
 interface Filial {
   codFilial: string;
   filial: string;
+  displayName?: string;
+  activeFilial?: string;
+  aliases?: string[];
 }
 
 interface Produto {
@@ -182,6 +184,23 @@ function normalizeFilialValue(v: string | null | undefined): string {
     .replace(/\s+/g, " ");
 }
 
+function getFilialMatchTokens(filial: Filial | null | undefined): string[] {
+  if (!filial) return [];
+  return [
+    filial.codFilial,
+    filial.filial,
+    filial.activeFilial,
+    filial.displayName,
+    ...(filial.aliases ?? []),
+  ].filter(Boolean) as string[];
+}
+
+function matchesFilialOption(filial: Filial | null | undefined, value: string | null | undefined): boolean {
+  const target = normalizeFilialValue(value);
+  if (!target || !filial) return false;
+  return getFilialMatchTokens(filial).some((token) => normalizeFilialValue(token) === target);
+}
+
 function normalizeDigits(v: string): string {
   const digits = v.replace(/\D/g, "");
   return digits.replace(/^0+/, "") || "0";
@@ -253,8 +272,11 @@ async function fetchPermissoes(username: string): Promise<TransferenciaPermissao
   }
 }
 
-async function fetchFiliais(): Promise<Filial[]> {
-  const response = await fetch("/api/transferencia-produtos/filiais", {
+async function fetchFiliais(companyKey?: string): Promise<Filial[]> {
+  const params = new URLSearchParams();
+  if (companyKey) params.set("company", companyKey);
+
+  const response = await fetch(`/api/transferencia-produtos/filiais${params.toString() ? `?${params.toString()}` : ""}`, {
     cache: "no-store",
   });
 
@@ -523,6 +545,11 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       getFilialLabelForDisplay(companyConfig, String(raw ?? "").trim()),
     [companyConfig]
   );
+  const filialOptionLabel = useCallback(
+    (filial: Filial | null | undefined) =>
+      filial?.displayName?.trim() || filialLabel(filial?.filial),
+    [filialLabel]
+  );
 
   const filiaisDestinoVisiveis = useMemo<Filial[]>(() => {
     const isDefeito = tipoRomaneioSelecionado.toUpperCase() === 'DEFEITO';
@@ -573,12 +600,11 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
   }, [user?.username, authLoading]);
 
   // Carregar filiais e aplicar filtros de permissão (aguardar permissões carregarem)
-  useEffect(() => {
+  const loadFiliais = useCallback(async () => {
     if (!permissoesCarregadas) return;
-    
-    async function loadFiliais() {
+
       try {
-        const data = await fetchFiliais();
+        const data = await fetchFiliais(companyKey);
         setFiliais(data);
 
         // Aplicar filtros de permissão se existirem
@@ -591,14 +617,10 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
            */
           const resolveFiliais = (lista: string[]) => {
             if (lista.length > 0) {
-              return data.filter(f =>
-                lista.some(cod => getActiveFilial(companyConfig, cod || "").trim() === f.codFilial.trim())
-              );
+              return data.filter((f) => lista.some((cod) => matchesFilialOption(f, cod)));
             }
             if (permissoes.filialAtribuida) {
-              return data.filter(
-                f => f.codFilial.trim() === getActiveFilial(companyConfig, permissoes.filialAtribuida).trim()
-              );
+              return data.filter((f) => matchesFilialOption(f, permissoes.filialAtribuida));
             }
             return data;
           };
@@ -608,37 +630,64 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
             : resolveFiliais(permissoes.filiaisDestino);
 
           setFiliaisDisponiveis(filiaisPermitidas);
-
-          if (filiaisPermitidas.length > 0) {
-            setFilialSelecionada(filiaisPermitidas[0]);
-          }
+          setFilialSelecionada((current) => {
+            if (!filiaisPermitidas.length) return null;
+            return filiaisPermitidas.find((f) => f.codFilial === current?.codFilial) ?? filiaisPermitidas[0];
+          });
 
           // Filiais destino visíveis no select de destino da saída
           // Usa filiaisDestinoControle (filiais destino visíveis do admin) — vazio = todas visíveis
           const controle = permissoes.filiaisDestinoControle ?? [];
           const destinos = controle.length > 0
-            ? data.filter(f => controle.some(cod => getActiveFilial(companyConfig, cod || "").trim() === f.codFilial.trim()))
+            ? data.filter((f) => controle.some((cod) => matchesFilialOption(f, cod)))
             : data;
           setFiliaisDestinoDisponiveis(destinos);
-          if (destinos.length === 1) setFilialDestinoSaida(destinos[0]);
+          setFilialDestinoSaida((current) => {
+            if (!destinos.length) return null;
+            return destinos.find((f) => f.codFilial === current?.codFilial) ?? (destinos.length === 1 ? destinos[0] : null);
+          });
         } else {
           setFiliaisDisponiveis(data);
-          if (data.length > 0) {
-            setFilialSelecionada(data[0]);
-          }
+          setFilialSelecionada((current) => {
+            if (!data.length) return null;
+            return data.find((f) => f.codFilial === current?.codFilial) ?? data[0];
+          });
           setFiliaisDestinoDisponiveis(data);
+          setFilialDestinoSaida((current) => {
+            if (!data.length) return null;
+            return data.find((f) => f.codFilial === current?.codFilial) ?? (data.length === 1 ? data[0] : null);
+          });
         }
       } catch (error) {
         console.error("Erro ao carregar filiais", error);
       }
-    }
-    loadFiliais();
-  }, [permissoes, permissoesCarregadas, tipoOperacao, companyConfig]);
+  }, [companyKey, permissoes, permissoesCarregadas, tipoOperacao]);
+
+  useEffect(() => {
+    void loadFiliais();
+  }, [loadFiliais]);
+
+  useEffect(() => {
+    if (!permissoesCarregadas) return;
+
+    const refreshIfVisible = () => {
+      if (document.visibilityState === "hidden") return;
+      void loadFiliais();
+    };
+
+    window.addEventListener("focus", refreshIfVisible);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+
+    return () => {
+      window.removeEventListener("focus", refreshIfVisible);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+    };
+  }, [loadFiliais, permissoesCarregadas]);
 
   // Carregar tipos de romaneio e aplicar filtros de permissão
   useEffect(() => {
     if (!permissoesCarregadas) return;
-    
+
     async function loadTiposRomaneio() {
       try {
         const data = await fetchTiposRomaneio();
@@ -964,12 +1013,12 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
           corProduto: produto.corProduto ? produto.corProduto.trim() : null,
           descCor: (produto.descCor || "").trim(),
           filial: filialSelecionada.codFilial,
-          nomeFilial: filialSelecionada.filial,
+          nomeFilial: filialOptionLabel(filialSelecionada),
           estoque: 0,
           quantidade: 1,
         };
       }
-      mostrarNotificacao(`Produto não possui estoque na filial ${filialLabel(filialSelecionada.filial)}`, "error");
+      mostrarNotificacao(`Produto não possui estoque na filial ${filialOptionLabel(filialSelecionada)}`, "error");
       return null;
     }
 
@@ -980,11 +1029,11 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       corProduto: produto.corProduto ? produto.corProduto.trim() : null,
       descCor: (produto.descCor || "").trim(),
       filial: filialSelecionada.codFilial,
-      nomeFilial: filialSelecionada.filial,
+      nomeFilial: filialOptionLabel(filialSelecionada),
       estoque: estoque.estoque,
       quantidade: 1,
     };
-  }, [filialSelecionada, mostrarNotificacao, tipoOperacao, filialLabel]);
+  }, [filialSelecionada, mostrarNotificacao, tipoOperacao, filialOptionLabel]);
 
   const ensureColorOptionsLoaded = useCallback(async (produtoSku: string) => {
     const sku = (produtoSku || "").trim();
@@ -1181,6 +1230,8 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
         quantidade: p.quantidade,
       }));
 
+      // A UI mostra o label lógico da loja/grupo, mas a operação sempre segue
+      // pela filial ativa real via `codFilial`.
       const resultado = await executarOperacaoLote(
         tipoOperacao,
         itens,
@@ -1506,7 +1557,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
             {tipoOperacao === "saida" ? "Filial de Saída" : "Filial de Entrada"}
           </span>
           {filiaisDisponiveis.length === 1 && filialSelecionada ? (
-            <span className={styles.configBarText}>{filialLabel(filialSelecionada.filial)}</span>
+            <span className={styles.configBarText}>{filialOptionLabel(filialSelecionada)}</span>
           ) : (
             <div className={styles.selectWrap}>
               <select
@@ -1520,7 +1571,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
               >
                 <option value="">Selecione...</option>
                 {filiaisDisponiveis.map(f => (
-                  <option key={f.codFilial} value={f.codFilial}>{filialLabel(f.filial)}</option>
+                  <option key={f.codFilial} value={f.codFilial}>{filialOptionLabel(f)}</option>
                 ))}
               </select>
               <span className={styles.selectChevron} aria-hidden="true">
@@ -1551,7 +1602,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                 {isSaidaMkt ? (
                   <span className={styles.configBarText} style={{ opacity: 0.45 }}>— Não se aplica —</span>
                 ) : filiaisDestinoVisiveis.length === 1 ? (
-                  <span className={styles.configBarText}>{filialLabel(filiaisDestinoVisiveis[0].filial)}</span>
+                  <span className={styles.configBarText}>{filialOptionLabel(filiaisDestinoVisiveis[0])}</span>
                 ) : (
                   <div className={styles.selectWrap}>
                     <select
@@ -1564,7 +1615,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                     >
                       <option value="" disabled>— Selecionar filial —</option>
                       {filiaisDestinoVisiveis.map(f => (
-                        <option key={f.codFilial} value={f.codFilial}>{filialLabel(f.filial)}</option>
+                        <option key={f.codFilial} value={f.codFilial}>{filialOptionLabel(f)}</option>
                       ))}
                     </select>
                     <span className={styles.selectChevron} aria-hidden="true">
@@ -2026,7 +2077,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
               </p>
               {tipoOperacao === "saida" && filialDestinoSaida && (
                 <p className={styles.confirmacaoTexto} style={{ marginTop: "8px" }}>
-                  Destino: <strong>{filialLabel(filialDestinoSaida.filial)}</strong>
+                  Destino: <strong>{filialOptionLabel(filialDestinoSaida)}</strong>
                 </p>
               )}
             </div>
@@ -2106,8 +2157,8 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                             title={estoque
                               ? `Estoque: ${estoque.estoque}`
                               : tipoOperacao === "saida"
-                                ? `Sem estoque em ${filialLabel(filialSelecionada?.filial)}`
-                                : `Sem estoque cadastrado em ${filialLabel(filialSelecionada?.filial)}`}
+                                ? `Sem estoque em ${filialOptionLabel(filialSelecionada)}`
+                                : `Sem estoque cadastrado em ${filialOptionLabel(filialSelecionada)}`}
                           >+</button>
                         )}
                         {isPickerActive && (
@@ -2124,7 +2175,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                                       className={`${styles.colorChip} ${tipoOperacao === "saida" ? styles.colorChipSaida : styles.colorChipEntrada}`}
                                       onClick={() => adicionarComCorSelecionada(opcao)}
                                       disabled={tipoOperacao === "saida" && !estoqueOpcao}
-                                      title={estoqueOpcao ? `Estoque: ${estoqueOpcao.estoque}` : `Sem estoque em ${filialLabel(filialSelecionada?.filial)}`}
+                                      title={estoqueOpcao ? `Estoque: ${estoqueOpcao.estoque}` : `Sem estoque em ${filialOptionLabel(filialSelecionada)}`}
                                     >
                                       {opcao.descCor || opcao.corProduto}
                                       {estoqueOpcao && <span className={styles.colorChipEstoque}> ({estoqueOpcao.estoque})</span>}

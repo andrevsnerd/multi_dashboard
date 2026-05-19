@@ -7,6 +7,7 @@ import { setDestinoRomaneio } from '@/lib/utils/destino-romaneio-store';
 import { executeSaidaLote, executeEntradaLote } from '@/lib/saida-entrada-executor';
 import { getActiveFilial } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
+import type { CompanyConfig } from '@/lib/config/company';
 
 interface ItemOperacao {
   produto: string;
@@ -32,6 +33,51 @@ function isTransferenciaEntreLojas(tipoRomaneio: string): boolean {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
   return normalized.includes('TRANSFERENCIA ENTRE LOJAS');
+}
+
+function normalizeFilialKey(value: string): string {
+  return (value || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+function isDisplayOnlyFilialInput(
+  company: CompanyConfig | null,
+  filial: string
+): boolean {
+  if (!company) return false;
+
+  const raw = normalizeFilialKey(filial);
+  if (!raw) return false;
+
+  const operationalNames = new Set<string>();
+  const addOperational = (value?: string | null) => {
+    const normalized = normalizeFilialKey(value || '');
+    if (normalized) operationalNames.add(normalized);
+  };
+
+  for (const filialName of company.filialFilters.inventory ?? []) {
+    addOperational(filialName);
+  }
+
+  for (const [canonical, members] of Object.entries(company.filialGroups ?? {})) {
+    addOperational(canonical);
+    for (const member of members) addOperational(member);
+  }
+
+  for (const [from, to] of Object.entries(company.activeFilials ?? {})) {
+    addOperational(from);
+    addOperational(to);
+  }
+
+  if (operationalNames.has(raw)) return false;
+
+  return Object.entries(company.filialDisplayNames ?? {}).some(([erpName, displayLabel]) => {
+    return normalizeFilialKey(displayLabel) === raw && normalizeFilialKey(erpName) !== raw;
+  });
 }
 
 async function getActiveFilialForRequest(companyKey: string | undefined, filial: string): Promise<string> {
@@ -146,6 +192,22 @@ export async function POST(request: Request) {
     if (tipoOperacao !== 'saida' && tipoOperacao !== 'entrada') {
       return NextResponse.json(
         { error: 'tipoOperacao deve ser "saida" ou "entrada"' },
+        { status: 400 }
+      );
+    }
+
+    const preferredCompany = await resolveCompanyDynamic(companyKey);
+
+    if (isDisplayOnlyFilialInput(preferredCompany, filial.trim())) {
+      return NextResponse.json(
+        { error: 'A filial enviada é um rótulo visual do grupo. A operação exige a filial operacional real.' },
+        { status: 400 }
+      );
+    }
+
+    if (filialDestino && isDisplayOnlyFilialInput(preferredCompany, filialDestino.trim())) {
+      return NextResponse.json(
+        { error: 'A filial destino enviada é um rótulo visual do grupo. A operação exige a filial operacional real.' },
         { status: 400 }
       );
     }
