@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getPublicDatabaseErrorMessage, isDatabaseConnectionError, withRequest } from '@/lib/db/connection';
 import sql from 'mssql';
-import { getColorDescription } from '@/lib/utils/colorMapping';
+import { getMappedColorDescription } from '@/lib/utils/colorMapping';
 import { getActiveFilial, resolveCompany } from '@/lib/config/company';
 
 export const maxDuration = 60;
@@ -423,8 +423,7 @@ export async function GET(request: Request) {
         const key = `${produto}::${cor}`;
 
         if (!produtosMap.has(key)) {
-          const descCorBanco = row.DESC_COR?.toString().trim() || '';
-          const descCorResolvida = getColorDescription(cor || undefined, descCorBanco);
+          const descCorResolvida = getMappedColorDescription(cor || undefined);
           produtosMap.set(key, {
             produto,
             descProduto: row.DESC_PRODUTO?.toString().trim() || '',
@@ -435,7 +434,7 @@ export async function GET(request: Request) {
             descColecao: row.DESC_COLECAO?.toString().trim() || null,
             codigoBarra: normalizeBarcode(row.CODIGO_BARRA) || null,
             corProduto: cor || null,
-            descCor: descCorResolvida || descCorBanco,
+            descCor: descCorResolvida,
             grade: row.GRADE?.toString().trim() || null,
             estoquesMap: new Map(),
           });

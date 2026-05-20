@@ -593,7 +593,10 @@ export default function CompraSalvaDetalhePage({
   const [listaRowsRefreshKey, setListaRowsRefreshKey] = useState(0);
   const [vendasRefreshKey, setVendasRefreshKey] = useState(0);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingTransitDraft, setExportingTransitDraft] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const compraSalvaExportRef = useRef<HTMLDivElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
   const [manualState, setManualState] = useState<Record<string, "editing" | "confirmed">>({});
   const [manualDistribuicao, setManualDistribuicao] = useState<Record<string, Record<string, number>>>({});
   const manualDistribuicaoRef = useRef(manualDistribuicao);
@@ -695,6 +698,19 @@ export default function CompraSalvaDetalhePage({
     destinoVendasFetchRef.current.clear();
     setVendasPorFilialCache({});
   }, [doc?.id, expandirPorCor]);
+
+  useEffect(() => {
+    if (!exportMenuOpen) return undefined;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!exportMenuRef.current?.contains(event.target as Node)) {
+        setExportMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [exportMenuOpen]);
 
   useEffect(() => {
     if (!doc || items.length === 0) return;
@@ -937,6 +953,54 @@ export default function CompraSalvaDetalhePage({
     }
   };
 
+  const handleExportToTransitDraft = async () => {
+    if (!doc || exportingTransitDraft) return;
+
+    const transitItems = rowsComputed
+      .map(({ it, estoque, custoUnit, effectiveQtdManual }) => ({
+        itemKey: String(it.itemKey ?? ""),
+        produto: String(it.produto ?? ""),
+        descricao: String(it.descricao ?? it.produto ?? ""),
+        corProduto: it.corProduto ? String(it.corProduto) : undefined,
+        corDescricao: it.corDescricao ? String(it.corDescricao) : undefined,
+        grade: it.grade ? String(it.grade) : undefined,
+        dataRecebimento: "",
+        quantidade: Math.max(0, Math.round(effectiveQtdManual)),
+        custoUnitario: custoUnit > 0 ? Number(custoUnit) : undefined,
+        estoqueAtual: estoque != null ? Number(estoque) : undefined,
+        status: "rascunho" as const,
+      }))
+      .filter((item) => item.quantidade > 0);
+
+    if (transitItems.length === 0) {
+      window.alert("Essa compra salva nao tem itens com quantidade para exportar.");
+      return;
+    }
+
+    setExportingTransitDraft(true);
+    try {
+      const res = await fetch("/api/compras-transito", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyKey,
+          title: titleEdit.trim() || doc.title,
+          items: transitItems,
+          draft: true,
+        }),
+      });
+      const json = (await res.json()) as { data?: { id?: string }; error?: string };
+      if (!res.ok || !json.data?.id) {
+        throw new Error(json.error ?? "Erro ao exportar compra para transito");
+      }
+      router.push(`/${companySlug}/compras-transito?draft=${encodeURIComponent(json.data.id)}`);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Erro ao exportar compra para transito");
+    } finally {
+      setExportingTransitDraft(false);
+    }
+  };
+
   const handleExportXlsx = () => {
     const fmt2 = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
     const rowExcel = rowsComputed.map(({ it, match, estoque, custoUnit, custoTotal, effectiveQtdManual }) => {
@@ -1144,6 +1208,12 @@ export default function CompraSalvaDetalhePage({
 
   return (
     <div className={styles.wrapper}>
+      <div className={styles.pageToolbar}>
+        <Link href={listBack} className={styles.backButton}>
+          ← Compras salvas
+        </Link>
+      </div>
+
       <div className={styles.headerCard}>
         <div className={styles.header}>
           <div className={styles.headerLeft}>
@@ -1185,11 +1255,8 @@ export default function CompraSalvaDetalhePage({
               )}
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-            <Link href={listBack} className={styles.backButton}>
-              ← Compras salvas
-            </Link>
-            <button type="button" className={styles.backButton} onClick={() => { void handleDeleteCompra(); }}>
+          <div className={styles.headerActions}>
+            <button type="button" className={styles.dangerButton} onClick={() => { void handleDeleteCompra(); }}>
               Excluir compra
             </button>
           </div>
@@ -1218,18 +1285,53 @@ export default function CompraSalvaDetalhePage({
                 <span className={styles.summaryValue}>{fmtBRL(totals.totalCusto)}</span>
               </div>
             </div>
-            <div className={styles.exportActions} data-pdf-hide="">
-              <button type="button" className={styles.exportBtn} onClick={handleExportXlsx}>
-                Exportar XLSX
-              </button>
+            <div className={styles.exportActions} data-pdf-hide="" ref={exportMenuRef}>
               <button
                 type="button"
                 className={styles.exportBtn}
-                disabled={exportingPdf || items.length === 0}
-                onClick={() => { void handleExportPdf(); }}
+                onClick={() => { void handleExportToTransitDraft(); }}
+                disabled={exportingTransitDraft || items.length === 0}
               >
+                {exportingTransitDraft ? "Exportando..." : "Exportar para transito"}
+              </button>
+              <button
+                type="button"
+                className={`${styles.exportBtn} ${styles.exportMenuToggle}`}
+                disabled={items.length === 0}
+                onClick={() => setExportMenuOpen((prev) => !prev)}
+                aria-expanded={exportMenuOpen}
+                aria-haspopup="menu"
+                aria-label="Abrir menu de exportacao"
+              >
+                <span className={styles.exportMenuLabel}>Exportar</span>
+                <span className={`${styles.exportCaret}${exportMenuOpen ? ` ${styles.exportCaretOpen}` : ""}`}>v</span>
                 {exportingPdf ? "Exportando PDF…" : "Exportar PDF"}
               </button>
+              {exportMenuOpen && (
+                <div className={styles.exportDropdown} role="menu">
+                  <button
+                    type="button"
+                    className={styles.exportMenuItem}
+                    onClick={() => {
+                      setExportMenuOpen(false);
+                      handleExportXlsx();
+                    }}
+                  >
+                    Exportar XLSX
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.exportMenuItem}
+                    disabled={exportingPdf}
+                    onClick={() => {
+                      setExportMenuOpen(false);
+                      void handleExportPdf();
+                    }}
+                  >
+                    {exportingPdf ? "Exportando PDF..." : "Exportar PDF"}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

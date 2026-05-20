@@ -1,1 +1,216 @@
-[]
+[
+  {
+    "id": "e7c0463f-cf17-4a2c-a095-7c2190cd8630",
+    "companyKey": "nerd",
+    "title": "[Lista Loja] TODAS (visão geral) 18/05/2026 14:41 · andre.sabetta",
+    "status": "rascunho",
+    "items": [
+      {
+        "itemKey": "N4.7I.0019|C9",
+        "produto": "N4.7I.0019",
+        "descricao": "CP SILICONE IP 17",
+        "corProduto": "C9",
+        "corDescricao": "AZUL MARINHO",
+        "dataRecebimento": "",
+        "quantidade": 4,
+        "custoUnitario": 10.4,
+        "estoqueAtual": 6,
+        "status": "rascunho"
+      },
+      {
+        "itemKey": "N4.7H.0080|03",
+        "produto": "N4.7H.0080",
+        "descricao": "CP SILICONE IP 17 PRO MAX",
+        "corProduto": "03",
+        "corDescricao": "AZUL",
+        "dataRecebimento": "",
+        "quantidade": 4,
+        "custoUnitario": 10.4,
+        "estoqueAtual": 5,
+        "status": "rascunho"
+      },
+      {
+        "itemKey": "N4.7P.0073|11",
+        "produto": "N4.7P.0073",
+        "descricao": "CP SILICONE IP 17 PRO",
+        "corProduto": "11",
+        "corDescricao": "LARANJA",
+        "dataRecebimento": "",
+        "quantidade": 1,
+        "custoUnitario": 10.4,
+        "estoqueAtual": 8,
+        "status": "rascunho"
+      },
+      {
+        "itemKey": "N4.7I.0019|Z3",
+        "produto": "N4.7I.0019",
+        "descricao": "CP SILICONE IP 17",
+        "corProduto": "Z3",
+        "corDescricao": "AVELÃ",
+        "dataRecebimento": "",
+        "quantidade": 4,
+        "custoUnitario": 10.4,
+        "estoqueAtual": 0,
+        "status": "rascunho"
+      },
+      {
+        "itemKey": "N4.7I.0019|06",
+        "produto": "N4.7I.0019",
+        "descricao": "CP SILICONE IP 17",
+        "corProduto": "06",
+        "corDescricao": "PRETO",
+        "dataRecebimento": "",
+        "quantidade": 2,
+        "custoUnitario": 10.4,
+        "estoqueAtual": 3,
+        "status": "rascunho"
+      },
+      {
+        "itemKey": "N4.7I.0019|07",
+        "produto": "N4.7I.0019",
+        "descricao": "CP SILICONE IP 17",
+        "corProduto": "07",
+        "corDescricao": "CINZA",
+        "dataRecebimento": "",
+        "quantidade": 1,
+        "custoUnitario": 10.4,
+        "estoqueAtual": 1,
+        "status": "rascunho"
+      },
+      {
+        "itemKey": "N4.7E.0080|09",
+        "produto": "N4.7E.0080",
+        "descricao": "CP SILICONE IP 17 AIR",
+        "corProduto": "09",
+        "corDescricao": "MARROM",
+        "dataRecebimento": "",
+        "quantidade": 1,
+        "custoUnitario": 10.24,
+        "estoqueAtual": 0,
+        "status": "rascunho"
+      },
+      {
+        "itemKey": "N4.7I.0019|75",
+        "produto": "N4.7I.0019",
+        "descricao": "CP SILICONE IP 17",
+        "corProduto": "75",
+        "corDescricao": "CINZA CHUMBO",
+        "dataRecebimento": "",
+        "quantidade": 1,
+        "custoUnitario": 10.4,
+        "estoqueAtual": 0,
+        "status": "rascunho"
+      }
+    ],
+    "createdAt": "2026-05-20T18:52:32.294Z",
+    "updatedAt": "2026-05-20T18:52:32.294Z",
+    "confirmedAt": "2026-05-20T18:52:32.294Z"
+  },
+  {
+    "id": "f4b52085-e292-4b62-96ab-d509796fb4a4",
+    "companyKey": "nerd",
+    "title": "[Lista Loja] TODAS (visão geral) 18/05/2026 14:41 · andre.sabetta",
+    "status": "rascunho",
+    "items": [
+      {
+        "itemKey": "N4.7I.0019|C9",
+        "produto": "N4.7I.0019",
+        "descricao": "CP SILICONE IP 17",
+        "corProduto": "C9",
+        "corDescricao": "AZUL MARINHO",
+        "dataRecebimento": "",
+        "quantidade": 4,
+        "custoUnitario": 10.4,
+        "estoqueAtual": 6,
+        "status": "rascunho"
+      },
+      {
+        "itemKey": "N4.7H.0080|03",
+        "produto": "N4.7H.0080",
+        "descricao": "CP SILICONE IP 17 PRO MAX",
+        "corProduto": "03",
+        "corDescricao": "AZUL",
+        "dataRecebimento": "",
+        "quantidade": 4,
+        "custoUnitario": 10.4,
+        "estoqueAtual": 5,
+        "status": "rascunho"
+      },
+      {
+        "itemKey": "N4.7P.0073|11",
+        "produto": "N4.7P.0073",
+        "descricao": "CP SILICONE IP 17 PRO",
+        "corProduto": "11",
+        "corDescricao": "LARANJA",
+        "dataRecebimento": "",
+        "quantidade": 1,
+        "custoUnitario": 10.4,
+        "estoqueAtual": 8,
+        "status": "rascunho"
+      },
+      {
+        "itemKey": "N4.7I.0019|Z3",
+        "produto": "N4.7I.0019",
+        "descricao": "CP SILICONE IP 17",
+        "corProduto": "Z3",
+        "corDescricao": "AVELÃ",
+        "dataRecebimento": "",
+        "quantidade": 4,
+        "custoUnitario": 10.4,
+        "estoqueAtual": 0,
+        "status": "rascunho"
+      },
+      {
+        "itemKey": "N4.7I.0019|06",
+        "produto": "N4.7I.0019",
+        "descricao": "CP SILICONE IP 17",
+        "corProduto": "06",
+        "corDescricao": "PRETO",
+        "dataRecebimento": "",
+        "quantidade": 2,
+        "custoUnitario": 10.4,
+        "estoqueAtual": 3,
+        "status": "rascunho"
+      },
+      {
+        "itemKey": "N4.7I.0019|07",
+        "produto": "N4.7I.0019",
+        "descricao": "CP SILICONE IP 17",
+        "corProduto": "07",
+        "corDescricao": "CINZA",
+        "dataRecebimento": "",
+        "quantidade": 1,
+        "custoUnitario": 10.4,
+        "estoqueAtual": 1,
+        "status": "rascunho"
+      },
+      {
+        "itemKey": "N4.7E.0080|09",
+        "produto": "N4.7E.0080",
+        "descricao": "CP SILICONE IP 17 AIR",
+        "corProduto": "09",
+        "corDescricao": "MARROM",
+        "dataRecebimento": "",
+        "quantidade": 1,
+        "custoUnitario": 10.24,
+        "estoqueAtual": 0,
+        "status": "rascunho"
+      },
+      {
+        "itemKey": "N4.7I.0019|75",
+        "produto": "N4.7I.0019",
+        "descricao": "CP SILICONE IP 17",
+        "corProduto": "75",
+        "corDescricao": "CINZA CHUMBO",
+        "dataRecebimento": "",
+        "quantidade": 1,
+        "custoUnitario": 10.4,
+        "estoqueAtual": 0,
+        "status": "rascunho"
+      }
+    ],
+    "createdAt": "2026-05-20T18:55:59.440Z",
+    "updatedAt": "2026-05-20T18:55:59.440Z",
+    "confirmedAt": "2026-05-20T18:55:59.440Z"
+  }
+]

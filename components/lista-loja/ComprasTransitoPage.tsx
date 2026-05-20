@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { CompanyKey } from "@/lib/config/company";
 import type {
@@ -107,6 +108,11 @@ export default function ComprasTransitoPage({
   companyName: string;
   companySlug: string;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const draftFromQuery = searchParams.get("draft");
+  const handledDraftRef = useRef<string | null>(null);
   const [view, setView] = useState<ViewMode>("list");
   const [compras, setCompras] = useState<CompraTransitoListEntry[]>([]);
   const [selectedCompra, setSelectedCompra] = useState<CompraTransito | null>(null);
@@ -197,6 +203,44 @@ export default function ComprasTransitoPage({
     setBulkDate("");
     setView("editor");
   }, []);
+
+  useEffect(() => {
+    if (!draftFromQuery || loading) return;
+    if (handledDraftRef.current === draftFromQuery) return;
+
+    handledDraftRef.current = draftFromQuery;
+    let cancelled = false;
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("draft");
+    const nextUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+
+    setLoadingDetail(true);
+    setError(null);
+    fetchCompra(companyKey, draftFromQuery)
+      .then((data) => {
+        if (cancelled) return;
+        startEdit(data);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        handledDraftRef.current = null;
+        setToast({
+          tipo: "error",
+          mensagem: err instanceof Error ? err.message : "Erro ao abrir rascunho",
+        });
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingDetail(false);
+          router.replace(nextUrl);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [companyKey, draftFromQuery, loading, pathname, router, searchParams, startEdit]);
 
   const applyBulkDate = useCallback((date: string) => {
     if (!date) return;
@@ -312,7 +356,7 @@ export default function ComprasTransitoPage({
         setSaving(false);
       }
     },
-    [canConfirm, canSaveDraft, companyKey, draftItems, draftTitle, editingId, loadCompras, saving]
+    [canConfirm, canSaveDraft, companyKey, draftItems, draftTitle, editingId, loadCompras, openDetail, saving]
   );
 
   const cancelCompra = useCallback(async () => {
@@ -715,9 +759,6 @@ export default function ComprasTransitoPage({
                 disabled={deleting || loadingDetail}
               >
                 {deleting ? "Cancelando..." : "Cancelar compra"}
-              </button>
-              <button type="button" className={styles.primaryBtn} onClick={startNew}>
-                + Nova Compra
               </button>
             </div>
           </div>

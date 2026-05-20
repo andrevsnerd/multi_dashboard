@@ -26,6 +26,7 @@ import {
 import { exportListaLojaToXlsx } from "@/lib/utils/exportListaLoja";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
 import { calcNecessidadeMinimaQty, combineBaseSuggestionWithNecessidadeMinima } from "@/lib/utils/necessidade-minima";
+import { getMappedColorDescription } from "@/lib/utils/colorMapping";
 import type { CompraSalvaItemRow } from "@/lib/types/compra-salva";
 import type { ProdutoTransferencia } from "@/lib/repositories/controleTransferencias";
 
@@ -282,7 +283,10 @@ async function fetchListas(company: string, username: string): Promise<ListaLoja
   });
   if (!res.ok) return [];
   const json = (await res.json()) as { data: ListaLoja[] };
-  return json.data || [];
+  return (json.data || []).map((lista) => ({
+    ...lista,
+    itens: Array.isArray(lista.itens) ? lista.itens.map(normalizeListaItemColor) : [],
+  }));
 }
 
 async function salvarLista(
@@ -301,7 +305,10 @@ async function salvarLista(
   const res = await fetch(url, {
     method: isNew ? "POST" : "PUT",
     headers: { "Content-Type": "application/json", "x-auth-username": username },
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      ...data,
+      itens: data.itens.map(normalizeListaItemColor),
+    }),
   });
   if (!res.ok) {
     const err = (await res.json()) as { error: string };
@@ -644,6 +651,46 @@ function normalizeKey(s?: string | null) {
 
 function buildItemKey(produto?: string | null, corProduto?: string | null) {
   return buildControleEstoqueItemKey(produto, corProduto);
+}
+
+function resolveStrictColorDescription(
+  corProduto?: string | null,
+  descCor?: string | null
+) {
+  const codigoCor = (corProduto ?? "").trim();
+  if (codigoCor) {
+    return getMappedColorDescription(codigoCor);
+  }
+
+  return (descCor ?? "").trim();
+}
+
+function formatColorDisplay(descCor?: string | null, corProduto?: string | null) {
+  const descricao = resolveStrictColorDescription(corProduto, descCor);
+  const codigoCor = (corProduto ?? "").trim();
+
+  if (descricao && codigoCor) {
+    return `${descricao} (${codigoCor})`;
+  }
+  if (descricao) {
+    return descricao;
+  }
+  if (codigoCor) {
+    return codigoCor;
+  }
+  return "—";
+}
+
+function formatColorInlineDetail(descCor?: string | null, corProduto?: string | null) {
+  const colorLabel = formatColorDisplay(descCor, corProduto);
+  return colorLabel === "—" ? "" : ` · ${colorLabel}`;
+}
+
+function normalizeListaItemColor(item: ListaItem): ListaItem {
+  return {
+    ...item,
+    descCor: resolveStrictColorDescription(item.corProduto, item.descCor),
+  };
 }
 
 function matchFilialName(a?: string | null, b?: string | null) {
@@ -1855,7 +1902,7 @@ function ListaLojaItensTable({
                   </span>
                 </div>
                 <div className={styles.productMeta}>{item.produto}</div>
-                <div className={styles.productMeta}>{(item.descCor || "").trim() || "—"}</div>
+                <div className={styles.productMeta}>{formatColorDisplay(item.descCor, item.corProduto)}</div>
                 {item.codigoBarra ? (
                   <div className={styles.productMeta}>Cód. barras: {item.codigoBarra}</div>
                 ) : null}
@@ -1896,7 +1943,7 @@ function ListaLojaItensTable({
                             className={styles.colorChip}
                             onClick={() => onApplyColor?.(idx, opcao)}
                           >
-                            {opcao.descCor || opcao.corProduto}
+                            {formatColorDisplay(opcao.descCor, opcao.corProduto)}
                           </button>
                         ))}
                         <button
@@ -1990,7 +2037,7 @@ function ListaLojaItensTable({
                           x: e.clientX,
                           y: e.clientY,
                           produto: item.produto,
-                          cor: item.descCor || "",
+                          cor: formatColorDisplay(item.descCor, item.corProduto),
                           escopo: filialCod ? "loja" : "geral",
                           periodo: periodoHistorico,
                           regra: "Classificação por faturamento acumulado (A até 80%, B até 95%, C acima de 95%).",
@@ -2063,7 +2110,7 @@ function ListaLojaItensTable({
                         x: e.clientX,
                         y: e.clientY,
                         produto: item.produto,
-                        cor: item.descCor || "",
+                        cor: formatColorDisplay(item.descCor, item.corProduto),
                         mode: "valor12m",
                         filiais: cached,
                         loading: false,
@@ -2074,7 +2121,7 @@ function ListaLojaItensTable({
                       x: e.clientX,
                       y: e.clientY,
                       produto: item.produto,
-                      cor: item.descCor || "",
+                      cor: formatColorDisplay(item.descCor, item.corProduto),
                       mode: "valor12m",
                       filiais: [],
                       loading: true,
@@ -2117,7 +2164,7 @@ function ListaLojaItensTable({
                         x: e.clientX,
                         y: e.clientY,
                         produto: item.produto,
-                        cor: item.descCor || "",
+                        cor: formatColorDisplay(item.descCor, item.corProduto),
                         mode: "12m",
                         filiais: cached,
                         loading: false,
@@ -2128,7 +2175,7 @@ function ListaLojaItensTable({
                       x: e.clientX,
                       y: e.clientY,
                       produto: item.produto,
-                      cor: item.descCor || "",
+                      cor: formatColorDisplay(item.descCor, item.corProduto),
                       mode: "12m",
                       filiais: [],
                       loading: true,
@@ -2192,7 +2239,7 @@ function ListaLojaItensTable({
                         x: e.clientX,
                         y: e.clientY,
                         produto: item.produto,
-                        cor: item.descCor || "",
+                        cor: formatColorDisplay(item.descCor, item.corProduto),
                         filiais: rows,
                         total: rows.reduce((s, r) => s + Math.max(0, Number(r.estoque ?? 0)), 0),
                       });
@@ -2246,7 +2293,7 @@ function ListaLojaItensTable({
                         x: e.clientX,
                         y: e.clientY,
                         produto: item.produto,
-                        cor: item.descCor || "",
+                        cor: formatColorDisplay(item.descCor, item.corProduto),
                         mode: "60d",
                         filiais: cached,
                         loading: false,
@@ -2257,7 +2304,7 @@ function ListaLojaItensTable({
                       x: e.clientX,
                       y: e.clientY,
                       produto: item.produto,
-                      cor: item.descCor || "",
+                      cor: formatColorDisplay(item.descCor, item.corProduto),
                       mode: "60d",
                       filiais: [],
                       loading: true,
@@ -3544,7 +3591,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
         descProduto: produto.descProduto,
         codigoBarra: produto.codigoBarra ?? null,
         corProduto: produto.corProduto,
-        descCor: (produto.descCor || "").trim(),
+        descCor: resolveStrictColorDescription(produto.corProduto, produto.descCor),
         linha: produto.linha ?? null,
         subgrupo: produto.subgrupo ?? null,
       };
@@ -3678,7 +3725,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             descProduto: p.descProduto,
             codigoBarra: p.codigoBarra ?? null,
             corProduto: p.corProduto,
-            descCor: (p.descCor || "").trim(),
+            descCor: resolveStrictColorDescription(p.corProduto, p.descCor),
             linha: p.linha ?? null,
             subgrupo: p.subgrupo ?? null,
           },
@@ -3798,7 +3845,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             descProduto: p.descProduto,
             codigoBarra: p.codigoBarra ?? null,
             corProduto: p.corProduto,
-            descCor: (p.descCor || "").trim(),
+            descCor: resolveStrictColorDescription(p.corProduto, p.descCor),
             linha: p.linha ?? null,
             subgrupo: p.subgrupo ?? null,
           },
@@ -4002,7 +4049,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             descProduto: p.descProduto,
             codigoBarra: p.codigoBarra ?? null,
             corProduto: p.corProduto,
-            descCor: (p.descCor || "").trim(),
+            descCor: resolveStrictColorDescription(p.corProduto, p.descCor),
             linha: p.linha ?? null,
             subgrupo: p.subgrupo ?? null,
           },
@@ -4223,7 +4270,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
           ...atual,
           codigoBarra: produtoComCor.codigoBarra ?? null,
           corProduto: produtoComCor.corProduto,
-          descCor: (produtoComCor.descCor || "").trim(),
+          descCor: resolveStrictColorDescription(produtoComCor.corProduto, produtoComCor.descCor),
           linha: produtoComCor.linha ?? atual.linha ?? null,
           subgrupo: produtoComCor.subgrupo ?? atual.subgrupo ?? null,
           ...novasMetricas,
@@ -4292,7 +4339,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     (lista: ListaLoja) => {
       setEditingId(lista.id);
       setNomeLista(lista.nome);
-      setItens(Array.isArray(lista.itens) ? lista.itens : []);
+      setItens(Array.isArray(lista.itens) ? lista.itens.map(normalizeListaItemColor) : []);
       const f = filiaisDisponiveis.find((f) => f.codFilial === lista.filial) ?? filiais.find((f) => f.codFilial === lista.filial);
       if (f) setFilialSelecionada(f);
       setMode("editor");
@@ -5020,7 +5067,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                               <div className={styles.produtoModalName}>{produto.descProduto}</div>
                               <div className={styles.produtoModalDetails}>
                                 {produto.produto}
-                                {produto.descCor ? ` · ${produto.descCor}` : produto.corProduto ? ` · ${produto.corProduto}` : ""}
+                                {formatColorInlineDetail(produto.descCor, produto.corProduto)}
                                 {produto.codigoBarra ? ` · ${produto.codigoBarra}` : ""}
                               </div>
                             </div>
@@ -5044,7 +5091,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                                         className={styles.colorChip}
                                         onClick={() => adicionarComCor(opcao)}
                                       >
-                                        {opcao.descCor || opcao.corProduto}
+                                        {formatColorDisplay(opcao.descCor, opcao.corProduto)}
                                       </button>
                                     ))}
                                     <button
@@ -5088,7 +5135,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                             <div className={styles.produtoName}>{item.descProduto}</div>
                             <div className={styles.produtoSku}>
                               {item.produto}
-                              {item.descCor ? ` · ${item.descCor}` : item.corProduto ? ` · ${item.corProduto}` : ""}
+                              {formatColorInlineDetail(item.descCor, item.corProduto)}
                               {item.codigoBarra ? ` · ${item.codigoBarra}` : ""}
                             </div>
                           </div>
