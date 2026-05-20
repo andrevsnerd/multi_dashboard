@@ -1,3 +1,5 @@
+import { buildControleEstoqueItemKey } from "@/lib/utils/controle-estoque-metricas";
+
 export type CurvaPorProdutoClassificacao = "A" | "B" | "C";
 
 export interface CurvaPorProdutoSelectedItem {
@@ -42,5 +44,5 @@ export function buildCurvaPorProdutoKey(
   produto?: string | null,
   corProduto?: string | null
 ): string {
-  return `${(produto ?? "").trim()}||${(corProduto ?? "").trim()}`;
+  return buildControleEstoqueItemKey(produto, corProduto);
 }

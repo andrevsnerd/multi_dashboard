@@ -13,7 +13,11 @@ import {
 import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateRangeFilter";
 import FilialFilter from "@/components/filters/FilialFilter";
 import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
-import { fetchControleEstoqueItemMetricasClient } from "@/lib/client/controle-estoque-metricas";
+import {
+  fetchControleEstoqueItemMetricasClient,
+  fetchControleEstoqueMetricasItensClient,
+} from "@/lib/client/controle-estoque-metricas";
+import { buildControleEstoqueItemKey } from "@/lib/utils/controle-estoque-metricas";
 import {
   buildCompraTransitoIndex,
   fetchComprasTransitoClient,
@@ -91,6 +95,24 @@ interface ProdutoComCurva extends ProdutoRow {
   percParticipacao: number;
   percCumulativa: number;
 }
+
+type CompraMetricRow = {
+  qtde12m: number | null;
+  vendasMesAtual: number | null;
+  estoqueFilial: number | null;
+  diasDesdeUltimaVenda: number | null;
+  mesesHistoricoFilial: number | null;
+  totalNmQty: number | null;
+};
+
+const EMPTY_COMPRA_METRIC_ROW: CompraMetricRow = {
+  qtde12m: null,
+  vendasMesAtual: null,
+  estoqueFilial: null,
+  diasDesdeUltimaVenda: null,
+  mesesHistoricoFilial: null,
+  totalNmQty: null,
+};
 
 // ─── Formatação ──────────────────────────────────────────────────────────────
 
@@ -203,16 +225,16 @@ function calcularCurvas(produtos: ProdutoRow[]): ProdutoComCurva[] {
   return produtos.map((p): ProdutoComCurva => {
     cumulative += p.vendas;
     const percCum = totalGeral > 0 ? cumulative / totalGeral : 1;
-    const curva: Curva = percCum <= 0.80 ? "A" : percCum <= 0.95 ? "B" : "C";
+    const curva: Curva = percCum <= 0.60 ? "A" : percCum <= 0.90 ? "B" : "C";
     const percParticipacao = totalGeral > 0 ? (p.vendas / totalGeral) * 100 : 0;
     return { ...p, curva, percParticipacao, percCumulativa: percCum };
   });
 }
 
 const CURVA_LABEL: Record<Curva, string> = {
-  A: "Curva A — 80% do faturamento",
-  B: "Curva B — 15% do faturamento",
-  C: "Curva C — 5% do faturamento",
+  A: "Curva A — 60% do faturamento",
+  B: "Curva B — 30% do faturamento",
+  C: "Curva C — 10% do faturamento",
 };
 
 const CURVA_BADGE_CLASS: Record<Curva, string> = {
@@ -226,6 +248,8 @@ const CURVA_BAR_CLASS: Record<Curva, string> = {
   B: styles.percBarFillB,
   C: styles.percBarFillC,
 };
+
+const METRICAS_CHUNK_SIZE = 40;
 
 // ─── Category helpers ─────────────────────────────────────────────────────────
 
@@ -399,6 +423,14 @@ function getReposicaoBaseType(sugestao: {
   if ((sugestao.qtdNM ?? 0) > 0) return "NM";
   if (sugestao.qtdSuficiente) return "SUFICIENTE";
   return "SEM_SUGESTAO";
+}
+
+function buildCurvaAbcMetricKey(
+  produto?: string | null,
+  corProduto?: string | null,
+  porCor: boolean = true
+): string {
+  return buildControleEstoqueItemKey(produto, porCor ? corProduto : null);
 }
 
 async function fetchEstoqueFilialSum(
@@ -576,19 +608,8 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [activeTab, setActiveTab] = useState<"produtos" | "vendedores">("produtos");
   const [porCor, setPorCor] = useState(true);
   const [filtrarSugeridos, setFiltrarSugeridos] = useState(false);
-  const [compraMetrics, setCompraMetrics] = useState<
-    Record<
-      string,
-      {
-        qtde12m: number | null;
-        vendasMesAtual: number | null;
-        estoqueFilial: number | null;
-        diasDesdeUltimaVenda: number | null;
-        mesesHistoricoFilial: number | null;
-        totalNmQty: number | null;
-      }
-    >
-  >({});
+  const [selectedCurva, setSelectedCurva] = useState<Curva | null>(null);
+  const [compraMetrics, setCompraMetrics] = useState<Record<string, CompraMetricRow>>({});
   const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
   const [sugestaoTooltip, setSugestaoTooltip] = useState<null | {
     x: number;
@@ -780,14 +801,19 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     return produtos;
   }, [produtosBaseFiltro, selectedSubgrupos, selectedGrades, selectedColecoes]);
 
-  const activeFilterLabels = [
+  const activeStructureFilterLabels = [
     selectedCategory ? getCategoryHeaderLabel(selectedCategory) : null,
     selectedSubgrupos.length > 0 ? `Subgrupos: ${selectedSubgrupos.join(", ")}` : null,
     selectedGrades.length > 0 ? `Grades: ${selectedGrades.join(", ")}` : null,
     selectedColecoes.length > 0 ? `Coleções: ${selectedColecoes.join(", ")}` : null,
   ].filter((value): value is string => Boolean(value));
 
-  const hasStructuredFilters = activeFilterLabels.length > 0;
+  const activeFilterLabels = [
+    ...activeStructureFilterLabels,
+    selectedCurva ? `Curva: ${selectedCurva}` : null,
+  ].filter((value): value is string => Boolean(value));
+
+  const hasStructuredFilters = activeStructureFilterLabels.length > 0;
 
   const produtosComCurva = useMemo(() => {
     if (produtosFiltrados.length === 0) return [];
@@ -795,10 +821,10 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   }, [produtosFiltrados]);
   const diasCorridosMes = Math.max(1, new Date().getDate());
 
-  const produtosComCurvaExibidos = useMemo(() => {
+  const produtosComCurvaComFiltroSugestao = useMemo(() => {
     if (!filtrarSugeridos) return produtosComCurva;
     return produtosComCurva.filter((p) => {
-      const metricKey = `${(p.produto ?? "").trim()}||${((p.cor ?? "") || "").trim()}`;
+      const metricKey = buildCurvaAbcMetricKey(p.produto, p.cor ?? null, porCor);
       const live = compraMetrics[metricKey];
       const hasLive = Object.prototype.hasOwnProperty.call(compraMetrics, metricKey);
       if (!hasLive) return false;
@@ -844,10 +870,15 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     });
   }, [filtrarSugeridos, produtosComCurva, compraMetrics, comprasTransitoIndex, diasCorridosMes, porCor]);
 
+  const produtosComCurvaExibidos = useMemo(() => {
+    if (!selectedCurva) return produtosComCurvaComFiltroSugestao;
+    return produtosComCurvaComFiltroSugestao.filter((p) => p.curva === selectedCurva);
+  }, [produtosComCurvaComFiltroSugestao, selectedCurva]);
+
   const maxPerc = produtosComCurvaExibidos.length > 0 ? produtosComCurvaExibidos[0].percParticipacao : 1;
-  const countA = produtosComCurvaExibidos.filter(p => p.curva === "A").length;
-  const countB = produtosComCurvaExibidos.filter(p => p.curva === "B").length;
-  const countC = produtosComCurvaExibidos.filter(p => p.curva === "C").length;
+  const countA = produtosComCurvaComFiltroSugestao.filter(p => p.curva === "A").length;
+  const countB = produtosComCurvaComFiltroSugestao.filter(p => p.curva === "B").length;
+  const countC = produtosComCurvaComFiltroSugestao.filter(p => p.curva === "C").length;
   const groups: Curva[] = ["A", "B", "C"];
 
   const displayVendas = hasStructuredFilters
@@ -857,6 +888,12 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     ? produtosFiltrados.reduce((s, p) => s + p.qtde, 0)
     : data?.qtde ?? 0;
   const displayCMV = produtosFiltrados.reduce((s, p) => s + p.custo * p.qtde, 0);
+  const hasAnyDisplayFilter = hasStructuredFilters || filtrarSugeridos || selectedCurva !== null;
+  const displayedCountLabel = selectedCurva
+    ? `${selectedCurva} ${porCor ? "itens exibidos" : "produtos exibidos"}`
+    : porCor
+      ? "ITENS (PROD. + COR)"
+      : "PRODUTOS ÚNICOS";
 
   useEffect(() => {
     setCompraMetrics({});
@@ -866,36 +903,51 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     if (produtosComCurva.length === 0) return;
     let cancelled = false;
     const load = async () => {
-      const CHUNK_SIZE = 12;
-      for (let i = 0; i < produtosComCurva.length; i += CHUNK_SIZE) {
+      const itens = produtosComCurva
+        .slice()
+        .sort((a, b) => b.vendas - a.vendas)
+        .map((p) => ({
+          produto: p.produto,
+          corProduto: porCor ? (p.cor ?? null) : null,
+        }));
+
+      for (let i = 0; i < itens.length; i += METRICAS_CHUNK_SIZE) {
         if (cancelled) return;
-        const chunk = produtosComCurva.slice(i, i + CHUNK_SIZE);
-        const rows = await Promise.all(
-          chunk.map(async (p) => {
-            const key = `${(p.produto ?? "").trim()}||${((p.cor ?? "") || "").trim()}`;
-            const [vendas, estoque] = await Promise.all([
-              fetchVendasItemMetricas(companyKey, selectedFilial, p.produto, porCor ? (p.cor ?? null) : null),
-              fetchEstoqueFilialSum(companyKey, selectedFilial, p.produto, porCor ? (p.cor ?? null) : null),
-            ]);
-            return {
-              key,
-              values: {
-                qtde12m: vendas?.qtde12m ?? null,
-                vendasMesAtual: vendas?.vendasMesAtual ?? null,
-                estoqueFilial: estoque,
-                diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
-                mesesHistoricoFilial: vendas?.mesesHistoricoFilial ?? null,
-                totalNmQty: vendas?.totalNmQty ?? null,
-              },
-            };
-          })
-        );
-        if (cancelled) return;
-        setCompraMetrics((prev) => {
-          const next = { ...prev };
-          for (const row of rows) next[row.key] = row.values;
-          return next;
-        });
+        const chunk = itens.slice(i, i + METRICAS_CHUNK_SIZE);
+        try {
+          const rows = await fetchControleEstoqueMetricasItensClient({
+            company: companyKey,
+            filial: selectedFilial,
+            includeHistorico: true,
+            itens: chunk,
+          });
+
+          if (cancelled) return;
+
+          setCompraMetrics((prev) => {
+            const next = { ...prev };
+            chunk.forEach((item) => {
+              next[buildControleEstoqueItemKey(item.produto, item.corProduto)] = EMPTY_COMPRA_METRIC_ROW;
+            });
+            Object.entries(rows).forEach(([key, value]) => {
+              next[key] = {
+                qtde12m: value.resumo.qtde12m,
+                vendasMesAtual: value.resumo.vendasMesAtual,
+                estoqueFilial: value.resumo.estoqueTotal,
+                diasDesdeUltimaVenda: value.resumo.diasDesdeUltimaVenda,
+                mesesHistoricoFilial: value.resumo.mesesHistoricoFilial,
+                totalNmQty: calcTotalNecessidadeMinimaPorFilial({
+                  company: resolveCompany(companyKey),
+                  vendasPorFilial: value.vendasPorFilial,
+                  estoquePorFilial: value.estoquePorFilial,
+                }),
+              };
+            });
+            return next;
+          });
+        } catch {
+          if (!cancelled && i === 0) setCompraMetrics({});
+        }
       }
     };
     void load();
@@ -950,7 +1002,7 @@ const handleBadgeClick = (cat: string) => {
   };
 
   const getSugestaoCompraExportValue = (p: ProdutoComCurva): number | "" => {
-    const metricKey = `${(p.produto ?? "").trim()}||${((p.cor ?? "") || "").trim()}`;
+    const metricKey = buildCurvaAbcMetricKey(p.produto, p.cor ?? null, porCor);
     const live = compraMetrics[metricKey];
     const hasLive = Object.prototype.hasOwnProperty.call(compraMetrics, metricKey);
     if (!hasLive) return "";
@@ -995,12 +1047,12 @@ const handleBadgeClick = (cat: string) => {
   };
 
   const buildExportSimpleRows = (): CurvaAbcSimpleXlsxRow[] => {
-    if (produtosComCurva.length === 0) return [];
+    if (produtosComCurvaExibidos.length === 0) return [];
     const rows: CurvaAbcSimpleXlsxRow[] = [];
     for (const curva of groups) {
-      const grupo = produtosComCurva.filter(p => p.curva === curva);
+      const grupo = produtosComCurvaExibidos.filter(p => p.curva === curva);
       for (const p of grupo) {
-        const rankGlobal = produtosComCurva.indexOf(p) + 1;
+        const rankGlobal = produtosComCurvaExibidos.indexOf(p) + 1;
         const precoMedio = p.qtde > 0 ? p.vendas / p.qtde : 0;
         const markup = p.custo > 0 && precoMedio > 0 ? precoMedio / p.custo : null;
         const cmp = getComparisonBadge(p.vendas, p.vendasPrevious);
@@ -1267,22 +1319,43 @@ const handleBadgeClick = (cat: string) => {
           {produtosComCurva.length > 0 && (
             <div className={styles.summaryCard}>
               <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>{porCor ? "ITENS (PROD. + COR)" : "PRODUTOS ÚNICOS"}</span>
-                <span className={styles.summaryValueNeutral}>{produtosComCurva.length}</span>
+                <span className={styles.summaryLabel}>{displayedCountLabel}</span>
+                <span className={styles.summaryValueNeutral}>{produtosComCurvaExibidos.length}</span>
               </div>
               <div className={styles.summaryDivider} />
-              <div className={styles.summaryItem}>
+              <button
+                type="button"
+                className={`${styles.summaryItem} ${styles.curvaFilterCard} ${selectedCurva === "A" ? styles.curvaFilterCardActive : ""}`}
+                onClick={() => setSelectedCurva((prev) => prev === "A" ? null : "A")}
+              >
                 <span className={styles.summaryLabel}>Curva A</span>
                 <span className={`${styles.summaryValueSmall} ${styles.textA}`}>{countA} produtos</span>
-              </div>
-              <div className={styles.summaryItem}>
+              </button>
+              <button
+                type="button"
+                className={`${styles.summaryItem} ${styles.curvaFilterCard} ${selectedCurva === "B" ? styles.curvaFilterCardActive : ""}`}
+                onClick={() => setSelectedCurva((prev) => prev === "B" ? null : "B")}
+              >
                 <span className={styles.summaryLabel}>Curva B</span>
                 <span className={`${styles.summaryValueSmall} ${styles.textB}`}>{countB} produtos</span>
-              </div>
-              <div className={styles.summaryItem}>
+              </button>
+              <button
+                type="button"
+                className={`${styles.summaryItem} ${styles.curvaFilterCard} ${selectedCurva === "C" ? styles.curvaFilterCardActive : ""}`}
+                onClick={() => setSelectedCurva((prev) => prev === "C" ? null : "C")}
+              >
                 <span className={styles.summaryLabel}>Curva C</span>
                 <span className={`${styles.summaryValueSmall} ${styles.textC}`}>{countC} produtos</span>
-              </div>
+              </button>
+              {selectedCurva && (
+                <button
+                  type="button"
+                  className={styles.clearCurveFilterBtn}
+                  onClick={() => setSelectedCurva(null)}
+                >
+                  Limpar curva
+                </button>
+              )}
               {activeFilterLabels.length > 0 && (
                 <>
                   <div className={styles.summaryDivider} />
@@ -1412,12 +1485,14 @@ const handleBadgeClick = (cat: string) => {
 
           {/* ABC Table */}
           <div className={styles.tableCard}>
-            {produtosComCurvaExibidos.length === 0 && hasStructuredFilters && (
+            {produtosComCurvaExibidos.length === 0 && hasAnyDisplayFilter && (
               <div className={styles.empty}>
-                Nenhum produto encontrado nos filtros selecionados neste período.
+                {filtrarSugeridos
+                  ? "Nenhum produto com sugestão de compra neste filtro."
+                  : "Nenhum produto encontrado nos filtros selecionados neste período."}
               </div>
             )}
-            {produtosComCurvaExibidos.length === 0 && !hasStructuredFilters && (
+            {produtosComCurvaExibidos.length === 0 && !hasAnyDisplayFilter && (
               <div className={styles.empty}>
                 {filtrarSugeridos
                   ? "Nenhum produto com sugestão de compra neste filtro."
@@ -1596,18 +1671,18 @@ const handleBadgeClick = (cat: string) => {
                               <td className={styles.vendas}>{markup !== null ? <span className={styles.markupBadge}>{markup.toFixed(2)}x</span> : <span className={styles.noData}>—</span>}</td>
                               <td className={styles.vendas}>
                                   {(() => {
-                                    const metricKey = `${(p.produto ?? "").trim()}||${((p.cor ?? "") || "").trim()}`;
+                                    const metricKey = buildCurvaAbcMetricKey(p.produto, p.cor ?? null, porCor);
                                     const live = compraMetrics[metricKey];
                                     const hasLive = Object.prototype.hasOwnProperty.call(compraMetrics, metricKey);
                                     if (!hasLive) {
-                                      return <span className={styles.cellMetric}>…</span>;
+                                      return <span className={styles.cellMetric}>Carregando...</span>;
                                     }
                                     const semBaseLive =
                                       live?.qtde12m == null &&
                                       live?.vendasMesAtual == null &&
                                       live?.estoqueFilial == null;
                                     if (semBaseLive) {
-                                      return <span className={styles.cellMetric}>—</span>;
+                                      return <span className={styles.cellMetric}>Sem dados</span>;
                                     }
                                     const compraItem = {
                                       vendasMesAtual: live?.vendasMesAtual ?? 0,
@@ -1857,7 +1932,7 @@ const handleBadgeClick = (cat: string) => {
                                           </span>
                                         );
                                       }
-                                      return <span className={styles.cellMetric}>—</span>;
+                                      return <span className={styles.cellMetric}>Sem sugestao</span>;
                                     }
                                     const vendasMes = Number(compraItem.vendasMesAtual ?? 0);
                                     const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;

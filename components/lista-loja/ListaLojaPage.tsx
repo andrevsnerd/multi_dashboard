@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthContext";
 import { calculateTransfers } from "@/components/controle-transferencias/ControleTransferenciasTable";
 import ComprasSalvasListPanel from "@/components/stock/ComprasSalvasListPanel";
+import { buildControleEstoqueItemKey } from "@/lib/utils/controle-estoque-metricas";
 import {
   aggregateEstoquePorFilialByDisplayLabel,
   compareFilialDisplayOrder,
@@ -642,7 +643,7 @@ function normalizeKey(s?: string | null) {
 }
 
 function buildItemKey(produto?: string | null, corProduto?: string | null) {
-  return `${normalizeKey(produto)}|${normalizeKey(corProduto)}`;
+  return buildControleEstoqueItemKey(produto, corProduto);
 }
 
 function matchFilialName(a?: string | null, b?: string | null) {
@@ -2527,7 +2528,7 @@ function ListaLojaItensTable({
                   if (baseType === "NM") {
                     const rotasNM = transferenciasPorItem?.[buildItemKey(item.produto, item.corProduto)] ?? [];
                     if (rotasNM.length > 0) {
-                      return <span className={styles.cellMetric}>—</span>;
+                      return <span className={styles.cellMetric}>Transferencia</span>;
                     }
                     return (
                       <span className={styles.reporAdd}>
@@ -2558,7 +2559,7 @@ function ListaLojaItensTable({
                   }
                   if (baseType === "SEM_SUGESTAO") {
                     if (transit.totalTransit <= 0) {
-                      return <span className={styles.cellMetric}>—</span>;
+                      return <span className={styles.cellMetric}>Sem sugestao</span>;
                     }
                     return (
                       <span

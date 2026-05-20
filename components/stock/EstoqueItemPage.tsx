@@ -58,8 +58,39 @@ function formatInt(n: number): string {
 }
 
 function sumOnlyPositive(values: number[]): number {
-  // Negativos devem ser exibidos (quando habilitado), mas não entram na soma.
-  return values.reduce((s, v) => s + (v > 0 ? v : 0), 0);
+  return values.reduce((sum, value) => sum + (value > 0 ? value : 0), 0);
+}
+
+function buildItemMeta(row: PivotRow, companyKey: CompanyKey): string {
+  const parts =
+    companyKey === "nerd"
+      ? [row.linha, row.subgrupo, row.cor]
+      : [row.linha, row.subgrupo, row.colecao, row.grade ? `Grade ${row.grade}` : null, row.cor];
+
+  return parts.filter((value) => Boolean(value && value.trim())).join(" · ");
+}
+
+function getHighlightedFiliais(row: PivotRow, filiaisColumns: string[]): Set<string> {
+  let maxValue = Number.NEGATIVE_INFINITY;
+  const highlighted = new Set<string>();
+
+  for (const filial of filiaisColumns) {
+    const value = row.porFilial[filial] ?? 0;
+    if (value <= 0) continue;
+
+    if (value > maxValue) {
+      maxValue = value;
+      highlighted.clear();
+      highlighted.add(filial);
+      continue;
+    }
+
+    if (value === maxValue) {
+      highlighted.add(filial);
+    }
+  }
+
+  return highlighted;
 }
 
 async function fetchDetalhesPorFilial(params: {
@@ -74,41 +105,53 @@ async function fetchDetalhesPorFilial(params: {
   mostrarZerados: boolean;
   mostrarNegativos: boolean;
 }): Promise<DetalhesPorFilialResponse> {
-  const sp = new URLSearchParams({ company: params.company });
-  if (params.filial) sp.set("filial", params.filial);
-  if (params.itens.trim()) sp.set("itens", params.itens.trim());
-  if (params.grupo) sp.set("grupo", params.grupo);
-  if (params.linha) sp.set("linha", params.linha);
-  if (params.subgrupo) sp.set("subgrupo", params.subgrupo);
-  if (params.grade) sp.set("grade", params.grade);
-  if (params.colecao) sp.set("colecao", params.colecao);
-  if (params.mostrarZerados) sp.set("mostrarZerados", "1");
-  if (params.mostrarNegativos) sp.set("mostrarNegativos", "1");
+  const searchParams = new URLSearchParams({ company: params.company });
 
-  const res = await fetch(`/api/controle-estoque/detalhes-por-filial?${sp.toString()}`, {
-    cache: "no-store",
-  });
-  const body = (await res.json().catch(() => ({}))) as { data?: DetalhesPorFilialResponse; error?: string };
-  if (!res.ok) {
-    throw new Error(body.error || `Erro ao consultar estoque (${res.status})`);
+  if (params.filial) searchParams.set("filial", params.filial);
+  if (params.itens.trim()) searchParams.set("itens", params.itens.trim());
+  if (params.grupo) searchParams.set("grupo", params.grupo);
+  if (params.linha) searchParams.set("linha", params.linha);
+  if (params.subgrupo) searchParams.set("subgrupo", params.subgrupo);
+  if (params.grade) searchParams.set("grade", params.grade);
+  if (params.colecao) searchParams.set("colecao", params.colecao);
+  if (params.mostrarZerados) searchParams.set("mostrarZerados", "1");
+  if (params.mostrarNegativos) searchParams.set("mostrarNegativos", "1");
+
+  const response = await fetch(
+    `/api/controle-estoque/detalhes-por-filial?${searchParams.toString()}`,
+    { cache: "no-store" },
+  );
+  const body = (await response.json().catch(() => ({}))) as {
+    data?: DetalhesPorFilialResponse;
+    error?: string;
+  };
+
+  if (!response.ok) {
+    throw new Error(body.error || `Erro ao consultar estoque (${response.status})`);
   }
+
   if (!body.data) {
-    throw new Error("Resposta inválida do servidor");
+    throw new Error("Resposta invalida do servidor");
   }
+
   return body.data;
 }
 
-export default function EstoqueItemPage({ companyKey, companyName }: EstoqueItemPageProps) {
+export default function EstoqueItemPage({
+  companyKey,
+  companyName,
+}: EstoqueItemPageProps) {
   const companyCfg = useMemo(() => resolveCompany(companyKey), [companyKey]);
   const range = useMemo(() => {
-    const r = getCurrentMonthRange();
-    return { startDate: r.start, endDate: r.end };
+    const currentRange = getCurrentMonthRange();
+    return { startDate: currentRange.start, endDate: currentRange.end };
   }, []);
 
   const linhasExcluidas = useMemo(() => {
     if (companyCfg?.excludedLines && companyCfg.excludedLines.length > 0) {
-      return new Set(companyCfg.excludedLines.map((l) => l.toUpperCase().trim()));
+      return new Set(companyCfg.excludedLines.map((linha) => linha.toUpperCase().trim()));
     }
+
     return new Set([
       "PRIVATE LABEL",
       "GASTRONOMICA",
@@ -145,23 +188,31 @@ export default function EstoqueItemPage({ companyKey, companyName }: EstoqueItem
       setAvailableGrupos([]);
       return;
     }
+
     let active = true;
-    (async () => {
+
+    void (async () => {
       try {
-        const sp = new URLSearchParams({
+        const searchParams = new URLSearchParams({
           company: companyKey,
           start: range.startDate.toISOString(),
           end: range.endDate.toISOString(),
         });
-        if (selectedFilial) sp.set("filial", selectedFilial);
-        const res = await fetch(`/api/products/grupos?${sp.toString()}`, { cache: "no-store" });
-        if (!res.ok) return;
-        const json = (await res.json()) as { data: string[] };
+
+        if (selectedFilial) searchParams.set("filial", selectedFilial);
+
+        const response = await fetch(`/api/products/grupos?${searchParams.toString()}`, {
+          cache: "no-store",
+        });
+        if (!response.ok) return;
+
+        const json = (await response.json()) as { data: string[] };
         if (active) setAvailableGrupos(json.data || []);
       } catch {
         /* ignore */
       }
     })();
+
     return () => {
       active = false;
     };
@@ -172,61 +223,84 @@ export default function EstoqueItemPage({ companyKey, companyName }: EstoqueItem
       setAvailableLinhas([]);
       return;
     }
+
     let active = true;
-    (async () => {
+
+    void (async () => {
       try {
-        const sp = new URLSearchParams({
+        const searchParams = new URLSearchParams({
           company: companyKey,
           start: range.startDate.toISOString(),
           end: range.endDate.toISOString(),
         });
-        if (selectedFilial) sp.set("filial", selectedFilial);
-        if (colecao) sp.append("colecoes", colecao);
-        if (subgrupo) sp.append("subgrupos", subgrupo);
-        if (grade) sp.append("grades", grade);
-        const res = await fetch(`/api/products/linhas?${sp.toString()}`, { cache: "no-store" });
-        if (!res.ok) return;
-        const json = (await res.json()) as { data: string[] };
+
+        if (selectedFilial) searchParams.set("filial", selectedFilial);
+        if (colecao) searchParams.append("colecoes", colecao);
+        if (subgrupo) searchParams.append("subgrupos", subgrupo);
+        if (grade) searchParams.append("grades", grade);
+
+        const response = await fetch(`/api/products/linhas?${searchParams.toString()}`, {
+          cache: "no-store",
+        });
+        if (!response.ok) return;
+
+        const json = (await response.json()) as { data: string[] };
         if (active) {
           const raw = json.data || [];
-          setAvailableLinhas(
-            raw.filter((l) => !linhasExcluidas.has(l.toUpperCase().trim())),
-          );
+          setAvailableLinhas(raw.filter((item) => !linhasExcluidas.has(item.toUpperCase().trim())));
         }
       } catch {
         /* ignore */
       }
     })();
+
     return () => {
       active = false;
     };
-  }, [companyKey, range.startDate, range.endDate, selectedFilial, colecao, subgrupo, grade, linhasExcluidas]);
+  }, [
+    companyKey,
+    range.startDate,
+    range.endDate,
+    selectedFilial,
+    colecao,
+    subgrupo,
+    grade,
+    linhasExcluidas,
+  ]);
 
   useEffect(() => {
     if (companyKey !== "scarfme") {
       setAvailableColecoes([]);
       return;
     }
+
     let active = true;
-    (async () => {
+
+    void (async () => {
       try {
-        const sp = new URLSearchParams({
+        const searchParams = new URLSearchParams({
           company: companyKey,
           start: range.startDate.toISOString(),
           end: range.endDate.toISOString(),
         });
-        if (selectedFilial) sp.set("filial", selectedFilial);
-        if (linha) sp.append("linhas", linha);
-        if (subgrupo) sp.append("subgrupos", subgrupo);
-        if (grade) sp.append("grades", grade);
-        const res = await fetch(`/api/products/colecoes?${sp.toString()}`, { cache: "no-store" });
-        if (!res.ok) return;
-        const json = (await res.json()) as { data: string[] };
+
+        if (selectedFilial) searchParams.set("filial", selectedFilial);
+        if (linha) searchParams.append("linhas", linha);
+        if (subgrupo) searchParams.append("subgrupos", subgrupo);
+        if (grade) searchParams.append("grades", grade);
+
+        const response = await fetch(`/api/products/colecoes?${searchParams.toString()}`, {
+          cache: "no-store",
+        });
+        if (!response.ok) return;
+
+        const json = (await response.json()) as { data: string[] };
         if (active) setAvailableColecoes(json.data || []);
       } catch {
         /* ignore */
       }
     })();
+
     return () => {
       active = false;
     };
@@ -237,26 +311,34 @@ export default function EstoqueItemPage({ companyKey, companyName }: EstoqueItem
       setAvailableSubgrupos([]);
       return;
     }
+
     let active = true;
-    (async () => {
+
+    void (async () => {
       try {
-        const sp = new URLSearchParams({
+        const searchParams = new URLSearchParams({
           company: companyKey,
           start: range.startDate.toISOString(),
           end: range.endDate.toISOString(),
         });
-        if (selectedFilial) sp.set("filial", selectedFilial);
-        if (linha) sp.append("linhas", linha);
-        if (colecao) sp.append("colecoes", colecao);
-        if (grade) sp.append("grades", grade);
-        const res = await fetch(`/api/products/subgrupos?${sp.toString()}`, { cache: "no-store" });
-        if (!res.ok) return;
-        const json = (await res.json()) as { data: string[] };
+
+        if (selectedFilial) searchParams.set("filial", selectedFilial);
+        if (linha) searchParams.append("linhas", linha);
+        if (colecao) searchParams.append("colecoes", colecao);
+        if (grade) searchParams.append("grades", grade);
+
+        const response = await fetch(`/api/products/subgrupos?${searchParams.toString()}`, {
+          cache: "no-store",
+        });
+        if (!response.ok) return;
+
+        const json = (await response.json()) as { data: string[] };
         if (active) setAvailableSubgrupos(json.data || []);
       } catch {
         /* ignore */
       }
     })();
+
     return () => {
       active = false;
     };
@@ -267,26 +349,34 @@ export default function EstoqueItemPage({ companyKey, companyName }: EstoqueItem
       setAvailableGrades([]);
       return;
     }
+
     let active = true;
-    (async () => {
+
+    void (async () => {
       try {
-        const sp = new URLSearchParams({
+        const searchParams = new URLSearchParams({
           company: companyKey,
           start: range.startDate.toISOString(),
           end: range.endDate.toISOString(),
         });
-        if (selectedFilial) sp.set("filial", selectedFilial);
-        if (linha) sp.append("linhas", linha);
-        if (colecao) sp.append("colecoes", colecao);
-        if (subgrupo) sp.append("subgrupos", subgrupo);
-        const res = await fetch(`/api/products/grades?${sp.toString()}`, { cache: "no-store" });
-        if (!res.ok) return;
-        const json = (await res.json()) as { data: string[] };
+
+        if (selectedFilial) searchParams.set("filial", selectedFilial);
+        if (linha) searchParams.append("linhas", linha);
+        if (colecao) searchParams.append("colecoes", colecao);
+        if (subgrupo) searchParams.append("subgrupos", subgrupo);
+
+        const response = await fetch(`/api/products/grades?${searchParams.toString()}`, {
+          cache: "no-store",
+        });
+        if (!response.ok) return;
+
+        const json = (await response.json()) as { data: string[] };
         if (active) setAvailableGrades(json.data || []);
       } catch {
         /* ignore */
       }
     })();
+
     return () => {
       active = false;
     };
@@ -295,8 +385,9 @@ export default function EstoqueItemPage({ companyKey, companyName }: EstoqueItem
   const consultar = useCallback(async () => {
     setLoading(true);
     setError(null);
+
     try {
-      const res = await fetchDetalhesPorFilial({
+      const response = await fetchDetalhesPorFilial({
         company: companyKey,
         filial: selectedFilial,
         itens: itensInput,
@@ -308,10 +399,10 @@ export default function EstoqueItemPage({ companyKey, companyName }: EstoqueItem
         mostrarZerados,
         mostrarNegativos,
       });
-      setData(res);
-    } catch (e) {
+      setData(response);
+    } catch (cause) {
       setData(null);
-      setError(e instanceof Error ? e.message : "Não foi possível carregar o estoque.");
+      setError(cause instanceof Error ? cause.message : "Nao foi possivel carregar o estoque.");
     } finally {
       setLoading(false);
     }
@@ -332,62 +423,67 @@ export default function EstoqueItemPage({ companyKey, companyName }: EstoqueItem
     if (!data?.variacoes.length) {
       return { pivotRows: [] as PivotRow[], filiaisColumns: [] as string[] };
     }
+
     const labelSet = new Set<string>();
-    for (const v of data.variacoes) {
-      labelSet.add(getFilialLabelForDisplay(companyCfg, v.filial));
+    for (const variacao of data.variacoes) {
+      labelSet.add(getFilialLabelForDisplay(companyCfg, variacao.filial));
     }
-    const filiaisColumns = Array.from(labelSet).sort((a, b) =>
-      compareFilialDisplayOrder(a, b, companyCfg),
+
+    const orderedFiliais = Array.from(labelSet).sort((left, right) =>
+      compareFilialDisplayOrder(left, right, companyCfg),
     );
 
-    const map = new Map<string, PivotRow>();
-    for (const v of data.variacoes) {
-      const key = `${v.produto}\u0000${v.cor}`;
-      const col = getFilialLabelForDisplay(companyCfg, v.filial);
-      if (!map.has(key)) {
-        const empty: Record<string, number> = {};
-        for (const f of filiaisColumns) empty[f] = 0;
-        map.set(key, {
-          produto: v.produto,
-          descricao: v.descricao,
-          linha: v.linha,
-          subgrupo: v.subgrupo,
-          grade: v.grade,
-          colecao: v.colecao,
-          cor: v.cor,
-          porFilial: empty,
+    const pivotMap = new Map<string, PivotRow>();
+
+    for (const variacao of data.variacoes) {
+      const key = `${variacao.produto}\u0000${variacao.cor}`;
+      const filialLabel = getFilialLabelForDisplay(companyCfg, variacao.filial);
+
+      if (!pivotMap.has(key)) {
+        const emptyFiliais: Record<string, number> = {};
+        for (const filial of orderedFiliais) emptyFiliais[filial] = 0;
+
+        pivotMap.set(key, {
+          produto: variacao.produto,
+          descricao: variacao.descricao,
+          linha: variacao.linha,
+          subgrupo: variacao.subgrupo,
+          grade: variacao.grade,
+          colecao: variacao.colecao,
+          cor: variacao.cor,
+          porFilial: emptyFiliais,
           total: 0,
         });
       }
-      const row = map.get(key)!;
-      row.porFilial[col] = (row.porFilial[col] ?? 0) + v.estoque;
+
+      const row = pivotMap.get(key);
+      if (!row) continue;
+
+      row.porFilial[filialLabel] = (row.porFilial[filialLabel] ?? 0) + variacao.estoque;
     }
 
-    const pivotRows = Array.from(map.values()).map((row) => {
-      const total = sumOnlyPositive(filiaisColumns.map((f) => row.porFilial[f] ?? 0));
-      return { ...row, total };
-    });
+    const rows = Array.from(pivotMap.values()).map((row) => ({
+      ...row,
+      total: sumOnlyPositive(orderedFiliais.map((filial) => row.porFilial[filial] ?? 0)),
+    }));
 
-    pivotRows.sort((a, b) => b.total - a.total || a.produto.localeCompare(b.produto));
-    return { pivotRows, filiaisColumns };
+    rows.sort((left, right) => right.total - left.total || left.produto.localeCompare(right.produto));
+
+    return {
+      pivotRows: rows,
+      filiaisColumns: orderedFiliais,
+    };
   }, [data, companyCfg]);
 
   const kpis = useMemo(() => {
     if (!data) return null;
+
     return {
       itens: pivotRows.length,
-      estoqueTotal: sumOnlyPositive(pivotRows.map((r) => r.total)),
+      estoqueTotal: sumOnlyPositive(pivotRows.map((row) => row.total)),
       filiais: filiaisColumns.length,
     };
-  }, [data, pivotRows.length, filiaisColumns.length]);
-
-  const totaisPorFilial = useMemo(() => {
-    if (!data || filiaisColumns.length === 0) return [];
-    return filiaisColumns.map((filialLabel) => {
-      const total = sumOnlyPositive(pivotRows.map((r) => r.porFilial[filialLabel] ?? 0));
-      return { filialLabel, total };
-    });
-  }, [data, filiaisColumns, pivotRows]);
+  }, [data, pivotRows, filiaisColumns]);
 
   const limparFiltros = () => {
     setItensInput("");
@@ -403,7 +499,6 @@ export default function EstoqueItemPage({ companyKey, companyName }: EstoqueItem
     setError(null);
   };
 
-  const selectClass = styles.select;
   const filtersGridClass =
     companyKey === "nerd"
       ? `${styles.filtersGrid} ${styles.filtersGridNerd}`
@@ -415,16 +510,14 @@ export default function EstoqueItemPage({ companyKey, companyName }: EstoqueItem
         <div className={styles.headerIcon} aria-hidden />
         <div>
           <h1 className={styles.title}>Estoque consulta</h1>
-          <p className={styles.subtitle}>
-            Itens e disponibilidade por filial — {companyName}
-          </p>
+          <p className={styles.subtitle}>Itens e disponibilidade por filial - {companyName}</p>
         </div>
       </header>
 
       <p className={styles.hint}>
-        Informe SKUs ou trechos de nome (separados por vírgula) e/ou use os filtros. Por padrão são
-        exibidas apenas variações com estoque positivo; marque as opções abaixo para incluir zeradas ou
-        negativas.
+        Informe SKUs ou trechos de nome separados por virgula e/ou use os filtros. Por padrao sao
+        exibidas apenas variacoes com estoque positivo; marque as opcoes abaixo para incluir
+        zeradas ou negativas.
       </p>
 
       <div className={styles.card}>
@@ -449,9 +542,9 @@ export default function EstoqueItemPage({ companyKey, companyName }: EstoqueItem
               <input
                 id="estoque-itens"
                 className={styles.searchInput}
-                placeholder="SKU, nome ou grade — separe por vírgula"
+                placeholder="SKU, nome ou grade - separe por virgula"
                 value={itensInput}
-                onChange={(e) => setItensInput(e.target.value)}
+                onChange={(event) => setItensInput(event.target.value)}
                 autoComplete="off"
               />
             </div>
@@ -464,14 +557,14 @@ export default function EstoqueItemPage({ companyKey, companyName }: EstoqueItem
               </label>
               <select
                 id="estoque-grupo"
-                className={selectClass}
+                className={styles.select}
                 value={grupo ?? ""}
-                onChange={(e) => setGrupo(e.target.value || null)}
+                onChange={(event) => setGrupo(event.target.value || null)}
               >
                 <option value="">Todos</option>
-                {availableGrupos.map((g) => (
-                  <option key={g} value={g}>
-                    {g}
+                {availableGrupos.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
                   </option>
                 ))}
               </select>
@@ -484,32 +577,32 @@ export default function EstoqueItemPage({ companyKey, companyName }: EstoqueItem
                 </label>
                 <select
                   id="estoque-linha"
-                  className={selectClass}
+                  className={styles.select}
                   value={linha ?? ""}
-                  onChange={(e) => setLinha(e.target.value || null)}
+                  onChange={(event) => setLinha(event.target.value || null)}
                 >
                   <option value="">Todas</option>
-                  {availableLinhas.map((l) => (
-                    <option key={l} value={l}>
-                      {l}
+                  {availableLinhas.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
                     </option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className={styles.fieldLabel} htmlFor="estoque-sub">
+                <label className={styles.fieldLabel} htmlFor="estoque-subgrupo">
                   Subgrupo
                 </label>
                 <select
-                  id="estoque-sub"
-                  className={selectClass}
+                  id="estoque-subgrupo"
+                  className={styles.select}
                   value={subgrupo ?? ""}
-                  onChange={(e) => setSubgrupo(e.target.value || null)}
+                  onChange={(event) => setSubgrupo(event.target.value || null)}
                 >
                   <option value="">Todos</option>
-                  {availableSubgrupos.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
+                  {availableSubgrupos.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
                     </option>
                   ))}
                 </select>
@@ -520,32 +613,32 @@ export default function EstoqueItemPage({ companyKey, companyName }: EstoqueItem
                 </label>
                 <select
                   id="estoque-grade"
-                  className={selectClass}
+                  className={styles.select}
                   value={grade ?? ""}
-                  onChange={(e) => setGrade(e.target.value || null)}
+                  onChange={(event) => setGrade(event.target.value || null)}
                 >
                   <option value="">Todas</option>
-                  {availableGrades.map((g) => (
-                    <option key={g} value={g}>
-                      {g}
+                  {availableGrades.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
                     </option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className={styles.fieldLabel} htmlFor="estoque-col">
-                  Coleção
+                <label className={styles.fieldLabel} htmlFor="estoque-colecao">
+                  Colecao
                 </label>
                 <select
-                  id="estoque-col"
-                  className={selectClass}
+                  id="estoque-colecao"
+                  className={styles.select}
                   value={colecao ?? ""}
-                  onChange={(e) => setColecao(e.target.value || null)}
+                  onChange={(event) => setColecao(event.target.value || null)}
                 >
                   <option value="">Todas</option>
-                  {availableColecoes.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
+                  {availableColecoes.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
                     </option>
                   ))}
                 </select>
@@ -570,7 +663,7 @@ export default function EstoqueItemPage({ companyKey, companyName }: EstoqueItem
               <input
                 type="checkbox"
                 checked={mostrarZerados}
-                onChange={(e) => setMostrarZerados(e.target.checked)}
+                onChange={(event) => setMostrarZerados(event.target.checked)}
               />
               Mostrar zerados
             </label>
@@ -578,20 +671,25 @@ export default function EstoqueItemPage({ companyKey, companyName }: EstoqueItem
               <input
                 type="checkbox"
                 checked={mostrarNegativos}
-                onChange={(e) => setMostrarNegativos(e.target.checked)}
+                onChange={(event) => setMostrarNegativos(event.target.checked)}
               />
               Mostrar negativos
             </label>
           </div>
           <button type="button" className={styles.clearBtn} onClick={limparFiltros}>
-            <span aria-hidden>×</span> Limpar filtros
+            <span aria-hidden>x</span> Limpar filtros
           </button>
         </div>
       </div>
 
       <div className={styles.actionsRow}>
-        <button type="button" className={styles.primaryBtn} onClick={() => void consultar()} disabled={loading}>
-          {loading ? "Consultando…" : "Consultar"}
+        <button
+          type="button"
+          className={styles.primaryBtn}
+          onClick={() => void consultar()}
+          disabled={loading}
+        >
+          {loading ? "Consultando..." : "Consultar"}
         </button>
       </div>
 
@@ -608,35 +706,16 @@ export default function EstoqueItemPage({ companyKey, companyName }: EstoqueItem
             <div className={styles.kpiValue}>{formatInt(kpis.estoqueTotal)}</div>
           </div>
           <div className={styles.kpi}>
-            <div className={styles.kpiLabel}>Filiais visíveis</div>
+            <div className={styles.kpiLabel}>Filiais visiveis</div>
             <div className={styles.kpiValue}>{formatInt(kpis.filiais)}</div>
           </div>
         </div>
       ) : null}
 
-      {kpis && !selectedFilial && totaisPorFilial.length > 0 ? (
-        <section className={styles.branchTotals}>
-          <div className={styles.branchTotalsHeader}>
-            <div className={styles.branchTotalsTitle}>Total por filial</div>
-            <div className={styles.branchTotalsSubtitle}>
-              Composição do “Estoque total” (somente positivos)
-            </div>
-          </div>
-          <div className={styles.branchTotalsGrid}>
-            {totaisPorFilial.map((t) => (
-              <div key={t.filialLabel} className={styles.branchTotalCard}>
-                <div className={styles.branchTotalLabel}>{t.filialLabel}</div>
-                <div className={styles.branchTotalValue}>{formatInt(t.total)}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {loading ? <div className={styles.loading}>Carregando…</div> : null}
+      {loading ? <div className={styles.loading}>Carregando...</div> : null}
 
       {!loading && data && pivotRows.length === 0 ? (
-        <div className={styles.empty}>Nenhuma variação encontrada com os filtros atuais.</div>
+        <div className={styles.empty}>Nenhuma variacao encontrada com os filtros atuais.</div>
       ) : null}
 
       {!loading && pivotRows.length > 0 ? (
@@ -644,49 +723,62 @@ export default function EstoqueItemPage({ companyKey, companyName }: EstoqueItem
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>SKU</th>
-                <th>Item</th>
-                {companyKey === "scarfme" ? <th>Grade</th> : null}
-                <th>Cor</th>
-                {filiaisColumns.map((f) => (
-                  <th key={f} className={styles.num}>
-                    {f}
+                <th className={styles.skuColumn}>Produto</th>
+                <th className={styles.itemColumn}>Desc. produto</th>
+                <th className={`${styles.num} ${styles.totalHeader}`}>Estoque total</th>
+                {filiaisColumns.map((filial) => (
+                  <th key={filial} className={styles.num}>
+                    {filial}
                   </th>
                 ))}
-                <th className={styles.num}>Total</th>
               </tr>
             </thead>
             <tbody>
-              {pivotRows.map((row) => (
-                <tr key={`${row.produto}-${row.cor}`}>
-                  <td className={styles.sku}>{row.produto}</td>
-                  <td>
-                    <span className={styles.itemName}>{row.descricao || "—"}</span>
-                    <span className={styles.itemMeta}>
-                      {companyKey === "nerd"
-                        ? row.linha || "—"
-                        : [row.linha, row.colecao].filter(Boolean).join(" · ") || "—"}
-                    </span>
-                  </td>
-                  {companyKey === "scarfme" ? (
-                    <td>
-                      {row.grade ? <span className={styles.pill}>{row.grade}</span> : "—"}
+              {pivotRows.map((row) => {
+                const highlightedFiliais = getHighlightedFiliais(row, filiaisColumns);
+                const meta = buildItemMeta(row, companyKey);
+
+                return (
+                  <tr key={`${row.produto}-${row.cor}`}>
+                    <td className={`${styles.sku} ${styles.skuColumn}`}>{row.produto}</td>
+                    <td className={styles.itemColumn}>
+                      <span className={styles.itemName}>{row.descricao || "-"}</span>
+                      <span className={styles.itemMeta}>{meta || "-"}</span>
                     </td>
-                  ) : null}
-                  <td>{row.cor || "—"}</td>
-                  {filiaisColumns.map((f) => {
-                    const v = row.porFilial[f] ?? 0;
-                    return (
-                      <td key={f} className={`${styles.num} ${v < 0 ? styles.neg : ""}`}>
-                        {formatInt(v)}
-                      </td>
-                    );
-                  })}
-                  <td className={`${styles.num} ${row.total < 0 ? styles.neg : ""}`}>
-                    {formatInt(row.total)}
-                  </td>
-                </tr>
-              ))}
+                    <td
+                      className={[
+                        styles.num,
+                        styles.totalCell,
+                        row.total < 0 ? styles.neg : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      <span className={styles.totalValue}>{formatInt(row.total)}</span>
+                    </td>
+                    {filiaisColumns.map((filial) => {
+                      const value = row.porFilial[filial] ?? 0;
+
+                      return (
+                        <td
+                          key={filial}
+                          className={[
+                            styles.num,
+                            styles.branchCell,
+                            value < 0 ? styles.neg : "",
+                            value === 0 ? styles.zeroCell : "",
+                            highlightedFiliais.has(filial) ? styles.branchCellHighlight : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          <span className={styles.branchValue}>{formatInt(value)}</span>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

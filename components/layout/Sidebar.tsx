@@ -150,7 +150,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
       key: "produtos-novos",
       label: "Produtos Novos",
       href: produtosNovosHref,
-      permission: "produtos",
+      permission: "produtos-novos",
       isActive: (currentPathname) => !!currentPathname && currentPathname.includes("/produtos-novos"),
     },
   ];
@@ -245,7 +245,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
                 key: "relatorio-claude",
                 label: "Relatório Claude",
                 href: relatorioClaudeHref,
-                permission: "produtos" as const,
+                permission: "relatorio-claude" as const,
                 isActive: (currentPathname: string | null) =>
                   matchesSegment(currentPathname, "/relatorio-claude", relatorioClaudeHref),
               },
@@ -277,7 +277,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
           key: "estoque-consulta",
           label: "Estoque Consulta",
           href: estoqueConsultaHref,
-          permission: "controle-estoque",
+          permission: "estoque-consulta",
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/estoque-consulta", estoqueConsultaHref),
         },
@@ -308,7 +308,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
           key: "curva-por-produto",
           label: "Curva por Produto",
           href: curvaPorProdutoHref,
-          permission: "curva-abc",
+          permission: "curva-por-produto",
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/curva-por-produto", curvaPorProdutoHref),
         },
@@ -316,7 +316,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
           key: "nova-filial",
           label: "Nova Filial",
           href: novaFilialHref,
-          permission: "curva-abc",
+          permission: "nova-filial",
           isActive: (currentPathname) => matchesSegment(currentPathname, "/nova-filial", novaFilialHref),
         },
       ],
@@ -367,7 +367,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
           key: "compras-transito",
           label: "Compras em Trânsito",
           href: comprasTransitoHref,
-          permission: "lista-loja",
+          permission: "compras-transito",
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/compras-transito", comprasTransitoHref),
         },
@@ -375,7 +375,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
           key: "compras-salvas",
           label: "Compras Salvas",
           href: comprasSalvasHref,
-          permission: "lista-loja",
+          permission: "compras-salvas",
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/compras-salvas", comprasSalvasHref),
         },

@@ -1,65 +1,20 @@
 /**
- * Mapa central de segmentos de rota → permissão necessária.
+ * Mapa central de segmentos de rota -> permissao necessaria.
  *
- * É a ÚNICA fonte de verdade para:
+ * E a UNICA fonte de verdade para:
  *   - lib/auth/permissions.ts (pathnameToPermission)
- *   - Sidebar.tsx (filtragem de itens por permissão)
+ *   - painel admin (lista de paginas configuraveis)
  *
- * Para adicionar uma nova página:
- *   1. Adicione a entrada aqui (segmento → PermissionKey)
+ * Para adicionar uma nova pagina:
+ *   1. Adicione a entrada em `page-permissions.ts`
  *   2. Adicione o item visual no Sidebar.tsx com `permission: "chave-aqui"`
- *   ✅ Nunca mais desincronizará.
+ *   3. O admin passa a exibir a nova permissao automaticamente
  */
 
+import { PAGE_ROUTE_PERMISSION_MAP } from "@/lib/config/page-permissions";
 import type { PermissionKey } from "@/types/auth";
 
 export const NAV_ROUTE_MAP: Record<string, PermissionKey | "admin"> = {
-  // ── Dashboard ──────────────────────────────────────────────────
-  dashboard: "dashboard",
-
-  // ── Produtos ───────────────────────────────────────────────────
-  produtos: "produtos",
-  "produto-detalhado": "produto-detalhado",
-  "produtos-recentes": "produtos",
-  "produtos-novos": "produtos",
-  "relatorio-colecao": "relatorio-colecao",
-  "relatorio-claude": "produtos",
-
-  // ── Vendas / CRM ───────────────────────────────────────────────
-  vendedores: "vendedores",
-  clientes: "clientes",
-
-  // ── Controles ──────────────────────────────────────────────────
-  "controle-estoque": "controle-estoque",
-  "estoque-consulta": "controle-estoque",
-  "controle-giro": "controle-giro",
-  "controle-performance": "controle-performance",
-  "controle-movimento": "controle-movimento",
-  "controle-transferencias": "controle-transferencias",
-
-  // ── Estoque por filial ─────────────────────────────────────────
-  "estoque-por-filial": "estoque-por-filial",
-
-  // ── Transferências / Romaneios / Saídas-Entradas ───────────────
-  "transferencia-produtos": "transferencia-produtos",
-  romaneios: "romaneios",
-  "saidas-entradas-produtos": "saidas-entradas-produtos",
-  "destino-romaneio": "destino-romaneio",
-
-  // ── Curva ABC ──────────────────────────────────────────────────
-  "curva-abc": "curva-abc",
-  "curva-por-produto": "curva-abc",
-  "nova-filial": "curva-abc",
-
-  // ── Relatórios / Extras ────────────────────────────────────────
-  "exportar-relatorios": "exportar-relatorios",
-  "lista-loja": "lista-loja",
-  "compras-transito": "lista-loja",
-  "compras-salvas": "lista-loja",
-  "mapa-clientes": "mapa-clientes",
-  sincronizacao: "sincronizacao",
-  blackfriday: "blackfriday",
-
-  // ── Admin ──────────────────────────────────────────────────────
+  ...PAGE_ROUTE_PERMISSION_MAP,
   admin: "admin",
 };

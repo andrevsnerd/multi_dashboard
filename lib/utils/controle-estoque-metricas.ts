@@ -60,8 +60,15 @@ export function normalizeControleEstoqueItemValue(value?: string | null): string
   return (value ?? "").toString().trim();
 }
 
+export function normalizeControleEstoqueItemKeyPart(value?: string | null): string {
+  return normalizeControleEstoqueItemValue(value)
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
 export function buildControleEstoqueItemKey(produto?: string | null, corProduto?: string | null): string {
-  return `${normalizeControleEstoqueItemValue(produto)}||${normalizeControleEstoqueItemValue(corProduto)}`;
+  return `${normalizeControleEstoqueItemKeyPart(produto)}||${normalizeControleEstoqueItemKeyPart(corProduto)}`;
 }
 
 export function dedupeControleEstoqueItens<T extends ControleEstoqueItemInput>(itens: T[]): T[] {

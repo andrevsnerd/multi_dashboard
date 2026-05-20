@@ -47,6 +47,15 @@ type MetricasRow = {
   totalNmQty: number | null;
 };
 
+const EMPTY_METRICAS_ROW: MetricasRow = {
+  qtde12m: null,
+  vendasMesAtual: null,
+  estoqueFilial: null,
+  diasDesdeUltimaVenda: null,
+  mesesHistoricoFilial: null,
+  totalNmQty: null,
+};
+
 type SuggestionType = "COMPRA" | "S" | "E" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
 
 type SuggestionView = {
@@ -370,6 +379,9 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
 
           setMetricas((prev) => {
             const next = { ...prev };
+            chunk.forEach((item) => {
+              next[buildCurvaPorProdutoKey(item.produto, item.corProduto ?? null)] = EMPTY_METRICAS_ROW;
+            });
             Object.entries(rows).forEach(([key, value]) => {
               next[key] = {
                 qtde12m: value.resumo.qtde12m,
@@ -406,6 +418,11 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
     return data.rows.map((row) => {
       const key = buildCurvaPorProdutoKey(row.produto, row.corProduto ?? null);
       const currentMetric = metricas[key];
+      const hasMetric = Object.prototype.hasOwnProperty.call(metricas, key);
+      const semBaseMetric =
+        currentMetric?.qtde12m == null &&
+        currentMetric?.vendasMesAtual == null &&
+        currentMetric?.estoqueFilial == null;
       const compraItem = {
         vendasMesAtual: currentMetric?.vendasMesAtual ?? 0,
         estoqueFilial: currentMetric?.estoqueFilial ?? 0,
@@ -440,7 +457,10 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
         limiteDias: getLimiteDiasReposicao(compraItem),
       });
 
-      let suggestion: SuggestionView = { text: "—", tone: "muted" };
+      let suggestion: SuggestionView = {
+        text: !hasMetric ? "Carregando..." : semBaseMetric ? "Sem dados" : "Sem sugestao",
+        tone: "muted",
+      };
       suggestion = {
         text: suggestion.text,
         tone: suggestion.tone,
@@ -450,7 +470,9 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
         nmExtraQty: combined.nmExtraQty,
         combinedWithNm: combined.hasCombinedNm,
       };
-      if (transit.qty > 0) {
+      if (!hasMetric || semBaseMetric) {
+        // Mantem o status explicito ate a linha ter metricas consolidadas.
+      } else if (transit.qty > 0) {
         const principalLabel = getSuggestionPrincipalBadgeLabel(combined.effectiveType);
         const summaryText = combined.hasCombinedNm && principalLabel
           ? `${fmt(transit.qty)} ${principalLabel} + NM +${fmt(combined.nmExtraQty)}`
@@ -484,6 +506,8 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
         suggestion = { text: "Quantidade suficiente", tone: "ok", summaryText: "Quantidade suficiente", qty: 0, baseType: combined.effectiveType, nmExtraQty: 0, combinedWithNm: false };
       } else if (combined.effectiveType === "SEM_SUGESTAO" && transit.totalTransit > 0) {
         suggestion = { text: "Em transito", tone: "ok", summaryText: "Em transito", qty: 0, baseType: combined.effectiveType, nmExtraQty: 0, combinedWithNm: false };
+      } else if (combined.effectiveType === "SEM_SUGESTAO") {
+        suggestion = { text: "Sem sugestao", tone: "muted", summaryText: "Sem sugestao", qty: 0, baseType: combined.effectiveType, nmExtraQty: 0, combinedWithNm: false };
       }
 
       return {
@@ -841,7 +865,7 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
                       <div className={styles.missingMeta}>
                       {row.produto}
                       {row.estoque > 0 ? ` · Estoque: ${fmt(row.estoque)}` : ""}
-                      {row.suggestion.text !== "—" ? ` · ${row.suggestion.text}` : ""}
+                      {row.suggestion.text ? ` · ${row.suggestion.text}` : ""}
                       </div>
                       {infoLine && <div className={styles.productSubMeta}>{infoLine}</div>}
                     </div>

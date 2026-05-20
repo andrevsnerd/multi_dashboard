@@ -1,35 +1,20 @@
+import { PAGE_PERMISSION_DEFINITIONS } from "@/lib/config/page-permissions";
 import type { PermissionKey } from "@/types/auth";
 
-const VALID_PERMISSION_KEYS: ReadonlySet<PermissionKey> = new Set([
-  "dashboard",
-  "produtos",
-  "produto-detalhado",
-  "relatorio-colecao",
-  "vendedores",
-  "clientes",
-  "controle-estoque",
-  "controle-giro",
-  "controle-performance",
-  "controle-movimento",
-  "controle-transferencias",
-  "exportar-relatorios",
-  "blackfriday",
-  "estoque-por-filial",
-  "transferencia-produtos",
-  "romaneios",
-  "saidas-entradas-produtos",
-  "destino-romaneio",
-  "mapa-clientes",
-  "lista-loja",
-  "curva-abc",
-  "sincronizacao",
-]);
+const VALID_PERMISSION_KEYS: ReadonlySet<PermissionKey> = new Set(
+  PAGE_PERMISSION_DEFINITIONS.map(({ key }) => key)
+);
 
 const LEGACY_PERMISSION_ALIASES: Record<string, PermissionKey> = {
   lista_loja: "lista-loja",
   "lista loja": "lista-loja",
   mapa_clientes: "mapa-clientes",
   "mapa clientes": "mapa-clientes",
+  compras_em_transito: "compras-transito",
+  "compras em transito": "compras-transito",
+  "compras em trânsito": "compras-transito",
+  compras_salvas: "compras-salvas",
+  "compras salvas": "compras-salvas",
 };
 
 function normalizeRawPermission(raw: string): PermissionKey | null {
