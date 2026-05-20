@@ -476,6 +476,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [selectedColecoes, setSelectedColecoes] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<"produtos" | "vendedores">("produtos");
   const [porCor, setPorCor] = useState(true);
+  const [filtrarEletronicos, setFiltrarEletronicos] = useState(companyKey === 'nerd');
   const [filtrarSugeridos, setFiltrarSugeridos] = useState(false);
   const [selectedCurvas, setSelectedCurvas] = useState<Set<Curva>>(new Set());
   const [compraMetrics, setCompraMetrics] = useState<Record<string, CompraMetricRow>>({});
@@ -701,8 +702,11 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const diasCorridosMes = Math.max(1, new Date().getDate());
 
   const produtosComCurvaComFiltroSugestao = useMemo(() => {
-    if (!filtrarSugeridos) return produtosComCurva;
-    return produtosComCurva.filter((p) => {
+    const base = (companyKey === 'nerd' && filtrarEletronicos)
+      ? produtosComCurva.filter((p) => normalizeKey(p.linha ?? '') === 'ELETRONICOS')
+      : produtosComCurva;
+    if (!filtrarSugeridos) return base;
+    return base.filter((p) => {
       const metricKey = buildCurvaAbcMetricKey(p.produto, p.cor ?? null, porCor);
       const live = compraMetrics[metricKey];
       const hasLive = Object.prototype.hasOwnProperty.call(compraMetrics, metricKey);
@@ -747,7 +751,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       });
       return transit.qty > 0;
     });
-  }, [filtrarSugeridos, produtosComCurva, compraMetrics, comprasTransitoIndex, diasCorridosMes, porCor]);
+  }, [filtrarEletronicos, filtrarSugeridos, companyKey, produtosComCurva, compraMetrics, comprasTransitoIndex, diasCorridosMes, porCor]);
 
   const produtosComCurvaExibidos = useMemo(() => {
     if (selectedCurvas.size === 0) return produtosComCurvaComFiltroSugestao;
@@ -1369,6 +1373,27 @@ const handleBadgeClick = (cat: string) => {
             >
               Por cor
             </button>
+            {companyKey === 'nerd' && (
+              <label
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  marginLeft: 6,
+                  fontSize: 13,
+                  color: "#334155",
+                  userSelect: "none",
+                }}
+                title="Filtra apenas produtos da linha Eletrônicos"
+              >
+                <input
+                  type="checkbox"
+                  checked={filtrarEletronicos}
+                  onChange={(e) => setFiltrarEletronicos(e.target.checked)}
+                />
+                Eletrônicos
+              </label>
+            )}
             <label
               style={{
                 display: "inline-flex",
