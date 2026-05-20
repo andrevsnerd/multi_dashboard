@@ -1,6 +1,6 @@
 import sql from "mssql";
 
-import { resolveCompany, getFilialLabelForDisplay } from "@/lib/config/company";
+import { resolveCompany, getFilialLabelForDisplay, getActiveFilial } from "@/lib/config/company";
 import { resolveCompanyDynamic } from "@/lib/config/company-server";
 import { withRequest } from "@/lib/db/connection";
 
@@ -33,7 +33,6 @@ const SINCRONIZACAO_FILIAIS_EXCLUIDAS = [
   "NERD MORUMBI",
   "SCARF ME- HIGIENOPOLIS",
 ] as const;
-const SINCRONIZACAO_FILIAL_OCULTA_EXATA = "NERD MORUMBI RDRRRJ";
 const SINCRONIZACAO_FILIAIS_EXCLUIDAS_NORMALIZADAS = new Set(
   SINCRONIZACAO_FILIAIS_EXCLUIDAS.map((f) => normalizarFilial(f))
 );
@@ -151,9 +150,6 @@ export async function fetchSincronizacaoFiliais(): Promise<{
         if (!Number.isFinite(row.codFilial)) {
           return false;
         }
-        if (row.filial === SINCRONIZACAO_FILIAL_OCULTA_EXATA) {
-          return false;
-        }
         if (SINCRONIZACAO_FILIAIS_EXCLUIDAS_NORMALIZADAS.has(row.filial)) {
           return false;
         }
@@ -173,9 +169,31 @@ export async function fetchSincronizacaoFiliais(): Promise<{
       })
       .sort((a, b) => (ordem.get(a.filialKey) ?? 10_000) - (ordem.get(b.filialKey) ?? 10_000));
 
+    // Deduplica por grupo: mantém apenas a filial ativa de cada grupo.
+    // Usa normalizarFilial (preserva hífen) para comparar nomes — necessário porque
+    // "SCARF ME PAULISTA FFFR" e "SCARF ME - PAULISTA FFFR" são entidades distintas.
+    const groupedByActive = new Map<string, typeof filiais[0]>();
+    for (const row of filiais) {
+      const config = row.filial.toUpperCase().startsWith("NERD") ? nerdConfig : scarfmeConfig;
+      const activeNome = getActiveFilial(config, row.filial);
+      const activeKey = normalizarChaveFilial(activeNome);
+      if (!groupedByActive.has(activeKey)) {
+        groupedByActive.set(activeKey, row);
+      } else {
+        const currentIsActive =
+          normalizarFilial(groupedByActive.get(activeKey)!.filial) === normalizarFilial(activeNome);
+        if (!currentIsActive) {
+          groupedByActive.set(activeKey, row);
+        }
+      }
+    }
+    const filiaisDeduped = [...groupedByActive.values()].sort(
+      (a, b) => (ordem.get(a.filialKey) ?? 10_000) - (ordem.get(b.filialKey) ?? 10_000)
+    );
+
     const resultado: SincronizacaoFilial[] = [];
 
-    for (const [index, filial] of filiais.entries()) {
+    for (const [index, filial] of filiaisDeduped.entries()) {
       const sufixo = `_${index}`;
       const isEcommerce = ecommerceFiliais.has(filial.filialKey);
       const dataVendaQuery = isEcommerce

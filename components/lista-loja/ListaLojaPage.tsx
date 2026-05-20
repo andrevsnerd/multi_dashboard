@@ -3215,11 +3215,10 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
         };
         disponiveis = resolveFiliais(permissoes.filiaisOrigem || []);
       }
-      const semMatriz = disponiveis.filter((f) => f.codFilial.trim().toUpperCase() !== "NERD" && f.filial.trim().toUpperCase() !== "MATRIZ");
       const comTodas =
-        semMatriz.length > 0
-          ? [{ codFilial: TODAS_FILIAIS_VALUE, filial: TODAS_FILIAIS_LABEL }, ...semMatriz]
-          : semMatriz;
+        disponiveis.length > 0
+          ? [{ codFilial: TODAS_FILIAIS_VALUE, filial: TODAS_FILIAIS_LABEL }, ...disponiveis]
+          : disponiveis;
       setFiliaisDisponiveis(comTodas);
       if (comTodas.length > 0) {
         setFilialSelecionada((prev) => {

@@ -7,6 +7,7 @@ import 'server-only';
  */
 
 import { hasPostgres, getNeonSql } from '@/lib/db/neon';
+import { invalidateActiveFilialCache } from './active-filial-detector';
 import fs from 'fs';
 import path from 'path';
 
@@ -67,8 +68,8 @@ export const DEFAULT_GRUPOS: FilialGrupo[] = [
     id: 'paulista',
     label: 'PAULISTA',
     company: 'scarfme',
-    members: ['SCARFME ME - PAULISTA FFF', 'SCARF ME - PAULISTA RSR', 'SCARF ME - PAULISTA FFFR'],
-    active: 'SCARF ME - PAULISTA RSR',
+    members: ['SCARFME ME - PAULISTA FFF', 'SCARF ME - PAULISTA RSR', 'SCARF ME - PAULISTA FFFR', 'SCARF ME PAULISTA FFFR'],
+    active: 'SCARF ME PAULISTA FFFR',
   },
   {
     id: 'ecommerce-scarfme',
@@ -158,16 +159,24 @@ export async function listFilialGrupos(): Promise<FilialGrupo[]> {
 
 export async function listFilialGruposByCompany(company: string): Promise<FilialGrupo[]> {
   const all = await listFilialGrupos();
-  const filtered = all.filter((g) => g.company === company.toLowerCase());
-  // Se vazio, retorna os defaults para essa empresa (sem salvar — só exibição)
-  if (filtered.length === 0) {
-    return DEFAULT_GRUPOS.filter((g) => g.company === company.toLowerCase());
+  const saved = all.filter((g) => g.company === company.toLowerCase());
+  const defaults = DEFAULT_GRUPOS.filter((g) => g.company === company.toLowerCase());
+
+  if (saved.length === 0) return defaults;
+
+  // Merge: defaults como base (mantém ordem), saved substitui por id;
+  // grupos salvos sem default correspondente são adicionados ao final.
+  const savedById = new Map(saved.map((g) => [g.id, g]));
+  const merged = defaults.map((d) => savedById.get(d.id) ?? d);
+  for (const s of saved) {
+    if (!defaults.some((d) => d.id === s.id)) merged.push(s);
   }
-  return filtered;
+  return merged;
 }
 
 export async function saveFilialGrupo(grupo: FilialGrupo): Promise<void> {
   invalidateCache();
+  invalidateActiveFilialCache(grupo.id);
   const normalizedGrupo = normalizeGrupoLabel(grupo);
 
   if (!hasPostgres()) {
@@ -202,6 +211,7 @@ export async function saveFilialGrupo(grupo: FilialGrupo): Promise<void> {
 
 export async function deleteFilialGrupo(id: string): Promise<void> {
   invalidateCache();
+  invalidateActiveFilialCache(id);
 
   if (!hasPostgres()) {
     const grupos = readGruposFile();

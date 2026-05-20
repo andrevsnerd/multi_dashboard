@@ -20,18 +20,18 @@ export async function GET(req: NextRequest) {
   const company = searchParams.get('company');
 
   try {
-    let grupos = await listFilialGrupos();
+    const saved = await listFilialGrupos();
 
-    if (company) {
-      const filtered = grupos.filter((g) => g.company === company.toLowerCase());
-      // Retorna defaults se o store está vazio para essa empresa
-      grupos = filtered.length > 0
-        ? filtered
-        : DEFAULT_GRUPOS.filter((g) => g.company === company.toLowerCase());
-    } else {
-      // Se o store está completamente vazio, retorna todos os defaults
-      if (grupos.length === 0) grupos = DEFAULT_GRUPOS;
+    // Merge defaults com saved: defaults como base, saved substitui por id.
+    const savedById = new Map(saved.map((g) => [g.id, g]));
+    const merged = DEFAULT_GRUPOS.map((d) => savedById.get(d.id) ?? d);
+    for (const s of saved) {
+      if (!DEFAULT_GRUPOS.some((d) => d.id === s.id)) merged.push(s);
     }
+
+    let grupos = company
+      ? merged.filter((g) => g.company === company.toLowerCase())
+      : merged;
 
     return NextResponse.json({ data: grupos });
   } catch (e) {

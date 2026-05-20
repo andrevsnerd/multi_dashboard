@@ -14,11 +14,7 @@ async function getFiliaisCanonicas(companyKey?: string | null): Promise<string[]
     const company = await resolveCompanyDynamic(companyKey);
     if (company) {
       const inventory = getOperationalFilials(company, 'inventory');
-      const semMatriz = inventory.filter((filial) => {
-        const display = company.filialDisplayNames?.[filial] ?? filial;
-        return display.trim().toUpperCase() !== 'MATRIZ';
-      });
-      return [...new Set(semMatriz)];
+      return [...new Set(inventory)];
     }
   }
   const nerd = getOperationalFilials((await resolveCompanyDynamic('nerd')), 'inventory');

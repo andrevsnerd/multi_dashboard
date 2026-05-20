@@ -1,0 +1,24 @@
+[
+  {
+    "id": "paulista",
+    "label": "PAULISTA",
+    "company": "scarfme",
+    "members": [
+      "SCARFME ME - PAULISTA FFF",
+      "SCARF ME - PAULISTA RSR",
+      "SCARF ME - PAULISTA FFFR",
+      "SCARF ME PAULISTA FFFR"
+    ],
+    "active": "SCARF ME PAULISTA FFFR"
+  },
+  {
+    "id": "morumbi-1",
+    "label": "MORUMBI 1",
+    "company": "nerd",
+    "members": [
+      "NERD MORUMBI RDRRRJ",
+      "NERD MORUMBI RDRX"
+    ],
+    "active": "NERD MORUMBI RDRRRJ"
+  }
+]
