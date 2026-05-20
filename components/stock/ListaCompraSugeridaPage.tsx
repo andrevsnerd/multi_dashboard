@@ -18,12 +18,13 @@ import {
   type DestinoCompraFinalParte,
 } from "@/lib/utils/compra-final-destino";
 import {
+  calcNecessidadeMinimaPorFilial,
   calcNecessidadeMinimaQty,
-  calcTotalNecessidadeMinimaPorFilial,
   combineBaseSuggestionWithNecessidadeMinima,
+  formatNecessidadeMinimaFiliaisDescription,
+  type FilialNecessidadeMinimaInfo,
   getCombinedNecessidadeMinimaTooltip,
   getNecessidadeMinimaRuleDescription,
-  getSuggestionPrincipalBadgeLabel,
 } from "@/lib/utils/necessidade-minima";
 import {
   fetchControleEstoqueItemMetricasClient,
@@ -155,6 +156,25 @@ function fmtBRL(n: number) {
 
 function fmtBRL2(n: number) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function getTooltipViewportPosition(x: number, y: number): { left: number; top: number } {
+  const offset = 12;
+  const tooltipWidth = 360;
+  const tooltipHeight = 280;
+  const margin = 12;
+  if (typeof window === "undefined") {
+    return { left: x + offset, top: y - tooltipHeight - offset };
+  }
+  const maxLeft = Math.max(margin, window.innerWidth - tooltipWidth - margin);
+  const maxTop = Math.max(margin, window.innerHeight - tooltipHeight - margin);
+  const left = Math.min(Math.max(margin, x + offset), maxLeft);
+  const topAbove = y - tooltipHeight - offset;
+  const topBelow = y + offset;
+  const top = topAbove >= margin
+    ? topAbove
+    : Math.min(Math.max(margin, topBelow), maxTop);
+  return { left, top };
 }
 
 function formatHistoricoDate(value?: string | null): string {
@@ -595,6 +615,7 @@ export default function ListaCompraSugeridaPage({
   const [reposicaoData, setReposicaoData] = useState<ReposicaoData | null>(null);
   const [reposicaoSuggestionMap, setReposicaoSuggestionMap] = useState<Record<string, ProdutoSugestao>>({});
   const [reposicaoNmTotalQtyMap, setReposicaoNmTotalQtyMap] = useState<Record<string, number>>({});
+  const [reposicaoNmFiliaisMap, setReposicaoNmFiliaisMap] = useState<Record<string, FilialNecessidadeMinimaInfo[]>>({});
   const [reposicaoSuggestionLoading, setReposicaoSuggestionLoading] = useState(false);
   const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
   const diasCorridosMes = useMemo(() => new Date().getDate(), []);
@@ -640,6 +661,7 @@ export default function ListaCompraSugeridaPage({
     if (!reposicaoData || reposicaoData.itens.length === 0) {
       setReposicaoSuggestionMap({});
       setReposicaoNmTotalQtyMap({});
+      setReposicaoNmFiliaisMap({});
       setReposicaoSuggestionLoading(false);
       return;
     }
@@ -647,6 +669,7 @@ export default function ListaCompraSugeridaPage({
     if (reposicaoData.itens.every(item => item.suggestionQty != null)) {
       setReposicaoSuggestionMap({});
       setReposicaoNmTotalQtyMap({});
+      setReposicaoNmFiliaisMap({});
       setReposicaoSuggestionLoading(false);
       return;
     }
@@ -656,6 +679,7 @@ export default function ListaCompraSugeridaPage({
     if (produtos.length === 0) {
       setReposicaoSuggestionMap({});
       setReposicaoNmTotalQtyMap({});
+      setReposicaoNmFiliaisMap({});
       setReposicaoSuggestionLoading(false);
       return;
     }
@@ -688,33 +712,39 @@ export default function ListaCompraSugeridaPage({
             : {};
         const next: Record<string, ProdutoSugestao> = {};
         const nextNmTotal: Record<string, number> = {};
+        const nextNmFiliais: Record<string, FilialNecessidadeMinimaInfo[]> = {};
         rows.forEach((r) => {
           r.qtde12m = getQtde12mBase(r);
           const produto = (r.produto ?? "").trim();
           if (!produto) return;
           const metricas = metricasItens[buildControleEstoqueItemKey(produto, r.cor ?? null)];
-          const totalNmQty = metricas
-            ? calcTotalNecessidadeMinimaPorFilial({
+          const filiaisNM = metricas
+            ? calcNecessidadeMinimaPorFilial({
               company: resolveCompany(companyKey),
               vendasPorFilial: metricas.vendasPorFilial,
               estoquePorFilial: metricas.estoquePorFilial,
             })
-            : 0;
+            : [];
+          const totalNmQty = filiaisNM.reduce((sum, row) => sum + row.qtd, 0);
           const keyCorCodigo = buildSuggestionKey(produto, r.cor ?? "");
           next[keyCorCodigo] = r;
           nextNmTotal[keyCorCodigo] = totalNmQty;
+          nextNmFiliais[keyCorCodigo] = filiaisNM;
           if ((r.corDescricao ?? "").trim()) {
             const keyCorDescricao = buildSuggestionKey(produto, r.corDescricao ?? "");
             next[keyCorDescricao] = r;
             nextNmTotal[keyCorDescricao] = totalNmQty;
+            nextNmFiliais[keyCorDescricao] = filiaisNM;
           }
         });
         setReposicaoSuggestionMap(next);
         setReposicaoNmTotalQtyMap(nextNmTotal);
+        setReposicaoNmFiliaisMap(nextNmFiliais);
       })
       .catch(() => {
         setReposicaoSuggestionMap({});
         setReposicaoNmTotalQtyMap({});
+        setReposicaoNmFiliaisMap({});
       })
       .finally(() => setReposicaoSuggestionLoading(false));
   }, [reposicaoData, companyKey, filial, categoria, searchParams, expandirPorCor]);
@@ -856,6 +886,7 @@ export default function ListaCompraSugeridaPage({
   const [errorABC, setErrorABC] = useState<string | null>(null);
   const [abcLoadedKey, setAbcLoadedKey] = useState<string | null>(null);
   const [abcNmTotalQtyMap, setAbcNmTotalQtyMap] = useState<Record<string, number>>({});
+  const [abcNmFiliaisMap, setAbcNmFiliaisMap] = useState<Record<string, FilialNecessidadeMinimaInfo[]>>({});
   const [modoReposicao, setModoReposicao] = useState(true);
   const [incluirCurvaB, setIncluirCurvaB] = useState(false);
   const [incluirCurvaC, setIncluirCurvaC] = useState(false);
@@ -1283,29 +1314,38 @@ export default function ListaCompraSugeridaPage({
             }).catch((): Record<string, ControleEstoqueItemMetricas> => ({}))
             : {};
         const nextNmTotal: Record<string, number> = {};
+        const nextNmFiliais: Record<string, FilialNecessidadeMinimaInfo[]> = {};
         data.forEach((row) => {
           const produto = (row.produto ?? "").trim();
           if (!produto) return;
           const metricas = metricasItens[buildControleEstoqueItemKey(produto, row.cor ?? null)];
-          const totalNmQty = metricas
-            ? calcTotalNecessidadeMinimaPorFilial({
+          const filiaisNM = metricas
+            ? calcNecessidadeMinimaPorFilial({
               company: resolveCompany(companyKey),
               vendasPorFilial: metricas.vendasPorFilial,
               estoquePorFilial: metricas.estoquePorFilial,
             })
-            : 0;
+            : [];
+          const totalNmQty = filiaisNM.reduce((sum, item) => sum + item.qtd, 0);
           const keyCorCodigo = buildSuggestionKey(produto, expandirPorCor ? (row.cor ?? "") : "");
           nextNmTotal[keyCorCodigo] = totalNmQty;
+          nextNmFiliais[keyCorCodigo] = filiaisNM;
           if (expandirPorCor && (row.corDescricao ?? "").trim()) {
             const keyCorDescricao = buildSuggestionKey(produto, row.corDescricao ?? "");
             nextNmTotal[keyCorDescricao] = totalNmQty;
+            nextNmFiliais[keyCorDescricao] = filiaisNM;
           }
         });
         setProdutosABC(data);
         setAbcNmTotalQtyMap(nextNmTotal);
+        setAbcNmFiliaisMap(nextNmFiliais);
         setAbcLoadedKey(abcFetchKey);
       })
-      .catch((e) => setErrorABC(e instanceof Error ? e.message : "Erro"))
+      .catch((e) => {
+        setAbcNmTotalQtyMap({});
+        setAbcNmFiliaisMap({});
+        setErrorABC(e instanceof Error ? e.message : "Erro");
+      })
       .finally(() => setLoadingABC(false));
   }, [activeTab, abcLoadedKey, abcFetchKey, companyKey, searchParams, categoria, qtdCompra, filial, expandirPorCor]);
 
@@ -1675,27 +1715,19 @@ export default function ListaCompraSugeridaPage({
                             const baseQty = Math.max(0, Number(item.sugestaoBaseQtd ?? item.sugestaoQtd ?? 0));
                             const nmExtraQty = Math.max(0, Number(item.sugestaoNmExtraQty ?? 0));
                             const hasCombinedNm = Boolean(item.sugestaoHasCombinedNm);
+                            const nmFiliais = reposicaoNmFiliaisMap[buildSuggestionKey(item.produto, expandirPorCor ? (item.cor ?? "") : "")] ?? [];
                             const combinedNmTitle = hasCombinedNm
                               ? getCombinedNecessidadeMinimaTooltip({
                                 baseType,
                                 baseQty,
                                 nmExtraQty,
                                 totalQty: Math.max(0, Number(item.sugestaoQtd ?? 0)),
+                                filiais: nmFiliais,
                               })
-                              : getNecessidadeMinimaRuleDescription();
-                            const principalBadgeLabel = getSuggestionPrincipalBadgeLabel(baseType);
+                              : `${getNecessidadeMinimaRuleDescription()}${nmFiliais.length ? ` Filiais NM: ${formatNecessidadeMinimaFiliaisDescription(nmFiliais)}.` : ""}`;
                             return (
                               <>
                           {fmt(item.sugestaoQtd ?? 0)}
-                          {baseType === "COMPRA" && hasCombinedNm && principalBadgeLabel && (
-                            <span
-                              className={styles.badgeT}
-                              style={{ marginLeft: 6, background: "#1d4ed8", borderColor: "#1e40af", color: "#fff" }}
-                              title={combinedNmTitle}
-                            >
-                              {principalBadgeLabel}
-                            </span>
-                          )}
                           {baseType === "S" && (
                             <span
                               className={styles.badgeS}
@@ -1726,7 +1758,7 @@ export default function ListaCompraSugeridaPage({
                               style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}
                               title={combinedNmTitle}
                             >
-                              NM +{fmt(nmExtraQty)}
+                              NM
                             </span>
                           )}
                           {item.sugestaoTipo === "NM" && !hasCombinedNm && (
@@ -2183,38 +2215,32 @@ export default function ListaCompraSugeridaPage({
                               {(() => {
                                 const sugestaoView = p.sugestaoView
                                   ?? { type: "SEM_SUGESTAO" as SuggestionType, qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0 };
+                                const suggestionKey = buildSuggestionKey(p.produto, expandirPorCor ? (p.cor ?? "") : "");
                                 const baseType = (sugestaoView.baseType ?? sugestaoView.type) as SuggestionType;
                                 const baseQty = Math.max(0, Number(sugestaoView.baseQty ?? sugestaoView.qty));
                                 const nmExtraQty = Math.max(0, Number(sugestaoView.nmExtraQty ?? 0));
                                 const hasCombinedNm = Boolean(sugestaoView.hasCombinedNm);
+                                const nmFiliais = abcNmFiliaisMap[suggestionKey] ?? [];
                                 const combinedNmTitle = hasCombinedNm
                                   ? getCombinedNecessidadeMinimaTooltip({
                                     baseType,
                                     baseQty,
                                     nmExtraQty,
                                     totalQty: sugestaoView.qty,
+                                    filiais: nmFiliais,
                                   })
-                                  : getNecessidadeMinimaRuleDescription();
+                                  : `${getNecessidadeMinimaRuleDescription()}${nmFiliais.length ? ` Filiais NM: ${formatNecessidadeMinimaFiliaisDescription(nmFiliais)}.` : ""}`;
                                 if (sugestaoView.type === "COMPRA" && sugestaoView.qty > 0) {
                                   return (
                                     <td className={styles.qtdSugerida}>
                                       {fmt(sugestaoView.qty)}
-                                      {baseType === "COMPRA" && hasCombinedNm ? (
-                                        <span
-                                          className={styles.badgeT}
-                                          style={{ marginLeft: 6, background: "#1d4ed8", borderColor: "#1e40af", color: "#fff" }}
-                                          title={combinedNmTitle}
-                                        >
-                                          COMPRA
-                                        </span>
-                                      ) : null}
                                       {hasCombinedNm ? (
                                         <span
                                           className={styles.badgeT}
                                           style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}
                                           title={combinedNmTitle}
                                         >
-                                          NM +{fmt(nmExtraQty)}
+                                          NM
                                         </span>
                                       ) : null}
                                       {sugestaoView.transitTotal ? (
@@ -2268,7 +2294,7 @@ export default function ListaCompraSugeridaPage({
                                             style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}
                                             title={combinedNmTitle}
                                           >
-                                            NM +{fmt(nmExtraQty)}
+                                            NM
                                           </span>
                                         ) : null}
                                         {sugestaoView.transitTotal ? (
@@ -2289,7 +2315,7 @@ export default function ListaCompraSugeridaPage({
                                           style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}
                                           title={combinedNmTitle}
                                         >
-                                          NM +{fmt(nmExtraQty)}
+                                          NM
                                         </span>
                                       ) : null}
                                       {sugestaoView.transitTotal ? (
@@ -2545,7 +2571,7 @@ export default function ListaCompraSugeridaPage({
       {sugestaoSTooltip && (
         <div
           className={styles.tooltip}
-          style={{ left: sugestaoSTooltip.x + 12, top: sugestaoSTooltip.y + 12 }}
+          style={getTooltipViewportPosition(sugestaoSTooltip.x, sugestaoSTooltip.y)}
         >
           <div className={styles.tooltipTitle}>Sugestão por Critério S</div>
           <div className={styles.tooltipLine} style={{ color: "#c4b5fd", marginBottom: 6 }}>
@@ -2580,7 +2606,7 @@ export default function ListaCompraSugeridaPage({
       {historicoTooltip && (
         <div
           className={styles.tooltip}
-          style={{ left: historicoTooltip.x + 12, top: historicoTooltip.y + 12 }}
+          style={getTooltipViewportPosition(historicoTooltip.x, historicoTooltip.y)}
         >
           <div className={styles.tooltipTitle}>Historico parcial na filial</div>
           <div className={styles.tooltipLine}>Este item ainda nao completou 12 meses de historico na filial selecionada.</div>
@@ -2596,7 +2622,7 @@ export default function ListaCompraSugeridaPage({
       {duracaoTooltip && (
         <div
           className={styles.tooltip}
-          style={{ left: duracaoTooltip.x + 12, top: duracaoTooltip.y + 12 }}
+          style={getTooltipViewportPosition(duracaoTooltip.x, duracaoTooltip.y)}
         >
           <div className={styles.tooltipTitle}>Duração real (mês atual)</div>
           <div className={styles.tooltipLine}><strong>Regra:</strong> {duracaoTooltip.regra}</div>
@@ -2613,7 +2639,7 @@ export default function ListaCompraSugeridaPage({
       {estoqueTooltip && (
         <div
           className={styles.tooltipEstoque}
-          style={{ left: estoqueTooltip.x + 12, top: estoqueTooltip.y + 12 }}
+          style={getTooltipViewportPosition(estoqueTooltip.x, estoqueTooltip.y)}
         >
           <div className={styles.tooltipEstoqueHeader}>Estoque por filial</div>
           <div className={styles.tooltipEstoqueMeta}><strong>Produto:</strong> {estoqueTooltip.produto}</div>
@@ -2645,7 +2671,7 @@ export default function ListaCompraSugeridaPage({
       {vendasTooltip && (
         <div
           className={styles.tooltipEstoque}
-          style={{ left: vendasTooltip.x + 12, top: vendasTooltip.y + 12 }}
+          style={getTooltipViewportPosition(vendasTooltip.x, vendasTooltip.y)}
         >
           <div className={styles.tooltipEstoqueHeader}>
             {vendasTooltip.mode === "12m" ? "Vendas 12 meses por filial" : "Vendas 60 dias por filial"}

@@ -25,6 +25,7 @@ export type SuggestionBaseType = "COMPRA" | "S" | "E" | "NM" | "SUFICIENTE" | "S
 export type FilialNecessidadeMinimaInfo = {
   filial: string;
   qtd: number;
+  qtde12m: number;
 };
 
 export function calcNecessidadeMinimaPorFilial(input: {
@@ -54,7 +55,7 @@ export function calcNecessidadeMinimaPorFilial(input: {
         estoqueAtual,
         qtde12m: row.qtde12m,
       });
-      return qtd > 0 ? { filial: row.filial, qtd } : null;
+      return qtd > 0 ? { filial: row.filial, qtd, qtde12m: Number(row.qtde12m ?? 0) } : null;
     })
     .filter((row): row is FilialNecessidadeMinimaInfo => row != null);
 }
@@ -109,11 +110,26 @@ export function getNecessidadeMinimaRuleDescription(): string {
   return "NM: estoque zerado e 1 unidade a cada 5 vendas nos últimos 12 meses.";
 }
 
+export function formatNecessidadeMinimaFiliaisDescription(
+  filiais: FilialNecessidadeMinimaInfo[] | null | undefined
+): string {
+  const rows = (filiais ?? []).filter((row) => Math.max(0, Number(row.qtd ?? 0)) > 0);
+  if (rows.length === 0) return "";
+  return rows
+    .map((row) => {
+      const vendas = Math.max(0, Math.round(Number(row.qtde12m ?? 0)));
+      const qtd = Math.max(0, Math.round(Number(row.qtd ?? 0)));
+      return `${row.filial} (${vendas} vendas): ${qtd} ${qtd === 1 ? "unidade" : "unidades"}`;
+    })
+    .join(" | ");
+}
+
 export function getCombinedNecessidadeMinimaTooltip(input: {
   baseType: SuggestionBaseType;
   baseQty: number;
   nmExtraQty: number;
   totalQty: number;
+  filiais?: FilialNecessidadeMinimaInfo[] | null;
 }): string {
   const principalLabel =
     input.baseType === "COMPRA"
@@ -124,5 +140,7 @@ export function getCombinedNecessidadeMinimaTooltip(input: {
           ? "regra E"
           : "regra NM";
 
-  return `Sugestão final = ${principalLabel} (${input.baseQty}) + NM não coberta (+${input.nmExtraQty}) = ${input.totalQty}. ${getNecessidadeMinimaRuleDescription()}`;
+  const nmTotal = Math.max(0, Math.round(Number(input.baseQty ?? 0))) + Math.max(0, Math.round(Number(input.nmExtraQty ?? 0)));
+  const filiaisText = formatNecessidadeMinimaFiliaisDescription(input.filiais);
+  return `Sugestão final = ${principalLabel} (${input.baseQty}) + NM não coberta (+${input.nmExtraQty}) = ${input.totalQty}. NM total da rede: ${nmTotal}. ${getNecessidadeMinimaRuleDescription()}${filiaisText ? ` Detalhe por filial: ${filiaisText}.` : ""}`;
 }

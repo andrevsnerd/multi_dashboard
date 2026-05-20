@@ -463,19 +463,9 @@ function DestinoCompraFinalBadges({ partes }: { partes: DestinoCompraFinalParte[
             key={p.label}
             className={styles.destinoFilialBadge}
             style={{ background: t.bg, color: t.fg, borderColor: t.border }}
-            title={p.isNM ? `Necessidade Mínima: ${fmt(p.nmQty ?? 0)} unidade(s) reservada(s) para esta filial (1 a cada 5 vendas nos últimos 12 meses, com estoque zerado)` : undefined}
           >
             <span className={styles.destinoFilialBadgeName}>{p.label}</span>
             <span className={styles.destinoFilialBadgeNum}>{fmt(p.qtd)}</span>
-            {p.isNM && (
-              <span style={{
-                marginLeft: 3,
-                fontSize: 9,
-                fontWeight: 800,
-                color: "#7c3aed",
-                lineHeight: 1,
-              }}>NM</span>
-            )}
           </span>
         );
       })}

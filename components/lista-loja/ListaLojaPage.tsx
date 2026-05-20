@@ -25,7 +25,11 @@ import {
 } from "@/lib/client/compras-transito";
 import { exportListaLojaToXlsx } from "@/lib/utils/exportListaLoja";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
-import { calcNecessidadeMinimaQty, combineBaseSuggestionWithNecessidadeMinima } from "@/lib/utils/necessidade-minima";
+import {
+  calcNecessidadeMinimaQty,
+  combineBaseSuggestionWithNecessidadeMinima,
+  formatNecessidadeMinimaFiliaisDescription,
+} from "@/lib/utils/necessidade-minima";
 import { getMappedColorDescription } from "@/lib/utils/colorMapping";
 import type { CompraSalvaItemRow } from "@/lib/types/compra-salva";
 import type { ProdutoTransferencia } from "@/lib/repositories/controleTransferencias";
@@ -90,6 +94,7 @@ interface ListaItem {
 type FilialNecessidadeMinima = {
   filial: string;
   qtd: number;
+  qtde12m: number;
 };
 
 type Curva = "A" | "B" | "C";
@@ -111,6 +116,25 @@ type CurvaAbcScopeData = {
   displayName?: string;
   produtos?: CurvaAbcProdutoRow[];
 };
+
+function getTooltipViewportPosition(x: number, y: number): { left: number; top: number } {
+  const offset = 12;
+  const tooltipWidth = 360;
+  const tooltipHeight = 280;
+  const margin = 12;
+  if (typeof window === "undefined") {
+    return { left: x + offset, top: y - tooltipHeight - offset };
+  }
+  const maxLeft = Math.max(margin, window.innerWidth - tooltipWidth - margin);
+  const maxTop = Math.max(margin, window.innerHeight - tooltipHeight - margin);
+  const left = Math.min(Math.max(margin, x + offset), maxLeft);
+  const topAbove = y - tooltipHeight - offset;
+  const topBelow = y + offset;
+  const top = topAbove >= margin
+    ? topAbove
+    : Math.min(Math.max(margin, topBelow), maxTop);
+  return { left, top };
+}
 
 interface ListaLoja {
   id: string;
@@ -513,13 +537,23 @@ async function fetchVendasItemMetricas(
           estoqueAtual: estoqueMap.get(filialKey) ?? 0,
           qtde12m: v.qtde12m,
         });
-        return qtd > 0 ? { filial: filialLabel, qtd } : null;
+        return qtd > 0 ? { filial: filialLabel, qtd, qtde12m: Math.floor(Number(v.qtde12m ?? 0)) } : null;
       })
       .filter((value): value is FilialNecessidadeMinima => value != null)
       .forEach((value) => {
         filiaisNMMap.set(value.filial, (filiaisNMMap.get(value.filial) ?? 0) + value.qtd);
       });
-    const filiaisNM = Array.from(filiaisNMMap.entries()).map(([filial, qtd]) => ({ filial, qtd }));
+    const filiaisNMQtde12mMap = new Map<string, number>();
+    metricas.vendasPorFilial.forEach((v) => {
+      const filialLabel = getFilialLabelForDisplay(companyConfig, v.filial);
+      const filialKey = normalizeFilialLookupKey(filialLabel);
+      filiaisNMQtde12mMap.set(filialKey, (filiaisNMQtde12mMap.get(filialKey) ?? 0) + Math.floor(Number(v.qtde12m ?? 0)));
+    });
+    const filiaisNM = Array.from(filiaisNMMap.entries()).map(([filial, qtd]) => ({
+      filial,
+      qtd,
+      qtde12m: filiaisNMQtde12mMap.get(normalizeFilialLookupKey(filial)) ?? 0,
+    }));
     return {
       qtde12m: metricas.resumo.qtde12m,
       qtde60d: metricas.resumo.qtde60d,
@@ -1618,6 +1652,9 @@ function ListaLojaItensTable({
     estoqueAtual: number;
     duracaoAtual: number;
     qtdCalculada: number;
+    baseQty?: number;
+    nmExtraQty?: number;
+    nmFiliais?: FilialNecessidadeMinima[];
     blendAplicado?: boolean;
     qtdFinalPuro?: number;
     qtdSBlend?: number;
@@ -1643,6 +1680,9 @@ function ListaLojaItensTable({
     estoqueAtual: number;
     limiteDias: number;
     qtdS: number;
+    baseQty?: number;
+    nmExtraQty?: number;
+    nmFiliais?: FilialNecessidadeMinima[];
     transitTotal?: number;
     transitDates?: string[];
   }>(null);
@@ -1656,6 +1696,9 @@ function ListaLojaItensTable({
     velocidadeAjustada: number;
     limiteDias: number;
     qtdE: number;
+    baseQty?: number;
+    nmExtraQty?: number;
+    nmFiliais?: FilialNecessidadeMinima[];
     transitTotal?: number;
     transitDates?: string[];
   }>(null);
@@ -2407,6 +2450,7 @@ function ListaLojaItensTable({
                   const filiaisNmDisplay = filiaisNMAgregado.map((f) => ({
                     filial: getFilialLabelForDisplay(companyConfig, f.filial),
                     qtd: f.qtd,
+                    qtde12m: f.qtde12m,
                   }));
                   const totalNmQtyAgregado = filiaisNmDisplay.reduce((sum, filial) => sum + filial.qtd, 0);
                   const combinedSuggestion = combineBaseSuggestionWithNecessidadeMinima({
@@ -2464,6 +2508,9 @@ function ListaLojaItensTable({
                             estoqueAtual,
                             duracaoAtual,
                             qtdCalculada: transit.qty,
+                            baseQty: combinedSuggestion.baseQty,
+                            nmExtraQty: combinedSuggestion.hasCombinedNm ? combinedSuggestion.nmExtraQty : undefined,
+                            nmFiliais: filiaisNMAgregado,
                             blendAplicado,
                             qtdFinalPuro,
                             qtdSBlend,
@@ -2473,7 +2520,15 @@ function ListaLojaItensTable({
                         }
                         onMouseLeave={() => setSugestaoTooltip(null)}
                       >
-                        {fmt(transit.qty)}{blendAplicado && <>{" "}<span style={{ display: "inline-flex", width: 16, height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#0f172a", background: "#fde047", border: "1px solid #facc15", verticalAlign: "middle", cursor: "help" }}>⚡</span></>}{combinedSuggestion.hasCombinedNm && <> <span className={styles.badgeT} style={{ background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }} title={`Sugestão final = regra principal (${fmt(combinedSuggestion.baseQty)}) + NM não coberta (+${fmt(combinedSuggestion.nmExtraQty)}).`}>NM +{fmt(combinedSuggestion.nmExtraQty)}</span></>}{transitBadge}{filiaisNmDisplay.length > 0 && <NmBadgeAgregado filiais={filiaisNmDisplay} comCompra onEnter={(e, filiais) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiais, total: filiais.reduce((sum, filial) => sum + filial.qtd, 0), comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
+                        {fmt(transit.qty)}
+                        {blendAplicado && <>{" "}<span style={{ display: "inline-flex", width: 16, height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#0f172a", background: "#fde047", border: "1px solid #facc15", verticalAlign: "middle", cursor: "help" }}>⚡</span></>}
+                        {combinedSuggestion.hasCombinedNm && filiaisNmDisplay.length === 0 ? (
+                          <span className={styles.badgeT} style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}>
+                            NM
+                          </span>
+                        ) : null}
+                        {transitBadge}
+                        {filiaisNmDisplay.length > 0 && <NmBadgeAgregado filiais={filiaisNmDisplay} comCompra onEnter={(e, filiais) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiais, total: filiais.reduce((sum, filial) => sum + filial.qtd, 0), comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
                       </span>
                     );
                   }
@@ -2492,6 +2547,9 @@ function ListaLojaItensTable({
                               estoqueAtual: Number(estoqueFilial ?? 0),
                               limiteDias,
                               qtdS: transit.qty,
+                              baseQty: combinedSuggestion.baseQty,
+                              nmExtraQty: combinedSuggestion.hasCombinedNm ? combinedSuggestion.nmExtraQty : undefined,
+                              nmFiliais: filiaisNMAgregado,
                               transitTotal: transit.totalTransit || undefined,
                               transitDates,
                             })
@@ -2515,7 +2573,13 @@ function ListaLojaItensTable({
                         >
                           S
                         </span>
-                        {combinedSuggestion.hasCombinedNm && <span className={styles.badgeT} style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }} title={`Sugestão final = regra principal (${fmt(combinedSuggestion.baseQty)}) + NM não coberta (+${fmt(combinedSuggestion.nmExtraQty)}).`}>NM +{fmt(combinedSuggestion.nmExtraQty)}</span>}{transitBadge}{filiaisNmDisplay.length > 0 && <NmBadgeAgregado filiais={filiaisNmDisplay} comCompra onEnter={(e, filiais) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiais, total: filiais.reduce((sum, filial) => sum + filial.qtd, 0), comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
+                        {combinedSuggestion.hasCombinedNm && filiaisNmDisplay.length === 0 ? (
+                          <span className={styles.badgeT} style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}>
+                            NM
+                          </span>
+                        ) : null}
+                        {transitBadge}
+                        {filiaisNmDisplay.length > 0 && <NmBadgeAgregado filiais={filiaisNmDisplay} comCompra onEnter={(e, filiais) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiais, total: filiais.reduce((sum, filial) => sum + filial.qtd, 0), comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
                       </span>
                     );
                   }
@@ -2545,6 +2609,9 @@ function ListaLojaItensTable({
                               velocidadeAjustada: eInfo.velocidadeAjustada,
                               limiteDias,
                               qtdE: transit.qty,
+                              baseQty: combinedSuggestion.baseQty,
+                              nmExtraQty: combinedSuggestion.hasCombinedNm ? combinedSuggestion.nmExtraQty : undefined,
+                              nmFiliais: filiaisNMAgregado,
                               transitTotal: transit.totalTransit || undefined,
                               transitDates,
                             })
@@ -2568,7 +2635,13 @@ function ListaLojaItensTable({
                         >
                           E
                         </span>
-                        {combinedSuggestion.hasCombinedNm && <span className={styles.badgeT} style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }} title={`Sugestão final = regra principal (${fmt(combinedSuggestion.baseQty)}) + NM não coberta (+${fmt(combinedSuggestion.nmExtraQty)}).`}>NM +{fmt(combinedSuggestion.nmExtraQty)}</span>}{transitBadge}{filiaisNmDisplay.length > 0 && <NmBadgeAgregado filiais={filiaisNmDisplay} comCompra onEnter={(e, filiais) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiais, total: filiais.reduce((sum, filial) => sum + filial.qtd, 0), comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
+                        {combinedSuggestion.hasCombinedNm && filiaisNmDisplay.length === 0 ? (
+                          <span className={styles.badgeT} style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}>
+                            NM
+                          </span>
+                        ) : null}
+                        {transitBadge}
+                        {filiaisNmDisplay.length > 0 && <NmBadgeAgregado filiais={filiaisNmDisplay} comCompra onEnter={(e, filiais) => setNmTooltipAgregado({ x: e.clientX, y: e.clientY, filiais, total: filiais.reduce((sum, filial) => sum + filial.qtd, 0), comCompra: true })} onLeave={() => setNmTooltipAgregado(null)} />}
                       </span>
                     );
                   }
@@ -2577,11 +2650,34 @@ function ListaLojaItensTable({
                     if (rotasNM.length > 0) {
                       return <span className={styles.cellMetric}>Transferencia</span>;
                     }
+                    const vendasMes = Number(vendasMesAtual ?? 0);
+                    const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
                     return (
-                      <span className={styles.reporAdd}>
+                      <span
+                        className={styles.reporAdd}
+                        onMouseEnter={(e) =>
+                          setSugestaoTooltip({
+                            x: e.clientX,
+                            y: e.clientY,
+                            titulo: "Necessidade mínima (NM)",
+                            regra: "Sem outra regra de reposição ativa. A sugestão vem da necessidade mínima do item.",
+                            limiteDias,
+                            vendasMesAtual: vendasMes,
+                            diasCorridos: diasCorridosMes,
+                            consumoDiario,
+                            estoqueAtual: Number(estoqueFilial ?? 0),
+                            duracaoAtual: 0,
+                            qtdCalculada: transit.qty,
+                            baseQty: transit.qty,
+                            nmFiliais: filiaisNMAgregado,
+                            transitTotal: transit.totalTransit || undefined,
+                            transitDates,
+                          })
+                        }
+                        onMouseLeave={() => setSugestaoTooltip(null)}
+                      >
                         {fmt(transit.qty)}{" "}
                         <span
-                          title={`Necessidade Mínima: estoque zerado e 1 unidade a cada 5 vendas nos últimos 12 meses. Sugestão atual: ${fmt(transit.qty)} unidade(s).`}
                           style={{
                             display: "inline-flex",
                             padding: "0 5px",
@@ -2778,7 +2874,7 @@ function ListaLojaItensTable({
         </tbody>
       </table>
       {estoqueTooltip && (
-        <div className={styles.metricTooltip} style={{ left: estoqueTooltip.x + 12, top: estoqueTooltip.y + 12 }}>
+        <div className={styles.metricTooltip} style={getTooltipViewportPosition(estoqueTooltip.x, estoqueTooltip.y)}>
           <div className={styles.metricTooltipTitle}>Estoque por filial</div>
           <div className={styles.metricTooltipMeta}><strong>Produto:</strong> {estoqueTooltip.produto}</div>
           {estoqueTooltip.cor && <div className={styles.metricTooltipMeta}><strong>Cor:</strong> {estoqueTooltip.cor}</div>}
@@ -2802,7 +2898,7 @@ function ListaLojaItensTable({
         </div>
       )}
       {vendasTooltip && (
-        <div className={styles.metricTooltip} style={{ left: vendasTooltip.x + 12, top: vendasTooltip.y + 12 }}>
+        <div className={styles.metricTooltip} style={getTooltipViewportPosition(vendasTooltip.x, vendasTooltip.y)}>
           <div className={styles.metricTooltipTitle}>
             {vendasTooltip.mode === "12m"
               ? "Vendas 12 meses por filial"
@@ -2852,7 +2948,7 @@ function ListaLojaItensTable({
         </div>
       )}
       {abcTooltip && (
-        <div className={styles.metricTooltip} style={{ left: abcTooltip.x + 12, top: abcTooltip.y + 12 }}>
+        <div className={styles.metricTooltip} style={getTooltipViewportPosition(abcTooltip.x, abcTooltip.y)}>
           <div className={styles.metricTooltipTitle}>Curva ABC (detalhe da lógica)</div>
           <div className={styles.metricTooltipMeta}><strong>Produto:</strong> {abcTooltip.produto}</div>
           {abcTooltip.cor && <div className={styles.metricTooltipMeta}><strong>Cor:</strong> {abcTooltip.cor}</div>}
@@ -2905,7 +3001,7 @@ function ListaLojaItensTable({
         </div>
       )}
       {sugestaoTooltip && (
-        <div className={styles.metricTooltip} style={{ left: sugestaoTooltip.x + 12, top: sugestaoTooltip.y + 12 }}>
+        <div className={styles.metricTooltip} style={getTooltipViewportPosition(sugestaoTooltip.x, sugestaoTooltip.y)}>
           <div className={styles.metricTooltipTitle}>{sugestaoTooltip.titulo}</div>
           <div className={styles.metricTooltipLine}>{sugestaoTooltip.regra}</div>
           <div className={styles.metricTooltipDivider} />
@@ -2929,6 +3025,23 @@ function ListaLojaItensTable({
             </>
           )}
           <div className={styles.metricTooltipDivider} />
+          {sugestaoTooltip.nmExtraQty ? (
+            <>
+              <div className={styles.metricTooltipLine}><strong>Base da regra:</strong> {fmt(sugestaoTooltip.baseQty ?? 0)} un</div>
+              <div className={styles.metricTooltipLine}><strong>NM total da rede:</strong> {fmt((sugestaoTooltip.baseQty ?? 0) + sugestaoTooltip.nmExtraQty)} un</div>
+              <div className={styles.metricTooltipLine}><strong>Já coberto pela regra base:</strong> {fmt(Math.min(sugestaoTooltip.baseQty ?? 0, (sugestaoTooltip.baseQty ?? 0) + sugestaoTooltip.nmExtraQty))} un</div>
+              <div className={styles.metricTooltipLine}><strong>Complemento NM:</strong> +{fmt(sugestaoTooltip.nmExtraQty)} un</div>
+              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
+                NM: estoque zerado e 1 unidade a cada 5 vendas nos últimos 12 meses.
+              </div>
+              {sugestaoTooltip.nmFiliais && sugestaoTooltip.nmFiliais.length > 0 ? (
+                <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
+                  <strong>NM por filial:</strong> {formatNecessidadeMinimaFiliaisDescription(sugestaoTooltip.nmFiliais)}
+                </div>
+              ) : null}
+              <div className={styles.metricTooltipDivider} />
+            </>
+          ) : null}
           <div className={styles.metricTooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoTooltip.qtdCalculada)} un</div>
           {sugestaoTooltip.transitTotal ? (
             <>
@@ -2946,13 +3059,30 @@ function ListaLojaItensTable({
         </div>
       )}
       {sugestaoSTooltip && (
-        <div className={styles.metricTooltip} style={{ left: sugestaoSTooltip.x + 12, top: sugestaoSTooltip.y + 12 }}>
+        <div className={styles.metricTooltip} style={getTooltipViewportPosition(sugestaoSTooltip.x, sugestaoSTooltip.y)}>
           <div className={styles.metricTooltipTitle}>Regra S (mesma lógica da ABC)</div>
           <div className={styles.metricTooltipLine}><strong>Base historica filial:</strong> {sugestaoSTooltip.mesesHistoricoFilial.toFixed(1)} meses</div>
           <div className={styles.metricTooltipLine}><strong>Média de vendas:</strong> {sugestaoSTooltip.mediaVendasMes.toFixed(1)} un/mês</div>
           <div className={styles.metricTooltipLine}><strong>Estoque atual:</strong> {fmt(sugestaoSTooltip.estoqueAtual)} un</div>
           <div className={styles.metricTooltipLine}><strong>Cobertura mínima:</strong> {sugestaoSTooltip.limiteDias} dias</div>
           <div className={styles.metricTooltipDivider} />
+          {sugestaoSTooltip.nmExtraQty ? (
+            <>
+              <div className={styles.metricTooltipLine}><strong>Base da regra S:</strong> {fmt(sugestaoSTooltip.baseQty ?? 0)} un</div>
+              <div className={styles.metricTooltipLine}><strong>NM total da rede:</strong> {fmt((sugestaoSTooltip.baseQty ?? 0) + sugestaoSTooltip.nmExtraQty)} un</div>
+              <div className={styles.metricTooltipLine}><strong>Já coberto pela regra S:</strong> {fmt(Math.min(sugestaoSTooltip.baseQty ?? 0, (sugestaoSTooltip.baseQty ?? 0) + sugestaoSTooltip.nmExtraQty))} un</div>
+              <div className={styles.metricTooltipLine}><strong>Complemento NM:</strong> +{fmt(sugestaoSTooltip.nmExtraQty)} un</div>
+              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
+                NM: estoque zerado e 1 unidade a cada 5 vendas nos últimos 12 meses.
+              </div>
+              {sugestaoSTooltip.nmFiliais && sugestaoSTooltip.nmFiliais.length > 0 ? (
+                <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
+                  <strong>NM por filial:</strong> {formatNecessidadeMinimaFiliaisDescription(sugestaoSTooltip.nmFiliais)}
+                </div>
+              ) : null}
+              <div className={styles.metricTooltipDivider} />
+            </>
+          ) : null}
           <div className={styles.metricTooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoSTooltip.qtdS)} un</div>
           <div className={styles.metricTooltipLine}>
             = {(sugestaoSTooltip.limiteDias / 30).toFixed(1)} meses × {sugestaoSTooltip.mediaVendasMes.toFixed(1)} un/mês
@@ -2973,7 +3103,7 @@ function ListaLojaItensTable({
         </div>
       )}
       {sugestaoETooltip && (
-        <div className={styles.metricTooltip} style={{ left: sugestaoETooltip.x + 12, top: sugestaoETooltip.y + 12 }}>
+        <div className={styles.metricTooltip} style={getTooltipViewportPosition(sugestaoETooltip.x, sugestaoETooltip.y)}>
           <div className={styles.metricTooltipTitle}>Regra E — Produto parado por falta de estoque</div>
           <div className={styles.metricTooltipLine} style={{ color: "#94a3b8", fontSize: 11 }}>
             A média mensal estava subestimada porque o produto ficou sem estoque.
@@ -2993,6 +3123,23 @@ function ListaLojaItensTable({
           </div>
           <div className={styles.metricTooltipLine}><strong>Cobertura mínima:</strong> {sugestaoETooltip.limiteDias} dias ({(sugestaoETooltip.limiteDias / 30).toFixed(1)} meses)</div>
           <div className={styles.metricTooltipDivider} />
+          {sugestaoETooltip.nmExtraQty ? (
+            <>
+              <div className={styles.metricTooltipLine}><strong>Base da regra E:</strong> {fmt(sugestaoETooltip.baseQty ?? 0)} un</div>
+              <div className={styles.metricTooltipLine}><strong>NM total da rede:</strong> {fmt((sugestaoETooltip.baseQty ?? 0) + sugestaoETooltip.nmExtraQty)} un</div>
+              <div className={styles.metricTooltipLine}><strong>Já coberto pela regra E:</strong> {fmt(Math.min(sugestaoETooltip.baseQty ?? 0, (sugestaoETooltip.baseQty ?? 0) + sugestaoETooltip.nmExtraQty))} un</div>
+              <div className={styles.metricTooltipLine}><strong>Complemento NM:</strong> +{fmt(sugestaoETooltip.nmExtraQty)} un</div>
+              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
+                NM: estoque zerado e 1 unidade a cada 5 vendas nos últimos 12 meses.
+              </div>
+              {sugestaoETooltip.nmFiliais && sugestaoETooltip.nmFiliais.length > 0 ? (
+                <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
+                  <strong>NM por filial:</strong> {formatNecessidadeMinimaFiliaisDescription(sugestaoETooltip.nmFiliais)}
+                </div>
+              ) : null}
+              <div className={styles.metricTooltipDivider} />
+            </>
+          ) : null}
           <div className={styles.metricTooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoETooltip.qtdE)} un</div>
           <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
             = ⌈{sugestaoETooltip.velocidadeAjustada.toFixed(2)} × {(sugestaoETooltip.limiteDias / 30).toFixed(1)}⌉ = {fmt(sugestaoETooltip.qtdE)}
@@ -3013,7 +3160,7 @@ function ListaLojaItensTable({
         </div>
       )}
       {nmTooltipAgregado && (
-        <div className={styles.metricTooltip} style={{ left: nmTooltipAgregado.x + 12, top: nmTooltipAgregado.y + 12 }}>
+        <div className={styles.metricTooltip} style={getTooltipViewportPosition(nmTooltipAgregado.x, nmTooltipAgregado.y)}>
           <div className={styles.metricTooltipTitle}>Necessidade Mínima por filial</div>
           {!nmTooltipAgregado.comCompra && nmTooltipAgregado.limiteDias != null && (
             <div className={styles.metricTooltipLine} style={{ color: "#22c55e", fontSize: 11 }}>
@@ -3046,7 +3193,7 @@ function ListaLojaItensTable({
         </div>
       )}
       {historicoTooltip && (
-        <div className={styles.metricTooltip} style={{ left: historicoTooltip.x + 12, top: historicoTooltip.y + 12 }}>
+        <div className={styles.metricTooltip} style={getTooltipViewportPosition(historicoTooltip.x, historicoTooltip.y)}>
           <div className={styles.metricTooltipTitle}>Historico parcial na filial</div>
           <div className={styles.metricTooltipLine}>Este item ainda nao completou 12 meses de historico na filial selecionada.</div>
           <div className={styles.metricTooltipDivider} />
@@ -3058,7 +3205,7 @@ function ListaLojaItensTable({
         </div>
       )}
       {duracaoTooltip && (
-        <div className={styles.metricTooltip} style={{ left: duracaoTooltip.x + 12, top: duracaoTooltip.y + 12 }}>
+        <div className={styles.metricTooltip} style={getTooltipViewportPosition(duracaoTooltip.x, duracaoTooltip.y)}>
           <div className={styles.metricTooltipTitle}>Duração de estoque</div>
           <div className={styles.metricTooltipLine}><strong>Regra:</strong> {duracaoTooltip.regra}</div>
           <div className={styles.metricTooltipLine}><strong>Limite do item:</strong> {duracaoTooltip.limiteDias} dias</div>
@@ -3087,7 +3234,7 @@ function ListaLojaItensTable({
         });
         const destinosSorted = Array.from(destinosMap.values()).sort((a, b) => a.cobertura - b.cobertura);
         return (
-          <div className={styles.metricTooltip} style={{ left: transferenciaTooltip.x + 12, top: transferenciaTooltip.y + 12 }}>
+          <div className={styles.metricTooltip} style={getTooltipViewportPosition(transferenciaTooltip.x, transferenciaTooltip.y)}>
             <div className={styles.metricTooltipTitle}>Sugestão de Transferência</div>
             <div className={styles.metricTooltipDivider} />
             {rotas.map((r) => (

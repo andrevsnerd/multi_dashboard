@@ -113,6 +113,7 @@ export function summarizeTransitAdjustment(input: {
   const vendasMesAtual = Number(input.vendasMesAtual ?? 0);
   const consumoDiario =
     diasCorridosMes > 0 && vendasMesAtual > 0 ? vendasMesAtual / diasCorridosMes : 0;
+  const baseQty = Math.max(0, Math.round(Number(input.baseQty ?? 0)));
 
   const relevantTransit = entries.reduce((sum, entry) => {
     const qty = Math.max(0, Math.round(Number(entry.quantidade ?? 0)));
@@ -127,7 +128,7 @@ export function summarizeTransitAdjustment(input: {
           limiteDias,
           entries: [],
         })
-      : Math.max(0, Math.round(Number(input.baseQty ?? 0)));
+      : baseQty;
 
   const deficitWithTransit =
     input.baseType === "COMPRA"
@@ -137,12 +138,15 @@ export function summarizeTransitAdjustment(input: {
           limiteDias,
           entries,
         })
-      : Math.max(0, Math.round(Number(input.baseQty ?? 0))) - Math.max(0, relevantTransit);
+      : baseQty - Math.max(0, relevantTransit);
 
   const adjustedQty = Math.max(
     0,
     input.baseType === "COMPRA"
-      ? deficitWithTransit
+      ? Math.max(
+          Math.ceil(Math.max(0, deficitWithTransit)),
+          Math.ceil(Math.max(0, baseQty - Math.max(0, relevantTransit)))
+        )
       : Math.ceil(Math.max(0, deficitWithTransit))
   );
 
@@ -151,7 +155,7 @@ export function summarizeTransitAdjustment(input: {
     relevantTransit,
     adjustedQty,
     suppressedByTransit:
-      Math.max(0, Math.round(Number(input.baseQty ?? 0))) > 0 &&
+      baseQty > 0 &&
       adjustedQty === 0 &&
       totalTransit > 0,
     entries,

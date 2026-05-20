@@ -26,9 +26,11 @@ import {
 import { formatDateForQuery } from "@/lib/utils/date";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
 import {
+  calcNecessidadeMinimaPorFilial,
   calcNecessidadeMinimaQty,
-  calcTotalNecessidadeMinimaPorFilial,
   combineBaseSuggestionWithNecessidadeMinima,
+  formatNecessidadeMinimaFiliaisDescription,
+  type FilialNecessidadeMinimaInfo,
 } from "@/lib/utils/necessidade-minima";
 import FilialVendedoresTab from "./FilialVendedoresTab";
 import { exportCurvaAbcSimpleCsv } from "@/lib/utils/exportCurvaAbcSimpleCsv";
@@ -101,6 +103,7 @@ type CompraMetricRow = {
   diasDesdeUltimaVenda: number | null;
   mesesHistoricoFilial: number | null;
   totalNmQty: number | null;
+  filiaisNM: FilialNecessidadeMinimaInfo[] | null;
 };
 
 const EMPTY_COMPRA_METRIC_ROW: CompraMetricRow = {
@@ -110,6 +113,7 @@ const EMPTY_COMPRA_METRIC_ROW: CompraMetricRow = {
   diasDesdeUltimaVenda: null,
   mesesHistoricoFilial: null,
   totalNmQty: null,
+  filiaisNM: null,
 };
 
 // ─── Formatação ──────────────────────────────────────────────────────────────
@@ -132,12 +136,16 @@ function getTooltipViewportPosition(x: number, y: number): { left: number; top: 
   const tooltipHeight = 280;
   const margin = 12;
   if (typeof window === "undefined") {
-    return { left: x + offset, top: y + offset };
+    return { left: x + offset, top: y - tooltipHeight - offset };
   }
   const maxLeft = Math.max(margin, window.innerWidth - tooltipWidth - margin);
-  const maxTop = Math.max(margin, window.innerHeight - tooltipHeight - margin);
   const left = Math.min(Math.max(margin, x + offset), maxLeft);
-  const top = Math.min(Math.max(margin, y + offset), maxTop);
+  const topAbove = y - tooltipHeight - offset;
+  const topBelow = y + offset;
+  const maxTop = Math.max(margin, window.innerHeight - tooltipHeight - margin);
+  const top = topAbove >= margin
+    ? topAbove
+    : Math.min(Math.max(margin, topBelow), maxTop);
   return { left, top };
 }
 
@@ -486,6 +494,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     qtdCalculada: number;
     baseQty?: number;
     nmExtraQty?: number;
+    nmFiliais?: FilialNecessidadeMinimaInfo[];
     blendAplicado?: boolean;
     qtdFinalPuro?: number;
     qtdSBlend?: number;
@@ -502,6 +511,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     qtdS: number;
     baseQty?: number;
     nmExtraQty?: number;
+    nmFiliais?: FilialNecessidadeMinimaInfo[];
     transitTotal?: number;
     transitDates?: string[];
   }>(null);
@@ -517,6 +527,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     qtdE: number;
     baseQty?: number;
     nmExtraQty?: number;
+    nmFiliais?: FilialNecessidadeMinimaInfo[];
     transitTotal?: number;
     transitDates?: string[];
   }>(null);
@@ -798,17 +809,19 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
               next[buildControleEstoqueItemKey(item.produto, item.corProduto)] = EMPTY_COMPRA_METRIC_ROW;
             });
             Object.entries(rows).forEach(([key, value]) => {
+              const filiaisNM = calcNecessidadeMinimaPorFilial({
+                company: resolveCompany(companyKey),
+                vendasPorFilial: value.vendasPorFilial,
+                estoquePorFilial: value.estoquePorFilial,
+              });
               next[key] = {
                 qtde12m: value.resumo.qtde12m,
                 vendasMesAtual: value.resumo.vendasMesAtual,
                 estoqueFilial: value.resumo.estoqueTotal,
                 diasDesdeUltimaVenda: value.resumo.diasDesdeUltimaVenda,
                 mesesHistoricoFilial: value.resumo.mesesHistoricoFilial,
-                totalNmQty: calcTotalNecessidadeMinimaPorFilial({
-                  company: resolveCompany(companyKey),
-                  vendasPorFilial: value.vendasPorFilial,
-                  estoquePorFilial: value.estoquePorFilial,
-                }),
+                totalNmQty: filiaisNM.reduce((sum, row) => sum + row.qtd, 0),
+                filiaisNM,
               };
             });
             return next;
@@ -1754,6 +1767,7 @@ const handleBadgeClick = (cat: string) => {
                                             qtdCalculada: transit.qty,
                                             baseQty: combined.baseQty,
                                             nmExtraQty: combined.hasCombinedNm ? combined.nmExtraQty : undefined,
+                                            nmFiliais: live?.filiaisNM ?? undefined,
                                             blendAplicado,
                                             qtdFinalPuro,
                                             qtdSBlend,
@@ -1762,7 +1776,14 @@ const handleBadgeClick = (cat: string) => {
                                           })}
                                           onMouseLeave={() => setSugestaoTooltip(null)}
                                         >
-                                          {fmt(transit.qty)}{blendAplicado && <>{" "}<span style={{ display: "inline-flex", width: 16, height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#0f172a", background: "#fde047", border: "1px solid #facc15", verticalAlign: "middle", cursor: "help" }}>⚡</span></>}{transitBadge}
+                                          {fmt(transit.qty)}
+                                          {blendAplicado && <>{" "}<span style={{ display: "inline-flex", width: 16, height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#0f172a", background: "#fde047", border: "1px solid #facc15", verticalAlign: "middle", cursor: "help" }}>⚡</span></>}
+                                          {combined.hasCombinedNm ? (
+                                            <span className={styles.badgeT} style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}>
+                                              NM
+                                            </span>
+                                          ) : null}
+                                          {transitBadge}
                                         </span>
                                       );
                                     }
@@ -1782,6 +1803,7 @@ const handleBadgeClick = (cat: string) => {
                                               qtdS: transit.qty,
                                               baseQty: combined.baseQty,
                                               nmExtraQty: combined.hasCombinedNm ? combined.nmExtraQty : undefined,
+                                              nmFiliais: live?.filiaisNM ?? undefined,
                                               transitTotal: transit.totalTransit || undefined,
                                               transitDates,
                                             })}
@@ -1804,6 +1826,11 @@ const handleBadgeClick = (cat: string) => {
                                           >
                                             S
                                           </span>
+                                          {combined.hasCombinedNm ? (
+                                            <span className={styles.badgeT} style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}>
+                                              NM
+                                            </span>
+                                          ) : null}
                                           {transitBadge}
                                         </span>
                                       );
@@ -1826,6 +1853,7 @@ const handleBadgeClick = (cat: string) => {
                                               qtdE: transit.qty,
                                               baseQty: combined.baseQty,
                                               nmExtraQty: combined.hasCombinedNm ? combined.nmExtraQty : undefined,
+                                              nmFiliais: live?.filiaisNM ?? undefined,
                                               transitTotal: transit.totalTransit || undefined,
                                               transitDates,
                                             })}
@@ -1848,6 +1876,11 @@ const handleBadgeClick = (cat: string) => {
                                           >
                                             E
                                           </span>
+                                          {combined.hasCombinedNm ? (
+                                            <span className={styles.badgeT} style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}>
+                                              NM
+                                            </span>
+                                          ) : null}
                                           {transitBadge}
                                         </span>
                                       );
@@ -1871,6 +1904,7 @@ const handleBadgeClick = (cat: string) => {
                                             duracaoAtual: 0,
                                             qtdCalculada: transit.qty,
                                             baseQty: combined.baseQty,
+                                            nmFiliais: live?.filiaisNM ?? undefined,
                                             transitTotal: transit.totalTransit || undefined,
                                             transitDates,
                                           })}
@@ -2003,9 +2037,24 @@ const handleBadgeClick = (cat: string) => {
           {sugestaoTooltip.nmExtraQty ? (
             <>
               <div className={styles.metricTooltipLine}><strong>Base da regra:</strong> {fmt(sugestaoTooltip.baseQty ?? 0)} un</div>
+              <div className={styles.metricTooltipLine}><strong>NM total da rede:</strong> {fmt((sugestaoTooltip.baseQty ?? 0) + sugestaoTooltip.nmExtraQty)} un</div>
+              <div className={styles.metricTooltipLine}><strong>Já coberto pela regra base:</strong> {fmt(Math.min(sugestaoTooltip.baseQty ?? 0, (sugestaoTooltip.baseQty ?? 0) + sugestaoTooltip.nmExtraQty))} un</div>
               <div className={styles.metricTooltipLine}><strong>Complemento NM:</strong> +{fmt(sugestaoTooltip.nmExtraQty)} un</div>
               <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
                 NM: estoque zerado e 1 unidade a cada 5 vendas nos últimos 12 meses.
+              </div>
+              {sugestaoTooltip.nmFiliais && sugestaoTooltip.nmFiliais.length > 0 ? (
+                <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
+                  <strong>NM por filial:</strong> {formatNecessidadeMinimaFiliaisDescription(sugestaoTooltip.nmFiliais)}
+                </div>
+              ) : null}
+              <div className={styles.metricTooltipDivider} />
+            </>
+          ) : null}
+          {!sugestaoTooltip.nmExtraQty && sugestaoTooltip.titulo === "Necessidade minima (NM)" && sugestaoTooltip.nmFiliais && sugestaoTooltip.nmFiliais.length > 0 ? (
+            <>
+              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
+                <strong>NM por filial:</strong> {formatNecessidadeMinimaFiliaisDescription(sugestaoTooltip.nmFiliais)}
               </div>
               <div className={styles.metricTooltipDivider} />
             </>
@@ -2040,10 +2089,17 @@ const handleBadgeClick = (cat: string) => {
           {sugestaoSTooltip.nmExtraQty ? (
             <>
               <div className={styles.metricTooltipLine}><strong>Base da regra S:</strong> {fmt(sugestaoSTooltip.baseQty ?? 0)} un</div>
+              <div className={styles.metricTooltipLine}><strong>NM total da rede:</strong> {fmt((sugestaoSTooltip.baseQty ?? 0) + sugestaoSTooltip.nmExtraQty)} un</div>
+              <div className={styles.metricTooltipLine}><strong>Já coberto pela regra S:</strong> {fmt(Math.min(sugestaoSTooltip.baseQty ?? 0, (sugestaoSTooltip.baseQty ?? 0) + sugestaoSTooltip.nmExtraQty))} un</div>
               <div className={styles.metricTooltipLine}><strong>Complemento NM:</strong> +{fmt(sugestaoSTooltip.nmExtraQty)} un</div>
               <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
                 NM: estoque zerado e 1 unidade a cada 5 vendas nos últimos 12 meses.
               </div>
+              {sugestaoSTooltip.nmFiliais && sugestaoSTooltip.nmFiliais.length > 0 ? (
+                <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
+                  <strong>NM por filial:</strong> {formatNecessidadeMinimaFiliaisDescription(sugestaoSTooltip.nmFiliais)}
+                </div>
+              ) : null}
               <div className={styles.metricTooltipDivider} />
             </>
           ) : null}
@@ -2093,10 +2149,17 @@ const handleBadgeClick = (cat: string) => {
           {sugestaoETooltip.nmExtraQty ? (
             <>
               <div className={styles.metricTooltipLine}><strong>Base da regra E:</strong> {fmt(sugestaoETooltip.baseQty ?? 0)} un</div>
+              <div className={styles.metricTooltipLine}><strong>NM total da rede:</strong> {fmt((sugestaoETooltip.baseQty ?? 0) + sugestaoETooltip.nmExtraQty)} un</div>
+              <div className={styles.metricTooltipLine}><strong>Já coberto pela regra E:</strong> {fmt(Math.min(sugestaoETooltip.baseQty ?? 0, (sugestaoETooltip.baseQty ?? 0) + sugestaoETooltip.nmExtraQty))} un</div>
               <div className={styles.metricTooltipLine}><strong>Complemento NM:</strong> +{fmt(sugestaoETooltip.nmExtraQty)} un</div>
               <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
                 NM: estoque zerado e 1 unidade a cada 5 vendas nos últimos 12 meses.
               </div>
+              {sugestaoETooltip.nmFiliais && sugestaoETooltip.nmFiliais.length > 0 ? (
+                <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
+                  <strong>NM por filial:</strong> {formatNecessidadeMinimaFiliaisDescription(sugestaoETooltip.nmFiliais)}
+                </div>
+              ) : null}
               <div className={styles.metricTooltipDivider} />
             </>
           ) : null}

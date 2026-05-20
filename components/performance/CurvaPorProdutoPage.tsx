@@ -23,9 +23,11 @@ import {
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
 import { formatDateForQuery } from "@/lib/utils/date";
 import {
+  calcNecessidadeMinimaPorFilial,
   calcNecessidadeMinimaQty,
-  calcTotalNecessidadeMinimaPorFilial,
   combineBaseSuggestionWithNecessidadeMinima,
+  formatNecessidadeMinimaFiliaisDescription,
+  type FilialNecessidadeMinimaInfo,
   getCombinedNecessidadeMinimaTooltip,
   getNecessidadeMinimaRuleDescription,
   getSuggestionPrincipalBadgeLabel,
@@ -45,6 +47,7 @@ type MetricasRow = {
   diasDesdeUltimaVenda: number | null;
   mesesHistoricoFilial: number | null;
   totalNmQty: number | null;
+  filiaisNM: FilialNecessidadeMinimaInfo[] | null;
 };
 
 const EMPTY_METRICAS_ROW: MetricasRow = {
@@ -54,6 +57,7 @@ const EMPTY_METRICAS_ROW: MetricasRow = {
   diasDesdeUltimaVenda: null,
   mesesHistoricoFilial: null,
   totalNmQty: null,
+  filiaisNM: null,
 };
 
 type SuggestionType = "COMPRA" | "S" | "E" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
@@ -67,6 +71,7 @@ type SuggestionView = {
   nmExtraQty?: number;
   combinedWithNm?: boolean;
   title?: string;
+  nmFiliais?: FilialNecessidadeMinimaInfo[];
 };
 
 type DisplayRow = CurvaPorProdutoApiResponse["rows"][number] & {
@@ -383,17 +388,19 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
               next[buildCurvaPorProdutoKey(item.produto, item.corProduto ?? null)] = EMPTY_METRICAS_ROW;
             });
             Object.entries(rows).forEach(([key, value]) => {
+              const filiaisNM = calcNecessidadeMinimaPorFilial({
+                company: resolveCompany(companyKey),
+                vendasPorFilial: value.vendasPorFilial,
+                estoquePorFilial: value.estoquePorFilial,
+              });
               next[key] = {
                 qtde12m: value.resumo.qtde12m,
                 vendasMesAtual: value.resumo.vendasMesAtual,
                 estoqueFilial: value.resumo.estoqueTotal,
                 diasDesdeUltimaVenda: value.resumo.diasDesdeUltimaVenda,
                 mesesHistoricoFilial: value.resumo.mesesHistoricoFilial,
-                totalNmQty: calcTotalNecessidadeMinimaPorFilial({
-                  company: resolveCompany(companyKey),
-                  vendasPorFilial: value.vendasPorFilial,
-                  estoquePorFilial: value.estoquePorFilial,
-                }),
+                totalNmQty: filiaisNM.reduce((sum, row) => sum + row.qtd, 0),
+                filiaisNM,
               };
             });
             return next;
@@ -469,13 +476,14 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
         baseType: combined.effectiveType,
         nmExtraQty: combined.nmExtraQty,
         combinedWithNm: combined.hasCombinedNm,
+        nmFiliais: currentMetric?.filiaisNM ?? undefined,
       };
       if (!hasMetric || semBaseMetric) {
         // Mantem o status explicito ate a linha ter metricas consolidadas.
       } else if (transit.qty > 0) {
         const principalLabel = getSuggestionPrincipalBadgeLabel(combined.effectiveType);
         const summaryText = combined.hasCombinedNm && principalLabel
-          ? `${fmt(transit.qty)} ${principalLabel} + NM +${fmt(combined.nmExtraQty)}`
+          ? `${fmt(transit.qty)} ${principalLabel} + NM`
           : combined.effectiveType === "S"
             ? `S ${fmt(transit.qty)}`
             : combined.effectiveType === "E"
@@ -497,10 +505,12 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
               baseQty: combined.baseQty,
               nmExtraQty: combined.nmExtraQty,
               totalQty: transit.qty,
+              filiais: currentMetric?.filiaisNM ?? undefined,
             })
             : combined.effectiveType === "NM"
-              ? getNecessidadeMinimaRuleDescription()
+              ? `${getNecessidadeMinimaRuleDescription()}${currentMetric?.filiaisNM?.length ? ` Filiais NM: ${formatNecessidadeMinimaFiliaisDescription(currentMetric.filiaisNM)}.` : ""}`
               : undefined,
+          nmFiliais: currentMetric?.filiaisNM ?? undefined,
         };
       } else if (combined.effectiveType === "SUFICIENTE" || transit.suppressedByTransit) {
         suggestion = { text: "Quantidade suficiente", tone: "ok", summaryText: "Quantidade suficiente", qty: 0, baseType: combined.effectiveType, nmExtraQty: 0, combinedWithNm: false };
@@ -820,19 +830,24 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
                             <span className={`${styles.suggestionBadge} ${styles[`suggestion${row.suggestion.tone}`]}`}>
                               {row.suggestion.text}
                             </span>
-                            {row.suggestion.combinedWithNm && row.suggestion.baseType === "COMPRA" && (
-                              <span className={`${styles.suggestionBadge} ${styles.suggestionbuy}`} style={{ background: "#1d4ed8", borderColor: "#1e40af", color: "#fff" }}>
-                                COMPRA
+                            {row.suggestion.baseType === "S" && (
+                              <span className={`${styles.suggestionBadge} ${styles.suggestions}`}>
+                                S
                               </span>
                             )}
-                            {row.suggestion.combinedWithNm && row.suggestion.baseType != null && row.suggestion.baseType !== "COMPRA" && (
-                              <span className={`${styles.suggestionBadge} ${styles[`suggestion${row.suggestion.tone}`]}`}>
-                                {getSuggestionPrincipalBadgeLabel(row.suggestion.baseType)}
+                            {row.suggestion.baseType === "E" && (
+                              <span className={`${styles.suggestionBadge} ${styles.suggestione}`}>
+                                E
+                              </span>
+                            )}
+                            {row.suggestion.baseType === "NM" && (
+                              <span className={`${styles.suggestionBadge} ${styles.suggestionbuy}`} style={{ background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}>
+                                NM
                               </span>
                             )}
                             {row.suggestion.combinedWithNm && (
                               <span className={`${styles.suggestionBadge} ${styles.suggestionbuy}`} style={{ background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}>
-                                NM +{fmt(row.suggestion.nmExtraQty)}
+                                NM
                               </span>
                             )}
                           </span>
