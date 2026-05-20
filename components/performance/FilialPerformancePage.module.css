@@ -64,6 +64,44 @@
   flex-wrap: wrap;
 }
 
+.filtroToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #dbe2ea;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.filtroToggle input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #2563eb;
+}
+
+.filtroClearBtn {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.filtroClearBtn:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
 .abcFiltersRow {
   display: flex;
   align-items: flex-start;

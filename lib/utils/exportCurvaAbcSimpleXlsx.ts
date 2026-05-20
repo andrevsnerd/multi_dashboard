@@ -4,20 +4,20 @@ import type { CompanyKey } from "@/lib/config/company";
 export interface CurvaAbcSimpleXlsxRow {
   RANK: number;
   CURVA: string;
-  DESCRICAO: string;
   PRODUTO: string;
+  DESCRICAO: string;
+  COR_DESCRICAO: string;
+  QTDE: number;
+  ESTOQUE: number;
   CODIGO_BARRA: string;
   LINHA: string;
   SUBGRUPO: string;
   TIPO_PRODUTO: string;
   COLECAO: string;
   GRADE: string;
-  COR_DESCRICAO: string;
   PERC_PARTICIPACAO: number;
   PERC_ACUMULADA: number;
   VENDAS: number;
-  QTDE: number;
-  ESTOQUE: number;
   MARKUP: number | "";
   SUGESTAO_COMPRA: number | "";
   VAR_VS_PERIODO_ANTERIOR: number | string;
@@ -47,7 +47,29 @@ export function exportCurvaAbcSimpleXlsx(
     return;
   }
 
-  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const orderedRows = rows.map((row) => ({
+    RANK: row.RANK,
+    CURVA: row.CURVA,
+    PRODUTO: row.PRODUTO,
+    DESCRICAO: row.DESCRICAO,
+    COR_DESCRICAO: row.COR_DESCRICAO,
+    QTDE: row.QTDE,
+    ESTOQUE: row.ESTOQUE,
+    CODIGO_BARRA: row.CODIGO_BARRA,
+    LINHA: row.LINHA,
+    SUBGRUPO: row.SUBGRUPO,
+    TIPO_PRODUTO: row.TIPO_PRODUTO,
+    COLECAO: row.COLECAO,
+    GRADE: row.GRADE,
+    PERC_PARTICIPACAO: row.PERC_PARTICIPACAO,
+    PERC_ACUMULADA: row.PERC_ACUMULADA,
+    VENDAS: row.VENDAS,
+    MARKUP: row.MARKUP,
+    SUGESTAO_COMPRA: row.SUGESTAO_COMPRA,
+    VAR_VS_PERIODO_ANTERIOR: row.VAR_VS_PERIODO_ANTERIOR,
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(orderedRows);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Curva ABC");
 

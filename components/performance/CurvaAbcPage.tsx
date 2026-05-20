@@ -14,7 +14,6 @@ import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateR
 import FilialFilter from "@/components/filters/FilialFilter";
 import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
 import {
-  fetchControleEstoqueItemMetricasClient,
   fetchControleEstoqueMetricasItensClient,
 } from "@/lib/client/controle-estoque-metricas";
 import { buildControleEstoqueItemKey } from "@/lib/utils/controle-estoque-metricas";
@@ -30,7 +29,6 @@ import {
   calcNecessidadeMinimaQty,
   calcTotalNecessidadeMinimaPorFilial,
   combineBaseSuggestionWithNecessidadeMinima,
-  getCombinedNecessidadeMinimaTooltip,
 } from "@/lib/utils/necessidade-minima";
 import FilialVendedoresTab from "./FilialVendedoresTab";
 import { exportCurvaAbcSimpleCsv } from "@/lib/utils/exportCurvaAbcSimpleCsv";
@@ -295,19 +293,6 @@ function getSuggestedDelta(
   return Number.isFinite(qtd) ? Math.max(0, qtd) : 0;
 }
 
-function hasSugestaoS(
-  item: { qtde12m?: number; mesesHistoricoFilial?: number; estoqueFilial?: number },
-  qtdFinal: number,
-  qtdSuficiente: boolean
-): boolean {
-  if (qtdFinal > 0) return false;
-  if (qtdSuficiente) return false;
-  const mediaVendasMes = Number(item.qtde12m ?? 0) / getMesesHistoricoFilial(item);
-  if (mediaVendasMes < 1) return false;
-  const estoqueAtual = Number(item.estoqueFilial ?? 0);
-  return estoqueAtual <= mediaVendasMes * 2;
-}
-
 function calcQtdSugestaoS(item: {
   qtde12m?: number;
   mesesHistoricoFilial?: number;
@@ -433,131 +418,6 @@ function buildCurvaAbcMetricKey(
   return buildControleEstoqueItemKey(produto, porCor ? corProduto : null);
 }
 
-async function fetchEstoqueFilialSum(
-  companyKey: string,
-  codFilial: string | null,
-  produto: string,
-  corProduto: string | null
-): Promise<number | null> {
-  try {
-    const metricas = await fetchControleEstoqueItemMetricasClient({
-      company: companyKey,
-      filial: codFilial,
-      includeHistorico: true,
-      item: {
-        produto: produto.trim(),
-        corProduto: corProduto?.trim() || null,
-      },
-    });
-    return metricas?.resumo.estoqueTotal ?? null;
-  } catch {
-    return null;
-  }
-}
-
-async function fetchVendasItemMetricas(
-  companyKey: string,
-  codFilial: string | null,
-  produto: string,
-  corProduto: string | null
-): Promise<{
-  qtde12m: number;
-  vendasMesAtual: number;
-  diasDesdeUltimaVenda: number | null;
-  mesesHistoricoFilial: number;
-  totalNmQty: number;
-} | null> {
-  type Row = {
-    qtde12m: number;
-    qtdeMesAtual?: number;
-    diasDesdeUltimaVenda?: number | null;
-    primeiraEntradaFilial?: string | null;
-    mesesHistoricoFilial?: number | null;
-  };
-  const fetchRows = async (includeHistorico: boolean): Promise<Row[]> => {
-    const params = new URLSearchParams({ company: companyKey, produto: produto.trim() });
-    if (includeHistorico) params.set("includeHistorico", "true");
-    if (codFilial && codFilial.trim()) params.set("filial", codFilial.trim());
-    if (corProduto) params.set("corProduto", corProduto.trim());
-    const res = await fetch(`/api/controle-estoque/vendas-por-filial-item?${params}`, { cache: "no-store" });
-    if (!res.ok) throw new Error("Erro ao carregar métricas de vendas");
-    const json = (await res.json()) as { data?: Row[] };
-    return json.data || [];
-  };
-  try {
-    const metricas = await fetchControleEstoqueItemMetricasClient({
-      company: companyKey,
-      filial: codFilial,
-      includeHistorico: true,
-      item: {
-        produto: produto.trim(),
-        corProduto: corProduto?.trim() || null,
-      },
-    });
-    if (metricas) {
-      return {
-        qtde12m: metricas.resumo.qtde12m,
-        vendasMesAtual: metricas.resumo.vendasMesAtual,
-        diasDesdeUltimaVenda: metricas.resumo.diasDesdeUltimaVenda,
-        mesesHistoricoFilial: metricas.resumo.mesesHistoricoFilial,
-        totalNmQty: calcTotalNecessidadeMinimaPorFilial({
-          company: resolveCompany(companyKey),
-          vendasPorFilial: metricas.vendasPorFilial,
-          estoquePorFilial: metricas.estoquePorFilial,
-        }),
-      };
-    }
-
-    let rows: Row[] = [];
-    try {
-      rows = await fetchRows(true);
-    } catch {
-      rows = await fetchRows(false);
-    }
-    const diasValidos = rows.map((r) => r.diasDesdeUltimaVenda).filter((d): d is number => d != null);
-
-    // Usa a data mais antiga de entrada entre todas as filiais para calcular meses,
-    // igual ao ListaLojaPage (mergeHistoricoFilialRows). Evita que uma filial nova
-    // com 1 mês de histórico contamine o cálculo via Math.min/Math.max.
-    let mesesHistoricoFilial = 12;
-    let primeiraEntrada: Date | null = null;
-    for (const row of rows) {
-      if (!row.primeiraEntradaFilial) continue;
-      const d = new Date(row.primeiraEntradaFilial!);
-      if (Number.isNaN(d.getTime())) continue;
-      const primeiraEntradaAtual = primeiraEntrada;
-      if (!primeiraEntradaAtual) {
-        primeiraEntrada = d;
-        continue;
-      }
-      if (d.getTime() < primeiraEntradaAtual!.getTime()) {
-        primeiraEntrada = d;
-      }
-    }
-    if (primeiraEntrada) {
-      const dias = Math.min(365, Math.max(0, Math.floor((Date.now() - primeiraEntrada!.getTime()) / 86400000)));
-      mesesHistoricoFilial = Math.min(12, Math.max(1, dias / 30));
-    } else {
-      const parcial = rows.find((r) => r.mesesHistoricoFilial != null);
-      const mesesParcial = parcial?.mesesHistoricoFilial;
-      if (mesesParcial != null) {
-        mesesHistoricoFilial = Math.min(12, Math.max(1, Number(mesesParcial)));
-      }
-    }
-
-    return {
-      qtde12m: Math.round(rows.reduce((s, r) => s + Number(r.qtde12m ?? 0), 0)),
-      vendasMesAtual: Math.round(rows.reduce((s, r) => s + Number(r.qtdeMesAtual ?? 0), 0)),
-      diasDesdeUltimaVenda: diasValidos.length > 0 ? Math.min(...diasValidos) : null,
-      mesesHistoricoFilial,
-      // Fallback não traz vendas/estoque por filial no formato de NM; evita superestimar.
-      totalNmQty: 0,
-    };
-  } catch {
-    return null;
-  }
-}
-
 function buildProductDetalhadoHref(
   companyKey: CompanyKey,
   p: Pick<ProdutoRow, "produto" | "descricao" | "cor">
@@ -601,6 +461,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubgrupos, setSelectedSubgrupos] = useState<string[]>([]);
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
@@ -608,7 +469,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [activeTab, setActiveTab] = useState<"produtos" | "vendedores">("produtos");
   const [porCor, setPorCor] = useState(true);
   const [filtrarSugeridos, setFiltrarSugeridos] = useState(false);
-  const [selectedCurva, setSelectedCurva] = useState<Curva | null>(null);
+  const [selectedCurvas, setSelectedCurvas] = useState<Set<Curva>>(new Set());
   const [compraMetrics, setCompraMetrics] = useState<Record<string, CompraMetricRow>>({});
   const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
   const [sugestaoTooltip, setSugestaoTooltip] = useState<null | {
@@ -623,6 +484,8 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     estoqueAtual: number;
     duracaoAtual: number;
     qtdCalculada: number;
+    baseQty?: number;
+    nmExtraQty?: number;
     blendAplicado?: boolean;
     qtdFinalPuro?: number;
     qtdSBlend?: number;
@@ -637,6 +500,8 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     estoqueAtual: number;
     limiteDias: number;
     qtdS: number;
+    baseQty?: number;
+    nmExtraQty?: number;
     transitTotal?: number;
     transitDates?: string[];
   }>(null);
@@ -650,10 +515,13 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     velocidadeAjustada: number;
     limiteDias: number;
     qtdE: number;
+    baseQty?: number;
+    nmExtraQty?: number;
     transitTotal?: number;
     transitDates?: string[];
   }>(null);
   const exportMenuRef = useRef<HTMLDivElement | null>(null);
+  const captureRef = useRef<HTMLDivElement | null>(null);
 
   // Quando filial muda, voltar para aba de produtos
   useEffect(() => {
@@ -810,7 +678,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
 
   const activeFilterLabels = [
     ...activeStructureFilterLabels,
-    selectedCurva ? `Curva: ${selectedCurva}` : null,
+    selectedCurvas.size > 0 ? `Curvas: ${Array.from(selectedCurvas).join(", ")}` : null,
   ].filter((value): value is string => Boolean(value));
 
   const hasStructuredFilters = activeStructureFilterLabels.length > 0;
@@ -871,9 +739,9 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   }, [filtrarSugeridos, produtosComCurva, compraMetrics, comprasTransitoIndex, diasCorridosMes, porCor]);
 
   const produtosComCurvaExibidos = useMemo(() => {
-    if (!selectedCurva) return produtosComCurvaComFiltroSugestao;
-    return produtosComCurvaComFiltroSugestao.filter((p) => p.curva === selectedCurva);
-  }, [produtosComCurvaComFiltroSugestao, selectedCurva]);
+    if (selectedCurvas.size === 0) return produtosComCurvaComFiltroSugestao;
+    return produtosComCurvaComFiltroSugestao.filter((p) => selectedCurvas.has(p.curva));
+  }, [produtosComCurvaComFiltroSugestao, selectedCurvas]);
 
   const maxPerc = produtosComCurvaExibidos.length > 0 ? produtosComCurvaExibidos[0].percParticipacao : 1;
   const countA = produtosComCurvaComFiltroSugestao.filter(p => p.curva === "A").length;
@@ -888,9 +756,9 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     ? produtosFiltrados.reduce((s, p) => s + p.qtde, 0)
     : data?.qtde ?? 0;
   const displayCMV = produtosFiltrados.reduce((s, p) => s + p.custo * p.qtde, 0);
-  const hasAnyDisplayFilter = hasStructuredFilters || filtrarSugeridos || selectedCurva !== null;
-  const displayedCountLabel = selectedCurva
-    ? `${selectedCurva} ${porCor ? "itens exibidos" : "produtos exibidos"}`
+  const hasAnyDisplayFilter = hasStructuredFilters || filtrarSugeridos || selectedCurvas.size > 0;
+  const displayedCountLabel = selectedCurvas.size > 0
+    ? `${Array.from(selectedCurvas).join(", ")} ${porCor ? "itens exibidos" : "produtos exibidos"}`
     : porCor
       ? "ITENS (PROD. + COR)"
       : "PRODUTOS ÚNICOS";
@@ -1107,6 +975,116 @@ const handleBadgeClick = (cat: string) => {
     exportCurvaAbcSimpleCsv(rows, exportOptions);
   };
 
+  const handleExportPdf = async () => {
+    const target = captureRef.current;
+    if (!target || produtosComCurvaExibidos.length === 0) return;
+
+    setExportMenuOpen(false);
+    setExportingPdf(true);
+
+    try {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+
+      const tableCard = target.querySelector<HTMLElement>(`.${styles.tableCard}`);
+      const tableElement = target.querySelector<HTMLTableElement>(`.${styles.table}`);
+      const prevOverflowX = tableCard?.style.overflowX ?? "";
+      const prevTableCardWidth = tableCard?.style.width ?? "";
+      const prevTargetWidth = target.style.width;
+      const prevTargetMaxWidth = target.style.maxWidth;
+      const prevTableWidth = tableElement?.style.width ?? "";
+      let canvas: HTMLCanvasElement;
+
+      try {
+        const exportWidth = Math.max(
+          target.scrollWidth,
+          tableCard?.scrollWidth ?? 0,
+          tableElement?.scrollWidth ?? 0
+        );
+
+        if (tableCard) {
+          tableCard.style.overflowX = "visible";
+          tableCard.style.width = `${exportWidth}px`;
+        }
+        if (tableElement) {
+          tableElement.style.width = `${exportWidth}px`;
+        }
+        target.style.width = `${exportWidth}px`;
+        target.style.maxWidth = "none";
+
+        canvas = await html2canvas(target, {
+          backgroundColor: "#f8fafc",
+          scale: 2,
+          useCORS: true,
+          scrollX: 0,
+          scrollY: -window.scrollY,
+          windowWidth: Math.max(target.scrollWidth, target.clientWidth),
+          windowHeight: Math.max(target.scrollHeight, target.clientHeight),
+        });
+      } finally {
+        if (tableCard) {
+          tableCard.style.overflowX = prevOverflowX;
+          tableCard.style.width = prevTableCardWidth;
+        }
+        if (tableElement) {
+          tableElement.style.width = prevTableWidth;
+        }
+        target.style.width = prevTargetWidth;
+        target.style.maxWidth = prevTargetMaxWidth;
+      }
+
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+      });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 6;
+      const usableWidth = pageWidth - margin * 2;
+      const usableHeight = pageHeight - margin * 2;
+      const sliceHeightPx = Math.floor(canvas.width / (usableWidth / usableHeight));
+      const totalPages = Math.ceil(canvas.height / sliceHeightPx);
+
+      for (let page = 0; page < totalPages; page += 1) {
+        if (page > 0) pdf.addPage();
+
+        const srcY = page * sliceHeightPx;
+        const srcHeight = Math.min(sliceHeightPx, canvas.height - srcY);
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = srcHeight;
+
+        const ctx = pageCanvas.getContext("2d");
+        if (!ctx) continue;
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        ctx.drawImage(canvas, 0, srcY, canvas.width, srcHeight, 0, 0, pageCanvas.width, pageCanvas.height);
+
+        const imageData = pageCanvas.toDataURL("image/png");
+        const drawHeight = (srcHeight * usableWidth) / canvas.width;
+        pdf.addImage(imageData, "PNG", margin, margin, usableWidth, Math.min(drawHeight, usableHeight), undefined, "FAST");
+      }
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const filialPart = selectedFilial
+        ? `-${(data?.displayName ?? selectedFilial).replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 48)}`
+        : "";
+      pdf.save(`curva-abc-${companyKey}${filialPart}-${dateStr}.pdf`);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Erro ao exportar PDF");
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   const comparisonLabel = comparisonMode === "month" ? "mês anterior" : "mesmo período do ano anterior";
 
   const pageTitle = selectedFilial
@@ -1238,7 +1216,7 @@ const handleBadgeClick = (cat: string) => {
       )}
 
       {activeTab === "produtos" && !loading && data && (
-        <>
+        <div ref={captureRef}>
           {/* Category badges — clicáveis para filtrar ABC */}
           {displayedCategories.length > 0 && (
             <div className={styles.categoryBadgesRow}>
@@ -1323,39 +1301,18 @@ const handleBadgeClick = (cat: string) => {
                 <span className={styles.summaryValueNeutral}>{produtosComCurvaExibidos.length}</span>
               </div>
               <div className={styles.summaryDivider} />
-              <button
-                type="button"
-                className={`${styles.summaryItem} ${styles.curvaFilterCard} ${selectedCurva === "A" ? styles.curvaFilterCardActive : ""}`}
-                onClick={() => setSelectedCurva((prev) => prev === "A" ? null : "A")}
-              >
+              <div className={styles.summaryItem}>
                 <span className={styles.summaryLabel}>Curva A</span>
                 <span className={`${styles.summaryValueSmall} ${styles.textA}`}>{countA} produtos</span>
-              </button>
-              <button
-                type="button"
-                className={`${styles.summaryItem} ${styles.curvaFilterCard} ${selectedCurva === "B" ? styles.curvaFilterCardActive : ""}`}
-                onClick={() => setSelectedCurva((prev) => prev === "B" ? null : "B")}
-              >
+              </div>
+              <div className={styles.summaryItem}>
                 <span className={styles.summaryLabel}>Curva B</span>
                 <span className={`${styles.summaryValueSmall} ${styles.textB}`}>{countB} produtos</span>
-              </button>
-              <button
-                type="button"
-                className={`${styles.summaryItem} ${styles.curvaFilterCard} ${selectedCurva === "C" ? styles.curvaFilterCardActive : ""}`}
-                onClick={() => setSelectedCurva((prev) => prev === "C" ? null : "C")}
-              >
+              </div>
+              <div className={styles.summaryItem}>
                 <span className={styles.summaryLabel}>Curva C</span>
                 <span className={`${styles.summaryValueSmall} ${styles.textC}`}>{countC} produtos</span>
-              </button>
-              {selectedCurva && (
-                <button
-                  type="button"
-                  className={styles.clearCurveFilterBtn}
-                  onClick={() => setSelectedCurva(null)}
-                >
-                  Limpar curva
-                </button>
-              )}
+              </div>
               {activeFilterLabels.length > 0 && (
                 <>
                   <div className={styles.summaryDivider} />
@@ -1418,6 +1375,35 @@ const handleBadgeClick = (cat: string) => {
               />
               Sugeridos
             </label>
+            {(["A", "B", "C"] as const).map((curva) => (
+              <label key={curva} className={styles.filtroToggle}>
+                <input
+                  type="checkbox"
+                  checked={selectedCurvas.has(curva)}
+                  onChange={(e) => {
+                    setSelectedCurvas((prev) => {
+                      const next = new Set(prev);
+                      if (e.target.checked) next.add(curva);
+                      else next.delete(curva);
+                      return next;
+                    });
+                  }}
+                />
+                <span className={`${styles.abcBadgeMini} ${styles[`abcBadge${curva}`]}`}>{curva}</span>
+              </label>
+            ))}
+            {(selectedCurvas.size > 0 || filtrarSugeridos) && (
+              <button
+                type="button"
+                className={styles.filtroClearBtn}
+                onClick={() => {
+                  setSelectedCurvas(new Set());
+                  setFiltrarSugeridos(false);
+                }}
+              >
+                Limpar filtros
+              </button>
+            )}
             {produtosComCurva.length > 0 && (
               <div className={styles.exportMenuWrap} ref={exportMenuRef}>
                 <button
@@ -1447,6 +1433,15 @@ const handleBadgeClick = (cat: string) => {
                       title="Exporta a tabela atual em Excel"
                     >
                       Exportar XLSX
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.exportMenuItem}
+                      onClick={handleExportPdf}
+                      title="Exporta a lista atual em PDF"
+                      disabled={exportingPdf}
+                    >
+                      {exportingPdf ? "Exportando PDF..." : "Exportar PDF"}
                     </button>
                   </div>
                 )}
@@ -1726,20 +1721,6 @@ const handleBadgeClick = (cat: string) => {
                                         T {fmt(transit.totalTransit)}
                                       </span>
                                     ) : null;
-                                    const combinedNmBadge = combined.hasCombinedNm ? (
-                                      <span
-                                        className={styles.badgeT}
-                                        style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}
-                                        title={getCombinedNecessidadeMinimaTooltip({
-                                          baseType,
-                                          baseQty: combined.baseQty,
-                                          nmExtraQty: combined.nmExtraQty,
-                                          totalQty: transit.qty,
-                                        })}
-                                      >
-                                        NM +{fmt(combined.nmExtraQty)}
-                                      </span>
-                                    ) : null;
                                     if (baseType === "COMPRA" && transit.qty > 0) {
                                       const vendasMes = Number(compraItem.vendasMesAtual ?? 0);
                                       const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
@@ -1771,6 +1752,8 @@ const handleBadgeClick = (cat: string) => {
                                             estoqueAtual,
                                             duracaoAtual,
                                             qtdCalculada: transit.qty,
+                                            baseQty: combined.baseQty,
+                                            nmExtraQty: combined.hasCombinedNm ? combined.nmExtraQty : undefined,
                                             blendAplicado,
                                             qtdFinalPuro,
                                             qtdSBlend,
@@ -1797,6 +1780,8 @@ const handleBadgeClick = (cat: string) => {
                                               estoqueAtual: Number(compraItem.estoqueFilial ?? 0),
                                               limiteDias,
                                               qtdS: transit.qty,
+                                              baseQty: combined.baseQty,
+                                              nmExtraQty: combined.hasCombinedNm ? combined.nmExtraQty : undefined,
                                               transitTotal: transit.totalTransit || undefined,
                                               transitDates,
                                             })}
@@ -1819,18 +1804,7 @@ const handleBadgeClick = (cat: string) => {
                                           >
                                             S
                                           </span>
-                                          {combinedNmBadge}
                                           {transitBadge}
-                                          {combined.hasCombinedNm ? (
-                                            <span
-                                              className={styles.badgeT}
-                                              style={{ marginLeft: 6, background: "#1d4ed8", borderColor: "#1e40af", color: "#fff" }}
-                                              title={getCombinedNecessidadeMinimaTooltip({ baseType, baseQty: combined.baseQty, nmExtraQty: combined.nmExtraQty, totalQty: transit.qty })}
-                                            >
-                                              COMPRA
-                                            </span>
-                                          ) : null}
-                                          {combinedNmBadge}
                                         </span>
                                       );
                                     }
@@ -1850,6 +1824,8 @@ const handleBadgeClick = (cat: string) => {
                                               velocidadeAjustada: eInfo.velocidadeAjustada,
                                               limiteDias,
                                               qtdE: transit.qty,
+                                              baseQty: combined.baseQty,
+                                              nmExtraQty: combined.hasCombinedNm ? combined.nmExtraQty : undefined,
                                               transitTotal: transit.totalTransit || undefined,
                                               transitDates,
                                             })}
@@ -1872,17 +1848,36 @@ const handleBadgeClick = (cat: string) => {
                                           >
                                             E
                                           </span>
-                                          {combinedNmBadge}
                                           {transitBadge}
                                         </span>
                                       );
                                     }
                                     if (baseType === "NM" && transit.qty > 0) {
+                                      const vendasMes = Number(compraItem.vendasMesAtual ?? 0);
+                                      const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
                                       return (
-                                        <span className={styles.reporAdd}>
+                                        <span
+                                          className={styles.reporAdd}
+                                          onMouseEnter={(e) => setSugestaoTooltip({
+                                            x: e.clientX,
+                                            y: e.clientY,
+                                            titulo: "Necessidade minima (NM)",
+                                            regra: "Sem outra regra de reposicao ativa. A sugestao vem da necessidade minima do item.",
+                                            limiteDias,
+                                            vendasMesAtual: vendasMes,
+                                            diasCorridos: diasCorridosMes,
+                                            consumoDiario,
+                                            estoqueAtual: Number(compraItem.estoqueFilial ?? 0),
+                                            duracaoAtual: 0,
+                                            qtdCalculada: transit.qty,
+                                            baseQty: combined.baseQty,
+                                            transitTotal: transit.totalTransit || undefined,
+                                            transitDates,
+                                          })}
+                                          onMouseLeave={() => setSugestaoTooltip(null)}
+                                        >
                                           {fmt(transit.qty)}{" "}
                                           <span
-                                            title={`Necessidade Mínima: estoque zerado e 1 unidade a cada 5 vendas nos últimos 12 meses. Sugestão atual: ${fmt(transit.qty)} unidade(s).`}
                                             style={{
                                               display: "inline-flex",
                                               padding: "0 5px",
@@ -1901,7 +1896,6 @@ const handleBadgeClick = (cat: string) => {
                                           >
                                             NM
                                           </span>
-                                          {combinedNmBadge}
                                           {transitBadge}
                                         </span>
                                       );
@@ -1976,7 +1970,7 @@ const handleBadgeClick = (cat: string) => {
               </table>
             )}
           </div>
-        </>
+        </div>
       )}
       {sugestaoTooltip && (
         <div
@@ -2006,6 +2000,16 @@ const handleBadgeClick = (cat: string) => {
             </>
           )}
           <div className={styles.metricTooltipDivider} />
+          {sugestaoTooltip.nmExtraQty ? (
+            <>
+              <div className={styles.metricTooltipLine}><strong>Base da regra:</strong> {fmt(sugestaoTooltip.baseQty ?? 0)} un</div>
+              <div className={styles.metricTooltipLine}><strong>Complemento NM:</strong> +{fmt(sugestaoTooltip.nmExtraQty)} un</div>
+              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
+                NM: estoque zerado e 1 unidade a cada 5 vendas nos últimos 12 meses.
+              </div>
+              <div className={styles.metricTooltipDivider} />
+            </>
+          ) : null}
           <div className={styles.metricTooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoTooltip.qtdCalculada)} un</div>
           {sugestaoTooltip.transitTotal ? (
             <>
@@ -2033,6 +2037,16 @@ const handleBadgeClick = (cat: string) => {
           <div className={styles.metricTooltipLine}><strong>Estoque atual:</strong> {fmt(sugestaoSTooltip.estoqueAtual)} un</div>
           <div className={styles.metricTooltipLine}><strong>Cobertura mínima:</strong> {sugestaoSTooltip.limiteDias} dias</div>
           <div className={styles.metricTooltipDivider} />
+          {sugestaoSTooltip.nmExtraQty ? (
+            <>
+              <div className={styles.metricTooltipLine}><strong>Base da regra S:</strong> {fmt(sugestaoSTooltip.baseQty ?? 0)} un</div>
+              <div className={styles.metricTooltipLine}><strong>Complemento NM:</strong> +{fmt(sugestaoSTooltip.nmExtraQty)} un</div>
+              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
+                NM: estoque zerado e 1 unidade a cada 5 vendas nos últimos 12 meses.
+              </div>
+              <div className={styles.metricTooltipDivider} />
+            </>
+          ) : null}
           <div className={styles.metricTooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoSTooltip.qtdS)} un</div>
           <div className={styles.metricTooltipLine}>
             = {(sugestaoSTooltip.limiteDias / 30).toFixed(1)} meses × {sugestaoSTooltip.mediaVendasMes.toFixed(1)} un/mês
@@ -2076,6 +2090,16 @@ const handleBadgeClick = (cat: string) => {
           </div>
           <div className={styles.metricTooltipLine}><strong>Cobertura mínima:</strong> {sugestaoETooltip.limiteDias} dias ({(sugestaoETooltip.limiteDias / 30).toFixed(1)} meses)</div>
           <div className={styles.metricTooltipDivider} />
+          {sugestaoETooltip.nmExtraQty ? (
+            <>
+              <div className={styles.metricTooltipLine}><strong>Base da regra E:</strong> {fmt(sugestaoETooltip.baseQty ?? 0)} un</div>
+              <div className={styles.metricTooltipLine}><strong>Complemento NM:</strong> +{fmt(sugestaoETooltip.nmExtraQty)} un</div>
+              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
+                NM: estoque zerado e 1 unidade a cada 5 vendas nos últimos 12 meses.
+              </div>
+              <div className={styles.metricTooltipDivider} />
+            </>
+          ) : null}
           <div className={styles.metricTooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoETooltip.qtdE)} un</div>
           <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#94a3b8" }}>
             = ⌈{sugestaoETooltip.velocidadeAjustada.toFixed(2)} × {(sugestaoETooltip.limiteDias / 30).toFixed(1)}⌉ = {fmt(sugestaoETooltip.qtdE)}
