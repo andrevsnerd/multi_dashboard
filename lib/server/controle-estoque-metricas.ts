@@ -3,6 +3,13 @@ import {
   fetchVendasProdutoPorFilial,
 } from "@/lib/repositories/controleEstoque";
 import {
+  getActiveFilial,
+  getFilialGroupMembers,
+  resolveCompany,
+  VAREJO_VALUE,
+} from "@/lib/config/company";
+import { resolveCompanyDynamic } from "@/lib/config/company-server";
+import {
   buildControleEstoqueItemKey,
   dedupeControleEstoqueItens,
   normalizeControleEstoqueItemValue,
@@ -22,6 +29,7 @@ type CacheEntry = {
 
 const metricasCache = new Map<string, CacheEntry>();
 const metricasInFlight = new Map<string, Promise<ControleEstoqueItemMetricas>>();
+const dynamicCompanyCache = new Map<string, Promise<Awaited<ReturnType<typeof resolveCompanyDynamic>>>>();
 
 function buildScopeCacheKey(input: {
   company?: string;
@@ -50,6 +58,42 @@ function setCachedMetricas(cacheKey: string, data: ControleEstoqueItemMetricas) 
     expiresAt: Date.now() + SERVER_CACHE_TTL_MS,
     data,
   });
+}
+
+async function getDynamicCompanyConfig(company?: string) {
+  const normalizedCompany = normalizeControleEstoqueItemValue(company).toLowerCase();
+  if (!normalizedCompany) return null;
+
+  const cached = dynamicCompanyCache.get(normalizedCompany);
+  if (cached) {
+    return cached;
+  }
+
+  const promise = resolveCompanyDynamic(normalizedCompany)
+    .catch(() => resolveCompany(normalizedCompany))
+    .then((config) => config ?? resolveCompany(normalizedCompany));
+
+  dynamicCompanyCache.set(normalizedCompany, promise);
+  return promise;
+}
+
+async function resolveEstoqueFilialScope(company?: string, filial?: string | null): Promise<string | null> {
+  const normalizedFilial = normalizeControleEstoqueItemValue(filial);
+  if (!normalizedFilial || normalizedFilial === VAREJO_VALUE) {
+    return filial ?? null;
+  }
+
+  const companyConfig = await getDynamicCompanyConfig(company);
+  if (!companyConfig) {
+    return filial ?? null;
+  }
+
+  const members = getFilialGroupMembers(companyConfig, normalizedFilial);
+  if (members.length <= 1) {
+    return normalizedFilial;
+  }
+
+  return getActiveFilial(companyConfig, normalizedFilial) || normalizedFilial;
 }
 
 async function mapWithConcurrency<T, R>(
@@ -88,11 +132,12 @@ async function loadControleEstoqueItemMetricas(input: {
 }): Promise<ControleEstoqueItemMetricas> {
   const produto = normalizeControleEstoqueItemValue(input.item.produto);
   const corProduto = normalizeControleEstoqueItemValue(input.item.corProduto) || null;
+  const estoqueFilialScope = await resolveEstoqueFilialScope(input.company, input.filial ?? null);
 
   const [estoquePorFilial, vendasPorFilialRaw] = await Promise.all([
     fetchEstoqueProdutoPorFilial({
       company: input.company,
-      filial: input.filial ?? null,
+      filial: estoqueFilialScope,
       produto,
       corProduto,
     }),

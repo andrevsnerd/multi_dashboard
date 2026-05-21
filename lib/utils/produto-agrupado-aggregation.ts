@@ -116,12 +116,12 @@ export function aggregateProductDetailsWithGroups(
       continue;
     }
 
-    const cor = groupByColor ? String(row.corProduto ?? "").trim() : "";
-    const key = buildGroupAggregationKey(group.id, cor);
+    // Grouped products always consolidate into one entry regardless of color
+    const key = buildGroupAggregationKey(group.id, "");
     const syntheticId = buildProdutoAgrupadoSyntheticId(group.id);
     const incomingMember: ProdutoAgrupadoMember = {
       produto: row.productId,
-      cor,
+      cor: String(row.corProduto ?? "").trim(),
       descricao: row.productName,
       corDescricao: row.descCorProduto ?? "",
     };
@@ -132,8 +132,8 @@ export function aggregateProductDetailsWithGroups(
         ...row,
         productId: syntheticId,
         productName: group.nome,
-        corProduto: groupByColor ? cor : row.corProduto ?? null,
-        descCorProduto: groupByColor ? (row.descCorProduto ?? "") : row.descCorProduto ?? null,
+        corProduto: "",
+        descCorProduto: "",
         cost: Number(row.cost ?? 0),
         averagePrice: Number(row.averagePrice ?? 0),
         markup: Number(row.markup ?? 0),
@@ -223,12 +223,12 @@ export function aggregateFilialProdutoSalesWithGroups(
       continue;
     }
 
-    const cor = groupByCor ? String(row.cor ?? "").trim() : "";
-    const key = buildGroupAggregationKey(group.id, cor);
+    // Grouped products always consolidate into one entry regardless of color
+    const key = buildGroupAggregationKey(group.id, "");
     const syntheticId = buildProdutoAgrupadoSyntheticId(group.id);
     const incomingMember: ProdutoAgrupadoMember = {
       produto: row.produto,
-      cor,
+      cor: String(row.cor ?? "").trim(),
       descricao: row.descricao,
       corDescricao: row.corDescricao ?? "",
     };
@@ -239,7 +239,8 @@ export function aggregateFilialProdutoSalesWithGroups(
         ...row,
         produto: syntheticId,
         descricao: group.nome,
-        cor: groupByCor ? cor : row.cor,
+        cor: "",
+        corDescricao: "",
         isGroupedProduct: true,
         groupId: group.id,
         groupedMembers: buildGroupedMembers([incomingMember]),
@@ -287,7 +288,7 @@ export function aggregateProdutoQtdePorFilialWithGroups(
       ? {
           ...row,
           produto: buildProdutoAgrupadoSyntheticId(group.id),
-          cor: groupByCor ? String(row.cor ?? "").trim() : "",
+          cor: "", // Groups always consolidate regardless of color
         }
       : { ...row };
     const key = buildQtdeRowKey(nextRow, groupByCor);
@@ -319,7 +320,7 @@ export function aggregateProdutoEstoquePorFilialWithGroups(
       ? {
           ...row,
           produto: buildProdutoAgrupadoSyntheticId(group.id),
-          cor: groupByCor ? String(row.cor ?? "").trim() : "",
+          cor: "", // Groups always consolidate regardless of color
         }
       : { ...row };
     const key = buildEstoqueRowKey(nextRow, groupByCor);

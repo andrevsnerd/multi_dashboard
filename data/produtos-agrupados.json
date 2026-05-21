@@ -1,0 +1,23 @@
+[
+  {
+    "company": "nerd",
+    "id": "8542bb70-7a39-4aef-8ae2-7882c1220dc1",
+    "nome": "PT HD",
+    "members": [
+      {
+        "produto": "N5.9.0032",
+        "cor": "",
+        "descricao": "PT BEEP PROTECT PRO CLEAR HD SOFT",
+        "corDescricao": ""
+      },
+      {
+        "produto": "N5.16.0003",
+        "cor": "",
+        "descricao": "PT HUANG HD LISA  HIDROGEL",
+        "corDescricao": ""
+      }
+    ],
+    "createdAt": "2026-05-21T18:09:30.739Z",
+    "updatedAt": "2026-05-21T18:09:30.739Z"
+  }
+]

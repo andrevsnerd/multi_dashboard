@@ -127,6 +127,13 @@ export async function GET(request: Request) {
     const year = resolvedRange.start.getUTCFullYear();
     const monthGoals: Record<string, number> = allGoals[companyKey]?.[String(year)]?.[String(month)] ?? {};
     const ecommerceFilials = new Set(company.ecommerceFilials ?? []);
+    const companyConfigSnapshot = {
+      filialFilters: company.filialFilters,
+      filialDisplayNames: company.filialDisplayNames ?? {},
+      filialGroups: company.filialGroups ?? {},
+      activeFilials: company.activeFilials ?? {},
+      ecommerceFilials: company.ecommerceFilials ?? [],
+    };
     const matrizFiliais: Record<string, string[]> = {
       scarfme: ['SCARF ME - MATRIZ'],
       nerd: ['NERD'],
@@ -367,6 +374,7 @@ export async function GET(request: Request) {
           start: formatDateForQuery(new Date(resolvedRange.start.getTime())),
           end: formatDateForQuery(new Date(endInclusiveUtc.getTime())),
         },
+        companyConfig: companyConfigSnapshot,
         produtos: produtosComFilial,
         porCor,
       }, { headers: { 'Cache-Control': 'no-store' } });
@@ -499,6 +507,7 @@ export async function GET(request: Request) {
         start: formatDateForQuery(new Date(resolvedRange.start.getTime())),
         end: formatDateForQuery(new Date(endInclusiveUtc.getTime())),
       },
+      companyConfig: companyConfigSnapshot,
       produtos: produtosComEstoque,
       porCor,
     }, { headers: { 'Cache-Control': 'no-store' } });

@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 
-import { getActiveFilial, resolveCompany, type CompanyKey, type CompanyModule, VAREJO_VALUE, isEcommerceFilial } from "@/lib/config/company";
+import {
+  resolveCompany,
+  type CompanyConfig,
+  type CompanyKey,
+  type CompanyModule,
+  VAREJO_VALUE,
+} from "@/lib/config/company";
 
 import styles from "./FilialFilter.module.css";
 
@@ -17,6 +23,10 @@ interface FilialFilterProps {
   /** Esconde a opção VAREJO (ex.: controle de transferências em scarfme). */
   hideVarejo?: boolean;
   showActiveGroupHint?: boolean;
+  companyConfigOverride?: Pick<
+    CompanyConfig,
+    "filialFilters" | "filialDisplayNames" | "filialGroups" | "activeFilials" | "ecommerceFilials"
+  > | null;
 }
 
 export default function FilialFilter({
@@ -28,14 +38,17 @@ export default function FilialFilter({
   allowedFiliais,
   hideVarejo = false,
   showActiveGroupHint = false,
+  companyConfigOverride = null,
 }: FilialFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const company = resolveCompany(companyKey);
+  const company = companyConfigOverride ?? resolveCompany(companyKey);
   const filiais = company?.filialFilters[module] ?? [];
   const displayNames = company?.filialDisplayNames ?? {};
   const isScarfme = companyKey === 'scarfme';
   const ecommerceFilials = company?.ecommerceFilials ?? [];
+  const isEcommerceOption = (filial: string | null | undefined) =>
+    Boolean(filial && ecommerceFilials.includes(filial));
 
   // Membros não-canônicos de grupos (ex: 'SCARF ME - PAULISTA RSR') → não mostrar no dropdown;
   // apenas a filial canônica do grupo aparece (ex: 'SCARFME ME - PAULISTA FFF' → "PAULISTA")
@@ -83,12 +96,16 @@ export default function FilialFilter({
     if (!showActiveGroupHint || !company || !filial || filial === VAREJO_VALUE) return null;
     const members = company.filialGroups?.[filial] ?? null;
     if (!members || members.length <= 1) return null;
-    return getActiveFilial(company, filial) || null;
+    return (
+      company.activeFilials?.[filial] ??
+      members.map((member) => company.activeFilials?.[member]).find(Boolean) ??
+      null
+    );
   };
 
   const displayValue = value === VAREJO_VALUE
     ? "VAREJO"
-    : isEcommerceFilial(companyKey, value)
+    : isEcommerceOption(value)
     ? ecommerceDisplayName ?? "E-COMMERCE"
     : value
     ? displayNames[value] ?? value

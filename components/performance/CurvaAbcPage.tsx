@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { startOfMonth, endOfMonth } from "date-fns";
-import { resolveCompany, type CompanyKey } from "@/lib/config/company";
+import { resolveCompany, type CompanyConfig, type CompanyKey } from "@/lib/config/company";
 import {
   OUTROS_LABEL,
   filterOutrosKeys,
@@ -81,6 +81,11 @@ interface ProdutoRow {
   groupedMembers?: ProdutoAgrupadoMember[];
 }
 
+type FilialFilterCompanyConfig = Pick<
+  CompanyConfig,
+  "filialFilters" | "filialDisplayNames" | "filialGroups" | "activeFilials" | "ecommerceFilials"
+>;
+
 interface FilialData {
   filial: string | null;
   displayName: string;
@@ -97,6 +102,7 @@ interface FilialData {
   totalDaysInMonth: number;
   month: number;
   year: number;
+  companyConfig?: FilialFilterCompanyConfig;
   produtos: ProdutoRow[];
 }
 
@@ -1206,6 +1212,7 @@ const handleBadgeClick = (cat: string) => {
                   onChange={setSelectedFilial}
                   label=""
                   showActiveGroupHint
+                  companyConfigOverride={data?.companyConfig ?? null}
                 />
               </div>
             </div>
