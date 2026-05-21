@@ -43,6 +43,7 @@ interface QtdePorFilialEntry {
   filial: string;
   displayName: string;
   qtde: number;
+  activeFilialName?: string;
 }
 
 interface ProdutoRow {
@@ -64,6 +65,8 @@ interface ProdutoRow {
   qtdePorFilial?: QtdePorFilialEntry[];
   estoque?: number;
   estoquePorFilial?: QtdePorFilialEntry[];
+  estoqueRede?: number;
+  estoqueRedePorFilial?: QtdePorFilialEntry[];
   qtde12m?: number;
   mesesHistoricoFilial?: number;
   diasDesdeUltimaVenda?: number | null;
@@ -141,12 +144,20 @@ function getTooltipViewportPosition(x: number, y: number): { left: number; top: 
   const maxLeft = Math.max(margin, window.innerWidth - tooltipWidth - margin);
   const left = Math.min(Math.max(margin, x + offset), maxLeft);
   const topAbove = y - tooltipHeight - offset;
-  const topBelow = y + offset;
   const maxTop = Math.max(margin, window.innerHeight - tooltipHeight - margin);
-  const top = topAbove >= margin
-    ? topAbove
-    : Math.min(Math.max(margin, topBelow), maxTop);
+  const top = Math.min(Math.max(margin, topAbove), maxTop);
   return { left, top };
+}
+
+function renderTooltipFilialLabel(entry: QtdePorFilialEntry): React.ReactNode {
+  if (!entry.activeFilialName) return entry.displayName;
+  const activeCode = entry.activeFilialName.trim().split(/\s+/).pop() || entry.activeFilialName;
+  return (
+    <>
+      <span className={styles.tooltipFilialPrimary}>{entry.displayName}</span>
+      <span className={styles.tooltipFilialSecondary}>({activeCode})</span>
+    </>
+  );
 }
 
 function formatSignedPct(value: number): string {
@@ -1111,6 +1122,7 @@ const handleBadgeClick = (cat: string) => {
   const pageSubtitle = selectedFilial
     ? "Performance de vendas"
     : "Visão geral — todas as filiais e e-commerce";
+  const showEstoqueRede = selectedFilial !== null;
 
   const abcTitleSuffix = activeFilterLabels.length > 0
     ? ` - ${activeFilterLabels.join(" | ")}`
@@ -1138,6 +1150,7 @@ const handleBadgeClick = (cat: string) => {
                   value={selectedFilial}
                   onChange={setSelectedFilial}
                   label=""
+                  showActiveGroupHint
                 />
               </div>
             </div>
@@ -1546,6 +1559,7 @@ const handleBadgeClick = (cat: string) => {
                       <th className={styles.right}>Faturamento no período</th>
                       <th className={styles.right}>Qtd vendida</th>
                       <th className={styles.right}>Estoque</th>
+                      {showEstoqueRede && <th className={styles.right}>Estoque rede</th>}
                       <th className={styles.right}>Markup</th>
                       <th className={styles.right}>Sugestão de compra</th>
                     </>
@@ -1558,7 +1572,7 @@ const handleBadgeClick = (cat: string) => {
                     return (
                       <React.Fragment key={curva}>
                         <tr className={`${styles.sectionRow} ${styles[`sectionRow${curva}`]}`}>
-                          <td colSpan={8}>
+                          <td colSpan={showEstoqueRede ? 9 : 8}>
                             <div className={styles.sectionLabel}>
                               <span className={`${styles.curvaBadge} ${CURVA_BADGE_CLASS[curva]}`}>{curva}</span>
                               <span className={styles.sectionTitle}>{CURVA_LABEL[curva]}</span>
@@ -1691,7 +1705,7 @@ const handleBadgeClick = (cat: string) => {
                                       <div className={styles.tooltipTitle}>Estoque por filial</div>
                                       {p.estoquePorFilial.map(entry => (
                                         <div key={entry.filial} className={styles.tooltipRow}>
-                                          <span className={styles.tooltipFilial}>{entry.displayName}</span>
+                                          <span className={styles.tooltipFilial}>{renderTooltipFilialLabel(entry)}</span>
                                           <span className={styles.tooltipQtde}>{fmt(entry.qtde)}</span>
                                         </div>
                                       ))}
@@ -1701,6 +1715,26 @@ const handleBadgeClick = (cat: string) => {
                                   fmt(p.estoque ?? 0)
                                 )}
                               </td>
+                              {showEstoqueRede && (
+                                <td className={styles.vendas}>
+                                  {p.estoqueRedePorFilial && p.estoqueRedePorFilial.length > 0 ? (
+                                    <div className={styles.qtdeTooltipWrapper}>
+                                      <span>{fmt(p.estoqueRede ?? 0)}</span>
+                                      <div className={styles.qtdeTooltipContent}>
+                                        <div className={styles.tooltipTitle}>Estoque por filial</div>
+                                        {p.estoqueRedePorFilial.map(entry => (
+                                          <div key={entry.filial} className={styles.tooltipRow}>
+                                            <span className={styles.tooltipFilial}>{renderTooltipFilialLabel(entry)}</span>
+                                            <span className={styles.tooltipQtde}>{fmt(entry.qtde)}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    fmt(p.estoqueRede ?? 0)
+                                  )}
+                                </td>
+                              )}
                               <td className={styles.vendas}>{markup !== null ? <span className={styles.markupBadge}>{markup.toFixed(2)}x</span> : <span className={styles.noData}>—</span>}</td>
                               <td className={styles.vendas}>
                                   {(() => {

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { resolveCompany, type CompanyKey, type CompanyModule, VAREJO_VALUE, isEcommerceFilial } from "@/lib/config/company";
+import { getActiveFilial, resolveCompany, type CompanyKey, type CompanyModule, VAREJO_VALUE, isEcommerceFilial } from "@/lib/config/company";
 
 import styles from "./FilialFilter.module.css";
 
@@ -16,6 +16,7 @@ interface FilialFilterProps {
   allowedFiliais?: string[] | null;
   /** Esconde a opção VAREJO (ex.: controle de transferências em scarfme). */
   hideVarejo?: boolean;
+  showActiveGroupHint?: boolean;
 }
 
 export default function FilialFilter({
@@ -26,6 +27,7 @@ export default function FilialFilter({
   module = "sales",
   allowedFiliais,
   hideVarejo = false,
+  showActiveGroupHint = false,
 }: FilialFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -77,6 +79,13 @@ export default function FilialFilter({
   }
   const ecommerceDisplayName = ecommerceFilial ? (displayNames[ecommerceFilial] ?? ecommerceFilial) : null;
 
+  const getGroupActiveHint = (filial: string | null): string | null => {
+    if (!showActiveGroupHint || !company || !filial || filial === VAREJO_VALUE) return null;
+    const members = company.filialGroups?.[filial] ?? null;
+    if (!members || members.length <= 1) return null;
+    return getActiveFilial(company, filial) || null;
+  };
+
   const displayValue = value === VAREJO_VALUE
     ? "VAREJO"
     : isEcommerceFilial(companyKey, value)
@@ -84,6 +93,7 @@ export default function FilialFilter({
     : value
     ? displayNames[value] ?? value
     : "Todas as filiais";
+  const displayActiveHint = getGroupActiveHint(value);
 
   return (
     <div className={styles.container}>
@@ -94,7 +104,10 @@ export default function FilialFilter({
         onClick={() => setIsOpen((prev) => !prev)}
       >
         <span className={styles.buttonValue}>
-          <span className={styles.valuePrimary}>{displayValue}</span>
+          <span className={styles.valuePrimary}>
+            {displayValue}
+            {displayActiveHint ? <span className={styles.valueSecondary}> ({displayActiveHint})</span> : null}
+          </span>
         </span>
         <span>▼</span>
       </button>
@@ -142,6 +155,7 @@ export default function FilialFilter({
             )}
             {normalFiliais.map((filial) => {
               const displayName = displayNames[filial] ?? filial;
+              const activeHint = getGroupActiveHint(filial);
               return (
                 <button
                   key={filial}
@@ -152,7 +166,10 @@ export default function FilialFilter({
                     setIsOpen(false);
                   }}
                 >
-                  {displayName}
+                  <span className={styles.optionLabel}>
+                    {displayName}
+                    {activeHint ? <span className={styles.optionSecondary}> ({activeHint})</span> : null}
+                  </span>
                 </button>
               );
             })}

@@ -924,7 +924,7 @@
 .qtdeTooltipContent {
   display: none;
   position: absolute;
-  top: 100%;
+  bottom: calc(100% + 10px);
   right: 0;
   left: auto;
   background: #0f172a;
@@ -946,11 +946,11 @@
 .qtdeTooltipContent::before {
   content: "";
   position: absolute;
-  bottom: 100%;
+  top: 100%;
   right: 14px;
-  margin-bottom: -1px;
+  margin-top: -1px;
   border: 6px solid transparent;
-  border-bottom-color: #0f172a;
+  border-top-color: #0f172a;
 }
 
 .qtdeTooltipWrapper:hover .qtdeTooltipContent {
@@ -986,7 +986,25 @@
   font-weight: 500;
   flex: 1;
   min-width: 0;
-  word-break: break-word;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tooltipFilialPrimary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tooltipFilialSecondary {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(148, 163, 184, 0.72);
 }
 
 .tooltipQtde {
