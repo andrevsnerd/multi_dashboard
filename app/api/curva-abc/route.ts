@@ -5,6 +5,12 @@ import {
   fetchProdutoQtdePorFilial,
   fetchProdutoEstoquePorFilial,
 } from '@/lib/repositories/performance';
+import {
+  aggregateFilialProdutoSalesWithGroups,
+  aggregateProdutoEstoquePorFilialWithGroups,
+  aggregateProdutoQtdePorFilialWithGroups,
+} from '@/lib/utils/produto-agrupado-aggregation';
+import { listProdutoAgrupadoGroups } from '@/lib/utils/produto-agrupado-store';
 import { readGoals } from '@/lib/utils/goals-storage';
 import { type CompanyKey, VAREJO_VALUE } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
@@ -111,9 +117,10 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [performanceData, allGoals] = await Promise.all([
+    const [performanceData, allGoals, groupedProducts] = await Promise.all([
       fetchPerformanceData(companyKey, resolvedRange, comparisonMode),
       readGoals(),
+      listProdutoAgrupadoGroups(companyKey),
     ]);
 
     const month = resolvedRange.start.getUTCMonth();
@@ -303,6 +310,13 @@ export async function GET(request: Request) {
           }),
           fetchProdutoEstoquePorFilial(companyKey, allPosMembers, allEcomMembers, { groupByCor: porCor }),
         ]);
+        produtos = aggregateFilialProdutoSalesWithGroups(produtos, groupedProducts, { groupByCor: porCor });
+        qtdePorFilialRows = aggregateProdutoQtdePorFilialWithGroups(qtdePorFilialRows, groupedProducts, {
+          groupByCor: porCor,
+        });
+        estoquePorFilialRows = aggregateProdutoEstoquePorFilialWithGroups(estoquePorFilialRows, groupedProducts, {
+          groupByCor: porCor,
+        });
       } catch (produtosError) {
         console.error('Erro ao carregar produtos (não-fatal):', produtosError);
       }
@@ -435,6 +449,15 @@ export async function GET(request: Request) {
         fetchProdutoEstoquePorFilial(companyKey, posMembers, ecomMembers, { groupByCor: porCor }),
         fetchProdutoEstoquePorFilial(companyKey, allPosMembers, allEcomMembers, { groupByCor: porCor }),
       ]);
+      produtos = aggregateFilialProdutoSalesWithGroups(produtos, groupedProducts, { groupByCor: porCor });
+      estoquePorFilialRows = aggregateProdutoEstoquePorFilialWithGroups(estoquePorFilialRows, groupedProducts, {
+        groupByCor: porCor,
+      });
+      estoqueRedePorFilialRows = aggregateProdutoEstoquePorFilialWithGroups(
+        estoqueRedePorFilialRows,
+        groupedProducts,
+        { groupByCor: porCor }
+      );
     } catch (produtosError) {
       console.error('Erro ao carregar produtos da filial (não-fatal):', produtosError);
     }

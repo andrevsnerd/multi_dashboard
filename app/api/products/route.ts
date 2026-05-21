@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 
 import { fetchProductsWithDetails, type ProductDetail } from '@/lib/repositories/products';
+import { aggregateProductDetailsWithGroups } from '@/lib/utils/produto-agrupado-aggregation';
+import { listProdutoAgrupadoGroups } from '@/lib/utils/produto-agrupado-store';
+import type { CompanyKey } from '@/lib/config/company';
 
 // Evita timeout em produção (proxy/túnel); padrão seria 10s no Hobby.
 export const maxDuration = 300;
@@ -42,20 +45,29 @@ export async function GET(request: Request) {
   const filterByRegistrationDate = filterByRegistrationDateParam === 'true';
 
   try {
-    const data = await fetchProductsWithDetails({
-      company,
-      range,
-      filial: filial || null,
-      grupos: grupos.length > 0 ? grupos : null,
-      linhas: linhas.length > 0 ? linhas : null,
-      colecoes: colecoes.length > 0 ? colecoes : null,
-      subgrupos: subgrupos.length > 0 ? subgrupos : null,
-      grades: grades.length > 0 ? grades : null,
+    const [rawData, groupedProducts] = await Promise.all([
+      fetchProductsWithDetails({
+        company,
+        range,
+        filial: filial || null,
+        grupos: grupos.length > 0 ? grupos : null,
+        linhas: linhas.length > 0 ? linhas : null,
+        colecoes: colecoes.length > 0 ? colecoes : null,
+        subgrupos: subgrupos.length > 0 ? subgrupos : null,
+        grades: grades.length > 0 ? grades : null,
+        groupByColor,
+        produtoId: produtoId || undefined,
+        produtoSearchTerm: produtoSearchTerm || undefined,
+        acimaDoTicket,
+        filterByRegistrationDate,
+      }),
+      company === 'nerd' || company === 'scarfme'
+        ? listProdutoAgrupadoGroups(company as CompanyKey)
+        : Promise.resolve([]),
+    ]);
+
+    const data: ProductDetail[] = aggregateProductDetailsWithGroups(rawData, groupedProducts, {
       groupByColor,
-      produtoId: produtoId || undefined,
-      produtoSearchTerm: produtoSearchTerm || undefined,
-      acimaDoTicket,
-      filterByRegistrationDate,
     });
 
     return NextResponse.json({ data });

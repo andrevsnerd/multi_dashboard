@@ -183,3 +183,97 @@ export function summarizeControleEstoqueItemMetricas(input: {
     ...historico,
   };
 }
+
+function getEarlierIsoDate(
+  current: string | null | undefined,
+  incoming: string | null | undefined
+): string | null {
+  if (!current) return incoming ?? null;
+  if (!incoming) return current;
+
+  const currentDate = new Date(current);
+  const incomingDate = new Date(incoming);
+  if (Number.isNaN(currentDate.getTime())) return incoming;
+  if (Number.isNaN(incomingDate.getTime())) return current;
+  return incomingDate < currentDate ? incoming : current;
+}
+
+export function mergeControleEstoqueMetricasEntries(
+  rows: ControleEstoqueItemMetricas[]
+): ControleEstoqueItemMetricas {
+  const estoquePorFilialMap = new Map<string, ControleEstoqueEstoquePorFilialRow>();
+  const vendasPorFilialMap = new Map<string, ControleEstoqueVendasPorFilialRow>();
+
+  for (const row of rows) {
+    for (const estoque of row.estoquePorFilial) {
+      const key = normalizeControleEstoqueItemValue(estoque.filial).toUpperCase();
+      const current = estoquePorFilialMap.get(key);
+      if (current) {
+        current.estoque += Number(estoque.estoque ?? 0);
+      } else {
+        estoquePorFilialMap.set(key, {
+          filial: normalizeControleEstoqueItemValue(estoque.filial),
+          estoque: Number(estoque.estoque ?? 0),
+        });
+      }
+    }
+
+    for (const venda of row.vendasPorFilial) {
+      const key = normalizeControleEstoqueItemValue(venda.filial).toUpperCase();
+      const current = vendasPorFilialMap.get(key);
+      if (current) {
+        current.qtde12m += Number(venda.qtde12m ?? 0);
+        current.qtde60d += Number(venda.qtde60d ?? 0);
+        current.qtdeMesAtual += Number(venda.qtdeMesAtual ?? 0);
+        current.valor12m += Number(venda.valor12m ?? 0);
+        current.custoUnitario = Math.max(Number(current.custoUnitario ?? 0), Number(venda.custoUnitario ?? 0));
+        current.diasDesdeUltimaVenda =
+          current.diasDesdeUltimaVenda == null
+            ? venda.diasDesdeUltimaVenda
+            : venda.diasDesdeUltimaVenda == null
+              ? current.diasDesdeUltimaVenda
+              : Math.min(current.diasDesdeUltimaVenda, venda.diasDesdeUltimaVenda);
+        current.primeiraEntradaFilial = getEarlierIsoDate(current.primeiraEntradaFilial, venda.primeiraEntradaFilial);
+        current.diasHistoricoFilial = Math.max(
+          Number(current.diasHistoricoFilial ?? 0),
+          Number(venda.diasHistoricoFilial ?? 0)
+        );
+        current.mesesHistoricoFilial = Math.max(
+          Number(current.mesesHistoricoFilial ?? 0),
+          Number(venda.mesesHistoricoFilial ?? 0)
+        );
+        current.historicoParcial = Boolean(current.historicoParcial) && Boolean(venda.historicoParcial);
+      } else {
+        vendasPorFilialMap.set(key, {
+          filial: normalizeControleEstoqueItemValue(venda.filial),
+          qtde12m: Number(venda.qtde12m ?? 0),
+          qtde60d: Number(venda.qtde60d ?? 0),
+          qtdeMesAtual: Number(venda.qtdeMesAtual ?? 0),
+          valor12m: Number(venda.valor12m ?? 0),
+          custoUnitario: Number(venda.custoUnitario ?? 0),
+          diasDesdeUltimaVenda: venda.diasDesdeUltimaVenda ?? null,
+          primeiraEntradaFilial: venda.primeiraEntradaFilial ?? null,
+          diasHistoricoFilial: Number(venda.diasHistoricoFilial ?? 0),
+          mesesHistoricoFilial: Number(venda.mesesHistoricoFilial ?? 0),
+          historicoParcial: Boolean(venda.historicoParcial),
+        });
+      }
+    }
+  }
+
+  const estoquePorFilial = Array.from(estoquePorFilialMap.values());
+  const vendasPorFilial = Array.from(vendasPorFilialMap.values());
+
+  return {
+    item: {
+      produto: rows[0]?.item.produto ?? "",
+      corProduto: rows[0]?.item.corProduto ?? null,
+    },
+    estoquePorFilial,
+    vendasPorFilial,
+    resumo: summarizeControleEstoqueItemMetricas({
+      estoquePorFilial,
+      vendasPorFilial,
+    }),
+  };
+}

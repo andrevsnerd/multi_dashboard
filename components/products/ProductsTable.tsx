@@ -80,7 +80,7 @@ export default function ProductsTable({
 
   const loadStockTooltip = useCallback(
     async (product: ProductDetail) => {
-      if (companyKey !== "scarfme") {
+      if (companyKey !== "scarfme" || product.isGroupedProduct) {
         return;
       }
 
@@ -352,7 +352,11 @@ export default function ProductsTable({
                 <tr key={`${product.productId}-${product.corProduto || ''}-${index}`}>
                   <td className={styles.descriptionCell}>
                     <div className={styles.productName}>{product.productName}</div>
-                    <div className={styles.productCode}>{product.productId}</div>
+                    <div className={styles.productCode}>
+                      {product.isGroupedProduct
+                        ? `${product.groupedMembers?.length ?? 0} item(ns) agrupados`
+                        : product.productId}
+                    </div>
                   </td>
                   {companyKey === "scarfme" && (
                     <td className={styles.gradeCell}>
@@ -398,6 +402,9 @@ export default function ProductsTable({
                       <div
                         className={styles.stockTooltipAnchor}
                         onMouseEnter={(e) => {
+                          if (product.isGroupedProduct) {
+                            return;
+                          }
                           setTooltipAnchorRect((e.currentTarget as HTMLElement).getBoundingClientRect());
                           setHoveredStockKey(stockTooltipKey);
                           void loadStockTooltip(product);
@@ -476,7 +483,11 @@ export default function ProductsTable({
                           {product.productName}
                         </h4>
                         <div className={styles.cardProductMeta}>
-                          <span className={styles.cardProductCode}>{product.productId}</span>
+                          <span className={styles.cardProductCode}>
+                            {product.isGroupedProduct
+                              ? `${product.groupedMembers?.length ?? 0} item(ns) agrupados`
+                              : product.productId}
+                          </span>
                           {companyKey === "scarfme" && product.grade && (
                             <span className={styles.cardGrade}>{product.grade}</span>
                           )}

@@ -16,7 +16,11 @@ import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
 import {
   fetchControleEstoqueMetricasItensClient,
 } from "@/lib/client/controle-estoque-metricas";
-import { buildControleEstoqueItemKey } from "@/lib/utils/controle-estoque-metricas";
+import {
+  buildControleEstoqueItemKey,
+  mergeControleEstoqueMetricasEntries,
+  type ControleEstoqueItemMetricas,
+} from "@/lib/utils/controle-estoque-metricas";
 import {
   buildCompraTransitoIndex,
   fetchComprasTransitoClient,
@@ -32,6 +36,8 @@ import {
   formatNecessidadeMinimaFiliaisDescription,
   type FilialNecessidadeMinimaInfo,
 } from "@/lib/utils/necessidade-minima";
+import type { ProdutoAgrupadoMember } from "@/lib/utils/produtos-agrupados";
+import { isProdutoAgrupadoSyntheticId } from "@/lib/utils/produtos-agrupados";
 import FilialVendedoresTab from "./FilialVendedoresTab";
 import { exportCurvaAbcSimpleCsv } from "@/lib/utils/exportCurvaAbcSimpleCsv";
 import { exportCurvaAbcSimpleXlsx, type CurvaAbcSimpleXlsxRow } from "@/lib/utils/exportCurvaAbcSimpleXlsx";
@@ -70,6 +76,9 @@ interface ProdutoRow {
   qtde12m?: number;
   mesesHistoricoFilial?: number;
   diasDesdeUltimaVenda?: number | null;
+  isGroupedProduct?: boolean;
+  groupId?: string | null;
+  groupedMembers?: ProdutoAgrupadoMember[];
 }
 
 interface FilialData {
@@ -441,6 +450,9 @@ function buildProductDetalhadoHref(
   companyKey: CompanyKey,
   p: Pick<ProdutoRow, "produto" | "descricao" | "cor">
 ): string {
+  if (isProdutoAgrupadoSyntheticId(p.produto)) {
+    return "#";
+  }
   const params = new URLSearchParams();
   params.set("productId", p.produto.trim());
   params.set("name", (p.descricao || p.produto).trim());
@@ -797,13 +809,30 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     if (produtosComCurva.length === 0) return;
     let cancelled = false;
     const load = async () => {
-      const itens = produtosComCurva
-        .slice()
-        .sort((a, b) => b.vendas - a.vendas)
-        .map((p) => ({
-          produto: p.produto,
-          corProduto: porCor ? (p.cor ?? null) : null,
-        }));
+      const groupedMetricMembers = new Map<string, Array<{ produto: string; corProduto: string | null }>>();
+      const itemLookup = new Map<string, { produto: string; corProduto: string | null }>();
+      const allMetricRows: Record<string, ControleEstoqueItemMetricas> = {};
+      const sortedRows = produtosComCurva.slice().sort((a, b) => b.vendas - a.vendas);
+
+      for (const row of sortedRows) {
+        const metricKey = buildCurvaAbcMetricKey(row.produto, row.cor ?? null, porCor);
+        const members = row.isGroupedProduct && (row.groupedMembers?.length ?? 0) > 0
+          ? row.groupedMembers!.map((member) => ({
+              produto: member.produto,
+              corProduto: porCor ? (member.cor || null) : null,
+            }))
+          : [{
+              produto: row.produto,
+              corProduto: porCor ? (row.cor ?? null) : null,
+            }];
+
+        groupedMetricMembers.set(metricKey, members);
+        for (const member of members) {
+          itemLookup.set(buildControleEstoqueItemKey(member.produto, member.corProduto), member);
+        }
+      }
+
+      const itens = Array.from(itemLookup.values());
 
       for (let i = 0; i < itens.length; i += METRICAS_CHUNK_SIZE) {
         if (cancelled) return;
@@ -824,6 +853,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
               next[buildControleEstoqueItemKey(item.produto, item.corProduto)] = EMPTY_COMPRA_METRIC_ROW;
             });
             Object.entries(rows).forEach(([key, value]) => {
+              allMetricRows[key] = value;
               const filiaisNM = calcNecessidadeMinimaPorFilial({
                 company: resolveCompany(companyKey),
                 vendasPorFilial: value.vendasPorFilial,
@@ -836,6 +866,31 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                 diasDesdeUltimaVenda: value.resumo.diasDesdeUltimaVenda,
                 mesesHistoricoFilial: value.resumo.mesesHistoricoFilial,
                 totalNmQty: filiaisNM.reduce((sum, row) => sum + row.qtd, 0),
+                filiaisNM,
+              };
+            });
+
+            groupedMetricMembers.forEach((members, groupedKey) => {
+              const memberMetrics = members
+                .map((member) => allMetricRows[buildControleEstoqueItemKey(member.produto, member.corProduto)])
+                .filter(Boolean);
+
+              if (memberMetrics.length === 0) return;
+
+              const merged = mergeControleEstoqueMetricasEntries(memberMetrics);
+              const filiaisNM = calcNecessidadeMinimaPorFilial({
+                company: resolveCompany(companyKey),
+                vendasPorFilial: merged.vendasPorFilial,
+                estoquePorFilial: merged.estoquePorFilial,
+              });
+
+              next[groupedKey] = {
+                qtde12m: merged.resumo.qtde12m,
+                vendasMesAtual: merged.resumo.vendasMesAtual,
+                estoqueFilial: merged.resumo.estoqueTotal,
+                diasDesdeUltimaVenda: merged.resumo.diasDesdeUltimaVenda,
+                mesesHistoricoFilial: merged.resumo.mesesHistoricoFilial,
+                totalNmQty: filiaisNM.reduce((sum, metricRow) => sum + metricRow.qtd, 0),
                 filiaisNM,
               };
             });

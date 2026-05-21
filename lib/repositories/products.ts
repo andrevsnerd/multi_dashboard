@@ -9,6 +9,7 @@ import {
   fetchTopProductsEcommerce,
 } from '@/lib/repositories/ecommerce';
 import { getColorDescription } from '@/lib/utils/colorMapping';
+import type { ProdutoAgrupadoMember } from '@/lib/utils/produtos-agrupados';
 
 export interface ProductDetail {
   productId: string;
@@ -28,6 +29,9 @@ export interface ProductDetail {
   estoqueRede?: number; // Estoque total em todas as filiais (apenas para scarfme)
   suggestedPrice?: number | null; // Preço sugerido (REVENDA da tabela PRODUTOS)
   registrationDate?: string | null; // Data de cadastramento do produto (DATA_CADASTRAMENTO)
+  isGroupedProduct?: boolean;
+  groupId?: string | null;
+  groupedMembers?: ProdutoAgrupadoMember[];
 }
 
 export interface ProductsQueryParams {

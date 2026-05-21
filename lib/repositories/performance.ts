@@ -2,6 +2,7 @@ import sql from 'mssql';
 import { withRequest } from '@/lib/db/connection';
 import { resolveCompany, type CompanyKey } from '@/lib/config/company';
 import { shiftRangeByMonths, type NormalizedRange } from '@/lib/utils/date';
+import type { ProdutoAgrupadoMember } from '@/lib/utils/produtos-agrupados';
 
 export interface PerformanceCategoryRow {
   filial: string;
@@ -309,6 +310,9 @@ export interface FilialProdutoSalesRow {
   qtde: number;
   custo: number;
   vendasPrevious: number;
+  isGroupedProduct?: boolean;
+  groupId?: string | null;
+  groupedMembers?: ProdutoAgrupadoMember[];
 }
 
 export interface FilialProdutoVendedorSalesRow {
