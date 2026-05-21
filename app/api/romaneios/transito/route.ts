@@ -19,24 +19,23 @@ export async function GET(request: NextRequest) {
 
     const search = request.nextUrl.searchParams.get("search")?.trim() ?? "";
     const companyConfig = await resolveCompanyDynamic(companyKey);
+    const filiaisEmpresa = new Set(
+      (companyConfig?.filialFilters.inventory ?? []).map((f) => f.toUpperCase())
+    );
     const transitos = await fetchLogTransito(1000, 3650, search);
+    const transitosDaEmpresa = filiaisEmpresa.size > 0
+      ? transitos.filter((t) =>
+          filiaisEmpresa.has((t.filialDestino ?? "").toUpperCase())
+        )
+      : transitos;
 
     if (!username) {
-      return NextResponse.json({ data: transitos });
+      return NextResponse.json({ data: transitosDaEmpresa });
     }
 
     const userRecord = await findUserByUsername(username);
     if (userRecord?.role === "logistica") {
-      if (!companyConfig) {
-        return NextResponse.json({ data: transitos });
-      }
-      const filiaisEmpresa = new Set(
-        companyConfig.filialFilters.inventory.map((f) => f.toUpperCase())
-      );
-      const filtered = transitos.filter((t) =>
-        filiaisEmpresa.has((t.filialDestino ?? "").toUpperCase())
-      );
-      return NextResponse.json({ data: filtered });
+      return NextResponse.json({ data: transitosDaEmpresa });
     }
 
     const permissao = await getPermissaoByUsername(username);
@@ -45,10 +44,10 @@ export async function GET(request: NextRequest) {
       !filialAtribuida || filialAtribuida === "" || filialAtribuida === "TODAS";
 
     if (verTodas) {
-      return NextResponse.json({ data: transitos });
+      return NextResponse.json({ data: transitosDaEmpresa });
     }
 
-    const filtered = transitos.filter((t) => {
+    const filtered = transitosDaEmpresa.filter((t) => {
       const destino = getActiveFilial(companyConfig, t.filialDestino ?? "").trim().toUpperCase();
       return destino === filialAtribuida;
     });

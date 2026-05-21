@@ -55,6 +55,9 @@ export async function GET(request: NextRequest) {
 
     const search = request.nextUrl.searchParams.get("search")?.trim() ?? "";
     const companyConfig = await resolveCompanyDynamic(companyKey);
+    const filiaisEmpresa = new Set(
+      (companyConfig?.filialFilters.inventory ?? []).map((f) => f.toUpperCase())
+    );
 
     const [saidas, destinosMap, confirmadosCounter] = await Promise.all([
       fetchLogSaidas(1000, 90, search),
@@ -84,23 +87,20 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    const saidasDaEmpresa = filiaisEmpresa.size > 0
+      ? saidasComDestino.filter((s) =>
+          filiaisEmpresa.has((s.filialOrigem ?? "").toUpperCase())
+        )
+      : saidasComDestino;
+
     if (!username) {
-      return NextResponse.json({ data: saidasComDestino });
+      return NextResponse.json({ data: saidasDaEmpresa });
     }
 
     // Logística vê todos os romaneios da empresa, filtrado pelas filiais da empresa
     const userRecord = await findUserByUsername(username);
     if (userRecord?.role === "logistica") {
-      if (!companyConfig) {
-        return NextResponse.json({ data: saidasComDestino });
-      }
-      const filiaisEmpresa = new Set(
-        companyConfig.filialFilters.inventory.map((f) => f.toUpperCase())
-      );
-      const filtered = saidasComDestino.filter((s) =>
-        filiaisEmpresa.has((s.filialOrigem ?? "").toUpperCase())
-      );
-      return NextResponse.json({ data: filtered });
+      return NextResponse.json({ data: saidasDaEmpresa });
     }
 
     const permissao = await getPermissaoByUsername(username);
@@ -109,10 +109,10 @@ export async function GET(request: NextRequest) {
       !filialAtribuida || filialAtribuida === "" || filialAtribuida === "TODAS";
 
     if (verTodas) {
-      return NextResponse.json({ data: saidasComDestino });
+      return NextResponse.json({ data: saidasDaEmpresa });
     }
 
-    const filtered = saidasComDestino.filter((s) => {
+    const filtered = saidasDaEmpresa.filter((s) => {
       const destino = getActiveFilial(companyConfig, s.destinoCodigo ?? "").trim().toUpperCase();
       return destino === filialAtribuida;
     });

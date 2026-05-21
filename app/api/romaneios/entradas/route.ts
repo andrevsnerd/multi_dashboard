@@ -27,6 +27,9 @@ export async function GET(request: NextRequest) {
 
     const search = request.nextUrl.searchParams.get("search")?.trim() ?? "";
     const companyConfig = await resolveCompanyDynamic(companyKey);
+    const filiaisEmpresa = new Set(
+      (companyConfig?.filialFilters.inventory ?? []).map((f) => f.toUpperCase())
+    );
 
     const [entradas, confirmadosCounter] = await Promise.all([
       fetchLogEntradas(1000, 90, search),
@@ -46,23 +49,20 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    const entradasDaEmpresa = filiaisEmpresa.size > 0
+      ? entradasComConfirmacao.filter((e) =>
+          filiaisEmpresa.has((e.filialDestino ?? "").toUpperCase())
+        )
+      : entradasComConfirmacao;
+
     if (!username) {
-      return NextResponse.json({ data: entradasComConfirmacao });
+      return NextResponse.json({ data: entradasDaEmpresa });
     }
 
     // Logística vê todos os romaneios da empresa, filtrado pelas filiais da empresa
     const userRecord = await findUserByUsername(username);
     if (userRecord?.role === "logistica") {
-      if (!companyConfig) {
-        return NextResponse.json({ data: entradasComConfirmacao });
-      }
-      const filiaisEmpresa = new Set(
-        companyConfig.filialFilters.inventory.map((f) => f.toUpperCase())
-      );
-      const filtered = entradasComConfirmacao.filter((e) =>
-        filiaisEmpresa.has((e.filialDestino ?? "").toUpperCase())
-      );
-      return NextResponse.json({ data: filtered });
+      return NextResponse.json({ data: entradasDaEmpresa });
     }
 
     const permissao = await getPermissaoByUsername(username);
@@ -71,10 +71,10 @@ export async function GET(request: NextRequest) {
       !filialAtribuida || filialAtribuida === "" || filialAtribuida === "TODAS";
 
     if (verTodas) {
-      return NextResponse.json({ data: entradasComConfirmacao });
+      return NextResponse.json({ data: entradasDaEmpresa });
     }
 
-    const filtered = entradasComConfirmacao.filter((e) => {
+    const filtered = entradasDaEmpresa.filter((e) => {
       const destino = getActiveFilial(companyConfig, e.filialDestino ?? "").trim().toUpperCase();
       return destino === filialAtribuida;
     });

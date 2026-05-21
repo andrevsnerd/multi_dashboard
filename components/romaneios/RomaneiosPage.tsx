@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useDeferredValue } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 import { useAuth } from "@/components/auth/AuthContext";
@@ -48,12 +48,9 @@ interface RomaneiosPageProps {
 
 async function fetchLogSaidas(
   companySlug: string,
-  username?: string | null,
-  searchTerm = ""
+  username?: string | null
 ): Promise<RomaneioListItem[]> {
   const params = new URLSearchParams({ company: companySlug });
-  const search = searchTerm.trim();
-  if (search) params.set("search", search);
   const url = `/api/romaneios/saidas?${params.toString()}`;
   const headers: Record<string, string> = {};
   if (username) headers["x-auth-username"] = username;
@@ -65,12 +62,9 @@ async function fetchLogSaidas(
 
 async function fetchLogEntradas(
   companySlug: string,
-  username?: string | null,
-  searchTerm = ""
+  username?: string | null
 ): Promise<RomaneioListItem[]> {
   const params = new URLSearchParams({ company: companySlug });
-  const search = searchTerm.trim();
-  if (search) params.set("search", search);
   const url = `/api/romaneios/entradas?${params.toString()}`;
   const headers: Record<string, string> = {};
   if (username) headers["x-auth-username"] = username;
@@ -82,12 +76,9 @@ async function fetchLogEntradas(
 
 async function fetchLogTransito(
   companySlug: string,
-  username?: string | null,
-  searchTerm = ""
+  username?: string | null
 ): Promise<RomaneioListItem[]> {
   const params = new URLSearchParams({ company: companySlug });
-  const search = searchTerm.trim();
-  if (search) params.set("search", search);
   const url = `/api/romaneios/transito?${params.toString()}`;
   const headers: Record<string, string> = {};
   if (username) headers["x-auth-username"] = username;
@@ -108,28 +99,56 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("saida");
   const [searchTerm, setSearchTerm] = useState("");
-  const deferredSearchTerm = useDeferredValue(searchTerm);
 
-  function getFilialDisplayName(filialValue: string | null | undefined) {
+  function getFilialOption(filialValue: string | null | undefined) {
     const filial = (filialValue || "").trim();
-    if (!filial) return "";
+    if (!filial) return null;
     const filialKey = filial.toUpperCase();
-    const option = filiais.find((f) =>
+    return filiais.find((f) =>
       f.codFilial.trim().toUpperCase() === filialKey ||
       f.filial.trim().toUpperCase() === filialKey ||
       (f.activeFilial || "").trim().toUpperCase() === filialKey ||
       (f.aliases ?? []).some((alias) => alias.trim().toUpperCase() === filialKey)
     );
+  }
+
+  function getFilialDisplayName(filialValue: string | null | undefined) {
+    const filial = (filialValue || "").trim();
+    if (!filial) return "";
+    const option = getFilialOption(filial);
     return option?.displayName || option?.filial || filial;
+  }
+
+  function getFilialSearchValues(filialValue: string | null | undefined) {
+    const filial = (filialValue || "").trim();
+    const option = getFilialOption(filial);
+    const values = [
+      filial,
+      option?.codFilial,
+      option?.filial,
+      option?.displayName,
+      option?.activeFilial,
+      ...(option?.aliases ?? []),
+    ];
+
+    return Array.from(
+      new Set(values.map((value) => (value || "").trim()).filter(Boolean))
+    );
+  }
+
+  function getDestinoFiltroValue(romaneio: RomaneioListItem) {
+    return romaneio.tipo === "saida"
+      ? cleanDestinoValue(romaneio.destinoCodigo) || cleanDestinoValue(romaneio.filialDestino)
+      : cleanDestinoValue(romaneio.filialDestino);
   }
 
   useEffect(() => {
     if (authLoading) return;
     let cancelled = false;
     Promise.all([
-      fetchLogSaidas(companySlug, user?.username, deferredSearchTerm),
-      fetchLogEntradas(companySlug, user?.username, deferredSearchTerm),
-      fetchLogTransito(companySlug, user?.username, deferredSearchTerm),
+      fetchLogSaidas(companySlug, user?.username),
+      fetchLogEntradas(companySlug, user?.username),
+      fetchLogTransito(companySlug, user?.username),
       fetch(
         `/api/transferencia-produtos/filiais?${new URLSearchParams({ company: companySlug }).toString()}`,
         { cache: "no-store" }
@@ -154,7 +173,7 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
     return () => {
       cancelled = true;
     };
-  }, [companySlug, user?.username, authLoading, deferredSearchTerm]);
+  }, [companySlug, user?.username, authLoading]);
 
   const basePath = `/${companySlug}`;
   const romaneiosBase =
@@ -162,16 +181,16 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
   const romaneios = (() => {
     const q = searchTerm.trim().toLowerCase();
     if (!q) return romaneiosBase;
-    return romaneiosBase.filter((r) =>
-      r.romaneio.toLowerCase().includes(q) ||
-      (r.responsavel || "").toLowerCase().includes(q) ||
-      (r.filialOrigem || "").toLowerCase().includes(q) ||
-      (r.filialDestino || "").toLowerCase().includes(q) ||
-      getFilialDisplayName(r.filialOrigem).toLowerCase().includes(q) ||
-      getFilialDisplayName(r.filialDestino).toLowerCase().includes(q) ||
-      getFilialDisplayName(r.destinoCodigo).toLowerCase().includes(q) ||
-      (r.tipoRomaneio || "").toLowerCase().includes(q)
-    );
+
+    return romaneiosBase.filter((r) => {
+      if (r.romaneio.toLowerCase().includes(q)) return true;
+      if ((r.responsavel || "").toLowerCase().includes(q)) return true;
+      if ((r.tipoRomaneio || "").toLowerCase().includes(q)) return true;
+
+      return getFilialSearchValues(getDestinoFiltroValue(r)).some((value) =>
+        value.toLowerCase().includes(q)
+      );
+    });
   })();
 
   return (
@@ -211,15 +230,17 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
           <input
             type="text"
             className={styles.searchInput}
-            placeholder="Buscar por romaneio, responsavel, filial, tipo..."
+            placeholder="Buscar por romaneio, responsavel, filial destino, tipo..."
             value={searchTerm}
-            onChange={(e) => {
-              setLoading(true);
-              setSearchTerm(e.target.value);
-            }}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
           {searchTerm && (
-            <button className={styles.searchClear} onClick={() => setSearchTerm("")} aria-label="Limpar">
+            <button
+              type="button"
+              className={styles.searchClear}
+              onClick={() => setSearchTerm("")}
+              aria-label="Limpar"
+            >
               x
             </button>
           )}
@@ -240,10 +261,7 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
       ) : (
         <div className={styles.list}>
           {romaneios.map((rom, index) => {
-            const destinoEfetivo =
-              rom.tipo === "saida"
-                ? cleanDestinoValue(rom.destinoCodigo) || cleanDestinoValue(rom.filialDestino)
-                : cleanDestinoValue(rom.filialDestino);
+            const destinoEfetivo = getDestinoFiltroValue(rom);
             const detailUrl = `${basePath}/romaneios/${encodeURIComponent(rom.romaneio)}?tipo=${rom.tipo}&filialOrigem=${encodeURIComponent(rom.filialOrigem)}&filialDestino=${encodeURIComponent(destinoEfetivo)}&dataEmissao=${encodeURIComponent(rom.dataEmissao)}&responsavel=${encodeURIComponent(rom.responsavel || "")}&tipoRomaneio=${encodeURIComponent(rom.tipoRomaneio || "")}`;
             const confirmados = rom.qtdConfirmados ?? 0;
             const todosConfirmados = rom.qtdProdutos > 0 && confirmados >= rom.qtdProdutos;
