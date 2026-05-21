@@ -1681,8 +1681,38 @@ const handleBadgeClick = (cat: string) => {
                                         </span>
                                       );
                                     })()}
+                                    {p.isGroupedProduct && (p.groupedMembers?.length ?? 0) > 0 && (
+                                      <div className={styles.groupedTooltipWrapper}>
+                                        <span className={styles.groupedBadge}>grupo</span>
+                                        <div className={styles.groupedTooltipContent}>
+                                          <div className={styles.tooltipTitle}>Produtos do grupo</div>
+                                          {(p.groupedMembers ?? []).map(m => (
+                                            <div key={m.produto} className={styles.groupedTooltipMember}>
+                                              <span className={styles.groupedTooltipMemberName}>{m.descricao || m.produto}</span>
+                                              <span className={styles.groupedTooltipMemberCode}>{m.produto}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
-                                  {((p.descricao && p.produto !== p.descricao) || p.categoria || p.codigoBarra) && (
+                                  {p.isGroupedProduct ? (
+                                    <div className={styles.productMeta}>
+                                      {(p.groupedMembers?.length ?? 0) > 0 && (
+                                        <span className={styles.productCode}>
+                                          {(p.groupedMembers ?? []).map(m => m.produto).join(" / ")}
+                                        </span>
+                                      )}
+                                      {(p.groupedMembers?.length ?? 0) > 0 && p.categoria && (
+                                        <span className={styles.productMetaSeparator}>|</span>
+                                      )}
+                                      {p.categoria && (
+                                        <span className={styles.productCategoria}>
+                                          {getCategoryHeaderLabel(p.categoria)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  ) : ((p.descricao && p.produto !== p.descricao) || p.categoria || p.codigoBarra) ? (
                                     <div className={styles.productMeta}>
                                       {((p.descricao && p.produto !== p.descricao) || p.codigoBarra) && (
                                         <span className={styles.productCode}>{p.produto}</span>
@@ -1710,7 +1740,7 @@ const handleBadgeClick = (cat: string) => {
                                         </span>
                                       )}
                                     </div>
-                                  )}
+                                  ) : null}
                                   {porCor && (p.corDescricao || p.cor) && (
                                     <div className={styles.productCode} style={{ marginTop: 4 }}>
                                       Cor: {p.corDescricao || p.cor}
@@ -1740,9 +1770,51 @@ const handleBadgeClick = (cat: string) => {
                                   <span className={styles.percText}>{p.percParticipacao.toFixed(1)}%</span>
                                 </div>
                               </td>
-                              <td className={styles.vendas}>{fmtBRL(p.vendas)}</td>
                               <td className={styles.vendas}>
-                                {p.qtdePorFilial && p.qtdePorFilial.length > 1 ? (
+                                {p.isGroupedProduct && (p.groupedMembers?.length ?? 0) > 0 ? (
+                                  <div className={styles.qtdeTooltipWrapper}>
+                                    <span>{fmtBRL(p.vendas)}</span>
+                                    <div className={styles.qtdeTooltipContent}>
+                                      <div className={styles.tooltipTitle}>Faturamento por produto</div>
+                                      {(p.groupedMembers ?? []).map(m => (
+                                        <div key={m.produto} className={styles.tooltipRow}>
+                                          <span className={styles.tooltipFilial}>{m.descricao || m.produto}</span>
+                                          <span className={styles.tooltipQtde}>{fmtBRL(m.vendas ?? 0)}</span>
+                                        </div>
+                                      ))}
+                                      {(p.groupedMembers?.length ?? 0) > 1 && (
+                                        <div className={styles.tooltipRow} style={{ borderTop: "1px solid rgba(148,163,184,0.3)", marginTop: 4, paddingTop: 4 }}>
+                                          <span className={styles.tooltipFilial} style={{ color: "#94a3b8" }}>Total</span>
+                                          <span className={styles.tooltipQtde} style={{ color: "#f1f5f9", fontWeight: 600 }}>{fmtBRL(p.vendas)}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  fmtBRL(p.vendas)
+                                )}
+                              </td>
+                              <td className={styles.vendas}>
+                                {p.isGroupedProduct && (p.groupedMembers?.length ?? 0) > 0 ? (
+                                  <div className={styles.qtdeTooltipWrapper}>
+                                    <span>{fmt(p.qtde)}</span>
+                                    <div className={styles.qtdeTooltipContent}>
+                                      <div className={styles.tooltipTitle}>Qtde por produto</div>
+                                      {(p.groupedMembers ?? []).map(m => (
+                                        <div key={m.produto} className={styles.tooltipRow}>
+                                          <span className={styles.tooltipFilial}>{m.descricao || m.produto}</span>
+                                          <span className={styles.tooltipQtde}>{fmt(m.qtde ?? 0)}</span>
+                                        </div>
+                                      ))}
+                                      {(p.groupedMembers?.length ?? 0) > 1 && (
+                                        <div className={styles.tooltipRow} style={{ borderTop: "1px solid rgba(148,163,184,0.3)", marginTop: 4, paddingTop: 4 }}>
+                                          <span className={styles.tooltipFilial} style={{ color: "#94a3b8" }}>Total</span>
+                                          <span className={styles.tooltipQtde} style={{ color: "#f1f5f9", fontWeight: 600 }}>{fmt(p.qtde)}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : p.qtdePorFilial && p.qtdePorFilial.length > 1 ? (
                                   <div className={styles.qtdeTooltipWrapper}>
                                     <span>{fmt(p.qtde)}</span>
                                     <div className={styles.qtdeTooltipContent}>

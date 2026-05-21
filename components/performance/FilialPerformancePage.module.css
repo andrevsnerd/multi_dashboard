@@ -957,6 +957,85 @@
   display: block;
 }
 
+/* ── Grouped product badge & tooltip ── */
+.groupedBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: #7c3aed;
+  background: #ede9fe;
+  border: 1px solid #ddd6fe;
+  border-radius: 4px;
+  padding: 1px 6px;
+  cursor: help;
+  line-height: 1.4;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.groupedTooltipWrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding-bottom: 10px;
+  margin-bottom: -10px;
+}
+
+.groupedTooltipContent {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.4;
+  z-index: 500;
+  box-shadow:
+    0 12px 32px rgba(15, 23, 42, 0.35),
+    0 0 0 1px rgba(148, 163, 184, 0.12);
+  pointer-events: none;
+  min-width: 220px;
+  max-width: min(360px, calc(100vw - 24px));
+  white-space: normal;
+}
+
+.groupedTooltipWrapper:hover .groupedTooltipContent {
+  display: block;
+}
+
+.groupedTooltipMember {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.groupedTooltipMember:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.groupedTooltipMember:first-child {
+  padding-top: 0;
+}
+
+.groupedTooltipMemberName {
+  font-size: 12px;
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+.groupedTooltipMemberCode {
+  font-size: 10px;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+
 .tooltipTitle {
   font-size: 10px;
   font-weight: 600;

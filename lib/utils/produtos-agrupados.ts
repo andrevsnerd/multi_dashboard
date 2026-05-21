@@ -7,6 +7,8 @@ export interface ProdutoAgrupadoMember {
   cor: string;
   descricao: string;
   corDescricao: string;
+  vendas?: number;
+  qtde?: number;
 }
 
 export interface ProdutoAgrupadoGroup {

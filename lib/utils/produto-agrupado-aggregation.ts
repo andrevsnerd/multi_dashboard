@@ -98,6 +98,24 @@ function buildGroupedMembers(members: ProdutoAgrupadoMember[]): ProdutoAgrupadoM
   );
 }
 
+// Dedup por produto (ignora cor), acumulando vendas e qtde de cada membro
+function buildGroupedMembersWithSales(members: ProdutoAgrupadoMember[]): ProdutoAgrupadoMember[] {
+  const unique = new Map<string, ProdutoAgrupadoMember>();
+  for (const member of members) {
+    const key = buildProdutoAgrupadoProductKey(member.produto);
+    const existing = unique.get(key);
+    if (!existing) {
+      unique.set(key, { ...member, vendas: member.vendas ?? 0, qtde: member.qtde ?? 0 });
+    } else {
+      existing.vendas = (existing.vendas ?? 0) + (member.vendas ?? 0);
+      existing.qtde = (existing.qtde ?? 0) + (member.qtde ?? 0);
+    }
+  }
+  return Array.from(unique.values()).sort((a, b) =>
+    (b.vendas ?? 0) - (a.vendas ?? 0) || a.descricao.localeCompare(b.descricao, "pt-BR")
+  );
+}
+
 export function aggregateProductDetailsWithGroups(
   rows: ProductDetail[],
   groups: ProdutoAgrupadoGroup[],
@@ -231,6 +249,8 @@ export function aggregateFilialProdutoSalesWithGroups(
       cor: String(row.cor ?? "").trim(),
       descricao: row.descricao,
       corDescricao: row.corDescricao ?? "",
+      vendas: Number(row.vendas ?? 0),
+      qtde: Number(row.qtde ?? 0),
     };
     const current = aggregated.get(key);
 
@@ -243,7 +263,7 @@ export function aggregateFilialProdutoSalesWithGroups(
         corDescricao: "",
         isGroupedProduct: true,
         groupId: group.id,
-        groupedMembers: buildGroupedMembers([incomingMember]),
+        groupedMembers: buildGroupedMembersWithSales([incomingMember]),
       });
       continue;
     }
@@ -265,7 +285,7 @@ export function aggregateFilialProdutoSalesWithGroups(
     current.colecao = joinDistinct([current.colecao, row.colecao]);
     current.descColecao = joinDistinct([current.descColecao, row.descColecao]);
     current.corDescricao = joinDistinct([current.corDescricao, row.corDescricao]);
-    current.groupedMembers = buildGroupedMembers([...(current.groupedMembers ?? []), incomingMember]);
+    current.groupedMembers = buildGroupedMembersWithSales([...(current.groupedMembers ?? []), incomingMember]);
   }
 
   return Array.from(aggregated.values()).sort((a, b) => b.vendas - a.vendas);
