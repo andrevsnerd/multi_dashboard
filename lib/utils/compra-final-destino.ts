@@ -5,9 +5,9 @@ import {
   resolveCompany,
   type CompanyKey,
 } from "@/lib/config/company";
-import { calcNecessidadeMinimaPorFilial } from "@/lib/utils/necessidade-minima";
+import { calcTotalPerFilialFiliais } from "@/lib/utils/necessidade-minima";
 
-export type DestinoCompraFinalParte = { label: string; qtd: number; isNM?: boolean; nmQty?: number };
+export type DestinoCompraFinalParte = { label: string; qtd: number; qtde12m?: number; isNM?: boolean; nmQty?: number };
 
 /**
  * Demanda por filial com ajuste 60d; distribui apenas para filiais (exclui MATRIZ); sobra pelo maior resto.
@@ -16,9 +16,10 @@ export type DestinoCompraFinalParte = { label: string; qtd: number; isNM?: boole
  */
 export function partesDestinoCompraFinal(
   qtdManual: number,
-  vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number }>,
+  vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number; velocidadeAjustada?: number | null; mesesDisponiveis?: number | null; diasComEstoquePositivo?: number | null }>,
   companyKey: CompanyKey,
-  estoquePorFilial?: Array<{ filial: string; estoque: number }>
+  estoquePorFilial?: Array<{ filial: string; estoque: number }>,
+  limiteDias = 60
 ): DestinoCompraFinalParte[] | null {
   if (qtdManual <= 0) return null;
   const cfg = resolveCompany(companyKey);
@@ -39,12 +40,15 @@ export function partesDestinoCompraFinal(
     return true;
   });
 
-  // Identifica filiais NM: a cada 5 vendas em 12m reserva +1 com estoque zerado
+  const qtde12mMap = new Map<string, number>(filiais.map((r) => [normalizeFilialLookupKey(r.filial), r.qtde12m]));
+
+  // Necessidade crítica por filial: estoque zero (NM) + cobertura abaixo do limite
   const nmReservas = estoquePorFilial
-    ? calcNecessidadeMinimaPorFilial({
+    ? calcTotalPerFilialFiliais({
         company: cfg,
         vendasPorFilial,
         estoquePorFilial,
+        limiteDias,
       })
         .filter((row) => filiais.some((filial) => normalizeFilialLookupKey(filial.filial) === normalizeFilialLookupKey(row.filial)))
         .map((row) => ({ filial: row.filial, qty: row.qtd }))
@@ -105,6 +109,7 @@ export function partesDestinoCompraFinal(
     .map(([label, { qtd, isNM, nmQty }]) => ({
       label,
       qtd,
+      qtde12m: qtde12mMap.get(normalizeFilialLookupKey(label)),
       isNM: isNM || undefined,
       nmQty: nmQty > 0 ? nmQty : undefined,
     }))
@@ -116,11 +121,12 @@ export function partesDestinoCompraFinal(
 
 export function textoDestinoCompraFinal(
   qtdManual: number,
-  vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number }>,
+  vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number; velocidadeAjustada?: number | null; mesesDisponiveis?: number | null; diasComEstoquePositivo?: number | null }>,
   companyKey: CompanyKey,
-  estoquePorFilial?: Array<{ filial: string; estoque: number }>
+  estoquePorFilial?: Array<{ filial: string; estoque: number }>,
+  limiteDias = 60
 ): string {
-  const partesH = partesDestinoCompraFinal(qtdManual, vendasPorFilial, companyKey, estoquePorFilial);
+  const partesH = partesDestinoCompraFinal(qtdManual, vendasPorFilial, companyKey, estoquePorFilial, limiteDias);
   if (partesH === null) return "—";
   const fmt = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
   return partesH.map((p) => `${p.label}: ${fmt(p.qtd)}`).join(" · ");

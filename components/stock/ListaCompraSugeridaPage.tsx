@@ -18,8 +18,8 @@ import {
   type DestinoCompraFinalParte,
 } from "@/lib/utils/compra-final-destino";
 import {
-  calcNecessidadeMinimaPorFilial,
   calcNecessidadeMinimaQty,
+  calcTotalPerFilialFiliais,
   combineBaseSuggestionWithNecessidadeMinima,
   formatNecessidadeMinimaFiliaisDescription,
   type FilialNecessidadeMinimaInfo,
@@ -723,10 +723,11 @@ export default function ListaCompraSugeridaPage({
           if (!produto) return;
           const metricas = metricasItens[buildControleEstoqueItemKey(produto, r.cor ?? null)];
           const filiaisNM = metricas
-            ? calcNecessidadeMinimaPorFilial({
+            ? calcTotalPerFilialFiliais({
               company: resolveCompany(companyKey),
               vendasPorFilial: metricas.vendasPorFilial,
               estoquePorFilial: metricas.estoquePorFilial,
+              limiteDias: getLimiteDiasReposicao(r).limiteDias,
             })
             : [];
           const totalNmQty = filiaisNM.reduce((sum, row) => sum + row.qtd, 0);
@@ -1335,10 +1336,11 @@ export default function ListaCompraSugeridaPage({
           if (!produto) return;
           const metricas = metricasItens[buildControleEstoqueItemKey(produto, row.cor ?? null)];
           const filiaisNM = metricas
-            ? calcNecessidadeMinimaPorFilial({
+            ? calcTotalPerFilialFiliais({
               company: resolveCompany(companyKey),
               vendasPorFilial: metricas.vendasPorFilial,
               estoquePorFilial: metricas.estoquePorFilial,
+              limiteDias: getLimiteDiasReposicao(row).limiteDias,
             })
             : [];
           const totalNmQty = filiaisNM.reduce((sum, item) => sum + item.qtd, 0);

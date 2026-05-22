@@ -84,6 +84,75 @@ export function calcNecessidadeMinimaPorFilial(input: {
     .filter((row): row is FilialNecessidadeMinimaInfo => row != null);
 }
 
+/**
+ * Opção C: para filiais com estoque > 0 mas cobertura < limiteDias,
+ * calcula quanto falta para atingir a cobertura alvo.
+ * Complementa calcNecessidadeMinimaPorFilial (que cobre filiais com estoque=0).
+ */
+export function calcCoberturaPorFilial(input: {
+  company: CompanyConfig | null | undefined;
+  vendasPorFilial: Array<{
+    filial: string;
+    qtde12m: number;
+    velocidadeAjustada?: number | null;
+    mesesDisponiveis?: number | null;
+    diasComEstoquePositivo?: number | null;
+  }>;
+  estoquePorFilial: Array<{ filial: string; estoque: number }>;
+  limiteDias: number;
+}): FilialNecessidadeMinimaInfo[] {
+  const vendasAgregadas = aggregateVendasPorFilialByDisplayLabel(
+    input.vendasPorFilial.map((row) => ({
+      filial: row.filial,
+      qtde12m: Number(row.qtde12m ?? 0),
+      qtde60d: 0,
+    })),
+    input.company
+  );
+  const estoqueMap = new Map<string, number>(
+    aggregateEstoquePorFilialByDisplayLabel(input.estoquePorFilial, input.company).map((row) => [
+      normalizeFilialLookupKey(row.filial),
+      Number(row.estoque ?? 0),
+    ])
+  );
+  const velocidadeMap = new Map(
+    input.vendasPorFilial.map((row) => [
+      normalizeFilialLookupKey(row.filial),
+      {
+        velocidadeAjustada: row.velocidadeAjustada,
+        mesesDisponiveis: row.mesesDisponiveis,
+        diasComEstoquePositivo: row.diasComEstoquePositivo,
+      },
+    ])
+  );
+
+  return vendasAgregadas
+    .map((row) => {
+      const filialKey = normalizeFilialLookupKey(row.filial);
+      const estoque = estoqueMap.get(filialKey) ?? 0;
+      if (estoque <= 0) return null; // estoque=0 é território da NM
+
+      const qtde12m = Math.max(0, Number(row.qtde12m ?? 0));
+      if (qtde12m < 3) return null;
+
+      const vInfo = velocidadeMap.get(filialKey);
+      const velocidade =
+        Number.isFinite(Number(vInfo?.velocidadeAjustada))
+          ? Number(vInfo!.velocidadeAjustada)
+          : qtde12m / Math.max(Number.isFinite(Number(vInfo?.mesesDisponiveis)) && Number(vInfo!.mesesDisponiveis) > 0
+              ? Number(vInfo!.mesesDisponiveis)
+              : 12, 1);
+      if (velocidade < 0.5) return null;
+
+      const alvo = Math.ceil(velocidade * (input.limiteDias / 30));
+      const necessidade = alvo - estoque;
+      if (necessidade <= 0) return null; // já tem cobertura suficiente
+
+      return { filial: row.filial, qtd: necessidade, qtde12m };
+    })
+    .filter((row): row is FilialNecessidadeMinimaInfo => row != null);
+}
+
 export function calcTotalNecessidadeMinimaPorFilial(input: {
   company: CompanyConfig | null | undefined;
   vendasPorFilial: Array<{
@@ -97,6 +166,32 @@ export function calcTotalNecessidadeMinimaPorFilial(input: {
   estoquePorFilial: Array<{ filial: string; estoque: number }>;
 }): number {
   return calcNecessidadeMinimaPorFilial(input).reduce((sum, row) => sum + row.qtd, 0);
+}
+
+type PerFilialInput = {
+  company: CompanyConfig | null | undefined;
+  vendasPorFilial: Array<{
+    filial: string;
+    qtde12m: number;
+    qtde60d?: number;
+    velocidadeAjustada?: number | null;
+    mesesDisponiveis?: number | null;
+    diasComEstoquePositivo?: number | null;
+  }>;
+  estoquePorFilial: Array<{ filial: string; estoque: number }>;
+  limiteDias: number;
+};
+
+/** NM (estoque=0) + Cobertura (estoque>0 mas cobertura < limiteDias). Fonte única para todas as telas. */
+export function calcTotalPerFilialFiliais(input: PerFilialInput): FilialNecessidadeMinimaInfo[] {
+  return [
+    ...calcNecessidadeMinimaPorFilial(input),
+    ...calcCoberturaPorFilial(input),
+  ];
+}
+
+export function calcTotalPerFilialQty(input: PerFilialInput): number {
+  return calcTotalPerFilialFiliais(input).reduce((sum, row) => sum + row.qtd, 0);
 }
 
 export function combineBaseSuggestionWithNecessidadeMinima(input: {

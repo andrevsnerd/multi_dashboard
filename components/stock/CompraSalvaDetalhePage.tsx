@@ -20,7 +20,7 @@ import {
 } from "@/lib/utils/compra-final-destino";
 import {
   calcNecessidadeMinimaQty,
-  calcTotalNecessidadeMinimaPorFilial,
+  calcTotalPerFilialQty,
   combineBaseSuggestionWithNecessidadeMinima,
 } from "@/lib/utils/necessidade-minima";
 import {
@@ -450,10 +450,14 @@ async function fetchVendasItemMetricas(params: URLSearchParams): Promise<{
     diasSemEstoque: metricas.resumo.diasSemEstoque,
     mesesDisponiveis: metricas.resumo.mesesDisponiveis,
     velocidadeAjustada: metricas.resumo.velocidadeAjustada,
-    totalNmQty: calcTotalNecessidadeMinimaPorFilial({
+    totalNmQty: calcTotalPerFilialQty({
       company: resolveCompany(params.get("company") ?? undefined),
       vendasPorFilial: metricas.vendasPorFilial,
       estoquePorFilial: metricas.estoquePorFilial,
+      limiteDias: getSharedLimiteDiasReposicao({
+        linha: params.get("linha") ?? undefined,
+        subgrupo: params.get("subgrupo") ?? undefined,
+      }),
     }),
   };
 }
@@ -950,7 +954,7 @@ export default function CompraSalvaDetalhePage({
           .map(([label, qty]) => `${label}: ${fmt2(qty)}`)
           .join(" · ");
       } else {
-        destino = vendasRows !== undefined ? textoDestinoCompraFinal(effectiveQtdManual, vendasRows, companyKey, estoquePorFilialCache[vendasKey]) : "";
+        destino = vendasRows !== undefined ? textoDestinoCompraFinal(effectiveQtdManual, vendasRows, companyKey, estoquePorFilialCache[vendasKey], getSharedLimiteDiasReposicao({ linha: match?.linha, subgrupo: match?.subgrupo })) : "";
       }
       return {
         PRODUTO: it.produto,
@@ -1283,7 +1287,7 @@ export default function CompraSalvaDetalhePage({
                   </tr>
                 </thead>
                 <tbody>
-                  {rowsComputed.map(({ it, estoque, custoUnit, custoTotal, qtdSugerida, sugestaoAtual, effectiveQtdManual }) => {
+                  {rowsComputed.map(({ it, match, estoque, custoUnit, custoTotal, qtdSugerida, sugestaoAtual, effectiveQtdManual }) => {
                     const itemManualState = manualState[it.itemKey] ?? "auto";
                     const isEditing = itemManualState === "editing";
                     const isConfirmed = itemManualState === "confirmed";
@@ -1296,11 +1300,11 @@ export default function CompraSalvaDetalhePage({
                     const partesDestino =
                       vendasRowsK === undefined
                         ? undefined
-                        : partesDestinoCompraFinal(effectiveQtdManual, vendasRowsK, companyKey, estoqueRowsK);
+                        : partesDestinoCompraFinal(effectiveQtdManual, vendasRowsK, companyKey, estoqueRowsK, getSharedLimiteDiasReposicao({ linha: match?.linha, subgrupo: match?.subgrupo }));
                     const partesDestinoSugerido =
                       vendasRowsK === undefined || qtdSugerida === null
                         ? undefined
-                        : partesDestinoCompraFinal(qtdSugerida, vendasRowsK, companyKey, estoqueRowsK);
+                        : partesDestinoCompraFinal(qtdSugerida, vendasRowsK, companyKey, estoqueRowsK, getSharedLimiteDiasReposicao({ linha: match?.linha, subgrupo: match?.subgrupo }));
                     return (
                       <tr key={it.itemKey}>
                         <td>

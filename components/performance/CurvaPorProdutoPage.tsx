@@ -23,8 +23,8 @@ import {
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
 import { formatDateForQuery } from "@/lib/utils/date";
 import {
-  calcNecessidadeMinimaPorFilial,
   calcNecessidadeMinimaQty,
+  calcTotalPerFilialFiliais,
   combineBaseSuggestionWithNecessidadeMinima,
   formatNecessidadeMinimaFiliaisDescription,
   type FilialNecessidadeMinimaInfo,
@@ -369,16 +369,20 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
 
     let cancelled = false;
 
+    const limiteDiasMap = new Map<string, number>();
     const prioritizedItems = data.rows
       .slice()
       .sort((a, b) => {
         if (a.represented !== b.represented) return a.represented ? -1 : 1;
         return b.vendas - a.vendas;
       })
-      .map((row) => ({
-        produto: row.produto,
-        corProduto: row.corProduto ?? null,
-      }));
+      .map((row) => {
+        limiteDiasMap.set(buildCurvaPorProdutoKey(row.produto, row.corProduto ?? null), getLimiteDiasReposicao(row));
+        return {
+          produto: row.produto,
+          corProduto: row.corProduto ?? null,
+        };
+      });
 
     const loadInChunks = async () => {
       for (let start = 0; start < prioritizedItems.length; start += METRICAS_CHUNK_SIZE) {
@@ -401,10 +405,11 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
               next[buildCurvaPorProdutoKey(item.produto, item.corProduto ?? null)] = EMPTY_METRICAS_ROW;
             });
             Object.entries(rows).forEach(([key, value]) => {
-              const filiaisNM = calcNecessidadeMinimaPorFilial({
+              const filiaisNM = calcTotalPerFilialFiliais({
                 company: resolveCompany(companyKey),
                 vendasPorFilial: value.vendasPorFilial,
                 estoquePorFilial: value.estoquePorFilial,
+                limiteDias: limiteDiasMap.get(key) ?? 60,
               });
               next[key] = {
                 qtde12m: value.resumo.qtde12m,

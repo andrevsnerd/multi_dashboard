@@ -26,8 +26,13 @@ import {
 import { exportListaLojaToXlsx } from "@/lib/utils/exportListaLoja";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
 import {
+  partesDestinoCompraFinal,
+  type DestinoCompraFinalParte,
+} from "@/lib/utils/compra-final-destino";
+import {
   calcNecessidadeMinimaQty,
   calcNecessidadeMinimaPorFilial,
+  calcCoberturaPorFilial,
   combineBaseSuggestionWithNecessidadeMinima,
   formatNecessidadeMinimaFiliaisDescription,
 } from "@/lib/utils/necessidade-minima";
@@ -498,8 +503,9 @@ async function fetchVendasItemMetricas(
   companyKey: string,
   codFilial: string | null,
   produto: string,
-  corProduto: string | null
-): Promise<{ qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null; diasDesdeUltimaVenda: number | null; primeiraEntradaFilial: string | null; diasHistoricoFilial: number; mesesHistoricoFilial: number; diasComEstoquePositivo: number; diasSemEstoque: number; mesesDisponiveis: number; velocidadeAjustada: number; historicoParcial: boolean; filiaisNM: FilialNecessidadeMinima[] } | null> {
+  corProduto: string | null,
+  itemMeta?: { linha?: string | null; subgrupo?: string | null }
+): Promise<{ qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null; diasDesdeUltimaVenda: number | null; primeiraEntradaFilial: string | null; diasHistoricoFilial: number; mesesHistoricoFilial: number; diasComEstoquePositivo: number; diasSemEstoque: number; mesesDisponiveis: number; velocidadeAjustada: number; historicoParcial: boolean; filiaisNM: FilialNecessidadeMinima[]; filiaisCobertura: FilialNecessidadeMinima[]; vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number; velocidadeAjustada?: number | null; mesesDisponiveis?: number | null; diasComEstoquePositivo?: number | null }>; estoquePorFilial: Array<{ filial: string; estoque: number }> } | null> {
   type VendasItemMetricasApiRow = {
     qtde12m: number;
     qtde60d: number;
@@ -551,6 +557,13 @@ async function fetchVendasItemMetricas(
       vendasPorFilial: metricas.vendasPorFilial,
       estoquePorFilial: metricas.estoquePorFilial,
     });
+    const limiteDiasItem = getLimiteDiasReposicao({ linha: itemMeta?.linha, subgrupo: itemMeta?.subgrupo });
+    const filiaisCobertura = calcCoberturaPorFilial({
+      company: companyConfig,
+      vendasPorFilial: metricas.vendasPorFilial,
+      estoquePorFilial: metricas.estoquePorFilial,
+      limiteDias: limiteDiasItem,
+    });
     return {
       qtde12m: metricas.resumo.qtde12m,
       qtde60d: metricas.resumo.qtde60d,
@@ -567,6 +580,9 @@ async function fetchVendasItemMetricas(
       velocidadeAjustada: metricas.resumo.velocidadeAjustada,
       historicoParcial: metricas.resumo.historicoParcial,
       filiaisNM,
+      filiaisCobertura,
+      vendasPorFilial: metricas.vendasPorFilial,
+      estoquePorFilial: metricas.estoquePorFilial,
     };
     let rows: VendasItemMetricasApiRow[];
     try {
@@ -595,6 +611,9 @@ async function fetchVendasItemMetricas(
       mesesDisponiveis: Math.max(1, ...rows.map((r) => Number(r.mesesDisponiveis ?? 1))),
       velocidadeAjustada: Math.max(0, ...rows.map((r) => Number(r.velocidadeAjustada ?? 0))),
       filiaisNM: [],
+      filiaisCobertura: [],
+      vendasPorFilial: [],
+      estoquePorFilial: [],
     };
   } catch {
     return null;
@@ -878,6 +897,7 @@ function buildEstoqueTooltipText(rows: FilialEstoqueRow[], company: CompanyConfi
   );
 }
 
+/** Redistribui `total` unidades proporcionalmente ao qtde12m de cada filial (maior resto primeiro). */
 function buildVendasTooltipText(
   rows: FilialVendaRow[],
   mode: "12m" | "60d" | "mesAtual" | "valor12m",
@@ -1666,7 +1686,7 @@ function ListaLojaItensTable({
     qtdCalculada: number;
     baseQty?: number;
     nmExtraQty?: number;
-    nmFiliais?: FilialNecessidadeMinima[];
+    distribuicao?: DestinoCompraFinalParte[];
     blendAplicado?: boolean;
     qtdFinalPuro?: number;
     qtdSBlend?: number;
@@ -1696,7 +1716,7 @@ function ListaLojaItensTable({
     qtdS: number;
     baseQty?: number;
     nmExtraQty?: number;
-    nmFiliais?: FilialNecessidadeMinima[];
+    distribuicao?: DestinoCompraFinalParte[];
     transitTotal?: number;
     transitDates?: string[];
   }>(null);
@@ -1712,7 +1732,7 @@ function ListaLojaItensTable({
     qtdE: number;
     baseQty?: number;
     nmExtraQty?: number;
-    nmFiliais?: FilialNecessidadeMinima[];
+    distribuicao?: DestinoCompraFinalParte[];
     transitTotal?: number;
     transitDates?: string[];
   }>(null);
@@ -1761,6 +1781,9 @@ function ListaLojaItensTable({
         velocidadeAjustada: number | null;
         historicoParcial: boolean | null;
         filiaisNM: FilialNecessidadeMinima[] | null;
+        filiaisCobertura: FilialNecessidadeMinima[] | null;
+        vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number; velocidadeAjustada?: number | null; mesesDisponiveis?: number | null; diasComEstoquePositivo?: number | null }> | null;
+        estoquePorFilial: Array<{ filial: string; estoque: number }> | null;
       }
     >
   >({});
@@ -1796,6 +1819,7 @@ function ListaLojaItensTable({
     velocidadeAjustada: number | null;
     historicoParcial: boolean | null;
     filiaisNM: FilialNecessidadeMinima[] | null;
+    filiaisCobertura: FilialNecessidadeMinima[] | null;
   }): boolean {
     return Object.values(values).some((value) => value !== null && value !== undefined);
   }
@@ -1842,7 +1866,7 @@ function ListaLojaItensTable({
       itens.map(async (item) => {
         const key = `${filialScopeKey}::${buildItemKey(item.produto, item.corProduto)}`;
         const [vendas, estoqueFilial] = await Promise.all([
-          fetchVendasItemMetricas(companyKey, filialCod, item.produto, item.corProduto),
+          fetchVendasItemMetricas(companyKey, filialCod, item.produto, item.corProduto, { linha: item.linha, subgrupo: item.subgrupo }),
           fetchEstoqueFilialSum(companyKey, filialCod, item.produto, item.corProduto),
         ]);
         return {
@@ -1864,6 +1888,9 @@ function ListaLojaItensTable({
             velocidadeAjustada: vendas?.velocidadeAjustada ?? null,
             historicoParcial: vendas?.historicoParcial ?? null,
             filiaisNM: vendas?.filiaisNM ?? null,
+            filiaisCobertura: vendas?.filiaisCobertura ?? null,
+            vendasPorFilial: vendas?.vendasPorFilial ?? null,
+            estoquePorFilial: vendas?.estoquePorFilial ?? null,
           },
         };
       })
@@ -1957,8 +1984,12 @@ function ListaLojaItensTable({
                 const diasHistoricoFilial = hasLive ? (live?.diasHistoricoFilial ?? null) : (item.diasHistoricoFilial ?? null);
                 const mesesHistoricoFilial = hasLive ? (live?.mesesHistoricoFilial ?? null) : (item.mesesHistoricoFilial ?? null);
                 const historicoParcial = hasLive ? (live?.historicoParcial ?? false) : (item.historicoParcial ?? false);
-                // filiaisNM só faz sentido na visão agregada (sem filial específica)
+                // filiaisNM e filiaisCobertura só fazem sentido na visão agregada (sem filial específica)
                 const filiaisNMAgregado = (!filialCod || !filialCod.trim()) ? (live?.filiaisNM ?? []) : [];
+                const filiaisCoberturaAgregado = (!filialCod || !filialCod.trim()) ? (live?.filiaisCobertura ?? []) : [];
+                // Opção C: total por filial = NM (zeradas) + Cobertura (abaixo do alvo)
+                // combineBaseSuggestion já faz MAX(rede, totalPerFilial)
+                const totalPerFilialQty = filiaisNMAgregado.reduce((s, f) => s + f.qtd, 0) + filiaisCoberturaAgregado.reduce((s, f) => s + f.qtd, 0);
                 return (
                   <>
               <td>
@@ -2473,16 +2504,18 @@ function ListaLojaItensTable({
                         : sugestaoBase.qtdE > 0
                           ? sugestaoBase.qtdE
                           : sugestaoBase.qtdNM;
-                  const filiaisNmDisplay = filiaisNMAgregado.map((f) => ({
+                  const filiaisNmDisplay = [
+                    ...filiaisNMAgregado,
+                    ...filiaisCoberturaAgregado,
+                  ].map((f) => ({
                     filial: getFilialLabelForDisplay(companyConfig, f.filial),
                     qtd: f.qtd,
                     qtde12m: f.qtde12m,
                   }));
-                  const totalNmQtyAgregado = filiaisNmDisplay.reduce((sum, filial) => sum + filial.qtd, 0);
                   const combinedSuggestion = combineBaseSuggestionWithNecessidadeMinima({
                     baseType,
                     baseQty,
-                    totalNmQty: totalNmQtyAgregado,
+                    totalNmQty: totalPerFilialQty,
                   });
                   const transit = applyTransitToSuggestion({
                     baseType: combinedSuggestion.effectiveType,
@@ -2536,7 +2569,7 @@ function ListaLojaItensTable({
                             qtdCalculada: transit.qty,
                             baseQty: combinedSuggestion.baseQty,
                             nmExtraQty: combinedSuggestion.hasCombinedNm ? combinedSuggestion.nmExtraQty : undefined,
-                            nmFiliais: filiaisNMAgregado,
+                            distribuicao: partesDestinoCompraFinal(transit.qty, live?.vendasPorFilial ?? [], companyKey, live?.estoquePorFilial ?? undefined, limiteDias) ?? undefined,
                             blendAplicado,
                             qtdFinalPuro,
                             qtdSBlend,
@@ -2577,7 +2610,7 @@ function ListaLojaItensTable({
                               qtdS: transit.qty,
                               baseQty: combinedSuggestion.baseQty,
                               nmExtraQty: combinedSuggestion.hasCombinedNm ? combinedSuggestion.nmExtraQty : undefined,
-                              nmFiliais: filiaisNMAgregado,
+                              distribuicao: partesDestinoCompraFinal(transit.qty, live?.vendasPorFilial ?? [], companyKey, live?.estoquePorFilial ?? undefined, limiteDias) ?? undefined,
                               transitTotal: transit.totalTransit || undefined,
                               transitDates,
                             })
@@ -2639,7 +2672,7 @@ function ListaLojaItensTable({
                               qtdE: transit.qty,
                               baseQty: combinedSuggestion.baseQty,
                               nmExtraQty: combinedSuggestion.hasCombinedNm ? combinedSuggestion.nmExtraQty : undefined,
-                              nmFiliais: filiaisNMAgregado,
+                              distribuicao: partesDestinoCompraFinal(transit.qty, live?.vendasPorFilial ?? [], companyKey, live?.estoquePorFilial ?? undefined, limiteDias) ?? undefined,
                               transitTotal: transit.totalTransit || undefined,
                               transitDates,
                             })
@@ -2697,7 +2730,7 @@ function ListaLojaItensTable({
                             duracaoAtual: 0,
                             qtdCalculada: transit.qty,
                             baseQty: transit.qty,
-                            nmFiliais: filiaisNMAgregado,
+                            distribuicao: partesDestinoCompraFinal(transit.qty, live?.vendasPorFilial ?? [], companyKey, live?.estoquePorFilial ?? undefined, limiteDias) ?? undefined,
                             transitTotal: transit.totalTransit || undefined,
                             transitDates,
                           })
@@ -3030,57 +3063,55 @@ function ListaLojaItensTable({
       )}
       {sugestaoTooltip && (
         <div className={styles.metricTooltip} style={getTooltipViewportPosition(sugestaoTooltip.x, sugestaoTooltip.y)}>
-          <div className={styles.metricTooltipTitle}>{sugestaoTooltip.titulo}</div>
-          <div className={styles.metricTooltipLine}>{sugestaoTooltip.regra}</div>
+          <div className={styles.metricTooltipTitle}>COMPRA → {fmt(sugestaoTooltip.qtdCalculada)} un</div>
           <div className={styles.metricTooltipDivider} />
-          <div className={styles.metricTooltipLine}><strong>Vendas mês:</strong> {fmt(sugestaoTooltip.vendasMesAtual)} un</div>
-          <div className={styles.metricTooltipLine}><strong>Dias corridos:</strong> {sugestaoTooltip.diasCorridos}</div>
-          <div className={styles.metricTooltipLine}><strong>Consumo/dia:</strong> {sugestaoTooltip.consumoDiario.toFixed(2)} un</div>
-          <div className={styles.metricTooltipLine}><strong>Estoque atual:</strong> {fmt(sugestaoTooltip.estoqueAtual)} un</div>
-          <div className={styles.metricTooltipLine}><strong>Duração atual:</strong> {Math.max(0, Math.round(sugestaoTooltip.duracaoAtual))} dias</div>
-          <div className={styles.metricTooltipLine}><strong>Limite do item:</strong> {sugestaoTooltip.limiteDias} dias</div>
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span>Estoque</span><span><strong>{fmt(sugestaoTooltip.estoqueAtual)} un</strong></span>
+          </div>
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span>Cobertura</span><span><strong>{Math.max(0, Math.round(sugestaoTooltip.duracaoAtual))}d</strong> / alvo {sugestaoTooltip.limiteDias}d</span>
+          </div>
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span>Consumo</span><span>{sugestaoTooltip.consumoDiario.toFixed(2)} un/dia ({fmt(sugestaoTooltip.vendasMesAtual)} vendas / {sugestaoTooltip.diasCorridos}d)</span>
+          </div>
           {sugestaoTooltip.blendAplicado && sugestaoTooltip.qtdFinalPuro != null && sugestaoTooltip.qtdSBlend != null && (
             <>
               <div className={styles.metricTooltipDivider} />
-              <div className={styles.metricTooltipLine}><strong>Cálculo atual (consumo):</strong> {fmt(sugestaoTooltip.qtdFinalPuro)} un</div>
-              <div className={styles.metricTooltipLine}><strong>Cálculo histórico (S):</strong> {fmt(sugestaoTooltip.qtdSBlend)} un</div>
-              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
-                Atual ({fmt(sugestaoTooltip.qtdFinalPuro)}) &lt; 60% de S ({fmt(Math.round(0.6 * sugestaoTooltip.qtdSBlend))}) → blend aplicado
+              <div className={styles.metricTooltipLine} style={{ color: "#64748b", fontSize: 11 }}>Mês atual abaixo do normal — histórico reforçou a sugestão</div>
+              <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                <span style={{ fontSize: 11, color: "#64748b" }}>Atual</span><span style={{ fontSize: 11 }}>{fmt(sugestaoTooltip.qtdFinalPuro)} un</span>
               </div>
-              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
-                = 80% × {fmt(sugestaoTooltip.qtdSBlend)} + 40% × {fmt(sugestaoTooltip.qtdFinalPuro)} = {fmt(sugestaoTooltip.qtdCalculada)}
+              <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                <span style={{ fontSize: 11, color: "#64748b" }}>Histórico</span><span style={{ fontSize: 11 }}>{fmt(sugestaoTooltip.qtdSBlend)} un</span>
               </div>
             </>
           )}
-          <div className={styles.metricTooltipDivider} />
-          {sugestaoTooltip.nmExtraQty ? (
+          {sugestaoTooltip.distribuicao && sugestaoTooltip.distribuicao.length > 0 ? (
             <>
-              <div className={styles.metricTooltipLine}><strong>Base da regra:</strong> {fmt(sugestaoTooltip.baseQty ?? 0)} un</div>
-              <div className={styles.metricTooltipLine}><strong>NM total da rede:</strong> {fmt((sugestaoTooltip.baseQty ?? 0) + sugestaoTooltip.nmExtraQty)} un</div>
-              <div className={styles.metricTooltipLine}><strong>Já coberto pela regra base:</strong> {fmt(Math.min(sugestaoTooltip.baseQty ?? 0, (sugestaoTooltip.baseQty ?? 0) + sugestaoTooltip.nmExtraQty))} un</div>
-              <div className={styles.metricTooltipLine}><strong>Complemento NM:</strong> +{fmt(sugestaoTooltip.nmExtraQty)} un</div>
-              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
-                NM: estoque zerado com ≥3 vendas e velocidade ≥0,5 un/mês → reserva mínima de 1 un.
-              </div>
-              {sugestaoTooltip.nmFiliais && sugestaoTooltip.nmFiliais.length > 0 ? (
-                <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
-                  <strong>NM por filial:</strong> {formatNecessidadeMinimaFiliaisDescription(sugestaoTooltip.nmFiliais)}
-                </div>
-              ) : null}
               <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Por loja (proporcional)</div>
+              {(() => {
+                const totalVendas = sugestaoTooltip.distribuicao.reduce((s, f) => s + (f.qtde12m ?? 0), 0);
+                return sugestaoTooltip.distribuicao.map((f) => (
+                  <div key={f.label} className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                    <span>{f.label}</span>
+                    <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      {totalVendas > 0 && <span style={{ fontSize: 11, color: "#64748b" }}>[{f.qtde12m ?? 0}/{totalVendas}]</span>}
+                      <strong>{fmt(f.qtd)} un</strong>
+                    </span>
+                  </div>
+                ));
+              })()}
             </>
           ) : null}
-          <div className={styles.metricTooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoTooltip.qtdCalculada)} un</div>
           {sugestaoTooltip.transitTotal ? (
             <>
               <div className={styles.metricTooltipDivider} />
-              <div className={styles.metricTooltipLine}>
-                <strong style={{ color: "#0f766e" }}>+{fmt(sugestaoTooltip.transitTotal)} em trânsito</strong>
+              <div className={styles.metricTooltipLine} style={{ color: "#0f766e" }}>
+                <strong>+{fmt(sugestaoTooltip.transitTotal)} em trânsito</strong>
               </div>
               {sugestaoTooltip.transitDates?.map((label) => (
-                <div key={label} className={styles.metricTooltipLine} style={{ color: "#0d9488", fontSize: 11 }}>
-                  {label}
-                </div>
+                <div key={label} className={styles.metricTooltipLine} style={{ color: "#0d9488", fontSize: 11 }}>{label}</div>
               ))}
             </>
           ) : null}
@@ -3088,49 +3119,47 @@ function ListaLojaItensTable({
       )}
       {sugestaoSTooltip && (
         <div className={styles.metricTooltip} style={getTooltipViewportPosition(sugestaoSTooltip.x, sugestaoSTooltip.y)}>
-          <div className={styles.metricTooltipTitle}>Regra S — Velocidade ajustada por disponibilidade</div>
-          <div className={styles.metricTooltipLine}>O produto vendeu, mas ficou zerado parte do tempo. A velocidade é calculada só sobre os dias em que havia estoque.</div>
+          <div className={styles.metricTooltipTitle}>S → {fmt(sugestaoSTooltip.qtdS)} un</div>
+          <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>Velocidade calculada só nos dias em que havia estoque</div>
           <div className={styles.metricTooltipDivider} />
-          <div className={styles.metricTooltipLine}><strong>Vendas 12 meses:</strong> {fmt(sugestaoSTooltip.qtde12m)} un</div>
-          <div className={styles.metricTooltipLine}><strong>Dias com estoque:</strong> {fmt(sugestaoSTooltip.diasComEstoquePositivo)} dias</div>
-          <div className={styles.metricTooltipLine}><strong>Meses disponíveis:</strong> {sugestaoSTooltip.mesesDisponiveis.toFixed(1)} meses</div>
-          <div className={styles.metricTooltipLine}><strong>Velocidade ajustada:</strong> {sugestaoSTooltip.velocidadeAjustada.toFixed(2)} un/mês</div>
-          <div className={styles.metricTooltipLine} style={{ fontSize: 11 }}>
-            = {fmt(sugestaoSTooltip.qtde12m)} un ÷ {sugestaoSTooltip.mesesDisponiveis.toFixed(1)} meses
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span>Velocidade</span><span><strong>{sugestaoSTooltip.velocidadeAjustada.toFixed(1)} un/mês</strong></span>
           </div>
-          <div className={styles.metricTooltipLine}><strong>Estoque atual:</strong> {fmt(sugestaoSTooltip.estoqueAtual)} un</div>
-          <div className={styles.metricTooltipLine}><strong>Cobertura alvo:</strong> {sugestaoSTooltip.limiteDias} dias</div>
-          <div className={styles.metricTooltipDivider} />
-          {sugestaoSTooltip.nmExtraQty ? (
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span style={{ fontSize: 11, color: "#64748b" }}>Base</span><span style={{ fontSize: 11 }}>{fmt(sugestaoSTooltip.qtde12m)} un em {fmt(sugestaoSTooltip.diasComEstoquePositivo)} dias c/ estoque</span>
+          </div>
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span>Estoque</span><span><strong>{fmt(sugestaoSTooltip.estoqueAtual)} un</strong></span>
+          </div>
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span>Alvo</span><span>{sugestaoSTooltip.limiteDias} dias</span>
+          </div>
+          {sugestaoSTooltip.distribuicao && sugestaoSTooltip.distribuicao.length > 0 ? (
             <>
-              <div className={styles.metricTooltipLine}><strong>Base da regra S:</strong> {fmt(sugestaoSTooltip.baseQty ?? 0)} un</div>
-              <div className={styles.metricTooltipLine}><strong>NM total da rede:</strong> {fmt((sugestaoSTooltip.baseQty ?? 0) + sugestaoSTooltip.nmExtraQty)} un</div>
-              <div className={styles.metricTooltipLine}><strong>Complemento NM:</strong> +{fmt(sugestaoSTooltip.nmExtraQty)} un</div>
-              <div className={styles.metricTooltipLine} style={{ fontSize: 11 }}>
-                NM: estoque zerado com ≥3 vendas e velocidade ≥0,5 un/mês → reserva mínima de 1 un.
-              </div>
-              {sugestaoSTooltip.nmFiliais && sugestaoSTooltip.nmFiliais.length > 0 ? (
-                <div className={styles.metricTooltipLine} style={{ fontSize: 11 }}>
-                  <strong>NM por filial:</strong> {formatNecessidadeMinimaFiliaisDescription(sugestaoSTooltip.nmFiliais)}
-                </div>
-              ) : null}
               <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Por loja (proporcional)</div>
+              {(() => {
+                const totalVendas = sugestaoSTooltip.distribuicao.reduce((s, f) => s + (f.qtde12m ?? 0), 0);
+                return sugestaoSTooltip.distribuicao.map((f) => (
+                  <div key={f.label} className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                    <span>{f.label}</span>
+                    <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      {totalVendas > 0 && <span style={{ fontSize: 11, color: "#64748b" }}>[{f.qtde12m ?? 0}/{totalVendas}]</span>}
+                      <strong>{fmt(f.qtd)} un</strong>
+                    </span>
+                  </div>
+                ));
+              })()}
             </>
           ) : null}
-          <div className={styles.metricTooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoSTooltip.qtdS)} un</div>
-          <div className={styles.metricTooltipLine} style={{ fontSize: 11 }}>
-            = ⌈{sugestaoSTooltip.velocidadeAjustada.toFixed(2)} × {(sugestaoSTooltip.limiteDias / 30).toFixed(1)}⌉ = {fmt(sugestaoSTooltip.qtdS)}
-          </div>
           {sugestaoSTooltip.transitTotal ? (
             <>
               <div className={styles.metricTooltipDivider} />
-              <div className={styles.metricTooltipLine}>
-                <strong style={{ color: "#0f766e" }}>+{fmt(sugestaoSTooltip.transitTotal)} em trânsito</strong>
+              <div className={styles.metricTooltipLine} style={{ color: "#0f766e" }}>
+                <strong>+{fmt(sugestaoSTooltip.transitTotal)} em trânsito</strong>
               </div>
               {sugestaoSTooltip.transitDates?.map((label) => (
-                <div key={label} className={styles.metricTooltipLine} style={{ fontSize: 11 }}>
-                  {label}
-                </div>
+                <div key={label} className={styles.metricTooltipLine} style={{ color: "#0d9488", fontSize: 11 }}>{label}</div>
               ))}
             </>
           ) : null}
@@ -3138,50 +3167,47 @@ function ListaLojaItensTable({
       )}
       {sugestaoETooltip && (
         <div className={styles.metricTooltip} style={getTooltipViewportPosition(sugestaoETooltip.x, sugestaoETooltip.y)}>
-          <div className={styles.metricTooltipTitle}>Regra E — Produto zerado com histórico de venda</div>
-          <div className={styles.metricTooltipLine}>Estoque zerado, mas o produto demonstra demanda real. A velocidade é calculada apenas sobre os dias em que havia estoque disponível.</div>
+          <div className={styles.metricTooltipTitle}>E → {fmt(sugestaoETooltip.qtdE)} un</div>
+          <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>Produto zerado — velocidade calculada nos dias em que tinha estoque</div>
           <div className={styles.metricTooltipDivider} />
-          <div className={styles.metricTooltipLine}><strong>Vendas 12 meses:</strong> {fmt(sugestaoETooltip.qtde12m)} un</div>
-          <div className={styles.metricTooltipLine}><strong>Dias com estoque:</strong> {fmt(sugestaoETooltip.diasComEstoquePositivo)} dias</div>
-          <div className={styles.metricTooltipLine}><strong>Dias sem estoque:</strong> {fmt(sugestaoETooltip.diasSemEstoque)} dias</div>
-          <div className={styles.metricTooltipLine}><strong>Meses disponíveis:</strong> {sugestaoETooltip.mesesDisponiveis.toFixed(1)} meses</div>
-          <div className={styles.metricTooltipDivider} />
-          <div className={styles.metricTooltipLine}><strong>Velocidade ajustada:</strong> {sugestaoETooltip.velocidadeAjustada.toFixed(2)} un/mês</div>
-          <div className={styles.metricTooltipLine} style={{ fontSize: 11 }}>
-            = {fmt(sugestaoETooltip.qtde12m)} un ÷ {sugestaoETooltip.mesesDisponiveis.toFixed(1)} meses
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span>Velocidade</span><span><strong>{sugestaoETooltip.velocidadeAjustada.toFixed(1)} un/mês</strong></span>
           </div>
-          <div className={styles.metricTooltipLine}><strong>Cobertura alvo:</strong> {sugestaoETooltip.limiteDias} dias</div>
-          <div className={styles.metricTooltipDivider} />
-          {sugestaoETooltip.nmExtraQty ? (
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span style={{ fontSize: 11, color: "#64748b" }}>Base</span><span style={{ fontSize: 11 }}>{fmt(sugestaoETooltip.qtde12m)} un em {fmt(sugestaoETooltip.diasComEstoquePositivo)} dias c/ estoque</span>
+          </div>
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span style={{ fontSize: 11, color: "#64748b" }}>Sem estoque</span><span style={{ fontSize: 11 }}>{fmt(sugestaoETooltip.diasSemEstoque)} dias</span>
+          </div>
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span>Alvo</span><span>{sugestaoETooltip.limiteDias} dias</span>
+          </div>
+          {sugestaoETooltip.distribuicao && sugestaoETooltip.distribuicao.length > 0 ? (
             <>
-              <div className={styles.metricTooltipLine}><strong>Base da regra E:</strong> {fmt(sugestaoETooltip.baseQty ?? 0)} un</div>
-              <div className={styles.metricTooltipLine}><strong>NM total da rede:</strong> {fmt((sugestaoETooltip.baseQty ?? 0) + sugestaoETooltip.nmExtraQty)} un</div>
-              <div className={styles.metricTooltipLine}><strong>Complemento NM:</strong> +{fmt(sugestaoETooltip.nmExtraQty)} un</div>
-              <div className={styles.metricTooltipLine} style={{ fontSize: 11 }}>
-                NM: estoque zerado com ≥3 vendas e velocidade ≥0,5 un/mês → reserva mínima de 1 un.
-              </div>
-              {sugestaoETooltip.nmFiliais && sugestaoETooltip.nmFiliais.length > 0 ? (
-                <div className={styles.metricTooltipLine} style={{ fontSize: 11 }}>
-                  <strong>NM por filial:</strong> {formatNecessidadeMinimaFiliaisDescription(sugestaoETooltip.nmFiliais)}
-                </div>
-              ) : null}
               <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Por loja (proporcional)</div>
+              {(() => {
+                const totalVendas = sugestaoETooltip.distribuicao.reduce((s, f) => s + (f.qtde12m ?? 0), 0);
+                return sugestaoETooltip.distribuicao.map((f) => (
+                  <div key={f.label} className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                    <span>{f.label}</span>
+                    <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      {totalVendas > 0 && <span style={{ fontSize: 11, color: "#64748b" }}>[{f.qtde12m ?? 0}/{totalVendas}]</span>}
+                      <strong>{fmt(f.qtd)} un</strong>
+                    </span>
+                  </div>
+                ));
+              })()}
             </>
           ) : null}
-          <div className={styles.metricTooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoETooltip.qtdE)} un</div>
-          <div className={styles.metricTooltipLine} style={{ fontSize: 11 }}>
-            = ⌈{sugestaoETooltip.velocidadeAjustada.toFixed(2)} × {(sugestaoETooltip.limiteDias / 30).toFixed(1)}⌉ = {fmt(sugestaoETooltip.qtdE)}
-          </div>
           {sugestaoETooltip.transitTotal ? (
             <>
               <div className={styles.metricTooltipDivider} />
-              <div className={styles.metricTooltipLine}>
-                <strong style={{ color: "#0f766e" }}>+{fmt(sugestaoETooltip.transitTotal)} em trânsito</strong>
+              <div className={styles.metricTooltipLine} style={{ color: "#0f766e" }}>
+                <strong>+{fmt(sugestaoETooltip.transitTotal)} em trânsito</strong>
               </div>
               {sugestaoETooltip.transitDates?.map((label) => (
-                <div key={label} className={styles.metricTooltipLine} style={{ fontSize: 11 }}>
-                  {label}
-                </div>
+                <div key={label} className={styles.metricTooltipLine} style={{ color: "#0d9488", fontSize: 11 }}>{label}</div>
               ))}
             </>
           ) : null}
@@ -3189,33 +3215,26 @@ function ListaLojaItensTable({
       )}
       {nmTooltipAgregado && (
         <div className={styles.metricTooltip} style={getTooltipViewportPosition(nmTooltipAgregado.x, nmTooltipAgregado.y)}>
-          <div className={styles.metricTooltipTitle}>Necessidade Mínima por filial</div>
-          {!nmTooltipAgregado.comCompra && nmTooltipAgregado.limiteDias != null && (
-            <div className={styles.metricTooltipLine} style={{ color: "#22c55e", fontSize: 11 }}>
-              ✓ Rede com quantidade suficiente pela regra de {nmTooltipAgregado.limiteDias} dias
-              {nmTooltipAgregado.duracaoAtual != null && nmTooltipAgregado.duracaoAtual > 0
-                ? ` (duração atual: ${Math.round(nmTooltipAgregado.duracaoAtual)} dias)`
-                : ""}
-            </div>
-          )}
+          <div className={styles.metricTooltipTitle}>NM → {nmTooltipAgregado.total} un</div>
           {nmTooltipAgregado.comCompra && (
-            <div className={styles.metricTooltipLine} style={{ color: "#64748b", fontSize: 11 }}>
-              A sugestão de compra cobre a rede. As filiais abaixo têm estoque zerado e precisam de prioridade na reposição.
-            </div>
+            <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>Complemento à sugestão principal — filiais zeradas com demanda</div>
+          )}
+          {!nmTooltipAgregado.comCompra && (
+            <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>Filiais zeradas com demanda, sem outros motivos de compra</div>
           )}
           <div className={styles.metricTooltipDivider} />
-          <div className={styles.metricTooltipLine} style={{ fontSize: 11 }}>
-            Filiais com estoque zerado, ≥3 vendas em 12 meses e velocidade ≥0,5 un/mês:
-          </div>
           {nmTooltipAgregado.filiais.map((filial) => (
-            <div key={filial.filial} className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 24 }}>
+            <div key={filial.filial} className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
               <span>{filial.filial}</span>
-              <span style={{ fontWeight: 600 }}>{fmt(filial.qtd)} un</span>
+              <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span style={{ fontSize: 11, color: "#64748b" }}>⌈{filial.qtde12m}/12⌉</span>
+                <strong>{fmt(filial.qtd)} un</strong>
+              </span>
             </div>
           ))}
           <div className={styles.metricTooltipDivider} />
           <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 24 }}>
-            <strong>Total NM</strong>
+            <strong>Total</strong>
             <strong>{nmTooltipAgregado.total} un</strong>
           </div>
         </div>

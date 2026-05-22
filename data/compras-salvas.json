@@ -874,5 +874,27 @@
     "comprada": false,
     "savedAt": "2026-05-18T17:41:17.404Z",
     "updatedAt": "2026-05-18T17:54:46.632Z"
+  },
+  {
+    "id": "4b52b47b-9349-4d61-a097-5e50a79506c7",
+    "companyKey": "nerd",
+    "sourceContextKey": "lista-loja:nerd:__TODAS__:novo",
+    "title": "[Lista Loja] TODAS (visão geral) 22/05/2026 13:30 · andre.sabetta",
+    "expandirPorCor": true,
+    "items": [
+      {
+        "itemKey": "F6.11.17||06",
+        "produto": "F6.11.17",
+        "corProduto": "06",
+        "corDescricao": "PRETO",
+        "descricao": "POWERBANK MAGSAFE 5.000 ULTRA GEONAV",
+        "qtdManual": 11,
+        "custoUnitario": 88.06,
+        "filialOrigem": null
+      }
+    ],
+    "comprada": false,
+    "savedAt": "2026-05-22T16:30:57.746Z",
+    "updatedAt": "2026-05-22T16:30:57.746Z"
   }
 ]
