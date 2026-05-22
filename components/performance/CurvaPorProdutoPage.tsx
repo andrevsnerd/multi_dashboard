@@ -32,6 +32,7 @@ import {
   getNecessidadeMinimaRuleDescription,
   getSuggestionPrincipalBadgeLabel,
 } from "@/lib/utils/necessidade-minima";
+import { getReposicaoCompraView as getSharedReposicaoCompraView } from "@/lib/utils/suggestion-rules";
 import { exportCurvaPorProdutoCsv } from "@/lib/utils/exportCurvaPorProdutoCsv";
 import { exportCurvaPorProdutoXlsx } from "@/lib/utils/exportCurvaPorProdutoXlsx";
 
@@ -46,6 +47,10 @@ type MetricasRow = {
   estoqueFilial: number | null;
   diasDesdeUltimaVenda: number | null;
   mesesHistoricoFilial: number | null;
+  diasComEstoquePositivo: number | null;
+  diasSemEstoque: number | null;
+  mesesDisponiveis: number | null;
+  velocidadeAjustada: number | null;
   totalNmQty: number | null;
   filiaisNM: FilialNecessidadeMinimaInfo[] | null;
 };
@@ -56,6 +61,10 @@ const EMPTY_METRICAS_ROW: MetricasRow = {
   estoqueFilial: null,
   diasDesdeUltimaVenda: null,
   mesesHistoricoFilial: null,
+  diasComEstoquePositivo: null,
+  diasSemEstoque: null,
+  mesesDisponiveis: null,
+  velocidadeAjustada: null,
   totalNmQty: null,
   filiaisNM: null,
 };
@@ -205,32 +214,36 @@ function getReposicaoCompraView(
     qtde12m?: number | null;
     mesesHistoricoFilial?: number | null;
     diasDesdeUltimaVenda?: number | null;
+    diasComEstoquePositivo?: number | null;
+    diasSemEstoque?: number | null;
+    mesesDisponiveis?: number | null;
+    velocidadeAjustada?: number | null;
   },
   diasCorridosMes: number
 ) {
-  const qtdFinal = getSuggestedDelta(item, diasCorridosMes) ?? 0;
-  const vendasMes = Number(item.vendasMesAtual ?? 0);
-  const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
-  const estoqueAtual = Number(item.estoqueFilial ?? 0);
-  const limiteDias = getLimiteDiasReposicao(item);
-  const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
-  const qtdSuficiente = consumoDiario > 0 && duracaoAtual >= limiteDias;
-  const mediaVendasMes = Number(item.qtde12m ?? 0) / getMesesHistoricoFilial(item);
-  const sEligivel = mediaVendasMes >= 1 && estoqueAtual <= mediaVendasMes * 2;
-  const qtdS = sEligivel ? calcQtdSugestaoS(item) : 0;
-
-  if (qtdFinal > 0) {
-    if (qtdS > 0 && qtdFinal < 0.6 * qtdS) {
-      return { qtdFinal: Math.round(0.8 * qtdS + 0.4 * qtdFinal), qtdS: 0, qtdE: 0, qtdNM: 0, qtdSuficiente: false };
-    }
-    return { qtdFinal, qtdS: 0, qtdE: 0, qtdNM: 0, qtdSuficiente: false };
-  }
-  if (qtdSuficiente) return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdNM: 0, qtdSuficiente: true };
-  if (sEligivel && qtdS > 0) return { qtdFinal: 0, qtdS, qtdE: 0, qtdNM: 0, qtdSuficiente: false };
-  const eInfo = calcQtdSugestaoEInfo(item);
-  if (eInfo) return { qtdFinal: 0, qtdS: 0, qtdE: eInfo.qtd, qtdNM: 0, qtdSuficiente: false };
-  const qtdNM = calcNecessidadeMinimaQty({ estoqueAtual, qtde12m: Number(item.qtde12m ?? 0) });
-  return { qtdFinal: 0, qtdS: 0, qtdE: 0, qtdNM, qtdSuficiente: false };
+  const sugestao = getSharedReposicaoCompraView(
+    {
+      qtde12m: item.qtde12m,
+      vendasMesAtual: item.vendasMesAtual,
+      estoqueAtual: item.estoqueFilial,
+      linha: item.linha,
+      subgrupo: item.subgrupo,
+      diasDesdeUltimaVenda: item.diasDesdeUltimaVenda,
+      mesesHistoricoFilial: item.mesesHistoricoFilial,
+      diasComEstoquePositivo: item.diasComEstoquePositivo,
+      diasSemEstoque: item.diasSemEstoque,
+      mesesDisponiveis: item.mesesDisponiveis,
+      velocidadeAjustada: item.velocidadeAjustada,
+    },
+    diasCorridosMes
+  );
+  return {
+    qtdFinal: sugestao.qtdFinal,
+    qtdS: sugestao.qtdS,
+    qtdE: sugestao.qtdE,
+    qtdNM: sugestao.qtdNM,
+    qtdSuficiente: sugestao.qtdSuficiente,
+  };
 }
 
 function getReposicaoBaseType(sugestao: {
@@ -399,6 +412,10 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
                 estoqueFilial: value.resumo.estoqueTotal,
                 diasDesdeUltimaVenda: value.resumo.diasDesdeUltimaVenda,
                 mesesHistoricoFilial: value.resumo.mesesHistoricoFilial,
+                diasComEstoquePositivo: value.resumo.diasComEstoquePositivo,
+                diasSemEstoque: value.resumo.diasSemEstoque,
+                mesesDisponiveis: value.resumo.mesesDisponiveis,
+                velocidadeAjustada: value.resumo.velocidadeAjustada,
                 totalNmQty: filiaisNM.reduce((sum, row) => sum + row.qtd, 0),
                 filiaisNM,
               };
@@ -438,6 +455,10 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
         qtde12m: currentMetric?.qtde12m ?? 0,
         mesesHistoricoFilial: currentMetric?.mesesHistoricoFilial ?? 12,
         diasDesdeUltimaVenda: currentMetric?.diasDesdeUltimaVenda ?? null,
+        diasComEstoquePositivo: currentMetric?.diasComEstoquePositivo ?? null,
+        diasSemEstoque: currentMetric?.diasSemEstoque ?? null,
+        mesesDisponiveis: currentMetric?.mesesDisponiveis ?? null,
+        velocidadeAjustada: currentMetric?.velocidadeAjustada ?? null,
       };
       const sugestao = getReposicaoCompraView(compraItem, diasCorridosMes);
       const baseType = getReposicaoBaseType(sugestao);

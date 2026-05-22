@@ -24,6 +24,11 @@ import {
   calcTotalNecessidadeMinimaPorFilial,
   combineBaseSuggestionWithNecessidadeMinima,
 } from "@/lib/utils/necessidade-minima";
+import {
+  getLimiteDiasReposicao as getSharedLimiteDiasReposicao,
+  getReposicaoCompraView as getSharedReposicaoCompraView,
+  getSuggestedQtyValue as getSharedSuggestedQtyValue,
+} from "@/lib/utils/suggestion-rules";
 
 import styles from "./ProjecaoEstoquePage.module.css";
 
@@ -180,6 +185,10 @@ interface ProdutoSugestaoMin {
   estoqueAtual?: number;
   mesesHistoricoFilial?: number | null;
   diasDesdeUltimaVenda?: number | null;
+  diasComEstoquePositivo?: number | null;
+  diasSemEstoque?: number | null;
+  mesesDisponiveis?: number | null;
+  velocidadeAjustada?: number | null;
   custoUnitario?: number;
 }
 
@@ -226,53 +235,39 @@ type SuggestionResult = {
 };
 
 function getSuggestionListaLojaRule(item: ProdutoSugestaoMin): SuggestionResult {
-  const diasCorridosMes = new Date().getDate();
-  const vendasMes = Number(item.vendasMesAtual ?? 0);
-  const estoqueAtual = Number(item.estoqueAtual ?? 0);
-  if (vendasMes > 0 && diasCorridosMes > 0) {
-    const consumoDiario = vendasMes / diasCorridosMes;
-    if (consumoDiario > 0) {
-      const limiteDias = getLimiteDiasReposicao(item);
-      const duracaoAtual = estoqueAtual / consumoDiario;
-      if (duracaoAtual < limiteDias) {
-        const qty = Math.ceil(consumoDiario * (limiteDias - duracaoAtual));
-        if (qty > 0) return { qty, type: "COMPRA" };
-      }
-      if (duracaoAtual >= limiteDias) return { qty: 0, type: "SUFICIENTE" };
-    }
-  }
+  const sugestao = getSharedReposicaoCompraView(
+    {
+      qtde12m: getQtde12mBaseMin(item),
+      vendasMesAtual: item.vendasMesAtual,
+      estoqueAtual: item.estoqueAtual,
+      linha: item.linha,
+      subgrupo: item.subgrupo,
+      diasDesdeUltimaVenda: item.diasDesdeUltimaVenda,
+      mesesHistoricoFilial: item.mesesHistoricoFilial,
+      diasComEstoquePositivo: (item as ProdutoSugestaoMin & { diasComEstoquePositivo?: number | null }).diasComEstoquePositivo,
+      diasSemEstoque: (item as ProdutoSugestaoMin & { diasSemEstoque?: number | null }).diasSemEstoque,
+      mesesDisponiveis: (item as ProdutoSugestaoMin & { mesesDisponiveis?: number | null }).mesesDisponiveis,
+      velocidadeAjustada: (item as ProdutoSugestaoMin & { velocidadeAjustada?: number | null }).velocidadeAjustada,
+    },
+    new Date().getDate()
+  );
 
-  const mesesHistoricoFilial = getMesesHistoricoFilial(item);
-  const mediaVendasMes = getQtde12mBaseMin(item) / mesesHistoricoFilial;
-  if (mediaVendasMes >= 1 && estoqueAtual <= mediaVendasMes * 2) {
-    const limiteDias = getLimiteDiasReposicao(item);
-    const qty = Math.ceil((limiteDias / 30) * mediaVendasMes);
-    if (qty > 0) return { qty, type: "S", sData: { mediaVendasMes, mesesHistoricoFilial, estoqueAtual, limiteDias } };
-  }
-
-  const diasDesdeUltimaVenda = item.diasDesdeUltimaVenda;
-  if (estoqueAtual <= 0 && diasDesdeUltimaVenda != null && diasDesdeUltimaVenda >= 30) {
-    const qtdeBase = getQtde12mBaseMin(item);
-    if (qtdeBase > 0) {
-      const mesesBase = getMesesHistoricoFilial(item);
-      const mesesSemVenda = diasDesdeUltimaVenda / 30;
-      const mesesAtivos = mesesBase - mesesSemVenda;
-      if (mesesAtivos >= 1) {
-        const velocidadeAjustada = qtdeBase / mesesAtivos;
-        if (velocidadeAjustada >= 0.5) {
-          const limiteDias = getLimiteDiasReposicao(item);
-          const qty = Math.max(1, Math.ceil((limiteDias / 30) * velocidadeAjustada));
-          if (qty > 0) return { qty, type: "E" };
-        }
-      }
-    }
-  }
-
-  // Regra NM: a cada 5 vendas em 12 meses = +1 com estoque zerado
-  const qtdNM = calcNecessidadeMinimaQty({ estoqueAtual, qtde12m: getQtde12mBaseMin(item) });
-  if (qtdNM > 0) return { qty: qtdNM, type: "NM" };
-
-  return { qty: 0, type: "SEM_SUGESTAO" };
+  return {
+    qty: getSharedSuggestedQtyValue(sugestao),
+    type:
+      sugestao.qtdFinal > 0
+        ? "COMPRA"
+        : sugestao.qtdS > 0
+          ? "S"
+          : sugestao.qtdE > 0
+            ? "E"
+            : sugestao.qtdNM > 0
+              ? "NM"
+              : sugestao.qtdSuficiente
+                ? "SUFICIENTE"
+                : "SEM_SUGESTAO",
+    sData: sugestao.sData,
+  };
 }
 
 function applyTransitToProjectionSuggestion(
@@ -319,7 +314,24 @@ function applyTransitToProjectionSuggestion(
 
 /** Mantido para compatibilidade com chamadas que só precisam do número */
 function getSuggestedQtyListaLojaRule(item: ProdutoSugestaoMin): number {
-  return getSuggestionListaLojaRule(item).qty;
+  return getSharedSuggestedQtyValue(
+    getSharedReposicaoCompraView(
+      {
+        qtde12m: getQtde12mBaseMin(item),
+        vendasMesAtual: item.vendasMesAtual,
+        estoqueAtual: item.estoqueAtual,
+        linha: item.linha,
+        subgrupo: item.subgrupo,
+        diasDesdeUltimaVenda: item.diasDesdeUltimaVenda,
+        mesesHistoricoFilial: item.mesesHistoricoFilial,
+        diasComEstoquePositivo: (item as ProdutoSugestaoMin & { diasComEstoquePositivo?: number | null }).diasComEstoquePositivo,
+        diasSemEstoque: (item as ProdutoSugestaoMin & { diasSemEstoque?: number | null }).diasSemEstoque,
+        mesesDisponiveis: (item as ProdutoSugestaoMin & { mesesDisponiveis?: number | null }).mesesDisponiveis,
+        velocidadeAjustada: (item as ProdutoSugestaoMin & { velocidadeAjustada?: number | null }).velocidadeAjustada,
+      },
+      new Date().getDate()
+    )
+  );
 }
 
 /**

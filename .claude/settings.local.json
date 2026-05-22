@@ -66,7 +66,12 @@
       "Bash(node -e \"require.resolve\\('server-only'\\)\")",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\NERD TIJUCA\\\\Documents\\\\NERD - ANDRE\\\\Dashboard NERD\\\\multi-dashboard\" -Directory)",
       "Bash(Select-Object Name)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(grep -v \"-- \\\\|//\")",
+      "Bash(grep -n \"const { \\\\|const {$\\\\|diasComEstoquePositivo\\\\|mesesDisponiveis\\\\|velocidadeAjustada\" components/lista-loja/ListaLojaPage.tsx)",
+      "Bash(grep -n \"const {$\\\\|} = item\" components/lista-loja/ListaLojaPage.tsx)",
+      "Bash(awk 'NR>=1930 && NR<=1960' components/lista-loja/ListaLojaPage.tsx)",
+      "Bash(awk 'NR>=2090 && NR<=2110' components/lista-loja/ListaLojaPage.tsx)"
     ]
   }
 }

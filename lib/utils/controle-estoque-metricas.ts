@@ -20,6 +20,10 @@ export interface ControleEstoqueVendasPorFilialRow {
   diasHistoricoFilial: number;
   mesesHistoricoFilial: number;
   historicoParcial: boolean;
+  diasComEstoquePositivo: number;
+  diasSemEstoque: number;
+  mesesDisponiveis: number;
+  velocidadeAjustada: number;
 }
 
 export interface ControleEstoqueResumoHistorico {
@@ -37,6 +41,10 @@ export interface ControleEstoqueItemMetricasResumo extends ControleEstoqueResumo
   valor12m: number | null;
   custoUnitario: number | null;
   diasDesdeUltimaVenda: number | null;
+  diasComEstoquePositivo: number;
+  diasSemEstoque: number;
+  mesesDisponiveis: number;
+  velocidadeAjustada: number;
 }
 
 export interface ControleEstoqueItemMetricas {
@@ -180,6 +188,30 @@ export function summarizeControleEstoqueItemMetricas(input: {
     valor12m: totalValor > 0 ? Math.round(totalValor) : null,
     custoUnitario: custoUnitario > 0 ? custoUnitario : null,
     diasDesdeUltimaVenda: diasValidos.length > 0 ? Math.min(...diasValidos) : null,
+    diasComEstoquePositivo: vendasPorFilial.reduce(
+      (max, row) => Math.max(max, Number(row.diasComEstoquePositivo ?? 0)),
+      0
+    ),
+    diasSemEstoque: vendasPorFilial.reduce(
+      (min, row) => Math.min(min, Number(row.diasSemEstoque ?? 365)),
+      365
+    ),
+    mesesDisponiveis: Math.max(
+      vendasPorFilial.reduce(
+        (max, row) => Math.max(max, Number(row.mesesDisponiveis ?? 1)),
+        1
+      ),
+      1
+    ),
+    velocidadeAjustada:
+      Math.round(
+        (vendasPorFilial.reduce(
+          (max, row) => Math.max(max, Number(row.velocidadeAjustada ?? 0)),
+          0
+        ) +
+          Number.EPSILON) *
+          100
+      ) / 100,
     ...historico,
   };
 }
@@ -243,6 +275,22 @@ export function mergeControleEstoqueMetricasEntries(
           Number(venda.mesesHistoricoFilial ?? 0)
         );
         current.historicoParcial = Boolean(current.historicoParcial) && Boolean(venda.historicoParcial);
+        current.diasComEstoquePositivo = Math.max(
+          Number(current.diasComEstoquePositivo ?? 0),
+          Number(venda.diasComEstoquePositivo ?? 0)
+        );
+        current.diasSemEstoque = Math.min(
+          Number(current.diasSemEstoque ?? 365),
+          Number(venda.diasSemEstoque ?? 365)
+        );
+        current.mesesDisponiveis = Math.max(
+          Number(current.mesesDisponiveis ?? 1),
+          Number(venda.mesesDisponiveis ?? 1)
+        );
+        current.velocidadeAjustada = Math.max(
+          Number(current.velocidadeAjustada ?? 0),
+          Number(venda.velocidadeAjustada ?? 0)
+        );
       } else {
         vendasPorFilialMap.set(key, {
           filial: normalizeControleEstoqueItemValue(venda.filial),
@@ -256,6 +304,10 @@ export function mergeControleEstoqueMetricasEntries(
           diasHistoricoFilial: Number(venda.diasHistoricoFilial ?? 0),
           mesesHistoricoFilial: Number(venda.mesesHistoricoFilial ?? 0),
           historicoParcial: Boolean(venda.historicoParcial),
+          diasComEstoquePositivo: Number(venda.diasComEstoquePositivo ?? 0),
+          diasSemEstoque: Number(venda.diasSemEstoque ?? 365),
+          mesesDisponiveis: Number(venda.mesesDisponiveis ?? 1),
+          velocidadeAjustada: Number(venda.velocidadeAjustada ?? 0),
         });
       }
     }

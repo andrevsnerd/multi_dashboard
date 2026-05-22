@@ -23,6 +23,13 @@ import {
   calcTotalNecessidadeMinimaPorFilial,
   combineBaseSuggestionWithNecessidadeMinima,
 } from "@/lib/utils/necessidade-minima";
+import {
+  getLimiteDiasReposicao as getSharedLimiteDiasReposicao,
+  getReposicaoBaseType as getSharedReposicaoBaseType,
+  getReposicaoCompraView as getSharedReposicaoCompraView,
+  getSuggestedQtyValue as getSharedSuggestedQtyValue,
+  type SuggestionRuleInput,
+} from "@/lib/utils/suggestion-rules";
 import { fetchControleEstoqueItemMetricasClient } from "@/lib/client/controle-estoque-metricas";
 import {
   buildCompraTransitoIndex,
@@ -116,16 +123,6 @@ function normalizeKey(s?: string | null) {
     .replace(/\p{Diacritic}/gu, "");
 }
 
-function getLimiteDiasReposicao(p: { linha?: string; subgrupo?: string }) {
-  const linha = normalizeKey(p.linha);
-  const subgrupo = normalizeKey(p.subgrupo);
-  if (linha === "INDIA") return 90;
-  if (linha === "ELETRONICOS") return 30;
-  const subgrupos90 = new Set(["CETIM DE SEDA", "MOUSSELINE DE SEDA", "SEDA PREMIUM"]);
-  if (subgrupos90.has(subgrupo)) return 90;
-  return 60;
-}
-
 // Extrai o codFilial do sourceContextKey no formato "lista-loja:{company}:{filial}:{id}"
 function parseListaLojaFilial(sourceContextKey: string): string | null {
   if (!sourceContextKey.startsWith("lista-loja:")) return null;
@@ -135,20 +132,34 @@ function parseListaLojaFilial(sourceContextKey: string): string | null {
   return filialCtx;
 }
 
-interface SugestaoItemInput {
-  vendasMesAtual?: number | null;
-  estoqueFilial?: number | null;
-  qtde12m?: number | null;
-  mesesHistoricoFilial?: number | null;
-  diasDesdeUltimaVenda?: number | null;
-  linha?: string | null;
-  subgrupo?: string | null;
-}
 
-function getMesesHistorico(item: Pick<SugestaoItemInput, "mesesHistoricoFilial">): number {
-  const meses = Number(item.mesesHistoricoFilial ?? 12);
-  if (!Number.isFinite(meses)) return 12;
-  return Math.min(12, Math.max(1, meses));
+function buildSuggestionRuleInput(
+  match: ProdutoSugestao,
+  liveData: {
+    qtde12m: number | null;
+    vendasMesAtual: number | null;
+    estoqueAtual: number | null;
+    diasDesdeUltimaVenda: number | null;
+    mesesHistoricoFilial: number | null;
+    diasComEstoquePositivo: number | null;
+    diasSemEstoque: number | null;
+    mesesDisponiveis: number | null;
+    velocidadeAjustada: number | null;
+  }
+): SuggestionRuleInput {
+  return {
+    qtde12m: liveData.qtde12m,
+    vendasMesAtual: liveData.vendasMesAtual,
+    estoqueAtual: liveData.estoqueAtual,
+    diasDesdeUltimaVenda: liveData.diasDesdeUltimaVenda,
+    mesesHistoricoFilial: liveData.mesesHistoricoFilial,
+    diasComEstoquePositivo: liveData.diasComEstoquePositivo,
+    diasSemEstoque: liveData.diasSemEstoque,
+    mesesDisponiveis: liveData.mesesDisponiveis,
+    velocidadeAjustada: liveData.velocidadeAjustada,
+    linha: match?.linha,
+    subgrupo: match?.subgrupo,
+  };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -163,69 +174,17 @@ function calcularSugestaoCompleto(
     estoqueAtual: number | null;
     diasDesdeUltimaVenda: number | null;
     mesesHistoricoFilial: number | null;
+    diasComEstoquePositivo: number | null;
+    diasSemEstoque: number | null;
+    mesesDisponiveis: number | null;
+    velocidadeAjustada: number | null;
   } | undefined
 ): number | null {
   if (!match) return null;
-  if (liveData === undefined) return null; // aguarda dados live — não usa fallback de match
-  const diasCorridosMes = new Date().getDate();
-  const item: SugestaoItemInput = {
-    vendasMesAtual: liveData.vendasMesAtual,
-    estoqueFilial: liveData.estoqueAtual,
-    qtde12m: liveData.qtde12m,
-    mesesHistoricoFilial: liveData.mesesHistoricoFilial,
-    diasDesdeUltimaVenda: liveData.diasDesdeUltimaVenda,
-    linha: match.linha,   // atributo do produto, não depende de filial
-    subgrupo: match.subgrupo,
-  };
-
-  // Regra Compra: consumo corrente insuficiente para cobrir o período de reposição
-  const vendasMes = Number(item.vendasMesAtual ?? 0);
-  const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
-  const estoqueAtual = Number(item.estoqueFilial ?? 0);
-  const limiteDias = getLimiteDiasReposicao({ linha: item.linha ?? undefined, subgrupo: item.subgrupo ?? undefined });
-  const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
-
-  // Regra S: pré-computa para aplicar blend quando Final < 60% de S
-  const mesesHistorico = getMesesHistorico(item);
-  const mediaVendasMes = Number(item.qtde12m ?? 0) / mesesHistorico;
-  const sEligivel = mediaVendasMes >= 1 && estoqueAtual <= mediaVendasMes * 2;
-  const qtdS = sEligivel ? Math.max(0, Math.ceil((limiteDias / 30) * mediaVendasMes)) : 0;
-
-  if (consumoDiario > 0 && duracaoAtual < limiteDias) {
-    const qtdFinal = Math.ceil(consumoDiario * (limiteDias - duracaoAtual));
-    if (qtdFinal > 0) {
-      if (qtdS > 0 && qtdFinal < 0.6 * qtdS) {
-        return Math.round(0.8 * qtdS + 0.4 * qtdFinal);
-      }
-      return qtdFinal;
-    }
-  }
-
-  const qtdSuficiente = consumoDiario > 0 && duracaoAtual >= limiteDias;
-  if (qtdSuficiente) return null;
-
-  if (qtdS > 0) return qtdS;
-
-  // Regra E: produto parado por falta de estoque (estoque <= 0, dias sem venda >= 30)
-  const qtde12m = Number(item.qtde12m ?? 0);
-  const diasSemVenda = item.diasDesdeUltimaVenda;
-  if (qtde12m > 0 && estoqueAtual <= 0 && diasSemVenda != null && diasSemVenda >= 30) {
-    const mesesSemVenda = diasSemVenda / 30;
-    const mesesAtivos = mesesHistorico - mesesSemVenda;
-    if (mesesAtivos >= 1) {
-      const velocidadeAjustada = qtde12m / mesesAtivos;
-      if (velocidadeAjustada >= 0.5) {
-        const qtdE = Math.max(1, Math.ceil((limiteDias / 30) * velocidadeAjustada));
-        return qtdE;
-      }
-    }
-  }
-
-  // Regra NM: a cada 5 vendas em 12 meses = +1 com estoque zerado
-  const qtdNM = calcNecessidadeMinimaQty({ estoqueAtual, qtde12m });
-  if (qtdNM > 0) return qtdNM;
-
-  return null;
+  if (liveData === undefined) return null;
+  const sugestao = getSharedReposicaoCompraView(buildSuggestionRuleInput(match, liveData), new Date().getDate());
+  const qty = getSharedSuggestedQtyValue(sugestao);
+  return qty > 0 ? qty : null;
 }
 
 function calcularSugestaoCompletoComTransito(
@@ -236,6 +195,10 @@ function calcularSugestaoCompletoComTransito(
     estoqueAtual: number | null;
     diasDesdeUltimaVenda: number | null;
     mesesHistoricoFilial: number | null;
+    diasComEstoquePositivo: number | null;
+    diasSemEstoque: number | null;
+    mesesDisponiveis: number | null;
+    velocidadeAjustada: number | null;
     totalNmQty: number | null;
   } | undefined,
   comprasTransitoIndex: CompraTransitoIndex
@@ -244,92 +207,47 @@ function calcularSugestaoCompletoComTransito(
     return { qty: null, transitTotal: 0, transitDates: [] };
   }
 
-  const diasCorridosMes = new Date().getDate();
-  const item: SugestaoItemInput = {
-    vendasMesAtual: liveData.vendasMesAtual,
-    estoqueFilial: liveData.estoqueAtual,
-    qtde12m: liveData.qtde12m,
-    mesesHistoricoFilial: liveData.mesesHistoricoFilial,
-    diasDesdeUltimaVenda: liveData.diasDesdeUltimaVenda,
-    linha: match.linha,
-    subgrupo: match.subgrupo,
-  };
+  {
+    const diasCorridosMes = new Date().getDate();
+    const suggestionInput = buildSuggestionRuleInput(match, liveData);
+    const sugestaoBase = getSharedReposicaoCompraView(suggestionInput, diasCorridosMes);
+    const baseType = getSharedReposicaoBaseType(sugestaoBase);
+    const baseQty = getSharedSuggestedQtyValue(sugestaoBase);
+    const limiteDias = getSharedLimiteDiasReposicao({
+      linha: match.linha ?? undefined,
+      subgrupo: match.subgrupo ?? undefined,
+    });
+    const qtdNM = calcNecessidadeMinimaQty({
+      estoqueAtual: liveData.estoqueAtual,
+      qtde12m: liveData.qtde12m,
+      velocidadeAjustada: liveData.velocidadeAjustada,
+      mesesDisponiveis: liveData.mesesDisponiveis,
+      diasComEstoquePositivo: liveData.diasComEstoquePositivo,
+    });
+    const combined = combineBaseSuggestionWithNecessidadeMinima({
+      baseType,
+      baseQty,
+      totalNmQty: liveData.totalNmQty ?? qtdNM,
+    });
 
-  const vendasMes = Number(item.vendasMesAtual ?? 0);
-  const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
-  const estoqueAtual = Number(item.estoqueFilial ?? 0);
-  const limiteDias = getLimiteDiasReposicao({ linha: item.linha ?? undefined, subgrupo: item.subgrupo ?? undefined });
-  const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
-  const mesesHistorico = getMesesHistorico(item);
-  const mediaVendasMes = Number(item.qtde12m ?? 0) / mesesHistorico;
-  const sEligivel = mediaVendasMes >= 1 && estoqueAtual <= mediaVendasMes * 2;
-  const qtdS = sEligivel ? Math.max(0, Math.ceil((limiteDias / 30) * mediaVendasMes)) : 0;
+    const transit = applyTransitToSuggestion({
+      baseType: combined.effectiveType,
+      baseQty: combined.totalQty,
+    entries: getCompraTransitoEntries(comprasTransitoIndex, match?.produto ?? "", match?.cor ?? null),
+      estoqueAtual: liveData.estoqueAtual,
+      vendasMesAtual: liveData.vendasMesAtual,
+      diasCorridosMes,
+      limiteDias,
+    });
 
-  let baseType: "COMPRA" | "S" | "E" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO" = "SEM_SUGESTAO";
-  let baseQty = 0;
-
-  if (consumoDiario > 0 && duracaoAtual < limiteDias) {
-    const qtdFinal = Math.ceil(consumoDiario * (limiteDias - duracaoAtual));
-    if (qtdFinal > 0) {
-      baseType = "COMPRA";
-      baseQty = qtdS > 0 && qtdFinal < 0.6 * qtdS
-        ? Math.round(0.8 * qtdS + 0.4 * qtdFinal)
-        : qtdFinal;
-    }
+    return {
+      qty: transit.qty > 0 ? transit.qty : null,
+      transitTotal: transit.totalTransit,
+      transitDates: transit.entries.map(
+        (entry) => `${new Date(`${entry.dataRecebimento}T00:00:00`).toLocaleDateString("pt-BR")} (+${fmt(entry.quantidade)})`
+      ),
+    };
   }
-
-  if (baseQty <= 0 && consumoDiario > 0 && duracaoAtual >= limiteDias) {
-    baseType = "SUFICIENTE";
-  }
-
-  if (baseQty <= 0 && qtdS > 0) {
-    baseType = "S";
-    baseQty = qtdS;
-  }
-
-  const qtde12m = Number(item.qtde12m ?? 0);
-  const diasSemVenda = item.diasDesdeUltimaVenda;
-  if (baseQty <= 0 && qtde12m > 0 && estoqueAtual <= 0 && diasSemVenda != null && diasSemVenda >= 30) {
-    const mesesSemVenda = diasSemVenda / 30;
-    const mesesAtivos = mesesHistorico - mesesSemVenda;
-    if (mesesAtivos >= 1) {
-      const velocidadeAjustada = qtde12m / mesesAtivos;
-      if (velocidadeAjustada >= 0.5) {
-        baseType = "E";
-        baseQty = Math.max(1, Math.ceil((limiteDias / 30) * velocidadeAjustada));
-      }
-    }
-  }
-
-  // Regra NM: a cada 5 vendas em 12 meses = +1 com estoque zerado
-  const qtdNM = calcNecessidadeMinimaQty({ estoqueAtual, qtde12m });
-  if (baseQty <= 0 && qtdNM > 0) {
-    baseType = "NM";
-    baseQty = qtdNM;
-  }
-  const combined = combineBaseSuggestionWithNecessidadeMinima({
-    baseType,
-    baseQty,
-    totalNmQty: liveData.totalNmQty ?? qtdNM,
-  });
-
-  const transit = applyTransitToSuggestion({
-    baseType: combined.effectiveType,
-    baseQty: combined.totalQty,
-    entries: getCompraTransitoEntries(comprasTransitoIndex, match.produto, match.cor ?? null),
-    estoqueAtual: liveData.estoqueAtual,
-    vendasMesAtual: liveData.vendasMesAtual,
-    diasCorridosMes,
-    limiteDias,
-  });
-
-  return {
-    qty: transit.qty > 0 ? transit.qty : null,
-    transitTotal: transit.totalTransit,
-    transitDates: transit.entries.map(
-      (entry) => `${new Date(`${entry.dataRecebimento}T00:00:00`).toLocaleDateString("pt-BR")} (+${fmt(entry.quantidade)})`
-    ),
-  };
 }
 
 const DESTINO_FILIAL_BADGE_THEMES = [
@@ -514,6 +432,10 @@ async function fetchVendasItemMetricas(params: URLSearchParams): Promise<{
   vendasMesAtual: number;
   diasDesdeUltimaVenda: number | null;
   mesesHistoricoFilial: number | null;
+  diasComEstoquePositivo: number | null;
+  diasSemEstoque: number | null;
+  mesesDisponiveis: number | null;
+  velocidadeAjustada: number | null;
   totalNmQty: number;
 } | null> {
   const metricas = await fetchItemMetricas(params);
@@ -524,6 +446,10 @@ async function fetchVendasItemMetricas(params: URLSearchParams): Promise<{
     vendasMesAtual: metricas.resumo.vendasMesAtual,
     diasDesdeUltimaVenda: metricas.resumo.diasDesdeUltimaVenda,
     mesesHistoricoFilial: metricas.resumo.mesesHistoricoFilial,
+    diasComEstoquePositivo: metricas.resumo.diasComEstoquePositivo,
+    diasSemEstoque: metricas.resumo.diasSemEstoque,
+    mesesDisponiveis: metricas.resumo.mesesDisponiveis,
+    velocidadeAjustada: metricas.resumo.velocidadeAjustada,
     totalNmQty: calcTotalNecessidadeMinimaPorFilial({
       company: resolveCompany(params.get("company") ?? undefined),
       vendasPorFilial: metricas.vendasPorFilial,
@@ -569,7 +495,18 @@ export default function CompraSalvaDetalhePage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [listaRows, setListaRows] = useState<ProdutoSugestao[]>([]);
-  const [liveMetrics, setLiveMetrics] = useState<Record<string, { qtde12m: number | null; vendasMesAtual: number | null; estoqueAtual: number | null; diasDesdeUltimaVenda: number | null; mesesHistoricoFilial: number | null; totalNmQty: number | null }>>({});
+  const [liveMetrics, setLiveMetrics] = useState<Record<string, {
+    qtde12m: number | null;
+    vendasMesAtual: number | null;
+    estoqueAtual: number | null;
+    diasDesdeUltimaVenda: number | null;
+    mesesHistoricoFilial: number | null;
+    diasComEstoquePositivo: number | null;
+    diasSemEstoque: number | null;
+    mesesDisponiveis: number | null;
+    velocidadeAjustada: number | null;
+    totalNmQty: number | null;
+  }>>({});
   const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
   const [estoquePorFilialCache, setEstoquePorFilialCache] = useState<
     Record<string, Array<{ filial: string; estoque: number }>>
@@ -765,6 +702,10 @@ export default function CompraSalvaDetalhePage({
             estoqueAtual: estoque,
             diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
             mesesHistoricoFilial: vendas?.mesesHistoricoFilial ?? null,
+            diasComEstoquePositivo: vendas?.diasComEstoquePositivo ?? null,
+            diasSemEstoque: vendas?.diasSemEstoque ?? null,
+            mesesDisponiveis: vendas?.mesesDisponiveis ?? null,
+            velocidadeAjustada: vendas?.velocidadeAjustada ?? null,
             totalNmQty: vendas?.totalNmQty ?? null,
           },
         };

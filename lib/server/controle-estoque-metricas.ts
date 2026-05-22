@@ -134,7 +134,7 @@ async function loadControleEstoqueItemMetricas(input: {
   const corProduto = normalizeControleEstoqueItemValue(input.item.corProduto) || null;
   const estoqueFilialScope = await resolveEstoqueFilialScope(input.company, input.filial ?? null);
 
-  const [estoquePorFilial, vendasPorFilialRaw] = await Promise.all([
+  const [estoquePorFilial, vendasPorFilialResult] = await Promise.all([
     fetchEstoqueProdutoPorFilial({
       company: input.company,
       filial: estoqueFilialScope,
@@ -149,6 +149,7 @@ async function loadControleEstoqueItemMetricas(input: {
       includeHistoricoRows: Boolean(input.includeHistorico),
     }),
   ]);
+  const vendasPorFilialRaw = vendasPorFilialResult.rows;
 
   const vendasPorFilial = vendasPorFilialRaw.map((row) => ({
     filial: row.filial,
@@ -164,7 +165,16 @@ async function loadControleEstoqueItemMetricas(input: {
     diasHistoricoFilial: Number(row.diasHistoricoFilial ?? 365),
     mesesHistoricoFilial: Number(row.mesesHistoricoFilial ?? 12),
     historicoParcial: Boolean(row.historicoParcial),
+    diasComEstoquePositivo: Number(row.diasComEstoquePositivo ?? 0),
+    diasSemEstoque: Number(row.diasSemEstoque ?? 365),
+    mesesDisponiveis: Number(row.mesesDisponiveis ?? 1),
+    velocidadeAjustada: Number(row.velocidadeAjustada ?? 0),
   }));
+
+  const resumo = summarizeControleEstoqueItemMetricas({
+    estoquePorFilial,
+    vendasPorFilial,
+  });
 
   return {
     item: { produto, corProduto },
@@ -173,10 +183,13 @@ async function loadControleEstoqueItemMetricas(input: {
       estoque: Number(row.estoque ?? 0),
     })),
     vendasPorFilial,
-    resumo: summarizeControleEstoqueItemMetricas({
-      estoquePorFilial,
-      vendasPorFilial,
-    }),
+    resumo: {
+      ...resumo,
+      diasComEstoquePositivo: Number(vendasPorFilialResult.resumoDisponibilidade.diasComEstoquePositivo ?? 0),
+      diasSemEstoque: Number(vendasPorFilialResult.resumoDisponibilidade.diasSemEstoque ?? 365),
+      mesesDisponiveis: Number(vendasPorFilialResult.resumoDisponibilidade.mesesDisponiveis ?? 1),
+      velocidadeAjustada: Number(vendasPorFilialResult.resumoDisponibilidade.velocidadeAjustada ?? 0),
+    },
   };
 }
 

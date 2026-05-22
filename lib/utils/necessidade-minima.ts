@@ -4,20 +4,18 @@ import {
   aggregateVendasPorFilialByDisplayLabel,
   normalizeFilialLookupKey,
 } from "@/lib/config/company";
+import { calcNecessidadeMinimaQtyAdjusted } from "@/lib/utils/suggestion-rules";
 
 export const NECESSIDADE_MINIMA_VENDAS_STEP = 5;
 
 export function calcNecessidadeMinimaQty(input: {
   estoqueAtual?: number | null;
   qtde12m?: number | null;
+  velocidadeAjustada?: number | null;
+  mesesDisponiveis?: number | null;
+  diasComEstoquePositivo?: number | null;
 }): number {
-  const estoqueAtual = Number(input.estoqueAtual ?? 0);
-  if (estoqueAtual > 0) return 0;
-
-  const qtde12m = Math.floor(Number(input.qtde12m ?? 0));
-  if (!Number.isFinite(qtde12m) || qtde12m <= 0) return 0;
-
-  return Math.floor(qtde12m / NECESSIDADE_MINIMA_VENDAS_STEP);
+  return calcNecessidadeMinimaQtyAdjusted(input);
 }
 
 export type SuggestionBaseType = "COMPRA" | "S" | "E" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
@@ -30,7 +28,14 @@ export type FilialNecessidadeMinimaInfo = {
 
 export function calcNecessidadeMinimaPorFilial(input: {
   company: CompanyConfig | null | undefined;
-  vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number }>;
+  vendasPorFilial: Array<{
+    filial: string;
+    qtde12m: number;
+    qtde60d?: number;
+    velocidadeAjustada?: number | null;
+    mesesDisponiveis?: number | null;
+    diasComEstoquePositivo?: number | null;
+  }>;
   estoquePorFilial: Array<{ filial: string; estoque: number }>;
 }): FilialNecessidadeMinimaInfo[] {
   const vendasAgregadas = aggregateVendasPorFilialByDisplayLabel(
@@ -47,13 +52,28 @@ export function calcNecessidadeMinimaPorFilial(input: {
       Number(row.estoque ?? 0),
     ])
   );
+  const vendasInfoMap = new Map(
+    input.vendasPorFilial.map((row) => [
+      normalizeFilialLookupKey(row.filial),
+      {
+        velocidadeAjustada: row.velocidadeAjustada,
+        mesesDisponiveis: row.mesesDisponiveis,
+        diasComEstoquePositivo: row.diasComEstoquePositivo,
+      },
+    ])
+  );
 
   return vendasAgregadas
     .map((row) => {
-      const estoqueAtual = estoqueMap.get(normalizeFilialLookupKey(row.filial)) ?? 0;
+      const filialKey = normalizeFilialLookupKey(row.filial);
+      const estoqueAtual = estoqueMap.get(filialKey) ?? 0;
+      const vendasInfo = vendasInfoMap.get(filialKey);
       const qtd = calcNecessidadeMinimaQty({
         estoqueAtual,
         qtde12m: row.qtde12m,
+        velocidadeAjustada: vendasInfo?.velocidadeAjustada,
+        mesesDisponiveis: vendasInfo?.mesesDisponiveis,
+        diasComEstoquePositivo: vendasInfo?.diasComEstoquePositivo,
       });
       return qtd > 0 ? { filial: row.filial, qtd, qtde12m: Number(row.qtde12m ?? 0) } : null;
     })
@@ -62,7 +82,14 @@ export function calcNecessidadeMinimaPorFilial(input: {
 
 export function calcTotalNecessidadeMinimaPorFilial(input: {
   company: CompanyConfig | null | undefined;
-  vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number }>;
+  vendasPorFilial: Array<{
+    filial: string;
+    qtde12m: number;
+    qtde60d?: number;
+    velocidadeAjustada?: number | null;
+    mesesDisponiveis?: number | null;
+    diasComEstoquePositivo?: number | null;
+  }>;
   estoquePorFilial: Array<{ filial: string; estoque: number }>;
 }): number {
   return calcNecessidadeMinimaPorFilial(input).reduce((sum, row) => sum + row.qtd, 0);
@@ -107,7 +134,7 @@ export function getSuggestionPrincipalBadgeLabel(type: SuggestionBaseType): stri
 }
 
 export function getNecessidadeMinimaRuleDescription(): string {
-  return "NM: estoque zerado e 1 unidade a cada 5 vendas nos últimos 12 meses.";
+  return "NM: estoque zerado, minimo de 3 vendas em 12 meses e velocidade ajustada de pelo menos 0,5 un./mes. Sugestao fixa de 1 unidade.";
 }
 
 export function formatNecessidadeMinimaFiliaisDescription(
@@ -140,7 +167,9 @@ export function getCombinedNecessidadeMinimaTooltip(input: {
           ? "regra E"
           : "regra NM";
 
-  const nmTotal = Math.max(0, Math.round(Number(input.baseQty ?? 0))) + Math.max(0, Math.round(Number(input.nmExtraQty ?? 0)));
+  const nmTotal =
+    Math.max(0, Math.round(Number(input.baseQty ?? 0))) +
+    Math.max(0, Math.round(Number(input.nmExtraQty ?? 0)));
   const filiaisText = formatNecessidadeMinimaFiliaisDescription(input.filiais);
-  return `Sugestão final = ${principalLabel} (${input.baseQty}) + NM não coberta (+${input.nmExtraQty}) = ${input.totalQty}. NM total da rede: ${nmTotal}. ${getNecessidadeMinimaRuleDescription()}${filiaisText ? ` Detalhe por filial: ${filiaisText}.` : ""}`;
+  return `Sugestao final = ${principalLabel} (${input.baseQty}) + NM nao coberta (+${input.nmExtraQty}) = ${input.totalQty}. NM total da rede: ${nmTotal}. ${getNecessidadeMinimaRuleDescription()}${filiaisText ? ` Detalhe por filial: ${filiaisText}.` : ""}`;
 }

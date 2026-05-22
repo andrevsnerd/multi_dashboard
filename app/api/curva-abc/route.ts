@@ -138,7 +138,8 @@ export async function GET(request: Request) {
       scarfme: ['SCARF ME - MATRIZ'],
       nerd: ['NERD'],
     };
-    const matrizSet = new Set(matrizFiliais[companyKey] ?? []);
+    const matrizList = matrizFiliais[companyKey] ?? [];
+    const matrizSet = new Set(matrizList);
     const filiais = company.filialFilters.sales.filter(f => !matrizSet.has(f));
 
     // Resolve canonical filial groups
@@ -165,6 +166,12 @@ export async function GET(request: Request) {
       });
       memberToCanonical.set(normalizeFilialKey(canonical), canonical);
     }
+    // Matriz filiais must resolve to themselves — prevents prefix matching from
+    // incorrectly assigning 'NERD' to the 'NERD MORUMBI' group and filtering it out.
+    matrizList.forEach(f => {
+      const norm = normalizeFilialKey(f);
+      if (!memberToCanonical.has(norm)) memberToCanonical.set(norm, f);
+    });
     const canonicalToMemberNorms = Array.from(canonicalToMembers.entries()).map(([canonical, members]) => ({
       canonical,
       members: Array.from(new Set([canonical, ...members])).map(normalizeFilialKey),
@@ -315,7 +322,7 @@ export async function GET(request: Request) {
           fetchProdutoQtdePorFilial(companyKey, allPosMembers, allEcomMembers, resolvedRange, {
             groupByCor: porCor,
           }),
-          fetchProdutoEstoquePorFilial(companyKey, allPosMembers, allEcomMembers, { groupByCor: porCor }),
+          fetchProdutoEstoquePorFilial(companyKey, [...allPosMembers, ...matrizList], allEcomMembers, { groupByCor: porCor }),
         ]);
         produtos = aggregateFilialProdutoSalesWithGroups(produtos, groupedProducts, { groupByCor: porCor });
         qtdePorFilialRows = aggregateProdutoQtdePorFilialWithGroups(qtdePorFilialRows, groupedProducts, {
@@ -455,7 +462,7 @@ export async function GET(request: Request) {
           groupByCor: porCor,
         }),
         fetchProdutoEstoquePorFilial(companyKey, posMembers, ecomMembers, { groupByCor: porCor }),
-        fetchProdutoEstoquePorFilial(companyKey, allPosMembers, allEcomMembers, { groupByCor: porCor }),
+        fetchProdutoEstoquePorFilial(companyKey, [...allPosMembers, ...matrizList], allEcomMembers, { groupByCor: porCor }),
       ]);
       produtos = aggregateFilialProdutoSalesWithGroups(produtos, groupedProducts, { groupByCor: porCor });
       estoquePorFilialRows = aggregateProdutoEstoquePorFilialWithGroups(estoquePorFilialRows, groupedProducts, {

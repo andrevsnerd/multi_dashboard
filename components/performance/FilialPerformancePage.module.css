@@ -927,16 +927,15 @@
   bottom: calc(100% + 10px);
   right: 0;
   left: auto;
-  background: #0f172a;
-  color: #e2e8f0;
+  background: #ffffff;
+  color: #1e293b;
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 10px 14px;
   font-size: 12px;
   line-height: 1.35;
   z-index: 500;
-  box-shadow:
-    0 12px 32px rgba(15, 23, 42, 0.35),
-    0 0 0 1px rgba(148, 163, 184, 0.12);
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.13);
   pointer-events: auto;
   min-width: 188px;
   max-width: min(300px, calc(100vw - 24px));
@@ -950,7 +949,7 @@
   right: 14px;
   margin-top: -1px;
   border: 6px solid transparent;
-  border-top-color: #0f172a;
+  border-top-color: #e2e8f0;
 }
 
 .qtdeTooltipWrapper:hover .qtdeTooltipContent {
@@ -987,16 +986,15 @@
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  background: #0f172a;
-  color: #e2e8f0;
+  background: #ffffff;
+  color: #1e293b;
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 10px 14px;
   font-size: 12px;
   line-height: 1.4;
   z-index: 500;
-  box-shadow:
-    0 12px 32px rgba(15, 23, 42, 0.35),
-    0 0 0 1px rgba(148, 163, 184, 0.12);
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.13);
   pointer-events: none;
   min-width: 220px;
   max-width: min(360px, calc(100vw - 24px));
@@ -1164,13 +1162,13 @@
 
 .groupedTooltipMemberName {
   font-size: 12px;
-  color: #e2e8f0;
+  color: #1e293b;
   font-weight: 500;
 }
 
 .groupedTooltipMemberCode {
   font-size: 10px;
-  color: #64748b;
+  color: #94a3b8;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1179,10 +1177,10 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #94a3b8;
+  color: #64748b;
   margin-bottom: 8px;
   padding-bottom: 6px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .tooltipRow {
@@ -1191,7 +1189,7 @@
   align-items: baseline;
   gap: 16px;
   padding: 5px 0;
-  border-bottom: 1px solid rgba(51, 65, 85, 0.85);
+  border-bottom: 1px solid #f1f5f9;
 }
 
 .tooltipRow:last-child {
@@ -1199,7 +1197,7 @@
 }
 
 .tooltipFilial {
-  color: #cbd5e1;
+  color: #334155;
   font-weight: 500;
   flex: 1;
   min-width: 0;
@@ -1221,11 +1219,11 @@
   flex-shrink: 0;
   font-size: 10px;
   font-weight: 500;
-  color: rgba(148, 163, 184, 0.72);
+  color: #94a3b8;
 }
 
 .tooltipQtde {
-  color: #f1f5f9;
+  color: #0f172a;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
@@ -1358,35 +1356,36 @@
   z-index: 2000;
   min-width: 260px;
   max-width: 360px;
-  background: #0f172a;
-  color: #f8fafc;
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: #ffffff;
+  color: #1e293b;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 10px 12px;
-  box-shadow: 0 14px 40px rgba(2, 6, 23, 0.4);
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.13);
   pointer-events: none;
 }
 
 .metricTooltipTitle {
   font-size: 13px;
   font-weight: 800;
+  color: #0f172a;
   margin-bottom: 6px;
 }
 
 .metricTooltipMeta {
   font-size: 12px;
-  color: #cbd5e1;
+  color: #64748b;
 }
 
 .metricTooltipDivider {
   height: 1px;
-  background: rgba(148, 163, 184, 0.3);
+  background: #e2e8f0;
   margin: 7px 0;
 }
 
 .metricTooltipLine {
   font-size: 12px;
-  color: #e2e8f0;
+  color: #334155;
 }
 
 .metricTooltipRow {
@@ -1395,7 +1394,7 @@
   justify-content: space-between;
   gap: 12px;
   font-size: 12px;
-  color: #e2e8f0;
+  color: #334155;
   margin-top: 3px;
 }
 
@@ -1405,9 +1404,10 @@
   justify-content: space-between;
   margin-top: 8px;
   padding-top: 6px;
-  border-top: 1px dashed rgba(148, 163, 184, 0.45);
+  border-top: 1px dashed #cbd5e1;
   font-size: 12px;
   font-weight: 700;
+  color: #0f172a;
 }
 
 .metricTooltipInlineBadge {

@@ -6377,7 +6377,31 @@ export async function fetchVendasProdutoPorFilial({
   produto: string;
   corProduto?: string | null;
   includeHistoricoRows?: boolean;
-}): Promise<Array<{ filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number; valor12m: number; custoUnitario: number; diasDesdeUltimaVenda: number | null; primeiraEntradaFilial: Date | null; diasHistoricoFilial: number; mesesHistoricoFilial: number; historicoParcial: boolean }>> {
+}): Promise<{
+  rows: Array<{
+    filial: string;
+    qtde12m: number;
+    qtde60d: number;
+    qtdeMesAtual: number;
+    valor12m: number;
+    custoUnitario: number;
+    diasDesdeUltimaVenda: number | null;
+    primeiraEntradaFilial: Date | null;
+    diasHistoricoFilial: number;
+    mesesHistoricoFilial: number;
+    historicoParcial: boolean;
+    diasComEstoquePositivo: number;
+    diasSemEstoque: number;
+    mesesDisponiveis: number;
+    velocidadeAjustada: number;
+  }>;
+  resumoDisponibilidade: {
+    diasComEstoquePositivo: number;
+    diasSemEstoque: number;
+    mesesDisponiveis: number;
+    velocidadeAjustada: number;
+  };
+}> {
   return withRequest(async (request) => {
     const filialSel = filial ?? null;
     const now = new Date();
@@ -6769,6 +6793,242 @@ export async function fetchVendasProdutoPorFilial({
       };
     };
 
+    const estoqueDisponibilidadeFilialFilter = buildFilialFilter(request, company, filialSel, 'EA');
+    const saidaEstoqueFilialFilter = estoqueDisponibilidadeFilialFilter.replace(/EA\./g, 'ES.');
+    const queryEstoqueAtual = `
+      SELECT
+        EA.FILIAL AS filial,
+        SUM(CASE WHEN EA.ESTOQUE > 0 THEN EA.ESTOQUE ELSE 0 END) AS positiveStock,
+        SUM(CASE WHEN EA.ESTOQUE < 0 THEN EA.ESTOQUE ELSE 0 END) AS negativeStock,
+        COUNT(CASE WHEN EA.ESTOQUE > 0 THEN 1 END) AS positiveCount
+      FROM ESTOQUE_PRODUTOS EA WITH (NOLOCK)
+      WHERE LTRIM(RTRIM(ISNULL(EA.PRODUTO, ''))) = @vf_produto
+        ${corProduto != null
+          ? `AND (
+              LTRIM(RTRIM(ISNULL(EA.COR_PRODUTO, ''))) = @vf_cor
+              OR (
+                @vf_cor_num IS NOT NULL
+                AND TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(ISNULL(EA.COR_PRODUTO, ''))), '')) = @vf_cor_num
+              )
+            )`
+          : ''}
+        ${estoqueDisponibilidadeFilialFilter}
+      GROUP BY EA.FILIAL
+    `;
+    const estoqueAtualResult = await request.query<{
+      filial: string;
+      positiveStock: number | null;
+      negativeStock: number | null;
+      positiveCount: number | null;
+    }>(queryEstoqueAtual);
+
+    type DailyMovementRow = { d: Date; filial: string; qty: number | null };
+    const entriesDailyQuery = `
+      SELECT
+        CAST(E.EMISSAO AS DATE) AS d,
+        E.FILIAL AS filial,
+        SUM(ISNULL(P.QTDE, 0)) AS qty
+      FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+      INNER JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK)
+        ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+        AND E.FILIAL = P.FILIAL
+      WHERE LTRIM(RTRIM(ISNULL(P.PRODUTO, ''))) = @vf_produto
+        AND E.EMISSAO >= @vf_inicio12m
+        AND E.EMISSAO < @vf_fim
+        ${corFilterEntradaEstoque}
+        ${entradaEstoqueFilialFilter}
+      GROUP BY CAST(E.EMISSAO AS DATE), E.FILIAL
+
+      UNION ALL
+
+      SELECT
+        CAST(LE.EMISSAO AS DATE) AS d,
+        LE.FILIAL AS filial,
+        SUM(ISNULL(LEP.QTDE_ENTRADA, 0)) AS qty
+      FROM LOJA_ENTRADAS_PRODUTO AS LEP WITH (NOLOCK)
+      INNER JOIN LOJA_ENTRADAS AS LE WITH (NOLOCK)
+        ON LEP.FILIAL = LE.FILIAL
+        AND LEP.ROMANEIO_PRODUTO = LE.ROMANEIO_PRODUTO
+      WHERE LTRIM(RTRIM(ISNULL(LEP.PRODUTO, ''))) = @vf_produto
+        AND LE.EMISSAO >= @vf_inicio12m
+        AND LE.EMISSAO < @vf_fim
+        AND (LE.ENTRADA_CANCELADA = 0 OR LE.ENTRADA_CANCELADA IS NULL)
+        ${corFilterEntradaLoja}
+        ${entradaLojaFilialFilter}
+      GROUP BY CAST(LE.EMISSAO AS DATE), LE.FILIAL
+    `;
+    const exitsDailyQuery = `
+      SELECT
+        CAST(ES.EMISSAO AS DATE) AS d,
+        ES.FILIAL AS filial,
+        SUM(ISNULL(P.QTDE, 0)) AS qty
+      FROM ESTOQUE_PROD_SAI AS ES WITH (NOLOCK)
+      INNER JOIN ESTOQUE_PROD1_SAI AS P WITH (NOLOCK)
+        ON ES.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+      WHERE LTRIM(RTRIM(ISNULL(P.PRODUTO, ''))) = @vf_produto
+        AND ES.EMISSAO >= @vf_inicio12m
+        AND ES.EMISSAO < @vf_fim
+        ${corFilterEntradaEstoque}
+        ${saidaEstoqueFilialFilter}
+      GROUP BY CAST(ES.EMISSAO AS DATE), ES.FILIAL
+    `;
+    const retailSalesDailyQuery = `
+      WITH vendas_base AS (
+        SELECT
+          vf.*,
+          CASE WHEN vf.QTDE_CANCELADA > 0 THEN 0 ELSE vf.QTDE END AS totalQtdeVenda
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vf WITH (NOLOCK)
+        WHERE LTRIM(RTRIM(ISNULL(vf.PRODUTO, ''))) = @vf_produto
+          AND vf.DATA_VENDA >= @vf_inicio12m
+          AND vf.DATA_VENDA < @vf_fim
+          AND vf.QTDE > 0
+          ${corFilterVf}
+          ${vendasFilialFilter}
+      ),
+      trocas_item AS (
+        SELECT
+          TICKET,
+          CODIGO_FILIAL,
+          PRODUTO,
+          COR_PRODUTO,
+          TAMANHO,
+          SUM(QTDE) AS qtdeTroca
+        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
+        WHERE QTDE_CANCELADA = 0
+        GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
+      )
+      SELECT
+        CAST(vb.DATA_VENDA AS DATE) AS d,
+        vb.FILIAL AS filial,
+        SUM(vb.totalQtdeVenda - ISNULL(ti.qtdeTroca, 0)) AS qty
+      FROM vendas_base vb
+      LEFT JOIN trocas_item ti
+        ON ti.TICKET = vb.TICKET
+        AND ti.CODIGO_FILIAL = vb.CODIGO_FILIAL
+        AND ti.PRODUTO = vb.PRODUTO
+        AND ISNULL(ti.COR_PRODUTO, '') = ISNULL(vb.COR_PRODUTO, '')
+        AND ISNULL(ti.TAMANHO, 0) = ISNULL(vb.TAMANHO, 0)
+      GROUP BY CAST(vb.DATA_VENDA AS DATE), vb.FILIAL
+    `;
+    const ecommerceSalesDailyQuery = `
+      SELECT
+        CAST(f.EMISSAO AS DATE) AS d,
+        f.FILIAL AS filial,
+        SUM(CAST(fp.QTDE AS FLOAT)) AS qty
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) = @vf_produto
+        AND f.EMISSAO >= @vf_inicio12m
+        AND f.EMISSAO < @vf_fim
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        AND CAST(fp.QTDE AS FLOAT) > 0
+        ${corFilterFp}
+        ${ecommerceFatFilialFilter}
+      GROUP BY CAST(f.EMISSAO AS DATE), f.FILIAL
+    `;
+
+    const [entriesDailyRes, exitsDailyRes, retailSalesDailyRes, ecommerceSalesDailyRes] =
+      await Promise.all([
+        request.query<DailyMovementRow>(entriesDailyQuery),
+        request.query<DailyMovementRow>(exitsDailyQuery),
+        request.query<DailyMovementRow>(retailSalesDailyQuery),
+        mergeScarfmeEcommerce
+          ? request.query<DailyMovementRow>(ecommerceSalesDailyQuery)
+          : Promise.resolve({ recordset: [] } as { recordset: DailyMovementRow[] }),
+      ]);
+
+    const currentStockMap = new Map<string, number>();
+    for (const row of estoqueAtualResult.recordset) {
+      const positiveStock = Number(row.positiveStock ?? 0);
+      const negativeStock = Number(row.negativeStock ?? 0);
+      const positiveCount = Number(row.positiveCount ?? 0);
+      const estoqueAtual = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
+      currentStockMap.set(row.filial, Math.round(estoqueAtual));
+    }
+
+    const entriesTotalMap = new Map<string, number>();
+    const salesTotalMap = new Map<string, number>();
+    const exitsTotalMap = new Map<string, number>();
+    const entryByDay = new Map<string, Map<string, number>>();
+    const saleByDay = new Map<string, Map<string, number>>();
+    const exitByDay = new Map<string, Map<string, number>>();
+    const addMovement = (
+      rows: DailyMovementRow[],
+      totals: Map<string, number>,
+      byDay: Map<string, Map<string, number>>
+    ) => {
+      for (const row of rows) {
+        const filialRow = (row.filial ?? '').trim();
+        if (!filialRow) continue;
+        const qty = Number(row.qty ?? 0);
+        if (!qty) continue;
+        totals.set(filialRow, (totals.get(filialRow) ?? 0) + qty);
+        const dateIso = new Date(row.d).toISOString().slice(0, 10);
+        const inner = byDay.get(dateIso) ?? new Map<string, number>();
+        inner.set(filialRow, (inner.get(filialRow) ?? 0) + qty);
+        byDay.set(dateIso, inner);
+      }
+    };
+    addMovement(entriesDailyRes.recordset, entriesTotalMap, entryByDay);
+    addMovement(exitsDailyRes.recordset, exitsTotalMap, exitByDay);
+    addMovement(retailSalesDailyRes.recordset, salesTotalMap, saleByDay);
+    addMovement(ecommerceSalesDailyRes.recordset, salesTotalMap, saleByDay);
+
+    const allFiliaisDisponibilidade = new Set<string>([
+      ...Array.from(currentStockMap.keys()),
+      ...Array.from(entriesTotalMap.keys()),
+      ...Array.from(salesTotalMap.keys()),
+      ...Array.from(exitsTotalMap.keys()),
+      ...Array.from(byFilial.keys()),
+    ]);
+    const runningStockMap = new Map<string, number>();
+    const diasPositivosPorFilial = new Map<string, number>();
+    for (const filialKey of allFiliaisDisponibilidade) {
+      const estoqueAtual = currentStockMap.get(filialKey) ?? 0;
+      const aberturaPeriodo =
+        estoqueAtual -
+        (entriesTotalMap.get(filialKey) ?? 0) +
+        (salesTotalMap.get(filialKey) ?? 0) +
+        (exitsTotalMap.get(filialKey) ?? 0);
+      runningStockMap.set(filialKey, Math.round(aberturaPeriodo));
+      diasPositivosPorFilial.set(filialKey, 0);
+    }
+
+    let diasPositivosResumo = 0;
+    for (let time = inicio12m.getTime(); time < fimPeriodo.getTime(); time += msPerDay) {
+      const dayIso = new Date(time).toISOString().slice(0, 10);
+      const entriesDay = entryByDay.get(dayIso);
+      const salesDay = saleByDay.get(dayIso);
+      const exitsDay = exitByDay.get(dayIso);
+
+      if (entriesDay) {
+        entriesDay.forEach((qty, filialKey) => {
+          runningStockMap.set(filialKey, Math.round((runningStockMap.get(filialKey) ?? 0) + qty));
+        });
+      }
+      if (salesDay) {
+        salesDay.forEach((qty, filialKey) => {
+          runningStockMap.set(filialKey, Math.round((runningStockMap.get(filialKey) ?? 0) - qty));
+        });
+      }
+      if (exitsDay) {
+        exitsDay.forEach((qty, filialKey) => {
+          runningStockMap.set(filialKey, Math.round((runningStockMap.get(filialKey) ?? 0) - qty));
+        });
+      }
+
+      let stockResumoDia = 0;
+      runningStockMap.forEach((stock, filialKey) => {
+        if (stock > 0) {
+          diasPositivosPorFilial.set(filialKey, (diasPositivosPorFilial.get(filialKey) ?? 0) + 1);
+          stockResumoDia += stock;
+        }
+      });
+      if (stockResumoDia > 0) diasPositivosResumo += 1;
+    }
+
     if (byFilial.size === 0 && produtoCustoUnitario > 0) {
       byFilial.set(filialSel ?? 'TODAS', {
         filial: filialSel ?? 'TODAS',
@@ -6783,19 +7043,41 @@ export async function fetchVendasProdutoPorFilial({
       });
     }
 
-    return Array.from(byFilial.values())
+    const rows = Array.from(byFilial.values())
       .sort((a, b) => a.filial.localeCompare(b.filial))
       .map((r) => {
         const historico = buildHistoricoFilial(r.primeiraEntradaFilial, r.primeiraVendaFilial);
         const dataBaseHistorico = r.primeiraEntradaFilial ?? r.primeiraVendaFilial;
+        const diasComEstoquePositivo = diasPositivosPorFilial.get(r.filial) ?? 0;
+        const diasSemEstoque = Math.max(0, 365 - diasComEstoquePositivo);
+        const mesesDisponiveis = Math.max(diasComEstoquePositivo / 30, 1);
         return {
           ...r,
           custoUnitario: Number(r.custoUnitario ?? 0) || produtoCustoUnitario,
           diasDesdeUltimaVenda: r.ultimaVenda ? Math.floor((nowMs - r.ultimaVenda.getTime()) / msPerDay) : null,
           primeiraEntradaFilial: dataBaseHistorico,
           ...historico,
+          diasComEstoquePositivo,
+          diasSemEstoque,
+          mesesDisponiveis,
+          velocidadeAjustada: Math.round((Number(r.qtde12m ?? 0) / mesesDisponiveis + Number.EPSILON) * 100) / 100,
         };
       });
+    const diasSemEstoqueResumo = Math.max(0, 365 - diasPositivosResumo);
+    const mesesDisponiveisResumo = Math.max(diasPositivosResumo / 30, 1);
+    return {
+      rows,
+      resumoDisponibilidade: {
+        diasComEstoquePositivo: diasPositivosResumo,
+        diasSemEstoque: diasSemEstoqueResumo,
+        mesesDisponiveis: mesesDisponiveisResumo,
+        velocidadeAjustada:
+          Math.round(
+            (rows.reduce((sum, row) => sum + Number(row.qtde12m ?? 0), 0) / mesesDisponiveisResumo + Number.EPSILON) *
+              100
+          ) / 100,
+      },
+    };
   });
 }
 
@@ -6844,12 +7126,13 @@ export async function fetchVendasQuantidadesTotaisItensLote({
     const slice = list.slice(i, i + CONCURRENCY);
     await Promise.all(
       slice.map(async ([k, { produto, corRaw }]) => {
-        const rows = await fetchVendasProdutoPorFilial({
+        const result = await fetchVendasProdutoPorFilial({
           company,
           filial,
           produto,
           corProduto: corRaw,
         });
+        const rows = result.rows;
         const qtde12m = rows.reduce((s, r) => s + r.qtde12m, 0);
         const qtde60d = rows.reduce((s, r) => s + r.qtde60d, 0);
         const qtdeMesAtual = rows.reduce((s, r) => s + r.qtdeMesAtual, 0);

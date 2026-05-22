@@ -108,6 +108,10 @@ interface ProdutoSugestao {
   mesesHistoricoFilial?: number | null;
   historicoParcial?: boolean | null;
   diasDesdeUltimaVenda?: number | null;
+  diasComEstoquePositivo?: number | null;
+  diasSemEstoque?: number | null;
+  mesesDisponiveis?: number | null;
+  velocidadeAjustada?: number | null;
   percParticipacao: number;
   qtdSugerida: number;
 }
@@ -727,6 +731,17 @@ export default function ListaCompraSugeridaPage({
             : [];
           const totalNmQty = filiaisNM.reduce((sum, row) => sum + row.qtd, 0);
           const keyCorCodigo = buildSuggestionKey(produto, r.cor ?? "");
+          if (metricas) {
+            r.diasDesdeUltimaVenda = metricas.resumo.diasDesdeUltimaVenda;
+            r.diasHistoricoFilial = metricas.resumo.diasHistoricoFilial;
+            r.mesesHistoricoFilial = metricas.resumo.mesesHistoricoFilial;
+            r.primeiraEntradaFilial = metricas.resumo.primeiraEntradaFilial;
+            r.historicoParcial = metricas.resumo.historicoParcial;
+            r.diasComEstoquePositivo = metricas.resumo.diasComEstoquePositivo;
+            r.diasSemEstoque = metricas.resumo.diasSemEstoque;
+            r.mesesDisponiveis = metricas.resumo.mesesDisponiveis;
+            r.velocidadeAjustada = metricas.resumo.velocidadeAjustada;
+          }
           next[keyCorCodigo] = r;
           nextNmTotal[keyCorCodigo] = totalNmQty;
           nextNmFiliais[keyCorCodigo] = filiaisNM;
@@ -2331,7 +2346,7 @@ export default function ListaCompraSugeridaPage({
                                     <td className={styles.qtdSugerida}>
                                       {fmt(sugestaoView.qty)}
                                       <span
-                                        title={`Necessidade Mínima: estoque zerado e 1 unidade a cada 5 vendas nos últimos 12 meses. Sugestão atual: ${fmt(sugestaoView.qty)} unidade(s).`}
+                                        title={`Necessidade Mínima: estoque zerado com ≥3 vendas e velocidade ≥0,5 un/mês → reserva de 1 un. Sugestão atual: ${fmt(sugestaoView.qty)} unidade(s).`}
                                         style={{
                                           marginLeft: 6,
                                           display: "inline-flex",
