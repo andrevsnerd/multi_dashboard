@@ -27,6 +27,7 @@ import { exportListaLojaToXlsx } from "@/lib/utils/exportListaLoja";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
 import {
   calcNecessidadeMinimaQty,
+  calcNecessidadeMinimaPorFilial,
   combineBaseSuggestionWithNecessidadeMinima,
   formatNecessidadeMinimaFiliaisDescription,
 } from "@/lib/utils/necessidade-minima";
@@ -545,32 +546,11 @@ async function fetchVendasItemMetricas(
         e.estoque,
       ])
     );
-    const filiaisNMMap = new Map<string, number>();
-    metricas.vendasPorFilial
-      .map((v) => {
-        const filialLabel = getFilialLabelForDisplay(companyConfig, v.filial);
-        const filialKey = normalizeFilialLookupKey(filialLabel);
-        const qtd = calcNecessidadeMinimaQty({
-          estoqueAtual: estoqueMap.get(filialKey) ?? 0,
-          qtde12m: v.qtde12m,
-        });
-        return qtd > 0 ? { filial: filialLabel, qtd, qtde12m: Math.floor(Number(v.qtde12m ?? 0)) } : null;
-      })
-      .filter((value): value is FilialNecessidadeMinima => value != null)
-      .forEach((value) => {
-        filiaisNMMap.set(value.filial, (filiaisNMMap.get(value.filial) ?? 0) + value.qtd);
-      });
-    const filiaisNMQtde12mMap = new Map<string, number>();
-    metricas.vendasPorFilial.forEach((v) => {
-      const filialLabel = getFilialLabelForDisplay(companyConfig, v.filial);
-      const filialKey = normalizeFilialLookupKey(filialLabel);
-      filiaisNMQtde12mMap.set(filialKey, (filiaisNMQtde12mMap.get(filialKey) ?? 0) + Math.floor(Number(v.qtde12m ?? 0)));
+    const filiaisNM = calcNecessidadeMinimaPorFilial({
+      company: companyConfig,
+      vendasPorFilial: metricas.vendasPorFilial,
+      estoquePorFilial: metricas.estoquePorFilial,
     });
-    const filiaisNM = Array.from(filiaisNMMap.entries()).map(([filial, qtd]) => ({
-      filial,
-      qtd,
-      qtde12m: filiaisNMQtde12mMap.get(normalizeFilialLookupKey(filial)) ?? 0,
-    }));
     return {
       qtde12m: metricas.resumo.qtde12m,
       qtde60d: metricas.resumo.qtde60d,

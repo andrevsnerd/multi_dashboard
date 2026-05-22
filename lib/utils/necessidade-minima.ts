@@ -68,14 +68,18 @@ export function calcNecessidadeMinimaPorFilial(input: {
       const filialKey = normalizeFilialLookupKey(row.filial);
       const estoqueAtual = estoqueMap.get(filialKey) ?? 0;
       const vendasInfo = vendasInfoMap.get(filialKey);
-      const qtd = calcNecessidadeMinimaQty({
+      const qualifica = calcNecessidadeMinimaQty({
         estoqueAtual,
         qtde12m: row.qtde12m,
         velocidadeAjustada: vendasInfo?.velocidadeAjustada,
         mesesDisponiveis: vendasInfo?.mesesDisponiveis,
         diasComEstoquePositivo: vendasInfo?.diasComEstoquePositivo,
       });
-      return qtd > 0 ? { filial: row.filial, qtd, qtde12m: Number(row.qtde12m ?? 0) } : null;
+      if (qualifica <= 0) return null;
+      // Quantidade baseada na velocidade da filial: 1 mês de cobertura na taxa histórica
+      const qtde12m = Math.max(0, Number(row.qtde12m ?? 0));
+      const qtd = Math.max(1, Math.ceil(qtde12m / 12));
+      return { filial: row.filial, qtd, qtde12m };
     })
     .filter((row): row is FilialNecessidadeMinimaInfo => row != null);
 }
