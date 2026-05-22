@@ -2091,34 +2091,100 @@ export async function fetchAvailableSubgrupos({
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
-    const linhaFilter = buildLinhaFilterForProducts(request, company, null, linhas);
-    const colecaoFilter = buildColecaoFilterForProducts(request, company, null, colecoes);
-    const gradeFilter = buildGradeFilterForProducts(request, company, null, grades);
+    const retailFilialFilter = buildFilialFilter(
+      request,
+      company,
+      'sales',
+      filial,
+      'f',
+      'availableSubgruposRetailFilial'
+    );
+    const retailLinhaFilter = buildInFilter(
+      request,
+      linhas,
+      'availableSubgruposRetailLinha',
+      'p.LINHA'
+    );
+    const retailColecaoFilter = buildInFilter(
+      request,
+      colecoes,
+      'availableSubgruposRetailColecao',
+      'p.COLECAO'
+    );
+    const retailGradeFilter = buildInFilter(
+      request,
+      grades,
+      'availableSubgruposRetailGrade',
+      'CONVERT(VARCHAR, p.GRADE)'
+    );
 
-    const query = `
-      SELECT DISTINCT 
-        COALESCE(vp.SUBGRUPO_PRODUTO, p.SUBGRUPO_PRODUTO, '') AS subgrupo
-      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-      WHERE vp.DATA_VENDA >= @startDate
-        AND vp.DATA_VENDA < @endDate
-        AND vp.QTDE > 0
-        AND COALESCE(vp.SUBGRUPO_PRODUTO, p.SUBGRUPO_PRODUTO, '') <> ''
-        ${filialFilter}
-        ${linhaFilter}
-        ${colecaoFilter}
-        ${gradeFilter}
-      ORDER BY subgrupo
-    `;
+    const ecommerceFilialFilter = buildScarfmeEcommerceFilialFilterForProducts(
+      request,
+      filial,
+      'f',
+      'availableSubgruposEcomFilial'
+    );
+    const ecommerceLinhaFilter = buildInFilter(
+      request,
+      linhas,
+      'availableSubgruposEcomLinha',
+      'p.LINHA'
+    );
+    const ecommerceColecaoFilter = buildInFilter(
+      request,
+      colecoes,
+      'availableSubgruposEcomColecao',
+      'p.COLECAO'
+    );
+    const ecommerceGradeFilter = buildInFilter(
+      request,
+      grades,
+      'availableSubgruposEcomGrade',
+      'CONVERT(VARCHAR, p.GRADE)'
+    );
 
     try {
-      const result = await request.query<{ subgrupo: string }>(query);
-      const subgrupos = result.recordset
-        .map((row) => {
-          const subgrupo = row.subgrupo?.trim() || '';
-          return subgrupo.toUpperCase();
-        })
+      const retailResult = await request.query<{ subgrupo: string | null }>(`
+          SELECT DISTINCT
+            UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) AS subgrupo
+          FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+          INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+            ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
+          LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.COD_FILIAL = vp.CODIGO_FILIAL
+          LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO
+          WHERE vp.DATA_VENDA >= @startDate
+            AND vp.DATA_VENDA < @endDate
+            AND vp.QTDE_CANCELADA = 0
+            AND vp.QTDE > 0
+            AND ISNULL(p.SUBGRUPO_PRODUTO, '') <> ''
+            ${retailFilialFilter}
+            ${retailLinhaFilter}
+            ${retailColecaoFilter}
+            ${retailGradeFilter}
+          ORDER BY subgrupo
+        `);
+      const ecommerceResult = await request.query<{ subgrupo: string | null }>(`
+          SELECT DISTINCT
+            UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) AS subgrupo
+          FROM FATURAMENTO f WITH (NOLOCK)
+          JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+            ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+          LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO
+          WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+            AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
+            AND f.NOTA_CANCELADA = 0
+            AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+            AND fp.QTDE > 0
+            AND ISNULL(p.SUBGRUPO_PRODUTO, '') <> ''
+            ${ecommerceFilialFilter}
+            ${ecommerceLinhaFilter}
+            ${ecommerceColecaoFilter}
+            ${ecommerceGradeFilter}
+          ORDER BY subgrupo
+        `);
+
+      const subgrupos = [...retailResult.recordset, ...ecommerceResult.recordset]
+        .map((row) => row.subgrupo?.trim().toUpperCase() || '')
         .filter((subgrupo) => subgrupo !== '');
       
       const subgruposUnicos = [...new Set(subgrupos)].sort();
@@ -2156,34 +2222,100 @@ export async function fetchAvailableGrades({
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
-    const linhaFilter = buildLinhaFilterForProducts(request, company, null, linhas);
-    const colecaoFilter = buildColecaoFilterForProducts(request, company, null, colecoes);
-    const subgrupoFilter = buildSubgrupoFilterForProducts(request, company, null, subgrupos);
+    const retailFilialFilter = buildFilialFilter(
+      request,
+      company,
+      'sales',
+      filial,
+      'f',
+      'availableGradesRetailFilial'
+    );
+    const retailLinhaFilter = buildInFilter(
+      request,
+      linhas,
+      'availableGradesRetailLinha',
+      'p.LINHA'
+    );
+    const retailColecaoFilter = buildInFilter(
+      request,
+      colecoes,
+      'availableGradesRetailColecao',
+      'p.COLECAO'
+    );
+    const retailSubgrupoFilter = buildInFilter(
+      request,
+      subgrupos,
+      'availableGradesRetailSubgrupo',
+      'p.SUBGRUPO_PRODUTO'
+    );
 
-    const query = `
-      SELECT DISTINCT 
-        UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) AS grade
-      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-      WHERE vp.DATA_VENDA >= @startDate
-        AND vp.DATA_VENDA < @endDate
-        AND vp.QTDE > 0
-        AND p.GRADE IS NOT NULL
-        ${filialFilter}
-        ${linhaFilter}
-        ${colecaoFilter}
-        ${subgrupoFilter}
-      ORDER BY grade
-    `;
+    const ecommerceFilialFilter = buildScarfmeEcommerceFilialFilterForProducts(
+      request,
+      filial,
+      'f',
+      'availableGradesEcomFilial'
+    );
+    const ecommerceLinhaFilter = buildInFilter(
+      request,
+      linhas,
+      'availableGradesEcomLinha',
+      'p.LINHA'
+    );
+    const ecommerceColecaoFilter = buildInFilter(
+      request,
+      colecoes,
+      'availableGradesEcomColecao',
+      'p.COLECAO'
+    );
+    const ecommerceSubgrupoFilter = buildInFilter(
+      request,
+      subgrupos,
+      'availableGradesEcomSubgrupo',
+      'p.SUBGRUPO_PRODUTO'
+    );
 
     try {
-      const result = await request.query<{ grade: string }>(query);
-      const grades = result.recordset
-        .map((row) => {
-          const grade = row.grade?.trim() || '';
-          return grade.toUpperCase();
-        })
+      const retailResult = await request.query<{ grade: string | null }>(`
+          SELECT DISTINCT
+            UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) AS grade
+          FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+          INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+            ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
+          LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.COD_FILIAL = vp.CODIGO_FILIAL
+          LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO
+          WHERE vp.DATA_VENDA >= @startDate
+            AND vp.DATA_VENDA < @endDate
+            AND vp.QTDE_CANCELADA = 0
+            AND vp.QTDE > 0
+            AND p.GRADE IS NOT NULL
+            ${retailFilialFilter}
+            ${retailLinhaFilter}
+            ${retailColecaoFilter}
+            ${retailSubgrupoFilter}
+          ORDER BY grade
+        `);
+      const ecommerceResult = await request.query<{ grade: string | null }>(`
+          SELECT DISTINCT
+            UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) AS grade
+          FROM FATURAMENTO f WITH (NOLOCK)
+          JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+            ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+          LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO
+          WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+            AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
+            AND f.NOTA_CANCELADA = 0
+            AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+            AND fp.QTDE > 0
+            AND p.GRADE IS NOT NULL
+            ${ecommerceFilialFilter}
+            ${ecommerceLinhaFilter}
+            ${ecommerceColecaoFilter}
+            ${ecommerceSubgrupoFilter}
+          ORDER BY grade
+        `);
+
+      const grades = [...retailResult.recordset, ...ecommerceResult.recordset]
+        .map((row) => row.grade?.trim().toUpperCase() || '')
         .filter((grade) => grade !== '');
       
       const gradesUnicas = [...new Set(grades)].sort();
