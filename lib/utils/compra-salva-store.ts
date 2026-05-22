@@ -255,6 +255,89 @@ export async function updateCompraSalvaItemQtd(
   return all[i];
 }
 
+function normalizeCompraSalvaItemRow(input: CompraSalvaItemRow): CompraSalvaItemRow {
+  return {
+    itemKey: String(input.itemKey ?? "").trim(),
+    produto: String(input.produto ?? "").trim(),
+    corProduto: input.corProduto ? String(input.corProduto).trim() : undefined,
+    corDescricao: input.corDescricao ? String(input.corDescricao).trim() : undefined,
+    descricao: String(input.descricao ?? input.produto ?? "").trim(),
+    grade: input.grade ? String(input.grade).trim() : undefined,
+    colecao: input.colecao ? String(input.colecao).trim() : undefined,
+    qtdManual: Math.max(0, Math.round(input.qtdManual ?? 0)),
+    custoUnitario: input.custoUnitario != null ? Number(input.custoUnitario) : undefined,
+    filialOrigem: input.filialOrigem === null
+      ? null
+      : input.filialOrigem != null
+        ? String(input.filialOrigem).trim()
+        : undefined,
+  };
+}
+
+function mergeCompraSalvaItems(
+  currentItems: CompraSalvaItemRow[],
+  item: CompraSalvaItemRow
+): CompraSalvaItemRow[] {
+  const normalizedItem = normalizeCompraSalvaItemRow(item);
+  const idx = currentItems.findIndex((current) => String(current.itemKey ?? "").trim() === normalizedItem.itemKey);
+
+  if (idx < 0) {
+    return [...currentItems, normalizedItem];
+  }
+
+  const current = currentItems[idx];
+  const next = [...currentItems];
+  next[idx] = {
+    ...current,
+    ...normalizedItem,
+    corProduto: normalizedItem.corProduto ?? current.corProduto,
+    corDescricao: normalizedItem.corDescricao ?? current.corDescricao,
+    grade: normalizedItem.grade ?? current.grade,
+    colecao: normalizedItem.colecao ?? current.colecao,
+    custoUnitario: normalizedItem.custoUnitario ?? current.custoUnitario,
+    filialOrigem: normalizedItem.filialOrigem ?? current.filialOrigem,
+    qtdManual: Math.max(0, Math.round(current.qtdManual ?? 0)) + normalizedItem.qtdManual,
+  };
+  return next;
+}
+
+export async function addCompraSalvaItem(
+  companyKey: string,
+  id: string,
+  item: CompraSalvaItemRow
+): Promise<CompraSalva | null> {
+  const updatedAt = new Date().toISOString();
+
+  if (hasPostgres()) {
+    await ensureTable();
+    const sql = getNeonSql();
+    const current = await getCompraSalva(companyKey, id);
+    if (!current) return null;
+    const nextItems = mergeCompraSalvaItems(current.items, item);
+    const rows = await sql`
+      UPDATE compras_salvas
+      SET items = ${JSON.stringify(nextItems)}::jsonb,
+      updated_at = ${updatedAt}
+      WHERE id = ${id} AND company_key = ${companyKey}
+      RETURNING id, company_key, source_context_key, title, expandir_por_cor, items, comprada, saved_at, updated_at
+    `;
+    const row = rows[0] as Parameters<typeof rowToCompraSalva>[0] | undefined;
+    return row ? rowToCompraSalva(row) : null;
+  }
+
+  const all = await readFileAll();
+  const i = all.findIndex((x) => x.id === id && x.companyKey === companyKey);
+  if (i < 0) return null;
+  const c = all[i];
+  all[i] = {
+    ...c,
+    items: mergeCompraSalvaItems(c.items, item),
+    updatedAt,
+  };
+  await writeFileAll(all);
+  return all[i];
+}
+
 export async function removeCompraSalvaItem(companyKey: string, id: string, itemKey: string): Promise<CompraSalva | null> {
   const updatedAt = new Date().toISOString();
   const normalizedItemKey = itemKey.trim();

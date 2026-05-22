@@ -30,7 +30,9 @@ import {
   getSuggestedQtyValue as getSharedSuggestedQtyValue,
   type SuggestionRuleInput,
 } from "@/lib/utils/suggestion-rules";
+import { getMappedColorDescription } from "@/lib/utils/colorMapping";
 import { fetchControleEstoqueItemMetricasClient } from "@/lib/client/controle-estoque-metricas";
+import { buildControleEstoqueItemKey } from "@/lib/utils/controle-estoque-metricas";
 import {
   buildCompraTransitoIndex,
   fetchComprasTransitoClient,
@@ -57,6 +59,23 @@ interface ProdutoSugestao {
   estoqueAtual?: number;
   qtdSugerida?: number;
 }
+
+interface ProdutoBuscaManual {
+  produto: string;
+  descProduto: string;
+  codigoBarra: string | null;
+  corProduto: string | null;
+  descCor: string;
+  grade?: string | null;
+  linha?: string | null;
+  subgrupo?: string | null;
+  colecao?: string | null;
+}
+
+type BarcodeLookupRow = {
+  produto: string;
+  corProduto: string | null;
+};
 
 function fmt(n: number) {
   return n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
@@ -130,6 +149,103 @@ function parseListaLojaFilial(sourceContextKey: string): string | null {
   const filialCtx = parts[2] ?? "";
   if (!filialCtx || filialCtx === "__TODAS__" || filialCtx === "sem-filial") return null;
   return filialCtx;
+}
+
+function buildItemKey(produto?: string | null, corProduto?: string | null) {
+  return buildControleEstoqueItemKey(produto, corProduto);
+}
+
+function resolveStrictColorDescription(
+  corProduto?: string | null,
+  descCor?: string | null
+) {
+  const codigoCor = (corProduto ?? "").trim();
+  if (codigoCor) {
+    return getMappedColorDescription(codigoCor);
+  }
+
+  return (descCor ?? "").trim();
+}
+
+async function buscarPorCodigoBarras(codigoBarras: string, companyKey?: string) {
+  const params = new URLSearchParams({ codigoBarras: codigoBarras.trim() });
+  if (companyKey) params.set("company", companyKey);
+  const res = await fetch(
+    `/api/transferencia-produtos/produto-por-codigo-barras?${params}`,
+    { cache: "no-store" }
+  );
+  if (!res.ok) return null;
+  const json = (await res.json()) as { data: BarcodeLookupRow | null };
+  return json.data || null;
+}
+
+function isSomenteDigitosCodigoBarras(term: string): boolean {
+  const t = term.trim();
+  return t.length >= 4 && /^\d+$/.test(t);
+}
+
+async function searchProdutos(
+  term: string,
+  companyKey?: string,
+  corProduto?: string | null
+): Promise<ProdutoBuscaManual[]> {
+  if (!term || term.trim().length < 2) return [];
+  const params = new URLSearchParams({ q: term.trim(), entrada: "true" });
+  if (companyKey) params.set("company", companyKey);
+  if (corProduto !== undefined && corProduto !== null) {
+    params.set("corProduto", String(corProduto).trim());
+  }
+  const res = await fetch(`/api/transferencia-produtos/produtos?${params}`, { cache: "no-store" });
+  if (!res.ok) return [];
+  const json = (await res.json()) as { data?: ProdutoBuscaManual[] };
+  return json.data || [];
+}
+
+async function produtoFromBarcodeLookup(
+  porBarra: BarcodeLookupRow,
+  companyKey?: string
+): Promise<ProdutoBuscaManual | null> {
+  const list = await searchProdutos(
+    porBarra.produto,
+    companyKey,
+    porBarra.corProduto != null ? porBarra.corProduto : undefined
+  );
+  const want = (porBarra.corProduto ?? "").trim();
+  if (want !== "") {
+    return list.find((p) => (p.corProduto ?? "").trim() === want) ?? null;
+  }
+  if (list.length === 1) return list[0] ?? null;
+  return null;
+}
+
+function resolveCompraSalvaFilialOrigem(
+  items: CompraSalvaItemRow[],
+  sourceContextKey: string
+): string | null | undefined {
+  const primeiroComOrigem = items.find((item) => item.filialOrigem !== undefined);
+  if (primeiroComOrigem) {
+    return primeiroComOrigem.filialOrigem;
+  }
+  return parseListaLojaFilial(sourceContextKey);
+}
+
+function mergeLocalCompraSalvaItems(
+  currentItems: CompraSalvaItemRow[],
+  item: CompraSalvaItemRow
+): CompraSalvaItemRow[] {
+  const idx = currentItems.findIndex((current) => current.itemKey === item.itemKey);
+  if (idx < 0) {
+    return [...currentItems, item];
+  }
+
+  const current = currentItems[idx];
+  const next = [...currentItems];
+  next[idx] = {
+    ...current,
+    ...item,
+    qtdManual: Math.max(0, Math.round(current.qtdManual ?? 0)) + Math.max(0, Math.round(item.qtdManual ?? 0)),
+  };
+  return next;
 }
 
 
@@ -526,6 +642,11 @@ export default function CompraSalvaDetalhePage({
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingTransitDraft, setExportingTransitDraft] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [manualSearchTerm, setManualSearchTerm] = useState("");
+  const [manualSearchResults, setManualSearchResults] = useState<ProdutoBuscaManual[]>([]);
+  const [manualSearchLoading, setManualSearchLoading] = useState(false);
+  const [manualSearchError, setManualSearchError] = useState<string | null>(null);
+  const [addingItemKey, setAddingItemKey] = useState<string | null>(null);
   const compraSalvaExportRef = useRef<HTMLDivElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const [manualState, setManualState] = useState<Record<string, "editing" | "confirmed">>({});
@@ -642,6 +763,59 @@ export default function CompraSalvaDetalhePage({
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [exportMenuOpen]);
+
+  useEffect(() => {
+    const term = manualSearchTerm.trim();
+    if (!doc) return;
+    if (term.length < 2) {
+      setManualSearchResults([]);
+      setManualSearchError(null);
+      setManualSearchLoading(false);
+      return;
+    }
+
+    let active = true;
+    setManualSearchLoading(true);
+    setManualSearchError(null);
+
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        let results: ProdutoBuscaManual[] = [];
+
+        if (term.length >= 3) {
+          const porBarra = await buscarPorCodigoBarras(term, companyKey);
+          if (porBarra) {
+            const matchBarra = await produtoFromBarcodeLookup(porBarra, companyKey);
+            if (matchBarra) results = [matchBarra];
+          } else if (isSomenteDigitosCodigoBarras(term)) {
+            results = [];
+          }
+        }
+
+        if (results.length === 0 && !isSomenteDigitosCodigoBarras(term)) {
+          results = await searchProdutos(term, companyKey);
+        }
+
+        if (active) {
+          setManualSearchResults(results);
+        }
+      } catch {
+        if (active) {
+          setManualSearchResults([]);
+          setManualSearchError("Erro ao buscar produtos.");
+        }
+      } finally {
+        if (active) {
+          setManualSearchLoading(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [manualSearchTerm, companyKey, doc]);
 
   useEffect(() => {
     if (!doc || items.length === 0) return;
@@ -802,6 +976,18 @@ export default function CompraSalvaDetalhePage({
     return { totalItens, totalQtdManual, totalCusto };
   }, [rowsComputed]);
 
+  const existingItemKeys = useMemo(() => new Set(items.map((item) => item.itemKey)), [items]);
+  const manualSearchDisplayResults = useMemo(() => {
+    if (!doc) return manualSearchResults;
+    const seen = new Set<string>();
+    return manualSearchResults.filter((produto) => {
+      const key = buildItemKey(produto.produto, doc.expandirPorCor ? produto.corProduto : null);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [doc, manualSearchResults]);
+
   const [estoqueTooltip, setEstoqueTooltip] = useState<null | {
     x: number;
     y: number;
@@ -857,6 +1043,58 @@ export default function CompraSalvaDetalhePage({
       setItems((prev) => prev.filter((i) => i.itemKey !== itemKey));
     } catch (e) {
       window.alert(e instanceof Error ? e.message : "Erro ao remover item");
+    }
+  };
+
+  const handleAddManualItem = async (produto: ProdutoBuscaManual) => {
+    if (!doc) return;
+
+    const corProduto = doc.expandirPorCor ? ((produto.corProduto ?? "").trim() || undefined) : undefined;
+    const corDescricao = doc.expandirPorCor
+      ? (resolveStrictColorDescription(produto.corProduto, produto.descCor) || undefined)
+      : undefined;
+    const addItem: CompraSalvaItemRow = {
+      itemKey: buildItemKey(produto.produto, corProduto),
+      produto: produto.produto,
+      corProduto,
+      corDescricao,
+      descricao: produto.descProduto,
+      grade: produto.grade ? String(produto.grade).trim() || undefined : undefined,
+      colecao: produto.colecao ? String(produto.colecao).trim() || undefined : undefined,
+      qtdManual: 1,
+      filialOrigem: resolveCompraSalvaFilialOrigem(items, doc.sourceContextKey),
+    };
+
+    const params = new URLSearchParams();
+    params.set("company", companyKey);
+    setAddingItemKey(addItem.itemKey);
+
+    try {
+      const res = await fetch(`/api/controle-estoque/compras-salvas/${compraId}?${params}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ addItem }),
+      });
+      const json = await res.json() as { error?: string };
+      if (!res.ok) {
+        throw new Error(json.error ?? "Erro ao adicionar item");
+      }
+
+      setItems((prev) => mergeLocalCompraSalvaItems(prev, addItem));
+      setDoc((prev) => prev
+        ? {
+            ...prev,
+            items: mergeLocalCompraSalvaItems(prev.items, addItem),
+            updatedAt: new Date().toISOString(),
+          }
+        : prev);
+      setManualSearchTerm("");
+      setManualSearchResults([]);
+      setManualSearchError(null);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Erro ao adicionar item");
+    } finally {
+      setAddingItemKey(null);
     }
   };
 
@@ -1268,6 +1506,67 @@ export default function CompraSalvaDetalhePage({
                 </div>
               )}
             </div>
+          </div>
+
+          <div className={styles.manualProductPanel} data-pdf-hide="">
+            <div className={styles.manualProductPanelHeader}>
+              <div>
+                <div className={styles.manualProductPanelTitle}>Adicionar produto manualmente</div>
+                <div className={styles.manualProductPanelHint}>
+                  Busque por codigo, nome ou codigo de barras.
+                </div>
+              </div>
+            </div>
+            <input
+              type="text"
+              className={styles.manualProductSearchInput}
+              placeholder="Buscar por codigo, nome ou codigo de barras..."
+              value={manualSearchTerm}
+              onChange={(e) => setManualSearchTerm(e.target.value)}
+            />
+            {manualSearchLoading && (
+              <div className={styles.manualProductStatus}>Buscando produtos...</div>
+            )}
+            {manualSearchError && (
+              <div className={styles.manualProductError}>{manualSearchError}</div>
+            )}
+            {!manualSearchLoading && !manualSearchError && manualSearchTerm.trim().length >= 2 && manualSearchDisplayResults.length === 0 && (
+              <div className={styles.manualProductStatus}>Nenhum produto encontrado.</div>
+            )}
+            {manualSearchDisplayResults.length > 0 && (
+              <div className={styles.manualProductResults}>
+                {manualSearchDisplayResults.map((produto) => {
+                  const resultItemKey = buildItemKey(
+                    produto.produto,
+                    doc.expandirPorCor ? produto.corProduto : null
+                  );
+                  const jaExiste = existingItemKeys.has(resultItemKey);
+                  const corDescricao = resolveStrictColorDescription(produto.corProduto, produto.descCor);
+                  return (
+                    <div key={resultItemKey} className={styles.manualProductResultRow}>
+                      <div className={styles.manualProductResultMain}>
+                        <div className={styles.productName}>{produto.descProduto || produto.produto}</div>
+                        <div className={styles.productCode}>{produto.produto}</div>
+                        {doc.expandirPorCor && corDescricao && (
+                          <div className={styles.productCode}>{corDescricao}</div>
+                        )}
+                        {produto.codigoBarra && (
+                          <div className={styles.productCode}>CB: {produto.codigoBarra}</div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        className={styles.manualProductAddBtn}
+                        onClick={() => { void handleAddManualItem(produto); }}
+                        disabled={addingItemKey === resultItemKey}
+                      >
+                        {addingItemKey === resultItemKey ? "Adicionando..." : jaExiste ? "+1" : "Adicionar"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {items.length === 0 ? (

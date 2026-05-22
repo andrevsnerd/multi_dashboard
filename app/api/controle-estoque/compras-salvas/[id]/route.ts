@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { fetchCustosPorProdutos } from "@/lib/repositories/controleEstoque";
 import {
+  addCompraSalvaItem,
   deleteCompraSalva,
   getCompraSalva,
   removeCompraSalvaItem,
@@ -18,12 +19,12 @@ export async function GET(
   const companyKey = searchParams.get("company") ?? "";
   const { id } = await params;
   if (!companyKey) {
-    return NextResponse.json({ error: "company é obrigatório" }, { status: 400 });
+    return NextResponse.json({ error: "company e obrigatorio" }, { status: 400 });
   }
   try {
     const data = await getCompraSalva(companyKey, id);
     if (!data) {
-      return NextResponse.json({ error: "Compra salva não encontrada" }, { status: 404 });
+      return NextResponse.json({ error: "Compra salva nao encontrada" }, { status: 404 });
     }
 
     // Enriquece itens sem custoUnitario salvo buscando do ERP
@@ -34,7 +35,7 @@ export async function GET(
       try {
         custoMap = await fetchCustosPorProdutos(produtos);
       } catch {
-        // fallback silencioso — retorna sem custo enriquecido
+        // fallback silencioso - retorna sem custo enriquecido
       }
       if (custoMap.size > 0) {
         data.items = data.items.map((i) => {
@@ -60,16 +61,16 @@ export async function PATCH(
   const companyKey = searchParams.get("company") ?? "";
   const { id } = await params;
   if (!companyKey) {
-    return NextResponse.json({ error: "company é obrigatório" }, { status: 400 });
+    return NextResponse.json({ error: "company e obrigatorio" }, { status: 400 });
   }
   try {
     const body = await request.json();
-    const { title, itemKey, qtdManual, removeItemKey, comprada } = body ?? {};
+    const { title, itemKey, qtdManual, removeItemKey, comprada, addItem } = body ?? {};
 
     if (typeof comprada === "boolean") {
       const updated = await toggleCompraSalvaComprada(companyKey, id, comprada);
       if (!updated) {
-        return NextResponse.json({ error: "Compra salva não encontrada" }, { status: 404 });
+        return NextResponse.json({ error: "Compra salva nao encontrada" }, { status: 404 });
       }
       return NextResponse.json({ data: updated });
     }
@@ -77,7 +78,7 @@ export async function PATCH(
     if (typeof title === "string" && title.trim()) {
       const updated = await updateCompraSalvaTitle(companyKey, id, title);
       if (!updated) {
-        return NextResponse.json({ error: "Compra salva não encontrada" }, { status: 404 });
+        return NextResponse.json({ error: "Compra salva nao encontrada" }, { status: 404 });
       }
       return NextResponse.json({ data: updated });
     }
@@ -85,7 +86,7 @@ export async function PATCH(
     if (typeof removeItemKey === "string" && removeItemKey) {
       const updated = await removeCompraSalvaItem(companyKey, id, removeItemKey);
       if (!updated) {
-        return NextResponse.json({ error: "Compra salva não encontrada" }, { status: 404 });
+        return NextResponse.json({ error: "Compra salva nao encontrada" }, { status: 404 });
       }
       return NextResponse.json({ data: updated });
     }
@@ -93,12 +94,41 @@ export async function PATCH(
     if (typeof itemKey === "string" && itemKey) {
       const updated = await updateCompraSalvaItemQtd(companyKey, id, itemKey, Number(qtdManual ?? 0));
       if (!updated) {
-        return NextResponse.json({ error: "Compra salva não encontrada" }, { status: 404 });
+        return NextResponse.json({ error: "Compra salva nao encontrada" }, { status: 404 });
       }
       return NextResponse.json({ data: updated });
     }
 
-    return NextResponse.json({ error: "Payload inválido" }, { status: 400 });
+    if (addItem && typeof addItem === "object") {
+      const normalizedItem = {
+        itemKey: String(addItem.itemKey ?? ""),
+        produto: String(addItem.produto ?? ""),
+        corProduto: addItem.corProduto ? String(addItem.corProduto) : undefined,
+        corDescricao: addItem.corDescricao ? String(addItem.corDescricao) : undefined,
+        descricao: String(addItem.descricao ?? addItem.produto ?? ""),
+        grade: addItem.grade ? String(addItem.grade) : undefined,
+        colecao: addItem.colecao ? String(addItem.colecao) : undefined,
+        qtdManual: Number(addItem.qtdManual ?? 0),
+        custoUnitario: addItem.custoUnitario != null ? Number(addItem.custoUnitario) : undefined,
+        filialOrigem: addItem.filialOrigem === null
+          ? null
+          : addItem.filialOrigem != null
+            ? String(addItem.filialOrigem)
+            : undefined,
+      };
+
+      if (!normalizedItem.itemKey || !normalizedItem.produto) {
+        return NextResponse.json({ error: "Item invalido para adicao" }, { status: 400 });
+      }
+
+      const updated = await addCompraSalvaItem(companyKey, id, normalizedItem);
+      if (!updated) {
+        return NextResponse.json({ error: "Compra salva nao encontrada" }, { status: 404 });
+      }
+      return NextResponse.json({ data: updated });
+    }
+
+    return NextResponse.json({ error: "Payload invalido" }, { status: 400 });
   } catch (error) {
     console.error("Erro ao atualizar compra salva", error);
     return NextResponse.json({ error: "Erro ao atualizar compra salva" }, { status: 500 });
@@ -113,12 +143,12 @@ export async function DELETE(
   const companyKey = searchParams.get("company") ?? "";
   const { id } = await params;
   if (!companyKey) {
-    return NextResponse.json({ error: "company é obrigatório" }, { status: 400 });
+    return NextResponse.json({ error: "company e obrigatorio" }, { status: 400 });
   }
   try {
     const ok = await deleteCompraSalva(companyKey, id);
     if (!ok) {
-      return NextResponse.json({ error: "Compra salva não encontrada" }, { status: 404 });
+      return NextResponse.json({ error: "Compra salva nao encontrada" }, { status: 404 });
     }
     return NextResponse.json({ success: true });
   } catch (error) {
