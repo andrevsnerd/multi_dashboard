@@ -105,10 +105,34 @@ function buildGroupedMembersWithSales(members: ProdutoAgrupadoMember[]): Produto
     const key = buildProdutoAgrupadoProductKey(member.produto);
     const existing = unique.get(key);
     if (!existing) {
-      unique.set(key, { ...member, vendas: member.vendas ?? 0, qtde: member.qtde ?? 0 });
+      unique.set(key, {
+        ...member,
+        vendas: Number(member.vendas ?? 0),
+        qtde: Number(member.qtde ?? 0),
+        averagePrice: Number(member.averagePrice ?? 0),
+        cost: Number(member.cost ?? 0),
+        markup: Number(member.markup ?? 0),
+      });
     } else {
-      existing.vendas = (existing.vendas ?? 0) + (member.vendas ?? 0);
-      existing.qtde = (existing.qtde ?? 0) + (member.qtde ?? 0);
+      const existingRevenue = Number(existing.vendas ?? 0);
+      const incomingRevenue = Number(member.vendas ?? 0);
+      const existingQuantity = Number(existing.qtde ?? 0);
+      const incomingQuantity = Number(member.qtde ?? 0);
+      const nextRevenue = existingRevenue + incomingRevenue;
+      const nextQuantity = existingQuantity + incomingQuantity;
+      const existingCostValue = Number(existing.cost ?? 0) * existingQuantity;
+      const incomingCostValue = Number(member.cost ?? 0) * incomingQuantity;
+
+      existing.vendas = nextRevenue;
+      existing.qtde = nextQuantity;
+      existing.averagePrice = computeWeightedAverage(nextRevenue, nextQuantity);
+      existing.cost = computeWeightedAverage(existingCostValue + incomingCostValue, nextQuantity);
+      existing.markup =
+        Number(existing.cost ?? 0) > 0
+          ? Number(existing.averagePrice ?? 0) / Number(existing.cost ?? 0)
+          : 0;
+      existing.cor = joinDistinct([existing.cor, member.cor]);
+      existing.corDescricao = joinDistinct([existing.corDescricao, member.corDescricao]);
     }
   }
   return Array.from(unique.values()).sort((a, b) =>
@@ -142,6 +166,13 @@ export function aggregateProductDetailsWithGroups(
       cor: String(row.corProduto ?? "").trim(),
       descricao: row.productName,
       corDescricao: row.descCorProduto ?? "",
+      vendas: Number(row.totalRevenue ?? 0),
+      qtde: Number(row.totalQuantity ?? 0),
+      averagePrice: Number(row.averagePrice ?? 0),
+      cost: Number(row.cost ?? 0),
+      markup: Number(row.markup ?? 0),
+      stock: Number(row.stock ?? 0),
+      estoqueRede: Number(row.estoqueRede ?? 0),
     };
     const current = aggregated.get(key);
 
@@ -251,6 +282,12 @@ export function aggregateFilialProdutoSalesWithGroups(
       corDescricao: row.corDescricao ?? "",
       vendas: Number(row.vendas ?? 0),
       qtde: Number(row.qtde ?? 0),
+      averagePrice: Number(row.qtde ?? 0) > 0 ? Number(row.vendas ?? 0) / Number(row.qtde ?? 0) : 0,
+      cost: Number(row.custo ?? 0),
+      markup:
+        Number(row.custo ?? 0) > 0 && Number(row.qtde ?? 0) > 0
+          ? (Number(row.vendas ?? 0) / Number(row.qtde ?? 0)) / Number(row.custo ?? 0)
+          : 0,
     };
     const current = aggregated.get(key);
 

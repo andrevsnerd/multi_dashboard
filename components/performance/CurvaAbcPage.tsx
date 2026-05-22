@@ -175,6 +175,17 @@ function renderTooltipFilialLabel(entry: QtdePorFilialEntry): React.ReactNode {
   );
 }
 
+function renderInlineTooltipFilialLabel(entry: QtdePorFilialEntry): React.ReactNode {
+  if (!entry.activeFilialName) return <span className={styles.inlineTooltipFilialPrimary}>{entry.displayName}</span>;
+  const activeCode = entry.activeFilialName.trim().split(/\s+/).pop() || entry.activeFilialName;
+  return (
+    <>
+      <span className={styles.inlineTooltipFilialPrimary}>{entry.displayName}</span>
+      <span className={styles.inlineTooltipFilialSecondary}>({activeCode})</span>
+    </>
+  );
+}
+
 function formatSignedPct(value: number): string {
   return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
 }
@@ -249,6 +260,44 @@ function formatProductInfoValue(value?: string | null): string {
 
 function formatCollectionCode(value?: string | null): string {
   return value?.trim() ?? "";
+}
+
+function splitGroupedMemberValues(value?: string | null): string[] {
+  return String(value ?? "")
+    .split("/")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function formatGroupedMemberShortName(value?: string | null): string {
+  const words = String(value ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (words.length === 0) return "";
+  return words.slice(0, 2).join(" ");
+}
+
+function formatGroupedMemberColors(member: ProdutoAgrupadoMember): string {
+  return Array.from(
+    new Set(splitGroupedMemberValues(member.corDescricao || member.cor))
+  ).join(" / ");
+}
+
+function renderGroupedMemberLabel(member: ProdutoAgrupadoMember, shortName: boolean): React.ReactNode {
+  const displayName = shortName
+    ? formatGroupedMemberShortName(member.descricao) || member.produto
+    : member.descricao || member.produto;
+  const colors = formatGroupedMemberColors(member);
+
+  return (
+    <span className={styles.inlineTooltipLabel}>
+      {displayName}
+      <span className={styles.inlineTooltipCode}>{member.produto}</span>
+      {colors && <span className={styles.inlineTooltipMeta}>{colors}</span>}
+    </span>
+  );
 }
 
 function calcularCurvas(produtos: ProdutoRow[]): ProdutoComCurva[] {
@@ -465,6 +514,87 @@ function buildProductDetalhadoHref(
   const cor = (p.cor ?? "").trim();
   if (cor) params.set("colors", cor);
   return `/${companyKey}/produto-detalhado?${params.toString()}`;
+}
+
+function renderGroupedMetricTooltip(
+  product: ProdutoRow,
+  title: string,
+  value: React.ReactNode,
+  valueFormatter: (value: number) => string,
+  valueSelector: (member: ProdutoAgrupadoMember) => number,
+  options?: { totalValue?: number; alignRight?: boolean }
+): React.ReactNode {
+  const groupedMembers = product.groupedMembers ?? [];
+  if (!product.isGroupedProduct || groupedMembers.length === 0) {
+    return value;
+  }
+
+  return (
+    <div className={styles.inlineTooltipWrapper}>
+      <span className={styles.inlineTooltipTrigger}>{value}</span>
+      <div
+        className={`${styles.inlineTooltipPanel}${options?.alignRight ? ` ${styles.inlineTooltipPanelRight}` : ""}`}
+      >
+        <div className={styles.inlineTooltipTitle}>{title}</div>
+        <div className={styles.inlineTooltipList}>
+          {groupedMembers.map((member) => (
+            <div key={member.produto} className={styles.inlineTooltipRow}>
+              {renderGroupedMemberLabel(member, true)}
+              <span className={styles.inlineTooltipValue}>
+                {valueFormatter(valueSelector(member))}
+              </span>
+            </div>
+          ))}
+        </div>
+        {groupedMembers.length > 1 && typeof options?.totalValue === "number" && (
+          <div className={styles.inlineTooltipFooter}>
+            <span>Total</span>
+            <span>{valueFormatter(options.totalValue)}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function renderFilialMetricTooltip(
+  title: string,
+  value: React.ReactNode,
+  entries: QtdePorFilialEntry[],
+  valueFormatter: (value: number) => string
+): React.ReactNode {
+  if (entries.length === 0) {
+    return value;
+  }
+
+  const totalValue = entries.reduce((sum, entry) => sum + Number(entry.qtde ?? 0), 0);
+
+  return (
+    <div className={styles.inlineTooltipWrapper}>
+      <span className={styles.inlineTooltipTrigger}>{value}</span>
+      <div className={`${styles.inlineTooltipPanel} ${styles.inlineTooltipPanelRight}`}>
+        <div className={styles.inlineTooltipTitle}>{title}</div>
+        <div className={styles.inlineTooltipList}>
+          {entries.map((entry) => (
+            <div key={entry.filial} className={styles.inlineTooltipRow}>
+              <span className={styles.inlineTooltipLabel}>
+                <span className={styles.inlineTooltipFilial}>
+                  {renderInlineTooltipFilialLabel(entry)}
+                </span>
+              </span>
+              <span className={styles.inlineTooltipValue}>{valueFormatter(entry.qtde)}</span>
+            </div>
+          ))}
+        </div>
+        {entries.length > 1 && (
+          <div className={styles.inlineTooltipFooter}>
+            <span>Total</span>
+            <span>{valueFormatter(totalValue)}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function getInitialRange(month: number, year: number): DateRangeValue {
@@ -1682,16 +1812,17 @@ const handleBadgeClick = (cat: string) => {
                                       );
                                     })()}
                                     {p.isGroupedProduct && (p.groupedMembers?.length ?? 0) > 0 && (
-                                      <div className={styles.groupedTooltipWrapper}>
+                                      <div className={`${styles.groupedTooltipWrapper} ${styles.inlineTooltipWrapper}`}>
                                         <span className={styles.groupedBadge}>grupo</span>
-                                        <div className={styles.groupedTooltipContent}>
-                                          <div className={styles.tooltipTitle}>Produtos do grupo</div>
-                                          {(p.groupedMembers ?? []).map(m => (
-                                            <div key={m.produto} className={styles.groupedTooltipMember}>
-                                              <span className={styles.groupedTooltipMemberName}>{m.descricao || m.produto}</span>
-                                              <span className={styles.groupedTooltipMemberCode}>{m.produto}</span>
-                                            </div>
-                                          ))}
+                                        <div className={styles.inlineTooltipPanel}>
+                                          <div className={styles.inlineTooltipTitle}>Produtos do grupo</div>
+                                          <div className={styles.inlineTooltipList}>
+                                            {(p.groupedMembers ?? []).map(m => (
+                                              <div key={m.produto} className={styles.inlineTooltipRow}>
+                                                {renderGroupedMemberLabel(m, false)}
+                                              </div>
+                                            ))}
+                                          </div>
                                         </div>
                                       </div>
                                     )}
@@ -1771,49 +1902,25 @@ const handleBadgeClick = (cat: string) => {
                                 </div>
                               </td>
                               <td className={styles.vendas}>
-                                {p.isGroupedProduct && (p.groupedMembers?.length ?? 0) > 0 ? (
-                                  <div className={styles.qtdeTooltipWrapper}>
-                                    <span>{fmtBRL(p.vendas)}</span>
-                                    <div className={styles.qtdeTooltipContent}>
-                                      <div className={styles.tooltipTitle}>Faturamento por produto</div>
-                                      {(p.groupedMembers ?? []).map(m => (
-                                        <div key={m.produto} className={styles.tooltipRow}>
-                                          <span className={styles.tooltipFilial}>{m.descricao || m.produto}</span>
-                                          <span className={styles.tooltipQtde}>{fmtBRL(m.vendas ?? 0)}</span>
-                                        </div>
-                                      ))}
-                                      {(p.groupedMembers?.length ?? 0) > 1 && (
-                                        <div className={styles.tooltipRow} style={{ borderTop: "1px solid rgba(148,163,184,0.3)", marginTop: 4, paddingTop: 4 }}>
-                                          <span className={styles.tooltipFilial} style={{ color: "#94a3b8" }}>Total</span>
-                                          <span className={styles.tooltipQtde} style={{ color: "#f1f5f9", fontWeight: 600 }}>{fmtBRL(p.vendas)}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  fmtBRL(p.vendas)
+                                {renderGroupedMetricTooltip(
+                                  p,
+                                  "Faturamento por produto",
+                                  fmtBRL(p.vendas),
+                                  fmtBRL,
+                                  (member) => Number(member.vendas ?? 0),
+                                  { totalValue: p.vendas, alignRight: true }
                                 )}
                               </td>
                               <td className={styles.vendas}>
                                 {p.isGroupedProduct && (p.groupedMembers?.length ?? 0) > 0 ? (
-                                  <div className={styles.qtdeTooltipWrapper}>
-                                    <span>{fmt(p.qtde)}</span>
-                                    <div className={styles.qtdeTooltipContent}>
-                                      <div className={styles.tooltipTitle}>Qtde por produto</div>
-                                      {(p.groupedMembers ?? []).map(m => (
-                                        <div key={m.produto} className={styles.tooltipRow}>
-                                          <span className={styles.tooltipFilial}>{m.descricao || m.produto}</span>
-                                          <span className={styles.tooltipQtde}>{fmt(m.qtde ?? 0)}</span>
-                                        </div>
-                                      ))}
-                                      {(p.groupedMembers?.length ?? 0) > 1 && (
-                                        <div className={styles.tooltipRow} style={{ borderTop: "1px solid rgba(148,163,184,0.3)", marginTop: 4, paddingTop: 4 }}>
-                                          <span className={styles.tooltipFilial} style={{ color: "#94a3b8" }}>Total</span>
-                                          <span className={styles.tooltipQtde} style={{ color: "#f1f5f9", fontWeight: 600 }}>{fmt(p.qtde)}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
+                                  renderGroupedMetricTooltip(
+                                    p,
+                                    "Qtde por produto",
+                                    fmt(p.qtde),
+                                    fmt,
+                                    (member) => Number(member.qtde ?? 0),
+                                    { totalValue: p.qtde, alignRight: true }
+                                  )
                                 ) : p.qtdePorFilial && p.qtdePorFilial.length > 1 ? (
                                   <div className={styles.qtdeTooltipWrapper}>
                                     <span>{fmt(p.qtde)}</span>
@@ -1833,18 +1940,12 @@ const handleBadgeClick = (cat: string) => {
                               </td>
                               <td className={styles.vendas}>
                                 {p.estoquePorFilial && p.estoquePorFilial.length > 0 ? (
-                                  <div className={styles.qtdeTooltipWrapper}>
-                                    <span>{fmt(p.estoque ?? 0)}</span>
-                                    <div className={styles.qtdeTooltipContent}>
-                                      <div className={styles.tooltipTitle}>Estoque por filial</div>
-                                      {p.estoquePorFilial.map(entry => (
-                                        <div key={entry.filial} className={styles.tooltipRow}>
-                                          <span className={styles.tooltipFilial}>{renderTooltipFilialLabel(entry)}</span>
-                                          <span className={styles.tooltipQtde}>{fmt(entry.qtde)}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
+                                  renderFilialMetricTooltip(
+                                    "Estoque por filial",
+                                    fmt(p.estoque ?? 0),
+                                    p.estoquePorFilial,
+                                    fmt
+                                  )
                                 ) : (
                                   fmt(p.estoque ?? 0)
                                 )}
@@ -1852,24 +1953,29 @@ const handleBadgeClick = (cat: string) => {
                               {showEstoqueRede && (
                                 <td className={styles.vendas}>
                                   {p.estoqueRedePorFilial && p.estoqueRedePorFilial.length > 0 ? (
-                                    <div className={styles.qtdeTooltipWrapper}>
-                                      <span>{fmt(p.estoqueRede ?? 0)}</span>
-                                      <div className={styles.qtdeTooltipContent}>
-                                        <div className={styles.tooltipTitle}>Estoque por filial</div>
-                                        {p.estoqueRedePorFilial.map(entry => (
-                                          <div key={entry.filial} className={styles.tooltipRow}>
-                                            <span className={styles.tooltipFilial}>{renderTooltipFilialLabel(entry)}</span>
-                                            <span className={styles.tooltipQtde}>{fmt(entry.qtde)}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
+                                    renderFilialMetricTooltip(
+                                      "Estoque por filial",
+                                      fmt(p.estoqueRede ?? 0),
+                                      p.estoqueRedePorFilial,
+                                      fmt
+                                    )
                                   ) : (
                                     fmt(p.estoqueRede ?? 0)
                                   )}
                                 </td>
                               )}
-                              <td className={styles.vendas}>{markup !== null ? <span className={styles.markupBadge}>{markup.toFixed(2)}x</span> : <span className={styles.noData}>—</span>}</td>
+                              <td className={styles.vendas}>
+                                {markup !== null
+                                  ? renderGroupedMetricTooltip(
+                                      p,
+                                      "Markup por produto",
+                                      <span className={styles.markupBadge}>{markup.toFixed(2)}x</span>,
+                                      (value) => `${value.toFixed(2)}x`,
+                                      (member) => Number(member.markup ?? 0),
+                                      { alignRight: true }
+                                    )
+                                  : <span className={styles.noData}>—</span>}
+                              </td>
                               <td className={styles.vendas}>
                                   {(() => {
                                     const metricKey = buildCurvaAbcMetricKey(p.produto, p.cor ?? null, porCor);

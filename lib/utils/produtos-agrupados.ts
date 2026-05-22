@@ -9,6 +9,11 @@ export interface ProdutoAgrupadoMember {
   corDescricao: string;
   vendas?: number;
   qtde?: number;
+  averagePrice?: number;
+  cost?: number;
+  markup?: number;
+  stock?: number;
+  estoqueRede?: number;
 }
 
 export interface ProdutoAgrupadoGroup {
