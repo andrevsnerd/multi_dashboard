@@ -585,6 +585,10 @@ export default function ProductDetailKPIs({
                       <div key={filial.filial} className={styles.stockByFilialRow}>
                         <div className={styles.stockByFilialName}>
                           {(filial.filialDisplayName || filial.filial || "").toUpperCase()}
+                          {filial.activeFilialRaw && (() => {
+                            const code = filial.activeFilialRaw.trim().split(/[\s\-]+/).pop() ?? "";
+                            return <span style={{ marginLeft: 5, fontSize: 10, color: "#94a3b8", fontWeight: 400, letterSpacing: "0.02em" }}>{code}</span>;
+                          })()}
                         </div>
                         <div className={styles.stockByFilialBarWrap} aria-hidden>
                           <div className={styles.stockByFilialBar} style={{ width: `${bar}%` }} />

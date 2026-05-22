@@ -1,6 +1,7 @@
 import sql from 'mssql';
 
-import { resolveCompany, isEcommerceFilial, type CompanyModule, VAREJO_VALUE } from '@/lib/config/company';
+import { resolveCompany, isEcommerceFilial, getActiveFilial, type CompanyModule, VAREJO_VALUE } from '@/lib/config/company';
+import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import { eachDayOfInterval, subMilliseconds } from 'date-fns';
@@ -183,6 +184,7 @@ export interface ProductDetailInfo {
 export interface ProductStockByFilial {
   filial: string;
   filialDisplayName: string;
+  activeFilialRaw?: string;
   stock: number;
   revenue: number;
   quantity: number;
@@ -1385,17 +1387,16 @@ export async function fetchProductStockByFilial({
   const { start, end } = resolveRange(range);
   const previousRange = shiftRangeByMonths({ start, end }, -1);
 
+  // Usa config dinâmica para respeitar a filial ativa definida no admin (Grupos de Filiais)
+  const companyConfig = await resolveCompanyDynamic(company);
+  if (!companyConfig) return [];
+
   return withRequest(async (request) => {
     request.input('productId', sql.VarChar, productId);
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
     request.input('previousStartDate', sql.DateTime, previousRange.start);
     request.input('previousEndDate', sql.DateTime, previousRange.end);
-
-    const companyConfig = resolveCompany(company);
-    if (!companyConfig) {
-      return [];
-    }
 
     const colorFilter = buildColorFilter(request, colors);
     const colorFilterVp = colorFilter('vp');
@@ -1582,7 +1583,7 @@ export async function fetchProductStockByFilial({
     const normalizedEcommerceFilials = ecommerceFilials.map(f => f.trim());
 
     // Agregar por filialDisplayName para não repetir a mesma filial (ex.: vários códigos → "E-COMMERCE")
-    const aggByDisplayName = new Map<string, { stock: number; revenue: number; quantity: number; previousRevenue: number }>();
+    const aggByDisplayName = new Map<string, { stock: number; revenue: number; quantity: number; previousRevenue: number; activeFilialRaw?: string }>();
 
     allFiliais.forEach((filialName) => {
       if (!normalizedFiliais.includes(filialName)) return;
@@ -1590,7 +1591,22 @@ export async function fetchProductStockByFilial({
 
       const filialDisplayName = displayNames[filialName] ?? filialName;
       const existing = aggByDisplayName.get(filialDisplayName) ?? { stock: 0, revenue: 0, quantity: 0, previousRevenue: 0 };
-      existing.stock += Math.max(0, stockMap.get(filialName) ?? 0);
+
+      // Estoque: usa somente a filial ativa do grupo (evita somar saldos de CNPJs antigos/inativos)
+      const activeFilialForStock = getActiveFilial(companyConfig, filialName);
+      const isActiveFilial = activeFilialForStock.trim().toUpperCase() === filialName.trim().toUpperCase();
+      if (isActiveFilial) {
+        existing.stock += Math.max(0, stockMap.get(filialName) ?? 0);
+        // Só expõe o código da filial ativa se a filial pertence a um grupo com múltiplos membros
+        const groupMembers = Object.values(companyConfig.filialGroups ?? {}).find((members) =>
+          members.some((m) => m.trim().toUpperCase() === filialName.trim().toUpperCase())
+        );
+        if (groupMembers && groupMembers.length > 1) {
+          existing.activeFilialRaw = filialName;
+        }
+      }
+
+      // Vendas: soma todas as entidades do grupo (histórico completo)
       existing.revenue += currentRevenueMap.get(filialName) ?? 0;
       existing.quantity += currentQuantityMap.get(filialName) ?? 0;
       existing.previousRevenue += previousRevenueMap.get(filialName) ?? 0;
@@ -1606,6 +1622,7 @@ export async function fetchProductStockByFilial({
       result.push({
         filial: filialDisplayName,
         filialDisplayName,
+        activeFilialRaw: agg.activeFilialRaw,
         stock: agg.stock,
         revenue: agg.revenue,
         quantity: agg.quantity,
