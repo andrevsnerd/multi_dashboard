@@ -18,7 +18,7 @@ export function calcNecessidadeMinimaQty(input: {
   return calcNecessidadeMinimaQtyAdjusted(input);
 }
 
-export type SuggestionBaseType = "COMPRA" | "S" | "E" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
+export type SuggestionBaseType = "COMPRA" | "S" | "E" | "PO" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
 
 export type FilialNecessidadeMinimaInfo = {
   filial: string;
@@ -228,6 +228,7 @@ export function getSuggestionPrincipalBadgeLabel(type: SuggestionBaseType): stri
   if (type === "COMPRA") return "COMPRA";
   if (type === "S") return "S";
   if (type === "E") return "E";
+  if (type === "PO") return "PO";
   if (type === "NM") return "NM";
   return null;
 }
@@ -264,6 +265,8 @@ export function getCombinedNecessidadeMinimaTooltip(input: {
         ? "regra S"
         : input.baseType === "E"
           ? "regra E"
+          : input.baseType === "PO"
+            ? "regra PO"
           : "regra NM";
 
   const nmTotal =

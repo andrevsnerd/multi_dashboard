@@ -383,6 +383,36 @@
   color: #64748b;
 }
 
+.ruleTooltip {
+  position: fixed;
+  z-index: 50;
+  max-width: 340px;
+  background: rgba(15, 23, 42, 0.96);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.32);
+  pointer-events: none;
+}
+
+.ruleTooltipTitle {
+  font-size: 12px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 8px;
+}
+
+.ruleTooltipLine {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #cbd5e1;
+}
+
+.ruleTooltipLine + .ruleTooltipLine {
+  margin-top: 4px;
+}
+
 .missingCard {
   margin-top: 18px;
   padding: 20px 22px;

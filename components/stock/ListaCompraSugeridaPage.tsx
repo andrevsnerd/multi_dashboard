@@ -27,6 +27,13 @@ import {
   getNecessidadeMinimaRuleDescription,
 } from "@/lib/utils/necessidade-minima";
 import {
+  calcQtdSugestaoPOInfo,
+  getReposicaoBaseType as getSharedReposicaoBaseType,
+  getReposicaoCompraView as getSharedReposicaoCompraView,
+  getSuggestedQtyValue as getSharedSuggestedQtyValue,
+  type SuggestionPOData,
+} from "@/lib/utils/suggestion-rules";
+import {
   fetchControleEstoqueItemMetricasClient,
   fetchControleEstoqueMetricasItensClient,
 } from "@/lib/client/controle-estoque-metricas";
@@ -63,7 +70,7 @@ interface ReposicaoItem {
   custoUnit?: number;
   /** Quantidade já calculada pela regra Lista-Loja em ProjecaoEstoquePage (evita re-fetch) */
   suggestionQty?: number;
-  /** Tipo da sugestão: COMPRA, S, E, SUFICIENTE, SEM_SUGESTAO */
+  /** Tipo da sugestão: COMPRA, S, E, PO, SUFICIENTE, SEM_SUGESTAO */
   suggestionType?: string;
   /** Dados para tooltip do critério S */
   suggestionSData?: { mediaVendasMes: number; mesesHistoricoFilial: number; estoqueAtual: number; limiteDias: number };
@@ -126,7 +133,7 @@ interface ProdutoComCurva extends ProdutoSugestao {
   sugestaoView?: SuggestionView;
 }
 
-type SuggestionType = "COMPRA" | "S" | "E" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
+type SuggestionType = "COMPRA" | "S" | "E" | "PO" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
 
 interface SuggestionView {
   type: SuggestionType;
@@ -134,6 +141,7 @@ interface SuggestionView {
   qtdFinal: number;
   qtdS: number;
   qtdE: number;
+  qtdPO?: number;
   transitTotal?: number;
   transitDates?: string[];
   suppressedByTransit?: boolean;
@@ -194,8 +202,62 @@ function getMesesHistoricoFilial(item: { mesesHistoricoFilial?: number | null })
   return Math.min(12, Math.max(1, meses));
 }
 
-function getQtde12mBase(item: { qtde12m?: number; vendas3meses?: number }): number {
+function getQtde12mBase(item: { qtde12m?: number | null; vendas3meses?: number | null }): number {
   return Number(item.qtde12m ?? item.vendas3meses ?? 0);
+}
+
+function hydrateProdutoSugestaoComMetricas(
+  item: ProdutoSugestao,
+  metricas?: ControleEstoqueItemMetricas
+): ProdutoSugestao {
+  const baseItem: ProdutoSugestao = {
+    ...item,
+    qtde12m: getQtde12mBase(item),
+  };
+  if (!metricas) return baseItem;
+
+  return {
+    ...baseItem,
+    qtde12m: metricas.resumo.qtde12m,
+    vendasMesAtual: metricas.resumo.vendasMesAtual,
+    estoqueAtual: metricas.resumo.estoqueTotal,
+    primeiraEntradaFilial: metricas.resumo.primeiraEntradaFilial,
+    diasHistoricoFilial: metricas.resumo.diasHistoricoFilial,
+    mesesHistoricoFilial: metricas.resumo.mesesHistoricoFilial,
+    historicoParcial: metricas.resumo.historicoParcial,
+    diasDesdeUltimaVenda: metricas.resumo.diasDesdeUltimaVenda,
+    diasComEstoquePositivo: metricas.resumo.diasComEstoquePositivo,
+    diasSemEstoque: metricas.resumo.diasSemEstoque,
+    mesesDisponiveis: metricas.resumo.mesesDisponiveis,
+    velocidadeAjustada: metricas.resumo.velocidadeAjustada,
+  };
+}
+
+function getPotencialOcultoInfo(item: {
+  qtde12m?: number | null;
+  vendas3meses?: number | null;
+  estoqueAtual?: number | null;
+  linha?: string | null;
+  subgrupo?: string | null;
+  diasDesdeUltimaVenda?: number | null;
+  mesesHistoricoFilial?: number | null;
+  diasComEstoquePositivo?: number | null;
+  diasSemEstoque?: number | null;
+  mesesDisponiveis?: number | null;
+  velocidadeAjustada?: number | null;
+}): SuggestionPOData | null {
+  return calcQtdSugestaoPOInfo({
+    qtde12m: getQtde12mBase(item),
+    estoqueAtual: item.estoqueAtual,
+    linha: item.linha,
+    subgrupo: item.subgrupo,
+    diasDesdeUltimaVenda: item.diasDesdeUltimaVenda,
+    mesesHistoricoFilial: item.mesesHistoricoFilial,
+    diasComEstoquePositivo: item.diasComEstoquePositivo,
+    diasSemEstoque: item.diasSemEstoque,
+    mesesDisponiveis: item.mesesDisponiveis,
+    velocidadeAjustada: item.velocidadeAjustada,
+  });
 }
 
 // ─── ABC helpers (usados apenas na aba Análise ABC) ───────────────────────────
@@ -482,48 +544,30 @@ function calcQtdSugestaoEInfoFromListaCompraRule(item: ProdutoSugestao): { qtd: 
 }
 
 function getSuggestionViewFromListaCompraRule(item: ProdutoSugestao, diasCorridosMes: number): SuggestionView {
-  const qtdFinal = getSuggestedDeltaFromListaCompraRule(item, diasCorridosMes);
-
-  const vendasMes = Number(item.vendasMesAtual ?? 0);
-  const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
-  const estoqueAtual = Number(item.estoqueAtual ?? 0);
-  const { limiteDias } = getLimiteDiasReposicao(item);
-  const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
-  const qtdSuficiente = consumoDiario > 0 && duracaoAtual >= limiteDias;
-
-  const mediaVendasMes = getQtde12mBase(item) / getMesesHistoricoFilial(item);
-  const sEligivel = mediaVendasMes >= 1 && estoqueAtual <= mediaVendasMes * 2;
-  const qtdS = sEligivel ? calcQtdSugestaoSFromListaCompraRule(item) : 0;
-
-  if (qtdFinal > 0) {
-    if (qtdS > 0 && qtdFinal < 0.6 * qtdS) {
-      const blended = Math.round(0.8 * qtdS + 0.4 * qtdFinal);
-      return { type: "COMPRA", qty: blended, qtdFinal: blended, qtdS: 0, qtdE: 0 };
-    }
-    return { type: "COMPRA", qty: qtdFinal, qtdFinal, qtdS: 0, qtdE: 0 };
-  }
-
-  if (qtdSuficiente) {
-    return { type: "SUFICIENTE", qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0 };
-  }
-
-  if (sEligivel && qtdS > 0) {
-    return { type: "S", qty: qtdS, qtdFinal: 0, qtdS, qtdE: 0 };
-  }
-
-  const hasSugestaoE = estoqueAtual <= 0;
-  const eInfo = hasSugestaoE ? calcQtdSugestaoEInfoFromListaCompraRule(item) : null;
-  if (eInfo?.qtd) {
-    return { type: "E", qty: eInfo.qtd, qtdFinal: 0, qtdS: 0, qtdE: eInfo.qtd };
-  }
-
-  // Regra NM: a cada 5 vendas em 12 meses = +1 com estoque zerado
-  const qtdNM = calcNecessidadeMinimaQty({ estoqueAtual, qtde12m: getQtde12mBase(item) });
-  if (qtdNM > 0) {
-    return { type: "NM", qty: qtdNM, qtdFinal: 0, qtdS: 0, qtdE: 0 };
-  }
-
-  return { type: "SEM_SUGESTAO", qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0 };
+  const sugestao = getSharedReposicaoCompraView(
+    {
+      qtde12m: getQtde12mBase(item),
+      vendasMesAtual: item.vendasMesAtual,
+      estoqueAtual: item.estoqueAtual,
+      linha: item.linha,
+      subgrupo: item.subgrupo,
+      diasDesdeUltimaVenda: item.diasDesdeUltimaVenda,
+      mesesHistoricoFilial: item.mesesHistoricoFilial,
+      diasComEstoquePositivo: (item as ProdutoSugestao & { diasComEstoquePositivo?: number | null }).diasComEstoquePositivo,
+      diasSemEstoque: (item as ProdutoSugestao & { diasSemEstoque?: number | null }).diasSemEstoque,
+      mesesDisponiveis: (item as ProdutoSugestao & { mesesDisponiveis?: number | null }).mesesDisponiveis,
+      velocidadeAjustada: (item as ProdutoSugestao & { velocidadeAjustada?: number | null }).velocidadeAjustada,
+    },
+    diasCorridosMes
+  );
+  return {
+    type: getSharedReposicaoBaseType(sugestao),
+    qty: getSharedSuggestedQtyValue(sugestao),
+    qtdFinal: sugestao.qtdFinal,
+    qtdS: sugestao.qtdS,
+    qtdE: sugestao.qtdE,
+    qtdPO: sugestao.qtdPO,
+  };
 }
 
 function applyTransitToListaCompraSuggestion(
@@ -717,11 +761,11 @@ export default function ListaCompraSugeridaPage({
         const next: Record<string, ProdutoSugestao> = {};
         const nextNmTotal: Record<string, number> = {};
         const nextNmFiliais: Record<string, FilialNecessidadeMinimaInfo[]> = {};
-        rows.forEach((r) => {
-          r.qtde12m = getQtde12mBase(r);
-          const produto = (r.produto ?? "").trim();
+        rows.forEach((row) => {
+          const produto = (row.produto ?? "").trim();
           if (!produto) return;
-          const metricas = metricasItens[buildControleEstoqueItemKey(produto, r.cor ?? null)];
+          const metricas = metricasItens[buildControleEstoqueItemKey(produto, row.cor ?? null)];
+          const r = hydrateProdutoSugestaoComMetricas(row, metricas);
           const filiaisNM = metricas
             ? calcTotalPerFilialFiliais({
               company: resolveCompany(companyKey),
@@ -732,17 +776,6 @@ export default function ListaCompraSugeridaPage({
             : [];
           const totalNmQty = filiaisNM.reduce((sum, row) => sum + row.qtd, 0);
           const keyCorCodigo = buildSuggestionKey(produto, r.cor ?? "");
-          if (metricas) {
-            r.diasDesdeUltimaVenda = metricas.resumo.diasDesdeUltimaVenda;
-            r.diasHistoricoFilial = metricas.resumo.diasHistoricoFilial;
-            r.mesesHistoricoFilial = metricas.resumo.mesesHistoricoFilial;
-            r.primeiraEntradaFilial = metricas.resumo.primeiraEntradaFilial;
-            r.historicoParcial = metricas.resumo.historicoParcial;
-            r.diasComEstoquePositivo = metricas.resumo.diasComEstoquePositivo;
-            r.diasSemEstoque = metricas.resumo.diasSemEstoque;
-            r.mesesDisponiveis = metricas.resumo.mesesDisponiveis;
-            r.velocidadeAjustada = metricas.resumo.velocidadeAjustada;
-          }
           next[keyCorCodigo] = r;
           nextNmTotal[keyCorCodigo] = totalNmQty;
           nextNmFiliais[keyCorCodigo] = filiaisNM;
@@ -839,7 +872,7 @@ export default function ListaCompraSugeridaPage({
           const sugestaoNmTotalQty = Math.max(0, Number(item.suggestionNmTotalQty ?? 0));
           const sugestaoNmExtraQty = Math.max(0, Number(item.suggestionNmExtraQty ?? 0));
           const sugestaoHasCombinedNm = Boolean(item.suggestionHasCombinedNm);
-          if (sugestaoQtd <= 0 || (sugestaoTipo !== "COMPRA" && sugestaoTipo !== "S" && sugestaoTipo !== "E")) {
+          if (sugestaoQtd <= 0 || (sugestaoTipo !== "COMPRA" && sugestaoTipo !== "S" && sugestaoTipo !== "E" && sugestaoTipo !== "PO" && sugestaoTipo !== "NM")) {
             return {
               ...item,
               sugestaoTipo: (sugestaoTipo || "SEM_SUGESTAO") as SuggestionType,
@@ -889,7 +922,7 @@ export default function ListaCompraSugeridaPage({
           custoTotal: sugestaoQtd * (item.custoUnit ?? 0),
         };
       })
-      .filter((item) => item.sugestaoTipo === "COMPRA" || item.sugestaoTipo === "S" || item.sugestaoTipo === "E" || item.sugestaoTipo === "NM")
+      .filter((item) => item.sugestaoTipo === "COMPRA" || item.sugestaoTipo === "S" || item.sugestaoTipo === "E" || item.sugestaoTipo === "PO" || item.sugestaoTipo === "NM")
       .sort((a, b) => (b.sugestaoQtd ?? 0) - (a.sugestaoQtd ?? 0));
   }, [expandirPorCor, reposicaoComCusto, reposicaoAgrupadaPorProduto, reposicaoSuggestionMap, reposicaoNmTotalQtyMap, diasCorridosMes, comprasTransitoIndex]);
 
@@ -944,6 +977,20 @@ export default function ListaCompraSugeridaPage({
     estoqueAtual: number;
     limiteDias: number;
     qtdS: number;
+    transitTotal?: number;
+    transitDates?: string[];
+  }>(null);
+  const [sugestaoPOTooltip, setSugestaoPOTooltip] = useState<null | {
+    x: number;
+    y: number;
+    qtde12m?: number;
+    diasComEstoquePositivo?: number;
+    diasSemEstoque?: number;
+    velocidadeAjustada?: number;
+    potencialMensalBruto?: number;
+    limiteSeguro?: number;
+    qtdPO: number;
+    resumo?: string;
     transitTotal?: number;
     transitDates?: string[];
   }>(null);
@@ -1353,7 +1400,13 @@ export default function ListaCompraSugeridaPage({
             nextNmFiliais[keyCorDescricao] = filiaisNM;
           }
         });
-        setProdutosABC(data);
+        const dataComMetricas = data.map((row) =>
+          hydrateProdutoSugestaoComMetricas(
+            row,
+            metricasItens[buildControleEstoqueItemKey(row.produto, row.cor ?? null)]
+          )
+        );
+        setProdutosABC(dataComMetricas);
         setAbcNmTotalQtyMap(nextNmTotal);
         setAbcNmFiliaisMap(nextNmFiliais);
         setAbcLoadedKey(abcFetchKey);
@@ -1699,7 +1752,7 @@ export default function ListaCompraSugeridaPage({
                     <td colSpan={8}>
                       <div className={styles.sectionLabel}>
                         <span className={`${styles.curvaBadge} ${styles.badgeReposicao}`}>↑</span>
-                        <span className={styles.sectionTitle}>Produtos com sugestão acionável pela regra da Lista Loja (Compra, S, E)</span>
+                        <span className={styles.sectionTitle}>Produtos com sugestão acionável pela regra da Lista Loja (Compra, S, E, PO)</span>
                         <span className={styles.sectionCount}>
                           {reposicaoExibidaComCusto.length} item(ns)
                         </span>
@@ -1768,6 +1821,39 @@ export default function ListaCompraSugeridaPage({
                           )}
                           {baseType === "E" && (
                             <span className={styles.badgeE} style={{ marginLeft: 6 }}>E</span>
+                          )}
+                          {baseType === "PO" && (
+                            <span
+                              style={{
+                                marginLeft: 6,
+                                display: "inline-flex",
+                                padding: "0 5px",
+                                height: 16,
+                                borderRadius: "999px",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: 10,
+                                fontWeight: 800,
+                                color: "#14532d",
+                                background: "#86efac",
+                                border: "1px solid #22c55e",
+                                verticalAlign: "middle",
+                                cursor: "help",
+                              }}
+                              onMouseEnter={(e) => {
+                                setSugestaoPOTooltip({
+                                  x: e.clientX,
+                                  y: e.clientY,
+                                  qtdPO: Math.max(0, Number(item.sugestaoQtd ?? 0)),
+                                  resumo: "Produto identificado como ruptura com potencial na sugestão consolidada da reposição.",
+                                  transitTotal,
+                                  transitDates,
+                                });
+                              }}
+                              onMouseLeave={() => setSugestaoPOTooltip(null)}
+                            >
+                              PO
+                            </span>
                           )}
                           {hasCombinedNm && (
                             <span
@@ -2343,6 +2429,63 @@ export default function ListaCompraSugeridaPage({
                                     </td>
                                   );
                                 }
+                                if (sugestaoView.type === "PO" && sugestaoView.qty > 0) {
+                                  const poInfo = getPotencialOcultoInfo(p);
+                                  return (
+                                    <td className={styles.qtdSugerida}>
+                                      {fmt(sugestaoView.qty)}
+                                      <span
+                                        style={{
+                                          marginLeft: 6,
+                                          display: "inline-flex",
+                                          padding: "0 5px",
+                                          height: 16,
+                                          borderRadius: "999px",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          fontSize: 10,
+                                          fontWeight: 800,
+                                          color: "#14532d",
+                                          background: "#86efac",
+                                          border: "1px solid #22c55e",
+                                          verticalAlign: "middle",
+                                          cursor: "help",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          if (!poInfo) return;
+                                          setSugestaoPOTooltip({
+                                            x: e.clientX,
+                                            y: e.clientY,
+                                            qtde12m: getQtde12mBase(p),
+                                            diasComEstoquePositivo: poInfo.diasComEstoquePositivo,
+                                            diasSemEstoque: poInfo.diasSemEstoque,
+                                            velocidadeAjustada: poInfo.velocidadeAjustada,
+                                            potencialMensalBruto: poInfo.potencialMensalBruto,
+                                            limiteSeguro: poInfo.limiteSeguro,
+                                            qtdPO: sugestaoView.qty,
+                                            transitTotal: sugestaoView.transitTotal,
+                                            transitDates: sugestaoView.transitDates,
+                                          });
+                                        }}
+                                        onMouseLeave={() => setSugestaoPOTooltip(null)}
+                                      >PO</span>
+                                      {hasCombinedNm ? (
+                                        <span
+                                          className={styles.badgeT}
+                                          style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}
+                                          title={combinedNmTitle}
+                                        >
+                                          NM
+                                        </span>
+                                      ) : null}
+                                      {sugestaoView.transitTotal ? (
+                                        <span className={styles.badgeT} style={{ marginLeft: 6 }}>
+                                          T {fmt(sugestaoView.transitTotal)}
+                                        </span>
+                                      ) : null}
+                                    </td>
+                                  );
+                                }
                                 if (sugestaoView.type === "NM" && sugestaoView.qty > 0) {
                                   return (
                                     <td className={styles.qtdSugerida}>
@@ -2611,6 +2754,43 @@ export default function ListaCompraSugeridaPage({
                 <strong style={{ color: "#5eead4" }}>+{fmt(sugestaoSTooltip.transitTotal)} em trânsito</strong>
               </div>
               {sugestaoSTooltip.transitDates?.map((label) => (
+                <div key={label} className={styles.tooltipLine} style={{ color: "#99f6e4", fontSize: 11 }}>
+                  {label}
+                </div>
+              ))}
+            </>
+          ) : null}
+        </div>
+      )}
+
+      {sugestaoPOTooltip && (
+        <div
+          className={styles.tooltip}
+          style={getTooltipViewportPosition(sugestaoPOTooltip.x, sugestaoPOTooltip.y)}
+        >
+          <div className={styles.tooltipTitle}>Potencial Oculto (PO)</div>
+          <div className={styles.tooltipLine} style={{ color: "#86efac", marginBottom: 6 }}>
+            {sugestaoPOTooltip.resumo ?? "Item vendeu forte enquanto tinha estoque e depois ficou em ruptura."}
+          </div>
+          <div className={styles.tooltipDivider} />
+          {sugestaoPOTooltip.qtde12m != null && sugestaoPOTooltip.diasComEstoquePositivo != null ? (
+            <>
+              <div className={styles.tooltipLine}><strong>Base:</strong> {fmt(sugestaoPOTooltip.qtde12m)} un em {fmt(sugestaoPOTooltip.diasComEstoquePositivo)} dias com estoque</div>
+              <div className={styles.tooltipLine}><strong>Sem estoque:</strong> {fmt(sugestaoPOTooltip.diasSemEstoque ?? 0)} dias</div>
+              <div className={styles.tooltipLine}><strong>Velocidade ajustada:</strong> {(sugestaoPOTooltip.velocidadeAjustada ?? 0).toFixed(1)} un/mês</div>
+              <div className={styles.tooltipLine}><strong>Potencial mensal bruto:</strong> {(sugestaoPOTooltip.potencialMensalBruto ?? 0).toFixed(1)} un/mês</div>
+              <div className={styles.tooltipDivider} />
+              <div className={styles.tooltipLine}><strong>Trava de segurança:</strong> máximo de {fmt(sugestaoPOTooltip.limiteSeguro ?? 0)} un</div>
+            </>
+          ) : null}
+          <div className={styles.tooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoPOTooltip.qtdPO)} un</div>
+          {sugestaoPOTooltip.transitTotal ? (
+            <>
+              <div className={styles.tooltipDivider} />
+              <div className={styles.tooltipLine}>
+                <strong style={{ color: "#5eead4" }}>+{fmt(sugestaoPOTooltip.transitTotal)} em trânsito</strong>
+              </div>
+              {sugestaoPOTooltip.transitDates?.map((label) => (
                 <div key={label} className={styles.tooltipLine} style={{ color: "#99f6e4", fontSize: 11 }}>
                   {label}
                 </div>

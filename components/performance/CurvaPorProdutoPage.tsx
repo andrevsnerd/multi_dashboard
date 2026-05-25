@@ -32,7 +32,10 @@ import {
   getNecessidadeMinimaRuleDescription,
   getSuggestionPrincipalBadgeLabel,
 } from "@/lib/utils/necessidade-minima";
-import { getReposicaoCompraView as getSharedReposicaoCompraView } from "@/lib/utils/suggestion-rules";
+import {
+  getReposicaoBaseType as getSharedReposicaoBaseType,
+  getReposicaoCompraView as getSharedReposicaoCompraView,
+} from "@/lib/utils/suggestion-rules";
 import { exportCurvaPorProdutoCsv } from "@/lib/utils/exportCurvaPorProdutoCsv";
 import { exportCurvaPorProdutoXlsx } from "@/lib/utils/exportCurvaPorProdutoXlsx";
 
@@ -69,7 +72,7 @@ const EMPTY_METRICAS_ROW: MetricasRow = {
   filiaisNM: null,
 };
 
-type SuggestionType = "COMPRA" | "S" | "E" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
+type SuggestionType = "COMPRA" | "S" | "E" | "PO" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
 
 type SuggestionView = {
   text: string;
@@ -81,6 +84,10 @@ type SuggestionView = {
   combinedWithNm?: boolean;
   title?: string;
   nmFiliais?: FilialNecessidadeMinimaInfo[];
+  ruleTooltip?: {
+    title: string;
+    lines: string[];
+  };
 };
 
 type DisplayRow = CurvaPorProdutoApiResponse["rows"][number] & {
@@ -241,8 +248,10 @@ function getReposicaoCompraView(
     qtdFinal: sugestao.qtdFinal,
     qtdS: sugestao.qtdS,
     qtdE: sugestao.qtdE,
+    qtdPO: sugestao.qtdPO,
     qtdNM: sugestao.qtdNM,
     qtdSuficiente: sugestao.qtdSuficiente,
+    poData: sugestao.poData,
   };
 }
 
@@ -250,15 +259,11 @@ function getReposicaoBaseType(sugestao: {
   qtdFinal: number;
   qtdS: number;
   qtdE: number;
+  qtdPO?: number;
   qtdNM?: number;
   qtdSuficiente: boolean;
-}): "COMPRA" | "S" | "E" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO" {
-  if (sugestao.qtdFinal > 0) return "COMPRA";
-  if (sugestao.qtdS > 0) return "S";
-  if (sugestao.qtdE > 0) return "E";
-  if ((sugestao.qtdNM ?? 0) > 0) return "NM";
-  if (sugestao.qtdSuficiente) return "SUFICIENTE";
-  return "SEM_SUGESTAO";
+}): "COMPRA" | "S" | "E" | "PO" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO" {
+  return getSharedReposicaoBaseType(sugestao);
 }
 
 function buildProductDetalhadoHref(
@@ -301,6 +306,25 @@ function extractSuggestionNumber(value: string): number | "" {
   return Number.isFinite(parsed) ? parsed : "";
 }
 
+function getTooltipViewportPosition(x: number, y: number): { left: number; top: number } {
+  const offset = 12;
+  const tooltipWidth = 340;
+  const tooltipHeight = 220;
+  const margin = 12;
+  if (typeof window === "undefined") {
+    return { left: x + offset, top: y + offset };
+  }
+  const maxLeft = Math.max(margin, window.innerWidth - tooltipWidth - margin);
+  const maxTop = Math.max(margin, window.innerHeight - tooltipHeight - margin);
+  const left = Math.min(Math.max(margin, x + offset), maxLeft);
+  const topAbove = y - tooltipHeight - offset;
+  const topBelow = y + offset;
+  const top = topAbove >= margin
+    ? topAbove
+    : Math.min(Math.max(margin, topBelow), maxTop);
+  return { left, top };
+}
+
 export default function CurvaPorProdutoPage({ companyKey, month, year, compare }: Props) {
   const [range, setRange] = useState<DateRangeValue>(() => getInitialRange(month, year));
   const [comparisonMode, setComparisonMode] = useState<ComparisonMode>(compare);
@@ -312,6 +336,12 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
   const [data, setData] = useState<CurvaPorProdutoApiResponse | null>(null);
   const [metricas, setMetricas] = useState<Record<string, MetricasRow>>({});
   const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
+  const [suggestionTooltip, setSuggestionTooltip] = useState<null | {
+    x: number;
+    y: number;
+    title: string;
+    lines: string[];
+  }>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -474,7 +504,9 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
             ? sugestao.qtdS
             : sugestao.qtdE > 0
               ? sugestao.qtdE
-              : sugestao.qtdNM;
+              : sugestao.qtdPO > 0
+                ? sugestao.qtdPO
+                : sugestao.qtdNM;
       const combined = combineBaseSuggestionWithNecessidadeMinima({
         baseType,
         baseQty,
@@ -508,12 +540,15 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
         // Mantem o status explicito ate a linha ter metricas consolidadas.
       } else if (transit.qty > 0) {
         const principalLabel = getSuggestionPrincipalBadgeLabel(combined.effectiveType);
+        const poInfo = sugestao.poData;
         const summaryText = combined.hasCombinedNm && principalLabel
           ? `${fmt(transit.qty)} ${principalLabel} + NM`
           : combined.effectiveType === "S"
             ? `S ${fmt(transit.qty)}`
-            : combined.effectiveType === "E"
+          : combined.effectiveType === "E"
               ? `E ${fmt(transit.qty)}`
+              : combined.effectiveType === "PO"
+                ? `PO ${fmt(transit.qty)}`
               : combined.effectiveType === "NM"
                 ? `NM ${fmt(transit.qty)}`
                 : fmt(transit.qty);
@@ -535,8 +570,23 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
             })
             : combined.effectiveType === "NM"
               ? `${getNecessidadeMinimaRuleDescription()}${currentMetric?.filiaisNM?.length ? ` Filiais NM: ${formatNecessidadeMinimaFiliaisDescription(currentMetric.filiaisNM)}.` : ""}`
+              : combined.effectiveType === "PO"
+                ? "Potencial oculto: poucos dias com estoque, ruptura prolongada e velocidade alta enquanto disponivel."
               : undefined,
           nmFiliais: currentMetric?.filiaisNM ?? undefined,
+          ruleTooltip: combined.effectiveType === "PO" && poInfo
+            ? {
+              title: "Potencial Oculto (PO)",
+              lines: [
+                `Base: ${fmt(compraItem.qtde12m)} un em ${fmt(poInfo.diasComEstoquePositivo)} dias com estoque.`,
+                `Sem estoque: ${fmt(poInfo.diasSemEstoque)} dias.`,
+                `Velocidade ajustada: ${poInfo.velocidadeAjustada.toFixed(1)} un/mês.`,
+                `Potencial mensal bruto: ${poInfo.potencialMensalBruto.toFixed(1)} un/mês.`,
+                `Trava de segurança: máximo de ${fmt(poInfo.limiteSeguro)} un.`,
+                `Qtd sugerida: ${fmt(transit.qty)} un.`,
+              ],
+            }
+            : undefined,
         };
       } else if (combined.effectiveType === "SUFICIENTE" || transit.suppressedByTransit) {
         suggestion = { text: "Quantidade suficiente", tone: "ok", summaryText: "Quantidade suficiente", qty: 0, baseType: combined.effectiveType, nmExtraQty: 0, combinedWithNm: false };
@@ -871,6 +921,24 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
                                 NM
                               </span>
                             )}
+                            {row.suggestion.baseType === "PO" && (
+                              <span
+                                className={`${styles.suggestionBadge} ${styles.suggestionbuy}`}
+                                style={{ background: "#86efac", borderColor: "#22c55e", color: "#14532d", cursor: "help" }}
+                                onMouseEnter={(e) => {
+                                  if (!row.suggestion.ruleTooltip) return;
+                                  setSuggestionTooltip({
+                                    x: e.clientX,
+                                    y: e.clientY,
+                                    title: row.suggestion.ruleTooltip.title,
+                                    lines: row.suggestion.ruleTooltip.lines,
+                                  });
+                                }}
+                                onMouseLeave={() => setSuggestionTooltip(null)}
+                              >
+                                PO
+                              </span>
+                            )}
                             {row.suggestion.combinedWithNm && (
                               <span className={`${styles.suggestionBadge} ${styles.suggestionbuy}`} style={{ background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}>
                                 NM
@@ -916,6 +984,15 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
             </div>
           )}
         </>
+      )}
+
+      {suggestionTooltip && (
+        <div className={styles.ruleTooltip} style={getTooltipViewportPosition(suggestionTooltip.x, suggestionTooltip.y)}>
+          <div className={styles.ruleTooltipTitle}>{suggestionTooltip.title}</div>
+          {suggestionTooltip.lines.map((line) => (
+            <div key={line} className={styles.ruleTooltipLine}>{line}</div>
+          ))}
+        </div>
       )}
 
       <CurvaPorProdutoPickerModal

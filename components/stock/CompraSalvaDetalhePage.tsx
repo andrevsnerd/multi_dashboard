@@ -24,10 +24,12 @@ import {
   combineBaseSuggestionWithNecessidadeMinima,
 } from "@/lib/utils/necessidade-minima";
 import {
+  calcQtdSugestaoPOInfo,
   getLimiteDiasReposicao as getSharedLimiteDiasReposicao,
   getReposicaoBaseType as getSharedReposicaoBaseType,
   getReposicaoCompraView as getSharedReposicaoCompraView,
   getSuggestedQtyValue as getSharedSuggestedQtyValue,
+  type SuggestionPOData,
   type SuggestionRuleInput,
 } from "@/lib/utils/suggestion-rules";
 import { getMappedColorDescription } from "@/lib/utils/colorMapping";
@@ -318,7 +320,13 @@ function calcularSugestaoCompletoComTransito(
     totalNmQty: number | null;
   } | undefined,
   comprasTransitoIndex: CompraTransitoIndex
-): { qty: number | null; transitTotal: number; transitDates: string[] } {
+): {
+  qty: number | null;
+  transitTotal: number;
+  transitDates: string[];
+  baseType?: "COMPRA" | "S" | "E" | "PO" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
+  poData?: SuggestionPOData;
+} {
   if (!match || liveData === undefined) {
     return { qty: null, transitTotal: 0, transitDates: [] };
   }
@@ -362,6 +370,8 @@ function calcularSugestaoCompletoComTransito(
       transitDates: transit.entries.map(
         (entry) => `${new Date(`${entry.dataRecebimento}T00:00:00`).toLocaleDateString("pt-BR")} (+${fmt(entry.quantidade)})`
       ),
+      baseType: combined.effectiveType,
+      poData: sugestaoBase.poData,
     };
   }
 }
@@ -964,7 +974,7 @@ export default function CompraSalvaDetalhePage({
       const custoTotal = custoUnit > 0 ? Math.round(effectiveQtdManual * custoUnit) : 0;
       const sugestaoAtual = calcularSugestaoCompletoComTransito(match, live, comprasTransitoIndex);
       const qtdSugerida = sugestaoAtual.qty;
-      return { it, match, estoque, custoUnit, custoTotal, qtdSugerida, sugestaoAtual, effectiveQtdManual };
+      return { it, match, live, estoque, custoUnit, custoTotal, qtdSugerida, sugestaoAtual, effectiveQtdManual };
     });
   }, [items, listaRows, expandirPorCor, liveMetrics, manualDistribuicao, manualState, manualTotalByItemKey, comprasTransitoIndex]);
 
@@ -1007,6 +1017,19 @@ export default function CompraSalvaDetalhePage({
     ritmoMensal60d: number;
     tendenciaTexto: string;
     ajusteDestinoTexto: string;
+    transitTotal?: number;
+    transitDates?: string[];
+  }>(null);
+  const [sugestaoPOTooltip, setSugestaoPOTooltip] = useState<null | {
+    x: number;
+    y: number;
+    qtde12m: number;
+    diasComEstoquePositivo: number;
+    diasSemEstoque: number;
+    velocidadeAjustada: number;
+    potencialMensalBruto: number;
+    limiteSeguro: number;
+    qtdPO: number;
     transitTotal?: number;
     transitDates?: string[];
   }>(null);
@@ -1586,7 +1609,7 @@ export default function CompraSalvaDetalhePage({
                   </tr>
                 </thead>
                 <tbody>
-                  {rowsComputed.map(({ it, match, estoque, custoUnit, custoTotal, qtdSugerida, sugestaoAtual, effectiveQtdManual }) => {
+                  {rowsComputed.map(({ it, match, live, estoque, custoUnit, custoTotal, qtdSugerida, sugestaoAtual, effectiveQtdManual }) => {
                     const itemManualState = manualState[it.itemKey] ?? "auto";
                     const isEditing = itemManualState === "editing";
                     const isConfirmed = itemManualState === "confirmed";
@@ -1699,6 +1722,35 @@ export default function CompraSalvaDetalhePage({
                                   : partesDestino === null
                                     ? "—"
                                     : <DestinoCompraFinalBadges partes={partesDestino} />}
+                                {qtdSugerida !== null && sugestaoAtual.baseType === "PO" && (() => {
+                                  const poInfo = sugestaoAtual.poData
+                                    ?? (match && live ? calcQtdSugestaoPOInfo(buildSuggestionRuleInput(match, live)) : null);
+                                  if (!poInfo) return null;
+                                  return (
+                                    <span
+                                      className={styles.badgeT}
+                                      style={{ marginLeft: 6, background: "#86efac", borderColor: "#22c55e", color: "#14532d", cursor: "help" }}
+                                      onMouseEnter={(e) => {
+                                        setSugestaoPOTooltip({
+                                          x: e.clientX,
+                                          y: e.clientY,
+                                          qtde12m: Math.max(0, Number(live?.qtde12m ?? 0)),
+                                          diasComEstoquePositivo: poInfo.diasComEstoquePositivo,
+                                          diasSemEstoque: poInfo.diasSemEstoque,
+                                          velocidadeAjustada: poInfo.velocidadeAjustada,
+                                          potencialMensalBruto: poInfo.potencialMensalBruto,
+                                          limiteSeguro: poInfo.limiteSeguro,
+                                          qtdPO: qtdSugerida,
+                                          transitTotal: sugestaoAtual.transitTotal || undefined,
+                                          transitDates: sugestaoAtual.transitDates,
+                                        });
+                                      }}
+                                      onMouseLeave={() => setSugestaoPOTooltip(null)}
+                                    >
+                                      PO
+                                    </span>
+                                  );
+                                })()}
                                 {qtdSugerida !== null && qtdSugerida !== effectiveQtdManual && (() => {
                                   const diff = qtdSugerida - effectiveQtdManual;
                                   const diffFmt = `${diff > 0 ? "+" : ""}${diff}`;
@@ -1895,6 +1947,48 @@ export default function CompraSalvaDetalhePage({
                 <strong style={{ color: "#0f766e" }}>+{fmt(sugestaoDiffTooltip.transitTotal)} em trânsito</strong>
               </div>
               {sugestaoDiffTooltip.transitDates?.map((label) => (
+                <div key={label} className={styles.tooltipLine} style={{ color: "#0f766e", fontSize: 11 }}>
+                  {label}
+                </div>
+              ))}
+            </>
+          ) : null}
+        </div>
+      )}
+      {sugestaoPOTooltip && (
+        <div
+          className={styles.tooltipEstoque}
+          style={{ left: sugestaoPOTooltip.x + 12, top: sugestaoPOTooltip.y + 12 }}
+        >
+          <div className={styles.tooltipEstoqueHeader}>Potencial Oculto (PO)</div>
+          <div className={styles.tooltipLine}>Item vendeu forte enquanto tinha estoque e depois ficou em ruptura.</div>
+          <div className={styles.tooltipDivider} />
+          <div className={styles.tooltipLine}>
+            <strong>Base:</strong> {fmt(sugestaoPOTooltip.qtde12m)} un em {fmt(sugestaoPOTooltip.diasComEstoquePositivo)} dias com estoque
+          </div>
+          <div className={styles.tooltipLine}>
+            <strong>Sem estoque:</strong> {fmt(sugestaoPOTooltip.diasSemEstoque)} dias
+          </div>
+          <div className={styles.tooltipLine}>
+            <strong>Velocidade ajustada:</strong> {sugestaoPOTooltip.velocidadeAjustada.toFixed(1)} un/mês
+          </div>
+          <div className={styles.tooltipLine}>
+            <strong>Potencial mensal bruto:</strong> {sugestaoPOTooltip.potencialMensalBruto.toFixed(1)} un/mês
+          </div>
+          <div className={styles.tooltipDivider} />
+          <div className={styles.tooltipLine}>
+            <strong>Trava de segurança:</strong> máximo de {fmt(sugestaoPOTooltip.limiteSeguro)} un
+          </div>
+          <div className={styles.tooltipLine}>
+            <strong>Qtd sugerida:</strong> {fmt(sugestaoPOTooltip.qtdPO)} un
+          </div>
+          {sugestaoPOTooltip.transitTotal ? (
+            <>
+              <div className={styles.tooltipDivider} />
+              <div className={styles.tooltipLine}>
+                <strong style={{ color: "#0f766e" }}>+{fmt(sugestaoPOTooltip.transitTotal)} em trânsito</strong>
+              </div>
+              {sugestaoPOTooltip.transitDates?.map((label) => (
                 <div key={label} className={styles.tooltipLine} style={{ color: "#0f766e", fontSize: 11 }}>
                   {label}
                 </div>

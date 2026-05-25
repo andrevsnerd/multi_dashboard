@@ -40,7 +40,10 @@ import {
   formatNecessidadeMinimaFiliaisDescription,
   type FilialNecessidadeMinimaInfo,
 } from "@/lib/utils/necessidade-minima";
-import { getReposicaoCompraView as getSharedReposicaoCompraView } from "@/lib/utils/suggestion-rules";
+import {
+  getReposicaoBaseType as getSharedReposicaoBaseType,
+  getReposicaoCompraView as getSharedReposicaoCompraView,
+} from "@/lib/utils/suggestion-rules";
 import type { ProdutoAgrupadoMember } from "@/lib/utils/produtos-agrupados";
 import { isProdutoAgrupadoSyntheticId } from "@/lib/utils/produtos-agrupados";
 import FilialVendedoresTab from "./FilialVendedoresTab";
@@ -463,11 +466,13 @@ function getReposicaoCompraView(
   qtdFinal: number;
   qtdS: number;
   qtdE: number;
+  qtdPO: number;
   qtdNM: number;
   qtdSuficiente: boolean;
   semSugestao: boolean;
   sData?: import("@/lib/utils/suggestion-rules").SuggestionSData;
   eData?: import("@/lib/utils/suggestion-rules").SuggestionEData;
+  poData?: import("@/lib/utils/suggestion-rules").SuggestionPOData;
 } {
   const sugestao = getSharedReposicaoCompraView(
     {
@@ -489,11 +494,13 @@ function getReposicaoCompraView(
     qtdFinal: sugestao.qtdFinal,
     qtdS: sugestao.qtdS,
     qtdE: sugestao.qtdE,
+    qtdPO: sugestao.qtdPO,
     qtdNM: sugestao.qtdNM,
     qtdSuficiente: sugestao.qtdSuficiente,
     semSugestao: sugestao.semSugestao,
     sData: sugestao.sData,
     eData: sugestao.eData,
+    poData: sugestao.poData,
   };
 }
 
@@ -501,15 +508,11 @@ function getReposicaoBaseType(sugestao: {
   qtdFinal: number;
   qtdS: number;
   qtdE: number;
+  qtdPO?: number;
   qtdNM?: number;
   qtdSuficiente: boolean;
-}): "COMPRA" | "S" | "E" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO" {
-  if (sugestao.qtdFinal > 0) return "COMPRA";
-  if (sugestao.qtdS > 0) return "S";
-  if (sugestao.qtdE > 0) return "E";
-  if ((sugestao.qtdNM ?? 0) > 0) return "NM";
-  if (sugestao.qtdSuficiente) return "SUFICIENTE";
-  return "SEM_SUGESTAO";
+}): "COMPRA" | "S" | "E" | "PO" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO" {
+  return getSharedReposicaoBaseType(sugestao);
 }
 
 function buildCurvaAbcMetricKey(
@@ -918,7 +921,9 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
             ? sugestao.qtdS
             : sugestao.qtdE > 0
               ? sugestao.qtdE
-              : sugestao.qtdNM;
+              : sugestao.qtdPO > 0
+                ? sugestao.qtdPO
+                : sugestao.qtdNM;
       const combined = combineBaseSuggestionWithNecessidadeMinima({
         baseType,
         baseQty,
@@ -1150,14 +1155,16 @@ const handleBadgeClick = (cat: string) => {
     };
     const sugestao = getReposicaoCompraView(compraItem, diasCorridosMes);
     const baseType = getReposicaoBaseType(sugestao);
-    const baseQty =
-      sugestao.qtdFinal > 0
-        ? sugestao.qtdFinal
-        : sugestao.qtdS > 0
-          ? sugestao.qtdS
-          : sugestao.qtdE > 0
-            ? sugestao.qtdE
-            : sugestao.qtdNM;
+                                      const baseQty =
+                                        sugestao.qtdFinal > 0
+                                          ? sugestao.qtdFinal
+                                          : sugestao.qtdS > 0
+                                            ? sugestao.qtdS
+                                            : sugestao.qtdE > 0
+                                              ? sugestao.qtdE
+                                              : sugestao.qtdPO > 0
+                                                ? sugestao.qtdPO
+                                                : sugestao.qtdNM;
     const combined = combineBaseSuggestionWithNecessidadeMinima({
       baseType,
       baseQty,
@@ -2052,14 +2059,16 @@ const handleBadgeClick = (cat: string) => {
                                     const sugestao = getReposicaoCompraView(compraItem, diasCorridosMes);
                                     const limiteDias = getLimiteDiasReposicao(compraItem);
                                     const baseType = getReposicaoBaseType(sugestao);
-                                    const baseQty =
-                                      sugestao.qtdFinal > 0
-                                        ? sugestao.qtdFinal
-                                        : sugestao.qtdS > 0
-                                          ? sugestao.qtdS
-                                          : sugestao.qtdE > 0
-                                            ? sugestao.qtdE
-                                            : sugestao.qtdNM;
+    const baseQty =
+      sugestao.qtdFinal > 0
+        ? sugestao.qtdFinal
+        : sugestao.qtdS > 0
+          ? sugestao.qtdS
+          : sugestao.qtdE > 0
+            ? sugestao.qtdE
+            : sugestao.qtdPO > 0
+              ? sugestao.qtdPO
+              : sugestao.qtdNM;
                                     const combined = combineBaseSuggestionWithNecessidadeMinima({
                                       baseType,
                                       baseQty,
@@ -2234,7 +2243,7 @@ const handleBadgeClick = (cat: string) => {
                                         </span>
                                       );
                                     }
-                                    if (baseType === "NM" && transit.qty > 0) {
+                                    if ((baseType === "PO" || baseType === "NM") && transit.qty > 0) {
                                       const vendasMes = Number(compraItem.vendasMesAtual ?? 0);
                                       const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
                                       return (
@@ -2243,8 +2252,10 @@ const handleBadgeClick = (cat: string) => {
                                           onMouseEnter={(e) => setSugestaoTooltip({
                                             x: e.clientX,
                                             y: e.clientY,
-                                            titulo: "Necessidade minima (NM)",
-                                            regra: "Sem outra regra de reposicao ativa. A sugestao vem da necessidade minima do item.",
+                                            titulo: baseType === "PO" ? "Potencial oculto (PO)" : "Necessidade minima (NM)",
+                                            regra: baseType === "PO"
+                                              ? "Poucos dias com estoque, ruptura prolongada e velocidade alta enquanto disponivel."
+                                              : "Sem outra regra de reposicao ativa. A sugestao vem da necessidade minima do item.",
                                             limiteDias,
                                             vendasMesAtual: vendasMes,
                                             diasCorridos: diasCorridosMes,
@@ -2277,7 +2288,7 @@ const handleBadgeClick = (cat: string) => {
                                               cursor: "help",
                                             }}
                                           >
-                                            NM
+                                            {baseType === "PO" ? "PO" : "NM"}
                                           </span>
                                           {transitBadge}
                                         </span>
@@ -2357,7 +2368,10 @@ const handleBadgeClick = (cat: string) => {
       )}
       {sugestaoTooltip && (
         <div className={styles.metricTooltip} style={getTooltipViewportPosition(sugestaoTooltip.x, sugestaoTooltip.y)}>
-          <div className={styles.metricTooltipTitle}>COMPRA → {fmt(sugestaoTooltip.qtdCalculada)} un</div>
+          <div className={styles.metricTooltipTitle}>{sugestaoTooltip.titulo}: {fmt(sugestaoTooltip.qtdCalculada)} un</div>
+          {sugestaoTooltip.regra ? (
+            <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>{sugestaoTooltip.regra}</div>
+          ) : null}
           <div className={styles.metricTooltipDivider} />
           <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
             <span>Estoque</span><span><strong>{fmt(sugestaoTooltip.estoqueAtual)} un</strong></span>

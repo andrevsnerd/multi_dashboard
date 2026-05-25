@@ -1,4 +1,4 @@
-export type SuggestionType = "COMPRA" | "S" | "E" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
+export type SuggestionType = "COMPRA" | "S" | "E" | "PO" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
 
 export interface SuggestionRuleInput {
   qtde12m?: number | null;
@@ -42,15 +42,31 @@ export interface SuggestionEData {
   cappedQty: number;
 }
 
+export interface SuggestionPOData {
+  qtd: number;
+  velocidadeAjustada: number;
+  velocidadeDisponivelDia: number;
+  potencialMensalBruto: number;
+  diasComEstoquePositivo: number;
+  diasSemEstoque: number;
+  mesesDisponiveis: number;
+  limiteDias: number;
+  sugestaoBruta: number;
+  limiteSeguro: number;
+  cappedQty: number;
+}
+
 export interface ReposicaoCompraView {
   qtdFinal: number;
   qtdS: number;
   qtdE: number;
+  qtdPO: number;
   qtdNM: number;
   qtdSuficiente: boolean;
   semSugestao: boolean;
   sData?: SuggestionSData;
   eData?: SuggestionEData;
+  poData?: SuggestionPOData;
 }
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
@@ -239,6 +255,54 @@ export function calcQtdSugestaoEInfo(item: SuggestionRuleInput): SuggestionEData
   };
 }
 
+function getPotencialOcultoLimiteSeguro(diasComEstoquePositivo: number): number {
+  if (diasComEstoquePositivo < 7) return 3;
+  if (diasComEstoquePositivo < 15) return 5;
+  return 8;
+}
+
+export function calcQtdSugestaoPOInfo(item: SuggestionRuleInput): SuggestionPOData | null {
+  const estoqueAtual = getEstoqueAtual(item);
+  if (estoqueAtual > 1) return null;
+
+  const qtde12m = getQtde12m(item);
+  if (qtde12m < 3) return null;
+
+  const diasComEstoquePositivo = getDiasComEstoquePositivo(item);
+  if (diasComEstoquePositivo <= 0 || diasComEstoquePositivo > 30) return null;
+
+  const diasSemEstoque = getDiasSemEstoque(item);
+  if (diasSemEstoque < Math.max(15, diasComEstoquePositivo * 2)) return null;
+
+  const mesesDisponiveis = getMesesDisponiveis(item);
+  const velocidadeAjustada = getVelocidadeAjustada(item);
+  const velocidadeDisponivelDia = qtde12m / Math.max(diasComEstoquePositivo, 1);
+  const potencialMensalBruto = velocidadeDisponivelDia * 30;
+  if (potencialMensalBruto < 4 || velocidadeAjustada < 4) return null;
+
+  const limiteDias = getLimiteDiasReposicao(item);
+  const sugestaoBruta = Math.max(1, Math.ceil(velocidadeAjustada * (limiteDias / 30)) - estoqueAtual);
+  const limiteSeguro = getPotencialOcultoLimiteSeguro(diasComEstoquePositivo);
+  const cappedQty = Math.max(
+    diasComEstoquePositivo < 15 ? 3 : 2,
+    Math.min(sugestaoBruta, limiteSeguro)
+  );
+
+  return {
+    qtd: cappedQty,
+    velocidadeAjustada,
+    velocidadeDisponivelDia,
+    potencialMensalBruto,
+    diasComEstoquePositivo,
+    diasSemEstoque,
+    mesesDisponiveis,
+    limiteDias,
+    sugestaoBruta,
+    limiteSeguro,
+    cappedQty,
+  };
+}
+
 export function getReposicaoCompraView(
   item: SuggestionRuleInput,
   diasCorridosMes: number
@@ -255,6 +319,8 @@ export function getReposicaoCompraView(
   const mesesDisponiveis = getMesesDisponiveis(item);
   const diasComEstoquePositivo = getDiasComEstoquePositivo(item);
   const diasSemEstoque = getDiasSemEstoque(item);
+  const poData = calcQtdSugestaoPOInfo(item) ?? undefined;
+  const qtdPO = poData?.qtd ?? 0;
   const alvoEstoqueS = Math.ceil(velocidadeAjustada * (limiteDias / 30));
   const sugestaoBrutaS = Math.max(0, alvoEstoqueS - estoqueAtual);
   const qtdS = velocidadeAjustada >= 1 ? applyDisponibilidadeCap(sugestaoBrutaS, item) : 0;
@@ -265,9 +331,11 @@ export function getReposicaoCompraView(
         qtdFinal: Math.round(0.8 * qtdS + 0.4 * qtdFinalPuro),
         qtdS: 0,
         qtdE: 0,
+        qtdPO,
         qtdNM: 0,
         qtdSuficiente: false,
         semSugestao: false,
+        poData,
       };
     }
 
@@ -275,9 +343,11 @@ export function getReposicaoCompraView(
       qtdFinal: qtdFinalPuro,
       qtdS: 0,
       qtdE: 0,
+      qtdPO,
       qtdNM: 0,
       qtdSuficiente: false,
       semSugestao: false,
+      poData,
     };
   }
 
@@ -286,9 +356,11 @@ export function getReposicaoCompraView(
       qtdFinal: 0,
       qtdS: 0,
       qtdE: 0,
+      qtdPO,
       qtdNM: 0,
       qtdSuficiente: true,
-      semSugestao: false,
+      semSugestao: qtdPO === 0,
+      poData,
     };
   }
 
@@ -297,6 +369,7 @@ export function getReposicaoCompraView(
       qtdFinal: 0,
       qtdS,
       qtdE: 0,
+      qtdPO,
       qtdNM: 0,
       qtdSuficiente: false,
       semSugestao: false,
@@ -313,6 +386,7 @@ export function getReposicaoCompraView(
         sugestaoBruta: sugestaoBrutaS,
         cappedQty: qtdS,
       },
+      poData,
     };
   }
 
@@ -322,10 +396,12 @@ export function getReposicaoCompraView(
       qtdFinal: 0,
       qtdS: 0,
       qtdE: eData.qtd,
+      qtdPO,
       qtdNM: 0,
       qtdSuficiente: false,
       semSugestao: false,
       eData,
+      poData,
     };
   }
 
@@ -341,9 +417,11 @@ export function getReposicaoCompraView(
     qtdFinal: 0,
     qtdS: 0,
     qtdE: 0,
+    qtdPO,
     qtdNM,
     qtdSuficiente: false,
-    semSugestao: qtdNM === 0,
+    semSugestao: qtdNM === 0 && qtdPO === 0,
+    poData,
   };
 }
 
@@ -351,23 +429,39 @@ export function getReposicaoBaseType(sugestao: {
   qtdFinal: number;
   qtdS: number;
   qtdE: number;
+  qtdPO?: number;
   qtdNM?: number;
   qtdSuficiente: boolean;
 }): SuggestionType {
-  if (sugestao.qtdFinal > 0) return "COMPRA";
-  if (sugestao.qtdS > 0) return "S";
-  if (sugestao.qtdE > 0) return "E";
-  if ((sugestao.qtdNM ?? 0) > 0) return "NM";
+  const principalQty = getSuggestedQtyValue({
+    qtdFinal: sugestao.qtdFinal,
+    qtdS: sugestao.qtdS,
+    qtdE: sugestao.qtdE,
+    qtdPO: sugestao.qtdPO ?? 0,
+    qtdNM: sugestao.qtdNM ?? 0,
+    qtdSuficiente: sugestao.qtdSuficiente,
+    semSugestao: false,
+  });
+  if (principalQty > 0) {
+    if (sugestao.qtdFinal === principalQty && sugestao.qtdFinal > 0) return "COMPRA";
+    if (sugestao.qtdS === principalQty && sugestao.qtdS > 0) return "S";
+    if (sugestao.qtdE === principalQty && sugestao.qtdE > 0) return "E";
+    if ((sugestao.qtdPO ?? 0) === principalQty && (sugestao.qtdPO ?? 0) > 0) return "PO";
+    if ((sugestao.qtdNM ?? 0) === principalQty && (sugestao.qtdNM ?? 0) > 0) return "NM";
+  }
   if (sugestao.qtdSuficiente) return "SUFICIENTE";
   return "SEM_SUGESTAO";
 }
 
 export function getSuggestedQtyValue(sugestao: ReposicaoCompraView): number {
-  if (sugestao.qtdFinal > 0) return sugestao.qtdFinal;
-  if (sugestao.qtdS > 0) return sugestao.qtdS;
-  if (sugestao.qtdE > 0) return sugestao.qtdE;
-  if (sugestao.qtdNM > 0) return sugestao.qtdNM;
-  return 0;
+  return Math.max(
+    0,
+    sugestao.qtdFinal,
+    sugestao.qtdS,
+    sugestao.qtdE,
+    sugestao.qtdPO,
+    sugestao.qtdNM
+  );
 }
 
 export function buildDisponibilidadeResumo(

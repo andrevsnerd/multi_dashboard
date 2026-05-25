@@ -195,6 +195,29 @@ interface ProdutoSugestaoMin {
 function getQtde12mBaseMin(item: { qtde12m?: number; vendas3meses?: number }): number {
   return Number(item.qtde12m ?? item.vendas3meses ?? 0);
 }
+function hydrateProjectionSuggestionItem(
+  item: ProdutoSugestaoMin,
+  metricas?: ControleEstoqueItemMetricas
+): ProdutoSugestaoMin {
+  const baseItem: ProdutoSugestaoMin = {
+    ...item,
+    qtde12m: getQtde12mBaseMin(item),
+  };
+  if (!metricas) return baseItem;
+
+  return {
+    ...baseItem,
+    qtde12m: metricas.resumo.qtde12m,
+    vendasMesAtual: metricas.resumo.vendasMesAtual,
+    estoqueAtual: metricas.resumo.estoqueTotal,
+    mesesHistoricoFilial: metricas.resumo.mesesHistoricoFilial,
+    diasDesdeUltimaVenda: metricas.resumo.diasDesdeUltimaVenda,
+    diasComEstoquePositivo: metricas.resumo.diasComEstoquePositivo,
+    diasSemEstoque: metricas.resumo.diasSemEstoque,
+    mesesDisponiveis: metricas.resumo.mesesDisponiveis,
+    velocidadeAjustada: metricas.resumo.velocidadeAjustada,
+  };
+}
 
 /** Item individual com necessidade de reposição */
 interface ReposicaoItem {
@@ -222,12 +245,12 @@ function getMesesHistoricoFilial(item: { mesesHistoricoFilial?: number | null })
 
 type SuggestionResult = {
   qty: number;
-  type: "COMPRA" | "S" | "E" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
+  type: "COMPRA" | "S" | "E" | "PO" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
   /** Dados para tooltip do critério S */
   sData?: { mediaVendasMes: number; mesesHistoricoFilial: number; estoqueAtual: number; limiteDias: number };
   transitTotal?: number;
   transitDates?: string[];
-  baseType?: "COMPRA" | "S" | "E" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
+  baseType?: "COMPRA" | "S" | "E" | "PO" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
   baseQty?: number;
   totalNmQty?: number;
   nmExtraQty?: number;
@@ -261,8 +284,10 @@ function getSuggestionListaLojaRule(item: ProdutoSugestaoMin): SuggestionResult 
           ? "S"
           : sugestao.qtdE > 0
             ? "E"
-            : sugestao.qtdNM > 0
-              ? "NM"
+            : sugestao.qtdPO > 0
+              ? "PO"
+              : sugestao.qtdNM > 0
+                ? "NM"
               : sugestao.qtdSuficiente
                 ? "SUFICIENTE"
                 : "SEM_SUGESTAO",
@@ -1225,10 +1250,16 @@ export default function ProjecaoEstoquePage({
             })),
           }).catch(() => ({} as Record<string, ControleEstoqueItemMetricas>))
           : {};
+        const rowsComMetricas = rows.map((row) =>
+          hydrateProjectionSuggestionItem(
+            row,
+            metricasItens[buildControleEstoqueItemKey(row.produto, row.cor ?? null)]
+          )
+        );
         const prices: Record<string, number> = {};
         const sugestoes: Record<string, number> = {};
         const results: Record<string, SuggestionResult> = {};
-        rows.forEach(p => {
+        rowsComMetricas.forEach(p => {
           prices[p.produto] = Number(p.custoUnitario ?? 0);
           const kCor = buildProdutoCorKey(p.produto, p.cor ?? "");
           const kCorDesc = buildProdutoCorKey(p.produto, (p as { corDescricao?: string }).corDescricao ?? "");
