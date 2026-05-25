@@ -31,6 +31,11 @@ type PendingBatch = {
 const clientCache = new Map<string, CacheEntry>();
 const pendingBatches = new Map<string, PendingBatch>();
 
+export function clearControleEstoqueMetricasClientCache() {
+  clientCache.clear();
+  pendingBatches.clear();
+}
+
 function buildScopeKey(input: {
   company?: string;
   filial?: string | null;

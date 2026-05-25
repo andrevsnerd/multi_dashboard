@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import type { SincronizacaoFilial, SincronizacaoStatus } from "@/lib/repositories/sincronizacao";
+import { formatBrasiliaDateTime } from "@/lib/utils/brasilia-datetime";
 
 import styles from "./SincronizacaoPage.module.css";
 
@@ -87,7 +88,7 @@ export default function SincronizacaoPage() {
           <span>Total de filiais: {filiais.length}</span>
           <span>
             Ultima verificacao:{" "}
-            {geradoEm ? new Date(geradoEm).toLocaleString("pt-BR") : "-"}
+            {geradoEm ? formatBrasiliaDateTime(geradoEm) : "-"}
           </span>
         </div>
       </div>
@@ -124,7 +125,7 @@ export default function SincronizacaoPage() {
                   <div className={styles.details}>
                     <span>
                       Ultima venda:{" "}
-                      {filial.ultimaVenda ? new Date(filial.ultimaVenda).toLocaleString("pt-BR") : "-"}
+                      {filial.ultimaVenda ? formatBrasiliaDateTime(filial.ultimaVenda) : "-"}
                     </span>
                     <span>Tempo: {filial.deltaDescricao}</span>
                     <span>Vendas hoje: {filial.vendasHoje}</span>

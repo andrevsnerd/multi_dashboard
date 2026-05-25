@@ -71,7 +71,14 @@
       "Bash(grep -n \"const { \\\\|const {$\\\\|diasComEstoquePositivo\\\\|mesesDisponiveis\\\\|velocidadeAjustada\" components/lista-loja/ListaLojaPage.tsx)",
       "Bash(grep -n \"const {$\\\\|} = item\" components/lista-loja/ListaLojaPage.tsx)",
       "Bash(awk 'NR>=1930 && NR<=1960' components/lista-loja/ListaLojaPage.tsx)",
-      "Bash(awk 'NR>=2090 && NR<=2110' components/lista-loja/ListaLojaPage.tsx)"
+      "Bash(awk 'NR>=2090 && NR<=2110' components/lista-loja/ListaLojaPage.tsx)",
+      "Bash(curl -s http://localhost:3000 -o /dev/null -w \"%{http_code}\")",
+      "Bash(curl -s \"http://localhost:3000/api/controle-estoque/lista-compra-sugerida?company=nerd&filial=&limit=10\")",
+      "Bash(npx tsx *)",
+      "Bash(NODE_PATH=node_modules node --require @swc-node/register/esm tmp/test-po-candidatos.ts)",
+      "Bash(echo \"\")",
+      "Bash(echo 'THROW_ERROR_LINE_RESTORED')",
+      "Bash(printf 'throw new Error\\(\\\\n  \"This module cannot be imported from a Client Component module. \" +\\\\n    \"It should only be used from a Server Component.\"\\\\n\\);\\\\n')"
     ]
   }
 }

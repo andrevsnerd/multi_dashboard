@@ -88,6 +88,7 @@ type SuggestionView = {
     title: string;
     lines: string[];
   };
+  hasPoData?: boolean;
 };
 
 type DisplayRow = CurvaPorProdutoApiResponse["rows"][number] & {
@@ -571,22 +572,22 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
             : combined.effectiveType === "NM"
               ? `${getNecessidadeMinimaRuleDescription()}${currentMetric?.filiaisNM?.length ? ` Filiais NM: ${formatNecessidadeMinimaFiliaisDescription(currentMetric.filiaisNM)}.` : ""}`
               : combined.effectiveType === "PO"
-                ? "Potencial oculto: poucos dias com estoque, ruptura prolongada e velocidade alta enquanto disponivel."
+                ? "Potencial oculto: velocidade ajustada pela disponibilidade real = qtde vendida ÷ (dias com estoque / 30), com trava de seguranca."
               : undefined,
           nmFiliais: currentMetric?.filiaisNM ?? undefined,
-          ruleTooltip: combined.effectiveType === "PO" && poInfo
+          ruleTooltip: poInfo
             ? {
-              title: "Potencial Oculto (PO)",
+              title: combined.effectiveType === "PO" ? "Potencial Oculto (PO)" : "Histórico Curto (PO)",
               lines: [
-                `Base: ${fmt(compraItem.qtde12m)} un em ${fmt(poInfo.diasComEstoquePositivo)} dias com estoque.`,
-                `Sem estoque: ${fmt(poInfo.diasSemEstoque)} dias.`,
-                `Velocidade ajustada: ${poInfo.velocidadeAjustada.toFixed(1)} un/mês.`,
-                `Potencial mensal bruto: ${poInfo.potencialMensalBruto.toFixed(1)} un/mês.`,
-                `Trava de segurança: máximo de ${fmt(poInfo.limiteSeguro)} un.`,
+                `Base: ${fmt(compraItem.qtde12m)} un em ${Math.round(poInfo.diasComEstoquePositivo)} dias com estoque.`,
+                ...(poInfo.diasSemEstoque > 0 ? [`Sem estoque: ${fmt(poInfo.diasSemEstoque)} dias.`] : []),
+                `Projeção: ~${poInfo.velocidadeAjustada.toFixed(0)} un/mês (= ${fmt(compraItem.qtde12m)} un ÷ ${(poInfo.diasComEstoquePositivo / 30).toFixed(2)} meses).`,
+                ...(poInfo.limiteSeguro > 0 ? [`Trava de segurança: máx. ${fmt(poInfo.limiteSeguro)} un.`] : []),
                 `Qtd sugerida: ${fmt(transit.qty)} un.`,
               ],
             }
             : undefined,
+          hasPoData: poInfo !== undefined,
         };
       } else if (combined.effectiveType === "SUFICIENTE" || transit.suppressedByTransit) {
         suggestion = { text: "Quantidade suficiente", tone: "ok", summaryText: "Quantidade suficiente", qty: 0, baseType: combined.effectiveType, nmExtraQty: 0, combinedWithNm: false };
@@ -921,7 +922,7 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
                                 NM
                               </span>
                             )}
-                            {row.suggestion.baseType === "PO" && (
+                            {(row.suggestion.baseType === "PO" || row.suggestion.hasPoData) && (
                               <span
                                 className={`${styles.suggestionBadge} ${styles.suggestionbuy}`}
                                 style={{ background: "#86efac", borderColor: "#22c55e", color: "#14532d", cursor: "help" }}

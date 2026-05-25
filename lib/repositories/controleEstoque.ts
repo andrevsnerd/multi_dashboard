@@ -7012,10 +7012,26 @@ export async function fetchVendasProdutoPorFilial({
       const entriesDay = entryByDay.get(dayIso);
       const salesDay = saleByDay.get(dayIso);
       const exitsDay = exitByDay.get(dayIso);
+      const filiaisPositivasNoDia = new Set<string>();
+      const markFilialPositivaNoDia = (filialKey: string) => {
+        if (filiaisPositivasNoDia.has(filialKey)) return;
+        filiaisPositivasNoDia.add(filialKey);
+        diasPositivosPorFilial.set(filialKey, (diasPositivosPorFilial.get(filialKey) ?? 0) + 1);
+      };
+
+      runningStockMap.forEach((stock, filialKey) => {
+        if (stock > 0) {
+          markFilialPositivaNoDia(filialKey);
+        }
+      });
 
       if (entriesDay) {
         entriesDay.forEach((qty, filialKey) => {
-          runningStockMap.set(filialKey, Math.round((runningStockMap.get(filialKey) ?? 0) + qty));
+          const nextStock = Math.round((runningStockMap.get(filialKey) ?? 0) + qty);
+          runningStockMap.set(filialKey, nextStock);
+          if (nextStock > 0) {
+            markFilialPositivaNoDia(filialKey);
+          }
         });
       }
       if (salesDay) {
@@ -7029,14 +7045,7 @@ export async function fetchVendasProdutoPorFilial({
         });
       }
 
-      let stockResumoDia = 0;
-      runningStockMap.forEach((stock, filialKey) => {
-        if (stock > 0) {
-          diasPositivosPorFilial.set(filialKey, (diasPositivosPorFilial.get(filialKey) ?? 0) + 1);
-          stockResumoDia += stock;
-        }
-      });
-      if (stockResumoDia > 0) diasPositivosResumo += 1;
+      if (filiaisPositivasNoDia.size > 0) diasPositivosResumo += 1;
     }
 
     if (byFilial.size === 0 && produtoCustoUnitario > 0) {
@@ -7060,7 +7069,7 @@ export async function fetchVendasProdutoPorFilial({
         const dataBaseHistorico = r.primeiraEntradaFilial ?? r.primeiraVendaFilial;
         const diasComEstoquePositivo = diasPositivosPorFilial.get(r.filial) ?? 0;
         const diasSemEstoque = Math.max(0, 365 - diasComEstoquePositivo);
-        const mesesDisponiveis = Math.max(diasComEstoquePositivo / 30, 1);
+        const mesesDisponiveis = diasComEstoquePositivo > 0 ? diasComEstoquePositivo / 30 : 0;
         return {
           ...r,
           custoUnitario: Number(r.custoUnitario ?? 0) || produtoCustoUnitario,
@@ -7070,11 +7079,14 @@ export async function fetchVendasProdutoPorFilial({
           diasComEstoquePositivo,
           diasSemEstoque,
           mesesDisponiveis,
-          velocidadeAjustada: Math.round((Number(r.qtde12m ?? 0) / mesesDisponiveis + Number.EPSILON) * 100) / 100,
+          velocidadeAjustada:
+            mesesDisponiveis > 0
+              ? Math.round((Number(r.qtde12m ?? 0) / mesesDisponiveis + Number.EPSILON) * 100) / 100
+              : 0,
         };
       });
     const diasSemEstoqueResumo = Math.max(0, 365 - diasPositivosResumo);
-    const mesesDisponiveisResumo = Math.max(diasPositivosResumo / 30, 1);
+    const mesesDisponiveisResumo = diasPositivosResumo > 0 ? diasPositivosResumo / 30 : 0;
     return {
       rows,
       resumoDisponibilidade: {
@@ -7082,10 +7094,12 @@ export async function fetchVendasProdutoPorFilial({
         diasSemEstoque: diasSemEstoqueResumo,
         mesesDisponiveis: mesesDisponiveisResumo,
         velocidadeAjustada:
-          Math.round(
-            (rows.reduce((sum, row) => sum + Number(row.qtde12m ?? 0), 0) / mesesDisponiveisResumo + Number.EPSILON) *
-              100
-          ) / 100,
+          mesesDisponiveisResumo > 0
+            ? Math.round(
+              (rows.reduce((sum, row) => sum + Number(row.qtde12m ?? 0), 0) / mesesDisponiveisResumo + Number.EPSILON) *
+                100
+            ) / 100
+            : 0,
       },
     };
   });

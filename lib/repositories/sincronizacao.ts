@@ -3,6 +3,7 @@ import sql from "mssql";
 import { resolveCompany, getFilialLabelForDisplay, getActiveFilial } from "@/lib/config/company";
 import { resolveCompanyDynamic } from "@/lib/config/company-server";
 import { withRequest } from "@/lib/db/connection";
+import { parseBrasiliaDateTime } from "@/lib/utils/brasilia-datetime";
 
 const SINCRONIZACAO_FILIAIS = [
   "SCARF ME - HIGIENOPOLIS 2",
@@ -53,14 +54,6 @@ export interface SincronizacaoFilial {
   itens: number | null;
   nfNumero: string | null;
   nfSerie: string | null;
-}
-
-function parseSqlDateTime(value: string | null | undefined): Date | null {
-  if (!value) return null;
-  // SQL returns "YYYY-MM-DD HH:mm:ss"; parse as local time to avoid UTC day shift.
-  const normalized = value.includes("T") ? value : value.replace(" ", "T");
-  const parsed = new Date(normalized);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function normalizarFilial(valor: unknown): string {
@@ -221,7 +214,7 @@ export async function fetchSincronizacaoFiliais(): Promise<{
             .query<{ DATA_VENDA: string | null }>(dataVendaQuery.replace("@codFilial", `@codFilial${sufixo}`));
 
       const venda = ultimaVendaResult.recordset[0];
-      const dataVenda = parseSqlDateTime(venda?.DATA_VENDA);
+      const dataVenda = parseBrasiliaDateTime(venda?.DATA_VENDA);
       const ticket = null;
       const valorTicket = 0;
       const vendedor = null;

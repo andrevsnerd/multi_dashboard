@@ -142,6 +142,7 @@ interface SuggestionView {
   qtdS: number;
   qtdE: number;
   qtdPO?: number;
+  hasPoData?: boolean;
   transitTotal?: number;
   transitDates?: string[];
   suppressedByTransit?: boolean;
@@ -567,6 +568,7 @@ function getSuggestionViewFromListaCompraRule(item: ProdutoSugestao, diasCorrido
     qtdS: sugestao.qtdS,
     qtdE: sugestao.qtdE,
     qtdPO: sugestao.qtdPO,
+    hasPoData: sugestao.poData !== undefined,
   };
 }
 
@@ -613,6 +615,8 @@ function applyTransitToListaCompraSuggestion(
     totalNmQty: combined.totalNmQty,
     nmExtraQty: combined.nmExtraQty,
     hasCombinedNm: combined.hasCombinedNm,
+    qtdPO: base.qtdPO,
+    hasPoData: base.hasPoData,
   };
 }
 
@@ -2323,6 +2327,12 @@ export default function ListaCompraSugeridaPage({
                                 const baseQty = Math.max(0, Number(sugestaoView.baseQty ?? sugestaoView.qty));
                                 const nmExtraQty = Math.max(0, Number(sugestaoView.nmExtraQty ?? 0));
                                 const hasCombinedNm = Boolean(sugestaoView.hasCombinedNm);
+                                const poInfo = getPotencialOcultoInfo(p);
+                                const hasPO = poInfo !== null || (sugestaoView.qtdPO != null && sugestaoView.qtdPO > 0) || Boolean(sugestaoView.hasPoData);
+                                const _poMesesHist = getMesesHistoricoFilial(p);
+                                const _poQtde12m = getQtde12mBase(p);
+                                const poDcFallback = poInfo?.diasComEstoquePositivo ?? (_poMesesHist > 0 ? Math.round(_poMesesHist * 30) : undefined);
+                                const poVelFallback = poInfo?.velocidadeAjustada ?? (_poMesesHist > 0 ? _poQtde12m / _poMesesHist : undefined);
                                 const nmFiliais = abcNmFiliaisMap[suggestionKey] ?? [];
                                 const combinedNmTitle = hasCombinedNm
                                   ? getCombinedNecessidadeMinimaTooltip({
@@ -2337,6 +2347,43 @@ export default function ListaCompraSugeridaPage({
                                   return (
                                     <td className={styles.qtdSugerida}>
                                       {fmt(sugestaoView.qty)}
+                                      {hasPO ? (
+                                        <span
+                                          style={{
+                                            marginLeft: 6,
+                                            display: "inline-flex",
+                                            padding: "0 5px",
+                                            height: 16,
+                                            borderRadius: "999px",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            fontSize: 10,
+                                            fontWeight: 800,
+                                            color: "#14532d",
+                                            background: "#86efac",
+                                            border: "1px solid #22c55e",
+                                            verticalAlign: "middle",
+                                            cursor: "help",
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            setSugestaoPOTooltip({
+                                              x: e.clientX,
+                                              y: e.clientY,
+                                              qtde12m: getQtde12mBase(p),
+                                              diasComEstoquePositivo: poDcFallback,
+                                              diasSemEstoque: poInfo?.diasSemEstoque,
+                                              velocidadeAjustada: poVelFallback,
+                                              potencialMensalBruto: poInfo?.potencialMensalBruto,
+                                              limiteSeguro: poInfo?.limiteSeguro,
+                                              qtdPO: sugestaoView.qty,
+                                              resumo: "Velocidade calculada sobre período com estoque limitado — potencial de demanda oculto.",
+                                              transitTotal: sugestaoView.transitTotal,
+                                              transitDates: sugestaoView.transitDates,
+                                            });
+                                          }}
+                                          onMouseLeave={() => setSugestaoPOTooltip(null)}
+                                        >PO</span>
+                                      ) : null}
                                       {hasCombinedNm ? (
                                         <span
                                           className={styles.badgeT}
@@ -2391,6 +2438,43 @@ export default function ListaCompraSugeridaPage({
                                           }
                                           onMouseLeave={() => setSugestaoSTooltip(null)}
                                         >S</span>
+                                        {hasPO ? (
+                                          <span
+                                            style={{
+                                              marginLeft: 6,
+                                              display: "inline-flex",
+                                              padding: "0 5px",
+                                              height: 16,
+                                              borderRadius: "999px",
+                                              alignItems: "center",
+                                              justifyContent: "center",
+                                              fontSize: 10,
+                                              fontWeight: 800,
+                                              color: "#14532d",
+                                              background: "#86efac",
+                                              border: "1px solid #22c55e",
+                                              verticalAlign: "middle",
+                                              cursor: "help",
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              setSugestaoPOTooltip({
+                                                x: e.clientX,
+                                                y: e.clientY,
+                                                qtde12m: getQtde12mBase(p),
+                                                diasComEstoquePositivo: poInfo?.diasComEstoquePositivo,
+                                                diasSemEstoque: poInfo?.diasSemEstoque,
+                                                velocidadeAjustada: poInfo?.velocidadeAjustada,
+                                                potencialMensalBruto: poInfo?.potencialMensalBruto,
+                                                limiteSeguro: poInfo?.limiteSeguro,
+                                                qtdPO: sugestaoView.qty,
+                                                resumo: "Velocidade calculada sobre período com estoque limitado — potencial de demanda oculto.",
+                                                transitTotal: sugestaoView.transitTotal,
+                                                transitDates: sugestaoView.transitDates,
+                                              });
+                                            }}
+                                            onMouseLeave={() => setSugestaoPOTooltip(null)}
+                                          >PO</span>
+                                        ) : null}
                                         {hasCombinedNm ? (
                                           <span
                                             className={styles.badgeT}
@@ -2412,6 +2496,43 @@ export default function ListaCompraSugeridaPage({
                                     <td className={styles.qtdSugerida}>
                                       {fmt(sugestaoView.qty)}
                                       <span className={styles.badgeE} style={{ marginLeft: 6 }}>E</span>
+                                      {hasPO ? (
+                                        <span
+                                          style={{
+                                            marginLeft: 6,
+                                            display: "inline-flex",
+                                            padding: "0 5px",
+                                            height: 16,
+                                            borderRadius: "999px",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            fontSize: 10,
+                                            fontWeight: 800,
+                                            color: "#14532d",
+                                            background: "#86efac",
+                                            border: "1px solid #22c55e",
+                                            verticalAlign: "middle",
+                                            cursor: "help",
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            setSugestaoPOTooltip({
+                                              x: e.clientX,
+                                              y: e.clientY,
+                                              qtde12m: getQtde12mBase(p),
+                                              diasComEstoquePositivo: poDcFallback,
+                                              diasSemEstoque: poInfo?.diasSemEstoque,
+                                              velocidadeAjustada: poVelFallback,
+                                              potencialMensalBruto: poInfo?.potencialMensalBruto,
+                                              limiteSeguro: poInfo?.limiteSeguro,
+                                              qtdPO: sugestaoView.qty,
+                                              resumo: "Velocidade calculada sobre período com estoque limitado — potencial de demanda oculto.",
+                                              transitTotal: sugestaoView.transitTotal,
+                                              transitDates: sugestaoView.transitDates,
+                                            });
+                                          }}
+                                          onMouseLeave={() => setSugestaoPOTooltip(null)}
+                                        >PO</span>
+                                      ) : null}
                                       {hasCombinedNm ? (
                                         <span
                                           className={styles.badgeT}
@@ -2770,20 +2891,41 @@ export default function ListaCompraSugeridaPage({
         >
           <div className={styles.tooltipTitle}>Potencial Oculto (PO)</div>
           <div className={styles.tooltipLine} style={{ color: "#86efac", marginBottom: 6 }}>
-            {sugestaoPOTooltip.resumo ?? "Item vendeu forte enquanto tinha estoque e depois ficou em ruptura."}
+            {sugestaoPOTooltip.resumo ?? "Vendeu rápido no curto período em que tinha estoque — demanda maior do que o histórico médio indica."}
           </div>
-          <div className={styles.tooltipDivider} />
           {sugestaoPOTooltip.qtde12m != null && sugestaoPOTooltip.diasComEstoquePositivo != null ? (
             <>
-              <div className={styles.tooltipLine}><strong>Base:</strong> {fmt(sugestaoPOTooltip.qtde12m)} un em {fmt(sugestaoPOTooltip.diasComEstoquePositivo)} dias com estoque</div>
-              <div className={styles.tooltipLine}><strong>Sem estoque:</strong> {fmt(sugestaoPOTooltip.diasSemEstoque ?? 0)} dias</div>
-              <div className={styles.tooltipLine}><strong>Velocidade ajustada:</strong> {(sugestaoPOTooltip.velocidadeAjustada ?? 0).toFixed(1)} un/mês</div>
-              <div className={styles.tooltipLine}><strong>Potencial mensal bruto:</strong> {(sugestaoPOTooltip.potencialMensalBruto ?? 0).toFixed(1)} un/mês</div>
               <div className={styles.tooltipDivider} />
-              <div className={styles.tooltipLine}><strong>Trava de segurança:</strong> máximo de {fmt(sugestaoPOTooltip.limiteSeguro ?? 0)} un</div>
+              <div className={styles.tooltipLine} style={{ fontSize: 13 }}>
+                <strong>{fmt(sugestaoPOTooltip.qtde12m)} vendas</strong>
+                {" em "}
+                <strong>{fmt(sugestaoPOTooltip.diasComEstoquePositivo)} dias</strong>
+                {" com estoque"}
+              </div>
+              <div className={styles.tooltipLine} style={{ color: "#86efac", fontSize: 13, marginTop: 2 }}>
+                {"→ projeção: ~"}
+                <strong>{(sugestaoPOTooltip.velocidadeAjustada ?? 0).toFixed(0)} un/mês</strong>
+              </div>
+              <div className={styles.tooltipLine} style={{ color: "#94a3b8", fontSize: 11, marginTop: 2 }}>
+                = {fmt(sugestaoPOTooltip.qtde12m)} un ÷ {((sugestaoPOTooltip.diasComEstoquePositivo ?? 0) / 30).toFixed(2)} meses disponíveis
+              </div>
+              {(sugestaoPOTooltip.diasSemEstoque ?? 0) > 0 && (
+                <div className={styles.tooltipLine} style={{ color: "#94a3b8", fontSize: 11 }}>
+                  {fmt(sugestaoPOTooltip.diasSemEstoque ?? 0)} dias sem estoque no período
+                </div>
+              )}
+              <div className={styles.tooltipDivider} />
             </>
-          ) : null}
-          <div className={styles.tooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoPOTooltip.qtdPO)} un</div>
+          ) : <div className={styles.tooltipDivider} />}
+          <div className={styles.tooltipLine} style={{ fontSize: 13 }}>
+            {"→ sugestão: "}
+            <strong>{fmt(sugestaoPOTooltip.qtdPO)} un</strong>
+          </div>
+          {sugestaoPOTooltip.limiteSeguro != null && sugestaoPOTooltip.limiteSeguro > 0 && (
+            <div className={styles.tooltipLine} style={{ color: "#94a3b8", fontSize: 11, marginTop: 2 }}>
+              trava de segurança: máx. {fmt(sugestaoPOTooltip.limiteSeguro)} un (histórico curto)
+            </div>
+          )}
           {sugestaoPOTooltip.transitTotal ? (
             <>
               <div className={styles.tooltipDivider} />

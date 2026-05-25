@@ -82,3 +82,436 @@ Creating turbopack project {
  POST /api/controle-estoque/metricas-itens 200 in 9.3s (compile: 4ms, render: 9.3s)
  POST /api/controle-estoque/metricas-itens 200 in 8.6s (compile: 5ms, render: 8.6s)
  POST /api/controle-estoque/metricas-itens 200 in 12.0s (compile: 6ms, render: 11.9s)
+ GET /nerd/curva-abc 200 in 3.3s (compile: 1346ms, render: 1927ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+ GET /api/compras-transito?company=nerd&includeItems=1 200 in 1314ms (compile: 225ms, render: 1089ms)
+ GET /api/curva-abc?company=nerd&month=4&year=2026&start=2026-05-01&end=2026-05-25&compare=month&porCor=1 200 in 8.8s (compile: 503ms, render: 8.3s)
+ GET /api/curva-abc?company=nerd&month=4&year=2026&start=2026-05-01&end=2026-05-25&compare=month&porCor=1 200 in 9.5s (compile: 397ms, render: 9.1s)
+ POST /api/controle-estoque/metricas-itens 200 in 52ms (compile: 23ms, render: 29ms)
+ POST /api/controle-estoque/metricas-itens 200 in 26ms (compile: 8ms, render: 18ms)
+ POST /api/controle-estoque/metricas-itens 200 in 19ms (compile: 4ms, render: 15ms)
+ POST /api/controle-estoque/metricas-itens 200 in 20ms (compile: 5ms, render: 15ms)
+ POST /api/controle-estoque/metricas-itens 200 in 91ms (compile: 40ms, render: 51ms)
+ POST /api/controle-estoque/metricas-itens 200 in 23ms (compile: 7ms, render: 16ms)
+ POST /api/controle-estoque/metricas-itens 200 in 39ms (compile: 10ms, render: 30ms)
+ POST /api/controle-estoque/metricas-itens 200 in 21ms (compile: 7ms, render: 14ms)
+ POST /api/controle-estoque/metricas-itens 200 in 16ms (compile: 5ms, render: 11ms)
+ POST /api/controle-estoque/metricas-itens 200 in 34ms (compile: 8ms, render: 26ms)
+ POST /api/controle-estoque/metricas-itens 200 in 18ms (compile: 6ms, render: 12ms)
+ POST /api/controle-estoque/metricas-itens 200 in 16ms (compile: 4ms, render: 12ms)
+ POST /api/controle-estoque/metricas-itens 200 in 22ms (compile: 5ms, render: 17ms)
+ POST /api/controle-estoque/metricas-itens 200 in 25ms (compile: 9ms, render: 16ms)
+ POST /api/controle-estoque/metricas-itens 200 in 71ms (compile: 27ms, render: 43ms)
+ POST /api/controle-estoque/metricas-itens 200 in 31ms (compile: 9ms, render: 21ms)
+ POST /api/controle-estoque/metricas-itens 200 in 31ms (compile: 12ms, render: 19ms)
+ POST /api/controle-estoque/metricas-itens 200 in 24ms (compile: 7ms, render: 17ms)
+ POST /api/controle-estoque/metricas-itens 200 in 38ms (compile: 8ms, render: 30ms)
+ POST /api/controle-estoque/metricas-itens 200 in 92ms (compile: 41ms, render: 51ms)
+ POST /api/controle-estoque/metricas-itens 200 in 23ms (compile: 11ms, render: 12ms)
+ POST /api/controle-estoque/metricas-itens 200 in 40ms (compile: 5ms, render: 34ms)
+ POST /api/controle-estoque/metricas-itens 200 in 7.9s (compile: 6ms, render: 7.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.3s (compile: 6ms, render: 8.3s)
+ POST /api/controle-estoque/metricas-itens 200 in 9.9s (compile: 3ms, render: 9.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 9.0s (compile: 4ms, render: 9.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 9.2s (compile: 8ms, render: 9.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 11.2s (compile: 4ms, render: 11.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.1s (compile: 6ms, render: 8.1s)
+ GET /scarfme/sincronizacao 200 in 234ms (compile: 66ms, render: 168ms)
+ POST /api/controle-estoque/metricas-itens 200 in 1781ms (compile: 7ms, render: 1774ms)
+ GET /api/sincronizacao 200 in 3.3s (compile: 29ms, render: 3.2s)
+ GET /api/sincronizacao 200 in 3.6s (compile: 45ms, render: 3.5s)
+ ✓ Compiled in 4.2s
+ GET /scarfme/sincronizacao 200 in 917ms (compile: 465ms, render: 453ms)
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+ GET /api/sincronizacao 200 in 4.9s (compile: 1540ms, render: 3.4s)
+ GET /api/sincronizacao 200 in 5.2s (compile: 1556ms, render: 3.6s)
+ GET /scarfme/sincronizacao 200 in 3.0s (compile: 1936ms, render: 1021ms)
+ GET /api/sincronizacao 200 in 4.8s (compile: 207ms, render: 4.6s)
+ GET /api/sincronizacao 200 in 4.9s (compile: 75ms, render: 4.8s)
+ GET /nerd/curva-abc 200 in 1144ms (compile: 618ms, render: 525ms)
+ GET /api/compras-transito?company=nerd&includeItems=1 200 in 73ms (compile: 34ms, render: 39ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+ GET /api/curva-abc?company=nerd&month=4&year=2026&start=2026-05-01&end=2026-05-25&compare=month&porCor=1 200 in 1681ms (compile: 33ms, render: 1648ms)
+ GET /api/curva-abc?company=nerd&month=4&year=2026&start=2026-05-01&end=2026-05-25&compare=month&porCor=1 200 in 2.1s (compile: 48ms, render: 2.0s)
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+ POST /api/controle-estoque/metricas-itens 200 in 11.6s (compile: 1346ms, render: 10.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.1s (compile: 10ms, render: 8.1s)
+ POST /api/controle-estoque/metricas-itens 200 in 9.5s (compile: 7ms, render: 9.5s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.6s (compile: 4ms, render: 8.5s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.4s (compile: 4ms, render: 8.4s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.7s (compile: 3ms, render: 7.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.2s (compile: 5ms, render: 8.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.6s (compile: 3ms, render: 7.6s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.1s (compile: 3ms, render: 8.1s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.9s (compile: 3ms, render: 7.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.9s (compile: 3ms, render: 7.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.2s (compile: 3ms, render: 8.1s)
+ ✓ Compiled in 1759ms
+ POST /api/controle-estoque/metricas-itens 200 in 7.8s (compile: 3ms, render: 7.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 2.7s (compile: 4ms, render: 2.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.0s (compile: 8ms, render: 8.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.8s (compile: 3ms, render: 8.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.2s (compile: 5ms, render: 8.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.1s (compile: 7ms, render: 8.1s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.6s (compile: 3ms, render: 7.6s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.7s (compile: 4ms, render: 7.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.9s (compile: 13ms, render: 7.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.0s (compile: 4ms, render: 8.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.6s (compile: 5ms, render: 7.6s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.9s (compile: 3ms, render: 8.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.8s (compile: 4ms, render: 7.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.2s (compile: 4ms, render: 8.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.0s (compile: 4ms, render: 8.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.8s (compile: 4ms, render: 7.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.8s (compile: 4ms, render: 7.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.8s (compile: 6ms, render: 7.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.7s (compile: 4ms, render: 7.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 3.2s (compile: 6ms, render: 3.2s)
+ GET /nerd/curva-abc 200 in 2.7s (compile: 1156ms, render: 1538ms)
+ GET /api/compras-transito?company=nerd&includeItems=1 200 in 70ms (compile: 33ms, render: 37ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+ GET /api/curva-abc?company=nerd&month=4&year=2026&start=2026-05-01&end=2026-05-25&compare=month&porCor=1 200 in 1551ms (compile: 36ms, render: 1515ms)
+ GET /api/curva-abc?company=nerd&month=4&year=2026&start=2026-05-01&end=2026-05-25&compare=month&porCor=1 200 in 1832ms (compile: 15ms, render: 1817ms)
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+ POST /api/controle-estoque/metricas-itens 200 in 11.8s (compile: 1771ms, render: 10.1s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.8s (compile: 3ms, render: 8.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 9.2s (compile: 3ms, render: 9.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.9s (compile: 3ms, render: 7.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.9s (compile: 2ms, render: 8.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.4s (compile: 3ms, render: 8.4s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.3s (compile: 2ms, render: 8.3s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.4s (compile: 2ms, render: 8.4s)
+ POST /api/controle-estoque/metricas-itens 200 in 9.1s (compile: 3ms, render: 9.1s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.8s (compile: 2ms, render: 7.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.8s (compile: 2ms, render: 7.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.2s (compile: 3ms, render: 8.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.0s (compile: 2ms, render: 8.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.5s (compile: 2ms, render: 8.5s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.2s (compile: 3ms, render: 8.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.7s (compile: 3ms, render: 8.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.0s (compile: 2ms, render: 8.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.4s (compile: 2ms, render: 7.4s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.6s (compile: 3ms, render: 7.6s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.1s (compile: 3ms, render: 8.1s)
+ ○ Compiling / ...
+ GET / 200 in 4.2s (compile: 4.1s, render: 90ms)
+ POST /api/controle-estoque/metricas-itens 200 in 7.6s (compile: 2ms, render: 7.6s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.0s (compile: 3ms, render: 8.0s)
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+✅ Conectado em 177.92.78.250
+ POST /api/controle-estoque/metricas-itens 200 in 9.6s (compile: 3ms, render: 9.6s)
+ GET /api/controle-estoque/lista-compra-sugerida?company=nerd&filial=&limit=10 200 in 13.0s (compile: 1907ms, render: 11.1s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.0s (compile: 1981µs, render: 8.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.3s (compile: 2ms, render: 7.3s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.8s (compile: 4ms, render: 7.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.8s (compile: 3ms, render: 7.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 12.0s (compile: 2ms, render: 12.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 12.1s (compile: 2ms, render: 12.1s)
+ POST /api/controle-estoque/metricas-itens 200 in 15.5s (compile: 3ms, render: 15.5s)
+ POST /api/controle-estoque/metricas-itens 200 in 6.5s (compile: 4ms, render: 6.5s)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+ GET /api/curva-abc?company=nerd&month=4&year=2026&start=2026-05-01&end=2026-05-25&compare=month&filial=NERD+MORUMBI+RDRRRJ&porCor=1 200 in 5.2s (compile: 336ms, render: 4.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 19.3s (compile: 82ms, render: 19.3s)
+ POST /api/controle-estoque/metricas-itens 200 in 14.1s (compile: 6ms, render: 14.1s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.8s (compile: 5ms, render: 8.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 10.8s (compile: 3ms, render: 10.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 11.3s (compile: 7ms, render: 11.3s)
+ POST /api/controle-estoque/metricas-itens 200 in 13.0s (compile: 2ms, render: 13.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 11.9s (compile: 3ms, render: 11.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 9.0s (compile: 3ms, render: 9.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.6s (compile: 3ms, render: 7.6s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.4s (compile: 3ms, render: 7.4s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.2s (compile: 4ms, render: 7.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 6.8s (compile: 5ms, render: 6.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 3.4s (compile: 3ms, render: 3.4s)
+ ✓ Compiled in 678ms
+ POST /api/controle-estoque/metricas-itens 200 in 35ms (compile: 18ms, render: 17ms)
+ POST /api/controle-estoque/metricas-itens 200 in 19ms (compile: 8ms, render: 11ms)
+ POST /api/controle-estoque/metricas-itens 200 in 34ms (compile: 16ms, render: 18ms)
+ POST /api/controle-estoque/metricas-itens 200 in 23ms (compile: 5ms, render: 18ms)
+ POST /api/controle-estoque/metricas-itens 200 in 13ms (compile: 4ms, render: 9ms)
+ ✓ Compiled in 1406ms
+ GET /api/compras-transito?company=nerd&includeItems=1 200 in 68ms (compile: 18ms, render: 50ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+ GET /api/curva-abc?company=nerd&month=4&year=2026&start=2026-05-01&end=2026-05-25&compare=month&porCor=1 200 in 1470ms (compile: 40ms, render: 1430ms)
+ POST /api/controle-estoque/metricas-itens 200 in 9.3s (compile: 3ms, render: 9.3s)
+ ✓ Compiled in 225ms
+ POST /api/controle-estoque/metricas-itens 200 in 8.7s (compile: 3ms, render: 8.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 6.0s (compile: 3ms, render: 6.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.3s (compile: 3ms, render: 8.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.5s (compile: 2ms, render: 8.5s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.2s (compile: 3ms, render: 8.1s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.0s (compile: 3ms, render: 8.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.7s (compile: 3ms, render: 7.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.7s (compile: 2ms, render: 7.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.7s (compile: 3ms, render: 7.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.7s (compile: 3ms, render: 8.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 10.9s (compile: 3ms, render: 10.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 12.1s (compile: 3ms, render: 12.1s)
+ POST /api/controle-estoque/metricas-itens 200 in 12.3s (compile: 3ms, render: 12.3s)
+ POST /api/controle-estoque/metricas-itens 200 in 12.1s (compile: 3ms, render: 12.1s)
+ POST /api/controle-estoque/metricas-itens 200 in 12.2s (compile: 3ms, render: 12.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 15.0s (compile: 3ms, render: 15.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 12.1s (compile: 3ms, render: 12.1s)
+ POST /api/controle-estoque/metricas-itens 200 in 12.2s (compile: 3ms, render: 12.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 12.6s (compile: 3ms, render: 12.6s)
+ ✓ Compiled in 255ms
+ POST /api/controle-estoque/metricas-itens 200 in 12.5s (compile: 4ms, render: 12.5s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.9s (compile: 3ms, render: 7.9s)
+ ✓ Compiled in 160ms
+ POST /api/controle-estoque/metricas-itens 200 in 24ms (compile: 8ms, render: 16ms)
+ POST /api/controle-estoque/metricas-itens 200 in 12.5s (compile: 3ms, render: 12.5s)
+ ✓ Compiled in 320ms
+ POST /api/controle-estoque/metricas-itens 200 in 12.2s (compile: 2ms, render: 12.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 9.3s (compile: 3ms, render: 9.3s)
+ POST /api/controle-estoque/metricas-itens 200 in 12.1s (compile: 3ms, render: 12.1s)
+ POST /api/controle-estoque/metricas-itens 200 in 12.3s (compile: 3ms, render: 12.3s)
+ POST /api/controle-estoque/metricas-itens 200 in 11.6s (compile: 3ms, render: 11.6s)
+ POST /api/controle-estoque/metricas-itens 200 in 11.9s (compile: 3ms, render: 11.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 12.3s (compile: 3ms, render: 12.3s)
+ POST /api/controle-estoque/metricas-itens 200 in 11.2s (compile: 3ms, render: 11.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.8s (compile: 2ms, render: 7.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 3.1s (compile: 3ms, render: 3.1s)
+ ✓ Compiled in 32ms
+ ✓ Compiled in 151ms
+ GET /nerd/curva-abc 200 in 1275ms (compile: 437ms, render: 838ms)
+ GET /api/compras-transito?company=nerd&includeItems=1 200 in 157ms (compile: 50ms, render: 107ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+ GET /api/curva-abc?company=nerd&month=4&year=2026&start=2026-05-01&end=2026-05-25&compare=month&porCor=1 200 in 2.8s (compile: 39ms, render: 2.8s)
+ GET /api/curva-abc?company=nerd&month=4&year=2026&start=2026-05-01&end=2026-05-25&compare=month&porCor=1 200 in 5.2s (compile: 85ms, render: 5.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 9.5s (compile: 36ms, render: 9.4s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.3s (compile: 4ms, render: 7.3s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.6s (compile: 3ms, render: 8.6s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.0s (compile: 3ms, render: 8.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.8s (compile: 2ms, render: 8.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.7s (compile: 4ms, render: 7.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 9.0s (compile: 5ms, render: 9.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.9s (compile: 3ms, render: 7.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.5s (compile: 3ms, render: 8.5s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.7s (compile: 2ms, render: 7.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.2s (compile: 3ms, render: 8.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.6s (compile: 2ms, render: 7.6s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.9s (compile: 4ms, render: 7.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.8s (compile: 2ms, render: 7.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.8s (compile: 4ms, render: 7.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.7s (compile: 4ms, render: 7.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.9s (compile: 2ms, render: 7.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 11.4s (compile: 3ms, render: 11.4s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.7s (compile: 2ms, render: 7.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.0s (compile: 3ms, render: 8.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.6s (compile: 2ms, render: 7.6s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.7s (compile: 3ms, render: 7.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.9s (compile: 3ms, render: 7.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.6s (compile: 2ms, render: 7.6s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.9s (compile: 3ms, render: 7.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.9s (compile: 2ms, render: 8.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 10.7s (compile: 2ms, render: 10.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 13.2s (compile: 2ms, render: 13.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 13.2s (compile: 3ms, render: 13.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 10.9s (compile: 4ms, render: 10.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 3.3s (compile: 3ms, render: 3.3s)
+ ✓ Compiled in 60ms
+ POST /api/controle-estoque/metricas-itens 200 in 15ms (compile: 6ms, render: 10ms)
+ POST /api/controle-estoque/metricas-itens 200 in 17ms (compile: 5ms, render: 12ms)
+ ✓ Compiled in 321ms
+ ✓ Compiled in 211ms
+ ✓ Compiled in 242ms
+ GET /nerd/curva-abc 200 in 1183ms (compile: 495ms, render: 689ms)
+ GET /api/compras-transito?company=nerd&includeItems=1 200 in 114ms (compile: 31ms, render: 84ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+ GET /api/curva-abc?company=nerd&month=4&year=2026&start=2026-05-01&end=2026-05-25&compare=month&porCor=1 200 in 2.9s (compile: 17ms, render: 2.9s)
+ GET /api/curva-abc?company=nerd&month=4&year=2026&start=2026-05-01&end=2026-05-25&compare=month&porCor=1 200 in 3.0s (compile: 6ms, render: 3.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 12ms (compile: 3ms, render: 8ms)
+ POST /api/controle-estoque/metricas-itens 200 in 14ms (compile: 5ms, render: 9ms)
+ POST /api/controle-estoque/metricas-itens 200 in 12ms (compile: 2ms, render: 9ms)
+ POST /api/controle-estoque/metricas-itens 200 in 13ms (compile: 3ms, render: 11ms)
+ POST /api/controle-estoque/metricas-itens 200 in 12ms (compile: 3ms, render: 9ms)
+ POST /api/controle-estoque/metricas-itens 200 in 14ms (compile: 3ms, render: 11ms)
+ POST /api/controle-estoque/metricas-itens 200 in 9ms (compile: 2ms, render: 7ms)
+ POST /api/controle-estoque/metricas-itens 200 in 11ms (compile: 3ms, render: 8ms)
+ POST /api/controle-estoque/metricas-itens 200 in 9ms (compile: 3ms, render: 7ms)
+ POST /api/controle-estoque/metricas-itens 200 in 13ms (compile: 3ms, render: 10ms)
+ POST /api/controle-estoque/metricas-itens 200 in 10ms (compile: 3ms, render: 7ms)
+ POST /api/controle-estoque/metricas-itens 200 in 9ms (compile: 2ms, render: 7ms)
+ POST /api/controle-estoque/metricas-itens 200 in 10ms (compile: 2ms, render: 8ms)
+ POST /api/controle-estoque/metricas-itens 200 in 9ms (compile: 2ms, render: 7ms)
+ POST /api/controle-estoque/metricas-itens 200 in 9ms (compile: 2ms, render: 6ms)
+ POST /api/controle-estoque/metricas-itens 200 in 9ms (compile: 2ms, render: 6ms)
+ POST /api/controle-estoque/metricas-itens 200 in 10ms (compile: 3ms, render: 7ms)
+ POST /api/controle-estoque/metricas-itens 200 in 8ms (compile: 2ms, render: 6ms)
+ POST /api/controle-estoque/metricas-itens 200 in 12ms (compile: 2ms, render: 10ms)
+ POST /api/controle-estoque/metricas-itens 200 in 11ms (compile: 2ms, render: 9ms)
+ POST /api/controle-estoque/metricas-itens 200 in 12ms (compile: 3ms, render: 9ms)
+ POST /api/controle-estoque/metricas-itens 200 in 13ms (compile: 4ms, render: 10ms)
+ POST /api/controle-estoque/metricas-itens 200 in 9ms (compile: 3ms, render: 7ms)
+ POST /api/controle-estoque/metricas-itens 200 in 14ms (compile: 2ms, render: 12ms)
+ POST /api/controle-estoque/metricas-itens 200 in 13ms (compile: 4ms, render: 10ms)
+ POST /api/controle-estoque/metricas-itens 200 in 80ms (compile: 68ms, render: 12ms)
+ POST /api/controle-estoque/metricas-itens 200 in 797ms (compile: 3ms, render: 794ms)
+ POST /api/controle-estoque/metricas-itens 200 in 12ms (compile: 3ms, render: 9ms)
+ POST /api/controle-estoque/metricas-itens 200 in 12ms (compile: 2ms, render: 9ms)
+ POST /api/controle-estoque/metricas-itens 200 in 9ms (compile: 2ms, render: 6ms)
+ POST /api/controle-estoque/metricas-itens 200 in 7ms (compile: 2ms, render: 5ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+ GET /api/curva-abc?company=nerd&start=2026-05-01&end=2026-05-25&compare=month&porCor=1 200 in 4.2s (compile: 195ms, render: 4.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 1160ms (compile: 11ms, render: 1149ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+ GET /api/curva-abc?company=nerd&start=2026-05-01&end=2026-05-25&compare=month&porCor=1 200 in 2.0s (compile: 7ms, render: 2.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 1455ms (compile: 3ms, render: 1452ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+ GET /api/curva-abc?company=nerd&start=2026-05-01&end=2026-05-25&compare=month&porCor=1 200 in 2.1s (compile: 4ms, render: 2.1s)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+ GET /api/curva-abc?company=nerd&start=2026-05-01&end=2026-05-25&compare=month&porCor=1 200 in 2.3s (compile: 6ms, render: 2.3s)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+ GET /api/curva-abc?company=nerd&start=2026-05-01&end=2026-05-25&compare=month&porCor=1 200 in 1717ms (compile: 3ms, render: 1715ms)
+ POST /api/controle-estoque/metricas-itens 200 in 7ms (compile: 3ms, render: 5ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+ GET /api/curva-abc?company=nerd&start=2026-05-01&end=2026-05-25&compare=month&porCor=1 200 in 1730ms (compile: 11ms, render: 1719ms)
+ POST /api/controle-estoque/metricas-itens 200 in 10ms (compile: 5ms, render: 5ms)
+ POST /api/controle-estoque/metricas-itens 200 in 12ms (compile: 6ms, render: 6ms)
+ POST /api/controle-estoque/metricas-itens 200 in 8ms (compile: 3ms, render: 5ms)
+ POST /api/controle-estoque/metricas-itens 200 in 7ms (compile: 3ms, render: 4ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+ GET /api/curva-abc?company=nerd&start=2026-05-01&end=2026-05-25&compare=month&porCor=1 200 in 2.7s (compile: 4ms, render: 2.7s)
+ ✓ Compiled in 835ms
+ POST /api/controle-estoque/metricas-itens 200 in 12.2s (compile: 24ms, render: 12.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 12.1s (compile: 30ms, render: 12.1s)
+ ✓ Compiled in 3.3s
+ POST /api/controle-estoque/metricas-itens 200 in 16ms (compile: 4ms, render: 12ms)
+ POST /api/controle-estoque/metricas-itens 200 in 18ms (compile: 4ms, render: 14ms)
+ POST /api/controle-estoque/metricas-itens 200 in 13.6s (compile: 21ms, render: 13.6s)
+ POST /api/controle-estoque/metricas-itens 200 in 3.8s (compile: 3ms, render: 3.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 10.8s (compile: 4ms, render: 10.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 18ms (compile: 9ms, render: 9ms)
+ POST /api/controle-estoque/metricas-itens 200 in 15.7s (compile: 4ms, render: 15.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 13.2s (compile: 5ms, render: 13.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.8s (compile: 5ms, render: 8.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 17.9s (compile: 6ms, render: 17.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 9.0s (compile: 6ms, render: 9.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 17.4s (compile: 10ms, render: 17.4s)
+ POST /api/controle-estoque/metricas-itens 200 in 18.9s (compile: 634ms, render: 18.3s)
+ POST /api/controle-estoque/metricas-itens 200 in 15.8s (compile: 8ms, render: 15.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 13.6s (compile: 110ms, render: 13.5s)
+ POST /api/controle-estoque/metricas-itens 200 in 11.9s (compile: 55ms, render: 11.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 46s (compile: 10ms, render: 46s)
+ POST /api/controle-estoque/metricas-itens 200 in 10.1s (compile: 209ms, render: 9.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 9.3s (compile: 8ms, render: 9.3s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.6s (compile: 9ms, render: 8.6s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.7s (compile: 86ms, render: 8.6s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.2s (compile: 7ms, render: 8.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.0s (compile: 7ms, render: 8.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 9.2s (compile: 7ms, render: 9.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 9.1s (compile: 4ms, render: 9.1s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.8s (compile: 5ms, render: 8.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.9s (compile: 6ms, render: 8.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 15.0s (compile: 188ms, render: 14.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 12.5s (compile: 28ms, render: 12.4s)
+ POST /api/controle-estoque/metricas-itens 200 in 12.8s (compile: 365ms, render: 12.5s)
+ POST /api/controle-estoque/metricas-itens 200 in 12.5s (compile: 9ms, render: 12.5s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.2s (compile: 518ms, render: 6.7s)

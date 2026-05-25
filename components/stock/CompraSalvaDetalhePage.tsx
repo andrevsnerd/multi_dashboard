@@ -1961,13 +1961,16 @@ export default function CompraSalvaDetalhePage({
           style={{ left: sugestaoPOTooltip.x + 12, top: sugestaoPOTooltip.y + 12 }}
         >
           <div className={styles.tooltipEstoqueHeader}>Potencial Oculto (PO)</div>
-          <div className={styles.tooltipLine}>Item vendeu forte enquanto tinha estoque e depois ficou em ruptura.</div>
+          <div className={styles.tooltipLine}>O item vendeu rapido nos dias em que tinha estoque e depois ficou zerado por bastante tempo.</div>
           <div className={styles.tooltipDivider} />
           <div className={styles.tooltipLine}>
             <strong>Base:</strong> {fmt(sugestaoPOTooltip.qtde12m)} un em {fmt(sugestaoPOTooltip.diasComEstoquePositivo)} dias com estoque
           </div>
           <div className={styles.tooltipLine}>
             <strong>Sem estoque:</strong> {fmt(sugestaoPOTooltip.diasSemEstoque)} dias
+          </div>
+          <div className={styles.tooltipLine} style={{ color: "#64748b", marginTop: 4, fontSize: 11 }}>
+            = {fmt(sugestaoPOTooltip.qtde12m)} un / {(sugestaoPOTooltip.diasComEstoquePositivo / 30).toFixed(2)} meses com estoque
           </div>
           <div className={styles.tooltipLine}>
             <strong>Velocidade ajustada:</strong> {sugestaoPOTooltip.velocidadeAjustada.toFixed(1)} un/mês
@@ -1981,6 +1984,9 @@ export default function CompraSalvaDetalhePage({
           </div>
           <div className={styles.tooltipLine}>
             <strong>Qtd sugerida:</strong> {fmt(sugestaoPOTooltip.qtdPO)} un
+          </div>
+          <div className={styles.tooltipLine} style={{ color: "#64748b", marginTop: 4, fontSize: 11 }}>
+            = menor valor entre a necessidade calculada e a trava de seguranÃ§a
           </div>
           {sugestaoPOTooltip.transitTotal ? (
             <>

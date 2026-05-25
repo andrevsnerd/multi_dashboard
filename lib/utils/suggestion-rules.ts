@@ -56,6 +56,17 @@ export interface SuggestionPOData {
   cappedQty: number;
 }
 
+export interface SuggestionCompraData {
+  qtdFinalPuro: number;
+  qtdSBlend: number;
+  blendAplicado: boolean;
+  velocidadeAjustada: number;
+  mesesDisponiveis: number;
+  diasComEstoquePositivo: number;
+  limiteDias: number;
+  estoqueAtual: number;
+}
+
 export interface ReposicaoCompraView {
   qtdFinal: number;
   qtdS: number;
@@ -67,6 +78,7 @@ export interface ReposicaoCompraView {
   sData?: SuggestionSData;
   eData?: SuggestionEData;
   poData?: SuggestionPOData;
+  compraData?: SuggestionCompraData;
 }
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
@@ -126,9 +138,9 @@ function getDiasSemEstoque(item: SuggestionRuleInput): number {
 export function getMesesDisponiveis(item: SuggestionRuleInput): number {
   const explicitMonths = Number(item.mesesDisponiveis ?? NaN);
   if (Number.isFinite(explicitMonths) && explicitMonths > 0) {
-    return Math.max(explicitMonths, 1);
+    return explicitMonths;
   }
-  return Math.max(getDiasComEstoquePositivo(item) / 30, 1);
+  return Math.max(getDiasComEstoquePositivo(item) / 30, 0);
 }
 
 export function getVelocidadeAjustada(item: SuggestionRuleInput): number {
@@ -136,7 +148,9 @@ export function getVelocidadeAjustada(item: SuggestionRuleInput): number {
   if (Number.isFinite(explicitVelocity) && explicitVelocity >= 0) {
     return explicitVelocity;
   }
-  return getQtde12m(item) / getMesesDisponiveis(item);
+  const mesesDisponiveis = getMesesDisponiveis(item);
+  if (mesesDisponiveis <= 0) return 0;
+  return getQtde12m(item) / mesesDisponiveis;
 }
 
 export function getLimiteDiasReposicao(item: Pick<SuggestionRuleInput, "linha" | "subgrupo">): number {
@@ -198,14 +212,15 @@ export function calcNecessidadeMinimaQtyAdjusted(input: {
   const velocidadeAjustada =
     Number.isFinite(velocidadeAjustadaExplicit) && velocidadeAjustadaExplicit >= 0
       ? velocidadeAjustadaExplicit
-      : qtde12m / Math.max(
-        Number.isFinite(mesesDisponiveis) && mesesDisponiveis > 0
-          ? mesesDisponiveis
-          : Number.isFinite(diasComEstoquePositivo)
-            ? Math.max(diasComEstoquePositivo / 30, 1)
-            : 12,
-        1
-      );
+      : (() => {
+        const mesesBase =
+          Number.isFinite(mesesDisponiveis) && mesesDisponiveis > 0
+            ? mesesDisponiveis
+            : Number.isFinite(diasComEstoquePositivo) && diasComEstoquePositivo > 0
+              ? diasComEstoquePositivo / 30
+              : 12;
+        return mesesBase > 0 ? qtde12m / mesesBase : 0;
+      })();
 
   return velocidadeAjustada >= 0.5 ? 1 : 0;
 }
@@ -272,7 +287,10 @@ export function calcQtdSugestaoPOInfo(item: SuggestionRuleInput): SuggestionPODa
   if (diasComEstoquePositivo <= 0 || diasComEstoquePositivo > 30) return null;
 
   const diasSemEstoque = getDiasSemEstoque(item);
-  if (diasSemEstoque < Math.max(15, diasComEstoquePositivo * 2)) return null;
+  // Estoque zerado: não exige tempo mínimo sem estoque — o próprio zero já confirma a ruptura.
+  // Estoque = 1: mantém requisito de ter ficado sem estoque por tempo relevante.
+  const estoqueZerado = estoqueAtual === 0;
+  if (!estoqueZerado && diasSemEstoque < Math.max(15, diasComEstoquePositivo * 2)) return null;
 
   const mesesDisponiveis = getMesesDisponiveis(item);
   const velocidadeAjustada = getVelocidadeAjustada(item);
@@ -319,11 +337,40 @@ export function getReposicaoCompraView(
   const mesesDisponiveis = getMesesDisponiveis(item);
   const diasComEstoquePositivo = getDiasComEstoquePositivo(item);
   const diasSemEstoque = getDiasSemEstoque(item);
-  const poData = calcQtdSugestaoPOInfo(item) ?? undefined;
+  let poData = calcQtdSugestaoPOInfo(item) ?? undefined;
+  // Histórico curto: mesmo com estoque > 1, se mesesDisponiveis < 1 a velocidade foi
+  // extrapolada de poucos dias — marcar com poData para exibir o badge/tooltip PO.
+  if (!poData && mesesDisponiveis > 0 && mesesDisponiveis < 1 && velocidadeAjustada >= 4) {
+    const limiteDiasLocal = getLimiteDiasReposicao(item);
+    poData = {
+      qtd: 0,
+      velocidadeAjustada,
+      velocidadeDisponivelDia: velocidadeAjustada / 30,
+      potencialMensalBruto: velocidadeAjustada,
+      diasComEstoquePositivo,
+      diasSemEstoque,
+      mesesDisponiveis,
+      limiteDias: limiteDiasLocal,
+      sugestaoBruta: 0,
+      limiteSeguro: 0,
+      cappedQty: 0,
+    };
+  }
   const qtdPO = poData?.qtd ?? 0;
   const alvoEstoqueS = Math.ceil(velocidadeAjustada * (limiteDias / 30));
   const sugestaoBrutaS = Math.max(0, alvoEstoqueS - estoqueAtual);
   const qtdS = velocidadeAjustada >= 1 ? applyDisponibilidadeCap(sugestaoBrutaS, item) : 0;
+
+  const baseCompraData: SuggestionCompraData = {
+    qtdFinalPuro,
+    qtdSBlend: qtdS,
+    blendAplicado: qtdS > 0 && qtdFinalPuro > 0 && qtdFinalPuro < 0.6 * qtdS,
+    velocidadeAjustada,
+    mesesDisponiveis,
+    diasComEstoquePositivo,
+    limiteDias,
+    estoqueAtual,
+  };
 
   if (qtdFinalPuro > 0) {
     if (qtdS > 0 && qtdFinalPuro < 0.6 * qtdS) {
@@ -336,6 +383,7 @@ export function getReposicaoCompraView(
         qtdSuficiente: false,
         semSugestao: false,
         poData,
+        compraData: baseCompraData,
       };
     }
 
@@ -348,6 +396,7 @@ export function getReposicaoCompraView(
       qtdSuficiente: false,
       semSugestao: false,
       poData,
+      compraData: { ...baseCompraData, blendAplicado: false },
     };
   }
 

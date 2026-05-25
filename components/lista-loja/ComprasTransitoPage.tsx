@@ -2,6 +2,8 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+// @ts-ignore - xlsx não tem tipos perfeitos
+import * as XLSX from "xlsx";
 
 import type { CompanyKey } from "@/lib/config/company";
 import type {
@@ -386,6 +388,50 @@ export default function ComprasTransitoPage({
     }
   }, [selectedCompra, deleting, companyKey, loadCompras]);
 
+  const exportListXlsx = useCallback(() => {
+    const rows = compras.map((c) => ({
+      Título: c.title,
+      Status: getStatusLabel(c.status),
+      Itens: c.itemCount,
+      "Quantidade Total": c.totalQuantidade,
+      "Valor Total (R$)": c.totalValor,
+      "Recebimento Início": c.minDataRecebimento ? fmtDate(c.minDataRecebimento) : "",
+      "Recebimento Fim": c.maxDataRecebimento ? fmtDate(c.maxDataRecebimento) : "",
+      "Criada em": fmtDateTime(c.confirmedAt),
+    }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Compras em Trânsito");
+    const dateStr = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `compras-transito-${companyKey}-${dateStr}.xlsx`);
+  }, [compras, companyKey]);
+
+  const exportDetailXlsx = useCallback(() => {
+    if (!selectedCompra) return;
+    const rows = selectedCompra.items.map((item) => {
+      const custo = Number(item.custoUnitario ?? 0);
+      const qtd = Math.max(0, Math.round(item.quantidade ?? 0));
+      const estoque = Math.round(Number(item.estoqueAtual ?? 0));
+      return {
+        "Data Recebimento": item.dataRecebimento ? fmtDate(item.dataRecebimento) : "",
+        Status: getStatusLabel(item.dataRecebimento ? getCompraTransitoItemStatus(item.dataRecebimento) : "rascunho"),
+        Produto: item.produto,
+        Descrição: item.descricao,
+        Cor: item.corDescricao || item.corProduto || "",
+        Grade: item.grade || "",
+        Quantidade: qtd,
+        "Custo Unitário (R$)": custo > 0 ? custo : "",
+        "Custo Total (R$)": custo > 0 ? Math.round(custo * qtd) : "",
+        "Estoque Atual": estoque,
+        "Estoque Final": estoque + qtd,
+      };
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Itens");
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const slug = selectedCompra.title.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase().slice(0, 40);
+    XLSX.writeFile(wb, `compra-${slug}-${dateStr}.xlsx`);
+  }, [selectedCompra]);
+
   const renderTableRows = (items: CompraTransitoItemRow[], readOnly: boolean, createdAt?: string) => (
     <div className={styles.tableWrap}>
       <table className={styles.table}>
@@ -526,9 +572,16 @@ export default function ComprasTransitoPage({
         </div>
         <div className={styles.topBarActions}>
           {view !== "editor" && (
-            <button type="button" className={styles.primaryBtn} onClick={startNew}>
-              + Nova Compra
-            </button>
+            <>
+              {view === "list" && compras.length > 0 && (
+                <button type="button" className={styles.secondaryBtn} onClick={exportListXlsx}>
+                  Exportar XLSX
+                </button>
+              )}
+              <button type="button" className={styles.primaryBtn} onClick={startNew}>
+                + Nova Compra
+              </button>
+            </>
           )}
           {view === "editor" && (
             <>
@@ -737,20 +790,30 @@ export default function ComprasTransitoPage({
             </button>
             <div className={styles.detailHeaderRight}>
               {selectedCompra && (
-                <button
-                  type="button"
-                  className={
-                    selectedCompra.status === "rascunho"
-                      ? styles.draftBtn
-                      : styles.secondaryBtn
-                  }
-                  onClick={() => startEdit(selectedCompra)}
-                  disabled={loadingDetail}
-                >
-                  {selectedCompra.status === "rascunho"
-                    ? "Editar rascunho"
-                    : "Editar / Reabrir"}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className={styles.secondaryBtn}
+                    onClick={exportDetailXlsx}
+                    disabled={loadingDetail}
+                  >
+                    Exportar XLSX
+                  </button>
+                  <button
+                    type="button"
+                    className={
+                      selectedCompra.status === "rascunho"
+                        ? styles.draftBtn
+                        : styles.secondaryBtn
+                    }
+                    onClick={() => startEdit(selectedCompra)}
+                    disabled={loadingDetail}
+                  >
+                    {selectedCompra.status === "rascunho"
+                      ? "Editar rascunho"
+                      : "Editar / Reabrir"}
+                  </button>
+                </>
               )}
               <button
                 type="button"
