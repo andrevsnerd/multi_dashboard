@@ -855,6 +855,254 @@
   letter-spacing: 0;
 }
 
+.obsHeader {
+  min-width: 200px;
+}
+
+.obsCell {
+  min-width: 200px;
+  vertical-align: top;
+}
+
+.obsTrigger {
+  width: 100%;
+  min-height: 52px;
+  position: relative;
+  display: block;
+  padding: 9px 34px 9px 11px;
+  border-radius: 12px;
+  border: 1px solid #d9dee7;
+  background: linear-gradient(180deg, #fffdfa 0%, #f8fafc 100%);
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  text-align: left;
+}
+
+.obsTrigger:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: linear-gradient(180deg, #fffefb 0%, #f1f5f9 100%);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+  transform: translateY(-1px);
+}
+
+.obsTrigger:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.obsTriggerFilled {
+  border-color: #d7dce5;
+}
+
+.obsTriggerEmpty {
+  border-style: dashed;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.obsTriggerError {
+  border-color: #fca5a5;
+  background: #fff1f2;
+}
+
+.obsTriggerText {
+  display: block;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #475569;
+  font-style: italic;
+  letter-spacing: 0.01em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.obsTriggerTextMuted {
+  color: #94a3b8;
+}
+
+.obsTriggerIcon {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  border: 1px solid #d7dee7;
+  background: rgba(255, 255, 255, 0.88);
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.obsModalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.obsModal {
+  width: min(560px, 100%);
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.28);
+  overflow: hidden;
+}
+
+.obsModalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.obsModalTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.obsModalMeta {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.obsModalClose {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.obsModalClose:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.obsModalBody {
+  padding: 18px 20px 14px;
+}
+
+.obsInput {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #0f172a;
+  background: #ffffff;
+  outline: none;
+  resize: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.obsInput:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.obsInput::placeholder {
+  color: #94a3b8;
+}
+
+.obsModalHint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #64748b;
+  text-align: right;
+}
+
+.obsModalError {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #b91c1c;
+}
+
+.obsModalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px 18px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.obsModalButtonGhost,
+.obsModalButtonSecondary,
+.obsModalButtonPrimary {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.obsModalButtonGhost {
+  margin-right: auto;
+  background: transparent;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.obsModalButtonGhost:hover:not(:disabled) {
+  background: #f8fafc;
+  color: #334155;
+}
+
+.obsModalButtonSecondary {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.obsModalButtonSecondary:hover {
+  background: #cbd5e1;
+}
+
+.obsModalButtonPrimary {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.obsModalButtonPrimary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.obsModalButtonPrimary:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.obsModalButtonGhost:disabled,
+.obsModalButtonSecondary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 /* ── Numbers ── */
 .vendas {
   color: #475569;

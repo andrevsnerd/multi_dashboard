@@ -157,6 +157,21 @@ type CompraMetricRow = {
   estoquePorFilial: Array<{ filial: string; estoque: number }> | null;
 };
 
+interface CurvaAbcObservacaoRecord {
+  produto: string;
+  cor: string;
+  observacao: string;
+}
+
+interface ObservacaoModalState {
+  produto: string;
+  cor: string | null;
+  usarCor: boolean;
+  titulo: string;
+  codigo: string;
+  corLabel: string | null;
+}
+
 const EMPTY_COMPRA_METRIC_ROW: CompraMetricRow = {
   qtde12m: null,
   vendasMesAtual: null,
@@ -185,6 +200,12 @@ function fmtBRL(n: number) {
 
 function fmtCurrency(n: number) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function formatObservacaoPreview(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "Sem observação";
+  return trimmed;
 }
 
 function getTooltipViewportPosition(x: number, y: number): { left: number; top: number } {
@@ -827,6 +848,178 @@ function renderFilialMetricTooltip(
   );
 }
 
+function ObservacaoEditorModal({
+  modal,
+  saving,
+  error,
+  initialValue,
+  onClose,
+  onSave,
+}: {
+  modal: ObservacaoModalState;
+  saving: boolean;
+  error?: string;
+  initialValue: string;
+  onClose: () => void;
+  onSave: (value: string) => void;
+}) {
+  const [draft, setDraft] = useState(initialValue);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
+
+  return (
+    <div className={styles.obsModalOverlay} onClick={onClose}>
+      <div className={styles.obsModal} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.obsModalHeader}>
+          <div>
+            <h3 className={styles.obsModalTitle}>Observação do item</h3>
+            <div className={styles.obsModalMeta}>
+              <strong>{modal.titulo}</strong>
+              <span>Cód. {modal.codigo}</span>
+              {modal.corLabel && <span>Cor: {modal.corLabel}</span>}
+            </div>
+          </div>
+          <button
+            type="button"
+            className={styles.obsModalClose}
+            onClick={onClose}
+            aria-label="Fechar modal de observação"
+          >
+            ×
+          </button>
+        </div>
+        <div className={styles.obsModalBody}>
+          <textarea
+            className={styles.obsInput}
+            value={draft}
+            maxLength={240}
+            rows={7}
+            placeholder="Escreva uma observação para este item"
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (!(e.key === "Enter" && (e.metaKey || e.ctrlKey))) return;
+              e.preventDefault();
+              onSave(draft);
+            }}
+          />
+          <div className={styles.obsModalHint}>{draft.trim().length}/240 caracteres</div>
+          {error && <div className={styles.obsModalError}>{error}</div>}
+        </div>
+        <div className={styles.obsModalFooter}>
+          <button
+            type="button"
+            className={styles.obsModalButtonGhost}
+            disabled={saving || draft.length === 0}
+            onClick={() => setDraft("")}
+          >
+            Limpar
+          </button>
+          <button type="button" className={styles.obsModalButtonSecondary} onClick={onClose}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className={styles.obsModalButtonPrimary}
+            disabled={saving}
+            onClick={() => onSave(draft)}
+          >
+            {saving ? "Salvando..." : "Salvar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const ObservacaoCell = React.memo(function ObservacaoCell({
+  produto,
+  cor,
+  usarCor,
+  titulo,
+  codigo,
+  corLabel,
+  observacao,
+  onSave,
+}: {
+  produto: string;
+  cor: string | null;
+  usarCor: boolean;
+  titulo: string;
+  codigo: string;
+  corLabel: string | null;
+  observacao: string;
+  onSave: (input: { produto: string; cor: string | null; usarCor: boolean; rawValue: string }) => Promise<{ ok: boolean; error?: string }>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | undefined>(undefined);
+
+  const possuiObservacao = observacao.trim().length > 0;
+
+  async function handleSave(rawValue: string) {
+    setSaving(true);
+    setError(undefined);
+    const result = await onSave({ produto, cor, usarCor, rawValue });
+    setSaving(false);
+    if (result.ok) {
+      setOpen(false);
+      return;
+    }
+    setError(result.error || "Erro ao salvar observação.");
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className={`${styles.obsTrigger} ${possuiObservacao ? styles.obsTriggerFilled : styles.obsTriggerEmpty} ${error ? styles.obsTriggerError : ""}`}
+        disabled={saving}
+        title={error ? `Erro ao salvar: ${error}` : (possuiObservacao ? observacao : "Adicionar observação")}
+        onClick={() => {
+          setError(undefined);
+          setOpen(true);
+        }}
+      >
+        <span className={`${styles.obsTriggerText} ${!possuiObservacao ? styles.obsTriggerTextMuted : ""}`}>
+          {saving ? "Salvando..." : formatObservacaoPreview(observacao)}
+        </span>
+        <span className={styles.obsTriggerIcon} aria-hidden>
+          ✎
+        </span>
+      </button>
+      {open && (
+        <ObservacaoEditorModal
+          modal={{ produto, cor, usarCor, titulo, codigo, corLabel }}
+          initialValue={observacao}
+          saving={saving}
+          error={error}
+          onClose={() => {
+            if (!saving) setOpen(false);
+          }}
+          onSave={(value) => {
+            void handleSave(value);
+          }}
+        />
+      )}
+    </>
+  );
+});
+
 function getInitialRange(month: number, year: number): DateRangeValue {
   const base = new Date(year, month, 1);
   const today = new Date();
@@ -870,6 +1063,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [selectedCurvas, setSelectedCurvas] = useState<Set<Curva>>(new Set());
   const [compraMetrics, setCompraMetrics] = useState<Record<string, CompraMetricRow>>({});
   const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
+  const [observacoes, setObservacoes] = useState<Record<string, string>>({});
   const [sugestaoTooltip, setSugestaoTooltip] = useState<null | {
     x: number;
     y: number;
@@ -968,6 +1162,34 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       .catch(() => {
         if (!cancelled) setComprasTransitoIndex(new Map());
       });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch(`/api/curva-abc-observacoes?company=${companyKey}`, { cache: "no-store" })
+      .then((res) => res.json())
+      .then((json: { data?: CurvaAbcObservacaoRecord[]; error?: string }) => {
+        if (json.error) throw new Error(json.error);
+
+        const nextMap = Object.fromEntries(
+          (json.data ?? []).map((row) => [
+            buildCurvaAbcMetricKey(row.produto, row.cor ?? null, true),
+            row.observacao ?? "",
+          ])
+        );
+
+        if (cancelled) return;
+        setObservacoes(nextMap);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setObservacoes({});
+      });
+
     return () => {
       cancelled = true;
     };
@@ -1084,6 +1306,59 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   useEffect(() => {
     setSelectedColecoes((prev) => prev.filter((value) => availableColecoes.includes(value)));
   }, [availableColecoes]);
+
+  async function saveObservacaoValue({
+    produto,
+    cor,
+    usarCor,
+    rawValue,
+  }: {
+    produto: string;
+    cor: string | null;
+    usarCor: boolean;
+    rawValue: string;
+  }): Promise<{ ok: boolean; error?: string }> {
+    const lookupKey = buildCurvaAbcMetricKey(produto, cor ?? null, usarCor);
+    const draftValue = rawValue.trim();
+    const savedValue = (observacoes[lookupKey] ?? "").trim();
+
+    if (draftValue === savedValue) return { ok: true };
+
+    try {
+      const res = await fetch("/api/curva-abc-observacoes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company: companyKey,
+          produto,
+          cor: usarCor ? cor ?? null : null,
+          observacao: draftValue,
+        }),
+      });
+
+      const json = (await res.json()) as { data?: CurvaAbcObservacaoRecord | null; error?: string };
+      if (!res.ok || json.error) {
+        throw new Error(json.error || "Erro ao salvar observação.");
+      }
+
+      const nextValue = json.data?.observacao ?? "";
+
+      setObservacoes((prev) => {
+        if (!nextValue) {
+          const next = { ...prev };
+          delete next[lookupKey];
+          return next;
+        }
+        return { ...prev, [lookupKey]: nextValue };
+      });
+      return { ok: true };
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : "Erro ao salvar observação.",
+      };
+    }
+  }
 
   const produtosFiltrados = useMemo(() => {
     let produtos = produtosBaseFiltro;
@@ -2059,6 +2334,7 @@ const handleBadgeClick = (cat: string) => {
                       Produto
                       {abcTitleSuffix && <span className={styles.thFilterLabel}>{abcTitleSuffix}</span>}
                     </th>
+                    <th className={styles.obsHeader}>Obs.</th>
                     <>
                       <th className={styles.right}>Participação</th>
                       <th className={styles.right}>Faturamento no período</th>
@@ -2077,7 +2353,7 @@ const handleBadgeClick = (cat: string) => {
                     return (
                       <React.Fragment key={curva}>
                         <tr className={`${styles.sectionRow} ${styles[`sectionRow${curva}`]}`}>
-                          <td colSpan={showEstoqueRede ? 9 : 8}>
+                          <td colSpan={showEstoqueRede ? 10 : 9}>
                             <div className={styles.sectionLabel}>
                               <span className={`${styles.curvaBadge} ${CURVA_BADGE_CLASS[curva]}`}>{curva}</span>
                               <span className={styles.sectionTitle}>{CURVA_LABEL[curva]}</span>
@@ -2201,6 +2477,18 @@ const handleBadgeClick = (cat: string) => {
                                     </div>
                                   )}
                                 </Link>
+                              </td>
+                              <td className={styles.obsCell}>
+                                <ObservacaoCell
+                                  produto={p.produto}
+                                  cor={p.cor ?? null}
+                                  usarCor={porCor}
+                                  titulo={p.descricao || p.produto}
+                                  codigo={p.produto}
+                                  corLabel={p.corDescricao || p.cor || null}
+                                  observacao={observacoes[buildCurvaAbcMetricKey(p.produto, p.cor ?? null, porCor)] ?? ""}
+                                  onSave={saveObservacaoValue}
+                                />
                               </td>
                               <>
                               <td className={styles.percCell}>
