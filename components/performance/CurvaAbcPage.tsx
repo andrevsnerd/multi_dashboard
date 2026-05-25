@@ -3,7 +3,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { startOfMonth, endOfMonth } from "date-fns";
-import { resolveCompany, type CompanyConfig, type CompanyKey } from "@/lib/config/company";
+import {
+  aggregateEstoquePorFilialByDisplayLabel,
+  compareFilialDisplayOrder,
+  getFilialLabelForDisplay,
+  resolveCompany,
+  type CompanyConfig,
+  type CompanyKey,
+} from "@/lib/config/company";
 import {
   OUTROS_LABEL,
   filterOutrosKeys,
@@ -135,7 +142,18 @@ type CompraMetricRow = {
   velocidadeAjustada: number | null;
   totalNmQty: number | null;
   filiaisNM: FilialNecessidadeMinimaInfo[] | null;
-  vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number; velocidadeAjustada?: number | null; mesesDisponiveis?: number | null; diasComEstoquePositivo?: number | null }> | null;
+  vendasPorFilial: Array<{
+    filial: string;
+    qtde12m: number;
+    qtde60d?: number;
+    qtdeMesAtual?: number;
+    diasDesdeUltimaVenda?: number | null;
+    mesesHistoricoFilial?: number | null;
+    diasSemEstoque?: number | null;
+    velocidadeAjustada?: number | null;
+    mesesDisponiveis?: number | null;
+    diasComEstoquePositivo?: number | null;
+  }> | null;
   estoquePorFilial: Array<{ filial: string; estoque: number }> | null;
 };
 
@@ -518,6 +536,193 @@ function getReposicaoBaseType(sugestao: {
   return getSharedReposicaoBaseType(sugestao);
 }
 
+function getSuggestedQtyFromReposicaoView(sugestao: {
+  qtdFinal: number;
+  qtdS: number;
+  qtdE: number;
+  qtdPO?: number;
+  qtdNM?: number;
+}): number {
+  return sugestao.qtdFinal > 0
+    ? sugestao.qtdFinal
+    : sugestao.qtdS > 0
+      ? sugestao.qtdS
+      : sugestao.qtdE > 0
+        ? sugestao.qtdE
+        : (sugestao.qtdPO ?? 0) > 0
+          ? (sugestao.qtdPO ?? 0)
+          : (sugestao.qtdNM ?? 0);
+}
+
+type FilialCompraSuggestionRow = {
+  filial: string;
+  qty: number;
+  baseType: "COMPRA" | "S" | "E" | "PO" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
+  qtde12m: number;
+  vendasMesAtual: number;
+  estoqueAtual: number;
+  diasComEstoquePositivo: number;
+  diasSemEstoque: number;
+  mesesDisponiveis: number;
+  velocidadeAjustada: number;
+  poData?: import("@/lib/utils/suggestion-rules").SuggestionPOData;
+};
+
+type PerFilialCompraSummary = {
+  totalQty: number;
+  topType: "COMPRA" | "S" | "E" | "PO" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
+  hasPo: boolean;
+  hasNm: boolean;
+  rows: FilialCompraSuggestionRow[];
+  distribuicao: DestinoCompraFinalParte[];
+  poRows: FilialCompraSuggestionRow[];
+  poPrincipal: FilialCompraSuggestionRow | null;
+};
+
+function buildPerFilialCompraSummary(input: {
+  companyKey: CompanyKey;
+  linha?: string | null;
+  subgrupo?: string | null;
+  diasCorridosMes: number;
+  live: CompraMetricRow;
+}): PerFilialCompraSummary | null {
+  if (!input.live.vendasPorFilial || input.live.vendasPorFilial.length === 0) return null;
+  const company = resolveCompany(input.companyKey);
+  const estoquePorFilial = aggregateEstoquePorFilialByDisplayLabel(
+    (input.live.estoquePorFilial ?? []).map((row) => ({
+      filial: row.filial,
+      estoque: Number(row.estoque ?? 0),
+    })),
+    company
+  );
+  const estoqueMap = new Map<string, number>(
+    estoquePorFilial.map((row) => [row.filial, Number(row.estoque ?? 0)])
+  );
+
+  const vendasMap = new Map<
+    string,
+    {
+      filial: string;
+      qtde12m: number;
+      qtdeMesAtual: number;
+      diasDesdeUltimaVenda: number | null;
+      mesesHistoricoFilial: number;
+      diasComEstoquePositivo: number;
+      diasSemEstoque: number;
+      mesesDisponiveis: number;
+      velocidadeAjustada: number;
+    }
+  >();
+
+  for (const row of input.live.vendasPorFilial) {
+    const filial = getFilialLabelForDisplay(company, row.filial);
+    const current = vendasMap.get(filial) ?? {
+      filial,
+      qtde12m: 0,
+      qtdeMesAtual: 0,
+      diasDesdeUltimaVenda: null,
+      mesesHistoricoFilial: 0,
+      diasComEstoquePositivo: 0,
+      diasSemEstoque: 365,
+      mesesDisponiveis: 0,
+      velocidadeAjustada: 0,
+    };
+    current.qtde12m += Number(row.qtde12m ?? 0);
+    current.qtdeMesAtual += Number(row.qtdeMesAtual ?? 0);
+    current.diasDesdeUltimaVenda =
+      current.diasDesdeUltimaVenda == null
+        ? (row.diasDesdeUltimaVenda ?? null)
+        : row.diasDesdeUltimaVenda == null
+          ? current.diasDesdeUltimaVenda
+          : Math.min(current.diasDesdeUltimaVenda, row.diasDesdeUltimaVenda);
+    current.mesesHistoricoFilial = Math.max(current.mesesHistoricoFilial, Number(row.mesesHistoricoFilial ?? 0));
+    current.diasComEstoquePositivo = Math.max(current.diasComEstoquePositivo, Number(row.diasComEstoquePositivo ?? 0));
+    current.diasSemEstoque = Math.min(current.diasSemEstoque, Number(row.diasSemEstoque ?? 365));
+    current.mesesDisponiveis = Math.max(current.mesesDisponiveis, Number(row.mesesDisponiveis ?? 0));
+    current.velocidadeAjustada = Math.max(current.velocidadeAjustada, Number(row.velocidadeAjustada ?? 0));
+    vendasMap.set(filial, current);
+  }
+
+  const rows = Array.from(vendasMap.values())
+    .map((row) => {
+      const diasComEstoquePositivo = Math.max(0, Math.round(row.diasComEstoquePositivo));
+      const mesesDisponiveis = diasComEstoquePositivo > 0 ? diasComEstoquePositivo / 30 : 0;
+      const velocidadeAjustada = mesesDisponiveis > 0 ? row.qtde12m / mesesDisponiveis : 0;
+      const diasSemEstoque = Math.max(0, 365 - diasComEstoquePositivo);
+      const estoqueAtual = estoqueMap.get(row.filial) ?? 0;
+      const sugestao = getReposicaoCompraView(
+        {
+          vendasMesAtual: row.qtdeMesAtual,
+          estoqueFilial: estoqueAtual,
+          linha: input.linha ?? "",
+          subgrupo: input.subgrupo ?? "",
+          qtde12m: row.qtde12m,
+          mesesHistoricoFilial: row.mesesHistoricoFilial,
+          diasDesdeUltimaVenda: row.diasDesdeUltimaVenda,
+          diasComEstoquePositivo,
+          diasSemEstoque,
+          mesesDisponiveis,
+          velocidadeAjustada,
+        },
+        input.diasCorridosMes
+      );
+      return {
+        filial: row.filial,
+        qty: getSuggestedQtyFromReposicaoView(sugestao),
+        baseType: getReposicaoBaseType(sugestao),
+        qtde12m: row.qtde12m,
+        vendasMesAtual: row.qtdeMesAtual,
+        estoqueAtual,
+        diasComEstoquePositivo,
+        diasSemEstoque,
+        mesesDisponiveis,
+        velocidadeAjustada,
+        poData: sugestao.poData,
+      } satisfies FilialCompraSuggestionRow;
+    })
+    .filter((row) => row.qty > 0)
+    .sort((a, b) => compareFilialDisplayOrder(a.filial, b.filial, company));
+
+  if (rows.length === 0) return null;
+
+  const totalQty = rows.reduce((sum, row) => sum + row.qty, 0);
+  const qtyByType = new Map<string, number>();
+  for (const row of rows) {
+    qtyByType.set(row.baseType, (qtyByType.get(row.baseType) ?? 0) + row.qty);
+  }
+  const typePriority = ["COMPRA", "S", "E", "PO", "NM"] as const;
+  let topType: PerFilialCompraSummary["topType"] = "SEM_SUGESTAO";
+  let topQty = -1;
+  for (const type of typePriority) {
+    const qty = qtyByType.get(type) ?? 0;
+    if (qty > topQty) {
+      topQty = qty;
+      topType = type;
+    }
+  }
+  const poRows = rows.filter((row) => row.poData || row.baseType === "PO");
+  const poPrincipal = poRows.length > 0
+    ? poRows.slice().sort((a, b) => b.qty - a.qty)[0] ?? null
+    : null;
+
+  return {
+    totalQty,
+    topType,
+    hasPo: poPrincipal != null,
+    hasNm: rows.some((row) => row.baseType === "NM"),
+    rows,
+    distribuicao: rows.map((row) => ({
+      label: row.filial,
+      qtd: row.qty,
+      qtde12m: row.qtde12m,
+      isNM: row.baseType === "NM" || undefined,
+      nmQty: row.baseType === "NM" ? row.qty : undefined,
+    })),
+    poRows,
+    poPrincipal,
+  };
+}
+
 function buildCurvaAbcMetricKey(
   produto?: string | null,
   corProduto?: string | null,
@@ -680,6 +885,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     baseQty?: number;
     nmExtraQty?: number;
     distribuicao?: DestinoCompraFinalParte[];
+    distribuicaoLabel?: string;
     blendAplicado?: boolean;
     qtdFinalPuro?: number;
     qtdSBlend?: number;
@@ -710,6 +916,16 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     x: number;
     y: number;
     qtde12m?: number;
+    filialLabel?: string;
+    poRows?: Array<{
+      filialLabel: string;
+      qtde12m: number;
+      diasComEstoquePositivo: number;
+      diasSemEstoque: number;
+      velocidadeAjustada: number;
+      limiteSeguro: number;
+      qtdPO: number;
+    }>;
     diasComEstoquePositivo?: number;
     diasSemEstoque?: number;
     velocidadeAjustada?: number;
@@ -1160,6 +1376,30 @@ const handleBadgeClick = (cat: string) => {
     const live = compraMetrics[metricKey];
     const hasLive = Object.prototype.hasOwnProperty.call(compraMetrics, metricKey);
     if (!hasLive) return "";
+
+    const perFilialSummary = !selectedFilial && live
+      ? buildPerFilialCompraSummary({
+          companyKey,
+          linha: p.linha ?? "",
+          subgrupo: p.subgrupo ?? "",
+          diasCorridosMes,
+          live,
+        })
+      : null;
+    if (perFilialSummary) {
+      const limiteDias = getLimiteDiasReposicao({ linha: p.linha ?? "", subgrupo: p.subgrupo ?? "" });
+      const transit = applyTransitToSuggestion({
+        baseType: perFilialSummary.topType,
+        baseQty: perFilialSummary.totalQty,
+        entries: getCompraTransitoEntries(comprasTransitoIndex, p.produto, porCor ? (p.cor ?? null) : null),
+        estoqueAtual: live?.estoqueFilial ?? 0,
+        vendasMesAtual: live?.vendasMesAtual ?? 0,
+        diasCorridosMes,
+        limiteDias,
+      });
+      if (transit.qty <= 0) return "";
+      return transit.qty;
+    }
 
     const compraItem = {
       vendasMesAtual: live?.vendasMesAtual ?? 0,
@@ -2064,6 +2304,136 @@ const handleBadgeClick = (cat: string) => {
                                     if (semBaseLive) {
                                       return <span className={styles.cellMetric}>Sem dados</span>;
                                     }
+                                    const perFilialSummary = !selectedFilial && live
+                                      ? buildPerFilialCompraSummary({
+                                          companyKey,
+                                          linha: p.linha ?? "",
+                                          subgrupo: p.subgrupo ?? "",
+                                          diasCorridosMes,
+                                          live,
+                                        })
+                                      : null;
+                                    if (perFilialSummary) {
+                                      const limiteDias = getLimiteDiasReposicao({ linha: p.linha ?? "", subgrupo: p.subgrupo ?? "" });
+                                      const vendasMes = Number(live?.vendasMesAtual ?? 0);
+                                      const estoqueAtual = Number(live?.estoqueFilial ?? 0);
+                                      const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
+                                      const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
+                                      const transit = applyTransitToSuggestion({
+                                        baseType: perFilialSummary.topType,
+                                        baseQty: perFilialSummary.totalQty,
+                                        entries: getCompraTransitoEntries(comprasTransitoIndex, p.produto, porCor ? (p.cor ?? null) : null),
+                                        estoqueAtual,
+                                        vendasMesAtual: vendasMes,
+                                        diasCorridosMes,
+                                        limiteDias,
+                                      });
+                                      const transitDates = transit.entries.map(
+                                        (entry) => `${new Date(`${entry.dataRecebimento}T00:00:00`).toLocaleDateString("pt-BR")} (+${fmt(entry.quantidade)})`
+                                      );
+                                      const transitBadge = transit.totalTransit > 0 ? (
+                                        <span className={styles.badgeT} style={{ marginLeft: 6 }}>
+                                          T {fmt(transit.totalTransit)}
+                                        </span>
+                                      ) : null;
+                                      if (transit.qty <= 0) {
+                                        return <span className={styles.reporNeutral}>Quantidade suficiente{transitBadge}</span>;
+                                      }
+                                      const poPrincipal = perFilialSummary.poPrincipal;
+                                      const topTypeLabel =
+                                        perFilialSummary.topType === "COMPRA" || perFilialSummary.topType === "PO"
+                                          ? null
+                                          : perFilialSummary.topType;
+                                      return (
+                                        <span
+                                          className={styles.reporAdd}
+                                          onMouseEnter={(e) => setSugestaoTooltip({
+                                            x: e.clientX,
+                                            y: e.clientY,
+                                            titulo: "Sugestão de reposição (soma por filial)",
+                                            regra: "Cada loja foi calculada individualmente com seu próprio estoque, dias com estoque positivo e velocidade. O total é a soma das lojas.",
+                                            limiteDias,
+                                            vendasMesAtual: vendasMes,
+                                            diasCorridos: diasCorridosMes,
+                                            consumoDiario,
+                                            estoqueAtual,
+                                            duracaoAtual,
+                                            qtdCalculada: transit.qty,
+                                            baseQty: perFilialSummary.totalQty,
+                                            distribuicao: perFilialSummary.distribuicao,
+                                            distribuicaoLabel: "Por loja (cálculo individual)",
+                                            transitTotal: transit.totalTransit || undefined,
+                                            transitDates,
+                                          })}
+                                          onMouseLeave={() => setSugestaoTooltip(null)}
+                                        >
+                                          {fmt(transit.qty)}
+                                          {topTypeLabel ? (
+                                            <span
+                                              style={{
+                                                marginLeft: 6,
+                                                display: "inline-flex",
+                                                width: 16,
+                                                height: 16,
+                                                borderRadius: "999px",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                fontSize: 10,
+                                                fontWeight: 800,
+                                                color: topTypeLabel === "E" ? "#fff" : "#0f172a",
+                                                background: topTypeLabel === "E" ? "#f97316" : "#fde047",
+                                                border: topTypeLabel === "E" ? "1px solid #ea580c" : "1px solid #facc15",
+                                                verticalAlign: "middle",
+                                                cursor: "help",
+                                              }}
+                                            >
+                                              {topTypeLabel}
+                                            </span>
+                                          ) : null}
+                                          {perFilialSummary.hasPo && poPrincipal ? (
+                                            <span
+                                              style={{ marginLeft: 6, display: "inline-flex", padding: "0 5px", height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#14532d", background: "#86efac", border: "1px solid #22c55e", verticalAlign: "middle", cursor: "help" }}
+                                              onMouseEnter={(e) => {
+                                                setSugestaoTooltip(null);
+                                                setSugestaoSTooltip(null);
+                                                setSugestaoETooltip(null);
+                                                setSugestaoPOTooltip({
+                                                  x: e.clientX,
+                                                  y: e.clientY,
+                                                  filialLabel: perFilialSummary.poRows.length === 1 ? poPrincipal.filial : undefined,
+                                                  poRows: perFilialSummary.poRows.map((row) => ({
+                                                    filialLabel: row.filial,
+                                                    qtde12m: row.qtde12m,
+                                                    diasComEstoquePositivo: row.poData?.diasComEstoquePositivo ?? row.diasComEstoquePositivo,
+                                                    diasSemEstoque: row.poData?.diasSemEstoque ?? row.diasSemEstoque,
+                                                    velocidadeAjustada: row.poData?.velocidadeAjustada ?? row.velocidadeAjustada,
+                                                    limiteSeguro: row.poData?.limiteSeguro ?? 0,
+                                                    qtdPO: row.qty,
+                                                  })),
+                                                  qtde12m: poPrincipal.qtde12m,
+                                                  diasComEstoquePositivo: poPrincipal.poData?.diasComEstoquePositivo ?? poPrincipal.diasComEstoquePositivo,
+                                                  diasSemEstoque: poPrincipal.poData?.diasSemEstoque ?? poPrincipal.diasSemEstoque,
+                                                  velocidadeAjustada: poPrincipal.poData?.velocidadeAjustada ?? poPrincipal.velocidadeAjustada,
+                                                  limiteSeguro: poPrincipal.poData?.limiteSeguro ?? 0,
+                                                  qtdPO: poPrincipal.qty,
+                                                  transitTotal: transit.totalTransit || undefined,
+                                                  transitDates,
+                                                });
+                                              }}
+                                              onMouseLeave={() => setSugestaoPOTooltip(null)}
+                                            >
+                                              PO
+                                            </span>
+                                          ) : null}
+                                          {perFilialSummary.hasNm && perFilialSummary.topType !== "NM" ? (
+                                            <span className={styles.badgeT} style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}>
+                                              NM
+                                            </span>
+                                          ) : null}
+                                          {transitBadge}
+                                        </span>
+                                      );
+                                    }
                                     const compraItem = {
                                       vendasMesAtual: live?.vendasMesAtual ?? 0,
                                       estoqueFilial: live?.estoqueFilial ?? 0,
@@ -2172,18 +2542,23 @@ const handleBadgeClick = (cat: string) => {
                                           {hasPOBadge ? (
                                             <span
                                               style={{ marginLeft: 6, display: "inline-flex", padding: "0 5px", height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#14532d", background: "#86efac", border: "1px solid #22c55e", verticalAlign: "middle", cursor: "help" }}
-                                              onMouseEnter={(e) => setSugestaoPOTooltip({
-                                                x: e.clientX,
-                                                y: e.clientY,
-                                                qtde12m: historicoQtde12m,
-                                                diasComEstoquePositivo: sugestao.poData?.diasComEstoquePositivo ?? historicoDiasComEstoquePositivo,
-                                                diasSemEstoque: sugestao.poData?.diasSemEstoque ?? Number(compraItem.diasSemEstoque ?? 0),
-                                                velocidadeAjustada: sugestao.poData?.velocidadeAjustada ?? historicoVelocidadeAjustada,
-                                                limiteSeguro: sugestao.poData?.limiteSeguro ?? 0,
-                                                qtdPO: transit.qty,
-                                                transitTotal: transit.totalTransit || undefined,
-                                                transitDates,
-                                              })}
+                                              onMouseEnter={(e) => {
+                                                setSugestaoTooltip(null);
+                                                setSugestaoSTooltip(null);
+                                                setSugestaoETooltip(null);
+                                                setSugestaoPOTooltip({
+                                                  x: e.clientX,
+                                                  y: e.clientY,
+                                                  qtde12m: historicoQtde12m,
+                                                  diasComEstoquePositivo: sugestao.poData?.diasComEstoquePositivo ?? historicoDiasComEstoquePositivo,
+                                                  diasSemEstoque: sugestao.poData?.diasSemEstoque ?? Number(compraItem.diasSemEstoque ?? 0),
+                                                  velocidadeAjustada: sugestao.poData?.velocidadeAjustada ?? historicoVelocidadeAjustada,
+                                                  limiteSeguro: sugestao.poData?.limiteSeguro ?? 0,
+                                                  qtdPO: transit.qty,
+                                                  transitTotal: transit.totalTransit || undefined,
+                                                  transitDates,
+                                                });
+                                              }}
                                               onMouseLeave={() => setSugestaoPOTooltip(null)}
                                             >PO</span>
                                           ) : null}
@@ -2239,7 +2614,12 @@ const handleBadgeClick = (cat: string) => {
                                           {sugestao.poData ? (
                                             <span
                                               style={{ marginLeft: 6, display: "inline-flex", padding: "0 5px", height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#14532d", background: "#86efac", border: "1px solid #22c55e", verticalAlign: "middle", cursor: "help" }}
-                                              onMouseEnter={(e) => setSugestaoPOTooltip({ x: e.clientX, y: e.clientY, qtde12m: Number(compraItem.qtde12m ?? 0), diasComEstoquePositivo: sugestao.poData!.diasComEstoquePositivo, diasSemEstoque: sugestao.poData!.diasSemEstoque, velocidadeAjustada: sugestao.poData!.velocidadeAjustada, limiteSeguro: sugestao.poData!.limiteSeguro, qtdPO: transit.qty, transitTotal: transit.totalTransit || undefined, transitDates })}
+                                              onMouseEnter={(e) => {
+                                                setSugestaoTooltip(null);
+                                                setSugestaoSTooltip(null);
+                                                setSugestaoETooltip(null);
+                                                setSugestaoPOTooltip({ x: e.clientX, y: e.clientY, qtde12m: Number(compraItem.qtde12m ?? 0), diasComEstoquePositivo: sugestao.poData!.diasComEstoquePositivo, diasSemEstoque: sugestao.poData!.diasSemEstoque, velocidadeAjustada: sugestao.poData!.velocidadeAjustada, limiteSeguro: sugestao.poData!.limiteSeguro, qtdPO: transit.qty, transitTotal: transit.totalTransit || undefined, transitDates });
+                                              }}
                                               onMouseLeave={() => setSugestaoPOTooltip(null)}
                                             >PO</span>
                                           ) : null}
@@ -2296,7 +2676,12 @@ const handleBadgeClick = (cat: string) => {
                                           {sugestao.poData ? (
                                             <span
                                               style={{ marginLeft: 6, display: "inline-flex", padding: "0 5px", height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#14532d", background: "#86efac", border: "1px solid #22c55e", verticalAlign: "middle", cursor: "help" }}
-                                              onMouseEnter={(e) => setSugestaoPOTooltip({ x: e.clientX, y: e.clientY, qtde12m: Number(compraItem.qtde12m ?? 0), diasComEstoquePositivo: sugestao.poData!.diasComEstoquePositivo, diasSemEstoque: sugestao.poData!.diasSemEstoque, velocidadeAjustada: sugestao.poData!.velocidadeAjustada, limiteSeguro: sugestao.poData!.limiteSeguro, qtdPO: transit.qty, transitTotal: transit.totalTransit || undefined, transitDates })}
+                                              onMouseEnter={(e) => {
+                                                setSugestaoTooltip(null);
+                                                setSugestaoSTooltip(null);
+                                                setSugestaoETooltip(null);
+                                                setSugestaoPOTooltip({ x: e.clientX, y: e.clientY, qtde12m: Number(compraItem.qtde12m ?? 0), diasComEstoquePositivo: sugestao.poData!.diasComEstoquePositivo, diasSemEstoque: sugestao.poData!.diasSemEstoque, velocidadeAjustada: sugestao.poData!.velocidadeAjustada, limiteSeguro: sugestao.poData!.limiteSeguro, qtdPO: transit.qty, transitTotal: transit.totalTransit || undefined, transitDates });
+                                              }}
                                               onMouseLeave={() => setSugestaoPOTooltip(null)}
                                             >PO</span>
                                           ) : null}
@@ -2478,7 +2863,9 @@ const handleBadgeClick = (cat: string) => {
           {sugestaoTooltip.distribuicao && sugestaoTooltip.distribuicao.length > 0 ? (
             <>
               <div className={styles.metricTooltipDivider} />
-              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Por loja (proporcional)</div>
+              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
+                {sugestaoTooltip.distribuicaoLabel ?? "Por loja (proporcional)"}
+              </div>
               {(() => {
                 const totalVendas = sugestaoTooltip.distribuicao.reduce((s, f) => s + (f.qtde12m ?? 0), 0);
                 return sugestaoTooltip.distribuicao.map((f) => (
@@ -2607,6 +2994,50 @@ const handleBadgeClick = (cat: string) => {
           <div className={styles.metricTooltipTitle} style={{ color: "#86efac" }}>
             {(sugestaoPOTooltip.limiteSeguro ?? 0) > 0 ? "Potencial Oculto (PO)" : "Histórico Curto (PO)"}
           </div>
+          {sugestaoPOTooltip.poRows && sugestaoPOTooltip.poRows.length > 1 ? (
+            <>
+              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
+                Mais de uma loja entrou por PO neste item. Abaixo está o detalhe de cada uma:
+              </div>
+              <div className={styles.metricTooltipDivider} />
+              {sugestaoPOTooltip.poRows.map((row, index) => (
+                <React.Fragment key={`${row.filialLabel}-${index}`}>
+                  <div className={styles.metricTooltipLine} style={{ color: "#86efac" }}>
+                    <strong>{row.filialLabel}</strong>
+                  </div>
+                  <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                    <span>Vendas</span><span><strong>{row.qtde12m} un</strong> em <strong>{Math.round(row.diasComEstoquePositivo)} dias</strong> c/ estoque</span>
+                  </div>
+                  <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                    <span>Projeção</span><span style={{ color: "#86efac" }}><strong>~{row.velocidadeAjustada.toFixed(0)} un/mês</strong></span>
+                  </div>
+                  <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
+                    = {row.qtde12m} un ÷ {(row.diasComEstoquePositivo / 30).toFixed(2)} meses disponíveis
+                  </div>
+                  {row.diasSemEstoque > 0 ? (
+                    <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
+                      {row.diasSemEstoque} dias sem estoque no período
+                    </div>
+                  ) : null}
+                  <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                    <span>Sugestão</span><span><strong>{row.qtdPO} un</strong></span>
+                  </div>
+                  {row.limiteSeguro > 0 ? (
+                    <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
+                      trava de segurança: máx. {row.limiteSeguro} un
+                    </div>
+                  ) : null}
+                  {index < sugestaoPOTooltip.poRows!.length - 1 ? <div className={styles.metricTooltipDivider} /> : null}
+                </React.Fragment>
+              ))}
+            </>
+          ) : (
+            <>
+          {sugestaoPOTooltip.filialLabel ? (
+            <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
+              Loja: <strong>{sugestaoPOTooltip.filialLabel}</strong>
+            </div>
+          ) : null}
           <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
             {(sugestaoPOTooltip.limiteSeguro ?? 0) > 0
               ? "Vendeu rápido no curto período em que tinha estoque"
@@ -2639,6 +3070,8 @@ const handleBadgeClick = (cat: string) => {
             <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
               trava de segurança: máx. {sugestaoPOTooltip.limiteSeguro} un (histórico curto)
             </div>
+          )}
+            </>
           )}
           {sugestaoPOTooltip.transitTotal ? (
             <>
