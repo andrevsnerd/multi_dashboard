@@ -1,0 +1,84 @@
+
+> multi-dashboard@0.1.0 dev
+> next dev
+
+   ▲ Next.js 16.0.10 (Turbopack)
+   - Local:         http://localhost:3000
+   - Network:       http://100.98.16.102:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+Creating turbopack project {
+  dir: 'C:\\Users\\NERD TIJUCA\\Documents\\NERD - ANDRE\\Dashboard NERD\\multi-dashboard',
+  testMode: true
+}
+ ✓ Ready in 2.2s
+ ○ Compiling /[company]/sincronizacao ...
+ GET /scarfme/sincronizacao 200 in 8.8s (compile: 7.9s, render: 857ms)
+ GET /scarfme/sincronizacao 200 in 389ms (compile: 64ms, render: 325ms)
+ GET /nerd/curva-abc 200 in 10.4s (compile: 9.9s, render: 492ms)
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+ GET /api/compras-transito?company=nerd&includeItems=1 200 in 382ms (compile: 343ms, render: 39ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+ GET /api/curva-abc?company=nerd&month=4&year=2026&start=2026-05-01&end=2026-05-25&compare=month&porCor=1 200 in 3.8s (compile: 411ms, render: 3.4s)
+ GET /api/curva-abc?company=nerd&month=4&year=2026&start=2026-05-01&end=2026-05-25&compare=month&porCor=1 200 in 5.2s (compile: 770ms, render: 4.4s)
+ GET /api/sincronizacao 200 in 8.6s (compile: 1473ms, render: 7.1s)
+ GET /api/sincronizacao 200 in 11.4s (compile: 4.0s, render: 7.3s)
+ GET /api/sincronizacao 200 in 11.4s (compile: 4.0s, render: 7.5s)
+ GET /api/sincronizacao 200 in 9.2s (compile: 1507ms, render: 7.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 10.8s (compile: 822ms, render: 9.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 4.8s (compile: 6ms, render: 4.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.8s (compile: 2ms, render: 8.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 11.0s (compile: 3ms, render: 11.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 11.2s (compile: 5ms, render: 11.2s)
+ GET /api/controle-estoque/lista-compra-sugerida?company=nerd&qtdCompra=100&limit=5 200 in 24.7s (compile: 351ms, render: 24.3s)
+ GET /api/controle-estoque/lista-compra-sugerida?company=nerd&qtdCompra=0&limit=5&porCor=1 200 in 24.9s (compile: 364ms, render: 24.5s)
+ GET /api/controle-estoque/lista-compra-sugerida?company=scarfme&qtdCompra=0&limit=5&porCor=1 200 in 27.5s (compile: 359ms, render: 27.2s)
+ GET /api/controle-estoque/lista-compra-sugerida?company=scarfme&qtdCompra=100&limit=5 200 in 27.5s (compile: 321ms, render: 27.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.5s (compile: 3ms, render: 8.5s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.5s (compile: 3ms, render: 8.5s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.9s (compile: 2ms, render: 8.9s)
+ GET /api/controle-estoque/lista-compra-sugerida?company=nerd&qtdCompra=10&limit=3&produtos=X2.03.0023 200 in 11.7s (compile: 4ms, render: 11.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 9.8s (compile: 3ms, render: 9.8s)
+ GET /api/controle-estoque/lista-compra-sugerida?company=scarfme&qtdCompra=10&limit=3&porCor=1&produtos=07.A1.00B3 200 in 13.6s (compile: 4ms, render: 13.6s)
+ GET /api/controle-estoque/lista-compra-sugerida?company=nerd&qtdCompra=100&limit=5 200 in 20.4s (compile: 4ms, render: 20.4s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.3s (compile: 3ms, render: 8.3s)
+ GET /api/controle-estoque/lista-compra-sugerida?company=scarfme&qtdCompra=100&limit=5 200 in 21.6s (compile: 8ms, render: 21.5s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.0s (compile: 4ms, render: 8.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.7s (compile: 3ms, render: 8.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.0s (compile: 5ms, render: 8.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.0s (compile: 5ms, render: 8.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.9s (compile: 2ms, render: 7.9s)
+ POST /api/controle-estoque/metricas-itens 200 in 9.1s (compile: 7ms, render: 9.1s)
+ POST /api/controle-estoque/metricas-itens 200 in 9.2s (compile: 3ms, render: 9.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.3s (compile: 3ms, render: 8.3s)
+ POST /api/controle-estoque/metricas-itens 200 in 7.7s (compile: 3ms, render: 7.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 9.3s (compile: 4ms, render: 9.3s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.6s (compile: 5ms, render: 8.6s)
+ POST /api/controle-estoque/metricas-itens 200 in 12.0s (compile: 6ms, render: 11.9s)

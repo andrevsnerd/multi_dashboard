@@ -5871,6 +5871,28 @@ export async function fetchTopProdutosUltimos3Meses({
       ? `COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO, vp.COR_PRODUTO)`
       : `COALESCE(vp.DESC_COR_PRODUTO, vp.COR_PRODUTO)`;
 
+    const barcodeGroupBy = porCor
+      ? `pb.PRODUTO, ISNULL(pb.COR_PRODUTO, '')`
+      : `pb.PRODUTO`;
+    const barcodeSelectCor = porCor
+      ? "ISNULL(pb.COR_PRODUTO, '') AS cor,"
+      : '';
+    const barcodeJoinCorVp = porCor
+      ? " AND ISNULL(pb_vp.cor, '') = ISNULL(vp.COR_PRODUTO, '')"
+      : '';
+    const barcodeJoinCorFp = porCor
+      ? " AND ISNULL(pb_fp.cor, '') = ISNULL(fp.COR_PRODUTO, '')"
+      : '';
+    const barcodeLookupSubquery = `
+      SELECT
+        pb.PRODUTO,
+        ${barcodeSelectCor}
+        MIN(LTRIM(RTRIM(pb.CODIGO_BARRA))) AS codigoBarra
+      FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+      WHERE ISNULL(LTRIM(RTRIM(pb.CODIGO_BARRA)), '') <> ''
+      GROUP BY ${barcodeGroupBy}
+    `;
+
     const estoqueJoinSubquery = `
       LEFT JOIN (
         SELECT
@@ -5887,14 +5909,7 @@ export async function fetchTopProdutosUltimos3Meses({
     const innerListaVarejo = `
       SELECT
         ISNULL(vp.PRODUTO, '') AS produto,
-        MAX(ISNULL((
-          SELECT TOP 1 pb.CODIGO_BARRA
-          FROM PRODUTOS_BARRA pb WITH (NOLOCK)
-          WHERE pb.PRODUTO = vp.PRODUTO
-            ${porCor ? "AND ISNULL(pb.COR_PRODUTO, '') = ISNULL(vp.COR_PRODUTO, '')" : ""}
-            AND ISNULL(pb.CODIGO_BARRA, '') <> ''
-          ORDER BY pb.CODIGO_BARRA
-        ), '')) AS codigoBarra,
+        MAX(ISNULL(pb_vp.codigoBarra, '')) AS codigoBarra,
         ${porCor ? "ISNULL(vp.COR_PRODUTO, '') AS cor," : ""}
         ${porCor ? `MAX(ISNULL(${corDescricaoExpr}, '')) AS corDescricao,` : ""}
         UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS descricao,
@@ -5909,6 +5924,9 @@ export async function fetchTopProdutosUltimos3Meses({
         MAX(ISNULL(p.CUSTO_REPOSICAO1, 0)) AS custoUnitario
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      LEFT JOIN (
+        ${barcodeLookupSubquery}
+      ) pb_vp ON pb_vp.PRODUTO = vp.PRODUTO${barcodeJoinCorVp}
       ${coresJoin}
       WHERE vp.DATA_VENDA >= @inicio3m
         AND vp.DATA_VENDA < @fim3m
@@ -5933,14 +5951,7 @@ export async function fetchTopProdutosUltimos3Meses({
     const innerListaEcommerce = `
       SELECT
         ISNULL(fp.PRODUTO, '') AS produto,
-        MAX(ISNULL((
-          SELECT TOP 1 pb.CODIGO_BARRA
-          FROM PRODUTOS_BARRA pb WITH (NOLOCK)
-          WHERE pb.PRODUTO = fp.PRODUTO
-            ${porCor ? "AND ISNULL(pb.COR_PRODUTO, '') = ISNULL(fp.COR_PRODUTO, '')" : ""}
-            AND ISNULL(pb.CODIGO_BARRA, '') <> ''
-          ORDER BY pb.CODIGO_BARRA
-        ), '')) AS codigoBarra,
+        MAX(ISNULL(pb_fp.codigoBarra, '')) AS codigoBarra,
         ${porCor ? "ISNULL(fp.COR_PRODUTO, '') AS cor," : ""}
         ${porCor ? "MAX(ISNULL(COALESCE(cb.DESC_COR, fp.COR_PRODUTO), '')) AS corDescricao," : ""}
         UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS descricao,
@@ -5957,6 +5968,9 @@ export async function fetchTopProdutosUltimos3Meses({
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO
+      LEFT JOIN (
+        ${barcodeLookupSubquery}
+      ) pb_fp ON pb_fp.PRODUTO = fp.PRODUTO${barcodeJoinCorFp}
       ${ecCoresJoinLista}
       WHERE f.EMISSAO >= @inicio3m
         AND f.EMISSAO < @fim3m
@@ -6007,14 +6021,7 @@ export async function fetchTopProdutosUltimos3Meses({
       : `
       SELECT TOP (@lc_limit)
         ISNULL(vp.PRODUTO, '') AS produto,
-        MAX(ISNULL((
-          SELECT TOP 1 pb.CODIGO_BARRA
-          FROM PRODUTOS_BARRA pb WITH (NOLOCK)
-          WHERE pb.PRODUTO = vp.PRODUTO
-            ${porCor ? "AND ISNULL(pb.COR_PRODUTO, '') = ISNULL(vp.COR_PRODUTO, '')" : ""}
-            AND ISNULL(pb.CODIGO_BARRA, '') <> ''
-          ORDER BY pb.CODIGO_BARRA
-        ), '')) AS codigoBarra,
+        MAX(ISNULL(pb_vp.codigoBarra, '')) AS codigoBarra,
         ${porCor ? "ISNULL(vp.COR_PRODUTO, '') AS cor," : ""}
         ${porCor ? `MAX(ISNULL(${corDescricaoExpr}, '')) AS corDescricao,` : ""}
         UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS descricao,
@@ -6030,6 +6037,9 @@ export async function fetchTopProdutosUltimos3Meses({
         MAX(ISNULL(est.estoqueAtual, 0)) AS estoqueAtual
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      LEFT JOIN (
+        ${barcodeLookupSubquery}
+      ) pb_vp ON pb_vp.PRODUTO = vp.PRODUTO${barcodeJoinCorVp}
       ${coresJoin}
       LEFT JOIN (
         SELECT
