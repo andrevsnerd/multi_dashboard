@@ -1178,12 +1178,45 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   };
   const exportMenuRef = useRef<HTMLDivElement | null>(null);
   const captureRef = useRef<HTMLDivElement | null>(null);
+  const tableRef = useRef<HTMLTableElement | null>(null);
+  const stickyBarRef = useRef<HTMLDivElement | null>(null);
 
   // Quando filial muda, voltar para aba de produtos
   useEffect(() => {
     setActiveTab("produtos");
     setSelectedCategory(null);
   }, [selectedFilial]);
+
+  // Sticky table header clone — DOM direto, sem setState
+  useEffect(() => {
+    const handleScroll = () => {
+      const bar = stickyBarRef.current;
+      const table = tableRef.current;
+      if (!bar || !table) return;
+      const thead = table.querySelector("thead");
+      if (!thead) return;
+      const theadRect = thead.getBoundingClientRect();
+      const tableRect = table.getBoundingClientRect();
+      if (theadRect.top < 0 && tableRect.bottom > 0) {
+        bar.style.display = "block";
+        bar.style.left = tableRect.left + "px";
+        bar.style.width = tableRect.width + "px";
+        const ths = Array.from(thead.querySelectorAll("th"));
+        const barThs = Array.from(bar.querySelectorAll("th"));
+        ths.forEach((th, i) => {
+          if (barThs[i]) (barThs[i] as HTMLElement).style.width = th.getBoundingClientRect().width + "px";
+        });
+      } else {
+        bar.style.display = "none";
+      }
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -2401,10 +2434,10 @@ const handleBadgeClick = (cat: string) => {
               </div>
             )}
             {produtosComCurvaExibidos.length > 0 && (
-              <table className={styles.table}>
+              <table className={styles.table} ref={tableRef}>
                 <thead>
                   <tr>
-                    <th style={{ width: 48 }}>#</th>
+                    <th style={{ width: 48 }} />
                     <th>
                       Produto
                       {abcTitleSuffix && <span className={styles.thFilterLabel}>{abcTitleSuffix}</span>}
@@ -3225,6 +3258,20 @@ const handleBadgeClick = (cat: string) => {
           </div>
         </div>
       )}
+      <div ref={stickyBarRef} className={styles.stickyTableHeader} style={{ display: "none" }}>
+        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed" }}>
+          <thead>
+            <tr>
+              {["", "Produto", "Obs.", "Participação", "Faturamento no período", "Qtd vendida", "Estoque", ...(showEstoqueRede ? ["Estoque rede"] : []), "Markup", "Sugestão de compra"].map((label, i) => (
+                <th key={i} className={styles.stickyTableHeaderTh} style={{ textAlign: i >= 3 ? "right" : "left" }}>
+                  {label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+        </table>
+      </div>
+
       {sugestaoTooltip && (
         <div className={styles.metricTooltip} style={getTooltipViewportPosition(sugestaoTooltip.x, sugestaoTooltip.y)}>
           <div className={styles.metricTooltipTitle}>{sugestaoTooltip.titulo}: {fmt(sugestaoTooltip.qtdCalculada)} un</div>
