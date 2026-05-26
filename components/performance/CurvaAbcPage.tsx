@@ -1042,6 +1042,76 @@ const ObservacaoCell = React.memo(function ObservacaoCell({
   );
 });
 
+const ExportMenu = React.memo(function ExportMenu({
+  exportingPdf,
+  onExportCsv,
+  onExportXlsx,
+  onExportPdf,
+}: {
+  exportingPdf: boolean;
+  onExportCsv: () => void;
+  onExportXlsx: () => void;
+  onExportPdf: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  return (
+    <div className={styles.exportMenuWrap} ref={menuRef}>
+      <button
+        type="button"
+        className={styles.exportMenuTrigger}
+        onClick={() => setOpen((prev) => !prev)}
+        title="Escolher formato de exportacao"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        ↓ Export
+      </button>
+      {open && (
+        <div className={styles.exportMenuDropdown} role="menu" aria-label="Opcoes de exportacao">
+          <button
+            type="button"
+            className={styles.exportMenuItem}
+            onClick={() => { setOpen(false); onExportCsv(); }}
+            title="Exporta a tabela atual em CSV"
+          >
+            Exportar CSV
+          </button>
+          <button
+            type="button"
+            className={styles.exportMenuItem}
+            onClick={() => { setOpen(false); onExportXlsx(); }}
+            title="Exporta a tabela atual em Excel"
+          >
+            Exportar XLSX
+          </button>
+          <button
+            type="button"
+            className={styles.exportMenuItem}
+            onClick={() => { setOpen(false); onExportPdf(); }}
+            title="Exporta a lista atual em PDF"
+            disabled={exportingPdf}
+          >
+            {exportingPdf ? "Exportando PDF..." : "Exportar PDF"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+});
+
 function getInitialRange(month: number, year: number): DateRangeValue {
   const base = new Date(year, month, 1);
   const today = new Date();
@@ -1072,7 +1142,6 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [data, setData] = useState<FilialData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubgrupos, setSelectedSubgrupos] = useState<string[]>([]);
@@ -1176,7 +1245,6 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     setSugestaoETooltip(null);
     setSugestaoPOTooltip(null);
   };
-  const exportMenuRef = useRef<HTMLDivElement | null>(null);
   const captureRef = useRef<HTMLDivElement | null>(null);
   const tableRef = useRef<HTMLTableElement | null>(null);
   const stickyBarRef = useRef<HTMLDivElement | null>(null);
@@ -1187,9 +1255,23 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     setSelectedCategory(null);
   }, [selectedFilial]);
 
-  // Sticky table header clone — DOM direto, sem setState
+  // Sticky table header clone — DOM direto, sem setState, throttled via rAF
   useEffect(() => {
-    const handleScroll = () => {
+    let rafId: number | null = null;
+    let isVisible = false;
+
+    const syncWidths = (thead: Element, bar: HTMLDivElement, tableRect: DOMRect) => {
+      bar.style.left = tableRect.left + "px";
+      bar.style.width = tableRect.width + "px";
+      const ths = thead.querySelectorAll("th");
+      const barThs = bar.querySelectorAll("th");
+      ths.forEach((th, i) => {
+        if (barThs[i]) (barThs[i] as HTMLElement).style.width = th.getBoundingClientRect().width + "px";
+      });
+    };
+
+    const update = () => {
+      rafId = null;
       const bar = stickyBarRef.current;
       const table = tableRef.current;
       if (!bar || !table) return;
@@ -1197,24 +1279,28 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       if (!thead) return;
       const theadRect = thead.getBoundingClientRect();
       const tableRect = table.getBoundingClientRect();
-      if (theadRect.top < 0 && tableRect.bottom > 0) {
+      const shouldShow = theadRect.top < 0 && tableRect.bottom > 0;
+      if (shouldShow && !isVisible) {
+        isVisible = true;
+        syncWidths(thead, bar, tableRect);
         bar.style.display = "block";
-        bar.style.left = tableRect.left + "px";
-        bar.style.width = tableRect.width + "px";
-        const ths = Array.from(thead.querySelectorAll("th"));
-        const barThs = Array.from(bar.querySelectorAll("th"));
-        ths.forEach((th, i) => {
-          if (barThs[i]) (barThs[i] as HTMLElement).style.width = th.getBoundingClientRect().width + "px";
-        });
-      } else {
+      } else if (!shouldShow && isVisible) {
+        isVisible = false;
         bar.style.display = "none";
+      } else if (shouldShow && isVisible) {
+        bar.style.left = tableRect.left + "px";
       }
     };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    window.addEventListener("resize", handleScroll, { passive: true });
+
+    const schedule = () => {
+      if (rafId === null) rafId = requestAnimationFrame(update);
+    };
+
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", () => { isVisible = false; schedule(); }, { passive: true });
     return () => {
-      window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("resize", handleScroll);
+      window.removeEventListener("scroll", schedule);
+      if (rafId !== null) cancelAnimationFrame(rafId);
     };
   }, []);
 
@@ -1288,20 +1374,6 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       .finally(() => setLoading(false));
   }, [companyKey, selectedFilial, selectedMonth, selectedYear, comparisonMode, range.startDate, range.endDate, porCor]);
 
-  useEffect(() => {
-    if (!exportMenuOpen) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
-        setExportMenuOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [exportMenuOpen]);
 
   const outrosTooltip = useMemo(() => getOutrosTooltip(companyKey), [companyKey]);
 
@@ -1869,38 +1941,35 @@ const handleBadgeClick = (cat: string) => {
   const buildExportSimpleRows = (): CurvaAbcSimpleXlsxRow[] => {
     if (produtosComCurvaExibidos.length === 0) return [];
     const rows: CurvaAbcSimpleXlsxRow[] = [];
-    for (const curva of groups) {
-      const grupo = produtosComCurvaExibidos.filter(p => p.curva === curva);
-      for (const p of grupo) {
-        const rankGlobal = produtosComCurvaExibidos.indexOf(p) + 1;
-        const precoMedio = p.qtde > 0 ? p.vendas / p.qtde : 0;
-        const markup = p.custo > 0 && precoMedio > 0 ? precoMedio / p.custo : null;
-        const cmp = getComparisonBadge(p.vendas, p.vendasPrevious);
-        let variacao: number | string = "";
-        if (cmp?.kind === "new") variacao = "NOVO";
-        else if (cmp?.kind === "pct") variacao = Math.round(cmp.value * 10) / 10;
-        rows.push({
-          RANK: rankGlobal,
-          CURVA: curva,
-          DESCRICAO: p.descricao || p.produto,
-          PRODUTO: p.produto,
-          CODIGO_BARRA: p.codigoBarra || "",
-          LINHA: p.linha?.trim() || "",
-          SUBGRUPO: p.subgrupo?.trim() || "",
-          TIPO_PRODUTO: p.tipoProduto?.trim() || "",
-          COLECAO: p.colecao?.trim() || "",
-          GRADE: companyKey === "scarfme" ? (p.grade ?? "") : "",
-          COR_DESCRICAO: porCor ? (p.corDescricao || p.cor || "") : "",
-          PERC_PARTICIPACAO: Math.round(p.percParticipacao * 10) / 10,
-          PERC_ACUMULADA: Math.round(p.percCumulativa * 1000) / 10,
-          VENDAS: Math.round(p.vendas * 100) / 100,
-          QTDE: p.qtde,
-          ESTOQUE: p.estoque ?? 0,
-          MARKUP: markup !== null ? Math.round(markup * 100) / 100 : "",
-          SUGESTAO_COMPRA: getSugestaoCompraExportValue(p),
-          VAR_VS_PERIODO_ANTERIOR: variacao,
-        });
-      }
+    for (let rankGlobal = 1; rankGlobal <= produtosComCurvaExibidos.length; rankGlobal++) {
+      const p = produtosComCurvaExibidos[rankGlobal - 1]!;
+      const precoMedio = p.qtde > 0 ? p.vendas / p.qtde : 0;
+      const markup = p.custo > 0 && precoMedio > 0 ? precoMedio / p.custo : null;
+      const cmp = getComparisonBadge(p.vendas, p.vendasPrevious);
+      let variacao: number | string = "";
+      if (cmp?.kind === "new") variacao = "NOVO";
+      else if (cmp?.kind === "pct") variacao = Math.round(cmp.value * 10) / 10;
+      rows.push({
+        RANK: rankGlobal,
+        CURVA: p.curva,
+        DESCRICAO: p.descricao || p.produto,
+        PRODUTO: p.produto,
+        CODIGO_BARRA: p.codigoBarra || "",
+        LINHA: p.linha?.trim() || "",
+        SUBGRUPO: p.subgrupo?.trim() || "",
+        TIPO_PRODUTO: p.tipoProduto?.trim() || "",
+        COLECAO: p.colecao?.trim() || "",
+        GRADE: companyKey === "scarfme" ? (p.grade ?? "") : "",
+        COR_DESCRICAO: porCor ? (p.corDescricao || p.cor || "") : "",
+        PERC_PARTICIPACAO: Math.round(p.percParticipacao * 10) / 10,
+        PERC_ACUMULADA: Math.round(p.percCumulativa * 1000) / 10,
+        VENDAS: Math.round(p.vendas * 100) / 100,
+        QTDE: p.qtde,
+        ESTOQUE: p.estoque ?? 0,
+        MARKUP: markup !== null ? Math.round(markup * 100) / 100 : "",
+        SUGESTAO_COMPRA: getSugestaoCompraExportValue(p),
+        VAR_VS_PERIODO_ANTERIOR: variacao,
+      });
     }
     return rows;
   };
@@ -1914,16 +1983,12 @@ const handleBadgeClick = (cat: string) => {
   const handleExportSimpleXlsx = () => {
     const rows = buildExportSimpleRows();
     if (rows.length === 0) return;
-    setExportMenuOpen(false);
-    exportCurvaAbcSimpleXlsx(rows, {
-      ...exportOptions,
-    });
+    exportCurvaAbcSimpleXlsx(rows, { ...exportOptions });
   };
 
   const handleExportSimpleCsv = () => {
     const rows = buildExportSimpleRows();
     if (rows.length === 0) return;
-    setExportMenuOpen(false);
     exportCurvaAbcSimpleCsv(rows, exportOptions);
   };
 
@@ -1931,7 +1996,6 @@ const handleBadgeClick = (cat: string) => {
     const target = captureRef.current;
     if (!target || produtosComCurvaExibidos.length === 0) return;
 
-    setExportMenuOpen(false);
     setExportingPdf(true);
 
     try {
@@ -2083,47 +2147,12 @@ const handleBadgeClick = (cat: string) => {
               companyConfigOverride={data?.companyConfig ?? null}
             />
             {produtosComCurva.length > 0 && (
-              <div className={styles.exportMenuWrap} ref={exportMenuRef}>
-                <button
-                  type="button"
-                  className={styles.exportMenuTrigger}
-                  onClick={() => setExportMenuOpen((prev) => !prev)}
-                  title="Escolher formato de exportacao"
-                  aria-haspopup="menu"
-                  aria-expanded={exportMenuOpen}
-                >
-                  ↓ Export
-                </button>
-                {exportMenuOpen && (
-                  <div className={styles.exportMenuDropdown} role="menu" aria-label="Opcoes de exportacao">
-                    <button
-                      type="button"
-                      className={styles.exportMenuItem}
-                      onClick={handleExportSimpleCsv}
-                      title="Exporta a tabela atual em CSV"
-                    >
-                      Exportar CSV
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.exportMenuItem}
-                      onClick={handleExportSimpleXlsx}
-                      title="Exporta a tabela atual em Excel"
-                    >
-                      Exportar XLSX
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.exportMenuItem}
-                      onClick={handleExportPdf}
-                      title="Exporta a lista atual em PDF"
-                      disabled={exportingPdf}
-                    >
-                      {exportingPdf ? "Exportando PDF..." : "Exportar PDF"}
-                    </button>
-                  </div>
-                )}
-              </div>
+              <ExportMenu
+                exportingPdf={exportingPdf}
+                onExportCsv={handleExportSimpleCsv}
+                onExportXlsx={handleExportSimpleXlsx}
+                onExportPdf={handleExportPdf}
+              />
             )}
           </div>
         </div>
