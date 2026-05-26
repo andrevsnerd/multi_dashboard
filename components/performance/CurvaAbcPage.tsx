@@ -2030,9 +2030,7 @@ const handleBadgeClick = (cat: string) => {
       <div className={styles.headerCard}>
         <div className={styles.header}>
           <div className={styles.titleRow}>
-            <span className={styles.liveDot} />
-            <h1 className={styles.title}>Curva A,B,C · Live</h1>
-            <span className={styles.liveTime}>{nowStr}</span>
+            <h1 className={styles.title}>Curva A,B,C</h1>
           </div>
 
           <div className={styles.headerRight}>
@@ -2249,6 +2247,27 @@ const handleBadgeClick = (cat: string) => {
               </span>
             )}
           </div>
+          <div className={styles.stockBucketInline}>
+              {(["zero", "low", "high"] as StockBucket[]).map(bucket => {
+                const count = stockBucketTotals[bucket];
+                const isActive = selectedStockBuckets.has(bucket);
+                const bucketColorClass = bucket === "zero" ? styles.stockBucketCountZero : bucket === "low" ? styles.stockBucketCountLow : styles.stockBucketCountHigh;
+                return (
+                  <button
+                    key={bucket}
+                    type="button"
+                    data-bucket={bucket}
+                    data-active={isActive ? "true" : undefined}
+                    className={styles.stockBucketInlineRow}
+                    onClick={() => handleStockBucketToggle(bucket)}
+                    title={`Filtrar por: ${STOCK_BUCKET_LABEL[bucket]}`}
+                  >
+                    <span className={styles.stockBucketLabel}>{STOCK_BUCKET_LABEL[bucket]}</span>
+                    <span className={`${styles.stockBucketCount} ${bucketColorClass}`}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
         </div>
       )}
 
@@ -2285,33 +2304,6 @@ const handleBadgeClick = (cat: string) => {
 
       {activeTab === "produtos" && !loading && data && (
         <div ref={captureRef}>
-          {/* CURVA ABC card (único) */}
-          {produtosComCurva.length > 0 && (
-            <div className={styles.abcCard} style={{ marginBottom: 14 }}>
-
-              {/* Stock bucket filter row */}
-              <div className={styles.stockBucketFilters}>
-                {(["zero", "low", "high"] as StockBucket[]).map(bucket => {
-                  const count = stockBucketTotals[bucket];
-                  const isActive = selectedStockBuckets.has(bucket);
-                  const bucketColorClass = bucket === "zero" ? styles.stockBucketCountZero : bucket === "low" ? styles.stockBucketCountLow : styles.stockBucketCountHigh;
-                  return (
-                    <button
-                      key={bucket}
-                      type="button"
-                      className={`${styles.stockBucketBtn} ${isActive ? styles.stockBucketBtnActive : ""}`}
-                      onClick={() => handleStockBucketToggle(bucket)}
-                      title={`Filtrar por: ${STOCK_BUCKET_LABEL[bucket]}`}
-                    >
-                      <span className={styles.stockBucketLabel}>{STOCK_BUCKET_LABEL[bucket]}</span>
-                      <span className={`${styles.stockBucketCount} ${bucketColorClass}`}>{count}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-            </div>
-          )}
 
           {/* Category section */}
           {displayedCategories.length > 0 && (

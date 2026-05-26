@@ -20,14 +20,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 5px 10px;
+  padding: 5px 12px;
   border-radius: 7px;
   border: 1px solid #e2e8f0;
   background: #ffffff;
   cursor: pointer;
   box-shadow: none;
   transition: border-color 0.15s, background 0.15s;
-  min-width: 80px;
+  min-width: 100px;
   font-size: 13px;
 }
 
@@ -46,7 +46,7 @@
 }
 
 .valuePrimary {
-  font-weight: 500;
+  font-weight: 700;
   color: #0f172a;
   font-size: 13px;
   text-align: left;

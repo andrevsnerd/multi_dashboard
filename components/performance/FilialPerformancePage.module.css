@@ -47,7 +47,7 @@
 }
 
 .title {
-  font-size: 17px;
+  font-size: 24px;
   font-weight: 700;
   color: #0f172a;
   margin: 0;
@@ -340,10 +340,10 @@
   background: #ffffff;
   border: 1px solid #e8eaed;
   border-radius: 14px;
-  padding: 20px 24px;
+  padding: 18px 22px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
@@ -353,13 +353,15 @@
   letter-spacing: 0.6px;
   color: #94a3b8;
   text-transform: uppercase;
+  margin-bottom: 6px;
 }
 
 .kpiValue {
   font-size: 26px;
   font-weight: 700;
   color: #0f172a;
-  line-height: 1.1;
+  line-height: 1.15;
+  margin-bottom: 4px;
 }
 
 .kpiProjecao {
@@ -2001,7 +2003,7 @@
 /* ── KPI cards standalone row ── */
 .kpiCardsRow {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 14px;
 }
@@ -2180,6 +2182,69 @@
 .stockBucketCountZero { background: #fee2e2; color: #dc2626; }
 .stockBucketCountLow  { background: #fef3c7; color: #d97706; }
 .stockBucketCountHigh { background: #dcfce7; color: #16a34a; }
+
+.stockBucketInline {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  justify-content: space-between;
+  height: 100%;
+}
+
+.stockBucketInlineRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fafafa;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+  transition: border-color 0.15s, background 0.15s, color 0.15s, transform 0.1s;
+  width: 100%;
+  text-align: left;
+}
+
+/* hover por bucket */
+.stockBucketInlineRow[data-bucket="zero"]:hover {
+  border-color: #fca5a5;
+  background: #fff1f2;
+  color: #dc2626;
+}
+.stockBucketInlineRow[data-bucket="low"]:hover {
+  border-color: #fcd34d;
+  background: #fffbeb;
+  color: #d97706;
+}
+.stockBucketInlineRow[data-bucket="high"]:hover {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+/* active (selecionado) por bucket */
+.stockBucketInlineRow[data-bucket="zero"][data-active="true"] {
+  border-color: #ef4444;
+  background: #fee2e2;
+  color: #dc2626;
+  font-weight: 600;
+}
+.stockBucketInlineRow[data-bucket="low"][data-active="true"] {
+  border-color: #f59e0b;
+  background: #fef3c7;
+  color: #d97706;
+  font-weight: 600;
+}
+.stockBucketInlineRow[data-bucket="high"][data-active="true"] {
+  border-color: #22c55e;
+  background: #dcfce7;
+  color: #16a34a;
+  font-weight: 600;
+}
 
 .abcCurveLabelRow {
   display: flex;
