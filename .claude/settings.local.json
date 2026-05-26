@@ -85,7 +85,12 @@
       "Bash(git -C .claude/worktrees/agent-a02d4fdff315e55e3 diff .claude/settings.local.json)",
       "Bash(git -C .claude/worktrees/agent-a02d4fdff315e55e3 restore .claude/settings.local.json)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(Get-ChildItem -Path . -Name)",
+      "Bash(sed -n '39,49p' \"c:/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/components/lista-loja/ListaLojaPage.tsx\")",
+      "Bash(sed -n '52,54p' \"c:/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/components/performance/CurvaAbcPage.tsx\")",
+      "Bash(sed -n '156,174p' \"c:/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/components/stock/ProjecaoEstoquePage.tsx\")",
+      "Bash(sed -n '27,31p' \"c:/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/components/stock/ProjecaoEstoquePage.tsx\")"
     ]
   }
 }

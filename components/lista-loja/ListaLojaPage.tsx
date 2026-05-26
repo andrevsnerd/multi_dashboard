@@ -138,6 +138,14 @@ type CurvaAbcScopeData = {
   produtos?: CurvaAbcProdutoRow[];
 };
 
+const MESES_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+function getPeriodoRef(diasSemEstoque: number, diasComEstoquePositivo: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - Math.round(diasSemEstoque + diasComEstoquePositivo / 2));
+  return `${MESES_PT[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`;
+}
+
 function getTooltipViewportPosition(x: number, y: number): { left: number; top: number } {
   const offset = 12;
   const tooltipWidth = 360;
@@ -1750,6 +1758,19 @@ function ListaLojaItensTable({
     transitTotal?: number;
     transitDates?: string[];
   }>(null);
+  const [sugestaoPOTooltip, setSugestaoPOTooltip] = useState<null | {
+    x: number;
+    y: number;
+    qtde12m?: number;
+    periodoRef?: string;
+    diasComEstoquePositivo?: number;
+    diasSemEstoque?: number;
+    velocidadeAjustada?: number;
+    limiteSeguro?: number;
+    qtdPO: number;
+    transitTotal?: number;
+    transitDates?: string[];
+  }>(null);
   const [historicoTooltip, setHistoricoTooltip] = useState<null | {
     x: number;
     y: number;
@@ -2650,6 +2671,47 @@ function ListaLojaItensTable({
                         >
                           S
                         </span>
+                        {sugestaoBase.poData ? (
+                          <span
+                            style={{
+                              marginLeft: 6,
+                              display: "inline-flex",
+                              padding: "0 5px",
+                              height: 16,
+                              borderRadius: "999px",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: 10,
+                              fontWeight: 800,
+                              color: "#14532d",
+                              background: "#86efac",
+                              border: "1px solid #22c55e",
+                              verticalAlign: "middle",
+                              cursor: "help",
+                            }}
+                            onMouseEnter={(e) =>
+                              setSugestaoPOTooltip({
+                                x: e.clientX,
+                                y: e.clientY,
+                                qtde12m: Number(qtde12m ?? 0),
+                                diasComEstoquePositivo: sugestaoBase.poData?.diasComEstoquePositivo,
+                                diasSemEstoque: sugestaoBase.poData?.diasSemEstoque,
+                                velocidadeAjustada: sugestaoBase.poData?.velocidadeAjustada,
+                                limiteSeguro: sugestaoBase.poData?.limiteSeguro,
+                                qtdPO: transit.qty,
+                                periodoRef: getPeriodoRef(
+                                  sugestaoBase.poData?.diasSemEstoque ?? 0,
+                                  sugestaoBase.poData?.diasComEstoquePositivo ?? 0
+                                ),
+                                transitTotal: transit.totalTransit || undefined,
+                                transitDates,
+                              })
+                            }
+                            onMouseLeave={() => setSugestaoPOTooltip(null)}
+                          >
+                            PO
+                          </span>
+                        ) : null}
                         {combinedSuggestion.hasCombinedNm && filiaisNmDisplay.length === 0 ? (
                           <span className={styles.badgeT} style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}>
                             NM
@@ -2712,6 +2774,47 @@ function ListaLojaItensTable({
                         >
                           E
                         </span>
+                        {sugestaoBase.poData ? (
+                          <span
+                            style={{
+                              marginLeft: 6,
+                              display: "inline-flex",
+                              padding: "0 5px",
+                              height: 16,
+                              borderRadius: "999px",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: 10,
+                              fontWeight: 800,
+                              color: "#14532d",
+                              background: "#86efac",
+                              border: "1px solid #22c55e",
+                              verticalAlign: "middle",
+                              cursor: "help",
+                            }}
+                            onMouseEnter={(e) =>
+                              setSugestaoPOTooltip({
+                                x: e.clientX,
+                                y: e.clientY,
+                                qtde12m: Number(qtde12m ?? 0),
+                                diasComEstoquePositivo: sugestaoBase.poData?.diasComEstoquePositivo,
+                                diasSemEstoque: sugestaoBase.poData?.diasSemEstoque,
+                                velocidadeAjustada: sugestaoBase.poData?.velocidadeAjustada,
+                                limiteSeguro: sugestaoBase.poData?.limiteSeguro,
+                                qtdPO: transit.qty,
+                                periodoRef: getPeriodoRef(
+                                  sugestaoBase.poData?.diasSemEstoque ?? 0,
+                                  sugestaoBase.poData?.diasComEstoquePositivo ?? 0
+                                ),
+                                transitTotal: transit.totalTransit || undefined,
+                                transitDates,
+                              })
+                            }
+                            onMouseLeave={() => setSugestaoPOTooltip(null)}
+                          >
+                            PO
+                          </span>
+                        ) : null}
                         {combinedSuggestion.hasCombinedNm && filiaisNmDisplay.length === 0 ? (
                           <span className={styles.badgeT} style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}>
                             NM
@@ -2736,32 +2839,7 @@ function ListaLojaItensTable({
                       velocidadeAjustada: item.velocidadeAjustada,
                     });
                     return (
-                      <span
-                        className={styles.reporAdd}
-                        onMouseEnter={(e) =>
-                          setSugestaoTooltip({
-                            x: e.clientX,
-                            y: e.clientY,
-                            titulo: "Potencial oculto (PO)",
-                            regra: poInfo
-                              ? `Ruptura com potencial: ${fmt(qtde12m ?? 0)} vendas em ${fmt(poInfo.diasComEstoquePositivo)} dias com estoque, ${fmt(poInfo.diasSemEstoque)} dias sem estoque e trava de ${fmt(poInfo.limiteSeguro)} un.`
-                              : "Ruptura com potencial detectada. O item vendeu forte enquanto teve estoque e ficou zerado depois.",
-                            limiteDias,
-                            vendasMesAtual: Number(vendasMesAtual ?? 0),
-                            diasCorridos: diasCorridosMes,
-                            consumoDiario: diasCorridosMes > 0 ? Number(vendasMesAtual ?? 0) / diasCorridosMes : 0,
-                            estoqueAtual: Number(estoqueFilial ?? 0),
-                            duracaoAtual: 0,
-                            qtdCalculada: transit.qty,
-                            baseQty: combinedSuggestion.baseQty,
-                            nmExtraQty: combinedSuggestion.hasCombinedNm ? combinedSuggestion.nmExtraQty : undefined,
-                            distribuicao: partesDestinoCompraFinal(transit.qty, live?.vendasPorFilial ?? [], companyKey, live?.estoquePorFilial ?? undefined, limiteDias) ?? undefined,
-                            transitTotal: transit.totalTransit || undefined,
-                            transitDates,
-                          })
-                        }
-                        onMouseLeave={() => setSugestaoTooltip(null)}
-                      >
+                      <span className={styles.reporAdd}>
                         {fmt(transit.qty)}{" "}
                         <span
                           style={{
@@ -2779,6 +2857,25 @@ function ListaLojaItensTable({
                             verticalAlign: "middle",
                             cursor: "help",
                           }}
+                          onMouseEnter={(e) =>
+                            setSugestaoPOTooltip({
+                              x: e.clientX,
+                              y: e.clientY,
+                              qtde12m: Number(qtde12m ?? 0),
+                              diasComEstoquePositivo: poInfo?.diasComEstoquePositivo,
+                              diasSemEstoque: poInfo?.diasSemEstoque,
+                              velocidadeAjustada: poInfo?.velocidadeAjustada,
+                              limiteSeguro: poInfo?.limiteSeguro,
+                              qtdPO: transit.qty,
+                              periodoRef: getPeriodoRef(
+                                poInfo?.diasSemEstoque ?? 0,
+                                poInfo?.diasComEstoquePositivo ?? 0
+                              ),
+                              transitTotal: transit.totalTransit || undefined,
+                              transitDates,
+                            })
+                          }
+                          onMouseLeave={() => setSugestaoPOTooltip(null)}
                         >
                           PO
                         </span>
@@ -3208,13 +3305,12 @@ function ListaLojaItensTable({
       {sugestaoSTooltip && (
         <div className={styles.metricTooltip} style={getTooltipViewportPosition(sugestaoSTooltip.x, sugestaoSTooltip.y)}>
           <div className={styles.metricTooltipTitle}>S → {fmt(sugestaoSTooltip.qtdS)} un</div>
-          <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>Velocidade calculada só nos dias em que havia estoque</div>
+          <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
+            Produto sem estoque. Velocidade calculada nos dias com venda disponível.
+          </div>
           <div className={styles.metricTooltipDivider} />
           <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
             <span>Velocidade</span><span><strong>{sugestaoSTooltip.velocidadeAjustada.toFixed(1)} un/mês</strong></span>
-          </div>
-          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-            <span style={{ fontSize: 11, color: "#64748b" }}>Base</span><span style={{ fontSize: 11 }}>{fmt(sugestaoSTooltip.qtde12m)} un em {fmt(sugestaoSTooltip.diasComEstoquePositivo)} dias c/ estoque</span>
           </div>
           <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
             <span>Estoque</span><span><strong>{fmt(sugestaoSTooltip.estoqueAtual)} un</strong></span>
@@ -3226,18 +3322,11 @@ function ListaLojaItensTable({
             <>
               <div className={styles.metricTooltipDivider} />
               <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Por loja (proporcional)</div>
-              {(() => {
-                const totalVendas = sugestaoSTooltip.distribuicao.reduce((s, f) => s + (f.qtde12m ?? 0), 0);
-                return sugestaoSTooltip.distribuicao.map((f) => (
-                  <div key={f.label} className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-                    <span>{f.label}</span>
-                    <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      {totalVendas > 0 && <span style={{ fontSize: 11, color: "#64748b" }}>[{f.qtde12m ?? 0}/{totalVendas}]</span>}
-                      <strong>{fmt(f.qtd)} un</strong>
-                    </span>
-                  </div>
-                ));
-              })()}
+              {sugestaoSTooltip.distribuicao.map((filial) => (
+                <div key={filial.label} className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                  <span>{filial.label}</span><strong>{fmt(filial.qtd)} un</strong>
+                </div>
+              ))}
             </>
           ) : null}
           {sugestaoSTooltip.transitTotal ? (
@@ -3256,16 +3345,12 @@ function ListaLojaItensTable({
       {sugestaoETooltip && (
         <div className={styles.metricTooltip} style={getTooltipViewportPosition(sugestaoETooltip.x, sugestaoETooltip.y)}>
           <div className={styles.metricTooltipTitle}>E → {fmt(sugestaoETooltip.qtdE)} un</div>
-          <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>Produto zerado — velocidade calculada nos dias em que tinha estoque</div>
+          <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
+            Produto zerado. Velocidade estimada do período com estoque disponível.
+          </div>
           <div className={styles.metricTooltipDivider} />
           <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
             <span>Velocidade</span><span><strong>{sugestaoETooltip.velocidadeAjustada.toFixed(1)} un/mês</strong></span>
-          </div>
-          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-            <span style={{ fontSize: 11, color: "#64748b" }}>Base</span><span style={{ fontSize: 11 }}>{fmt(sugestaoETooltip.qtde12m)} un em {fmt(sugestaoETooltip.diasComEstoquePositivo)} dias c/ estoque</span>
-          </div>
-          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-            <span style={{ fontSize: 11, color: "#64748b" }}>Sem estoque</span><span style={{ fontSize: 11 }}>{fmt(sugestaoETooltip.diasSemEstoque)} dias</span>
           </div>
           <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
             <span>Alvo</span><span>{sugestaoETooltip.limiteDias} dias</span>
@@ -3274,18 +3359,11 @@ function ListaLojaItensTable({
             <>
               <div className={styles.metricTooltipDivider} />
               <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Por loja (proporcional)</div>
-              {(() => {
-                const totalVendas = sugestaoETooltip.distribuicao.reduce((s, f) => s + (f.qtde12m ?? 0), 0);
-                return sugestaoETooltip.distribuicao.map((f) => (
-                  <div key={f.label} className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-                    <span>{f.label}</span>
-                    <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      {totalVendas > 0 && <span style={{ fontSize: 11, color: "#64748b" }}>[{f.qtde12m ?? 0}/{totalVendas}]</span>}
-                      <strong>{fmt(f.qtd)} un</strong>
-                    </span>
-                  </div>
-                ));
-              })()}
+              {sugestaoETooltip.distribuicao.map((filial) => (
+                <div key={filial.label} className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                  <span>{filial.label}</span><strong>{fmt(filial.qtd)} un</strong>
+                </div>
+              ))}
             </>
           ) : null}
           {sugestaoETooltip.transitTotal ? (
@@ -3295,6 +3373,46 @@ function ListaLojaItensTable({
                 <strong>+{fmt(sugestaoETooltip.transitTotal)} em trânsito</strong>
               </div>
               {sugestaoETooltip.transitDates?.map((label) => (
+                <div key={label} className={styles.metricTooltipLine} style={{ color: "#0d9488", fontSize: 11 }}>{label}</div>
+              ))}
+            </>
+          ) : null}
+        </div>
+      )}
+      {sugestaoPOTooltip && (
+        <div className={styles.metricTooltip} style={getTooltipViewportPosition(sugestaoPOTooltip.x, sugestaoPOTooltip.y)}>
+          <div className={styles.metricTooltipTitle} style={{ color: "#059669" }}>
+            {(sugestaoPOTooltip.limiteSeguro ?? 0) > 0 ? "Potencial Oculto (PO)" : "Histórico Curto (PO)"}
+          </div>
+          {(sugestaoPOTooltip.limiteSeguro ?? 0) > 0 && (
+            <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
+              Vendeu bem em período curto e ficou sem estoque.
+            </div>
+          )}
+          {sugestaoPOTooltip.qtde12m != null && sugestaoPOTooltip.diasComEstoquePositivo != null && (
+            <div className={styles.metricTooltipLine} style={{ fontSize: 11 }}>
+              Vendas: {sugestaoPOTooltip.qtde12m} un em {Math.round(sugestaoPOTooltip.diasComEstoquePositivo)} dias c/ estoque
+              {sugestaoPOTooltip.velocidadeAjustada != null && (
+                <>
+                  <span style={{ color: "#94a3b8" }}> | </span>
+                  <strong>{sugestaoPOTooltip.velocidadeAjustada.toFixed(0)} un/mês</strong>
+                </>
+              )}
+            </div>
+          )}
+          {(sugestaoPOTooltip.diasSemEstoque ?? 0) > 0 && (
+            <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
+              {Math.round(sugestaoPOTooltip.diasSemEstoque ?? 0)} dias sem estoque
+              {sugestaoPOTooltip.periodoRef ? ` (${sugestaoPOTooltip.periodoRef})` : ""}
+            </div>
+          )}
+          {sugestaoPOTooltip.transitTotal ? (
+            <>
+              <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine} style={{ color: "#0f766e" }}>
+                <strong>+{fmt(sugestaoPOTooltip.transitTotal)} em trânsito</strong>
+              </div>
+              {sugestaoPOTooltip.transitDates?.map((label) => (
                 <div key={label} className={styles.metricTooltipLine} style={{ color: "#0d9488", fontSize: 11 }}>{label}</div>
               ))}
             </>

@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-// @ts-ignore - xlsx não tem tipos perfeitos
+// @ts-ignore - xlsx nÃ£o tem tipos perfeitos
 import * as XLSX from "xlsx";
 
 import { useSidebar } from "@/components/layout/SidebarContext";
@@ -48,10 +48,10 @@ import { buildControleEstoqueItemKey, type ControleEstoqueItemMetricas } from "@
 import ComprasSalvasListPanel from "@/components/stock/ComprasSalvasListPanel";
 import styles from "./ListaCompraSugeridaPage.module.css";
 
-/** UserHeaderBar é sticky ~top:0 — cabeçalho da tabela ABC fica logo abaixo */
+/** UserHeaderBar Ã© sticky ~top:0 â€” cabeÃ§alho da tabela ABC fica logo abaixo */
 const USER_STICKY_HEADER_PX = 48;
 
-// ─── Tipos ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Tipos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface ReposicaoItem {
   produto: string;
@@ -68,11 +68,11 @@ interface ReposicaoItem {
   diasCobertura: number;
   necessidadeTotal: number;
   custoUnit?: number;
-  /** Quantidade já calculada pela regra Lista-Loja em ProjecaoEstoquePage (evita re-fetch) */
+  /** Quantidade jÃ¡ calculada pela regra Lista-Loja em ProjecaoEstoquePage (evita re-fetch) */
   suggestionQty?: number;
-  /** Tipo da sugestão: COMPRA, S, E, PO, SUFICIENTE, SEM_SUGESTAO */
+  /** Tipo da sugestÃ£o: COMPRA, S, E, PO, SUFICIENTE, SEM_SUGESTAO */
   suggestionType?: string;
-  /** Dados para tooltip do critério S */
+  /** Dados para tooltip do critÃ©rio S */
   suggestionSData?: { mediaVendasMes: number; mesesHistoricoFilial: number; estoqueAtual: number; limiteDias: number };
   suggestionTransitTotal?: number;
   suggestionTransitDates?: string[];
@@ -103,11 +103,11 @@ interface ProdutoSugestao {
   colecao?: string;
   qtde12m?: number;
   vendas3meses: number;
-  /** Últimos 60 dias — apenas exibição na tabela ABC */
+  /** Ãšltimos 60 dias â€” apenas exibiÃ§Ã£o na tabela ABC */
   vendas60dias?: number;
   vendasMesAtual?: number;
   valor3meses: number;
-  /** Custo de reposição (cadastro), não preço médio de venda */
+  /** Custo de reposiÃ§Ã£o (cadastro), nÃ£o preÃ§o mÃ©dio de venda */
   custoUnitario?: number;
   estoqueAtual?: number;
   primeiraEntradaFilial?: string | null;
@@ -157,7 +157,7 @@ function buildSuggestionKey(produto?: string | null, cor?: string | null): strin
   return `${normalizeKey(produto)}||${normalizeKey(cor)}`;
 }
 
-// ─── Formatação ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ FormataÃ§Ã£o â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function fmt(n: number) {
   return n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
@@ -169,6 +169,14 @@ function fmtBRL(n: number) {
 
 function fmtBRL2(n: number) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+const MESES_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+function getPeriodoRef(diasSemEstoque: number, diasComEstoquePositivo: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - Math.round(diasSemEstoque + diasComEstoquePositivo / 2));
+  return `${MESES_PT[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`;
 }
 
 function getTooltipViewportPosition(x: number, y: number): { left: number; top: number } {
@@ -261,7 +269,7 @@ function getPotencialOcultoInfo(item: {
   });
 }
 
-// ─── ABC helpers (usados apenas na aba Análise ABC) ───────────────────────────
+// â”€â”€â”€ ABC helpers (usados apenas na aba AnÃ¡lise ABC) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function fetchListaCompra(params: URLSearchParams): Promise<ProdutoSugestao[]> {
   const res = await fetch(`/api/controle-estoque/lista-compra-sugerida?${params}`, { cache: "no-store" });
@@ -310,7 +318,7 @@ function hamiltonDistribute(items: { valor: number }[], total: number): number[]
   return floors.map((f, i) => f + (boost.has(i) ? 1 : 0));
 }
 
-/** Agrega códigos ERP por rótulo da dashboard (E-COMMERCE, PAULISTA, …) e ordena. */
+/** Agrega cÃ³digos ERP por rÃ³tulo da dashboard (E-COMMERCE, PAULISTA, â€¦) e ordena. */
 function normalizeVendasPorFilialParaExibicao(
   companyKey: CompanyKey,
   rows: Array<{ filial: string; qtde12m: number; qtde60d: number }>
@@ -320,7 +328,7 @@ function normalizeVendasPorFilialParaExibicao(
   return [...merged].sort((a, b) => compareFilialDisplayOrder(a.filial, b.filial, cfg));
 }
 
-/** Claros com cor perceptível, mas contida (meio-termo entre cinza e pastel forte). */
+/** Claros com cor perceptÃ­vel, mas contida (meio-termo entre cinza e pastel forte). */
 const DESTINO_FILIAL_BADGE_THEMES = [
   { bg: "#c8d4ea", fg: "#1e3a5f", border: "#7d9dc4" },
   { bg: "#c5e0d0", fg: "#134332", border: "#5fa889" },
@@ -387,9 +395,9 @@ function calcularCurvas(produtos: ProdutoSugestao[], qtdCompra: number): Produto
 }
 
 const CURVA_LABEL: Record<Curva, string> = {
-  A: "Curva A — 80% do faturamento",
-  B: "Curva B — 15% do faturamento",
-  C: "Curva C — 5% do faturamento",
+  A: "Curva A â€” 80% do faturamento",
+  B: "Curva B â€” 15% do faturamento",
+  C: "Curva C â€” 5% do faturamento",
 };
 
 const CURVA_BADGE_CLASS: Record<Curva, string> = {
@@ -453,8 +461,8 @@ function AbcAnalysisTableHead({ modoReposicao }: { modoReposicao: boolean }) {
         <th className={styles.right}>QTD 12 meses</th>
         <th className={styles.right}>Estoque</th>
         <th className={styles.right}>QTD 60 dias</th>
-        <th className={styles.right}>Duração</th>
-        <th className={styles.right}>Participação</th>
+        <th className={styles.right}>DuraÃ§Ã£o</th>
+        <th className={styles.right}>ParticipaÃ§Ã£o</th>
         <th className={styles.right}>{modoReposicao ? "Qtd a Repor" : "Qtd Proporcional"}</th>
         <th className={styles.right}>Custo Unit.</th>
         <th className={styles.right}>Custo Total</th>
@@ -493,11 +501,11 @@ function getLimiteDiasReposicao(p: { linha?: string; subgrupo?: string }) {
   const linha = normalizeKey(p.linha);
   const subgrupo = normalizeKey(p.subgrupo);
 
-  // Linha índia: regra exclusiva (subgrupo não conta)
-  if (linha === "INDIA") return { limiteDias: 90, regra: "Linha Índia" };
-  if (linha === "ELETRONICOS") return { limiteDias: 30, regra: "Padrão" };
+  // Linha Ã­ndia: regra exclusiva (subgrupo nÃ£o conta)
+  if (linha === "INDIA") return { limiteDias: 90, regra: "Linha Ãndia" };
+  if (linha === "ELETRONICOS") return { limiteDias: 30, regra: "PadrÃ£o" };
 
-  // 90 dias para subgrupos específicos de seda
+  // 90 dias para subgrupos especÃ­ficos de seda
   const subgrupos90 = new Set([
     "CETIM DE SEDA",
     "MOUSSELINE DE SEDA",
@@ -506,7 +514,7 @@ function getLimiteDiasReposicao(p: { linha?: string; subgrupo?: string }) {
   if (subgrupos90.has(subgrupo)) return { limiteDias: 90, regra: `Subgrupo: ${p.subgrupo ?? ""}`.trim() };
 
   // Restante
-  return { limiteDias: 60, regra: "Padrão" };
+  return { limiteDias: 60, regra: "PadrÃ£o" };
 }
 
 function getSuggestedDeltaFromListaCompraRule(item: ProdutoSugestao, diasCorridosMes: number): number {
@@ -620,7 +628,7 @@ function applyTransitToListaCompraSuggestion(
   };
 }
 
-// ─── Componente principal ─────────────────────────────────────────────────────
+// â”€â”€â”€ Componente principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function ListaCompraSugeridaPage({
   companyKey,
@@ -663,7 +671,7 @@ export default function ListaCompraSugeridaPage({
     [pathname, router, searchParams]
   );
 
-  // ── Aba Reposição ──────────────────────────────────────────────────────────
+  // â”€â”€ Aba ReposiÃ§Ã£o â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [reposicaoData, setReposicaoData] = useState<ReposicaoData | null>(null);
   const [reposicaoSuggestionMap, setReposicaoSuggestionMap] = useState<Record<string, ProdutoSugestao>>({});
   const [reposicaoNmTotalQtyMap, setReposicaoNmTotalQtyMap] = useState<Record<string, number>>({});
@@ -691,7 +699,7 @@ export default function ListaCompraSugeridaPage({
       const stored = sessionStorage.getItem("lista_compra_reposicao");
       if (stored) {
         const data = JSON.parse(stored) as ReposicaoData;
-        // Só usa dados recentes (< 10 minutos)
+        // SÃ³ usa dados recentes (< 10 minutos)
         if (Date.now() - data.timestamp < 10 * 60 * 1000) {
           setReposicaoData(data);
         }
@@ -708,7 +716,7 @@ export default function ListaCompraSugeridaPage({
     }));
   }, [reposicaoData]);
 
-  // Busca fallback via API apenas quando os itens não carregam suggestionQty do sessionStorage
+  // Busca fallback via API apenas quando os itens nÃ£o carregam suggestionQty do sessionStorage
   useEffect(() => {
     if (!reposicaoData || reposicaoData.itens.length === 0) {
       setReposicaoSuggestionMap({});
@@ -717,7 +725,7 @@ export default function ListaCompraSugeridaPage({
       setReposicaoSuggestionLoading(false);
       return;
     }
-    // Se todos os itens já têm suggestionQty pré-computada, não precisa buscar
+    // Se todos os itens jÃ¡ tÃªm suggestionQty prÃ©-computada, nÃ£o precisa buscar
     if (reposicaoData.itens.every(item => item.suggestionQty != null)) {
       setReposicaoSuggestionMap({});
       setReposicaoNmTotalQtyMap({});
@@ -819,7 +827,7 @@ export default function ListaCompraSugeridaPage({
       const duracaoReal = consumoDiario > 0 ? Math.round(estoqueReal / consumoDiario) : 0;
       const diasCobertura = items.reduce((max, i) => Math.max(max, i.diasCobertura ?? 0), 0);
       const necessidadeTotal = consumoDiario * diasCobertura;
-      // Soma das sugestões individuais por cor; undefined se algum item não tem suggestionQty
+      // Soma das sugestÃµes individuais por cor; undefined se algum item nÃ£o tem suggestionQty
       const allHaveSuggestion = items.every(i => i.suggestionQty != null);
       const sumSuggestionQty = allHaveSuggestion ? items.reduce((s, i) => s + (i.suggestionQty ?? 0), 0) : undefined;
       const suggestionType = allHaveSuggestion ? (items[0].suggestionType ?? "SEM_SUGESTAO") : undefined;
@@ -867,7 +875,7 @@ export default function ListaCompraSugeridaPage({
     }));
     return base
       .map((item) => {
-        // Caminho principal: usa suggestionQty + type pré-computados pela ProjecaoEstoquePage
+        // Caminho principal: usa suggestionQty + type prÃ©-computados pela ProjecaoEstoquePage
         if (item.suggestionQty != null && item.suggestionType != null) {
           const sugestaoQtd = item.suggestionQty;
           const sugestaoTipo = item.suggestionType as SuggestionType;
@@ -905,7 +913,7 @@ export default function ListaCompraSugeridaPage({
             custoTotal: sugestaoQtd * (item.custoUnit ?? 0),
           };
         }
-        // Fallback: recalcula via mapa de sugestões buscado da API
+        // Fallback: recalcula via mapa de sugestÃµes buscado da API
         const key = buildSuggestionKey(item.produto, expandirPorCor ? (item.cor ?? "") : "");
         const suggestionSource = reposicaoSuggestionMap[key] ?? null;
         const suggestion = suggestionSource
@@ -933,7 +941,7 @@ export default function ListaCompraSugeridaPage({
   const totalCustoReposicao = reposicaoExibidaComCusto.reduce((s, i) => s + (i.custoTotal ?? 0), 0);
   const totalQtdReposicao = reposicaoExibidaComCusto.reduce((s, i) => s + (i.sugestaoQtd ?? 0), 0);
 
-  // ── Aba ABC ────────────────────────────────────────────────────────────────
+  // â”€â”€ Aba ABC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [produtosABC, setProdutosABC] = useState<ProdutoSugestao[]>([]);
   const [loadingABC, setLoadingABC] = useState(false);
   const [errorABC, setErrorABC] = useState<string | null>(null);
@@ -976,11 +984,30 @@ export default function ListaCompraSugeridaPage({
   const [sugestaoSTooltip, setSugestaoSTooltip] = useState<null | {
     x: number;
     y: number;
+    qtde12m: number;
+    diasComEstoquePositivo: number;
+    mesesDisponiveis: number;
+    velocidadeAjustada: number;
     mediaVendasMes: number;
     mesesHistoricoFilial: number;
     estoqueAtual: number;
     limiteDias: number;
     qtdS: number;
+    distribuicao?: DestinoCompraFinalParte[];
+    transitTotal?: number;
+    transitDates?: string[];
+  }>(null);
+  const [sugestaoETooltip, setSugestaoETooltip] = useState<null | {
+    x: number;
+    y: number;
+    qtde12m: number;
+    diasComEstoquePositivo: number;
+    diasSemEstoque: number;
+    mesesDisponiveis: number;
+    velocidadeAjustada: number;
+    limiteDias: number;
+    qtdE: number;
+    distribuicao?: DestinoCompraFinalParte[];
     transitTotal?: number;
     transitDates?: string[];
   }>(null);
@@ -988,13 +1015,25 @@ export default function ListaCompraSugeridaPage({
     x: number;
     y: number;
     qtde12m?: number;
+    filialLabel?: string;
+    periodoRef?: string;
+    poRows?: Array<{
+      filialLabel: string;
+      qtde12m: number;
+      diasComEstoquePositivo: number;
+      diasSemEstoque: number;
+      velocidadeAjustada: number;
+      limiteSeguro: number;
+      qtdPO: number;
+      periodoRef: string;
+    }>;
     diasComEstoquePositivo?: number;
     diasSemEstoque?: number;
     velocidadeAjustada?: number;
-    potencialMensalBruto?: number;
+    potencialMensalBruto: number;
     limiteSeguro?: number;
     qtdPO: number;
-    resumo?: string;
+    resumo: string;
     transitTotal?: number;
     transitDates?: string[];
   }>(null);
@@ -1066,8 +1105,8 @@ export default function ListaCompraSugeridaPage({
     ].join("::");
   }, [companyKey, filial, categoria, qtdCompra, expandirPorCor, searchParams]);
 
-  // contextKey estável para Compra Final — exclui o filtro de produto individual (p=)
-  // que é temporário e não deve mudar a "sessão" de compra
+  // contextKey estÃ¡vel para Compra Final â€” exclui o filtro de produto individual (p=)
+  // que Ã© temporÃ¡rio e nÃ£o deve mudar a "sessÃ£o" de compra
   const contextKey = useMemo(() => {
     const gruposKey = searchParams.getAll("grupos").slice().sort().join("|");
     const linhasKey = searchParams.getAll("linhas").slice().sort().join("|");
@@ -1112,7 +1151,7 @@ export default function ListaCompraSugeridaPage({
       .finally(() => setLoadingFinal(false));
   }, [activeTab, contextKey, companyKey]);
 
-  // Vendas por filial (12m) sem filtro de filial — necessário para ratear a qtd da Compra Final entre todas as lojas.
+  // Vendas por filial (12m) sem filtro de filial â€” necessÃ¡rio para ratear a qtd da Compra Final entre todas as lojas.
   useEffect(() => {
     if (activeTab !== "final" || compraFinal.length === 0) return;
     const unique = new Map<string, { produto: string; cor?: string }>();
@@ -1429,7 +1468,7 @@ export default function ListaCompraSugeridaPage({
   );
   const hasHistoricoParcialABC = produtosComCurva.some((p) => p.historicoParcial);
 
-  // Modo Reposição Real: calcula qtd individualmente por produto (meta DIAS_META dias de cobertura)
+  // Modo ReposiÃ§Ã£o Real: calcula qtd individualmente por produto (meta DIAS_META dias de cobertura)
   const produtosComCurvaFinal = useMemo((): ProdutoComCurva[] => {
     if (!modoReposicao) return produtosComCurva;
     return produtosComCurva.map(p => {
@@ -1589,7 +1628,7 @@ export default function ListaCompraSugeridaPage({
     abcFetchKey,
   ]);
 
-  // ── Navegação de volta ─────────────────────────────────────────────────────
+  // â”€â”€ NavegaÃ§Ã£o de volta â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleVoltar = () => {
     const projecaoParams = new URLSearchParams();
     if (filial) projecaoParams.set("filial", filial);
@@ -1619,13 +1658,13 @@ export default function ListaCompraSugeridaPage({
             <div>
               <h1 className={styles.title}>Lista de Compra Sugerida</h1>
               <p className={styles.subtitle}>
-                {categoria ? `Categoria: ${categoria} · ` : ""}
-                Reposição baseada na performance real individual de cada produto
+                {categoria ? `Categoria: ${categoria} Â· ` : ""}
+                ReposiÃ§Ã£o baseada na performance real individual de cada produto
               </p>
             </div>
           </div>
           <button type="button" className={styles.backButton} onClick={handleVoltar}>
-            ← Voltar
+            â† Voltar
           </button>
         </div>
 
@@ -1639,7 +1678,7 @@ export default function ListaCompraSugeridaPage({
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" />
             </svg>
-            Reposição Necessária
+            ReposiÃ§Ã£o NecessÃ¡ria
           </button>
           <button
             type="button"
@@ -1649,7 +1688,7 @@ export default function ListaCompraSugeridaPage({
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" />
             </svg>
-            Análise ABC
+            AnÃ¡lise ABC
             <span className={styles.tabBadgeInfo}>visual</span>
           </button>
           <button
@@ -1670,19 +1709,19 @@ export default function ListaCompraSugeridaPage({
         </div>
       </div>
 
-      {/* ── ABA REPOSIÇÃO ─────────────────────────────────────────────────── */}
+      {/* â”€â”€ ABA REPOSIÃ‡ÃƒO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {activeTab === "reposicao" && (
         <>
-          {/* Banner de projeção simulada */}
+          {/* Banner de projeÃ§Ã£o simulada */}
           {reposicaoData?.isProjecaoSimulada && (
             <div className={styles.projecaoSimuladaBanner}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
               </svg>
               <span>
-                <strong>PROJEÇÃO SIMULADA</strong> — Compra futura projetada com base em vendas do ano passado + 10%.
+                <strong>PROJEÃ‡ÃƒO SIMULADA</strong> â€” Compra futura projetada com base em vendas do ano passado + 10%.
                 {reposicaoData.mesCompra && <> Compra prevista para <strong>{reposicaoData.mesCompra}</strong>.</>}
-                {" "}Os itens abaixo são sugestões para planejamento e não refletem necessidade real imediata.
+                {" "}Os itens abaixo sÃ£o sugestÃµes para planejamento e nÃ£o refletem necessidade real imediata.
               </span>
             </div>
           )}
@@ -1701,16 +1740,16 @@ export default function ListaCompraSugeridaPage({
               </div>
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Produtos em Reposição</span>
+                <span className={styles.summaryLabel}>Produtos em ReposiÃ§Ã£o</span>
                 <span className={styles.summaryValueNeutral}>
                   {reposicaoExibidaComCusto.length}
                 </span>
               </div>
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Base do Cálculo</span>
+                <span className={styles.summaryLabel}>Base do CÃ¡lculo</span>
                 <span className={styles.summaryValueNeutral} style={{ fontSize: 14 }}>
-                  {reposicaoData.isProjecaoSimulada ? "Vendas ano passado + 10%" : "Estoque e duração reais"}
+                  {reposicaoData.isProjecaoSimulada ? "Vendas ano passado + 10%" : "Estoque e duraÃ§Ã£o reais"}
                 </span>
               </div>
             </div>
@@ -1721,20 +1760,20 @@ export default function ListaCompraSugeridaPage({
             {reposicaoData && reposicaoSuggestionLoading && (
               <div className={styles.inlineLoading}>
                 <span className={styles.inlineLoadingDot} />
-                Atualizando sugestões...
+                Atualizando sugestÃµes...
               </div>
             )}
             {!reposicaoData && (
               <div className={styles.empty}>
-                <div style={{ marginBottom: 8, fontSize: 32 }}>📋</div>
-                <div>Nenhum dado de reposição disponível.</div>
+                <div style={{ marginBottom: 8, fontSize: 32 }}>ðŸ“‹</div>
+                <div>Nenhum dado de reposiÃ§Ã£o disponÃ­vel.</div>
                 <div style={{ marginTop: 4, fontSize: 13, color: "#94a3b8" }}>
-                  Clique em uma quantidade de compra na projeção de estoque para ver aqui.
+                  Clique em uma quantidade de compra na projeÃ§Ã£o de estoque para ver aqui.
                 </div>
               </div>
             )}
             {reposicaoData && !reposicaoSuggestionLoading && reposicaoExibidaComCusto.length === 0 && (
-              <div className={styles.empty}>Nenhum produto precisa de reposição neste escopo.</div>
+              <div className={styles.empty}>Nenhum produto precisa de reposiÃ§Ã£o neste escopo.</div>
             )}
             {reposicaoData && !reposicaoSuggestionLoading && reposicaoExibidaComCusto.length > 0 && (
               <table className={styles.table}>
@@ -1743,20 +1782,20 @@ export default function ListaCompraSugeridaPage({
                     <th style={{ width: 40 }}>#</th>
                     <th>Produto</th>
                     <th className={styles.right}>Estoque Atual</th>
-                    <th className={styles.right}>Duração Atual</th>
+                    <th className={styles.right}>DuraÃ§Ã£o Atual</th>
                     <th className={styles.right}>Consumo/dia</th>
-                    <th className={styles.right}>Sugestão</th>
+                    <th className={styles.right}>SugestÃ£o</th>
                     <th className={styles.right}>Custo Unit.</th>
                     <th className={styles.right}>Custo Total</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Cabeçalho de seção */}
+                  {/* CabeÃ§alho de seÃ§Ã£o */}
                   <tr className={styles.sectionRowReposicao}>
                     <td colSpan={8}>
                       <div className={styles.sectionLabel}>
-                        <span className={`${styles.curvaBadge} ${styles.badgeReposicao}`}>↑</span>
-                        <span className={styles.sectionTitle}>Produtos com sugestão acionável pela regra da Lista Loja (Compra, S, E, PO)</span>
+                        <span className={`${styles.curvaBadge} ${styles.badgeReposicao}`}>â†‘</span>
+                        <span className={styles.sectionTitle}>Produtos com sugestÃ£o acionÃ¡vel pela regra da Lista Loja (Compra, S, E, PO)</span>
                         <span className={styles.sectionCount}>
                           {reposicaoExibidaComCusto.length} item(ns)
                         </span>
@@ -1773,7 +1812,7 @@ export default function ListaCompraSugeridaPage({
                         <div className={styles.productCode}>{item.produto}</div>
                         {expandirPorCor && item.cor && <div className={styles.productCode}>{item.cor}</div>}
                         {item.grade && <div className={styles.productCode}>Grade: {item.grade}</div>}
-                        {item.colecao && <div className={styles.productCode}>Coleção: {item.colecao}</div>}
+                        {item.colecao && <div className={styles.productCode}>ColeÃ§Ã£o: {item.colecao}</div>}
                       </td>
                       <td className={styles.vendas}>{fmt(item.estoqueReal)}</td>
                       <td>
@@ -1811,6 +1850,10 @@ export default function ListaCompraSugeridaPage({
                                 if (sd) setSugestaoSTooltip({
                                   x: e.clientX,
                                   y: e.clientY,
+                                  qtde12m: Math.round(sd.mediaVendasMes * sd.mesesHistoricoFilial),
+                                  diasComEstoquePositivo: Math.round(sd.mesesHistoricoFilial * 30),
+                                  mesesDisponiveis: sd.mesesHistoricoFilial,
+                                  velocidadeAjustada: sd.mediaVendasMes,
                                   mediaVendasMes: sd.mediaVendasMes,
                                   mesesHistoricoFilial: sd.mesesHistoricoFilial,
                                   estoqueAtual: sd.estoqueAtual,
@@ -1824,7 +1867,26 @@ export default function ListaCompraSugeridaPage({
                             >S</span>
                           )}
                           {baseType === "E" && (
-                            <span className={styles.badgeE} style={{ marginLeft: 6 }}>E</span>
+                            <span
+                              className={styles.badgeE}
+                              style={{ marginLeft: 6 }}
+                              onMouseEnter={(e) =>
+                                setSugestaoETooltip({
+                                  x: e.clientX,
+                                  y: e.clientY,
+                                  qtde12m: 0,
+                                  diasComEstoquePositivo: 0,
+                                  diasSemEstoque: 0,
+                                  mesesDisponiveis: 0,
+                                  velocidadeAjustada: item.consumoDiario * 30,
+                                  limiteDias: Math.max(0, item.diasCobertura ?? 0),
+                                  qtdE: baseQty,
+                                  transitTotal,
+                                  transitDates,
+                                })
+                              }
+                              onMouseLeave={() => setSugestaoETooltip(null)}
+                            >E</span>
                           )}
                           {baseType === "PO" && (
                             <span
@@ -1849,7 +1911,8 @@ export default function ListaCompraSugeridaPage({
                                   x: e.clientX,
                                   y: e.clientY,
                                   qtdPO: Math.max(0, Number(item.sugestaoQtd ?? 0)),
-                                  resumo: "Produto identificado como ruptura com potencial na sugestão consolidada da reposição.",
+                                  potencialMensalBruto: 0,
+                                  resumo: "",
                                   transitTotal,
                                   transitDates,
                                 });
@@ -1888,10 +1951,10 @@ export default function ListaCompraSugeridaPage({
                         </span>
                       </td>
                       <td className={`${styles.right} ${item.custoUnit > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
-                        {item.custoUnit > 0 ? fmtBRL2(item.custoUnit) : "—"}
+                        {item.custoUnit > 0 ? fmtBRL2(item.custoUnit) : "â€”"}
                       </td>
                       <td className={`${styles.right} ${item.custoTotal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
-                        {item.custoTotal > 0 ? fmtBRL(item.custoTotal) : "—"}
+                        {item.custoTotal > 0 ? fmtBRL(item.custoTotal) : "â€”"}
                       </td>
                     </tr>
                   ))}
@@ -1913,7 +1976,7 @@ export default function ListaCompraSugeridaPage({
         </>
       )}
 
-      {/* ── ABA ABC ───────────────────────────────────────────────────────── */}
+      {/* â”€â”€ ABA ABC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {activeTab === "abc" && (
         <>
           {!modoReposicao && (
@@ -1922,14 +1985,14 @@ export default function ListaCompraSugeridaPage({
                 <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
               </svg>
               <span>
-                Esta análise é <strong>apenas informativa</strong> — mostra a performance dos produtos por curva ABC.
-                A sugestão de compra real está na aba <strong>Reposição Necessária</strong>, calculada individualmente por produto.
-                Ative o toggle abaixo para calcular sugestões por reposição real.
+                Esta anÃ¡lise Ã© <strong>apenas informativa</strong> â€” mostra a performance dos produtos por curva ABC.
+                A sugestÃ£o de compra real estÃ¡ na aba <strong>ReposiÃ§Ã£o NecessÃ¡ria</strong>, calculada individualmente por produto.
+                Ative o toggle abaixo para calcular sugestÃµes por reposiÃ§Ã£o real.
               </span>
             </div>
           )}
 
-          {/* ── Toggle de Modo ── */}
+          {/* â”€â”€ Toggle de Modo â”€â”€ */}
           <div className={styles.modoBar}>
             <div
               role="switch"
@@ -1961,7 +2024,7 @@ export default function ListaCompraSugeridaPage({
               <div className={`${styles.toggleTrack} ${modoReposicao ? styles.toggleTrackOn : ""}`}>
                 <div className={`${styles.toggleThumb} ${modoReposicao ? styles.toggleThumbOn : ""}`} />
               </div>
-              <span className={styles.toggleLabelText}>Reposição Real</span>
+              <span className={styles.toggleLabelText}>ReposiÃ§Ã£o Real</span>
             </div>
 
             <div className={styles.toggleDivider} />
@@ -2011,7 +2074,7 @@ export default function ListaCompraSugeridaPage({
             {modoReposicao ? (
               <>
                 <div className={styles.toggleDivider} />
-                <span className={styles.toggleIncluirLabel}>Incluir sugestões:</span>
+                <span className={styles.toggleIncluirLabel}>Incluir sugestÃµes:</span>
                 <label className={`${styles.curvaCheckboxLabel} ${styles.checkboxLabelB}`}>
                   <input
                     type="checkbox"
@@ -2037,7 +2100,7 @@ export default function ListaCompraSugeridaPage({
                 </span>
               </>
             ) : (
-              <span className={styles.modoDescTag}>Distribuição proporcional pela qtd de referência</span>
+              <span className={styles.modoDescTag}>DistribuiÃ§Ã£o proporcional pela qtd de referÃªncia</span>
             )}
           </div>
 
@@ -2045,19 +2108,19 @@ export default function ListaCompraSugeridaPage({
           {!loadingABC && !errorABC && produtosComCurva.length > 0 && (
             <div className={styles.summaryCard}>
               <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>{modoReposicao ? "Total Calculado" : "QTD Referência"}</span>
+                <span className={styles.summaryLabel}>{modoReposicao ? "Total Calculado" : "QTD ReferÃªncia"}</span>
                 <span className={styles.summaryValue}>{modoReposicao ? fmt(totalQtdABC) : fmt(qtdCompra)}</span>
               </div>
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
                 <span className={styles.summaryLabel}>{modoReposicao ? "Custo Total" : "Custo (Curva A)"}</span>
-                <span className={styles.summaryValue}>{totalCustoABC > 0 ? fmtBRL(totalCustoABC) : "—"}</span>
+                <span className={styles.summaryValue}>{totalCustoABC > 0 ? fmtBRL(totalCustoABC) : "â€”"}</span>
               </div>
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>{modoReposicao ? "Cobertura Meta" : "Período Base"}</span>
+                <span className={styles.summaryLabel}>{modoReposicao ? "Cobertura Meta" : "PerÃ­odo Base"}</span>
                 <span className={styles.summaryValueNeutral} style={{ fontSize: 14 }}>
-                  {modoReposicao ? "Por item (60/90 dias)" : hasHistoricoParcialABC ? "Historico real por item" : "Últimos 12 meses"}
+                  {modoReposicao ? "Por item (60/90 dias)" : hasHistoricoParcialABC ? "Historico real por item" : "Ãšltimos 12 meses"}
                 </span>
               </div>
               <div className={styles.summaryDivider} />
@@ -2078,7 +2141,7 @@ export default function ListaCompraSugeridaPage({
 
           {/* Table ABC */}
           <div ref={abcTableCardRef} className={`${styles.tableCard} ${styles.tableCardAbc}`}>
-            {loadingABC && <div className={styles.loading}>Carregando análise ABC...</div>}
+            {loadingABC && <div className={styles.loading}>Carregando anÃ¡lise ABC...</div>}
             {errorABC && <div className={styles.error}>{errorABC}</div>}
             {!loadingABC && !errorABC && produtosComCurva.length === 0 && (
               <div className={styles.empty}>Nenhum produto encontrado para este filtro.</div>
@@ -2120,11 +2183,11 @@ export default function ListaCompraSugeridaPage({
                               <span className={styles.sectionCount}>{grupo.length} produtos</span>
                               {curva === "A" && (
                                 <span className={styles.sectionNote}>
-                                  {modoReposicao ? "← meta por item (60/90)" : "← referência proporcional"}
+                                  {modoReposicao ? "â† meta por item (60/90)" : "â† referÃªncia proporcional"}
                                 </span>
                               )}
                               {modoReposicao && curva !== "A" && curvaAtivaModo && (
-                                <span className={styles.sectionNoteIncluida}>← incluída na sugestão</span>
+                                <span className={styles.sectionNoteIncluida}>â† incluÃ­da na sugestÃ£o</span>
                               )}
                             </div>
                           </td>
@@ -2159,7 +2222,7 @@ export default function ListaCompraSugeridaPage({
                                   <div className={styles.productCode}>{p.corDescricao}</div>
                                 )}
                                 {p.grade && <div className={styles.productCode}>Grade: {p.grade}</div>}
-                                {p.colecao && <div className={styles.productCode}>Coleção: {p.colecao}</div>}
+                                {p.colecao && <div className={styles.productCode}>ColeÃ§Ã£o: {p.colecao}</div>}
                               </td>
                               <td className={styles.vendas}>{fmtBRL(p.valor3meses)}</td>
                               <td
@@ -2248,7 +2311,7 @@ export default function ListaCompraSugeridaPage({
                                 }}
                                 onMouseLeave={() => setEstoqueTooltip(null)}
                               >
-                                {p.estoqueAtual != null ? fmt(p.estoqueAtual) : "—"}
+                                {p.estoqueAtual != null ? fmt(p.estoqueAtual) : "â€”"}
                               </td>
                               <td
                                 className={`${styles.vendas} ${styles.tooltipCell}`}
@@ -2302,7 +2365,7 @@ export default function ListaCompraSugeridaPage({
                               >
                                 {(() => {
                                   const consumoDiario = consumoDiarioMesAtual(p);
-                                  if (consumoDiario <= 0 || !p.estoqueAtual) return "—";
+                                  if (consumoDiario <= 0 || !p.estoqueAtual) return "â€”";
                                   const dias = Math.round(p.estoqueAtual / consumoDiario);
                                   if (dias >= 365) return `${Math.round(dias / 30)} meses`;
                                   return `${dias} dias`;
@@ -2371,12 +2434,13 @@ export default function ListaCompraSugeridaPage({
                                               y: e.clientY,
                                               qtde12m: getQtde12mBase(p),
                                               diasComEstoquePositivo: poDcFallback,
-                                              diasSemEstoque: poInfo?.diasSemEstoque,
+                                              diasSemEstoque: poInfo?.diasSemEstoque ?? 0,
                                               velocidadeAjustada: poVelFallback,
-                                              potencialMensalBruto: poInfo?.potencialMensalBruto,
+                                              potencialMensalBruto: poInfo?.potencialMensalBruto ?? poVelFallback ?? 0,
                                               limiteSeguro: poInfo?.limiteSeguro,
                                               qtdPO: sugestaoView.qty,
-                                              resumo: "Velocidade calculada sobre período com estoque limitado — potencial de demanda oculto.",
+                                              periodoRef: getPeriodoRef(poInfo?.diasSemEstoque ?? 0, poDcFallback ?? 0),
+                                              resumo: "",
                                               transitTotal: sugestaoView.transitTotal,
                                               transitDates: sugestaoView.transitDates,
                                             });
@@ -2414,8 +2478,6 @@ export default function ListaCompraSugeridaPage({
                                   );
                                 }
                                 if (sugestaoView.type === "S" && sugestaoView.qty > 0) {
-                                  const mesesHistoricoFilial = getMesesHistoricoFilial(p);
-                                  const mediaVendasMes = p.vendas3meses / mesesHistoricoFilial;
                                   const { limiteDias } = getLimiteDiasReposicao(p);
                                   return (
                                     <td className={styles.qtdSugeridaS}>
@@ -2427,11 +2489,16 @@ export default function ListaCompraSugeridaPage({
                                             setSugestaoSTooltip({
                                               x: e.clientX,
                                               y: e.clientY,
-                                              mediaVendasMes,
-                                              mesesHistoricoFilial,
+                                              qtde12m: getQtde12mBase(p),
+                                              diasComEstoquePositivo: p.diasComEstoquePositivo ?? 0,
+                                              mesesDisponiveis: p.mesesDisponiveis ?? getMesesHistoricoFilial(p),
+                                              velocidadeAjustada: p.velocidadeAjustada ?? 0,
+                                              mediaVendasMes: p.velocidadeAjustada ?? 0,
+                                              mesesHistoricoFilial: p.mesesDisponiveis ?? getMesesHistoricoFilial(p),
                                               estoqueAtual: p.estoqueAtual ?? 0,
                                               limiteDias,
                                               qtdS: baseQty,
+                                              distribuicao: undefined,
                                               transitTotal: sugestaoView.transitTotal,
                                               transitDates: sugestaoView.transitDates,
                                             })
@@ -2460,17 +2527,18 @@ export default function ListaCompraSugeridaPage({
                                               setSugestaoPOTooltip({
                                                 x: e.clientX,
                                                 y: e.clientY,
-                                                qtde12m: getQtde12mBase(p),
-                                                diasComEstoquePositivo: poInfo?.diasComEstoquePositivo,
-                                                diasSemEstoque: poInfo?.diasSemEstoque,
-                                                velocidadeAjustada: poInfo?.velocidadeAjustada,
-                                                potencialMensalBruto: poInfo?.potencialMensalBruto,
-                                                limiteSeguro: poInfo?.limiteSeguro,
-                                                qtdPO: sugestaoView.qty,
-                                                resumo: "Velocidade calculada sobre período com estoque limitado — potencial de demanda oculto.",
-                                                transitTotal: sugestaoView.transitTotal,
-                                                transitDates: sugestaoView.transitDates,
-                                              });
+                                              qtde12m: getQtde12mBase(p),
+                                              diasComEstoquePositivo: poInfo?.diasComEstoquePositivo,
+                                              diasSemEstoque: poInfo?.diasSemEstoque ?? 0,
+                                              velocidadeAjustada: poInfo?.velocidadeAjustada,
+                                              potencialMensalBruto: poInfo?.potencialMensalBruto ?? poInfo?.velocidadeAjustada ?? 0,
+                                              limiteSeguro: poInfo?.limiteSeguro,
+                                              qtdPO: sugestaoView.qty,
+                                              periodoRef: getPeriodoRef(poInfo?.diasSemEstoque ?? 0, poInfo?.diasComEstoquePositivo ?? 0),
+                                              resumo: "",
+                                              transitTotal: sugestaoView.transitTotal,
+                                              transitDates: sugestaoView.transitDates,
+                                            });
                                             }}
                                             onMouseLeave={() => setSugestaoPOTooltip(null)}
                                           >PO</span>
@@ -2492,10 +2560,31 @@ export default function ListaCompraSugeridaPage({
                                   );
                                 }
                                 if (sugestaoView.type === "E" && sugestaoView.qty > 0) {
+                                  const { limiteDias } = getLimiteDiasReposicao(p);
                                   return (
                                     <td className={styles.qtdSugerida}>
                                       {fmt(sugestaoView.qty)}
-                                      <span className={styles.badgeE} style={{ marginLeft: 6 }}>E</span>
+                                      <span
+                                        className={styles.badgeE}
+                                        style={{ marginLeft: 6 }}
+                                        onMouseEnter={(e) =>
+                                          setSugestaoETooltip({
+                                            x: e.clientX,
+                                            y: e.clientY,
+                                            qtde12m: getQtde12mBase(p),
+                                            diasComEstoquePositivo: p.diasComEstoquePositivo ?? 0,
+                                            diasSemEstoque: p.diasSemEstoque ?? 0,
+                                            mesesDisponiveis: p.mesesDisponiveis ?? getMesesHistoricoFilial(p),
+                                            velocidadeAjustada: p.velocidadeAjustada ?? 0,
+                                            limiteDias,
+                                            qtdE: baseQty,
+                                            distribuicao: undefined,
+                                            transitTotal: sugestaoView.transitTotal,
+                                            transitDates: sugestaoView.transitDates,
+                                          })
+                                        }
+                                        onMouseLeave={() => setSugestaoETooltip(null)}
+                                      >E</span>
                                       {hasPO ? (
                                         <span
                                           style={{
@@ -2520,12 +2609,13 @@ export default function ListaCompraSugeridaPage({
                                               y: e.clientY,
                                               qtde12m: getQtde12mBase(p),
                                               diasComEstoquePositivo: poDcFallback,
-                                              diasSemEstoque: poInfo?.diasSemEstoque,
+                                              diasSemEstoque: poInfo?.diasSemEstoque ?? 0,
                                               velocidadeAjustada: poVelFallback,
-                                              potencialMensalBruto: poInfo?.potencialMensalBruto,
+                                              potencialMensalBruto: poInfo?.potencialMensalBruto ?? poVelFallback ?? 0,
                                               limiteSeguro: poInfo?.limiteSeguro,
                                               qtdPO: sugestaoView.qty,
-                                              resumo: "Velocidade calculada sobre período com estoque limitado — potencial de demanda oculto.",
+                                              periodoRef: getPeriodoRef(poInfo?.diasSemEstoque ?? 0, poDcFallback ?? 0),
+                                              resumo: "",
                                               transitTotal: sugestaoView.transitTotal,
                                               transitDates: sugestaoView.transitDates,
                                             });
@@ -2584,6 +2674,8 @@ export default function ListaCompraSugeridaPage({
                                             potencialMensalBruto: poInfo.potencialMensalBruto,
                                             limiteSeguro: poInfo.limiteSeguro,
                                             qtdPO: sugestaoView.qty,
+                                            periodoRef: getPeriodoRef(poInfo.diasSemEstoque, poInfo.diasComEstoquePositivo),
+                                            resumo: "",
                                             transitTotal: sugestaoView.transitTotal,
                                             transitDates: sugestaoView.transitDates,
                                           });
@@ -2612,7 +2704,7 @@ export default function ListaCompraSugeridaPage({
                                     <td className={styles.qtdSugerida}>
                                       {fmt(sugestaoView.qty)}
                                       <span
-                                        title={`Necessidade Mínima: estoque zerado com ≥3 vendas e velocidade ≥0,5 un/mês → reserva de 1 un. Sugestão atual: ${fmt(sugestaoView.qty)} unidade(s).`}
+                                        title={`Necessidade MÃ­nima: estoque zerado com â‰¥3 vendas e velocidade â‰¥0,5 un/mÃªs â†’ reserva de 1 un. SugestÃ£o atual: ${fmt(sugestaoView.qty)} unidade(s).`}
                                         style={{
                                           marginLeft: 6,
                                           display: "inline-flex",
@@ -2638,7 +2730,7 @@ export default function ListaCompraSugeridaPage({
                                     </td>
                                   );
                                 }
-                                return <td className={styles.qtdSugeridaZero}>—</td>;
+                                return <td className={styles.qtdSugeridaZero}>â€”</td>;
                               })()}
                               {(() => {
                                 const sugestaoView = p.sugestaoView
@@ -2652,10 +2744,10 @@ export default function ListaCompraSugeridaPage({
                                 return (
                                   <>
                                     <td className={`${styles.right} ${cellClass}`}>
-                                      {showCost ? fmtBRL2(cu) : "—"}
+                                      {showCost ? fmtBRL2(cu) : "â€”"}
                                     </td>
                                     <td className={`${styles.right} ${cellClass}`}>
-                                      {showCost ? fmtBRL(qtdParaCusto * cu) : "—"}
+                                      {showCost ? fmtBRL(qtdParaCusto * cu) : "â€”"}
                                     </td>
                                   </>
                                 );
@@ -2701,7 +2793,7 @@ export default function ListaCompraSugeridaPage({
                 disabled={savingCompraSalva || compraFinal.length === 0}
                 onClick={() => { void handleSalvarCompraAtual(); }}
               >
-                {savingCompraSalva ? "Salvando…" : "Salvar compra atual"}
+                {savingCompraSalva ? "Salvandoâ€¦" : "Salvar compra atual"}
               </button>
               <button type="button" className={styles.exportBtn} onClick={handleExportCompraFinalXlsx}>
                 Exportar XLSX
@@ -2712,7 +2804,7 @@ export default function ListaCompraSugeridaPage({
                 disabled={exportingPdf || compraFinal.length === 0}
                 onClick={() => { void handleExportCompraFinalPdf(); }}
               >
-                {exportingPdf ? "Exportando PDF…" : "Exportar PDF"}
+                {exportingPdf ? "Exportando PDFâ€¦" : "Exportar PDF"}
               </button>
             </div>
           </div>
@@ -2753,7 +2845,7 @@ export default function ListaCompraSugeridaPage({
                           <div className={styles.productCode}>{it.produto}</div>
                           {it.corDescricao && <div className={styles.productCode}>{it.corDescricao}</div>}
                           {it.grade && <div className={styles.productCode}>Grade: {it.grade}</div>}
-                          {it.colecao && <div className={styles.productCode}>Coleção: {it.colecao}</div>}
+                          {it.colecao && <div className={styles.productCode}>ColeÃ§Ã£o: {it.colecao}</div>}
                         </td>
                         <td className={styles.right}>
                           <input
@@ -2770,9 +2862,9 @@ export default function ListaCompraSugeridaPage({
                         </td>
                         <td className={styles.destinoCell}>
                           {partesDestino === undefined
-                            ? "…"
+                            ? "â€¦"
                             : partesDestino === null
-                              ? "—"
+                              ? "â€”"
                               : <DestinoCompraFinalBadges partes={partesDestino} />}
                         </td>
                         <td
@@ -2815,13 +2907,13 @@ export default function ListaCompraSugeridaPage({
                           }}
                           onMouseLeave={() => setEstoqueTooltip(null)}
                         >
-                          {estoque != null ? fmt(estoque) : "—"}
+                          {estoque != null ? fmt(estoque) : "â€”"}
                         </td>
                         <td className={`${styles.right} ${custoUnit > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
-                          {custoUnit > 0 ? fmtBRL2(custoUnit) : "—"}
+                          {custoUnit > 0 ? fmtBRL2(custoUnit) : "â€”"}
                         </td>
                         <td className={`${styles.right} ${custoTotal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
-                          {custoTotal > 0 ? fmtBRL(custoTotal) : "—"}
+                          {custoTotal > 0 ? fmtBRL(custoTotal) : "â€”"}
                         </td>
                         <td className={styles.right}>
                           <button
@@ -2830,7 +2922,7 @@ export default function ListaCompraSugeridaPage({
                             onClick={() => { void handleRemoveFinal(it.itemKey); }}
                             title="Remover"
                           >
-                            ×
+                            Ã—
                           </button>
                         </td>
                       </tr>
@@ -2851,31 +2943,85 @@ export default function ListaCompraSugeridaPage({
 
       {sugestaoSTooltip && (
         <div
-          className={styles.tooltip}
+          className={styles.metricTooltip}
           style={getTooltipViewportPosition(sugestaoSTooltip.x, sugestaoSTooltip.y)}
         >
-          <div className={styles.tooltipTitle}>Sugestão por Critério S</div>
-          <div className={styles.tooltipLine} style={{ color: "#c4b5fd", marginBottom: 6 }}>
-            Produto com vendas consistentes e estoque abaixo da média mensal
+          <div className={styles.metricTooltipTitle}>S â†’ {fmt(sugestaoSTooltip.qtdS)} un</div>
+          <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
+            Produto sem estoque. Velocidade calculada nos dias com venda disponÃ­vel.
           </div>
-          <div className={styles.tooltipDivider} />
-          <div className={styles.tooltipLine}><strong>Base historica filial:</strong> {sugestaoSTooltip.mesesHistoricoFilial.toFixed(1)} meses</div>
-          <div className={styles.tooltipLine}><strong>Média de vendas:</strong> {sugestaoSTooltip.mediaVendasMes.toFixed(1)} un/mês</div>
-          <div className={styles.tooltipLine}><strong>Estoque atual:</strong> {fmt(sugestaoSTooltip.estoqueAtual)} un</div>
-          <div className={styles.tooltipLine}><strong>Cobertura mínima:</strong> {sugestaoSTooltip.limiteDias} dias</div>
-          <div className={styles.tooltipDivider} />
-          <div className={styles.tooltipLine}><strong>Qtd sugerida:</strong> {fmt(sugestaoSTooltip.qtdS)} un</div>
-          <div className={styles.tooltipLine} style={{ color: "#94a3b8", marginTop: 4, fontSize: 11 }}>
-            = {sugestaoSTooltip.limiteDias / 30} meses × {sugestaoSTooltip.mediaVendasMes.toFixed(1)} un/mês
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span>Velocidade</span><span><strong>{sugestaoSTooltip.velocidadeAjustada.toFixed(1)} un/mÃªs</strong></span>
           </div>
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span>Estoque</span><span><strong>{fmt(sugestaoSTooltip.estoqueAtual)} un</strong></span>
+          </div>
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span>Alvo</span><span>{sugestaoSTooltip.limiteDias} dias</span>
+          </div>
+          {sugestaoSTooltip.distribuicao && sugestaoSTooltip.distribuicao.length > 0 ? (
+            <>
+              <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Por loja (proporcional)</div>
+              {sugestaoSTooltip.distribuicao.map((filial) => (
+                <div key={filial.label} className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                  <span>{filial.label}</span><strong>{fmt(filial.qtd)} un</strong>
+                </div>
+              ))}
+            </>
+          ) : null}
           {sugestaoSTooltip.transitTotal ? (
             <>
-              <div className={styles.tooltipDivider} />
-              <div className={styles.tooltipLine}>
-                <strong style={{ color: "#5eead4" }}>+{fmt(sugestaoSTooltip.transitTotal)} em trânsito</strong>
+              <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine} style={{ color: "#0f766e" }}>
+                <strong>+{fmt(sugestaoSTooltip.transitTotal)} em trÃ¢nsito</strong>
               </div>
               {sugestaoSTooltip.transitDates?.map((label) => (
-                <div key={label} className={styles.tooltipLine} style={{ color: "#99f6e4", fontSize: 11 }}>
+                <div key={label} className={styles.metricTooltipLine} style={{ color: "#0d9488", fontSize: 11 }}>
+                  {label}
+                </div>
+              ))}
+            </>
+          ) : null}
+        </div>
+      )}
+
+      {sugestaoETooltip && (
+        <div
+          className={styles.metricTooltip}
+          style={getTooltipViewportPosition(sugestaoETooltip.x, sugestaoETooltip.y)}
+        >
+          <div className={styles.metricTooltipTitle}>E â†’ {fmt(sugestaoETooltip.qtdE)} un</div>
+          <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
+            Produto zerado. Velocidade estimada do perÃ­odo com estoque disponÃ­vel.
+          </div>
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span>Velocidade</span><span><strong>{sugestaoETooltip.velocidadeAjustada.toFixed(1)} un/mÃªs</strong></span>
+          </div>
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span>Alvo</span><span>{sugestaoETooltip.limiteDias} dias</span>
+          </div>
+          {sugestaoETooltip.distribuicao && sugestaoETooltip.distribuicao.length > 0 ? (
+            <>
+              <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Por loja (proporcional)</div>
+              {sugestaoETooltip.distribuicao.map((filial) => (
+                <div key={filial.label} className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                  <span>{filial.label}</span><strong>{fmt(filial.qtd)} un</strong>
+                </div>
+              ))}
+            </>
+          ) : null}
+          {sugestaoETooltip.transitTotal ? (
+            <>
+              <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine} style={{ color: "#0f766e" }}>
+                <strong>+{fmt(sugestaoETooltip.transitTotal)} em trÃ¢nsito</strong>
+              </div>
+              {sugestaoETooltip.transitDates?.map((label) => (
+                <div key={label} className={styles.metricTooltipLine} style={{ color: "#0d9488", fontSize: 11 }}>
                   {label}
                 </div>
               ))}
@@ -2886,54 +3032,77 @@ export default function ListaCompraSugeridaPage({
 
       {sugestaoPOTooltip && (
         <div
-          className={styles.tooltip}
+          className={styles.metricTooltip}
           style={getTooltipViewportPosition(sugestaoPOTooltip.x, sugestaoPOTooltip.y)}
         >
-          <div className={styles.tooltipTitle}>Potencial Oculto (PO)</div>
-          <div className={styles.tooltipLine} style={{ color: "#86efac", marginBottom: 6 }}>
-            {sugestaoPOTooltip.resumo ?? "Vendeu rápido no curto período em que tinha estoque — demanda maior do que o histórico médio indica."}
+          <div className={styles.metricTooltipTitle} style={{ color: "#059669" }}>
+            {(sugestaoPOTooltip.limiteSeguro ?? 0) > 0 ? "Potencial Oculto (PO)" : "Histórico Curto (PO)"}
           </div>
-          {sugestaoPOTooltip.qtde12m != null && sugestaoPOTooltip.diasComEstoquePositivo != null ? (
+          {(sugestaoPOTooltip.limiteSeguro ?? 0) > 0 && (
+            <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
+              Vendeu bem em perÃ­odo curto e ficou sem estoque.
+            </div>
+          )}
+          {sugestaoPOTooltip.poRows && sugestaoPOTooltip.poRows!.length > 1 ? (
             <>
-              <div className={styles.tooltipDivider} />
-              <div className={styles.tooltipLine} style={{ fontSize: 13 }}>
-                <strong>{fmt(sugestaoPOTooltip.qtde12m)} vendas</strong>
-                {" em "}
-                <strong>{fmt(sugestaoPOTooltip.diasComEstoquePositivo)} dias</strong>
-                {" com estoque"}
-              </div>
-              <div className={styles.tooltipLine} style={{ color: "#86efac", fontSize: 13, marginTop: 2 }}>
-                {"→ projeção: ~"}
-                <strong>{(sugestaoPOTooltip.velocidadeAjustada ?? 0).toFixed(0)} un/mês</strong>
-              </div>
-              <div className={styles.tooltipLine} style={{ color: "#94a3b8", fontSize: 11, marginTop: 2 }}>
-                = {fmt(sugestaoPOTooltip.qtde12m)} un ÷ {((sugestaoPOTooltip.diasComEstoquePositivo ?? 0) / 30).toFixed(2)} meses disponíveis
-              </div>
-              {(sugestaoPOTooltip.diasSemEstoque ?? 0) > 0 && (
-                <div className={styles.tooltipLine} style={{ color: "#94a3b8", fontSize: 11 }}>
-                  {fmt(sugestaoPOTooltip.diasSemEstoque ?? 0)} dias sem estoque no período
+              {sugestaoPOTooltip.poRows.map((row, index) => (
+                <React.Fragment key={`${row.filialLabel}-${index}`}>
+                  <div className={styles.metricTooltipLine}>
+                    <strong style={{ color: "#047857" }}>{row.filialLabel}</strong>
+                    {row.periodoRef && <span style={{ color: "#64748b", fontWeight: 400 }}> ({row.periodoRef})</span>}
+                    <span style={{ color: "#94a3b8" }}> | </span>
+                    <span>SugestÃ£o: <strong>{row.qtdPO} un</strong></span>
+                  </div>
+                  <div className={styles.metricTooltipLine} style={{ fontSize: 11 }}>
+                    Vendas: {row.qtde12m} un em {Math.round(row.diasComEstoquePositivo)} dias c/ estoque
+                    <span style={{ color: "#94a3b8" }}> | </span>
+                    <strong>{row.velocidadeAjustada.toFixed(0)} un/mÃªs</strong>
+                  </div>
+                  {row.diasSemEstoque > 0 ? (
+                    <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
+                      {Math.round(row.diasSemEstoque)} dias sem estoque
+                    </div>
+                  ) : null}
+                  {index < sugestaoPOTooltip.poRows!.length - 1 ? <div className={styles.metricTooltipDivider} /> : null}
+                </React.Fragment>
+              ))}
+            </>
+          ) : (
+            <>
+              {sugestaoPOTooltip.filialLabel ? (
+                <div className={styles.metricTooltipLine}>
+                  <strong style={{ color: "#047857" }}>{sugestaoPOTooltip.filialLabel}</strong>
+                  {sugestaoPOTooltip.periodoRef && <span style={{ color: "#64748b", fontWeight: 400 }}> ({sugestaoPOTooltip.periodoRef})</span>}
+                  <span style={{ color: "#94a3b8" }}> | </span>
+                  <span>SugestÃ£o: <strong>{sugestaoPOTooltip.qtdPO} un</strong></span>
+                </div>
+              ) : null}
+              {sugestaoPOTooltip.qtde12m != null && sugestaoPOTooltip.diasComEstoquePositivo != null && (
+                <div className={styles.metricTooltipLine} style={{ fontSize: 11 }}>
+                  Vendas: {sugestaoPOTooltip.qtde12m} un em {Math.round(sugestaoPOTooltip.diasComEstoquePositivo)} dias c/ estoque
+                  {sugestaoPOTooltip.velocidadeAjustada != null && (
+                    <>
+                      <span style={{ color: "#94a3b8" }}> | </span>
+                      <strong>{sugestaoPOTooltip.velocidadeAjustada.toFixed(0)} un/mÃªs</strong>
+                    </>
+                  )}
                 </div>
               )}
-              <div className={styles.tooltipDivider} />
+              {(sugestaoPOTooltip.diasSemEstoque ?? 0) > 0 && (
+                <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
+                  {Math.round(sugestaoPOTooltip.diasSemEstoque ?? 0)} dias sem estoque
+                </div>
+              )}
             </>
-          ) : <div className={styles.tooltipDivider} />}
-          <div className={styles.tooltipLine} style={{ fontSize: 13 }}>
-            {"→ sugestão: "}
-            <strong>{fmt(sugestaoPOTooltip.qtdPO)} un</strong>
-          </div>
-          {sugestaoPOTooltip.limiteSeguro != null && sugestaoPOTooltip.limiteSeguro > 0 && (
-            <div className={styles.tooltipLine} style={{ color: "#94a3b8", fontSize: 11, marginTop: 2 }}>
-              trava de segurança: máx. {fmt(sugestaoPOTooltip.limiteSeguro)} un (histórico curto)
-            </div>
           )}
           {sugestaoPOTooltip.transitTotal ? (
             <>
-              <div className={styles.tooltipDivider} />
-              <div className={styles.tooltipLine}>
-                <strong style={{ color: "#5eead4" }}>+{fmt(sugestaoPOTooltip.transitTotal)} em trânsito</strong>
+              <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine} style={{ color: "#0f766e" }}>
+                <strong>+{fmt(sugestaoPOTooltip.transitTotal)} em trÃ¢nsito</strong>
               </div>
               {sugestaoPOTooltip.transitDates?.map((label) => (
-                <div key={label} className={styles.tooltipLine} style={{ color: "#99f6e4", fontSize: 11 }}>
+                <div key={label} className={styles.metricTooltipLine} style={{ color: "#0d9488", fontSize: 11 }}>
                   {label}
                 </div>
               ))}
@@ -2963,15 +3132,15 @@ export default function ListaCompraSugeridaPage({
           className={styles.tooltip}
           style={getTooltipViewportPosition(duracaoTooltip.x, duracaoTooltip.y)}
         >
-          <div className={styles.tooltipTitle}>Duração real (mês atual)</div>
+          <div className={styles.tooltipTitle}>DuraÃ§Ã£o real (mÃªs atual)</div>
           <div className={styles.tooltipLine}><strong>Regra:</strong> {duracaoTooltip.regra}</div>
           <div className={styles.tooltipLine}><strong>Limite do item:</strong> {duracaoTooltip.limiteDias} dias</div>
           <div className={styles.tooltipDivider} />
-          <div className={styles.tooltipLine}><strong>Vendas mês:</strong> {fmt(duracaoTooltip.vendasMesAtual)}</div>
+          <div className={styles.tooltipLine}><strong>Vendas mÃªs:</strong> {fmt(duracaoTooltip.vendasMesAtual)}</div>
           <div className={styles.tooltipLine}><strong>Dias corridos:</strong> {duracaoTooltip.diasCorridos}</div>
           <div className={styles.tooltipLine}><strong>Consumo/dia:</strong> {duracaoTooltip.consumoDiario.toFixed(2)}</div>
           <div className={styles.tooltipLine}><strong>Estoque atual:</strong> {fmt(duracaoTooltip.estoqueAtual)}</div>
-          <div className={styles.tooltipLine}><strong>Duração:</strong> {duracaoTooltip.duracaoDias} dias</div>
+          <div className={styles.tooltipLine}><strong>DuraÃ§Ã£o:</strong> {duracaoTooltip.duracaoDias} dias</div>
         </div>
       )}
 
@@ -3023,7 +3192,7 @@ export default function ListaCompraSugeridaPage({
           {vendasTooltip.loading ? (
             <div className={styles.tooltipLine}>Carregando...</div>
           ) : vendasTooltip.filiais.length === 0 ? (
-            <div className={styles.tooltipLine}>Sem vendas no período.</div>
+            <div className={styles.tooltipLine}>Sem vendas no perÃ­odo.</div>
           ) : (
             <>
               <div className={styles.tooltipEstoqueFiliais}>
@@ -3049,3 +3218,4 @@ export default function ListaCompraSugeridaPage({
     </div>
   );
 }
+

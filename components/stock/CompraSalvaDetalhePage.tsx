@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -96,6 +96,33 @@ function fmtBRL2(n: number) {
   });
 }
 
+const MESES_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+function getPeriodoRef(diasSemEstoque: number, diasComEstoquePositivo: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - Math.round(diasSemEstoque + diasComEstoquePositivo / 2));
+  return `${MESES_PT[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`;
+}
+
+function getTooltipViewportPosition(x: number, y: number): { left: number; top: number } {
+  const offset = 12;
+  const tooltipWidth = 360;
+  const tooltipHeight = 280;
+  const margin = 12;
+  if (typeof window === "undefined") {
+    return { left: x + offset, top: y - tooltipHeight - offset };
+  }
+  const maxLeft = Math.max(margin, window.innerWidth - tooltipWidth - margin);
+  const maxTop = Math.max(margin, window.innerHeight - tooltipHeight - margin);
+  const left = Math.min(Math.max(margin, x + offset), maxLeft);
+  const topAbove = y - tooltipHeight - offset;
+  const topBelow = y + offset;
+  const top = topAbove >= margin
+    ? topAbove
+    : Math.min(Math.max(margin, topBelow), maxTop);
+  return { left, top };
+}
+
 function sumDistribuicaoManual(distribuicao?: Record<string, number>): number {
   return Object.values(distribuicao ?? {}).reduce((total, value) => total + Math.max(0, Number(value) || 0), 0);
 }
@@ -104,7 +131,7 @@ function resumirAjusteEntreDestinos(
   atual: DestinoCompraFinalParte[] | null,
   sugerido: DestinoCompraFinalParte[] | null
 ): string {
-  if (!atual || !sugerido) return "Sem distribuição por filial para comparar.";
+  if (!atual || !sugerido) return "Sem distribuiÃ§Ã£o por filial para comparar.";
   const mapaAtual = new Map(atual.map((p) => [p.label, p.qtd]));
   const mapaSug = new Map(sugerido.map((p) => [p.label, p.qtd]));
   const labels = new Set([...mapaAtual.keys(), ...mapaSug.keys()]);
@@ -118,7 +145,7 @@ function resumirAjusteEntreDestinos(
   });
 
   if (sobe.length === 0 && desce.length === 0) {
-    return "Distribuição por filial sem mudança.";
+    return "DistribuiÃ§Ã£o por filial sem mudanÃ§a.";
   }
   const partes: string[] = [];
   if (sobe.length > 0) partes.push(`Colocar: ${sobe.join(", ")}`);
@@ -281,8 +308,8 @@ function buildSuggestionRuleInput(
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-// Replica a lógica completa de getReposicaoCompraView da Lista Loja (regras Compra, S e E).
-// Só calcula quando liveData estiver carregado — nunca usa match para vendas/estoque
+// Replica a lÃ³gica completa de getReposicaoCompraView da Lista Loja (regras Compra, S e E).
+// SÃ³ calcula quando liveData estiver carregado â€” nunca usa match para vendas/estoque
 // pois lista-compra-sugerida usa query diferente (sem e-commerce para isProdutoLookup).
 function calcularSugestaoCompleto(
   match: ProdutoSugestao | null | undefined,
@@ -458,7 +485,7 @@ function ManualDestinoEditor({
             >
               {filial}
             </span>
-            <button type="button" className={styles.manualQtyBtn} onClick={() => onDelta(filial, -1)}>−</button>
+            <button type="button" className={styles.manualQtyBtn} onClick={() => onDelta(filial, -1)}>âˆ’</button>
             <span className={styles.manualQtyVal}>{qty}</span>
             <button type="button" className={styles.manualQtyBtn} onClick={() => onDelta(filial, +1)}>+</button>
           </div>
@@ -855,11 +882,11 @@ export default function CompraSalvaDetalhePage({
   useEffect(() => {
     if (!doc || items.length === 0) return;
     let cancelled = false;
-    // Usa filialOrigem do primeiro item que a tenha (campo salvo a partir desta versão).
+    // Usa filialOrigem do primeiro item que a tenha (campo salvo a partir desta versÃ£o).
     // Fallback para sourceContextKey apenas em compras antigas sem filialOrigem.
     const primeiroComOrigem = items.find((it) => it.filialOrigem !== undefined);
     const filialFiltro = primeiroComOrigem !== undefined
-      ? primeiroComOrigem.filialOrigem  // pode ser null (todas) ou codFilial específico
+      ? primeiroComOrigem.filialOrigem  // pode ser null (todas) ou codFilial especÃ­fico
       : parseListaLojaFilial(doc.sourceContextKey);
     const unique = new Map<string, { produto: string; corProduto: string | null }>();
     items.forEach((it) => {
@@ -876,7 +903,7 @@ export default function CompraSalvaDetalhePage({
         if (val.corProduto) params.set("corProduto", val.corProduto);
         if (filialFiltro) params.set("filial", filialFiltro);
         const estoqueParams = new URLSearchParams(params);
-        // includeHistorico só vai para vendas; estoque usa endpoint diferente
+        // includeHistorico sÃ³ vai para vendas; estoque usa endpoint diferente
         params.set("includeHistorico", "true");
         const [vendas, estoque] = await Promise.all([
           fetchVendasItemMetricas(params),
@@ -980,7 +1007,7 @@ export default function CompraSalvaDetalhePage({
 
   const totals = useMemo(() => {
     const totalItens = rowsComputed.length;
-    // Usa qtdSugerida quando disponível, incorporando a diferença no total
+    // Usa qtdSugerida quando disponÃ­vel, incorporando a diferenÃ§a no total
     const totalQtdManual = rowsComputed.reduce((s, r) => s + r.effectiveQtdManual, 0);
     const totalCusto = rowsComputed.reduce((s, r) => s + (r.custoTotal ?? 0), 0);
     return { totalItens, totalQtdManual, totalCusto };
@@ -1020,10 +1047,39 @@ export default function CompraSalvaDetalhePage({
     transitTotal?: number;
     transitDates?: string[];
   }>(null);
+  const [sugestaoSTooltip, setSugestaoSTooltip] = useState<null | {
+    x: number;
+    y: number;
+    qtde12m: number;
+    diasComEstoquePositivo: number;
+    mesesDisponiveis: number;
+    velocidadeAjustada: number;
+    estoqueAtual: number;
+    limiteDias: number;
+    qtdS: number;
+    distribuicao?: DestinoCompraFinalParte[];
+    transitTotal?: number;
+    transitDates?: string[];
+  }>(null);
+  const [sugestaoETooltip, setSugestaoETooltip] = useState<null | {
+    x: number;
+    y: number;
+    qtde12m: number;
+    diasComEstoquePositivo: number;
+    diasSemEstoque: number;
+    mesesDisponiveis: number;
+    velocidadeAjustada: number;
+    limiteDias: number;
+    qtdE: number;
+    distribuicao?: DestinoCompraFinalParte[];
+    transitTotal?: number;
+    transitDates?: string[];
+  }>(null);
   const [sugestaoPOTooltip, setSugestaoPOTooltip] = useState<null | {
     x: number;
     y: number;
     qtde12m: number;
+    periodoRef?: string;
     diasComEstoquePositivo: number;
     diasSemEstoque: number;
     velocidadeAjustada: number;
@@ -1140,7 +1196,7 @@ export default function CompraSalvaDetalhePage({
   };
 
   const handleDeleteCompra = async () => {
-    if (!window.confirm("Excluir esta compra salva? Esta ação não pode ser desfeita.")) return;
+    if (!window.confirm("Excluir esta compra salva? Esta aÃ§Ã£o nÃ£o pode ser desfeita.")) return;
     const params = new URLSearchParams();
     params.set("company", companyKey);
     const res = await fetch(`/api/controle-estoque/compras-salvas/${compraId}?${params}`, { method: "DELETE" });
@@ -1213,7 +1269,7 @@ export default function CompraSalvaDetalhePage({
           .filter(([, qty]) => qty > 0)
           .sort(([a], [b]) => compareFilialDisplayOrder(a, b, cfg))
           .map(([label, qty]) => `${label}: ${fmt2(qty)}`)
-          .join(" · ");
+          .join(" Â· ");
       } else {
         destino = vendasRows !== undefined ? textoDestinoCompraFinal(effectiveQtdManual, vendasRows, companyKey, estoquePorFilialCache[vendasKey], getSharedLimiteDiasReposicao({ linha: match?.linha, subgrupo: match?.subgrupo })) : "";
       }
@@ -1234,7 +1290,7 @@ export default function CompraSalvaDetalhePage({
     });
 
     const kpis = [
-      { METRICA: "Título", VALOR: doc?.title ?? "" },
+      { METRICA: "TÃ­tulo", VALOR: doc?.title ?? "" },
       { METRICA: "Empresa", VALOR: companyKey },
       { METRICA: "Itens", VALOR: totals.totalItens },
       { METRICA: "Total Qtd Manual", VALOR: totals.totalQtdManual },
@@ -1261,7 +1317,7 @@ export default function CompraSalvaDetalhePage({
 
       const target = compraSalvaExportRef.current;
 
-      // Coleta valores dos inputs ANTES do clone (cloneNode não copia .value de inputs React)
+      // Coleta valores dos inputs ANTES do clone (cloneNode nÃ£o copia .value de inputs React)
       const originalInputs = Array.from(target.querySelectorAll("input")) as HTMLInputElement[];
       const inputValues = originalInputs.map((inp) => inp.value);
 
@@ -1271,10 +1327,10 @@ export default function CompraSalvaDetalhePage({
         useCORS: true,
         logging: false,
         // onclone: html2canvas renderiza o clone num iframe isolado,
-        // fora de qualquer container scrollável do layout — isso garante
-        // captura do conteúdo COMPLETO, não só a porção visível na tela.
+        // fora de qualquer container scrollÃ¡vel do layout â€” isso garante
+        // captura do conteÃºdo COMPLETO, nÃ£o sÃ³ a porÃ§Ã£o visÃ­vel na tela.
         onclone: (cloneDoc, cloneEl) => {
-          // Ocultar elementos de UI que não devem aparecer no PDF
+          // Ocultar elementos de UI que nÃ£o devem aparecer no PDF
           cloneEl.querySelectorAll("[data-pdf-hide]").forEach((el) => {
             (el as HTMLElement).style.display = "none";
           });
@@ -1406,7 +1462,7 @@ export default function CompraSalvaDetalhePage({
     <div className={styles.wrapper}>
       <div className={styles.pageToolbar}>
         <Link href={listBack} className={styles.backButton}>
-          ← Compras salvas
+          â† Compras salvas
         </Link>
       </div>
 
@@ -1419,11 +1475,11 @@ export default function CompraSalvaDetalhePage({
               </svg>
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              {!doc && loading && <h1 className={styles.title}>Carregando compra…</h1>}
+              {!doc && loading && <h1 className={styles.title}>Carregando compraâ€¦</h1>}
               {doc && (
                 <>
                   <label className={styles.subtitle} htmlFor="compra-salva-titulo" style={{ display: "block", marginBottom: 6 }}>
-                    Título
+                    TÃ­tulo
                   </label>
                   <input
                     id="compra-salva-titulo"
@@ -1445,7 +1501,7 @@ export default function CompraSalvaDetalhePage({
                     onBlur={() => { void handleTitleBlur(); }}
                   />
                   <p className={styles.subtitle}>
-                    Salva em {new Date(doc.savedAt).toLocaleString("pt-BR")} · {expandirPorCor ? "Por cor" : "Por produto"}
+                    Salva em {new Date(doc.savedAt).toLocaleString("pt-BR")} Â· {expandirPorCor ? "Por cor" : "Por produto"}
                   </p>
                 </>
               )}
@@ -1477,7 +1533,7 @@ export default function CompraSalvaDetalhePage({
               </div>
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Custo total (referência)</span>
+                <span className={styles.summaryLabel}>Custo total (referÃªncia)</span>
                 <span className={styles.summaryValue}>{fmtBRL(totals.totalCusto)}</span>
               </div>
             </div>
@@ -1501,7 +1557,7 @@ export default function CompraSalvaDetalhePage({
               >
                 <span className={styles.exportMenuLabel}>Exportar</span>
                 <span className={`${styles.exportCaret}${exportMenuOpen ? ` ${styles.exportCaretOpen}` : ""}`}>v</span>
-                {exportingPdf ? "Exportando PDF…" : "Exportar PDF"}
+                {exportingPdf ? "Exportando PDFâ€¦" : "Exportar PDF"}
               </button>
               {exportMenuOpen && (
                 <div className={styles.exportDropdown} role="menu">
@@ -1627,6 +1683,10 @@ export default function CompraSalvaDetalhePage({
                       vendasRowsK === undefined || qtdSugerida === null
                         ? undefined
                         : partesDestinoCompraFinal(qtdSugerida, vendasRowsK, companyKey, estoqueRowsK, getSharedLimiteDiasReposicao({ linha: match?.linha, subgrupo: match?.subgrupo }));
+                    const limiteDias = getSharedLimiteDiasReposicao({ linha: match?.linha, subgrupo: match?.subgrupo });
+                    const sugestaoBase = match && live
+                      ? getSharedReposicaoCompraView(buildSuggestionRuleInput(match, live), new Date().getDate())
+                      : null;
                     return (
                       <tr key={it.itemKey}>
                         <td>
@@ -1634,7 +1694,7 @@ export default function CompraSalvaDetalhePage({
                           <div className={styles.productCode}>{it.produto}</div>
                           {it.corDescricao && <div className={styles.productCode}>{it.corDescricao}</div>}
                           {it.grade && <div className={styles.productCode}>Grade: {it.grade}</div>}
-                          {it.colecao && <div className={styles.productCode}>Coleção: {it.colecao}</div>}
+                          {it.colecao && <div className={styles.productCode}>ColeÃ§Ã£o: {it.colecao}</div>}
                         </td>
                         <td className={styles.right}>
                           {isManual ? (
@@ -1655,7 +1715,7 @@ export default function CompraSalvaDetalhePage({
                         </td>
                         <td className={styles.destinoCell}>
                           {isEditing ? (
-                            /* ── Estado: editando ── */
+                            /* â”€â”€ Estado: editando â”€â”€ */
                             <div>
                               <ManualDestinoEditor
                                 distribuicao={manualDistribuicao[it.itemKey] ?? {}}
@@ -1669,7 +1729,7 @@ export default function CompraSalvaDetalhePage({
                                   className={styles.manualConfirmBtn}
                                   onClick={() => confirmManual(it.itemKey)}
                                 >
-                                  Confirmar ✓
+                                  Confirmar âœ“
                                 </button>
                                 <button
                                   type="button"
@@ -1681,7 +1741,7 @@ export default function CompraSalvaDetalhePage({
                               </div>
                             </div>
                           ) : isConfirmed ? (
-                            /* ── Estado: manual confirmado — visual igual ao auto ── */
+                            /* â”€â”€ Estado: manual confirmado â€” visual igual ao auto â”€â”€ */
                             <div>
                               <div className={styles.destinoCellInner}>
                                 {(() => {
@@ -1692,7 +1752,7 @@ export default function CompraSalvaDetalhePage({
                                     .sort((a, b) => compareFilialDisplayOrder(a.label, b.label, cfg));
                                   return manualPartes.length > 0
                                     ? <DestinoCompraFinalBadges partes={manualPartes} />
-                                    : <span style={{ color: "#94a3b8", fontSize: 12 }}>Sem distribuição</span>;
+                                    : <span style={{ color: "#94a3b8", fontSize: 12 }}>Sem distribuiÃ§Ã£o</span>;
                                 })()}
                               </div>
                               <div className={styles.manualConfirmedActions} data-pdf-hide="">
@@ -1707,21 +1767,99 @@ export default function CompraSalvaDetalhePage({
                                   type="button"
                                   className={styles.manualToggleBtn}
                                   onClick={() => cancelManual(it.itemKey)}
-                                  title="Voltar ao modo automático"
+                                  title="Voltar ao modo automÃ¡tico"
                                 >
-                                  → Auto
+                                  â†’ Auto
                                 </button>
                               </div>
                             </div>
                           ) : (
-                            /* ── Estado: automático (padrão) ── */
+                            /* â”€â”€ Estado: automÃ¡tico (padrÃ£o) â”€â”€ */
                             <div>
                               <div className={styles.destinoCellInner}>
                                 {partesDestino === undefined
-                                  ? "…"
+                                  ? "â€¦"
                                   : partesDestino === null
-                                    ? "—"
+                                    ? "â€”"
                                     : <DestinoCompraFinalBadges partes={partesDestino} />}
+                                {qtdSugerida !== null && sugestaoAtual.baseType === "S" && sugestaoBase ? (
+                                  <span
+                                    className={styles.badgeS}
+                                    style={{ marginLeft: 6 }}
+                                    onMouseEnter={(e) =>
+                                      setSugestaoSTooltip({
+                                        x: e.clientX,
+                                        y: e.clientY,
+                                        qtde12m: Math.max(0, Number(live?.qtde12m ?? 0)),
+                                        diasComEstoquePositivo: sugestaoBase.sData?.diasComEstoquePositivo ?? 0,
+                                        mesesDisponiveis: sugestaoBase.sData?.mesesDisponiveis ?? Math.max(0, Number(live?.mesesDisponiveis ?? 0)),
+                                        velocidadeAjustada: sugestaoBase.sData?.velocidadeAjustada ?? Math.max(0, Number(live?.velocidadeAjustada ?? 0)),
+                                        estoqueAtual: Math.max(0, Number(live?.estoqueAtual ?? 0)),
+                                        limiteDias,
+                                        qtdS: qtdSugerida,
+                                        distribuicao: partesDestinoSugerido ?? undefined,
+                                        transitTotal: sugestaoAtual.transitTotal || undefined,
+                                        transitDates: sugestaoAtual.transitDates,
+                                      })
+                                    }
+                                    onMouseLeave={() => setSugestaoSTooltip(null)}
+                                  >
+                                    S
+                                  </span>
+                                ) : null}
+                                {qtdSugerida !== null && sugestaoAtual.baseType === "E" && sugestaoBase ? (
+                                  <span
+                                    className={styles.badgeE}
+                                    style={{ marginLeft: 6 }}
+                                    onMouseEnter={(e) =>
+                                      setSugestaoETooltip({
+                                        x: e.clientX,
+                                        y: e.clientY,
+                                        qtde12m: Math.max(0, Number(live?.qtde12m ?? 0)),
+                                        diasComEstoquePositivo: sugestaoBase.eData?.diasComEstoquePositivo ?? Math.max(0, Number(live?.diasComEstoquePositivo ?? 0)),
+                                        diasSemEstoque: sugestaoBase.eData?.diasSemEstoque ?? Math.max(0, Number(live?.diasSemEstoque ?? 0)),
+                                        mesesDisponiveis: Math.max(0, Number(live?.mesesDisponiveis ?? 0)),
+                                        velocidadeAjustada: sugestaoBase.eData?.velocidadeAjustada ?? Math.max(0, Number(live?.velocidadeAjustada ?? 0)),
+                                        limiteDias,
+                                        qtdE: qtdSugerida,
+                                        distribuicao: partesDestinoSugerido ?? undefined,
+                                        transitTotal: sugestaoAtual.transitTotal || undefined,
+                                        transitDates: sugestaoAtual.transitDates,
+                                      })
+                                    }
+                                    onMouseLeave={() => setSugestaoETooltip(null)}
+                                  >
+                                    E
+                                  </span>
+                                ) : null}
+                                {qtdSugerida !== null && sugestaoAtual.poData && sugestaoAtual.baseType !== "PO" ? (
+                                  <span
+                                    className={styles.badgeT}
+                                    style={{ marginLeft: 6, background: "#86efac", borderColor: "#22c55e", color: "#14532d", cursor: "help" }}
+                                    onMouseEnter={(e) => {
+                                      setSugestaoPOTooltip({
+                                        x: e.clientX,
+                                        y: e.clientY,
+                                        qtde12m: Math.max(0, Number(live?.qtde12m ?? 0)),
+                                        diasComEstoquePositivo: sugestaoAtual.poData?.diasComEstoquePositivo ?? 0,
+                                        diasSemEstoque: sugestaoAtual.poData?.diasSemEstoque ?? 0,
+                                        velocidadeAjustada: sugestaoAtual.poData?.velocidadeAjustada ?? 0,
+                                        potencialMensalBruto: sugestaoAtual.poData?.potencialMensalBruto ?? 0,
+                                        limiteSeguro: sugestaoAtual.poData?.limiteSeguro ?? 0,
+                                        qtdPO: qtdSugerida,
+                                        periodoRef: getPeriodoRef(
+                                          sugestaoAtual.poData?.diasSemEstoque ?? 0,
+                                          sugestaoAtual.poData?.diasComEstoquePositivo ?? 0
+                                        ),
+                                        transitTotal: sugestaoAtual.transitTotal || undefined,
+                                        transitDates: sugestaoAtual.transitDates,
+                                      });
+                                    }}
+                                    onMouseLeave={() => setSugestaoPOTooltip(null)}
+                                  >
+                                    PO
+                                  </span>
+                                ) : null}
                                 {qtdSugerida !== null && sugestaoAtual.baseType === "PO" && (() => {
                                   const poInfo = sugestaoAtual.poData
                                     ?? (match && live ? calcQtdSugestaoPOInfo(buildSuggestionRuleInput(match, live)) : null);
@@ -1741,6 +1879,7 @@ export default function CompraSalvaDetalhePage({
                                           potencialMensalBruto: poInfo.potencialMensalBruto,
                                           limiteSeguro: poInfo.limiteSeguro,
                                           qtdPO: qtdSugerida,
+                                          periodoRef: getPeriodoRef(poInfo.diasSemEstoque, poInfo.diasComEstoquePositivo),
                                           transitTotal: sugestaoAtual.transitTotal || undefined,
                                           transitDates: sugestaoAtual.transitDates,
                                         });
@@ -1756,18 +1895,18 @@ export default function CompraSalvaDetalhePage({
                                   const diffFmt = `${diff > 0 ? "+" : ""}${diff}`;
                                   const explicacao =
                                     diff > 0
-                                      ? "Sugestão atual maior que a quantidade salva"
-                                      : "Sugestão atual menor que a quantidade salva";
+                                      ? "SugestÃ£o atual maior que a quantidade salva"
+                                      : "SugestÃ£o atual menor que a quantidade salva";
                                   const total12m = (vendasRowsK ?? []).reduce((s, r) => s + (r.qtde12m ?? 0), 0);
                                   const total60d = (vendasRowsK ?? []).reduce((s, r) => s + (r.qtde60d ?? 0), 0);
                                   const mediaMensal12m = total12m / 12;
                                   const ritmoMensal60d = total60d / 2;
                                   const tendenciaTexto =
                                     mediaMensal12m <= 0
-                                      ? "Sem base de vendas para tendência."
+                                      ? "Sem base de vendas para tendÃªncia."
                                       : ritmoMensal60d >= mediaMensal12m
-                                        ? `Ritmo recente acima/igual da média (${ritmoMensal60d.toFixed(1)} vs ${mediaMensal12m.toFixed(1)} un/mês).`
-                                        : `Ritmo recente abaixo da média (${ritmoMensal60d.toFixed(1)} vs ${mediaMensal12m.toFixed(1)} un/mês).`;
+                                        ? `Ritmo recente acima/igual da mÃ©dia (${ritmoMensal60d.toFixed(1)} vs ${mediaMensal12m.toFixed(1)} un/mÃªs).`
+                                        : `Ritmo recente abaixo da mÃ©dia (${ritmoMensal60d.toFixed(1)} vs ${mediaMensal12m.toFixed(1)} un/mÃªs).`;
                                   const ajusteDestinoTexto =
                                     partesDestinoSugerido === undefined
                                       ? "Destino: aguardando dados de vendas por filial."
@@ -1776,7 +1915,7 @@ export default function CompraSalvaDetalhePage({
                                     <span
                                       className={`${styles.badgeS} ${diff > 0 ? styles.badgeSDiffUp : styles.badgeSDiffDown}`}
                                       style={{ width: "auto", padding: "0 6px" }}
-                                      aria-label={`Delta sugestão ${diffFmt}`}
+                                      aria-label={`Delta sugestÃ£o ${diffFmt}`}
                                       onMouseEnter={(e) => {
                                         setSugestaoDiffTooltip({
                                           x: e.clientX,
@@ -1805,7 +1944,7 @@ export default function CompraSalvaDetalhePage({
                                   type="button"
                                   className={styles.manualToggleBtn}
                                   onClick={() => startManualEdit(it.itemKey, partesDestino)}
-                                  title="Editar distribuição por filial manualmente"
+                                  title="Editar distribuiÃ§Ã£o por filial manualmente"
                                 >
                                   Manual
                                 </button>
@@ -1849,13 +1988,13 @@ export default function CompraSalvaDetalhePage({
                           }}
                           onMouseLeave={() => setEstoqueTooltip(null)}
                         >
-                          {estoque != null ? fmt(estoque) : "—"}
+                          {estoque != null ? fmt(estoque) : "â€”"}
                         </td>
                         <td className={`${styles.right} ${custoUnit > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
-                          {custoUnit > 0 ? fmtBRL2(custoUnit) : "—"}
+                          {custoUnit > 0 ? fmtBRL2(custoUnit) : "â€”"}
                         </td>
                         <td className={`${styles.right} ${custoTotal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
-                          {custoTotal > 0 ? fmtBRL(custoTotal) : "—"}
+                          {custoTotal > 0 ? fmtBRL(custoTotal) : "â€”"}
                         </td>
                         <td className={styles.right} data-pdf-hide="">
                           <button
@@ -1864,7 +2003,7 @@ export default function CompraSalvaDetalhePage({
                             onClick={() => { void handleRemove(it.itemKey); }}
                             title="Remover"
                           >
-                            ×
+                            Ã—
                           </button>
                         </td>
                       </tr>
@@ -1915,7 +2054,7 @@ export default function CompraSalvaDetalhePage({
           className={styles.tooltipEstoque}
           style={{ left: sugestaoDiffTooltip.x + 12, top: sugestaoDiffTooltip.y + 12 }}
         >
-          <div className={styles.tooltipEstoqueHeader}>Delta da sugestão</div>
+          <div className={styles.tooltipEstoqueHeader}>Delta da sugestÃ£o</div>
           <div className={styles.tooltipLine}>
             <strong>Resultado:</strong> {sugestaoDiffTooltip.diffFmt}
           </div>
@@ -1944,7 +2083,7 @@ export default function CompraSalvaDetalhePage({
             <>
               <div className={styles.tooltipDivider} />
               <div className={styles.tooltipLine}>
-                <strong style={{ color: "#0f766e" }}>+{fmt(sugestaoDiffTooltip.transitTotal)} em trânsito</strong>
+                <strong style={{ color: "#0f766e" }}>+{fmt(sugestaoDiffTooltip.transitTotal)} em trÃ¢nsito</strong>
               </div>
               {sugestaoDiffTooltip.transitDates?.map((label) => (
                 <div key={label} className={styles.tooltipLine} style={{ color: "#0f766e", fontSize: 11 }}>
@@ -1955,47 +2094,44 @@ export default function CompraSalvaDetalhePage({
           ) : null}
         </div>
       )}
-      {sugestaoPOTooltip && (
+      {sugestaoSTooltip && (
         <div
-          className={styles.tooltipEstoque}
-          style={{ left: sugestaoPOTooltip.x + 12, top: sugestaoPOTooltip.y + 12 }}
+          className={styles.metricTooltip}
+          style={getTooltipViewportPosition(sugestaoSTooltip.x, sugestaoSTooltip.y)}
         >
-          <div className={styles.tooltipEstoqueHeader}>Potencial Oculto (PO)</div>
-          <div className={styles.tooltipLine}>O item vendeu rapido nos dias em que tinha estoque e depois ficou zerado por bastante tempo.</div>
-          <div className={styles.tooltipDivider} />
-          <div className={styles.tooltipLine}>
-            <strong>Base:</strong> {fmt(sugestaoPOTooltip.qtde12m)} un em {fmt(sugestaoPOTooltip.diasComEstoquePositivo)} dias com estoque
+          <div className={styles.metricTooltipTitle}>S â†’ {fmt(sugestaoSTooltip.qtdS)} un</div>
+          <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
+            Produto sem estoque. Velocidade calculada nos dias com venda disponÃ­vel.
           </div>
-          <div className={styles.tooltipLine}>
-            <strong>Sem estoque:</strong> {fmt(sugestaoPOTooltip.diasSemEstoque)} dias
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span>Velocidade</span><span><strong>{sugestaoSTooltip.velocidadeAjustada.toFixed(1)} un/mÃªs</strong></span>
           </div>
-          <div className={styles.tooltipLine} style={{ color: "#64748b", marginTop: 4, fontSize: 11 }}>
-            = {fmt(sugestaoPOTooltip.qtde12m)} un / {(sugestaoPOTooltip.diasComEstoquePositivo / 30).toFixed(2)} meses com estoque
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span>Estoque</span><span><strong>{fmt(sugestaoSTooltip.estoqueAtual)} un</strong></span>
           </div>
-          <div className={styles.tooltipLine}>
-            <strong>Velocidade ajustada:</strong> {sugestaoPOTooltip.velocidadeAjustada.toFixed(1)} un/mês
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span>Alvo</span><span>{sugestaoSTooltip.limiteDias} dias</span>
           </div>
-          <div className={styles.tooltipLine}>
-            <strong>Potencial mensal bruto:</strong> {sugestaoPOTooltip.potencialMensalBruto.toFixed(1)} un/mês
-          </div>
-          <div className={styles.tooltipDivider} />
-          <div className={styles.tooltipLine}>
-            <strong>Trava de segurança:</strong> máximo de {fmt(sugestaoPOTooltip.limiteSeguro)} un
-          </div>
-          <div className={styles.tooltipLine}>
-            <strong>Qtd sugerida:</strong> {fmt(sugestaoPOTooltip.qtdPO)} un
-          </div>
-          <div className={styles.tooltipLine} style={{ color: "#64748b", marginTop: 4, fontSize: 11 }}>
-            = menor valor entre a necessidade calculada e a trava de seguranÃ§a
-          </div>
-          {sugestaoPOTooltip.transitTotal ? (
+          {sugestaoSTooltip.distribuicao && sugestaoSTooltip.distribuicao.length > 0 ? (
             <>
-              <div className={styles.tooltipDivider} />
-              <div className={styles.tooltipLine}>
-                <strong style={{ color: "#0f766e" }}>+{fmt(sugestaoPOTooltip.transitTotal)} em trânsito</strong>
+              <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Por loja (proporcional)</div>
+              {sugestaoSTooltip.distribuicao.map((filial) => (
+                <div key={filial.label} className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                  <span>{filial.label}</span><strong>{fmt(filial.qtd)} un</strong>
+                </div>
+              ))}
+            </>
+          ) : null}
+          {sugestaoSTooltip.transitTotal ? (
+            <>
+              <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine} style={{ color: "#0f766e" }}>
+                <strong>+{fmt(sugestaoSTooltip.transitTotal)} em trÃ¢nsito</strong>
               </div>
-              {sugestaoPOTooltip.transitDates?.map((label) => (
-                <div key={label} className={styles.tooltipLine} style={{ color: "#0f766e", fontSize: 11 }}>
+              {sugestaoSTooltip.transitDates?.map((label) => (
+                <div key={label} className={styles.metricTooltipLine} style={{ color: "#0d9488", fontSize: 11 }}>
                   {label}
                 </div>
               ))}
@@ -2003,6 +2139,95 @@ export default function CompraSalvaDetalhePage({
           ) : null}
         </div>
       )}
+      {sugestaoETooltip && (
+        <div
+          className={styles.metricTooltip}
+          style={getTooltipViewportPosition(sugestaoETooltip.x, sugestaoETooltip.y)}
+        >
+          <div className={styles.metricTooltipTitle}>E â†’ {fmt(sugestaoETooltip.qtdE)} un</div>
+          <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
+            Produto zerado. Velocidade estimada do perÃ­odo com estoque disponÃ­vel.
+          </div>
+          <div className={styles.metricTooltipDivider} />
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span>Velocidade</span><span><strong>{sugestaoETooltip.velocidadeAjustada.toFixed(1)} un/mÃªs</strong></span>
+          </div>
+          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span>Alvo</span><span>{sugestaoETooltip.limiteDias} dias</span>
+          </div>
+          {sugestaoETooltip.distribuicao && sugestaoETooltip.distribuicao.length > 0 ? (
+            <>
+              <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Por loja (proporcional)</div>
+              {sugestaoETooltip.distribuicao.map((filial) => (
+                <div key={filial.label} className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                  <span>{filial.label}</span><strong>{fmt(filial.qtd)} un</strong>
+                </div>
+              ))}
+            </>
+          ) : null}
+          {sugestaoETooltip.transitTotal ? (
+            <>
+              <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine} style={{ color: "#0f766e" }}>
+                <strong>+{fmt(sugestaoETooltip.transitTotal)} em trÃ¢nsito</strong>
+              </div>
+              {sugestaoETooltip.transitDates?.map((label) => (
+                <div key={label} className={styles.metricTooltipLine} style={{ color: "#0d9488", fontSize: 11 }}>
+                  {label}
+                </div>
+              ))}
+            </>
+          ) : null}
+        </div>
+      )}
+      {sugestaoPOTooltip && (
+        <div
+          className={styles.metricTooltip}
+          style={getTooltipViewportPosition(sugestaoPOTooltip.x, sugestaoPOTooltip.y)}
+        >
+          <div className={styles.metricTooltipTitle} style={{ color: "#059669" }}>
+            {(sugestaoPOTooltip.limiteSeguro ?? 0) > 0 ? "Potencial Oculto (PO)" : "Histórico Curto (PO)"}
+          </div>
+          {(sugestaoPOTooltip.limiteSeguro ?? 0) > 0 && (
+            <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
+              Vendeu bem em perÃ­odo curto e ficou sem estoque.
+            </div>
+          )}
+          {sugestaoPOTooltip.qtde12m != null && sugestaoPOTooltip.diasComEstoquePositivo != null && (
+            <div className={styles.metricTooltipLine} style={{ fontSize: 11 }}>
+              Vendas: {sugestaoPOTooltip.qtde12m} un em {Math.round(sugestaoPOTooltip.diasComEstoquePositivo)} dias c/ estoque
+              {sugestaoPOTooltip.velocidadeAjustada != null && (
+                <>
+                  <span style={{ color: "#94a3b8" }}> | </span>
+                  <strong>{sugestaoPOTooltip.velocidadeAjustada.toFixed(0)} un/mÃªs</strong>
+                </>
+              )}
+            </div>
+          )}
+          {(sugestaoPOTooltip.diasSemEstoque ?? 0) > 0 && (
+            <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
+              {Math.round(sugestaoPOTooltip.diasSemEstoque ?? 0)} dias sem estoque
+              {sugestaoPOTooltip.periodoRef ? ` (${sugestaoPOTooltip.periodoRef})` : ""}
+            </div>
+          )}
+          {sugestaoPOTooltip.transitTotal ? (
+            <>
+              <div className={styles.metricTooltipDivider} />
+              <div className={styles.metricTooltipLine} style={{ color: "#0f766e" }}>
+                <strong>+{fmt(sugestaoPOTooltip.transitTotal)} em trÃ¢nsito</strong>
+              </div>
+              {sugestaoPOTooltip.transitDates?.map((label) => (
+                <div key={label} className={styles.metricTooltipLine} style={{ color: "#0d9488", fontSize: 11 }}>
+                  {label}
+                </div>
+              ))}
+            </>
+          ) : null}
+        </div>
+      )}
+
     </div>
   );
 }
+
