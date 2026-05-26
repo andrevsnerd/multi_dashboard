@@ -9,8 +9,8 @@
   background: #ffffff;
   border: 1px solid #e8eaed;
   border-radius: 12px;
-  margin-bottom: 20px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  margin-bottom: 14px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .header {
@@ -18,13 +18,20 @@
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding: 20px 24px;
+  padding: 16px 24px;
 }
 
 .headerLeft {
   display: flex;
   align-items: flex-start;
   gap: 16px;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .iconWrapper {
@@ -40,10 +47,10 @@
 }
 
 .title {
-  font-size: 22px;
+  font-size: 17px;
   font-weight: 700;
   color: #0f172a;
-  margin: 0 0 4px 0;
+  margin: 0;
 }
 
 .subtitle {
@@ -177,23 +184,23 @@
 
 .exportMenuWrap {
   position: relative;
-  margin-left: auto;
 }
 
 .exportMenuTrigger {
-  padding: 8px 14px;
-  background: #fff;
-  border: 1px solid #0f172a;
-  border-radius: 6px;
+  padding: 8px 16px;
+  background: #16a34a;
+  border: none;
+  border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #0f172a;
+  color: #fff;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition: background 0.15s;
+  white-space: nowrap;
 }
 
 .exportMenuTrigger:hover {
-  background: #0f172a;
+  background: #15803d;
   color: #fff;
 }
 
@@ -228,42 +235,45 @@
 }
 
 .comparisonLabel {
-  font-size: 13px;
-  font-weight: 600;
-  color: #555;
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-right: 2px;
 }
 
 .comparisonToggle {
   display: flex;
-  gap: 4px;
+  gap: 2px;
 }
 
 .toggleBtn {
-  padding: 8px 14px;
-  background: #fff;
-  border: 1px solid #e0e0e0;
+  padding: 5px 11px;
+  background: transparent;
+  border: none;
   border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
-  color: #555;
+  color: #475569;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.12s, color 0.12s;
 }
 
 .toggleBtn:hover {
-  background: #f5f5f5;
-  border-color: #ccc;
+  background: #f1f5f9;
+  color: #0f172a;
 }
 
 .toggleBtnActive {
-  background: #263238;
+  background: #1e293b;
   color: #fff;
-  border-color: #263238;
+  font-weight: 600;
 }
 
 .toggleBtnActive:hover {
-  background: #37474f;
-  border-color: #37474f;
+  background: #0f172a;
+  color: #fff;
 }
 
 /* ── Tabs ── */
@@ -327,28 +337,29 @@
 }
 
 .kpiCard {
-  background: #f8fafc;
-  border: 1px solid #e8e8e8;
-  border-radius: 10px;
-  padding: 16px 20px;
+  background: #ffffff;
+  border: 1px solid #e8eaed;
+  border-radius: 14px;
+  padding: 20px 24px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  flex: 1;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .kpiLabel {
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
   color: #94a3b8;
   text-transform: uppercase;
 }
 
 .kpiValue {
-  font-size: 20px;
+  font-size: 26px;
   font-weight: 700;
   color: #0f172a;
+  line-height: 1.1;
 }
 
 .kpiProjecao {
@@ -1893,4 +1904,426 @@
 
 .error {
   color: #dc2626;
+}
+
+/* ── Live indicator dot ── */
+.liveDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #22c55e;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.liveTime {
+  font-size: 13px;
+  font-weight: 400;
+  color: #94a3b8;
+  margin-left: 4px;
+}
+
+/* ── Filter strip card ── */
+.filterStripCard {
+  background: #ffffff;
+  border: 1px solid #e8eaed;
+  border-radius: 12px;
+  margin-bottom: 14px;
+  padding: 7px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  min-height: 44px;
+}
+
+.filterStripLeft {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.filterStripRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.curvaCheckDot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.curvaCheckDot[data-curva="A"] { background: #22c55e; }
+.curvaCheckDot[data-curva="B"] { background: #f59e0b; }
+.curvaCheckDot[data-curva="C"] { background: #f43f5e; }
+
+.filterStripDivider {
+  display: inline-block;
+  width: 1px;
+  height: 18px;
+  background: #e2e8f0;
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+
+.checkboxLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  user-select: none;
+  padding: 3px 6px;
+  border-radius: 6px;
+  transition: background 0.12s;
+}
+
+.checkboxLabel:hover {
+  background: #f1f5f9;
+}
+
+.checkboxLabel input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: #3b82f6;
+  cursor: pointer;
+  margin: 0;
+}
+
+/* ── KPI cards standalone row ── */
+.kpiCardsRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.kpiCardVendas {
+  background: #f0fdf4 !important;
+  border-color: #bbf7d0 !important;
+  border-left: 4px solid #22c55e !important;
+}
+
+.kpiValueCents {
+  font-size: 0.58em;
+  font-weight: 600;
+  opacity: 0.7;
+  letter-spacing: 0;
+}
+
+.kpiProjecaoRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.kpiSubtitle {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.kpiMetaHr {
+  border: none;
+  border-top: 2px solid #e2e8f0;
+  margin: 2px 0 4px;
+  width: 40px;
+}
+
+.kpiMetaDefinir {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+/* ── ABC + Alerts two-column ── */
+.abcAlertsRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.abcCard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 20px 22px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.abcCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.abcSubtitle {
+  font-size: 13px;
+  color: #64748b;
+  margin: -8px 0 0;
+  font-weight: 400;
+}
+
+/* Legacy (kept for safety, no longer used in main ABC card) */
+.abcCurveRow {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  cursor: pointer;
+}
+
+/* 3-column grid for curves */
+.abcCurvesGrid {
+  display: flex;
+  overflow: hidden;
+  border-radius: 10px;
+  gap: 0;
+}
+
+.abcCurveCol {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  padding: 11px 16px;
+  min-width: 0;
+  overflow: hidden;
+  transition: filter 0.15s;
+}
+
+.abcCurveCol:hover {
+  filter: brightness(0.94);
+}
+
+.abcCurveColActive {
+  box-shadow: inset 0 0 0 2.5px rgba(0, 0, 0, 0.22);
+}
+
+.abcCurveColLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.abcCurveColStats {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Stock bucket filter buttons */
+.stockBucketFilters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stockBucketBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #475569;
+  transition: border-color 0.15s, background 0.15s;
+  flex: 1;
+  justify-content: space-between;
+}
+
+.stockBucketBtn:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.stockBucketBtnActive {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.stockBucketLabel {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.stockBucketCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 7px;
+}
+
+.stockBucketCountZero { background: #fee2e2; color: #dc2626; }
+.stockBucketCountLow  { background: #fef3c7; color: #d97706; }
+.stockBucketCountHigh { background: #dcfce7; color: #16a34a; }
+
+.abcCurveLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.abcCurveLabelLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+}
+
+.abcCurvePct {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.abcCurveDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.abcCurveDotA { background: #22c55e; }
+.abcCurveDotB { background: #f59e0b; }
+.abcCurveDotC { background: #f43f5e; }
+
+.abcCurveBarTrack {
+  width: 100%;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.abcCurveBarTrackA { background: #dcfce7; }
+.abcCurveBarTrackB { background: #fef9c3; }
+.abcCurveBarTrackC { background: #ffe4e6; }
+
+.abcCurveBarFill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.5s ease;
+}
+
+/* ── Alertas Curva A ── */
+.alertasCard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 20px 22px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.alertasHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.alertasTitle {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #e11d48;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.alertasProductCount {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.alertasList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+}
+
+.alertasRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  color: #334155;
+}
+
+.alertasRowValue {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 24px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 10px;
+}
+
+.alertasValueZero { background: #fee2e2; color: #dc2626; }
+.alertasValueLow { background: #fef3c7; color: #d97706; }
+.alertasValueHigh { background: #dcfce7; color: #16a34a; }
+
+/* ── Category section wrapper ── */
+.categorySection {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px 20px 18px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.categorySectionTitle {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #64748b;
+  display: block;
+  margin-bottom: 12px;
 }

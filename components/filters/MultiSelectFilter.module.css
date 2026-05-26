@@ -1,36 +1,41 @@
 .container {
   position: relative;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
 }
 
 .label {
-  font-size: 12px;
-  letter-spacing: 0.12em;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #475569;
+  color: #94a3b8;
+  white-space: nowrap;
 }
 
 .button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 14px 18px;
-  border-radius: 16px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  border: 1px solid #e2e8f0;
   background: #ffffff;
   cursor: pointer;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  min-width: 180px;
+  box-shadow: none;
+  transition: border-color 0.15s, background 0.15s;
+  min-width: 80px;
+  font-size: 13px;
 }
 
 .button:hover,
 .buttonActive {
-  border-color: rgba(14, 165, 233, 0.4);
-  box-shadow: 0 12px 28px rgba(14, 165, 233, 0.18);
+  border-color: #94a3b8;
+  background: #f8fafc;
+  box-shadow: none;
 }
 
 .buttonValue {
@@ -41,9 +46,9 @@
 }
 
 .valuePrimary {
-  font-weight: 600;
+  font-weight: 500;
   color: #0f172a;
-  font-size: 14px;
+  font-size: 13px;
   text-align: left;
 }
 

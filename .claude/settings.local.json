@@ -90,7 +90,8 @@
       "Bash(sed -n '39,49p' \"c:/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/components/lista-loja/ListaLojaPage.tsx\")",
       "Bash(sed -n '52,54p' \"c:/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/components/performance/CurvaAbcPage.tsx\")",
       "Bash(sed -n '156,174p' \"c:/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/components/stock/ProjecaoEstoquePage.tsx\")",
-      "Bash(sed -n '27,31p' \"c:/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/components/stock/ProjecaoEstoquePage.tsx\")"
+      "Bash(sed -n '27,31p' \"c:/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/components/stock/ProjecaoEstoquePage.tsx\")",
+      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")"
     ]
   }
 }

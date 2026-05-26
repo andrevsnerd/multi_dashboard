@@ -39,6 +39,14 @@ const OUTROS_NERD_NORMALIZED = new Set([
   "CAFTAN LONGO",
   "ALMOFADA",
   "PROMOCIONAIS",
+  "FONE DE OUVIDO BLUETOOTH",
+  "FONE DE OUVDO BLUETOOTH",
+  "CARREGADOR VEICULAR",
+  "FONE DE OUVIDO",
+  "CAMISETA",
+  "BOLSA",
+  "CAPA",
+  "CETIM",
 ]);
 
 const OUTROS_NERD_TOOLTIP_LINES = [
@@ -67,6 +75,13 @@ const OUTROS_NERD_TOOLTIP_LINES = [
   "Caftan longo",
   "Almofada",
   "Promocionais",
+  "Fone de ouvido bluetooth",
+  "Carregador veicular",
+  "Fone de ouvido",
+  "Camiseta",
+  "Bolsa",
+  "Capa",
+  "Cetim",
 ];
 
 const OUTROS_SCARFME_TOOLTIP_LINES = Array.from(OUTROS_CATEGORIES_SCARFME);

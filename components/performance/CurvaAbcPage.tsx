@@ -1514,6 +1514,22 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const curveSummaryTotal = curveStockSummary.reduce((sum, item) => sum + item.total, 0);
   const focusedCurveSummary = curveStockSummary.find(({ curva }) => curva === focusedCurve) ?? curveStockSummary[0] ?? null;
 
+  const totalVendasAllCurves = produtosComCurva.reduce((s, p) => s + p.vendas, 0);
+  const curveRevenuePcts: Record<Curva, number> = {
+    A: totalVendasAllCurves > 0 ? produtosComCurva.filter(p => p.curva === "A").reduce((s, p) => s + p.vendas, 0) / totalVendasAllCurves : 0,
+    B: totalVendasAllCurves > 0 ? produtosComCurva.filter(p => p.curva === "B").reduce((s, p) => s + p.vendas, 0) / totalVendasAllCurves : 0,
+    C: totalVendasAllCurves > 0 ? produtosComCurva.filter(p => p.curva === "C").reduce((s, p) => s + p.vendas, 0) / totalVendasAllCurves : 0,
+  };
+  const curveAData = curveStockSummary.find(x => x.curva === "A") ?? null;
+  const activeCurveData = selectedCurvas.size > 0
+    ? curveStockSummary.filter(c => selectedCurvas.has(c.curva))
+    : curveStockSummary;
+  const stockBucketTotals: Record<StockBucket, number> = {
+    zero: activeCurveData.reduce((s, c) => s + c.buckets.zero, 0),
+    low:  activeCurveData.reduce((s, c) => s + c.buckets.low, 0),
+    high: activeCurveData.reduce((s, c) => s + c.buckets.high, 0),
+  };
+
   const displayVendas = hasStructuredFilters
     ? produtosFiltrados.reduce((s, p) => s + p.vendas, 0)
     : data?.vendas ?? 0;
@@ -1538,6 +1554,22 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       setSelectedStockBuckets(new Set());
     }
     setFocusedCurve(curva);
+  };
+
+  const handleCurveToggle = (curva: Curva) => {
+    setSelectedCurvas(prev => {
+      const next = new Set(prev);
+      if (next.has(curva)) next.delete(curva);
+      else next.add(curva);
+      return next;
+    });
+  };
+
+  const handleStockBucketToggle = (bucket: StockBucket) => {
+    setSelectedStockBuckets(prev => {
+      if (prev.has(bucket) && prev.size === 1) return new Set();
+      return new Set([bucket]);
+    });
   };
 
   const handleCurveStockShortcutClick = (curva: Curva, bucket: StockBucket) => {
@@ -1987,94 +2019,242 @@ const handleBadgeClick = (cat: string) => {
     ? ` - ${activeFilterLabels.join(" | ")}`
     : "";
 
+  const nowStr = new Date().toLocaleString("pt-BR", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+
   return (
     <div className={styles.wrapper}>
       {/* Header */}
       <div className={styles.headerCard}>
         <div className={styles.header}>
-          <div className={styles.headerLeft}>
-            <div>
-              <h1 className={styles.title}>{pageTitle}</h1>
-              <p className={styles.subtitle}>{pageSubtitle}</p>
-              <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
-                <div className={styles.periodFilter}>
-                  <DateRangeFilter
-                    label=""
-                    value={range}
-                    onChange={(nextRange) => setRange(nextRange)}
-                  />
-                </div>
-                <FilialFilter
-                  companyKey={companyKey}
-                  value={selectedFilial}
-                  onChange={setSelectedFilial}
-                  label=""
-                  showActiveGroupHint
-                  companyConfigOverride={data?.companyConfig ?? null}
-                />
-              </div>
-            </div>
+          <div className={styles.titleRow}>
+            <span className={styles.liveDot} />
+            <h1 className={styles.title}>Curva A,B,C · Live</h1>
+            <span className={styles.liveTime}>{nowStr}</span>
           </div>
 
-          {/* KPI Cards inline */}
-          {data && (
-            <div className={styles.kpiCards}>
-              <div className={styles.kpiCard}>
-                <span className={styles.kpiLabel}>VENDAS</span>
-                <span className={styles.kpiValue}>{fmtCurrency(displayVendas)}</span>
-                {!hasStructuredFilters && <span className={styles.kpiProjecao}>Projeção: {fmtCurrency(data.projecao)}</span>}
-                {variation && (
-                  <span
-                    className={`${styles.variationBadge} ${
-                      variation.kind === "new"
-                        ? styles.variationPos
-                        : variation.value >= 0
-                          ? styles.variationPos
-                          : styles.variationNeg
-                    }`}
-                  >
-                    {variation.kind === "new"
-                      ? "★ NOVO"
-                      : `${variation.value >= 0 ? "↗" : "↘"} ${formatSignedPct(variation.value)}`}
-                    <span className={styles.variationLabel}> vs {comparisonLabel}</span>
-                  </span>
-                )}
-              </div>
-              <div className={styles.kpiCard}>
-                <span className={styles.kpiLabel}>META</span>
-                <span className={styles.kpiValue}>{data.meta > 0 ? fmtCurrency(data.meta) : "—"}</span>
-                {data.meta > 0 && realPct !== null && (
-                  <>
-                    <div className={styles.metaBarRow}>
-                      <span className={`${styles.metaPct} ${realMetaPctClass}`}>{realPct.toFixed(1)}% atingido</span>
-                    </div>
-                    <div className={styles.progressBarTrack}>
-                      <div className={`${styles.progressBarFill} ${realBarClass}`} style={{ width: `${realBarPct}%` }} />
-                    </div>
-                    <span className={styles.metaFalta}>
-                      {realPct >= 100
-                        ? `✓ Meta atingida`
-                        : `Faltam ${fmtCurrency(data.meta - data.vendas)}`}
-                    </span>
-                  </>
-                )}
-              </div>
-              <div className={styles.kpiCard}>
-                <span className={styles.kpiLabel}>QTDE VENDAS</span>
-                <span className={styles.kpiValue}>{fmt(displayQtde)}</span>
-              </div>
-              <div className={styles.kpiCard}>
-                <span className={styles.kpiLabel}>CMV</span>
-                <span className={styles.kpiValue}>{displayCMV > 0 ? fmtCurrency(displayCMV) : "—"}</span>
-              </div>
+          <div className={styles.headerRight}>
+            <div className={styles.periodFilter}>
+              <DateRangeFilter
+                label=""
+                value={range}
+                onChange={(nextRange) => setRange(nextRange)}
+              />
             </div>
-          )}
+            <FilialFilter
+              companyKey={companyKey}
+              value={selectedFilial}
+              onChange={setSelectedFilial}
+              label=""
+              showActiveGroupHint
+              companyConfigOverride={data?.companyConfig ?? null}
+            />
+            {produtosComCurva.length > 0 && (
+              <div className={styles.exportMenuWrap} ref={exportMenuRef}>
+                <button
+                  type="button"
+                  className={styles.exportMenuTrigger}
+                  onClick={() => setExportMenuOpen((prev) => !prev)}
+                  title="Escolher formato de exportacao"
+                  aria-haspopup="menu"
+                  aria-expanded={exportMenuOpen}
+                >
+                  ↓ Export
+                </button>
+                {exportMenuOpen && (
+                  <div className={styles.exportMenuDropdown} role="menu" aria-label="Opcoes de exportacao">
+                    <button
+                      type="button"
+                      className={styles.exportMenuItem}
+                      onClick={handleExportSimpleCsv}
+                      title="Exporta a tabela atual em CSV"
+                    >
+                      Exportar CSV
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.exportMenuItem}
+                      onClick={handleExportSimpleXlsx}
+                      title="Exporta a tabela atual em Excel"
+                    >
+                      Exportar XLSX
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.exportMenuItem}
+                      onClick={handleExportPdf}
+                      title="Exporta a lista atual em PDF"
+                      disabled={exportingPdf}
+                    >
+                      {exportingPdf ? "Exportando PDF..." : "Exportar PDF"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* Filter strip card */}
+      {data && (
+        <div className={styles.filterStripCard}>
+          <div className={styles.filterStripLeft}>
+            <span className={styles.comparisonLabel}>COMPARAÇÃO</span>
+            <div className={styles.comparisonToggle}>
+              <button
+                type="button"
+                className={`${styles.toggleBtn} ${comparisonMode === "month" ? styles.toggleBtnActive : ""}`}
+                onClick={() => setComparisonMode("month")}
+              >
+                Mês
+              </button>
+              <button
+                type="button"
+                className={`${styles.toggleBtn} ${comparisonMode === "year" ? styles.toggleBtnActive : ""}`}
+                onClick={() => setComparisonMode("year")}
+              >
+                Ano
+              </button>
+            </div>
+            <button
+              type="button"
+              className={`${styles.toggleBtn} ${porCor ? styles.toggleBtnActive : ""}`}
+              onClick={() => setPorCor(v => !v)}
+              title="Cada linha vira produto + cor (vendas, estoque e tooltips por cor)"
+            >
+              Por cor
+            </button>
+            <span className={styles.filterStripDivider} />
+            {companyKey === 'nerd' && (
+              <label className={styles.checkboxLabel} title="Filtra apenas produtos da linha Eletrônicos">
+                <input
+                  type="checkbox"
+                  checked={filtrarEletronicos}
+                  onChange={(e) => setFiltrarEletronicos(e.target.checked)}
+                />
+                Eletrônicos
+              </label>
+            )}
+            <label className={styles.checkboxLabel} title="Mostra apenas produtos com sugestão de compra">
+              <input
+                type="checkbox"
+                checked={filtrarSugeridos}
+                onChange={(e) => setFiltrarSugeridos(e.target.checked)}
+              />
+              Sugeridos
+            </label>
+            <span className={styles.filterStripDivider} />
+            {(["A", "B", "C"] as Curva[]).map(curva => (
+              <label key={curva} className={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={selectedCurvas.has(curva)}
+                  onChange={() => handleCurveToggle(curva)}
+                />
+                <span className={styles.curvaCheckDot} data-curva={curva}>{curva}</span>
+              </label>
+            ))}
+            {(selectedCurvas.size > 0 || selectedStockBuckets.size > 0 || filtrarSugeridos) && (
+              <button
+                type="button"
+                className={styles.filtroClearBtn}
+                onClick={() => {
+                  setSelectedCurvas(new Set());
+                  setSelectedStockBuckets(new Set());
+                  setFiltrarSugeridos(false);
+                }}
+              >
+                Limpar filtros
+              </button>
+            )}
+          </div>
+          <div className={styles.filterStripRight}>
+            {availableSubgrupos.length > 0 && (
+              <MultiSelectFilter
+                label="Subgrupo"
+                value={selectedSubgrupos}
+                options={availableSubgrupos}
+                onChange={setSelectedSubgrupos}
+              />
+            )}
+            {availableGrades.length > 0 && (
+              <MultiSelectFilter
+                label="Grade"
+                value={selectedGrades}
+                options={availableGrades}
+                onChange={setSelectedGrades}
+              />
+            )}
+            {availableColecoes.length > 0 && (
+              <MultiSelectFilter
+                label="Coleção"
+                value={selectedColecoes}
+                options={availableColecoes}
+                onChange={setSelectedColecoes}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* KPI cards row */}
+      {data && (
+        <div className={styles.kpiCardsRow}>
+          <div className={`${styles.kpiCard} ${styles.kpiCardVendas}`}>
+            <span className={styles.kpiLabel}>VENDAS</span>
+            <span className={styles.kpiValue}>
+              {(() => {
+                const str = fmtCurrency(displayVendas);
+                const ci = str.lastIndexOf(",");
+                return ci === -1 ? str : <>{str.slice(0, ci)}<span className={styles.kpiValueCents}>{str.slice(ci)}</span></>;
+              })()}
+            </span>
+            <div className={styles.kpiProjecaoRow}>
+              {variation && (
+                <span
+                  className={`${styles.variationBadge} ${
+                    variation.kind === "new"
+                      ? styles.variationPos
+                      : variation.value >= 0
+                        ? styles.variationPos
+                        : styles.variationNeg
+                  }`}
+                >
+                  {variation.kind === "new"
+                    ? "★ NOVO"
+                    : `${variation.value >= 0 ? "↑" : "↓"} ${Math.abs(variation.value).toFixed(1)}%`}
+                </span>
+              )}
+              {!hasStructuredFilters && data.projecao > 0 && (
+                <span className={styles.kpiSubtitle}>Projeção {fmtCurrency(data.projecao)}</span>
+              )}
+            </div>
+          </div>
+          <div className={styles.kpiCard}>
+            <span className={styles.kpiLabel}>QTD. VENDAS</span>
+            <span className={styles.kpiValue}>{fmt(displayQtde)}</span>
+            {curveSummaryTotal > 0 && (
+              <span className={styles.kpiSubtitle}>{fmt(curveSummaryTotal)} itens</span>
+            )}
+          </div>
+          <div className={styles.kpiCard}>
+            <span className={styles.kpiLabel}>CMV</span>
+            <span className={styles.kpiValue}>{displayCMV > 0 ? fmtCurrency(displayCMV) : "—"}</span>
+            {displayCMV > 0 && displayVendas > 0 && (
+              <span className={styles.kpiSubtitle}>
+                margem {Math.round(((displayVendas - displayCMV) / displayVendas) * 100)}%
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {error && <div className={styles.error}>{error}</div>}
 
-      {!error && (
+      {!error && selectedFilial && (
         <div className={styles.tabsRow}>
           <button
             type="button"
@@ -2083,15 +2263,13 @@ const handleBadgeClick = (cat: string) => {
           >
             Produtos
           </button>
-          {selectedFilial && (
-            <button
-              type="button"
-              className={`${styles.tabBtn} ${activeTab === "vendedores" ? styles.tabBtnActive : ""}`}
-              onClick={() => setActiveTab("vendedores")}
-            >
-              Vendedores
-            </button>
-          )}
+          <button
+            type="button"
+            className={`${styles.tabBtn} ${activeTab === "vendedores" ? styles.tabBtnActive : ""}`}
+            onClick={() => setActiveTab("vendedores")}
+          >
+            Vendedores
+          </button>
         </div>
       )}
 
@@ -2107,9 +2285,38 @@ const handleBadgeClick = (cat: string) => {
 
       {activeTab === "produtos" && !loading && data && (
         <div ref={captureRef}>
-          {/* Category badges — clicáveis para filtrar ABC */}
+          {/* CURVA ABC card (único) */}
+          {produtosComCurva.length > 0 && (
+            <div className={styles.abcCard} style={{ marginBottom: 14 }}>
+
+              {/* Stock bucket filter row */}
+              <div className={styles.stockBucketFilters}>
+                {(["zero", "low", "high"] as StockBucket[]).map(bucket => {
+                  const count = stockBucketTotals[bucket];
+                  const isActive = selectedStockBuckets.has(bucket);
+                  const bucketColorClass = bucket === "zero" ? styles.stockBucketCountZero : bucket === "low" ? styles.stockBucketCountLow : styles.stockBucketCountHigh;
+                  return (
+                    <button
+                      key={bucket}
+                      type="button"
+                      className={`${styles.stockBucketBtn} ${isActive ? styles.stockBucketBtnActive : ""}`}
+                      onClick={() => handleStockBucketToggle(bucket)}
+                      title={`Filtrar por: ${STOCK_BUCKET_LABEL[bucket]}`}
+                    >
+                      <span className={styles.stockBucketLabel}>{STOCK_BUCKET_LABEL[bucket]}</span>
+                      <span className={`${styles.stockBucketCount} ${bucketColorClass}`}>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+            </div>
+          )}
+
+          {/* Category section */}
           {displayedCategories.length > 0 && (
-            <div className={styles.categoryBadgesRow}>
+            <div className={styles.categorySection}>
+              <div className={styles.categoryBadgesRow} style={{ marginBottom: 0 }}>
               {selectedCategory && (
                 <span className={styles.badgesHint}>Filtrando por categoria — clique para remover:</span>
               )}
@@ -2180,263 +2387,7 @@ const handleBadgeClick = (cat: string) => {
                   </button>
                 );
               })}
-            </div>
-          )}
-
-          {/* ABC Summary */}
-          {produtosComCurva.length > 0 && (
-            <div className={styles.summaryCard}>
-              <div className={styles.summaryIntro}>
-                <div className={styles.summaryItem}>
-                  <span className={styles.summaryLabel}>{displayedCountLabel}</span>
-                  <span className={styles.summaryValueNeutral}>{produtosComCurvaExibidos.length}</span>
-                </div>
               </div>
-              <div className={styles.summaryCurvesGrid}>
-                {curveStockSummary.map(({ curva, total, buckets }) => {
-                  const isCardActive = focusedCurve === curva;
-                  const isCardMuted = focusedCurve !== curva;
-                  const sharePct = curveSummaryTotal > 0 ? Math.round((total / curveSummaryTotal) * 100) : 0;
-                  const bucketTotal = STOCK_BUCKET_ORDER.reduce((sum, bucket) => sum + buckets[bucket], 0);
-                  const stockMiniBarTitle = STOCK_BUCKET_ORDER
-                    .map((bucket) => `${STOCK_BUCKET_LABEL[bucket]}: ${buckets[bucket]}`)
-                    .join(" | ");
-                  return (
-                    <div
-                      key={curva}
-                      className={`${styles.summaryCurveCard} ${isCardActive ? styles.summaryCurveCardActive : ""} ${isCardMuted ? styles.summaryCurveCardMuted : ""}`}
-                    >
-                      <button
-                        type="button"
-                        className={`${styles.curvaFilterCard} ${isCardActive ? styles.curvaFilterCardActive : ""}`}
-                        onClick={() => handleCurveCardClick(curva)}
-                        title={`Exibir detalhes da Curva ${curva}`}
-                      >
-                        <div className={styles.curveCardTopline}>
-                          <span className={styles.summaryLabel}>Curva {curva}</span>
-                          <span className={styles.curveCardPct}>{sharePct}%</span>
-                        </div>
-                        <div className={styles.curveCardHeadline}>
-                          <span className={`${styles.summaryValueSmall} ${styles[`text${curva}`]}`}>{total}</span>
-                          <span className={styles.curveCardUnit}>produtos</span>
-                        </div>
-                        <div className={styles.stockMiniBar} title={stockMiniBarTitle}>
-                          {STOCK_BUCKET_ORDER.map((bucket) => {
-                            return (
-                              <span
-                                key={`${curva}-${bucket}`}
-                                className={`${styles.stockMiniSegment} ${styles[`stockMiniSegment${bucket}`]}`}
-                                style={{
-                                  flexGrow: bucketTotal > 0 ? buckets[bucket] : 0,
-                                  minWidth: bucketTotal > 0 && buckets[bucket] > 0 ? 6 : 0,
-                                }}
-                              />
-                            );
-                          })}
-                        </div>
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-              {focusedCurveSummary && (
-                <div className={styles.curveDetailPanel}>
-                  <div className={styles.curveDetailHeader}>
-                    <span className={styles.summaryLabel}>Estoque da Curva {focusedCurveSummary.curva}</span>
-                  </div>
-                  <div className={styles.stockShortcutList}>
-                    {STOCK_BUCKET_ORDER.map((bucket) => {
-                      const isShortcutActive =
-                        selectedCurvas.size === 1 &&
-                        selectedCurvas.has(focusedCurveSummary.curva) &&
-                        selectedStockBuckets.size === 1 &&
-                        selectedStockBuckets.has(bucket);
-                      return (
-                        <button
-                          key={`${focusedCurveSummary.curva}-${bucket}`}
-                          type="button"
-                          className={`${styles.stockShortcutBtn} ${isShortcutActive ? styles.stockShortcutBtnActive : ""}`}
-                          onClick={() => handleCurveStockShortcutClick(focusedCurveSummary.curva, bucket)}
-                          title={`Filtrar Curva ${focusedCurveSummary.curva} com ${STOCK_BUCKET_LABEL[bucket]}`}
-                        >
-                          <span
-                            className={`${styles.stockShortcutDot} ${styles[`stockShortcutDot${bucket}`]}`}
-                            aria-hidden
-                          />
-                          <span className={styles.stockShortcutLabel}>{STOCK_BUCKET_LABEL[bucket]}</span>
-                          <span className={styles.stockShortcutValue}>{focusedCurveSummary.buckets[bucket]}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              {activeFilterLabels.length > 0 && (
-                <>
-                  <div className={styles.summaryFilters}>
-                    <span className={styles.summaryLabel}>Filtros ativos</span>
-                    <div className={styles.activeFilterBadges}>
-                      {activeFilterLabels.map((label) => (
-                        <span key={label} className={styles.filterActiveBadge}>{label}</span>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Comparação toggle + export visão simples */}
-          <div className={styles.comparisonRow}>
-            <span className={styles.comparisonLabel}>Comparação:</span>
-            <div className={styles.comparisonToggle}>
-              <button
-                type="button"
-                className={`${styles.toggleBtn} ${comparisonMode === "month" ? styles.toggleBtnActive : ""}`}
-                onClick={() => setComparisonMode("month")}
-              >
-                Mês
-              </button>
-              <button
-                type="button"
-                className={`${styles.toggleBtn} ${comparisonMode === "year" ? styles.toggleBtnActive : ""}`}
-                onClick={() => setComparisonMode("year")}
-              >
-                Ano
-              </button>
-            </div>
-            <button
-              type="button"
-              className={`${styles.toggleBtn} ${porCor ? styles.toggleBtnActive : ""}`}
-              onClick={() => setPorCor(v => !v)}
-              title="Cada linha vira produto + cor (vendas, estoque e tooltips por cor)"
-            >
-              Por cor
-            </button>
-            {companyKey === 'nerd' && (
-              <label
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  marginLeft: 6,
-                  fontSize: 13,
-                  color: "#334155",
-                  userSelect: "none",
-                }}
-                title="Filtra apenas produtos da linha Eletrônicos"
-              >
-                <input
-                  type="checkbox"
-                  checked={filtrarEletronicos}
-                  onChange={(e) => setFiltrarEletronicos(e.target.checked)}
-                />
-                Eletrônicos
-              </label>
-            )}
-            <label
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                marginLeft: 6,
-                fontSize: 13,
-                color: "#334155",
-                userSelect: "none",
-              }}
-              title="Mostra apenas produtos com sugestão de compra"
-            >
-              <input
-                type="checkbox"
-                checked={filtrarSugeridos}
-                onChange={(e) => setFiltrarSugeridos(e.target.checked)}
-              />
-              Sugeridos
-            </label>
-            {(selectedCurvas.size > 0 || selectedStockBuckets.size > 0 || filtrarSugeridos) && (
-              <button
-                type="button"
-                className={styles.filtroClearBtn}
-                onClick={() => {
-                  setSelectedCurvas(new Set());
-                  setSelectedStockBuckets(new Set());
-                  setFiltrarSugeridos(false);
-                }}
-              >
-                Limpar filtros
-              </button>
-            )}
-            {produtosComCurva.length > 0 && (
-              <div className={styles.exportMenuWrap} ref={exportMenuRef}>
-                <button
-                  type="button"
-                  className={styles.exportMenuTrigger}
-                  onClick={() => setExportMenuOpen((prev) => !prev)}
-                  title="Escolher formato de exportacao"
-                  aria-haspopup="menu"
-                  aria-expanded={exportMenuOpen}
-                >
-                  Exportar ▼
-                </button>
-                {exportMenuOpen && (
-                  <div className={styles.exportMenuDropdown} role="menu" aria-label="Opcoes de exportacao">
-                    <button
-                      type="button"
-                      className={styles.exportMenuItem}
-                      onClick={handleExportSimpleCsv}
-                      title="Exporta a tabela atual em CSV"
-                    >
-                      Exportar CSV
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.exportMenuItem}
-                      onClick={handleExportSimpleXlsx}
-                      title="Exporta a tabela atual em Excel"
-                    >
-                      Exportar XLSX
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.exportMenuItem}
-                      onClick={handleExportPdf}
-                      title="Exporta a lista atual em PDF"
-                      disabled={exportingPdf}
-                    >
-                      {exportingPdf ? "Exportando PDF..." : "Exportar PDF"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {(availableSubgrupos.length > 0 || availableGrades.length > 0 || availableColecoes.length > 0) && (
-            <div className={styles.abcFiltersRow}>
-              {availableSubgrupos.length > 0 && (
-                <MultiSelectFilter
-                  label="Subgrupo"
-                  value={selectedSubgrupos}
-                  options={availableSubgrupos}
-                  onChange={setSelectedSubgrupos}
-                />
-              )}
-              {availableGrades.length > 0 && (
-                <MultiSelectFilter
-                  label="Grade"
-                  value={selectedGrades}
-                  options={availableGrades}
-                  onChange={setSelectedGrades}
-                />
-              )}
-              {availableColecoes.length > 0 && (
-                <MultiSelectFilter
-                  label="Coleção"
-                  value={selectedColecoes}
-                  options={availableColecoes}
-                  onChange={setSelectedColecoes}
-                />
-              )}
             </div>
           )}
 
