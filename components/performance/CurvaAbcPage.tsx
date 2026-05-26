@@ -123,6 +123,7 @@ interface FilialData {
 }
 
 type Curva = "A" | "B" | "C";
+type StockBucket = "high" | "low" | "zero";
 
 interface ProdutoComCurva extends ProdutoRow {
   curva: Curva;
@@ -186,6 +187,13 @@ const EMPTY_COMPRA_METRIC_ROW: CompraMetricRow = {
   filiaisNM: null,
   vendasPorFilial: null,
   estoquePorFilial: null,
+};
+
+const STOCK_BUCKET_ORDER: StockBucket[] = ["high", "low", "zero"];
+const STOCK_BUCKET_LABEL: Record<StockBucket, string> = {
+  high: "5+ estoque",
+  low: "1-4 estoque",
+  zero: "0 estoque",
 };
 
 // ─── Formatação ──────────────────────────────────────────────────────────────
@@ -266,6 +274,13 @@ function formatCompactSignedPctForBadge(value: number): string {
   if (thousands <= 999) return `${sign}${thousands}K%`;
 
   return `${sign}999K%`;
+}
+
+function getStockBucket(estoque: number | undefined): StockBucket {
+  const value = Number(estoque ?? 0);
+  if (value <= 0) return "zero";
+  if (value < 5) return "low";
+  return "high";
 }
 
 function getComparisonBadge(
@@ -1068,6 +1083,8 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [filtrarEletronicos, setFiltrarEletronicos] = useState(companyKey === 'nerd');
   const [filtrarSugeridos, setFiltrarSugeridos] = useState(false);
   const [selectedCurvas, setSelectedCurvas] = useState<Set<Curva>>(new Set());
+  const [selectedStockBuckets, setSelectedStockBuckets] = useState<Set<StockBucket>>(new Set());
+  const [focusedCurve, setFocusedCurve] = useState<Curva>("A");
   const [compraMetrics, setCompraMetrics] = useState<Record<string, CompraMetricRow>>({});
   const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
   const [observacoes, setObservacoes] = useState<Record<string, string>>({});
@@ -1399,6 +1416,9 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const activeFilterLabels = [
     ...activeStructureFilterLabels,
     selectedCurvas.size > 0 ? `Curvas: ${Array.from(selectedCurvas).join(", ")}` : null,
+    selectedStockBuckets.size > 0
+      ? `Estoque: ${Array.from(selectedStockBuckets).map((bucket) => STOCK_BUCKET_LABEL[bucket]).join(", ")}`
+      : null,
   ].filter((value): value is string => Boolean(value));
 
   const hasStructuredFilters = activeStructureFilterLabels.length > 0;
@@ -1467,16 +1487,32 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     });
   }, [filtrarEletronicos, filtrarSugeridos, companyKey, produtosComCurva, compraMetrics, comprasTransitoIndex, diasCorridosMes, porCor]);
 
+  const produtosComCurvaComFiltroEstoque = useMemo(() => {
+    if (selectedStockBuckets.size === 0) return produtosComCurvaComFiltroSugestao;
+    return produtosComCurvaComFiltroSugestao.filter((p) => selectedStockBuckets.has(getStockBucket(p.estoque)));
+  }, [produtosComCurvaComFiltroSugestao, selectedStockBuckets]);
+
   const produtosComCurvaExibidos = useMemo(() => {
-    if (selectedCurvas.size === 0) return produtosComCurvaComFiltroSugestao;
-    return produtosComCurvaComFiltroSugestao.filter((p) => selectedCurvas.has(p.curva));
-  }, [produtosComCurvaComFiltroSugestao, selectedCurvas]);
+    if (selectedCurvas.size === 0) return produtosComCurvaComFiltroEstoque;
+    return produtosComCurvaComFiltroEstoque.filter((p) => selectedCurvas.has(p.curva));
+  }, [produtosComCurvaComFiltroEstoque, selectedCurvas]);
 
   const maxPerc = produtosComCurvaExibidos.length > 0 ? produtosComCurvaExibidos[0].percParticipacao : 1;
-  const countA = produtosComCurvaComFiltroSugestao.filter(p => p.curva === "A").length;
-  const countB = produtosComCurvaComFiltroSugestao.filter(p => p.curva === "B").length;
-  const countC = produtosComCurvaComFiltroSugestao.filter(p => p.curva === "C").length;
   const groups: Curva[] = ["A", "B", "C"];
+  const filteredCurve = selectedCurvas.size === 1 ? Array.from(selectedCurvas)[0] : null;
+  const curveStockSummary = groups.map((curva) => {
+    const items = produtosComCurvaComFiltroSugestao.filter((p) => p.curva === curva);
+    const buckets = STOCK_BUCKET_ORDER.reduce(
+      (acc, bucket) => {
+        acc[bucket] = items.filter((p) => getStockBucket(p.estoque) === bucket).length;
+        return acc;
+      },
+      {} as Record<StockBucket, number>
+    );
+    return { curva, total: items.length, buckets };
+  });
+  const curveSummaryTotal = curveStockSummary.reduce((sum, item) => sum + item.total, 0);
+  const focusedCurveSummary = curveStockSummary.find(({ curva }) => curva === focusedCurve) ?? curveStockSummary[0] ?? null;
 
   const displayVendas = hasStructuredFilters
     ? produtosFiltrados.reduce((s, p) => s + p.vendas, 0)
@@ -1485,12 +1521,41 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     ? produtosFiltrados.reduce((s, p) => s + p.qtde, 0)
     : data?.qtde ?? 0;
   const displayCMV = produtosFiltrados.reduce((s, p) => s + p.custo * p.qtde, 0);
-  const hasAnyDisplayFilter = hasStructuredFilters || filtrarSugeridos || selectedCurvas.size > 0;
-  const displayedCountLabel = selectedCurvas.size > 0
+  const hasAnyDisplayFilter =
+    hasStructuredFilters ||
+    filtrarSugeridos ||
+    selectedCurvas.size > 0 ||
+    selectedStockBuckets.size > 0;
+  const displayedCountLabel = filteredCurve
     ? `${Array.from(selectedCurvas).join(", ")} ${porCor ? "itens exibidos" : "produtos exibidos"}`
     : porCor
       ? "ITENS (PROD. + COR)"
       : "PRODUTOS ÚNICOS";
+
+  const handleCurveCardClick = (curva: Curva) => {
+    if (filteredCurve && filteredCurve !== curva) {
+      setSelectedCurvas(new Set());
+      setSelectedStockBuckets(new Set());
+    }
+    setFocusedCurve(curva);
+  };
+
+  const handleCurveStockShortcutClick = (curva: Curva, bucket: StockBucket) => {
+    const isOnlyShortcutActive =
+      selectedCurvas.size === 1 &&
+      selectedCurvas.has(curva) &&
+      selectedStockBuckets.size === 1 &&
+      selectedStockBuckets.has(bucket);
+
+    if (isOnlyShortcutActive) {
+      setSelectedCurvas(new Set());
+      setSelectedStockBuckets(new Set());
+      return;
+    }
+
+    setSelectedCurvas(new Set([curva]));
+    setSelectedStockBuckets(new Set([bucket]));
+  };
 
   useEffect(() => {
     setCompraMetrics({});
@@ -2121,27 +2186,94 @@ const handleBadgeClick = (cat: string) => {
           {/* ABC Summary */}
           {produtosComCurva.length > 0 && (
             <div className={styles.summaryCard}>
-              <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>{displayedCountLabel}</span>
-                <span className={styles.summaryValueNeutral}>{produtosComCurvaExibidos.length}</span>
+              <div className={styles.summaryIntro}>
+                <div className={styles.summaryItem}>
+                  <span className={styles.summaryLabel}>{displayedCountLabel}</span>
+                  <span className={styles.summaryValueNeutral}>{produtosComCurvaExibidos.length}</span>
+                </div>
               </div>
-              <div className={styles.summaryDivider} />
-              <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Curva A</span>
-                <span className={`${styles.summaryValueSmall} ${styles.textA}`}>{countA} produtos</span>
+              <div className={styles.summaryCurvesGrid}>
+                {curveStockSummary.map(({ curva, total, buckets }) => {
+                  const isCardActive = focusedCurve === curva;
+                  const isCardMuted = focusedCurve !== curva;
+                  const sharePct = curveSummaryTotal > 0 ? Math.round((total / curveSummaryTotal) * 100) : 0;
+                  const bucketTotal = STOCK_BUCKET_ORDER.reduce((sum, bucket) => sum + buckets[bucket], 0);
+                  const stockMiniBarTitle = STOCK_BUCKET_ORDER
+                    .map((bucket) => `${STOCK_BUCKET_LABEL[bucket]}: ${buckets[bucket]}`)
+                    .join(" | ");
+                  return (
+                    <div
+                      key={curva}
+                      className={`${styles.summaryCurveCard} ${isCardActive ? styles.summaryCurveCardActive : ""} ${isCardMuted ? styles.summaryCurveCardMuted : ""}`}
+                    >
+                      <button
+                        type="button"
+                        className={`${styles.curvaFilterCard} ${isCardActive ? styles.curvaFilterCardActive : ""}`}
+                        onClick={() => handleCurveCardClick(curva)}
+                        title={`Exibir detalhes da Curva ${curva}`}
+                      >
+                        <div className={styles.curveCardTopline}>
+                          <span className={styles.summaryLabel}>Curva {curva}</span>
+                          <span className={styles.curveCardPct}>{sharePct}%</span>
+                        </div>
+                        <div className={styles.curveCardHeadline}>
+                          <span className={`${styles.summaryValueSmall} ${styles[`text${curva}`]}`}>{total}</span>
+                          <span className={styles.curveCardUnit}>produtos</span>
+                        </div>
+                        <div className={styles.stockMiniBar} title={stockMiniBarTitle}>
+                          {STOCK_BUCKET_ORDER.map((bucket) => {
+                            return (
+                              <span
+                                key={`${curva}-${bucket}`}
+                                className={`${styles.stockMiniSegment} ${styles[`stockMiniSegment${bucket}`]}`}
+                                style={{
+                                  flexGrow: bucketTotal > 0 ? buckets[bucket] : 0,
+                                  minWidth: bucketTotal > 0 && buckets[bucket] > 0 ? 6 : 0,
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-              <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Curva B</span>
-                <span className={`${styles.summaryValueSmall} ${styles.textB}`}>{countB} produtos</span>
-              </div>
-              <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Curva C</span>
-                <span className={`${styles.summaryValueSmall} ${styles.textC}`}>{countC} produtos</span>
-              </div>
+              {focusedCurveSummary && (
+                <div className={styles.curveDetailPanel}>
+                  <div className={styles.curveDetailHeader}>
+                    <span className={styles.summaryLabel}>Estoque da Curva {focusedCurveSummary.curva}</span>
+                  </div>
+                  <div className={styles.stockShortcutList}>
+                    {STOCK_BUCKET_ORDER.map((bucket) => {
+                      const isShortcutActive =
+                        selectedCurvas.size === 1 &&
+                        selectedCurvas.has(focusedCurveSummary.curva) &&
+                        selectedStockBuckets.size === 1 &&
+                        selectedStockBuckets.has(bucket);
+                      return (
+                        <button
+                          key={`${focusedCurveSummary.curva}-${bucket}`}
+                          type="button"
+                          className={`${styles.stockShortcutBtn} ${isShortcutActive ? styles.stockShortcutBtnActive : ""}`}
+                          onClick={() => handleCurveStockShortcutClick(focusedCurveSummary.curva, bucket)}
+                          title={`Filtrar Curva ${focusedCurveSummary.curva} com ${STOCK_BUCKET_LABEL[bucket]}`}
+                        >
+                          <span
+                            className={`${styles.stockShortcutDot} ${styles[`stockShortcutDot${bucket}`]}`}
+                            aria-hidden
+                          />
+                          <span className={styles.stockShortcutLabel}>{STOCK_BUCKET_LABEL[bucket]}</span>
+                          <span className={styles.stockShortcutValue}>{focusedCurveSummary.buckets[bucket]}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {activeFilterLabels.length > 0 && (
                 <>
-                  <div className={styles.summaryDivider} />
-                  <div className={styles.summaryItem}>
+                  <div className={styles.summaryFilters}>
                     <span className={styles.summaryLabel}>Filtros ativos</span>
                     <div className={styles.activeFilterBadges}>
                       {activeFilterLabels.map((label) => (
@@ -2221,29 +2353,13 @@ const handleBadgeClick = (cat: string) => {
               />
               Sugeridos
             </label>
-            {(["A", "B", "C"] as const).map((curva) => (
-              <label key={curva} className={styles.filtroToggle}>
-                <input
-                  type="checkbox"
-                  checked={selectedCurvas.has(curva)}
-                  onChange={(e) => {
-                    setSelectedCurvas((prev) => {
-                      const next = new Set(prev);
-                      if (e.target.checked) next.add(curva);
-                      else next.delete(curva);
-                      return next;
-                    });
-                  }}
-                />
-                <span className={`${styles.abcBadgeMini} ${styles[`abcBadge${curva}`]}`}>{curva}</span>
-              </label>
-            ))}
-            {(selectedCurvas.size > 0 || filtrarSugeridos) && (
+            {(selectedCurvas.size > 0 || selectedStockBuckets.size > 0 || filtrarSugeridos) && (
               <button
                 type="button"
                 className={styles.filtroClearBtn}
                 onClick={() => {
                   setSelectedCurvas(new Set());
+                  setSelectedStockBuckets(new Set());
                   setFiltrarSugeridos(false);
                 }}
               >
