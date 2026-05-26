@@ -78,7 +78,14 @@
       "Bash(NODE_PATH=node_modules node --require @swc-node/register/esm tmp/test-po-candidatos.ts)",
       "Bash(echo \"\")",
       "Bash(echo 'THROW_ERROR_LINE_RESTORED')",
-      "Bash(printf 'throw new Error\\(\\\\n  \"This module cannot be imported from a Client Component module. \" +\\\\n    \"It should only be used from a Server Component.\"\\\\n\\);\\\\n')"
+      "Bash(printf 'throw new Error\\(\\\\n  \"This module cannot be imported from a Client Component module. \" +\\\\n    \"It should only be used from a Server Component.\"\\\\n\\);\\\\n')",
+      "Bash(git submodule *)",
+      "Bash(git -C .claude/worktrees/agent-a02d4fdff315e55e3 status)",
+      "Bash(git -C .claude/worktrees/agent-a02d4fdff315e55e3 log --oneline -5)",
+      "Bash(git -C .claude/worktrees/agent-a02d4fdff315e55e3 diff .claude/settings.local.json)",
+      "Bash(git -C .claude/worktrees/agent-a02d4fdff315e55e3 restore .claude/settings.local.json)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
