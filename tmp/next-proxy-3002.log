@@ -1,0 +1,12 @@
+
+> multi-dashboard@0.1.0 dev
+> next dev --port 3002
+
+   ▲ Next.js 16.0.10 (Turbopack)
+   - Local:         http://localhost:3002
+   - Network:       http://100.98.16.102:3002
+   - Environments: .env.local
+
+ ✓ Starting...
+   Suggestion: If you intended to restart next dev, terminate the other process, and then try again.
+[?25h

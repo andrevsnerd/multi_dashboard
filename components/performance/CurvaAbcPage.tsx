@@ -1153,6 +1153,12 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     transitTotal?: number;
     transitDates?: string[];
   }>(null);
+  const clearAllTooltips = () => {
+    setSugestaoTooltip(null);
+    setSugestaoSTooltip(null);
+    setSugestaoETooltip(null);
+    setSugestaoPOTooltip(null);
+  };
   const exportMenuRef = useRef<HTMLDivElement | null>(null);
   const captureRef = useRef<HTMLDivElement | null>(null);
 
@@ -2641,10 +2647,16 @@ const handleBadgeClick = (cat: string) => {
                                         perFilialSummary.topType === "COMPRA" || perFilialSummary.topType === "PO"
                                           ? null
                                           : perFilialSummary.topType;
+                                      const topSRow = topTypeLabel === "S"
+                                        ? perFilialSummary.rows.filter(r => r.baseType === "S").sort((a, b) => b.qty - a.qty)[0] ?? null
+                                        : null;
+                                      const topERow = topTypeLabel === "E"
+                                        ? perFilialSummary.rows.filter(r => r.baseType === "E").sort((a, b) => b.qty - a.qty)[0] ?? null
+                                        : null;
                                       return (
                                         <span
                                           className={styles.reporAdd}
-                                          onMouseEnter={(e) => setSugestaoTooltip({
+                                          onMouseEnter={(e) => { clearAllTooltips(); setSugestaoTooltip({
                                             x: e.clientX,
                                             y: e.clientY,
                                             titulo: "Sugestão de reposição (soma por filial)",
@@ -2661,7 +2673,7 @@ const handleBadgeClick = (cat: string) => {
                                             distribuicaoLabel: "Por loja (cálculo individual)",
                                             transitTotal: transit.totalTransit || undefined,
                                             transitDates,
-                                          })}
+                                          }); }}
                                           onMouseLeave={() => setSugestaoTooltip(null)}
                                         >
                                           {fmt(transit.qty)}
@@ -2683,6 +2695,43 @@ const handleBadgeClick = (cat: string) => {
                                                 verticalAlign: "middle",
                                                 cursor: "help",
                                               }}
+                                              onMouseEnter={(e) => {
+                                                clearAllTooltips();
+                                                if (topTypeLabel === "S" && topSRow) {
+                                                  setSugestaoSTooltip({
+                                                    x: e.clientX,
+                                                    y: e.clientY,
+                                                    qtde12m: topSRow.qtde12m,
+                                                    diasComEstoquePositivo: topSRow.diasComEstoquePositivo,
+                                                    mesesDisponiveis: topSRow.mesesDisponiveis,
+                                                    velocidadeAjustada: topSRow.velocidadeAjustada,
+                                                    estoqueAtual: topSRow.estoqueAtual,
+                                                    limiteDias,
+                                                    qtdS: topSRow.qty,
+                                                    baseQty: topSRow.qty,
+                                                    distribuicao: perFilialSummary.distribuicao,
+                                                    transitTotal: transit.totalTransit || undefined,
+                                                    transitDates,
+                                                  });
+                                                } else if (topTypeLabel === "E" && topERow) {
+                                                  setSugestaoETooltip({
+                                                    x: e.clientX,
+                                                    y: e.clientY,
+                                                    qtde12m: topERow.qtde12m,
+                                                    diasComEstoquePositivo: topERow.diasComEstoquePositivo,
+                                                    diasSemEstoque: topERow.diasSemEstoque,
+                                                    mesesDisponiveis: topERow.mesesDisponiveis,
+                                                    velocidadeAjustada: topERow.velocidadeAjustada,
+                                                    limiteDias,
+                                                    qtdE: topERow.qty,
+                                                    baseQty: topERow.qty,
+                                                    distribuicao: perFilialSummary.distribuicao,
+                                                    transitTotal: transit.totalTransit || undefined,
+                                                    transitDates,
+                                                  });
+                                                }
+                                              }}
+                                              onMouseLeave={() => { setSugestaoSTooltip(null); setSugestaoETooltip(null); }}
                                             >
                                               {topTypeLabel}
                                             </span>
@@ -2691,9 +2740,7 @@ const handleBadgeClick = (cat: string) => {
                                             <span
                                               style={{ marginLeft: 6, display: "inline-flex", padding: "0 5px", height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#14532d", background: "#86efac", border: "1px solid #22c55e", verticalAlign: "middle", cursor: "help" }}
                                               onMouseEnter={(e) => {
-                                                setSugestaoTooltip(null);
-                                                setSugestaoSTooltip(null);
-                                                setSugestaoETooltip(null);
+                                                clearAllTooltips();
                                                 setSugestaoPOTooltip({
                                                   x: e.clientX,
                                                   y: e.clientY,
@@ -2809,7 +2856,7 @@ const handleBadgeClick = (cat: string) => {
                                       return (
                                         <span
                                           className={styles.reporAdd}
-                                          onMouseEnter={(e) => setSugestaoTooltip({
+                                          onMouseEnter={(e) => { clearAllTooltips(); setSugestaoTooltip({
                                             x: e.clientX,
                                             y: e.clientY,
                                             titulo: blendAplicado
@@ -2837,7 +2884,7 @@ const handleBadgeClick = (cat: string) => {
                                             historicoVelocidadeAjustada,
                                             transitTotal: transit.totalTransit || undefined,
                                             transitDates,
-                                          })}
+                                          }); }}
                                           onMouseLeave={() => setSugestaoTooltip(null)}
                                         >
                                           {fmt(transit.qty)}
@@ -2846,9 +2893,7 @@ const handleBadgeClick = (cat: string) => {
                                             <span
                                               style={{ marginLeft: 6, display: "inline-flex", padding: "0 5px", height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#14532d", background: "#86efac", border: "1px solid #22c55e", verticalAlign: "middle", cursor: "help" }}
                                               onMouseEnter={(e) => {
-                                                setSugestaoTooltip(null);
-                                                setSugestaoSTooltip(null);
-                                                setSugestaoETooltip(null);
+                                                clearAllTooltips();
                                                 {
                                                   const ds = sugestao.poData?.diasSemEstoque ?? Number(compraItem.diasSemEstoque ?? 0);
                                                   setSugestaoPOTooltip({
@@ -2883,7 +2928,7 @@ const handleBadgeClick = (cat: string) => {
                                         <span className={styles.reporAdd}>
                                           {fmt(transit.qty)}{" "}
                                           <span
-                                            onMouseEnter={(e) => setSugestaoSTooltip({
+                                            onMouseEnter={(e) => { clearAllTooltips(); setSugestaoSTooltip({
                                               x: e.clientX,
                                               y: e.clientY,
                                               qtde12m: Number(compraItem.qtde12m ?? 0),
@@ -2898,7 +2943,7 @@ const handleBadgeClick = (cat: string) => {
                                               distribuicao: partesDestinoCompraFinal(transit.qty, live?.vendasPorFilial ?? [], companyKey, live?.estoquePorFilial ?? undefined, limiteDias) ?? undefined,
                                               transitTotal: transit.totalTransit || undefined,
                                               transitDates,
-                                            })}
+                                            }); }}
                                             onMouseLeave={() => setSugestaoSTooltip(null)}
                                             style={{
                                               display: "inline-flex",
@@ -2922,9 +2967,7 @@ const handleBadgeClick = (cat: string) => {
                                             <span
                                               style={{ marginLeft: 6, display: "inline-flex", padding: "0 5px", height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#14532d", background: "#86efac", border: "1px solid #22c55e", verticalAlign: "middle", cursor: "help" }}
                                               onMouseEnter={(e) => {
-                                                setSugestaoTooltip(null);
-                                                setSugestaoSTooltip(null);
-                                                setSugestaoETooltip(null);
+                                                clearAllTooltips();
                                                 setSugestaoPOTooltip({ x: e.clientX, y: e.clientY, qtde12m: Number(compraItem.qtde12m ?? 0), diasComEstoquePositivo: sugestao.poData!.diasComEstoquePositivo, diasSemEstoque: sugestao.poData!.diasSemEstoque, velocidadeAjustada: sugestao.poData!.velocidadeAjustada, limiteSeguro: sugestao.poData!.limiteSeguro, qtdPO: transit.qty, periodoRef: getPeriodoRef(sugestao.poData!.diasSemEstoque, sugestao.poData!.diasComEstoquePositivo), transitTotal: transit.totalTransit || undefined, transitDates });
                                               }}
                                               onMouseLeave={() => setSugestaoPOTooltip(null)}
@@ -2945,7 +2988,7 @@ const handleBadgeClick = (cat: string) => {
                                         <span className={styles.reporAdd}>
                                           {fmt(transit.qty)}{" "}
                                           <span
-                                            onMouseEnter={(e) => eInfo && setSugestaoETooltip({
+                                            onMouseEnter={(e) => { clearAllTooltips(); eInfo && setSugestaoETooltip({
                                               x: e.clientX,
                                               y: e.clientY,
                                               qtde12m: Number(compraItem.qtde12m ?? 0),
@@ -2960,7 +3003,7 @@ const handleBadgeClick = (cat: string) => {
                                               distribuicao: partesDestinoCompraFinal(transit.qty, live?.vendasPorFilial ?? [], companyKey, live?.estoquePorFilial ?? undefined, limiteDias) ?? undefined,
                                               transitTotal: transit.totalTransit || undefined,
                                               transitDates,
-                                            })}
+                                            }); }}
                                             onMouseLeave={() => setSugestaoETooltip(null)}
                                             style={{
                                               display: "inline-flex",
@@ -2984,9 +3027,7 @@ const handleBadgeClick = (cat: string) => {
                                             <span
                                               style={{ marginLeft: 6, display: "inline-flex", padding: "0 5px", height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#14532d", background: "#86efac", border: "1px solid #22c55e", verticalAlign: "middle", cursor: "help" }}
                                               onMouseEnter={(e) => {
-                                                setSugestaoTooltip(null);
-                                                setSugestaoSTooltip(null);
-                                                setSugestaoETooltip(null);
+                                                clearAllTooltips();
                                                 setSugestaoPOTooltip({ x: e.clientX, y: e.clientY, qtde12m: Number(compraItem.qtde12m ?? 0), diasComEstoquePositivo: sugestao.poData!.diasComEstoquePositivo, diasSemEstoque: sugestao.poData!.diasSemEstoque, velocidadeAjustada: sugestao.poData!.velocidadeAjustada, limiteSeguro: sugestao.poData!.limiteSeguro, qtdPO: transit.qty, periodoRef: getPeriodoRef(sugestao.poData!.diasSemEstoque, sugestao.poData!.diasComEstoquePositivo), transitTotal: transit.totalTransit || undefined, transitDates });
                                               }}
                                               onMouseLeave={() => setSugestaoPOTooltip(null)}
@@ -3007,7 +3048,7 @@ const handleBadgeClick = (cat: string) => {
                                       return (
                                         <span
                                           className={styles.reporAdd}
-                                          onMouseEnter={(e) => setSugestaoTooltip({
+                                          onMouseEnter={(e) => { clearAllTooltips(); setSugestaoTooltip({
                                             x: e.clientX,
                                             y: e.clientY,
                                             titulo: baseType === "PO" ? "Potencial oculto (PO)" : "Necessidade minima (NM)",
@@ -3025,7 +3066,7 @@ const handleBadgeClick = (cat: string) => {
                                             distribuicao: partesDestinoCompraFinal(transit.qty, live?.vendasPorFilial ?? [], companyKey, live?.estoquePorFilial ?? undefined, limiteDias) ?? undefined,
                                             transitTotal: transit.totalTransit || undefined,
                                             transitDates,
-                                          })}
+                                          }); }}
                                           onMouseLeave={() => setSugestaoTooltip(null)}
                                         >
                                           {fmt(transit.qty)}{" "}
@@ -3057,7 +3098,7 @@ const handleBadgeClick = (cat: string) => {
                                         return (
                                           <span
                                             className={styles.reporOk}
-                                            onMouseEnter={(e) => setSugestaoTooltip({
+                                            onMouseEnter={(e) => { clearAllTooltips(); setSugestaoTooltip({
                                               x: e.clientX,
                                               y: e.clientY,
                                               titulo: "Em trânsito",
@@ -3071,7 +3112,7 @@ const handleBadgeClick = (cat: string) => {
                                               qtdCalculada: 0,
                                               transitTotal: transit.totalTransit || undefined,
                                               transitDates,
-                                            })}
+                                            }); }}
                                             onMouseLeave={() => setSugestaoTooltip(null)}
                                           >
                                             {transitBadge}
@@ -3087,7 +3128,7 @@ const handleBadgeClick = (cat: string) => {
                                     return (
                                       <span
                                         className={styles.reporOk}
-                                        onMouseEnter={(e) => setSugestaoTooltip({
+                                        onMouseEnter={(e) => { clearAllTooltips(); setSugestaoTooltip({
                                           x: e.clientX,
                                           y: e.clientY,
                                           titulo: "Quantidade suficiente",
@@ -3103,7 +3144,7 @@ const handleBadgeClick = (cat: string) => {
                                           qtdCalculada: 0,
                                           transitTotal: transit.totalTransit || undefined,
                                           transitDates,
-                                        })}
+                                        }); }}
                                         onMouseLeave={() => setSugestaoTooltip(null)}
                                       >
                                         Quantidade suficiente{transitBadge}
@@ -3127,6 +3168,11 @@ const handleBadgeClick = (cat: string) => {
       {sugestaoTooltip && (
         <div className={styles.metricTooltip} style={getTooltipViewportPosition(sugestaoTooltip.x, sugestaoTooltip.y)}>
           <div className={styles.metricTooltipTitle}>{sugestaoTooltip.titulo}: {fmt(sugestaoTooltip.qtdCalculada)} un</div>
+          <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
+            {sugestaoTooltip.blendAplicado
+              ? "Mês atual fraco. Misturou consumo do mês com histórico."
+              : "Estoque abaixo do alvo de cobertura."}
+          </div>
           <div className={styles.metricTooltipDivider} />
           <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
             <span>Estoque</span><span><strong>{fmt(sugestaoTooltip.estoqueAtual)} un</strong></span>
@@ -3200,13 +3246,12 @@ const handleBadgeClick = (cat: string) => {
       {sugestaoSTooltip && (
         <div className={styles.metricTooltip} style={getTooltipViewportPosition(sugestaoSTooltip.x, sugestaoSTooltip.y)}>
           <div className={styles.metricTooltipTitle}>S → {fmt(sugestaoSTooltip.qtdS)} un</div>
-          <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>Velocidade calculada só nos dias em que havia estoque</div>
+          <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
+            Produto sem estoque. Velocidade calculada nos dias com venda disponível.
+          </div>
           <div className={styles.metricTooltipDivider} />
           <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
             <span>Velocidade</span><span><strong>{sugestaoSTooltip.velocidadeAjustada.toFixed(1)} un/mês</strong></span>
-          </div>
-          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-            <span style={{ fontSize: 11, color: "#64748b" }}>Base</span><span style={{ fontSize: 11 }}>{fmt(sugestaoSTooltip.qtde12m)} un em {fmt(sugestaoSTooltip.diasComEstoquePositivo)} dias c/ estoque</span>
           </div>
           <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
             <span>Estoque</span><span><strong>{fmt(sugestaoSTooltip.estoqueAtual)} un</strong></span>
@@ -3218,18 +3263,11 @@ const handleBadgeClick = (cat: string) => {
             <>
               <div className={styles.metricTooltipDivider} />
               <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Por loja (proporcional)</div>
-              {(() => {
-                const totalVendas = sugestaoSTooltip.distribuicao.reduce((s, f) => s + (f.qtde12m ?? 0), 0);
-                return sugestaoSTooltip.distribuicao.map((f) => (
-                  <div key={f.label} className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-                    <span>{f.label}</span>
-                    <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      {totalVendas > 0 && <span style={{ fontSize: 11, color: "#64748b" }}>[{f.qtde12m ?? 0}/{totalVendas}]</span>}
-                      <strong>{fmt(f.qtd)} un</strong>
-                    </span>
-                  </div>
-                ));
-              })()}
+              {sugestaoSTooltip.distribuicao.map((f) => (
+                <div key={f.label} className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                  <span>{f.label}</span><strong>{fmt(f.qtd)} un</strong>
+                </div>
+              ))}
             </>
           ) : null}
           {sugestaoSTooltip.transitTotal ? (
@@ -3248,16 +3286,12 @@ const handleBadgeClick = (cat: string) => {
       {sugestaoETooltip && (
         <div className={styles.metricTooltip} style={getTooltipViewportPosition(sugestaoETooltip.x, sugestaoETooltip.y)}>
           <div className={styles.metricTooltipTitle}>E → {fmt(sugestaoETooltip.qtdE)} un</div>
-          <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>Produto zerado — velocidade calculada nos dias em que tinha estoque</div>
+          <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
+            Produto zerado. Velocidade estimada do período com estoque disponível.
+          </div>
           <div className={styles.metricTooltipDivider} />
           <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
             <span>Velocidade</span><span><strong>{sugestaoETooltip.velocidadeAjustada.toFixed(1)} un/mês</strong></span>
-          </div>
-          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-            <span style={{ fontSize: 11, color: "#64748b" }}>Base</span><span style={{ fontSize: 11 }}>{fmt(sugestaoETooltip.qtde12m)} un em {fmt(sugestaoETooltip.diasComEstoquePositivo)} dias c/ estoque</span>
-          </div>
-          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-            <span style={{ fontSize: 11, color: "#64748b" }}>Sem estoque</span><span style={{ fontSize: 11 }}>{fmt(sugestaoETooltip.diasSemEstoque)} dias</span>
           </div>
           <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
             <span>Alvo</span><span>{sugestaoETooltip.limiteDias} dias</span>
@@ -3266,18 +3300,11 @@ const handleBadgeClick = (cat: string) => {
             <>
               <div className={styles.metricTooltipDivider} />
               <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Por loja (proporcional)</div>
-              {(() => {
-                const totalVendas = sugestaoETooltip.distribuicao.reduce((s, f) => s + (f.qtde12m ?? 0), 0);
-                return sugestaoETooltip.distribuicao.map((f) => (
-                  <div key={f.label} className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-                    <span>{f.label}</span>
-                    <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      {totalVendas > 0 && <span style={{ fontSize: 11, color: "#64748b" }}>[{f.qtde12m ?? 0}/{totalVendas}]</span>}
-                      <strong>{fmt(f.qtd)} un</strong>
-                    </span>
-                  </div>
-                ));
-              })()}
+              {sugestaoETooltip.distribuicao.map((f) => (
+                <div key={f.label} className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                  <span>{f.label}</span><strong>{fmt(f.qtd)} un</strong>
+                </div>
+              ))}
             </>
           ) : null}
           {sugestaoETooltip.transitTotal ? (

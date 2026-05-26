@@ -5772,6 +5772,7 @@ export async function fetchTopProdutosUltimos3Meses({
   produtos,
   qtdCompra,
   porCor = false,
+  includeHistorico = false,
   limit = 50,
   allowedFiliais,
 }: {
@@ -5786,6 +5787,7 @@ export async function fetchTopProdutosUltimos3Meses({
   produtos?: string[] | null;
   qtdCompra: number;
   porCor?: boolean;
+  includeHistorico?: boolean;
   limit?: number;
   allowedFiliais?: string[] | null;
 }): Promise<ProdutoVendaUltimos3Meses[]> {
@@ -6135,7 +6137,7 @@ export async function fetchTopProdutosUltimos3Meses({
     }));
 
     const historicoKeys = Array.from(new Set(rows.map((r) => makeHistoricoKey(r.produto, porCor ? r.cor : null))));
-    if (historicoKeys.length > 0) {
+    if (includeHistorico && historicoKeys.length > 0) {
       try {
         request.input('lcHistoricoKeysJson', sql.NVarChar(sql.MAX), JSON.stringify(historicoKeys));
         // No modo isProdutoLookup, vendasFilialFilter está vazio mas o histórico precisa de filial.
