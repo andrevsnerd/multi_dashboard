@@ -7068,7 +7068,7 @@ export async function fetchVendasProdutoPorFilial({
         const historico = buildHistoricoFilial(r.primeiraEntradaFilial, r.primeiraVendaFilial);
         const dataBaseHistorico = r.primeiraEntradaFilial ?? r.primeiraVendaFilial;
         const diasComEstoquePositivo = diasPositivosPorFilial.get(r.filial) ?? 0;
-        const diasSemEstoque = Math.max(0, 365 - diasComEstoquePositivo);
+        const diasSemEstoque = Math.max(0, historico.diasHistoricoFilial - diasComEstoquePositivo);
         const mesesDisponiveis = diasComEstoquePositivo > 0 ? diasComEstoquePositivo / 30 : 0;
         return {
           ...r,

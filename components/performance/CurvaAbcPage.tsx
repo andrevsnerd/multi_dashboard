@@ -208,6 +208,13 @@ function formatObservacaoPreview(value: string): string {
   return trimmed;
 }
 
+const MESES_PT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+function getPeriodoRef(diasSemEstoque: number, diasComEstoquePositivo: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - Math.round(diasSemEstoque + diasComEstoquePositivo / 2));
+  return `${MESES_PT[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`;
+}
+
 function getTooltipViewportPosition(x: number, y: number): { left: number; top: number } {
   const offset = 12;
   const tooltipWidth = 360;
@@ -669,7 +676,7 @@ function buildPerFilialCompraSummary(input: {
       const diasComEstoquePositivo = Math.max(0, Math.round(row.diasComEstoquePositivo));
       const mesesDisponiveis = diasComEstoquePositivo > 0 ? diasComEstoquePositivo / 30 : 0;
       const velocidadeAjustada = mesesDisponiveis > 0 ? row.qtde12m / mesesDisponiveis : 0;
-      const diasSemEstoque = Math.max(0, 365 - diasComEstoquePositivo);
+      const diasSemEstoque = Math.max(0, row.diasSemEstoque);
       const estoqueAtual = estoqueMap.get(row.filial) ?? 0;
       const sugestao = getReposicaoCompraView(
         {
@@ -1111,6 +1118,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     y: number;
     qtde12m?: number;
     filialLabel?: string;
+    periodoRef?: string;
     poRows?: Array<{
       filialLabel: string;
       qtde12m: number;
@@ -1119,6 +1127,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       velocidadeAjustada: number;
       limiteSeguro: number;
       qtdPO: number;
+      periodoRef: string;
     }>;
     diasComEstoquePositivo?: number;
     diasSemEstoque?: number;
@@ -2689,15 +2698,21 @@ const handleBadgeClick = (cat: string) => {
                                                   x: e.clientX,
                                                   y: e.clientY,
                                                   filialLabel: perFilialSummary.poRows.length === 1 ? poPrincipal.filial : undefined,
-                                                  poRows: perFilialSummary.poRows.map((row) => ({
-                                                    filialLabel: row.filial,
-                                                    qtde12m: row.qtde12m,
-                                                    diasComEstoquePositivo: row.poData?.diasComEstoquePositivo ?? row.diasComEstoquePositivo,
-                                                    diasSemEstoque: row.poData?.diasSemEstoque ?? row.diasSemEstoque,
-                                                    velocidadeAjustada: row.poData?.velocidadeAjustada ?? row.velocidadeAjustada,
-                                                    limiteSeguro: row.poData?.limiteSeguro ?? 0,
-                                                    qtdPO: row.qty,
-                                                  })),
+                                                  periodoRef: perFilialSummary.poRows.length === 1 ? getPeriodoRef(poPrincipal.poData?.diasSemEstoque ?? poPrincipal.diasSemEstoque, poPrincipal.poData?.diasComEstoquePositivo ?? poPrincipal.diasComEstoquePositivo) : undefined,
+                                                  poRows: perFilialSummary.poRows.map((row) => {
+                                                    const ds = row.poData?.diasSemEstoque ?? row.diasSemEstoque;
+                                                    const dc = row.poData?.diasComEstoquePositivo ?? row.diasComEstoquePositivo;
+                                                    return {
+                                                      filialLabel: row.filial,
+                                                      qtde12m: row.qtde12m,
+                                                      diasComEstoquePositivo: dc,
+                                                      diasSemEstoque: ds,
+                                                      velocidadeAjustada: row.poData?.velocidadeAjustada ?? row.velocidadeAjustada,
+                                                      limiteSeguro: row.poData?.limiteSeguro ?? 0,
+                                                      qtdPO: row.qty,
+                                                      periodoRef: getPeriodoRef(ds, dc),
+                                                    };
+                                                  }),
                                                   qtde12m: poPrincipal.qtde12m,
                                                   diasComEstoquePositivo: poPrincipal.poData?.diasComEstoquePositivo ?? poPrincipal.diasComEstoquePositivo,
                                                   diasSemEstoque: poPrincipal.poData?.diasSemEstoque ?? poPrincipal.diasSemEstoque,
@@ -2834,18 +2849,22 @@ const handleBadgeClick = (cat: string) => {
                                                 setSugestaoTooltip(null);
                                                 setSugestaoSTooltip(null);
                                                 setSugestaoETooltip(null);
-                                                setSugestaoPOTooltip({
-                                                  x: e.clientX,
-                                                  y: e.clientY,
-                                                  qtde12m: historicoQtde12m,
-                                                  diasComEstoquePositivo: sugestao.poData?.diasComEstoquePositivo ?? historicoDiasComEstoquePositivo,
-                                                  diasSemEstoque: sugestao.poData?.diasSemEstoque ?? Number(compraItem.diasSemEstoque ?? 0),
-                                                  velocidadeAjustada: sugestao.poData?.velocidadeAjustada ?? historicoVelocidadeAjustada,
-                                                  limiteSeguro: sugestao.poData?.limiteSeguro ?? 0,
-                                                  qtdPO: transit.qty,
-                                                  transitTotal: transit.totalTransit || undefined,
-                                                  transitDates,
-                                                });
+                                                {
+                                                  const ds = sugestao.poData?.diasSemEstoque ?? Number(compraItem.diasSemEstoque ?? 0);
+                                                  setSugestaoPOTooltip({
+                                                    x: e.clientX,
+                                                    y: e.clientY,
+                                                    qtde12m: historicoQtde12m,
+                                                    diasComEstoquePositivo: sugestao.poData?.diasComEstoquePositivo ?? historicoDiasComEstoquePositivo,
+                                                    diasSemEstoque: ds,
+                                                    velocidadeAjustada: sugestao.poData?.velocidadeAjustada ?? historicoVelocidadeAjustada,
+                                                    limiteSeguro: sugestao.poData?.limiteSeguro ?? 0,
+                                                    qtdPO: transit.qty,
+                                                    periodoRef: getPeriodoRef(ds, sugestao.poData?.diasComEstoquePositivo ?? historicoDiasComEstoquePositivo ?? 0),
+                                                    transitTotal: transit.totalTransit || undefined,
+                                                    transitDates,
+                                                  });
+                                                }
                                               }}
                                               onMouseLeave={() => setSugestaoPOTooltip(null)}
                                             >PO</span>
@@ -2906,7 +2925,7 @@ const handleBadgeClick = (cat: string) => {
                                                 setSugestaoTooltip(null);
                                                 setSugestaoSTooltip(null);
                                                 setSugestaoETooltip(null);
-                                                setSugestaoPOTooltip({ x: e.clientX, y: e.clientY, qtde12m: Number(compraItem.qtde12m ?? 0), diasComEstoquePositivo: sugestao.poData!.diasComEstoquePositivo, diasSemEstoque: sugestao.poData!.diasSemEstoque, velocidadeAjustada: sugestao.poData!.velocidadeAjustada, limiteSeguro: sugestao.poData!.limiteSeguro, qtdPO: transit.qty, transitTotal: transit.totalTransit || undefined, transitDates });
+                                                setSugestaoPOTooltip({ x: e.clientX, y: e.clientY, qtde12m: Number(compraItem.qtde12m ?? 0), diasComEstoquePositivo: sugestao.poData!.diasComEstoquePositivo, diasSemEstoque: sugestao.poData!.diasSemEstoque, velocidadeAjustada: sugestao.poData!.velocidadeAjustada, limiteSeguro: sugestao.poData!.limiteSeguro, qtdPO: transit.qty, periodoRef: getPeriodoRef(sugestao.poData!.diasSemEstoque, sugestao.poData!.diasComEstoquePositivo), transitTotal: transit.totalTransit || undefined, transitDates });
                                               }}
                                               onMouseLeave={() => setSugestaoPOTooltip(null)}
                                             >PO</span>
@@ -2968,7 +2987,7 @@ const handleBadgeClick = (cat: string) => {
                                                 setSugestaoTooltip(null);
                                                 setSugestaoSTooltip(null);
                                                 setSugestaoETooltip(null);
-                                                setSugestaoPOTooltip({ x: e.clientX, y: e.clientY, qtde12m: Number(compraItem.qtde12m ?? 0), diasComEstoquePositivo: sugestao.poData!.diasComEstoquePositivo, diasSemEstoque: sugestao.poData!.diasSemEstoque, velocidadeAjustada: sugestao.poData!.velocidadeAjustada, limiteSeguro: sugestao.poData!.limiteSeguro, qtdPO: transit.qty, transitTotal: transit.totalTransit || undefined, transitDates });
+                                                setSugestaoPOTooltip({ x: e.clientX, y: e.clientY, qtde12m: Number(compraItem.qtde12m ?? 0), diasComEstoquePositivo: sugestao.poData!.diasComEstoquePositivo, diasSemEstoque: sugestao.poData!.diasSemEstoque, velocidadeAjustada: sugestao.poData!.velocidadeAjustada, limiteSeguro: sugestao.poData!.limiteSeguro, qtdPO: transit.qty, periodoRef: getPeriodoRef(sugestao.poData!.diasSemEstoque, sugestao.poData!.diasComEstoquePositivo), transitTotal: transit.totalTransit || undefined, transitDates });
                                               }}
                                               onMouseLeave={() => setSugestaoPOTooltip(null)}
                                             >PO</span>
@@ -3108,9 +3127,6 @@ const handleBadgeClick = (cat: string) => {
       {sugestaoTooltip && (
         <div className={styles.metricTooltip} style={getTooltipViewportPosition(sugestaoTooltip.x, sugestaoTooltip.y)}>
           <div className={styles.metricTooltipTitle}>{sugestaoTooltip.titulo}: {fmt(sugestaoTooltip.qtdCalculada)} un</div>
-          {sugestaoTooltip.regra ? (
-            <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>{sugestaoTooltip.regra}</div>
-          ) : null}
           <div className={styles.metricTooltipDivider} />
           <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
             <span>Estoque</span><span><strong>{fmt(sugestaoTooltip.estoqueAtual)} un</strong></span>
@@ -3141,7 +3157,7 @@ const handleBadgeClick = (cat: string) => {
                     Base histórica: {fmt(sugestaoTooltip.historicoQtde12m)} vendas em {fmt(sugestaoTooltip.historicoDiasComEstoquePositivo)} dias com estoque
                   </div>
                   <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
-                    Projeção histórica: ~{Math.round(sugestaoTooltip.historicoVelocidadeAjustada)} un/mês
+                    Projeção histórica: {Math.round(sugestaoTooltip.historicoVelocidadeAjustada)} un/mês
                     {sugestaoTooltip.historicoMesesDisponiveis != null ? ` (${sugestaoTooltip.historicoMesesDisponiveis.toFixed(2)} meses disponíveis)` : ""}
                   </div>
                 </>
@@ -3279,40 +3295,32 @@ const handleBadgeClick = (cat: string) => {
       )}
       {sugestaoPOTooltip && (
         <div className={styles.metricTooltip} style={getTooltipViewportPosition(sugestaoPOTooltip.x, sugestaoPOTooltip.y)}>
-          <div className={styles.metricTooltipTitle} style={{ color: "#86efac" }}>
+          <div className={styles.metricTooltipTitle} style={{ color: "#059669" }}>
             {(sugestaoPOTooltip.limiteSeguro ?? 0) > 0 ? "Potencial Oculto (PO)" : "Histórico Curto (PO)"}
           </div>
+          {(sugestaoPOTooltip.limiteSeguro ?? 0) > 0 && (
+            <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
+              Vendeu bem em período curto e ficou sem estoque.
+            </div>
+          )}
           {sugestaoPOTooltip.poRows && sugestaoPOTooltip.poRows.length > 1 ? (
             <>
-              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
-                Mais de uma loja entrou por PO neste item. Abaixo está o detalhe de cada uma:
-              </div>
-              <div className={styles.metricTooltipDivider} />
               {sugestaoPOTooltip.poRows.map((row, index) => (
                 <React.Fragment key={`${row.filialLabel}-${index}`}>
-                  <div className={styles.metricTooltipLine} style={{ color: "#86efac" }}>
-                    <strong>{row.filialLabel}</strong>
+                  <div className={styles.metricTooltipLine}>
+                    <strong style={{ color: "#047857" }}>{row.filialLabel}</strong>
+                    {row.periodoRef && <span style={{ color: "#64748b", fontWeight: 400 }}> ({row.periodoRef})</span>}
+                    <span style={{ color: "#94a3b8" }}> | </span>
+                    <span>Sugestão: <strong>{row.qtdPO} un</strong></span>
                   </div>
-                  <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-                    <span>Vendas</span><span><strong>{row.qtde12m} un</strong> em <strong>{Math.round(row.diasComEstoquePositivo)} dias</strong> c/ estoque</span>
-                  </div>
-                  <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-                    <span>Projeção</span><span style={{ color: "#86efac" }}><strong>~{row.velocidadeAjustada.toFixed(0)} un/mês</strong></span>
-                  </div>
-                  <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
-                    = {row.qtde12m} un ÷ {(row.diasComEstoquePositivo / 30).toFixed(2)} meses disponíveis
+                  <div className={styles.metricTooltipLine} style={{ fontSize: 11 }}>
+                    Vendas: {row.qtde12m} un em {Math.round(row.diasComEstoquePositivo)} dias c/ estoque
+                    <span style={{ color: "#94a3b8" }}> | </span>
+                    <strong>{row.velocidadeAjustada.toFixed(0)} un/mês</strong>
                   </div>
                   {row.diasSemEstoque > 0 ? (
                     <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
-                      {row.diasSemEstoque} dias sem estoque no período
-                    </div>
-                  ) : null}
-                  <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-                    <span>Sugestão</span><span><strong>{row.qtdPO} un</strong></span>
-                  </div>
-                  {row.limiteSeguro > 0 ? (
-                    <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
-                      trava de segurança: máx. {row.limiteSeguro} un
+                      {Math.round(row.diasSemEstoque)} dias sem estoque
                     </div>
                   ) : null}
                   {index < sugestaoPOTooltip.poRows!.length - 1 ? <div className={styles.metricTooltipDivider} /> : null}
@@ -3321,44 +3329,34 @@ const handleBadgeClick = (cat: string) => {
             </>
           ) : (
             <>
-          {sugestaoPOTooltip.filialLabel ? (
-            <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
-              Loja: <strong>{sugestaoPOTooltip.filialLabel}</strong>
-            </div>
-          ) : null}
-          <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
-            {(sugestaoPOTooltip.limiteSeguro ?? 0) > 0
-              ? "Vendeu rápido no curto período em que tinha estoque"
-              : "Velocidade extrapolada de histórico curto — use com cautela"}
-          </div>
-          <div className={styles.metricTooltipDivider} />
-          {sugestaoPOTooltip.qtde12m != null && sugestaoPOTooltip.diasComEstoquePositivo != null ? (
-            <>
-              <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-                <span>Vendas</span><span><strong>{sugestaoPOTooltip.qtde12m} un</strong> em <strong>{Math.round(sugestaoPOTooltip.diasComEstoquePositivo)} dias</strong> c/ estoque</span>
-              </div>
-              <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-                <span>Projeção</span><span style={{ color: "#86efac" }}><strong>~{sugestaoPOTooltip.velocidadeAjustada?.toFixed(0)} un/mês</strong></span>
-              </div>
-              <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
-                = {sugestaoPOTooltip.qtde12m} un ÷ {((sugestaoPOTooltip.diasComEstoquePositivo ?? 0) / 30).toFixed(2)} meses disponíveis
-              </div>
-              {(sugestaoPOTooltip.diasSemEstoque ?? 0) > 0 && (
-                <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
-                  {sugestaoPOTooltip.diasSemEstoque} dias sem estoque no período
+              {sugestaoPOTooltip.filialLabel ? (
+                <div className={styles.metricTooltipLine}>
+                  <strong style={{ color: "#047857" }}>{sugestaoPOTooltip.filialLabel}</strong>
+                  {sugestaoPOTooltip.periodoRef && <span style={{ color: "#64748b", fontWeight: 400 }}> ({sugestaoPOTooltip.periodoRef})</span>}
+                  {sugestaoPOTooltip.qtdPO != null && (
+                    <>
+                      <span style={{ color: "#94a3b8" }}> | </span>
+                      <span>Sugestão: <strong>{sugestaoPOTooltip.qtdPO} un</strong></span>
+                    </>
+                  )}
+                </div>
+              ) : null}
+              {sugestaoPOTooltip.qtde12m != null && sugestaoPOTooltip.diasComEstoquePositivo != null && (
+                <div className={styles.metricTooltipLine} style={{ fontSize: 11 }}>
+                  Vendas: {sugestaoPOTooltip.qtde12m} un em {Math.round(sugestaoPOTooltip.diasComEstoquePositivo)} dias c/ estoque
+                  {sugestaoPOTooltip.velocidadeAjustada != null && (
+                    <>
+                      <span style={{ color: "#94a3b8" }}> | </span>
+                      <strong>{sugestaoPOTooltip.velocidadeAjustada.toFixed(0)} un/mês</strong>
+                    </>
+                  )}
                 </div>
               )}
-              <div className={styles.metricTooltipDivider} />
-            </>
-          ) : <div className={styles.metricTooltipDivider} />}
-          <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-            <span>Sugestão</span><span><strong>{sugestaoPOTooltip.qtdPO} un</strong></span>
-          </div>
-          {sugestaoPOTooltip.limiteSeguro != null && sugestaoPOTooltip.limiteSeguro > 0 && (
-            <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
-              trava de segurança: máx. {sugestaoPOTooltip.limiteSeguro} un (histórico curto)
-            </div>
-          )}
+              {(sugestaoPOTooltip.diasSemEstoque ?? 0) > 0 && (
+                <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b" }}>
+                  {Math.round(sugestaoPOTooltip.diasSemEstoque ?? 0)} dias sem estoque
+                </div>
+              )}
             </>
           )}
           {sugestaoPOTooltip.transitTotal ? (
