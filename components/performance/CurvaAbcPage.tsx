@@ -2370,20 +2370,21 @@ const handleBadgeClick = (cat: string) => {
                 const comparisonValuesTitle = categoryComparisonValues
                   ? `Atual: ${fmtCurrency(categoryComparisonValues.current)} | Anterior: ${categoryComparisonValues.previous !== null ? fmtCurrency(categoryComparisonValues.previous) : "—"}`
                   : "Atual: — | Anterior: —";
+                const deltaClass = delta === null
+                  ? styles.catDeltaNeutral
+                  : delta >= 0 ? styles.catDeltaUp : styles.catDeltaDown;
                 return (
                   <button
                     key={cat}
                     type="button"
-                    className={`${styles.catPill} ${catPillTrendClass} ${isInactive ? styles.catPillInactive : ""}`}
+                    className={`${styles.catPill} ${isActive ? styles.catPillActive : ""} ${isInactive ? styles.catPillInactive : ""}`}
                     title={`${baseTitle} | Variação vs ${comparisonLabel} | ${comparisonValuesTitle}`}
                     onClick={() => handleBadgeClick(cat)}
                   >
-                    {getCategoryHeaderLabel(cat)} {delta !== null ? formatCompactSignedPctForBadge(delta) : "—"}
-                    {delta !== null && !isActive && (
-                      <span className={delta >= 0 ? styles.catArrowUp : styles.catArrowDown}>
-                        {delta >= 0 ? " ↑" : " ↓"}
-                      </span>
-                    )}
+                    {getCategoryHeaderLabel(cat)}{" "}
+                    <span className={deltaClass}>
+                      {delta !== null ? formatCompactSignedPctForBadge(delta) : "—"}
+                    </span>
                   </button>
                 );
               })}
@@ -2452,7 +2453,7 @@ const handleBadgeClick = (cat: string) => {
                           return (
                             <tr
                               key={`${p.produto}-${p.categoria}-${p.cor ?? ""}-${p.grade ?? ""}`}
-                              className={curva !== "A" ? styles.rowDimmed : ""}
+                              className=""
                             >
                               <td>
                                 <span className={`${styles.rank} ${i < 3 && curva === "A" ? styles.top : ""}`}>
