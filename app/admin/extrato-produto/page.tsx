@@ -713,7 +713,6 @@ export default function ExtratoPage() {
                   <th style={{ ...th, color: "#22d3ee" }}>Saldo</th>
                   <th style={th}>Preço</th>
                   <th style={th}>Status Trânsito</th>
-                  <th style={th}>Atualizou Est.</th>
                   <th style={th}>OBS</th>
                 </tr>
               </thead>
@@ -770,13 +769,6 @@ export default function ExtratoPage() {
                           ? STATUS_TRANSITO[l.statusTransito] ?? l.statusTransito
                           : "—"}
                       </td>
-                      <td style={{ ...td, textAlign: "center" }}>
-                        {l.atualizouEstoque == null
-                          ? "—"
-                          : l.atualizouEstoque
-                          ? <span style={{ color: "#22c55e" }}>✓</span>
-                          : <span style={{ color: "#ef4444" }}>✗</span>}
-                      </td>
                       <td style={{ ...td, color: "#64748b", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                           title={l.obs ?? undefined}>
                         {l.obs ?? "—"}
@@ -786,7 +778,7 @@ export default function ExtratoPage() {
                 })}
                 {linhasComSaldo.length === 0 && (
                   <tr>
-                    <td colSpan={13} style={{ ...td, textAlign: "center", color: "#475569", padding: 32 }}>
+                    <td colSpan={12} style={{ ...td, textAlign: "center", color: "#475569", padding: 32 }}>
                       Nenhum movimento encontrado com os filtros atuais.
                     </td>
                   </tr>
