@@ -515,9 +515,10 @@ export default function EstoqueItemPage({
       </header>
 
       <p className={styles.hint}>
-        Informe SKUs ou trechos de nome separados por virgula e/ou use os filtros. Por padrao sao
-        exibidas apenas variacoes com estoque positivo; marque as opcoes abaixo para incluir
-        zeradas ou negativas.
+        Informe SKUs ou trechos de nome separados por virgula e/ou use os filtros. Voce pode
+        consultar usando apenas a filial, apenas o {companyKey === "nerd" ? "grupo" : "filtro de categoria"}, ou
+        qualquer combinacao - nao e necessario informar um item. Por padrao sao exibidas apenas
+        variacoes com estoque positivo; marque as opcoes abaixo para incluir zeradas ou negativas.
       </p>
 
       <div className={styles.card}>

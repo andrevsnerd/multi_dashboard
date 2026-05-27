@@ -4241,10 +4241,11 @@ export async function fetchProdutoDetalhesPorFilial({
       !!subgrupo ||
       !!grade ||
       !!colecao;
+    const hasFilial = !!(filial && filial.trim());
 
-    if (!useProdutosPermitidos && !hasBusca && !hasCategoria) {
+    if (!useProdutosPermitidos && !hasBusca && !hasCategoria && !hasFilial) {
       throw new Error(
-        'Informe itens na busca ou selecione grupo, linha, subgrupo, grade ou coleção.',
+        'Informe itens na busca, selecione uma filial ou um grupo, linha, subgrupo, grade ou coleção.',
       );
     }
 

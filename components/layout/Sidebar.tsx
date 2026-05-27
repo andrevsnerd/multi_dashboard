@@ -83,6 +83,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
   const vendedoresHref =
     basePath && basePath !== "/" ? `${basePath}/vendedores` : "/vendedores";
   const clientesHref = basePath && basePath !== "/" ? `${basePath}/clientes` : "/clientes";
+  const filialHref =
+    basePath && basePath !== "/" ? `${basePath}/filial` : "/filial";
   const exportarRelatoriosHref =
     basePath && basePath !== "/" ? `${basePath}/exportar-relatorios` : "/exportar-relatorios";
   const controleEstoqueHref =
@@ -395,6 +397,13 @@ export default function Sidebar({ companyName }: SidebarProps) {
       key: "ferramentas",
       label: "Ferramentas",
       items: [
+        {
+          key: "filial",
+          label: "Filiais",
+          href: filialHref,
+          permission: "filial",
+          isActive: (currentPathname) => matchesSegment(currentPathname, "/filial", filialHref),
+        },
         {
           key: "exportar-relatorios",
           label: "Exportar Relatórios",

@@ -34,6 +34,7 @@ export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "compras-transito", label: "Compras em Transito", routeSegments: ["compras-transito"] },
   { key: "compras-salvas", label: "Compras Salvas", routeSegments: ["compras-salvas"] },
   { key: "mapa-clientes", label: "Mapa de Clientes", routeSegments: ["mapa-clientes"] },
+  { key: "filial", label: "Filiais", routeSegments: ["filial"] },
   { key: "exportar-relatorios", label: "Exportar Relatorios", routeSegments: ["exportar-relatorios"] },
   { key: "sincronizacao", label: "Sincronizacao", routeSegments: ["sincronizacao"] },
   { key: "blackfriday", label: "Black Friday", routeSegments: ["blackfriday"] },
