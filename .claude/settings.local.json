@@ -92,7 +92,20 @@
       "Bash(sed -n '156,174p' \"c:/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/components/stock/ProjecaoEstoquePage.tsx\")",
       "Bash(sed -n '27,31p' \"c:/Users/NERD TIJUCA/Documents/NERD - ANDRE/Dashboard NERD/multi-dashboard/components/stock/ProjecaoEstoquePage.tsx\")",
       "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
-      "Bash(node scripts/diag-extrato.mjs \"G2.11.0017\" \"67\" \"NERD MORUMBI RDRRRJ\")"
+      "Bash(node scripts/diag-extrato.mjs \"G2.11.0017\" \"67\" \"NERD MORUMBI RDRRRJ\")",
+      "Bash(node scripts/investigar-romaneios-transito.mjs)",
+      "Bash(node scripts/investigar-entradas-presas.mjs)",
+      "Bash(node scripts/inspecionar-trigger-entradas.mjs)",
+      "Bash(node scripts/contar-entradas-presas.mjs)",
+      "Bash(node --check lib/saida-entrada-executor.js)",
+      "Bash(node scripts/limpar-transitos-fake.mjs)",
+      "Bash(echo \"=== tsc exit: $? ===\")",
+      "Bash(npx eslint *)",
+      "Bash(echo \"=== eslint exit: $? ===\")",
+      "Bash(node scripts/verificar-seguranca-limpeza.mjs)",
+      "Bash(node scripts/limpar-transitos-fake.mjs --apply)",
+      "Bash(node scripts/investigar-romaneios-transito.mjs 832168 832169 832176)",
+      "Bash(node -e \"const sql=require\\('mssql'\\);\\(async\\(\\)=>{const p=await sql.connect\\({server:'177.92.78.250',database:'LINX_PRODUCAO',user:'andre.sabetta',password:'asabetta',port:1433,options:{encrypt:false,trustServerCertificate:true}}\\);const r=await p.request\\(\\).query\\(\\\\\"SELECT LTRIM\\(RTRIM\\(ROMANEIO_PRODUTO\\)\\) AS R, CONVERT\\(VARCHAR\\(19\\),DATA_ENTRADA_CONFERIDA,120\\) AS DATA_CONF FROM LOJA_ENTRADAS WITH \\(NOLOCK\\) WHERE ROMANEIO_PRODUTO IN \\('832168','832169','832176','832671'\\)\\\\\"\\);console.table\\(r.recordset\\);await p.close\\(\\);}\\)\\(\\).catch\\(e=>{console.error\\(e.message\\);process.exit\\(1\\);}\\);\")"
     ]
   }
 }

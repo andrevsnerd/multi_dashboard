@@ -24,7 +24,6 @@ interface SaidaEntradaRequest {
   responsavel?: string;
   observacao?: string | null;
   companyKey?: string;
-  liberarTransitoAutomaticamente?: boolean;
 }
 
 function isTransferenciaEntreLojas(tipoRomaneio: string): boolean {
@@ -95,68 +94,6 @@ async function getActiveFilialForRequest(companyKey: string | undefined, filial:
   return filial.trim();
 }
 
-async function liberarEntradaTransitoAutomaticamente(
-  pool: ProxyPool | Awaited<ReturnType<typeof getConnectionPool>>,
-  filial: string,
-  romaneio: string
-): Promise<boolean> {
-  const req = pool.request();
-  req.input('filial', filial.trim());
-  req.input('romaneio', romaneio.trim());
-  const result = await req.query(`
-    DECLARE @updated INT;
-
-    UPDATE LOJA_ENTRADAS
-       SET STATUS_TRANSITO = 4,
-           ENTRADA_CONFERIDA = 1,
-           DATA_PARA_TRANSFERENCIA = GETDATE(),
-           OBS = CASE
-             WHEN OBS IS NULL OR LTRIM(RTRIM(CONVERT(VARCHAR(200), OBS))) = ''
-               THEN 'Retirado do Transito pela Tela de Liberação'
-             WHEN CONVERT(VARCHAR(200), OBS) LIKE '%Retirado do Transito pela Tela de Liberação%'
-               THEN OBS
-             ELSE CONVERT(VARCHAR(200), OBS) + ' - Retirado do Transito pela Tela de Liberação'
-           END
-     WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @romaneio
-       AND LTRIM(RTRIM(FILIAL)) = @filial
-       AND (STATUS_TRANSITO IS NULL OR STATUS_TRANSITO < 4)
-       AND ISNULL(ENTRADA_CONFERIDA, 0) = 0
-       AND ISNULL(ENTRADA_ENCERRADA, 0) = 1
-       AND NOT EXISTS (
-         SELECT 1
-           FROM LOJA_ENTRADAS_PRODUTO lep
-          WHERE lep.ROMANEIO_PRODUTO = LOJA_ENTRADAS.ROMANEIO_PRODUTO
-            AND lep.FILIAL = LOJA_ENTRADAS.FILIAL
-       )
-       AND EXISTS (
-         SELECT 1
-           FROM ESTOQUE_PROD1_ENT e
-          WHERE e.ROMANEIO_PRODUTO = LOJA_ENTRADAS.ROMANEIO_PRODUTO
-            AND e.FILIAL = LOJA_ENTRADAS.FILIAL
-       );
-
-    SET @updated = @@ROWCOUNT;
-
-    SELECT
-      @updated AS UPDATED,
-      STATUS_TRANSITO,
-      ENTRADA_CONFERIDA
-    FROM LOJA_ENTRADAS
-    WHERE LTRIM(RTRIM(ROMANEIO_PRODUTO)) = @romaneio
-      AND LTRIM(RTRIM(FILIAL)) = @filial;
-  `);
-
-  const row = result.recordset?.[0] as
-    | { UPDATED?: number; STATUS_TRANSITO?: number | null; ENTRADA_CONFERIDA?: boolean | number | null }
-    | undefined;
-
-  return (
-    Number(row?.UPDATED ?? 0) === 1 &&
-    Number(row?.STATUS_TRANSITO ?? 0) === 4 &&
-    (row?.ENTRADA_CONFERIDA === true || Number(row?.ENTRADA_CONFERIDA ?? 0) === 1)
-  );
-}
-
 export async function POST(request: Request) {
   try {
     const username = request.headers.get('x-auth-username')?.trim();
@@ -169,7 +106,6 @@ export async function POST(request: Request) {
       tipoRomaneio = tipoOperacao === 'saida' ? 'TRANSFERENCIA' : 'ENTRADA AVULSA',
       observacao = null,
       companyKey,
-      liberarTransitoAutomaticamente = false,
     } = body;
 
     // Validar dados
@@ -271,23 +207,6 @@ export async function POST(request: Request) {
       ? await executeSaidaLote(pool, { itens, filial: filialTrim, filialDestino: filialDestinoTrim, tipoRomaneio, responsavel: responsavelFinal, observacao } as any)
       : await executeEntradaLote(pool, { itens, filial: filialTrim, tipoRomaneio, responsavel: responsavelFinal, observacao });
 
-    let autoReleaseMessage = '';
-    if (tipoOperacao === 'entrada' && liberarTransitoAutomaticamente && result.romaneio) {
-      try {
-        const released = await liberarEntradaTransitoAutomaticamente(pool, filialTrim, result.romaneio);
-        if (!released) {
-          console.error('Entrada criada, mas não foi possível liberar trânsito automaticamente', {
-            filial: filialTrim,
-            romaneio: result.romaneio,
-          });
-          autoReleaseMessage = ' Entrada criada, mas a liberação automática do trânsito precisa de revisão manual.';
-        }
-      } catch (releaseError) {
-        console.error('Falha ao liberar trânsito automaticamente', releaseError);
-        autoReleaseMessage = ' Entrada criada, mas a liberação automática do trânsito precisa de revisão manual.';
-      }
-    }
-
     if (tipoOperacao === 'saida' && companyKey && filialDestinoTrim && result.romaneio) {
       try {
         await setDestinoRomaneio(companyKey, result.romaneio, filialTrim, filialDestinoTrim);
@@ -299,7 +218,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       romaneio: result.romaneio,
-      message: `${result.message}${autoReleaseMessage}`,
+      message: result.message,
     });
   } catch (error: unknown) {
     console.error('Erro ao executar operação', error);

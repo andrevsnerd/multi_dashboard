@@ -79,8 +79,7 @@ async function executarEntradaEstoqueLote(
   companyKey: string,
   filialCod: string,
   itens: Array<{ produto: string; corProduto: string | null; quantidade: number }>,
-  responsavel: string,
-  liberarTransitoAutomaticamente = false
+  responsavel: string
 ): Promise<{ ok: boolean; romaneio?: string; error?: string }> {
   const res = await fetch("/api/saidas-entradas-produtos/executar", {
     method: "POST",
@@ -93,7 +92,6 @@ async function executarEntradaEstoqueLote(
       tipoRomaneio: "TRANSFERENCIA ENTRE LOJAS",
       responsavel: responsavel || "LOGISTICA",
       observacao: null,
-      liberarTransitoAutomaticamente,
     }),
   });
   if (!res.ok) {
@@ -487,8 +485,7 @@ export default function RomaneioDetalhePage({
             corProduto: i.corProduto,
             quantidade: i.quantidade,
           })),
-          responsavelPadrao || "",
-          true
+          responsavelPadrao || ""
         );
         if (!result.ok) {
           setErroConfirmacao(result.error ? `Erro ao registrar entrada de estoque: ${result.error}` : "Erro ao registrar entrada de estoque. Tente novamente.");
