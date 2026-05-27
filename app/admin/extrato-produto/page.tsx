@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthContext";
 import type {
   ExtratoResponse,
@@ -9,14 +10,17 @@ import type {
   ProdutoFilialOption,
   ProdutoLookupResponse,
 } from "@/app/api/admin/extrato-produto/route";
+import type { ProdutosAtivosResponse } from "@/app/api/admin/extrato-produto/produtos/route";
+import type { AdminFilialOption } from "@/app/api/admin/extrato-produto/filiais/route";
 
 // ── Constantes ──────────────────────────────────────────────────────────────
 
 const TIPO_CORES: Record<string, string> = {
-  "LOJA ENTRADAS":  "#22c55e",
   "ENTRADA NORMAL": "#86efac",
-  "LOJA SAIDAS":    "#f97316",
-  "SAIDA NORMAL":   "#fdba74",
+  "ENTRADA POR TRANSFERENCIA": "#22c55e",
+  "SAÍDA NORMAL": "#fdba74",
+  "SAÍDA POR TRANSFERÊNCIA": "#f97316",
+  "AJUSTE": "#a78bfa",
   "LOJA VENDAS":    "#ef4444",
 };
 
@@ -64,6 +68,8 @@ function badge(tipo: string) {
 
 export default function ExtratoPage() {
   const { user } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [produto, setProduto] = useState("");
   const [cor, setCor] = useState("");
   const [filial, setFilial] = useState("");
@@ -76,14 +82,74 @@ export default function ExtratoPage() {
   const [filiaisDisponiveis, setFiliaisDisponiveis] = useState<ProdutoFilialOption[]>([]);
   const [tiposFiltro, setTiposFiltro] = useState<string[]>([]);
   const [mostrarZeroGrade, setMostrarZeroGrade] = useState(true);
+  const [allFiliais, setAllFiliais] = useState<AdminFilialOption[]>([]);
+  const [showFilialDropdown, setShowFilialDropdown] = useState(false);
   const corRef = useRef(cor);
   const tableRef = useRef<HTMLDivElement>(null);
+  const filialInputRef = useRef<HTMLInputElement>(null);
+  const filialDropdownRef = useRef<HTMLDivElement>(null);
+
+  // ── Lista de produtos por filial ───────────────────────────────────────────
+  const [listaPage, setListaPage] = useState(1);
+  const [listaLoading, setListaLoading] = useState(false);
+  const [listaErro, setListaErro] = useState("");
+  const [listaDados, setListaDados] = useState<ProdutosAtivosResponse | null>(null);
 
   const authHeader = useCallback(
     (): Record<string, string> =>
       user ? { "X-Auth-Username": user.username } : {},
     [user]
   );
+
+  // Carrega todas as filiais disponíveis uma vez para o autocomplete.
+  useEffect(() => {
+    if (!user) return;
+    fetch("/api/admin/extrato-produto/filiais", { headers: authHeader() })
+      .then((r) => r.json())
+      .then((json) => { if (json.data) setAllFiliais(json.data); })
+      .catch(() => {});
+  }, [user, authHeader]);
+
+  // Fecha dropdown de filial ao clicar fora.
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (
+        filialInputRef.current &&
+        !filialInputRef.current.contains(e.target as Node) &&
+        filialDropdownRef.current &&
+        !filialDropdownRef.current.contains(e.target as Node)
+      ) {
+        setShowFilialDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  // Ler querystring para permitir abrir extrato automaticamente.
+  useEffect(() => {
+    if (!searchParams) return;
+    const p = searchParams.get("produto")?.trim();
+    const c = searchParams.get("cor")?.trim();
+    const f = searchParams.get("filial")?.trim();
+
+    if (p && p !== produto) setProduto(p);
+    if (c && c !== cor) setCor(c);
+    if (f && f !== filial) setFilial(f);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  // Se a URL vier com produto+cor, já carrega o extrato automaticamente (fluxo 1-clique).
+  useEffect(() => {
+    if (!user || !searchParams) return;
+    const p = searchParams.get("produto")?.trim() ?? "";
+    const c = searchParams.get("cor")?.trim() ?? "";
+    const f = searchParams.get("filial")?.trim() ?? "";
+    if (!p || !c) return;
+    if (dados) return;
+    fetchExtrato({ produto: p, cor: c, filial: f || filial });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, searchParams]);
 
   useEffect(() => {
     corRef.current = cor;
@@ -165,24 +231,47 @@ export default function ExtratoPage() {
     };
   }, [produto, cor, filial, user, authHeader]);
 
-  async function buscar(e: React.FormEvent) {
-    e.preventDefault();
-    if (!produto.trim()) {
-      setErro("Preencha Produto ou Código de Barras.");
+  async function buscarListaProdutos(targetPage?: number, overrideFilial?: string) {
+    if (!user) return;
+    const f = (overrideFilial ?? filial).trim();
+    if (!f) {
+      setListaDados(null);
       return;
     }
+
+    const nextPage = Math.max(1, targetPage ?? listaPage);
+    setListaLoading(true);
+    setListaErro("");
+    try {
+      const params = new URLSearchParams({ filial: f, page: String(nextPage), pageSize: "20" });
+      const res = await fetch(`/api/admin/extrato-produto/produtos?${params}`, {
+        headers: authHeader(),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erro ao listar produtos");
+      setListaDados(json as ProdutosAtivosResponse);
+      setListaPage(nextPage);
+    } catch (e) {
+      setListaErro((e as Error).message);
+      setListaDados(null);
+    } finally {
+      setListaLoading(false);
+    }
+  }
+
+  async function fetchExtrato(paramsIn: { produto: string; cor?: string; filial?: string }) {
+    const p = paramsIn.produto.trim();
+    if (!p) return;
     setLoading(true);
     setErro("");
     setDados(null);
 
     try {
-      const params = new URLSearchParams({ produto: produto.trim() });
-      if (cor.trim()) params.set("cor", cor.trim());
-      if (filial.trim()) params.set("filial", filial.trim());
+      const params = new URLSearchParams({ produto: p });
+      if (paramsIn.cor?.trim()) params.set("cor", paramsIn.cor.trim());
+      if (paramsIn.filial?.trim()) params.set("filial", paramsIn.filial.trim());
 
-      const res = await fetch(`/api/admin/extrato-produto?${params}`, {
-        headers: authHeader(),
-      });
+      const res = await fetch(`/api/admin/extrato-produto?${params}`, { headers: authHeader() });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Erro ao buscar");
       setDados(json as ExtratoResponse);
@@ -196,6 +285,30 @@ export default function ExtratoPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function buscar(e: React.FormEvent) {
+    e.preventDefault();
+    const p = produto.trim();
+    const f = filial.trim();
+
+    // Fluxo 1: só filial => lista paginada de produtos por atividade
+    if (!p) {
+      if (!f) {
+        setErro("Preencha Filial para listar produtos (ou informe Produto/Código de barras).");
+        return;
+      }
+      setErro("");
+      setListaErro("");
+      setListaPage(1);
+      setDados(null);
+      await buscarListaProdutos(1, f);
+      return;
+    }
+
+    // Fluxo 2: produto informado => extrato normal
+    setListaDados(null);
+    await fetchExtrato({ produto: p, cor, filial: f });
   }
 
   if (!user) return null;
@@ -220,12 +333,13 @@ export default function ExtratoPage() {
       })
     : [];
 
-  // Saldo corrente acumulado pelo movimento total declarado em QTDE.
+  // Saldo calculado em ordem cronológica (ascendente) para ficar correto,
+  // depois invertido para exibição do mais recente ao mais antigo.
   let saldo = 0;
-  const linhasComSaldo = linhasFiltradas.map((l) => {
+  const linhasComSaldo = [...linhasFiltradas.map((l) => {
     saldo += l.qtde;
     return { ...l, saldoAcumulado: saldo };
-  });
+  })].reverse();
 
   // Totais por tipo
   const totaisPorTipo = tiposDisponiveis.map((tipo) => {
@@ -268,7 +382,6 @@ export default function ExtratoPage() {
             }}
             placeholder="Ex: 13.71.0365 ou 789..."
             style={inputStyle}
-            required
           />
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#94a3b8" }}>
@@ -278,7 +391,6 @@ export default function ExtratoPage() {
               value={cor}
               onChange={(e) => setCor(e.target.value)}
               style={{ ...inputStyle, width: 220 }}
-              required
             >
               <option value="">Selecione</option>
               {coresDisponiveis.map((item) => (
@@ -299,28 +411,76 @@ export default function ExtratoPage() {
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#94a3b8" }}>
           Filial
-          {filiaisDisponiveis.length > 0 ? (
-            <select
-              value={filial}
-              onChange={(e) => setFilial(e.target.value)}
-              style={{ ...inputStyle, width: 260 }}
-            >
-              <option value="">Todas juntas</option>
-              {filiaisDisponiveis.map((item) => (
-                <option key={item.filial} value={item.filial}>
-                  {item.filial} ({item.estoqueAtual} un)
-                </option>
-              ))}
-            </select>
-          ) : (
+          <div style={{ position: "relative" }}>
             <input
+              ref={filialInputRef}
               type="text"
               value={filial}
-              onChange={(e) => setFilial(e.target.value)}
+              onChange={(e) => { setFilial(e.target.value); setShowFilialDropdown(true); }}
+              onFocus={() => setShowFilialDropdown(true)}
               placeholder="Todas juntas ou Ex: GUARULHOS"
               style={inputStyle}
+              autoComplete="off"
             />
-          )}
+            {showFilialDropdown && (() => {
+              const pool = filiaisDisponiveis.length > 0
+                ? filiaisDisponiveis.map((f) => ({ filial: f.filial, extra: ` (${f.estoqueAtual} un)` }))
+                : allFiliais.map((f) => ({ filial: f.filial, extra: "" }));
+              const q = filial.trim().toLowerCase();
+              const sugestoes = pool
+                .filter((f) => q === "" || f.filial.toLowerCase().includes(q))
+                .slice(0, 10);
+              if (sugestoes.length === 0) return null;
+              return (
+                <div
+                  ref={filialDropdownRef}
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 2px)",
+                    left: 0,
+                    right: 0,
+                    background: "#1e293b",
+                    border: "1px solid #334155",
+                    borderRadius: 6,
+                    zIndex: 50,
+                    maxHeight: 240,
+                    overflowY: "auto",
+                    boxShadow: "0 4px 16px #00000066",
+                  }}
+                >
+                  {sugestoes.map((s) => (
+                    <button
+                      key={s.filial}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setFilial(s.filial);
+                        setShowFilialDropdown(false);
+                      }}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "8px 10px",
+                        background: "none",
+                        border: "none",
+                        borderBottom: "1px solid #0f172a",
+                        color: "#f1f5f9",
+                        cursor: "pointer",
+                        fontSize: 12,
+                        display: "flex",
+                        gap: 4,
+                      }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#334155"; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "none"; }}
+                    >
+                      <span>{s.filial}</span>
+                      {s.extra && <span style={{ color: "#64748b" }}>{s.extra}</span>}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
         </label>
         <button
           type="submit"
@@ -353,6 +513,109 @@ export default function ExtratoPage() {
       {erro && (
         <div style={{ background: "#450a0a", border: "1px solid #dc2626", borderRadius: 6, padding: "10px 16px", color: "#fca5a5", marginBottom: 16, fontSize: 13 }}>
           {erro}
+        </div>
+      )}
+
+      {/* ── Lista de produtos por filial (quando buscar sem produto) ── */}
+      {listaDados && (
+        <div style={{ marginTop: -4, marginBottom: 20 }}>
+          {listaErro && (
+            <div style={{ background: "#450a0a", border: "1px solid #dc2626", borderRadius: 6, padding: "10px 16px", color: "#fca5a5", marginBottom: 12, fontSize: 13 }}>
+              {listaErro}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 10, color: "#94a3b8", fontSize: 12 }}>
+            <span>
+              {listaDados.total} produto(s) com movimento em <strong style={{ color: "#e2e8f0" }}>{listaDados.filial}</strong> · página {listaDados.page}
+            </span>
+            <span style={{ marginLeft: "auto" }}>20 por página · mais recente → mais antigo</span>
+          </div>
+
+          <div style={{ border: "1px solid #1e293b", borderRadius: 8, overflow: "hidden" }}>
+            {listaDados.items.map((item) => (
+              <button
+                key={`${item.produto}-${item.cor}`}
+                type="button"
+                onClick={() => {
+                  // 1 clique: seleciona produto+cor do movimento mais recente e já busca o extrato
+                  const p = item.produto;
+                  const c = item.cor;
+                  const f = listaDados.filial;
+
+                  setProduto(p);
+                  setCor(c);
+                  setFilial(f);
+                  setListaDados(null);
+
+                  const params = new URLSearchParams({ produto: p, cor: c, filial: f });
+                  router.replace(`/admin/extrato-produto?${params.toString()}`);
+                  fetchExtrato({ produto: p, cor: c, filial: f });
+                }}
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  display: "flex",
+                  gap: 12,
+                  alignItems: "center",
+                  padding: "10px 12px",
+                  background: "#0f172a",
+                  border: "none",
+                  borderBottom: "1px solid #1e293b",
+                  cursor: "pointer",
+                  color: "#e2e8f0",
+                }}
+              >
+                <span style={{ fontFamily: "monospace", color: "#7dd3fc", minWidth: 110 }}>
+                  {item.produto}
+                </span>
+                <span style={{ color: "#a3e635", fontFamily: "monospace", minWidth: 40 }}>
+                  {item.cor || "—"}
+                </span>
+                <span style={{ color: "#94a3b8", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {item.descProduto ?? "—"}
+                </span>
+                <span style={{ color: "#64748b", fontSize: 12, whiteSpace: "nowrap" }}>
+                  {fmtDate(item.ultimoMovimento)}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 10 }}>
+            <button
+              type="button"
+              disabled={listaLoading || listaPage <= 1}
+              onClick={() => buscarListaProdutos(listaPage - 1)}
+              style={{
+                padding: "7px 12px",
+                background: "#1e293b",
+                color: "#e2e8f0",
+                border: "1px solid #334155",
+                borderRadius: 6,
+                cursor: "pointer",
+                fontSize: 12,
+              }}
+            >
+              ← Anterior
+            </button>
+            <button
+              type="button"
+              disabled={listaLoading || listaPage * listaDados.pageSize >= listaDados.total}
+              onClick={() => buscarListaProdutos(listaPage + 1)}
+              style={{
+                padding: "7px 12px",
+                background: "#1e293b",
+                color: "#e2e8f0",
+                border: "1px solid #334155",
+                borderRadius: 6,
+                cursor: "pointer",
+                fontSize: 12,
+              }}
+            >
+              Próxima →
+            </button>
+          </div>
         </div>
       )}
 
@@ -441,8 +704,8 @@ export default function ExtratoPage() {
                 <tr style={{ background: "#1e293b", color: "#94a3b8" }}>
                   <th style={th}>Data</th>
                   <th style={th}>Tipo</th>
-                  <th style={th}>Tipo Romaneio</th>
                   <th style={th}>Documento</th>
+                  <th style={th}>Romaneio / Pedido</th>
                   <th style={th}>Filial Origem</th>
                   <th style={th}>Filial Destino</th>
                   <th style={{ ...th, color: "#f1f5f9" }}>QTDE</th>
@@ -471,11 +734,12 @@ export default function ExtratoPage() {
                     >
                       <td style={td}>{fmtDate(l.emissao)}</td>
                       <td style={td}>{badge(l.tipo)}</td>
-                      <td style={{ ...td, color: "#94a3b8", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {l.tipoRomaneio ?? "—"}
-                      </td>
                       <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>
                         {l.doc}
+                      </td>
+                      <td style={{ ...td, color: "#a78bfa", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                          title={l.romaneio ?? undefined}>
+                        {l.romaneio ?? "—"}
                       </td>
                       <td style={{ ...td, color: "#94a3b8", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {l.filialOrigem ?? "—"}

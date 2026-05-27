@@ -79,6 +79,47 @@ function trimValue(value: unknown) {
   return value == null ? "" : String(value).trim();
 }
 
+function buildOpPedOs(...fields: Array<string | null | undefined>): string | null {
+  const labels = ["OP", "PED", "OS"];
+  const parts = fields
+    .slice(0, 3)
+    .map((v, i) => (v?.trim() ? `${labels[i]}:${v.trim()}` : null))
+    .filter(Boolean) as string[];
+  return parts.length > 0 ? parts.join("/") : null;
+}
+
+function resolveLinxTipoMovimento(
+  direction: "E" | "S",
+  ...candidates: Array<string | number | null | undefined>
+) {
+  const t = candidates
+    .filter((v) => v != null && String(v).trim() !== "")
+    .map((v) => String(v).trim().toUpperCase())
+    .join(" | ");
+
+  const isAjuste =
+    /AJUST/.test(t) ||
+    /INVENT/.test(t) ||
+    /ACERT/.test(t) ||
+    /BALAN/.test(t) ||
+    /CONTAG/.test(t) ||
+    /AVULS/.test(t) ||
+    /DEFEIT/.test(t) ||
+    /MOV\.?\s*INTERNA/.test(t) ||
+    /MOVIMENTA(C|Ç)(A|Ã)O\s+INTERNA/.test(t);
+
+  if (isAjuste) return "AJUSTE";
+
+  const isTransferencia = /TRANSFER/.test(t);
+  if (isTransferencia) {
+    return direction === "E"
+      ? "ENTRADA POR TRANSFERENCIA"
+      : "SAÍDA POR TRANSFERÊNCIA";
+  }
+
+  return direction === "E" ? "ENTRADA NORMAL" : "SAÍDA NORMAL";
+}
+
 function produtoEqualsSql(column: string, produto: string) {
   return `RTRIM(LTRIM(CAST(${column} AS VARCHAR(50)))) = '${sqlText(produto)}'`;
 }
@@ -423,7 +464,7 @@ export async function GET(request: NextRequest) {
     for (const r of rows) {
       linhas.push({
         emissao: r.EMISSAO ? new Date(r.EMISSAO).toISOString() : "",
-        tipo: "LOJA ENTRADAS",
+        tipo: resolveLinxTipoMovimento("E", r.DESC_TIPO, r.TIPO_ENTRADA_SAIDA, r.ROMANEIO_PRODUTO),
         tipoRomaneio: r.DESC_TIPO ?? r.TIPO_ENTRADA_SAIDA ?? null,
         doc: r.ROMANEIO_PRODUTO?.trim() ?? "",
         filialOrigem: r.FILIAL_ORIGEM?.trim() ?? null,
@@ -455,6 +496,10 @@ export async function GET(request: NextRequest) {
       EN_1: number;
       CUSTO1: number;
       ROMANEIO_ORIGEM: string | null;
+      OP: string | null;
+      PEDIDO: string | null;
+      OS: string | null;
+      COMENTARIO: string | null;
       OBS: string | null;
     }>(`
       SELECT
@@ -468,25 +513,30 @@ export async function GET(request: NextRequest) {
         p.EN_1,
         p.CUSTO1,
         e.ROMANEIO_ORIGEM,
+        NULLIF(RTRIM(LTRIM(CAST(e.ORDEM_PRODUCAO AS VARCHAR(50)))), '') AS OP,
+        NULLIF(RTRIM(LTRIM(CAST(e.PEDIDO         AS VARCHAR(50)))), '') AS PEDIDO,
+        NULLIF(RTRIM(LTRIM(CAST(e.ORDEM_SERVICO  AS VARCHAR(50)))), '') AS OS,
+        NULLIF(RTRIM(LTRIM(CAST(e.COMENTARIO     AS VARCHAR(40)))), '') AS COMENTARIO,
         CAST(e.OBS AS varchar(500)) AS OBS
       FROM ESTOQUE_PROD_ENT e WITH (NOLOCK)
       JOIN ESTOQUE_PROD1_ENT p WITH (NOLOCK)
         ON e.ROMANEIO_PRODUTO = p.ROMANEIO_PRODUTO
-        AND e.FILIAL = p.FILIAL
       WHERE p.PRODUTO = '${produtoSql}'
         AND p.COR_PRODUTO = '${corSql}'
         ${filialFilterEnt}
       ORDER BY e.EMISSAO
     `);
     for (const r of rows) {
+      const opPedOs = `OP:${r.OP?.trim() ?? ""}/PED:${r.PEDIDO?.trim() ?? ""}/OS:${r.OS?.trim() ?? ""}`;
+      const romEnt = r.ROMANEIO_ORIGEM?.trim() || r.COMENTARIO?.trim() || opPedOs;
       linhas.push({
         emissao: r.EMISSAO ? new Date(r.EMISSAO).toISOString() : "",
-        tipo: "ENTRADA NORMAL",
+        tipo: resolveLinxTipoMovimento("E", r.TIPO_ROMANEIO, r.TIPO_ENTRADA, r.ROMANEIO_PRODUTO),
         tipoRomaneio: r.TIPO_ROMANEIO?.trim() ?? null,
         doc: r.ROMANEIO_PRODUTO?.trim() ?? "",
         filialOrigem: null,
         filialDestino: r.FILIAL_DESTINO?.trim() ?? r.FILIAL?.trim() ?? null,
-        romaneio: r.ROMANEIO_ORIGEM?.trim() ?? null,
+        romaneio: romEnt || null,
         qtde: r.QTDE ?? 0,
         qtdeGrade: r.EN_1 ?? 0,
         valor: 0,
@@ -512,6 +562,8 @@ export async function GET(request: NextRequest) {
       QTDE: number;
       SA_1: number;
       CUSTO1: number;
+      OP: string | null;
+      COMENTARIO: string | null;
       OBS: string | null;
     }>(`
       SELECT
@@ -524,25 +576,27 @@ export async function GET(request: NextRequest) {
         p.QTDE,
         p.SA_1,
         p.CUSTO1,
+        NULLIF(RTRIM(LTRIM(CAST(s.ORDEM_PRODUCAO AS VARCHAR(50)))), '') AS OP,
+        NULLIF(RTRIM(LTRIM(CAST(s.COMENTARIO     AS VARCHAR(40)))), '') AS COMENTARIO,
         CAST(s.OBS AS varchar(500)) AS OBS
       FROM ESTOQUE_PROD_SAI s WITH (NOLOCK)
       JOIN ESTOQUE_PROD1_SAI p WITH (NOLOCK)
         ON s.ROMANEIO_PRODUTO = p.ROMANEIO_PRODUTO
-        AND s.FILIAL = p.FILIAL
       WHERE p.PRODUTO = '${produtoSql}'
         AND p.COR_PRODUTO = '${corSql}'
         ${filialFilterSai}
       ORDER BY s.EMISSAO
     `);
     for (const r of rows) {
+      const romSai = r.ROMANEIO_DESTINO?.trim() || (r.OP?.trim() ? `OP:${r.OP.trim()}` : null) || r.COMENTARIO?.trim();
       linhas.push({
         emissao: r.EMISSAO ? new Date(r.EMISSAO).toISOString() : "",
-        tipo: "SAIDA NORMAL",
+        tipo: resolveLinxTipoMovimento("S", r.TIPO_ROMANEIO, r.ROMANEIO_PRODUTO),
         tipoRomaneio: r.TIPO_ROMANEIO?.trim() ?? null,
         doc: r.ROMANEIO_PRODUTO?.trim() ?? "",
         filialOrigem: r.FILIAL?.trim() ?? null,
         filialDestino: r.FILIAL_DESTINO?.trim() ?? null,
-        romaneio: r.ROMANEIO_DESTINO?.trim() ?? null,
+        romaneio: romSai || null,
         qtde: -(r.QTDE ?? 0),
         qtdeGrade: -(r.SA_1 ?? 0),
         valor: 0,
@@ -583,13 +637,13 @@ export async function GET(request: NextRequest) {
       LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.COD_FILIAL = vp.CODIGO_FILIAL
       WHERE vp.PRODUTO = '${produtoSql}'
         AND vp.COR_PRODUTO = '${corSql}'
-        AND vp.QTDE_CANCELADA = 0
         AND ISNULL(vp.NAO_MOVIMENTA_ESTOQUE, 0) = 0
         ${filialFilterV}
       ORDER BY v.DATA_VENDA
     `);
     for (const r of rows) {
       const qtdeLiquida = (r.QTDE ?? 0) - (r.QTDE_CANCELADA ?? 0);
+      if (qtdeLiquida === 0) continue; // ignora linhas com movimento líquido zero
       linhas.push({
         emissao: r.DATA_VENDA ? new Date(r.DATA_VENDA).toISOString() : "",
         tipo: "LOJA VENDAS",
@@ -647,7 +701,7 @@ export async function GET(request: NextRequest) {
     for (const r of rows) {
       linhas.push({
         emissao: r.EMISSAO ? new Date(r.EMISSAO).toISOString() : "",
-        tipo: "LOJA SAIDAS",
+        tipo: resolveLinxTipoMovimento("S", r.DESC_TIPO, r.TIPO_ENTRADA_SAIDA, r.ROMANEIO_PRODUTO),
         tipoRomaneio: r.DESC_TIPO ?? r.TIPO_ENTRADA_SAIDA ?? null,
         doc: r.ROMANEIO_PRODUTO?.trim() ?? "",
         filialOrigem: r.FILIAL?.trim() ?? null,
@@ -664,6 +718,59 @@ export async function GET(request: NextRequest) {
     }
   } catch (e) {
     erros.push(`LOJA SAIDAS: ${(e as Error).message}`);
+  }
+
+  // ── 6. CONTAGEM / AJUSTE (ESTOQUE_PROD_CONTAGEM + ESTOQUE_PROD_CTG_AJUSTE) ──
+  // Esses registros são ajustes gerados pelo módulo de contagem de estoque do Linx.
+  // O "Documento" é NOME_CONTAGEM e o "Romaneio/Pedido" é RESPONSAVEL.
+  try {
+    const filialFilterCtg = filialSql ? `AND c.FILIAL LIKE '%${filialSql}%'` : "";
+    const rows = await query<{
+      EMISSAO: Date;
+      FILIAL: string;
+      NOME_CONTAGEM: string;
+      RESPONSAVEL: string | null;
+      TIPO: string | null;
+      QTDE_AJUSTE: number;
+      A1: number;
+    }>(`
+      SELECT
+        c.EMISSAO,
+        c.FILIAL,
+        c.NOME_CONTAGEM,
+        c.RESPONSAVEL,
+        c.TIPO,
+        a.QTDE_AJUSTE,
+        a.A1
+      FROM ESTOQUE_PROD_CONTAGEM c WITH (NOLOCK)
+      JOIN ESTOQUE_PROD_CTG_AJUSTE a WITH (NOLOCK)
+        ON c.NOME_CONTAGEM = a.NOME_CONTAGEM
+      WHERE RTRIM(LTRIM(CAST(a.PRODUTO AS VARCHAR(50)))) = '${produtoSql}'
+        AND RTRIM(LTRIM(ISNULL(CAST(a.COR_PRODUTO AS VARCHAR(20)), ''))) = '${corSql}'
+        AND c.ESTOQUE_AJUSTADO = 1
+        ${filialFilterCtg}
+      ORDER BY c.EMISSAO
+    `);
+    for (const r of rows) {
+      linhas.push({
+        emissao: r.EMISSAO ? new Date(r.EMISSAO).toISOString() : "",
+        tipo: "AJUSTE",
+        tipoRomaneio: r.TIPO?.trim() ?? null,
+        doc: r.NOME_CONTAGEM?.trim() ?? "",
+        filialOrigem: r.FILIAL?.trim() ?? null,
+        filialDestino: null,
+        romaneio: r.RESPONSAVEL?.trim() ?? null,
+        qtde: r.QTDE_AJUSTE ?? 0,
+        qtdeGrade: r.A1 ?? 0,
+        valor: 0,
+        preco: 0,
+        obs: null,
+        atualizouEstoque: true,
+        statusTransito: null,
+      });
+    }
+  } catch (e) {
+    erros.push(`CONTAGEM/AJUSTE: ${(e as Error).message}`);
   }
 
   // Ordenar por data
