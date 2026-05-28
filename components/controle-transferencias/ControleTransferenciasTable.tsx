@@ -1769,6 +1769,10 @@ export default function ControleTransferenciasTable({
               });
             };
 
+            const activeTab = getActiveTab(origemCanonicoDoGrupo, destinoCanonicoDoGrupo);
+            const realizadasCount =
+              realizadasContadores?.get(`${origemCanonicoDoGrupo}|${destinoCanonicoDoGrupo}`) ?? 0;
+
             return (
             <div key={`${group.origem}-${destGroup.destino}-${destIndex}`} className={styles.destinationSection}>
               {/* Header menor: Filial de destino */}
@@ -1782,8 +1786,32 @@ export default function ControleTransferenciasTable({
                     <span className={styles.destinationName}>{destGroup.destino}</span>
                   </div>
                 </div>
+                <div className={styles.destinationTabs} role="tablist" aria-label="Visão do destino">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === "sugestoes"}
+                    className={`${styles.destinationTab} ${activeTab === "sugestoes" ? styles.destinationTabActive : ""}`}
+                    onClick={() => setActiveTab(origemCanonicoDoGrupo, destinoCanonicoDoGrupo, "sugestoes")}
+                  >
+                    Sugestões
+                    <span className={styles.destinationTabBadge}>{destGroup.items.length}</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === "realizadas"}
+                    className={`${styles.destinationTab} ${activeTab === "realizadas" ? styles.destinationTabActive : ""}`}
+                    onClick={() => setActiveTab(origemCanonicoDoGrupo, destinoCanonicoDoGrupo, "realizadas")}
+                  >
+                    Realizadas
+                    {realizadasCount > 0 ? (
+                      <span className={styles.destinationTabBadge}>{realizadasCount}</span>
+                    ) : null}
+                  </button>
+                </div>
                 <div className={styles.destinationActions}>
-                  {podeOperarOrigem && totalSelecionavel > 0 ? (
+                  {activeTab === "sugestoes" && podeOperarOrigem && totalSelecionavel > 0 ? (
                     <button
                       type="button"
                       className={styles.bulkTransferBtn}
@@ -1809,6 +1837,16 @@ export default function ControleTransferenciasTable({
                 </div>
               </div>
 
+              {activeTab === "realizadas" ? (
+                <RealizadasPanel
+                  companyKey={companyKey}
+                  companySlug={companyKey}
+                  origemCanonico={origemCanonicoDoGrupo}
+                  origemLabel={group.origem}
+                  destinoCanonico={destinoCanonicoDoGrupo}
+                  destinoLabel={destGroup.destino}
+                />
+              ) : (
               <table className={styles.table}>
                 <thead>
                   <tr>
@@ -2217,6 +2255,7 @@ export default function ControleTransferenciasTable({
                   })}
                 </tbody>
               </table>
+              )}
             </div>
             );
           })}

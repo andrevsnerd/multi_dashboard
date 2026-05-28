@@ -57,12 +57,17 @@ export default function RealizadasPanel({
 }: RealizadasPanelProps) {
   const [rows, setRows] = useState<RealizadasPanelRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError(null);
+    // Lifecycle de fetch: marcamos loading e limpamos estados via microtask.
+    // (Evita o warning react-hooks/set-state-in-effect sobre setState síncrono no body.)
+    queueMicrotask(() => {
+      if (!active) return;
+      setLoading(true);
+      setError(null);
+    });
 
     const params = new URLSearchParams({
       company: companyKey,

@@ -56,6 +56,43 @@ function getLast30DaysRange() {
   };
 }
 
+async function fetchCooldownKeys(company: string, days = 7): Promise<Set<string>> {
+  try {
+    const res = await fetch(
+      `/api/transferencias-pendentes/cooldown?company=${encodeURIComponent(company)}&days=${days}`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return new Set();
+    const json = (await res.json()) as { keys: string[] };
+    return new Set(json.keys || []);
+  } catch {
+    return new Set();
+  }
+}
+
+async function fetchRealizadasContadores(
+  company: string,
+  days = 30
+): Promise<Map<string, number>> {
+  try {
+    const res = await fetch(
+      `/api/transferencias-pendentes/contadores?company=${encodeURIComponent(company)}&days=${days}`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return new Map();
+    const json = (await res.json()) as {
+      data: Array<{ origemCanonico: string; destinoCanonico: string; total: number }>;
+    };
+    const map = new Map<string, number>();
+    for (const row of json.data || []) {
+      map.set(`${row.origemCanonico}|${row.destinoCanonico}`, row.total);
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
 async function fetchControleTransferencias(
   company: string,
   range: { startDate: Date; endDate: Date },
@@ -127,6 +164,8 @@ export default function ControleTransferenciasPage({
   const [data, setData] = useState<ProdutoTransferencia[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cooldownKeys, setCooldownKeys] = useState<Set<string>>(new Set());
+  const [realizadasContadores, setRealizadasContadores] = useState<Map<string, number>>(new Map());
 
   const rangeKey = useMemo(
     () =>
@@ -139,11 +178,13 @@ export default function ControleTransferenciasPage({
       setLoading(true);
       setError(null);
       try {
-        const transferenciasData = await fetchControleTransferencias(
-          companyKey,
-          range,
-          null
-        );
+        // Carrega os 3 datasets em paralelo: produtos (MSSQL pesado),
+        // cooldown (Neon leve) e contadores das tabs Realizadas (Neon leve).
+        const [transferenciasData, cooldown, contadores] = await Promise.all([
+          fetchControleTransferencias(companyKey, range, null),
+          fetchCooldownKeys(companyKey, 7),
+          fetchRealizadasContadores(companyKey, 30),
+        ]);
         if (signal?.aborted) return;
         const dataWithDates = transferenciasData.map(item => ({
           ...item,
@@ -157,6 +198,8 @@ export default function ControleTransferenciasPage({
           })),
         }));
         setData(dataWithDates);
+        setCooldownKeys(cooldown);
+        setRealizadasContadores(contadores);
       } catch (err) {
         if (signal?.aborted) return;
         setError(
@@ -290,6 +333,8 @@ export default function ControleTransferenciasPage({
         selectedFilial={selectedFilial}
         permissoes={permissoes}
         filiaisApi={filiais}
+        cooldownKeys={cooldownKeys}
+        realizadasContadores={realizadasContadores}
         onTransferExecuted={() => loadData()}
       />
     </div>
