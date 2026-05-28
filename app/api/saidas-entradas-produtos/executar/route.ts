@@ -4,6 +4,10 @@ import { shouldUseProxy, ProxyPool } from '@/lib/db/proxy';
 import { findUserByUsername } from '@/lib/auth/users-store';
 import { getPermissaoByUsername } from '@/lib/utils/transferencia-permissoes-store';
 import { setDestinoRomaneio } from '@/lib/utils/destino-romaneio-store';
+import {
+  insertTransferenciasPendentes,
+  type TransferenciaPendenteInsert,
+} from '@/lib/utils/transferencia-pendente-store';
 import { executeSaidaLote, executeEntradaLote } from '@/lib/saida-entrada-executor';
 import { getActiveFilial } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
@@ -12,6 +16,25 @@ import type { CompanyConfig } from '@/lib/config/company';
 interface ItemOperacao {
   produto: string;
   corProduto: string | null;
+  quantidade: number;
+}
+
+/**
+ * Metadados opcionais para registrar a saída no histórico de transferências
+ * (tela Controle de Transferências). Quando presente em uma operação `saida` do
+ * tipo TRANSFERENCIA ENTRE LOJAS, gravamos uma linha em `transferencia_pendente`
+ * por item, ligada ao romaneio gerado. O JOIN com `romaneio_item_confirmado`
+ * deriva o status (pendente/confirmada) na leitura.
+ */
+interface ControleTransferenciaItemMeta {
+  produto: string;
+  corCodigo: string | null;
+  corDescricao: string | null;
+  descricao: string | null;
+  codigoBarra: string | null;
+  origemLabel: string | null;
+  destinoLabel: string | null;
+  itemKey: string;
   quantidade: number;
 }
 
@@ -24,6 +47,9 @@ interface SaidaEntradaRequest {
   responsavel?: string;
   observacao?: string | null;
   companyKey?: string;
+  registrarTransferenciaPendente?: {
+    items: ControleTransferenciaItemMeta[];
+  };
 }
 
 function isTransferenciaEntreLojas(tipoRomaneio: string): boolean {
@@ -106,6 +132,7 @@ export async function POST(request: Request) {
       tipoRomaneio = tipoOperacao === 'saida' ? 'TRANSFERENCIA' : 'ENTRADA AVULSA',
       observacao = null,
       companyKey,
+      registrarTransferenciaPendente = null,
     } = body;
 
     // Validar dados
@@ -212,6 +239,36 @@ export async function POST(request: Request) {
         await setDestinoRomaneio(companyKey, result.romaneio, filialTrim, filialDestinoTrim);
       } catch (destinoError) {
         console.error('Erro ao salvar destino auxiliar do romaneio', destinoError);
+      }
+
+      // Histórico para a tela "Controle de Transferências". Falha aqui é logada
+      // mas não desfaz a saída — o romaneio já foi gerado no ERP.
+      if (registrarTransferenciaPendente?.items?.length) {
+        try {
+          const itemsToInsert: TransferenciaPendenteInsert[] =
+            registrarTransferenciaPendente.items.map((meta) => ({
+              itemKey: meta.itemKey,
+              produto: meta.produto,
+              corDescricao: meta.corDescricao,
+              corCodigo: meta.corCodigo,
+              descricao: meta.descricao,
+              codigoBarra: meta.codigoBarra,
+              origemCanonico: filialTrim,
+              destinoCanonico: filialDestinoTrim,
+              origemLabel: meta.origemLabel,
+              destinoLabel: meta.destinoLabel,
+              romaneioSaida: result.romaneio,
+              quantidade: Math.max(1, Math.floor(meta.quantidade)),
+            }));
+          await insertTransferenciasPendentes(
+            companyKey,
+            result.romaneio,
+            username,
+            itemsToInsert
+          );
+        } catch (registerError) {
+          console.error('Erro ao registrar transferência pendente', registerError);
+        }
       }
     }
 

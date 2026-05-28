@@ -7,6 +7,7 @@ import type { DateRangeValue } from "@/components/filters/DateRangeFilter";
 import { useAuth } from "@/components/auth/AuthContext";
 import { exportTransfersToPDF } from "./exportToPDF";
 import TransferenciaConfirmModal from "./TransferenciaConfirmModal";
+import RealizadasPanel from "./RealizadasPanel";
 
 import styles from "./ControleTransferenciasTable.module.css";
 
@@ -47,6 +48,11 @@ interface ControleTransferenciasTableProps {
   /** Carregados uma vez na página — evita GET duplicado em /permissoes e /filiais */
   permissoes: ControleTransferenciasPermissao | null;
   filiaisApi: ControleTransferenciasFilialApi[];
+  /** Chaves do cooldown (origens que mandaram esse produto+cor nos últimos N dias).
+   * Carregado em paralelo pela página. Formato: `${produto}|${codigoCor}|${origemUPPER}`. */
+  cooldownKeys?: Set<string>;
+  /** Contadores de itens em "Realizadas" por (origem|destino). Usado para badges nas tabs. */
+  realizadasContadores?: Map<string, number>;
   /** Disparado após uma transferência (saída) ser executada com sucesso. Usado pela página
    * para refazer o fetch de /api/controle-transferencias e refletir o novo estoque. */
   onTransferExecuted?: () => void | Promise<void>;
@@ -433,12 +439,18 @@ function organizeFiliais(
 
 /**
  * Calcula as transferências necessárias
- * Mesma lógica da versão antiga, mas otimizada
+ * Mesma lógica da versão antiga, mas otimizada.
+ *
+ * `cooldownKeys`: chaves no formato `${produto}|${codigoCor}|${origemCanonicoUpper}`
+ * que devem ser excluídas como origem para esse produto+cor. Usado para impedir
+ * que a mesma loja seja sugerida como origem para o mesmo produto duas vezes
+ * dentro da janela de cooldown (default 7 dias) configurada no backend.
  */
 export function calculateTransfers(
   data: ProdutoTransferencia[],
   companyKey: CompanyKey,
-  dateRange?: DateRangeValue
+  dateRange?: DateRangeValue,
+  cooldownKeys?: Set<string>
 ): TransferByOrigin[] {
   const company = resolveCompany(companyKey);
   if (!company) {
@@ -589,9 +601,19 @@ export function calculateTransfers(
 
     if (filiaisQuePrecisam.length === 0) return;
 
+    // Pré-computa chave do cooldown para este produto+cor (codigoCor).
+    // O backend devolve chaves no formato `${produto}|${codigoCor}|${origemUPPER}`.
+    const cooldownProdutoCorPrefix = cooldownKeys && cooldownKeys.size > 0
+      ? `${(item.produto || '').trim()}|${(item.codigoCor || '').trim()}|`
+      : null;
+
     // --- 3. Origens: filiais com excedente > 0 ---
     const filiaisComEstoque = item.filiais
       .filter(f => {
+        if (cooldownProdutoCorPrefix && cooldownKeys) {
+          const chave = cooldownProdutoCorPrefix + (f.filial || '').trim().toUpperCase();
+          if (cooldownKeys.has(chave)) return false;
+        }
         const demanda   = demandaPorFilial.get(f.filial) || 0;
         const diaria    = getDiaria(demanda, f.vendas12m);
         const estPos    = Math.max(0, f.stock);
@@ -1110,14 +1132,17 @@ export default function ControleTransferenciasTable({
   selectedFilial,
   permissoes,
   filiaisApi,
+  cooldownKeys,
+  realizadasContadores,
   onTransferExecuted,
 }: ControleTransferenciasTableProps) {
   const company = resolveCompany(companyKey);
 
-  /** Só depende de dados + período — evita recalcular algoritmo inteiro ao trocar só a filial de origem na UI. */
+  /** Só depende de dados + período + cooldown. Cooldown remove origens que já enviaram
+   * esse produto+cor recentemente, evitando sugestões repetidas. */
   const transfersAllOrigins = useMemo(
-    () => calculateTransfers(data, companyKey, dateRange),
-    [data, companyKey, dateRange]
+    () => calculateTransfers(data, companyKey, dateRange, cooldownKeys),
+    [data, companyKey, dateRange, cooldownKeys]
   );
 
   // Agrupar por origem, e dentro de cada origem, agrupar por destino
@@ -1196,9 +1221,6 @@ export default function ControleTransferenciasTable({
     });
     return transferGroups;
   }, [transfersAllOrigins, selectedFilial, company]);
-
-  const [markedKeys, setMarkedKeys] = useState<Set<string>>(new Set());
-  const [savingMarked, setSavingMarked] = useState(false);
 
   // Quantidades reais (Neon): item_key -> quantidade
   const [quantidadesReais, setQuantidadesReais] = useState<Record<string, number>>({});
@@ -1329,44 +1351,6 @@ export default function ControleTransferenciasTable({
     filiaisApi.length,
   ]);
 
-  const { visibleItemKeys, visibleItemKeysSig } = useMemo(() => {
-    const set = new Set<string>();
-    filteredTransfersByOriginAndDestination.forEach((group) => {
-      group.destinationGroups.forEach((dg) => {
-        dg.items.forEach((item) => set.add(getTransferItemKey(item)));
-      });
-    });
-    const sig = [...set].sort().join("|");
-    return { visibleItemKeys: set, visibleItemKeysSig: sig };
-  }, [filteredTransfersByOriginAndDestination]);
-
-
-  // Carregar marcações da API (Neon + Redis com migração automática)
-  // IMPORTANTE: Carregamos TODOS os dados salvos, não apenas os visíveis.
-  // Isso garante que dados não sejam perdidos quando itens saem da lista.
-  // Apenas mostramos como marcados os itens que estão visíveis E salvos.
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const res = await fetch(`/api/transferencias-realizadas?company=${encodeURIComponent(companyKey)}`);
-        if (!active) return;
-        if (!res.ok) return;
-        const json = await res.json();
-        const stored: string[] = Array.isArray(json.markedKeys) ? json.markedKeys : [];
-        // Filtrar apenas os visíveis para exibição, mas manter todos salvos no backend
-        const visible = visibleItemKeys;
-        const filtered = stored.filter((k) => visible.has(k));
-        setMarkedKeys(new Set(filtered));
-      } catch {
-        if (active) setMarkedKeys(new Set());
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [companyKey, visibleItemKeysSig]);
-
   // Carregar quantidades reais da API (Neon)
   useEffect(() => {
     let active = true;
@@ -1424,6 +1408,24 @@ export default function ControleTransferenciasTable({
   // chave já contém origem+destino, então não há colisão entre grupos.
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 
+  // Aba ativa por destinationGroup: "sugestoes" (default) ou "realizadas".
+  // Chave: `${origemCanonico}|${destinoCanonico}`.
+  const [activeTabByGroup, setActiveTabByGroup] = useState<Record<string, "sugestoes" | "realizadas">>({});
+  const getActiveTab = useCallback(
+    (origemCanonico: string, destinoCanonico: string): "sugestoes" | "realizadas" =>
+      activeTabByGroup[`${origemCanonico}|${destinoCanonico}`] ?? "sugestoes",
+    [activeTabByGroup]
+  );
+  const setActiveTab = useCallback(
+    (origemCanonico: string, destinoCanonico: string, tab: "sugestoes" | "realizadas") => {
+      setActiveTabByGroup((prev) => ({
+        ...prev,
+        [`${origemCanonico}|${destinoCanonico}`]: tab,
+      }));
+    },
+    []
+  );
+
   const toggleSelectKey = useCallback((key: string) => {
     setSelectedKeys((prev) => {
       const next = new Set(prev);
@@ -1465,37 +1467,9 @@ export default function ControleTransferenciasTable({
     [user?.role, permissoes, permissaoMatchFilial]
   );
 
-  /** Marca vários itens como realizada (cinza) em uma única chamada, preservando
-   * o histórico. Idempotente: itens já marcados são ignorados. */
-  const marcarVariosComoRealizada = async (items: TransferItem[]): Promise<void> => {
-    const keysNovas = items
-      .map(getTransferItemKey)
-      .filter((k) => !markedKeys.has(k));
-    if (keysNovas.length === 0) return;
-
-    const next = new Set(markedKeys);
-    keysNovas.forEach((k) => next.add(k));
-    setMarkedKeys(next);
-
-    setSavingMarked(true);
-    try {
-      await fetch("/api/transferencias-realizadas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyKey,
-          markedKeys: keysNovas,
-          removeKeys: [],
-        }),
-      });
-    } finally {
-      setSavingMarked(false);
-    }
-  };
-
   /** Executa a saída como TRANSFERENCIA ENTRE LOJAS em LOTE. Um único romaneio
-   * cobre todos os itens (mesma filial origem + filial destino). Em sucesso,
-   * marca todos como realizada (cinza) e pede refetch dos dados. */
+   * cobre todos os itens (mesma filial origem + filial destino). Inclui metadata
+   * no payload para o backend gravar `transferencia_pendente` (histórico/cooldown). */
   const executarTransferenciaSaida = async (
     target: NonNullable<typeof transferTarget>
   ): Promise<void> => {
@@ -1520,6 +1494,18 @@ export default function ControleTransferenciasTable({
         quantidade,
       }));
 
+      const metadataItems = itensValidos.map(({ item, quantidade }) => ({
+        produto: item.produto,
+        corCodigo: item.itemOriginal.codigoCor ?? null,
+        corDescricao: item.cor ?? null,
+        descricao: item.descricao ?? null,
+        codigoBarra: item.codigoBarra ?? null,
+        origemLabel: item.origem ?? null,
+        destinoLabel: item.destino ?? null,
+        itemKey: getTransferItemKey(item),
+        quantidade,
+      }));
+
       const response = await fetch("/api/saidas-entradas-produtos/executar", {
         method: "POST",
         headers: {
@@ -1534,6 +1520,7 @@ export default function ControleTransferenciasTable({
           tipoRomaneio: "TRANSFERENCIA ENTRE LOJAS",
           observacao: null,
           companyKey,
+          registrarTransferenciaPendente: { items: metadataItems },
         }),
       });
 
@@ -1548,9 +1535,8 @@ export default function ControleTransferenciasTable({
         romaneio?: string;
       };
 
-      // Marca todos como realizada e limpa a seleção desses itens
+      // Limpa seleção dos itens transferidos
       const itensTransferidos = itensValidos.map((x) => x.item);
-      await marcarVariosComoRealizada(itensTransferidos);
       setSelectedKeys((prev) => {
         const next = new Set(prev);
         itensTransferidos.forEach((it) => next.delete(getTransferItemKey(it)));
@@ -1655,7 +1641,7 @@ export default function ControleTransferenciasTable({
       })),
     }));
 
-    exportTransfersToPDF(dataForExport, companyKey, dateRange, markedKeys, quantidadesReais);
+    exportTransfersToPDF(dataForExport, companyKey, dateRange, new Set(), quantidadesReais);
   };
 
   return (
@@ -1741,9 +1727,8 @@ export default function ControleTransferenciasTable({
                 else if (realFila < it.quantidade) qtdAjustada = realFila;
               }
 
-              const realizada = markedKeys.has(key);
-              const isSelectable = podeOperarOrigem && !realizada && qtdAjustada > 0;
-              return { key, isSelectable, qtdAjustada, realizada, item: it };
+              const isSelectable = podeOperarOrigem && qtdAjustada > 0;
+              return { key, isSelectable, qtdAjustada, item: it };
             });
 
             const allItemKeys = itemSelecaoInfo.map((x) => x.key);
@@ -1803,7 +1788,7 @@ export default function ControleTransferenciasTable({
                       type="button"
                       className={styles.bulkTransferBtn}
                       onClick={handleAbrirModalLote}
-                      disabled={totalSelecionados === 0 || savingMarked}
+                      disabled={totalSelecionados === 0 || transferSubmitting}
                       title={
                         totalSelecionados === 0
                           ? "Selecione ao menos um item para transferir"
@@ -1837,7 +1822,7 @@ export default function ControleTransferenciasTable({
                             if (el) el.indeterminate = someSelected;
                           }}
                           onChange={handleToggleAllInGroup}
-                          disabled={savingMarked}
+                          disabled={transferSubmitting}
                           aria-label="Selecionar todos"
                         />
                       ) : null}
@@ -1873,8 +1858,7 @@ export default function ControleTransferenciasTable({
                     const numFiliais = item.itemOriginal.filiais.length;
                     const tooltipHeightEstimate = Math.min(700, 100 + (numFiliais * 28));
                     const itemKey = getTransferItemKey(item);
-                    const isMarkedRealizada = markedKeys.has(itemKey);
-                    
+
                     // Calcular quantidade ajustada baseada no estoque real
                     const estoqueReal = quantidadesReais[itemKey];
                     const temEstoqueReal = estoqueReal !== undefined && estoqueReal !== null;
@@ -1935,23 +1919,16 @@ export default function ControleTransferenciasTable({
                       // Se estoque real >= quantidade original, quantidade mantém igual (não afetada)
                     }
 
-                    const urgenciaStatus = item.quantidadeExplicacao?.[0]?.regra?.statusDestino;
-
                     return (
-                <tr
-                  key={`${item.produto}-${item.cor}-${item.destino}-${index}`}
-                  className={isMarkedRealizada ? styles.rowRealizada : undefined}
-                >
+                <tr key={`${item.produto}-${item.cor}-${item.destino}-${index}`}>
                   <td className={styles.selectCell}>
-                    {isMarkedRealizada ? (
-                      <span className={styles.realizadaTag}>Realizada</span>
-                    ) : podeOperarOrigem ? (
+                    {podeOperarOrigem ? (
                       <input
                         type="checkbox"
                         className={styles.selectCheckbox}
                         checked={selectedKeys.has(itemKey)}
                         onChange={() => toggleSelectKey(itemKey)}
-                        disabled={quantidadeAjustada <= 0 || savingMarked}
+                        disabled={quantidadeAjustada <= 0 || transferSubmitting}
                         title={
                           quantidadeAjustada <= 0
                             ? "Quantidade ajustada é zero — não pode ser transferida"
