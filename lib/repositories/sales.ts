@@ -1,6 +1,6 @@
 import sql from 'mssql';
 
-import { resolveCompany, isEcommerceFilial, type CompanyModule, VAREJO_VALUE } from '@/lib/config/company';
+import { resolveCompany, isEcommerceFilial, type CompanyModule, type CompanyKey, VAREJO_VALUE } from '@/lib/config/company';
 import {
   fetchEcommerceSummary,
   fetchTopProductsEcommerce,
@@ -21,6 +21,7 @@ import type {
   FilialPerformance,
 } from '@/types/dashboard';
 import { normalizeRangeForQuery, shiftRangeByMonths } from '@/lib/utils/date';
+import { fetchSalesTotals } from '@/lib/services/salesTotals';
 
 const DEFAULT_LIMIT = 5;
 
@@ -845,6 +846,108 @@ export async function fetchSalesSummary({
     const hasProdutoFilter = !!(produtoId || (produtoSearchTerm && produtoSearchTerm.trim().length >= 2));
     const useLightQuery = !needProdutoJoin && !acimaDoTicket && !filterByRegistrationDate && !hasProdutoFilter;
 
+    // Fonte global compartilhada por Dashboard, Produtos por Venda e Curva ABC.
+    // Quando não há filtros avançados (grupos/coleções/subgrupos/grades/produto/acimaDoTicket/registrationDate),
+    // delegamos os totais (vendas, qtde, tickets) para `fetchSalesTotals` para garantir
+    // que os 3 lugares sempre apresentem o MESMO número.
+    // O filtro de linha (NERD: ELETRONICOS) é suportado nativamente pela fonte global.
+    const linhasInputList = linhas && linhas.length > 0 ? linhas : linha ? [linha] : [];
+    const colecoesInputList = colecoes && colecoes.length > 0 ? colecoes : colecao ? [colecao] : [];
+    const subgruposInputList = subgrupos && subgrupos.length > 0 ? subgrupos : subgrupo ? [subgrupo] : [];
+    const gradesInputList = grades && grades.length > 0 ? grades : grade ? [grade] : [];
+    const useUnifiedTotals =
+      !acimaDoTicket
+      && !filterByRegistrationDate
+      && !hasProdutoFilter
+      && gruposList.length === 0
+      && colecoesInputList.length === 0
+      && subgruposInputList.length === 0
+      && gradesInputList.length === 0
+      // Linha do NERD é suportada nativamente pela fonte global; scarfme com filtro de linha não
+      && (company !== 'scarfme' || linhasInputList.length === 0);
+
+    if (useUnifiedTotals) {
+      const totals = await fetchSalesTotals({
+        company: company as CompanyKey,
+        range: currentRange,
+        filial: filial ?? null,
+        linhas: company === 'nerd' && linhasInputList.length > 0 ? linhasInputList : null,
+      });
+
+      const stockKpisUnified = await fetchEstoqueKPIs({
+        company,
+        filial,
+        grupos,
+        linhas,
+        colecoes,
+        subgrupos,
+        grades,
+        produtoId,
+        produtoSearchTerm,
+        filterByRegistrationDate,
+        range: currentRange,
+      });
+
+      const buildMetricUnified = (current: number, previous: number): MetricSummary => {
+        if (previous === 0 && current === 0) {
+          return { currentValue: current, previousValue: previous, changePercentage: 0 };
+        }
+        const changePercentage =
+          previous === 0
+            ? null
+            : Number((((current - previous) / previous) * 100).toFixed(1));
+        return { currentValue: current, previousValue: previous, changePercentage };
+      };
+
+      const avgCurrent = totals.tickets > 0
+        ? Number((totals.vendas / totals.tickets).toFixed(2)) : 0;
+      const avgPrevious = totals.ticketsPrevious > 0
+        ? Number((totals.vendasPrevious / totals.ticketsPrevious).toFixed(2)) : 0;
+
+      const summary: SalesSummary = {
+        totalRevenue: buildMetricUnified(totals.vendas, totals.vendasPrevious),
+        totalQuantity: buildMetricUnified(totals.qtde, totals.qtdePrevious),
+        totalTickets: buildMetricUnified(totals.tickets, totals.ticketsPrevious),
+        averageTicket: buildMetricUnified(avgCurrent, avgPrevious),
+        totalStockQuantity: {
+          currentValue: stockKpisUnified.estoqueTotal,
+          previousValue: stockKpisUnified.estoqueTotal,
+          changePercentage: null,
+        },
+        totalStockValue: {
+          currentValue: stockKpisUnified.valorEmEstoque,
+          previousValue: stockKpisUnified.valorEmEstoque,
+          changePercentage: null,
+        },
+      };
+
+      const availabilityRow = await withRequest(async (availabilityRequest) => {
+        const availabilityFilter = buildFilialFilter(availabilityRequest, company, 'sales', filial);
+        const availabilityQuery = `
+          SELECT
+            MIN(vp.DATA_VENDA) AS firstSaleDate,
+            MAX(vp.DATA_VENDA) AS lastSaleDate
+          FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+          WHERE vp.QTDE > 0
+            ${availabilityFilter}
+        `;
+        const availabilityResult = await availabilityRequest.query<{
+          firstSaleDate: Date | null;
+          lastSaleDate: Date | null;
+        }>(availabilityQuery);
+        return availabilityResult.recordset[0] ?? { firstSaleDate: null, lastSaleDate: null };
+      });
+
+      return {
+        summary,
+        currentPeriodLastSaleDate: totals.lastSaleDate,
+        availableRange: {
+          start: availabilityRow.firstSaleDate ? new Date(availabilityRow.firstSaleDate) : null,
+          end: availabilityRow.lastSaleDate ? new Date(availabilityRow.lastSaleDate) : null,
+        },
+      };
+    }
+
     // Se acimaDoTicket estiver ativo, filtrar apenas vendas onde PRECO_LIQUIDO > preço sugerido
     let acimaDoTicketFilter = '';
     if (acimaDoTicket) {
@@ -1037,12 +1140,13 @@ export async function fetchSalesSummary({
           AND v.TICKET = vp.TICKET
         LEFT JOIN FILIAIS f WITH (NOLOCK)
           ON f.COD_FILIAL = vp.CODIGO_FILIAL
-        LEFT JOIN PRODUTOS p WITH (NOLOCK) 
+        LEFT JOIN PRODUTOS p WITH (NOLOCK)
           ON p.PRODUTO = vp.PRODUTO
         WHERE (
             (vp.DATA_VENDA >= @startDate AND vp.DATA_VENDA < @endDate)
             OR (vp.DATA_VENDA >= @prevStartDate AND vp.DATA_VENDA < @prevEndDate)
           )
+          AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
           ${filialFilter}
           ${grupoFilter.replace(/vp\.GRUPO_PRODUTO/g, 'p.GRUPO_PRODUTO')}
           ${linhaFilter.replace(/vp\.LINHA/g, 'p.LINHA')}

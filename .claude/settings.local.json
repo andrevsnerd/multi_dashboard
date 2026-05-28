@@ -110,7 +110,23 @@
       "Bash(curl -s -m 90 \"http://localhost:3000/api/filiais\" -o _apiout.json -w \"HTTP %{http_code}\\\\n\")",
       "Bash(node -e \"const d=require\\('./_apiout.json'\\); if\\(d.error\\){console.log\\('ERROR:',d.error\\)} else {const a=d.data||[]; console.log\\('total:',a.length\\); const cn=a.find\\(x=>x.filial.includes\\('CENTER NORTE'\\)\\); console.log\\('center norte:', cn?JSON.stringify\\({filial:cn.filial,empresa:cn.empresaCod+' '+cn.empresaNome,cnpj:cn.cnpj,ie:cn.inscricaoEstadual,cidade:cn.cidade,uf:cn.uf}\\):'NOT FOUND'\\); console.log\\('grupos:', [...new Set\\(a.map\\(x=>x.empresaCod+' '+x.empresaNome\\)\\)].length\\);}\")",
       "Bash(echo \"EXIT=$?\")",
-      "Bash(npx next *)"
+      "Bash(npx next *)",
+      "Bash(echo \"EXIT_CODE=$?\")",
+      "Bash(ls \"C:\\\\Users\\\\NERD TIJUCA\\\\Documents\\\\varejo.xlsx\" \"C:\\\\Users\\\\NERD TIJUCA\\\\Documents\\\\ecom.xlsx\")",
+      "Read(//c/Users/NERD TIJUCA/Documents/**)",
+      "Bash(python -c \"import openpyxl; print\\('ok'\\)\")",
+      "Bash(python -c \"import pandas; print\\('pandas ok'\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('scripts:', d.get\\('scripts'\\)\\)\")",
+      "Bash(netstat -ano)",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 3000,3001 -ErrorAction SilentlyContinue | Select-Object LocalAddress,LocalPort,State\")",
+      "Bash(python -c 'import json,sys; d=json.load\\(sys.stdin\\); s=d.get\\('\\\\''data'\\\\'',{}\\); print\\('\\\\''TOTAL REVENUE \\(NERD abril/2026, sem filtro\\):'\\\\''\\); print\\('\\\\'' currentValue ='\\\\'', s.get\\('\\\\''totalRevenue'\\\\'',{}\\).get\\('\\\\''currentValue'\\\\''\\)\\); *)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); s=d.get\\('data',{}\\); print\\('=== NERD abril/2026, linha=ELETRONICOS ==='\\); print\\(' Vendas =', s.get\\('totalRevenue',{}\\).get\\('currentValue'\\)\\); print\\(' Qtde   =', s.get\\('totalQuantity',{}\\).get\\('currentValue'\\)\\)\")",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); s=d.get\\('data',{}\\); print\\('=== NERD abril/2026 \\(end=2026-04-30, ou seja apenas abril\\) ==='\\); print\\(' Vendas =', s.get\\('totalRevenue',{}\\).get\\('currentValue'\\)\\); print\\(' Qtde   =', s.get\\('totalQuantity',{}\\).get\\('currentValue'\\)\\)\")",
+      "Bash(curl -s \"http://localhost:3000/api/products/search?company=nerd&q=MUSELLA\" --max-time 30)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d\\)\")",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(' Vendas =', d.get\\('vendas'\\)\\); print\\(' Qtde   =', d.get\\('qtde'\\)\\)\")",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); s=d.get\\('summary',{}\\); print\\(' Vendas =', s.get\\('totalRevenue',{}\\).get\\('currentValue'\\)\\); print\\(' Qtde   =', s.get\\('totalQuantity',{}\\).get\\('currentValue'\\)\\)\")"
     ]
   }
 }

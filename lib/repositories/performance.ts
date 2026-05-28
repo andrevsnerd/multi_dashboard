@@ -57,10 +57,16 @@ function buildNormalizedFilialSqlExpr(column: string): string {
 export async function fetchPerformanceData(
   companyKey: CompanyKey,
   range: NormalizedRange,
-  comparisonMode: 'month' | 'year' = 'month'
+  comparisonMode: 'month' | 'year' = 'month',
+  options?: { linhas?: string[] | null }
 ): Promise<PerformanceDataResult> {
   const company = resolveCompany(companyKey);
   if (!company) return { current: [], previous: [] };
+
+  // Filtro de linha (NERD: ex. ELETRONICOS) — mantém Curva ABC alinhada com Dashboard/Produtos por Venda.
+  const linhaList = (companyKey === 'nerd' && options?.linhas)
+    ? options.linhas.map(l => l.trim().toUpperCase()).filter(Boolean)
+    : [];
 
   const matrizFiliais = new Set(MATRIZ_FILIAIS[companyKey] ?? []);
   const ecommerceFilials = company.ecommerceFilials ?? [];
@@ -105,6 +111,18 @@ export async function fetchPerformanceData(
       });
       const filialPlaceholders = posFiliais.map((_, i) => `@${prefix}f${i}`).join(', ');
 
+      let linhaClause = '';
+      if (linhaList.length > 0) {
+        if (linhaList.length === 1) {
+          request.input(`${prefix}linha`, sql.VarChar, linhaList[0]);
+          linhaClause = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @${prefix}linha`;
+        } else {
+          linhaList.forEach((l, i) => request.input(`${prefix}linha${i}`, sql.VarChar, l));
+          const linhaPlaceholders = linhaList.map((_, i) => `@${prefix}linha${i}`).join(', ');
+          linhaClause = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) IN (${linhaPlaceholders})`;
+        }
+      }
+
       const query = `
         WITH vendas_base AS (
           SELECT
@@ -127,7 +145,9 @@ export async function fetchPerformanceData(
             ON p.PRODUTO = vp.PRODUTO
           WHERE vp.DATA_VENDA >= @${prefix}start
             AND vp.DATA_VENDA < @${prefix}end
+            AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
             AND f.FILIAL IN (${filialPlaceholders})
+            ${linhaClause}
         ),
         trocas_item AS (
           SELECT
@@ -171,6 +191,7 @@ export async function fetchPerformanceData(
                 AND ISNULL(vp2.QTDE_CANCELADA, 0) = 0
             )
             AND f.FILIAL IN (${filialPlaceholders})
+            ${linhaClause}
         ),
         VendasComNumero AS (
           SELECT
@@ -337,9 +358,12 @@ export async function fetchFilialProdutoSales(
   ecommerceFilialNames: string[],
   range: NormalizedRange,
   comparisonMode: 'month' | 'year' = 'month',
-  options?: { groupByCor?: boolean; limit?: number },
+  options?: { groupByCor?: boolean; limit?: number; linhas?: string[] | null },
 ): Promise<FilialProdutoSalesRow[]> {
   const groupByCor = options?.groupByCor === true;
+  const linhaList = (companyKey === 'nerd' && options?.linhas)
+    ? options.linhas.map(l => l.trim().toUpperCase()).filter(Boolean)
+    : [];
   const start = range.start;
   const end = range.end;
   const prev = shiftRangeByMonths(range, comparisonMode === 'year' ? -12 : -1);
@@ -418,6 +442,18 @@ export async function fetchFilialProdutoSales(
         ? 'LEFT JOIN CORES_BASICAS cor_ref WITH (NOLOCK) ON cor_ref.COR = m.COR_PRODUTO'
         : '';
       const corGroupBy = groupByCor ? ', ISNULL(m.COR_PRODUTO, \'\')' : '';
+
+      let linhaFinalClause = '';
+      if (linhaList.length > 0) {
+        if (linhaList.length === 1) {
+          request.input(`${prefix}Linha`, sql.VarChar, linhaList[0]);
+          linhaFinalClause = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @${prefix}Linha`;
+        } else {
+          linhaList.forEach((l, i) => request.input(`${prefix}Linha${i}`, sql.VarChar, l));
+          const linhaPlaceholders = linhaList.map((_, i) => `@${prefix}Linha${i}`).join(', ');
+          linhaFinalClause = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) IN (${linhaPlaceholders})`;
+        }
+      }
       const query = `
         WITH vendas_base AS (
           SELECT
@@ -557,6 +593,7 @@ export async function fetchFilialProdutoSales(
         ) pbsel
         ${corJoin}
         WHERE m.FILIAL IS NOT NULL
+          ${linhaFinalClause}
         GROUP BY ISNULL(m.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}${gradeGroupBy}${corGroupBy}
         ORDER BY VENDAS DESC
       `;
@@ -580,6 +617,19 @@ export async function fetchFilialProdutoSales(
         ? 'LEFT JOIN CORES_BASICAS cor_ref WITH (NOLOCK) ON cor_ref.COR = fp.COR_PRODUTO'
         : '';
       const corGroupBy = groupByCor ? ', ISNULL(fp.COR_PRODUTO, \'\')' : '';
+
+      let linhaEcomClause = '';
+      if (linhaList.length > 0) {
+        if (linhaList.length === 1) {
+          request.input(`${prefix}EcomLinha`, sql.VarChar, linhaList[0]);
+          linhaEcomClause = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @${prefix}EcomLinha`;
+        } else {
+          linhaList.forEach((l, i) => request.input(`${prefix}EcomLinha${i}`, sql.VarChar, l));
+          const linhaPlaceholders = linhaList.map((_, i) => `@${prefix}EcomLinha${i}`).join(', ');
+          linhaEcomClause = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) IN (${linhaPlaceholders})`;
+        }
+      }
+
       const query = `
         SELECT ${topClause}
           ISNULL(fp.PRODUTO, '') AS PRODUTO,
@@ -613,6 +663,7 @@ export async function fetchFilialProdutoSales(
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
           AND f.FILIAL IN (${placeholders})
+          ${linhaEcomClause}
         GROUP BY ISNULL(fp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}${gradeGroupBy}, ISNULL(p.CUSTO_REPOSICAO1, 0)${corGroupBy}
         ORDER BY VENDAS DESC
       `;

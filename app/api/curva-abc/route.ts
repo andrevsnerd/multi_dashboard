@@ -15,6 +15,7 @@ import { readGoals } from '@/lib/utils/goals-storage';
 import { type CompanyKey, VAREJO_VALUE } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import { normalizeRangeForQuery, formatDateForQuery } from '@/lib/utils/date';
+import { fetchSalesTotals } from '@/lib/services/salesTotals';
 
 export const maxDuration = 300;
 
@@ -76,6 +77,8 @@ export async function GET(request: Request) {
   const yearParam = searchParams.get('year');
   const compareParam = searchParams.get('compare');
   const porCor = searchParams.get('porCor') === '1';
+  const linhaParams = searchParams.getAll('linha');
+  const linhasFilter = linhaParams.length > 0 ? linhaParams : null;
 
   if (!companyKey) {
     return NextResponse.json({ error: 'Parâmetros obrigatórios faltando' }, { status: 400 });
@@ -118,7 +121,7 @@ export async function GET(request: Request) {
 
   try {
     const [performanceData, allGoals, groupedProducts] = await Promise.all([
-      fetchPerformanceData(companyKey, resolvedRange, comparisonMode),
+      fetchPerformanceData(companyKey, resolvedRange, comparisonMode, { linhas: linhasFilter }),
       readGoals(),
       listProdutoAgrupadoGroups(companyKey),
     ]);
@@ -258,16 +261,18 @@ export async function GET(request: Request) {
       const allPosMembers = filiais.filter(f => !ecommerceFilials.has(f));
       const allEcomMembers = filiais.filter(f => ecommerceFilials.has(f));
 
-      // KPIs: soma de todas as filiais não-matriz
-      let vendas = 0, vendasPrevious = 0, qtde = 0;
-      currentByFilial.forEach((filialMap, canonical) => {
-        if (matrizSet.has(canonical)) return;
-        filialMap.forEach(d => { vendas += d.vendas; qtde += d.qtde; });
+      // KPIs: usam a fonte global compartilhada com Dashboard e Produtos por Venda
+      // (`fetchSalesTotals` aplica QTDE_CANCELADA=0, deduções de trocas, e o filtro de linha).
+      const globalTotals = await fetchSalesTotals({
+        company: companyKey,
+        range: resolvedRange,
+        filial: null,
+        linhas: linhasFilter,
+        comparisonMode,
       });
-      previousByFilial.forEach((filialMap, canonical) => {
-        if (matrizSet.has(canonical)) return;
-        filialMap.forEach(d => { vendasPrevious += d.vendas; });
-      });
+      const vendas = globalTotals.vendas;
+      const vendasPrevious = globalTotals.vendasPrevious;
+      const qtde = globalTotals.qtde;
 
       // Categorias agregadas de todas as filiais
       const allCatCurrent = new Map<string, { vendas: number; qtde: number }>();
@@ -318,6 +323,7 @@ export async function GET(request: Request) {
         [produtos, qtdePorFilialRows, estoquePorFilialRows] = await Promise.all([
           fetchFilialProdutoSales(companyKey, allPosMembers, allEcomMembers, resolvedRange, comparisonMode, {
             groupByCor: porCor,
+            linhas: linhasFilter,
           }),
           fetchProdutoQtdePorFilial(companyKey, allPosMembers, allEcomMembers, resolvedRange, {
             groupByCor: porCor,
@@ -435,9 +441,18 @@ export async function GET(request: Request) {
     const currentData = mergeCategoryMaps(currentByFilial, aggregationKeys);
     const previousData = mergeCategoryMaps(previousByFilial, aggregationKeys);
 
-    const vendas = Array.from(currentData.values()).reduce((s, d) => s + d.vendas, 0);
-    const vendasPrevious = Array.from(previousData.values()).reduce((s, d) => s + d.vendas, 0);
-    const qtde = Array.from(currentData.values()).reduce((s, d) => s + d.qtde, 0);
+    // KPIs principais vêm da fonte global compartilhada com Dashboard/Produtos por Venda
+    // para garantir que os 3 lugares apresentem o MESMO número.
+    const globalTotals = await fetchSalesTotals({
+      company: companyKey,
+      range: resolvedRange,
+      filial: selectedFilialKey,
+      linhas: linhasFilter,
+      comparisonMode,
+    });
+    const vendas = globalTotals.vendas;
+    const vendasPrevious = globalTotals.vendasPrevious;
+    const qtde = globalTotals.qtde;
     const meta = groupMembers.reduce((s, f) => s + (monthGoals[f] ?? 0), 0);
     const projecao = daysElapsed > 0 ? (vendas / daysElapsed) * totalDaysInMonth : vendas;
     const projecaoPct = meta > 0 ? (projecao / meta) * 100 : null;
@@ -460,6 +475,7 @@ export async function GET(request: Request) {
       [produtos, estoquePorFilialRows, estoqueRedePorFilialRows] = await Promise.all([
         fetchFilialProdutoSales(companyKey, posMembers, ecomMembers, resolvedRange, comparisonMode, {
           groupByCor: porCor,
+          linhas: linhasFilter,
         }),
         fetchProdutoEstoquePorFilial(companyKey, posMembers, ecomMembers, { groupByCor: porCor }),
         fetchProdutoEstoquePorFilial(companyKey, [...allPosMembers, ...matrizList], allEcomMembers, { groupByCor: porCor }),

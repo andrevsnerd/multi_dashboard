@@ -1364,6 +1364,11 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     if (porCor) {
       params.set('porCor', '1');
     }
+    // Para NERD, o toggle "Eletrônicos" envia o filtro de linha ao backend
+    // (mesma lógica de Dashboard e Produtos por Venda, alimentadas pela fonte global `fetchSalesTotals`).
+    if (companyKey === 'nerd' && filtrarEletronicos) {
+      params.append('linha', 'ELETRONICOS');
+    }
     fetch(`/api/curva-abc?${params}`, { cache: "no-store" })
       .then(res => res.json())
       .then((json: FilialData & { error?: string }) => {
@@ -1372,7 +1377,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       })
       .catch(e => setError(e instanceof Error ? e.message : "Erro desconhecido"))
       .finally(() => setLoading(false));
-  }, [companyKey, selectedFilial, selectedMonth, selectedYear, comparisonMode, range.startDate, range.endDate, porCor]);
+  }, [companyKey, selectedFilial, selectedMonth, selectedYear, comparisonMode, range.startDate, range.endDate, porCor, filtrarEletronicos]);
 
 
   const outrosTooltip = useMemo(() => getOutrosTooltip(companyKey), [companyKey]);
@@ -1641,18 +1646,30 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     selectedCurvas.size > 0 ||
     selectedStockBuckets.size > 0;
 
+  // Filtros já aplicados no servidor (que retorna `data.vendas` / `data.qtde` via fonte global):
+  //  - Eletrônicos (NERD): backend filtra LINHA = 'ELETRONICOS'
+  // Quando o único filtro ativo é o eletrônicos, podemos usar os totais autoritativos do servidor
+  // — assim Dashboard, Produtos por Venda e Curva ABC mostram exatamente o mesmo número.
+  const onlyServerSideFilters =
+    (companyKey === "nerd" && filtrarEletronicos) &&
+    !hasStructuredFilters &&
+    !filtrarSugeridos &&
+    selectedCurvas.size === 0 &&
+    selectedStockBuckets.size === 0;
+
   // Os cards de resumo refletem exatamente os produtos exibidos na tabela
   // (após TODOS os filtros: categoria, eletrônicos, sugeridos, estoque e curva).
-  // Sem nenhum filtro ativo, usamos os totais autoritativos do servidor.
-  const displayVendas = hasAnyDisplayFilter
-    ? produtosComCurvaExibidos.reduce((s, p) => s + p.vendas, 0)
-    : data?.vendas ?? 0;
-  const displayVendasPrevious = hasAnyDisplayFilter
-    ? produtosComCurvaExibidos.reduce((s, p) => s + p.vendasPrevious, 0)
-    : data?.vendasPrevious ?? 0;
-  const displayQtde = hasAnyDisplayFilter
-    ? produtosComCurvaExibidos.reduce((s, p) => s + p.qtde, 0)
-    : data?.qtde ?? 0;
+  // Sem nenhum filtro ativo (ou apenas o filtro server-side de eletrônicos), usamos os totais autoritativos do servidor.
+  const useServerTotals = !hasAnyDisplayFilter || onlyServerSideFilters;
+  const displayVendas = useServerTotals
+    ? data?.vendas ?? 0
+    : produtosComCurvaExibidos.reduce((s, p) => s + p.vendas, 0);
+  const displayVendasPrevious = useServerTotals
+    ? data?.vendasPrevious ?? 0
+    : produtosComCurvaExibidos.reduce((s, p) => s + p.vendasPrevious, 0);
+  const displayQtde = useServerTotals
+    ? data?.qtde ?? 0
+    : produtosComCurvaExibidos.reduce((s, p) => s + p.qtde, 0);
   const displayCMV = produtosComCurvaExibidos.reduce((s, p) => s + p.custo * p.qtde, 0);
   const displayedCountLabel = filteredCurve
     ? `${Array.from(selectedCurvas).join(", ")} ${porCor ? "itens exibidos" : "produtos exibidos"}`
