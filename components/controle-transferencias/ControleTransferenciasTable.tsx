@@ -1406,41 +1406,45 @@ export default function ControleTransferenciasTable({
     }
   };
 
-  /** Marca um item como "realizada" (cinza). Idempotente — não desmarca. Usado após
-   * confirmação de saída pelo modal de transferência. Mantemos a leitura de
-   * `markedKeys` apenas para preservar o histórico cinza já existente. */
-  const marcarComoRealizada = async (item: TransferItem): Promise<void> => {
-    const key = getTransferItemKey(item);
-    if (markedKeys.has(key)) return;
-
-    const next = new Set(markedKeys);
-    next.add(key);
-    setMarkedKeys(next);
-
-    setSavingMarked(true);
-    try {
-      await fetch("/api/transferencias-realizadas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyKey,
-          markedKeys: [key],
-          removeKeys: [],
-        }),
-      });
-    } finally {
-      setSavingMarked(false);
-    }
-  };
-
-  // Estado do modal de confirmação de transferência
+  // Estado do modal de confirmação de transferência (lote — mesmo origem/destino).
+  // `transferTarget` é o snapshot dos itens que vão para o modal, junto com a
+  // quantidade efetiva a transferir de cada um (já ajustada por estoque real).
   const [transferTarget, setTransferTarget] = useState<{
-    item: TransferItem;
-    quantidade: number;
+    origemCanonico: string;
+    destinoCanonico: string;
+    origemLabel: string;
+    destinoLabel: string;
+    items: Array<{ item: TransferItem; quantidade: number }>;
   } | null>(null);
   const [transferSubmitting, setTransferSubmitting] = useState(false);
   const [transferError, setTransferError] = useState<string | null>(null);
   const [transferSuccess, setTransferSuccess] = useState<string | null>(null);
+
+  // Seleção em lote: chave estável do item. Sem `originGroup` separado porque a
+  // chave já contém origem+destino, então não há colisão entre grupos.
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+
+  const toggleSelectKey = useCallback((key: string) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const replaceSelectionForGroup = useCallback(
+    (groupKeys: string[], allOnGroupKeys: string[]) => {
+      setSelectedKeys((prev) => {
+        const next = new Set(prev);
+        // remove apenas as chaves visíveis deste grupo, preservando seleções de outros grupos
+        for (const k of allOnGroupKeys) next.delete(k);
+        for (const k of groupKeys) next.add(k);
+        return next;
+      });
+    },
+    []
+  );
 
   /** Verifica se o usuário pode executar saída a partir da origem informada.
    * Espelha exatamente a regra de `/api/saidas-entradas-produtos/executar`:
@@ -1461,19 +1465,47 @@ export default function ControleTransferenciasTable({
     [user?.role, permissoes, permissaoMatchFilial]
   );
 
-  /** Executa a saída como TRANSFERENCIA ENTRE LOJAS, mesma chamada da página de
-   * saída-entrada (gera romaneio, registra destino e dispara o fluxo do ERP).
-   * Em sucesso, marca o item como realizada (cinza) e pede refetch dos dados. */
+  /** Marca vários itens como realizada (cinza) em uma única chamada, preservando
+   * o histórico. Idempotente: itens já marcados são ignorados. */
+  const marcarVariosComoRealizada = async (items: TransferItem[]): Promise<void> => {
+    const keysNovas = items
+      .map(getTransferItemKey)
+      .filter((k) => !markedKeys.has(k));
+    if (keysNovas.length === 0) return;
+
+    const next = new Set(markedKeys);
+    keysNovas.forEach((k) => next.add(k));
+    setMarkedKeys(next);
+
+    setSavingMarked(true);
+    try {
+      await fetch("/api/transferencias-realizadas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyKey,
+          markedKeys: keysNovas,
+          removeKeys: [],
+        }),
+      });
+    } finally {
+      setSavingMarked(false);
+    }
+  };
+
+  /** Executa a saída como TRANSFERENCIA ENTRE LOJAS em LOTE. Um único romaneio
+   * cobre todos os itens (mesma filial origem + filial destino). Em sucesso,
+   * marca todos como realizada (cinza) e pede refetch dos dados. */
   const executarTransferenciaSaida = async (
-    item: TransferItem,
-    quantidade: number
+    target: NonNullable<typeof transferTarget>
   ): Promise<void> => {
     if (!user?.username) {
       setTransferError("Usuário não identificado. Faça login novamente.");
       return;
     }
-    if (quantidade <= 0) {
-      setTransferError("Quantidade inválida para transferência.");
+    const itensValidos = target.items.filter((x) => x.quantidade > 0);
+    if (itensValidos.length === 0) {
+      setTransferError("Nenhum item com quantidade válida para transferir.");
       return;
     }
 
@@ -1482,7 +1514,12 @@ export default function ControleTransferenciasTable({
     setTransferSuccess(null);
 
     try {
-      const corProduto = item.itemOriginal.codigoCor ?? null;
+      const itensPayload = itensValidos.map(({ item, quantidade }) => ({
+        produto: item.produto,
+        corProduto: item.itemOriginal.codigoCor ?? null,
+        quantidade,
+      }));
+
       const response = await fetch("/api/saidas-entradas-produtos/executar", {
         method: "POST",
         headers: {
@@ -1491,15 +1528,9 @@ export default function ControleTransferenciasTable({
         },
         body: JSON.stringify({
           tipoOperacao: "saida",
-          filial: item.origemCanonico,
-          filialDestino: item.destinoCanonico,
-          itens: [
-            {
-              produto: item.produto,
-              corProduto,
-              quantidade,
-            },
-          ],
+          filial: target.origemCanonico,
+          filialDestino: target.destinoCanonico,
+          itens: itensPayload,
           tipoRomaneio: "TRANSFERENCIA ENTRE LOJAS",
           observacao: null,
           companyKey,
@@ -1517,12 +1548,20 @@ export default function ControleTransferenciasTable({
         romaneio?: string;
       };
 
-      // Marca como realizada (cinza) — preserva o feedback visual mesmo após refetch
-      await marcarComoRealizada(item);
+      // Marca todos como realizada e limpa a seleção desses itens
+      const itensTransferidos = itensValidos.map((x) => x.item);
+      await marcarVariosComoRealizada(itensTransferidos);
+      setSelectedKeys((prev) => {
+        const next = new Set(prev);
+        itensTransferidos.forEach((it) => next.delete(getTransferItemKey(it)));
+        return next;
+      });
 
+      const totalQtd = itensValidos.reduce((s, x) => s + x.quantidade, 0);
+      const totalItens = itensValidos.length;
       setTransferSuccess(
         json.romaneio
-          ? `Romaneio ${json.romaneio} gerado com sucesso.`
+          ? `Romaneio ${json.romaneio} gerado com ${totalItens} ${totalItens === 1 ? "item" : "itens"} (${totalQtd} un.).`
           : json.message || "Transferência executada com sucesso."
       );
 
@@ -1533,11 +1572,10 @@ export default function ControleTransferenciasTable({
         // ignorar erro de refetch — a transferência já foi registrada
       }
 
-      // Fecha o modal após breve delay para o usuário ler o sucesso
       setTimeout(() => {
         setTransferTarget(null);
         setTransferSuccess(null);
-      }, 1100);
+      }, 1300);
     } catch (err) {
       setTransferError(
         err instanceof Error ? err.message : "Erro ao executar a transferência."
@@ -1659,7 +1697,94 @@ export default function ControleTransferenciasTable({
           </div>
 
           {/* Grupos por destino dentro desta origem */}
-          {group.destinationGroups.map((destGroup, destIndex) => (
+          {group.destinationGroups.map((destGroup, destIndex) => {
+            // Computa estado de seleção/seleção possível deste destinationGroup
+            const origemCanonicoDoGrupo = destGroup.items[0]?.origemCanonico ?? "";
+            const destinoCanonicoDoGrupo = destGroup.items[0]?.destinoCanonico ?? "";
+            const podeOperarOrigem = canExecuteSaidaFromOrigem(origemCanonicoDoGrupo);
+
+            // Para cada item do grupo: chave + se é selecionável + quantidade ajustada
+            const itemSelecaoInfo = destGroup.items.map((it) => {
+              const key = getTransferItemKey(it);
+              const realFila = quantidadesReais[key];
+              const temReal = realFila !== undefined && realFila !== null;
+              const filialOrigemData = getFilialData(
+                it.itemOriginal,
+                company,
+                it.origemCanonico,
+                it.origem
+              );
+              // Espelha a lógica usada na renderização para calcular a quantidade ajustada.
+              const isMatriz =
+                isMainMatrizFilial(companyKey, it.origemCanonico) ||
+                isMainMatrizFilial(companyKey, filialOrigemData?.filial ?? "") ||
+                isMainMatrizFilial(companyKey, it.origem);
+              let isParada = false;
+              if (filialOrigemData) {
+                const estoquePositivo = Math.max(0, filialOrigemData.stock);
+                if (estoquePositivo >= 1 && filialOrigemData.sales === 0 && filialOrigemData.salesLast30Days === 0) {
+                  if (filialOrigemData.ultimaEntrada) {
+                    const hoje = new Date();
+                    const dataUltimaEntrada = new Date(filialOrigemData.ultimaEntrada);
+                    const dias = Math.floor((hoje.getTime() - dataUltimaEntrada.getTime()) / (1000 * 60 * 60 * 24));
+                    if (dias >= 14) isParada = true;
+                  } else {
+                    isParada = true;
+                  }
+                }
+              }
+              const podeEnviarTudo = isMatriz || (isParada && filialOrigemData?.sales === 0);
+              let qtdAjustada = it.quantidade;
+              if (temReal) {
+                if (realFila === 0) qtdAjustada = 0;
+                else if (realFila === 1) qtdAjustada = podeEnviarTudo ? 1 : 0;
+                else if (realFila < it.quantidade) qtdAjustada = realFila;
+              }
+
+              const realizada = markedKeys.has(key);
+              const isSelectable = podeOperarOrigem && !realizada && qtdAjustada > 0;
+              return { key, isSelectable, qtdAjustada, realizada, item: it };
+            });
+
+            const allItemKeys = itemSelecaoInfo.map((x) => x.key);
+            const selectableItems = itemSelecaoInfo.filter((x) => x.isSelectable);
+            const selecionadosNoGrupo = selectableItems.filter((x) => selectedKeys.has(x.key));
+            const totalSelecionados = selecionadosNoGrupo.length;
+            const totalSelecionavel = selectableItems.length;
+            const allSelected = totalSelecionavel > 0 && totalSelecionados === totalSelecionavel;
+            const someSelected = totalSelecionados > 0 && totalSelecionados < totalSelecionavel;
+            const qtdTotalSelecionada = selecionadosNoGrupo.reduce((s, x) => s + x.qtdAjustada, 0);
+
+            const handleToggleAllInGroup = () => {
+              if (allSelected) {
+                // desmarca todas do grupo
+                replaceSelectionForGroup([], allItemKeys);
+              } else {
+                // marca todos os selecionáveis
+                replaceSelectionForGroup(
+                  selectableItems.map((x) => x.key),
+                  allItemKeys
+                );
+              }
+            };
+
+            const handleAbrirModalLote = () => {
+              if (selecionadosNoGrupo.length === 0) return;
+              setTransferError(null);
+              setTransferSuccess(null);
+              setTransferTarget({
+                origemCanonico: origemCanonicoDoGrupo,
+                destinoCanonico: destinoCanonicoDoGrupo,
+                origemLabel: group.origem,
+                destinoLabel: destGroup.destino,
+                items: selecionadosNoGrupo.map((x) => ({
+                  item: x.item,
+                  quantidade: x.qtdAjustada,
+                })),
+              });
+            };
+
+            return (
             <div key={`${group.origem}-${destGroup.destino}-${destIndex}`} className={styles.destinationSection}>
               {/* Header menor: Filial de destino */}
               <div className={styles.destinationHeader}>
@@ -1672,16 +1797,50 @@ export default function ControleTransferenciasTable({
                     <span className={styles.destinationName}>{destGroup.destino}</span>
                   </div>
                 </div>
-                <div className={styles.destinationTotal}>
-                  {destGroup.totalQuantidade} un
+                <div className={styles.destinationActions}>
+                  {podeOperarOrigem && totalSelecionavel > 0 ? (
+                    <button
+                      type="button"
+                      className={styles.bulkTransferBtn}
+                      onClick={handleAbrirModalLote}
+                      disabled={totalSelecionados === 0 || savingMarked}
+                      title={
+                        totalSelecionados === 0
+                          ? "Selecione ao menos um item para transferir"
+                          : `Gera 1 romaneio com ${totalSelecionados} ${totalSelecionados === 1 ? "item" : "itens"} (${qtdTotalSelecionada} un.) para ${destGroup.destino}`
+                      }
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                        <polyline points="12 5 19 12 12 19" />
+                      </svg>
+                      Transferir
+                      <span className={styles.bulkTransferCount}>{totalSelecionados}</span>
+                    </button>
+                  ) : null}
+                  <div className={styles.destinationTotal}>
+                    {destGroup.totalQuantidade} un
+                  </div>
                 </div>
               </div>
 
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th className={styles.transferirHeader} title="Executar saída desta linha com destino na própria filial — gera romaneio">
-                      Transferir
+                    <th className={styles.selectHeader} title="Selecionar todos os itens transferíveis deste destino">
+                      {podeOperarOrigem && totalSelecionavel > 0 ? (
+                        <input
+                          type="checkbox"
+                          className={styles.selectCheckbox}
+                          checked={allSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = someSelected;
+                          }}
+                          onChange={handleToggleAllInGroup}
+                          disabled={savingMarked}
+                          aria-label="Selecionar todos"
+                        />
+                      ) : null}
                     </th>
                     <th className={styles.produtoHeader}>Produto</th>
                     <th className={styles.codigoBarraHeader}>Código de Barras</th>
@@ -1783,27 +1942,23 @@ export default function ControleTransferenciasTable({
                   key={`${item.produto}-${item.cor}-${item.destino}-${index}`}
                   className={isMarkedRealizada ? styles.rowRealizada : undefined}
                 >
-                  <td className={styles.transferirCell}>
+                  <td className={styles.selectCell}>
                     {isMarkedRealizada ? (
                       <span className={styles.realizadaTag}>Realizada</span>
-                    ) : canExecuteSaidaFromOrigem(item.origemCanonico) ? (
-                      <button
-                        type="button"
-                        className={styles.transferirBtn}
-                        onClick={() => {
-                          setTransferError(null);
-                          setTransferSuccess(null);
-                          setTransferTarget({ item, quantidade: quantidadeAjustada });
-                        }}
+                    ) : podeOperarOrigem ? (
+                      <input
+                        type="checkbox"
+                        className={styles.selectCheckbox}
+                        checked={selectedKeys.has(itemKey)}
+                        onChange={() => toggleSelectKey(itemKey)}
                         disabled={quantidadeAjustada <= 0 || savingMarked}
                         title={
                           quantidadeAjustada <= 0
-                            ? "Quantidade ajustada é zero — nada a transferir"
-                            : `Transferir ${quantidadeAjustada} un. para ${item.destino}`
+                            ? "Quantidade ajustada é zero — não pode ser transferida"
+                            : `Selecionar ${quantidadeAjustada} un. para ${item.destino}`
                         }
-                      >
-                        Transferir
-                      </button>
+                        aria-label={`Selecionar ${item.descricao} ${item.cor}`}
+                      />
                     ) : (
                       <span className={styles.transferirDisabled} title="Sem permissão de saída nesta origem">—</span>
                     )}
@@ -2086,7 +2241,8 @@ export default function ControleTransferenciasTable({
                 </tbody>
               </table>
             </div>
-          ))}
+            );
+          })}
 
           <div className={styles.footer}>
             <div className={styles.footerLeft}>
@@ -2101,22 +2257,23 @@ export default function ControleTransferenciasTable({
 
       <TransferenciaConfirmModal
         open={transferTarget !== null}
-        produto={transferTarget?.item.codigo ?? ""}
-        descricao={transferTarget?.item.descricao ?? ""}
-        cor={transferTarget?.item.cor ?? ""}
-        codigoBarra={transferTarget?.item.codigoBarra}
-        origemLabel={transferTarget?.item.origem ?? ""}
-        destinoLabel={transferTarget?.item.destino ?? ""}
-        quantidade={transferTarget?.quantidade ?? 0}
+        origemLabel={transferTarget?.origemLabel ?? ""}
+        destinoLabel={transferTarget?.destinoLabel ?? ""}
+        items={
+          transferTarget?.items.map(({ item, quantidade }) => ({
+            codigo: item.codigo,
+            descricao: item.descricao,
+            cor: item.cor,
+            codigoBarra: item.codigoBarra,
+            quantidade,
+          })) ?? []
+        }
         submitting={transferSubmitting}
         error={transferError}
         success={transferSuccess}
         onConfirm={() => {
           if (!transferTarget) return;
-          void executarTransferenciaSaida(
-            transferTarget.item,
-            transferTarget.quantidade
-          );
+          void executarTransferenciaSaida(transferTarget);
         }}
         onCancel={() => {
           if (transferSubmitting) return;

@@ -265,6 +265,185 @@
   letter-spacing: 0.3px;
 }
 
+/* ------- Seleção em lote ------- */
+/* Cabeçalho da coluna de seleção (checkbox "selecionar todos do destino") */
+.selectHeader {
+  width: 56px;
+  text-align: center;
+  padding: 12px 8px !important;
+}
+
+.selectCell {
+  text-align: center;
+  vertical-align: middle;
+  padding: 12px 8px;
+}
+
+.selectCheckbox {
+  width: 18px;
+  height: 18px;
+  accent-color: #16a34a;
+  cursor: pointer;
+  margin: 0;
+}
+
+.selectCheckbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* Linha realizada: o checkbox some completamente (não dá mais pra alterar) */
+.table tbody tr.rowRealizada .selectCheckbox {
+  visibility: hidden;
+}
+
+/* Botão de transferência em lote dentro do destinationHeader */
+.destinationActions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.bulkTransferBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #16a34a;
+  background: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.bulkTransferBtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.bulkTransferBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.bulkTransferBtn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.bulkTransferCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  background: #16a34a;
+  color: #fff;
+  border-radius: 11px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ------- Lista de itens dentro do modal ------- */
+.modalItemsBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modalItemsHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.modalItemsCount {
+  color: #047857;
+  font-weight: 800;
+}
+
+.modalItemsList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.modalItemRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid #f1f5f9;
+}
+
+.modalItemMain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.modalItemDesc {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modalItemMeta {
+  font-size: 11px;
+  color: #6b7280;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.modalItemMeta span:not(:first-child)::before {
+  content: "·";
+  margin-right: 6px;
+  color: #cbd5e1;
+}
+
+.modalItemQty {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.modalItemQtyNumber {
+  font-size: 16px;
+  font-weight: 800;
+  color: #047857;
+}
+
+.modalItemQtyUnit {
+  font-size: 11px;
+  font-weight: 600;
+  color: #16a34a;
+}
+
 /* ------- Modal de confirmação de transferência ------- */
 .modalBackdrop {
   position: fixed;

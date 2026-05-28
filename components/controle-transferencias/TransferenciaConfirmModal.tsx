@@ -4,15 +4,19 @@ import { useEffect } from "react";
 
 import styles from "./ControleTransferenciasTable.module.css";
 
-export interface TransferenciaConfirmModalProps {
-  open: boolean;
-  produto: string;
+export interface TransferenciaConfirmModalItem {
+  codigo: string;
   descricao: string;
   cor: string;
   codigoBarra?: string;
+  quantidade: number;
+}
+
+export interface TransferenciaConfirmModalProps {
+  open: boolean;
   origemLabel: string;
   destinoLabel: string;
-  quantidade: number;
+  items: TransferenciaConfirmModalItem[];
   submitting: boolean;
   error: string | null;
   success: string | null;
@@ -22,13 +26,9 @@ export interface TransferenciaConfirmModalProps {
 
 export default function TransferenciaConfirmModal({
   open,
-  produto,
-  descricao,
-  cor,
-  codigoBarra,
   origemLabel,
   destinoLabel,
-  quantidade,
+  items,
   submitting,
   error,
   success,
@@ -45,6 +45,9 @@ export default function TransferenciaConfirmModal({
   }, [open, submitting, onCancel]);
 
   if (!open) return null;
+
+  const totalQuantidade = items.reduce((sum, it) => sum + it.quantidade, 0);
+  const totalItens = items.length;
 
   return (
     <div
@@ -98,29 +101,41 @@ export default function TransferenciaConfirmModal({
             </div>
           </div>
 
-          <div className={styles.modalRow}>
-            <span className={styles.modalRowLabel}>Código</span>
-            <span className={styles.modalRowValue}>{produto}</span>
-          </div>
-          <div className={styles.modalRow}>
-            <span className={styles.modalRowLabel}>Descrição</span>
-            <span className={styles.modalRowValue}>{descricao}</span>
-          </div>
-          <div className={styles.modalRow}>
-            <span className={styles.modalRowLabel}>Cor</span>
-            <span className={styles.modalRowValue}>{cor}</span>
-          </div>
-          {codigoBarra ? (
-            <div className={styles.modalRow}>
-              <span className={styles.modalRowLabel}>Cód. barras</span>
-              <span className={styles.modalRowValue}>{codigoBarra}</span>
+          <div className={styles.modalItemsBlock}>
+            <div className={styles.modalItemsHead}>
+              <span>
+                {totalItens === 1 ? "1 item selecionado" : `${totalItens} itens selecionados`}
+              </span>
+              <span className={styles.modalItemsCount}>
+                Total: {totalQuantidade} {totalQuantidade === 1 ? "un." : "un."}
+              </span>
             </div>
-          ) : null}
+            <ul className={styles.modalItemsList}>
+              {items.map((it, idx) => (
+                <li key={`${it.codigo}-${it.cor}-${idx}`} className={styles.modalItemRow}>
+                  <div className={styles.modalItemMain}>
+                    <span className={styles.modalItemDesc} title={it.descricao}>
+                      {it.descricao}
+                    </span>
+                    <span className={styles.modalItemMeta}>
+                      <span>{it.codigo}</span>
+                      <span>{it.cor}</span>
+                      {it.codigoBarra ? <span>{it.codigoBarra}</span> : null}
+                    </span>
+                  </div>
+                  <span className={styles.modalItemQty}>
+                    <span className={styles.modalItemQtyNumber}>{it.quantidade}</span>
+                    <span className={styles.modalItemQtyUnit}>un.</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
 
           <div className={styles.modalQuantidade}>
-            <span className={styles.modalQuantidadeNumber}>{quantidade}</span>
+            <span className={styles.modalQuantidadeNumber}>{totalQuantidade}</span>
             <span className={styles.modalQuantidadeLabel}>
-              {quantidade === 1 ? "unidade" : "unidades"}
+              {totalQuantidade === 1 ? "unidade total" : "unidades no total"}
             </span>
           </div>
         </div>
@@ -141,7 +156,7 @@ export default function TransferenciaConfirmModal({
             type="button"
             className={styles.modalBtnPrimary}
             onClick={onConfirm}
-            disabled={submitting || quantidade <= 0}
+            disabled={submitting || totalQuantidade <= 0 || totalItens === 0}
           >
             {submitting ? (
               <>
