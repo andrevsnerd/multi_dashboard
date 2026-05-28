@@ -281,11 +281,19 @@
   },
   {
     "company": "scarfme",
+    "produto": "13.46.0443",
+    "cor": "04",
+    "label": "produto novo",
+    "createdAt": "2026-05-28T15:20:41.242Z",
+    "updatedAt": "2026-05-28T15:20:41.296Z"
+  },
+  {
+    "company": "scarfme",
     "produto": "28.05.0121",
     "cor": "03",
     "label": "produto novo",
     "createdAt": "2026-05-27T16:27:28.947Z",
-    "updatedAt": "2026-05-27T16:27:28.958Z"
+    "updatedAt": "2026-05-28T15:20:41.296Z"
   },
   {
     "company": "scarfme",
@@ -293,7 +301,7 @@
     "cor": "04",
     "label": "produto novo",
     "createdAt": "2026-05-27T16:27:28.947Z",
-    "updatedAt": "2026-05-27T16:27:28.958Z"
+    "updatedAt": "2026-05-28T15:20:41.296Z"
   },
   {
     "company": "scarfme",
@@ -301,7 +309,7 @@
     "cor": "06",
     "label": "produto novo",
     "createdAt": "2026-05-27T16:27:28.947Z",
-    "updatedAt": "2026-05-27T16:27:28.958Z"
+    "updatedAt": "2026-05-28T15:20:41.296Z"
   },
   {
     "company": "scarfme",
@@ -309,7 +317,7 @@
     "cor": "86",
     "label": "produto novo",
     "createdAt": "2026-05-19T19:50:51.345Z",
-    "updatedAt": "2026-05-27T16:27:28.958Z"
+    "updatedAt": "2026-05-28T15:20:41.296Z"
   },
   {
     "company": "scarfme",
@@ -317,7 +325,7 @@
     "cor": "86",
     "label": "produto novo",
     "createdAt": "2026-05-19T19:50:51.345Z",
-    "updatedAt": "2026-05-27T16:27:28.958Z"
+    "updatedAt": "2026-05-28T15:20:41.296Z"
   },
   {
     "company": "scarfme",
@@ -325,7 +333,7 @@
     "cor": "04",
     "label": "produto novo",
     "createdAt": "2026-05-15T14:25:04.451Z",
-    "updatedAt": "2026-05-27T16:27:28.958Z"
+    "updatedAt": "2026-05-28T15:20:41.296Z"
   },
   {
     "company": "scarfme",
@@ -333,7 +341,7 @@
     "cor": "03",
     "label": "produto novo",
     "createdAt": "2026-05-14T15:56:06.558Z",
-    "updatedAt": "2026-05-27T16:27:28.958Z"
+    "updatedAt": "2026-05-28T15:20:41.296Z"
   },
   {
     "company": "scarfme",
@@ -341,7 +349,7 @@
     "cor": "03",
     "label": "produto novo",
     "createdAt": "2026-05-14T15:56:06.558Z",
-    "updatedAt": "2026-05-27T16:27:28.958Z"
+    "updatedAt": "2026-05-28T15:20:41.296Z"
   },
   {
     "company": "scarfme",
@@ -349,14 +357,6 @@
     "cor": "03",
     "label": "produto novo",
     "createdAt": "2026-05-14T15:56:06.558Z",
-    "updatedAt": "2026-05-27T16:27:28.958Z"
-  },
-  {
-    "company": "scarfme",
-    "produto": "13.46.0437",
-    "cor": "40",
-    "label": "produto novo",
-    "createdAt": "2026-05-11T16:25:32.349Z",
-    "updatedAt": "2026-05-27T16:27:28.958Z"
+    "updatedAt": "2026-05-28T15:20:41.296Z"
   }
 ]

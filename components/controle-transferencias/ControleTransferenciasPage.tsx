@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -134,10 +134,8 @@ export default function ControleTransferenciasPage({
     [range.startDate, range.endDate]
   );
 
-  useEffect(() => {
-    let active = true;
-
-    async function load() {
+  const loadData = useCallback(
+    async (signal?: { aborted: boolean }) => {
       setLoading(true);
       setError(null);
       try {
@@ -146,41 +144,40 @@ export default function ControleTransferenciasPage({
           range,
           null
         );
-        if (active) {
-          const dataWithDates = transferenciasData.map(item => ({
-            ...item,
-            filiais: item.filiais.map(filial => ({
-              ...filial,
-              ultimaEntrada: filial.ultimaEntrada
-                ? (typeof filial.ultimaEntrada === "string"
-                    ? new Date(filial.ultimaEntrada)
-                    : filial.ultimaEntrada)
-                : null,
-            })),
-          }));
-          setData(dataWithDates);
-        }
+        if (signal?.aborted) return;
+        const dataWithDates = transferenciasData.map(item => ({
+          ...item,
+          filiais: item.filiais.map(filial => ({
+            ...filial,
+            ultimaEntrada: filial.ultimaEntrada
+              ? (typeof filial.ultimaEntrada === "string"
+                  ? new Date(filial.ultimaEntrada)
+                  : filial.ultimaEntrada)
+              : null,
+          })),
+        }));
+        setData(dataWithDates);
       } catch (err) {
-        if (active) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Não foi possível carregar os dados."
-          );
-        }
+        if (signal?.aborted) return;
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Não foi possível carregar os dados."
+        );
       } finally {
-        if (active) {
-          setLoading(false);
-        }
+        if (!signal?.aborted) setLoading(false);
       }
-    }
+    },
+    [companyKey, range]
+  );
 
-    void load();
-
+  useEffect(() => {
+    const signal = { aborted: false };
+    void loadData(signal);
     return () => {
-      active = false;
+      signal.aborted = true;
     };
-  }, [companyKey, range, rangeKey]);
+  }, [loadData, rangeKey]);
 
   useEffect(() => {
     if (!user?.username) return;
@@ -293,6 +290,7 @@ export default function ControleTransferenciasPage({
         selectedFilial={selectedFilial}
         permissoes={permissoes}
         filiaisApi={filiais}
+        onTransferExecuted={() => loadData()}
       />
     </div>
   );

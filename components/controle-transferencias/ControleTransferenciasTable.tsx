@@ -6,6 +6,7 @@ import type { ProdutoTransferencia, FilialData } from "@/lib/repositories/contro
 import type { DateRangeValue } from "@/components/filters/DateRangeFilter";
 import { useAuth } from "@/components/auth/AuthContext";
 import { exportTransfersToPDF } from "./exportToPDF";
+import TransferenciaConfirmModal from "./TransferenciaConfirmModal";
 
 import styles from "./ControleTransferenciasTable.module.css";
 
@@ -46,6 +47,9 @@ interface ControleTransferenciasTableProps {
   /** Carregados uma vez na página — evita GET duplicado em /permissoes e /filiais */
   permissoes: ControleTransferenciasPermissao | null;
   filiaisApi: ControleTransferenciasFilialApi[];
+  /** Disparado após uma transferência (saída) ser executada com sucesso. Usado pela página
+   * para refazer o fetch de /api/controle-transferencias e refletir o novo estoque. */
+  onTransferExecuted?: () => void | Promise<void>;
 }
 
 /** Ordem de atendimento dos destinos (para esta origem neste produto+cor). */
@@ -1106,6 +1110,7 @@ export default function ControleTransferenciasTable({
   selectedFilial,
   permissoes,
   filiaisApi,
+  onTransferExecuted,
 }: ControleTransferenciasTableProps) {
   const company = resolveCompany(companyKey);
 
@@ -1401,34 +1406,144 @@ export default function ControleTransferenciasTable({
     }
   };
 
-  const toggleMarked = async (item: TransferItem) => {
+  /** Marca um item como "realizada" (cinza). Idempotente — não desmarca. Usado após
+   * confirmação de saída pelo modal de transferência. Mantemos a leitura de
+   * `markedKeys` apenas para preservar o histórico cinza já existente. */
+  const marcarComoRealizada = async (item: TransferItem): Promise<void> => {
     const key = getTransferItemKey(item);
-    const isCurrentlyMarked = markedKeys.has(key);
+    if (markedKeys.has(key)) return;
+
     const next = new Set(markedKeys);
-    
-    // Atualizar estado local imediatamente
-    if (isCurrentlyMarked) {
-      next.delete(key);
-    } else {
-      next.add(key);
-    }
+    next.add(key);
     setMarkedKeys(next);
-    
+
     setSavingMarked(true);
     try {
-      // Usar a nova API que faz merge - adiciona/remove apenas este item específico
-      // Isso preserva todos os outros dados, mesmo os que não estão visíveis
       await fetch("/api/transferencias-realizadas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          companyKey, 
-          markedKeys: isCurrentlyMarked ? [] : [key], // Adicionar apenas se não estava marcado
-          removeKeys: isCurrentlyMarked ? [key] : []  // Remover apenas se estava marcado
+        body: JSON.stringify({
+          companyKey,
+          markedKeys: [key],
+          removeKeys: [],
         }),
       });
     } finally {
       setSavingMarked(false);
+    }
+  };
+
+  // Estado do modal de confirmação de transferência
+  const [transferTarget, setTransferTarget] = useState<{
+    item: TransferItem;
+    quantidade: number;
+  } | null>(null);
+  const [transferSubmitting, setTransferSubmitting] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
+  const [transferSuccess, setTransferSuccess] = useState<string | null>(null);
+
+  /** Verifica se o usuário pode executar saída a partir da origem informada.
+   * Espelha exatamente a regra de `/api/saidas-entradas-produtos/executar`:
+   *   - admin: pode tudo
+   *   - sem permissões cadastradas: bloqueado
+   *   - filiaisOrigem vazio: todas as origens liberadas
+   *   - caso contrário: precisa bater com a origem via permissaoMatchFilial
+   */
+  const canExecuteSaidaFromOrigem = useCallback(
+    (origemCanonico: string): boolean => {
+      if (user?.role === "admin") return true;
+      if (!permissoes) return false;
+      if (permissoes.filiaisOrigem.length === 0) return true;
+      return permissoes.filiaisOrigem.some((p) =>
+        permissaoMatchFilial(p, origemCanonico)
+      );
+    },
+    [user?.role, permissoes, permissaoMatchFilial]
+  );
+
+  /** Executa a saída como TRANSFERENCIA ENTRE LOJAS, mesma chamada da página de
+   * saída-entrada (gera romaneio, registra destino e dispara o fluxo do ERP).
+   * Em sucesso, marca o item como realizada (cinza) e pede refetch dos dados. */
+  const executarTransferenciaSaida = async (
+    item: TransferItem,
+    quantidade: number
+  ): Promise<void> => {
+    if (!user?.username) {
+      setTransferError("Usuário não identificado. Faça login novamente.");
+      return;
+    }
+    if (quantidade <= 0) {
+      setTransferError("Quantidade inválida para transferência.");
+      return;
+    }
+
+    setTransferSubmitting(true);
+    setTransferError(null);
+    setTransferSuccess(null);
+
+    try {
+      const corProduto = item.itemOriginal.codigoCor ?? null;
+      const response = await fetch("/api/saidas-entradas-produtos/executar", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-auth-username": user.username,
+        },
+        body: JSON.stringify({
+          tipoOperacao: "saida",
+          filial: item.origemCanonico,
+          filialDestino: item.destinoCanonico,
+          itens: [
+            {
+              produto: item.produto,
+              corProduto,
+              quantidade,
+            },
+          ],
+          tipoRomaneio: "TRANSFERENCIA ENTRE LOJAS",
+          observacao: null,
+          companyKey,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorJson = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(errorJson.error || "Erro ao executar a transferência.");
+      }
+
+      const json = (await response.json()) as {
+        success: boolean;
+        message?: string;
+        romaneio?: string;
+      };
+
+      // Marca como realizada (cinza) — preserva o feedback visual mesmo após refetch
+      await marcarComoRealizada(item);
+
+      setTransferSuccess(
+        json.romaneio
+          ? `Romaneio ${json.romaneio} gerado com sucesso.`
+          : json.message || "Transferência executada com sucesso."
+      );
+
+      // Refetch dos dados de controle (reflete o novo estoque)
+      try {
+        await onTransferExecuted?.();
+      } catch {
+        // ignorar erro de refetch — a transferência já foi registrada
+      }
+
+      // Fecha o modal após breve delay para o usuário ler o sucesso
+      setTimeout(() => {
+        setTransferTarget(null);
+        setTransferSuccess(null);
+      }, 1100);
+    } catch (err) {
+      setTransferError(
+        err instanceof Error ? err.message : "Erro ao executar a transferência."
+      );
+    } finally {
+      setTransferSubmitting(false);
     }
   };
 
@@ -1565,8 +1680,8 @@ export default function ControleTransferenciasTable({
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th className={styles.realizadaHeader} title="Marcar como já realizada (pendente de atualização no sistema)">
-                      Realizada
+                    <th className={styles.transferirHeader} title="Executar saída desta linha com destino na própria filial — gera romaneio">
+                      Transferir
                     </th>
                     <th className={styles.produtoHeader}>Produto</th>
                     <th className={styles.codigoBarraHeader}>Código de Barras</th>
@@ -1668,19 +1783,30 @@ export default function ControleTransferenciasTable({
                   key={`${item.produto}-${item.cor}-${item.destino}-${index}`}
                   className={isMarkedRealizada ? styles.rowRealizada : undefined}
                 >
-                  <td className={styles.realizadaCell}>
-                    <label className={styles.realizadaCheckboxLabel} title="Já realizada, pendente de atualização no sistema">
-                      <input
-                        type="checkbox"
-                        checked={isMarkedRealizada}
-                        onChange={() => toggleMarked(item)}
-                        disabled={savingMarked}
-                        className={styles.realizadaCheckbox}
-                      />
-                      {isMarkedRealizada && (
-                        <span className={styles.realizadaCheckboxText}>Realizada</span>
-                      )}
-                    </label>
+                  <td className={styles.transferirCell}>
+                    {isMarkedRealizada ? (
+                      <span className={styles.realizadaTag}>Realizada</span>
+                    ) : canExecuteSaidaFromOrigem(item.origemCanonico) ? (
+                      <button
+                        type="button"
+                        className={styles.transferirBtn}
+                        onClick={() => {
+                          setTransferError(null);
+                          setTransferSuccess(null);
+                          setTransferTarget({ item, quantidade: quantidadeAjustada });
+                        }}
+                        disabled={quantidadeAjustada <= 0 || savingMarked}
+                        title={
+                          quantidadeAjustada <= 0
+                            ? "Quantidade ajustada é zero — nada a transferir"
+                            : `Transferir ${quantidadeAjustada} un. para ${item.destino}`
+                        }
+                      >
+                        Transferir
+                      </button>
+                    ) : (
+                      <span className={styles.transferirDisabled} title="Sem permissão de saída nesta origem">—</span>
+                    )}
                   </td>
                   <td className={styles.produtoCell}>
                     <div className={styles.produtoIcon}>
@@ -1972,6 +2098,33 @@ export default function ControleTransferenciasTable({
           </div>
         </div>
       ))}
+
+      <TransferenciaConfirmModal
+        open={transferTarget !== null}
+        produto={transferTarget?.item.codigo ?? ""}
+        descricao={transferTarget?.item.descricao ?? ""}
+        cor={transferTarget?.item.cor ?? ""}
+        codigoBarra={transferTarget?.item.codigoBarra}
+        origemLabel={transferTarget?.item.origem ?? ""}
+        destinoLabel={transferTarget?.item.destino ?? ""}
+        quantidade={transferTarget?.quantidade ?? 0}
+        submitting={transferSubmitting}
+        error={transferError}
+        success={transferSuccess}
+        onConfirm={() => {
+          if (!transferTarget) return;
+          void executarTransferenciaSaida(
+            transferTarget.item,
+            transferTarget.quantidade
+          );
+        }}
+        onCancel={() => {
+          if (transferSubmitting) return;
+          setTransferTarget(null);
+          setTransferError(null);
+          setTransferSuccess(null);
+        }}
+      />
 
       {quantidadeTooltip ? (
         <div
