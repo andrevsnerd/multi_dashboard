@@ -102,6 +102,7 @@ async function fetchDashboardData(
   filial: string | null,
   month: number,
   year: number,
+  linhas: string[] | null,
 ): Promise<DashboardData> {
   const isSameDay = (a: Date, b: Date) =>
     a.getFullYear() === b.getFullYear() &&
@@ -121,6 +122,10 @@ async function fetchDashboardData(
   if (filial) {
     params.set("filial", filial);
   }
+
+  (linhas ?? []).forEach((linha) => {
+    params.append("linha", linha);
+  });
 
   const response = await fetch(`/api/dashboard-data?${params.toString()}`, {
     cache: "no-store",
@@ -151,6 +156,7 @@ export default function CompanyDashboard({
 
   const [range, setRange] = useState<DateRangeValue>(initialRange);
   const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
+  const [filtrarEletronicos, setFiltrarEletronicos] = useState(companyKey === "nerd");
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,10 +168,17 @@ export default function CompanyDashboard({
     return { month: date.getMonth(), year: date.getFullYear() };
   }, [range.startDate]);
 
+  // Para NERD, o toggle "Eletrônicos" filtra somente a linha ELETRONICOS
+  // (mesma lógica da Curva ABC e da página de Produtos).
+  const linhas = useMemo<string[] | null>(
+    () => (companyKey === "nerd" && filtrarEletronicos ? ["ELETRONICOS"] : null),
+    [companyKey, filtrarEletronicos],
+  );
+
   const rangeKey = useMemo(
     () =>
-      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? "all"}`,
-    [range.startDate, range.endDate, selectedFilial],
+      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? "all"}::${(linhas ?? []).join(",")}`,
+    [range.startDate, range.endDate, selectedFilial, linhas],
   );
 
   useEffect(() => {
@@ -181,6 +194,7 @@ export default function CompanyDashboard({
           selectedFilial,
           monthYear.month,
           monthYear.year,
+          linhas,
         );
         if (active) {
           setDashboardData(data);
@@ -201,7 +215,7 @@ export default function CompanyDashboard({
     return () => {
       active = false;
     };
-  }, [companyKey, rangeKey, retryKey, range, selectedFilial, monthYear.month, monthYear.year]);
+  }, [companyKey, rangeKey, retryKey, range, selectedFilial, monthYear.month, monthYear.year, linhas]);
 
   // Recarregar metas quando o modal fechar
   useEffect(() => {
@@ -307,6 +321,16 @@ export default function CompanyDashboard({
               value={selectedFilial}
               onChange={setSelectedFilial}
             />
+            {companyKey === "nerd" && (
+              <label className={styles.checkboxLabel} title="Filtra apenas produtos da linha Eletrônicos">
+                <input
+                  type="checkbox"
+                  checked={filtrarEletronicos}
+                  onChange={(e) => setFiltrarEletronicos(e.target.checked)}
+                />
+                Eletrônicos
+              </label>
+            )}
             {error ? (
               <span className={styles.error}>
                 {error}
@@ -352,6 +376,7 @@ export default function CompanyDashboard({
                 startDate={range.startDate}
                 endDate={range.endDate}
                 filial={selectedFilial}
+                linhas={linhas}
                 initialData={dashboardData?.dailyRevenue}
               />
             </div>
@@ -362,6 +387,7 @@ export default function CompanyDashboard({
             startDate={range.startDate}
             endDate={range.endDate}
             filial={selectedFilial}
+            linhas={linhas}
             filialPerformance={dashboardData?.filialPerformance ?? []}
             summaryRevenue={summary.totalRevenue}
             initialProducts={dashboardData?.topProducts}

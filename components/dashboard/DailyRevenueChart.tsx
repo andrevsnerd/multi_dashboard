@@ -25,6 +25,7 @@ interface DailyRevenueChartProps {
   startDate: Date;
   endDate: Date;
   filial?: string | null;
+  linhas?: string[] | null;
   initialData?: DailyRevenueData[];
 }
 
@@ -33,6 +34,7 @@ async function fetchDailyRevenue(
   startDate: Date,
   endDate: Date,
   filial: string | null,
+  linhas: string[] | null,
 ): Promise<DailyRevenueData[]> {
   const searchParams = new URLSearchParams({
     company,
@@ -43,6 +45,10 @@ async function fetchDailyRevenue(
   if (filial) {
     searchParams.set("filial", filial);
   }
+
+  (linhas ?? []).forEach((linha) => {
+    searchParams.append("linha", linha);
+  });
 
   const response = await fetch(`/api/daily-revenue?${searchParams.toString()}`, {
     cache: "no-store",
@@ -79,6 +85,7 @@ export default function DailyRevenueChart({
   startDate,
   endDate,
   filial = null,
+  linhas = null,
   initialData,
 }: DailyRevenueChartProps) {
   const [data, setData] = useState<DailyRevenueData[]>(initialData ?? []);
@@ -87,13 +94,21 @@ export default function DailyRevenueChart({
   const [mounted, setMounted] = useState(false);
 
   const rangeKey = useMemo(
-    () => `${startDate.toISOString()}::${endDate.toISOString()}::${filial ?? "all"}`,
-    [startDate, endDate, filial],
+    () => `${startDate.toISOString()}::${endDate.toISOString()}::${filial ?? "all"}::${(linhas ?? []).join(",")}`,
+    [startDate, endDate, filial, linhas],
   );
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Quando os dados já vêm prontos do dashboard (initialData), sincroniza o estado
+  // a cada atualização (ex.: troca de filtros recarrega o dashboard com novos dados).
+  useEffect(() => {
+    if (initialData === undefined) return;
+    setData(initialData);
+    setLoading(false);
+  }, [initialData]);
 
   useEffect(() => {
     if (initialData !== undefined) return;
@@ -106,7 +121,7 @@ export default function DailyRevenueChart({
       setError(null);
 
       try {
-        const revenue = await fetchDailyRevenue(companyKey, startDate, endDate, filial);
+        const revenue = await fetchDailyRevenue(companyKey, startDate, endDate, filial, linhas);
         if (active) {
           setData(revenue);
         }
@@ -128,7 +143,7 @@ export default function DailyRevenueChart({
     return () => {
       active = false;
     };
-  }, [companyKey, rangeKey, startDate, endDate, filial, mounted, initialData]);
+  }, [companyKey, rangeKey, startDate, endDate, filial, linhas, mounted, initialData]);
 
   const maxRevenue = useMemo(() => {
     if (data.length === 0) return 0;

@@ -1616,7 +1616,6 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     );
     return { curva, total: items.length, buckets };
   });
-  const curveSummaryTotal = curveStockSummary.reduce((sum, item) => sum + item.total, 0);
   const focusedCurveSummary = curveStockSummary.find(({ curva }) => curva === focusedCurve) ?? curveStockSummary[0] ?? null;
 
   const totalVendasAllCurves = produtosComCurva.reduce((s, p) => s + p.vendas, 0);
@@ -1635,18 +1634,26 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     high: activeCurveData.reduce((s, c) => s + c.buckets.high, 0),
   };
 
-  const displayVendas = hasStructuredFilters
-    ? produtosFiltrados.reduce((s, p) => s + p.vendas, 0)
-    : data?.vendas ?? 0;
-  const displayQtde = hasStructuredFilters
-    ? produtosFiltrados.reduce((s, p) => s + p.qtde, 0)
-    : data?.qtde ?? 0;
-  const displayCMV = produtosFiltrados.reduce((s, p) => s + p.custo * p.qtde, 0);
   const hasAnyDisplayFilter =
     hasStructuredFilters ||
+    (companyKey === "nerd" && filtrarEletronicos) ||
     filtrarSugeridos ||
     selectedCurvas.size > 0 ||
     selectedStockBuckets.size > 0;
+
+  // Os cards de resumo refletem exatamente os produtos exibidos na tabela
+  // (após TODOS os filtros: categoria, eletrônicos, sugeridos, estoque e curva).
+  // Sem nenhum filtro ativo, usamos os totais autoritativos do servidor.
+  const displayVendas = hasAnyDisplayFilter
+    ? produtosComCurvaExibidos.reduce((s, p) => s + p.vendas, 0)
+    : data?.vendas ?? 0;
+  const displayVendasPrevious = hasAnyDisplayFilter
+    ? produtosComCurvaExibidos.reduce((s, p) => s + p.vendasPrevious, 0)
+    : data?.vendasPrevious ?? 0;
+  const displayQtde = hasAnyDisplayFilter
+    ? produtosComCurvaExibidos.reduce((s, p) => s + p.qtde, 0)
+    : data?.qtde ?? 0;
+  const displayCMV = produtosComCurvaExibidos.reduce((s, p) => s + p.custo * p.qtde, 0);
   const displayedCountLabel = filteredCurve
     ? `${Array.from(selectedCurvas).join(", ")} ${porCor ? "itens exibidos" : "produtos exibidos"}`
     : porCor
@@ -1818,7 +1825,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     };
   }, [produtosComCurva, companyKey, selectedFilial, porCor]);
 
-  const variation = data ? getComparisonBadge(data.vendas, data.vendasPrevious) : null;
+  const variation = data ? getComparisonBadge(displayVendas, displayVendasPrevious) : null;
 
   const salesPct = data?.projecaoPct ?? null;
 
@@ -2288,7 +2295,7 @@ const handleBadgeClick = (cat: string) => {
                     : `${variation.value >= 0 ? "↑" : "↓"} ${Math.abs(variation.value).toFixed(1)}%`}
                 </span>
               )}
-              {!hasStructuredFilters && data.projecao > 0 && (
+              {!hasAnyDisplayFilter && data.projecao > 0 && (
                 <span className={styles.kpiSubtitle}>Projeção {fmtCurrency(data.projecao)}</span>
               )}
             </div>
@@ -2296,8 +2303,8 @@ const handleBadgeClick = (cat: string) => {
           <div className={styles.kpiCard}>
             <span className={styles.kpiLabel}>QTD. VENDAS</span>
             <span className={styles.kpiValue}>{fmt(displayQtde)}</span>
-            {curveSummaryTotal > 0 && (
-              <span className={styles.kpiSubtitle}>{fmt(curveSummaryTotal)} itens</span>
+            {produtosComCurvaExibidos.length > 0 && (
+              <span className={styles.kpiSubtitle}>{fmt(produtosComCurvaExibidos.length)} itens</span>
             )}
           </div>
           <div className={styles.kpiCard}>

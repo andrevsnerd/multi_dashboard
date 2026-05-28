@@ -280,7 +280,7 @@ function buildGrupoFilterForProducts(
 }
 
 /**
- * Cria filtro de linha para ScarfMe (suporta múltiplos valores)
+ * Cria filtro de linha para ScarfMe e NERD (ex.: Eletrônicos) — suporta múltiplos valores
  */
 function buildLinhaFilterForProducts(
   request: sql.Request | RequestLike,
@@ -288,7 +288,7 @@ function buildLinhaFilterForProducts(
   linha: string | null | undefined,
   linhas: string[] | null | undefined
 ): string {
-  if (companySlug !== 'scarfme') {
+  if (companySlug !== 'scarfme' && companySlug !== 'nerd') {
     return '';
   }
   

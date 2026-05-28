@@ -15,6 +15,8 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const company = searchParams.get('company') ?? undefined;
   const filial = searchParams.get('filial') || null;
+  const linhasParam = searchParams.getAll('linha');
+  const linhas = linhasParam.length > 0 ? linhasParam : null;
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
   const monthParam = searchParams.get('month');
@@ -40,11 +42,11 @@ export async function GET(request: Request) {
       salesSummaryResult,
       allGoals,
     ] = await Promise.all([
-      fetchFilialPerformance({ company, range }),
-      fetchTopProducts({ company, range, filial }),
-      fetchTopCategories({ company, range, filial }),
-      fetchDailyRevenue({ company, range, filial }),
-      fetchSalesSummary({ company, range, filial }),
+      fetchFilialPerformance({ company, range, linhas }),
+      fetchTopProducts({ company, range, filial, linhas }),
+      fetchTopCategories({ company, range, filial, linhas }),
+      fetchDailyRevenue({ company, range, filial, linhas }),
+      fetchSalesSummary({ company, range, filial, linhas }),
       readGoals(),
     ]);
 

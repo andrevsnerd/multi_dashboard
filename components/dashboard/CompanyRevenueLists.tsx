@@ -12,6 +12,7 @@ export interface CompanyRevenueListsProps {
   startDate: Date;
   endDate: Date;
   filial?: string | null | undefined;
+  linhas?: string[] | null;
   filialPerformance?: FilialPerformance[];
   summaryRevenue?: MetricSummary | null;
   title?: string;
@@ -72,6 +73,7 @@ async function fetchRevenue(
   startDate: Date,
   endDate: Date,
   filial: string | null,
+  linhas: string[] | null,
 ): Promise<RevenueState> {
   const searchParams = new URLSearchParams({
     company,
@@ -82,6 +84,10 @@ async function fetchRevenue(
   if (filial) {
     searchParams.set('filial', filial);
   }
+
+  (linhas ?? []).forEach((linha) => {
+    searchParams.append('linha', linha);
+  });
 
   const [productsResponse, categoriesResponse] = await Promise.all([
     fetch(`/api/top-products?${searchParams.toString()}`, { cache: "no-store" }),
@@ -113,6 +119,7 @@ export default function CompanyRevenueLists({
   startDate,
   endDate,
   filial = null,
+  linhas = null,
   filialPerformance: filialPerformanceProp = [],
   summaryRevenue = null,
   title = "Top faturamento",
@@ -128,9 +135,20 @@ export default function CompanyRevenueLists({
   const [error, setError] = useState<string | null>(null);
 
   const rangeKey = useMemo(
-    () => `${startDate.toISOString()}::${endDate.toISOString()}::${filial ?? 'all'}`,
-    [startDate, endDate, filial],
+    () => `${startDate.toISOString()}::${endDate.toISOString()}::${filial ?? 'all'}::${(linhas ?? []).join(",")}`,
+    [startDate, endDate, filial, linhas],
   );
+
+  // Quando os dados já vêm prontos do dashboard, sincroniza o estado a cada
+  // atualização (troca de filtros recarrega o dashboard com novos dados).
+  useEffect(() => {
+    if (initialProducts === undefined) return;
+    setState({
+      products: initialProducts ?? [],
+      categories: initialCategories ?? [],
+    });
+    setLoading(false);
+  }, [initialProducts, initialCategories]);
 
   useEffect(() => {
     if (initialProducts !== undefined) return;
@@ -142,7 +160,7 @@ export default function CompanyRevenueLists({
       setError(null);
 
       try {
-        const revenue = await fetchRevenue(companyKey, startDate, endDate, filial);
+        const revenue = await fetchRevenue(companyKey, startDate, endDate, filial, linhas);
         if (active) {
           setState(revenue);
         }
@@ -164,7 +182,7 @@ export default function CompanyRevenueLists({
     return () => {
       active = false;
     };
-  }, [companyKey, rangeKey, startDate, endDate, filial, initialProducts]);
+  }, [companyKey, rangeKey, startDate, endDate, filial, linhas, initialProducts]);
 
   // SCARFME: adicionar "VAREJO" agregado e agregar filiais com mesmo displayName (PAULISTA, E-COMMERCE)
   const filialPerformanceWithVarejo = useMemo(() => {

@@ -134,11 +134,46 @@ function buildFilialFilter(
   return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
 }
 
+/**
+ * Filtro de linha para NERD (ex.: Eletrônicos) usado nas consultas do dashboard.
+ * Registra os parâmetros uma única vez e devolve um builder de cláusula WHERE
+ * (`clause`) que pode ser reutilizado em vários CTEs apontando para a coluna LINHA
+ * correta. `active` indica se há filtro (para decidir o JOIN com PRODUTOS).
+ */
+function buildLinhaFilterTokens(
+  request: sql.Request | RequestLike,
+  company: string | undefined,
+  linhas: string[] | null | undefined,
+): { active: boolean; clause: (linhaColumn: string) => string } {
+  const inactive = { active: false, clause: () => '' };
+  if (company !== 'nerd') return inactive;
+  const list = (linhas ?? []).map((l) => l.trim().toUpperCase()).filter(Boolean);
+  if (list.length === 0) return inactive;
+
+  if (list.length === 1) {
+    request.input('linhaDash', sql.VarChar, list[0]);
+    return {
+      active: true,
+      clause: (col) => `AND UPPER(LTRIM(RTRIM(ISNULL(${col}, '')))) = @linhaDash`,
+    };
+  }
+
+  list.forEach((l, index) => {
+    request.input(`linhaDash${index}`, sql.VarChar, l);
+  });
+  const placeholders = list.map((_, index) => `@linhaDash${index}`).join(', ');
+  return {
+    active: true,
+    clause: (col) => `AND UPPER(LTRIM(RTRIM(ISNULL(${col}, '')))) IN (${placeholders})`,
+  };
+}
+
 export interface TopQueryParams {
   limit?: number;
   company?: string;
   range?: DateRangeInput;
   filial?: string | null;
+  linhas?: string[] | null;
 }
 
 export interface SummaryQueryParams {
@@ -175,6 +210,7 @@ export async function fetchTopProducts({
   company,
   range,
   filial,
+  linhas,
 }: TopQueryParams = {}): Promise<ProductRevenue[]> {
   // Se for e-commerce, usar função específica de e-commerce
   if (isEcommerceFilial(company, filial)) {
@@ -227,10 +263,12 @@ export async function fetchTopProducts({
     // Ajustar filtro de filial para usar f.FILIAL (da tabela FILIAIS) quando usar LOJA_VENDA_PRODUTO
     const filialFilterBase = buildFilialFilter(request, company, 'sales', filial, 'f');
     const filialFilter = filialFilterBase.replace(/f\.FILIAL/g, 'f.FILIAL').replace(/AND f\.FILIAL/g, 'AND f.FILIAL');
+    const linhaTokens = buildLinhaFilterTokens(request, company, linhas);
+    const linhaFilter = linhaTokens.clause('p.LINHA');
 
     const query = `
       WITH vendas_base AS (
-        SELECT 
+        SELECT
           vp.TICKET,
           vp.CODIGO_FILIAL,
           vp.DATA_VENDA,
@@ -252,26 +290,27 @@ export async function fetchTopProducts({
           p.GRIFFE,
           p.GRADE,
           CAST((vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) AS DECIMAL(38,6)) AS DESCONTO_VENDA,
-          CASE 
+          CASE
             WHEN vp.QTDE_CANCELADA > 0 THEN 0
             ELSE CAST((vp.PRECO_LIQUIDO * vp.QTDE) - (vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) AS DECIMAL(38,6))
           END AS TOTAL_VENDA,
-          CASE 
+          CASE
             WHEN vp.QTDE_CANCELADA > 0 THEN 0
             ELSE vp.QTDE
           END AS TOTAL_QTDE_VENDA
         FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
         INNER JOIN LOJA_VENDA v WITH (NOLOCK)
-          ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL 
+          ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL
           AND v.TICKET = vp.TICKET
         LEFT JOIN FILIAIS f WITH (NOLOCK)
           ON f.COD_FILIAL = vp.CODIGO_FILIAL
-        LEFT JOIN PRODUTOS p WITH (NOLOCK) 
+        LEFT JOIN PRODUTOS p WITH (NOLOCK)
           ON p.PRODUTO = vp.PRODUTO
         WHERE vp.DATA_VENDA >= @startDate
           AND vp.DATA_VENDA < @endDate
           AND vp.QTDE > 0
           ${filialFilter}
+          ${linhaFilter}
       ),
       trocas_item AS (
         SELECT
@@ -340,9 +379,10 @@ export async function fetchTopProducts({
               AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
           )
           ${filialFilter}
+          ${linhaFilter}
       ),
       VendasComNumero AS (
-        SELECT 
+        SELECT
           vb.*,
           ROW_NUMBER() OVER (
             PARTITION BY vb.TICKET, vb.CODIGO_FILIAL, vb.PRODUTO, vb.COR_PRODUTO, vb.TAMANHO
@@ -351,7 +391,7 @@ export async function fetchTopProducts({
         FROM vendas_base vb
       ),
       vendas_com_troca AS (
-        SELECT 
+        SELECT
           vcn.TICKET,
           vcn.CODIGO_FILIAL,
           vcn.DATA_VENDA,
@@ -759,6 +799,34 @@ export async function fetchSalesSummary({
       }
       if ((acimaDoTicket || filterByRegistrationDate) && !grupoJoin && !scarfmeJoin) {
         grupoJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
+      }
+    }
+
+    // Filtro de linha para NERD (ex.: Eletrônicos) — mesma lógica da Curva ABC
+    if (company === 'nerd') {
+      const linhasList = linhas && linhas.length > 0 ? linhas : linha ? [linha] : [];
+      if (linhasList.length > 0) {
+        const linhasNormalizadas = linhasList.map(l => l.trim().toUpperCase());
+        if (linhasNormalizadas.length === 1) {
+          request.input('linha', sql.VarChar, linhasNormalizadas[0]);
+          linhaFilter = `AND (
+            UPPER(LTRIM(RTRIM(ISNULL(vp.LINHA, '')))) = @linha
+            OR UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linha
+          )`;
+        } else {
+          linhasNormalizadas.forEach((l, index) => {
+            request.input(`linha${index}`, sql.VarChar, l);
+          });
+          const placeholders = linhasNormalizadas.map((_, index) => `@linha${index}`).join(', ');
+          linhaFilter = `AND (
+            UPPER(LTRIM(RTRIM(ISNULL(vp.LINHA, '')))) IN (${placeholders})
+            OR UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) IN (${placeholders})
+          )`;
+        }
+        // Garante o JOIN com PRODUTOS (força fullQuery, que tem p.LINHA disponível)
+        if (!grupoJoin) {
+          grupoJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
+        }
       }
     }
 
@@ -1271,6 +1339,7 @@ export async function fetchTopCategories({
   company,
   range,
   filial,
+  linhas,
 }: TopQueryParams = {}): Promise<CategoryRevenue[]> {
   // Se for e-commerce, usar função específica de e-commerce
   if (isEcommerceFilial(company, filial)) {
@@ -1321,10 +1390,12 @@ export async function fetchTopCategories({
 
     const filialFilterBase = buildFilialFilter(request, company, 'sales', filial, 'f');
     const filialFilter = filialFilterBase.replace(/f\.FILIAL/g, 'f.FILIAL').replace(/AND f\.FILIAL/g, 'AND f.FILIAL');
+    const linhaTokens = buildLinhaFilterTokens(request, company, linhas);
+    const linhaFilter = linhaTokens.clause('p.LINHA');
 
     const query = `
       WITH vendas_base AS (
-        SELECT 
+        SELECT
           vp.TICKET,
           vp.CODIGO_FILIAL,
           vp.DATA_VENDA,
@@ -1365,6 +1436,7 @@ export async function fetchTopCategories({
         WHERE vp.DATA_VENDA >= @startDate
           AND vp.DATA_VENDA < @endDate
           ${filialFilter}
+          ${linhaFilter}
       ),
       trocas_item AS (
         SELECT
@@ -1417,13 +1489,13 @@ export async function fetchTopCategories({
           AND v.TICKET = vt.TICKET
         LEFT JOIN FILIAIS f WITH (NOLOCK)
           ON f.COD_FILIAL = vt.CODIGO_FILIAL
-        LEFT JOIN PRODUTOS p WITH (NOLOCK) 
+        LEFT JOIN PRODUTOS p WITH (NOLOCK)
           ON p.PRODUTO = vt.PRODUTO
         WHERE vt.QTDE_CANCELADA = 0
           AND v.DATA_VENDA >= @startDate
           AND v.DATA_VENDA < @endDate
           AND NOT EXISTS (
-            SELECT 1 
+            SELECT 1
             FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
             WHERE vp.TICKET = vt.TICKET
               AND vp.CODIGO_FILIAL = vt.CODIGO_FILIAL
@@ -1433,6 +1505,7 @@ export async function fetchTopCategories({
               AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
           )
           ${filialFilter.replace(/f\.FILIAL/g, 'f.FILIAL')}
+          ${linhaFilter}
       ),
       VendasComNumero AS (
         SELECT 
@@ -1513,6 +1586,7 @@ export async function fetchDailyRevenue({
   company,
   range,
   filial,
+  linhas,
 }: SummaryQueryParams = {}): Promise<DailyRevenue[]> {
   // Se for e-commerce, usar função específica de e-commerce
   if (isEcommerceFilial(company, filial)) {
@@ -1558,24 +1632,31 @@ export async function fetchDailyRevenue({
     request.input('endDate', sql.DateTime, end);
 
     const filialFilter = buildFilialFilter(request, company, 'sales', filial);
+    const linhaTokens = buildLinhaFilterTokens(request, company, linhas);
+    const linhaJoin = linhaTokens.active
+      ? `LEFT JOIN PRODUTOS p_lf WITH (NOLOCK) ON p_lf.PRODUTO = vp.PRODUTO`
+      : '';
+    const linhaFilter = linhaTokens.clause('p_lf.LINHA');
 
     const query = `
       WITH vendas_base AS (
-        SELECT 
+        SELECT
           vp.*,
-          CASE 
+          CASE
             WHEN vp.QTDE_CANCELADA > 0 THEN 0
             ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
           END AS TOTAL_VENDA,
-          CASE 
+          CASE
             WHEN vp.QTDE_CANCELADA > 0 THEN 0
             ELSE vp.QTDE
           END AS TOTAL_QTDE_VENDA
         FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        ${linhaJoin}
         WHERE vp.DATA_VENDA >= @startDate
           AND vp.DATA_VENDA < @endDate
           AND vp.QTDE > 0
           ${filialFilter}
+          ${linhaFilter}
       ),
       trocas_item AS (
         SELECT
@@ -1672,6 +1753,7 @@ export async function fetchDailyRevenue({
 export async function fetchFilialPerformance({
   company,
   range,
+  linhas,
 }: SummaryQueryParams = {}): Promise<FilialPerformance[]> {
   const companyConfig = resolveCompany(company);
   if (!companyConfig) {
@@ -1703,10 +1785,18 @@ export async function fetchFilialPerformance({
       request.input(`filial${index}`, sql.VarChar, filial);
     });
     const placeholders = normalFiliaisList.map((_, index) => `@filial${index}`).join(', ');
+    const linhaTokens = buildLinhaFilterTokens(request, company, linhas);
+    const linhaFilter = linhaTokens.clause('p_lf.LINHA');
+    const linhaJoinVp = linhaTokens.active
+      ? `LEFT JOIN PRODUTOS p_lf WITH (NOLOCK) ON p_lf.PRODUTO = vp.PRODUTO`
+      : '';
+    const linhaJoinVt = linhaTokens.active
+      ? `LEFT JOIN PRODUTOS p_lf WITH (NOLOCK) ON p_lf.PRODUTO = vt.PRODUTO`
+      : '';
 
     const query = `
       WITH vendas_base AS (
-        SELECT 
+        SELECT
           vp.TICKET,
           vp.CODIGO_FILIAL,
           vp.DATA_VENDA,
@@ -1721,25 +1811,27 @@ export async function fetchFilialPerformance({
           vp.FATOR_VENDA_LIQ,
           f.FILIAL,
           CAST((vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) AS DECIMAL(38,6)) AS DESCONTO_VENDA,
-          CASE 
+          CASE
             WHEN vp.QTDE_CANCELADA > 0 THEN 0
             ELSE CAST((vp.PRECO_LIQUIDO * vp.QTDE) - (vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) AS DECIMAL(38,6))
           END AS TOTAL_VENDA,
-          CASE 
+          CASE
             WHEN vp.QTDE_CANCELADA > 0 THEN 0
             ELSE vp.QTDE
           END AS TOTAL_QTDE_VENDA
         FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
         INNER JOIN LOJA_VENDA v WITH (NOLOCK)
-          ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL 
+          ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL
           AND v.TICKET = vp.TICKET
         LEFT JOIN FILIAIS f WITH (NOLOCK)
           ON f.COD_FILIAL = vp.CODIGO_FILIAL
+        ${linhaJoinVp}
         WHERE (
             (vp.DATA_VENDA >= @startDate AND vp.DATA_VENDA < @endDate)
             OR (vp.DATA_VENDA >= @prevStartDate AND vp.DATA_VENDA < @prevEndDate)
           )
           AND f.FILIAL IN (${placeholders})
+          ${linhaFilter}
       ),
       trocas_item AS (
         SELECT
@@ -1784,17 +1876,18 @@ export async function fetchFilialPerformance({
           (0 - vt.QTDE) AS QTDE_LIQUIDA_CALC
         FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
         INNER JOIN LOJA_VENDA v WITH (NOLOCK)
-          ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL 
+          ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL
           AND v.TICKET = vt.TICKET
         LEFT JOIN FILIAIS f WITH (NOLOCK)
           ON f.COD_FILIAL = vt.CODIGO_FILIAL
+        ${linhaJoinVt}
         WHERE vt.QTDE_CANCELADA = 0
           AND (
             (v.DATA_VENDA >= @startDate AND v.DATA_VENDA < @endDate)
             OR (v.DATA_VENDA >= @prevStartDate AND v.DATA_VENDA < @prevEndDate)
           )
           AND NOT EXISTS (
-            SELECT 1 
+            SELECT 1
             FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
             WHERE vp.TICKET = vt.TICKET
               AND vp.CODIGO_FILIAL = vt.CODIGO_FILIAL
@@ -1804,6 +1897,7 @@ export async function fetchFilialPerformance({
               AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
           )
           AND f.FILIAL IN (${placeholders})
+          ${linhaFilter}
       ),
       VendasComNumero AS (
         SELECT 

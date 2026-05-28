@@ -7,6 +7,8 @@ export async function GET(request: Request) {
   const limit = Number(searchParams.get('limit') ?? '');
   const company = searchParams.get('company') ?? undefined;
   const filial = searchParams.get('filial');
+  const linhasParam = searchParams.getAll('linha');
+  const linhas = linhasParam.length > 0 ? linhasParam : null;
   const startParam = searchParams.get('start');
   const endParam = searchParams.get('end');
   const range =
@@ -23,6 +25,7 @@ export async function GET(request: Request) {
       company,
       range,
       filial: filial || null,
+      linhas,
     });
 
     return NextResponse.json({ data });

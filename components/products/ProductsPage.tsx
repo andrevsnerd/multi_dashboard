@@ -221,6 +221,7 @@ export default function ProductsPage({
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
   const [groupByColor, setGroupByColor] = useState(true);
   const [acimaDoTicket, setAcimaDoTicket] = useState(false);
+  const [filtrarEletronicos, setFiltrarEletronicos] = useState(companyKey === "nerd");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [selectedProductName, setSelectedProductName] = useState<string | null>(null);
@@ -551,10 +552,17 @@ export default function ProductsPage({
     };
   }, []);
 
+  // Linhas efetivas enviadas ao servidor: para NERD, o toggle "Eletrônicos"
+  // filtra somente a linha ELETRONICOS (mesma lógica da Curva ABC).
+  const effectiveLinhas = useMemo(
+    () => (companyKey === "nerd" && filtrarEletronicos ? ["ELETRONICOS"] : selectedLinhas),
+    [companyKey, filtrarEletronicos, selectedLinhas]
+  );
+
   const rangeKey = useMemo(
     () =>
-      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}::${selectedGrupos.join(',')}::${selectedLinhas.join(',')}::${selectedColecoes.join(',')}::${selectedSubgrupos.join(',')}::${selectedGrades.join(',')}::${groupByColor}::${acimaDoTicket}::${selectedProductId ?? 'all'}::${searchTerm.trim()}`,
-    [range.startDate, range.endDate, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, groupByColor, acimaDoTicket, selectedProductId, searchTerm]
+      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? 'all'}::${selectedGrupos.join(',')}::${effectiveLinhas.join(',')}::${selectedColecoes.join(',')}::${selectedSubgrupos.join(',')}::${selectedGrades.join(',')}::${groupByColor}::${acimaDoTicket}::${selectedProductId ?? 'all'}::${searchTerm.trim()}`,
+    [range.startDate, range.endDate, selectedFilial, selectedGrupos, effectiveLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, groupByColor, acimaDoTicket, selectedProductId, searchTerm]
   );
 
   useEffect(() => {
@@ -565,8 +573,8 @@ export default function ProductsPage({
       setError(null);
       try {
         const [productsData, summaryData] = await Promise.all([
-          fetchProducts(companyKey, range, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, groupByColor, acimaDoTicket, selectedProductId, selectedProductId ? null : (searchTerm && searchTerm.trim().length >= 2 ? searchTerm.trim() : null)),
-          fetchSummary(companyKey, range, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, acimaDoTicket, selectedProductId, selectedProductId ? null : (searchTerm && searchTerm.trim().length >= 2 ? searchTerm.trim() : null)),
+          fetchProducts(companyKey, range, selectedFilial, selectedGrupos, effectiveLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, groupByColor, acimaDoTicket, selectedProductId, selectedProductId ? null : (searchTerm && searchTerm.trim().length >= 2 ? searchTerm.trim() : null)),
+          fetchSummary(companyKey, range, selectedFilial, selectedGrupos, effectiveLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, acimaDoTicket, selectedProductId, selectedProductId ? null : (searchTerm && searchTerm.trim().length >= 2 ? searchTerm.trim() : null)),
         ]);
         if (active) {
           setData(productsData);
@@ -592,7 +600,7 @@ export default function ProductsPage({
     return () => {
       active = false;
     };
-  }, [companyKey, range, rangeKey, selectedFilial, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, acimaDoTicket]);
+  }, [companyKey, range, rangeKey, selectedFilial, selectedGrupos, effectiveLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, acimaDoTicket]);
 
   return (
     <div className={styles.wrapper}>
@@ -775,7 +783,7 @@ export default function ProductsPage({
                 filters: {
                   filial: selectedFilial,
                   grupos: selectedGrupos.length > 0 ? selectedGrupos : undefined,
-                  linhas: selectedLinhas.length > 0 ? selectedLinhas : undefined,
+                  linhas: effectiveLinhas.length > 0 ? effectiveLinhas : undefined,
                   colecoes: selectedColecoes.length > 0 ? selectedColecoes : undefined,
                   subgrupos: selectedSubgrupos.length > 0 ? selectedSubgrupos : undefined,
                   grades: selectedGrades.length > 0 ? selectedGrades : undefined,
@@ -841,6 +849,17 @@ export default function ProductsPage({
             />
             <span className={styles.switchText}>Acima do ticket</span>
           </label>
+          {companyKey === "nerd" && (
+            <label className={styles.switchLabel} title="Filtra apenas produtos da linha Eletrônicos">
+              <input
+                type="checkbox"
+                className={styles.switch}
+                checked={filtrarEletronicos}
+                onChange={(e) => setFiltrarEletronicos(e.target.checked)}
+              />
+              <span className={styles.switchText}>Eletrônicos</span>
+            </label>
+          )}
         </div>
 
         <ProductsTable 
