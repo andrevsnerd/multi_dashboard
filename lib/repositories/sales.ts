@@ -1934,6 +1934,7 @@ export async function fetchFilialPerformance({
             (vp.DATA_VENDA >= @startDate AND vp.DATA_VENDA < @endDate)
             OR (vp.DATA_VENDA >= @prevStartDate AND vp.DATA_VENDA < @prevEndDate)
           )
+          AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
           AND f.FILIAL IN (${placeholders})
           ${linhaFilter}
       ),
