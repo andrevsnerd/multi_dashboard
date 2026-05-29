@@ -48,3 +48,4 @@ test-proxy.js
 
 # Local AI tool settings (never commit)
 .claude/settings.local.json
+.claude/worktrees/
