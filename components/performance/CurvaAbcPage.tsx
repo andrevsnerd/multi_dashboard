@@ -1369,14 +1369,29 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     if (companyKey === 'nerd' && filtrarEletronicos) {
       params.append('linha', 'ELETRONICOS');
     }
-    fetch(`/api/curva-abc?${params}`, { cache: "no-store" })
+    // Guarda de corrida: ao trocar filtros rapidamente, várias requisições disparam. Sem isso, uma
+    // resposta antiga pode chegar depois e sobrescrever a nova (números "bugando"). O AbortController
+    // cancela a requisição anterior e a flag `cancelled` impede aplicar respostas obsoletas.
+    const controller = new AbortController();
+    let cancelled = false;
+    fetch(`/api/curva-abc?${params}`, { cache: "no-store", signal: controller.signal })
       .then(res => res.json())
       .then((json: FilialData & { error?: string }) => {
+        if (cancelled) return;
         if (json.error) throw new Error(json.error);
         setData(json);
       })
-      .catch(e => setError(e instanceof Error ? e.message : "Erro desconhecido"))
-      .finally(() => setLoading(false));
+      .catch(e => {
+        if (cancelled || (e instanceof Error && e.name === "AbortError")) return;
+        setError(e instanceof Error ? e.message : "Erro desconhecido");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [companyKey, selectedFilial, selectedMonth, selectedYear, comparisonMode, range.startDate, range.endDate, porCor, filtrarEletronicos]);
 
 
@@ -1671,6 +1686,11 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     ? data?.qtde ?? 0
     : produtosComCurvaExibidos.reduce((s, p) => s + p.qtde, 0);
   const displayCMV = produtosComCurvaExibidos.reduce((s, p) => s + p.custo * p.qtde, 0);
+  // Projeção do mês escalada ao vendas exibido (mesmo run-rate do servidor: totalDias/diasDecorridos).
+  // Assim a projeção aparece SEMPRE — inclusive com filtros — e fica coerente com o número exibido.
+  // Sem filtro, displayVendas = data.vendas, então displayProjecao == data.projecao (idêntico ao servidor).
+  const projecaoFactor = data && data.daysElapsed > 0 ? data.totalDaysInMonth / data.daysElapsed : 1;
+  const displayProjecao = displayVendas * projecaoFactor;
   const displayedCountLabel = filteredCurve
     ? `${Array.from(selectedCurvas).join(", ")} ${porCor ? "itens exibidos" : "produtos exibidos"}`
     : porCor
@@ -2312,8 +2332,8 @@ const handleBadgeClick = (cat: string) => {
                     : `${variation.value >= 0 ? "↑" : "↓"} ${Math.abs(variation.value).toFixed(1)}%`}
                 </span>
               )}
-              {!hasAnyDisplayFilter && data.projecao > 0 && (
-                <span className={styles.kpiSubtitle}>Projeção {fmtCurrency(data.projecao)}</span>
+              {displayProjecao > 0 && (
+                <span className={styles.kpiSubtitle}>Projeção {fmtCurrency(displayProjecao)}</span>
               )}
             </div>
           </div>

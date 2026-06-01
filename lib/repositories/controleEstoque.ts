@@ -6958,7 +6958,13 @@ export async function fetchVendasProdutoPorFilial({
       const negativeStock = Number(row.negativeStock ?? 0);
       const positiveCount = Number(row.positiveCount ?? 0);
       const estoqueAtual = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
-      currentStockMap.set(row.filial, Math.round(estoqueAtual));
+      // Normaliza a chave da filial (trim) para casar com os mapas de movimento (addMovement
+      // também faz .trim()). Sem isso, FILIAL com espaços à direita (ex.: "NERD CENTER NORTE        ")
+      // não bate com a chave dos movimentos, o estoque atual "vaza" para uma filial fantasma sempre
+      // positiva e o saldo de abertura da filial real fica negativo — corrompendo diasComEstoquePositivo.
+      const filialKey = (row.filial ?? '').trim();
+      if (!filialKey) continue;
+      currentStockMap.set(filialKey, (currentStockMap.get(filialKey) ?? 0) + Math.round(estoqueAtual));
     }
 
     const entriesTotalMap = new Map<string, number>();
@@ -6989,12 +6995,14 @@ export async function fetchVendasProdutoPorFilial({
     addMovement(retailSalesDailyRes.recordset, salesTotalMap, saleByDay);
     addMovement(ecommerceSalesDailyRes.recordset, salesTotalMap, saleByDay);
 
+    // Todas as chaves abaixo precisam estar normalizadas (trim) para que estoque, movimentos e
+    // contagem de dias positivos compartilhem a MESMA chave de filial.
     const allFiliaisDisponibilidade = new Set<string>([
       ...Array.from(currentStockMap.keys()),
       ...Array.from(entriesTotalMap.keys()),
       ...Array.from(salesTotalMap.keys()),
       ...Array.from(exitsTotalMap.keys()),
-      ...Array.from(byFilial.keys()),
+      ...Array.from(byFilial.keys()).map((f) => (f ?? '').trim()),
     ]);
     const runningStockMap = new Map<string, number>();
     const diasPositivosPorFilial = new Map<string, number>();
@@ -7009,6 +7017,21 @@ export async function fetchVendasProdutoPorFilial({
       diasPositivosPorFilial.set(filialKey, 0);
     }
 
+    // Data real de nascimento do produto em cada filial (1a entrada, ou 1a venda como fallback).
+    // Usada para NÃO contar como "dia com estoque" os dias anteriores à existência do produto
+    // naquela loja — caso contrário, quando o saldo de abertura retrocalcula positivo, a janela
+    // inteira de 365 dias seria contada (ex.: 365 dias para um produto com só ~6 meses de vida),
+    // inflando diasComEstoquePositivo e deprimindo a velocidade. Consistente com diasHistoricoFilial.
+    const firstActiveIsoByFilial = new Map<string, string>();
+    for (const r of byFilial.values()) {
+      const key = (r.filial ?? '').trim();
+      const base = r.primeiraEntradaFilial ?? r.primeiraVendaFilial;
+      if (!base || Number.isNaN(base.getTime())) continue;
+      const iso = base.toISOString().slice(0, 10);
+      const prev = firstActiveIsoByFilial.get(key);
+      if (prev == null || iso < prev) firstActiveIsoByFilial.set(key, iso);
+    }
+
     let diasPositivosResumo = 0;
     for (let time = inicio12m.getTime(); time < fimPeriodo.getTime(); time += msPerDay) {
       const dayIso = new Date(time).toISOString().slice(0, 10);
@@ -7018,6 +7041,9 @@ export async function fetchVendasProdutoPorFilial({
       const filiaisPositivasNoDia = new Set<string>();
       const markFilialPositivaNoDia = (filialKey: string) => {
         if (filiaisPositivasNoDia.has(filialKey)) return;
+        // Não conta dias anteriores à 1a entrada/venda do produto nesta filial (produto ainda não existia).
+        const firstIso = firstActiveIsoByFilial.get(filialKey);
+        if (firstIso && dayIso < firstIso) return;
         filiaisPositivasNoDia.add(filialKey);
         diasPositivosPorFilial.set(filialKey, (diasPositivosPorFilial.get(filialKey) ?? 0) + 1);
       };
@@ -7070,7 +7096,7 @@ export async function fetchVendasProdutoPorFilial({
       .map((r) => {
         const historico = buildHistoricoFilial(r.primeiraEntradaFilial, r.primeiraVendaFilial);
         const dataBaseHistorico = r.primeiraEntradaFilial ?? r.primeiraVendaFilial;
-        const diasComEstoquePositivo = diasPositivosPorFilial.get(r.filial) ?? 0;
+        const diasComEstoquePositivo = diasPositivosPorFilial.get((r.filial ?? '').trim()) ?? 0;
         const diasSemEstoque = Math.max(0, historico.diasHistoricoFilial - diasComEstoquePositivo);
         const mesesDisponiveis = diasComEstoquePositivo > 0 ? diasComEstoquePositivo / 30 : 0;
         return {
