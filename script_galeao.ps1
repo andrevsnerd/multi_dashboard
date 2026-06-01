@@ -1,6 +1,6 @@
 $baseUrl = "https://multi-dashboard.vercel.app"
 $adminUsername = "andre.sabetta"
-$filialParaAdicionar = "SCARFME LLL - GALEAO RJ"
+$filialParaAdicionar = "SCARFME LLL -  GALEAO RJ"
 
 $usuariosAlvo = @(
   "scarfme.gru",

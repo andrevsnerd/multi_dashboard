@@ -47,7 +47,7 @@ SCARFME_FILIAIS_ESTOQUE = [
     "SCARF ME MATRIZ - FFF",
     "VILLA LOBOS - LLL",
     "MSC COMERCIO DE LENCOS LT",
-    "SCARFME LLL - GALEAO RJ",
+    "SCARFME LLL -  GALEAO RJ",
 ]
 
 # Linhas excluídas no dashboard (excludedLines) - produtos com LINHA nessa lista não entram

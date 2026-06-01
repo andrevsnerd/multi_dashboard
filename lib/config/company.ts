@@ -108,7 +108,7 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
         'SCARF ME MATRIZ - FFF',
         'VILLA LOBOS - LLL',
         'MSC COMERCIO DE LENCOS LT',
-        'SCARFME LLL - GALEAO RJ',
+        'SCARFME LLL -  GALEAO RJ',
       ],
       inventory: [
         'GUARULHOS - RSR',
@@ -127,7 +127,7 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
         'SCARF ME MATRIZ - FFF',
         'VILLA LOBOS - LLL',
         'MSC COMERCIO DE LENCOS LT',
-        'SCARFME LLL - GALEAO RJ',
+        'SCARFME LLL -  GALEAO RJ',
       ],
     },
     filialDisplayNames: {
@@ -147,7 +147,7 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
       'SCARF ME MATRIZ - FFF': 'E-COMMERCE',
       'VILLA LOBOS - LLL': 'VILLA LOBOS',
       'MSC COMERCIO DE LENCOS LT': 'E-COMMERCE',
-      'SCARFME LLL - GALEAO RJ': 'GALEÃO RJ',
+      'SCARFME LLL -  GALEAO RJ': 'GALEÃO RJ',
     },
     estoqueFilialOrder: ['MATRIZ', 'E-COMMERCE', 'GUARULHOS', 'MORUMBI', 'OSCAR FREIRE', 'VILLA LOBOS', 'GALEÃO RJ'],
     ecommerceFilials: ['SCARFME MATRIZ CMS', 'SCARF ME - MATRIZ LLL', 'SCARF ME MATRIZ - FFF', 'MSC COMERCIO DE LENCOS LT'],

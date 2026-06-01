@@ -40,7 +40,7 @@ const PRESETS: Record<CompanyKey, NovaFilialPreset[]> = {
       label: "Guarulhos -> Galeao RJ",
       description: "Quiosques de aeroporto com comparacao direta de sortimento e profundidade.",
       model: "GUARULHOS - RSR",
-      target: "SCARFME LLL - GALEAO RJ",
+      target: "SCARFME LLL -  GALEAO RJ",
     },
   ],
   nerd: [
