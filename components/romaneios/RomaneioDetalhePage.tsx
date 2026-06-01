@@ -459,7 +459,7 @@ export default function RomaneioDetalhePage({
           return (quantidades.get(chave) ?? item.qtde) !== item.qtde;
         });
         if (possuiDivergencia) {
-          setErroConfirmacao("Romaneios em trÃ¢nsito do Linx devem ser confirmados com a quantidade integral do faturamento.");
+          setErroConfirmacao("Romaneios em trânsito do Linx devem ser confirmados com a quantidade integral do faturamento.");
           return;
         }
 
@@ -470,10 +470,10 @@ export default function RomaneioDetalhePage({
           filialOrigem
         );
         if (!result.ok) {
-          setErroConfirmacao(result.error ?? "Erro ao liberar trÃ¢nsito do Linx.");
+          setErroConfirmacao(result.error ?? "Erro ao liberar trânsito do Linx.");
           return;
         }
-        setLiberacaoTransitoMsg(`TrÃ¢nsito liberado com sucesso para ${filialDestino}.`);
+        setLiberacaoTransitoMsg(`Trânsito liberado com sucesso para ${filialDestino}.`);
       } else if (isSaida) {
         // Registra entrada de estoque em lote (1 romaneio para todos)
         const result = await executarEntradaEstoqueLote(
@@ -881,8 +881,8 @@ export default function RomaneioDetalhePage({
 
       {isTransito && (
         <>
-          <p className={styles.destinoReadOnly}>Origem: {filialOrigem || "â€”"}</p>
-          <p className={styles.destinoReadOnly}>Destino: {filialDestino || "â€”"}</p>
+          <p className={styles.destinoReadOnly}>Origem: {filialOrigem || "—"}</p>
+          <p className={styles.destinoReadOnly}>Destino: {filialDestino || "—"}</p>
         </>
       )}
 
@@ -899,7 +899,7 @@ export default function RomaneioDetalhePage({
             onClick={() => setLiberacaoTransitoMsg(null)}
             title="Fechar"
           >
-            âœ•
+            ✕
           </button>
         </div>
       )}

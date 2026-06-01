@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -131,7 +131,7 @@ function resumirAjusteEntreDestinos(
   atual: DestinoCompraFinalParte[] | null,
   sugerido: DestinoCompraFinalParte[] | null
 ): string {
-  if (!atual || !sugerido) return "Sem distribuiÃ§Ã£o por filial para comparar.";
+  if (!atual || !sugerido) return "Sem distribuição por filial para comparar.";
   const mapaAtual = new Map(atual.map((p) => [p.label, p.qtd]));
   const mapaSug = new Map(sugerido.map((p) => [p.label, p.qtd]));
   const labels = new Set([...mapaAtual.keys(), ...mapaSug.keys()]);
@@ -145,7 +145,7 @@ function resumirAjusteEntreDestinos(
   });
 
   if (sobe.length === 0 && desce.length === 0) {
-    return "DistribuiÃ§Ã£o por filial sem mudanÃ§a.";
+    return "Distribuição por filial sem mudança.";
   }
   const partes: string[] = [];
   if (sobe.length > 0) partes.push(`Colocar: ${sobe.join(", ")}`);
@@ -308,8 +308,8 @@ function buildSuggestionRuleInput(
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-// Replica a lÃ³gica completa de getReposicaoCompraView da Lista Loja (regras Compra, S e E).
-// SÃ³ calcula quando liveData estiver carregado â€” nunca usa match para vendas/estoque
+// Replica a lógica completa de getReposicaoCompraView da Lista Loja (regras Compra, S e E).
+// Só calcula quando liveData estiver carregado — nunca usa match para vendas/estoque
 // pois lista-compra-sugerida usa query diferente (sem e-commerce para isProdutoLookup).
 function calcularSugestaoCompleto(
   match: ProdutoSugestao | null | undefined,
@@ -451,11 +451,13 @@ function ManualDestinoEditor({
   distribuicao,
   allFiliais,
   onDelta,
+  onSet,
   onAddFilial,
 }: {
   distribuicao: Record<string, number>;
   allFiliais: string[];
   onDelta: (filial: string, delta: number) => void;
+  onSet: (filial: string, value: number) => void;
   onAddFilial: (filial: string) => void;
 }) {
   const [novaFilial, setNovaFilial] = useState("");
@@ -485,8 +487,19 @@ function ManualDestinoEditor({
             >
               {filial}
             </span>
-            <button type="button" className={styles.manualQtyBtn} onClick={() => onDelta(filial, -1)}>âˆ’</button>
-            <span className={styles.manualQtyVal}>{qty}</span>
+            <button type="button" className={styles.manualQtyBtn} onClick={() => onDelta(filial, -1)}>−</button>
+            <input
+              type="number"
+              min={0}
+              inputMode="numeric"
+              className={styles.manualQtyVal}
+              value={qty}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                onSet(filial, Number.isNaN(v) ? 0 : v);
+              }}
+              onFocus={(e) => e.currentTarget.select()}
+            />
             <button type="button" className={styles.manualQtyBtn} onClick={() => onDelta(filial, +1)}>+</button>
           </div>
         );
@@ -882,11 +895,11 @@ export default function CompraSalvaDetalhePage({
   useEffect(() => {
     if (!doc || items.length === 0) return;
     let cancelled = false;
-    // Usa filialOrigem do primeiro item que a tenha (campo salvo a partir desta versÃ£o).
+    // Usa filialOrigem do primeiro item que a tenha (campo salvo a partir desta versão).
     // Fallback para sourceContextKey apenas em compras antigas sem filialOrigem.
     const primeiroComOrigem = items.find((it) => it.filialOrigem !== undefined);
     const filialFiltro = primeiroComOrigem !== undefined
-      ? primeiroComOrigem.filialOrigem  // pode ser null (todas) ou codFilial especÃ­fico
+      ? primeiroComOrigem.filialOrigem  // pode ser null (todas) ou codFilial específico
       : parseListaLojaFilial(doc.sourceContextKey);
     const unique = new Map<string, { produto: string; corProduto: string | null }>();
     items.forEach((it) => {
@@ -903,7 +916,7 @@ export default function CompraSalvaDetalhePage({
         if (val.corProduto) params.set("corProduto", val.corProduto);
         if (filialFiltro) params.set("filial", filialFiltro);
         const estoqueParams = new URLSearchParams(params);
-        // includeHistorico sÃ³ vai para vendas; estoque usa endpoint diferente
+        // includeHistorico só vai para vendas; estoque usa endpoint diferente
         params.set("includeHistorico", "true");
         const [vendas, estoque] = await Promise.all([
           fetchVendasItemMetricas(params),
@@ -1007,7 +1020,7 @@ export default function CompraSalvaDetalhePage({
 
   const totals = useMemo(() => {
     const totalItens = rowsComputed.length;
-    // Usa qtdSugerida quando disponÃ­vel, incorporando a diferenÃ§a no total
+    // Usa qtdSugerida quando disponível, incorporando a diferença no total
     const totalQtdManual = rowsComputed.reduce((s, r) => s + r.effectiveQtdManual, 0);
     const totalCusto = rowsComputed.reduce((s, r) => s + (r.custoTotal ?? 0), 0);
     return { totalItens, totalQtdManual, totalCusto };
@@ -1196,7 +1209,7 @@ export default function CompraSalvaDetalhePage({
   };
 
   const handleDeleteCompra = async () => {
-    if (!window.confirm("Excluir esta compra salva? Esta aÃ§Ã£o nÃ£o pode ser desfeita.")) return;
+    if (!window.confirm("Excluir esta compra salva? Esta ação não pode ser desfeita.")) return;
     const params = new URLSearchParams();
     params.set("company", companyKey);
     const res = await fetch(`/api/controle-estoque/compras-salvas/${compraId}?${params}`, { method: "DELETE" });
@@ -1269,7 +1282,7 @@ export default function CompraSalvaDetalhePage({
           .filter(([, qty]) => qty > 0)
           .sort(([a], [b]) => compareFilialDisplayOrder(a, b, cfg))
           .map(([label, qty]) => `${label}: ${fmt2(qty)}`)
-          .join(" Â· ");
+          .join(" · ");
       } else {
         destino = vendasRows !== undefined ? textoDestinoCompraFinal(effectiveQtdManual, vendasRows, companyKey, estoquePorFilialCache[vendasKey], getSharedLimiteDiasReposicao({ linha: match?.linha, subgrupo: match?.subgrupo })) : "";
       }
@@ -1290,7 +1303,7 @@ export default function CompraSalvaDetalhePage({
     });
 
     const kpis = [
-      { METRICA: "TÃ­tulo", VALOR: doc?.title ?? "" },
+      { METRICA: "Título", VALOR: doc?.title ?? "" },
       { METRICA: "Empresa", VALOR: companyKey },
       { METRICA: "Itens", VALOR: totals.totalItens },
       { METRICA: "Total Qtd Manual", VALOR: totals.totalQtdManual },
@@ -1317,7 +1330,7 @@ export default function CompraSalvaDetalhePage({
 
       const target = compraSalvaExportRef.current;
 
-      // Coleta valores dos inputs ANTES do clone (cloneNode nÃ£o copia .value de inputs React)
+      // Coleta valores dos inputs ANTES do clone (cloneNode não copia .value de inputs React)
       const originalInputs = Array.from(target.querySelectorAll("input")) as HTMLInputElement[];
       const inputValues = originalInputs.map((inp) => inp.value);
 
@@ -1327,10 +1340,10 @@ export default function CompraSalvaDetalhePage({
         useCORS: true,
         logging: false,
         // onclone: html2canvas renderiza o clone num iframe isolado,
-        // fora de qualquer container scrollÃ¡vel do layout â€” isso garante
-        // captura do conteÃºdo COMPLETO, nÃ£o sÃ³ a porÃ§Ã£o visÃ­vel na tela.
+        // fora de qualquer container scrollável do layout — isso garante
+        // captura do conteúdo COMPLETO, não só a porção visível na tela.
         onclone: (cloneDoc, cloneEl) => {
-          // Ocultar elementos de UI que nÃ£o devem aparecer no PDF
+          // Ocultar elementos de UI que não devem aparecer no PDF
           cloneEl.querySelectorAll("[data-pdf-hide]").forEach((el) => {
             (el as HTMLElement).style.display = "none";
           });
@@ -1448,6 +1461,16 @@ export default function CompraSalvaDetalhePage({
     void handleUpdateQtd(itemKey, total);
   };
 
+  const handleManualFilialSet = (itemKey: string, filial: string, value: number) => {
+    const itemDist = { ...(manualDistribuicaoRef.current[itemKey] ?? {}) };
+    itemDist[filial] = Math.max(0, Math.round(value));
+    const total = sumDistribuicaoManual(itemDist);
+    manualDistribuicaoRef.current = { ...manualDistribuicaoRef.current, [itemKey]: itemDist };
+    setManualDistribuicao((prev) => ({ ...prev, [itemKey]: itemDist }));
+    setItems((prev) => prev.map((i) => (i.itemKey === itemKey ? { ...i, qtdManual: total } : i)));
+    void handleUpdateQtd(itemKey, total);
+  };
+
   const handleManualAddFilial = (itemKey: string, filial: string) => {
     setManualDistribuicao((prev) => {
       const current = prev[itemKey] ?? {};
@@ -1462,7 +1485,7 @@ export default function CompraSalvaDetalhePage({
     <div className={styles.wrapper}>
       <div className={styles.pageToolbar}>
         <Link href={listBack} className={styles.backButton}>
-          â† Compras salvas
+          ← Compras salvas
         </Link>
       </div>
 
@@ -1475,11 +1498,11 @@ export default function CompraSalvaDetalhePage({
               </svg>
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              {!doc && loading && <h1 className={styles.title}>Carregando compraâ€¦</h1>}
+              {!doc && loading && <h1 className={styles.title}>Carregando compra…</h1>}
               {doc && (
                 <>
                   <label className={styles.subtitle} htmlFor="compra-salva-titulo" style={{ display: "block", marginBottom: 6 }}>
-                    TÃ­tulo
+                    Título
                   </label>
                   <input
                     id="compra-salva-titulo"
@@ -1501,7 +1524,7 @@ export default function CompraSalvaDetalhePage({
                     onBlur={() => { void handleTitleBlur(); }}
                   />
                   <p className={styles.subtitle}>
-                    Salva em {new Date(doc.savedAt).toLocaleString("pt-BR")} Â· {expandirPorCor ? "Por cor" : "Por produto"}
+                    Salva em {new Date(doc.savedAt).toLocaleString("pt-BR")} · {expandirPorCor ? "Por cor" : "Por produto"}
                   </p>
                 </>
               )}
@@ -1533,7 +1556,7 @@ export default function CompraSalvaDetalhePage({
               </div>
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Custo total (referÃªncia)</span>
+                <span className={styles.summaryLabel}>Custo total (referência)</span>
                 <span className={styles.summaryValue}>{fmtBRL(totals.totalCusto)}</span>
               </div>
             </div>
@@ -1557,7 +1580,7 @@ export default function CompraSalvaDetalhePage({
               >
                 <span className={styles.exportMenuLabel}>Exportar</span>
                 <span className={`${styles.exportCaret}${exportMenuOpen ? ` ${styles.exportCaretOpen}` : ""}`}>v</span>
-                {exportingPdf ? "Exportando PDFâ€¦" : "Exportar PDF"}
+                {exportingPdf ? "Exportando PDF…" : "Exportar PDF"}
               </button>
               {exportMenuOpen && (
                 <div className={styles.exportDropdown} role="menu">
@@ -1694,7 +1717,7 @@ export default function CompraSalvaDetalhePage({
                           <div className={styles.productCode}>{it.produto}</div>
                           {it.corDescricao && <div className={styles.productCode}>{it.corDescricao}</div>}
                           {it.grade && <div className={styles.productCode}>Grade: {it.grade}</div>}
-                          {it.colecao && <div className={styles.productCode}>ColeÃ§Ã£o: {it.colecao}</div>}
+                          {it.colecao && <div className={styles.productCode}>Coleção: {it.colecao}</div>}
                         </td>
                         <td className={styles.right}>
                           {isManual ? (
@@ -1715,12 +1738,13 @@ export default function CompraSalvaDetalhePage({
                         </td>
                         <td className={styles.destinoCell}>
                           {isEditing ? (
-                            /* â”€â”€ Estado: editando â”€â”€ */
+                            /* ── Estado: editando ── */
                             <div>
                               <ManualDestinoEditor
                                 distribuicao={manualDistribuicao[it.itemKey] ?? {}}
                                 allFiliais={filialOptions}
                                 onDelta={(filial, delta) => handleManualFilialDelta(it.itemKey, filial, delta)}
+                                onSet={(filial, value) => handleManualFilialSet(it.itemKey, filial, value)}
                                 onAddFilial={(filial) => handleManualAddFilial(it.itemKey, filial)}
                               />
                               <div className={styles.manualEditActions} data-pdf-hide="">
@@ -1729,7 +1753,7 @@ export default function CompraSalvaDetalhePage({
                                   className={styles.manualConfirmBtn}
                                   onClick={() => confirmManual(it.itemKey)}
                                 >
-                                  Confirmar âœ“
+                                  Confirmar ✓
                                 </button>
                                 <button
                                   type="button"
@@ -1741,7 +1765,7 @@ export default function CompraSalvaDetalhePage({
                               </div>
                             </div>
                           ) : isConfirmed ? (
-                            /* â”€â”€ Estado: manual confirmado â€” visual igual ao auto â”€â”€ */
+                            /* ── Estado: manual confirmado — visual igual ao auto ── */
                             <div>
                               <div className={styles.destinoCellInner}>
                                 {(() => {
@@ -1752,7 +1776,7 @@ export default function CompraSalvaDetalhePage({
                                     .sort((a, b) => compareFilialDisplayOrder(a.label, b.label, cfg));
                                   return manualPartes.length > 0
                                     ? <DestinoCompraFinalBadges partes={manualPartes} />
-                                    : <span style={{ color: "#94a3b8", fontSize: 12 }}>Sem distribuiÃ§Ã£o</span>;
+                                    : <span style={{ color: "#94a3b8", fontSize: 12 }}>Sem distribuição</span>;
                                 })()}
                               </div>
                               <div className={styles.manualConfirmedActions} data-pdf-hide="">
@@ -1767,20 +1791,20 @@ export default function CompraSalvaDetalhePage({
                                   type="button"
                                   className={styles.manualToggleBtn}
                                   onClick={() => cancelManual(it.itemKey)}
-                                  title="Voltar ao modo automÃ¡tico"
+                                  title="Voltar ao modo automático"
                                 >
-                                  â†’ Auto
+                                  → Auto
                                 </button>
                               </div>
                             </div>
                           ) : (
-                            /* â”€â”€ Estado: automÃ¡tico (padrÃ£o) â”€â”€ */
+                            /* ── Estado: automático (padrão) ── */
                             <div>
                               <div className={styles.destinoCellInner}>
                                 {partesDestino === undefined
-                                  ? "â€¦"
+                                  ? "…"
                                   : partesDestino === null
-                                    ? "â€”"
+                                    ? "—"
                                     : <DestinoCompraFinalBadges partes={partesDestino} />}
                                 {qtdSugerida !== null && sugestaoAtual.baseType === "S" && sugestaoBase ? (
                                   <span
@@ -1895,18 +1919,18 @@ export default function CompraSalvaDetalhePage({
                                   const diffFmt = `${diff > 0 ? "+" : ""}${diff}`;
                                   const explicacao =
                                     diff > 0
-                                      ? "SugestÃ£o atual maior que a quantidade salva"
-                                      : "SugestÃ£o atual menor que a quantidade salva";
+                                      ? "Sugestão atual maior que a quantidade salva"
+                                      : "Sugestão atual menor que a quantidade salva";
                                   const total12m = (vendasRowsK ?? []).reduce((s, r) => s + (r.qtde12m ?? 0), 0);
                                   const total60d = (vendasRowsK ?? []).reduce((s, r) => s + (r.qtde60d ?? 0), 0);
                                   const mediaMensal12m = total12m / 12;
                                   const ritmoMensal60d = total60d / 2;
                                   const tendenciaTexto =
                                     mediaMensal12m <= 0
-                                      ? "Sem base de vendas para tendÃªncia."
+                                      ? "Sem base de vendas para tendência."
                                       : ritmoMensal60d >= mediaMensal12m
-                                        ? `Ritmo recente acima/igual da mÃ©dia (${ritmoMensal60d.toFixed(1)} vs ${mediaMensal12m.toFixed(1)} un/mÃªs).`
-                                        : `Ritmo recente abaixo da mÃ©dia (${ritmoMensal60d.toFixed(1)} vs ${mediaMensal12m.toFixed(1)} un/mÃªs).`;
+                                        ? `Ritmo recente acima/igual da média (${ritmoMensal60d.toFixed(1)} vs ${mediaMensal12m.toFixed(1)} un/mês).`
+                                        : `Ritmo recente abaixo da média (${ritmoMensal60d.toFixed(1)} vs ${mediaMensal12m.toFixed(1)} un/mês).`;
                                   const ajusteDestinoTexto =
                                     partesDestinoSugerido === undefined
                                       ? "Destino: aguardando dados de vendas por filial."
@@ -1915,7 +1939,7 @@ export default function CompraSalvaDetalhePage({
                                     <span
                                       className={`${styles.badgeS} ${diff > 0 ? styles.badgeSDiffUp : styles.badgeSDiffDown}`}
                                       style={{ width: "auto", padding: "0 6px" }}
-                                      aria-label={`Delta sugestÃ£o ${diffFmt}`}
+                                      aria-label={`Delta sugestão ${diffFmt}`}
                                       onMouseEnter={(e) => {
                                         setSugestaoDiffTooltip({
                                           x: e.clientX,
@@ -1944,7 +1968,7 @@ export default function CompraSalvaDetalhePage({
                                   type="button"
                                   className={styles.manualToggleBtn}
                                   onClick={() => startManualEdit(it.itemKey, partesDestino)}
-                                  title="Editar distribuiÃ§Ã£o por filial manualmente"
+                                  title="Editar distribuição por filial manualmente"
                                 >
                                   Manual
                                 </button>
@@ -1988,13 +2012,13 @@ export default function CompraSalvaDetalhePage({
                           }}
                           onMouseLeave={() => setEstoqueTooltip(null)}
                         >
-                          {estoque != null ? fmt(estoque) : "â€”"}
+                          {estoque != null ? fmt(estoque) : "—"}
                         </td>
                         <td className={`${styles.right} ${custoUnit > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
-                          {custoUnit > 0 ? fmtBRL2(custoUnit) : "â€”"}
+                          {custoUnit > 0 ? fmtBRL2(custoUnit) : "—"}
                         </td>
                         <td className={`${styles.right} ${custoTotal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
-                          {custoTotal > 0 ? fmtBRL(custoTotal) : "â€”"}
+                          {custoTotal > 0 ? fmtBRL(custoTotal) : "—"}
                         </td>
                         <td className={styles.right} data-pdf-hide="">
                           <button
@@ -2002,8 +2026,15 @@ export default function CompraSalvaDetalhePage({
                             className={styles.removeBtn}
                             onClick={() => { void handleRemove(it.itemKey); }}
                             title="Remover"
+                            aria-label="Remover"
                           >
-                            Ã—
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3 6h18" />
+                              <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                              <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                              <path d="M10 11v6" />
+                              <path d="M14 11v6" />
+                            </svg>
                           </button>
                         </td>
                       </tr>
@@ -2054,7 +2085,7 @@ export default function CompraSalvaDetalhePage({
           className={styles.tooltipEstoque}
           style={{ left: sugestaoDiffTooltip.x + 12, top: sugestaoDiffTooltip.y + 12 }}
         >
-          <div className={styles.tooltipEstoqueHeader}>Delta da sugestÃ£o</div>
+          <div className={styles.tooltipEstoqueHeader}>Delta da sugestão</div>
           <div className={styles.tooltipLine}>
             <strong>Resultado:</strong> {sugestaoDiffTooltip.diffFmt}
           </div>
@@ -2083,7 +2114,7 @@ export default function CompraSalvaDetalhePage({
             <>
               <div className={styles.tooltipDivider} />
               <div className={styles.tooltipLine}>
-                <strong style={{ color: "#0f766e" }}>+{fmt(sugestaoDiffTooltip.transitTotal)} em trÃ¢nsito</strong>
+                <strong style={{ color: "#0f766e" }}>+{fmt(sugestaoDiffTooltip.transitTotal)} em trânsito</strong>
               </div>
               {sugestaoDiffTooltip.transitDates?.map((label) => (
                 <div key={label} className={styles.tooltipLine} style={{ color: "#0f766e", fontSize: 11 }}>
@@ -2099,13 +2130,13 @@ export default function CompraSalvaDetalhePage({
           className={styles.metricTooltip}
           style={getTooltipViewportPosition(sugestaoSTooltip.x, sugestaoSTooltip.y)}
         >
-          <div className={styles.metricTooltipTitle}>S â†’ {fmt(sugestaoSTooltip.qtdS)} un</div>
+          <div className={styles.metricTooltipTitle}>S → {fmt(sugestaoSTooltip.qtdS)} un</div>
           <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
-            Produto sem estoque. Velocidade calculada nos dias com venda disponÃ­vel.
+            Produto sem estoque. Velocidade calculada nos dias com venda disponível.
           </div>
           <div className={styles.metricTooltipDivider} />
           <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-            <span>Velocidade</span><span><strong>{sugestaoSTooltip.velocidadeAjustada.toFixed(1)} un/mÃªs</strong></span>
+            <span>Velocidade</span><span><strong>{sugestaoSTooltip.velocidadeAjustada.toFixed(1)} un/mês</strong></span>
           </div>
           <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
             <span>Estoque</span><span><strong>{fmt(sugestaoSTooltip.estoqueAtual)} un</strong></span>
@@ -2128,7 +2159,7 @@ export default function CompraSalvaDetalhePage({
             <>
               <div className={styles.metricTooltipDivider} />
               <div className={styles.metricTooltipLine} style={{ color: "#0f766e" }}>
-                <strong>+{fmt(sugestaoSTooltip.transitTotal)} em trÃ¢nsito</strong>
+                <strong>+{fmt(sugestaoSTooltip.transitTotal)} em trânsito</strong>
               </div>
               {sugestaoSTooltip.transitDates?.map((label) => (
                 <div key={label} className={styles.metricTooltipLine} style={{ color: "#0d9488", fontSize: 11 }}>
@@ -2144,13 +2175,13 @@ export default function CompraSalvaDetalhePage({
           className={styles.metricTooltip}
           style={getTooltipViewportPosition(sugestaoETooltip.x, sugestaoETooltip.y)}
         >
-          <div className={styles.metricTooltipTitle}>E â†’ {fmt(sugestaoETooltip.qtdE)} un</div>
+          <div className={styles.metricTooltipTitle}>E → {fmt(sugestaoETooltip.qtdE)} un</div>
           <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
-            Produto zerado. Velocidade estimada do perÃ­odo com estoque disponÃ­vel.
+            Produto zerado. Velocidade estimada do período com estoque disponível.
           </div>
           <div className={styles.metricTooltipDivider} />
           <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-            <span>Velocidade</span><span><strong>{sugestaoETooltip.velocidadeAjustada.toFixed(1)} un/mÃªs</strong></span>
+            <span>Velocidade</span><span><strong>{sugestaoETooltip.velocidadeAjustada.toFixed(1)} un/mês</strong></span>
           </div>
           <div className={styles.metricTooltipLine} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
             <span>Alvo</span><span>{sugestaoETooltip.limiteDias} dias</span>
@@ -2170,7 +2201,7 @@ export default function CompraSalvaDetalhePage({
             <>
               <div className={styles.metricTooltipDivider} />
               <div className={styles.metricTooltipLine} style={{ color: "#0f766e" }}>
-                <strong>+{fmt(sugestaoETooltip.transitTotal)} em trÃ¢nsito</strong>
+                <strong>+{fmt(sugestaoETooltip.transitTotal)} em trânsito</strong>
               </div>
               {sugestaoETooltip.transitDates?.map((label) => (
                 <div key={label} className={styles.metricTooltipLine} style={{ color: "#0d9488", fontSize: 11 }}>
@@ -2191,7 +2222,7 @@ export default function CompraSalvaDetalhePage({
           </div>
           {(sugestaoPOTooltip.limiteSeguro ?? 0) > 0 && (
             <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
-              Vendeu bem em perÃ­odo curto e ficou sem estoque.
+              Vendeu bem em período curto e ficou sem estoque.
             </div>
           )}
           {sugestaoPOTooltip.qtde12m != null && sugestaoPOTooltip.diasComEstoquePositivo != null && (
@@ -2200,7 +2231,7 @@ export default function CompraSalvaDetalhePage({
               {sugestaoPOTooltip.velocidadeAjustada != null && (
                 <>
                   <span style={{ color: "#94a3b8" }}> | </span>
-                  <strong>{sugestaoPOTooltip.velocidadeAjustada.toFixed(0)} un/mÃªs</strong>
+                  <strong>{sugestaoPOTooltip.velocidadeAjustada.toFixed(0)} un/mês</strong>
                 </>
               )}
             </div>
@@ -2215,7 +2246,7 @@ export default function CompraSalvaDetalhePage({
             <>
               <div className={styles.metricTooltipDivider} />
               <div className={styles.metricTooltipLine} style={{ color: "#0f766e" }}>
-                <strong>+{fmt(sugestaoPOTooltip.transitTotal)} em trÃ¢nsito</strong>
+                <strong>+{fmt(sugestaoPOTooltip.transitTotal)} em trânsito</strong>
               </div>
               {sugestaoPOTooltip.transitDates?.map((label) => (
                 <div key={label} className={styles.metricTooltipLine} style={{ color: "#0d9488", fontSize: 11 }}>
