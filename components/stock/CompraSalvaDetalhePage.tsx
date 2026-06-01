@@ -2047,10 +2047,16 @@ export default function CompraSalvaDetalhePage({
         </div>
       )}
 
-      {estoqueTooltip && doc && (
+      {estoqueTooltip && doc && (() => {
+        const flipUp =
+          typeof window !== "undefined" && estoqueTooltip.y > window.innerHeight * 0.55;
+        const style: React.CSSProperties = flipUp
+          ? { left: estoqueTooltip.x + 12, top: estoqueTooltip.y - 12, transform: "translateY(-100%)" }
+          : { left: estoqueTooltip.x + 12, top: estoqueTooltip.y + 12 };
+        return (
         <div
           className={styles.tooltipEstoque}
-          style={{ left: estoqueTooltip.x + 12, top: estoqueTooltip.y + 12 }}
+          style={style}
         >
           <div className={styles.tooltipEstoqueHeader}>Estoque por filial</div>
           <div className={styles.tooltipEstoqueMeta}><strong>Produto:</strong> {estoqueTooltip.produto}</div>
@@ -2079,7 +2085,8 @@ export default function CompraSalvaDetalhePage({
             </>
           )}
         </div>
-      )}
+        );
+      })()}
       {sugestaoDiffTooltip && (
         <div
           className={styles.tooltipEstoque}
