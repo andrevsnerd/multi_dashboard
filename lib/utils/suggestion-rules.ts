@@ -173,7 +173,10 @@ export function getSuggestedDelta(
   const vendasMes = Number(item.vendasMesAtual ?? 0);
   if (vendasMes <= 0 || diasCorridosMes <= 0) return 0;
 
-  const consumoDiario = vendasMes / diasCorridosMes;
+  // Evita extrapolação agressiva no início do mês: não calcula consumo/dia com menos de 7 dias de dados.
+  // Ex.: 1 venda no dia 1º não vira "30 vendas/mês". Usa mínimo de 7 dias pra tendência realista.
+  const diasParaExtrapolacao = Math.max(diasCorridosMes, 7);
+  const consumoDiario = vendasMes / diasParaExtrapolacao;
   if (consumoDiario <= 0) return 0;
 
   const estoqueAtual = getEstoqueAtual(item);
