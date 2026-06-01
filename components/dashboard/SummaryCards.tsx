@@ -1,6 +1,6 @@
 import type { MetricSummary, SalesSummary } from "@/types/dashboard";
 import type { DateRangeValue } from "@/components/filters/DateRangeFilter";
-import { shiftRangeByMonths } from "@/lib/utils/date";
+import { shiftRangeByMonths, normalizeRangeForQuery } from "@/lib/utils/date";
 
 import styles from "./SummaryCards.module.css";
 
@@ -92,18 +92,20 @@ export default function SummaryCards({
       return "MÊS ANTERIOR";
     }
 
-    const currentRange = {
+    // Normalizar para o mesmo pipeline do backend (UTC, fim exclusivo) para que
+    // o label reflita exatamente o período comparado na consulta.
+    const currentRange = normalizeRangeForQuery({
       start: dateRange.startDate,
       end: dateRange.endDate,
-    };
+    });
     const previousRange = shiftRangeByMonths(currentRange, -1);
-    
-    const startDay = previousRange.start.getDate();
-    // O end pode ser exclusivo (início do próximo dia), então subtrair 1 dia para obter o último dia do período
-    const endDate = new Date(previousRange.end);
-    endDate.setDate(endDate.getDate() - 1);
-    const endDay = endDate.getDate();
-    
+
+    const startDay = previousRange.start.getUTCDate();
+    // O end é exclusivo (início do dia seguinte): subtrair 1 dia em UTC para
+    // obter o último dia do período anterior.
+    const inclusiveEnd = new Date(previousRange.end.getTime() - 24 * 60 * 60 * 1000);
+    const endDay = inclusiveEnd.getUTCDate();
+
     return `MÊS ANTERIOR (${startDay}-${endDay})`;
   })();
 

@@ -123,6 +123,14 @@ function addMonthsUtc(date: Date, months: number): Date {
   );
 }
 
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+function lastDayOfMonthUtc(date: Date): number {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)
+  ).getUTCDate();
+}
+
 export function shiftRangeByMonths(
   range: NormalizedRange,
   months: number
@@ -134,33 +142,42 @@ export function shiftRangeByMonths(
     };
   }
 
-  // Calcular o período anterior mantendo a mesma duração
-  // O endDate é exclusivo (início do próximo dia), então precisamos calcular corretamente
+  // Regra de comparação por calendário (não por duração em ms):
+  // - O endDate é exclusivo (início do dia seguinte ao último dia do período).
+  // - Mantemos os mesmos dias do mês (ex.: 1-20 -> 1-20 do mês anterior, com
+  //   clamp para o último dia quando o mês de destino é mais curto).
+  // - Quando o período atual termina no ÚLTIMO dia do seu mês (mês fechado), o
+  //   período anterior abrange o MÊS INTEIRO anterior, independentemente de ter
+  //   mais ou menos dias (ex.: maio 1-31 -> abril 1-30; abril 1-30 -> março 1-31).
   const startDate = range.start;
-  const endDate = range.end;
-  
-  // Calcular a duração em milissegundos (endDate é exclusivo, então já está correto)
-  const duration = endDate.getTime() - startDate.getTime();
-  
-  // Calcular a data de início do período anterior
+  const inclusiveEnd = new Date(range.end.getTime() - DAY_IN_MS);
+
+  // O período atual cobre o mês inteiro até o fim?
+  const coversFullEndOfMonth =
+    inclusiveEnd.getUTCDate() === lastDayOfMonthUtc(inclusiveEnd);
+
+  // Deslocar cada extremo por calendário (addMonthsUtc já faz o clamp do dia).
   const previousStart = addMonthsUtc(startDate, months);
-  
-  // Calcular a data de fim do período anterior mantendo a mesma duração
-  const previousEnd = new Date(previousStart.getTime() + duration);
-  
-  // Verificar se o período anterior ultrapassa o mês anterior
-  const previousMonth = previousStart.getUTCMonth();
-  const previousYear = previousStart.getUTCFullYear();
-  const nextMonthStart = new Date(Date.UTC(previousYear, previousMonth + 1, 1));
-  
-  // Se o período anterior ultrapassar o mês, ajustar para terminar no último dia do mês
-  if (previousEnd.getTime() > nextMonthStart.getTime()) {
-    // Ajustar para o último dia do mês anterior (início do próximo mês, que é exclusivo)
-    return {
-      start: previousStart,
-      end: nextMonthStart,
-    };
+  let previousInclusiveEnd = addMonthsUtc(inclusiveEnd, months);
+
+  if (coversFullEndOfMonth) {
+    // Forçar o último dia do mês de destino (mês inteiro anterior).
+    const lastDay = lastDayOfMonthUtc(previousInclusiveEnd);
+    previousInclusiveEnd = new Date(
+      Date.UTC(
+        previousInclusiveEnd.getUTCFullYear(),
+        previousInclusiveEnd.getUTCMonth(),
+        lastDay,
+        previousInclusiveEnd.getUTCHours(),
+        previousInclusiveEnd.getUTCMinutes(),
+        previousInclusiveEnd.getUTCSeconds(),
+        previousInclusiveEnd.getUTCMilliseconds()
+      )
+    );
   }
+
+  // Voltar para o fim exclusivo (início do dia seguinte).
+  const previousEnd = new Date(previousInclusiveEnd.getTime() + DAY_IN_MS);
 
   return {
     start: previousStart,
