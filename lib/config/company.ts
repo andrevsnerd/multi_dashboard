@@ -169,6 +169,11 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
       'SCARF ME - MATRIZ LLL': 'MSC COMERCIO DE LENCOS LT',
       'SCARF ME MATRIZ - FFF': 'MSC COMERCIO DE LENCOS LT',
       'MSC COMERCIO DE LENCOS LT': 'MSC COMERCIO DE LENCOS LT',
+      // Galeão: o nome real no DB tem 2 espaços após o hífen ("SCARFME LLL -  GALEAO RJ").
+      // Como findActiveRule colapsa \s+ ao comparar, esta regra normaliza qualquer variação
+      // de espaçamento (ex.: destinos antigos salvos com 1 espaço) para o nome canônico do DB.
+      // Auto-corrige leitura de destinos/confirmações legados sem migrar linha a linha.
+      'SCARFME LLL -  GALEAO RJ': 'SCARFME LLL -  GALEAO RJ',
     },
     excludedLines: [
       'PRIVATE LABEL',
