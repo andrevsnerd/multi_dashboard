@@ -568,14 +568,24 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
 
   const isSaidaMkt = isTipoSemDestino(tipoRomaneioSelecionado);
 
-  // Resetar filial destino ao mudar tipo de romaneio; auto-selecionar se só há uma opção
+  // Resetar filial destino ao TROCAR o tipo de romaneio; auto-selecionar quando só há uma opção.
+  // NÃO zerar a seleção quando a lista apenas muda de referência (refresh em foco/visibilidade):
+  // nesse caso mantemos a filial escolhida se ela ainda existir na lista (compara por codFilial).
+  const tipoRomaneioRef = useRef(tipoRomaneioSelecionado);
   useEffect(() => {
-    const nextDestino = !isTipoSemDestino(tipoRomaneioSelecionado) && filiaisDestinoVisiveis.length === 1
-      ? filiaisDestinoVisiveis[0]
-      : null;
-    setFilialDestinoSaida((prev) => (
-      prev?.codFilial === nextDestino?.codFilial ? prev : nextDestino
-    ));
+    const tipoMudou = tipoRomaneioRef.current !== tipoRomaneioSelecionado;
+    tipoRomaneioRef.current = tipoRomaneioSelecionado;
+
+    setFilialDestinoSaida((prev) => {
+      if (isTipoSemDestino(tipoRomaneioSelecionado)) return null;
+      if (filiaisDestinoVisiveis.length === 1) return filiaisDestinoVisiveis[0];
+      if (tipoMudou) return null;
+      // Refresh da lista (nova referência): preserva a seleção atual se ainda for válida.
+      if (prev) {
+        return filiaisDestinoVisiveis.find((f) => f.codFilial === prev.codFilial) ?? null;
+      }
+      return null;
+    });
   }, [tipoRomaneioSelecionado, filiaisDestinoVisiveis]);
 
   // Carregar permissões do usuário PRIMEIRO (antes de tudo)
@@ -1444,9 +1454,16 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
     executarLote(produtosSelecionados, obs);
   }, [executarLote, produtosSelecionados, observacaoAtual, setObservacaoAtual]);
 
-  // Limpar produtos selecionados quando mudar filial
+  // Limpar produtos selecionados somente quando mudar a filial DE FATO (por codFilial real).
+  // Comparar por codFilial e não por referência: o refresh em foco/visibilidade recria os
+  // objetos Filial (mesma loja, nova referência) e não deve apagar a lista do usuário.
+  const filialCodRef = useRef<string | null>(filialSelecionada?.codFilial ?? null);
   useEffect(() => {
-    setProdutosSelecionados([]);
+    const cod = filialSelecionada?.codFilial ?? null;
+    if (filialCodRef.current !== cod) {
+      filialCodRef.current = cod;
+      setProdutosSelecionados([]);
+    }
   }, [filialSelecionada]);
 
   const totalItens = produtosSelecionados.reduce((sum, p) => sum + p.quantidade, 0);
