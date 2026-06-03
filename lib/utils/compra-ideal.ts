@@ -136,7 +136,10 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
   let ritmoVendasBase = 0;
   let consumoDiario = 0;
   let confiabilidade: CompraIdealConfiabilidade;
-  if (input.ritmoDiasComEstoque != null) {
+  // Usa a janela de "dias com estoque" só quando ela existe (>0). Quando vem 0/ausente
+  // (ex.: resumo de produto agrupado, que não recalcula a janela), cai no fallback de
+  // 60 dias corridos via qtde60d — que continua agregado corretamente.
+  if (input.ritmoDiasComEstoque != null && Number(input.ritmoDiasComEstoque) > 0) {
     ritmoDiasBase = Math.max(0, Math.round(Number(input.ritmoDiasComEstoque ?? 0)));
     ritmoVendasBase = Math.max(0, Number(input.ritmoVendasPeriodo ?? 0));
     consumoDiario = ritmoDiasBase > 0 ? ritmoVendasBase / ritmoDiasBase : 0;
@@ -249,6 +252,50 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
     compraIdeal,
     status,
   };
+}
+
+/**
+ * Campos do `resumo` de métricas de item que alimentam a Compra Ideal.
+ * Estruturalmente compatível com `ControleEstoqueItemMetricasResumo`.
+ */
+export interface CompraIdealResumoLike {
+  estoqueTotal?: number | null;
+  qtde60d?: number | null;
+  ritmoDiasComEstoque?: number | null;
+  ritmoVendasPeriodo?: number | null;
+  ritmoInicioIso?: string | null;
+  ritmoFimIso?: string | null;
+  ritmoDiasComVenda?: number | null;
+  ritmoPrimeiraVendaIso?: string | null;
+  ritmoUltimaVendaIso?: string | null;
+}
+
+/**
+ * Adaptador único: monta a Compra Ideal a partir do `resumo` de métricas do item +
+ * compras em trânsito + linha/subgrupo. Fonte de verdade compartilhada por TODAS as
+ * telas (lista loja, curva ABC, lista de compra, compras salvas etc.) — mesma regra.
+ */
+export function calcCompraIdealFromResumo(
+  resumo: CompraIdealResumoLike | null | undefined,
+  transitEntries: CompraTransitoIndexEntry[],
+  meta: { linha?: string | null; subgrupo?: string | null },
+  hoje?: Date
+): CompraIdealResult {
+  return calcCompraIdeal({
+    estoqueAtual: resumo?.estoqueTotal ?? 0,
+    qtde60d: resumo?.qtde60d ?? null,
+    ritmoDiasComEstoque: resumo?.ritmoDiasComEstoque ?? null,
+    ritmoVendasPeriodo: resumo?.ritmoVendasPeriodo ?? null,
+    ritmoInicioIso: resumo?.ritmoInicioIso ?? null,
+    ritmoFimIso: resumo?.ritmoFimIso ?? null,
+    ritmoDiasComVenda: resumo?.ritmoDiasComVenda ?? null,
+    ritmoPrimeiraVendaIso: resumo?.ritmoPrimeiraVendaIso ?? null,
+    ritmoUltimaVendaIso: resumo?.ritmoUltimaVendaIso ?? null,
+    linha: meta.linha,
+    subgrupo: meta.subgrupo,
+    transitEntries,
+    hoje,
+  });
 }
 
 export const COMPRA_IDEAL_STATUS_LABEL: Record<CompraIdealStatus, string> = {

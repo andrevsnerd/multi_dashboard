@@ -14,6 +14,8 @@ import {
   type CompraTransitoIndex,
 } from "@/lib/client/compras-transito";
 import { fetchControleEstoqueMetricasItensClient } from "@/lib/client/controle-estoque-metricas";
+import { calcCompraIdealFromResumo, type CompraIdealResult } from "@/lib/utils/compra-ideal";
+import CompraIdealCell from "@/components/shared/CompraIdealCell";
 import {
   buildCurvaPorProdutoKey,
   type CurvaPorProdutoApiResponse,
@@ -46,6 +48,7 @@ type ComparisonMode = "month" | "year";
 
 type MetricasRow = {
   qtde12m: number | null;
+  qtde60d: number | null;
   vendasMesAtual: number | null;
   estoqueFilial: number | null;
   diasDesdeUltimaVenda: number | null;
@@ -54,12 +57,20 @@ type MetricasRow = {
   diasSemEstoque: number | null;
   mesesDisponiveis: number | null;
   velocidadeAjustada: number | null;
+  ritmoDiasComEstoque: number | null;
+  ritmoVendasPeriodo: number | null;
+  ritmoInicioIso: string | null;
+  ritmoFimIso: string | null;
+  ritmoDiasComVenda: number | null;
+  ritmoPrimeiraVendaIso: string | null;
+  ritmoUltimaVendaIso: string | null;
   totalNmQty: number | null;
   filiaisNM: FilialNecessidadeMinimaInfo[] | null;
 };
 
 const EMPTY_METRICAS_ROW: MetricasRow = {
   qtde12m: null,
+  qtde60d: null,
   vendasMesAtual: null,
   estoqueFilial: null,
   diasDesdeUltimaVenda: null,
@@ -68,6 +79,13 @@ const EMPTY_METRICAS_ROW: MetricasRow = {
   diasSemEstoque: null,
   mesesDisponiveis: null,
   velocidadeAjustada: null,
+  ritmoDiasComEstoque: null,
+  ritmoVendasPeriodo: null,
+  ritmoInicioIso: null,
+  ritmoFimIso: null,
+  ritmoDiasComVenda: null,
+  ritmoPrimeiraVendaIso: null,
+  ritmoUltimaVendaIso: null,
   totalNmQty: null,
   filiaisNM: null,
 };
@@ -93,7 +111,8 @@ type SuggestionView = {
 
 type DisplayRow = CurvaPorProdutoApiResponse["rows"][number] & {
   estoque: number;
-  suggestion: SuggestionView;
+  ideal: CompraIdealResult | null;
+  metricState: "loading" | "nodata" | "ok";
 };
 
 const METRICAS_CHUNK_SIZE = 40;
@@ -444,6 +463,7 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
               });
               next[key] = {
                 qtde12m: value.resumo.qtde12m,
+                qtde60d: value.resumo.qtde60d,
                 vendasMesAtual: value.resumo.vendasMesAtual,
                 estoqueFilial: value.resumo.estoqueTotal,
                 diasDesdeUltimaVenda: value.resumo.diasDesdeUltimaVenda,
@@ -452,6 +472,13 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
                 diasSemEstoque: value.resumo.diasSemEstoque,
                 mesesDisponiveis: value.resumo.mesesDisponiveis,
                 velocidadeAjustada: value.resumo.velocidadeAjustada,
+                ritmoDiasComEstoque: value.resumo.ritmoDiasComEstoque,
+                ritmoVendasPeriodo: value.resumo.ritmoVendasPeriodo,
+                ritmoInicioIso: value.resumo.ritmoInicioIso,
+                ritmoFimIso: value.resumo.ritmoFimIso,
+                ritmoDiasComVenda: value.resumo.ritmoDiasComVenda,
+                ritmoPrimeiraVendaIso: value.resumo.ritmoPrimeiraVendaIso,
+                ritmoUltimaVendaIso: value.resumo.ritmoUltimaVendaIso,
                 totalNmQty: filiaisNM.reduce((sum, row) => sum + row.qtd, 0),
                 filiaisNM,
               };
@@ -483,127 +510,31 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
         currentMetric?.qtde12m == null &&
         currentMetric?.vendasMesAtual == null &&
         currentMetric?.estoqueFilial == null;
-      const compraItem = {
-        vendasMesAtual: currentMetric?.vendasMesAtual ?? 0,
-        estoqueFilial: currentMetric?.estoqueFilial ?? 0,
-        linha: row.linha ?? "",
-        subgrupo: row.subgrupo ?? "",
-        qtde12m: currentMetric?.qtde12m ?? 0,
-        mesesHistoricoFilial: currentMetric?.mesesHistoricoFilial ?? 12,
-        diasDesdeUltimaVenda: currentMetric?.diasDesdeUltimaVenda ?? null,
-        diasComEstoquePositivo: currentMetric?.diasComEstoquePositivo ?? null,
-        diasSemEstoque: currentMetric?.diasSemEstoque ?? null,
-        mesesDisponiveis: currentMetric?.mesesDisponiveis ?? null,
-        velocidadeAjustada: currentMetric?.velocidadeAjustada ?? null,
-      };
-      const sugestao = getReposicaoCompraView(compraItem, diasCorridosMes);
-      const baseType = getReposicaoBaseType(sugestao);
-      const baseQty =
-        sugestao.qtdFinal > 0
-          ? sugestao.qtdFinal
-          : sugestao.qtdS > 0
-            ? sugestao.qtdS
-            : sugestao.qtdE > 0
-              ? sugestao.qtdE
-              : sugestao.qtdPO > 0
-                ? sugestao.qtdPO
-                : sugestao.qtdNM;
-      const combined = combineBaseSuggestionWithNecessidadeMinima({
-        baseType,
-        baseQty,
-        totalNmQty: currentMetric?.totalNmQty ?? sugestao.qtdNM,
-      });
-      const transit = applyTransitToSuggestion({
-        baseType: combined.effectiveType,
-        baseQty: combined.totalQty,
-        entries: getCompraTransitoEntries(comprasTransitoIndex, row.produto, row.corProduto ?? null),
-        estoqueAtual: compraItem.estoqueFilial,
-        vendasMesAtual: compraItem.vendasMesAtual,
-        diasCorridosMes,
-        limiteDias: getLimiteDiasReposicao(compraItem),
-      });
-
-      let suggestion: SuggestionView = {
-        text: !hasMetric ? "Carregando..." : semBaseMetric ? "Sem dados" : "Sem sugestao",
-        tone: "muted",
-      };
-      suggestion = {
-        text: suggestion.text,
-        tone: suggestion.tone,
-        summaryText: suggestion.text,
-        qty: 0,
-        baseType: combined.effectiveType,
-        nmExtraQty: combined.nmExtraQty,
-        combinedWithNm: combined.hasCombinedNm,
-        nmFiliais: currentMetric?.filiaisNM ?? undefined,
-      };
-      if (!hasMetric || semBaseMetric) {
-        // Mantem o status explicito ate a linha ter metricas consolidadas.
-      } else if (transit.qty > 0) {
-        const principalLabel = getSuggestionPrincipalBadgeLabel(combined.effectiveType);
-        const poInfo = sugestao.poData;
-        const summaryText = combined.hasCombinedNm && principalLabel
-          ? `${fmt(transit.qty)} ${principalLabel} + NM`
-          : combined.effectiveType === "S"
-            ? `S ${fmt(transit.qty)}`
-          : combined.effectiveType === "E"
-              ? `E ${fmt(transit.qty)}`
-              : combined.effectiveType === "PO"
-                ? `PO ${fmt(transit.qty)}`
-              : combined.effectiveType === "NM"
-                ? `NM ${fmt(transit.qty)}`
-                : fmt(transit.qty);
-        suggestion = {
-          text: fmt(transit.qty),
-          tone: combined.effectiveType === "S" ? "s" : combined.effectiveType === "E" ? "e" : "buy",
-          summaryText,
-          qty: transit.qty,
-          baseType: combined.effectiveType,
-          nmExtraQty: combined.nmExtraQty,
-          combinedWithNm: combined.hasCombinedNm,
-          title: combined.hasCombinedNm
-            ? getCombinedNecessidadeMinimaTooltip({
-              baseType: combined.effectiveType,
-              baseQty: combined.baseQty,
-              nmExtraQty: combined.nmExtraQty,
-              totalQty: transit.qty,
-              filiais: currentMetric?.filiaisNM ?? undefined,
-            })
-            : combined.effectiveType === "NM"
-              ? `${getNecessidadeMinimaRuleDescription()}${currentMetric?.filiaisNM?.length ? ` Filiais NM: ${formatNecessidadeMinimaFiliaisDescription(currentMetric.filiaisNM)}.` : ""}`
-              : combined.effectiveType === "PO"
-                ? "Potencial oculto: velocidade ajustada pela disponibilidade real = qtde vendida ÷ (dias com estoque / 30), com trava de seguranca."
-              : undefined,
-          nmFiliais: currentMetric?.filiaisNM ?? undefined,
-          ruleTooltip: poInfo
-            ? {
-              title: combined.effectiveType === "PO" ? "Potencial Oculto (PO)" : "Histórico Curto (PO)",
-              lines: [
-                `Base: ${fmt(compraItem.qtde12m)} un em ${Math.round(poInfo.diasComEstoquePositivo)} dias com estoque.`,
-                ...(poInfo.diasSemEstoque > 0 ? [`Sem estoque: ${fmt(poInfo.diasSemEstoque)} dias.`] : []),
-                `Projeção: ~${poInfo.velocidadeAjustada.toFixed(0)} un/mês (= ${fmt(compraItem.qtde12m)} un ÷ ${(poInfo.diasComEstoquePositivo / 30).toFixed(2)} meses).`,
-                ...(poInfo.limiteSeguro > 0 ? [`Trava de segurança: máx. ${fmt(poInfo.limiteSeguro)} un.`] : []),
-                `Qtd sugerida: ${fmt(transit.qty)} un.`,
-              ],
-            }
-            : undefined,
-          hasPoData: poInfo !== undefined,
-        };
-      } else if (combined.effectiveType === "SUFICIENTE" || transit.suppressedByTransit) {
-        suggestion = { text: "Quantidade suficiente", tone: "ok", summaryText: "Quantidade suficiente", qty: 0, baseType: combined.effectiveType, nmExtraQty: 0, combinedWithNm: false };
-      } else if (combined.effectiveType === "SEM_SUGESTAO" && transit.totalTransit > 0) {
-        suggestion = { text: "Em transito", tone: "ok", summaryText: "Em transito", qty: 0, baseType: combined.effectiveType, nmExtraQty: 0, combinedWithNm: false };
-      } else if (combined.effectiveType === "SEM_SUGESTAO") {
-        suggestion = { text: "Sem sugestao", tone: "muted", summaryText: "Sem sugestao", qty: 0, baseType: combined.effectiveType, nmExtraQty: 0, combinedWithNm: false };
-      }
+      const transitEntries = getCompraTransitoEntries(comprasTransitoIndex, row.produto, row.corProduto ?? null);
+      const ideal = calcCompraIdealFromResumo(
+        {
+          estoqueTotal: currentMetric?.estoqueFilial ?? 0,
+          qtde60d: currentMetric?.qtde60d ?? null,
+          ritmoDiasComEstoque: currentMetric?.ritmoDiasComEstoque ?? null,
+          ritmoVendasPeriodo: currentMetric?.ritmoVendasPeriodo ?? null,
+          ritmoInicioIso: currentMetric?.ritmoInicioIso ?? null,
+          ritmoFimIso: currentMetric?.ritmoFimIso ?? null,
+          ritmoDiasComVenda: currentMetric?.ritmoDiasComVenda ?? null,
+          ritmoPrimeiraVendaIso: currentMetric?.ritmoPrimeiraVendaIso ?? null,
+          ritmoUltimaVendaIso: currentMetric?.ritmoUltimaVendaIso ?? null,
+        },
+        transitEntries,
+        { linha: row.linha, subgrupo: row.subgrupo }
+      );
 
       return {
         ...row,
         estoque: Math.max(0, Math.round(currentMetric?.estoqueFilial ?? 0)),
-        suggestion,
+        ideal,
+        metricState: (!hasMetric ? "loading" : semBaseMetric ? "nodata" : "ok") as DisplayRow["metricState"],
       };
     });
-  }, [comprasTransitoIndex, data, diasCorridosMes, metricas]);
+  }, [comprasTransitoIndex, data, metricas]);
 
   const representedRows = useMemo(
     () => displayRows.filter((row) => row.represented).sort((a, b) => b.vendas - a.vendas),
@@ -621,13 +552,7 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
   const countC = representedRows.filter((row) => row.curva === "C").length;
 
   const handleExportXlsx = () => {
-    exportCurvaPorProdutoXlsx(
-      exportRows.map((row) => ({
-        ...row,
-        "Sugestao de compra": extractSuggestionNumber(String(row["Sugestao de compra"] ?? "")),
-      })),
-      exportOptions
-    );
+    exportCurvaPorProdutoXlsx(exportRows, exportOptions);
   };
 
   const handleExportCsv = () => {
@@ -659,7 +584,7 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
         Faturamento: row.vendas,
         Qtd: row.qtde,
         Estoque: row.estoque,
-        "Sugestao de compra": row.suggestion.summaryText ?? row.suggestion.text,
+        "Compra ideal": row.metricState === "ok" && row.ideal ? row.ideal.compraIdeal : "",
         "Var. vs periodo anterior": badge == null ? "" : badge.kind === "new" ? "NOVO" : Number(badge.value.toFixed(2)),
       };
     });
@@ -838,7 +763,7 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
                     <th className={styles.right}>Faturamento</th>
                     <th className={styles.right}>Qtd</th>
                     <th className={styles.right}>Estoque</th>
-                    <th>Sugestao de compra</th>
+                    <th>Compra ideal</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -900,52 +825,13 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
                         <td className={styles.right}>{fmt(row.qtde)}</td>
                         <td className={styles.right}>{fmt(row.estoque)}</td>
                         <td>
-                          <span
-                            style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}
-                            title={row.suggestion.title}
-                          >
-                            <span className={`${styles.suggestionBadge} ${styles[`suggestion${row.suggestion.tone}`]}`}>
-                              {row.suggestion.text}
+                          {row.metricState !== "ok" || !row.ideal ? (
+                            <span style={{ color: "#94a3b8" }}>
+                              {row.metricState === "loading" ? "Carregando…" : "Sem dados"}
                             </span>
-                            {row.suggestion.baseType === "S" && (
-                              <span className={`${styles.suggestionBadge} ${styles.suggestions}`}>
-                                S
-                              </span>
-                            )}
-                            {row.suggestion.baseType === "E" && (
-                              <span className={`${styles.suggestionBadge} ${styles.suggestione}`}>
-                                E
-                              </span>
-                            )}
-                            {row.suggestion.baseType === "NM" && (
-                              <span className={`${styles.suggestionBadge} ${styles.suggestionbuy}`} style={{ background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}>
-                                NM
-                              </span>
-                            )}
-                            {(row.suggestion.baseType === "PO" || row.suggestion.hasPoData) && (
-                              <span
-                                className={`${styles.suggestionBadge} ${styles.suggestionbuy}`}
-                                style={{ background: "#86efac", borderColor: "#22c55e", color: "#14532d", cursor: "help" }}
-                                onMouseEnter={(e) => {
-                                  if (!row.suggestion.ruleTooltip) return;
-                                  setSuggestionTooltip({
-                                    x: e.clientX,
-                                    y: e.clientY,
-                                    title: row.suggestion.ruleTooltip.title,
-                                    lines: row.suggestion.ruleTooltip.lines,
-                                  });
-                                }}
-                                onMouseLeave={() => setSuggestionTooltip(null)}
-                              >
-                                PO
-                              </span>
-                            )}
-                            {row.suggestion.combinedWithNm && (
-                              <span className={`${styles.suggestionBadge} ${styles.suggestionbuy}`} style={{ background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}>
-                                NM
-                              </span>
-                            )}
-                          </span>
+                          ) : (
+                            <CompraIdealCell ideal={row.ideal} />
+                          )}
                         </td>
                       </tr>
                     );
@@ -975,7 +861,7 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
                       <div className={styles.missingMeta}>
                       {row.produto}
                       {row.estoque > 0 ? ` · Estoque: ${fmt(row.estoque)}` : ""}
-                      {row.suggestion.text ? ` · ${row.suggestion.text}` : ""}
+                      {row.metricState === "ok" && row.ideal ? ` · Compra ideal: ${fmt(row.ideal.compraIdeal)} pcs` : ""}
                       </div>
                       {infoLine && <div className={styles.productSubMeta}>{infoLine}</div>}
                     </div>

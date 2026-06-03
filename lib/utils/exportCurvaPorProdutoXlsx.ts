@@ -19,7 +19,7 @@ export interface CurvaPorProdutoXlsxRow {
   Faturamento: number;
   Qtd: number;
   Estoque: number;
-  "Sugestao de compra": string | number;
+  "Compra ideal": string | number;
   "Var. vs periodo anterior": number | string;
 }
 

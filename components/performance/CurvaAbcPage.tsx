@@ -37,6 +37,8 @@ import {
 } from "@/lib/client/compras-transito";
 import { formatDateForQuery } from "@/lib/utils/date";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
+import { calcCompraIdealFromResumo, type CompraIdealResult } from "@/lib/utils/compra-ideal";
+import CompraIdealCell from "@/components/shared/CompraIdealCell";
 import {
   partesDestinoCompraFinal,
   type DestinoCompraFinalParte,
@@ -133,6 +135,7 @@ interface ProdutoComCurva extends ProdutoRow {
 
 type CompraMetricRow = {
   qtde12m: number | null;
+  qtde60d: number | null;
   vendasMesAtual: number | null;
   estoqueFilial: number | null;
   diasDesdeUltimaVenda: number | null;
@@ -141,6 +144,13 @@ type CompraMetricRow = {
   diasSemEstoque: number | null;
   mesesDisponiveis: number | null;
   velocidadeAjustada: number | null;
+  ritmoDiasComEstoque: number | null;
+  ritmoVendasPeriodo: number | null;
+  ritmoInicioIso: string | null;
+  ritmoFimIso: string | null;
+  ritmoDiasComVenda: number | null;
+  ritmoPrimeiraVendaIso: string | null;
+  ritmoUltimaVendaIso: string | null;
   totalNmQty: number | null;
   filiaisNM: FilialNecessidadeMinimaInfo[] | null;
   vendasPorFilial: Array<{
@@ -175,6 +185,7 @@ interface ObservacaoModalState {
 
 const EMPTY_COMPRA_METRIC_ROW: CompraMetricRow = {
   qtde12m: null,
+  qtde60d: null,
   vendasMesAtual: null,
   estoqueFilial: null,
   diasDesdeUltimaVenda: null,
@@ -183,11 +194,42 @@ const EMPTY_COMPRA_METRIC_ROW: CompraMetricRow = {
   diasSemEstoque: null,
   mesesDisponiveis: null,
   velocidadeAjustada: null,
+  ritmoDiasComEstoque: null,
+  ritmoVendasPeriodo: null,
+  ritmoInicioIso: null,
+  ritmoFimIso: null,
+  ritmoDiasComVenda: null,
+  ritmoPrimeiraVendaIso: null,
+  ritmoUltimaVendaIso: null,
   totalNmQty: null,
   filiaisNM: null,
   vendasPorFilial: null,
   estoquePorFilial: null,
 };
+
+/** Compra Ideal (regra global) a partir do CompraMetricRow + trânsito do produto. */
+function buildCompraIdealFromMetricRow(
+  live: CompraMetricRow | undefined,
+  p: { produto: string; cor?: string | null; linha?: string | null; subgrupo?: string | null },
+  comprasTransitoIndex: CompraTransitoIndex,
+  porCor: boolean
+): CompraIdealResult {
+  return calcCompraIdealFromResumo(
+    {
+      estoqueTotal: live?.estoqueFilial ?? 0,
+      qtde60d: live?.qtde60d ?? null,
+      ritmoDiasComEstoque: live?.ritmoDiasComEstoque ?? null,
+      ritmoVendasPeriodo: live?.ritmoVendasPeriodo ?? null,
+      ritmoInicioIso: live?.ritmoInicioIso ?? null,
+      ritmoFimIso: live?.ritmoFimIso ?? null,
+      ritmoDiasComVenda: live?.ritmoDiasComVenda ?? null,
+      ritmoPrimeiraVendaIso: live?.ritmoPrimeiraVendaIso ?? null,
+      ritmoUltimaVendaIso: live?.ritmoUltimaVendaIso ?? null,
+    },
+    getCompraTransitoEntries(comprasTransitoIndex, p.produto, porCor ? (p.cor ?? null) : null),
+    { linha: p.linha, subgrupo: p.subgrupo }
+  );
+}
 
 const STOCK_BUCKET_ORDER: StockBucket[] = ["high", "low", "zero"];
 const STOCK_BUCKET_LABEL: Record<StockBucket, string> = {
@@ -1569,46 +1611,8 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
         live?.vendasMesAtual == null &&
         live?.estoqueFilial == null;
       if (semBaseLive) return false;
-      const compraItem = {
-        vendasMesAtual: live?.vendasMesAtual ?? 0,
-        estoqueFilial: live?.estoqueFilial ?? 0,
-        linha: p.linha ?? "",
-        subgrupo: p.subgrupo ?? "",
-        qtde12m: live?.qtde12m ?? 0,
-        mesesHistoricoFilial: live?.mesesHistoricoFilial ?? 12,
-        diasDesdeUltimaVenda: live?.diasDesdeUltimaVenda ?? null,
-        diasComEstoquePositivo: live?.diasComEstoquePositivo ?? null,
-        diasSemEstoque: live?.diasSemEstoque ?? null,
-        mesesDisponiveis: live?.mesesDisponiveis ?? null,
-        velocidadeAjustada: live?.velocidadeAjustada ?? null,
-      };
-      const sugestao = getReposicaoCompraView(compraItem, diasCorridosMes);
-      const baseType = getReposicaoBaseType(sugestao);
-      const baseQty =
-        sugestao.qtdFinal > 0
-          ? sugestao.qtdFinal
-          : sugestao.qtdS > 0
-            ? sugestao.qtdS
-            : sugestao.qtdE > 0
-              ? sugestao.qtdE
-              : sugestao.qtdPO > 0
-                ? sugestao.qtdPO
-                : sugestao.qtdNM;
-      const combined = combineBaseSuggestionWithNecessidadeMinima({
-        baseType,
-        baseQty,
-        totalNmQty: live?.totalNmQty ?? sugestao.qtdNM,
-      });
-      const transit = applyTransitToSuggestion({
-        baseType: combined.effectiveType,
-        baseQty: combined.totalQty,
-        entries: getCompraTransitoEntries(comprasTransitoIndex, p.produto, porCor ? (p.cor ?? null) : null),
-        estoqueAtual: compraItem.estoqueFilial,
-        vendasMesAtual: compraItem.vendasMesAtual,
-        diasCorridosMes,
-        limiteDias: getLimiteDiasReposicao(compraItem),
-      });
-      return transit.qty > 0;
+      const ideal = buildCompraIdealFromMetricRow(live, p, comprasTransitoIndex, porCor);
+      return ideal.compraIdeal > 0;
     });
   }, [filtrarEletronicos, filtrarSugeridos, companyKey, produtosComCurva, compraMetrics, comprasTransitoIndex, diasCorridosMes, porCor]);
 
@@ -1803,6 +1807,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
               });
               next[key] = {
                 qtde12m: value.resumo.qtde12m,
+                qtde60d: value.resumo.qtde60d,
                 vendasMesAtual: value.resumo.vendasMesAtual,
                 estoqueFilial: value.resumo.estoqueTotal,
                 diasDesdeUltimaVenda: value.resumo.diasDesdeUltimaVenda,
@@ -1811,6 +1816,13 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                 diasSemEstoque: value.resumo.diasSemEstoque,
                 mesesDisponiveis: value.resumo.mesesDisponiveis,
                 velocidadeAjustada: value.resumo.velocidadeAjustada,
+                ritmoDiasComEstoque: value.resumo.ritmoDiasComEstoque,
+                ritmoVendasPeriodo: value.resumo.ritmoVendasPeriodo,
+                ritmoInicioIso: value.resumo.ritmoInicioIso,
+                ritmoFimIso: value.resumo.ritmoFimIso,
+                ritmoDiasComVenda: value.resumo.ritmoDiasComVenda,
+                ritmoPrimeiraVendaIso: value.resumo.ritmoPrimeiraVendaIso,
+                ritmoUltimaVendaIso: value.resumo.ritmoUltimaVendaIso,
                 totalNmQty: filiaisNM.reduce((sum, row) => sum + row.qtd, 0),
                 filiaisNM,
                 vendasPorFilial: value.vendasPorFilial,
@@ -1835,6 +1847,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
 
               next[groupedKey] = {
                 qtde12m: merged.resumo.qtde12m,
+                qtde60d: merged.resumo.qtde60d,
                 vendasMesAtual: merged.resumo.vendasMesAtual,
                 estoqueFilial: merged.resumo.estoqueTotal,
                 diasDesdeUltimaVenda: merged.resumo.diasDesdeUltimaVenda,
@@ -1843,6 +1856,13 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                 diasSemEstoque: merged.resumo.diasSemEstoque,
                 mesesDisponiveis: merged.resumo.mesesDisponiveis,
                 velocidadeAjustada: merged.resumo.velocidadeAjustada,
+                ritmoDiasComEstoque: merged.resumo.ritmoDiasComEstoque,
+                ritmoVendasPeriodo: merged.resumo.ritmoVendasPeriodo,
+                ritmoInicioIso: merged.resumo.ritmoInicioIso,
+                ritmoFimIso: merged.resumo.ritmoFimIso,
+                ritmoDiasComVenda: merged.resumo.ritmoDiasComVenda,
+                ritmoPrimeiraVendaIso: merged.resumo.ritmoPrimeiraVendaIso,
+                ritmoUltimaVendaIso: merged.resumo.ritmoUltimaVendaIso,
                 totalNmQty: filiaisNM.reduce((sum, metricRow) => sum + metricRow.qtd, 0),
                 filiaisNM,
                 vendasPorFilial: merged.vendasPorFilial,
@@ -1912,74 +1932,8 @@ const handleBadgeClick = (cat: string) => {
     const live = compraMetrics[metricKey];
     const hasLive = Object.prototype.hasOwnProperty.call(compraMetrics, metricKey);
     if (!hasLive) return "";
-
-    const perFilialSummary = !selectedFilial && live
-      ? buildPerFilialCompraSummary({
-          companyKey,
-          linha: p.linha ?? "",
-          subgrupo: p.subgrupo ?? "",
-          diasCorridosMes,
-          live,
-        })
-      : null;
-    if (perFilialSummary) {
-      const limiteDias = getLimiteDiasReposicao({ linha: p.linha ?? "", subgrupo: p.subgrupo ?? "" });
-      const transit = applyTransitToSuggestion({
-        baseType: perFilialSummary.topType,
-        baseQty: perFilialSummary.totalQty,
-        entries: getCompraTransitoEntries(comprasTransitoIndex, p.produto, porCor ? (p.cor ?? null) : null),
-        estoqueAtual: live?.estoqueFilial ?? 0,
-        vendasMesAtual: live?.vendasMesAtual ?? 0,
-        diasCorridosMes,
-        limiteDias,
-      });
-      if (transit.qty <= 0) return "";
-      return transit.qty;
-    }
-
-    const compraItem = {
-      vendasMesAtual: live?.vendasMesAtual ?? 0,
-      estoqueFilial: live?.estoqueFilial ?? 0,
-      linha: p.linha ?? "",
-      subgrupo: p.subgrupo ?? "",
-      qtde12m: live?.qtde12m ?? 0,
-      mesesHistoricoFilial: live?.mesesHistoricoFilial ?? 12,
-      diasDesdeUltimaVenda: live?.diasDesdeUltimaVenda ?? null,
-      diasComEstoquePositivo: live?.diasComEstoquePositivo ?? null,
-      diasSemEstoque: live?.diasSemEstoque ?? null,
-      mesesDisponiveis: live?.mesesDisponiveis ?? null,
-      velocidadeAjustada: live?.velocidadeAjustada ?? null,
-    };
-    const sugestao = getReposicaoCompraView(compraItem, diasCorridosMes);
-    const baseType = getReposicaoBaseType(sugestao);
-                                      const baseQty =
-                                        sugestao.qtdFinal > 0
-                                          ? sugestao.qtdFinal
-                                          : sugestao.qtdS > 0
-                                            ? sugestao.qtdS
-                                            : sugestao.qtdE > 0
-                                              ? sugestao.qtdE
-                                              : sugestao.qtdPO > 0
-                                                ? sugestao.qtdPO
-                                                : sugestao.qtdNM;
-    const combined = combineBaseSuggestionWithNecessidadeMinima({
-      baseType,
-      baseQty,
-      totalNmQty: live?.totalNmQty ?? sugestao.qtdNM,
-    });
-    const transit = applyTransitToSuggestion({
-      baseType: combined.effectiveType,
-      baseQty: combined.totalQty,
-      entries: getCompraTransitoEntries(comprasTransitoIndex, p.produto, porCor ? (p.cor ?? null) : null),
-      estoqueAtual: compraItem.estoqueFilial,
-      vendasMesAtual: compraItem.vendasMesAtual,
-      diasCorridosMes,
-      limiteDias: getLimiteDiasReposicao(compraItem),
-    });
-
-    if (baseType === "SUFICIENTE") return "";
-    if (transit.qty <= 0) return "";
-    return transit.qty;
+    const ideal = buildCompraIdealFromMetricRow(live, p, comprasTransitoIndex, porCor);
+    return ideal.compraIdeal;
   };
 
   const buildExportSimpleRows = (): CurvaAbcSimpleXlsxRow[] => {
@@ -2011,7 +1965,7 @@ const handleBadgeClick = (cat: string) => {
         QTDE: p.qtde,
         ESTOQUE: p.estoque ?? 0,
         MARKUP: markup !== null ? Math.round(markup * 100) / 100 : "",
-        SUGESTAO_COMPRA: getSugestaoCompraExportValue(p),
+        COMPRA_IDEAL: getSugestaoCompraExportValue(p),
         VAR_VS_PERIODO_ANTERIOR: variacao,
       });
     }
@@ -2523,7 +2477,7 @@ const handleBadgeClick = (cat: string) => {
                       <th className={styles.right}>Estoque</th>
                       {showEstoqueRede && <th className={styles.right}>Estoque rede</th>}
                       <th className={styles.right}>Markup</th>
-                      <th className={styles.right}>Sugestão de compra</th>
+                      <th className={styles.right}>Compra ideal</th>
                     </>
                   </tr>
                 </thead>
@@ -2773,549 +2727,8 @@ const handleBadgeClick = (cat: string) => {
                                     if (semBaseLive) {
                                       return <span className={styles.cellMetric}>Sem dados</span>;
                                     }
-                                    const perFilialSummary = !selectedFilial && live
-                                      ? buildPerFilialCompraSummary({
-                                          companyKey,
-                                          linha: p.linha ?? "",
-                                          subgrupo: p.subgrupo ?? "",
-                                          diasCorridosMes,
-                                          live,
-                                        })
-                                      : null;
-                                    if (perFilialSummary) {
-                                      const limiteDias = getLimiteDiasReposicao({ linha: p.linha ?? "", subgrupo: p.subgrupo ?? "" });
-                                      const vendasMes = Number(live?.vendasMesAtual ?? 0);
-                                      const estoqueAtual = Number(live?.estoqueFilial ?? 0);
-                                      const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
-                                      const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
-                                      const transit = applyTransitToSuggestion({
-                                        baseType: perFilialSummary.topType,
-                                        baseQty: perFilialSummary.totalQty,
-                                        entries: getCompraTransitoEntries(comprasTransitoIndex, p.produto, porCor ? (p.cor ?? null) : null),
-                                        estoqueAtual,
-                                        vendasMesAtual: vendasMes,
-                                        diasCorridosMes,
-                                        limiteDias,
-                                      });
-                                      const transitDates = transit.entries.map(
-                                        (entry) => `${new Date(`${entry.dataRecebimento}T00:00:00`).toLocaleDateString("pt-BR")} (+${fmt(entry.quantidade)})`
-                                      );
-                                      const transitBadge = transit.totalTransit > 0 ? (
-                                        <span className={styles.badgeT} style={{ marginLeft: 6 }}>
-                                          T {fmt(transit.totalTransit)}
-                                        </span>
-                                      ) : null;
-                                      if (transit.qty <= 0) {
-                                        return <span className={styles.reporNeutral}>Quantidade suficiente{transitBadge}</span>;
-                                      }
-                                      const poPrincipal = perFilialSummary.poPrincipal;
-                                      const topTypeLabel =
-                                        perFilialSummary.topType === "COMPRA" || perFilialSummary.topType === "PO"
-                                          ? null
-                                          : perFilialSummary.topType;
-                                      const topSRow = topTypeLabel === "S"
-                                        ? perFilialSummary.rows.filter(r => r.baseType === "S").sort((a, b) => b.qty - a.qty)[0] ?? null
-                                        : null;
-                                      const topERow = topTypeLabel === "E"
-                                        ? perFilialSummary.rows.filter(r => r.baseType === "E").sort((a, b) => b.qty - a.qty)[0] ?? null
-                                        : null;
-                                      return (
-                                        <span
-                                          className={styles.reporAdd}
-                                          onMouseEnter={(e) => { clearAllTooltips(); setSugestaoTooltip({
-                                            x: e.clientX,
-                                            y: e.clientY,
-                                            titulo: "Sugestão de reposição (soma por filial)",
-                                            regra: "Cada loja foi calculada individualmente com seu próprio estoque, dias com estoque positivo e velocidade. O total é a soma das lojas.",
-                                            limiteDias,
-                                            vendasMesAtual: vendasMes,
-                                            diasCorridos: diasCorridosMes,
-                                            consumoDiario,
-                                            estoqueAtual,
-                                            duracaoAtual,
-                                            qtdCalculada: transit.qty,
-                                            baseQty: perFilialSummary.totalQty,
-                                            distribuicao: perFilialSummary.distribuicao,
-                                            distribuicaoLabel: "Por loja (cálculo individual)",
-                                            transitTotal: transit.totalTransit || undefined,
-                                            transitDates,
-                                          }); }}
-                                          onMouseLeave={() => setSugestaoTooltip(null)}
-                                        >
-                                          {fmt(transit.qty)}
-                                          {topTypeLabel ? (
-                                            <span
-                                              style={{
-                                                marginLeft: 6,
-                                                display: "inline-flex",
-                                                width: 16,
-                                                height: 16,
-                                                borderRadius: "999px",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                fontSize: 10,
-                                                fontWeight: 800,
-                                                color: topTypeLabel === "E" ? "#fff" : "#0f172a",
-                                                background: topTypeLabel === "E" ? "#f97316" : "#fde047",
-                                                border: topTypeLabel === "E" ? "1px solid #ea580c" : "1px solid #facc15",
-                                                verticalAlign: "middle",
-                                                cursor: "help",
-                                              }}
-                                              onMouseEnter={(e) => {
-                                                clearAllTooltips();
-                                                if (topTypeLabel === "S" && topSRow) {
-                                                  setSugestaoSTooltip({
-                                                    x: e.clientX,
-                                                    y: e.clientY,
-                                                    qtde12m: topSRow.qtde12m,
-                                                    diasComEstoquePositivo: topSRow.diasComEstoquePositivo,
-                                                    mesesDisponiveis: topSRow.mesesDisponiveis,
-                                                    velocidadeAjustada: topSRow.velocidadeAjustada,
-                                                    estoqueAtual: topSRow.estoqueAtual,
-                                                    limiteDias,
-                                                    qtdS: topSRow.qty,
-                                                    baseQty: topSRow.qty,
-                                                    distribuicao: perFilialSummary.distribuicao,
-                                                    transitTotal: transit.totalTransit || undefined,
-                                                    transitDates,
-                                                  });
-                                                } else if (topTypeLabel === "E" && topERow) {
-                                                  setSugestaoETooltip({
-                                                    x: e.clientX,
-                                                    y: e.clientY,
-                                                    qtde12m: topERow.qtde12m,
-                                                    diasComEstoquePositivo: topERow.diasComEstoquePositivo,
-                                                    diasSemEstoque: topERow.diasSemEstoque,
-                                                    mesesDisponiveis: topERow.mesesDisponiveis,
-                                                    velocidadeAjustada: topERow.velocidadeAjustada,
-                                                    limiteDias,
-                                                    qtdE: topERow.qty,
-                                                    baseQty: topERow.qty,
-                                                    distribuicao: perFilialSummary.distribuicao,
-                                                    transitTotal: transit.totalTransit || undefined,
-                                                    transitDates,
-                                                  });
-                                                }
-                                              }}
-                                              onMouseLeave={() => { setSugestaoSTooltip(null); setSugestaoETooltip(null); }}
-                                            >
-                                              {topTypeLabel}
-                                            </span>
-                                          ) : null}
-                                          {perFilialSummary.hasPo && poPrincipal ? (
-                                            <span
-                                              style={{ marginLeft: 6, display: "inline-flex", padding: "0 5px", height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#14532d", background: "#86efac", border: "1px solid #22c55e", verticalAlign: "middle", cursor: "help" }}
-                                              onMouseEnter={(e) => {
-                                                clearAllTooltips();
-                                                setSugestaoPOTooltip({
-                                                  x: e.clientX,
-                                                  y: e.clientY,
-                                                  filialLabel: perFilialSummary.poRows.length === 1 ? poPrincipal.filial : undefined,
-                                                  periodoRef: perFilialSummary.poRows.length === 1 ? getPeriodoRef(poPrincipal.poData?.diasSemEstoque ?? poPrincipal.diasSemEstoque, poPrincipal.poData?.diasComEstoquePositivo ?? poPrincipal.diasComEstoquePositivo) : undefined,
-                                                  poRows: perFilialSummary.poRows.map((row) => {
-                                                    const ds = row.poData?.diasSemEstoque ?? row.diasSemEstoque;
-                                                    const dc = row.poData?.diasComEstoquePositivo ?? row.diasComEstoquePositivo;
-                                                    return {
-                                                      filialLabel: row.filial,
-                                                      qtde12m: row.qtde12m,
-                                                      diasComEstoquePositivo: dc,
-                                                      diasSemEstoque: ds,
-                                                      velocidadeAjustada: row.poData?.velocidadeAjustada ?? row.velocidadeAjustada,
-                                                      limiteSeguro: row.poData?.limiteSeguro ?? 0,
-                                                      qtdPO: row.qty,
-                                                      periodoRef: getPeriodoRef(ds, dc),
-                                                    };
-                                                  }),
-                                                  qtde12m: poPrincipal.qtde12m,
-                                                  diasComEstoquePositivo: poPrincipal.poData?.diasComEstoquePositivo ?? poPrincipal.diasComEstoquePositivo,
-                                                  diasSemEstoque: poPrincipal.poData?.diasSemEstoque ?? poPrincipal.diasSemEstoque,
-                                                  velocidadeAjustada: poPrincipal.poData?.velocidadeAjustada ?? poPrincipal.velocidadeAjustada,
-                                                  limiteSeguro: poPrincipal.poData?.limiteSeguro ?? 0,
-                                                  qtdPO: poPrincipal.qty,
-                                                  transitTotal: transit.totalTransit || undefined,
-                                                  transitDates,
-                                                });
-                                              }}
-                                              onMouseLeave={() => setSugestaoPOTooltip(null)}
-                                            >
-                                              PO
-                                            </span>
-                                          ) : null}
-                                          {perFilialSummary.hasNm && perFilialSummary.topType !== "NM" ? (
-                                            <span className={styles.badgeT} style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}>
-                                              NM
-                                            </span>
-                                          ) : null}
-                                          {transitBadge}
-                                        </span>
-                                      );
-                                    }
-                                    const compraItem = {
-                                      vendasMesAtual: live?.vendasMesAtual ?? 0,
-                                      estoqueFilial: live?.estoqueFilial ?? 0,
-                                      linha: p.linha ?? "",
-                                      subgrupo: p.subgrupo ?? "",
-                                      qtde12m: live?.qtde12m ?? 0,
-                                      mesesHistoricoFilial: live?.mesesHistoricoFilial ?? 12,
-                                      diasDesdeUltimaVenda: live?.diasDesdeUltimaVenda ?? null,
-                                      diasComEstoquePositivo: live?.diasComEstoquePositivo ?? null,
-                                      diasSemEstoque: live?.diasSemEstoque ?? null,
-                                      mesesDisponiveis: live?.mesesDisponiveis ?? null,
-                                      velocidadeAjustada: live?.velocidadeAjustada ?? null,
-                                    };
-                                    const sugestao = getReposicaoCompraView(compraItem, diasCorridosMes);
-                                    const limiteDias = getLimiteDiasReposicao(compraItem);
-                                    const baseType = getReposicaoBaseType(sugestao);
-    const baseQty =
-      sugestao.qtdFinal > 0
-        ? sugestao.qtdFinal
-        : sugestao.qtdS > 0
-          ? sugestao.qtdS
-          : sugestao.qtdE > 0
-            ? sugestao.qtdE
-            : sugestao.qtdPO > 0
-              ? sugestao.qtdPO
-              : sugestao.qtdNM;
-                                    const combined = combineBaseSuggestionWithNecessidadeMinima({
-                                      baseType,
-                                      baseQty,
-                                      totalNmQty: live?.totalNmQty ?? sugestao.qtdNM,
-                                    });
-                                    const transit = applyTransitToSuggestion({
-                                      baseType: combined.effectiveType,
-                                      baseQty: combined.totalQty,
-                                      entries: getCompraTransitoEntries(comprasTransitoIndex, p.produto, porCor ? (p.cor ?? null) : null),
-                                      estoqueAtual: compraItem.estoqueFilial,
-                                      vendasMesAtual: compraItem.vendasMesAtual,
-                                      diasCorridosMes,
-                                      limiteDias,
-                                    });
-                                    const transitDates = transit.entries.map(
-                                      (entry) => `${new Date(`${entry.dataRecebimento}T00:00:00`).toLocaleDateString("pt-BR")} (+${fmt(entry.quantidade)})`
-                                    );
-                                    const transitBadge = transit.totalTransit > 0 ? (
-                                      <span className={styles.badgeT} style={{ marginLeft: 6 }}>
-                                        T {fmt(transit.totalTransit)}
-                                      </span>
-                                    ) : null;
-                                    if (baseType === "COMPRA" && transit.qty > 0) {
-                                      const vendasMes = Number(compraItem.vendasMesAtual ?? 0);
-                                      const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
-                                      const estoqueAtual = sugestao.compraData?.estoqueAtual ?? Number(compraItem.estoqueFilial ?? 0);
-                                      const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
-                                      const qtdFinalPuro = sugestao.compraData?.qtdFinalPuro ?? 0;
-                                      const qtdSBlend = sugestao.compraData?.qtdSBlend ?? 0;
-                                      const blendAplicado = sugestao.compraData?.blendAplicado ?? false;
-                                      const historicoQtde12m = Number(compraItem.qtde12m ?? 0);
-                                      const historicoDiasComEstoquePositivo = sugestao.compraData?.diasComEstoquePositivo ?? Number(compraItem.diasComEstoquePositivo ?? 0);
-                                      const historicoMesesDisponiveis = sugestao.compraData?.mesesDisponiveis ?? Number(compraItem.mesesDisponiveis ?? 0);
-                                      const historicoVelocidadeAjustada = sugestao.compraData?.velocidadeAjustada ?? Number(compraItem.velocidadeAjustada ?? 0);
-                                      const hasPOBadge =
-                                        Boolean(sugestao.poData) ||
-                                        (
-                                          blendAplicado &&
-                                          qtdSBlend > 0 &&
-                                          historicoMesesDisponiveis > 0 &&
-                                          historicoMesesDisponiveis < 1 &&
-                                          historicoVelocidadeAjustada >= 4
-                                        );
-                                      return (
-                                        <span
-                                          className={styles.reporAdd}
-                                          onMouseEnter={(e) => { clearAllTooltips(); setSugestaoTooltip({
-                                            x: e.clientX,
-                                            y: e.clientY,
-                                            titulo: blendAplicado
-                                              ? "Sugestão de reposição (ajuste histórico aplicado)"
-                                              : "Sugestão de reposição (cálculo principal)",
-                                            regra: blendAplicado
-                                              ? "Mês atual baixo (< 60% da média histórica). Qtd = 80% histórico + 40% atual."
-                                              : "Qtd = consumo/dia × (limite de cobertura - duração atual).",
-                                            limiteDias,
-                                            vendasMesAtual: vendasMes,
-                                            diasCorridos: diasCorridosMes,
-                                            consumoDiario,
-                                            estoqueAtual,
-                                            duracaoAtual,
-                                            qtdCalculada: transit.qty,
-                                            baseQty: combined.baseQty,
-                                            nmExtraQty: combined.hasCombinedNm ? combined.nmExtraQty : undefined,
-                                            distribuicao: partesDestinoCompraFinal(transit.qty, live?.vendasPorFilial ?? [], companyKey, live?.estoquePorFilial ?? undefined, limiteDias) ?? undefined,
-                                            blendAplicado,
-                                            qtdFinalPuro,
-                                            qtdSBlend,
-                                            historicoQtde12m,
-                                            historicoDiasComEstoquePositivo,
-                                            historicoMesesDisponiveis,
-                                            historicoVelocidadeAjustada,
-                                            transitTotal: transit.totalTransit || undefined,
-                                            transitDates,
-                                          }); }}
-                                          onMouseLeave={() => setSugestaoTooltip(null)}
-                                        >
-                                          {fmt(transit.qty)}
-                                          {blendAplicado && <>{" "}<span style={{ display: "inline-flex", width: 16, height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#0f172a", background: "#fde047", border: "1px solid #facc15", verticalAlign: "middle", cursor: "help" }}>⚡</span></>}
-                                          {hasPOBadge ? (
-                                            <span
-                                              style={{ marginLeft: 6, display: "inline-flex", padding: "0 5px", height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#14532d", background: "#86efac", border: "1px solid #22c55e", verticalAlign: "middle", cursor: "help" }}
-                                              onMouseEnter={(e) => {
-                                                clearAllTooltips();
-                                                {
-                                                  const ds = sugestao.poData?.diasSemEstoque ?? Number(compraItem.diasSemEstoque ?? 0);
-                                                  setSugestaoPOTooltip({
-                                                    x: e.clientX,
-                                                    y: e.clientY,
-                                                    qtde12m: historicoQtde12m,
-                                                    diasComEstoquePositivo: sugestao.poData?.diasComEstoquePositivo ?? historicoDiasComEstoquePositivo,
-                                                    diasSemEstoque: ds,
-                                                    velocidadeAjustada: sugestao.poData?.velocidadeAjustada ?? historicoVelocidadeAjustada,
-                                                    limiteSeguro: sugestao.poData?.limiteSeguro ?? 0,
-                                                    qtdPO: transit.qty,
-                                                    periodoRef: getPeriodoRef(ds, sugestao.poData?.diasComEstoquePositivo ?? historicoDiasComEstoquePositivo ?? 0),
-                                                    transitTotal: transit.totalTransit || undefined,
-                                                    transitDates,
-                                                  });
-                                                }
-                                              }}
-                                              onMouseLeave={() => setSugestaoPOTooltip(null)}
-                                            >PO</span>
-                                          ) : null}
-                                          {combined.hasCombinedNm ? (
-                                            <span className={styles.badgeT} style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}>
-                                              NM
-                                            </span>
-                                          ) : null}
-                                          {transitBadge}
-                                        </span>
-                                      );
-                                    }
-                                    if (baseType === "S" && transit.qty > 0) {
-                                      return (
-                                        <span className={styles.reporAdd}>
-                                          {fmt(transit.qty)}{" "}
-                                          <span
-                                            onMouseEnter={(e) => { clearAllTooltips(); setSugestaoSTooltip({
-                                              x: e.clientX,
-                                              y: e.clientY,
-                                              qtde12m: Number(compraItem.qtde12m ?? 0),
-                                              diasComEstoquePositivo: sugestao.sData?.diasComEstoquePositivo ?? 0,
-                                              mesesDisponiveis: sugestao.sData?.mesesDisponiveis ?? 1,
-                                              velocidadeAjustada: sugestao.sData?.velocidadeAjustada ?? 0,
-                                              estoqueAtual: Number(compraItem.estoqueFilial ?? 0),
-                                              limiteDias,
-                                              qtdS: transit.qty,
-                                              baseQty: combined.baseQty,
-                                              nmExtraQty: combined.hasCombinedNm ? combined.nmExtraQty : undefined,
-                                              distribuicao: partesDestinoCompraFinal(transit.qty, live?.vendasPorFilial ?? [], companyKey, live?.estoquePorFilial ?? undefined, limiteDias) ?? undefined,
-                                              transitTotal: transit.totalTransit || undefined,
-                                              transitDates,
-                                            }); }}
-                                            onMouseLeave={() => setSugestaoSTooltip(null)}
-                                            style={{
-                                              display: "inline-flex",
-                                              width: 16,
-                                              height: 16,
-                                              borderRadius: "999px",
-                                              alignItems: "center",
-                                              justifyContent: "center",
-                                              fontSize: 10,
-                                              fontWeight: 800,
-                                              color: "#0f172a",
-                                              background: "#fde047",
-                                              border: "1px solid #facc15",
-                                              verticalAlign: "middle",
-                                              cursor: "help",
-                                            }}
-                                          >
-                                            S
-                                          </span>
-                                          {sugestao.poData ? (
-                                            <span
-                                              style={{ marginLeft: 6, display: "inline-flex", padding: "0 5px", height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#14532d", background: "#86efac", border: "1px solid #22c55e", verticalAlign: "middle", cursor: "help" }}
-                                              onMouseEnter={(e) => {
-                                                clearAllTooltips();
-                                                setSugestaoPOTooltip({ x: e.clientX, y: e.clientY, qtde12m: Number(compraItem.qtde12m ?? 0), diasComEstoquePositivo: sugestao.poData!.diasComEstoquePositivo, diasSemEstoque: sugestao.poData!.diasSemEstoque, velocidadeAjustada: sugestao.poData!.velocidadeAjustada, limiteSeguro: sugestao.poData!.limiteSeguro, qtdPO: transit.qty, periodoRef: getPeriodoRef(sugestao.poData!.diasSemEstoque, sugestao.poData!.diasComEstoquePositivo), transitTotal: transit.totalTransit || undefined, transitDates });
-                                              }}
-                                              onMouseLeave={() => setSugestaoPOTooltip(null)}
-                                            >PO</span>
-                                          ) : null}
-                                          {combined.hasCombinedNm ? (
-                                            <span className={styles.badgeT} style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}>
-                                              NM
-                                            </span>
-                                          ) : null}
-                                          {transitBadge}
-                                        </span>
-                                      );
-                                    }
-                                    if (baseType === "E" && transit.qty > 0) {
-                                      const eInfo = calcQtdSugestaoEInfo(compraItem);
-                                      return (
-                                        <span className={styles.reporAdd}>
-                                          {fmt(transit.qty)}{" "}
-                                          <span
-                                            onMouseEnter={(e) => { clearAllTooltips(); eInfo && setSugestaoETooltip({
-                                              x: e.clientX,
-                                              y: e.clientY,
-                                              qtde12m: Number(compraItem.qtde12m ?? 0),
-                                              diasComEstoquePositivo: sugestao.eData?.diasComEstoquePositivo ?? Math.round(eInfo.mesesAtivos * 30),
-                                              diasSemEstoque: sugestao.eData?.diasSemEstoque ?? 0,
-                                              mesesDisponiveis: eInfo.mesesAtivos,
-                                              velocidadeAjustada: eInfo.velocidadeAjustada,
-                                              limiteDias,
-                                              qtdE: transit.qty,
-                                              baseQty: combined.baseQty,
-                                              nmExtraQty: combined.hasCombinedNm ? combined.nmExtraQty : undefined,
-                                              distribuicao: partesDestinoCompraFinal(transit.qty, live?.vendasPorFilial ?? [], companyKey, live?.estoquePorFilial ?? undefined, limiteDias) ?? undefined,
-                                              transitTotal: transit.totalTransit || undefined,
-                                              transitDates,
-                                            }); }}
-                                            onMouseLeave={() => setSugestaoETooltip(null)}
-                                            style={{
-                                              display: "inline-flex",
-                                              width: 16,
-                                              height: 16,
-                                              borderRadius: "999px",
-                                              alignItems: "center",
-                                              justifyContent: "center",
-                                              fontSize: 10,
-                                              fontWeight: 800,
-                                              color: "#fff",
-                                              background: "#f97316",
-                                              border: "1px solid #ea580c",
-                                              verticalAlign: "middle",
-                                              cursor: "help",
-                                            }}
-                                          >
-                                            E
-                                          </span>
-                                          {sugestao.poData ? (
-                                            <span
-                                              style={{ marginLeft: 6, display: "inline-flex", padding: "0 5px", height: 16, borderRadius: "999px", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#14532d", background: "#86efac", border: "1px solid #22c55e", verticalAlign: "middle", cursor: "help" }}
-                                              onMouseEnter={(e) => {
-                                                clearAllTooltips();
-                                                setSugestaoPOTooltip({ x: e.clientX, y: e.clientY, qtde12m: Number(compraItem.qtde12m ?? 0), diasComEstoquePositivo: sugestao.poData!.diasComEstoquePositivo, diasSemEstoque: sugestao.poData!.diasSemEstoque, velocidadeAjustada: sugestao.poData!.velocidadeAjustada, limiteSeguro: sugestao.poData!.limiteSeguro, qtdPO: transit.qty, periodoRef: getPeriodoRef(sugestao.poData!.diasSemEstoque, sugestao.poData!.diasComEstoquePositivo), transitTotal: transit.totalTransit || undefined, transitDates });
-                                              }}
-                                              onMouseLeave={() => setSugestaoPOTooltip(null)}
-                                            >PO</span>
-                                          ) : null}
-                                          {combined.hasCombinedNm ? (
-                                            <span className={styles.badgeT} style={{ marginLeft: 6, background: "#7c3aed", borderColor: "#6d28d9", color: "#fff" }}>
-                                              NM
-                                            </span>
-                                          ) : null}
-                                          {transitBadge}
-                                        </span>
-                                      );
-                                    }
-                                    if ((baseType === "PO" || baseType === "NM") && transit.qty > 0) {
-                                      const vendasMes = Number(compraItem.vendasMesAtual ?? 0);
-                                      const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
-                                      return (
-                                        <span
-                                          className={styles.reporAdd}
-                                          onMouseEnter={(e) => { clearAllTooltips(); setSugestaoTooltip({
-                                            x: e.clientX,
-                                            y: e.clientY,
-                                            titulo: baseType === "PO" ? "Potencial oculto (PO)" : "Necessidade minima (NM)",
-                                            regra: baseType === "PO"
-                                              ? "Velocidade ajustada pela disponibilidade real: qtde vendida ÷ (dias com estoque / 30), com trava de seguranca para nao superdimensionar."
-                                              : "Sem outra regra de reposicao ativa. A sugestao vem da necessidade minima do item.",
-                                            limiteDias,
-                                            vendasMesAtual: vendasMes,
-                                            diasCorridos: diasCorridosMes,
-                                            consumoDiario,
-                                            estoqueAtual: Number(compraItem.estoqueFilial ?? 0),
-                                            duracaoAtual: 0,
-                                            qtdCalculada: transit.qty,
-                                            baseQty: combined.baseQty,
-                                            distribuicao: partesDestinoCompraFinal(transit.qty, live?.vendasPorFilial ?? [], companyKey, live?.estoquePorFilial ?? undefined, limiteDias) ?? undefined,
-                                            transitTotal: transit.totalTransit || undefined,
-                                            transitDates,
-                                          }); }}
-                                          onMouseLeave={() => setSugestaoTooltip(null)}
-                                        >
-                                          {fmt(transit.qty)}{" "}
-                                          <span
-                                            style={{
-                                              display: "inline-flex",
-                                              padding: "0 5px",
-                                              height: 16,
-                                              borderRadius: "999px",
-                                              alignItems: "center",
-                                              justifyContent: "center",
-                                              fontSize: 10,
-                                              fontWeight: 800,
-                                              color: "#fff",
-                                              background: "#7c3aed",
-                                              border: "1px solid #6d28d9",
-                                              verticalAlign: "middle",
-                                              cursor: "help",
-                                            }}
-                                          >
-                                            {baseType === "PO" ? "PO" : "NM"}
-                                          </span>
-                                          {transitBadge}
-                                        </span>
-                                      );
-                                    }
-                                    if (baseType === "SEM_SUGESTAO") {
-                                      if (transit.totalTransit > 0) {
-                                        return (
-                                          <span
-                                            className={styles.reporOk}
-                                            onMouseEnter={(e) => { clearAllTooltips(); setSugestaoTooltip({
-                                              x: e.clientX,
-                                              y: e.clientY,
-                                              titulo: "Em trânsito",
-                                              regra: "Sem sugestão de compra no momento, mas existem unidades já compradas em trânsito.",
-                                              limiteDias,
-                                              vendasMesAtual: Number(compraItem.vendasMesAtual ?? 0),
-                                              diasCorridos: diasCorridosMes,
-                                              consumoDiario: diasCorridosMes > 0 ? Number(compraItem.vendasMesAtual ?? 0) / diasCorridosMes : 0,
-                                              estoqueAtual: Number(compraItem.estoqueFilial ?? 0),
-                                              duracaoAtual: 0,
-                                              qtdCalculada: 0,
-                                              transitTotal: transit.totalTransit || undefined,
-                                              transitDates,
-                                            }); }}
-                                            onMouseLeave={() => setSugestaoTooltip(null)}
-                                          >
-                                            {transitBadge}
-                                          </span>
-                                        );
-                                      }
-                                      return <span className={styles.cellMetric}>Sem sugestao</span>;
-                                    }
-                                    const vendasMes = Number(compraItem.vendasMesAtual ?? 0);
-                                    const consumoDiario = diasCorridosMes > 0 ? vendasMes / diasCorridosMes : 0;
-                                    const estoqueAtual = Number(compraItem.estoqueFilial ?? 0);
-                                    const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
-                                    return (
-                                      <span
-                                        className={styles.reporOk}
-                                        onMouseEnter={(e) => { clearAllTooltips(); setSugestaoTooltip({
-                                          x: e.clientX,
-                                          y: e.clientY,
-                                          titulo: "Quantidade suficiente",
-                                          regra: transit.suppressedByTransit
-                                            ? "Sem reposição adicional: a compra em trânsito cobre a necessidade antes do estoque acabar."
-                                            : "Sem reposição: duração atual já atende o limite de cobertura.",
-                                          limiteDias,
-                                          vendasMesAtual: vendasMes,
-                                          diasCorridos: diasCorridosMes,
-                                          consumoDiario,
-                                          estoqueAtual,
-                                          duracaoAtual,
-                                          qtdCalculada: 0,
-                                          transitTotal: transit.totalTransit || undefined,
-                                          transitDates,
-                                        }); }}
-                                        onMouseLeave={() => setSugestaoTooltip(null)}
-                                      >
-                                        Quantidade suficiente{transitBadge}
-                                      </span>
-                                    );
+                                    const ideal = buildCompraIdealFromMetricRow(live, p, comprasTransitoIndex, porCor);
+                                    return <CompraIdealCell ideal={ideal} />;
                                   })()}
                                 </td>
                               </>
@@ -3335,7 +2748,7 @@ const handleBadgeClick = (cat: string) => {
         <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed" }}>
           <thead>
             <tr>
-              {["", "Produto", "Obs.", "Participação", "Faturamento no período", "Qtd vendida", "Estoque", ...(showEstoqueRede ? ["Estoque rede"] : []), "Markup", "Sugestão de compra"].map((label, i) => (
+              {["", "Produto", "Obs.", "Participação", "Faturamento no período", "Qtd vendida", "Estoque", ...(showEstoqueRede ? ["Estoque rede"] : []), "Markup", "Compra ideal"].map((label, i) => (
                 <th key={i} className={styles.stickyTableHeaderTh} style={{ textAlign: i >= 3 ? "right" : "left" }}>
                   {label}
                 </th>

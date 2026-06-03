@@ -19,7 +19,7 @@ export interface CurvaAbcSimpleXlsxRow {
   PERC_ACUMULADA: number;
   VENDAS: number;
   MARKUP: number | "";
-  SUGESTAO_COMPRA: number | "";
+  COMPRA_IDEAL: number | "";
   VAR_VS_PERIODO_ANTERIOR: number | string;
 }
 
@@ -65,7 +65,7 @@ export function exportCurvaAbcSimpleXlsx(
     PERC_ACUMULADA: row.PERC_ACUMULADA,
     VENDAS: row.VENDAS,
     MARKUP: row.MARKUP,
-    SUGESTAO_COMPRA: row.SUGESTAO_COMPRA,
+    COMPRA_IDEAL: row.COMPRA_IDEAL,
     VAR_VS_PERIODO_ANTERIOR: row.VAR_VS_PERIODO_ANTERIOR,
   }));
 

@@ -212,5 +212,29 @@
     "createdAt": "2026-05-20T18:55:59.440Z",
     "updatedAt": "2026-06-03T13:10:27.366Z",
     "confirmedAt": "2026-06-03T13:10:27.366Z"
+  },
+  {
+    "id": "30e05905-bffd-4f86-adff-86f1641edc24",
+    "companyKey": "scarfme",
+    "title": "Compra em trânsito 03/06/2026 16:37",
+    "status": "em_transito",
+    "items": [
+      {
+        "itemKey": "07.A1.00B3||06",
+        "produto": "07.A1.00B3",
+        "descricao": "PASHMINA LISA TOQUE DE LA 06/24",
+        "corProduto": "06",
+        "corDescricao": "PRETO",
+        "grade": "70X180",
+        "dataRecebimento": "2026-07-02",
+        "quantidade": 40,
+        "custoUnitario": 66.58,
+        "estoqueAtual": 25,
+        "status": "em_transito"
+      }
+    ],
+    "createdAt": "2026-06-03T19:37:50.063Z",
+    "updatedAt": "2026-06-03T19:38:06.438Z",
+    "confirmedAt": "2026-06-03T19:38:06.438Z"
   }
 ]

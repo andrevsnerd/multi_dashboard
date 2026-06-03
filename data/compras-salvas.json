@@ -896,5 +896,27 @@
     "comprada": false,
     "savedAt": "2026-05-22T16:30:57.746Z",
     "updatedAt": "2026-06-01T17:46:17.606Z"
+  },
+  {
+    "id": "3710fe68-a341-4728-99d1-ab5d3f2b0d4d",
+    "companyKey": "scarfme",
+    "sourceContextKey": "lista-loja:scarfme:__TODAS__:novo",
+    "title": "[Lista Loja] TODAS (visão geral) 03/06/2026 16:41 · andre.sabetta",
+    "expandirPorCor": true,
+    "items": [
+      {
+        "itemKey": "07.A1.00B3||06",
+        "produto": "07.A1.00B3",
+        "corProduto": "06",
+        "corDescricao": "PRETO",
+        "descricao": "PASHMINA LISA TOQUE DE LA 06/24",
+        "qtdManual": 70,
+        "custoUnitario": 66.58,
+        "filialOrigem": null
+      }
+    ],
+    "comprada": false,
+    "savedAt": "2026-06-03T19:41:13.782Z",
+    "updatedAt": "2026-06-03T19:41:13.782Z"
   }
 ]

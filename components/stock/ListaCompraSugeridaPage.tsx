@@ -37,6 +37,8 @@ import {
   fetchControleEstoqueItemMetricasClient,
   fetchControleEstoqueMetricasItensClient,
 } from "@/lib/client/controle-estoque-metricas";
+import { calcCompraIdealFromResumo, type CompraIdealResult } from "@/lib/utils/compra-ideal";
+import CompraIdealCell from "@/components/shared/CompraIdealCell";
 import {
   buildCompraTransitoIndex,
   fetchComprasTransitoClient,
@@ -119,6 +121,13 @@ interface ProdutoSugestao {
   diasSemEstoque?: number | null;
   mesesDisponiveis?: number | null;
   velocidadeAjustada?: number | null;
+  ritmoDiasComEstoque?: number | null;
+  ritmoVendasPeriodo?: number | null;
+  ritmoInicioIso?: string | null;
+  ritmoFimIso?: string | null;
+  ritmoDiasComVenda?: number | null;
+  ritmoPrimeiraVendaIso?: string | null;
+  ritmoUltimaVendaIso?: string | null;
   percParticipacao: number;
   qtdSugerida: number;
 }
@@ -131,6 +140,7 @@ interface ProdutoComCurva extends ProdutoSugestao {
   percCumulativa: number;
   qtdSuficiente?: boolean;
   sugestaoView?: SuggestionView;
+  ideal?: CompraIdealResult;
 }
 
 type SuggestionType = "COMPRA" | "S" | "E" | "PO" | "NM" | "SUFICIENTE" | "SEM_SUGESTAO";
@@ -239,6 +249,13 @@ function hydrateProdutoSugestaoComMetricas(
     diasSemEstoque: metricas.resumo.diasSemEstoque,
     mesesDisponiveis: metricas.resumo.mesesDisponiveis,
     velocidadeAjustada: metricas.resumo.velocidadeAjustada,
+    ritmoDiasComEstoque: metricas.resumo.ritmoDiasComEstoque,
+    ritmoVendasPeriodo: metricas.resumo.ritmoVendasPeriodo,
+    ritmoInicioIso: metricas.resumo.ritmoInicioIso,
+    ritmoFimIso: metricas.resumo.ritmoFimIso,
+    ritmoDiasComVenda: metricas.resumo.ritmoDiasComVenda,
+    ritmoPrimeiraVendaIso: metricas.resumo.ritmoPrimeiraVendaIso,
+    ritmoUltimaVendaIso: metricas.resumo.ritmoUltimaVendaIso,
   };
 }
 
@@ -463,7 +480,7 @@ function AbcAnalysisTableHead({ modoReposicao }: { modoReposicao: boolean }) {
         <th className={styles.right}>QTD 60 dias</th>
         <th className={styles.right}>Duração</th>
         <th className={styles.right}>Participação</th>
-        <th className={styles.right}>{modoReposicao ? "Qtd a Repor" : "Qtd Proporcional"}</th>
+        <th className={styles.right}>{modoReposicao ? "Compra ideal" : "Qtd Proporcional"}</th>
         <th className={styles.right}>Custo Unit.</th>
         <th className={styles.right}>Custo Total</th>
       </tr>
@@ -1484,18 +1501,35 @@ export default function ListaCompraSugeridaPage({
           sugestaoView: { type: "SEM_SUGESTAO" as SuggestionType, qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0 },
         };
       }
-      const suggestionKey = buildSuggestionKey(p.produto, expandirPorCor ? (p.cor ?? p.corDescricao ?? "") : "");
-      const sugestaoView = applyTransitToListaCompraSuggestion(
-        p,
-        diasCorridosMes,
-        comprasTransitoIndex,
-        abcNmTotalQtyMap[suggestionKey] ?? 0
+      const transitEntries = getCompraTransitoEntries(comprasTransitoIndex, p.produto, expandirPorCor ? (p.cor ?? null) : null);
+      const ideal = calcCompraIdealFromResumo(
+        {
+          estoqueTotal: p.estoqueAtual ?? 0,
+          qtde60d: p.vendas60dias ?? null,
+          ritmoDiasComEstoque: p.ritmoDiasComEstoque ?? null,
+          ritmoVendasPeriodo: p.ritmoVendasPeriodo ?? null,
+          ritmoInicioIso: p.ritmoInicioIso ?? null,
+          ritmoFimIso: p.ritmoFimIso ?? null,
+          ritmoDiasComVenda: p.ritmoDiasComVenda ?? null,
+          ritmoPrimeiraVendaIso: p.ritmoPrimeiraVendaIso ?? null,
+          ritmoUltimaVendaIso: p.ritmoUltimaVendaIso ?? null,
+        },
+        transitEntries,
+        { linha: p.linha, subgrupo: p.subgrupo }
       );
+      const qtd = Math.max(0, ideal.compraIdeal);
       return {
         ...p,
-        qtdFinal: sugestaoView.type === "COMPRA" ? sugestaoView.qty : 0,
-        qtdSuficiente: sugestaoView.type === "SUFICIENTE",
-        sugestaoView,
+        qtdFinal: qtd,
+        qtdSuficiente: ideal.compraIdeal <= 0,
+        ideal,
+        sugestaoView: {
+          type: (qtd > 0 ? "COMPRA" : "SEM_SUGESTAO") as SuggestionType,
+          qty: qtd,
+          qtdFinal: qtd,
+          qtdS: 0,
+          qtdE: 0,
+        },
       };
     });
   }, [produtosComCurva, modoReposicao, incluirCurvaB, incluirCurvaC, diasCorridosMes, comprasTransitoIndex, expandirPorCor, abcNmTotalQtyMap]);
@@ -2383,6 +2417,14 @@ export default function ListaCompraSugeridaPage({
                                 </div>
                               </td>
                               {(() => {
+                                // Modo Reposição: Compra Ideal (regra global). Modo proporcional segue a lógica antiga.
+                                if (modoReposicao) {
+                                  return (
+                                    <td className={styles.qtdSugerida}>
+                                      {p.ideal ? <CompraIdealCell ideal={p.ideal} /> : "—"}
+                                    </td>
+                                  );
+                                }
                                 const sugestaoView = p.sugestaoView
                                   ?? { type: "SEM_SUGESTAO" as SuggestionType, qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0 };
                                 const suggestionKey = buildSuggestionKey(p.produto, expandirPorCor ? (p.cor ?? "") : "");
