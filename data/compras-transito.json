@@ -110,7 +110,7 @@
     "id": "f4b52085-e292-4b62-96ab-d509796fb4a4",
     "companyKey": "nerd",
     "title": "[Lista Loja] TODAS (visão geral) 18/05/2026 14:41 · andre.sabetta",
-    "status": "rascunho",
+    "status": "em_transito",
     "items": [
       {
         "itemKey": "N4.7I.0019|C9",
@@ -118,11 +118,11 @@
         "descricao": "CP SILICONE IP 17",
         "corProduto": "C9",
         "corDescricao": "AZUL MARINHO",
-        "dataRecebimento": "",
+        "dataRecebimento": "2026-07-05",
         "quantidade": 4,
         "custoUnitario": 10.4,
         "estoqueAtual": 6,
-        "status": "rascunho"
+        "status": "em_transito"
       },
       {
         "itemKey": "N4.7H.0080|03",
@@ -130,11 +130,11 @@
         "descricao": "CP SILICONE IP 17 PRO MAX",
         "corProduto": "03",
         "corDescricao": "AZUL",
-        "dataRecebimento": "",
+        "dataRecebimento": "2026-07-05",
         "quantidade": 4,
         "custoUnitario": 10.4,
         "estoqueAtual": 5,
-        "status": "rascunho"
+        "status": "em_transito"
       },
       {
         "itemKey": "N4.7P.0073|11",
@@ -142,11 +142,11 @@
         "descricao": "CP SILICONE IP 17 PRO",
         "corProduto": "11",
         "corDescricao": "LARANJA",
-        "dataRecebimento": "",
+        "dataRecebimento": "2026-07-05",
         "quantidade": 1,
         "custoUnitario": 10.4,
         "estoqueAtual": 8,
-        "status": "rascunho"
+        "status": "em_transito"
       },
       {
         "itemKey": "N4.7I.0019|Z3",
@@ -154,11 +154,11 @@
         "descricao": "CP SILICONE IP 17",
         "corProduto": "Z3",
         "corDescricao": "AVELÃ",
-        "dataRecebimento": "",
+        "dataRecebimento": "2026-07-05",
         "quantidade": 4,
         "custoUnitario": 10.4,
         "estoqueAtual": 0,
-        "status": "rascunho"
+        "status": "em_transito"
       },
       {
         "itemKey": "N4.7I.0019|06",
@@ -166,11 +166,11 @@
         "descricao": "CP SILICONE IP 17",
         "corProduto": "06",
         "corDescricao": "PRETO",
-        "dataRecebimento": "",
+        "dataRecebimento": "2026-07-05",
         "quantidade": 2,
         "custoUnitario": 10.4,
         "estoqueAtual": 3,
-        "status": "rascunho"
+        "status": "em_transito"
       },
       {
         "itemKey": "N4.7I.0019|07",
@@ -178,11 +178,11 @@
         "descricao": "CP SILICONE IP 17",
         "corProduto": "07",
         "corDescricao": "CINZA",
-        "dataRecebimento": "",
+        "dataRecebimento": "2026-07-05",
         "quantidade": 1,
         "custoUnitario": 10.4,
         "estoqueAtual": 1,
-        "status": "rascunho"
+        "status": "em_transito"
       },
       {
         "itemKey": "N4.7E.0080|09",
@@ -190,11 +190,11 @@
         "descricao": "CP SILICONE IP 17 AIR",
         "corProduto": "09",
         "corDescricao": "MARROM",
-        "dataRecebimento": "",
+        "dataRecebimento": "2026-07-05",
         "quantidade": 1,
         "custoUnitario": 10.24,
         "estoqueAtual": 0,
-        "status": "rascunho"
+        "status": "em_transito"
       },
       {
         "itemKey": "N4.7I.0019|75",
@@ -202,15 +202,15 @@
         "descricao": "CP SILICONE IP 17",
         "corProduto": "75",
         "corDescricao": "CINZA CHUMBO",
-        "dataRecebimento": "",
+        "dataRecebimento": "2026-07-05",
         "quantidade": 1,
         "custoUnitario": 10.4,
         "estoqueAtual": 0,
-        "status": "rascunho"
+        "status": "em_transito"
       }
     ],
     "createdAt": "2026-05-20T18:55:59.440Z",
-    "updatedAt": "2026-05-20T18:55:59.440Z",
-    "confirmedAt": "2026-05-20T18:55:59.440Z"
+    "updatedAt": "2026-06-03T13:10:27.366Z",
+    "confirmedAt": "2026-06-03T13:10:27.366Z"
   }
 ]
