@@ -27,12 +27,12 @@ export async function GET(request: NextRequest) {
 
     const search = request.nextUrl.searchParams.get("search")?.trim() ?? "";
     const companyConfig = await resolveCompanyDynamic(companyKey);
-    const filiaisEmpresa = new Set(
-      (companyConfig?.filialFilters.inventory ?? []).map((f) => f.toUpperCase())
-    );
+    const filiaisInventory = companyConfig?.filialFilters.inventory ?? [];
+    const filiaisEmpresa = new Set(filiaisInventory.map((f) => f.toUpperCase()));
 
+    // Filtra no SQL (antes do TOP) pelas filiais da empresa — teto por empresa, sem misturar.
     const [entradas, confirmadosCounter] = await Promise.all([
-      fetchLogEntradas(1000, 90, search),
+      fetchLogEntradas(1000, 90, search, filiaisInventory),
       getContadorConfirmadosByCompany(companyKey),
     ]);
 

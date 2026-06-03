@@ -40,11 +40,22 @@ function buildSearchConfig(searchTerm = "") {
 export async function fetchLogTransito(
   limit = 200,
   dias = 3650,
-  searchTerm = ""
+  searchTerm = "",
+  filiais: string[] = []
 ): Promise<LogTransitoRow[]> {
   const limitClamp = Math.min(Math.max(limit || 200, 1), 1000);
   const diasClamp = Math.min(Math.max(dias || 3650, 1), 3650);
   const searchConfig = buildSearchConfig(searchTerm);
+
+  // Filtro de filiais (destino) aplicado DENTRO do SQL, antes do TOP — evita teto de
+  // linhas compartilhado entre empresas. Match por nome (trim + upper), igual à rota.
+  const filiaisNorm = Array.from(
+    new Set((filiais || []).map((f) => (f || "").trim().toUpperCase()).filter(Boolean))
+  );
+  const hasFilialFilter = filiaisNorm.length > 0;
+  const filialFilter = hasFilialFilter
+    ? `AND UPPER(LTRIM(RTRIM(ISNULL(le.FILIAL, '')))) IN (${filiaisNorm.map((_, i) => `@fil${i}`).join(", ")})`
+    : "";
   const useDateFilter = !searchConfig.isRomaneioSearch && diasClamp < 3650;
   const dateFilter = useDateFilter
     ? `AND le.EMISSAO >= DATEADD(DAY, -${diasClamp}, GETDATE())`
@@ -72,6 +83,9 @@ export async function fetchLogTransito(
     if (searchConfig.hasSearch) {
       req.input("searchLike", sql.VarChar, searchConfig.like);
       req.input("searchExactRomaneio", sql.VarChar, searchConfig.exactRomaneio);
+    }
+    if (hasFilialFilter) {
+      filiaisNorm.forEach((f, i) => req.input(`fil${i}`, sql.VarChar, f));
     }
 
     const query = `
@@ -128,6 +142,7 @@ export async function fetchLogTransito(
         )
         ${dateFilter}
         ${searchFilter}
+        ${filialFilter}
       ORDER BY le.EMISSAO DESC, le.ROMANEIO_PRODUTO DESC
     `;
 

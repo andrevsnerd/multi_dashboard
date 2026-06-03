@@ -41,11 +41,26 @@ function buildSearchConfig(searchTerm = "") {
 export async function fetchLogEntradas(
   limit = 200,
   dias = 90,
-  searchTerm = ""
+  searchTerm = "",
+  filiais: string[] = []
 ): Promise<LogEntradaRow[]> {
   const limitClamp = Math.min(Math.max(limit || 200, 1), 1000);
   const diasClamp = Math.min(Math.max(dias || 30, 1), 365);
   const searchConfig = buildSearchConfig(searchTerm);
+
+  // Filtro de filiais (destino) aplicado DENTRO do SQL, antes do TOP — evita teto de
+  // linhas compartilhado entre empresas. Match por nome (trim + upper), igual à rota.
+  const filiaisNorm = Array.from(
+    new Set((filiais || []).map((f) => (f || "").trim().toUpperCase()).filter(Boolean))
+  );
+  const hasFilialFilter = filiaisNorm.length > 0;
+  const filialParams = filiaisNorm.map((_, i) => `@fil${i}`).join(", ");
+  const filialFilterEstoque = hasFilialFilter
+    ? `AND UPPER(LTRIM(RTRIM(ISNULL(e.FILIAL, '')))) IN (${filialParams})`
+    : "";
+  const filialFilterLoja = hasFilialFilter
+    ? `AND UPPER(LTRIM(RTRIM(ISNULL(le.FILIAL, '')))) IN (${filialParams})`
+    : "";
   const useDateFilter = !searchConfig.isRomaneioSearch;
   const dateFilterEstoque = useDateFilter
     ? `AND e.EMISSAO >= DATEADD(DAY, -${diasClamp}, GETDATE())`
@@ -94,6 +109,9 @@ export async function fetchLogEntradas(
       req.input("searchLike", sql.VarChar, searchConfig.like);
       req.input("searchExactRomaneio", sql.VarChar, searchConfig.exactRomaneio);
     }
+    if (hasFilialFilter) {
+      filiaisNorm.forEach((f, i) => req.input(`fil${i}`, sql.VarChar, f));
+    }
 
     const query = `
       SELECT TOP (${limitClamp}) * FROM (
@@ -128,6 +146,7 @@ export async function fetchLogEntradas(
         WHERE 1 = 1
           ${dateFilterEstoque}
           ${searchFilterEstoque}
+          ${filialFilterEstoque}
 
         UNION ALL
 
@@ -163,6 +182,7 @@ export async function fetchLogEntradas(
         AND (le.ENTRADA_CANCELADA = 0 OR le.ENTRADA_CANCELADA IS NULL)
         ${dateFilterLoja}
         ${searchFilterLoja}
+        ${filialFilterLoja}
       ) AS unificado
       ORDER BY EMISSAO DESC, ROMANEIO_PRODUTO DESC
     `;

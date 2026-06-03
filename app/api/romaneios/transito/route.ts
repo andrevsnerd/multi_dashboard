@@ -19,10 +19,10 @@ export async function GET(request: NextRequest) {
 
     const search = request.nextUrl.searchParams.get("search")?.trim() ?? "";
     const companyConfig = await resolveCompanyDynamic(companyKey);
-    const filiaisEmpresa = new Set(
-      (companyConfig?.filialFilters.inventory ?? []).map((f) => f.toUpperCase())
-    );
-    const transitos = await fetchLogTransito(1000, 3650, search);
+    const filiaisInventory = companyConfig?.filialFilters.inventory ?? [];
+    const filiaisEmpresa = new Set(filiaisInventory.map((f) => f.toUpperCase()));
+    // Filtra no SQL (antes do TOP) pelas filiais da empresa — teto por empresa, sem misturar.
+    const transitos = await fetchLogTransito(1000, 3650, search, filiaisInventory);
     const transitosDaEmpresa = filiaisEmpresa.size > 0
       ? transitos.filter((t) =>
           filiaisEmpresa.has((t.filialDestino ?? "").toUpperCase())

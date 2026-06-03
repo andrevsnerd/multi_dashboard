@@ -55,12 +55,13 @@ export async function GET(request: NextRequest) {
 
     const search = request.nextUrl.searchParams.get("search")?.trim() ?? "";
     const companyConfig = await resolveCompanyDynamic(companyKey);
-    const filiaisEmpresa = new Set(
-      (companyConfig?.filialFilters.inventory ?? []).map((f) => f.toUpperCase())
-    );
+    const filiaisInventory = companyConfig?.filialFilters.inventory ?? [];
+    const filiaisEmpresa = new Set(filiaisInventory.map((f) => f.toUpperCase()));
 
+    // Passa as filiais da empresa para a query filtrar no SQL (antes do TOP),
+    // garantindo que o teto de linhas seja por empresa e nunca misture NERD + SCARFME.
     const [saidas, destinosMap, confirmadosCounter] = await Promise.all([
-      fetchLogSaidas(1000, 90, search),
+      fetchLogSaidas(1000, 90, search, filiaisInventory),
       getAllDestinosByCompany(companyKey),
       getContadorConfirmadosByCompany(companyKey),
     ]);

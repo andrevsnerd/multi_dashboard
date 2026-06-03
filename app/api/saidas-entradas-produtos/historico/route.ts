@@ -81,11 +81,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Parâmetro company é obrigatório" }, { status: 400 });
     }
 
-    const [dataset, companyConfig, destinosMap] = await Promise.all([
+    const companyConfig = await resolveCompanyDynamic(companyKey);
+    const filiaisInventory = companyConfig?.filialFilters.inventory ?? [];
+
+    // Filtra no SQL pelas filiais da empresa (antes do TOP) — nunca mistura NERD + SCARFME.
+    const [dataset, destinosMap] = await Promise.all([
       tipo === "saida"
-        ? fetchLogSaidas(1000, 365, romaneio)
-        : fetchLogEntradas(1000, 365, romaneio),
-      resolveCompanyDynamic(companyKey),
+        ? fetchLogSaidas(1000, 365, romaneio, filiaisInventory)
+        : fetchLogEntradas(1000, 365, romaneio, filiaisInventory),
       tipo === "saida" ? getAllDestinosByCompany(companyKey) : Promise.resolve(new Map<string, string>()),
     ]);
 
