@@ -96,6 +96,9 @@ interface ListaItem {
   valor12m?: number | null;
   /** QTD vendas 60 dias, snapshot ao adicionar */
   qtde60d?: number | null;
+  /** Janela de ritmo (maior período contínuo com estoque), snapshot ao adicionar */
+  ritmoDiasComEstoque?: number | null;
+  ritmoVendasPeriodo?: number | null;
   /** Vendas no mês atual (para cálculo de Duração), snapshot ao adicionar */
   vendasMesAtual?: number | null;
   /** Custo unitário de reposição, snapshot ao adicionar */
@@ -3239,6 +3242,8 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             diasSemEstoque: vendas?.diasSemEstoque ?? null,
             mesesDisponiveis: vendas?.mesesDisponiveis ?? null,
             velocidadeAjustada: vendas?.velocidadeAjustada ?? null,
+            ritmoDiasComEstoque: vendas?.ritmoDiasComEstoque ?? null,
+            ritmoVendasPeriodo: vendas?.ritmoVendasPeriodo ?? null,
             historicoParcial: vendas?.historicoParcial ?? null,
           };
         })
@@ -3568,6 +3573,8 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                   diasSemEstoque: vendas?.diasSemEstoque ?? null,
                   mesesDisponiveis: vendas?.mesesDisponiveis ?? null,
                   velocidadeAjustada: vendas?.velocidadeAjustada ?? null,
+                  ritmoDiasComEstoque: vendas?.ritmoDiasComEstoque ?? null,
+                  ritmoVendasPeriodo: vendas?.ritmoVendasPeriodo ?? null,
                   historicoParcial: vendas?.historicoParcial ?? null,
                 },
                 new Date().getDate()
@@ -3586,6 +3593,8 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
               diasSemEstoque: vendas?.diasSemEstoque ?? null,
               mesesDisponiveis: vendas?.mesesDisponiveis ?? null,
               velocidadeAjustada: vendas?.velocidadeAjustada ?? null,
+              ritmoDiasComEstoque: vendas?.ritmoDiasComEstoque ?? null,
+              ritmoVendasPeriodo: vendas?.ritmoVendasPeriodo ?? null,
               historicoParcial: vendas?.historicoParcial ?? null,
             },
           ];
@@ -3695,6 +3704,8 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             diasSemEstoque: vendas?.diasSemEstoque ?? null,
             mesesDisponiveis: vendas?.mesesDisponiveis ?? null,
             velocidadeAjustada: vendas?.velocidadeAjustada ?? null,
+            ritmoDiasComEstoque: vendas?.ritmoDiasComEstoque ?? null,
+            ritmoVendasPeriodo: vendas?.ritmoVendasPeriodo ?? null,
             historicoParcial: vendas?.historicoParcial ?? null,
           }] as const;
         })
@@ -3827,6 +3838,8 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             diasSemEstoque: vendas?.diasSemEstoque ?? null,
             mesesDisponiveis: vendas?.mesesDisponiveis ?? null,
             velocidadeAjustada: vendas?.velocidadeAjustada ?? null,
+            ritmoDiasComEstoque: vendas?.ritmoDiasComEstoque ?? null,
+            ritmoVendasPeriodo: vendas?.ritmoVendasPeriodo ?? null,
             historicoParcial: vendas?.historicoParcial ?? null,
           }] as const;
         })
@@ -4048,6 +4061,8 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             diasSemEstoque: vendas?.diasSemEstoque ?? null,
             mesesDisponiveis: vendas?.mesesDisponiveis ?? null,
             velocidadeAjustada: vendas?.velocidadeAjustada ?? null,
+            ritmoDiasComEstoque: vendas?.ritmoDiasComEstoque ?? null,
+            ritmoVendasPeriodo: vendas?.ritmoVendasPeriodo ?? null,
             historicoParcial: vendas?.historicoParcial ?? null,
           }] as const;
         })
@@ -4235,6 +4250,8 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
         diasSemEstoque: vendas?.diasSemEstoque ?? null,
         mesesDisponiveis: vendas?.mesesDisponiveis ?? null,
         velocidadeAjustada: vendas?.velocidadeAjustada ?? null,
+        ritmoDiasComEstoque: vendas?.ritmoDiasComEstoque ?? null,
+        ritmoVendasPeriodo: vendas?.ritmoVendasPeriodo ?? null,
         historicoParcial: vendas?.historicoParcial ?? null,
       };
 
