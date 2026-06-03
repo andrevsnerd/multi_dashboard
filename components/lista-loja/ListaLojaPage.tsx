@@ -2523,8 +2523,8 @@ function ListaLojaItensTable({
               </td>
               <td className={styles.colNumeric}>
                 <span className={styles.cellMetric}>
-                  {custoUnit != null && custoUnit > 0 && ideal.compraIdeal > 0
-                    ? fmtBRL(ideal.compraIdeal * custoUnit)
+                  {custoUnit != null && custoUnit > 0 && item.quantidade > 0
+                    ? fmtBRL(item.quantidade * custoUnit)
                     : "—"}
                 </span>
               </td>
