@@ -72,6 +72,8 @@ export interface CompraIdealResult {
   emTransito: number;
   /** Próxima chegada de trânsito (ISO yyyy-mm-dd), ou null. */
   chegaEm: string | null;
+  /** Dias até a próxima chegada de trânsito (a partir de hoje), ou null. */
+  diasAteChegada: number | null;
   /** Data em que o estoque atual zera no ritmo de consumo (ISO), ou null se sem consumo. */
   acabaEm: string | null;
   diasAteAcabar: number | null;
@@ -191,11 +193,13 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
     acabaEm = formatIso(addDays(hoje, diasAteAcabar));
   }
 
+  // Dias até a próxima chegada de trânsito (a partir de hoje).
+  const diasAteChegada = proximaChegada ? Math.max(0, daysBetween(hoje, proximaChegada)) : null;
+
   // Saldo na chegada: estoque atual restante quando o trânsito chega (sem somar o que chega).
   let saldoChegada: number | null = null;
-  if (proximaChegada) {
-    const dias = Math.max(0, daysBetween(hoje, proximaChegada));
-    saldoChegada = Math.max(0, Math.round(estoqueAtual - consumoDiario * dias));
+  if (proximaChegada && diasAteChegada != null) {
+    saldoChegada = Math.max(0, Math.round(estoqueAtual - consumoDiario * diasAteChegada));
   }
 
   // Alvo = sobreviver o lead time (até a compra nova chegar) + manter cobertura saudável
@@ -210,8 +214,7 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
   const coberturaAtualDias = consumoDiario > 0 ? Math.round(estoqueAtual / consumoDiario) : null;
   // Folga até a chegada do trânsito existente: rompe antes se negativo.
   let folgaAteChegadaDias: number | null = null;
-  if (proximaChegada && consumoDiario > 0) {
-    const diasAteChegada = Math.max(0, daysBetween(hoje, proximaChegada));
+  if (proximaChegada && consumoDiario > 0 && diasAteChegada != null) {
     folgaAteChegadaDias = (coberturaAtualDias ?? 0) - diasAteChegada;
   }
 
@@ -241,6 +244,7 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
     estoqueAtual,
     emTransito,
     chegaEm,
+    diasAteChegada,
     acabaEm,
     diasAteAcabar,
     coberturaAtualDias,

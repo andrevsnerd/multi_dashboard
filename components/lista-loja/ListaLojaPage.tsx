@@ -2030,9 +2030,8 @@ function ListaLojaItensTable({
             <th className={styles.colNumeric}>Estoque</th>
             <th className={styles.colNumeric}>Ritmo 60d</th>
             <th className={styles.colNumeric}>Acaba em</th>
-            <th className={styles.colNumeric}>Em trânsito</th>
             <th className={styles.colNumeric}>Chega em</th>
-            <th className={styles.colNumeric}>Saldo chegada</th>
+            <th className={styles.colNumeric}>Estoque chegada</th>
             <th className={styles.colNumeric}>Compra ideal</th>
             <th className={styles.colNumeric}>Status</th>
             <th className={styles.colNumeric}>Custo Total</th>
@@ -2432,14 +2431,22 @@ function ListaLojaItensTable({
                   className={styles.cellMetric}
                   title={ideal.acabaEm ? `Estoque atual zera no ritmo dos últimos 60 dias` : "Sem venda nos últimos 60 dias"}
                 >
-                  {ideal.acabaEm ? `${fmt(ideal.diasAteAcabar ?? 0)} dias (${formatShortDate(ideal.acabaEm)})` : "—"}
+                  {ideal.acabaEm ? `${formatShortDate(ideal.acabaEm)} (${fmt(ideal.diasAteAcabar ?? 0)}d)` : "—"}
                 </span>
               </td>
               <td className={styles.colNumeric}>
-                {ideal.emTransito > 0 ? (
+                <span className={styles.cellMetric}>
+                  {ideal.chegaEm
+                    ? `${formatShortDate(ideal.chegaEm)}${ideal.diasAteChegada != null ? ` (${fmt(ideal.diasAteChegada)}d)` : ""}`
+                    : "—"}
+                </span>
+              </td>
+              <td className={styles.colNumeric}>
+                {ideal.saldoChegada != null ? (
                   <span
                     className={styles.cellMetric}
-                    onMouseEnter={(e) =>
+                    title="Estoque atual restante na data da chegada (+ o que chega, em verde)"
+                    onMouseEnter={ideal.emTransito > 0 ? (e) =>
                       setTransitoTooltip({
                         x: e.clientX,
                         y: e.clientY,
@@ -2447,53 +2454,51 @@ function ListaLojaItensTable({
                         cor: formatColorDisplay(item.descCor, item.corProduto),
                         entries: transitEntries,
                         total: ideal.emTransito,
-                      })
-                    }
+                      }) : undefined}
                     onMouseLeave={() => setTransitoTooltip(null)}
                   >
-                    {fmt(ideal.emTransito)} pcs
+                    {fmt(ideal.saldoChegada)}
+                    {ideal.emTransito > 0 ? (
+                      <span style={{ color: "#166534", fontWeight: 700 }}> (+{fmt(ideal.emTransito)})</span>
+                    ) : null}
                   </span>
                 ) : (
                   <span className={styles.cellMetric}>—</span>
                 )}
               </td>
               <td className={styles.colNumeric}>
-                <span className={styles.cellMetric}>
-                  {ideal.chegaEm ? formatShortDate(ideal.chegaEm) : "—"}
-                </span>
-              </td>
-              <td className={styles.colNumeric}>
-                <span
-                  className={styles.cellMetric}
-                  title={ideal.saldoChegada != null ? "Estoque atual restante na data da chegada (sem somar o que chega)" : "Sem trânsito previsto"}
-                >
-                  {ideal.saldoChegada != null ? `${fmt(ideal.saldoChegada)} pcs` : "—"}
-                </span>
-              </td>
-              <td className={styles.colNumeric}>
-                <span
-                  className={styles.cellMetric}
-                  onMouseEnter={(e) =>
-                    setCompraIdealTooltip({
-                      x: e.clientX,
-                      y: e.clientY,
-                      produto: item.produto,
-                      cor: formatColorDisplay(item.descCor, item.corProduto),
-                      ideal,
-                    })
-                  }
-                  onMouseLeave={() => setCompraIdealTooltip(null)}
-                  style={{
-                    fontWeight: 700,
-                    color: ideal.compraIdeal > 0 ? "#b45309" : ideal.compraIdeal < 0 ? "#b91c1c" : "#475569",
-                  }}
-                >
-                  {fmt(ideal.compraIdeal)} pcs
-                </span>
+                {(() => {
+                  const compraIdealDisplay = Math.max(0, ideal.compraIdeal);
+                  return (
+                    <span
+                      className={styles.cellMetric}
+                      onMouseEnter={(e) =>
+                        setCompraIdealTooltip({
+                          x: e.clientX,
+                          y: e.clientY,
+                          produto: item.produto,
+                          cor: formatColorDisplay(item.descCor, item.corProduto),
+                          ideal,
+                        })
+                      }
+                      onMouseLeave={() => setCompraIdealTooltip(null)}
+                      style={{ fontWeight: 700, color: compraIdealDisplay > 0 ? "#b45309" : "#475569" }}
+                    >
+                      {fmt(compraIdealDisplay)} pcs
+                    </span>
+                  );
+                })()}
               </td>
               <td className={styles.colNumeric}>
                 {(() => {
+                  const excedente = Math.max(0, -ideal.compraIdeal);
                   const v = compraIdealStatusVisual(ideal.status);
+                  const label =
+                    ideal.status === "REPOR"
+                      ? "Repor"
+                      : excedente > 0
+                        ? `Excesso +${fmt(excedente)}`
+                        : "OK";
                   return (
                     <span
                       title={`Cobertura-alvo ${ideal.coberturaAlvoDias}d · alvo ${fmt(ideal.alvoEstoque)} un · posição ${fmt(ideal.estoqueAtual + ideal.emTransito)} un`}
@@ -2511,7 +2516,7 @@ function ListaLojaItensTable({
                         cursor: "help",
                       }}
                     >
-                      {v.icon} {COMPRA_IDEAL_STATUS_LABEL[ideal.status]}
+                      {v.icon} {label}
                     </span>
                   );
                 })()}
@@ -2694,8 +2699,15 @@ function ListaLojaItensTable({
           </div>
           <div className={styles.metricTooltipDivider} />
           <div className={styles.metricTooltipRow}>
-            <span><strong>Compra ideal</strong></span><span><strong>{fmt(compraIdealTooltip.ideal.compraIdeal)} pcs</strong></span>
+            <span><strong>Compra ideal</strong></span>
+            <span><strong>{fmt(Math.max(0, compraIdealTooltip.ideal.compraIdeal))} pcs</strong></span>
           </div>
+          {compraIdealTooltip.ideal.compraIdeal < 0 ? (
+            <div className={styles.metricTooltipRow}>
+              <span>Excedente</span>
+              <span style={{ color: "#166534", fontWeight: 700 }}>+{fmt(-compraIdealTooltip.ideal.compraIdeal)} un</span>
+            </div>
+          ) : null}
         </div>
       )}
       {ritmoTooltip && (
