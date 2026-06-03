@@ -6413,6 +6413,20 @@ export async function fetchVendasProdutoPorFilial({
     diasSemEstoque: number;
     mesesDisponiveis: number;
     velocidadeAjustada: number;
+    /** Dias do maior período contínuo com estoque nos últimos 12 meses (até 60). */
+    ritmoDiasComEstoque: number;
+    /** Vendas líquidas ocorridas nesse período. */
+    ritmoVendasPeriodo: number;
+    /** Data de início da janela usada (ISO yyyy-mm-dd), ou null. */
+    ritmoInicioIso: string | null;
+    /** Data de término desse período (ISO yyyy-mm-dd), ou null. */
+    ritmoFimIso: string | null;
+    /** Dias COM venda dentro da janela (mede concentração das vendas). */
+    ritmoDiasComVenda: number;
+    /** 1ª venda dentro da janela (ISO), ou null. */
+    ritmoPrimeiraVendaIso: string | null;
+    /** Última venda dentro da janela (ISO), ou null. */
+    ritmoUltimaVendaIso: string | null;
   };
 }> {
   return withRequest(async (request) => {
@@ -7033,6 +7047,9 @@ export async function fetchVendasProdutoPorFilial({
     }
 
     let diasPositivosResumo = 0;
+    // Série diária (cronológica) p/ a janela de ritmo: por dia, a data, se o escopo tinha
+    // estoque disponível e quanto vendeu nesse dia. Consumida após o loop.
+    const ritmoDias: Array<{ iso: string; temEstoque: boolean; vendas: number }> = [];
     for (let time = inicio12m.getTime(); time < fimPeriodo.getTime(); time += msPerDay) {
       const dayIso = new Date(time).toISOString().slice(0, 10);
       const entriesDay = entryByDay.get(dayIso);
@@ -7075,6 +7092,57 @@ export async function fetchVendasProdutoPorFilial({
       }
 
       if (filiaisPositivasNoDia.size > 0) diasPositivosResumo += 1;
+
+      let vendasResumoDia = 0;
+      if (salesDay) salesDay.forEach((qty) => { vendasResumoDia += qty; });
+      ritmoDias.push({ iso: dayIso, temEstoque: filiaisPositivasNoDia.size > 0, vendas: vendasResumoDia });
+    }
+
+    // Janela de ritmo: usa o MAIOR período contínuo com estoque positivo nos últimos 12 meses
+    // (base mais estável; evita misturar venda antiga com surto recente). Empate de tamanho →
+    // o período mais recente. Limita a 60 dias (usa os 60 dias finais do período). Guarda a
+    // data de término do período p/ sinalizar há quanto tempo foi.
+    let bestStart = -1;
+    let bestEnd = -1;
+    let bestLen = 0;
+    let curStart = -1;
+    let curLen = 0;
+    for (let i = 0; i < ritmoDias.length; i++) {
+      if (ritmoDias[i]!.temEstoque) {
+        if (curLen === 0) curStart = i;
+        curLen += 1;
+        if (curLen >= bestLen) {
+          bestLen = curLen;
+          bestStart = curStart;
+          bestEnd = i;
+        }
+      } else {
+        curLen = 0;
+      }
+    }
+    let ritmoDiasComEstoque = 0;
+    let ritmoVendasPeriodo = 0;
+    let ritmoInicioIso: string | null = null;
+    let ritmoFimIso: string | null = null;
+    // Concentração da venda dentro da janela: quantos dias tiveram venda e o intervalo
+    // da 1ª à última venda — revela se as unidades saíram concentradas em pouco tempo.
+    let ritmoDiasComVenda = 0;
+    let ritmoPrimeiraVendaIso: string | null = null;
+    let ritmoUltimaVendaIso: string | null = null;
+    if (bestEnd >= 0) {
+      const windowStart = bestLen > 60 ? bestEnd - 59 : bestStart;
+      for (let i = windowStart; i <= bestEnd; i++) {
+        ritmoDiasComEstoque += 1;
+        const vendasDia = ritmoDias[i]!.vendas;
+        ritmoVendasPeriodo += vendasDia;
+        if (vendasDia > 0) {
+          ritmoDiasComVenda += 1;
+          if (!ritmoPrimeiraVendaIso) ritmoPrimeiraVendaIso = ritmoDias[i]!.iso;
+          ritmoUltimaVendaIso = ritmoDias[i]!.iso;
+        }
+      }
+      ritmoInicioIso = ritmoDias[windowStart]!.iso;
+      ritmoFimIso = ritmoDias[bestEnd]!.iso;
     }
 
     if (byFilial.size === 0 && produtoCustoUnitario > 0) {
@@ -7129,6 +7197,13 @@ export async function fetchVendasProdutoPorFilial({
                 100
             ) / 100
             : 0,
+        ritmoDiasComEstoque,
+        ritmoVendasPeriodo: Math.round(ritmoVendasPeriodo),
+        ritmoInicioIso,
+        ritmoFimIso,
+        ritmoDiasComVenda,
+        ritmoPrimeiraVendaIso,
+        ritmoUltimaVendaIso,
       },
     };
   });

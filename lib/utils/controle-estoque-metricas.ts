@@ -45,6 +45,20 @@ export interface ControleEstoqueItemMetricasResumo extends ControleEstoqueResumo
   diasSemEstoque: number;
   mesesDisponiveis: number;
   velocidadeAjustada: number;
+  /** Dias do maior período contínuo com estoque nos últimos 12 meses (até 60). */
+  ritmoDiasComEstoque: number;
+  /** Vendas líquidas ocorridas nesse período. */
+  ritmoVendasPeriodo: number;
+  /** Data de início da janela usada (ISO yyyy-mm-dd), ou null. */
+  ritmoInicioIso: string | null;
+  /** Data de término desse período (ISO yyyy-mm-dd), ou null. */
+  ritmoFimIso: string | null;
+  /** Dias COM venda dentro da janela (mede concentração das vendas). */
+  ritmoDiasComVenda: number;
+  /** 1ª venda dentro da janela (ISO), ou null. */
+  ritmoPrimeiraVendaIso: string | null;
+  /** Última venda dentro da janela (ISO), ou null. */
+  ritmoUltimaVendaIso: string | null;
 }
 
 export interface ControleEstoqueItemMetricas {
@@ -212,6 +226,14 @@ export function summarizeControleEstoqueItemMetricas(input: {
           Number.EPSILON) *
           100
       ) / 100,
+    // Defaults; o servidor sobrescreve com a janela de ritmo do resumoDisponibilidade.
+    ritmoDiasComEstoque: 0,
+    ritmoVendasPeriodo: 0,
+    ritmoInicioIso: null,
+    ritmoFimIso: null,
+    ritmoDiasComVenda: 0,
+    ritmoPrimeiraVendaIso: null,
+    ritmoUltimaVendaIso: null,
     ...historico,
   };
 }
