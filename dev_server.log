@@ -806,3 +806,101 @@
 ✅ Conectado em 177.92.78.250
 [DBG scope tem matriz?]: true | total filiais: 17
  POST /api/mcp?token=scarfme2026 200 in 19.7s (compile: 11ms, render: 19.7s)
+ GET /scarfme/curva-abc 200 in 243ms (compile: 76ms, render: 167ms)
+ GET /api/curva-abc-observacoes?company=scarfme 200 in 29ms (compile: 15ms, render: 14ms)
+ GET /api/compras-transito?company=scarfme&includeItems=1 200 in 71ms (compile: 8ms, render: 62ms)
+ GET /api/curva-abc-observacoes?company=scarfme 200 in 23ms (compile: 15ms, render: 7ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-05-31T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: null,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+ GET /api/curva-abc?company=scarfme&month=5&year=2026&start=2026-06-01&end=2026-06-04&compare=month&porCor=1 200 in 18.9s (compile: 27ms, render: 18.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 28.1s (compile: 5ms, render: 28.1s)
+ POST /api/controle-estoque/metricas-itens 200 in 29.7s (compile: 5ms, render: 29.7s)
+C:\NERD\multi_dashboard\.next\dev\server\chunks\node_modules_mssql_e736e4ed._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\.next\dev\server\chunks\node_modules_tedious_lib_f3d46736._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\.next\dev\server\chunks\node_modules_tedious_lib_connection_070c4ef5.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[getControleEstoqueMetricasItens] Falha ao carregar item do lote {
+  company: 'scarfme',
+  filial: null,
+  produto: '13.82.0209',
+  corProduto: '03',
+  error: Error [RequestError]: read ECONNRESET
+      at ignore-listed frames {
+    code: 'ECONNRESET',
+    originalError: Error: read ECONNRESET
+        at ignore-listed frames {
+      errno: -4077,
+      code: 'ECONNRESET',
+      syscall: 'read'
+    },
+    number: 'ECONNRESET',
+    lineNumber: undefined,
+    state: undefined,
+    class: undefined,
+    serverName: undefined,
+    procName: undefined,
+    precedingErrors: []
+  }
+}
+ POST /api/controle-estoque/metricas-itens 200 in 31.8s (compile: 5ms, render: 31.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 47s (compile: 5ms, render: 47s)
+ POST /api/controle-estoque/metricas-itens 200 in 17.6s (compile: 5ms, render: 17.6s)
+ POST /api/controle-estoque/metricas-itens 200 in 36.3s (compile: 5ms, render: 36.3s)
+ POST /api/controle-estoque/metricas-itens 200 in 21.4s (compile: 4ms, render: 21.4s)
+ POST /api/controle-estoque/metricas-itens 200 in 56s (compile: 8ms, render: 56s)
+C:\NERD\multi_dashboard\.next\dev\server\chunks\node_modules_33294fc2._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[getControleEstoqueMetricasItens] Falha ao carregar item do lote {
+  company: 'scarfme',
+  filial: null,
+  produto: '13.50.0097',
+  corProduto: '04',
+  error: Error: operation timed out for an unknown reason
+      at ignore-listed frames
+}
+ POST /api/controle-estoque/metricas-itens 200 in 60s (compile: 5ms, render: 60s)
+ POST /api/mcp?token=scarfme2026 200 in 1193ms (compile: 1082ms, render: 111ms)
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+✅ Conectado em 177.92.78.250
+ POST /api/mcp?token=scarfme2026 200 in 10.1s (compile: 240ms, render: 9.8s)
+ POST /api/mcp?token=scarfme2026 200 in 1387ms (compile: 1312ms, render: 75ms)
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+✅ Conectado em 177.92.78.250
+ POST /api/mcp?token=scarfme2026 200 in 4.3s (compile: 4ms, render: 4.3s)
+ POST /api/mcp?token=scarfme2026 200 in 1603ms (compile: 16ms, render: 1587ms)
