@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "@neondatabase/serverless": "^1.0.2",
     "@types/mssql": "^9.1.8",
     "@types/react-date-range": "^1.4.10",
@@ -19,6 +20,7 @@
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.7",
+    "mcp-handler": "^1.1.0",
     "mssql": "^12.1.0",
     "next": "^16.0.10",
     "react": "^19.2.3",
@@ -28,7 +30,8 @@
     "recharts": "^3.4.1",
     "server-only": "^0.0.1",
     "typescript": "^5",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^20",

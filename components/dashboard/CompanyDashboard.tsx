@@ -59,43 +59,6 @@ interface DashboardData {
   goals: Record<string, number>;
 }
 
-function buildMetricFromTotals(current: number, previous: number): MetricSummary {
-  if (previous === 0 && current === 0) {
-    return { currentValue: current, previousValue: previous, changePercentage: 0 };
-  }
-  const changePercentage =
-    previous === 0 ? null : Number((((current - previous) / previous) * 100).toFixed(1));
-  return { currentValue: current, previousValue: previous, changePercentage };
-}
-
-function computeFilialKpi(rows: FilialPerformance[]): MetricSummary {
-  const filtered = rows.filter(
-    (item) =>
-      item.currentRevenue > 0 &&
-      item.filialDisplayName !== "MATRIZ" &&
-      item.filialDisplayName !== "VAREJO",
-  );
-
-  const byName = new Map<string, { current: number; previous: number }>();
-  for (const item of filtered) {
-    const key = item.filialDisplayName;
-    const existing = byName.get(key);
-    if (!existing) {
-      byName.set(key, {
-        current: Number(item.currentRevenue ?? 0),
-        previous: Number(item.previousRevenue ?? 0),
-      });
-    } else {
-      existing.current += Number(item.currentRevenue ?? 0);
-      existing.previous += Number(item.previousRevenue ?? 0);
-    }
-  }
-
-  const totalCurrent = Array.from(byName.values()).reduce((s, v) => s + v.current, 0);
-  const totalPrevious = Array.from(byName.values()).reduce((s, v) => s + v.previous, 0);
-  return buildMetricFromTotals(totalCurrent, totalPrevious);
-}
-
 async function fetchDashboardData(
   company: string,
   range: DateRangeValue,
@@ -245,13 +208,8 @@ export default function CompanyDashboard({
 
   const summary: SalesSummary = useMemo(() => {
     if (!dashboardData) return DEFAULT_SUMMARY;
-    return {
-      ...dashboardData.summary,
-      totalRevenue: selectedFilial
-        ? dashboardData.summary.totalRevenue
-        : computeFilialKpi(dashboardData.filialPerformance),
-    };
-  }, [dashboardData, selectedFilial]);
+    return dashboardData.summary;
+  }, [dashboardData]);
 
   const currentGoal = useMemo(() => {
     if (!dashboardData) return 0;
