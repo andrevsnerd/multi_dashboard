@@ -10,28 +10,21 @@ Não precisa saber nada técnico. Só ler os exemplos abaixo e adaptar.
 
 ## 1. Como conectar (uma vez só)
 
-Você precisa de **dois dados** (peça para quem administra):
-- **Link (URL):** `https://SEU-APP.vercel.app/api/mcp`
-- **Token (senha):** algo como `mcp_94e2...` (uma chave secreta)
+Você precisa de **um link único** (já tem tudo incluído):
 
-### Opção A — Claude (app de computador ou site claude.ai) — *recomendado*
+### Claude (app de computador ou site claude.ai) — *recomendado*
 1. Abra o Claude → **Settings (Configurações)** → **Connectors (Conectores)**.
 2. Clique em **Add custom connector** (Adicionar conector).
-3. No campo de URL, cole o link **com o token no final**, assim:
+3. Cole este link no campo de URL:
    ```
-   https://SEU-APP.vercel.app/api/mcp?token=COLE_O_TOKEN_AQUI
+   https://multi-dashboard.vercel.app/api/mcp?token=scarfme2026
    ```
 4. Salve. Pronto — vai aparecer "multi-dashboard" com as ferramentas disponíveis.
 
-> O token no final do link é o que libera o acesso. **Trate esse link como senha.**
+> **Esse link é a sua senha.** Não compartilhe publicamente. Só pra donos/diretoria.
 
-### Opção B — Claude Code (para quem usa o terminal)
-```bash
-claude mcp add --transport http multi-dashboard https://SEU-APP.vercel.app/api/mcp \
-  --header "Authorization: Bearer COLE_O_TOKEN_AQUI"
-```
-
-Depois de conectar, é só conversar.
+Depois de conectar, é só conversar com o Claude normalmente. Ele vai usar as
+ferramentas automaticamente quando entender que precisa de dados.
 
 ---
 
@@ -155,16 +148,26 @@ Você pode pedir coisas mais ricas e ele junta as ferramentas sozinho:
 
 ---
 
-## Apêndice — Para o administrador (deploy)
+## Apêndice — Deploy checklist
 
-1. **Token:** gere um valor forte e privado (ex.: `node -e "console.log('mcp_'+require('crypto').randomBytes(24).toString('hex'))"`).
-2. **Local (dev):** está em `.env.local` como `MCP_API_TOKEN=...`.
-3. **Produção (Vercel):** Project → Settings → Environment Variables → adicione
-   `MCP_API_TOKEN` com o mesmo valor (Production). As variáveis do banco/proxy
-   (`PROXY_URL`, `PROXY_SECRET`, etc.) já existem e são reaproveitadas.
-4. **Deploy:** `git push` (ou redeploy no painel da Vercel) para publicar a rota `/api/mcp`.
-5. **Conexão:** entregue ao time o link `https://SEU-APP.vercel.app/api/mcp?token=SEU_TOKEN`
-   (Claude.ai/Desktop) ou o comando `claude mcp add ...` com header (Claude Code).
-6. **Rotacionar token:** troque `MCP_API_TOKEN` (env local + Vercel) e redistribua o link.
+Código e configurações:
+- ✅ Rota `/api/mcp` → [app/api/[transport]/route.ts](../app/api/[transport]/route.ts)
+- ✅ 19 tools registradas → [lib/mcp/registry.ts](../lib/mcp/registry.ts)
+- ✅ Token no `.env.local` → `MCP_API_TOKEN=scarfme2026`
+- ✅ Suporte a `?token=` na URL (sem OAuth, funciona no Claude.ai/Desktop)
+
+Para publicar (uma vez só):
+1. **Vercel → Environment Variables → adicione `MCP_API_TOKEN=scarfme2026`** (selecionar "Production").
+   As variáveis do banco (`PROXY_URL`, `PROXY_SECRET`) já existem e são reaproveitadas.
+2. **`git push`** (ou redeploy no painel da Vercel).
+3. **Link final para compartilhar:**
+   ```
+   https://multi-dashboard.vercel.app/api/mcp?token=scarfme2026
+   ```
+
+Para rotacionar o token depois (ex.: se vazar):
+1. Gere um novo: `node -e "console.log('scarfme_' + require('crypto').randomBytes(16).toString('hex'))"`
+2. Atualize em `.env.local` e Vercel (`MCP_API_TOKEN`).
+3. Redistribua o novo link.
 
 Detalhes técnicos das tools: ver [mcp-server.md](mcp-server.md).
