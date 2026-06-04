@@ -170,14 +170,11 @@ export async function fetchProductStock(
       positiveCount: 0,
     };
     
+    // Negativos NUNCA são contabilizados: estoque = soma apenas dos saldos positivos.
+    // SKU só com saldo negativo → 0 (segue valendo como ruptura pela regra <= 0).
     const positiveStock = Number(row.positiveStock ?? 0);
-    const negativeStock = Number(row.negativeStock ?? 0);
-    const positiveCount = Number(row.positiveCount ?? 0);
-    
-    // Se houver estoque positivo, usar apenas a soma dos positivos
-    // Caso contrário, usar a soma dos negativos
-    const finalStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
-    
+    const finalStock = Math.max(0, positiveStock);
+
     return finalStock;
   });
 }
@@ -248,10 +245,8 @@ export async function fetchMultipleProductsStock(
     // Somar apenas filiais com estoque positivo (nunca somar negativos)
     const stockMap = new Map<string, number>();
     result.recordset.forEach((row) => {
-      const positiveStock = Number(row.positiveStock ?? 0);
-      const negativeStock = Number(row.negativeStock ?? 0);
-      const positiveCount = Number(row.positiveCount ?? 0);
-      const filialStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
+      // Negativos NUNCA contam: soma só os saldos positivos.
+      const filialStock = Math.max(0, Number(row.positiveStock ?? 0));
       if (filialStock <= 0) return;
 
       const dbKey = String(row.productId ?? '').trim();
@@ -394,10 +389,8 @@ export async function fetchMultipleProductsStockByColor(
 
     // Processar resultados do lote: somar apenas filiais com estoque positivo (nunca somar negativos)
     batchResult.forEach((row) => {
-      const positiveStock = Number(row.positiveStock ?? 0);
-      const negativeStock = Number(row.negativeStock ?? 0);
-      const positiveCount = Number(row.positiveCount ?? 0);
-      const filialStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
+      // Negativos NUNCA contam: soma só os saldos positivos.
+      const filialStock = Math.max(0, Number(row.positiveStock ?? 0));
       if (filialStock <= 0) return;
 
       const productId = String(row.productId ?? '').trim();

@@ -677,9 +677,8 @@ export async function fetchStockByFilial({
       const negativeStock = Number(row.negativeStock ?? 0);
       const positiveCount = Number(row.positiveCount ?? 0);
       
-      // Se houver estoque positivo, usar apenas a soma dos positivos
-      // Caso contrário, usar a soma dos positivos + negativos
-      const estoqueFilial = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
+      // Negativos NUNCA são contabilizados: soma só os saldos positivos.
+      const estoqueFilial = Math.max(0, positiveStock);
       
       // Normalizar código do produto para garantir consistência
       const produtoNormalizado = (row.produto || '').trim().toUpperCase();
@@ -917,8 +916,8 @@ export async function fetchStockByFilial({
       const negativeStock = Number(row.negativeStock ?? 0);
       const positiveCount = Number(row.positiveCount ?? 0);
       
-      // Aplicar a mesma lógica do top produtos
-      const finalStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
+      // Negativos NUNCA são contabilizados: soma só os saldos positivos.
+      const finalStock = Math.max(0, positiveStock);
       
       // Usar mapeamento de cores (prioridade) ou fallback para cor do banco
       const corNormalizada = normalizeColor(

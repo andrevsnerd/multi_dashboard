@@ -199,14 +199,21 @@ export async function GET(request: Request) {
           company.activeFilials?.[canonical] ??
           members.map((member) => company.activeFilials?.[member]).find(Boolean) ??
           canonical;
-        if (members.length > 1 && normalizeFilialKey(row.filial) !== normalizeFilialKey(activeFilial)) {
-          return;
-        }
         const k = produtoAggKey(row.produto, row.cor, porCor);
         if (!estoqueMap.has(k)) estoqueMap.set(k, []);
-        estoqueMap.get(k)!.push({
-          filial: row.filial,
-          displayName: company.filialDisplayNames?.[row.filial] ?? row.filial,
+        const entryFilial = members.length > 1 ? activeFilial : row.filial;
+        const entryDisplayName = company.filialDisplayNames?.[entryFilial]
+          ?? company.filialDisplayNames?.[row.filial]
+          ?? entryFilial;
+        const entries = estoqueMap.get(k)!;
+        const existing = entries.find((entry) => normalizeFilialKey(entry.filial) === normalizeFilialKey(entryFilial));
+        if (existing) {
+          existing.qtde += row.estoque;
+          return;
+        }
+        entries.push({
+          filial: entryFilial,
+          displayName: entryDisplayName,
           qtde: row.estoque,
           activeFilialName: members.length > 1 ? activeFilial : undefined,
         });

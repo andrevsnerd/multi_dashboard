@@ -541,9 +541,8 @@ export async function fetchControleTransferencias({
       const finalMap = new Map<string, number>();
 
       filialMap.forEach((components, filial) => {
-        const stock = components.positiveCount > 0
-          ? components.positiveStock
-          : (components.positiveStock + components.negativeStock);
+        // Negativos NUNCA são contabilizados: soma só os saldos positivos.
+        const stock = Math.max(0, components.positiveStock);
         finalMap.set(filial, stock);
       });
 

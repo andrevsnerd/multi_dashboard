@@ -81,6 +81,20 @@ function normalizeUniqueUpper(values: string[] | null | undefined): string[] {
   );
 }
 
+/**
+ * Normaliza o código de cor para uso como CHAVE de agregação, tolerando os dois
+ * formatos que chegam das fontes (varejo manda '06', e-commerce manda '6'/' 06').
+ * Espelha o TRY_CONVERT(INT) do SQL: se for numérico, remove zeros à esquerda;
+ * senão, só faz trim/upper. Sem isso, a mesma cor vira duas linhas no merge
+ * varejo+ecommerce. Ver memória [[cor-produto-formato-duas-fontes]].
+ */
+function normalizeCorKey(cor: string | null | undefined): string {
+  const trimmed = String(cor ?? '').trim();
+  if (trimmed === '') return '';
+  if (/^\d+$/.test(trimmed)) return String(parseInt(trimmed, 10));
+  return trimmed.toUpperCase();
+}
+
 function buildInFilter(
   request: sql.Request | RequestLike,
   values: string[] | null | undefined,
@@ -504,17 +518,22 @@ export async function fetchProductsWithDetails({
       fetchProductsWithDetailsEcommerce({ company, range, filial: null, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm, acimaDoTicket, filterByRegistrationDate }),
     ]);
 
-    // Agregar produtos por productId (e cor se groupByColor estiver ativo)
+    // Agregar produtos por productId (e cor se groupByColor estiver ativo).
+    // IMPORTANTE: varejo e e-commerce vêm de fontes diferentes — o varejo manda
+    // PRODUTO como CHAR com padding ('07.A1.00B3  ') e a cor como '06', enquanto o
+    // e-commerce manda limpos ('07.A1.00B3', '6'). Sem normalizar AMBOS (trim no id
+    // + normalizeCorKey na cor), a mesma variação vira duas linhas. Ver memória
+    // [[cor-produto-formato-duas-fontes]].
     const productMap = new Map<string, ProductDetail>();
-    const getKey = (product: ProductDetail) => 
-      groupByColor && product.corProduto 
-        ? `${product.productId}-${product.corProduto}` 
-        : product.productId;
+    const getKey = (product: ProductDetail) =>
+      groupByColor && product.corProduto
+        ? `${String(product.productId ?? '').trim()}-${normalizeCorKey(product.corProduto)}`
+        : String(product.productId ?? '').trim();
 
     // Adicionar produtos de vendas normais
     salesProducts.forEach((product) => {
       const key = getKey(product);
-      productMap.set(key, { ...product });
+      productMap.set(key, { ...product, productId: String(product.productId ?? '').trim() });
     });
 
     // Agregar produtos de ecommerce
@@ -534,7 +553,7 @@ export async function fetchProductsWithDetails({
           existing.grade = product.grade;
         }
       } else {
-        productMap.set(key, { ...product });
+        productMap.set(key, { ...product, productId: String(product.productId ?? '').trim() });
       }
     });
 

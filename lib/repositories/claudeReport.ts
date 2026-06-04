@@ -893,11 +893,12 @@ async function queryCurrentStock(
 
   const stockMap = new Map<string, number>();
   rows.forEach((row) => {
+    // Negativos NUNCA são contabilizados na soma de estoque. POSITIVE_STOCK já é a
+    // soma APENAS dos saldos positivos por filial — idêntico ao SUM(MAX(0, estoque))
+    // por filial da página /curva-abc. Saldos negativos (rupturas) viram 0, e o SKU
+    // segue marcado como ruptura pela regra estoque <= 0.
     const positiveStock = Number(row.POSITIVE_STOCK ?? 0);
-    const negativeStock = Number(row.NEGATIVE_STOCK ?? 0);
-    const positiveCount = Number(row.POSITIVE_COUNT ?? 0);
-    const finalStock = positiveCount > 0 ? positiveStock : positiveStock + negativeStock;
-    stockMap.set(buildSkuKey(cleanText(row.PRODUTO), cleanText(row.COR)), Math.round(finalStock));
+    stockMap.set(buildSkuKey(cleanText(row.PRODUTO), cleanText(row.COR)), Math.round(positiveStock));
   });
   return stockMap;
 }
@@ -1438,6 +1439,19 @@ export async function fetchClaudeReport({
   const previousRange = previousEquivalentRange(normalizedRange);
   const endInclusive = new Date(normalizedRange.end.getTime() - 24 * 60 * 60 * 1000);
   const scope = resolveScope(filial ?? null, company);
+
+  // O estoque da curva ABC deve incluir o DEPÓSITO/MATRIZ. A matriz é excluída das
+  // VENDAS (via REPORT_EXCLUDED_FILIAIS — ela não vende, é depósito), mas guarda
+  // inventário real que precisa entrar no estoque/rupturas — espelha a página
+  // /curva-abc, que soma a matriz no estoque de rede. Só na rede/varejo: ao filtrar
+  // uma loja específica ou o e-commerce, a matriz não entra.
+  const canonicalSelecionado = filial ? resolveCanonicalFilial(filial, company, scope.maps) : null;
+  const incluirMatrizNoEstoque =
+    canonicalSelecionado === null || canonicalSelecionado === VAREJO_VALUE;
+  const matrizStockMembers = incluirMatrizNoEstoque
+    ? company.filialFilters.sales.filter((f) => REPORT_EXCLUDED_FILIAIS.has(f))
+    : [];
+
   const selectedColecoes = uniqueValues(colecoes);
   const selectedSubgrupos = uniqueValues(subgrupos);
   const selectedGrades = uniqueValues(grades);
@@ -1464,7 +1478,7 @@ export async function fetchClaudeReport({
     hasTypeFilters
       ? querySalesRows(normalizedRange, scope.posMembers, scope.ecommerceMembers, { colecoes: selectedColecoes }, company, scope.maps)
       : Promise.resolve([] as SalesRow[]),
-    queryCurrentStock([...scope.posMembers, ...scope.ecommerceMembers], company),
+    queryCurrentStock([...scope.posMembers, ...scope.ecommerceMembers, ...matrizStockMembers], company),
     collectionOptionsPromise,
   ]);
 

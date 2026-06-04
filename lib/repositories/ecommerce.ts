@@ -582,7 +582,7 @@ export async function fetchEcommerceSummary({
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         ${filialFilter}
@@ -600,7 +600,7 @@ export async function fetchEcommerceSummary({
       LEFT JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         ${filialFilter}
@@ -620,7 +620,7 @@ export async function fetchEcommerceSummary({
         AND f.NF_SAIDA = fp.NF_SAIDA 
         AND f.SERIE_NF = fp.SERIE_NF
       WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         AND LTRIM(RTRIM(f.FILIAL)) = LTRIM(RTRIM(@ecommerceFilial))
@@ -745,7 +745,7 @@ export async function fetchEcommerceSummary({
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         ${filialFilter}
@@ -797,7 +797,7 @@ export async function fetchEcommerceSummary({
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         ${filialFilter}
@@ -843,7 +843,7 @@ export async function fetchEcommerceSummary({
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         ${filialFilter}
@@ -892,7 +892,7 @@ export async function fetchEcommerceSummary({
         SUM(ISNULL(f.VALOR_TOTAL, 0)) AS valorTotalFaturas
       FROM FATURAMENTO f WITH (NOLOCK)
       WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         ${filialFilter}
@@ -933,7 +933,7 @@ export async function fetchEcommerceSummary({
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         ${filialFilter}
@@ -983,7 +983,7 @@ export async function fetchEcommerceSummary({
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         ${filialFilter}
@@ -1141,7 +1141,7 @@ export async function fetchTopCategoriesEcommerce({
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO
       WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         ${filialFilter}
@@ -1184,7 +1184,7 @@ export async function fetchDailyEcommerceRevenue({
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         ${filialFilter}

@@ -263,10 +263,9 @@ function mergeSalesDailyRows(a: StockMovementRow[], b: StockMovementRow[]): Stoc
 }
 
 function getDisplayedStock(row: StockAggregationRow): number {
+  // Negativos NUNCA são contabilizados: estoque = soma só dos saldos positivos.
   const positiveStock = Number(row.positiveStock ?? 0);
-  const negativeStock = Number(row.negativeStock ?? 0);
-  const positiveCount = Number(row.positiveCount ?? 0);
-  return positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
+  return Math.max(0, positiveStock);
 }
 
 function toNonNegativeStock(value: number): number {
@@ -625,7 +624,7 @@ async function fetchProductDetailEcommerce({
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       WHERE fp.PRODUTO = @productId
         AND CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         AND fp.QTDE > 0
@@ -643,7 +642,7 @@ async function fetchProductDetailEcommerce({
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       WHERE fp.PRODUTO = @productId
         AND CAST(f.EMISSAO AS DATE) >= CAST(@previousStartDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@previousEndDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@previousEndDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         AND fp.QTDE > 0
@@ -1225,7 +1224,7 @@ async function fetchProductStockByFilialEcommerce({
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       WHERE fp.PRODUTO = @productId
         AND CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         AND fp.QTDE > 0
@@ -1244,7 +1243,7 @@ async function fetchProductStockByFilialEcommerce({
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       WHERE fp.PRODUTO = @productId
         AND CAST(f.EMISSAO AS DATE) >= CAST(@previousStartDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@previousEndDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@previousEndDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         AND fp.QTDE > 0
@@ -1682,7 +1681,7 @@ async function fetchProductSaleHistoryEcommerce({
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON fp.COR_PRODUTO = c.COR
       WHERE fp.PRODUTO = @productId
         AND CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         AND fp.QTDE > 0
@@ -1931,7 +1930,7 @@ async function fetchProductSaleHistoryComparisonEcommerce({
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
       WHERE fp.PRODUTO = @productId
         AND CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-        AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         AND fp.QTDE > 0

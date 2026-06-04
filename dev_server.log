@@ -1,0 +1,808 @@
+
+> multi-dashboard@0.1.0 dev
+> next dev
+
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+   ▲ Next.js 16.0.10 (Turbopack)
+   - Local:         http://localhost:3000
+   - Network:       http://192.168.0.17:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1129ms
+ GET /scarfme/curva-abc 200 in 3.7s (compile: 3.5s, render: 198ms)
+ GET /api/curva-abc-observacoes?company=scarfme 200 in 613ms (compile: 594ms, render: 19ms)
+ GET /api/curva-abc-observacoes?company=scarfme 200 in 594ms (compile: 587ms, render: 6ms)
+ GET /api/compras-transito?company=scarfme&includeItems=1 200 in 683ms (compile: 668ms, render: 14ms)
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-05-31T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: null,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-05-31T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: null,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+ POST /api/mcp?token=scarfme2026 200 in 2.3s (compile: 2.2s, render: 33ms)
+ GET /api/curva-abc?company=scarfme&month=5&year=2026&start=2026-06-01&end=2026-06-04&compare=month&porCor=1 200 in 6.3s (compile: 1255ms, render: 5.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 15.2s (compile: 196ms, render: 15.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 17.1s (compile: 3ms, render: 17.1s)
+ POST /api/mcp?token=scarfme2026 200 in 26.6s (compile: 11ms, render: 26.6s)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-05-31T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: null,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+ GET /api/curva-abc?company=scarfme&start=2026-06-01&end=2026-06-04&porCor=1 200 in 4.2s (compile: 2ms, render: 4.2s)
+ POST /api/controle-estoque/metricas-itens 200 in 16.4s (compile: 3ms, render: 16.4s)
+ POST /api/controle-estoque/metricas-itens 200 in 17.1s (compile: 1843µs, render: 17.1s)
+ POST /api/controle-estoque/metricas-itens 200 in 18.3s (compile: 2ms, render: 18.3s)
+ POST /api/controle-estoque/metricas-itens 200 in 15.8s (compile: 2ms, render: 15.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 16.7s (compile: 2ms, render: 16.7s)
+ POST /api/mcp?token=scarfme2026 200 in 24.9s (compile: 10ms, render: 24.9s)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-05-31T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: null,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+ GET /api/curva-abc?company=scarfme&start=2026-06-01&end=2026-06-04&porCor=1 200 in 6.0s (compile: 1823µs, render: 6.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 16.1s (compile: 3ms, render: 16.1s)
+ POST /api/controle-estoque/metricas-itens 200 in 8.0s (compile: 2ms, render: 7.9s)
+ POST /api/mcp?token=scarfme2026 200 in 24ms (compile: 10ms, render: 14ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2025-05-31T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: null,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+ GET /api/curva-abc?company=scarfme&start=2025-06-01&end=2026-06-04&porCor=1 200 in 60s (compile: 1657µs, render: 60s)
+ GET /scarfme/curva-abc 200 in 106ms (compile: 19ms, render: 87ms)
+ GET /api/curva-abc-observacoes?company=scarfme 200 in 13ms (compile: 9ms, render: 4ms)
+ GET /api/compras-transito?company=scarfme&includeItems=1 200 in 23ms (compile: 5ms, render: 18ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+ GET /api/curva-abc-observacoes?company=scarfme 200 in 8ms (compile: 4ms, render: 5ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-05-31T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: null,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+ GET /api/curva-abc?company=scarfme&month=5&year=2026&start=2026-06-01&end=2026-06-04&compare=month&porCor=1 200 in 115ms (compile: 7ms, render: 108ms)
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-05-31T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: null,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+ GET /api/curva-abc?company=scarfme&month=5&year=2026&start=2026-06-01&end=2026-06-04&compare=month&porCor=1 200 in 3.8s (compile: 7ms, render: 3.8s)
+ POST /api/controle-estoque/metricas-itens 200 in 8ms (compile: 2ms, render: 6ms)
+ POST /api/controle-estoque/metricas-itens 200 in 9ms (compile: 2ms, render: 7ms)
+ POST /api/controle-estoque/metricas-itens 200 in 8ms (compile: 1886µs, render: 6ms)
+ POST /api/controle-estoque/metricas-itens 200 in 12ms (compile: 3ms, render: 8ms)
+ POST /api/controle-estoque/metricas-itens 200 in 8ms (compile: 2ms, render: 6ms)
+ POST /api/controle-estoque/metricas-itens 200 in 8ms (compile: 1832µs, render: 6ms)
+ POST /api/controle-estoque/metricas-itens 200 in 8ms (compile: 1834µs, render: 6ms)
+ POST /api/controle-estoque/metricas-itens 200 in 10ms (compile: 1925µs, render: 8ms)
+ POST /api/controle-estoque/metricas-itens 200 in 10ms (compile: 2ms, render: 7ms)
+ GET /scarfme/produto-detalhado?productId=13.71.0696&name=BANDANA+GLORIOSA+C+04%2F26&colors=06 200 in 2.1s (compile: 2.1s, render: 38ms)
+ GET /api/product-detail?productId=13.71.0696&company=scarfme&start=2026-06-01T03%3A00%3A00.000Z&end=2026-06-04T03%3A00%3A00.000Z&includeStockProgress=0&colors=06 200 in 557ms (compile: 352ms, render: 204ms)
+ POST /api/product-detail/stock-progress 200 in 277ms (compile: 209ms, render: 67ms)
+ GET /api/curva-abc-observacoes?company=scarfme 200 in 12ms (compile: 4ms, render: 8ms)
+ GET /api/curva-abc-observacoes?company=scarfme 200 in 6ms (compile: 3ms, render: 3ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-05-31T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: null,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+ GET /api/curva-abc?company=scarfme&month=5&year=2026&start=2026-06-01&end=2026-06-04&compare=month&porCor=1 200 in 3.6s (compile: 7ms, render: 3.6s)
+ POST /api/controle-estoque/metricas-itens 200 in 8ms (compile: 2ms, render: 5ms)
+ POST /api/controle-estoque/metricas-itens 200 in 9ms (compile: 3ms, render: 7ms)
+ POST /api/controle-estoque/metricas-itens 200 in 13ms (compile: 7ms, render: 6ms)
+ POST /api/controle-estoque/metricas-itens 200 in 8ms (compile: 1823µs, render: 6ms)
+ POST /api/controle-estoque/metricas-itens 200 in 9ms (compile: 2ms, render: 7ms)
+ GET /scarfme/produto-detalhado?productId=07.A1.00B3&name=PASHMINA+LISA+TOQUE+DE+LA+06%2F24&colors=06 200 in 43ms (compile: 12ms, render: 31ms)
+ GET /api/product-detail?productId=07.A1.00B3&company=scarfme&start=2026-06-01T03%3A00%3A00.000Z&end=2026-06-04T03%3A00%3A00.000Z&includeStockProgress=0&colors=06 200 in 305ms (compile: 3ms, render: 302ms)
+ POST /api/product-detail/stock-progress 200 in 73ms (compile: 6ms, render: 67ms)
+ GET /api/curva-abc-observacoes?company=scarfme 200 in 11ms (compile: 4ms, render: 7ms)
+ GET /api/curva-abc-observacoes?company=scarfme 200 in 5ms (compile: 2ms, render: 3ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-05-31T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: null,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+ GET /api/curva-abc?company=scarfme&month=5&year=2026&start=2026-06-01&end=2026-06-04&compare=month&porCor=1 200 in 3.4s (compile: 6ms, render: 3.4s)
+ POST /api/controle-estoque/metricas-itens 200 in 8ms (compile: 2ms, render: 6ms)
+ POST /api/controle-estoque/metricas-itens 200 in 7ms (compile: 2ms, render: 5ms)
+ POST /api/controle-estoque/metricas-itens 200 in 7ms (compile: 2ms, render: 5ms)
+ POST /api/controle-estoque/metricas-itens 200 in 8ms (compile: 2ms, render: 5ms)
+ POST /api/controle-estoque/metricas-itens 200 in 8ms (compile: 2ms, render: 6ms)
+ POST /api/controle-estoque/metricas-itens 200 in 7ms (compile: 1923µs, render: 5ms)
+ POST /api/controle-estoque/metricas-itens 200 in 7ms (compile: 1899µs, render: 5ms)
+ POST /api/controle-estoque/metricas-itens 200 in 7ms (compile: 1843µs, render: 6ms)
+ POST /api/controle-estoque/metricas-itens 200 in 6ms (compile: 1865µs, render: 4ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+ GET /scarfme/curva-abc 200 in 70ms (compile: 17ms, render: 53ms)
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-05-31T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: null,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+ GET /api/product-detail?company=scarfme&start=2026-06-01&end=2026-06-04&productId=07.A1.00B3 200 in 660ms (compile: 4ms, render: 656ms)
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+ GET /api/products?company=scarfme&start=2026-06-01&end=2026-06-04&groupByColor=true&produtoId=07.A1.00B3 200 in 1324ms (compile: 297ms, render: 1027ms)
+ GET /api/curva-abc?company=scarfme&start=2026-06-01&end=2026-06-04&porCor=1 200 in 3.6s (compile: 9ms, render: 3.6s)
+ GET /api/product-detail?company=scarfme&start=2026-06-01&end=2026-06-04&productId=07.A1.00B3&colors=06 200 in 323ms (compile: 3ms, render: 320ms)
+ GET /api/product-detail?company=scarfme&start=2026-06-01&end=2026-06-03&productId=07.A1.00B3&colors=06 200 in 423ms (compile: 12ms, render: 411ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-06-02T00:00:00.000Z',
+  endDate: '2026-06-04T00:00:00.000Z',
+  linha: undefined,
+  linhas: null,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+ GET /api/products?company=scarfme&start=2026-06-03&end=2026-06-03&groupByColor=true&produtoId=07.A1.00B3 200 in 1053ms (compile: 2ms, render: 1051ms)
+ GET /api/curva-abc?company=scarfme&start=2026-06-03&end=2026-06-03&porCor=1 200 in 3.3s (compile: 1997µs, render: 3.3s)
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+ GET /api/product-detail?company=scarfme&start=2026-06-01&end=2026-06-03&productId=07.A1.00B3&colors=06 200 in 1130ms (compile: 314ms, render: 816ms)
+ GET /api/product-detail?company=scarfme&start=2026-06-01&end=2026-06-04&productId=07.A1.00B3&colors=06 200 in 1156ms (compile: 332ms, render: 824ms)
+ GET /scarfme/curva-abc 200 in 59ms (compile: 18ms, render: 42ms)
+ GET /api/curva-abc-observacoes?company=scarfme 200 in 26ms (compile: 16ms, render: 9ms)
+ GET /api/curva-abc-observacoes?company=scarfme 200 in 8ms (compile: 4ms, render: 4ms)
+ GET /api/compras-transito?company=scarfme&includeItems=1 200 in 61ms (compile: 8ms, render: 53ms)
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+✅ Conectado em 177.92.78.250
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-05-31T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: null,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+ GET /api/curva-abc?company=scarfme&month=5&year=2026&start=2026-06-01&end=2026-06-04&compare=month&porCor=1 200 in 4.4s (compile: 276ms, render: 4.1s)
+ GET /scarfme/produto-detalhado?productId=07.A1.00B3&name=PASHMINA+LISA+TOQUE+DE+LA+06%2F24&colors=06 200 in 33ms (compile: 12ms, render: 21ms)
+ GET /api/product-detail?productId=07.A1.00B3&company=scarfme&start=2026-06-01T03%3A00%3A00.000Z&end=2026-06-04T03%3A00%3A00.000Z&includeStockProgress=0&colors=06 200 in 263ms (compile: 3ms, render: 260ms)
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+✅ Conectado em 177.92.78.250
+ POST /api/product-detail/stock-progress 200 in 712ms (compile: 204ms, render: 509ms)
+ POST /api/controle-estoque/metricas-itens 200 in 6.3s (compile: 2ms, render: 6.3s)
+ GET /scarfme/produto-detalhado?productId=07.A1.00B3&name=PASHMINA+LISA+TOQUE+DE+LA+06%2F24&colors=06 200 in 141ms (compile: 12ms, render: 129ms)
+ GET /api/product-detail?productId=07.A1.00B3&company=scarfme&start=2026-06-01T03%3A00%3A00.000Z&end=2026-06-04T03%3A00%3A00.000Z&includeStockProgress=0&colors=06 200 in 574ms (compile: 5ms, render: 570ms)
+ POST /api/product-detail/stock-progress 200 in 85ms (compile: 3ms, render: 82ms)
+ GET /scarfme/curva-abc 200 in 36ms (compile: 15ms, render: 22ms)
+ GET /api/curva-abc-observacoes?company=scarfme 200 in 10ms (compile: 4ms, render: 6ms)
+ GET /api/compras-transito?company=scarfme&includeItems=1 200 in 35ms (compile: 5ms, render: 30ms)
+ GET /api/curva-abc-observacoes?company=scarfme 200 in 8ms (compile: 4ms, render: 4ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-05-31T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: null,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+ GET /api/curva-abc?company=scarfme&month=5&year=2026&start=2026-06-01&end=2026-06-04&compare=month&porCor=1 200 in 5.3s (compile: 9ms, render: 5.3s)
+ POST /api/controle-estoque/metricas-itens 200 in 1897ms (compile: 4ms, render: 1893ms)
+ POST /api/controle-estoque/metricas-itens 200 in 15.0s (compile: 4ms, render: 15.0s)
+ POST /api/controle-estoque/metricas-itens 200 in 14.7s (compile: 3ms, render: 14.7s)
+ POST /api/controle-estoque/metricas-itens 200 in 15.4s (compile: 4ms, render: 15.4s)
+ POST /api/controle-estoque/metricas-itens 200 in 16.4s (compile: 2ms, render: 16.4s)
+ POST /api/controle-estoque/metricas-itens 200 in 15.4s (compile: 2ms, render: 15.4s)
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+✅ Conectado em 177.92.78.250
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-05-31T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: null,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+ POST /api/controle-estoque/metricas-itens 200 in 15.7s (compile: 3ms, render: 15.7s)
+ GET /api/curva-abc?company=scarfme&start=2026-06-01&end=2026-06-04&porCor=1 200 in 8.7s (compile: 319ms, render: 8.4s)
+ POST /api/controle-estoque/metricas-itens 200 in 15.3s (compile: 2ms, render: 15.3s)
+ GET /scarfme/curva-abc 200 in 80ms (compile: 16ms, render: 64ms)
+ GET /api/compras-transito?company=scarfme&includeItems=1 200 in 19ms (compile: 4ms, render: 15ms)
+ GET /api/curva-abc-observacoes?company=scarfme 200 in 9ms (compile: 4ms, render: 5ms)
+ GET /api/curva-abc-observacoes?company=scarfme 200 in 17ms (compile: 13ms, render: 5ms)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-05-31T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: null,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+ GET /api/curva-abc?company=scarfme&month=5&year=2026&start=2026-06-01&end=2026-06-04&compare=month&porCor=1 200 in 3.4s (compile: 4ms, render: 3.4s)
+ POST /api/controle-estoque/metricas-itens 200 in 7ms (compile: 1739µs, render: 5ms)
+ POST /api/controle-estoque/metricas-itens 200 in 9ms (compile: 3ms, render: 7ms)
+ POST /api/controle-estoque/metricas-itens 200 in 8ms (compile: 2ms, render: 5ms)
+ POST /api/controle-estoque/metricas-itens 200 in 10ms (compile: 2ms, render: 8ms)
+ POST /api/controle-estoque/metricas-itens 200 in 10ms (compile: 1907µs, render: 8ms)
+ POST /api/controle-estoque/metricas-itens 200 in 10ms (compile: 3ms, render: 7ms)
+ POST /api/controle-estoque/metricas-itens 200 in 10ms (compile: 3ms, render: 7ms)
+ POST /api/controle-estoque/metricas-itens 200 in 8ms (compile: 1940µs, render: 6ms)
+ POST /api/controle-estoque/metricas-itens 200 in 9.1s (compile: 1883µs, render: 9.1s)
+[goals-storage] Verificando Redis: { hasUrl: false, hasToken: false, usingRedis: false, envKeys: [] }
+[goals-storage] Usando fallback para arquivo local
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-05-31T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: null,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+ POST /api/mcp?token=scarfme2026 406 in 654ms (compile: 623ms, render: 31ms)
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+ GET /api/curva-abc?company=scarfme&start=2026-06-01&end=2026-06-04&porCor=1 200 in 3.9s (compile: 3ms, render: 3.9s)
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+✅ Conectado em 177.92.78.250
+[DBG scope tem matriz?]: true | total filiais: 17
+ POST /api/mcp?token=scarfme2026 200 in 19.7s (compile: 11ms, render: 19.7s)

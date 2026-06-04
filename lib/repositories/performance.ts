@@ -963,7 +963,7 @@ export async function fetchProdutoEstoquePorFilial(
         const positiveStock = Number(r.POSITIVE_STOCK ?? 0);
         const negativeStock = Number(r.NEGATIVE_STOCK ?? 0);
         const positiveCount = Number(r.POSITIVE_COUNT ?? 0);
-        const finalStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
+        const finalStock = Math.max(0, positiveStock); // negativos nunca contam
 
         return {
           produto: r.PRODUTO?.trim() ?? '',
@@ -1065,7 +1065,7 @@ export async function fetchProdutoEstoqueDetalhadoPorFilial(
         const positiveStock = Number(row.POSITIVE_STOCK ?? 0);
         const negativeStock = Number(row.NEGATIVE_STOCK ?? 0);
         const positiveCount = Number(row.POSITIVE_COUNT ?? 0);
-        const finalStock = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
+        const finalStock = Math.max(0, positiveStock); // negativos nunca contam
 
         return {
           produto: row.PRODUTO?.trim() ?? '',

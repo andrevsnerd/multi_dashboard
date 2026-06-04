@@ -6389,7 +6389,7 @@ export async function fetchEstoqueProdutoPorFilial({
       const positiveStock = Number(r.positiveStock ?? 0);
       const negativeStock = Number(r.negativeStock ?? 0);
       const positiveCount = Number(r.positiveCount ?? 0);
-      const estoque = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
+      const estoque = Math.max(0, positiveStock); // negativos nunca contam
       return { filial: r.filial, estoque: Math.round(estoque) };
     });
   });
@@ -6988,7 +6988,7 @@ export async function fetchVendasProdutoPorFilial({
       const positiveStock = Number(row.positiveStock ?? 0);
       const negativeStock = Number(row.negativeStock ?? 0);
       const positiveCount = Number(row.positiveCount ?? 0);
-      const estoqueAtual = positiveCount > 0 ? positiveStock : (positiveStock + negativeStock);
+      const estoqueAtual = Math.max(0, positiveStock); // negativos nunca contam
       // Normaliza a chave da filial (trim) para casar com os mapas de movimento (addMovement
       // também faz .trim()). Sem isso, FILIAL com espaços à direita (ex.: "NERD CENTER NORTE        ")
       // não bate com a chave dos movimentos, o estoque atual "vaza" para uma filial fantasma sempre
