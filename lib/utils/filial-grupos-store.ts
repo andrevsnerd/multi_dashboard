@@ -8,6 +8,7 @@ import 'server-only';
 
 import { hasPostgres, getNeonSql } from '@/lib/db/neon';
 import { invalidateActiveFilialCache } from './active-filial-detector';
+import { FILIAL_GROUPS } from '@/lib/config/filial-registry';
 import fs from 'fs';
 import path from 'path';
 
@@ -47,43 +48,16 @@ export interface FilialGrupo {
   active: string;    // filial operacional/ativa (deve estar em members)
 }
 
-// ── Defaults hardcoded (seed quando o store está vazio para uma empresa) ──────
+// ── Defaults (seed quando o store está vazio) — DERIVADOS do registry, por ID ──
+// members/active são COD_FILIAL. Fonte única de verdade: filial-registry.ts.
 
-export const DEFAULT_GRUPOS: FilialGrupo[] = [
-  {
-    id: 'morumbi-1',
-    label: 'MORUMBI 1',
-    company: 'nerd',
-    members: ['NERD MORUMBI RDRRRJ', 'NERD MORUMBI RDRX'],
-    active: 'NERD MORUMBI RDRX',
-  },
-  {
-    id: 'morumbi-2',
-    label: 'MORUMBI 2',
-    company: 'nerd',
-    members: ['NERD MORUMBI RDRRX'],
-    active: 'NERD MORUMBI RDRRX',
-  },
-  {
-    id: 'paulista',
-    label: 'PAULISTA',
-    company: 'scarfme',
-    members: ['SCARFME ME - PAULISTA FFF', 'SCARF ME - PAULISTA RSR', 'SCARF ME - PAULISTA FFFR', 'SCARF ME PAULISTA FFFR'],
-    active: 'SCARF ME PAULISTA FFFR',
-  },
-  {
-    id: 'ecommerce-scarfme',
-    label: 'E-COMMERCE',
-    company: 'scarfme',
-    members: [
-      'SCARFME MATRIZ CMS',
-      'SCARF ME - MATRIZ LLL',
-      'SCARF ME MATRIZ - FFF',
-      'MSC COMERCIO DE LENCOS LT',
-    ],
-    active: 'MSC COMERCIO DE LENCOS LT',
-  },
-];
+export const DEFAULT_GRUPOS: FilialGrupo[] = FILIAL_GROUPS.map((g) => ({
+  id: g.id,
+  label: g.display,
+  company: g.company,
+  members: [...g.memberIds],
+  active: g.activeId,
+}));
 
 // ── Arquivo local ─────────────────────────────────────────────────────────────
 

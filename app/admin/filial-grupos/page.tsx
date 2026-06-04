@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import styles from "../page.module.css";
 
@@ -8,8 +8,16 @@ interface FilialGrupo {
   id: string;
   label: string;
   company: string;
-  members: string[];
-  active: string;
+  members: string[]; // COD_FILIAL
+  active: string;    // COD_FILIAL
+}
+
+interface FilialOption {
+  id: string;        // COD_FILIAL
+  company: string;
+  display: string;   // nome curto de exibição
+  dbName: string;    // nome vivo no banco
+  ecommerce: boolean;
 }
 
 type ModalMode = "none" | "add" | "edit";
@@ -21,6 +29,7 @@ const COMPANY_LABELS: Record<string, string> = {
 
 export default function FilialGruposPage() {
   const [grupos, setGrupos] = useState<FilialGrupo[]>([]);
+  const [available, setAvailable] = useState<FilialOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -33,17 +42,23 @@ export default function FilialGruposPage() {
   // Campos do formulário
   const [formLabel, setFormLabel] = useState("");
   const [formCompany, setFormCompany] = useState("nerd");
-  const [formMembersRaw, setFormMembersRaw] = useState("");
+  const [formMemberIds, setFormMemberIds] = useState<string[]>([]);
   const [formActive, setFormActive] = useState("");
 
-  const loadGrupos = useCallback(async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/admin/filial-grupos");
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Erro ao carregar grupos");
-      setGrupos(data.data ?? []);
+      const [gruposRes, filiaisRes] = await Promise.all([
+        fetch("/api/admin/filial-grupos"),
+        fetch("/api/admin/filiais-disponiveis"),
+      ]);
+      const gruposData = await gruposRes.json();
+      const filiaisData = await filiaisRes.json();
+      if (!gruposRes.ok) throw new Error(gruposData.error ?? "Erro ao carregar grupos");
+      if (!filiaisRes.ok) throw new Error(filiaisData.error ?? "Erro ao carregar filiais");
+      setGrupos(gruposData.data ?? []);
+      setAvailable(filiaisData.data ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao carregar");
     } finally {
@@ -52,20 +67,35 @@ export default function FilialGruposPage() {
   }, []);
 
   useEffect(() => {
-    loadGrupos();
-  }, [loadGrupos]);
+    loadData();
+  }, [loadData]);
 
-  function parsedMembers(raw: string): string[] {
-    return raw
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean);
-  }
+  // COD_FILIAL -> opção (para rotular membros pelo nome em vez do código)
+  const optionById = useMemo(() => {
+    const m = new Map<string, FilialOption>();
+    for (const f of available) m.set(f.id, f);
+    return m;
+  }, [available]);
+
+  const filialLabel = useCallback(
+    (id: string): string => {
+      const f = optionById.get(id);
+      if (!f) return id;
+      return f.display === f.dbName ? f.display : `${f.display} · ${f.dbName}`;
+    },
+    [optionById]
+  );
+
+  // Filiais disponíveis para a empresa do formulário
+  const availableForForm = useMemo(
+    () => available.filter((f) => f.company === formCompany),
+    [available, formCompany]
+  );
 
   function resetForm() {
     setFormLabel("");
     setFormCompany("nerd");
-    setFormMembersRaw("");
+    setFormMemberIds([]);
     setFormActive("");
     setFormError("");
   }
@@ -80,7 +110,7 @@ export default function FilialGruposPage() {
     setEditingId(g.id);
     setFormLabel(g.label);
     setFormCompany(g.company);
-    setFormMembersRaw(g.members.join("\n"));
+    setFormMemberIds(g.members);
     setFormActive(g.active);
     setFormError("");
     setModal("edit");
@@ -91,34 +121,38 @@ export default function FilialGruposPage() {
     setEditingId(null);
   }
 
+  function toggleMember(id: string) {
+    setFormMemberIds((prev) => {
+      const next = prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id];
+      if (!next.includes(formActive)) setFormActive("");
+      return next;
+    });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError("");
-    setSaving(true);
 
-    const members = parsedMembers(formMembersRaw);
-    if (members.length === 0) {
-      setFormError("Adicione pelo menos uma filial membro.");
-      setSaving(false);
+    if (formMemberIds.length === 0) {
+      setFormError("Selecione pelo menos uma filial membro.");
       return;
     }
     if (!formActive) {
       setFormError("Selecione a filial ativa.");
-      setSaving(false);
       return;
     }
-    if (!members.includes(formActive)) {
-      setFormError("A filial ativa deve estar na lista de membros.");
-      setSaving(false);
+    if (!formMemberIds.includes(formActive)) {
+      setFormError("A filial ativa deve estar entre os membros.");
       return;
     }
 
+    setSaving(true);
     try {
       const payload = {
         id: editingId ?? undefined,
         label: formLabel,
         company: formCompany,
-        members,
+        members: formMemberIds,
         active: formActive,
       };
 
@@ -135,7 +169,7 @@ export default function FilialGruposPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erro ao salvar");
 
-      await loadGrupos();
+      await loadData();
       closeModal();
     } catch (e) {
       setFormError(e instanceof Error ? e.message : "Erro ao salvar");
@@ -150,14 +184,11 @@ export default function FilialGruposPage() {
       const res = await fetch(`/api/admin/filial-grupos/${id}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erro ao remover");
-      await loadGrupos();
+      await loadData();
     } catch (e) {
       alert(e instanceof Error ? e.message : "Erro ao remover");
     }
   }
-
-  // Filiais derivadas do campo de texto para o select de ativa
-  const membersForSelect = parsedMembers(formMembersRaw);
 
   // Agrupar por empresa para exibição
   const gruposPorEmpresa: Record<string, FilialGrupo[]> = {};
@@ -176,6 +207,7 @@ export default function FilialGruposPage() {
           <h1 className={styles.title}>Grupos de Filiais</h1>
           <p className={styles.subtitle}>
             Defina quais filiais formam um grupo lógico e qual é a filial ativa para operações.
+            As filiais são identificadas pelo número (COD_FILIAL), então renomeá-las no ERP não quebra o grupo.
           </p>
         </div>
         <button type="button" className={styles.addButton} onClick={openAdd}>
@@ -236,7 +268,8 @@ export default function FilialGruposPage() {
                                 border: m === g.active ? "1px solid #bbf7d0" : "1px solid #e2e8f0",
                               }}
                             >
-                              {m === g.active ? "✓ " : ""}{m}
+                              {m === g.active ? "✓ " : ""}{filialLabel(m)}
+                              <span style={{ color: "#94a3b8", marginLeft: 4 }}>#{m}</span>
                             </span>
                           ))}
                         </div>
@@ -251,7 +284,7 @@ export default function FilialGruposPage() {
                           borderRadius: 20,
                           border: "1px solid #bbf7d0",
                         }}>
-                          {g.active}
+                          {filialLabel(g.active)}
                         </span>
                       </td>
                       <td className={styles.actionsCol}>
@@ -292,7 +325,7 @@ export default function FilialGruposPage() {
       }}>
         <strong>Como funciona:</strong> Filiais do mesmo grupo são somadas em vendas e estoque.
         Em operações (saída, entrada, transferência), apenas a filial ativa é usada.
-        Permissões salvas com filiais históricas do grupo são automaticamente resolvidas para a ativa.
+        As filiais são referenciadas pelo número (COD_FILIAL); o nome exibido vem do banco.
       </div>
 
       {/* Modal */}
@@ -329,9 +362,13 @@ export default function FilialGruposPage() {
                       Empresa
                       <select
                         value={formCompany}
-                        onChange={(e) => setFormCompany(e.target.value)}
+                        onChange={(e) => {
+                          setFormCompany(e.target.value);
+                          setFormMemberIds([]);
+                          setFormActive("");
+                        }}
                         className={styles.select}
-                        disabled={saving}
+                        disabled={saving || modal === "edit"}
                       >
                         <option value="nerd">NERD</option>
                         <option value="scarfme">SCARF ME</option>
@@ -339,54 +376,79 @@ export default function FilialGruposPage() {
                     </label>
                   </div>
 
-                  <label className={styles.label}>
+                  <div className={styles.label}>
                     Filiais membros do grupo
                     <span className={styles.hint}>
-                      Uma filial por linha. Copie o nome exato como aparece no ERP.
+                      Marque as filiais que compõem o grupo. Identificadas pelo número (COD_FILIAL).
                     </span>
-                    <textarea
-                      value={formMembersRaw}
-                      onChange={(e) => {
-                        setFormMembersRaw(e.target.value);
-                        // Se a ativa atual não está mais na lista, limpa
-                        const parsed = e.target.value
-                          .split("\n")
-                          .map((s) => s.trim())
-                          .filter(Boolean);
-                        if (formActive && !parsed.includes(formActive)) {
-                          setFormActive("");
-                        }
-                      }}
-                      className={styles.input}
-                      rows={5}
-                      placeholder={"NERD MORUMBI RDRRRJ\nNERD MORUMBI RDRX"}
-                      required
-                      disabled={saving}
-                      style={{ resize: "vertical", fontFamily: "monospace", fontSize: 12 }}
-                    />
-                    {membersForSelect.length > 0 && (
+                    <div style={{
+                      maxHeight: 240,
+                      overflowY: "auto",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 6,
+                      padding: 8,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 2,
+                    }}>
+                      {availableForForm.length === 0 ? (
+                        <span style={{ fontSize: 12, color: "#94a3b8", padding: 6 }}>
+                          Nenhuma filial disponível.
+                        </span>
+                      ) : (
+                        availableForForm.map((f) => {
+                          const checked = formMemberIds.includes(f.id);
+                          return (
+                            <label
+                              key={f.id}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                padding: "5px 6px",
+                                borderRadius: 4,
+                                cursor: saving ? "default" : "pointer",
+                                background: checked ? "#eff6ff" : "transparent",
+                                fontSize: 13,
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleMember(f.id)}
+                                disabled={saving}
+                              />
+                              <span style={{ fontWeight: 600, color: "#0f172a" }}>{f.display}</span>
+                              <span style={{ color: "#64748b" }}>{f.dbName}</span>
+                              <span style={{ color: "#cbd5e1", marginLeft: "auto", fontSize: 11 }}>#{f.id}</span>
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                    {formMemberIds.length > 0 && (
                       <span className={styles.hint}>
-                        {membersForSelect.length} filial{membersForSelect.length !== 1 ? "is" : ""} detectada{membersForSelect.length !== 1 ? "s" : ""}.
+                        {formMemberIds.length} filial{formMemberIds.length !== 1 ? "is" : ""} selecionada{formMemberIds.length !== 1 ? "s" : ""}.
                       </span>
                     )}
-                  </label>
+                  </div>
 
                   <label className={styles.label}>
                     Filial ativa (operacional)
                     <span className={styles.hint}>
-                      Usada em saídas, entradas e transferências. Deve estar na lista acima.
+                      Usada em saídas, entradas e transferências. Deve estar entre os membros.
                     </span>
                     <select
                       value={formActive}
                       onChange={(e) => setFormActive(e.target.value)}
                       className={styles.select}
                       required
-                      disabled={saving || membersForSelect.length === 0}
+                      disabled={saving || formMemberIds.length === 0}
                     >
                       <option value="">Selecione...</option>
-                      {membersForSelect.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
+                      {formMemberIds.map((id) => (
+                        <option key={id} value={id}>
+                          {filialLabel(id)}
                         </option>
                       ))}
                     </select>

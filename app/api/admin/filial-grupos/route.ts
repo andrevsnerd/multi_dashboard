@@ -5,6 +5,7 @@ import {
   DEFAULT_GRUPOS,
   type FilialGrupo,
 } from '@/lib/utils/filial-grupos-store';
+import { idsForFilialRefs, idForFilialRef } from '@/lib/server/company-live';
 
 function slugify(text: string): string {
   return text
@@ -29,11 +30,21 @@ export async function GET(req: NextRequest) {
       if (!DEFAULT_GRUPOS.some((d) => d.id === s.id)) merged.push(s);
     }
 
-    let grupos = company
+    const grupos = company
       ? merged.filter((g) => g.company === company.toLowerCase())
       : merged;
 
-    return NextResponse.json({ data: grupos });
+    // Normaliza membros/ativa para COD_FILIAL (tolera grupos legados salvos por nome),
+    // para o painel sempre trabalhar por ID.
+    const gruposPorId = await Promise.all(
+      grupos.map(async (g) => ({
+        ...g,
+        members: await idsForFilialRefs(g.members),
+        active: (await idForFilialRef(g.active)) ?? g.active,
+      }))
+    );
+
+    return NextResponse.json({ data: gruposPorId });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'Erro ao listar grupos' },

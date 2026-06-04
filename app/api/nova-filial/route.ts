@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
+import { liveNamesForIncoming } from "@/lib/server/company-live";
 import {
   fetchFilialProdutoSales,
   fetchProdutoEstoqueDetalhadoPorFilial,
@@ -220,20 +221,28 @@ export async function GET(request: Request) {
   const modelSplit = splitMembers(companyKey, modelMembers);
   const targetSplit = splitMembers(companyKey, targetMembers);
 
+  // Normaliza os nomes (config estática) para o nome vivo do banco (match por COD_FILIAL).
+  const [modelPos, modelEcom, targetPos, targetEcom] = await Promise.all([
+    liveNamesForIncoming(modelSplit.posMembers),
+    liveNamesForIncoming(modelSplit.ecommerceMembers),
+    liveNamesForIncoming(targetSplit.posMembers),
+    liveNamesForIncoming(targetSplit.ecommerceMembers),
+  ]);
+
   try {
     const [modelSalesRows, targetStockRows] = await Promise.all([
       fetchFilialProdutoSales(
         companyKey,
-        modelSplit.posMembers,
-        modelSplit.ecommerceMembers,
+        modelPos ?? modelSplit.posMembers,
+        modelEcom ?? modelSplit.ecommerceMembers,
         resolvedRange,
         "month",
         { groupByCor: true, limit: 5000 }
       ),
       fetchProdutoEstoqueDetalhadoPorFilial(
         companyKey,
-        targetSplit.posMembers,
-        targetSplit.ecommerceMembers,
+        targetPos ?? targetSplit.posMembers,
+        targetEcom ?? targetSplit.ecommerceMembers,
         { groupByCor: true }
       ),
     ]);

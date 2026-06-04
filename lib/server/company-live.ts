@@ -2,6 +2,7 @@ import 'server-only';
 
 import { resolveCompany, VAREJO_VALUE, type CompanyConfig } from '@/lib/config/company';
 import { buildDerivedFilialConfig, staticNameOf } from '@/lib/config/filial-config-builder';
+import { getFilialById } from '@/lib/config/filial-registry';
 import { getIdToNameMap, idForName, nameForId } from './filial-resolver';
 
 /**
@@ -45,6 +46,50 @@ export async function liveNamesForIncoming(
   for (const n of names) {
     const live = await liveNameForIncoming(n);
     if (typeof live === 'string') out.push(live);
+  }
+  return out;
+}
+
+/**
+ * Resolve uma REFERÊNCIA de filial — que pode ser um COD_FILIAL (novo formato dos
+ * grupos por ID) OU um nome (formato legado) — para o nome vivo atual no banco.
+ * Usado onde dados podem conter qualquer um dos dois (ex.: grupos do admin).
+ */
+export async function liveNameForFilialRef(ref: string | null | undefined): Promise<string | null | undefined> {
+  if (!ref || ref === VAREJO_VALUE) return ref;
+  const byId = getFilialById(ref);
+  if (byId) return (await nameForId(byId.id)) ?? byId.dbNameFallback;
+  // Não é COD_FILIAL do registry → trata como nome (legado).
+  return liveNameForIncoming(ref);
+}
+
+/** Versão em lote de `liveNameForFilialRef`. */
+export async function liveNamesForFilialRefs(
+  refs: string[] | null | undefined
+): Promise<string[] | null | undefined> {
+  if (!refs) return refs;
+  const out: string[] = [];
+  for (const r of refs) {
+    const live = await liveNameForFilialRef(r);
+    if (typeof live === 'string') out.push(live);
+  }
+  return out;
+}
+
+/** Resolve uma referência (COD_FILIAL ou nome) para o COD_FILIAL canônico do registry. */
+export async function idForFilialRef(ref: string | null | undefined): Promise<string | null> {
+  if (!ref) return null;
+  const byId = getFilialById(ref);
+  if (byId) return byId.id;
+  return idForName(ref);
+}
+
+/** Versão em lote de `idForFilialRef` (mantém o ref original se não reconhecer, p/ não perder dados). */
+export async function idsForFilialRefs(refs: string[] | null | undefined): Promise<string[]> {
+  if (!refs) return [];
+  const out: string[] = [];
+  for (const r of refs) {
+    out.push((await idForFilialRef(r)) ?? r);
   }
   return out;
 }
