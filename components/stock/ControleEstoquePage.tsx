@@ -27,6 +27,7 @@ import type { CompanyKey } from "@/lib/config/company";
 import { resolveCompany } from "@/lib/config/company";
 import { getCurrentMonthRange } from "@/lib/utils/date";
 import { exportEstoqueConsultaXlsx } from "@/lib/utils/exportEstoqueConsultaXlsx";
+import { setGiroSessionCache } from "@/lib/utils/giro-session-cache";
 
 import styles from "./ControleEstoquePage.module.css";
 
@@ -1194,14 +1195,7 @@ export default function ControleEstoquePage({
         if (active) {
           setGiroCategoriasPermitidas(new Set(chaves));
           setGiroProdutosPorChave(produtosPorChave);
-          try {
-            sessionStorage.setItem(
-              `giroProdutosPorChave_${companyKey}_${selectedGiro}`,
-              JSON.stringify(produtosPorChave)
-            );
-          } catch {
-            // sessionStorage pode falhar (privado, quota)
-          }
+          setGiroSessionCache(companyKey, selectedGiro!, produtosPorChave);
         }
       } catch (err) {
         if (active) {

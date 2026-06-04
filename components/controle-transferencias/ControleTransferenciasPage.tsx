@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -167,6 +167,11 @@ export default function ControleTransferenciasPage({
   const [cooldownKeys, setCooldownKeys] = useState<Set<string>>(new Set());
   const [realizadasContadores, setRealizadasContadores] = useState<Map<string, number>>(new Map());
 
+  // Controle do refetch ao focar a aba: evita disparar a query pesada concorrente
+  // ou com frequência alta a cada alt-tab.
+  const inFlightRef = useRef(false);
+  const lastLoadedAtRef = useRef(0);
+
   const rangeKey = useMemo(
     () =>
       `${range.startDate.toISOString()}::${range.endDate.toISOString()}`,
@@ -175,6 +180,7 @@ export default function ControleTransferenciasPage({
 
   const loadData = useCallback(
     async (signal?: { aborted: boolean }) => {
+      inFlightRef.current = true;
       setLoading(true);
       setError(null);
       try {
@@ -200,6 +206,7 @@ export default function ControleTransferenciasPage({
         setData(dataWithDates);
         setCooldownKeys(cooldown);
         setRealizadasContadores(contadores);
+        lastLoadedAtRef.current = Date.now();
       } catch (err) {
         if (signal?.aborted) return;
         setError(
@@ -208,6 +215,7 @@ export default function ControleTransferenciasPage({
             : "Não foi possível carregar os dados."
         );
       } finally {
+        inFlightRef.current = false;
         if (!signal?.aborted) setLoading(false);
       }
     },
@@ -221,6 +229,25 @@ export default function ControleTransferenciasPage({
       signal.aborted = true;
     };
   }, [loadData, rangeKey]);
+
+  // Revalida ao voltar o foco para a aba/janela, para os números não ficarem
+  // congelados sem precisar deslogar. Com throttle e guarda de concorrência
+  // porque a consulta é pesada (MSSQL).
+  useEffect(() => {
+    const REFRESH_THROTTLE_MS = 60 * 1000;
+    function maybeReload() {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      if (inFlightRef.current) return;
+      if (Date.now() - lastLoadedAtRef.current < REFRESH_THROTTLE_MS) return;
+      void loadData();
+    }
+    window.addEventListener("focus", maybeReload);
+    document.addEventListener("visibilitychange", maybeReload);
+    return () => {
+      window.removeEventListener("focus", maybeReload);
+      document.removeEventListener("visibilitychange", maybeReload);
+    };
+  }, [loadData]);
 
   useEffect(() => {
     if (!user?.username) return;

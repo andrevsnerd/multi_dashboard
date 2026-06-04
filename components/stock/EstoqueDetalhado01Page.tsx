@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import type { CompanyKey } from "@/lib/config/company";
 import { exportDetalhadoToXlsx } from "@/lib/utils/exportDetalhadoXlsx";
+import { getGiroSessionCache } from "@/lib/utils/giro-session-cache";
 
 import styles from "./EstoqueDetalhado01Page.module.css";
 
@@ -242,8 +243,7 @@ export default function EstoqueDetalhado01Page({
 
         if (useGiroPost) {
           try {
-            const raw = sessionStorage.getItem(`giroProdutosPorChave_${companyKey}_${giroDias}`);
-            const produtosPorChave = raw ? (JSON.parse(raw) as Record<string, string[]>) : null;
+            const produtosPorChave = getGiroSessionCache(companyKey, giroDias);
             const chave = [
               grupo ?? "",
               companyKey === "nerd" ? "" : (linha ?? ""),
