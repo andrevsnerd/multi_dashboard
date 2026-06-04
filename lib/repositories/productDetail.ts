@@ -1,6 +1,7 @@
 import sql from 'mssql';
 
 import { resolveCompany, isEcommerceFilial, getActiveFilial, type CompanyModule, VAREJO_VALUE } from '@/lib/config/company';
+import { resolveCompanyLive, liveNameForIncoming } from '@/lib/server/company-live';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
@@ -27,21 +28,24 @@ function shouldAggregateEcommerce(
   return isScarfme && hasEcommerce;
 }
 
-function buildEcommerceFilialFilter(
+async function buildEcommerceFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   specificFilial?: string | null,
   tableAlias: string = 'f'
-): string {
+): Promise<string> {
   if (!companySlug) {
     return '';
   }
 
-  const company = resolveCompany(companySlug);
+  const company = await resolveCompanyLive(companySlug);
 
   if (!company) {
     return '';
   }
+
+  // Normaliza o nome vindo do front para o nome vivo do banco (match por COD_FILIAL).
+  specificFilial = await liveNameForIncoming(specificFilial);
 
   // Se uma filial específica foi selecionada
   if (specificFilial) {
@@ -67,23 +71,26 @@ function buildEcommerceFilialFilter(
   return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
 }
 
-function buildFilialFilter(
+async function buildFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   module: CompanyModule,
   specificFilial?: string | null,
   tableAlias: string = 'vp',
   paramPrefix: string = 'filial'
-): string {
+): Promise<string> {
   if (!companySlug) {
     return '';
   }
 
-  const company = resolveCompany(companySlug);
+  const company = await resolveCompanyLive(companySlug);
 
   if (!company) {
     return '';
   }
+
+  // Normaliza o nome vindo do front para o nome vivo do banco (match por COD_FILIAL).
+  specificFilial = await liveNameForIncoming(specificFilial);
 
   const isScarfme = companySlug === 'scarfme';
   const filiais = company.filialFilters[module] ?? [];
@@ -603,7 +610,7 @@ async function fetchProductDetailEcommerce({
     request.input('previousStartDate', sql.DateTime, previousRange.start);
     request.input('previousEndDate', sql.DateTime, previousRange.end);
 
-    const filialFilter = buildEcommerceFilialFilter(request, company, filial, 'f');
+    const filialFilter = await buildEcommerceFilialFilter(request, company, filial, 'f');
     const colorFilterFp = buildColorFilter(request, colors)('fp');
 
     // Buscar vendas do período atual (com filtro de cor)
@@ -734,7 +741,7 @@ export async function fetchProductDetail({
     let topFilial: string | null = null;
     let topFilialDisplayName: string | null = null;
     let topFilialRevenue = 0;
-    const companyConfig = resolveCompany(company);
+    const companyConfig = await resolveCompanyLive(company);
     const displayNames = companyConfig?.filialDisplayNames ?? {};
     allRevenueByFilial.forEach((revenue, filialName) => {
       if (revenue > topFilialRevenue) {
@@ -786,7 +793,7 @@ export async function fetchProductDetail({
     request.input('previousStartDate', sql.DateTime, previousRange.start);
     request.input('previousEndDate', sql.DateTime, previousRange.end);
 
-    const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+    const filialFilter = await buildFilialFilter(request, company, 'sales', filial, 'vp');
     const colorFilter = buildColorFilter(request, colors);
     const colorFilterVp = colorFilter('vp');
     const colorFilterE = colorFilter('e');
@@ -841,7 +848,7 @@ export async function fetchProductDetail({
       lastEntryFilial: null,
     };
 
-    const companyConfig = resolveCompany(company);
+    const companyConfig = await resolveCompanyLive(company);
     const displayNames = companyConfig?.filialDisplayNames ?? {};
 
     // Buscar vendas do período atual
@@ -1164,7 +1171,7 @@ async function fetchProductStockByFilialEcommerce({
     request.input('previousStartDate', sql.DateTime, previousRange.start);
     request.input('previousEndDate', sql.DateTime, previousRange.end);
 
-    const companyConfig = resolveCompany(company);
+    const companyConfig = await resolveCompanyLive(company);
     if (!companyConfig) {
       return [];
     }
@@ -1338,7 +1345,7 @@ export async function fetchProductStockByFilial({
       fetchProductStockByFilialEcommerce({ productId, company, range, filial: null, colors }),
     ]);
 
-    const companyConfig = resolveCompany(company);
+    const companyConfig = await resolveCompanyLive(company);
     const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
     
     // Agregar por filial - usar nome normalizado (trim) como chave para evitar duplicatas
@@ -1417,7 +1424,7 @@ export async function fetchProductStockByFilial({
     `;
 
     // Buscar vendas por filial - período atual
-    const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp', 'vendasFilial');
+    const filialFilter = await buildFilialFilter(request, company, 'sales', filial, 'vp', 'vendasFilial');
     const currentSalesQuery = `
       WITH vendas_base AS (
         SELECT 
@@ -1652,12 +1659,12 @@ async function fetchProductSaleHistoryEcommerce({
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const companyConfig = resolveCompany(company);
+    const companyConfig = await resolveCompanyLive(company);
     if (!companyConfig) {
       return [];
     }
 
-    const filialFilter = buildEcommerceFilialFilter(request, company, filial, 'f');
+    const filialFilter = await buildEcommerceFilialFilter(request, company, filial, 'f');
     const colorFilterFp = buildColorFilter(request, colors)('fp');
 
     const query = `
@@ -1755,12 +1762,12 @@ export async function fetchProductSaleHistory({
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const companyConfig = resolveCompany(company);
+    const companyConfig = await resolveCompanyLive(company);
     if (!companyConfig) {
       return [];
     }
 
-    const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+    const filialFilter = await buildFilialFilter(request, company, 'sales', filial, 'vp');
     const colorFilterVp = buildColorFilter(request, colors)('vp');
 
     // Mesma base de cálculo que fetchProductDetail (TOTAL_VENDA - VALOR_TROCA por item/troca)
@@ -1905,12 +1912,12 @@ async function fetchProductSaleHistoryComparisonEcommerce({
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const companyConfig = resolveCompany(company);
+    const companyConfig = await resolveCompanyLive(company);
     if (!companyConfig) {
       return [];
     }
 
-    const filialFilter = buildEcommerceFilialFilter(request, company, filial, 'f');
+    const filialFilter = await buildEcommerceFilialFilter(request, company, filial, 'f');
     const colorFilterFp = buildColorFilter(request, colors)('fp');
 
     const query = `
@@ -1980,12 +1987,12 @@ export async function fetchProductSaleHistoryComparison(
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const companyConfig = resolveCompany(company);
+    const companyConfig = await resolveCompanyLive(company);
     if (!companyConfig) {
       return [];
     }
 
-    const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+    const filialFilter = await buildFilialFilter(request, company, 'sales', filial, 'vp');
     const colorFilterVp = buildColorFilter(request, colors)('vp');
 
     const query = `
@@ -2086,11 +2093,11 @@ async function fetchStockEntriesDailyRows(
     request.input('productId', sql.VarChar, params.productId);
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
-    const companyConfig = resolveCompany(params.company);
+    const companyConfig = await resolveCompanyLive(params.company);
     if (!companyConfig) {
       return [];
     }
-    const filialFilter = buildFilialFilter(request, params.company, 'inventory', params.filial, 'E', 'entF');
+    const filialFilter = await buildFilialFilter(request, params.company, 'inventory', params.filial, 'E', 'entF');
     const colorFilterP = buildColorFilter(request, params.colors)('P');
     const query = `
       SELECT 
@@ -2124,9 +2131,9 @@ async function fetchStockExitsDailyRows(
     request.input('productId', sql.VarChar, params.productId);
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
-    const companyConfig = resolveCompany(params.company);
+    const companyConfig = await resolveCompanyLive(params.company);
     if (!companyConfig) return [];
-    const filialFilter = buildFilialFilter(request, params.company, 'inventory', params.filial, 'ES', 'exitF');
+    const filialFilter = await buildFilialFilter(request, params.company, 'inventory', params.filial, 'ES', 'exitF');
     const colorFilterP = buildColorFilter(request, params.colors)('P');
     const query = `
       SELECT
@@ -2159,11 +2166,11 @@ async function fetchStockSalesDailyRetailRows(
     request.input('productId', sql.VarChar, params.productId);
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
-    const companyConfig = resolveCompany(params.company);
+    const companyConfig = await resolveCompanyLive(params.company);
     if (!companyConfig) {
       return [];
     }
-    const filialFilter = buildFilialFilter(request, params.company, 'sales', params.filial, 'vp', 'sdRetail');
+    const filialFilter = await buildFilialFilter(request, params.company, 'sales', params.filial, 'vp', 'sdRetail');
     const colorFilterVp = buildColorFilter(request, params.colors)('vp');
     const query = `
       WITH vendas_base AS (
@@ -2243,11 +2250,11 @@ async function fetchStockSalesDailyEcommerceRows(
     request.input('productId', sql.VarChar, params.productId);
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
-    const companyConfig = resolveCompany(params.company);
+    const companyConfig = await resolveCompanyLive(params.company);
     if (!companyConfig) {
       return [];
     }
-    const filialFilter = buildEcommerceFilialFilter(request, params.company, params.filial, 'f');
+    const filialFilter = await buildEcommerceFilialFilter(request, params.company, params.filial, 'f');
     const colorFilterFp = buildColorFilter(request, params.colors)('fp');
     const query = `
       SELECT 
@@ -2284,7 +2291,7 @@ export async function fetchProductStockProgressSeries(
   params: ProductDetailParams,
   stockByFilial: ProductStockByFilial[]
 ): Promise<ProductStockProgressDay[]> {
-  const companyConfig = resolveCompany(params.company);
+  const companyConfig = await resolveCompanyLive(params.company);
   if (!companyConfig) {
     return [];
   }

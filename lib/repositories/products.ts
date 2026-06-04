@@ -1,6 +1,7 @@
 import sql from 'mssql';
 
-import { resolveCompany, isEcommerceFilial, type CompanyModule, VAREJO_VALUE } from '@/lib/config/company';
+import { isEcommerceFilial, type CompanyModule, VAREJO_VALUE } from '@/lib/config/company';
+import { resolveCompanyLive, liveNameForIncoming } from '@/lib/server/company-live';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import { normalizeRangeForQuery, shiftRangeByMonths } from '@/lib/utils/date';
@@ -107,16 +108,19 @@ function buildInFilter(
   return `AND UPPER(LTRIM(RTRIM(ISNULL(${sqlExpression}, '')))) IN (${placeholders})`;
 }
 
-function buildScarfmeEcommerceFilialFilterForProducts(
+async function buildScarfmeEcommerceFilialFilterForProducts(
   request: sql.Request | RequestLike,
   filial: string | null | undefined,
   tableAlias: string = 'f',
   paramBase: string = 'ecomFilial'
-): string {
-  const company = resolveCompany('scarfme');
+): Promise<string> {
+  const company = await resolveCompanyLive('scarfme');
   if (!company) {
     return '';
   }
+
+  // Normaliza o nome vindo do front para o nome vivo do banco (match por COD_FILIAL).
+  filial = await liveNameForIncoming(filial);
 
   const ecommerceFilials = company.ecommerceFilials ?? [];
 
@@ -143,23 +147,26 @@ function buildScarfmeEcommerceFilialFilterForProducts(
   return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
 }
 
-function buildFilialFilter(
+async function buildFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   module: CompanyModule,
   specificFilial?: string | null,
   tableAlias: string = 'vp',
   paramBase: string = 'filial'
-): string {
+): Promise<string> {
   if (!companySlug) {
     return '';
   }
 
-  const company = resolveCompany(companySlug);
+  const company = await resolveCompanyLive(companySlug);
 
   if (!company) {
     return '';
   }
+
+  // Normaliza o nome vindo do front para o nome vivo do banco (match por COD_FILIAL).
+  specificFilial = await liveNameForIncoming(specificFilial);
 
   const isScarfme = companySlug === 'scarfme';
   const filiais = company.filialFilters[module] ?? [];
@@ -611,9 +618,9 @@ async function fetchProductsWithDetailsSales({
     request.input('previousStartDate', sql.DateTime, previousRange.start);
     request.input('previousEndDate', sql.DateTime, previousRange.end);
 
-    const salesFilialFilter = buildFilialFilter(request, company, 'sales', filial, 'f', 'salesFilial');
-    const salesCheckFilialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp_check', 'salesCheckFilial');
-    const historicalFilialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp', 'historicalFilial');
+    const salesFilialFilter = await buildFilialFilter(request, company, 'sales', filial, 'f', 'salesFilial');
+    const salesCheckFilialFilter = await buildFilialFilter(request, company, 'sales', filial, 'vp_check', 'salesCheckFilial');
+    const historicalFilialFilter = await buildFilialFilter(request, company, 'sales', filial, 'vp', 'historicalFilial');
     const grupoFilter = buildGrupoFilterForProducts(request, company, grupo, grupos);
     const linhaFilter = buildLinhaFilterForProducts(request, company, linha, linhas);
     const colecaoFilter = buildColecaoFilterForProducts(request, company, colecao, colecoes);
@@ -1238,7 +1245,7 @@ async function fetchProductsWithDetailsEcommerce({
     // Construir filtro de filial para e-commerce
     let filialFilter = '';
     if (company) {
-      const companyConfig = resolveCompany(company);
+      const companyConfig = await resolveCompanyLive(company);
       const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
       
       if (filial && filial !== VAREJO_VALUE) {
@@ -1785,7 +1792,7 @@ export async function fetchAvailableGrupos({
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+    const filialFilter = await buildFilialFilter(request, company, 'sales', filial, 'vp');
     // Aplicar filtros dependentes (apenas para ScarfMe, mas não aplicamos aqui pois é NERD)
     // Para NERD, não há filtros dependentes de outros campos
 
@@ -1847,7 +1854,7 @@ export async function fetchAvailableLinhas({
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+    const filialFilter = await buildFilialFilter(request, company, 'sales', filial, 'vp');
     const colecaoFilter = buildColecaoFilterForProducts(request, company, null, colecoes);
     const subgrupoFilter = buildSubgrupoFilterForProducts(request, company, null, subgrupos);
     const gradeFilter = buildGradeFilterForProducts(request, company, null, grades);
@@ -1912,7 +1919,7 @@ export async function fetchAvailableColecoes({
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+    const filialFilter = await buildFilialFilter(request, company, 'sales', filial, 'vp');
     const linhaFilter = buildLinhaFilterForProducts(request, company, null, linhas);
     const subgrupoFilter = buildSubgrupoFilterForProducts(request, company, null, subgrupos);
     const gradeFilter = buildGradeFilterForProducts(request, company, null, grades);
@@ -1973,7 +1980,7 @@ export async function fetchAvailableColecoesWithDescriptions({
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const retailFilialFilter = buildFilialFilter(request, company, 'sales', filial, 'vp');
+    const retailFilialFilter = await buildFilialFilter(request, company, 'sales', filial, 'vp');
     const retailLinhaFilter = buildLinhaFilterForProducts(request, company, null, linhas);
     const retailSubgrupoFilter = buildSubgrupoFilterForProducts(request, company, null, subgrupos);
     const retailGradeFilter = buildGradeFilterForProducts(request, company, null, grades);
@@ -1994,7 +2001,7 @@ export async function fetchAvailableColecoesWithDescriptions({
       ORDER BY colecao
     `);
 
-    const ecommerceFilialFilter = buildScarfmeEcommerceFilialFilterForProducts(
+    const ecommerceFilialFilter = await buildScarfmeEcommerceFilialFilterForProducts(
       request,
       filial,
       'f',
@@ -2091,7 +2098,7 @@ export async function fetchAvailableSubgrupos({
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const retailFilialFilter = buildFilialFilter(
+    const retailFilialFilter = await buildFilialFilter(
       request,
       company,
       'sales',
@@ -2118,7 +2125,7 @@ export async function fetchAvailableSubgrupos({
       'CONVERT(VARCHAR, p.GRADE)'
     );
 
-    const ecommerceFilialFilter = buildScarfmeEcommerceFilialFilterForProducts(
+    const ecommerceFilialFilter = await buildScarfmeEcommerceFilialFilterForProducts(
       request,
       filial,
       'f',
@@ -2222,7 +2229,7 @@ export async function fetchAvailableGrades({
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const retailFilialFilter = buildFilialFilter(
+    const retailFilialFilter = await buildFilialFilter(
       request,
       company,
       'sales',
@@ -2249,7 +2256,7 @@ export async function fetchAvailableGrades({
       'p.SUBGRUPO_PRODUTO'
     );
 
-    const ecommerceFilialFilter = buildScarfmeEcommerceFilialFilterForProducts(
+    const ecommerceFilialFilter = await buildScarfmeEcommerceFilialFilterForProducts(
       request,
       filial,
       'f',

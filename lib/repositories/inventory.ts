@@ -1,23 +1,25 @@
 import sql from 'mssql';
 
-import { resolveCompany, VAREJO_VALUE } from '@/lib/config/company';
+import { VAREJO_VALUE } from '@/lib/config/company';
+import { resolveCompanyLive } from '@/lib/server/company-live';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import type { MetricSummary } from '@/types/dashboard';
 
 const ENABLE_STOCK_SUMMARY_DEBUG = false;
 
-function buildFilialFilter(
+async function buildFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   specificFilial?: string | null,
   prefix: string = 'e'
-): string {
+): Promise<string> {
   if (!companySlug) {
     return '';
   }
 
-  const company = resolveCompany(companySlug);
+  // Nome vivo da FILIAIS pelo COD_FILIAL — auto-corrige rename no ERP.
+  const company = await resolveCompanyLive(companySlug);
 
   if (!company) {
     return '';
@@ -131,7 +133,7 @@ export async function fetchProductStock(
     let filialFilter = '';
     if (ecommerceOnly && !filial && company) {
       // Buscar apenas filiais de e-commerce
-      const companyConfig = resolveCompany(company);
+      const companyConfig = await resolveCompanyLive(company);
       const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
       if (ecommerceFilials.length > 0) {
         ecommerceFilials.forEach((filial, index) => {
@@ -143,7 +145,7 @@ export async function fetchProductStock(
         filialFilter = `AND e.FILIAL IN (${placeholders})`;
       }
     } else {
-      filialFilter = buildFilialFilter(request, company, filial);
+      filialFilter = await buildFilialFilter(request, company, filial);
     }
 
     const query = `
@@ -198,7 +200,7 @@ export async function fetchMultipleProductsStock(
       // Não aplica filtro de filial — busca em todas as filiais do banco
     } else if (ecommerceOnly && !filial && company) {
       // Buscar apenas filiais de e-commerce
-      const companyConfig = resolveCompany(company);
+      const companyConfig = await resolveCompanyLive(company);
       const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
       if (ecommerceFilials.length > 0) {
         ecommerceFilials.forEach((filial, index) => {
@@ -210,7 +212,7 @@ export async function fetchMultipleProductsStock(
         filialFilter = `AND e.FILIAL IN (${placeholders})`;
       }
     } else {
-      filialFilter = buildFilialFilter(request, company, filial);
+      filialFilter = await buildFilialFilter(request, company, filial);
     }
 
     // Criar placeholders para os IDs dos produtos
@@ -318,7 +320,7 @@ export async function fetchMultipleProductsStockByColor(
       if (!skipFilialFilter) {
         if (ecommerceOnly && !filial && company) {
           // Buscar apenas filiais de e-commerce
-          const companyConfig = resolveCompany(company);
+          const companyConfig = await resolveCompanyLive(company);
           const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
           if (ecommerceFilials.length > 0) {
             ecommerceFilials.forEach((filial, index) => {
@@ -330,7 +332,7 @@ export async function fetchMultipleProductsStockByColor(
             filialFilter = `AND e.FILIAL IN (${placeholders})`;
           }
         } else {
-          filialFilter = buildFilialFilter(request, company, filial);
+          filialFilter = await buildFilialFilter(request, company, filial);
         }
       }
 
@@ -568,7 +570,7 @@ export async function fetchStockSummary({
     let estoqueFilialFilterForWhere = '';
     if (ecommerceOnly && !filial && company) {
       // Buscar apenas filiais de e-commerce
-      const companyConfig = resolveCompany(company);
+      const companyConfig = await resolveCompanyLive(company);
       const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
       if (ecommerceFilials.length > 0) {
         ecommerceFilials.forEach((filial, index) => {
@@ -580,7 +582,7 @@ export async function fetchStockSummary({
         estoqueFilialFilterForWhere = `AND e.FILIAL IN (${placeholders})`;
       }
     } else {
-      estoqueFilialFilterForWhere = buildFilialFilter(request, company, filial, 'e');
+      estoqueFilialFilterForWhere = await buildFilialFilter(request, company, filial, 'e');
     }
     
     // Filtro de produto

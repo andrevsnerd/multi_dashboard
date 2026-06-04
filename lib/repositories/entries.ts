@@ -1,6 +1,7 @@
 import sql from 'mssql';
 
-import { resolveCompany, VAREJO_VALUE } from '@/lib/config/company';
+import { VAREJO_VALUE } from '@/lib/config/company';
+import { resolveCompanyLive, liveNameForIncoming } from '@/lib/server/company-live';
 import { withRequest } from '@/lib/db/connection';
 import { getColorDescription, normalizeColor } from '@/lib/utils/colorMapping';
 
@@ -64,10 +65,13 @@ export async function buildEntriesMap(
   filial?: string | null
 ): Promise<Map<string, boolean>> {
   return withRequest(async (request) => {
-    const companyConfig = resolveCompany(company);
+    const companyConfig = await resolveCompanyLive(company);
     if (!companyConfig) {
       return new Map();
     }
+
+    // Normaliza o nome vindo do front para o nome vivo do banco (match por COD_FILIAL).
+    filial = await liveNameForIncoming(filial);
 
     // Build branch filter
     let filialFilter = '';

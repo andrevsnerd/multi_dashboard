@@ -1,6 +1,7 @@
 import sql from 'mssql';
 import { withRequest } from '@/lib/db/connection';
-import { resolveCompany, type CompanyKey } from '@/lib/config/company';
+import { type CompanyKey } from '@/lib/config/company';
+import { resolveCompanyLive } from '@/lib/server/company-live';
 import { shiftRangeByMonths, type NormalizedRange } from '@/lib/utils/date';
 import type { ProdutoAgrupadoMember } from '@/lib/utils/produtos-agrupados';
 
@@ -60,7 +61,7 @@ export async function fetchPerformanceData(
   comparisonMode: 'month' | 'year' = 'month',
   options?: { linhas?: string[] | null }
 ): Promise<PerformanceDataResult> {
-  const company = resolveCompany(companyKey);
+  const company = await resolveCompanyLive(companyKey);
   if (!company) return { current: [], previous: [] };
 
   // Filtro de linha (NERD: ex. ELETRONICOS) — mantém Curva ABC alinhada com Dashboard/Produtos por Venda.

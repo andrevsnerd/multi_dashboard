@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { getPublicDatabaseErrorMessage, isDatabaseConnectionError, withRequest } from '@/lib/db/connection';
 import sql from 'mssql';
 import { getMappedColorDescription } from '@/lib/utils/colorMapping';
-import { getActiveFilial, resolveCompany } from '@/lib/config/company';
+import { getActiveFilial } from '@/lib/config/company';
+import { resolveCompanyLive } from '@/lib/server/company-live';
 
 export const maxDuration = 60;
 
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
   const searchTerm = searchParams.get('q') || '';
   const barcodeHint = searchParams.get('barcodeHint') || '';
   const filialOrigem = searchParams.get('filialOrigem');
-  const company = resolveCompany(searchParams.get('company') || undefined);
+  const company = await resolveCompanyLive(searchParams.get('company') || undefined);
   const filialOperacional = filialOrigem ? getActiveFilial(company, filialOrigem) : null;
   const corProduto = searchParams.get('corProduto'); // Para filtrar quando encontrado por código de barras
   const isEntrada = searchParams.get('entrada') === 'true';

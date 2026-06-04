@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { resolveCompany, type CompanyKey } from "@/lib/config/company";
+import { type CompanyKey } from "@/lib/config/company";
+import { resolveCompanyLive } from "@/lib/server/company-live";
 import { formatDateForQuery, normalizeRangeForQuery } from "@/lib/utils/date";
 import { fetchFilialProdutoSales } from "@/lib/repositories/performance";
 import {
@@ -145,7 +146,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Periodo invalido" }, { status: 400 });
   }
 
-  const company = resolveCompany(companyKey);
+  const company = await resolveCompanyLive(companyKey);
   if (!company) {
     return NextResponse.json({ error: "Empresa nao encontrada" }, { status: 404 });
   }

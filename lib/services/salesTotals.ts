@@ -9,6 +9,7 @@ import {
   type CompanyKey,
   type CompanyModule,
 } from '@/lib/config/company';
+import { resolveCompanyLive, liveNameForIncoming } from '@/lib/server/company-live';
 import { shiftRangeByMonths, type NormalizedRange } from '@/lib/utils/date';
 import {
   fetchEcommerceSummary,
@@ -42,15 +43,18 @@ const EMPTY: SalesTotals = {
   lastSaleDate: null,
 };
 
-function buildFilialClause(
+async function buildFilialClause(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   module: CompanyModule,
   specificFilial: string | null | undefined,
-): string {
+): Promise<string> {
   if (!companySlug) return '';
-  const company = resolveCompany(companySlug);
+  const company = await resolveCompanyLive(companySlug);
   if (!company) return '';
+
+  // Normaliza o nome vindo do front para o nome vivo do banco (match por COD_FILIAL).
+  specificFilial = await liveNameForIncoming(specificFilial);
 
   const isScarfme = companySlug === 'scarfme';
   const filiais = company.filialFilters[module] ?? [];
@@ -184,7 +188,7 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
     request.input('stPrevStart', sql.DateTime, previousRange.start);
     request.input('stPrevEnd', sql.DateTime, previousRange.end);
 
-    const filialClause = buildFilialClause(request, company as string, 'sales', filial ?? null);
+    const filialClause = await buildFilialClause(request, company as string, 'sales', filial ?? null);
     const linhaTokens = buildLinhaClause(request, company as string, linhas);
     const needsProdutoJoin = linhaTokens.active;
 

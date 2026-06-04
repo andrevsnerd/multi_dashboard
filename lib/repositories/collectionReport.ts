@@ -6,6 +6,7 @@ import {
   resolveCompany,
   VAREJO_VALUE,
 } from "@/lib/config/company";
+import { resolveCompanyLive, liveNameForIncoming } from "@/lib/server/company-live";
 import { withRequest } from "@/lib/db/connection";
 import { RequestLike } from "@/lib/db/proxy";
 import { normalizeRangeForQuery } from "@/lib/utils/date";
@@ -136,18 +137,21 @@ function shouldIncludeEcommerceChannel(company?: string, filial?: string | null)
   return isEcommerceFilial(company, filial);
 }
 
-function buildSalesFilialFilter(
+async function buildSalesFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   filial: string | null | undefined,
   paramPrefix: string,
   tableAlias = "vp"
-) {
-  const company = resolveCompany(companySlug);
+): Promise<string> {
+  const company = await resolveCompanyLive(companySlug);
 
   if (!company) {
     return "";
   }
+
+  // Normaliza o nome vindo do front para o nome vivo do banco (match por COD_FILIAL).
+  filial = await liveNameForIncoming(filial);
 
   const ecommerceFilials = new Set(company.ecommerceFilials ?? []);
   const salesFiliais = company.filialFilters.sales.filter(
@@ -174,18 +178,21 @@ function buildSalesFilialFilter(
   return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
 }
 
-function buildEcommerceFilialFilter(
+async function buildEcommerceFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   filial: string | null | undefined,
   paramPrefix: string,
   tableAlias = "f"
-) {
-  const company = resolveCompany(companySlug);
+): Promise<string> {
+  const company = await resolveCompanyLive(companySlug);
 
   if (!company) {
     return "";
   }
+
+  // Normaliza o nome vindo do front para o nome vivo do banco (match por COD_FILIAL).
+  filial = await liveNameForIncoming(filial);
 
   const ecommerceFiliais = company.ecommerceFilials ?? [];
 
@@ -359,7 +366,7 @@ async function fetchSalesDetails(
   }
 
   const salesFilial = filial && filial !== VAREJO_VALUE ? filial : VAREJO_VALUE;
-  const filialFilter = buildSalesFilialFilter(request, company, salesFilial, "sales");
+  const filialFilter = await buildSalesFilialFilter(request, company, salesFilial, "sales");
   const collectionFilter = buildSalesCollectionFilter(request, colecoes, "sales");
 
   const query = `
@@ -410,7 +417,7 @@ async function fetchEcommerceDetails(
   }
 
   const ecommerceFilial = filial && isEcommerceFilial(company, filial) ? filial : null;
-  const filialFilter = buildEcommerceFilialFilter(
+  const filialFilter = await buildEcommerceFilialFilter(
     request,
     company,
     ecommerceFilial,
@@ -601,7 +608,7 @@ export async function fetchCollectionReportColecoes({
 
     if (shouldIncludeSalesChannel(company, filial)) {
       const salesFilial = filial && filial !== VAREJO_VALUE ? filial : VAREJO_VALUE;
-      const filialFilter = buildSalesFilialFilter(request, company, salesFilial, "salesOptions");
+      const filialFilter = await buildSalesFilialFilter(request, company, salesFilial, "salesOptions");
       const result = await request.query<{ colecao: string | null }>(`
         SELECT DISTINCT UPPER(LTRIM(RTRIM(COALESCE(vp.COLECAO, p.COLECAO, '')))) AS colecao
         FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
@@ -622,7 +629,7 @@ export async function fetchCollectionReportColecoes({
 
     if (shouldIncludeEcommerceChannel(company, filial)) {
       const ecommerceFilial = filial && isEcommerceFilial(company, filial) ? filial : null;
-      const filialFilter = buildEcommerceFilialFilter(
+      const filialFilter = await buildEcommerceFilialFilter(
         request,
         company,
         ecommerceFilial,
@@ -687,7 +694,7 @@ export async function fetchCollectionReportAvailableRange({
 
     if (shouldIncludeSalesChannel(company, filial)) {
       const salesFilial = filial && filial !== VAREJO_VALUE ? filial : VAREJO_VALUE;
-      const filialFilter = buildSalesFilialFilter(
+      const filialFilter = await buildSalesFilialFilter(
         request,
         company,
         salesFilial,
@@ -723,7 +730,7 @@ export async function fetchCollectionReportAvailableRange({
 
     if (shouldIncludeEcommerceChannel(company, filial)) {
       const ecommerceFilial = filial && isEcommerceFilial(company, filial) ? filial : null;
-      const filialFilter = buildEcommerceFilialFilter(
+      const filialFilter = await buildEcommerceFilialFilter(
         request,
         company,
         ecommerceFilial,

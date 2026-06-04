@@ -1,6 +1,7 @@
 import sql from "mssql";
 
-import { resolveCompany, VAREJO_VALUE, type CompanyConfig } from "@/lib/config/company";
+import { VAREJO_VALUE, type CompanyConfig } from "@/lib/config/company";
+import { resolveCompanyLive } from "@/lib/server/company-live";
 import { withRequest } from "@/lib/db/connection";
 import { RequestLike } from "@/lib/db/proxy";
 import { fetchAvailableColecoesWithDescriptions } from "@/lib/repositories/products";
@@ -1428,7 +1429,7 @@ export async function fetchClaudeReport({
   subgrupos,
   grades,
 }: ClaudeReportRequest): Promise<ClaudeReportPayload> {
-  const company = resolveCompany("scarfme");
+  const company = await resolveCompanyLive("scarfme");
   if (!company) {
     throw new Error("Empresa scarfme não encontrada.");
   }

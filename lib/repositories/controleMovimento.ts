@@ -1,6 +1,7 @@
 import sql from 'mssql';
 
 import { resolveCompany, VAREJO_VALUE } from '@/lib/config/company';
+import { resolveCompanyLive, liveNameForIncoming } from '@/lib/server/company-live';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import { normalizeRangeForQuery, shiftRangeByMonths } from '@/lib/utils/date';
@@ -13,20 +14,23 @@ function resolveRange(range?: DateRangeInput) {
   });
 }
 
-function buildFilialFilterEntradas(
+async function buildFilialFilterEntradas(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   specificFilial?: string | null,
   prefix: string = 'E'
-): string {
+): Promise<string> {
   if (!companySlug) {
     return '';
   }
 
-  const company = resolveCompany(companySlug);
+  const company = await resolveCompanyLive(companySlug);
   if (!company) {
     return '';
   }
+
+  // Normaliza o nome vindo do front para o nome vivo do banco (match por COD_FILIAL).
+  specificFilial = await liveNameForIncoming(specificFilial);
 
   const filiais = company.filialFilters['inventory'] ?? [];
   const ecommerceFilials = company.ecommerceFilials ?? [];
@@ -62,20 +66,23 @@ function buildFilialFilterEntradas(
   return `AND ${prefix}.FILIAL IN (${placeholders})`;
 }
 
-function buildVendasFilialFilter(
+async function buildVendasFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   specificFilial?: string | null,
   prefix: string = 'vp'
-): string {
+): Promise<string> {
   if (!companySlug) {
     return '';
   }
 
-  const company = resolveCompany(companySlug);
+  const company = await resolveCompanyLive(companySlug);
   if (!company) {
     return '';
   }
+
+  // Normaliza o nome vindo do front para o nome vivo do banco (match por COD_FILIAL).
+  specificFilial = await liveNameForIncoming(specificFilial);
 
   const isScarfme = companySlug === 'scarfme';
   const filiais = company.filialFilters['sales'] ?? [];
@@ -331,7 +338,7 @@ export async function fetchControleMovimentoKPIs({
     request.input('previousStartDate', sql.DateTime, previousRange.start);
     request.input('previousEndDate', sql.DateTime, previousRange.end);
 
-    const companyConfig = resolveCompany(company);
+    const companyConfig = await resolveCompanyLive(company);
     const categoriaField = company === 'nerd' ? 'pr.GRUPO_PRODUTO' : 'pr.LINHA';
 
     // Filtros para entradas - APENAS NA MATRIZ (igual ao controle de estoque)
@@ -383,7 +390,7 @@ export async function fetchControleMovimentoKPIs({
     const exclusionFilterEntradas = buildExclusionFilter(request, company, 'pr', 'excludedLineEntradas');
 
     // Filtros para vendas
-    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
+    const vendasFilialFilter = await buildVendasFilialFilter(request, company, filial, 'vp');
     const grupoFilterVendas = buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilterVendas = buildLinhaFilter(request, company, linhas, 'p');
     const colecaoFilterVendas = buildColecaoFilter(request, company, colecoes, 'p');
@@ -825,7 +832,7 @@ export async function fetchMovimentoDetalhes({
     request.input('previousStartDate', sql.DateTime, previousRange.start);
     request.input('previousEndDate', sql.DateTime, previousRange.end);
 
-    const companyConfig = resolveCompany(company);
+    const companyConfig = await resolveCompanyLive(company);
     const categoriaField = company === 'nerd' ? 'pr.GRUPO_PRODUTO' : 'pr.LINHA';
 
     // Filtros para entradas - APENAS NA MATRIZ
@@ -877,7 +884,7 @@ export async function fetchMovimentoDetalhes({
     const exclusionFilterEntradas = buildExclusionFilter(request, company, 'pr', 'excludedLineEntradas');
 
     // Filtros para vendas
-    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
+    const vendasFilialFilter = await buildVendasFilialFilter(request, company, filial, 'vp');
     const grupoFilterVendas = buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilterVendas = buildLinhaFilter(request, company, linhas, 'p');
     const colecaoFilterVendas = buildColecaoFilter(request, company, colecoes, 'p');

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { fetchPerformanceData } from '@/lib/repositories/performance';
 import { readGoals } from '@/lib/utils/goals-storage';
-import { resolveCompany, type CompanyKey } from '@/lib/config/company';
+import { type CompanyKey } from '@/lib/config/company';
+import { resolveCompanyLive } from '@/lib/server/company-live';
 import { normalizeRangeForQuery, formatDateForQuery } from '@/lib/utils/date';
 
 export const maxDuration = 300;
@@ -58,7 +59,7 @@ export async function GET(request: Request) {
 
   const comparisonMode: 'month' | 'year' = compareParam === 'year' ? 'year' : 'month';
 
-  const company = resolveCompany(companyKey);
+  const company = await resolveCompanyLive(companyKey);
   if (!company) {
     return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404 });
   }

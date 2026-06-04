@@ -1,6 +1,7 @@
 import sql from 'mssql';
 
-import { resolveCompany, type CompanyModule } from '@/lib/config/company';
+import { type CompanyModule } from '@/lib/config/company';
+import { resolveCompanyLive, liveNameForIncoming } from '@/lib/server/company-live';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import { fetchEstoqueKPIs } from '@/lib/repositories/controleEstoque';
@@ -25,23 +26,26 @@ function resolveRange(range?: DateRangeInput) {
   });
 }
 
-function buildEcommerceFilialFilter(
+async function buildEcommerceFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   specificFilial?: string | null,
   tableAlias: string = 'f'
-): string {
+): Promise<string> {
   if (!companySlug) {
     console.log('[buildEcommerceFilialFilter] DEBUG - Sem companySlug');
     return '';
   }
 
-  const company = resolveCompany(companySlug);
+  const company = await resolveCompanyLive(companySlug);
 
   if (!company) {
     console.log('[buildEcommerceFilialFilter] DEBUG - Empresa não encontrada:', companySlug);
     return '';
   }
+
+  // Normaliza o nome vindo do front para o nome vivo do banco (match por COD_FILIAL).
+  specificFilial = await liveNameForIncoming(specificFilial);
 
   const ecommerceFilials = company.ecommerceFilials ?? [];
 
@@ -137,7 +141,7 @@ export async function fetchTopProductsEcommerce({
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const filialFilter = buildEcommerceFilialFilter(request, company, filial);
+    const filialFilter = await buildEcommerceFilialFilter(request, company, filial);
 
     const query = `
       SELECT TOP (@limit)
@@ -224,7 +228,7 @@ export async function fetchEcommerceSummary({
     request.input('prevStartDate', sql.DateTime, previousRange.start);
     request.input('prevEndDate', sql.DateTime, previousRange.end);
 
-    const filialFilter = buildEcommerceFilialFilter(request, company, filial);
+    const filialFilter = await buildEcommerceFilialFilter(request, company, filial);
 
     // Criar filtros para ScarfMe (e-commerce usa apenas p, não vp) - suporta múltiplos
     let linhaFilter = '';
@@ -1073,7 +1077,7 @@ export async function fetchEcommerceSummary({
 
     // Buscar disponibilidade de datas usando withRequest para suportar proxy
     const availabilityRow = await withRequest(async (availabilityRequest) => {
-      const availabilityFilter = buildEcommerceFilialFilter(availabilityRequest, company, filial);
+      const availabilityFilter = await buildEcommerceFilialFilter(availabilityRequest, company, filial);
       const availabilityQuery = `
         SELECT
           MIN(f.EMISSAO) AS firstSaleDate,
@@ -1124,7 +1128,7 @@ export async function fetchTopCategoriesEcommerce({
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const filialFilter = buildEcommerceFilialFilter(request, company, filial);
+    const filialFilter = await buildEcommerceFilialFilter(request, company, filial);
 
     const query = `
       SELECT TOP (@limit)
@@ -1170,7 +1174,7 @@ export async function fetchDailyEcommerceRevenue({
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const filialFilter = buildEcommerceFilialFilter(request, company, filial);
+    const filialFilter = await buildEcommerceFilialFilter(request, company, filial);
 
     const query = `
       SELECT
@@ -1219,7 +1223,7 @@ export async function fetchEcommerceFilialPerformance({
     request.input('prevStartDate', sql.DateTime, previousRange.start);
     request.input('prevEndDate', sql.DateTime, previousRange.end);
 
-    const companyConfig = resolveCompany(company);
+    const companyConfig = await resolveCompanyLive(company);
     if (!companyConfig) {
       return [];
     }

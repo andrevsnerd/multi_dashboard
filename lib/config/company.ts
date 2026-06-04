@@ -1,3 +1,5 @@
+import { buildDerivedFilialConfig, staticNameOf } from './filial-config-builder';
+
 export type CompanyKey = 'nerd' | 'scarfme';
 
 export type CompanyModule = 'sales' | 'inventory';
@@ -30,151 +32,23 @@ export interface CompanyConfig {
   };
 }
 
+/**
+ * Os campos de filial (filialFilters, filialDisplayNames, ecommerceFilials,
+ * estoqueFilialOrder, filialGroups, activeFilials, leadTimeDays) são DERIVADOS do
+ * registry por ID (`filial-registry.ts`) via `buildDerivedFilialConfig`. Aqui usamos
+ * os nomes fallback (estáticos); o nome vivo do banco é injetado no caminho server
+ * que monta SQL. Não edite estes campos à mão — edite o registry.
+ */
 const companyConfigs: Record<CompanyKey, CompanyConfig> = {
   nerd: {
     key: 'nerd',
     name: 'NERD',
-    filialFilters: {
-      sales: [
-        'NERD CENTER NORTE',
-        'NERD HIGIENOPOLIS',
-        'NERD LEBLON',
-        'NERD MORUMBI RDRRRJ',
-        'NERD MORUMBI RDRX',
-        'NERD MORUMBI RDRRX',
-        'NERD ELDORADO',
-        'NERD VILLA LOBOS',
-      ],
-      inventory: [
-        'NERD CENTER NORTE',
-        'NERD HIGIENOPOLIS',
-        'NERD LEBLON',
-        'NERD MORUMBI RDRRRJ',
-        'NERD MORUMBI RDRX',
-        'NERD MORUMBI RDRRX',
-        'NERD ELDORADO',
-        'NERD VILLA LOBOS',
-        'NERD',
-      ],
-    },
-    filialDisplayNames: {
-      'NERD CENTER NORTE': 'CENTER NORTE',
-      'NERD HIGIENOPOLIS': 'HIGIENOPOLIS',
-      'NERD LEBLON': 'LEBLON',
-      'NERD MORUMBI RDRRRJ': 'MORUMBI 1',
-      'NERD MORUMBI RDRX': 'MORUMBI 1',
-      'NERD MORUMBI RDRRX': 'MORUMBI 2',
-      'NERD ELDORADO': 'ELDORADO',
-      'NERD VILLA LOBOS': 'VILLA LOBOS',
-      'NERD': 'MATRIZ',
-    },
-    estoqueFilialOrder: ['MATRIZ', 'MORUMBI 1', 'MORUMBI 2', 'ELDORADO', 'VILLA LOBOS', 'HIGIENOPOLIS', 'LEBLON', 'CENTER NORTE'],
-    filialGroups: {
-      'NERD MORUMBI RDRRRJ': [
-        'NERD MORUMBI RDRRRJ',
-        'NERD MORUMBI RDRX',
-      ],
-    },
-    activeFilials: {
-      'NERD MORUMBI RDRRRJ': 'NERD MORUMBI RDRX',
-      'NERD MORUMBI RDRX': 'NERD MORUMBI RDRX',
-      'NERD MORUMBI RDRRX': 'NERD MORUMBI RDRRX',
-    },
-    leadTimeDays: {
-      default: 2,
-      byFilial: {
-        'NERD': 1,
-      },
-    },
+    ...buildDerivedFilialConfig('nerd', staticNameOf),
   },
   scarfme: {
     key: 'scarfme',
     name: 'SCARF ME',
-    filialFilters: {
-      sales: [
-        'GUARULHOS - RSR',
-        'IGUATEMI SP - JJJ',
-        'MORUMBI - JJJ',
-        'OSCAR FREIRE - FSZ',
-        'SCARF ME - HIGIENOPOLIS 2',
-        'SCARFME - IBIRAPUERA LLL',
-        'SCARFME ME - PAULISTA FFF',
-        'SCARF ME - PAULISTA RSR',
-        'SCARF ME - PAULISTA FFFR',
-        'SCARF ME PAULISTA FFFR',
-        'SCARF ME - MATRIZ',
-        'SCARFME MATRIZ CMS',
-        'SCARF ME - MATRIZ LLL',
-        'SCARF ME MATRIZ - FFF',
-        'VILLA LOBOS - LLL',
-        'MSC COMERCIO DE LENCOS LT',
-        'SCARFME LLL -  GALEAO RJ',
-      ],
-      inventory: [
-        'GUARULHOS - RSR',
-        'IGUATEMI SP - JJJ',
-        'MORUMBI - JJJ',
-        'OSCAR FREIRE - FSZ',
-        'SCARF ME - HIGIENOPOLIS 2',
-        'SCARFME - IBIRAPUERA LLL',
-        'SCARFME ME - PAULISTA FFF',
-        'SCARF ME - PAULISTA RSR',
-        'SCARF ME - PAULISTA FFFR',
-        'SCARF ME PAULISTA FFFR',
-        'SCARF ME - MATRIZ',
-        'SCARFME MATRIZ CMS',
-        'SCARF ME - MATRIZ LLL',
-        'SCARF ME MATRIZ - FFF',
-        'VILLA LOBOS - LLL',
-        'MSC COMERCIO DE LENCOS LT',
-        'SCARFME LLL -  GALEAO RJ',
-      ],
-    },
-    filialDisplayNames: {
-      'GUARULHOS - RSR': 'GUARULHOS',
-      'IGUATEMI SP - JJJ': 'IGUATEMI',
-      'MORUMBI - JJJ': 'MORUMBI',
-      'OSCAR FREIRE - FSZ': 'OSCAR FREIRE',
-      'SCARF ME - HIGIENOPOLIS 2': 'HIGIENÓPOLIS',
-      'SCARFME - IBIRAPUERA LLL': 'IBIRAPUERA',
-      'SCARFME ME - PAULISTA FFF': 'PAULISTA',
-      'SCARF ME - PAULISTA RSR': 'PAULISTA',
-      'SCARF ME - PAULISTA FFFR': 'PAULISTA',
-      'SCARF ME PAULISTA FFFR': 'PAULISTA',
-      'SCARF ME - MATRIZ': 'MATRIZ',
-      'SCARFME MATRIZ CMS': 'E-COMMERCE',
-      'SCARF ME - MATRIZ LLL': 'E-COMMERCE',
-      'SCARF ME MATRIZ - FFF': 'E-COMMERCE',
-      'VILLA LOBOS - LLL': 'VILLA LOBOS',
-      'MSC COMERCIO DE LENCOS LT': 'E-COMMERCE',
-      'SCARFME LLL -  GALEAO RJ': 'GALEÃO RJ',
-    },
-    estoqueFilialOrder: ['MATRIZ', 'E-COMMERCE', 'GUARULHOS', 'MORUMBI', 'OSCAR FREIRE', 'VILLA LOBOS', 'GALEÃO RJ'],
-    ecommerceFilials: ['SCARFME MATRIZ CMS', 'SCARF ME - MATRIZ LLL', 'SCARF ME MATRIZ - FFF', 'MSC COMERCIO DE LENCOS LT'],
-    filialGroups: {
-      // PAULISTA: várias entidades/CNPJs no sistema, tratadas como uma loja lógica
-      'SCARFME ME - PAULISTA FFF': [
-        'SCARFME ME - PAULISTA FFF',
-        'SCARF ME - PAULISTA RSR',
-        'SCARF ME - PAULISTA FFFR',
-        'SCARF ME PAULISTA FFFR',
-      ],
-    },
-    activeFilials: {
-      'SCARFME ME - PAULISTA FFF': 'SCARF ME PAULISTA FFFR',
-      'SCARF ME - PAULISTA RSR': 'SCARF ME PAULISTA FFFR',
-      'SCARF ME - PAULISTA FFFR': 'SCARF ME PAULISTA FFFR',
-      'SCARF ME PAULISTA FFFR': 'SCARF ME PAULISTA FFFR',
-      'SCARFME MATRIZ CMS': 'MSC COMERCIO DE LENCOS LT',
-      'SCARF ME - MATRIZ LLL': 'MSC COMERCIO DE LENCOS LT',
-      'SCARF ME MATRIZ - FFF': 'MSC COMERCIO DE LENCOS LT',
-      'MSC COMERCIO DE LENCOS LT': 'MSC COMERCIO DE LENCOS LT',
-      // Galeão: o nome real no DB tem 2 espaços após o hífen ("SCARFME LLL -  GALEAO RJ").
-      // Como findActiveRule colapsa \s+ ao comparar, esta regra normaliza qualquer variação
-      // de espaçamento (ex.: destinos antigos salvos com 1 espaço) para o nome canônico do DB.
-      // Auto-corrige leitura de destinos/confirmações legados sem migrar linha a linha.
-      'SCARFME LLL -  GALEAO RJ': 'SCARFME LLL -  GALEAO RJ',
-    },
+    ...buildDerivedFilialConfig('scarfme', staticNameOf),
     excludedLines: [
       'PRIVATE LABEL',
       'GASTRONOMICA',
@@ -184,15 +58,6 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
       'EMBALAGENS',
       'CAPAS E ACESSORIOS P/ CEL',
     ],
-    leadTimeDays: {
-      default: 3,
-      byFilial: {
-        'SCARF ME - MATRIZ': 2,
-        'SCARFME MATRIZ CMS': 2,
-        'SCARF ME - MATRIZ LLL': 2,
-        'SCARF ME MATRIZ - FFF': 2,
-      },
-    },
   },
 };
 

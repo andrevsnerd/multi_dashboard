@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import sql from 'mssql';
 
 import { withRequest } from '@/lib/db/connection';
-import { resolveCompany } from '@/lib/config/company';
+import { resolveCompanyLive } from '@/lib/server/company-live';
 
 export const maxDuration = 60;
 
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'company required' }, { status: 400 });
   }
 
-  const companyConfig = resolveCompany(company);
+  const companyConfig = await resolveCompanyLive(company);
   if (!companyConfig) {
     return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 400 });
   }

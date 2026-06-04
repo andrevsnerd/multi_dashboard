@@ -1,6 +1,7 @@
 import sql from 'mssql';
 
-import { resolveCompany, VAREJO_VALUE } from '@/lib/config/company';
+import { VAREJO_VALUE } from '@/lib/config/company';
+import { resolveCompanyLive, liveNameForIncoming } from '@/lib/server/company-live';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import { normalizeRangeForQuery } from '@/lib/utils/date';
@@ -42,21 +43,24 @@ export interface StockByFilialItem {
   colecao?: string;
 }
 
-function buildFilialFilter(
+async function buildFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   specificFilial?: string | null,
   prefix: string = 'e'
-): string {
+): Promise<string> {
   if (!companySlug) {
     return '';
   }
 
-  const company = resolveCompany(companySlug);
+  const company = await resolveCompanyLive(companySlug);
 
   if (!company) {
     return '';
   }
+
+  // Normaliza o nome vindo do front para o nome vivo do banco (match por COD_FILIAL).
+  specificFilial = await liveNameForIncoming(specificFilial);
 
   const isScarfme = companySlug === 'scarfme';
   const filiais = company.filialFilters['inventory'] ?? [];
@@ -297,21 +301,24 @@ function buildGrupoFilterForSales(
   return '';
 }
 
-function buildSalesFilialFilter(
+async function buildSalesFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   specificFilial?: string | null,
   prefix: string = 'vp'
-): string {
+): Promise<string> {
   if (!companySlug) {
     return '';
   }
 
-  const company = resolveCompany(companySlug);
+  const company = await resolveCompanyLive(companySlug);
 
   if (!company) {
     return '';
   }
+
+  // Normaliza o nome vindo do front para o nome vivo do banco (match por COD_FILIAL).
+  specificFilial = await liveNameForIncoming(specificFilial);
 
   const isScarfme = companySlug === 'scarfme';
   const filiais = company.filialFilters['sales'] ?? [];
@@ -405,8 +412,8 @@ export async function fetchStockByFilial({
     request.input('endDate', sql.DateTime, end);
     request.input('thirtyDaysAgo', sql.DateTime, thirtyDaysAgo);
 
-    const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
-    const vendasFilialFilter = buildSalesFilialFilter(request, company, filial, 'vp');
+    const estoqueFilialFilter = await buildFilialFilter(request, company, filial, 'e');
+    const vendasFilialFilter = await buildSalesFilialFilter(request, company, filial, 'vp');
     const grupoFilter = buildGrupoFilter(company, 'p');
     // Para vendas, verificar tanto vp quanto p (produtos) para LINHA e GRUPO_PRODUTO
     const grupoFilterVendas = buildGrupoFilterForSales(company);

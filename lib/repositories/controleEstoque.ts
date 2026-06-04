@@ -1,6 +1,7 @@
 import sql from 'mssql';
 
 import { resolveCompany, VAREJO_VALUE, isEcommerceFilial, getFilialGroupMembers } from '@/lib/config/company';
+import { resolveCompanyLive, liveNameForIncoming, liveNamesForIncoming } from '@/lib/server/company-live';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import { getCurrentMonthRange, normalizeRangeForQuery, shiftRangeByMonths } from '@/lib/utils/date';
@@ -38,22 +39,26 @@ function restrictFiliaisToAllowed(
   return filiais.filter((filial) => allowedSet.has(filial.trim().toUpperCase()));
 }
 
-function buildFilialFilter(
+async function buildFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   specificFilial?: string | null,
   prefix: string = 'e',
   allowedFiliais?: string[] | null
-): string {
+): Promise<string> {
   if (!companySlug) {
     return '';
   }
 
-  const company = resolveCompany(companySlug);
+  const company = await resolveCompanyLive(companySlug);
 
   if (!company) {
     return '';
   }
+
+  // Normaliza nomes vindos do front para o nome vivo do banco (match por COD_FILIAL).
+  specificFilial = await liveNameForIncoming(specificFilial);
+  allowedFiliais = await liveNamesForIncoming(allowedFiliais);
 
   const isScarfme = companySlug === 'scarfme';
   const filiais = company.filialFilters['inventory'] ?? [];
@@ -147,23 +152,27 @@ function buildFilialFilter(
   return `AND ${prefix}.FILIAL IN (${placeholders})`;
 }
 
-function buildEntradaFilialFilter(
+async function buildEntradaFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   specificFilial: string | null | undefined,
   alias: string,
   paramPrefix: string,
   allowedFiliais?: string[] | null
-): string {
+): Promise<string> {
   if (!companySlug) {
     return '';
   }
 
-  const company = resolveCompany(companySlug);
+  const company = await resolveCompanyLive(companySlug);
 
   if (!company) {
     return '';
   }
+
+  // Normaliza nomes vindos do front para o nome vivo do banco (match por COD_FILIAL).
+  specificFilial = await liveNameForIncoming(specificFilial);
+  allowedFiliais = await liveNamesForIncoming(allowedFiliais);
 
   const isScarfme = companySlug === 'scarfme';
   const filiais = company.filialFilters['sales'] ?? [];
@@ -220,22 +229,26 @@ function buildEntradaFilialFilter(
   return `AND ${alias}.FILIAL IN (${placeholders})`;
 }
 
-function buildVendasFilialFilter(
+async function buildVendasFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   specificFilial?: string | null,
   prefix: string = 'vp',
   allowedFiliais?: string[] | null
-): string {
+): Promise<string> {
   if (!companySlug) {
     return '';
   }
 
-  const company = resolveCompany(companySlug);
+  const company = await resolveCompanyLive(companySlug);
 
   if (!company) {
     return '';
   }
+
+  // Normaliza nomes vindos do front para o nome vivo do banco (match por COD_FILIAL).
+  specificFilial = await liveNameForIncoming(specificFilial);
+  allowedFiliais = await liveNamesForIncoming(allowedFiliais);
 
   const isScarfme = companySlug === 'scarfme';
   const filiais = company.filialFilters['sales'] ?? [];
@@ -327,16 +340,20 @@ function buildVendasFilialFilter(
  * Mesma regra de fetchVendasPorCategoriaGiro: todas (null) = IN ecommerceFilials; VAREJO = exclui;
  * filial física só se estiver em ecommerceFilials.
  */
-function buildScarfmeEcommerceFaturamentoFilialFilter(
+async function buildScarfmeEcommerceFaturamentoFilialFilter(
   request: sql.Request | RequestLike,
   filial: string | null,
   paramPrefix: string,
   allowedFiliais?: string[] | null
-): string {
-  const companyConfig = resolveCompany('scarfme');
+): Promise<string> {
+  const companyConfig = await resolveCompanyLive('scarfme');
   if (!companyConfig) {
     return '';
   }
+
+  // Normaliza nomes do front para o nome vivo do banco (match por COD_FILIAL).
+  filial = (await liveNameForIncoming(filial)) ?? null;
+  allowedFiliais = await liveNamesForIncoming(allowedFiliais);
 
   const ecommerceFilials = restrictFiliaisToAllowed(
     companyConfig.ecommerceFilials ?? [],
@@ -631,8 +648,8 @@ export async function fetchCategoriasComGiro({
   }
 
   return withRequest(async (request) => {
-    const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
-    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vg');
+    const estoqueFilialFilter = await buildFilialFilter(request, company, filial, 'e');
+    const vendasFilialFilter = await buildVendasFilialFilter(request, company, filial, 'vg');
     const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
     const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
@@ -750,8 +767,8 @@ export async function fetchProdutosParados({
   diasGiro,
 }: ControleEstoqueParams & { diasGiro: number }): Promise<ProdutoParado[]> {
   return withRequest(async (request) => {
-    const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
-    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vg');
+    const estoqueFilialFilter = await buildFilialFilter(request, company, filial, 'e');
+    const vendasFilialFilter = await buildVendasFilialFilter(request, company, filial, 'vg');
     const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
     const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
@@ -988,9 +1005,9 @@ export async function fetchEstoqueKPIs({
     };
     const previousMonth = shiftRangeByMonths(currentMonth, -1);
     
-    const companyConfig = resolveCompany(company);
-    const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
-    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
+    const companyConfig = await resolveCompanyLive(company);
+    const estoqueFilialFilter = await buildFilialFilter(request, company, filial, 'e');
+    const vendasFilialFilter = await buildVendasFilialFilter(request, company, filial, 'vp');
     const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
     const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
@@ -1328,7 +1345,7 @@ export async function fetchEstoqueKPIs({
     let ecommercePeriodo = 0;
     let valorEcommercePeriodo = 0;
     if (company === 'scarfme') {
-      const companyConfig = resolveCompany(company);
+      const companyConfig = await resolveCompanyLive(company);
       if (companyConfig) {
         const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
         let ecommerceFilialFilterKPI = '';
@@ -1466,8 +1483,8 @@ export async function fetchEstoquePorCategoria({
     request.input('periodoStart', sql.DateTime, periodoStart);
     request.input('periodoEnd', sql.DateTime, periodoEnd);
 
-    const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
-    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
+    const estoqueFilialFilter = await buildFilialFilter(request, company, filial, 'e');
+    const vendasFilialFilter = await buildVendasFilialFilter(request, company, filial, 'vp');
     const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
     const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
@@ -1483,7 +1500,7 @@ export async function fetchEstoquePorCategoria({
     // para garantir que não perdemos vendas no cálculo de "Vendas Totais (período)"
     let vendasGlobaisFilter = '';
     if (company) {
-      const companyConfig = resolveCompany(company);
+      const companyConfig = await resolveCompanyLive(company);
       if (companyConfig) {
         // Unir filiais de venda e filiais de ecommerce em um único conjunto
         const todasFiliais = new Set([
@@ -1642,7 +1659,7 @@ export async function fetchEstoquePorCategoria({
     if (company === 'scarfme') {
       // Criar filtro de filial para e-commerce que inclua todas as filiais de e-commerce
       let ecommercePeriodoFilialFilter = '';
-      const companyConfig = resolveCompany(company);
+      const companyConfig = await resolveCompanyLive(company);
       if (companyConfig) {
         const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
         if (ecommerceFilials.length > 0) {
@@ -1781,7 +1798,7 @@ export async function fetchEstoquePorCategoria({
     // Identificar filiais matriz para considerar apenas entradas reais (compras)
     // As principais entradas sempre são na matriz, transferências para lojas não devem contar
     let matrizFilialFilter = '';
-    const companyConfig = resolveCompany(company);
+    const companyConfig = await resolveCompanyLive(company);
     if (companyConfig) {
       // Identificar matriz baseada na empresa
       let matrizFiliais: string[] = [];
@@ -1977,7 +1994,7 @@ export async function fetchEstoquePorCategoria({
     // Mas com nomes de parâmetros únicos para evitar conflitos (EDUPEPARAM)
     let ecommerceFilialFilter = '';
     if (company === 'scarfme') {
-      const companyConfig = resolveCompany(company);
+      const companyConfig = await resolveCompanyLive(company);
       if (companyConfig) {
         const isScarfme = company === 'scarfme';
         const filiais = companyConfig.filialFilters['inventory'] ?? [];
@@ -2315,8 +2332,8 @@ export async function fetchEvolucaoEstoque({
   grades,
 }: ControleEstoqueParams): Promise<EvolucaoEstoqueData[]> {
   return withRequest(async (request) => {
-    const companyConfig = resolveCompany(company);
-    const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
+    const companyConfig = await resolveCompanyLive(company);
+    const estoqueFilialFilter = await buildFilialFilter(request, company, filial, 'e');
     const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
     const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
@@ -2434,7 +2451,7 @@ export async function fetchDetalhesEntradasSemana({
     request.input('periodoStart', sql.DateTime, periodoStart);
     request.input('periodoEnd', sql.DateTime, periodoEnd);
 
-    const companyConfig = resolveCompany(company);
+    const companyConfig = await resolveCompanyLive(company);
     
     // Identificar matriz
     let matrizFiliais: string[] = [];
@@ -2584,7 +2601,7 @@ export async function fetchDetalhesEntradasSemana({
         ? coresUnicas.map((_, i) => `@corVenda${i}`).join(', ')
         : '';
 
-      const vendasFilialFilter = buildFilialFilter(request, company, filial, 'vp');
+      const vendasFilialFilter = await buildFilialFilter(request, company, filial, 'vp');
       
       const vendasQuery = `
         SELECT 
@@ -2703,12 +2720,12 @@ export async function fetchDetalhesVendasSemana({
     const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos || (subgrupo ? [subgrupo] : []), 'p');
     const gradeFilter = buildGradeFilter(request, company, grades || (grade ? [grade] : []), 'p');
     const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
-    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
+    const vendasFilialFilter = await buildVendasFilialFilter(request, company, filial, 'vp');
 
     // Filtro de filial para e-commerce (apenas ScarfMe)
     let ecommerceFilialFilter = '';
     if (company === 'scarfme') {
-      const companyConfig = resolveCompany(company);
+      const companyConfig = await resolveCompanyLive(company);
       if (companyConfig) {
         const filiais = companyConfig.filialFilters['inventory'] ?? [];
         const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
@@ -2920,7 +2937,7 @@ export async function fetchDetalhesEcommerceSemana({
 
     // Filtro de filial para e-commerce
     let ecommerceFilialFilter = '';
-    const companyConfig = resolveCompany(company);
+    const companyConfig = await resolveCompanyLive(company);
     if (companyConfig) {
       const filiais = companyConfig.filialFilters['inventory'] ?? [];
       const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
@@ -3043,8 +3060,8 @@ export async function fetchVendasPorCategoria({
 }: ControleEstoqueParams): Promise<VendasCategoriaData[]> {
   return withRequest(async (request) => {
     const { start: periodoStart, end: periodoEnd } = resolveRange(range);
-    const companyConfig = resolveCompany(company);
-    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
+    const companyConfig = await resolveCompanyLive(company);
+    const vendasFilialFilter = await buildVendasFilialFilter(request, company, filial, 'vp');
     const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
     const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
@@ -3171,7 +3188,7 @@ export async function fetchVendasPorCategoriaGiro({
   return withRequest(async (request) => {
     const { start: periodoStart, end: periodoEnd } = resolveRange(range);
     
-    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
+    const vendasFilialFilter = await buildVendasFilialFilter(request, company, filial, 'vp');
     const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
     const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
@@ -3333,7 +3350,7 @@ export async function fetchVendasPorCategoriaGiro({
     // Criar filtro de filial para e-commerce com a mesma lógica usada em outras funções
     let ecommerceFilialFilter = '';
     if (company === 'scarfme') {
-      const companyConfig = resolveCompany(company);
+      const companyConfig = await resolveCompanyLive(company);
       if (companyConfig) {
         const isScarfme = company === 'scarfme';
         const filiais = companyConfig.filialFilters['inventory'] ?? [];
@@ -3513,8 +3530,8 @@ export async function fetchPrevisoesEstoque({
       end: new Date(now.getFullYear(), now.getMonth() + 1, 1), // Início do próximo mês (exclusivo)
     };
     
-    const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
-    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
+    const estoqueFilialFilter = await buildFilialFilter(request, company, filial, 'e');
+    const vendasFilialFilter = await buildVendasFilialFilter(request, company, filial, 'vp');
     const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
     const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
@@ -3635,7 +3652,7 @@ export async function fetchPrevisoesEstoque({
     if (company === 'scarfme') {
       // Criar filtro de filial para e-commerce que inclua todas as filiais de e-commerce
       let ecommercePeriodoFilialFilter = '';
-      const companyConfig = resolveCompany(company);
+      const companyConfig = await resolveCompanyLive(company);
       if (companyConfig) {
         const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
         if (ecommerceFilials.length > 0) {
@@ -3919,8 +3936,8 @@ export async function fetchProdutoDetalhes({
     request.input('startDate', sql.DateTime, startDate);
     request.input('endDate', sql.DateTime, endDate);
 
-    const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
-    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
+    const estoqueFilialFilter = await buildFilialFilter(request, company, filial, 'e');
+    const vendasFilialFilter = await buildVendasFilialFilter(request, company, filial, 'vp');
     
     // Construir filtros baseados nos parâmetros
     // Criar filtros separados para estoque (alias 'e') e vendas (alias 'vp')
@@ -4000,7 +4017,7 @@ export async function fetchProdutoDetalhes({
     const detalheCategoriaComGiro = !useProdutosPermitidos && (filtrarApenasComVendas || (startDateParam != null && endDateParam != null)) && company === 'nerd' && grupo && !subgrupo && !grade && !colecao;
     let filtroGiroNaQueryDetalhe = '';
     if (detalheCategoriaComGiro && typeof giroDiasParam === 'number' && company) {
-      const companyConfig = resolveCompany(company);
+      const companyConfig = await resolveCompanyLive(company);
       if (companyConfig) {
         const todasFiliaisVenda = new Set([
           ...(companyConfig.filialFilters['sales'] ?? []),
@@ -4258,8 +4275,8 @@ export async function fetchProdutoDetalhesPorFilial({
     request.input('startDate', sql.DateTime, currentMonth.start);
     request.input('endDate', sql.DateTime, currentMonth.end);
 
-    const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
-    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
+    const estoqueFilialFilter = await buildFilialFilter(request, company, filial, 'e');
+    const vendasFilialFilter = await buildVendasFilialFilter(request, company, filial, 'vp');
 
     let produtoFilter = '';
 
@@ -4718,9 +4735,9 @@ export async function fetchProjecaoMensal({
 
     // Quando filial de e-commerce selecionada, estoque deve incluir TODAS as filiais de e-commerce
     // (não apenas a filial "representante" que o buildFilialFilter filtraria para uma só)
-    let estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
+    let estoqueFilialFilter = await buildFilialFilter(request, company, filial, 'e');
     if (isEcommerceSelected && company === 'scarfme') {
-      const companyConfig = resolveCompany(company);
+      const companyConfig = await resolveCompanyLive(company);
       const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
       if (ecommerceFilials.length > 0) {
         ecommerceFilials.forEach((f, i) => request.input(`estoqueEcommerceFilial${i}`, sql.VarChar, f.trim()));
@@ -4729,7 +4746,7 @@ export async function fetchProjecaoMensal({
       }
     }
 
-    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp');
+    const vendasFilialFilter = await buildVendasFilialFilter(request, company, filial, 'vp');
     const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
     const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
@@ -4742,7 +4759,7 @@ export async function fetchProjecaoMensal({
     // Quando filial = null e scarfme, inclui ecommerce de varejo junto (para bater com o card total).
     let vendasMesAtualFilialFilter = '';
     if (company) {
-      const companyConfig = resolveCompany(company);
+      const companyConfig = await resolveCompanyLive(company);
       if (companyConfig) {
         let filiaisParaMesAtual: string[];
         if (filial && filial !== VAREJO_VALUE && !isEcommerceSelected) {
@@ -4849,7 +4866,7 @@ export async function fetchProjecaoMensal({
     // 2.1. Buscar vendas de e-commerce do ano passado por categoria e mês (apenas ScarfMe)
     let ecommerceAnoPassadoResult: { recordset: Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; mes: number; vendas: number | null }> } = { recordset: [] };
     if (includeEcommerce) {
-      const companyConfig = resolveCompany(company);
+      const companyConfig = await resolveCompanyLive(company);
       if (companyConfig) {
         const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
         let ecommerceAnoPassadoFilialFilter = '';
@@ -4998,7 +5015,7 @@ export async function fetchProjecaoMensal({
     // 2.9. E-commerce mês anterior e últimos 30 dias (ScarfMe) - para regra dos primeiros 5 dias incluir canal
     let ecommerceMesAnterior30DiasResult: { recordset: Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; vendasMesAnterior: number | null; vendas30Dias: number | null }> } = { recordset: [] };
     if (includeEcommerce) {
-      const companyConfig = resolveCompany(company);
+      const companyConfig = await resolveCompanyLive(company);
       if (companyConfig?.ecommerceFilials?.length) {
         const ecommerceFilials = companyConfig.ecommerceFilials;
         ecommerceFilials.forEach((f, idx) => request.input(`ecommercePrev30Filial${idx}`, sql.VarChar, f.trim()));
@@ -5035,7 +5052,7 @@ export async function fetchProjecaoMensal({
     // 3.1. Buscar vendas de e-commerce do mês atual (até hoje) - apenas ScarfMe
     let ecommerceMesAtualResult: { recordset: Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; vendas: number | null }> } = { recordset: [] };
     if (includeEcommerce) {
-      const companyConfig = resolveCompany(company);
+      const companyConfig = await resolveCompanyLive(company);
       if (companyConfig) {
         const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
         let ecommerceMesAtualFilialFilter = '';
@@ -5126,7 +5143,7 @@ export async function fetchProjecaoMensal({
     // 3.3. E-commerce ano atual por mês (ScarfMe)
     let ecommerceAnoAtualPorMesResult: { recordset: Array<{ categoria: string; linha?: string; subgrupo?: string; grade?: string; colecao?: string; mes: number; vendas: number | null }> } = { recordset: [] };
     if (includeEcommerce) {
-      const companyConfig = resolveCompany(company);
+      const companyConfig = await resolveCompanyLive(company);
       if (companyConfig?.ecommerceFilials?.length) {
         const ecommerceFilials = companyConfig.ecommerceFilials;
         ecommerceFilials.forEach((f, index) => request.input(`ecommerceAnoAtualFilial${index}`, sql.VarChar, f.trim()));
@@ -5190,7 +5207,7 @@ export async function fetchProjecaoMensal({
     let matrizProjecaoFilialFilter = '';
     let lojasProjecaoFilterSaidas = '';
     {
-      const companyConf = resolveCompany(company);
+      const companyConf = await resolveCompanyLive(company);
       if (companyConf) {
         const matrizFiliais: string[] = company === 'scarfme' ? ['SCARF ME - MATRIZ'] : company === 'nerd' ? ['NERD'] : [];
         if (matrizFiliais.length > 0) {
@@ -5818,11 +5835,11 @@ export async function fetchTopProdutosUltimos3Meses({
 
     const vendasFilialFilter = isProdutoLookup
       ? ''
-      : buildVendasFilialFilter(request, company, filialSel, 'vp', allowedFiliais);
-    const estoqueFilialFilter = isProdutoLookup ? '' : buildFilialFilter(request, company, filialSel, 'e2', allowedFiliais);
+      : await buildVendasFilialFilter(request, company, filialSel, 'vp', allowedFiliais);
+    const estoqueFilialFilter = isProdutoLookup ? '' : await buildFilialFilter(request, company, filialSel, 'e2', allowedFiliais);
     // Filtros de histórico sempre respeitam filial (preço ignora filial, mas período histórico não)
-    const entradaEstoqueFilialFilter = buildEntradaFilialFilter(request, company, filialSel, 'E', 'lcHistEntradaEstoque', allowedFiliais);
-    const entradaLojaFilialFilter = buildEntradaFilialFilter(request, company, filialSel, 'LE', 'lcHistEntradaLoja', allowedFiliais);
+    const entradaEstoqueFilialFilter = await buildEntradaFilialFilter(request, company, filialSel, 'E', 'lcHistEntradaEstoque', allowedFiliais);
+    const entradaLojaFilialFilter = await buildEntradaFilialFilter(request, company, filialSel, 'LE', 'lcHistEntradaLoja', allowedFiliais);
     const grupoFilter = isProdutoLookup ? '' : buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilter = isProdutoLookup ? '' : buildLinhaFilter(request, company, linhas, 'p');
     const colecaoFilter = isProdutoLookup ? '' : buildColecaoFilter(request, company, colecoes, 'p');
@@ -5858,7 +5875,7 @@ export async function fetchTopProdutosUltimos3Meses({
     const produtosFilterEc = produtosFilter.replace(/vp\./g, 'fp.');
     const ecommerceFatFilialFilter =
       company === 'scarfme' && !isProdutoLookup
-        ? buildScarfmeEcommerceFaturamentoFilialFilter(request, filialSel, 'lcEcFil', allowedFiliais)
+        ? await buildScarfmeEcommerceFaturamentoFilialFilter(request, filialSel, 'lcEcFil', allowedFiliais)
         : '';
     const mergeScarfmeEcommerce =
       company === 'scarfme' &&
@@ -6145,7 +6162,7 @@ export async function fetchTopProdutosUltimos3Meses({
         // Chama buildVendasFilialFilter com alias VH (primeira vez — sem colisão de params).
         // No modo normal, reutiliza o filtro já construído apenas trocando o alias.
         const vendasFilialHistoricoFilter = isProdutoLookup
-          ? buildVendasFilialFilter(request, company, filialSel, 'VH', allowedFiliais)
+          ? await buildVendasFilialFilter(request, company, filialSel, 'VH', allowedFiliais)
           : vendasFilialFilter.replace(/vp\./g, 'VH.');
         const keyVarejo = historicoKeySql('VH.PRODUTO', 'VH.COR_PRODUTO');
         const keyEcommerce = historicoKeySql('FP.PRODUTO', 'FP.COR_PRODUTO');
@@ -6336,7 +6353,7 @@ export async function fetchEstoqueProdutoPorFilial({
     const corNormNum = Number.parseInt(corNorm, 10);
     request.input('p_cor_num', sql.Int, Number.isNaN(corNormNum) ? null : corNormNum);
 
-    const estoqueFilialFilter = buildFilialFilter(request, company, filial ?? null, 'e');
+    const estoqueFilialFilter = await buildFilialFilter(request, company, filial ?? null, 'e');
     const corFilter = corProduto != null
       ? `AND (
           LTRIM(RTRIM(ISNULL(e.COR_PRODUTO, ''))) = @p_cor
@@ -6451,13 +6468,13 @@ export async function fetchVendasProdutoPorFilial({
     `);
     const produtoCustoUnitario = Number(produtoCadastroResult.recordset[0]?.custoUnitario ?? 0);
 
-    const vendasFilialFilter = buildVendasFilialFilter(request, company, filialSel, 'vf');
+    const vendasFilialFilter = await buildVendasFilialFilter(request, company, filialSel, 'vf');
     const ecommerceFatFilialFilter =
       company === 'scarfme'
-        ? buildScarfmeEcommerceFaturamentoFilialFilter(request, filialSel, 'vfEcFil')
+        ? await buildScarfmeEcommerceFaturamentoFilialFilter(request, filialSel, 'vfEcFil')
         : '';
-    const entradaEstoqueFilialFilter = buildEntradaFilialFilter(request, company, filialSel, 'E', 'entradaEstoqueFilial');
-    const entradaLojaFilialFilter = buildEntradaFilialFilter(request, company, filialSel, 'LE', 'entradaLojaFilial');
+    const entradaEstoqueFilialFilter = await buildEntradaFilialFilter(request, company, filialSel, 'E', 'entradaEstoqueFilial');
+    const entradaLojaFilialFilter = await buildEntradaFilialFilter(request, company, filialSel, 'LE', 'entradaLojaFilial');
     const mergeScarfmeEcommerce =
       company === 'scarfme' &&
       ecommerceFatFilialFilter !== '' &&
@@ -6820,7 +6837,7 @@ export async function fetchVendasProdutoPorFilial({
       };
     };
 
-    const estoqueDisponibilidadeFilialFilter = buildFilialFilter(request, company, filialSel, 'EA');
+    const estoqueDisponibilidadeFilialFilter = await buildFilialFilter(request, company, filialSel, 'EA');
     const saidaEstoqueFilialFilter = estoqueDisponibilidadeFilialFilter.replace(/EA\./g, 'ES.');
     const queryEstoqueAtual = `
       SELECT
@@ -7297,8 +7314,8 @@ export async function fetchParadosPorCategoriaGiro({
   return withRequest(async (request) => {
     const { start: periodoStart, end: periodoEnd } = resolveRange(range);
 
-    const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
-    const vendasFilialFilter = buildVendasFilialFilter(request, company, filial, 'vp2');
+    const estoqueFilialFilter = await buildFilialFilter(request, company, filial, 'e');
+    const vendasFilialFilter = await buildVendasFilialFilter(request, company, filial, 'vp2');
     const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
     const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
     const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');

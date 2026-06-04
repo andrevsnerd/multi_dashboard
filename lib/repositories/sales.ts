@@ -1,6 +1,7 @@
 import sql from 'mssql';
 
 import { resolveCompany, isEcommerceFilial, type CompanyModule, type CompanyKey, VAREJO_VALUE } from '@/lib/config/company';
+import { resolveCompanyLive, liveNameForIncoming } from '@/lib/server/company-live';
 import {
   fetchEcommerceSummary,
   fetchTopProductsEcommerce,
@@ -50,22 +51,25 @@ function shouldAggregateEcommerce(
   return isScarfme && hasEcommerce;
 }
 
-function buildFilialFilter(
+async function buildFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   module: CompanyModule,
   specificFilial?: string | null,
   tableAlias: string = 'vp'
-): string {
+): Promise<string> {
   if (!companySlug) {
     return '';
   }
 
-  const company = resolveCompany(companySlug);
+  const company = await resolveCompanyLive(companySlug);
 
   if (!company) {
     return '';
   }
+
+  // Normaliza o nome vindo do front para o nome vivo do banco (match por COD_FILIAL).
+  specificFilial = await liveNameForIncoming(specificFilial);
 
   const isScarfme = companySlug === 'scarfme';
   const filiais = company.filialFilters[module] ?? [];
@@ -262,7 +266,7 @@ export async function fetchTopProducts({
     request.input('endDate', sql.DateTime, end);
 
     // Ajustar filtro de filial para usar f.FILIAL (da tabela FILIAIS) quando usar LOJA_VENDA_PRODUTO
-    const filialFilterBase = buildFilialFilter(request, company, 'sales', filial, 'f');
+    const filialFilterBase = await buildFilialFilter(request, company, 'sales', filial, 'f');
     const filialFilter = filialFilterBase.replace(/f\.FILIAL/g, 'f.FILIAL').replace(/AND f\.FILIAL/g, 'AND f.FILIAL');
     const linhaTokens = buildLinhaFilterTokens(request, company, linhas);
     const linhaFilter = linhaTokens.clause('p.LINHA');
@@ -674,7 +678,7 @@ export async function fetchSalesSummary({
     request.input('prevEndDate', sql.DateTime, previousRange.end);
 
     // Ajustar filtro de filial para usar f.FILIAL (da tabela FILIAIS) quando usar LOJA_VENDA_PRODUTO
-    const filialFilter = buildFilialFilter(request, company, 'sales', filial, 'f');
+    const filialFilter = await buildFilialFilter(request, company, 'sales', filial, 'f');
     
     // Criar filtro de grupo para NERD (suporta múltiplos)
     let grupoFilter = '';
@@ -922,7 +926,7 @@ export async function fetchSalesSummary({
       };
 
       const availabilityRow = await withRequest(async (availabilityRequest) => {
-        const availabilityFilter = buildFilialFilter(availabilityRequest, company, 'sales', filial);
+        const availabilityFilter = await buildFilialFilter(availabilityRequest, company, 'sales', filial);
         const availabilityQuery = `
           SELECT
             MIN(vp.DATA_VENDA) AS firstSaleDate,
@@ -1402,7 +1406,7 @@ export async function fetchSalesSummary({
 
     // Buscar disponibilidade de datas usando withRequest para suportar proxy
     const availabilityRow = await withRequest(async (availabilityRequest) => {
-      const availabilityFilter = buildFilialFilter(availabilityRequest, company, 'sales', filial);
+      const availabilityFilter = await buildFilialFilter(availabilityRequest, company, 'sales', filial);
       const availabilityQuery = `
         SELECT
           MIN(vp.DATA_VENDA) AS firstSaleDate,
@@ -1492,7 +1496,7 @@ export async function fetchTopCategories({
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const filialFilterBase = buildFilialFilter(request, company, 'sales', filial, 'f');
+    const filialFilterBase = await buildFilialFilter(request, company, 'sales', filial, 'f');
     const filialFilter = filialFilterBase.replace(/f\.FILIAL/g, 'f.FILIAL').replace(/AND f\.FILIAL/g, 'AND f.FILIAL');
     const linhaTokens = buildLinhaFilterTokens(request, company, linhas);
     const linhaFilter = linhaTokens.clause('p.LINHA');
@@ -1735,7 +1739,7 @@ export async function fetchDailyRevenue({
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
 
-    const filialFilter = buildFilialFilter(request, company, 'sales', filial);
+    const filialFilter = await buildFilialFilter(request, company, 'sales', filial);
     const linhaTokens = buildLinhaFilterTokens(request, company, linhas);
     const linhaJoin = linhaTokens.active
       ? `LEFT JOIN PRODUTOS p_lf WITH (NOLOCK) ON p_lf.PRODUTO = vp.PRODUTO`
@@ -1859,7 +1863,7 @@ export async function fetchFilialPerformance({
   range,
   linhas,
 }: SummaryQueryParams = {}): Promise<FilialPerformance[]> {
-  const companyConfig = resolveCompany(company);
+  const companyConfig = await resolveCompanyLive(company);
   if (!companyConfig) {
     return [];
   }

@@ -1,0 +1,210 @@
+   ▲ Next.js 16.0.10 (Turbopack)
+   - Local:         http://localhost:3011
+   - Network:       http://192.168.0.17:3011
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1251ms
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-06-01T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: undefined,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[buildEcommerceFilialFilter] DEBUG - Grupo e-commerce selecionado: SCARF ME MATRIZ - FFF Filter: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: 'SCARF ME MATRIZ - FFF',
+  startDate: '2026-06-01T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: undefined,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Grupo e-commerce selecionado: SCARF ME MATRIZ - FFF Filter: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-06-01T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: undefined,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+ GET /api/zdebug-rollout 200 in 19.4s (compile: 1433ms, render: 18.0s)
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-06-01T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: undefined,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[buildEcommerceFilialFilter] DEBUG - Grupo e-commerce selecionado: SCARF ME MATRIZ - FFF Filter: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: 'SCARF ME MATRIZ - FFF',
+  startDate: '2026-06-01T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: undefined,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Grupo e-commerce selecionado: SCARF ME MATRIZ - FFF Filter: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-06-01T00:00:00.000Z',
+  endDate: '2026-06-05T00:00:00.000Z',
+  linha: undefined,
+  linhas: undefined,
+  colecao: undefined,
+  colecoes: undefined,
+  subgrupo: undefined,
+  subgrupos: undefined,
+  grade: undefined,
+  grades: undefined
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: 'AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)',
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'MSC COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3)
+ GET /api/zdebug-rollout 200 in 14.4s (compile: 7ms, render: 14.4s)

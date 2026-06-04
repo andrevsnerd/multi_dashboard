@@ -1,6 +1,7 @@
 import sql from 'mssql';
 
 import { getFilialGroupMembers, resolveCompany, VAREJO_VALUE } from '@/lib/config/company';
+import { resolveCompanyLive, liveNameForIncoming } from '@/lib/server/company-live';
 import { withRequest } from '@/lib/db/connection';
 import { syncProdutoNovoLabels } from '@/lib/repositories/produtosNovos';
 import { RequestLike } from '@/lib/db/proxy';
@@ -44,21 +45,24 @@ export interface ProdutoTransferencia {
   totalEstoque: number;
 }
 
-function buildFilialFilter(
+async function buildFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   specificFilial?: string | null,
   prefix: string = 'e'
-): string {
+): Promise<string> {
   if (!companySlug) {
     return '';
   }
 
-  const company = resolveCompany(companySlug);
+  const company = await resolveCompanyLive(companySlug);
 
   if (!company) {
     return '';
   }
+
+  // Normaliza o nome vindo do front para o nome vivo do banco (match por COD_FILIAL).
+  specificFilial = await liveNameForIncoming(specificFilial);
 
   const filiais = company.filialFilters['inventory'] ?? [];
   const ecommerceFilials = company.ecommerceFilials ?? [];
@@ -161,11 +165,11 @@ export async function fetchControleTransferencias({
     const minStartDate = twelveMonthsAgo;
     request.input('minStartDate', sql.DateTime, minStartDate);
 
-    const estoqueFilialFilter = buildFilialFilter(request, company, filial, 'e');
-    const vendasFilialFilter = buildFilialFilter(request, company, filial, 'vp');
+    const estoqueFilialFilter = await buildFilialFilter(request, company, filial, 'e');
+    const vendasFilialFilter = await buildFilialFilter(request, company, filial, 'vp');
 
     // Verificar se precisa buscar vendas de e-commerce (ScarfMe e filial null)
-    const companyConfig = resolveCompany(company);
+    const companyConfig = await resolveCompanyLive(company);
     const isScarfme = company === 'scarfme';
     const shouldIncludeEcommerce = isScarfme && filial === null;
     const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
@@ -256,11 +260,11 @@ export async function fetchControleTransferencias({
     // Query para buscar última data de entrada por produto+cor+filial
     // Busca em ESTOQUE_PROD_ENT e também em LOJA_ENTRADAS_PRODUTO (priorizando a mais recente)
     // Criar filtro de filial para a query de entrada (usando alias E, mas com prefixo diferente para evitar conflito de variáveis)
-    const ultimaEntradaFilialFilter = buildFilialFilter(request, company, filial, 'ent');
+    const ultimaEntradaFilialFilter = await buildFilialFilter(request, company, filial, 'ent');
     // Ajustar o filtro para usar o alias E na query (substituir 'ent.' por 'E.')
     const ultimaEntradaFilialFilterAjustado = ultimaEntradaFilialFilter.replace(/ent\./g, 'E.');
     // Criar filtro para LOJA_ENTRADAS (usando prefixo 'le' para evitar conflito)
-    const lojaEntradasFilialFilter = buildFilialFilter(request, company, filial, 'le');
+    const lojaEntradasFilialFilter = await buildFilialFilter(request, company, filial, 'le');
     // Ajustar o filtro para usar o alias LE na query (substituir 'le.' por 'LE.')
     const lojaEntradasFilialFilterAjustado = lojaEntradasFilialFilter.replace(/le\./g, 'LE.');
     const ultimaEntradaQuery = `

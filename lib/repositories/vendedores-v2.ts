@@ -6,7 +6,6 @@
 
 import sql from 'mssql';
 import {
-  resolveCompany,
   getActiveFilial,
   getFilialGroupMembers,
   getFilialLabelForDisplay,
@@ -14,6 +13,7 @@ import {
   type CompanyModule,
   VAREJO_VALUE,
 } from '@/lib/config/company';
+import { resolveCompanyLive, liveNameForIncoming } from '@/lib/server/company-live';
 import { withRequest } from '@/lib/db/connection';
 import type { RequestLike } from '@/lib/db/proxy';
 import { normalizeRangeForQuery } from '@/lib/utils/date';
@@ -189,16 +189,19 @@ export interface VendedoresListParams {
   comparisonMode?: 'month' | 'year';
 }
 
-function buildFilialFilter(
+async function buildFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   module: CompanyModule,
   specificFilial?: string | null,
   tableAlias: string = 'vp'
-): string {
+): Promise<string> {
   if (!companySlug) return '';
-  const company = resolveCompany(companySlug);
+  const company = await resolveCompanyLive(companySlug);
   if (!company) return '';
+
+  // Normaliza o nome vindo do front para o nome vivo do banco (match por COD_FILIAL).
+  specificFilial = await liveNameForIncoming(specificFilial);
 
   const filiais = company.filialFilters[module] ?? [];
   const ecommerceFilials = company.ecommerceFilials ?? [];
@@ -239,17 +242,19 @@ function buildListFilter(
   return `AND ${fieldExpression} IN (${nonEmpty.map((_, i) => `@${paramBase}${i}`).join(', ')})`;
 }
 
-function buildDetailFilialFilter(
+async function buildDetailFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   filial: string,
   fieldExpression: string,
   paramBase: string
-): string {
-  const filialTrim = filial.trim();
-  if (!filialTrim) return '';
+): Promise<string> {
+  const filialTrimRaw = filial.trim();
+  if (!filialTrimRaw) return '';
 
-  const company = resolveCompany(companySlug);
+  const company = await resolveCompanyLive(companySlug);
+  // Normaliza o nome vindo do front para o nome vivo do banco (match por COD_FILIAL).
+  const filialTrim = (await liveNameForIncoming(filialTrimRaw)) ?? filialTrimRaw;
   const filiais = company
     ? Array.from(
         new Set(
@@ -304,7 +309,7 @@ export async function fetchVendedoresList(
       filials.forEach((f, i) => request.input(`fgrp${i}`, sql.VarChar, f));
       filialFilter = `AND f.FILIAL IN (${filials.map((_, i) => `@fgrp${i}`).join(', ')})`;
     } else {
-      filialFilter = buildFilialFilter(request, company, 'sales', filial, 'f');
+      filialFilter = await buildFilialFilter(request, company, 'sales', filial, 'f');
     }
 
     const hasProdutoSearchTerm = (produtoSearchTerm?.trim() ?? '').length >= 2;
@@ -567,7 +572,7 @@ export async function fetchVendedoresList(
           params.filials.forEach((fv, i) => req.input(`pfgrp${i}`, sql.VarChar, fv));
           filialFilter = `AND f.FILIAL IN (${params.filials.map((_, i) => `@pfgrp${i}`).join(', ')})`;
         } else {
-          filialFilter = buildFilialFilter(req, params.company, 'sales', params.filial ?? null, 'f');
+          filialFilter = await buildFilialFilter(req, params.company, 'sales', params.filial ?? null, 'f');
         }
         const query = `
           SELECT
@@ -648,7 +653,7 @@ export async function fetchVendedorProdutoVendas(
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
     request.input('produto', sql.VarChar, produto);
-    const filialFilter = buildDetailFilialFilter(
+    const filialFilter = await buildDetailFilialFilter(
       request,
       company,
       filial,
@@ -732,7 +737,7 @@ export async function fetchVendedorClientesList(
     const { start, end } = normalizeRangeForQuery(range);
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
-    const filialFilter = buildDetailFilialFilter(
+    const filialFilter = await buildDetailFilialFilter(
       request,
       company,
       filial,
@@ -825,7 +830,7 @@ export async function fetchClienteProdutosList(
     const { start, end } = normalizeRangeForQuery(range);
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
-    const filialFilter = buildDetailFilialFilter(
+    const filialFilter = await buildDetailFilialFilter(
       request,
       company,
       filial,
@@ -914,7 +919,7 @@ export async function fetchVendedorProdutosList(
     const { start, end } = normalizeRangeForQuery(range);
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
-    const filialFilter = buildDetailFilialFilter(
+    const filialFilter = await buildDetailFilialFilter(
       request,
       company,
       filial,

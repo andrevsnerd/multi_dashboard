@@ -6,7 +6,8 @@ import type {
   ClienteRankingItem,
 } from '@/lib/clientes/cliente-types';
 import { parseSemCadastroChave, SEM_CAD_CHAVE_PREFIX } from '@/lib/clientes/sem-cadastro-chave';
-import { resolveCompany, isEcommerceFilial, type CompanyModule, VAREJO_VALUE } from '@/lib/config/company';
+import { isEcommerceFilial, type CompanyModule, VAREJO_VALUE } from '@/lib/config/company';
+import { resolveCompanyLive, liveNameForIncoming } from '@/lib/server/company-live';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import { normalizeRangeForQuery, getCurrentMonthRange } from '@/lib/utils/date';
@@ -37,22 +38,25 @@ export interface ClientesQueryParams {
   searchTerm?: string;
 }
 
-function buildFilialFilter(
+async function buildFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   module: CompanyModule,
   specificFilial?: string | null,
   tableAlias: string = 'c'
-): string {
+): Promise<string> {
   if (!companySlug) {
     return '';
   }
 
-  const company = resolveCompany(companySlug);
+  const company = await resolveCompanyLive(companySlug);
 
   if (!company) {
     return '';
   }
+
+  // Normaliza o nome vindo do front para o nome vivo do banco (match por COD_FILIAL).
+  specificFilial = await liveNameForIncoming(specificFilial);
 
   const isScarfme = companySlug === 'scarfme';
   const filiais = company.filialFilters[module] ?? [];
@@ -181,7 +185,7 @@ export async function fetchClientes({
     request.input('startDate', sql.Date, startDateStr);
     request.input('endDate', sql.Date, endDateStr);
 
-    const filialFilter = buildFilialFilter(
+    const filialFilter = await buildFilialFilter(
       request,
       company,
       'sales',
@@ -496,7 +500,7 @@ export async function fetchClientesCount({
     request.input('startDate', sql.Date, startDateStr);
     request.input('endDate', sql.Date, endDateStr);
 
-    const filialFilter = buildFilialFilter(
+    const filialFilter = await buildFilialFilter(
       request,
       company,
       'sales',
@@ -590,7 +594,7 @@ export async function fetchTopFilialByClientes({
     request.input('startDate', sql.Date, startDateStr);
     request.input('endDate', sql.Date, endDateStr);
 
-    const filialFilter = buildFilialFilter(
+    const filialFilter = await buildFilialFilter(
       request,
       company,
       'sales',
@@ -736,7 +740,7 @@ export async function fetchClientesCountPreviousPeriod({
     request.input('startDate', sql.Date, startDateStr);
     request.input('endDate', sql.Date, endDateStr);
 
-    const filialFilter = buildFilialFilter(
+    const filialFilter = await buildFilialFilter(
       request,
       company,
       'sales',
@@ -798,7 +802,7 @@ export async function fetchFilialClientesPerformance({
   searchTerm,
 }: ClientesQueryParams = {}): Promise<FilialClientesPerformance[]> {
   return withRequest(async (request) => {
-    const companyConfig = resolveCompany(company);
+    const companyConfig = await resolveCompanyLive(company);
     if (!companyConfig) {
       return [];
     }
@@ -1014,7 +1018,7 @@ export async function fetchTopVendedoresClientes({
     request.input('startDate', sql.Date, startDateStr);
     request.input('endDate', sql.Date, endDateStr);
 
-    const filialFilter = buildFilialFilter(
+    const filialFilter = await buildFilialFilter(
       request,
       company,
       'sales',
@@ -1119,7 +1123,7 @@ export async function fetchVendedoresList({
     request.input('startDate', sql.Date, startDateStr);
     request.input('endDate', sql.Date, endDateStr);
 
-    const filialFilter = buildFilialFilter(
+    const filialFilter = await buildFilialFilter(
       request,
       company,
       'sales',
@@ -1173,7 +1177,7 @@ export async function fetchClientesRankingCompras({
     request.input("startDate", sql.DateTime, start);
     request.input("endDate", sql.DateTime, end);
 
-    const filialFilter = buildFilialFilter(request, company, "sales", filial, "v");
+    const filialFilter = await buildFilialFilter(request, company, "sales", filial, "v");
 
     let vendedorFilter = "";
     if (vendedor && vendedor.trim() !== "") {
@@ -1290,7 +1294,7 @@ export async function fetchClienteDetalheInfo({
   return withRequest(async (request) => {
     const semCad = chaveCliente ? parseSemCadastroChave(chaveCliente) : null;
     if (semCad) {
-      const filialFilter = buildFilialFilter(request, company, "sales", null, "v");
+      const filialFilter = await buildFilialFilter(request, company, "sales", null, "v");
       request.input("scFilial", sql.VarChar, semCad.filial);
       request.input("scPedido", sql.VarChar, semCad.pedido);
       request.input("scTicket", sql.VarChar, semCad.ticket);
@@ -1319,7 +1323,7 @@ export async function fetchClienteDetalheInfo({
       };
     }
 
-    const filialFilter = buildFilialFilter(request, company, "sales", null, "cv");
+    const filialFilter = await buildFilialFilter(request, company, "sales", null, "cv");
 
     let clienteFilter = "";
     const cpfDigits = (cpf ?? "").replace(/\D/g, "");
@@ -1420,7 +1424,7 @@ export async function fetchClienteComprasDetalhe({
     request.input("startDate", sql.DateTime, start);
     request.input("endDate", sql.DateTime, end);
 
-    const filialFilter = buildFilialFilter(request, company, "sales", null, "v");
+    const filialFilter = await buildFilialFilter(request, company, "sales", null, "v");
 
     const semCad = chaveCliente ? parseSemCadastroChave(chaveCliente) : null;
     let clienteFilter = "";
