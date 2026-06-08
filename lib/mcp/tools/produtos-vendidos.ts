@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { fetchProductsWithDetails, type ProductDetail } from '@/lib/repositories/products';
-import { fetchProdutosComDesconto } from '@/lib/repositories/vendedores-v2';
+import { fetchProdutosComDesconto, fetchDescontoTotal } from '@/lib/repositories/vendedores-v2';
 import { aggregateProductDetailsWithGroups } from '@/lib/utils/produto-agrupado-aggregation';
 import { listProdutoAgrupadoGroups } from '@/lib/utils/produto-agrupado-store';
 import type { CompanyKey } from '@/lib/config/company';
@@ -147,10 +147,11 @@ export function registerProdutosVendidosTools(server: McpServer) {
     'produtos_desconto',
     {
       description:
-        'Lista os produtos que foram vendidos COM DESCONTO no período, POR PRODUTO×COR (padrão), mostrando quanto foi ' +
-        'descontado em cada um (R$ e % do bruto), além de quantidade e faturamento líquido. Ordenado do maior desconto ao menor. ' +
-        'Só inclui itens que tiveram desconto. Responde "quais produtos foram vendidos com desconto e quanto foi descontado em cada". ' +
-        'Passe `vendedor` (apelido/código) para ver os descontos dados POR aquele vendedor (relaciona desconto × produto × vendedor). ' +
+        'Descontos concedidos no período. Responde tanto o TOTAL ("quanto de desconto tivemos no mês" → totais.desconto, ' +
+        'valor da empresa toda, sem corte) quanto o DETALHE por produto: lista os produtos vendidos COM desconto, ' +
+        'POR PRODUTO×COR (padrão), com quanto foi descontado em cada (R$ e % do bruto), quantidade e faturamento líquido, ' +
+        'do maior desconto ao menor. Para só o total da empresa, ignore a lista e use totais.desconto. ' +
+        'Passe `vendedor` (apelido/código) para os descontos dados POR aquele vendedor (relaciona desconto × produto × vendedor). ' +
         'Filtros: filial, categoria (grupos/linhas/subgrupos/coleções/grades), `busca` (descrição) e `produto` (SKU). ' +
         'Padrão: mês atual. Para somar todas as cores num item só, passe porCor=false.',
       inputSchema: {
@@ -174,7 +175,7 @@ export function registerProdutosVendidosTools(server: McpServer) {
       const padrao = defaultRange();
       const range = { start: inicio ?? padrao.inicio, end: fim ?? padrao.fim };
 
-      const lista = await fetchProdutosComDesconto({
+      const filtros = {
         company: empresa,
         filial: filial ?? '',
         vendedor: vendedor?.trim() || undefined,
@@ -186,12 +187,13 @@ export function registerProdutosVendidosTools(server: McpServer) {
         grades: listaOuNull(grades) ?? undefined,
         produtoId: produto?.trim() || undefined,
         produtoSearchTerm: !produto && busca ? busca : undefined,
-        porCor: porCor !== false,
-        limit: limite ?? 100,
-      });
+      };
 
-      const descontoTotal = lista.reduce((s, p) => s + (p.desconto ?? 0), 0);
-      const faturamentoTotal = lista.reduce((s, p) => s + (p.faturamento ?? 0), 0);
+      // Total real (sem cap) + lista detalhada (top N) em paralelo.
+      const [total, lista] = await Promise.all([
+        fetchDescontoTotal(filtros),
+        fetchProdutosComDesconto({ ...filtros, porCor: porCor !== false, limit: limite ?? 100 }),
+      ]);
 
       return texto({
         empresa,
@@ -199,7 +201,15 @@ export function registerProdutosVendidosTools(server: McpServer) {
         filial: filial ?? 'TODAS',
         vendedor: vendedor?.trim() || 'TODOS',
         porCor: porCor !== false,
-        totais: { itens: lista.length, desconto: descontoTotal, faturamento: faturamentoTotal },
+        // totais = empresa toda no recorte (NÃO limitado por `limite`). Use para
+        // "quanto de desconto no mês". A lista abaixo é o top N por desconto.
+        totais: {
+          desconto: total.desconto,
+          faturamento: total.faturamento,
+          descontoPct: total.descontoPct,
+          itensComDesconto: total.itensComDesconto,
+          itensListados: lista.length,
+        },
         produtos: lista.map((p) => ({
           produto: p.produto,
           descricao: p.descricao,

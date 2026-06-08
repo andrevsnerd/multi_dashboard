@@ -121,6 +121,7 @@ pode sempre refinar na pergunta seguinte ("e só na Paulista?", "e em abril?").
 - "Quais vendedores deram mais desconto na SCARF ME esse mês?"
 - "Quais produtos a Stephanie vendeu esse mês (com valores)?" *(fixa o vendedor, lista os produtos)*
 - "Detalhe das vendas do vendedor X — todos os produtos."
+- "Quanto de desconto tivemos esse mês na NERD?" *(total da empresa)*
 - "Quais produtos foram vendidos com desconto esse mês e quanto foi descontado em cada (por cor)?"
 - "E os descontos que a Stephanie deu, por produto?" *(relaciona desconto × produto × vendedor)*
 - "Top 20 clientes da SCARF ME por compras neste ano."

@@ -40,7 +40,8 @@ export function registerVendasTools(server: McpServer) {
         'Resumo de vendas de uma empresa em um período: faturamento, quantidade, nº de tickets, ' +
         'ticket médio e estoque — cada um com valor atual, do período anterior equivalente e variação %. ' +
         'Filtros opcionais por filial, grupos, subgrupos, linhas, coleções e grades. ' +
-        'Use listar_filiais para descobrir os valores de `filial`/grupos. Omitir `filial` = todas as filiais.',
+        'Use listar_filiais para descobrir os valores de `filial`/grupos. Omitir `filial` = todas as filiais. ' +
+        'Obs.: NÃO traz desconto concedido — para "quanto de desconto tivemos no mês" use a tool `produtos_desconto` (totais.desconto).',
       inputSchema: {
         empresa: empresaSchema,
         inicio: dataSchema,

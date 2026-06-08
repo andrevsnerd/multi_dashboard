@@ -1236,3 +1236,112 @@ export async function fetchProdutosComDesconto(
     });
   });
 }
+
+export interface DescontoTotalResult {
+  /** Desconto total concedido no período (R$). */
+  desconto: number;
+  /** Faturamento líquido no mesmo recorte (R$), para contexto. */
+  faturamento: number;
+  /** % do bruto que virou desconto: desconto / (faturamento + desconto). */
+  descontoPct: number;
+  /** Nº de itens de venda (linhas) com algum desconto. */
+  itensComDesconto: number;
+}
+
+/**
+ * Total de desconto concedido por uma empresa no período (sem cap de linhas) —
+ * responde "quanto de desconto tivemos no mês". Mesma fonte (W_CTB.DESCONTO_VENDA)
+ * e mesmas regras de cancelamento das demais tools de desconto. Aceita os mesmos
+ * filtros (filial, categoria, vendedor, produto/busca), todos opcionais.
+ */
+export async function fetchDescontoTotal(
+  params: Omit<ProdutosComDescontoParams, 'porCor' | 'limit'>
+): Promise<DescontoTotalResult> {
+  return withRequest(async (request) => {
+    const {
+      company,
+      filial = '',
+      vendedor,
+      range,
+      grupos,
+      linhas,
+      colecoes,
+      subgrupos,
+      grades,
+      produtoId,
+      produtoSearchTerm,
+    } = params;
+
+    const { start, end } = normalizeRangeForQuery(range);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+
+    const filialFilter = await buildDetailFilialFilter(request, company, filial, 'vp.FILIAL', 'filialDtot');
+
+    let vendedorFilter = '';
+    if (vendedor && vendedor.trim()) {
+      request.input('vendedorApelidoDtot', sql.VarChar, vendedor.trim());
+      const codigoResult = await request.query<{ codigo: string }>(`
+        SELECT LTRIM(RTRIM(CAST(VENDEDOR AS VARCHAR))) AS codigo
+        FROM LOJA_VENDEDORES WITH (NOLOCK)
+        WHERE LTRIM(RTRIM(ISNULL(VENDEDOR_APELIDO, ISNULL(NOME_VENDEDOR, CAST(VENDEDOR AS VARCHAR))))) = @vendedorApelidoDtot
+      `);
+      const codigos = (codigoResult.recordset ?? []).map((r) => r.codigo).filter(Boolean);
+      if (codigos.length === 0) codigos.push(vendedor.trim());
+      codigos.forEach((c, i) => request.input(`vdtot${i}`, sql.VarChar, c));
+      vendedorFilter = `AND vp.VENDEDOR IN (${codigos.map((_, i) => `@vdtot${i}`).join(', ')})`;
+    }
+
+    const grupoFilter = buildListFilter(request, "COALESCE(vp.GRUPO_PRODUTO, p.GRUPO_PRODUTO, '')", grupos, 'grupoDtot');
+    const linhaFilter = buildListFilter(request, "COALESCE(vp.LINHA, p.LINHA, '')", linhas, 'linhaDtot');
+    const colecaoFilter = buildListFilter(request, "COALESCE(vp.COLECAO, p.COLECAO, '')", colecoes, 'colecaoDtot');
+    const subgrupoFilter = buildListFilter(request, "COALESCE(vp.SUBGRUPO_PRODUTO, p.SUBGRUPO_PRODUTO, '')", subgrupos, 'subgrupoDtot');
+    const gradeFilter = buildListFilter(request, 'CONVERT(VARCHAR, p.GRADE)', grades, 'gradeDtot');
+
+    let produtoFilter = '';
+    if (produtoId) {
+      request.input('produtoIdDtot', sql.VarChar, produtoId);
+      produtoFilter = 'AND vp.PRODUTO = @produtoIdDtot';
+    } else if ((produtoSearchTerm?.trim() ?? '').length >= 2) {
+      request.input('produtoSearchTermDtot', sql.VarChar, `%${(produtoSearchTerm ?? '').trim()}%`);
+      produtoFilter = 'AND vp.DESC_PRODUTO LIKE @produtoSearchTermDtot';
+    }
+
+    const query = `
+      SELECT
+        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE ISNULL(vp.DESCONTO_VENDA, 0) END) AS desconto,
+        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) END) AS faturamento,
+        SUM(CASE WHEN vp.QTDE_CANCELADA = 0 AND ISNULL(vp.DESCONTO_VENDA, 0) > 0 THEN 1 ELSE 0 END) AS itensComDesconto
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      WHERE vp.DATA_VENDA >= @startDate
+        AND vp.DATA_VENDA < @endDate
+        AND vp.QTDE > 0
+        ${filialFilter}
+        ${vendedorFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        ${produtoFilter}
+    `;
+
+    const result = await request.query<{
+      desconto: number | null;
+      faturamento: number | null;
+      itensComDesconto: number | null;
+    }>(query);
+
+    const row = result.recordset[0];
+    const desconto = Number(row?.desconto ?? 0);
+    const faturamento = Number(row?.faturamento ?? 0);
+    const bruto = faturamento + desconto;
+    return {
+      desconto,
+      faturamento,
+      descontoPct: bruto > 0 ? Number(((desconto / bruto) * 100).toFixed(1)) : 0,
+      itensComDesconto: Number(row?.itensComDesconto ?? 0),
+    };
+  });
+}
