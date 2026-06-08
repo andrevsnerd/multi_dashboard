@@ -4,9 +4,21 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { fetchLogEntradas, fetchProductEntries } from '@/lib/repositories/logEntradas';
-import { fetchLogSaidas } from '@/lib/repositories/logSaidas';
+import { fetchLogSaidas, fetchDefeitos } from '@/lib/repositories/logSaidas';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
-import { empresaSchema, texto } from '@/lib/mcp/shared';
+import { empresaSchema, dataSchema, texto } from '@/lib/mcp/shared';
+
+/** Filial de destino que representa "defeito" em cada empresa. */
+const DEFEITO_FILIAL_DESTINO: Record<string, string> = {
+  nerd: 'NERD DEFEITOS',
+  scarfme: 'BAZAR SCARF ME',
+};
+
+function mesAtualRange(): { inicio: string; fim: string } {
+  const hoje = new Date();
+  const inicio = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), 1));
+  return { inicio: inicio.toISOString().slice(0, 10), fim: hoje.toISOString().slice(0, 10) };
+}
 
 /**
  * fetchLogEntradas/fetchLogSaidas NÃO filtram por empresa — só por `filiais`.
@@ -121,6 +133,73 @@ export function registerRomaneioTools(server: McpServer) {
       const escopo = await filiaisDaEmpresa(empresa, filiais);
       const rows = await fetchLogSaidas(limite ?? 200, dias ?? 90, busca ?? '', escopo);
       return texto({ empresa, tipo: 'saidas', dias: dias ?? 90, total: rows.length, romaneios: rows });
+    }
+  );
+
+  server.registerTool(
+    'defeitos',
+    {
+      description:
+        'Itens enviados para DEFEITO no período (romaneios de SAÍDA com tipo "DEFEITO" ou destino à filial de defeito — ' +
+        'NERD DEFEITOS / BAZAR SCARF ME). Devolve os TOTAIS (quantidade e VALOR sugerido) + a lista POR PRODUTO×COR: ' +
+        'produto, descrição, cor, quantidade, preço sugerido (cadastro) e valor sugerido (qtd × preço). ' +
+        'Responde "quantos produtos foram pra defeito esse mês, quais, quanto em qtd e valor". ' +
+        'Filtros: `filial` (loja de ORIGEM), `responsavel` (quem registrou o romaneio), `produto`/`busca` (descrição). ' +
+        'Padrão: mês atual. Ordenado por quantidade. Para somar cores num item só, porCor=false.',
+      inputSchema: {
+        empresa: empresaSchema,
+        inicio: dataSchema.optional().describe('Início (YYYY-MM-DD). Padrão: 1º dia do mês atual.'),
+        fim: dataSchema.optional().describe('Fim (YYYY-MM-DD). Padrão: hoje.'),
+        filial: z.string().optional().describe('Loja de ORIGEM (listar_filiais). Omitir = todas da empresa.'),
+        responsavel: z.string().optional().describe('Quem registrou o romaneio de defeito (busca parcial).'),
+        produto: z.string().optional().describe('Código de UM produto (SKU) para ver só ele.'),
+        busca: z.string().optional().describe('Trecho da DESCRIÇÃO do produto.'),
+        porCor: z.boolean().optional().describe('Quebrar por cor (padrão true → uma linha por produto×cor).'),
+        limite: z.number().int().min(1).max(1000).optional().describe('Qtde de itens na lista (padrão 200). Totais não são limitados.'),
+      },
+    },
+    async ({ empresa, inicio, fim, filial, responsavel, produto, busca, porCor, limite }) => {
+      const destino = DEFEITO_FILIAL_DESTINO[empresa];
+      if (!destino) {
+        return texto({ empresa, erro: `Empresa "${empresa}" não tem filial de defeito mapeada.` });
+      }
+
+      const company = await resolveCompanyDynamic(empresa);
+      const escopo = company?.filialFilters.inventory ?? [];
+
+      const padrao = mesAtualRange();
+      const start = new Date(`${inicio ?? padrao.inicio}T00:00:00`);
+      // Fim inclusivo: vai até o fim do dia informado.
+      const fimDia = fim ?? padrao.fim;
+      const end = new Date(`${fimDia}T23:59:59`);
+
+      const resultado = await fetchDefeitos({
+        filiaisOrigem: escopo,
+        defeitoFilialDestino: destino,
+        range: { start, end },
+        filialOrigem: filial?.trim() || null,
+        responsavel: responsavel?.trim() || undefined,
+        produtoId: produto?.trim() || undefined,
+        produtoSearchTerm: !produto && busca ? busca : undefined,
+        porCor: porCor !== false,
+        limit: limite ?? 200,
+      });
+
+      return texto({
+        empresa,
+        periodo: { inicio: inicio ?? padrao.inicio, fim: fimDia },
+        destinoDefeito: destino,
+        filialOrigem: filial?.trim() || 'TODAS',
+        responsavel: responsavel?.trim() || 'TODOS',
+        porCor: porCor !== false,
+        totais: {
+          quantidade: resultado.totalQuantidade,
+          valorSugerido: resultado.totalValor,
+          itensDistintos: resultado.totalItens,
+          itensListados: resultado.itensListados,
+        },
+        produtos: resultado.itens,
+      });
     }
   );
 }

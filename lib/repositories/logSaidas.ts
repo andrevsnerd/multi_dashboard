@@ -242,3 +242,201 @@ export async function fetchLogSaidas(
 
   return saidas;
 }
+
+export interface DefeitoItem {
+  produto: string;
+  descricao: string;
+  cor?: string;
+  corCodigo?: string;
+  filialOrigem: string;
+  quantidade: number;
+  /** Preço de venda sugerido cadastrado (PRODUTOS.PRECO_REPOSICAO_1). */
+  precoSugerido: number;
+  /** quantidade × precoSugerido. */
+  valorSugerido: number;
+}
+
+export interface DefeitosResult {
+  itens: DefeitoItem[];
+  totalQuantidade: number;
+  totalValor: number;
+  /** Linhas (produto×cor[×filial]) distintas com defeito — pode exceder os itens listados. */
+  totalItens: number;
+  itensListados: number;
+}
+
+export interface DefeitosParams {
+  /** Filiais de ORIGEM válidas da empresa (escopo inventory) — evita vazar entre empresas. */
+  filiaisOrigem: string[];
+  /** Nome da filial de DESTINO de defeito (ex.: "NERD DEFEITOS", "BAZAR SCARF ME"). */
+  defeitoFilialDestino: string;
+  range: { start: Date; end: Date };
+  /** Restringe a UMA filial de origem (loja). */
+  filialOrigem?: string | null;
+  /** Filtra pelo responsável do romaneio (quem registrou) — LIKE. */
+  responsavel?: string;
+  produtoId?: string;
+  produtoSearchTerm?: string;
+  /** Quebra por cor (padrão true → uma linha por produto×cor). */
+  porCor?: boolean;
+  limit?: number;
+}
+
+/**
+ * Itens enviados para DEFEITO (ex.: filial "NERD DEFEITOS" / "BAZAR SCARF ME") —
+ * romaneios de SAÍDA com tipo "DEFEITO" OU destino na filial de defeito. Agrega por
+ * produto×cor (por padrão) trazendo quantidade, preço sugerido (PRECO_REPOSICAO_1) e
+ * valor sugerido (qtd × preço). Devolve também os totais (quantidade e valor) do
+ * recorte inteiro, sem o teto da lista. Filtros: filial de origem (loja), responsável,
+ * produto/busca. Fonte: ESTOQUE_PROD_SAI + ESTOQUE_PROD1_SAI.
+ */
+export async function fetchDefeitos(params: DefeitosParams): Promise<DefeitosResult> {
+  const {
+    filiaisOrigem,
+    defeitoFilialDestino,
+    range,
+    filialOrigem,
+    responsavel,
+    produtoId,
+    produtoSearchTerm,
+    porCor = true,
+    limit = 200,
+  } = params;
+
+  const destino = (defeitoFilialDestino || "").trim().toUpperCase();
+  const escopo = Array.from(
+    new Set((filiaisOrigem || []).map((f) => (f || "").trim().toUpperCase()).filter(Boolean))
+  );
+  const topClamp = Math.min(Math.max(limit || 200, 1), 1000);
+
+  return withRequest(async (req) => {
+    req.input("startDate", sql.DateTime, range.start);
+    req.input("endDate", sql.DateTime, range.end);
+    req.input("defeitoDestino", sql.VarChar, destino);
+
+    // Escopo de origem (empresa). Sem escopo, não filtra por empresa (evita resultado vazio indevido).
+    let escopoFilter = "";
+    if (escopo.length > 0) {
+      escopo.forEach((f, i) => req.input(`org${i}`, sql.VarChar, f));
+      escopoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(s.FILIAL, '')))) IN (${escopo.map((_, i) => `@org${i}`).join(", ")})`;
+    }
+
+    let filialOrigemFilter = "";
+    if (filialOrigem && filialOrigem.trim()) {
+      req.input("filialOrigem", sql.VarChar, filialOrigem.trim().toUpperCase());
+      filialOrigemFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(s.FILIAL, '')))) = @filialOrigem`;
+    }
+
+    let responsavelFilter = "";
+    if (responsavel && responsavel.trim()) {
+      req.input("responsavel", sql.VarChar, `%${responsavel.trim()}%`);
+      responsavelFilter = `AND LTRIM(RTRIM(ISNULL(s.RESPONSAVEL, ''))) LIKE @responsavel`;
+    }
+
+    let produtoFilter = "";
+    if (produtoId && produtoId.trim()) {
+      req.input("produtoId", sql.VarChar, produtoId.trim());
+      produtoFilter = "AND p.PRODUTO = @produtoId";
+    } else if ((produtoSearchTerm?.trim() ?? "").length >= 2) {
+      req.input("produtoSearch", sql.VarChar, `%${(produtoSearchTerm ?? "").trim()}%`);
+      produtoFilter = "AND pr.DESC_PRODUTO LIKE @produtoSearch";
+    }
+
+    const defeitoCondicao = `
+      AND (
+        UPPER(LTRIM(RTRIM(ISNULL(s.TIPO_ROMANEIO, '')))) = 'DEFEITO'
+        OR UPPER(LTRIM(RTRIM(ISNULL(s.FILIAL_DESTINO, '')))) = @defeitoDestino
+      )`;
+
+    const precoSugeridoExpr =
+      "CASE WHEN pr.PRECO_REPOSICAO_1 IS NULL OR pr.PRECO_REPOSICAO_1 = 0 THEN 0 ELSE CAST(pr.PRECO_REPOSICAO_1 AS DECIMAL(18,2)) END";
+
+    const whereCommon = `
+      WHERE s.EMISSAO >= @startDate
+        AND s.EMISSAO < @endDate
+        ${defeitoCondicao}
+        ${escopoFilter}
+        ${filialOrigemFilter}
+        ${responsavelFilter}
+        ${produtoFilter}
+    `;
+
+    const fromCommon = `
+      FROM ESTOQUE_PROD_SAI s WITH (NOLOCK)
+      JOIN ESTOQUE_PROD1_SAI p WITH (NOLOCK)
+        ON s.ROMANEIO_PRODUTO = p.ROMANEIO_PRODUTO
+        AND LTRIM(RTRIM(ISNULL(s.FILIAL, ''))) = LTRIM(RTRIM(ISNULL(p.FILIAL, '')))
+      LEFT JOIN PRODUTOS pr WITH (NOLOCK) ON pr.PRODUTO = p.PRODUTO
+    `;
+
+    // Totais do recorte inteiro (sem teto de linhas).
+    const totalQuery = `
+      SELECT
+        SUM(ISNULL(p.QTDE, 0)) AS totalQuantidade,
+        SUM(ISNULL(p.QTDE, 0) * (${precoSugeridoExpr})) AS totalValor,
+        COUNT(*) AS linhas
+      ${fromCommon}
+      ${whereCommon}
+    `;
+
+    const corCodigoSelect = porCor ? "p.COR_PRODUTO AS corCodigo," : "'' AS corCodigo,";
+    const corDescSelect = porCor ? "MAX(ISNULL(c.DESC_COR, '')) AS cor," : "'' AS cor,";
+    const groupBy = porCor ? "p.PRODUTO, p.COR_PRODUTO" : "p.PRODUTO";
+
+    const listQuery = `
+      SELECT TOP (${topClamp})
+        p.PRODUTO AS produto,
+        MAX(ISNULL(pr.DESC_PRODUTO, '')) AS descricao,
+        ${corCodigoSelect}
+        ${corDescSelect}
+        MAX(LTRIM(RTRIM(ISNULL(s.FILIAL, '')))) AS filialOrigem,
+        SUM(ISNULL(p.QTDE, 0)) AS quantidade,
+        MAX(${precoSugeridoExpr}) AS precoSugerido
+      ${fromCommon}
+      ${porCor ? "LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON p.COR_PRODUTO = c.COR" : ""}
+      ${whereCommon}
+      GROUP BY ${groupBy}
+      ORDER BY quantidade DESC
+    `;
+
+    const totalResult = await req.query<{
+      totalQuantidade: number | null;
+      totalValor: number | null;
+      linhas: number | null;
+    }>(totalQuery);
+
+    const listResult = await req.query<{
+      produto: string;
+      descricao: string;
+      corCodigo: string;
+      cor: string;
+      filialOrigem: string;
+      quantidade: number | null;
+      precoSugerido: number | null;
+    }>(listQuery);
+
+    const totalRow = totalResult.recordset[0];
+    const itens: DefeitoItem[] = listResult.recordset.map((row) => {
+      const quantidade = Number(row.quantidade ?? 0);
+      const precoSugerido = Number(row.precoSugerido ?? 0);
+      return {
+        produto: (row.produto ?? "").trim(),
+        descricao: row.descricao?.trim() || "SEM DESCRIÇÃO",
+        cor: row.cor?.trim() || undefined,
+        corCodigo: row.corCodigo?.trim() || undefined,
+        filialOrigem: row.filialOrigem?.trim() || "",
+        quantidade,
+        precoSugerido,
+        valorSugerido: Number((quantidade * precoSugerido).toFixed(2)),
+      };
+    });
+
+    return {
+      itens,
+      totalQuantidade: Number(totalRow?.totalQuantidade ?? 0),
+      totalValor: Number(totalRow?.totalValor ?? 0),
+      totalItens: Number(totalRow?.linhas ?? 0),
+      itensListados: itens.length,
+    };
+  });
+}

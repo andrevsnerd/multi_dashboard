@@ -33,6 +33,7 @@ Em produção (Vercel), defina `MCP_API_TOKEN` em Project → Settings → Envir
 | `estoque` | Saldo de estoque agregado por filial (+ vendas no período e 30d) + totais. `incluirProdutos=true` traz topProdutos. Filtros: filial, linha, subgrupo, coleção, grade. |
 | `entradas` | Lista romaneios de **entrada** (recebimentos). Filtros: `dias`, `limite`, `busca` (nº romaneio), `filiais`, `produto`. Com `produto`, retorna só as entradas daquele SKU (nº de romaneio, qtd recebida e custo). Escopo padrão = filiais da empresa. |
 | `saidas` | Lista romaneios de **saída/transferência** (origem→destino). Mesmos filtros de `entradas`. |
+| `defeitos` | Itens enviados para **DEFEITO** (saída tipo "DEFEITO" ou destino NERD DEFEITOS / BAZAR SCARF ME) no período. Totais (qtd + **valor sugerido**) + lista POR PRODUTO×COR (produto, cor, qtd, preço sugerido = PRECO_REPOSICAO_1, valor sugerido). Filtros: `filial` (loja origem), `responsavel` (quem registrou), `produto`/`busca`. Padrão = mês atual. Fonte: ESTOQUE_PROD_SAI + ESTOQUE_PROD1_SAI. |
 | `movimento` | KPIs de movimentação: entradas (qtd/custo), vendidos (qtd/valor), itens parados — com comparativo vs. mês anterior. Filtros: filial, grupos, linhas, coleções, subgrupos, grades. |
 | `transferencias` | Base por produto para análise de transferência entre filiais (estoque + vendas 30d/60d/12m por filial). Retorna totais + top N (`limite`). |
 
@@ -84,6 +85,7 @@ Padrão de uso pelo Claude: **descobrir** (`listar_filiais`, `listar_categorias`
 | "produtos sem estoque" | `sem_estoque` |
 | "sugestão de compra do produto" | `top_produtos` / `sem_estoque` (campo `sugestaoCompra`) |
 | "foi comprado / quando chega / em trânsito" | `compras_transito` |
+| "quantos/quais produtos foram pra defeito esse mês (qtd e valor)" | `defeitos` (+ `filial`/`responsavel` p/ filtrar) |
 | "vendeu ontem? quanto vendeu no período X?" | `produtos_vendidos` (ranking) ou `produto` (um SKU, inicio=fim) |
 | "quanto venderam os produtos com 'geonav' no nome, e quais" | `produtos_vendidos` com `busca: "geonav"` (+ inicio/fim) |
 | "quais produtos da linha/subgrupo/grupo/grade/coleção X mais venderam" | `produtos_vendidos` com o filtro de categoria (+ inicio/fim) |
