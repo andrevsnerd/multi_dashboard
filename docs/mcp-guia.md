@@ -100,6 +100,8 @@ pode sempre refinar na pergunta seguinte ("e só na Paulista?", "e em abril?").
 - "Últimas entradas (recebimentos) da NERD."
 - "Saídas e transferências da SCARF ME nos últimos 15 dias."
 - "Me acha o romaneio 833045."
+- "Qual o romaneio da última entrada do produto 07.A1.00B3 na SCARF ME?"
+- "Mostra as últimas 3 entradas do produto X (data, romaneio, filial e quantidade)."
 
 ### 👥 Vendedores e clientes
 - "Ranking de vendedores da NERD mês passado."

@@ -38,6 +38,153 @@ function buildSearchConfig(searchTerm = "") {
   };
 }
 
+export interface ProductEntryRow {
+  romaneio: string;
+  filialOrigem: string;
+  filialDestino: string;
+  dataEmissao: string;
+  tipoRomaneio: string;
+  responsavel: string;
+  /** Quantidade DESTE produto recebida no romaneio (somada entre cores/grades). */
+  qtde: number;
+  /** Custo unitário médio do produto nessa entrada (0 quando indisponível). */
+  custoUnitario: number;
+  /** Origem do registro: 'estoque' (ESTOQUE_PROD_ENT) ou 'loja' (LOJA_ENTRADAS). */
+  fonte: "estoque" | "loja";
+}
+
+/**
+ * Lista as entradas (romaneios de recebimento) de UM produto específico, unindo
+ * as duas fontes — ESTOQUE_PROD_ENT/ESTOQUE_PROD1_ENT e LOJA_ENTRADAS/
+ * LOJA_ENTRADAS_PRODUTO (esta última só quando o romaneio não existe na primeira,
+ * igual à listagem geral) — agregadas por documento (romaneio + filial). Cada
+ * linha traz o nº do romaneio, filiais, data, tipo, responsável, quantidade
+ * recebida do produto e custo unitário médio. Ordenado da entrada mais recente
+ * para a mais antiga.
+ */
+export async function fetchProductEntries(
+  productId: string,
+  limit = 50,
+  filiais: string[] = [],
+  dias?: number
+): Promise<ProductEntryRow[]> {
+  const produto = (productId || "").trim();
+  if (!produto) return [];
+
+  const limitClamp = Math.min(Math.max(limit || 50, 1), 1000);
+
+  const filiaisNorm = Array.from(
+    new Set((filiais || []).map((f) => (f || "").trim().toUpperCase()).filter(Boolean))
+  );
+  const hasFilialFilter = filiaisNorm.length > 0;
+  const filialParams = filiaisNorm.map((_, i) => `@pfil${i}`).join(", ");
+  const filialFilterEstoque = hasFilialFilter
+    ? `AND UPPER(LTRIM(RTRIM(ISNULL(e.FILIAL, '')))) IN (${filialParams})`
+    : "";
+  const filialFilterLoja = hasFilialFilter
+    ? `AND UPPER(LTRIM(RTRIM(ISNULL(le.FILIAL, '')))) IN (${filialParams})`
+    : "";
+
+  const useDateFilter = typeof dias === "number" && dias > 0;
+  const diasClamp = useDateFilter ? Math.min(Math.max(dias as number, 1), 365) : 0;
+  const dateFilterEstoque = useDateFilter
+    ? `AND e.EMISSAO >= DATEADD(DAY, -${diasClamp}, GETDATE())`
+    : "";
+  const dateFilterLoja = useDateFilter
+    ? `AND le.EMISSAO >= DATEADD(DAY, -${diasClamp}, GETDATE())`
+    : "";
+
+  return withRequest(async (req) => {
+    req.input("produtoId", sql.VarChar, produto);
+    if (hasFilialFilter) {
+      filiaisNorm.forEach((f, i) => req.input(`pfil${i}`, sql.VarChar, f));
+    }
+
+    const query = `
+      SELECT TOP (${limitClamp}) * FROM (
+        SELECT
+          e.ROMANEIO_PRODUTO,
+          e.FILIAL AS FILIAL_DESTINO,
+          LTRIM(RTRIM(ISNULL(e.FILIAL_ORIGEM, ''))) AS FILIAL_ORIGEM,
+          MAX(e.EMISSAO) AS EMISSAO,
+          (CONVERT(VARCHAR(10), MAX(e.EMISSAO), 120) + 'T' + CONVERT(VARCHAR(8), MAX(e.EMISSAO), 108)) AS EMISSAO_STR,
+          MAX(ISNULL(e.TIPO_ROMANEIO, '')) AS TIPO,
+          MAX(ISNULL(e.RESPONSAVEL, '')) AS RESPONSAVEL,
+          SUM(ISNULL(p.QTDE, 0)) AS QTDE,
+          AVG(NULLIF(p.CUSTO1, 0)) AS CUSTO_UNIT,
+          'estoque' AS FONTE
+        FROM ESTOQUE_PROD_ENT e WITH (NOLOCK)
+        JOIN ESTOQUE_PROD1_ENT p WITH (NOLOCK)
+          ON e.ROMANEIO_PRODUTO = p.ROMANEIO_PRODUTO
+        WHERE p.PRODUTO = @produtoId
+          ${dateFilterEstoque}
+          ${filialFilterEstoque}
+        GROUP BY e.ROMANEIO_PRODUTO, e.FILIAL, LTRIM(RTRIM(ISNULL(e.FILIAL_ORIGEM, '')))
+
+        UNION ALL
+
+        SELECT
+          le.ROMANEIO_PRODUTO,
+          le.FILIAL AS FILIAL_DESTINO,
+          LTRIM(RTRIM(ISNULL(le.FILIAL_ORIGEM, ''))) AS FILIAL_ORIGEM,
+          MAX(le.EMISSAO) AS EMISSAO,
+          (CONVERT(VARCHAR(10), MAX(le.EMISSAO), 120) + 'T' + CONVERT(VARCHAR(8), MAX(le.EMISSAO), 108)) AS EMISSAO_STR,
+          MAX(ISNULL(t.DESC_TIPO_ENTRADA_SAIDA, ISNULL(le.TIPO_ENTRADA_SAIDA, ''))) AS TIPO,
+          MAX(ISNULL(le.RESPONSAVEL, '')) AS RESPONSAVEL,
+          SUM(ISNULL(lep.QTDE_ENTRADA, 0)) AS QTDE,
+          AVG(NULLIF(lep.PRECO1, 0)) AS CUSTO_UNIT,
+          'loja' AS FONTE
+        FROM LOJA_ENTRADAS le WITH (NOLOCK)
+        JOIN LOJA_ENTRADAS_PRODUTO lep WITH (NOLOCK)
+          ON le.FILIAL = lep.FILIAL AND le.ROMANEIO_PRODUTO = lep.ROMANEIO_PRODUTO
+        LEFT JOIN LOJA_TIPOS_ENTRADA_SAIDA t WITH (NOLOCK)
+          ON t.TIPO_ENTRADA_SAIDA = le.TIPO_ENTRADA_SAIDA
+        WHERE lep.PRODUTO = @produtoId
+          AND (le.ENTRADA_CANCELADA = 0 OR le.ENTRADA_CANCELADA IS NULL)
+          AND NOT EXISTS (
+            SELECT 1 FROM ESTOQUE_PROD_ENT ee WITH (NOLOCK)
+            WHERE ee.ROMANEIO_PRODUTO = le.ROMANEIO_PRODUTO
+              AND LTRIM(RTRIM(ISNULL(ee.FILIAL, ''))) = LTRIM(RTRIM(ISNULL(le.FILIAL, '')))
+          )
+          ${dateFilterLoja}
+          ${filialFilterLoja}
+        GROUP BY le.ROMANEIO_PRODUTO, le.FILIAL, LTRIM(RTRIM(ISNULL(le.FILIAL_ORIGEM, '')))
+      ) AS unificado
+      ORDER BY EMISSAO DESC, ROMANEIO_PRODUTO DESC
+    `;
+
+    const result = await req.query<{
+      ROMANEIO_PRODUTO: string;
+      FILIAL_DESTINO: string;
+      FILIAL_ORIGEM: string | null;
+      EMISSAO: Date;
+      EMISSAO_STR: string;
+      TIPO: string | null;
+      RESPONSAVEL: string | null;
+      QTDE: number | null;
+      CUSTO_UNIT: number | null;
+      FONTE: "estoque" | "loja";
+    }>(query);
+
+    return result.recordset.map((row) => ({
+      romaneio: row.ROMANEIO_PRODUTO?.toString().trim() || "",
+      filialOrigem: row.FILIAL_ORIGEM?.toString().trim() || "",
+      filialDestino: row.FILIAL_DESTINO?.toString().trim() || "",
+      dataEmissao:
+        row.EMISSAO_STR != null && String(row.EMISSAO_STR).trim() !== ""
+          ? String(row.EMISSAO_STR).trim()
+          : row.EMISSAO
+            ? new Date(row.EMISSAO).toISOString()
+            : "",
+      tipoRomaneio: row.TIPO?.toString().trim() || "",
+      responsavel: row.RESPONSAVEL?.toString().trim() || "",
+      qtde: Number(row.QTDE ?? 0),
+      custoUnitario: Number(row.CUSTO_UNIT ?? 0),
+      fonte: row.FONTE,
+    }));
+  });
+}
+
 export async function fetchLogEntradas(
   limit = 200,
   dias = 90,

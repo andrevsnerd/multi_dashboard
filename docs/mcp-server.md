@@ -31,7 +31,7 @@ Em produção (Vercel), defina `MCP_API_TOKEN` em Project → Settings → Envir
 | Tool | O que faz |
 |------|-----------|
 | `estoque` | Saldo de estoque agregado por filial (+ vendas no período e 30d) + totais. `incluirProdutos=true` traz topProdutos. Filtros: filial, linha, subgrupo, coleção, grade. |
-| `entradas` | Lista romaneios de **entrada** (recebimentos). Filtros: `dias`, `limite`, `busca` (nº romaneio), `filiais`. Escopo padrão = filiais da empresa. |
+| `entradas` | Lista romaneios de **entrada** (recebimentos). Filtros: `dias`, `limite`, `busca` (nº romaneio), `filiais`, `produto`. Com `produto`, retorna só as entradas daquele SKU (nº de romaneio, qtd recebida e custo). Escopo padrão = filiais da empresa. |
 | `saidas` | Lista romaneios de **saída/transferência** (origem→destino). Mesmos filtros de `entradas`. |
 | `movimento` | KPIs de movimentação: entradas (qtd/custo), vendidos (qtd/valor), itens parados — com comparativo vs. mês anterior. Filtros: filial, grupos, linhas, coleções, subgrupos, grades. |
 | `transferencias` | Base por produto para análise de transferência entre filiais (estoque + vendas 30d/60d/12m por filial). Retorna totais + top N (`limite`). |
@@ -51,7 +51,7 @@ Em produção (Vercel), defina `MCP_API_TOKEN` em Project → Settings → Envir
 |------|-----------|
 | `top_produtos` | Ranking de produtos mais vendidos com **estoque atual** e **sugestão de compra** por item. Filtros: filial + categoria (NERD→grupos; SCARF ME→linhas/subgrupos/coleções/grades). Ex.: "top capas em NERD" → `grupos:["CAPAS"]`. Janelas fixas (12m/60d/mês atual), não aceita range arbitrário. |
 | `sem_estoque` | Rupturas: produtos com estoque ≤ 0 que venderam nos últimos 12m, com sugestão de compra. Filtros de filial/categoria. |
-| `produto` | Ficha 360 de UM produto (por código): estoque total + **por filial** (onde está), **última venda**, **última entrada** (quando entrou), receita/qtd no período, custo/preço. |
+| `produto` | Ficha 360 de UM produto (por código): estoque total + **por filial** (onde está), **última venda**, **última entrada** (quando/onde entrou, com **nº de romaneio**, qtd recebida e custo) + últimas entradas, receita/qtd no período, custo/preço. |
 | `compras_transito` | Compras em trânsito: o que foi comprado, quanto, custo e **quando chega** (`dataRecebimento`). Busca por `produto`/`status`. Fonte: cadastro de compras em trânsito do dashboard (não é pedido do ERP). |
 | `produtos_vendidos` | Ranking de produtos vendidos em um **período arbitrário** (datas exatas, inclusive um único dia). Responde "mais vendidos no mês passado", "o que vendeu ontem". Filtros: filial + categoria (grupo/linha/subgrupo/coleção/grade) + busca. |
 | `produto_curva` | Curva ABC de um produto em **duas janelas**: últimos 12 meses e mês atual. Responde "é curva A nos 12m?" e "é curva A neste mês?" (independente). NERD e SCARF ME, escopo rede. |
@@ -65,6 +65,7 @@ Padrão de uso pelo Claude: **descobrir** (`listar_filiais`, `listar_categorias`
 | "relatório dos mais vendidos" / "top capas NERD" / "pashmina mais vendida" | `top_produtos` |
 | "quanto tem de estoque" / "onde está" | `produto` (ou `estoque`) |
 | "quando entrou" / "última vez que vendeu" | `produto` |
+| "qual o romaneio da última entrada" / "últimas N entradas do produto" | `produto` (ficha) ou `entradas` com `produto` |
 | "produtos sem estoque" | `sem_estoque` |
 | "sugestão de compra do produto" | `top_produtos` / `sem_estoque` (campo `sugestaoCompra`) |
 | "foi comprado / quando chega / em trânsito" | `compras_transito` |

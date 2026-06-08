@@ -10,6 +10,8 @@ import {
   fetchProductAvailableColors,
   type ProductAvailableColor,
 } from '@/lib/repositories/productDetail';
+import { fetchProductEntries } from '@/lib/repositories/logEntradas';
+import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import { empresaSchema, dataSchema, texto } from '@/lib/mcp/shared';
 
 /**
@@ -52,7 +54,8 @@ export function registerProdutoTools(server: McpServer) {
     {
       description:
         'Ficha completa de UM produto (por código): descrição, estoque total e por filial (onde está, INCLUINDO a matriz/depósito), ' +
-        'última venda, última entrada (quando entrou), receita/quantidade no período, custo e preço médios. ' +
+        'última venda, última entrada (quando/onde entrou, COM nº de romaneio, qtd recebida e custo) e as últimas entradas, ' +
+        'receita/quantidade no período, custo e preço médios. ' +
         'Use o código `produto` retornado por top_produtos/sem_estoque/curva_abc/produtos_vendidos. ' +
         'Para uma COR específica (ex.: o item veio de um ranking POR COR), passe `cor` (código "06" ou descrição "PRETO"): ' +
         'aí estoque por filial e vendas vêm SÓ daquela cor. Sem `cor`, soma todas as cores. ' +
@@ -103,13 +106,21 @@ export function registerProdutoTools(server: McpServer) {
         ...(coresFiltro ? { colors: coresFiltro } : {}),
       };
 
-      const [detail, porFilial, historico] = await Promise.all([
+      // Escopo de filiais da empresa (módulo inventory) para listar as entradas
+      // do produto sem vazar entre empresas. Independe do filtro `filial` (que é
+      // sobre estoque/vendas) — a última entrada é vista na empresa toda.
+      const company = await resolveCompanyDynamic(empresa);
+      const escopoEntradas = company?.filialFilters.inventory ?? [];
+
+      const [detail, porFilial, historico, entradas] = await Promise.all([
         fetchProductDetail(params),
         fetchProductStockByFilial(params),
         fetchProductSaleHistory(params),
+        fetchProductEntries(produto, 5, escopoEntradas),
       ]);
 
       const ultimaVenda = historico.length > 0 ? historico[0] : null;
+      const ultimaEntrada = entradas.length > 0 ? entradas[0] : null;
 
       return texto({
         empresa,
@@ -144,10 +155,43 @@ export function registerProdutoTools(server: McpServer) {
             : null,
         },
         entrada: {
-          ultimaEntrada: detail.lastEntryDate
-            ? detail.lastEntryDate.toISOString().slice(0, 10)
-            : null,
-          filialUltimaEntrada: detail.lastEntryFilial,
+          // Última entrada com nº de romaneio, filial, qtd recebida e custo —
+          // das duas fontes (ESTOQUE_PROD_ENT + LOJA_ENTRADAS). Cai para a data/
+          // filial do detalhe quando não há linha de entrada detalhada.
+          ultimaEntrada: ultimaEntrada
+            ? {
+                data: ultimaEntrada.dataEmissao
+                  ? ultimaEntrada.dataEmissao.slice(0, 10)
+                  : null,
+                romaneio: ultimaEntrada.romaneio,
+                filial: ultimaEntrada.filialDestino,
+                filialOrigem: ultimaEntrada.filialOrigem || null,
+                quantidade: ultimaEntrada.qtde,
+                custoUnitario: ultimaEntrada.custoUnitario,
+                tipo: ultimaEntrada.tipoRomaneio || null,
+                responsavel: ultimaEntrada.responsavel || null,
+              }
+            : detail.lastEntryDate
+              ? {
+                  data: detail.lastEntryDate.toISOString().slice(0, 10),
+                  romaneio: null,
+                  filial: detail.lastEntryFilial,
+                  filialOrigem: null,
+                  quantidade: null,
+                  custoUnitario: null,
+                  tipo: null,
+                  responsavel: null,
+                }
+              : null,
+          ultimasEntradas: entradas.map((e) => ({
+            data: e.dataEmissao ? e.dataEmissao.slice(0, 10) : null,
+            romaneio: e.romaneio,
+            filial: e.filialDestino,
+            filialOrigem: e.filialOrigem || null,
+            quantidade: e.qtde,
+            custoUnitario: e.custoUnitario,
+            tipo: e.tipoRomaneio || null,
+          })),
         },
         custos: {
           custoMedio: detail.averageCost,
