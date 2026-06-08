@@ -79,6 +79,9 @@ pode sempre refinar na pergunta seguinte ("e só na Paulista?", "e em abril?").
 - "Onde esse produto mais vendeu nos últimos 6 meses?"
 - "Qual vendedor foi responsável pela última venda desse produto?"
 - "Quais vendedores mais venderam esse item?"
+- "Quanto de desconto esse produto deu nesse mês?"
+- "Qual o desconto dessa última venda e quem foi o vendedor?"
+- "Quais vendedores deram mais desconto nesse produto?"
 
 ### 🅰️ Curva ABC
 - "O produto 07.A1.00B3 é curva A nos últimos 12 meses?"
@@ -110,6 +113,7 @@ pode sempre refinar na pergunta seguinte ("e só na Paulista?", "e em abril?").
 ### 👥 Vendedores e clientes
 - "Ranking de vendedores da NERD mês passado."
 - "Quem mais vendeu na Higienópolis?"
+- "Quais vendedores deram mais desconto na SCARF ME esse mês?"
 - "Top 20 clientes da SCARF ME por compras neste ano."
 
 ### 🧭 Descoberta (quando não souber os nomes)

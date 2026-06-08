@@ -204,6 +204,8 @@ export interface ProductSaleHistory {
   filialDisplayName: string;
   quantity: number;
   revenue: number;
+  /** Desconto concedido nessas vendas (R$). Soma de DESCONTO_VENDA; 0 no e-commerce. */
+  desconto: number;
   vendedor: string | null;
   color: string | null;
   colorDisplayName: string | null;
@@ -1724,6 +1726,7 @@ async function fetchProductSaleHistoryEcommerce({
         })(),
         quantity: Number(row.quantity ?? 0),
         revenue: Number(row.revenue ?? 0),
+        desconto: 0,
         vendedor: row.vendedor ?? null,
         color: row.color,
         colorDisplayName,
@@ -1824,11 +1827,12 @@ export async function fetchProductSaleHistory({
           ISNULL(VALOR_TROCA_ITEM, 0) AS VALOR_TROCA
         FROM vendas_com_troca
       )
-      SELECT 
+      SELECT
         CAST(vf.DATA_VENDA AS DATE) AS date,
         vf.FILIAL,
         SUM(vf.TOTAL_QTDE_VENDA - vf.QTDE_TROCA) AS quantity,
         SUM(vf.TOTAL_VENDA - vf.VALOR_TROCA) AS revenue,
+        SUM(CASE WHEN vf.QTDE_CANCELADA > 0 THEN 0 ELSE ISNULL(vf.DESCONTO_VENDA, 0) END) AS desconto,
         vf.VENDEDOR AS vendedor,
         vf.COR_PRODUTO AS color,
         ISNULL(vf.DESC_COR, '') AS corBanco
@@ -1852,6 +1856,7 @@ export async function fetchProductSaleHistory({
       FILIAL: string;
       quantity: number;
       revenue: number;
+      desconto: number;
       vendedor: string | null;
       color: string | null;
       corBanco: string;
@@ -1889,6 +1894,7 @@ export async function fetchProductSaleHistory({
         })(),
         quantity: Number(row.quantity ?? 0),
         revenue: Number(row.revenue ?? 0),
+        desconto: Number(row.desconto ?? 0),
         vendedor: vendedorNome,
         color: row.color,
         colorDisplayName,
@@ -1958,6 +1964,7 @@ async function fetchProductSaleHistoryComparisonEcommerce({
       })(),
       quantity: Number(row.quantity ?? 0),
       revenue: Number(row.revenue ?? 0),
+      desconto: 0,
       vendedor: null,
       color: null,
       colorDisplayName: null,
@@ -2077,6 +2084,7 @@ export async function fetchProductSaleHistoryComparison(
       })(),
       quantity: Number(row.quantity ?? 0),
       revenue: Number(row.revenue ?? 0),
+      desconto: 0,
       vendedor: null,
       color: null,
       colorDisplayName: null,

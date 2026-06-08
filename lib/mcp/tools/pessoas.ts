@@ -17,13 +17,24 @@ export function registerPessoasTools(server: McpServer) {
     'vendedores',
     {
       description:
-        'Ranking de vendedores de uma empresa no período, por faturamento (com qtd vendida, tickets, ticket médio e ' +
-        'participação na filial). Filtros: filial, grupos, linhas, coleções, subgrupos, grades. Limita a `limite` (padrão 50).',
+        'Ranking de vendedores de uma empresa no período, por faturamento (com qtd vendida, DESCONTO concedido, tickets, ticket médio e ' +
+        'participação na filial). Filtros: filial, grupos, linhas, coleções, subgrupos, grades. ' +
+        'Para o ranking de QUEM deu mais desconto, use `ordenarPor: "desconto"`. ' +
+        'Para "quais vendedores deram mais desconto NESTE produto", passe `produto` (código) + `ordenarPor: "desconto"`. ' +
+        'Limita a `limite` (padrão 50).',
       inputSchema: {
         empresa: empresaSchema,
         inicio: dataSchema.optional(),
         fim: dataSchema.optional(),
         filial: z.string().optional().describe('Valor de filial (listar_filiais). Omitir = todas.'),
+        produto: z
+          .string()
+          .optional()
+          .describe('Código de UM produto: restringe o ranking às vendas desse SKU (ex.: quem mais vendeu/descontou este item).'),
+        ordenarPor: z
+          .enum(['faturamento', 'desconto'])
+          .optional()
+          .describe('Critério de ordenação do ranking. Padrão: faturamento. Use "desconto" para quem deu mais desconto.'),
         grupos: listaOpcional('Grupos de produto (NERD).'),
         linhas: listaOpcional('Linhas (SCARF ME).'),
         colecoes: listaOpcional('Coleções (SCARF ME).'),
@@ -32,11 +43,12 @@ export function registerPessoasTools(server: McpServer) {
         limite: z.number().int().min(1).max(500).optional().describe('Máximo de vendedores (padrão 50).'),
       },
     },
-    async ({ empresa, inicio, fim, filial, grupos, linhas, colecoes, subgrupos, grades, limite }) => {
+    async ({ empresa, inicio, fim, filial, produto, ordenarPor, grupos, linhas, colecoes, subgrupos, grades, limite }) => {
       const lista = await fetchVendedoresList({
         company: empresa,
         filial: filial ?? null,
         range: inicio && fim ? { start: inicio, end: fim } : undefined,
+        produtoId: produto?.trim() || undefined,
         grupos: listaOuNull(grupos) ?? undefined,
         linhas: listaOuNull(linhas) ?? undefined,
         colecoes: listaOuNull(colecoes) ?? undefined,
@@ -45,20 +57,33 @@ export function registerPessoasTools(server: McpServer) {
         light: true,
       });
 
+      const ordenarPorDesconto = ordenarPor === 'desconto';
       const vendedores = [...lista]
-        .sort((a, b) => (b.faturamento ?? 0) - (a.faturamento ?? 0))
+        .sort((a, b) =>
+          ordenarPorDesconto
+            ? (b.desconto ?? 0) - (a.desconto ?? 0)
+            : (b.faturamento ?? 0) - (a.faturamento ?? 0)
+        )
         .slice(0, limite ?? 50)
         .map((v) => ({
           vendedor: v.vendedor,
           filial: v.filial,
           faturamento: v.faturamento,
+          desconto: v.desconto,
           quantidadeVendida: v.quantidadeVendida,
           tickets: v.tickets,
           ticketMedio: v.ticketMedio,
           participacaoFilial: v.participacaoFilial,
         }));
 
-      return texto({ empresa, filial: filial ?? 'TODAS', total: lista.length, vendedores });
+      return texto({
+        empresa,
+        filial: filial ?? 'TODAS',
+        produto: produto?.trim() || null,
+        ordenadoPor: ordenarPorDesconto ? 'desconto' : 'faturamento',
+        total: lista.length,
+        vendedores,
+      });
     }
   );
 

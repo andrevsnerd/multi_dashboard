@@ -30,6 +30,8 @@ export interface VendedorItem {
   faturamento: number;
   faturamentoPrevious?: number;
   quantidadeVendida: number;
+  /** Desconto total concedido pelo vendedor no período (R$). */
+  desconto: number;
   tickets: number;
   ticketMedio: number;
   quantidadePorTicket: number;
@@ -57,6 +59,7 @@ export function aggregateVendedoresByFilialLabel(
     consulta: string;
     faturamento: number;
     quantidadeVendida: number;
+    desconto: number;
     tickets: number;
     faturamentoPrevious: number;
     hasPrev: boolean;
@@ -87,6 +90,7 @@ export function aggregateVendedoresByFilialLabel(
         consulta,
         faturamento: fat,
         quantidadeVendida: item.quantidadeVendida ?? 0,
+        desconto: item.desconto ?? 0,
         tickets: item.tickets ?? 0,
         faturamentoPrevious: hasPrev ? (prev as number) : 0,
         hasPrev,
@@ -101,6 +105,7 @@ export function aggregateVendedoresByFilialLabel(
 
     existing.faturamento += fat;
     existing.quantidadeVendida += item.quantidadeVendida ?? 0;
+    existing.desconto += item.desconto ?? 0;
     existing.tickets += item.tickets ?? 0;
     if (hasPrev) {
       existing.faturamentoPrevious += prev as number;
@@ -127,6 +132,7 @@ export function aggregateVendedoresByFilialLabel(
       filialConsulta: b.consulta,
       faturamento: b.faturamento,
       quantidadeVendida: b.quantidadeVendida,
+      desconto: b.desconto,
       tickets,
       ticketMedio,
       quantidadePorTicket,
@@ -375,6 +381,7 @@ export async function fetchVendedoresList(
           LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR))) AS VENDEDOR,
           ISNULL(LTRIM(RTRIM(lv.VENDEDOR_APELIDO)), LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR)))) AS VENDEDOR_APELIDO,
           valor = CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - (vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) END,
+          desconto = CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) END,
           qtde_eff = CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.QTDE END,
           ticket = CASE WHEN vp.QTDE_CANCELADA = 0 AND vp.QTDE > 0 THEN vp.TICKET ELSE NULL END
         FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
@@ -402,6 +409,7 @@ export async function fetchVendedoresList(
           VENDEDOR,
           MAX(VENDEDOR_APELIDO) AS VENDEDOR_APELIDO,
           SUM(valor) AS faturamento,
+          SUM(desconto) AS desconto,
           SUM(qtde_eff) AS quantidadeVendida,
           COUNT(DISTINCT ticket) AS tickets
         FROM Base
@@ -413,6 +421,7 @@ export async function fetchVendedoresList(
         VENDEDOR_APELIDO AS vendedor,
         FILIAL AS filial,
         faturamento,
+        desconto,
         quantidadeVendida,
         tickets,
         SUM(faturamento) OVER (PARTITION BY FILIAL) AS totalFilial
@@ -425,6 +434,7 @@ export async function fetchVendedoresList(
       vendedor: string;
       filial: string;
       faturamento: number;
+      desconto: number;
       quantidadeVendida: number;
       tickets: number;
       totalFilial: number;
@@ -440,6 +450,7 @@ export async function fetchVendedoresList(
       const faturamento = row.faturamento ?? 0;
       const tickets = row.tickets ?? 0;
       const quantidadeVendida = row.quantidadeVendida ?? 0;
+      const desconto = row.desconto ?? 0;
       const totalFilial = row.totalFilial ?? 0;
       const ticketMedio = tickets > 0 ? faturamento / tickets : 0;
       const quantidadePorTicket = tickets > 0 ? quantidadeVendida / tickets : 0;
@@ -451,6 +462,7 @@ export async function fetchVendedoresList(
         filial: row.filial,
         faturamento,
         quantidadeVendida,
+        desconto,
         tickets,
         ticketMedio,
         quantidadePorTicket,

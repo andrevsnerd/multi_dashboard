@@ -54,11 +54,12 @@ export function registerProdutoTools(server: McpServer) {
     {
       description:
         'Ficha completa de UM produto (por código): descrição, estoque total e por filial (onde está, INCLUINDO a matriz/depósito), ' +
-        'última venda (COM o vendedor responsável), última entrada (quando/onde entrou, COM nº de romaneio, qtd recebida e custo) e as últimas entradas, ' +
-        'receita/quantidade no período, vendas POR FILIAL (ONDE vendeu — quantidade e receita em cada filial no período), ' +
-        'top VENDEDORES (QUEM mais vendeu este produto — qtd/receita por vendedor), custo e preço médios. ' +
+        'última venda (COM o vendedor responsável e o DESCONTO concedido), última entrada (quando/onde entrou, COM nº de romaneio, qtd recebida e custo) e as últimas entradas, ' +
+        'receita/quantidade/DESCONTO total no período, vendas POR FILIAL (ONDE vendeu — quantidade e receita em cada filial no período), ' +
+        'top VENDEDORES (QUEM mais vendeu este produto — qtd/receita E desconto por vendedor), custo e preço médios. ' +
         'Responde "onde vendeu essas N unidades"/"onde vendeu nos últimos X meses" (vendas.porFilial), ' +
-        '"qual vendedor fez a última venda" (vendas.ultimaVenda.vendedor) e "quem mais vendeu este item" (vendas.topVendedores) — use inicio/fim para o range. ' +
+        '"qual vendedor fez a última venda" (vendas.ultimaVenda.vendedor), "quem mais vendeu este item" (vendas.topVendedores), ' +
+        '"quanto de desconto este produto deu" (vendas.descontoPeriodo) e "quem deu mais desconto neste produto" (vendas.topVendedores[].desconto) — use inicio/fim para o range. ' +
         'Use o código `produto` retornado por top_produtos/sem_estoque/curva_abc/produtos_vendidos. ' +
         'Para uma COR específica (ex.: o item veio de um ranking POR COR), passe `cor` (código "06" ou descrição "PRETO"): ' +
         'aí estoque por filial e vendas vêm SÓ daquela cor. Sem `cor`, soma todas as cores. ' +
@@ -129,19 +130,29 @@ export function registerProdutoTools(server: McpServer) {
       // com o vendedor resolvido para apelido/nome) por vendedor. Reusa a mesma
       // base de fetchProductSaleHistory — sem query nova. Vendas de e-commerce
       // vêm sem vendedor (null) e ficam fora do ranking.
-      const vendedoresMap = new Map<string, { quantidade: number; receita: number }>();
+      const vendedoresMap = new Map<string, { quantidade: number; receita: number; desconto: number }>();
       for (const h of historico) {
         const nome = (h.vendedor ?? '').trim();
         if (!nome) continue;
-        const acc = vendedoresMap.get(nome) ?? { quantidade: 0, receita: 0 };
+        const acc = vendedoresMap.get(nome) ?? { quantidade: 0, receita: 0, desconto: 0 };
         acc.quantidade += h.quantity ?? 0;
         acc.receita += h.revenue ?? 0;
+        acc.desconto += h.desconto ?? 0;
         vendedoresMap.set(nome, acc);
       }
       const topVendedores = [...vendedoresMap.entries()]
-        .map(([vendedor, v]) => ({ vendedor, quantidade: v.quantidade, receita: v.receita }))
+        .map(([vendedor, v]) => ({
+          vendedor,
+          quantidade: v.quantidade,
+          receita: v.receita,
+          desconto: v.desconto,
+        }))
         .filter((v) => v.quantidade > 0)
         .sort((a, b) => b.quantidade - a.quantidade);
+
+      // Desconto total concedido neste produto no período (R$). Para "quem deu mais
+      // desconto", o ranking acima já traz desconto por vendedor.
+      const descontoPeriodo = historico.reduce((s, h) => s + (h.desconto ?? 0), 0);
 
       return texto({
         empresa,
@@ -166,6 +177,7 @@ export function registerProdutoTools(server: McpServer) {
         vendas: {
           receitaPeriodo: detail.totalRevenue,
           quantidadePeriodo: detail.totalQuantity,
+          descontoPeriodo,
           variacaoReceitaPct: detail.revenueVariance,
           // ONDE vendeu: distribuição da quantidade/receita por filial no período
           // (respeita inicio/fim e o filtro de cor). Responde "onde vendeu essas N
@@ -186,6 +198,8 @@ export function registerProdutoTools(server: McpServer) {
                 quantidade: ultimaVenda.quantity,
                 // Vendedor responsável (apelido/nome). null em venda de e-commerce.
                 vendedor: ultimaVenda.vendedor ?? null,
+                // Desconto concedido nessa venda (R$). 0 no e-commerce.
+                desconto: ultimaVenda.desconto ?? 0,
               }
             : null,
           // QUEM mais vendeu este produto no período (qtd/receita por vendedor),
