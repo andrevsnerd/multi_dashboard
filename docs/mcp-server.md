@@ -46,7 +46,7 @@ Em produção (Vercel), defina `MCP_API_TOKEN` em Project → Settings → Envir
 | `vendedores` | Ranking de vendedores por faturamento no período (qtd, **desconto concedido**, tickets, ticket médio, participação). Filtros: produto (`produto`) + filial + categorias. `ordenarPor: "desconto"` → ranking de quem mais descontou (geral ou no produto). `limite` (padrão 50). |
 | `vendedor_produtos` | **Inverso** do filtro produto→vendedor: fixa UM vendedor e lista TODOS os produtos que ele vendeu no período (produto, descrição, cor, categoria, qtd, faturamento **e desconto**), ordenado por faturamento. Responde "quais produtos a Stephanie vendeu" e "quanto ela descontou em cada". `vendedor` (apelido/código) obrigatório; `filial` opcional (omitir = todas). Filtros: categoria + `busca` (descrição) + `produto` (SKU). |
 | `clientes` | Ranking de clientes por compras no período. Filtros: filial, vendedor, busca (nome). `limite` (padrão 100). |
-| `curva_abc` | Curva ABC de SKUs por receita (resumo A/B/C + top da curva A + rankings de subgrupo/coleção). **Apenas SCARF ME** (via `fetchClaudeReport`). |
+| `curva_abc` | Curva ABC de SKUs por receita (resumo A/B/C + top da curva A + rankings de subgrupo/coleção). **NERD e SCARF ME** (via `fetchClaudeReport`, com `company`). A classificação ABC por SKU/receita vale p/ as duas; rankings de subgrupo/coleção são vocabulário SCARF ME (vazios na NERD). |
 
 ### Fase 4 — produto (ficha 360) + ranking + compras
 | Tool | O que faz |

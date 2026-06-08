@@ -156,6 +156,8 @@ interface ReportAudit {
 }
 
 export interface ClaudeReportRequest {
+  /** Slug da empresa (padrão 'scarfme'). A curva ABC por SKU/receita funciona para qualquer empresa. */
+  company?: string;
   filial?: string | null;
   range: {
     start?: string | Date;
@@ -1424,15 +1426,16 @@ function buildPresentationContext({
 }
 
 export async function fetchClaudeReport({
+  company: companySlug = "scarfme",
   filial,
   range,
   colecoes,
   subgrupos,
   grades,
 }: ClaudeReportRequest): Promise<ClaudeReportPayload> {
-  const company = await resolveCompanyLive("scarfme");
+  const company = await resolveCompanyLive(companySlug);
   if (!company) {
-    throw new Error("Empresa scarfme não encontrada.");
+    throw new Error(`Empresa ${companySlug} não encontrada.`);
   }
 
   const normalizedRange = normalizeRangeForQuery(range);
@@ -1458,7 +1461,7 @@ export async function fetchClaudeReport({
   const gradeLabel = selectedGrades[0] ?? "MIX";
 
   const collectionOptionsPromise = fetchAvailableColecoesWithDescriptions({
-    company: "scarfme",
+    company: companySlug,
     range: normalizedRange,
     filial: filial ?? null,
     subgrupos: selectedSubgrupos,

@@ -91,7 +91,8 @@ pode sempre refinar na pergunta seguinte ("e só na Paulista?", "e em abril?").
 ### 🅰️ Curva ABC
 - "O produto 07.A1.00B3 é curva A nos últimos 12 meses?"
 - "E neste mês, continua curva A?"
-- "Me dá a tabela ABC geral da SCARF ME do mês passado." *(visão completa, SCARF ME)*
+- "Me dá a tabela ABC geral da SCARF ME do mês passado." *(visão completa)*
+- "E a curva ABC da NERD desse mês?" *(ABC por SKU/receita também funciona na NERD)*
 
 ### 🚨 Sem estoque / rupturas + sugestão de compra
 - "Quais produtos estão sem estoque na SCARF ME?"

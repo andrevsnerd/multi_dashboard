@@ -17,27 +17,23 @@ export function registerCurvaTools(server: McpServer) {
     {
       description:
         'Curva ABC de SKUs por participação de receita no período (resumo por curva A/B/C + top itens da curva A). ' +
-        'Disponível para SCARF ME. Filtros: filial, coleções, subgrupos, grades.',
+        'Disponível para NERD e SCARF ME. A classificação ABC (por SKU/receita) vale para as duas; ' +
+        'os rankings por subgrupo/coleção são vocabulário SCARF ME (na NERD ficam vazios). ' +
+        'Filtros: filial, coleções/subgrupos/grades (SCARF ME).',
       inputSchema: {
         empresa: empresaSchema,
         inicio: dataSchema,
         fim: dataSchema,
         filial: z.string().optional().describe('Valor de filial (listar_filiais). Omitir = rede.'),
-        colecoes: listaOpcional('Coleções.'),
-        subgrupos: listaOpcional('Subgrupos.'),
-        grades: listaOpcional('Grades.'),
+        colecoes: listaOpcional('Coleções (SCARF ME).'),
+        subgrupos: listaOpcional('Subgrupos (SCARF ME).'),
+        grades: listaOpcional('Grades (SCARF ME).'),
         limite: z.number().int().min(1).max(100).optional().describe('Itens da curva A (padrão 20).'),
       },
     },
     async ({ empresa, inicio, fim, filial, colecoes, subgrupos, grades, limite }) => {
-      if (empresa !== 'scarfme') {
-        return texto({
-          erro: 'Curva ABC disponível apenas para SCARF ME no momento.',
-          empresa,
-        });
-      }
-
       const report = await fetchClaudeReport({
+        company: empresa,
         filial: filial ?? null,
         range: { start: inicio, end: fim },
         colecoes: listaOuNull(colecoes),
