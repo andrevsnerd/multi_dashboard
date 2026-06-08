@@ -1256,3 +1256,38 @@ export async function fetchFilialProdutoVendedorSales(
 
   return Array.from(merged.values()).sort((a, b) => b.vendas - a.vendas);
 }
+
+/**
+ * Estoque atual por produto (somando todas as cores/grades) nas filiais
+ * informadas. Só conta saldos positivos (negativos nunca contam — regra do
+ * estoque). Retorna um Map<código do produto (UPPER/trim), estoque>.
+ */
+export async function fetchStockByProduto(
+  filiais: string[]
+): Promise<Map<string, number>> {
+  const filiaisNorm = Array.from(
+    new Set((filiais || []).map((f) => (f || '').trim().toUpperCase()).filter(Boolean))
+  );
+  const map = new Map<string, number>();
+  if (filiaisNorm.length === 0) return map;
+
+  return withRequest(async (request) => {
+    filiaisNorm.forEach((f, i) => request.input(`sf${i}`, sql.VarChar, f));
+    const placeholders = filiaisNorm.map((_, i) => `@sf${i}`).join(', ');
+    const query = `
+      SELECT
+        UPPER(LTRIM(RTRIM(ISNULL(e.PRODUTO, '')))) AS produto,
+        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoque
+      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      WHERE UPPER(LTRIM(RTRIM(ISNULL(e.FILIAL, '')))) IN (${placeholders})
+      GROUP BY UPPER(LTRIM(RTRIM(ISNULL(e.PRODUTO, ''))))
+    `;
+    const result = await request.query<{ produto: string; estoque: number | null }>(query);
+    for (const row of result.recordset) {
+      const key = (row.produto ?? '').trim();
+      if (!key) continue;
+      map.set(key, Math.max(0, Number(row.estoque ?? 0)));
+    }
+    return map;
+  });
+}
