@@ -53,7 +53,7 @@ Em produção (Vercel), defina `MCP_API_TOKEN` em Project → Settings → Envir
 | `sem_estoque` | Rupturas: produtos com estoque ≤ 0 que venderam nos últimos 12m, com sugestão de compra. Filtros de filial/categoria. |
 | `produto` | Ficha 360 de UM produto (por código): estoque total + **por filial** (onde está), **última venda** (com **vendedor** responsável e **desconto** da venda), **vendas por filial** (ONDE vendeu — qtd/receita em cada filial no período, respeita inicio/fim), **top vendedores** (QUEM mais vendeu — qtd/receita **e desconto** por vendedor), **desconto total** no período, **última entrada** (quando/onde entrou, com **nº de romaneio**, qtd recebida e custo) + últimas entradas, receita/qtd no período, custo/preço. |
 | `compras_transito` | Compras em trânsito: o que foi comprado, quanto, custo e **quando chega** (`dataRecebimento`). Busca por `produto`/`status`. Fonte: cadastro de compras em trânsito do dashboard (não é pedido do ERP). |
-| `produtos_vendidos` | Ranking de produtos vendidos em um **período arbitrário** (datas exatas, inclusive um único dia). Responde "mais vendidos no mês passado", "o que vendeu ontem". Filtros: filial + categoria (grupo/linha/subgrupo/coleção/grade) + busca. |
+| `produtos_vendidos` | Ranking de produtos vendidos em um **período arbitrário** (datas exatas, inclusive um único dia). Responde "mais vendidos no mês passado", "o que vendeu ontem". Filtros combináveis: filial + categoria (grupo/linha/subgrupo/coleção/grade) + `busca` (trecho da **descrição** — ex.: marca "geonav", "lenço"). Devolve a lista (quais) + totais do período (quanto faturou/vendeu o conjunto). Ideal para ações em produtos com termo no nome ou de uma categoria. |
 | `produto_curva` | Curva ABC de um produto em **duas janelas**: últimos 12 meses e mês atual. Responde "é curva A nos 12m?" e "é curva A neste mês?" (independente). NERD e SCARF ME, escopo rede. |
 | `produtos_parados` | Produtos com estoque **sem venda há mais de N dias** (você escolhe `dias`: 90, 120, 180…). Filtros de filial/categoria. Ordenado por estoque (maior encalhe primeiro). |
 
@@ -76,6 +76,8 @@ Padrão de uso pelo Claude: **descobrir** (`listar_filiais`, `listar_categorias`
 | "sugestão de compra do produto" | `top_produtos` / `sem_estoque` (campo `sugestaoCompra`) |
 | "foi comprado / quando chega / em trânsito" | `compras_transito` |
 | "vendeu ontem? quanto vendeu no período X?" | `produtos_vendidos` (ranking) ou `produto` (um SKU, inicio=fim) |
+| "quanto venderam os produtos com 'geonav' no nome, e quais" | `produtos_vendidos` com `busca: "geonav"` (+ inicio/fim) |
+| "quais produtos da linha/subgrupo/grupo/grade/coleção X mais venderam" | `produtos_vendidos` com o filtro de categoria (+ inicio/fim) |
 | "é curva A nos 12 meses? e neste mês?" | `produto_curva` (NERD + SCARF ME) |
 | "qual produto está parado há mais de X dias?" | `produtos_parados` (`dias` configurável) |
 | "tabela/ranking ABC geral" (SCARF ME) | `curva_abc` |

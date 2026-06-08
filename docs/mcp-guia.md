@@ -59,6 +59,9 @@ pode sempre refinar na pergunta seguinte ("e só na Paulista?", "e em abril?").
 - "Os mais vendidos na filial Morumbi mês passado." *(usa período livre)*
 - "O que mais vendeu ontem na SCARF ME?"
 - "Quanto cada produto da linha PASHMINA vendeu entre 1 e 20 de maio?"
+- "Quanto venderam no mês os produtos com 'geonav' na descrição, e quais foram?" *(busca por termo no nome)*
+- "Quais produtos da linha LENÇOS mais venderam esse mês?"
+- "Mais vendidos do subgrupo X / grupo Y / grade Z / coleção W esse mês." *(qualquer categoria)*
 
 > Diferença útil: para **mais vendidos + sugestão de compra + estoque**, ele usa
 > uma visão de janelas (12 meses / 60 dias / mês). Para um **período exato** (datas),

@@ -44,7 +44,9 @@ export function registerProdutosVendidosTools(server: McpServer) {
         'Use para "mais vendidos este mês/no mês passado", "o que vendeu ontem", "quanto a categoria X faturou entre datas". ' +
         'Padrão: mês atual e separado POR COR (porCor=true) — assim dá pra ver vendas E estoque por produto x cor. ' +
         'Para um único dia, passe inicio=fim. Para um SKU específico e suas cores, passe `produto`. ' +
-        'Filtros: filial e categoria (grupos p/ NERD; linhas/subgrupos/coleções/grades p/ SCARF ME) e/ou busca por SKU/nome.',
+        'Filtros combináveis: filial + categoria (grupos p/ NERD; linhas/subgrupos/coleções/grades p/ SCARF ME) + `busca`. ' +
+        '`busca` casa qualquer trecho da DESCRIÇÃO do produto (ex.: marca/termo "geonav", "lenço") — ideal para ações em produtos que ' +
+        'compartilham um termo no nome. Devolve a lista (quais) e os totais do período (quanto faturou/vendeu o conjunto filtrado).',
       inputSchema: {
         empresa: empresaSchema,
         inicio: dataSchema.optional().describe('Início do período (YYYY-MM-DD). Padrão: 1º dia do mês atual.'),
@@ -60,7 +62,10 @@ export function registerProdutosVendidosTools(server: McpServer) {
         subgrupos: listaOpcional('Subgrupos (SCARF ME).'),
         colecoes: listaOpcional('Coleções (SCARF ME).'),
         grades: listaOpcional('Grades (SCARF ME).'),
-        busca: z.string().optional().describe('Termo de busca por SKU/nome (opcional).'),
+        busca: z
+          .string()
+          .optional()
+          .describe('Trecho da DESCRIÇÃO do produto (ex.: "geonav", "lenço"). Casa qualquer produto cujo nome contém o termo. Combina com os filtros de categoria. Para SKU exato, use `produto`.'),
         ordenarPor: ordenarPorSchema,
         limite: z.number().int().min(1).max(300).optional().describe('Qtde de produtos (padrão 50).'),
       },
