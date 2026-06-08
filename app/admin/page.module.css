@@ -415,3 +415,105 @@
 .selectAll:hover {
   text-decoration: underline;
 }
+
+/* ── Páginas agrupadas ── */
+.permGroups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.permGroup {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.permGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  background: #fff;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.permGroupHeader:hover {
+  background: #f1f5f9;
+}
+
+.permGroupChevron {
+  color: #94a3b8;
+  font-size: 11px;
+  width: 12px;
+  flex-shrink: 0;
+}
+
+.permGroupTitle {
+  flex: 1;
+  text-align: left;
+}
+
+.permGroupCount {
+  font-size: 11px;
+  color: #64748b;
+  background: #e2e8f0;
+  border-radius: 20px;
+  padding: 1px 8px;
+}
+
+.permGroupBody {
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+}
+
+.permGroupGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+}
+
+/* ── Filial: ver todas / só essa ── */
+.radioGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.radioLabel {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 400;
+  color: #334155;
+  cursor: pointer;
+}
+
+.radioLabel input {
+  margin-top: 2px;
+  accent-color: #0ea5e9;
+  flex-shrink: 0;
+}
+
+.infoNote {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #1e40af;
+}

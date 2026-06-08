@@ -20,6 +20,56 @@ function getFilialLabel(filial: string): string {
   return _filialLabelOverrides[filial] ?? filial;
 }
 
+/* Agrupamento visual das páginas (espelha as seções da Sidebar). Não altera
+ * permissões — só organiza os checkboxes. Chaves fora dos grupos caem em "Outros". */
+const PERMISSION_GROUPS: { label: string; keys: PermissionKey[] }[] = [
+  {
+    label: "Visão geral",
+    keys: [
+      "dashboard", "produtos", "produto-agrupado", "produto-detalhado",
+      "produtos-recentes", "produtos-novos", "relatorio-colecao", "relatorio-claude",
+      "vendedores", "clientes", "mapa-clientes",
+    ],
+  },
+  {
+    label: "Estoque",
+    keys: [
+      "controle-estoque", "estoque-consulta", "controle-giro", "controle-performance",
+      "controle-movimento", "curva-abc", "curva-por-produto", "nova-filial", "estoque-por-filial",
+    ],
+  },
+  {
+    label: "Operações",
+    keys: [
+      "controle-transferencias", "transferencia-produtos", "romaneios",
+      "saidas-entradas-produtos", "lista-loja", "compras-transito", "compras-salvas", "destino-romaneio",
+    ],
+  },
+  {
+    label: "Ferramentas",
+    keys: ["filial", "exportar-relatorios", "sincronizacao", "blackfriday"],
+  },
+];
+
+/** Organiza ALL_PERMISSION_KEYS nos grupos acima, preservando os labels oficiais. */
+function buildGroupedPermissions() {
+  const labelByKey = new Map(ALL_PERMISSION_KEYS.map((p) => [p.key, p.label] as const));
+  const grouped = new Set<PermissionKey>();
+  const groups = PERMISSION_GROUPS.map((g) => {
+    const items = g.keys
+      .filter((k) => labelByKey.has(k))
+      .map((k) => {
+        grouped.add(k);
+        return { key: k, label: labelByKey.get(k)! };
+      });
+    return { label: g.label, items };
+  }).filter((g) => g.items.length > 0);
+
+  const outros = ALL_PERMISSION_KEYS.filter((p) => !grouped.has(p.key));
+  if (outros.length > 0) groups.push({ label: "Outros", items: outros });
+  return groups;
+}
+
 /* ── Tipos ── */
 interface UserRow {
   id: string;
@@ -57,6 +107,8 @@ export default function AdminPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [transfPerms, setTransfPerms] = useState<TransfPerm[]>([]);
   const [filiais, setFiliais] = useState<Filial[]>([]);
+  const [filiaisNerd, setFiliaisNerd] = useState<Filial[]>([]);
+  const [filiaisScarf, setFiliaisScarf] = useState<Filial[]>([]);
   const [tiposRomaneio, setTiposRomaneio] = useState<string[]>([]);
   const [responsaveis, setResponsaveis] = useState<string[]>([]);
 
@@ -92,6 +144,9 @@ export default function AdminPage() {
   const [formTipoRomaneioFixo, setFormTipoRomaneioFixo] = useState(false);
   const [formPodeVerOutras, setFormPodeVerOutras] = useState(false);
 
+  // Grupos de páginas recolhidos (vazio = todos expandidos)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
   const authHeader = useCallback(
     (): Record<string, string> =>
       currentUser ? { "X-Auth-Username": currentUser.username } : {},
@@ -104,10 +159,11 @@ export default function AdminPage() {
     setLoading(true);
     setError("");
     try {
-      const [usersRes, permsRes, filiaisRes, tiposRes, responsRes] = await Promise.all([
+      const [usersRes, permsRes, filiaisNerdRes, filiaisScarfRes, tiposRes, responsRes] = await Promise.all([
         fetch("/api/admin/users", { headers: authHeader() }),
         fetch("/api/admin/transferencia-permissoes", { headers: authHeader(), cache: "no-store" }),
-        fetch("/api/transferencia-produtos/filiais", { cache: "no-store" }),
+        fetch("/api/transferencia-produtos/filiais?company=nerd", { cache: "no-store" }),
+        fetch("/api/transferencia-produtos/filiais?company=scarfme", { cache: "no-store" }),
         fetch("/api/transferencia-produtos/tipos-romaneio", { cache: "no-store" }),
         fetch("/api/transferencia-produtos/responsaveis", { cache: "no-store" }),
       ]);
@@ -119,10 +175,20 @@ export default function AdminPage() {
         const p = await permsRes.json();
         setTransfPerms(p.data || []);
       }
-      if (filiaisRes.ok) {
-        const f = await filiaisRes.json();
-        setFiliais(f.data || []);
+      const nerdList: Filial[] = filiaisNerdRes.ok ? (await filiaisNerdRes.json()).data || [] : [];
+      const scarfList: Filial[] = filiaisScarfRes.ok ? (await filiaisScarfRes.json()).data || [] : [];
+      setFiliaisNerd(nerdList);
+      setFiliaisScarf(scarfList);
+      // União (dedup por codFilial) — usada para resolver nomes na tabela de usuários.
+      const seenCod = new Set(nerdList.map((f) => f.codFilial));
+      const union = [...nerdList];
+      for (const f of scarfList) {
+        if (!seenCod.has(f.codFilial)) {
+          seenCod.add(f.codFilial);
+          union.push(f);
+        }
       }
+      setFiliais(union);
       if (tiposRes.ok) {
         const t = await tiposRes.json();
         setTiposRomaneio(t.data || []);
@@ -236,6 +302,40 @@ export default function AdminPage() {
       setFormFiliaisOrigem(cod ? [cod] : []);
       setFormFiliaisDestino(cod ? [cod] : []);
     }
+    if (!cod) setFormPodeVerOutras(false);
+  }
+
+  /** Filiais disponíveis no form conforme a empresa escolhida (Ambas = união). */
+  function filiaisForEmpresa(emp: "" | CompanyKey): Filial[] {
+    if (emp === "nerd") return filiaisNerd;
+    if (emp === "scarfme") return filiaisScarf;
+    return filiais;
+  }
+
+  function handleEmpresaChange(emp: "" | CompanyKey) {
+    setFormEmpresa(emp);
+    // Se a filial atribuída não pertence à nova empresa, limpa para não ficar oculta.
+    if (formFilialPrincipal && !filiaisForEmpresa(emp).some((f) => f.codFilial === formFilialPrincipal)) {
+      handleFilialPrincipalChange("");
+    }
+  }
+
+  function toggleGroup(label: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  }
+
+  function toggleGroupAll(keys: PermissionKey[], allSelected: boolean) {
+    setFormPermissions((prev) => {
+      if (allSelected) return prev.filter((k) => !keys.includes(k));
+      const set = new Set(prev);
+      keys.forEach((k) => set.add(k));
+      return Array.from(set);
+    });
   }
 
   /* ── Submit ── */
@@ -282,16 +382,23 @@ export default function AdminPage() {
         savedUsername = data.username;
       }
 
-      // 2) Salvar permissões de transferência (sempre que tiver dados de filial ou transferência)
-      const temDadosTransf =
+      // 2) Permissões de transferência.
+      //    - Com filial atribuída ou config avançada → cria/atualiza a linha.
+      //    - Sem nada (Nenhuma) → SOMENTE LEITURA: remove a linha se existir
+      //      (sem linha, o gate de execução bloqueia saídas/entradas, mas o
+      //       usuário continua vendo o quadro completo).
+      const temConfigTransf =
         formFilialPrincipal ||
         formFiliaisOrigem.length > 0 ||
         formFiliaisDestino.length > 0 ||
+        formFiliaisDestinoControle.length > 0 ||
         formTiposRomaneio.length > 0 ||
         formResponsavel ||
         formTipoRomaneio;
 
-      if (temDadosTransf || transfPerms.some((p) => p.username === savedUsername)) {
+      const jaTinhaPermissao = transfPerms.some((p) => p.username === savedUsername);
+
+      if (temConfigTransf) {
         const filiaisOrigem = formAdvancedFiliais
           ? formFiliaisOrigem
           : formFilialPrincipal
@@ -325,6 +432,15 @@ export default function AdminPage() {
         if (!transfRes.ok) {
           const d = await transfRes.json().catch(() => ({}));
           throw new Error(d.error ?? "Erro ao salvar permissões de filial");
+        }
+      } else if (jaTinhaPermissao) {
+        const delRes = await fetch(
+          `/api/admin/transferencia-permissoes?username=${encodeURIComponent(savedUsername)}`,
+          { method: "DELETE", headers: authHeader() }
+        );
+        if (!delRes.ok) {
+          const d = await delRes.json().catch(() => ({}));
+          throw new Error(d.error ?? "Erro ao limpar permissões de filial");
         }
       }
 
@@ -364,6 +480,9 @@ export default function AdminPage() {
   }
 
   if (!currentUser) return null;
+
+  const groupedPermissions = buildGroupedPermissions();
+  const formFiliais = filiaisForEmpresa(formEmpresa);
 
   return (
     <main className={styles.container}>
@@ -566,7 +685,7 @@ export default function AdminPage() {
                       Empresa
                       <select
                         value={formEmpresa}
-                        onChange={(e) => setFormEmpresa(e.target.value as "" | CompanyKey)}
+                        onChange={(e) => handleEmpresaChange(e.target.value as "" | CompanyKey)}
                         className={styles.select}
                         disabled={saving}
                       >
@@ -579,22 +698,56 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* ── Seção: Páginas ── */}
+              {/* ── Seção: Páginas (agrupadas e recolhíveis) ── */}
               {formRole !== "admin" && (
                 <div className={styles.section}>
                   <p className={styles.sectionTitle}>Páginas que pode acessar</p>
-                  <div className={styles.checkboxGrid}>
-                    {ALL_PERMISSION_KEYS.map(({ key, label }) => (
-                      <label key={key} className={styles.checkboxLabel}>
-                        <input
-                          type="checkbox"
-                          checked={formPermissions.includes(key)}
-                          onChange={() => togglePermission(key)}
-                          disabled={saving}
-                        />
-                        {label}
-                      </label>
-                    ))}
+                  <div className={styles.permGroups}>
+                    {groupedPermissions.map((group) => {
+                      const groupKeys = group.items.map((i) => i.key);
+                      const selectedCount = groupKeys.filter((k) => formPermissions.includes(k)).length;
+                      const allSelected = selectedCount === groupKeys.length;
+                      const collapsed = collapsedGroups.has(group.label);
+                      return (
+                        <div key={group.label} className={styles.permGroup}>
+                          <button
+                            type="button"
+                            className={styles.permGroupHeader}
+                            onClick={() => toggleGroup(group.label)}
+                          >
+                            <span className={styles.permGroupChevron}>{collapsed ? "▸" : "▾"}</span>
+                            <span className={styles.permGroupTitle}>{group.label}</span>
+                            <span className={styles.permGroupCount}>
+                              {selectedCount}/{groupKeys.length}
+                            </span>
+                          </button>
+                          {!collapsed && (
+                            <div className={styles.permGroupBody}>
+                              <button
+                                type="button"
+                                className={styles.selectAll}
+                                onClick={() => toggleGroupAll(groupKeys, allSelected)}
+                              >
+                                {allSelected ? "Desmarcar todos" : "Marcar todos"}
+                              </button>
+                              <div className={styles.permGroupGrid}>
+                                {group.items.map(({ key, label }) => (
+                                  <label key={key} className={styles.checkboxLabel}>
+                                    <input
+                                      type="checkbox"
+                                      checked={formPermissions.includes(key)}
+                                      onChange={() => togglePermission(key)}
+                                      disabled={saving}
+                                    />
+                                    {label}
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -611,17 +764,49 @@ export default function AdminPage() {
                       className={styles.select}
                       disabled={saving}
                     >
-                      <option value="">Todas (sem restrição)</option>
-                      {filiais.map((f) => (
+                      <option value="">Nenhuma — somente visualização</option>
+                      {formFiliais.map((f) => (
                         <option key={f.codFilial} value={f.codFilial}>
                           {f.filial}
                         </option>
                       ))}
                     </select>
                     <span className={styles.hint}>
-                      Define a filial padrão do usuário. Limita saídas/entradas e filtra romaneios.
+                      {formEmpresa === ""
+                        ? "Mostrando filiais das duas empresas — selecione a empresa acima para filtrar."
+                        : "Filial onde o usuário executa saídas/entradas e que filtra os romaneios."}
                     </span>
                   </label>
+
+                  {formFilialPrincipal ? (
+                    <div className={styles.radioGroup}>
+                      <label className={styles.radioLabel}>
+                        <input
+                          type="radio"
+                          name="verFiliais"
+                          checked={!formPodeVerOutras}
+                          onChange={() => setFormPodeVerOutras(false)}
+                          disabled={saving}
+                        />
+                        <span>Vê e opera <strong>somente nesta filial</strong></span>
+                      </label>
+                      <label className={styles.radioLabel}>
+                        <input
+                          type="radio"
+                          name="verFiliais"
+                          checked={formPodeVerOutras}
+                          onChange={() => setFormPodeVerOutras(true)}
+                          disabled={saving}
+                        />
+                        <span>Vê <strong>todas as filiais</strong> da empresa, mas opera só nesta</span>
+                      </label>
+                    </div>
+                  ) : (
+                    <div className={styles.infoNote}>
+                      Sem filial atribuída o usuário <strong>vê o quadro completo</strong> de
+                      transferências, mas <strong>não executa</strong> saídas nem entradas (somente leitura).
+                    </div>
+                  )}
 
                   {/* Toggle avançado */}
                   <button
@@ -656,16 +841,16 @@ export default function AdminPage() {
                           type="button"
                           className={styles.selectAll}
                           onClick={() => {
-                            const all = filiais.length > 0 && formFiliaisOrigem.length === filiais.length;
-                            setFormFiliaisOrigem(all ? [] : filiais.map((f) => f.codFilial));
+                            const all = formFiliais.length > 0 && formFiliaisOrigem.length === formFiliais.length;
+                            setFormFiliaisOrigem(all ? [] : formFiliais.map((f) => f.codFilial));
                           }}
                         >
-                          {filiais.length > 0 && formFiliaisOrigem.length === filiais.length
+                          {formFiliais.length > 0 && formFiliaisOrigem.length === formFiliais.length
                             ? "Desmarcar tudo"
                             : "Selecionar tudo"}
                         </button>
                         <div className={styles.checkboxList}>
-                          {filiais.map((f) => (
+                          {formFiliais.map((f) => (
                             <label key={f.codFilial} className={styles.checkboxLabel}>
                               <input
                                 type="checkbox"
@@ -691,7 +876,7 @@ export default function AdminPage() {
                           Vazio = todas. O usuário só pode lançar entrada nessas filiais.
                         </span>
                         <div className={styles.checkboxList}>
-                          {filiais.map((f) => (
+                          {formFiliais.map((f) => (
                             <label key={f.codFilial} className={styles.checkboxLabel}>
                               <input
                                 type="checkbox"
@@ -724,16 +909,16 @@ export default function AdminPage() {
                           type="button"
                           className={styles.selectAll}
                           onClick={() => {
-                            const all = filiais.length > 0 && formFiliaisDestinoControle.length === filiais.length;
-                            setFormFiliaisDestinoControle(all ? [] : filiais.map((f) => f.codFilial));
+                            const all = formFiliais.length > 0 && formFiliaisDestinoControle.length === formFiliais.length;
+                            setFormFiliaisDestinoControle(all ? [] : formFiliais.map((f) => f.codFilial));
                           }}
                         >
-                          {filiais.length > 0 && formFiliaisDestinoControle.length === filiais.length
+                          {formFiliais.length > 0 && formFiliaisDestinoControle.length === formFiliais.length
                             ? "Desmarcar tudo"
                             : "Selecionar tudo"}
                         </button>
                         <div className={styles.checkboxList}>
-                          {filiais.map((f) => (
+                          {formFiliais.map((f) => (
                             <label key={f.codFilial} className={styles.checkboxLabel}>
                               <input
                                 type="checkbox"
