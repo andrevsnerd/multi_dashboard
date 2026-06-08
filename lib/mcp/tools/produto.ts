@@ -55,7 +55,8 @@ export function registerProdutoTools(server: McpServer) {
       description:
         'Ficha completa de UM produto (por código): descrição, estoque total e por filial (onde está, INCLUINDO a matriz/depósito), ' +
         'última venda, última entrada (quando/onde entrou, COM nº de romaneio, qtd recebida e custo) e as últimas entradas, ' +
-        'receita/quantidade no período, custo e preço médios. ' +
+        'receita/quantidade no período E vendas POR FILIAL (ONDE vendeu — quantidade e receita em cada filial no período), custo e preço médios. ' +
+        'Responde "onde vendeu essas N unidades" e "onde vendeu nos últimos X meses" (use inicio/fim para o range) via vendas.porFilial. ' +
         'Use o código `produto` retornado por top_produtos/sem_estoque/curva_abc/produtos_vendidos. ' +
         'Para uma COR específica (ex.: o item veio de um ranking POR COR), passe `cor` (código "06" ou descrição "PRETO"): ' +
         'aí estoque por filial e vendas vêm SÓ daquela cor. Sem `cor`, soma todas as cores. ' +
@@ -146,6 +147,18 @@ export function registerProdutoTools(server: McpServer) {
           receitaPeriodo: detail.totalRevenue,
           quantidadePeriodo: detail.totalQuantity,
           variacaoReceitaPct: detail.revenueVariance,
+          // ONDE vendeu: distribuição da quantidade/receita por filial no período
+          // (respeita inicio/fim e o filtro de cor). Responde "onde vendeu essas N
+          // unidades" e "onde vendeu nos últimos X meses". Só filiais com venda > 0,
+          // da que mais vendeu para a que menos vendeu.
+          porFilial: porFilial
+            .filter((f) => (f.quantity ?? 0) > 0)
+            .sort((a, b) => (b.quantity ?? 0) - (a.quantity ?? 0))
+            .map((f) => ({
+              filial: f.filialDisplayName,
+              quantidade: f.quantity,
+              receita: f.revenue,
+            })),
           ultimaVenda: ultimaVenda
             ? {
                 data: ultimaVenda.date instanceof Date ? ultimaVenda.date.toISOString().slice(0, 10) : ultimaVenda.date,
