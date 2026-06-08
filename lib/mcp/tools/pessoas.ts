@@ -129,6 +129,7 @@ export function registerPessoasTools(server: McpServer) {
 
       const faturamentoTotal = lista.reduce((s, p) => s + (p.faturamento ?? 0), 0);
       const quantidadeTotal = lista.reduce((s, p) => s + (p.quantidade ?? 0), 0);
+      const descontoTotal = lista.reduce((s, p) => s + (p.desconto ?? 0), 0);
       const produtos = lista.slice(0, limite ?? 100).map((p) => ({
         produto: p.codigo ?? null,
         descricao: p.descricao,
@@ -140,6 +141,7 @@ export function registerPessoasTools(server: McpServer) {
         grade: p.grade ?? null,
         quantidade: p.quantidade,
         faturamento: p.faturamento,
+        desconto: p.desconto,
       }));
 
       return texto({
@@ -147,7 +149,12 @@ export function registerPessoasTools(server: McpServer) {
         vendedor,
         filial: filial ?? 'TODAS',
         periodo: inicio && fim ? { inicio, fim } : 'padrão',
-        totais: { produtos: lista.length, faturamento: faturamentoTotal, quantidade: quantidadeTotal },
+        totais: {
+          produtos: lista.length,
+          faturamento: faturamentoTotal,
+          quantidade: quantidadeTotal,
+          desconto: descontoTotal,
+        },
         produtos,
       });
     }

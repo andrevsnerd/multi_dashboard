@@ -175,6 +175,8 @@ export interface VendedorProdutoItem {
   descricao: string;
   faturamento: number;
   quantidade: number;
+  /** Desconto concedido neste produto pelo vendedor no período (R$). */
+  desconto: number;
 }
 
 export interface VendedoresListParams {
@@ -1003,7 +1005,8 @@ export async function fetchVendedorProdutosList(
         MAX(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO, '')) AS cor,
         MAX(vp.DESC_PRODUTO) AS descricao,
         SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) END) AS faturamento,
-        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.QTDE END) AS quantidade
+        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.QTDE END) AS quantidade,
+        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE ISNULL(vp.DESCONTO_VENDA, 0) END) AS desconto
       FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR
@@ -1034,6 +1037,7 @@ export async function fetchVendedorProdutosList(
       descricao: string;
       faturamento: number;
       quantidade: number;
+      desconto: number;
     }>(query);
 
     return result.recordset.map((row) => ({
@@ -1047,6 +1051,188 @@ export async function fetchVendedorProdutosList(
       descricao: row.descricao || 'SEM DESCRIÇÃO',
       faturamento: row.faturamento ?? 0,
       quantidade: row.quantidade ?? 0,
+      desconto: row.desconto ?? 0,
     }));
+  });
+}
+
+export interface ProdutoDescontoItem {
+  produto: string;
+  descricao: string;
+  cor?: string;
+  corCodigo?: string;
+  grupo?: string;
+  linha?: string;
+  subgrupo?: string;
+  colecao?: string;
+  grade?: string;
+  quantidade: number;
+  faturamento: number;
+  desconto: number;
+  /** % do valor bruto que virou desconto: desconto / (faturamento + desconto). */
+  descontoPct: number;
+}
+
+export interface ProdutosComDescontoParams {
+  company?: string;
+  /** Filial específica; vazio/omitido = todas. */
+  filial?: string;
+  /** Apelido/código do vendedor; omitido = todos os vendedores. */
+  vendedor?: string;
+  range?: { start?: Date | string; end?: Date | string };
+  grupos?: string[];
+  linhas?: string[];
+  colecoes?: string[];
+  subgrupos?: string[];
+  grades?: string[];
+  produtoId?: string;
+  produtoSearchTerm?: string;
+  /** Quebra por cor (padrão true → uma linha por produto×cor). */
+  porCor?: boolean;
+  limit?: number;
+}
+
+/**
+ * Lista os produtos que foram vendidos COM desconto no período, por produto
+ * (×cor por padrão), trazendo quanto foi descontado em cada (R$ e %). Consulta
+ * W_CTB_LOJA_VENDA_PEDIDO_PRODUTO direto (mesma fonte de DESCONTO_VENDA usada na
+ * ficha do produto), então NÃO depende da query da página /produtos. Aceita
+ * `vendedor` opcional para relacionar desconto × produto × vendedor. Só retorna
+ * itens com desconto > 0, do maior desconto para o menor.
+ */
+export async function fetchProdutosComDesconto(
+  params: ProdutosComDescontoParams
+): Promise<ProdutoDescontoItem[]> {
+  return withRequest(async (request) => {
+    const {
+      company,
+      filial = '',
+      vendedor,
+      range,
+      grupos,
+      linhas,
+      colecoes,
+      subgrupos,
+      grades,
+      produtoId,
+      produtoSearchTerm,
+      porCor = true,
+      limit = 100,
+    } = params;
+
+    const { start, end } = normalizeRangeForQuery(range);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+
+    const filialFilter = await buildDetailFilialFilter(
+      request,
+      company,
+      filial,
+      'vp.FILIAL',
+      'filialDesc'
+    );
+
+    let vendedorFilter = '';
+    if (vendedor && vendedor.trim()) {
+      request.input('vendedorApelidoDesc', sql.VarChar, vendedor.trim());
+      const codigoResult = await request.query<{ codigo: string }>(`
+        SELECT LTRIM(RTRIM(CAST(VENDEDOR AS VARCHAR))) AS codigo
+        FROM LOJA_VENDEDORES WITH (NOLOCK)
+        WHERE LTRIM(RTRIM(ISNULL(VENDEDOR_APELIDO, ISNULL(NOME_VENDEDOR, CAST(VENDEDOR AS VARCHAR))))) = @vendedorApelidoDesc
+      `);
+      const codigos = (codigoResult.recordset ?? []).map((r) => r.codigo).filter(Boolean);
+      if (codigos.length === 0) codigos.push(vendedor.trim());
+      codigos.forEach((c, i) => request.input(`vdesc${i}`, sql.VarChar, c));
+      vendedorFilter = `AND vp.VENDEDOR IN (${codigos.map((_, i) => `@vdesc${i}`).join(', ')})`;
+    }
+
+    const grupoFilter = buildListFilter(request, "COALESCE(vp.GRUPO_PRODUTO, p.GRUPO_PRODUTO, '')", grupos, 'grupoDesc');
+    const linhaFilter = buildListFilter(request, "COALESCE(vp.LINHA, p.LINHA, '')", linhas, 'linhaDesc');
+    const colecaoFilter = buildListFilter(request, "COALESCE(vp.COLECAO, p.COLECAO, '')", colecoes, 'colecaoDesc');
+    const subgrupoFilter = buildListFilter(request, "COALESCE(vp.SUBGRUPO_PRODUTO, p.SUBGRUPO_PRODUTO, '')", subgrupos, 'subgrupoDesc');
+    const gradeFilter = buildListFilter(request, 'CONVERT(VARCHAR, p.GRADE)', grades, 'gradeDesc');
+
+    let produtoFilter = '';
+    if (produtoId) {
+      request.input('produtoIdDesc', sql.VarChar, produtoId);
+      produtoFilter = 'AND vp.PRODUTO = @produtoIdDesc';
+    } else if ((produtoSearchTerm?.trim() ?? '').length >= 2) {
+      request.input('produtoSearchTermDesc', sql.VarChar, `%${(produtoSearchTerm ?? '').trim()}%`);
+      produtoFilter = 'AND vp.DESC_PRODUTO LIKE @produtoSearchTermDesc';
+    }
+
+    const topClamp = Math.min(Math.max(limit || 100, 1), 1000);
+    const corCodigoSelect = porCor ? 'MAX(vp.COR_PRODUTO) AS corCodigo,' : `'' AS corCodigo,`;
+    const corDescSelect = porCor ? "MAX(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO, '')) AS cor," : `'' AS cor,`;
+    const groupBy = porCor ? 'vp.PRODUTO, vp.COR_PRODUTO' : 'vp.PRODUTO';
+
+    const query = `
+      SELECT TOP (${topClamp})
+        vp.PRODUTO AS produto,
+        MAX(vp.DESC_PRODUTO) AS descricao,
+        ${corCodigoSelect}
+        ${corDescSelect}
+        MAX(ISNULL(vp.GRUPO_PRODUTO, '')) AS grupo,
+        MAX(COALESCE(vp.LINHA, p.LINHA, '')) AS linha,
+        MAX(COALESCE(vp.SUBGRUPO_PRODUTO, p.SUBGRUPO_PRODUTO, '')) AS subgrupo,
+        MAX(COALESCE(vp.COLECAO, p.COLECAO, '')) AS colecao,
+        MAX(ISNULL(CONVERT(VARCHAR, p.GRADE), '')) AS grade,
+        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.QTDE END) AS quantidade,
+        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) END) AS faturamento,
+        SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE ISNULL(vp.DESCONTO_VENDA, 0) END) AS desconto
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+      ${porCor ? 'LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vp.COR_PRODUTO = c.COR' : ''}
+      WHERE vp.DATA_VENDA >= @startDate
+        AND vp.DATA_VENDA < @endDate
+        AND vp.QTDE > 0
+        ${filialFilter}
+        ${vendedorFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        ${produtoFilter}
+      GROUP BY ${groupBy}
+      HAVING SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE ISNULL(vp.DESCONTO_VENDA, 0) END) > 0
+      ORDER BY desconto DESC
+    `;
+
+    const result = await request.query<{
+      produto: string;
+      descricao: string;
+      corCodigo: string;
+      cor: string;
+      grupo: string;
+      linha: string;
+      subgrupo: string;
+      colecao: string;
+      grade: string;
+      quantidade: number;
+      faturamento: number;
+      desconto: number;
+    }>(query);
+
+    return result.recordset.map((row) => {
+      const faturamento = Number(row.faturamento ?? 0);
+      const desconto = Number(row.desconto ?? 0);
+      const bruto = faturamento + desconto;
+      return {
+        produto: (row.produto ?? '').trim(),
+        descricao: row.descricao || 'SEM DESCRIÇÃO',
+        cor: row.cor?.trim() || undefined,
+        corCodigo: row.corCodigo?.trim() || undefined,
+        grupo: row.grupo?.trim() || undefined,
+        linha: row.linha?.trim() || undefined,
+        subgrupo: row.subgrupo?.trim() || undefined,
+        colecao: row.colecao?.trim() || undefined,
+        grade: row.grade?.trim() || undefined,
+        quantidade: Number(row.quantidade ?? 0),
+        faturamento,
+        desconto,
+        descontoPct: bruto > 0 ? Number(((desconto / bruto) * 100).toFixed(1)) : 0,
+      };
+    });
   });
 }

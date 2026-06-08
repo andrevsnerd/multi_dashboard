@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { fetchProductsWithDetails, type ProductDetail } from '@/lib/repositories/products';
+import { fetchProdutosComDesconto } from '@/lib/repositories/vendedores-v2';
 import { aggregateProductDetailsWithGroups } from '@/lib/utils/produto-agrupado-aggregation';
 import { listProdutoAgrupadoGroups } from '@/lib/utils/produto-agrupado-store';
 import type { CompanyKey } from '@/lib/config/company';
@@ -138,6 +139,77 @@ export function registerProdutosVendidosTools(server: McpServer) {
           quantidade: quantidadeTotal,
         },
         produtos,
+      });
+    }
+  );
+
+  server.registerTool(
+    'produtos_desconto',
+    {
+      description:
+        'Lista os produtos que foram vendidos COM DESCONTO no período, POR PRODUTO×COR (padrão), mostrando quanto foi ' +
+        'descontado em cada um (R$ e % do bruto), além de quantidade e faturamento líquido. Ordenado do maior desconto ao menor. ' +
+        'Só inclui itens que tiveram desconto. Responde "quais produtos foram vendidos com desconto e quanto foi descontado em cada". ' +
+        'Passe `vendedor` (apelido/código) para ver os descontos dados POR aquele vendedor (relaciona desconto × produto × vendedor). ' +
+        'Filtros: filial, categoria (grupos/linhas/subgrupos/coleções/grades), `busca` (descrição) e `produto` (SKU). ' +
+        'Padrão: mês atual. Para somar todas as cores num item só, passe porCor=false.',
+      inputSchema: {
+        empresa: empresaSchema,
+        inicio: dataSchema.optional().describe('Início do período (YYYY-MM-DD). Padrão: 1º dia do mês atual.'),
+        fim: dataSchema.optional().describe('Fim do período (YYYY-MM-DD). Padrão: hoje.'),
+        filial: z.string().optional().describe('Valor de filial (listar_filiais). Omitir = todas.'),
+        vendedor: z.string().optional().describe('Apelido/código do vendedor: limita aos descontos dados por ele.'),
+        porCor: z.boolean().optional().describe('Quebrar por cor (padrão true → uma linha por produto×cor).'),
+        grupos: listaOpcional('Grupos (NERD).'),
+        linhas: listaOpcional('Linhas (SCARF ME).'),
+        subgrupos: listaOpcional('Subgrupos (SCARF ME).'),
+        colecoes: listaOpcional('Coleções (SCARF ME).'),
+        grades: listaOpcional('Grades (SCARF ME).'),
+        busca: z.string().optional().describe('Trecho da DESCRIÇÃO do produto (ex.: "geonav").'),
+        produto: z.string().optional().describe('Código de UM produto (SKU) para ver só ele.'),
+        limite: z.number().int().min(1).max(500).optional().describe('Qtde de itens (padrão 100).'),
+      },
+    },
+    async ({ empresa, inicio, fim, filial, vendedor, porCor, grupos, linhas, subgrupos, colecoes, grades, busca, produto, limite }) => {
+      const padrao = defaultRange();
+      const range = { start: inicio ?? padrao.inicio, end: fim ?? padrao.fim };
+
+      const lista = await fetchProdutosComDesconto({
+        company: empresa,
+        filial: filial ?? '',
+        vendedor: vendedor?.trim() || undefined,
+        range,
+        grupos: listaOuNull(grupos) ?? undefined,
+        linhas: listaOuNull(linhas) ?? undefined,
+        colecoes: listaOuNull(colecoes) ?? undefined,
+        subgrupos: listaOuNull(subgrupos) ?? undefined,
+        grades: listaOuNull(grades) ?? undefined,
+        produtoId: produto?.trim() || undefined,
+        produtoSearchTerm: !produto && busca ? busca : undefined,
+        porCor: porCor !== false,
+        limit: limite ?? 100,
+      });
+
+      const descontoTotal = lista.reduce((s, p) => s + (p.desconto ?? 0), 0);
+      const faturamentoTotal = lista.reduce((s, p) => s + (p.faturamento ?? 0), 0);
+
+      return texto({
+        empresa,
+        periodo: { inicio: range.start, fim: range.end },
+        filial: filial ?? 'TODAS',
+        vendedor: vendedor?.trim() || 'TODOS',
+        porCor: porCor !== false,
+        totais: { itens: lista.length, desconto: descontoTotal, faturamento: faturamentoTotal },
+        produtos: lista.map((p) => ({
+          produto: p.produto,
+          descricao: p.descricao,
+          cor: p.cor ?? null,
+          corCodigo: p.corCodigo ?? null,
+          quantidade: p.quantidade,
+          faturamento: p.faturamento,
+          desconto: p.desconto,
+          descontoPct: p.descontoPct,
+        })),
       });
     }
   );
