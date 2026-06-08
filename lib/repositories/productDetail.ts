@@ -345,6 +345,70 @@ export async function fetchProductAvailableColors(
   });
 }
 
+export interface BarcodeResolution {
+  codigoBarras: string;
+  produto: string;
+  /** Código da cor (COR_PRODUTO) que o código de barras representa. */
+  corCodigo: string | null;
+  /** Descrição/nome da cor (display). */
+  corDescricao: string | null;
+  /** Tamanho/grade da variação, quando houver. */
+  tamanho: string | null;
+  descricaoProduto: string | null;
+}
+
+/**
+ * Resolve um CÓDIGO DE BARRAS para a variação exata (produto + cor + tamanho)
+ * via PRODUTOS_BARRA. Um código de barras já identifica produto E cor juntos,
+ * então isto devolve a chave necessária para consultar a ficha daquela variação.
+ * Retorna null quando o código não existe.
+ */
+export async function resolveBarcode(codigoBarras: string): Promise<BarcodeResolution | null> {
+  const code = (codigoBarras || '').trim();
+  if (!code) return null;
+
+  return withRequest(async (request) => {
+    request.input('codigoBarras', sql.VarChar, code);
+    const query = `
+      SELECT TOP 1
+        LTRIM(RTRIM(pb.CODIGO_BARRA)) AS codigoBarras,
+        pb.PRODUTO AS produto,
+        ISNULL(pb.COR_PRODUTO, '') AS corCodigo,
+        ISNULL(c.DESC_COR, '') AS corDescricao,
+        ISNULL(CONVERT(VARCHAR, pb.TAMANHO), '') AS tamanho,
+        ISNULL(p.DESC_PRODUTO, '') AS descricaoProduto
+      FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = pb.PRODUTO
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = pb.COR_PRODUTO
+      WHERE LTRIM(RTRIM(pb.CODIGO_BARRA)) = @codigoBarras
+    `;
+    const result = await request.query<{
+      codigoBarras: string;
+      produto: string;
+      corCodigo: string;
+      corDescricao: string;
+      tamanho: string;
+      descricaoProduto: string;
+    }>(query);
+
+    const row = result.recordset[0];
+    if (!row || !(row.produto ?? '').trim()) return null;
+
+    const corCodigo = (row.corCodigo ?? '').trim() || null;
+    return {
+      codigoBarras: (row.codigoBarras ?? '').trim() || code,
+      produto: (row.produto ?? '').trim(),
+      corCodigo,
+      corDescricao:
+        getColorDescription(corCodigo || undefined, row.corDescricao) ||
+        (row.corDescricao ?? '').trim() ||
+        null,
+      tamanho: (row.tamanho ?? '').trim() || null,
+      descricaoProduto: (row.descricaoProduto ?? '').trim() || null,
+    };
+  });
+}
+
 /** Ordem das cores principais (primeiras na lista). Comparação case-insensitive. */
 const PRINCIPAL_COLORS_ORDER = [
   'preto',

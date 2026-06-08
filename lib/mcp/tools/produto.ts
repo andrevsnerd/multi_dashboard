@@ -8,6 +8,7 @@ import {
   fetchProductStockByFilial,
   fetchProductSaleHistory,
   fetchProductAvailableColors,
+  resolveBarcode,
   type ProductAvailableColor,
 } from '@/lib/repositories/productDetail';
 import { fetchProductEntries } from '@/lib/repositories/logEntradas';
@@ -60,6 +61,9 @@ export function registerProdutoTools(server: McpServer) {
         'Responde "onde vendeu essas N unidades"/"onde vendeu nos últimos X meses" (vendas.porFilial), ' +
         '"qual vendedor fez a última venda" (vendas.ultimaVenda.vendedor), "quem mais vendeu este item" (vendas.topVendedores), ' +
         '"quanto de desconto este produto deu" (vendas.descontoPeriodo) e "quem deu mais desconto neste produto" (vendas.topVendedores[].desconto) — use inicio/fim para o range. ' +
+        'Identifique o produto de 3 formas: (a) `produto` = código do produto (visão GERAL; some `cor` para uma variação), ' +
+        '(b) `cor` junto do `produto` para uma cor específica, ou (c) `codigoBarras` — que já aponta para UMA variação ' +
+        '(produto + cor); aí a ficha vem travada nessa cor automaticamente. ' +
         'Use o código `produto` retornado por top_produtos/sem_estoque/curva_abc/produtos_vendidos. ' +
         'Para uma COR específica (ex.: o item veio de um ranking POR COR), passe `cor` (código "06" ou descrição "PRETO"): ' +
         'aí estoque por filial e vendas vêm SÓ daquela cor. Sem `cor`, soma todas as cores. ' +
@@ -67,17 +71,24 @@ export function registerProdutoTools(server: McpServer) {
         'Para saber se vendeu num dia específico (ex.: ontem) e quanto, passe inicio=fim nesse dia.',
       inputSchema: {
         empresa: empresaSchema,
-        produto: z.string().describe('Código do produto (campo `produto` das outras tools).'),
+        produto: z
+          .string()
+          .optional()
+          .describe('Código do produto (campo `produto` das outras tools). Visão geral; combine com `cor` para uma variação. Obrigatório se não passar `codigoBarras`.'),
+        codigoBarras: z
+          .string()
+          .optional()
+          .describe('Código de barras (EAN). Já identifica produto + cor: a ficha vem travada nessa variação. Alternativa a `produto`+`cor`.'),
         cor: z
           .string()
           .optional()
-          .describe('Cor específica: código (ex.: "06") ou descrição (ex.: "PRETO"). Omitir = todas as cores somadas.'),
+          .describe('Cor específica: código (ex.: "06") ou descrição (ex.: "PRETO"). Omitir = todas as cores somadas. Ignorado/redundante quando o `codigoBarras` já define a cor.'),
         filial: z.string().optional().describe('Restringe a uma filial (listar_filiais). Omitir = todas (incl. matriz).'),
         inicio: dataSchema.optional().describe('Início da janela de vendas (padrão: 24 meses atrás).'),
         fim: dataSchema.optional().describe('Fim da janela (padrão: hoje).'),
       },
     },
-    async ({ empresa, produto, cor, filial, inicio, fim }) => {
+    async ({ empresa, produto, codigoBarras, cor, filial, inicio, fim }) => {
       const hoje = new Date();
       const defaultStart = new Date(hoje);
       defaultStart.setMonth(defaultStart.getMonth() - 24);
@@ -86,16 +97,50 @@ export function registerProdutoTools(server: McpServer) {
         end: fim ?? hoje.toISOString().slice(0, 10),
       };
 
+      // Resolve a identificação: código de barras → produto + cor da variação.
+      let produtoId = (produto ?? '').trim();
+      let corInput = cor;
+      let barcodeResolvido:
+        | { codigoBarras: string; tamanho: string | null; cor: string | null }
+        | null = null;
+
+      if (codigoBarras && codigoBarras.trim()) {
+        const info = await resolveBarcode(codigoBarras.trim());
+        if (!info) {
+          return texto({
+            empresa,
+            erro: `Código de barras "${codigoBarras.trim()}" não encontrado em PRODUTOS_BARRA.`,
+            codigoBarras: codigoBarras.trim(),
+          });
+        }
+        produtoId = info.produto;
+        // O código de barras já define a cor: trava nela, a menos que o usuário
+        // tenha passado `cor` explicitamente (aí respeita o pedido dele).
+        if (!corInput && info.corCodigo) corInput = info.corCodigo;
+        barcodeResolvido = {
+          codigoBarras: info.codigoBarras,
+          tamanho: info.tamanho,
+          cor: info.corDescricao,
+        };
+      }
+
+      if (!produtoId) {
+        return texto({
+          empresa,
+          erro: 'Informe `produto` (código do produto) ou `codigoBarras`.',
+        });
+      }
+
       // Lista de cores do produto (sempre devolvida) + resolução do filtro de cor.
-      const coresDisponiveis = await fetchProductAvailableColors(produto, empresa);
+      const coresDisponiveis = await fetchProductAvailableColors(produtoId, empresa);
       let coresFiltro: string[] | undefined;
       let corResolvida: { codigo: string; descricao: string } | null = null;
       let avisoCor: string | undefined;
 
-      if (cor) {
-        const match = resolveCores(cor, coresDisponiveis);
+      if (corInput) {
+        const match = resolveCores(corInput, coresDisponiveis);
         if (match.length === 0) {
-          avisoCor = `Cor "${cor}" não encontrada para este produto. Veja coresDisponiveis e tente o código ou a descrição exata.`;
+          avisoCor = `Cor "${corInput}" não encontrada para este produto. Veja coresDisponiveis e tente o código ou a descrição exata.`;
         } else {
           coresFiltro = match.map((m) => m.code);
           corResolvida = { codigo: match[0].code, descricao: match[0].displayName || match[0].description };
@@ -103,7 +148,7 @@ export function registerProdutoTools(server: McpServer) {
       }
 
       const params = {
-        productId: produto,
+        productId: produtoId,
         company: empresa,
         range,
         filial: filial ?? null,
@@ -120,7 +165,7 @@ export function registerProdutoTools(server: McpServer) {
         fetchProductDetail(params),
         fetchProductStockByFilial(params),
         fetchProductSaleHistory(params),
-        fetchProductEntries(produto, 5, escopoEntradas),
+        fetchProductEntries(produtoId, 5, escopoEntradas),
       ]);
 
       const ultimaVenda = historico.length > 0 ? historico[0] : null;
@@ -157,6 +202,9 @@ export function registerProdutoTools(server: McpServer) {
       return texto({
         empresa,
         produto: detail.productId,
+        // Quando a consulta veio por código de barras, devolve a variação resolvida
+        // (código de barras + tamanho + cor) para o Claude confirmar ao usuário.
+        ...(barcodeResolvido ? { codigoBarras: barcodeResolvido } : {}),
         descricao: detail.productName,
         grade: detail.grade ?? null,
         cor: corResolvida,

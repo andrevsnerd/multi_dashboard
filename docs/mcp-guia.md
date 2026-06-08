@@ -73,7 +73,9 @@ pode sempre refinar na pergunta seguinte ("e só na Paulista?", "e em abril?").
 - "Quanto de estoque a NERD tem na linha de capas?"
 
 ### 🔎 Ficha de um produto (360°)
-- "Me mostra tudo do produto 07.A1.00B3 da SCARF ME."
+- "Me mostra tudo do produto 07.A1.00B3 da SCARF ME." *(código = visão geral)*
+- "E só na cor preta?" *(código do produto + cor)*
+- "Me mostra o produto do código de barras 7891234567890." *(EAN já traz produto + cor)*
 - "Quando esse produto entrou pela última vez?"
 - "Qual foi a última vez que ele vendeu?"
 - "Esse produto vendeu ontem? Quanto?"
