@@ -61,6 +61,8 @@ export function registerProdutoTools(server: McpServer) {
         'Responde "onde vendeu essas N unidades"/"onde vendeu nos últimos X meses" (vendas.porFilial), ' +
         '"qual vendedor fez a última venda" (vendas.ultimaVenda.vendedor), "quem mais vendeu este item" (vendas.topVendedores), ' +
         '"quanto de desconto este produto deu" (vendas.descontoPeriodo) e "quem deu mais desconto neste produto" (vendas.topVendedores[].desconto) — use inicio/fim para o range. ' +
+        'Para o DETALHE venda a venda (cada dia × filial × vendedor × cor, com qtd, receita e desconto de cada), veja vendas.detalhe — ' +
+        'responde "detalhe cada venda: data, onde, quem vendeu e quanto descontou". Combine com `cor` para focar numa cor. ' +
         'Identifique o produto de 3 formas: (a) `produto` = código do produto (visão GERAL; some `cor` para uma variação), ' +
         '(b) `cor` junto do `produto` para uma cor específica, ou (c) `codigoBarras` — que já aponta para UMA variação ' +
         '(produto + cor); aí a ficha vem travada nessa cor automaticamente. ' +
@@ -199,6 +201,20 @@ export function registerProdutoTools(server: McpServer) {
       // desconto", o ranking acima já traz desconto por vendedor.
       const descontoPeriodo = historico.reduce((s, h) => s + (h.desconto ?? 0), 0);
 
+      // Detalhe venda a venda (cada linha = dia × filial × vendedor × cor): data,
+      // onde, quem vendeu, qtd, receita e DESCONTO de cada uma. Responde "detalhe
+      // cada venda". Mais recente primeiro; capado para não estourar o payload.
+      const DETALHE_MAX = 300;
+      const detalheVendas = historico.slice(0, DETALHE_MAX).map((h) => ({
+        data: h.date instanceof Date ? h.date.toISOString().slice(0, 10) : h.date,
+        filial: h.filialDisplayName,
+        vendedor: h.vendedor ?? null,
+        cor: h.colorDisplayName ?? null,
+        quantidade: h.quantity,
+        receita: h.revenue,
+        desconto: h.desconto ?? 0,
+      }));
+
       return texto({
         empresa,
         produto: detail.productId,
@@ -254,6 +270,11 @@ export function registerProdutoTools(server: McpServer) {
           // do que mais vendeu para o que menos vendeu. E-commerce não tem vendedor,
           // então essas vendas não aparecem aqui.
           topVendedores,
+          // DETALHE venda a venda (dia × filial × vendedor × cor): data, onde, quem,
+          // qtd, receita e desconto de cada. Para focar numa cor, passe `cor`.
+          detalhe: detalheVendas,
+          detalheTruncado: historico.length > detalheVendas.length,
+          detalheTotalLinhas: historico.length,
         },
         entrada: {
           // Última entrada com nº de romaneio, filial, qtd recebida e custo —
