@@ -159,10 +159,10 @@ export default function MapaClientesPage({ companyKey }: MapaClientesPageProps) 
                       {UF_TO_REGIAO[row.uf] ?? "—"}
                     </td>
                     <td className={styles.countCell}>
-                      {row.totalCompradores.toLocaleString("pt-BR")}
+                      {(row.totalCompradores ?? 0).toLocaleString("pt-BR")}
                     </td>
                     <td className={styles.countCell}>
-                      {row.totalQtd.toLocaleString("pt-BR")}
+                      {(row.totalQtd ?? 0).toLocaleString("pt-BR")}
                     </td>
                     <td className={styles.percentCell}>{row.percentTotal.toFixed(1)}%</td>
                   </tr>
@@ -171,8 +171,8 @@ export default function MapaClientesPage({ companyKey }: MapaClientesPageProps) 
             </table>
             <div className={styles.tableFooter}>
               {stateRows.length} estado{stateRows.length !== 1 ? "s" : ""} &nbsp;·&nbsp;
-              {total.toLocaleString("pt-BR")} pedidos &nbsp;·&nbsp;
-              <strong>{totalQtdGeral.toLocaleString("pt-BR")}</strong> itens vendidos
+              {(total ?? 0).toLocaleString("pt-BR")} pedidos &nbsp;·&nbsp;
+              <strong>{(totalQtdGeral ?? 0).toLocaleString("pt-BR")}</strong> itens vendidos
             </div>
           </div>
         </div>

@@ -183,7 +183,7 @@ export default function BrazilMap({ dataByUF, total }: BrazilMapProps) {
                 <span className={styles.tooltipSub}> dos pedidos</span>
               </div>
               <div className={styles.tooltipCount}>
-                {tooltip.pedidos.toLocaleString("pt-BR")} pedidos
+                {(tooltip.pedidos ?? 0).toLocaleString("pt-BR")} pedidos
               </div>
             </>
           ) : (
