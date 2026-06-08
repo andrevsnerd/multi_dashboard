@@ -43,6 +43,8 @@ export function registerProdutosVendidosTools(server: McpServer) {
         'Ranking de produtos vendidos em um PERÍODO (datas exatas), por empresa — espelha a página /produtos do dashboard. ' +
         'Traz FATURAMENTO, quantidade, preço médio, custo, markup e ESTOQUE de cada item, ordenado por faturamento (como na tela). ' +
         'Use para "mais vendidos este mês/no mês passado", "o que vendeu ontem", "quanto a categoria X faturou entre datas". ' +
+        'É O tool para "os N mais vendidos esse mês POR COR" (NERD e SCARF ME): já vem separado por produto×cor por padrão — só passe `limite`=N. ' +
+        'Para ordenar por unidades em vez de faturamento, use ordenarPor="quantidade". ' +
         'Padrão: mês atual e separado POR COR (porCor=true) — assim dá pra ver vendas E estoque por produto x cor. ' +
         'Para um único dia, passe inicio=fim. Para um SKU específico e suas cores, passe `produto`. ' +
         'Filtros combináveis: filial + categoria (grupos p/ NERD; linhas/subgrupos/coleções/grades p/ SCARF ME) + `busca`. ' +

@@ -53,6 +53,7 @@ pode sempre refinar na pergunta seguinte ("e só na Paulista?", "e em abril?").
 - "Quanto vendeu o e-commerce da SCARF ME nos últimos 90 dias?"
 
 ### 🏆 Produtos mais vendidos
+- "Os 10 mais vendidos esse mês na NERD, por cor." *(produtos_vendidos já vem por cor; uma linha por produto×cor)*
 - "Quais os 30 produtos mais vendidos da SCARF ME?"
 - "Top 10 capas na NERD." *(capas é uma categoria)*
 - "Qual a pashmina mais vendida da SCARF ME?"

@@ -59,15 +59,17 @@ export function registerTopProdutosTools(server: McpServer) {
         'Ranking de produtos mais vendidos de uma empresa, com estoque atual e sugestão de compra por item. ' +
         'Filtros: filial e categoria (NERD → grupos; SCARF ME → linhas/subgrupos/coleções/grades). ' +
         'Ex.: "top capas em NERD" → grupos=["CAPAS"]; "pashmina mais vendida" → linhas/subgrupos=["PASHMINA"]. ' +
-        'Para "mais vendidos POR COR" (cada cor do produto como uma linha, com vendas/estoque/sugestão por cor), passe porCor=true. ' +
-        'Janelas de venda: 12 meses, 60 dias e mês atual (não aceita período arbitrário). Ordene com `ordenarPor`.',
+        'Para "mais vendidos POR COR" (cada cor do produto como uma linha, com vendas/estoque/sugestão por cor), passe porCor=true — ' +
+        'sempre que o usuário pedir "por cor", use porCor=true (vale NERD e SCARF ME). ' +
+        'Janelas de venda: 12 meses, 60 dias e mês atual (não aceita período arbitrário). Ordene com `ordenarPor` (ex.: qtdeMes p/ "mais vendidos do mês"). ' +
+        'Para "os N mais vendidos ESSE MÊS por cor", o tool `produtos_vendidos` é mais direto (já vem por cor por padrão e aceita o período exato).',
       inputSchema: {
         empresa: empresaSchema,
         filial: z.string().optional().describe('Valor de filial (listar_filiais). Omitir = todas.'),
         porCor: z
           .boolean()
           .optional()
-          .describe('Separar por cor (true = uma linha por produto×cor). Use quando pedirem "por cor". Padrão false (por SKU).'),
+          .describe('Separar por cor (uma linha por produto×cor). Padrão TRUE. Passe false para ver por SKU (somando as cores).'),
         grupos: listaOpcional('Grupos de produto (NERD). Ex.: ["CAPAS"].'),
         linhas: listaOpcional('Linhas (SCARF ME). Ex.: ["PASHMINA"].'),
         subgrupos: listaOpcional('Subgrupos (SCARF ME).'),
@@ -88,7 +90,7 @@ export function registerTopProdutosTools(server: McpServer) {
       const lista = await fetchTopProdutosUltimos3Meses({
         company: empresa,
         filial: filial ?? null,
-        porCor: porCor ?? false,
+        porCor: porCor ?? true,
         grupos: listaOuNull(grupos),
         linhas: listaOuNull(linhas),
         subgrupos: listaOuNull(subgrupos),
@@ -102,7 +104,7 @@ export function registerTopProdutosTools(server: McpServer) {
       return texto({
         empresa,
         filial: filial ?? 'TODAS',
-        porCor: porCor ?? false,
+        porCor: porCor ?? true,
         ordenadoPor: ordenarPor ?? 'receita',
         total: ordenada.length,
         produtos: ordenada.map(compactProduto),
