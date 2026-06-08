@@ -325,7 +325,8 @@ export default function ProductsTable({
     return sorted;
   }, [data, sortColumn, sortDirection]);
 
-  const formatCurrency = (value: number) => {
+  const formatCurrency = (value: number | null | undefined) => {
+    if (value == null) return "R$ 0,00";
     return value.toLocaleString("pt-BR", {
       style: "currency",
       currency: "BRL",
@@ -334,14 +335,16 @@ export default function ProductsTable({
     });
   };
 
-  const formatNumber = (value: number) => {
+  const formatNumber = (value: number | null | undefined) => {
+    if (value == null) return "0";
     return value.toLocaleString("pt-BR", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     });
   };
 
-  const formatMarkup = (value: number) => {
+  const formatMarkup = (value: number | null | undefined) => {
+    if (value == null) return "0,00x";
     return `${value.toFixed(2)}x`;
   };
 

@@ -101,7 +101,8 @@ export default function VendedoresTable({
     return sorted;
   }, [data, sortColumn, sortDirection]);
 
-  const formatCurrency = (value: number) => {
+  const formatCurrency = (value: number | null | undefined) => {
+    if (value == null) return "R$ 0,00";
     return value.toLocaleString("pt-BR", {
       style: "currency",
       currency: "BRL",
@@ -110,22 +111,25 @@ export default function VendedoresTable({
     });
   };
 
-  const formatNumber = (value: number) => {
+  const formatNumber = (value: number | null | undefined) => {
+    if (value == null) return "0";
     return value.toLocaleString("pt-BR", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     });
   };
 
-  const formatDecimal = (value: number, decimals = 2) => {
+  const formatDecimal = (value: number | null | undefined, decimals = 2) => {
+    if (value == null) return "0,00";
     return value.toLocaleString("pt-BR", {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
     });
   };
 
-  const formatPercentage = (value: number) => {
-    return `${formatDecimal(value, 1)}%`;
+  const formatPercentage = (value: number | null | undefined) => {
+    if (value == null) return "0,0%";
+    return `${value.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
   };
 
   const getFilialDisplayName = (filial: string): string => {

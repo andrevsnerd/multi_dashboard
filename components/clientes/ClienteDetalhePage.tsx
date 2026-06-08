@@ -104,19 +104,23 @@ export default function ClienteDetalhePage({
     [compras]
   );
 
-  const formatCurrency = (value: number) =>
-    value.toLocaleString("pt-BR", {
+  const formatCurrency = (value: number | null | undefined) => {
+    if (value == null) return "R$ 0,00";
+    return value.toLocaleString("pt-BR", {
       style: "currency",
       currency: "BRL",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+  };
 
-  const formatNumber = (value: number) =>
-    value.toLocaleString("pt-BR", {
+  const formatNumber = (value: number | null | undefined) => {
+    if (value == null) return "0";
+    return value.toLocaleString("pt-BR", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     });
+  };
 
   const formatDate = (value: Date | string) => {
     const date = value instanceof Date ? value : new Date(value);

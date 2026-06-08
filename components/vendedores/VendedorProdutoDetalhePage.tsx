@@ -82,10 +82,14 @@ export default function VendedorProdutoDetalhePage({
     return () => { active = false; };
   }, [companyKey, vendedorNome, filial, produtoCodigo, initialStart, initialEnd]);
 
-  const formatCurrency = (value: number) =>
-    value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const formatNumber = (value: number) =>
-    value.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const formatCurrency = (value: number | null | undefined) => {
+    if (value == null) return "R$ 0,00";
+    return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+  const formatNumber = (value: number | null | undefined) => {
+    if (value == null) return "0";
+    return value.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  };
 
   const totalFaturamento = data.reduce((acc, p) => acc + p.faturamento, 0);
   const totalQuantidade = data.reduce((acc, p) => acc + p.quantidade, 0);

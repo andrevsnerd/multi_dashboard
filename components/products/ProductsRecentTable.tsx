@@ -58,19 +58,23 @@ export default function ProductsRecentTable({
     return sorted;
   }, [data, sortColumn, sortDirection]);
 
-  const formatCurrency = (value: number) =>
-    value.toLocaleString("pt-BR", {
+  const formatCurrency = (value: number | null | undefined) => {
+    if (value == null) return "R$ 0,00";
+    return value.toLocaleString("pt-BR", {
       style: "currency",
       currency: "BRL",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+  };
 
-  const formatNumber = (value: number) =>
-    value.toLocaleString("pt-BR", {
+  const formatNumber = (value: number | null | undefined) => {
+    if (value == null) return "0";
+    return value.toLocaleString("pt-BR", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     });
+  };
 
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return "--";
@@ -86,7 +90,10 @@ export default function ProductsRecentTable({
     }
   };
 
-  const formatMarkup = (value: number) => `${value.toFixed(2)}x`;
+  const formatMarkup = (value: number | null | undefined) => {
+    if (value == null) return "0,00x";
+    return `${value.toFixed(2)}x`;
+  };
 
   const showStockColumn = companyKey !== "scarfme" || Boolean(selectedFilial);
   const showStockRedeColumn = companyKey === "scarfme";

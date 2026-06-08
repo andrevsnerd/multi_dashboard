@@ -58,7 +58,8 @@ export default function ClientesTable({
     return sorted;
   }, [data, sortColumn, sortDirection]);
 
-  const formatCurrency = (value: number) => {
+  const formatCurrency = (value: number | null | undefined) => {
+    if (value == null) return "R$ 0,00";
     return value.toLocaleString("pt-BR", {
       style: "currency",
       currency: "BRL",
@@ -67,7 +68,8 @@ export default function ClientesTable({
     });
   };
 
-  const formatNumber = (value: number) => {
+  const formatNumber = (value: number | null | undefined) => {
+    if (value == null) return "0";
     return value.toLocaleString("pt-BR", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
