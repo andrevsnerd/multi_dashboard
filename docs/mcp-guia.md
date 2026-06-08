@@ -54,6 +54,7 @@ pode sempre refinar na pergunta seguinte ("e só na Paulista?", "e em abril?").
 
 ### 🏆 Produtos mais vendidos
 - "Os 10 mais vendidos esse mês na NERD, por cor." *(produtos_vendidos já vem por cor; uma linha por produto×cor)*
+- "Top da NERD geral, não só eletrônicos." *(linha="todas")* — "E só de ASSISTENCIA?" *(linha="ASSISTENCIA")*
 - "Quais os 30 produtos mais vendidos da SCARF ME?"
 - "Top 10 capas na NERD." *(capas é uma categoria)*
 - "Qual a pashmina mais vendida da SCARF ME?"

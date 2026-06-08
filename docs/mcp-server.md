@@ -86,6 +86,7 @@ Padrão de uso pelo Claude: **descobrir** (`listar_filiais`, `listar_categorias`
 | "sugestão de compra do produto" | `top_produtos` / `sem_estoque` (campo `sugestaoCompra`) |
 | "foi comprado / quando chega / em trânsito" | `compras_transito` |
 | "quantos/quais produtos foram pra defeito esse mês (qtd e valor)" | `defeitos` (+ `filial`/`responsavel` p/ filtrar) |
+| (NERD) "ver geral, não só eletrônicos" / "só assistência" | `top_produtos`/`sem_estoque`/`produtos_parados` com `linha`="todas" ou `linha`="ASSISTENCIA" |
 | "vendeu ontem? quanto vendeu no período X?" | `produtos_vendidos` (ranking) ou `produto` (um SKU, inicio=fim) |
 | "quanto venderam os produtos com 'geonav' no nome, e quais" | `produtos_vendidos` com `busca: "geonav"` (+ inicio/fim) |
 | "quais produtos da linha/subgrupo/grupo/grade/coleção X mais venderam" | `produtos_vendidos` com o filtro de categoria (+ inicio/fim) |

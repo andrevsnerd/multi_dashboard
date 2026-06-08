@@ -19,6 +19,7 @@ export function registerProdutosParadosTools(server: McpServer) {
         'Produtos com estoque que NÃO vendem há mais de N dias (giro parado), de uma empresa. ' +
         'Você escolhe o limite em `dias` (ex.: 120, 90, 180). Responde "qual produto está parado há mais de X dias". ' +
         'Filtros: filial e categoria (grupos p/ NERD; linhas/subgrupos/coleções/grades p/ SCARF ME). ' +
+        '(NERD) por padrão conta SÓ a linha ELETRONICOS (sinalizado em escopoLinha); para o geral passe `linha`="todas", ou uma linha específica (ex.: "ASSISTENCIA"). ' +
         'Ordenado por estoque (maior encalhe primeiro).',
       inputSchema: {
         empresa: empresaSchema,
@@ -29,6 +30,13 @@ export function registerProdutosParadosTools(server: McpServer) {
           .max(3650)
           .describe('Limite de dias sem venda (parado há mais de N dias). Ex.: 120.'),
         filial: z.string().optional().describe('Valor de filial (listar_filiais). Omitir = todas.'),
+        linha: z
+          .string()
+          .optional()
+          .describe(
+            '(NERD) Escopo de LINHA. Padrão: só ELETRONICOS (sinalizado). ' +
+              'Use "todas" p/ todas as linhas (inclui BAG, ASSISTENCIA), ou uma linha específica (ex.: "ASSISTENCIA"). Ignorado p/ SCARF ME.'
+          ),
         grupos: listaOpcional('Grupos (NERD).'),
         linhas: listaOpcional('Linhas (SCARF ME).'),
         subgrupos: listaOpcional('Subgrupos (SCARF ME).'),
@@ -37,7 +45,7 @@ export function registerProdutosParadosTools(server: McpServer) {
         limite: z.number().int().min(1).max(500).optional().describe('Máximo de produtos (padrão 100).'),
       },
     },
-    async ({ empresa, dias, filial, grupos, linhas, subgrupos, colecoes, grades, limite }) => {
+    async ({ empresa, dias, filial, linha, grupos, linhas, subgrupos, colecoes, grades, limite }) => {
       const lista = await fetchProdutosParados({
         company: empresa,
         filial: filial ?? null,
@@ -47,15 +55,27 @@ export function registerProdutosParadosTools(server: McpServer) {
         colecoes: listaOuNull(colecoes),
         grades: listaOuNull(grades),
         diasGiro: dias,
+        nerdLinha: linha,
       });
 
       const ordenada = [...lista].sort((a, b) => (b.estoque ?? 0) - (a.estoque ?? 0));
       const totalEstoque = ordenada.reduce((s, p) => s + (p.estoque ?? 0), 0);
 
+      const escopoLinha =
+        empresa === 'nerd'
+          ? (() => {
+              const raw = (linha ?? '').trim().toLowerCase();
+              if (!raw || raw === 'eletronicos') return 'ELETRONICOS (padrão)';
+              if (raw === 'todas' || raw === 'geral' || raw === 'all') return 'TODAS as linhas';
+              return (linha ?? '').trim().toUpperCase();
+            })()
+          : null;
+
       return texto({
         empresa,
         criterio: `sem venda há mais de ${dias} dias, com estoque`,
         filial: filial ?? 'TODAS',
+        escopoLinha,
         totais: { produtos: ordenada.length, estoque: totalEstoque },
         produtos: ordenada.slice(0, limite ?? 100).map((p) => ({
           produto: p.produto,

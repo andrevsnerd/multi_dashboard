@@ -569,14 +569,35 @@ function buildExclusionFilter(
 }
 
 /**
- * Filtro fixo para NERD: contabilizar apenas a linha ELETRONICOS (campo LINHA).
+ * Filtro de LINHA para NERD (campo LINHA). Por PADRÃO contabiliza apenas
+ * 'ELETRONICOS' (comportamento histórico — dashboard e demais consumidores que
+ * NÃO passam `escopo` continuam idênticos). Pode ser sobrescrito:
+ *   - `escopo` undefined/'eletronicos' → só ELETRONICOS (padrão)
+ *   - `escopo` 'todas'/'geral'/'all'   → sem filtro (todas as linhas)
+ *   - `escopo` outro valor (ex.: 'ASSISTENCIA', 'BAG') → só aquela linha
+ * O valor é sanitizado (apenas A-Z, 0-9 e espaço) antes de ir ao SQL.
  * Não altera a visão de grupos; aplicado só no backend.
  */
-function buildNerdOnlyLinhaEletronicosFilter(company: string | undefined, prefix: string): string {
+function buildNerdOnlyLinhaEletronicosFilter(
+  company: string | undefined,
+  prefix: string,
+  escopo?: string | null
+): string {
   if (company !== 'nerd') {
     return '';
   }
-  return `AND UPPER(LTRIM(RTRIM(ISNULL(${prefix}.LINHA, '')))) = 'ELETRONICOS'`;
+  const raw = (escopo ?? 'eletronicos').trim().toLowerCase();
+  if (raw === 'todas' || raw === 'geral' || raw === 'all' || raw === '') {
+    return '';
+  }
+  const linha =
+    raw === 'eletronicos'
+      ? 'ELETRONICOS'
+      : (escopo ?? '').toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim();
+  if (!linha) {
+    return '';
+  }
+  return `AND UPPER(LTRIM(RTRIM(ISNULL(${prefix}.LINHA, '')))) = '${linha}'`;
 }
 
 /** Para NERD: exclui categorias BAG e ASSISTENCIA do controle de estoque */
@@ -602,6 +623,12 @@ export interface ControleEstoqueParams {
   produtoId?: string;
   produtoSearchTerm?: string | null;
   filterByRegistrationDate?: boolean;
+  /**
+   * (NERD) Escopo de LINHA: undefined/'eletronicos' = só ELETRONICOS (padrão histórico);
+   * 'todas'/'geral' = todas as linhas; ou uma linha específica (ex.: 'ASSISTENCIA').
+   * Consumidores que não passam mantêm o comportamento atual (ELETRONICOS).
+   */
+  nerdLinha?: string | null;
 }
 
 
@@ -765,6 +792,7 @@ export async function fetchProdutosParados({
   subgrupos,
   grades,
   diasGiro,
+  nerdLinha,
 }: ControleEstoqueParams & { diasGiro: number }): Promise<ProdutoParado[]> {
   return withRequest(async (request) => {
     const estoqueFilialFilter = await buildFilialFilter(request, company, filial, 'e');
@@ -775,7 +803,7 @@ export async function fetchProdutosParados({
     const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
     const gradeFilter = buildGradeFilter(request, company, grades, 'p');
     const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineGiro');
-    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p', nerdLinha);
 
     request.input('giroDiasParados', sql.Int, diasGiro);
 
@@ -5793,6 +5821,7 @@ export async function fetchTopProdutosUltimos3Meses({
   includeHistorico = false,
   limit = 50,
   allowedFiliais,
+  nerdLinha,
 }: {
   company?: string;
   filial?: string | null;
@@ -5808,6 +5837,8 @@ export async function fetchTopProdutosUltimos3Meses({
   includeHistorico?: boolean;
   limit?: number;
   allowedFiliais?: string[] | null;
+  /** (NERD) Escopo de linha — ver buildNerdOnlyLinhaEletronicosFilter. Padrão ELETRONICOS. */
+  nerdLinha?: string | null;
 }): Promise<ProdutoVendaUltimos3Meses[]> {
   return withRequest(async (request) => {
     const filialSel = filial ?? null;
@@ -5846,7 +5877,7 @@ export async function fetchTopProdutosUltimos3Meses({
     const subgrupoFilter = isProdutoLookup ? '' : buildSubgrupoFilter(request, company, subgrupos, 'p');
     const gradeFilter = isProdutoLookup ? '' : buildGradeFilter(request, company, grades, 'p');
     const exclusionFilter = isProdutoLookup ? '' : buildExclusionFilter(request, company, 'p', 'excludedLineLc');
-    const nerdOnlyEletronicosFilter = isProdutoLookup ? '' : buildNerdOnlyLinhaEletronicosFilter(company, 'p');
+    const nerdOnlyEletronicosFilter = isProdutoLookup ? '' : buildNerdOnlyLinhaEletronicosFilter(company, 'p', nerdLinha);
 
     // Filtro de categoria específica (se informado)
     let categoriaFilter = '';

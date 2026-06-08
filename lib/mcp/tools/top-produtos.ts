@@ -6,6 +6,26 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { fetchTopProdutosUltimos3Meses } from '@/lib/repositories/controleEstoque';
 import { empresaSchema, listaOpcional, listaOuNull, texto } from '@/lib/mcp/shared';
 
+/**
+ * (NERD) Escopo de linha aplicado: por padrão só ELETRONICOS; "todas" = todas;
+ * ou uma linha específica. Para SCARF ME não se aplica (retorna null).
+ */
+function escopoLinhaLabel(empresa: string, linha?: string): string | null {
+  if (empresa !== 'nerd') return null;
+  const raw = (linha ?? '').trim().toLowerCase();
+  if (!raw || raw === 'eletronicos') return 'ELETRONICOS (padrão)';
+  if (raw === 'todas' || raw === 'geral' || raw === 'all') return 'TODAS as linhas';
+  return (linha ?? '').trim().toUpperCase();
+}
+
+const linhaNerdSchema = z
+  .string()
+  .optional()
+  .describe(
+    '(NERD) Escopo de LINHA. Padrão: só ELETRONICOS (sinalizado no retorno). ' +
+      'Use "todas" para todas as linhas (inclui BAG, ASSISTENCIA), ou uma linha específica (ex.: "ASSISTENCIA", "BAG"). Ignorado para SCARF ME.'
+  );
+
 const ordenarPorSchema = z
   .enum(['receita', 'qtde12m', 'qtde60d', 'qtdeMes'])
   .optional()
@@ -62,10 +82,12 @@ export function registerTopProdutosTools(server: McpServer) {
         'Para "mais vendidos POR COR" (cada cor do produto como uma linha, com vendas/estoque/sugestão por cor), passe porCor=true — ' +
         'sempre que o usuário pedir "por cor", use porCor=true (vale NERD e SCARF ME). ' +
         'Janelas de venda: 12 meses, 60 dias e mês atual (não aceita período arbitrário). Ordene com `ordenarPor` (ex.: qtdeMes p/ "mais vendidos do mês"). ' +
-        'Para "os N mais vendidos ESSE MÊS por cor", o tool `produtos_vendidos` é mais direto (já vem por cor por padrão e aceita o período exato).',
+        'Para "os N mais vendidos ESSE MÊS por cor", o tool `produtos_vendidos` é mais direto (já vem por cor por padrão e aceita o período exato). ' +
+        '(NERD) por padrão conta SÓ a linha ELETRONICOS (sinalizado em escopoLinha); para o geral passe `linha`="todas", ou uma linha específica (ex.: "ASSISTENCIA").',
       inputSchema: {
         empresa: empresaSchema,
         filial: z.string().optional().describe('Valor de filial (listar_filiais). Omitir = todas.'),
+        linha: linhaNerdSchema,
         porCor: z
           .boolean()
           .optional()
@@ -86,7 +108,7 @@ export function registerTopProdutosTools(server: McpServer) {
           .describe('Meses-alvo de cobertura para a sugestão de compra (padrão 3).'),
       },
     },
-    async ({ empresa, filial, porCor, grupos, linhas, subgrupos, colecoes, grades, ordenarPor, limite, mesesCobertura }) => {
+    async ({ empresa, filial, linha, porCor, grupos, linhas, subgrupos, colecoes, grades, ordenarPor, limite, mesesCobertura }) => {
       const lista = await fetchTopProdutosUltimos3Meses({
         company: empresa,
         filial: filial ?? null,
@@ -98,12 +120,14 @@ export function registerTopProdutosTools(server: McpServer) {
         grades: listaOuNull(grades),
         qtdCompra: mesesCobertura ?? 3,
         limit: Math.max(limite ?? 30, 1),
+        nerdLinha: linha,
       });
 
       const ordenada = ordenar(lista, ordenarPor).slice(0, limite ?? 30);
       return texto({
         empresa,
         filial: filial ?? 'TODAS',
+        escopoLinha: escopoLinhaLabel(empresa, linha),
         porCor: porCor ?? true,
         ordenadoPor: ordenarPor ?? 'receita',
         total: ordenada.length,
@@ -117,10 +141,12 @@ export function registerTopProdutosTools(server: McpServer) {
     {
       description:
         'Produtos SEM ESTOQUE (estoque atual <= 0) que tiveram venda — rupturas — de uma empresa, ordenados por venda. ' +
-        'Inclui a sugestão de compra de cada item. Filtros: filial e categoria (grupos/linhas/subgrupos/coleções/grades).',
+        'Inclui a sugestão de compra de cada item. Filtros: filial e categoria (grupos/linhas/subgrupos/coleções/grades). ' +
+        '(NERD) por padrão conta SÓ a linha ELETRONICOS (sinalizado em escopoLinha); para o geral passe `linha`="todas", ou uma linha específica.',
       inputSchema: {
         empresa: empresaSchema,
         filial: z.string().optional().describe('Valor de filial (listar_filiais). Omitir = todas.'),
+        linha: linhaNerdSchema,
         grupos: listaOpcional('Grupos (NERD).'),
         linhas: listaOpcional('Linhas (SCARF ME).'),
         subgrupos: listaOpcional('Subgrupos (SCARF ME).'),
@@ -130,7 +156,7 @@ export function registerTopProdutosTools(server: McpServer) {
         mesesCobertura: z.number().int().min(1).max(12).optional().describe('Meses-alvo p/ sugestão (padrão 3).'),
       },
     },
-    async ({ empresa, filial, grupos, linhas, subgrupos, colecoes, grades, limite, mesesCobertura }) => {
+    async ({ empresa, filial, linha, grupos, linhas, subgrupos, colecoes, grades, limite, mesesCobertura }) => {
       const lista = await fetchTopProdutosUltimos3Meses({
         company: empresa,
         filial: filial ?? null,
@@ -141,6 +167,7 @@ export function registerTopProdutosTools(server: McpServer) {
         grades: listaOuNull(grades),
         qtdCompra: mesesCobertura ?? 3,
         limit: 1000,
+        nerdLinha: linha,
       });
 
       const rupturas = ordenar(
@@ -151,6 +178,7 @@ export function registerTopProdutosTools(server: McpServer) {
       return texto({
         empresa,
         filial: filial ?? 'TODAS',
+        escopoLinha: escopoLinhaLabel(empresa, linha),
         criterio: 'estoqueAtual <= 0 e com venda nos últimos 12 meses',
         total: rupturas.length,
         produtos: rupturas.map(compactProduto),
