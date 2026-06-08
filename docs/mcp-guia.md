@@ -119,6 +119,8 @@ pode sempre refinar na pergunta seguinte ("e só na Paulista?", "e em abril?").
 - "Ranking de vendedores da NERD mês passado."
 - "Quem mais vendeu na Higienópolis?"
 - "Quais vendedores deram mais desconto na SCARF ME esse mês?"
+- "Quais produtos a Stephanie vendeu esse mês (com valores)?" *(fixa o vendedor, lista os produtos)*
+- "Detalhe das vendas do vendedor X — todos os produtos."
 - "Top 20 clientes da SCARF ME por compras neste ano."
 
 ### 🧭 Descoberta (quando não souber os nomes)

@@ -3,7 +3,7 @@ import 'server-only';
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import { fetchVendedoresList } from '@/lib/repositories/vendedores-v2';
+import { fetchVendedoresList, fetchVendedorProdutosList } from '@/lib/repositories/vendedores-v2';
 import { fetchClientesRankingCompras } from '@/lib/repositories/clientes';
 import { empresaSchema, dataSchema, listaOpcional, listaOuNull, texto } from '@/lib/mcp/shared';
 
@@ -83,6 +83,72 @@ export function registerPessoasTools(server: McpServer) {
         ordenadoPor: ordenarPorDesconto ? 'desconto' : 'faturamento',
         total: lista.length,
         vendedores,
+      });
+    }
+  );
+
+  server.registerTool(
+    'vendedor_produtos',
+    {
+      description:
+        'Lista TODOS os produtos que UM vendedor vendeu no período (cada item: produto, descrição, cor, categoria, ' +
+        'quantidade e faturamento), ordenados por faturamento. É o INVERSO de "quem vendeu este produto": aqui você fixa o ' +
+        'vendedor e vê o detalhe dos produtos dele. Responde "quais produtos a Stephanie vendeu este mês", "detalhe das vendas do vendedor X". ' +
+        'Informe `vendedor` (apelido como aparece no ranking de `vendedores`, ou código). `filial` opcional (omitir = todas as filiais onde ele atuou). ' +
+        'Dá pra recortar por categoria (grupos/linhas/subgrupos/coleções/grades), por termo na descrição (`busca`) ou por um SKU (`produto`).',
+      inputSchema: {
+        empresa: empresaSchema,
+        vendedor: z.string().describe('Apelido do vendedor (como no ranking de `vendedores`) ou código.'),
+        filial: z.string().optional().describe('Valor de filial (listar_filiais). Omitir = todas as filiais onde o vendedor atuou.'),
+        inicio: dataSchema.optional(),
+        fim: dataSchema.optional(),
+        grupos: listaOpcional('Grupos de produto (NERD).'),
+        linhas: listaOpcional('Linhas (SCARF ME).'),
+        colecoes: listaOpcional('Coleções (SCARF ME).'),
+        subgrupos: listaOpcional('Subgrupos (SCARF ME).'),
+        grades: listaOpcional('Grades (SCARF ME).'),
+        busca: z.string().optional().describe('Trecho da DESCRIÇÃO do produto (ex.: "geonav").'),
+        produto: z.string().optional().describe('Código de UM produto (SKU) para ver só ele.'),
+        limite: z.number().int().min(1).max(500).optional().describe('Máximo de produtos (padrão 100).'),
+      },
+    },
+    async ({ empresa, vendedor, filial, inicio, fim, grupos, linhas, colecoes, subgrupos, grades, busca, produto, limite }) => {
+      const lista = await fetchVendedorProdutosList({
+        company: empresa,
+        vendedor,
+        filial: filial ?? '',
+        range: inicio && fim ? { start: inicio, end: fim } : undefined,
+        grupos: listaOuNull(grupos) ?? undefined,
+        linhas: listaOuNull(linhas) ?? undefined,
+        colecoes: listaOuNull(colecoes) ?? undefined,
+        subgrupos: listaOuNull(subgrupos) ?? undefined,
+        grades: listaOuNull(grades) ?? undefined,
+        produtoId: produto?.trim() || undefined,
+        produtoSearchTerm: !produto && busca ? busca : undefined,
+      });
+
+      const faturamentoTotal = lista.reduce((s, p) => s + (p.faturamento ?? 0), 0);
+      const quantidadeTotal = lista.reduce((s, p) => s + (p.quantidade ?? 0), 0);
+      const produtos = lista.slice(0, limite ?? 100).map((p) => ({
+        produto: p.codigo ?? null,
+        descricao: p.descricao,
+        cor: p.cor ?? null,
+        grupo: p.grupo ?? null,
+        linha: p.linha ?? null,
+        subgrupo: p.subgrupo ?? null,
+        colecao: p.colecao ?? null,
+        grade: p.grade ?? null,
+        quantidade: p.quantidade,
+        faturamento: p.faturamento,
+      }));
+
+      return texto({
+        empresa,
+        vendedor,
+        filial: filial ?? 'TODAS',
+        periodo: inicio && fim ? { inicio, fim } : 'padrão',
+        totais: { produtos: lista.length, faturamento: faturamentoTotal, quantidade: quantidadeTotal },
+        produtos,
       });
     }
   );

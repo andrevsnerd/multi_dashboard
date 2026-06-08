@@ -43,6 +43,7 @@ Em produção (Vercel), defina `MCP_API_TOKEN` em Project → Settings → Envir
 |------|-----------|
 | `listar_categorias` | Vocabulário de produto para filtrar. **NERD → grupos**; **SCARF ME → linhas, coleções, subgrupos, grades**. Considera produtos com venda no período/filial. |
 | `vendedores` | Ranking de vendedores por faturamento no período (qtd, **desconto concedido**, tickets, ticket médio, participação). Filtros: produto (`produto`) + filial + categorias. `ordenarPor: "desconto"` → ranking de quem mais descontou (geral ou no produto). `limite` (padrão 50). |
+| `vendedor_produtos` | **Inverso** do filtro produto→vendedor: fixa UM vendedor e lista TODOS os produtos que ele vendeu no período (produto, descrição, cor, categoria, qtd, faturamento), ordenado por faturamento. Responde "quais produtos a Stephanie vendeu". `vendedor` (apelido/código) obrigatório; `filial` opcional (omitir = todas). Filtros: categoria + `busca` (descrição) + `produto` (SKU). |
 | `clientes` | Ranking de clientes por compras no período. Filtros: filial, vendedor, busca (nome). `limite` (padrão 100). |
 | `curva_abc` | Curva ABC de SKUs por receita (resumo A/B/C + top da curva A + rankings de subgrupo/coleção). **Apenas SCARF ME** (via `fetchClaudeReport`). |
 
@@ -72,6 +73,7 @@ Padrão de uso pelo Claude: **descobrir** (`listar_filiais`, `listar_categorias`
 | "quem mais vendeu este produto" | `produto` → `vendas.topVendedores` (com inicio/fim) |
 | "qual o desconto dessa venda" / "quanto de desconto esse produto deu no mês" | `produto` → `vendas.ultimaVenda.desconto` / `vendas.descontoPeriodo` |
 | "quais vendedores deram mais desconto neste produto" | `produto` → `vendas.topVendedores[].desconto`, ou `vendedores` com `produto` + `ordenarPor: "desconto"` |
+| "quais produtos o vendedor X vendeu" / "detalhe das vendas da Stephanie" | `vendedor_produtos` (vendedor + período) |
 | "no geral, quem deu mais desconto" | `vendedores` com `ordenarPor: "desconto"` |
 | "qual o romaneio da última entrada" / "últimas N entradas do produto" | `produto` (ficha) ou `entradas` com `produto` |
 | "produtos sem estoque" | `sem_estoque` |
