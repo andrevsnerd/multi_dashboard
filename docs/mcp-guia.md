@@ -77,6 +77,8 @@ pode sempre refinar na pergunta seguinte ("e só na Paulista?", "e em abril?").
 - "Quanto esse produto vendeu de 5 do mês passado até hoje?"
 - "Onde (em quais filiais) ele vendeu essas unidades?"
 - "Onde esse produto mais vendeu nos últimos 6 meses?"
+- "Qual vendedor foi responsável pela última venda desse produto?"
+- "Quais vendedores mais venderam esse item?"
 
 ### 🅰️ Curva ABC
 - "O produto 07.A1.00B3 é curva A nos últimos 12 meses?"

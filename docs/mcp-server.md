@@ -51,7 +51,7 @@ Em produção (Vercel), defina `MCP_API_TOKEN` em Project → Settings → Envir
 |------|-----------|
 | `top_produtos` | Ranking de produtos mais vendidos com **estoque atual** e **sugestão de compra** por item. Filtros: filial + categoria (NERD→grupos; SCARF ME→linhas/subgrupos/coleções/grades). Ex.: "top capas em NERD" → `grupos:["CAPAS"]`. Janelas fixas (12m/60d/mês atual), não aceita range arbitrário. |
 | `sem_estoque` | Rupturas: produtos com estoque ≤ 0 que venderam nos últimos 12m, com sugestão de compra. Filtros de filial/categoria. |
-| `produto` | Ficha 360 de UM produto (por código): estoque total + **por filial** (onde está), **última venda**, **vendas por filial** (ONDE vendeu — qtd/receita em cada filial no período, respeita inicio/fim), **última entrada** (quando/onde entrou, com **nº de romaneio**, qtd recebida e custo) + últimas entradas, receita/qtd no período, custo/preço. |
+| `produto` | Ficha 360 de UM produto (por código): estoque total + **por filial** (onde está), **última venda** (com **vendedor** responsável), **vendas por filial** (ONDE vendeu — qtd/receita em cada filial no período, respeita inicio/fim), **top vendedores** (QUEM mais vendeu este produto — qtd/receita por vendedor), **última entrada** (quando/onde entrou, com **nº de romaneio**, qtd recebida e custo) + últimas entradas, receita/qtd no período, custo/preço. |
 | `compras_transito` | Compras em trânsito: o que foi comprado, quanto, custo e **quando chega** (`dataRecebimento`). Busca por `produto`/`status`. Fonte: cadastro de compras em trânsito do dashboard (não é pedido do ERP). |
 | `produtos_vendidos` | Ranking de produtos vendidos em um **período arbitrário** (datas exatas, inclusive um único dia). Responde "mais vendidos no mês passado", "o que vendeu ontem". Filtros: filial + categoria (grupo/linha/subgrupo/coleção/grade) + busca. |
 | `produto_curva` | Curva ABC de um produto em **duas janelas**: últimos 12 meses e mês atual. Responde "é curva A nos 12m?" e "é curva A neste mês?" (independente). NERD e SCARF ME, escopo rede. |
@@ -66,6 +66,8 @@ Padrão de uso pelo Claude: **descobrir** (`listar_filiais`, `listar_categorias`
 | "quanto tem de estoque" / "onde está" | `produto` (ou `estoque`) |
 | "quando entrou" / "última vez que vendeu" | `produto` |
 | "onde vendeu essas N unidades" / "onde vendeu nos últimos X meses" | `produto` → `vendas.porFilial` (com inicio/fim) |
+| "qual vendedor fez a última venda" | `produto` → `vendas.ultimaVenda.vendedor` (null se e-commerce) |
+| "quem mais vendeu este produto" | `produto` → `vendas.topVendedores` (com inicio/fim) |
 | "qual o romaneio da última entrada" / "últimas N entradas do produto" | `produto` (ficha) ou `entradas` com `produto` |
 | "produtos sem estoque" | `sem_estoque` |
 | "sugestão de compra do produto" | `top_produtos` / `sem_estoque` (campo `sugestaoCompra`) |

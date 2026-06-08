@@ -54,9 +54,11 @@ export function registerProdutoTools(server: McpServer) {
     {
       description:
         'Ficha completa de UM produto (por código): descrição, estoque total e por filial (onde está, INCLUINDO a matriz/depósito), ' +
-        'última venda, última entrada (quando/onde entrou, COM nº de romaneio, qtd recebida e custo) e as últimas entradas, ' +
-        'receita/quantidade no período E vendas POR FILIAL (ONDE vendeu — quantidade e receita em cada filial no período), custo e preço médios. ' +
-        'Responde "onde vendeu essas N unidades" e "onde vendeu nos últimos X meses" (use inicio/fim para o range) via vendas.porFilial. ' +
+        'última venda (COM o vendedor responsável), última entrada (quando/onde entrou, COM nº de romaneio, qtd recebida e custo) e as últimas entradas, ' +
+        'receita/quantidade no período, vendas POR FILIAL (ONDE vendeu — quantidade e receita em cada filial no período), ' +
+        'top VENDEDORES (QUEM mais vendeu este produto — qtd/receita por vendedor), custo e preço médios. ' +
+        'Responde "onde vendeu essas N unidades"/"onde vendeu nos últimos X meses" (vendas.porFilial), ' +
+        '"qual vendedor fez a última venda" (vendas.ultimaVenda.vendedor) e "quem mais vendeu este item" (vendas.topVendedores) — use inicio/fim para o range. ' +
         'Use o código `produto` retornado por top_produtos/sem_estoque/curva_abc/produtos_vendidos. ' +
         'Para uma COR específica (ex.: o item veio de um ranking POR COR), passe `cor` (código "06" ou descrição "PRETO"): ' +
         'aí estoque por filial e vendas vêm SÓ daquela cor. Sem `cor`, soma todas as cores. ' +
@@ -123,6 +125,24 @@ export function registerProdutoTools(server: McpServer) {
       const ultimaVenda = historico.length > 0 ? historico[0] : null;
       const ultimaEntrada = entradas.length > 0 ? entradas[0] : null;
 
+      // Top vendedores DESTE produto no período: agrega o histórico (que já vem
+      // com o vendedor resolvido para apelido/nome) por vendedor. Reusa a mesma
+      // base de fetchProductSaleHistory — sem query nova. Vendas de e-commerce
+      // vêm sem vendedor (null) e ficam fora do ranking.
+      const vendedoresMap = new Map<string, { quantidade: number; receita: number }>();
+      for (const h of historico) {
+        const nome = (h.vendedor ?? '').trim();
+        if (!nome) continue;
+        const acc = vendedoresMap.get(nome) ?? { quantidade: 0, receita: 0 };
+        acc.quantidade += h.quantity ?? 0;
+        acc.receita += h.revenue ?? 0;
+        vendedoresMap.set(nome, acc);
+      }
+      const topVendedores = [...vendedoresMap.entries()]
+        .map(([vendedor, v]) => ({ vendedor, quantidade: v.quantidade, receita: v.receita }))
+        .filter((v) => v.quantidade > 0)
+        .sort((a, b) => b.quantidade - a.quantidade);
+
       return texto({
         empresa,
         produto: detail.productId,
@@ -164,8 +184,14 @@ export function registerProdutoTools(server: McpServer) {
                 data: ultimaVenda.date instanceof Date ? ultimaVenda.date.toISOString().slice(0, 10) : ultimaVenda.date,
                 filial: ultimaVenda.filialDisplayName,
                 quantidade: ultimaVenda.quantity,
+                // Vendedor responsável (apelido/nome). null em venda de e-commerce.
+                vendedor: ultimaVenda.vendedor ?? null,
               }
             : null,
+          // QUEM mais vendeu este produto no período (qtd/receita por vendedor),
+          // do que mais vendeu para o que menos vendeu. E-commerce não tem vendedor,
+          // então essas vendas não aparecem aqui.
+          topVendedores,
         },
         entrada: {
           // Última entrada com nº de romaneio, filial, qtd recebida e custo —
