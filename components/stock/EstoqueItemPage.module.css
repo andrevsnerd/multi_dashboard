@@ -409,12 +409,14 @@
 .totalHeader {
   background: linear-gradient(180deg, #dff5e8 0%, #c7edd9 100%) !important;
   color: #166534;
-  box-shadow: inset 4px 0 0 #10b981;
+  border: 0.5px solid #10b981 !important;
 }
 
 .totalCell {
   background: linear-gradient(180deg, rgba(199, 237, 217, 0.98) 0%, rgba(180, 231, 206, 0.98) 100%) !important;
-  box-shadow: inset 4px 0 0 #10b981;
+  border-left: 0.5px solid #10b981 !important;
+  border-right: 0.5px solid #10b981 !important;
+  border-bottom: 0.5px solid #10b981 !important;
 }
 
 .totalValue {
