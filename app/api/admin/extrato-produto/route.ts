@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findUserByUsername } from "@/lib/auth/users-store";
 import { query } from "@/lib/db/connection";
-import { queryAjustesHistorico } from "@/lib/repositories/ajuste-historico";
 
 async function isAdmin(username: string): Promise<boolean> {
   const user = await findUserByUsername(username);
@@ -776,8 +775,26 @@ export async function GET(request: NextRequest) {
 
   // ── 7. AJUSTES MANUAIS (NERD_AJUSTE_HISTORICO) ──
   try {
-    const ajustes = await queryAjustesHistorico(produto, cor, filial ?? undefined);
-    for (const r of ajustes) {
+    const filialFilterNerd = filialSql ? `AND FILIAL LIKE '%${filialSql}%'` : "";
+    const ajustesNerd = await query<{
+      ID: number;
+      DATA_AJUSTE: Date;
+      FILIAL: string;
+      PRODUTO: string;
+      COR_PRODUTO: string;
+      QTDE_AJUSTE: number;
+      ROMANEIO_REF: string | null;
+      TIPO_AJUSTE: string | null;
+      RESPONSAVEL: string | null;
+      OBS: string | null;
+    }>(`
+      SELECT * FROM NERD_AJUSTE_HISTORICO WITH (NOLOCK)
+      WHERE PRODUTO = '${produtoSql}'
+        AND COR_PRODUTO = '${corSql}'
+        ${filialFilterNerd}
+      ORDER BY DATA_AJUSTE
+    `);
+    for (const r of ajustesNerd) {
       linhas.push({
         emissao: r.DATA_AJUSTE ? new Date(r.DATA_AJUSTE).toISOString() : "",
         tipo: "AJUSTE",
