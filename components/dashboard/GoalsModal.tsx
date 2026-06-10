@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 
-import { resolveCompany, type CompanyKey, isEcommerceFilial } from "@/lib/config/company";
+import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 
 import styles from "./GoalsModal.module.css";
 
@@ -62,15 +62,27 @@ export default function GoalsModal({
   const allFiliais = company?.filialFilters.sales ?? [];
   const displayNames = company?.filialDisplayNames ?? {};
   const ecommerceFilials = company?.ecommerceFilials ?? [];
+  const filialGroups = company?.filialGroups ?? {};
 
   // Normalizar nomes para comparação (trim e uppercase)
   const normalizedEcommerceFilials = ecommerceFilials.map(f => f.trim().toUpperCase());
-  
-  // Agrupar filiais: separar normais e e-commerce
-  // Filtrar filiais que NÃO são e-commerce (comparação case-insensitive e com trim)
+
+  // Membros não-canônicos de grupos lógicos (ex.: as 3 Paulistas extras) — excluídos da lista
+  const groupNonCanonicals = useMemo(() => {
+    const set = new Set<string>();
+    for (const members of Object.values(filialGroups)) {
+      members.slice(1).forEach(m => set.add(m));
+    }
+    return set;
+  }, [filialGroups]);
+
+  // Filiais normais: sem ecommerce, sem membros não-canônicos de grupos, sem MATRIZ
   const normalFiliais = allFiliais.filter(f => {
     const normalizedFilial = f.trim().toUpperCase();
-    return !normalizedEcommerceFilials.includes(normalizedFilial);
+    if (normalizedEcommerceFilials.includes(normalizedFilial)) return false;
+    if (groupNonCanonicals.has(f)) return false;
+    if ((displayNames[f] ?? f) === 'MATRIZ') return false;
+    return true;
   });
   
   const hasEcommerce = ecommerceFilials.length > 0;
@@ -111,39 +123,41 @@ export default function GoalsModal({
       setLoading(true);
       loadGoals(companyKey, monthYear.month, monthYear.year)
         .then((loadedGoals) => {
-          // Agregar valores de e-commerce se houver múltiplas filiais
           const processedGoals: GoalData = { ...loadedGoals };
-          
+
+          // Agregar e-commerce em uma única entrada
           if (hasEcommerce && ecommerceFilials.length > 0) {
-            // Calcular total de e-commerce (soma de todas as filiais de e-commerce)
-            const normalizedEcommerceFilials = ecommerceFilials.map(f => f.trim().toUpperCase());
-            const ecommerceTotal = Object.keys(loadedGoals).reduce((sum, filialKey) => {
-              const normalizedKey = filialKey.trim().toUpperCase();
-              if (normalizedEcommerceFilials.includes(normalizedKey)) {
-                return sum + (loadedGoals[filialKey] || 0);
-              }
-              return sum;
+            const normalizedEc = ecommerceFilials.map(f => f.trim().toUpperCase());
+            const ecommerceTotal = Object.keys(loadedGoals).reduce((sum, key) => {
+              return normalizedEc.includes(key.trim().toUpperCase()) ? sum + (loadedGoals[key] || 0) : sum;
             }, 0);
-            
-            // Remover entradas individuais de e-commerce do processedGoals
             Object.keys(processedGoals).forEach(key => {
-              const normalizedKey = key.trim().toUpperCase();
-              if (normalizedEcommerceFilials.includes(normalizedKey)) {
-                delete processedGoals[key];
-              }
+              if (normalizedEc.includes(key.trim().toUpperCase())) delete processedGoals[key];
             });
-            
-            // Adicionar entrada agregada para E-COMMERCE
             processedGoals['E-COMMERCE'] = ecommerceTotal;
           }
-          
+
+          // Agregar membros não-canônicos de grupos lógicos (ex.: Paulista) na entrada canônica
+          for (const [canonical, members] of Object.entries(filialGroups)) {
+            const nonCanonicals = members.slice(1);
+            if (nonCanonicals.length === 0) continue;
+            const total = members.reduce((sum, m) => sum + (processedGoals[m] || 0), 0);
+            nonCanonicals.forEach(m => delete processedGoals[m]);
+            if (total > 0) processedGoals[canonical] = total;
+          }
+
+          // Remover MATRIZ (sem meta)
+          Object.keys(processedGoals).forEach(key => {
+            if ((displayNames[key] ?? key) === 'MATRIZ') delete processedGoals[key];
+          });
+
           setGoals(processedGoals);
         })
         .finally(() => {
           setLoading(false);
         });
     }
-  }, [isOpen, companyKey, monthYear.month, monthYear.year, hasEcommerce, ecommerceFilials]);
+  }, [isOpen, companyKey, monthYear.month, monthYear.year, hasEcommerce, ecommerceFilials, filialGroups, displayNames]);
 
   const handleGoalChange = async (filialKey: string, value: string) => {
     const numValue = value === "" ? 0 : parseFloat(value) || 0;
@@ -184,22 +198,14 @@ export default function GoalsModal({
   }, [monthYear.month, monthYear.year]);
 
   const totalGoal = useMemo(() => {
-    // Calcular total excluindo a entrada agregada E-COMMERCE (já que ela é a soma das filiais individuais)
-    const normalizedEcommerceFilials = ecommerceFilials.map(f => f.trim().toUpperCase());
+    const normalizedEc = ecommerceFilials.map(f => f.trim().toUpperCase());
     return Object.entries(goals).reduce((sum, [key, value]) => {
-      const normalizedKey = key.trim().toUpperCase();
-      // Se for a entrada agregada E-COMMERCE, incluir (é a soma total)
-      if (key === 'E-COMMERCE') {
-        return sum + value;
-      }
-      // Se for uma filial de e-commerce individual, não incluir (já está na entrada agregada)
-      if (normalizedEcommerceFilials.includes(normalizedKey)) {
-        return sum;
-      }
-      // Para filiais normais, incluir
+      if (key === 'E-COMMERCE') return sum + value;
+      if (normalizedEc.includes(key.trim().toUpperCase())) return sum;
+      if ((displayNames[key] ?? key) === 'MATRIZ') return sum;
       return sum + value;
     }, 0);
-  }, [goals, ecommerceFilials]);
+  }, [goals, ecommerceFilials, displayNames]);
 
   if (!isOpen) {
     return null;
