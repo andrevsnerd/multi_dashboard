@@ -91,7 +91,8 @@ async function fetchKPIs(
   linhas: string[],
   colecoes: string[],
   subgrupos: string[],
-  grades: string[]
+  grades: string[],
+  signal?: AbortSignal
 ): Promise<EstoqueKPI> {
   const searchParams = new URLSearchParams({
     company,
@@ -111,6 +112,7 @@ async function fetchKPIs(
 
   const response = await fetch(`/api/controle-estoque?${searchParams.toString()}`, {
     cache: "no-store",
+    signal,
   });
 
   if (!response.ok) {
@@ -132,7 +134,8 @@ async function fetchCategorias(
   subgrupos: string[],
   grades: string[],
   filtrarEstoquePorGiro?: boolean,
-  giroDias?: number
+  giroDias?: number,
+  signal?: AbortSignal
 ): Promise<CategoriaEstoque[]> {
   const searchParams = new URLSearchParams({
     company,
@@ -159,6 +162,7 @@ async function fetchCategorias(
 
   const response = await fetch(`/api/controle-estoque?${searchParams.toString()}`, {
     cache: "no-store",
+    signal,
   });
 
   if (!response.ok) {
@@ -178,7 +182,8 @@ async function fetchEvolucao(
   linhas: string[],
   colecoes: string[],
   subgrupos: string[],
-  grades: string[]
+  grades: string[],
+  signal?: AbortSignal
 ): Promise<EvolucaoEstoqueData[]> {
   const searchParams = new URLSearchParams({
     company,
@@ -199,6 +204,7 @@ async function fetchEvolucao(
 
   const response = await fetch(`/api/controle-estoque?${searchParams.toString()}`, {
     cache: "no-store",
+    signal,
   });
 
   if (!response.ok) {
@@ -217,7 +223,8 @@ async function fetchVendas(
   linhas: string[],
   colecoes: string[],
   subgrupos: string[],
-  grades: string[]
+  grades: string[],
+  signal?: AbortSignal
 ): Promise<VendasCategoriaData[]> {
   const searchParams = new URLSearchParams({
     company,
@@ -237,6 +244,7 @@ async function fetchVendas(
 
   const response = await fetch(`/api/controle-estoque?${searchParams.toString()}`, {
     cache: "no-store",
+    signal,
   });
 
   if (!response.ok) {
@@ -255,7 +263,8 @@ async function fetchPrevisoes(
   linhas: string[],
   colecoes: string[],
   subgrupos: string[],
-  grades: string[]
+  grades: string[],
+  signal?: AbortSignal
 ): Promise<PrevisaoEstoque[]> {
   const searchParams = new URLSearchParams({
     company,
@@ -275,6 +284,7 @@ async function fetchPrevisoes(
 
   const response = await fetch(`/api/controle-estoque?${searchParams.toString()}`, {
     cache: "no-store",
+    signal,
   });
 
   if (!response.ok) {
@@ -399,6 +409,7 @@ export default function ControleEstoquePage({
   const [availableSubgrupos, setAvailableSubgrupos] = useState<string[]>([]);
   const [availableGrades, setAvailableGrades] = useState<string[]>([]);
 
+  const [retryCount, setRetryCount] = useState(0);
   const [kpis, setKpis] = useState<EstoqueKPI | null>(null);
   const [categorias, setCategorias] = useState<CategoriaEstoque[]>([]);
   const [evolucao, setEvolucao] = useState<EvolucaoEstoqueData[]>([]);
@@ -1127,18 +1138,22 @@ export default function ControleEstoquePage({
   // Carregar dados
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
+    // Timeout de 60s: se qualquer fetch travar, aborta e exibe erro em vez de ficar preso em loading
+    const timeoutId = setTimeout(() => controller.abort(), 60_000);
 
     async function load() {
       setLoading(true);
       setError(null);
 
       try {
+        const sig = controller.signal;
         const [kpisData, categoriasData, evolucaoData, vendasData, previsoesData] = await Promise.all([
-          fetchKPIs(companyKey, selectedFilial, range, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades),
-          fetchCategorias(companyKey, selectedFilial, range, periodType, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, selectedGiro != null, selectedGiro != null ? parseInt(selectedGiro, 10) : undefined),
-          fetchEvolucao(companyKey, selectedFilial, range, periodType, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades),
-          fetchVendas(companyKey, selectedFilial, range, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades),
-          fetchPrevisoes(companyKey, selectedFilial, range, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades),
+          fetchKPIs(companyKey, selectedFilial, range, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, sig),
+          fetchCategorias(companyKey, selectedFilial, range, periodType, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, selectedGiro != null, selectedGiro != null ? parseInt(selectedGiro, 10) : undefined, sig),
+          fetchEvolucao(companyKey, selectedFilial, range, periodType, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, sig),
+          fetchVendas(companyKey, selectedFilial, range, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, sig),
+          fetchPrevisoes(companyKey, selectedFilial, range, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, sig),
         ]);
 
         if (active) {
@@ -1150,9 +1165,11 @@ export default function ControleEstoquePage({
         }
       } catch (err) {
         if (active) {
-          setError(err instanceof Error ? err.message : "Erro ao carregar dados");
+          const isAbort = err instanceof Error && err.name === "AbortError";
+          setError(isAbort ? "A consulta demorou muito tempo. Tente novamente." : (err instanceof Error ? err.message : "Erro ao carregar dados"));
         }
       } finally {
+        clearTimeout(timeoutId);
         if (active) {
           setLoading(false);
         }
@@ -1163,8 +1180,10 @@ export default function ControleEstoquePage({
 
     return () => {
       active = false;
+      controller.abort();
+      clearTimeout(timeoutId);
     };
-  }, [companyKey, selectedFilial, range, periodType, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, selectedGiro]);
+  }, [companyKey, selectedFilial, range, periodType, selectedGrupos, selectedLinhas, selectedColecoes, selectedSubgrupos, selectedGrades, selectedGiro, retryCount]);
 
   // Buscar categorias com giro quando filtro de giro é selecionado
   useEffect(() => {
@@ -1298,7 +1317,15 @@ export default function ControleEstoquePage({
   if (error) {
     return (
       <div className={styles.wrapper}>
-        <div className={styles.error}>{error}</div>
+        <div className={styles.error}>
+          {error}
+          <button
+            onClick={() => setRetryCount(c => c + 1)}
+            style={{ marginLeft: 12, padding: "4px 12px", cursor: "pointer" }}
+          >
+            Tentar novamente
+          </button>
+        </div>
       </div>
     );
   }

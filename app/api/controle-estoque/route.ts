@@ -14,6 +14,8 @@ import {
   fetchProdutosParados,
 } from '@/lib/repositories/controleEstoque';
 
+export const maxDuration = 60;
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const company = searchParams.get('company') ?? undefined;
