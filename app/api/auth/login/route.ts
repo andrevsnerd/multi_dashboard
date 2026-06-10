@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
       permissions: user.permissions,
       allowedCompanies: user.allowedCompanies,
       nomeExibicao: user.nomeExibicao,
+      somenteVarejo: user.somenteVarejo,
     };
     return NextResponse.json({ user: session });
   } catch (e) {

@@ -8,12 +8,15 @@
       "000095",
       "000099"
     ],
+    "filiaisDestinoControle": [],
     "tiposRomaneioPermitidos": [
       "TRANSFERENCIA ENTRE LOJAS"
     ],
     "responsavelPadrao": "LOGISTICA",
     "responsavelFixo": true,
-    "tipoRomaneioFixo": true
+    "tipoRomaneioFixo": true,
+    "podeVerOutrasFiliais": false,
+    "filialAtribuida": null
   },
   {
     "username": "andre.sabetta",

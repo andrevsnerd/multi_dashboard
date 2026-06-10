@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@/components/auth/AuthContext";
+import { VAREJO_VALUE } from "@/lib/config/company";
 
 import DateRangeFilter, {
   type DateRangeValue,
@@ -112,6 +114,9 @@ export default function CompanyDashboard({
   companyKey,
   companyName,
 }: CompanyDashboardProps) {
+  const { user, isLoading: isLoadingAuth } = useAuth();
+  const defaultFilialApplied = useRef(false);
+
   const initialRange = useMemo(() => {
     const range = getCurrentMonthRange();
     return { startDate: range.start, endDate: range.end };
@@ -119,6 +124,17 @@ export default function CompanyDashboard({
 
   const [range, setRange] = useState<DateRangeValue>(initialRange);
   const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
+
+  const isSomenteVarejo = !isLoadingAuth && user?.somenteVarejo === true && companyKey === "scarfme";
+
+  // Aplica o padrão Varejo uma vez quando o usuário é carregado
+  useEffect(() => {
+    if (isLoadingAuth || defaultFilialApplied.current) return;
+    defaultFilialApplied.current = true;
+    if (user?.somenteVarejo && companyKey === "scarfme") {
+      setSelectedFilial(VAREJO_VALUE);
+    }
+  }, [isLoadingAuth, user, companyKey]);
   const [filtrarEletronicos, setFiltrarEletronicos] = useState(companyKey === "nerd");
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -138,10 +154,12 @@ export default function CompanyDashboard({
     [companyKey, filtrarEletronicos],
   );
 
+  const effectiveFilial = isSomenteVarejo ? VAREJO_VALUE : selectedFilial;
+
   const rangeKey = useMemo(
     () =>
-      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${selectedFilial ?? "all"}::${(linhas ?? []).join(",")}`,
-    [range.startDate, range.endDate, selectedFilial, linhas],
+      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${effectiveFilial ?? "all"}::${(linhas ?? []).join(",")}`,
+    [range.startDate, range.endDate, effectiveFilial, linhas],
   );
 
   useEffect(() => {
@@ -154,7 +172,7 @@ export default function CompanyDashboard({
         const data = await fetchDashboardData(
           companyKey,
           range,
-          selectedFilial,
+          effectiveFilial,
           monthYear.month,
           monthYear.year,
           linhas,
@@ -178,7 +196,7 @@ export default function CompanyDashboard({
     return () => {
       active = false;
     };
-  }, [companyKey, rangeKey, retryKey, range, selectedFilial, monthYear.month, monthYear.year, linhas]);
+  }, [companyKey, rangeKey, retryKey, range, effectiveFilial, monthYear.month, monthYear.year, linhas]);
 
   // Recarregar metas quando o modal fechar
   useEffect(() => {
@@ -214,9 +232,9 @@ export default function CompanyDashboard({
   const currentGoal = useMemo(() => {
     if (!dashboardData) return 0;
     const goals = dashboardData.goals;
-    if (selectedFilial) return goals[selectedFilial] ?? 0;
+    if (effectiveFilial) return goals[effectiveFilial] ?? 0;
     return Object.values(goals).reduce((sum, v) => sum + (v as number), 0);
-  }, [dashboardData, selectedFilial]);
+  }, [dashboardData, effectiveFilial]);
 
   const monthProjection = useMemo(() => {
     if (!dashboardData) return 0;
@@ -274,11 +292,13 @@ export default function CompanyDashboard({
                   : undefined
               }
             />
-            <FilialFilter
-              companyKey={companyKey}
-              value={selectedFilial}
-              onChange={setSelectedFilial}
-            />
+            {!isSomenteVarejo && (
+              <FilialFilter
+                companyKey={companyKey}
+                value={selectedFilial}
+                onChange={setSelectedFilial}
+              />
+            )}
             {companyKey === "nerd" && (
               <label className={styles.checkboxLabel} title="Filtra apenas produtos da linha Eletrônicos">
                 <input

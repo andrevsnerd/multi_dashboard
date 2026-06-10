@@ -19,6 +19,7 @@ async function ensureTable(sql: ReturnType<typeof getNeonSql>) {
   `;
   await sql`ALTER TABLE dashboard_users ADD COLUMN IF NOT EXISTS allowed_companies JSONB`;
   await sql`ALTER TABLE dashboard_users ADD COLUMN IF NOT EXISTS nome_exibicao TEXT`;
+  await sql`ALTER TABLE dashboard_users ADD COLUMN IF NOT EXISTS somente_varejo BOOLEAN DEFAULT FALSE`;
   // Atualiza o CHECK constraint para incluir o role 'logistica'
   await sql`
     DO $$
@@ -57,6 +58,7 @@ function rowToUser(row: {
   permissions: string[] | unknown;
   allowed_companies?: string[] | null;
   nome_exibicao?: string | null;
+  somente_varejo?: boolean | null;
 }): UserRecord {
   const perms = normalizePermissionKeys(row.permissions);
   const raw = row.allowed_companies;
@@ -72,6 +74,7 @@ function rowToUser(row: {
     permissions: perms,
     allowedCompanies,
     nomeExibicao: row.nome_exibicao ?? undefined,
+    somenteVarejo: row.somente_varejo === true ? true : undefined,
   };
 }
 
@@ -80,7 +83,7 @@ export async function findUserByUsername(username: string): Promise<UserRecord |
   await ensureTable(sql);
   const normalized = username.trim().toLowerCase();
   const rows = await sql`
-    SELECT id, username, password_hash, role, permissions, allowed_companies, nome_exibicao
+    SELECT id, username, password_hash, role, permissions, allowed_companies, nome_exibicao, somente_varejo
     FROM dashboard_users
     WHERE LOWER(username) = ${normalized}
     LIMIT 1
@@ -93,7 +96,7 @@ export async function findUserById(id: string): Promise<UserRecord | null> {
   const sql = getNeonSql();
   await ensureTable(sql);
   const rows = await sql`
-    SELECT id, username, password_hash, role, permissions, allowed_companies, nome_exibicao
+    SELECT id, username, password_hash, role, permissions, allowed_companies, nome_exibicao, somente_varejo
     FROM dashboard_users
     WHERE id = ${id}
     LIMIT 1
@@ -117,7 +120,8 @@ export async function createUser(
   role: RoleKey,
   permissions: PermissionKey[],
   allowedCompanies?: CompanyKey[],
-  nomeExibicao?: string
+  nomeExibicao?: string,
+  somenteVarejo?: boolean
 ): Promise<UserRecord> {
   const sql = getNeonSql();
   await ensureTable(sql);
@@ -135,9 +139,10 @@ export async function createUser(
   const allowedJson =
     allowedCompanies?.length ? JSON.stringify(allowedCompanies) : null;
   const nomeEx = nomeExibicao?.trim() || null;
+  const somenteVarejoVal = somenteVarejo === true;
   await sql`
-    INSERT INTO dashboard_users (id, username, password_hash, role, permissions, allowed_companies, nome_exibicao)
-    VALUES (${id}, ${normalized}, ${passwordHash}, ${role}, ${JSON.stringify(perms)}::jsonb, ${allowedJson}::jsonb, ${nomeEx})
+    INSERT INTO dashboard_users (id, username, password_hash, role, permissions, allowed_companies, nome_exibicao, somente_varejo)
+    VALUES (${id}, ${normalized}, ${passwordHash}, ${role}, ${JSON.stringify(perms)}::jsonb, ${allowedJson}::jsonb, ${nomeEx}, ${somenteVarejoVal})
   `;
   return {
     id,
@@ -147,6 +152,7 @@ export async function createUser(
     permissions: perms,
     allowedCompanies: allowedCompanies?.length ? allowedCompanies : undefined,
     nomeExibicao: nomeEx ?? undefined,
+    somenteVarejo: somenteVarejoVal || undefined,
   };
 }
 
@@ -159,12 +165,13 @@ export async function updateUser(
     permissions?: PermissionKey[];
     allowedCompanies?: CompanyKey[] | null;
     nomeExibicao?: string | null;
+    somenteVarejo?: boolean | null;
   }
 ): Promise<UserRecord> {
   const sql = getNeonSql();
   await ensureTable(sql);
   const rows = await sql`
-    SELECT id, username, password_hash, role, permissions, allowed_companies, nome_exibicao
+    SELECT id, username, password_hash, role, permissions, allowed_companies, nome_exibicao, somente_varejo
     FROM dashboard_users WHERE id = ${id} LIMIT 1
   `;
   if (rows.length === 0) throw new Error("Usuário não encontrado");
@@ -175,6 +182,7 @@ export async function updateUser(
   let permissions = current.permissions;
   let allowedCompanies = current.allowedCompanies;
   let nomeExibicao = current.nomeExibicao;
+  let somenteVarejo = current.somenteVarejo;
   if (updates.username !== undefined) {
     const normalized = updates.username.trim().toLowerCase();
     const existing = await sql`
@@ -201,18 +209,23 @@ export async function updateUser(
   if (updates.nomeExibicao !== undefined) {
     nomeExibicao = updates.nomeExibicao?.trim() || undefined;
   }
+  if (updates.somenteVarejo !== undefined) {
+    somenteVarejo = updates.somenteVarejo === true ? true : undefined;
+  }
   const allowedJson =
     allowedCompanies?.length ? JSON.stringify(allowedCompanies) : null;
   const nomeEx = nomeExibicao?.trim() || null;
+  const somenteVarejoVal = somenteVarejo === true;
   await sql`
     UPDATE dashboard_users
     SET username = ${username}, password_hash = ${passwordHash}, role = ${role},
         permissions = ${JSON.stringify(permissions)}::jsonb,
         allowed_companies = ${allowedJson}::jsonb,
-        nome_exibicao = ${nomeEx}
+        nome_exibicao = ${nomeEx},
+        somente_varejo = ${somenteVarejoVal}
     WHERE id = ${id}
   `;
-  return { id: current.id, username, passwordHash, role, permissions, allowedCompanies, nomeExibicao };
+  return { id: current.id, username, passwordHash, role, permissions, allowedCompanies, nomeExibicao, somenteVarejo };
 }
 
 export async function deleteUser(id: string): Promise<void> {
@@ -227,7 +240,7 @@ export async function listUsers(): Promise<UserRecord[]> {
   const sql = getNeonSql();
   await ensureTable(sql);
   const rows = await sql`
-    SELECT id, username, password_hash, role, permissions, allowed_companies, nome_exibicao
+    SELECT id, username, password_hash, role, permissions, allowed_companies, nome_exibicao, somente_varejo
     FROM dashboard_users
     ORDER BY username
   `;

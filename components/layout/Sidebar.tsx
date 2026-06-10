@@ -25,7 +25,7 @@ type NavSubItem = {
 type NavItemBase = {
   key: string;
   label: string;
-  permission?: PermissionKey | "admin" | "home";
+  permission?: PermissionKey | "admin";
   href?: string;
   subItems?: NavSubItem[];
   isActive?: (pathname: string | null) => boolean;
@@ -201,13 +201,6 @@ export default function Sidebar({ companyName }: SidebarProps) {
       key: "overview",
       label: "Visão geral",
       items: [
-        {
-          key: "home",
-          label: "Home",
-          href: "/",
-          permission: "home",
-          isActive: (currentPathname) => currentPathname === "/",
-        },
         {
           key: "dashboard",
           label: "Dashboard",
@@ -442,9 +435,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
       : []),
   ];
 
-  const canSeePermission = (permission?: PermissionKey | "admin" | "home") => {
-    if (permission === "home") return true;
-
+  const canSeePermission = (permission?: PermissionKey | "admin") => {
     if (!user) return permission !== "admin";
 
     if (permission === "admin") return user.role === "admin";
@@ -587,11 +578,13 @@ export default function Sidebar({ companyName }: SidebarProps) {
 
       <aside className={`${styles.sidebar} ${isOpen ? styles.sidebarOpen : styles.sidebarClosed}`}>
         <div className={styles.logo}>
-          <strong
-            className={`${styles.logoText} ${companyName === "SCARF ME" ? styles.logoTextScarfme : ""}`}
-          >
-            {companyName}
-          </strong>
+          <Link href="/" className={styles.logoLink} onClick={handleLinkClick}>
+            <strong
+              className={`${styles.logoText} ${companyName === "SCARF ME" ? styles.logoTextScarfme : ""}`}
+            >
+              {companyName}
+            </strong>
+          </Link>
         </div>
 
         <div className={styles.navScroll}>

@@ -22,6 +22,8 @@ export interface UserRecord {
   allowedCompanies?: CompanyKey[];
   /** Nome de exibicao opcional (ex: "Maria Logistica"). Se vazio, usa o username. */
   nomeExibicao?: string;
+  /** Se true: dashboard SCARF ME inicializa sempre em modo Varejo (ignora e-commerce). */
+  somenteVarejo?: boolean;
 }
 
 export interface UserSession {
@@ -33,6 +35,8 @@ export interface UserSession {
   allowedCompanies?: CompanyKey[];
   /** Nome de exibicao opcional. Se vazio, usa o username. */
   nomeExibicao?: string;
+  /** Se true: dashboard SCARF ME inicializa sempre em modo Varejo (ignora e-commerce). */
+  somenteVarejo?: boolean;
 }
 
 /** Lista de todas as permissoes para o painel admin. */

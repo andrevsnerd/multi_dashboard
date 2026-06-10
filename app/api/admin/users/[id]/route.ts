@@ -33,6 +33,7 @@ export async function GET(
       permissions: user.permissions,
       allowedCompanies: user.allowedCompanies ?? undefined,
       nomeExibicao: user.nomeExibicao ?? undefined,
+      somenteVarejo: user.somenteVarejo ?? undefined,
     });
   } catch (e) {
     console.error("Get user error:", e);
@@ -54,7 +55,7 @@ export async function PATCH(
     }
     const { id } = await params;
     const body = await request.json();
-    const { username: newUsername, password, role, permissions, allowedCompanies, nomeExibicao } = body;
+    const { username: newUsername, password, role, permissions, allowedCompanies, nomeExibicao, somenteVarejo } = body;
     const updates: {
       username?: string;
       password?: string;
@@ -62,6 +63,7 @@ export async function PATCH(
       permissions?: PermissionKey[];
       allowedCompanies?: CompanyKey[] | null;
       nomeExibicao?: string | null;
+      somenteVarejo?: boolean | null;
     } = {};
     if (newUsername !== undefined) updates.username = String(newUsername).trim();
     if (password !== undefined) updates.password = String(password);
@@ -76,6 +78,9 @@ export async function PATCH(
     if (nomeExibicao !== undefined) {
       updates.nomeExibicao = nomeExibicao ? String(nomeExibicao).trim() : null;
     }
+    if (somenteVarejo !== undefined) {
+      updates.somenteVarejo = somenteVarejo === true ? true : null;
+    }
     const user = await updateUser(id, updates);
     return NextResponse.json({
       id: user.id,
@@ -84,6 +89,7 @@ export async function PATCH(
       permissions: user.permissions,
       allowedCompanies: user.allowedCompanies ?? undefined,
       nomeExibicao: user.nomeExibicao ?? undefined,
+      somenteVarejo: user.somenteVarejo ?? undefined,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro ao atualizar usuário";

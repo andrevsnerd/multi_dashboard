@@ -78,6 +78,7 @@ interface UserRow {
   role: RoleKey;
   permissions: PermissionKey[];
   allowedCompanies?: CompanyKey[];
+  somenteVarejo?: boolean;
 }
 
 interface TransfPerm {
@@ -143,6 +144,9 @@ export default function AdminPage() {
   const [formResponsavelFixo, setFormResponsavelFixo] = useState(false);
   const [formTipoRomaneioFixo, setFormTipoRomaneioFixo] = useState(false);
   const [formPodeVerOutras, setFormPodeVerOutras] = useState(false);
+
+  // Dashboard
+  const [formSomenteVarejo, setFormSomenteVarejo] = useState(false);
 
   // Grupos de páginas recolhidos (vazio = todos expandidos)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -227,6 +231,7 @@ export default function AdminPage() {
     setFormResponsavelFixo(false);
     setFormTipoRomaneioFixo(false);
     setFormPodeVerOutras(false);
+    setFormSomenteVarejo(false);
     setFormError("");
   }
 
@@ -246,6 +251,7 @@ export default function AdminPage() {
     const ac = u.allowedCompanies;
     setFormEmpresa(!ac?.length || ac.length === 2 ? "" : (ac[0] as "" | CompanyKey));
     setFormPermissions(u.permissions ?? []);
+    setFormSomenteVarejo(u.somenteVarejo ?? false);
 
     // Preencher dados de transferência se existir
     const tp = transfPerms.find((p) => p.username === u.username);
@@ -352,6 +358,7 @@ export default function AdminPage() {
         permissions: formRole === "admin" ? [] : formPermissions,
         allowedCompanies: formEmpresa ? [formEmpresa] : [],
         nomeExibicao: formNome || null,
+        somenteVarejo: formSomenteVarejo || null,
         ...(formPassword ? { password: formPassword } : {}),
       };
 
@@ -695,6 +702,18 @@ export default function AdminPage() {
                       </select>
                     </label>
                   </div>
+
+                  {formEmpresa === "scarfme" && (
+                    <label className={styles.checkboxLabel} style={{ marginTop: 4 }}>
+                      <input
+                        type="checkbox"
+                        checked={formSomenteVarejo}
+                        onChange={(e) => setFormSomenteVarejo(e.target.checked)}
+                        disabled={saving}
+                      />
+                      Dashboard: mostrar somente Varejo (ignora e-commerce)
+                    </label>
+                  )}
                 </div>
               </div>
 

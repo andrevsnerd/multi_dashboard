@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
       permissions: u.permissions,
       allowedCompanies: u.allowedCompanies ?? undefined,
       nomeExibicao: u.nomeExibicao ?? undefined,
+      somenteVarejo: u.somenteVarejo ?? undefined,
     }));
     return NextResponse.json(users);
   } catch (e) {
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
     }
     await seedInitialUsersIfEmpty();
     const body = await request.json();
-    const { username: newUsername, password, role, permissions, allowedCompanies, nomeExibicao } = body;
+    const { username: newUsername, password, role, permissions, allowedCompanies, nomeExibicao, somenteVarejo } = body;
     if (!newUsername || !password || !role) {
       return NextResponse.json(
         { error: "Usuário, senha e função são obrigatórios" },
@@ -61,7 +62,8 @@ export async function POST(request: NextRequest) {
       Array.isArray(allowedCompanies) && allowedCompanies.length > 0
         ? (allowedCompanies as CompanyKey[])
         : undefined,
-      nomeExibicao ? String(nomeExibicao).trim() : undefined
+      nomeExibicao ? String(nomeExibicao).trim() : undefined,
+      somenteVarejo === true
     );
     return NextResponse.json({
       id: user.id,
@@ -70,6 +72,7 @@ export async function POST(request: NextRequest) {
       permissions: user.permissions,
       allowedCompanies: user.allowedCompanies ?? undefined,
       nomeExibicao: user.nomeExibicao ?? undefined,
+      somenteVarejo: user.somenteVarejo ?? undefined,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro ao criar usuário";

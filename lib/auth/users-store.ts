@@ -82,10 +82,11 @@ export async function createUser(
   role: RoleKey,
   permissions: PermissionKey[],
   allowedCompanies?: CompanyKey[],
-  nomeExibicao?: string
+  nomeExibicao?: string,
+  somenteVarejo?: boolean
 ): Promise<UserRecord> {
   if (hasPostgres())
-    return neonStore.createUser(username, password, role, permissions, allowedCompanies, nomeExibicao);
+    return neonStore.createUser(username, password, role, permissions, allowedCompanies, nomeExibicao, somenteVarejo);
   const users = readUsersFile();
   const normalized = username.trim().toLowerCase();
   if (users.some((u) => u.username.toLowerCase() === normalized)) {
@@ -104,6 +105,7 @@ export async function createUser(
     allowedCompanies:
       allowedCompanies?.length ? allowedCompanies : undefined,
     nomeExibicao: nomeExibicao?.trim() || undefined,
+    somenteVarejo: somenteVarejo === true ? true : undefined,
   };
   users.push(record);
   writeUsersFile(users);
@@ -119,6 +121,7 @@ export async function updateUser(
     permissions?: PermissionKey[];
     allowedCompanies?: CompanyKey[] | null;
     nomeExibicao?: string | null;
+    somenteVarejo?: boolean | null;
   }
 ): Promise<UserRecord> {
   if (hasPostgres()) return neonStore.updateUser(id, updates);
@@ -152,6 +155,9 @@ export async function updateUser(
   }
   if (updates.nomeExibicao !== undefined) {
     current.nomeExibicao = updates.nomeExibicao?.trim() || undefined;
+  }
+  if (updates.somenteVarejo !== undefined) {
+    current.somenteVarejo = updates.somenteVarejo === true ? true : undefined;
   }
   writeUsersFile(users);
   return { ...current };
