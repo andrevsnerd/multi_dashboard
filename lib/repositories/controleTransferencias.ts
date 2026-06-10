@@ -1,7 +1,8 @@
 import sql from 'mssql';
 
-import { getFilialGroupMembers, resolveCompany, VAREJO_VALUE } from '@/lib/config/company';
+import { getActiveFilial, getFilialGroupMembers, resolveCompany, VAREJO_VALUE } from '@/lib/config/company';
 import { resolveCompanyLive, liveNameForIncoming } from '@/lib/server/company-live';
+import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import { withRequest } from '@/lib/db/connection';
 import { syncProdutoNovoLabels } from '@/lib/repositories/produtosNovos';
 import { RequestLike } from '@/lib/db/proxy';
@@ -169,7 +170,10 @@ export async function fetchControleTransferencias({
     const vendasFilialFilter = await buildFilialFilter(request, company, filial, 'vp');
 
     // Verificar se precisa buscar vendas de e-commerce (ScarfMe e filial null)
-    const companyConfig = await resolveCompanyLive(company);
+    // Usa resolveCompanyDynamic (grupos do admin + filial ativa) — a MESMA régua
+    // usada na execução da saída e na gravação da transferência, para que tela,
+    // cooldown, contadores e "Realizadas" usem todos a filial ATIVA como chave.
+    const companyConfig = await resolveCompanyDynamic(company);
     const isScarfme = company === 'scarfme';
     const shouldIncludeEcommerce = isScarfme && filial === null;
     const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
@@ -491,9 +495,15 @@ export async function fetchControleTransferencias({
     const getFilialCanonico = (filial: string): string => {
       const normalizado = normalizeFilial(filial);
       const mapped = filialLookupMap.get(normalizado) ?? normalizado;
-      return filialGroupCanonicalMap.get(mapped)
+      const groupCanonical = filialGroupCanonicalMap.get(mapped)
         ?? filialGroupCanonicalMap.get(normalizado)
         ?? mapped;
+      // Colapsa para o MEMBRO ATIVO do grupo via getActiveFilial — exatamente a
+      // mesma função/config que a saída usa. Idempotente: getActiveFilial(ativa) =
+      // ativa, então o canônico da tela == o nome gravado em transferencia_pendente
+      // (origem/destino), fazendo cooldown, contadores e "Realizadas" casarem.
+      // Para filiais sem grupo, getActiveFilial é identidade (mantém o nome).
+      return getActiveFilial(companyConfig, groupCanonical);
     };
 
     // Processar resultados
