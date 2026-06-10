@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findUserByUsername } from "@/lib/auth/users-store";
 import { query } from "@/lib/db/connection";
+import { queryAjustesHistorico } from "@/lib/repositories/ajuste-historico";
 
 async function isAdmin(username: string): Promise<boolean> {
   const user = await findUserByUsername(username);
@@ -771,6 +772,31 @@ export async function GET(request: NextRequest) {
     }
   } catch (e) {
     erros.push(`CONTAGEM/AJUSTE: ${(e as Error).message}`);
+  }
+
+  // ── 7. AJUSTES MANUAIS (NERD_AJUSTE_HISTORICO) ──
+  try {
+    const ajustes = await queryAjustesHistorico(produto, cor, filial ?? undefined);
+    for (const r of ajustes) {
+      linhas.push({
+        emissao: r.DATA_AJUSTE ? new Date(r.DATA_AJUSTE).toISOString() : "",
+        tipo: "AJUSTE",
+        tipoRomaneio: r.TIPO_AJUSTE ?? null,
+        doc: r.ROMANEIO_REF ?? "AJUSTE",
+        filialOrigem: r.QTDE_AJUSTE < 0 ? r.FILIAL?.trim() ?? null : null,
+        filialDestino: r.QTDE_AJUSTE >= 0 ? r.FILIAL?.trim() ?? null : null,
+        romaneio: r.OBS?.trim() ?? r.RESPONSAVEL?.trim() ?? null,
+        qtde: r.QTDE_AJUSTE,
+        qtdeGrade: r.QTDE_AJUSTE,
+        valor: 0,
+        preco: 0,
+        obs: r.OBS?.trim() ?? null,
+        atualizouEstoque: true,
+        statusTransito: null,
+      });
+    }
+  } catch (e) {
+    erros.push(`AJUSTE MANUAL: ${(e as Error).message}`);
   }
 
   // Ordenar por data

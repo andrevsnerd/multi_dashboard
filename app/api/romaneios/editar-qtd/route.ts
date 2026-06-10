@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withRequest } from '@/lib/db/connection';
 import { findUserByUsername } from '@/lib/auth/users-store';
+import { inserirAjuste } from '@/lib/repositories/ajuste-historico';
 import sql from 'mssql';
 
 async function podeEditarQtdRomaneio(username: string | null): Promise<boolean> {
@@ -130,6 +131,22 @@ export async function PUT(request: NextRequest) {
         `);
       }
     });
+
+    // Registra auditoria no histórico de ajustes (não-bloqueante)
+    const filialAjuste = tipo === 'saida'
+      ? (filialOrigem ?? '').toString().trim()
+      : (filialDestino ?? '').toString().trim();
+    // Saída: diff>0 = mais saiu (estoque -), diff<0 = menos saiu (estoque +) → qtdeAjuste = -diff
+    // Entrada: diff>0 = mais chegou (estoque +), diff<0 = menos chegou (estoque -) → qtdeAjuste = diff
+    const qtdeAjuste = tipo === 'saida' ? -diff : diff;
+    inserirAjuste({
+      filial: filialAjuste,
+      itens: [{ produto, cor, qtde: qtdeAjuste }],
+      romaneioRef: romaneio,
+      tipoAjuste: tipo === 'saida' ? 'EDICAO_ROMANEIO_SAIDA' : 'EDICAO_ROMANEIO_ENTRADA',
+      responsavel: username ?? undefined,
+      obs: `Qtde ${tipo} ajustada: ${qtdeAtual} → ${qtdeNova}`,
+    }).catch((err) => console.error('[ajuste-historico] Falha ao registrar auditoria:', err));
 
     return NextResponse.json({ success: true });
   } catch (error) {
