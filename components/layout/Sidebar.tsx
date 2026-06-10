@@ -93,6 +93,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/estoque-consulta` : "/estoque-consulta";
   const controleGiroHref =
     basePath && basePath !== "/" ? `${basePath}/controle-giro` : "/controle-giro";
+  const produtosParadosHref =
+    basePath && basePath !== "/" ? `${basePath}/produtos-parados` : "/produtos-parados";
   const controlePerformanceHref =
     basePath && basePath !== "/" ? `${basePath}/controle-performance` : "/controle-performance";
   const curvaAbcHref = basePath && basePath !== "/" ? `${basePath}/curva-abc` : "/curva-abc";
@@ -171,6 +173,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/controle-estoque",
     "/estoque-consulta",
     "/controle-giro",
+    "/produtos-parados",
     "/controle-performance",
     "/curva-abc",
     "/curva-por-produto",
@@ -293,6 +296,14 @@ export default function Sidebar({ companyName }: SidebarProps) {
           permission: "controle-giro",
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/controle-giro", controleGiroHref),
+        },
+        {
+          key: "produtos-parados",
+          label: "Produtos Parados",
+          href: produtosParadosHref,
+          permission: "produtos-parados",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/produtos-parados", produtosParadosHref),
         },
         {
           key: "controle-performance",

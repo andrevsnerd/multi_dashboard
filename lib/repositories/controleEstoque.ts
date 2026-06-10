@@ -529,6 +529,43 @@ function buildGradeFilter(
 }
 
 /**
+ * Para SCARFME: constrói o filtro de filial para a fonte de e-commerce (FATURAMENTO).
+ * Retorna `include: true` quando o UNION com FATURAMENTO deve ser adicionado.
+ * Retorna `include: false` para NERD (sem e-commerce), filial varejo específica, ou VAREJO_VALUE.
+ */
+async function buildEcomVendasFilter(
+  request: sql.Request | RequestLike,
+  companySlug: string | undefined,
+  specificFilial: string | null | undefined,
+): Promise<{ filterSql: string; include: boolean }> {
+  if (companySlug !== 'scarfme') {
+    return { filterSql: '', include: false };
+  }
+
+  const company = await resolveCompanyLive(companySlug);
+  if (!company) return { filterSql: '', include: false };
+
+  const ecommerceFilials = company.ecommerceFilials ?? [];
+  if (ecommerceFilials.length === 0) return { filterSql: '', include: false };
+
+  const normalizedSpecific = specificFilial ? await liveNameForIncoming(specificFilial) : null;
+
+  if (normalizedSpecific === VAREJO_VALUE) return { filterSql: '', include: false };
+
+  // Filial varejo específica → sem e-commerce
+  if (normalizedSpecific && !ecommerceFilials.includes(normalizedSpecific)) {
+    return { filterSql: '', include: false };
+  }
+
+  // null (todas as filiais) ou uma filial de e-commerce específica → inclui FATURAMENTO
+  ecommerceFilials.forEach((f, i) => {
+    request.input(`ecomVendasFilial${i}`, sql.VarChar, f);
+  });
+  const placeholders = ecommerceFilials.map((_, i) => `@ecomVendasFilial${i}`).join(', ');
+  return { filterSql: `AND f.FILIAL IN (${placeholders})`, include: true };
+}
+
+/**
  * Cria filtro de exclusão de linhas para ScarfMe
  * Exclui linhas configuradas em excludedLines da configuração da empresa
  * @param paramPrefix Prefixo único para os parâmetros SQL (para evitar duplicação quando chamado múltiplas vezes)
@@ -884,6 +921,172 @@ export async function fetchProdutosParados({
       subgrupo: r.subgrupo ?? '',
       colecao: r.colecao ?? '',
       estoque: Number(r.estoque) || 0,
+    }));
+  });
+}
+
+export interface ProdutoParadoDetalhado {
+  produto: string;
+  codigoBarra: string;
+  descricao: string;
+  cor: string;
+  grade: string;
+  linha: string;
+  subgrupo: string;
+  colecao: string;
+  estoque: number;
+  diasParado: number;
+  ultimaVenda: string | null;
+}
+
+/**
+ * Retorna todos os produtos com estoque na rede, com dias parado e data da última venda.
+ * Filtra por minDias: só mostra produtos parados há pelo menos X dias (0 = todos).
+ * diasParado = 9999 indica produto que nunca foi vendido.
+ */
+export async function fetchProdutosParadosDetalhado({
+  company,
+  filial,
+  grupos,
+  linhas,
+  colecoes,
+  subgrupos,
+  grades,
+  minDias = 30,
+  nerdLinha,
+}: ControleEstoqueParams & { minDias?: number }): Promise<ProdutoParadoDetalhado[]> {
+  return withRequest(async (request) => {
+    const estoqueFilialFilter = await buildFilialFilter(request, company, filial, 'e');
+    const vendasFilialFilter = await buildVendasFilialFilter(request, company, filial, 'vg');
+    const ecomVendas = await buildEcomVendasFilter(request, company, filial);
+    const grupoFilter = buildGrupoFilter(request, company, grupos, 'p');
+    const linhaFilter = buildLinhaFilter(request, company, linhas, 'p');
+    const colecaoFilter = buildColecaoFilter(request, company, colecoes, 'p');
+    const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos, 'p');
+    const gradeFilter = buildGradeFilter(request, company, grades, 'p');
+    const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineGiro');
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p', nerdLinha);
+
+    request.input('minDiasParado', sql.Int, minDias);
+
+    // E-commerce union: só para SCARFME, via FATURAMENTO + W_FATURAMENTO_PROD_02
+    const ecomUnion = ecomVendas.include ? `
+      UNION ALL
+      SELECT
+        fp.PRODUTO,
+        ISNULL(fp.COR_PRODUTO, '') AS COR_PRODUTO,
+        CAST(f.EMISSAO AS DATE) AS dataVenda
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE fp.QTDE > 0
+        AND f.NOTA_CANCELADA = 0
+        ${ecomVendas.filterSql}` : '';
+
+    const query = `
+      ;WITH AllVendas AS (
+        SELECT
+          vg.PRODUTO,
+          ISNULL(vg.COR_PRODUTO, '') AS COR_PRODUTO,
+          CAST(vg.DATA_VENDA AS DATE) AS dataVenda
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vg WITH (NOLOCK)
+        WHERE vg.QTDE > 0
+          ${vendasFilialFilter}
+        ${ecomUnion}
+      ),
+      UltimaVenda AS (
+        SELECT
+          PRODUTO,
+          ISNULL(COR_PRODUTO, '') AS COR_PRODUTO,
+          MAX(dataVenda) AS ultimaVenda
+        FROM AllVendas
+        GROUP BY PRODUTO, ISNULL(COR_PRODUTO, '')
+      )
+      SELECT
+        e.PRODUTO AS produto,
+        ISNULL((
+          SELECT TOP 1 pb.CODIGO_BARRA
+          FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+          WHERE pb.PRODUTO = e.PRODUTO
+            AND ISNULL(pb.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')
+            AND ISNULL(pb.CODIGO_BARRA, '') <> ''
+          ORDER BY pb.CODIGO_BARRA
+        ), '') AS codigoBarra,
+        ISNULL(p.DESC_PRODUTO, '') AS descricao,
+        ISNULL(COALESCE(cb.DESC_COR, e.COR_PRODUTO), '') AS cor,
+        ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
+        ISNULL(p.LINHA, '') AS linha,
+        ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
+        ISNULL(p.COLECAO, '') AS colecao,
+        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoque,
+        uv.ultimaVenda,
+        CASE
+          WHEN uv.ultimaVenda IS NULL THEN 9999
+          ELSE DATEDIFF(DAY, uv.ultimaVenda, CAST(GETDATE() AS DATE))
+        END AS diasParado
+      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+      LEFT JOIN CORES_BASICAS cb WITH (NOLOCK) ON e.COR_PRODUTO = cb.COR
+      LEFT JOIN UltimaVenda uv ON uv.PRODUTO = e.PRODUTO AND ISNULL(uv.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')
+      WHERE e.ESTOQUE > 0
+        ${estoqueFilialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
+        AND (
+          uv.ultimaVenda IS NULL
+          OR DATEDIFF(DAY, uv.ultimaVenda, CAST(GETDATE() AS DATE)) >= @minDiasParado
+        )
+      GROUP BY
+        e.PRODUTO,
+        e.COR_PRODUTO,
+        p.DESC_PRODUTO,
+        cb.DESC_COR,
+        p.GRADE,
+        p.LINHA,
+        p.SUBGRUPO_PRODUTO,
+        p.COLECAO,
+        uv.ultimaVenda
+      HAVING SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) > 0
+      ORDER BY
+        CASE WHEN uv.ultimaVenda IS NULL THEN 9999 ELSE DATEDIFF(DAY, uv.ultimaVenda, CAST(GETDATE() AS DATE)) END DESC,
+        p.LINHA,
+        e.PRODUTO,
+        e.COR_PRODUTO
+    `;
+
+    const result = await request.query<{
+      produto: string;
+      codigoBarra: string;
+      descricao: string;
+      cor: string;
+      grade: string;
+      linha: string;
+      subgrupo: string;
+      colecao: string;
+      estoque: number;
+      ultimaVenda: Date | null;
+      diasParado: number;
+    }>(query);
+
+    return result.recordset.map(r => ({
+      produto: r.produto ?? '',
+      codigoBarra: r.codigoBarra ?? '',
+      descricao: r.descricao ?? '',
+      cor: r.cor ?? '',
+      grade: r.grade ?? '',
+      linha: r.linha ?? '',
+      subgrupo: r.subgrupo ?? '',
+      colecao: r.colecao ?? '',
+      estoque: Number(r.estoque) || 0,
+      diasParado: Number(r.diasParado) || 0,
+      ultimaVenda: r.ultimaVenda instanceof Date
+        ? r.ultimaVenda.toISOString().split('T')[0]
+        : (r.ultimaVenda ? String(r.ultimaVenda).split('T')[0] : null),
     }));
   });
 }
