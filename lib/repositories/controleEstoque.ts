@@ -4285,12 +4285,13 @@ export async function fetchProdutoDetalhesPorFilial({
       !!linha ||
       !!subgrupo ||
       !!grade ||
-      !!colecao;
+      !!colecao ||
+      !!cor;
     const hasFilial = !!(filial && filial.trim());
 
     if (!useProdutosPermitidos && !hasBusca && !hasCategoria && !hasFilial) {
       throw new Error(
-        'Informe itens na busca, selecione uma filial ou um grupo, linha, subgrupo, grade ou coleção.',
+        'Informe itens na busca, selecione uma filial, cor ou categoria.',
       );
     }
 
@@ -4310,16 +4311,43 @@ export async function fetchProdutoDetalhesPorFilial({
 
     if (!useProdutosPermitidos && buscaItens.length > 0) {
       const orParts: string[] = [];
+      // Resolve barcodes upfront — single indexed lookup, avoids correlated EXISTS per row
+      const barcodeTokens = buscaItens.map((t) => t.trim()).filter(Boolean);
+      barcodeTokens.forEach((bc, i) => request.input(`bc${i}`, sql.VarChar, bc));
+      const bcPlaceholders = barcodeTokens.map((_, i) => `@bc${i}`).join(', ');
+      const bcResult = await request.query<{ codigoBarra: string; produto: string; corProduto: string }>(`
+        SELECT LTRIM(RTRIM(CODIGO_BARRA)) AS codigoBarra,
+               LTRIM(RTRIM(PRODUTO))      AS produto,
+               ISNULL(LTRIM(RTRIM(COR_PRODUTO)), '') AS corProduto
+        FROM PRODUTOS_BARRA WITH (NOLOCK)
+        WHERE LTRIM(RTRIM(CODIGO_BARRA)) IN (${bcPlaceholders})
+      `);
+      const resolvedBarcodes = new Map<string, { produto: string; corProduto: string }>();
+      for (const row of bcResult.recordset) {
+        resolvedBarcodes.set(row.codigoBarra, { produto: row.produto, corProduto: row.corProduto });
+      }
+
       buscaItens.forEach((token, i) => {
         const norm = token.toUpperCase().replace(/\s+/g, '');
         const like = `%${token.toUpperCase()}%`;
+        const resolved = resolvedBarcodes.get(token.trim());
         request.input(`buscaNorm${i}`, sql.VarChar, norm);
         request.input(`buscaLike${i}`, sql.VarChar, like);
-        orParts.push(`(
-          UPPER(REPLACE(LTRIM(RTRIM(e.PRODUTO)), ' ', '')) = @buscaNorm${i}
-          OR UPPER(ISNULL(p.DESC_PRODUTO, '')) LIKE @buscaLike${i}
-          OR UPPER(LTRIM(RTRIM(CONVERT(VARCHAR, p.GRADE)))) = @buscaNorm${i}
-        )`);
+
+        if (resolved) {
+          request.input(`bcProd${i}`, sql.VarChar, resolved.produto);
+          request.input(`bcCor${i}`, sql.VarChar, resolved.corProduto);
+          orParts.push(`(
+            LTRIM(RTRIM(e.PRODUTO)) = @bcProd${i}
+            AND ISNULL(LTRIM(RTRIM(e.COR_PRODUTO)), '') = @bcCor${i}
+          )`);
+        } else {
+          orParts.push(`(
+            UPPER(REPLACE(LTRIM(RTRIM(e.PRODUTO)), ' ', '')) = @buscaNorm${i}
+            OR UPPER(ISNULL(p.DESC_PRODUTO, '')) LIKE @buscaLike${i}
+            OR UPPER(LTRIM(RTRIM(CONVERT(VARCHAR, p.GRADE)))) = @buscaNorm${i}
+          )`);
+        }
       });
       produtoFilter = `AND (${orParts.join(' OR ')})`;
       if (company === 'nerd' && grupo) {
@@ -7473,5 +7501,36 @@ export async function fetchCustosPorProdutos(
       if (row.produto) map.set(row.produto.trim(), Number(row.custoUnitario ?? 0));
     }
     return map;
+  });
+}
+
+export async function fetchAvailableCores({
+  company,
+  filial,
+}: {
+  company?: string;
+  filial?: string | null;
+}): Promise<string[]> {
+  if (!company) return [];
+
+  return withRequest(async (request) => {
+    const filialFilter = await buildFilialFilter(request, company, filial, 'e', null);
+    const nerdLinhaFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
+
+    const result = await request.query<{ cor: string }>(`
+      SELECT DISTINCT
+        UPPER(LTRIM(RTRIM(ISNULL(COALESCE(c.DESC_COR, e.COR_PRODUTO), '')))) AS cor
+      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
+      WHERE ISNULL(COALESCE(c.DESC_COR, e.COR_PRODUTO), '') <> ''
+        ${filialFilter}
+        ${nerdLinhaFilter}
+      ORDER BY cor
+    `);
+
+    return result.recordset
+      .map((row) => row.cor?.trim() ?? '')
+      .filter(Boolean);
   });
 }

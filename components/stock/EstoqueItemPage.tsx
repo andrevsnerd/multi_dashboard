@@ -102,6 +102,7 @@ async function fetchDetalhesPorFilial(params: {
   subgrupo: string | null;
   grade: string | null;
   colecao: string | null;
+  cor: string | null;
   mostrarZerados: boolean;
   mostrarNegativos: boolean;
 }): Promise<DetalhesPorFilialResponse> {
@@ -114,6 +115,7 @@ async function fetchDetalhesPorFilial(params: {
   if (params.subgrupo) searchParams.set("subgrupo", params.subgrupo);
   if (params.grade) searchParams.set("grade", params.grade);
   if (params.colecao) searchParams.set("colecao", params.colecao);
+  if (params.cor) searchParams.set("cor", params.cor);
   if (params.mostrarZerados) searchParams.set("mostrarZerados", "1");
   if (params.mostrarNegativos) searchParams.set("mostrarNegativos", "1");
 
@@ -170,22 +172,49 @@ export default function EstoqueItemPage({
   const [grade, setGrade] = useState<string | null>(null);
   const [colecao, setColecao] = useState<string | null>(null);
   const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
+  const [cor, setCor] = useState<string | null>(null);
   const [mostrarZerados, setMostrarZerados] = useState(false);
   const [mostrarNegativos, setMostrarNegativos] = useState(false);
 
-  const [availableGrupos, setAvailableGrupos] = useState<string[]>([]);
-  const [availableLinhas, setAvailableLinhas] = useState<string[]>([]);
-  const [availableSubgrupos, setAvailableSubgrupos] = useState<string[]>([]);
-  const [availableGrades, setAvailableGrades] = useState<string[]>([]);
-  const [availableColecoes, setAvailableColecoes] = useState<string[]>([]);
+  const [apiCores, setApiCores] = useState<string[]>([]);
+  const [apiGrupos, setApiGrupos] = useState<string[]>([]);
+  const [apiLinhas, setApiLinhas] = useState<string[]>([]);
+  const [apiSubgrupos, setApiSubgrupos] = useState<string[]>([]);
+  const [apiGrades, setApiGrades] = useState<string[]>([]);
+  const [apiColecoes, setApiColecoes] = useState<string[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DetalhesPorFilialResponse | null>(null);
 
   useEffect(() => {
+    let active = true;
+
+    void (async () => {
+      try {
+        const searchParams = new URLSearchParams({ company: companyKey });
+        if (selectedFilial) searchParams.set("filial", selectedFilial);
+
+        const response = await fetch(`/api/products/cores?${searchParams.toString()}`, {
+          cache: "no-store",
+        });
+        if (!response.ok) return;
+
+        const json = (await response.json()) as { data: string[] };
+        if (active) setApiCores(json.data || []);
+      } catch {
+        /* ignore */
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [companyKey, selectedFilial]);
+
+  useEffect(() => {
     if (companyKey !== "nerd") {
-      setAvailableGrupos([]);
+      setApiGrupos([]);
       return;
     }
 
@@ -207,7 +236,7 @@ export default function EstoqueItemPage({
         if (!response.ok) return;
 
         const json = (await response.json()) as { data: string[] };
-        if (active) setAvailableGrupos(json.data || []);
+        if (active) setApiGrupos(json.data || []);
       } catch {
         /* ignore */
       }
@@ -220,7 +249,7 @@ export default function EstoqueItemPage({
 
   useEffect(() => {
     if (companyKey !== "scarfme") {
-      setAvailableLinhas([]);
+      setApiLinhas([]);
       return;
     }
 
@@ -247,7 +276,7 @@ export default function EstoqueItemPage({
         const json = (await response.json()) as { data: string[] };
         if (active) {
           const raw = json.data || [];
-          setAvailableLinhas(raw.filter((item) => !linhasExcluidas.has(item.toUpperCase().trim())));
+          setApiLinhas(raw.filter((item) => !linhasExcluidas.has(item.toUpperCase().trim())));
         }
       } catch {
         /* ignore */
@@ -270,7 +299,7 @@ export default function EstoqueItemPage({
 
   useEffect(() => {
     if (companyKey !== "scarfme") {
-      setAvailableColecoes([]);
+      setApiColecoes([]);
       return;
     }
 
@@ -295,7 +324,7 @@ export default function EstoqueItemPage({
         if (!response.ok) return;
 
         const json = (await response.json()) as { data: string[] };
-        if (active) setAvailableColecoes(json.data || []);
+        if (active) setApiColecoes(json.data || []);
       } catch {
         /* ignore */
       }
@@ -308,7 +337,7 @@ export default function EstoqueItemPage({
 
   useEffect(() => {
     if (companyKey !== "scarfme") {
-      setAvailableSubgrupos([]);
+      setApiSubgrupos([]);
       return;
     }
 
@@ -333,7 +362,7 @@ export default function EstoqueItemPage({
         if (!response.ok) return;
 
         const json = (await response.json()) as { data: string[] };
-        if (active) setAvailableSubgrupos(json.data || []);
+        if (active) setApiSubgrupos(json.data || []);
       } catch {
         /* ignore */
       }
@@ -346,7 +375,7 @@ export default function EstoqueItemPage({
 
   useEffect(() => {
     if (companyKey !== "scarfme") {
-      setAvailableGrades([]);
+      setApiGrades([]);
       return;
     }
 
@@ -371,7 +400,7 @@ export default function EstoqueItemPage({
         if (!response.ok) return;
 
         const json = (await response.json()) as { data: string[] };
-        if (active) setAvailableGrades(json.data || []);
+        if (active) setApiGrades(json.data || []);
       } catch {
         /* ignore */
       }
@@ -396,6 +425,7 @@ export default function EstoqueItemPage({
         subgrupo: companyKey === "scarfme" ? subgrupo : null,
         grade: companyKey === "scarfme" ? grade : null,
         colecao: companyKey === "scarfme" ? colecao : null,
+        cor,
         mostrarZerados,
         mostrarNegativos,
       });
@@ -415,6 +445,7 @@ export default function EstoqueItemPage({
     subgrupo,
     grade,
     colecao,
+    cor,
     mostrarZerados,
     mostrarNegativos,
   ]);
@@ -475,15 +506,77 @@ export default function EstoqueItemPage({
     };
   }, [data, companyCfg]);
 
+  const availableCores = useMemo(() => {
+    if (!pivotRows.length) return apiCores;
+    const seen = new Set<string>();
+    for (const row of pivotRows) {
+      if (row.cor?.trim()) seen.add(row.cor.trim());
+    }
+    return Array.from(seen).sort();
+  }, [pivotRows, apiCores]);
+
+  const availableGrupos = useMemo(() => {
+    if (!pivotRows.length) return apiGrupos;
+    const seen = new Set<string>();
+    for (const row of pivotRows) {
+      if (row.linha?.trim()) seen.add(row.linha.trim());
+    }
+    return Array.from(seen).sort();
+  }, [pivotRows, apiGrupos]);
+
+  const availableLinhas = useMemo(() => {
+    if (!pivotRows.length) return apiLinhas;
+    const seen = new Set<string>();
+    for (const row of pivotRows) {
+      if (row.linha?.trim() && !linhasExcluidas.has(row.linha.trim().toUpperCase())) {
+        seen.add(row.linha.trim());
+      }
+    }
+    return Array.from(seen).sort();
+  }, [pivotRows, apiLinhas, linhasExcluidas]);
+
+  const availableSubgrupos = useMemo(() => {
+    if (!pivotRows.length) return apiSubgrupos;
+    const seen = new Set<string>();
+    for (const row of pivotRows) {
+      if (row.subgrupo?.trim()) seen.add(row.subgrupo.trim());
+    }
+    return Array.from(seen).sort();
+  }, [pivotRows, apiSubgrupos]);
+
+  const availableGrades = useMemo(() => {
+    if (!pivotRows.length) return apiGrades;
+    const seen = new Set<string>();
+    for (const row of pivotRows) {
+      if (row.grade?.trim()) seen.add(row.grade.trim());
+    }
+    return Array.from(seen).sort();
+  }, [pivotRows, apiGrades]);
+
+  const availableColecoes = useMemo(() => {
+    if (!pivotRows.length) return apiColecoes;
+    const seen = new Set<string>();
+    for (const row of pivotRows) {
+      if (row.colecao?.trim()) seen.add(row.colecao.trim());
+    }
+    return Array.from(seen).sort();
+  }, [pivotRows, apiColecoes]);
+
+  const filteredPivotRows = useMemo(() => {
+    if (!cor) return pivotRows;
+    const target = cor.trim().toUpperCase();
+    return pivotRows.filter((row) => row.cor.trim().toUpperCase() === target);
+  }, [pivotRows, cor]);
+
   const kpis = useMemo(() => {
     if (!data) return null;
 
     return {
-      itens: pivotRows.length,
-      estoqueTotal: sumOnlyPositive(pivotRows.map((row) => row.total)),
+      itens: filteredPivotRows.length,
+      estoqueTotal: sumOnlyPositive(filteredPivotRows.map((row) => row.total)),
       filiais: filiaisColumns.length,
     };
-  }, [data, pivotRows, filiaisColumns]);
+  }, [data, filteredPivotRows, filiaisColumns]);
 
   const limparFiltros = () => {
     setItensInput("");
@@ -492,6 +585,7 @@ export default function EstoqueItemPage({
     setSubgrupo(null);
     setGrade(null);
     setColecao(null);
+    setCor(null);
     setSelectedFilial(null);
     setMostrarZerados(false);
     setMostrarNegativos(false);
@@ -514,11 +608,10 @@ export default function EstoqueItemPage({
         </div>
       </header>
 
-      <p className={styles.hint}>
-        Informe SKUs ou trechos de nome separados por virgula e/ou use os filtros. Voce pode
-        consultar usando apenas a filial, apenas o {companyKey === "nerd" ? "grupo" : "filtro de categoria"}, ou
-        qualquer combinacao - nao e necessario informar um item. Por padrao sao exibidas apenas
-        variacoes com estoque positivo; marque as opcoes abaixo para incluir zeradas ou negativas.
+      <p className={styles.scopeNote}>
+        O <strong>Estoque total</strong> e a soma das colunas exibidas (lojas oficiais),
+        contando apenas saldo positivo. Nao inclui bazar/outlet, depositos de defeito nem
+        saldos negativos (mostrados em vermelho apenas como referencia).
       </p>
 
       <div className={styles.card}>
@@ -543,12 +636,31 @@ export default function EstoqueItemPage({
               <input
                 id="estoque-itens"
                 className={styles.searchInput}
-                placeholder="SKU, nome ou grade - separe por virgula"
+                placeholder="SKU, nome, grade ou cód. barras - separe por virgula"
                 value={itensInput}
                 onChange={(event) => setItensInput(event.target.value)}
                 autoComplete="off"
               />
             </div>
+          </div>
+
+          <div>
+            <label className={styles.fieldLabel} htmlFor="estoque-cor">
+              Cor
+            </label>
+            <select
+              id="estoque-cor"
+              className={styles.select}
+              value={cor ?? ""}
+              onChange={(event) => setCor(event.target.value || null)}
+            >
+              <option value="">Todas</option>
+              {availableCores.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
           </div>
 
           {companyKey === "nerd" ? (
@@ -713,13 +825,14 @@ export default function EstoqueItemPage({
         </div>
       ) : null}
 
+
       {loading ? <div className={styles.loading}>Carregando...</div> : null}
 
-      {!loading && data && pivotRows.length === 0 ? (
+      {!loading && data && filteredPivotRows.length === 0 ? (
         <div className={styles.empty}>Nenhuma variacao encontrada com os filtros atuais.</div>
       ) : null}
 
-      {!loading && pivotRows.length > 0 ? (
+      {!loading && filteredPivotRows.length > 0 ? (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <thead>
@@ -735,7 +848,7 @@ export default function EstoqueItemPage({
               </tr>
             </thead>
             <tbody>
-              {pivotRows.map((row) => {
+              {filteredPivotRows.map((row) => {
                 const highlightedFiliais = getHighlightedFiliais(row, filiaisColumns);
                 const meta = buildItemMeta(row, companyKey);
 
