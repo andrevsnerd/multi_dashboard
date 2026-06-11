@@ -1494,6 +1494,27 @@
   white-space: nowrap;
 }
 
+.descontinuadoBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #ffffff;
+  background: #dc2626;
+  border: 1px solid #b91c1c;
+  border-radius: 4px;
+  padding: 1px 6px;
+  line-height: 1.4;
+  text-transform: uppercase;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.descontinuadoRow td {
+  background: #fef2f2 !important;
+}
+
 .groupedTooltipWrapper {
   position: relative;
   display: inline-flex;

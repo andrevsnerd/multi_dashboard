@@ -523,6 +523,32 @@
   letter-spacing: 0.5px;
 }
 
+.productNameRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.descontinuadoBadge {
+  display: inline-flex;
+  align-items: center;
+  background-color: #dc2626;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.descontinuadoRow td {
+  background-color: #fef2f2 !important;
+}
+
 .markupCell {
   text-align: center !important;
   min-width: 80px;

@@ -97,6 +97,7 @@ interface ProdutoRow {
   isGroupedProduct?: boolean;
   groupId?: string | null;
   groupedMembers?: ProdutoAgrupadoMember[];
+  descontinuado?: boolean;
 }
 
 type FilialFilterCompanyConfig = Pick<
@@ -2569,7 +2570,7 @@ const handleBadgeClick = (cat: string) => {
                           return (
                             <tr
                               key={`${p.produto}-${p.categoria}-${p.cor ?? ""}-${p.grade ?? ""}`}
-                              className=""
+                              className={p.descontinuado ? styles.descontinuadoRow : ""}
                             >
                               <td>
                                 <span className={`${styles.rank} ${i < 3 && curva === "A" ? styles.top : ""}`}>
@@ -2613,6 +2614,9 @@ const handleBadgeClick = (cat: string) => {
                                           </div>
                                         </div>
                                       </div>
+                                    )}
+                                    {p.descontinuado && (
+                                      <span className={styles.descontinuadoBadge}>DESCONTINUADO</span>
                                     )}
                                   </div>
                                   {p.isGroupedProduct ? (

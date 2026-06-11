@@ -9,6 +9,7 @@ export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "dashboard", label: "Dashboard", routeSegments: ["dashboard"] },
   { key: "produtos", label: "Produtos", routeSegments: ["produtos"] },
   { key: "produto-agrupado", label: "Produto Agrupado", routeSegments: ["produto-agrupado"] },
+  { key: "produto-descontinuado", label: "Produto Descontinuado", routeSegments: ["produto-descontinuado"] },
   { key: "produto-detalhado", label: "Produto Detalhado", routeSegments: ["produto-detalhado"] },
   { key: "produtos-recentes", label: "Produtos Recentes", routeSegments: ["produtos-recentes"] },
   { key: "produtos-novos", label: "Produtos Novos", routeSegments: ["produtos-novos"] },
@@ -57,6 +58,7 @@ export const PAGE_ROUTE_PERMISSION_MAP = Object.fromEntries(
 export const LEGACY_PERMISSION_FALLBACKS: Partial<Record<PermissionKey, PermissionKey[]>> = {
   "relatorio-colecao": ["produtos"],
   "produto-agrupado": ["produtos"],
+  "produto-descontinuado": ["produtos"],
   "produtos-recentes": ["produtos"],
   "produtos-novos": ["produtos"],
   "relatorio-claude": ["produtos"],

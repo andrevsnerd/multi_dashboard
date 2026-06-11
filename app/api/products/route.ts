@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import { fetchProductsWithDetails, type ProductDetail } from '@/lib/repositories/products';
 import { aggregateProductDetailsWithGroups } from '@/lib/utils/produto-agrupado-aggregation';
 import { listProdutoAgrupadoGroups } from '@/lib/utils/produto-agrupado-store';
+import { listProdutosDescontinuados } from '@/lib/utils/produto-descontinuado-store';
+import { buildDescontinuadoKeySet, isProdutoDescontinuado } from '@/lib/utils/produtos-descontinuados';
 import type { CompanyKey } from '@/lib/config/company';
 
 // Evita timeout em produção (proxy/túnel); padrão seria 10s no Hobby.
@@ -45,7 +47,8 @@ export async function GET(request: Request) {
   const filterByRegistrationDate = filterByRegistrationDateParam === 'true';
 
   try {
-    const [rawData, groupedProducts] = await Promise.all([
+    const isKnownCompany = company === 'nerd' || company === 'scarfme';
+    const [rawData, groupedProducts, descontinuados] = await Promise.all([
       fetchProductsWithDetails({
         company,
         range,
@@ -61,14 +64,19 @@ export async function GET(request: Request) {
         acimaDoTicket,
         filterByRegistrationDate,
       }),
-      company === 'nerd' || company === 'scarfme'
-        ? listProdutoAgrupadoGroups(company as CompanyKey)
-        : Promise.resolve([]),
+      isKnownCompany ? listProdutoAgrupadoGroups(company as CompanyKey) : Promise.resolve([]),
+      isKnownCompany ? listProdutosDescontinuados(company as CompanyKey) : Promise.resolve([]),
     ]);
 
-    const data: ProductDetail[] = aggregateProductDetailsWithGroups(rawData, groupedProducts, {
+    const aggregated: ProductDetail[] = aggregateProductDetailsWithGroups(rawData, groupedProducts, {
       groupByColor,
     });
+
+    const descontinuadoKeys = buildDescontinuadoKeySet(descontinuados);
+    const data: ProductDetail[] = aggregated.map((product) => ({
+      ...product,
+      descontinuado: isProdutoDescontinuado(descontinuadoKeys, product.productId),
+    }));
 
     return NextResponse.json({ data });
   } catch (error) {

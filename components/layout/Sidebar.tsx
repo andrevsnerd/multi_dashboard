@@ -74,6 +74,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/produto-detalhado` : "/produto-detalhado";
   const produtoAgrupadoHref =
     basePath && basePath !== "/" ? `${basePath}/produto-agrupado` : "/produto-agrupado";
+  const produtoDescontinuadoHref =
+    basePath && basePath !== "/" ? `${basePath}/produto-descontinuado` : "/produto-descontinuado";
   const produtosNovosHref =
     basePath && basePath !== "/" ? `${basePath}/produtos-novos` : "/produtos-novos";
   const relatorioColecaoHref =
@@ -153,6 +155,13 @@ export default function Sidebar({ companyName }: SidebarProps) {
       isActive: (currentPathname) => !!currentPathname && currentPathname.includes("/produto-agrupado"),
     },
     {
+      key: "produto-descontinuado",
+      label: "Produto Descontinuado",
+      href: produtoDescontinuadoHref,
+      permission: "produto-descontinuado",
+      isActive: (currentPathname) => !!currentPathname && currentPathname.includes("/produto-descontinuado"),
+    },
+    {
       key: "produto-detalhado",
       label: "Produto Detalhado",
       href: produtoDetalhadoHref,
@@ -187,6 +196,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/produtos",
     "/produtos-recentes",
     "/produto-agrupado",
+    "/produto-descontinuado",
     "/produtos-novos",
     "/relatorio-colecao",
     "/relatorio-claude",

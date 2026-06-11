@@ -37,6 +37,7 @@ export interface ProductDetail {
   isGroupedProduct?: boolean;
   groupId?: string | null;
   groupedMembers?: ProdutoAgrupadoMember[];
+  descontinuado?: boolean; // true se o produto está marcado como descontinuado
 }
 
 export interface ProductsQueryParams {

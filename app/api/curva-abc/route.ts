@@ -11,6 +11,8 @@ import {
   aggregateProdutoQtdePorFilialWithGroups,
 } from '@/lib/utils/produto-agrupado-aggregation';
 import { listProdutoAgrupadoGroups } from '@/lib/utils/produto-agrupado-store';
+import { listProdutosDescontinuados } from '@/lib/utils/produto-descontinuado-store';
+import { buildDescontinuadoKeySet, isProdutoDescontinuado } from '@/lib/utils/produtos-descontinuados';
 import { readGoals } from '@/lib/utils/goals-storage';
 import { type CompanyKey, VAREJO_VALUE } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
@@ -120,11 +122,13 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [performanceData, allGoals, groupedProducts] = await Promise.all([
+    const [performanceData, allGoals, groupedProducts, descontinuados] = await Promise.all([
       fetchPerformanceData(companyKey, resolvedRange, comparisonMode, { linhas: linhasFilter }),
       readGoals(),
       listProdutoAgrupadoGroups(companyKey),
+      listProdutosDescontinuados(companyKey),
     ]);
+    const descontinuadoKeys = buildDescontinuadoKeySet(descontinuados);
 
     const month = resolvedRange.start.getUTCMonth();
     const year = resolvedRange.start.getUTCFullYear();
@@ -372,6 +376,7 @@ export async function GET(request: Request) {
           qtdePorFilial: qtdePorFilialMap.get(k) ?? [],
           estoque,
           estoquePorFilial: porFilial,
+          descontinuado: isProdutoDescontinuado(descontinuadoKeys, p.produto),
         };
       });
 
@@ -515,6 +520,7 @@ export async function GET(request: Request) {
         estoquePorFilial: porFilial,
         estoqueRede,
         estoqueRedePorFilial: porFilialRede,
+        descontinuado: isProdutoDescontinuado(descontinuadoKeys, p.produto),
       };
     });
 

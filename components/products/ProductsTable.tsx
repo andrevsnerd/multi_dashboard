@@ -588,9 +588,17 @@ export default function ProductsTable({
               const stockTooltipError = stockTooltipErrors[stockTooltipKey];
 
               return (
-                <tr key={`${product.productId}-${product.corProduto || ''}-${index}`}>
+                <tr
+                  key={`${product.productId}-${product.corProduto || ''}-${index}`}
+                  className={product.descontinuado ? styles.descontinuadoRow : undefined}
+                >
                   <td className={styles.descriptionCell}>
-                    <div className={styles.productName}>{product.productName}</div>
+                    <div className={styles.productNameRow}>
+                      <span className={styles.productName}>{product.productName}</span>
+                      {product.descontinuado && (
+                        <span className={styles.descontinuadoBadge}>DESCONTINUADO</span>
+                      )}
+                    </div>
                     {product.isGroupedProduct && groupedMembers.length > 0 ? (
                       <div className={styles.inlineTooltipWrapper}>
                         <div className={`${styles.productCode} ${styles.inlineTooltipTrigger}`}>
