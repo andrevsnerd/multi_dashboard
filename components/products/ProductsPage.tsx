@@ -241,9 +241,9 @@ export default function ProductsPage({
   const [availableSubgrupos, setAvailableSubgrupos] = useState<string[]>([]);
   const [availableGrades, setAvailableGrades] = useState<string[]>([]);
 
-  // Buscar grupos disponíveis para NERD
+  // Buscar grupos disponíveis para NERD e ScarfMe
   useEffect(() => {
-    if (companyKey !== "nerd") {
+    if (companyKey !== "nerd" && companyKey !== "scarfme") {
       setAvailableGrupos([]);
       return;
     }
@@ -623,6 +623,12 @@ export default function ProductsPage({
           )}
           {companyKey === "scarfme" && (
             <>
+              <MultiSelectFilter
+                label="Grupo"
+                value={selectedGrupos}
+                options={availableGrupos}
+                onChange={setSelectedGrupos}
+              />
               <MultiSelectFilter
                 label="Linha"
                 value={selectedLinhas}

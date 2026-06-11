@@ -390,7 +390,7 @@ function buildGrupoFilter(
   grupos: string[] | null | undefined,
   prefix: string = 'p'
 ): string {
-  if (company !== 'nerd' || !grupos || grupos.length === 0) {
+  if ((company !== 'nerd' && company !== 'scarfme') || !grupos || grupos.length === 0) {
     return '';
   }
 
@@ -399,18 +399,22 @@ function buildGrupoFilter(
     return '';
   }
 
+  // Nome de parâmetro derivado do prefixo (alias) para evitar EDUPEPARAM quando
+  // o mesmo request constrói este filtro mais de uma vez (ex.: estoque 'p' e entradas 'pr').
+  const paramBase = `grupo_${prefix}`;
+
   if (gruposNormalizados.length === 1) {
-    request.input('grupo', sql.VarChar, gruposNormalizados[0]);
+    request.input(paramBase, sql.VarChar, gruposNormalizados[0]);
     return `AND (
-      UPPER(LTRIM(RTRIM(ISNULL(${prefix}.GRUPO_PRODUTO, '')))) = @grupo
+      UPPER(LTRIM(RTRIM(ISNULL(${prefix}.GRUPO_PRODUTO, '')))) = @${paramBase}
     )`;
   }
 
   gruposNormalizados.forEach((g, index) => {
-    request.input(`grupo${index}`, sql.VarChar, g);
+    request.input(`${paramBase}${index}`, sql.VarChar, g);
   });
 
-  const placeholders = gruposNormalizados.map((_, index) => `@grupo${index}`).join(', ');
+  const placeholders = gruposNormalizados.map((_, index) => `@${paramBase}${index}`).join(', ');
   return `AND (
     UPPER(LTRIM(RTRIM(ISNULL(${prefix}.GRUPO_PRODUTO, '')))) IN (${placeholders})
   )`;

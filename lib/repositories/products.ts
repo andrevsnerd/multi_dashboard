@@ -251,7 +251,7 @@ async function buildFilialFilter(
 }
 
 /**
- * Cria filtro de grupo para NERD (suporta múltiplos valores)
+ * Cria filtro de grupo para NERD e ScarfMe (suporta múltiplos valores)
  */
 function buildGrupoFilterForProducts(
   request: sql.Request | RequestLike,
@@ -259,7 +259,7 @@ function buildGrupoFilterForProducts(
   grupo: string | null | undefined,
   grupos: string[] | null | undefined
 ): string {
-  if (companySlug !== 'nerd') {
+  if (companySlug !== 'nerd' && companySlug !== 'scarfme') {
     return '';
   }
   
@@ -1292,6 +1292,7 @@ async function fetchProductsWithDetailsEcommerce({
 
     // Para e-commerce, construir filtros usando apenas p (não temos vp)
     // Criar filtros específicos para e-commerce para evitar problemas com substituição de strings
+    let grupoFilter = '';
     let linhaFilter = '';
     let colecaoFilter = '';
     let subgrupoFilter = '';
@@ -1307,6 +1308,22 @@ async function fetchProductsWithDetailsEcommerce({
       produtoFilter = `AND p.DESC_PRODUTO LIKE @produtoSearchTermEcommerce`;
     }
     
+    // Filtro de grupo para e-commerce
+    const gruposList = grupos && grupos.length > 0 ? grupos : grupo ? [grupo] : [];
+    if (company === 'scarfme' && gruposList.length > 0) {
+      const gruposNormalizados = gruposList.map(g => g.trim().toUpperCase());
+      if (gruposNormalizados.length === 1) {
+        request.input('grupoEcommerce', sql.VarChar, gruposNormalizados[0]);
+        grupoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupoEcommerce`;
+      } else {
+        gruposNormalizados.forEach((g, index) => {
+          request.input(`grupoEcommerce${index}`, sql.VarChar, g);
+        });
+        const placeholders = gruposNormalizados.map((_, index) => `@grupoEcommerce${index}`).join(', ');
+        grupoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) IN (${placeholders})`;
+      }
+    }
+
     // Filtro de linha para e-commerce
     const linhasList = linhas && linhas.length > 0 ? linhas : linha ? [linha] : [];
     if (company === 'scarfme' && linhasList.length > 0) {
@@ -1431,6 +1448,7 @@ async function fetchProductsWithDetailsEcommerce({
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')`}
         ${filialFilter}
+        ${grupoFilter}
         ${linhaFilter}
         ${colecaoFilter}
         ${subgrupoFilter}
@@ -1438,7 +1456,7 @@ async function fetchProductsWithDetailsEcommerce({
         ${produtoFilter}
         ${ecommerceAcimaDoTicketFilter}
       GROUP BY ${ecommerceGroupByFields}
-      ${acimaDoTicket ? `HAVING MAX(${ecommerceSuggestedPriceField}) IS NOT NULL 
+      ${acimaDoTicket ? `HAVING MAX(${ecommerceSuggestedPriceField}) IS NOT NULL
         AND (SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) / NULLIF(SUM(fp.QTDE), 0)) > MAX(${ecommerceSuggestedPriceField})` : ''}
     `;
 
@@ -1488,6 +1506,7 @@ async function fetchProductsWithDetailsEcommerce({
           AND p.DATA_CADASTRAMENTO < @endDate
           AND p.DATA_CADASTRAMENTO IS NOT NULL
           AND fp_check.PRODUTO IS NULL
+          ${grupoFilter}
           ${linhaFilter}
           ${colecaoFilter}
           ${subgrupoFilter}
@@ -1518,6 +1537,7 @@ async function fetchProductsWithDetailsEcommerce({
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         ${filialFilter}
+        ${grupoFilter}
         ${linhaFilter}
         ${colecaoFilter}
         ${subgrupoFilter}
@@ -1544,6 +1564,7 @@ async function fetchProductsWithDetailsEcommerce({
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
         ${filialFilter}
+        ${grupoFilter}
         ${linhaFilter}
         ${colecaoFilter}
         ${subgrupoFilter}

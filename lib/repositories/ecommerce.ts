@@ -231,20 +231,36 @@ export async function fetchEcommerceSummary({
     const filialFilter = await buildEcommerceFilialFilter(request, company, filial);
 
     // Criar filtros para ScarfMe (e-commerce usa apenas p, não vp) - suporta múltiplos
+    let grupoFilter = '';
     let linhaFilter = '';
     let colecaoFilter = '';
     let subgrupoFilter = '';
     let gradeFilter = '';
     let produtoJoin = '';
-    
+
+    const gruposList = grupos && grupos.length > 0 ? grupos : grupo ? [grupo] : [];
     const linhasList = linhas && linhas.length > 0 ? linhas : linha ? [linha] : [];
     const colecoesList = colecoes && colecoes.length > 0 ? colecoes : colecao ? [colecao] : [];
     const subgruposList = subgrupos && subgrupos.length > 0 ? subgrupos : subgrupo ? [subgrupo] : [];
     const gradesList = grades && grades.length > 0 ? grades : grade ? [grade] : [];
-    
-    if (company === 'scarfme' && (linhasList.length > 0 || colecoesList.length > 0 || subgruposList.length > 0 || gradesList.length > 0)) {
+
+    if (company === 'scarfme' && (gruposList.length > 0 || linhasList.length > 0 || colecoesList.length > 0 || subgruposList.length > 0 || gradesList.length > 0)) {
       produtoJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO`;
-      
+
+      if (gruposList.length > 0) {
+        const gruposNormalizados = gruposList.map(g => g.trim().toUpperCase());
+        if (gruposNormalizados.length === 1) {
+          request.input('grupo', sql.VarChar, gruposNormalizados[0]);
+          grupoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupo`;
+        } else {
+          gruposNormalizados.forEach((g, index) => {
+            request.input(`grupo${index}`, sql.VarChar, g);
+          });
+          const placeholders = gruposNormalizados.map((_, index) => `@grupo${index}`).join(', ');
+          grupoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) IN (${placeholders})`;
+        }
+      }
+
       if (linhasList.length > 0) {
         const linhasNormalizadas = linhasList.map(l => l.trim().toUpperCase());
         if (linhasNormalizadas.length === 1) {
@@ -392,6 +408,7 @@ export async function fetchEcommerceSummary({
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
           ${filialFilter}
+          ${grupoFilter}
           ${linhaFilter}
           ${colecaoFilter}
           ${subgrupoFilter}
@@ -418,6 +435,7 @@ export async function fetchEcommerceSummary({
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
           ${filialFilter}
+          ${grupoFilter}
           ${linhaFilter}
           ${colecaoFilter}
           ${subgrupoFilter}

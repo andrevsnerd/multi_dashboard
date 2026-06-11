@@ -680,7 +680,7 @@ export async function fetchSalesSummary({
     // Ajustar filtro de filial para usar f.FILIAL (da tabela FILIAIS) quando usar LOJA_VENDA_PRODUTO
     const filialFilter = await buildFilialFilter(request, company, 'sales', filial, 'f');
     
-    // Criar filtro de grupo para NERD (suporta múltiplos)
+    // Criar filtro de grupo para NERD e ScarfMe (suporta múltiplos)
     let grupoFilter = '';
     let grupoJoin = '';
     // Se acimaDoTicket ou filterByRegistrationDate estiver ativo, precisamos do JOIN com PRODUTOS
@@ -688,7 +688,7 @@ export async function fetchSalesSummary({
       grupoJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
     }
     const gruposList = grupos && grupos.length > 0 ? grupos : grupo ? [grupo] : [];
-    if (company === 'nerd' && gruposList.length > 0) {
+    if ((company === 'nerd' || company === 'scarfme') && gruposList.length > 0) {
       const gruposNormalizados = gruposList.map(g => g.trim().toUpperCase());
       if (!grupoJoin) {
         grupoJoin = `LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO`;
