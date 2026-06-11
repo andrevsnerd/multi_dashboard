@@ -171,6 +171,7 @@ type CompraMetricRow = {
 interface CurvaAbcObservacaoRecord {
   produto: string;
   cor: string;
+  filial?: string;
   observacao: string;
 }
 
@@ -181,6 +182,9 @@ interface ObservacaoModalState {
   titulo: string;
   codigo: string;
   corLabel: string | null;
+  filialLabel: string;
+  /** A observação exibida vem do padrão (Todas as filiais), não desta filial. */
+  inherited: boolean;
 }
 
 const EMPTY_COMPRA_METRIC_ROW: CompraMetricRow = {
@@ -956,6 +960,7 @@ function ObservacaoEditorModal({
               <strong>{modal.titulo}</strong>
               <span>Cód. {modal.codigo}</span>
               {modal.corLabel && <span>Cor: {modal.corLabel}</span>}
+              <span>Filial: {modal.filialLabel}</span>
             </div>
           </div>
           <button
@@ -982,6 +987,13 @@ function ObservacaoEditorModal({
             }}
           />
           <div className={styles.obsModalHint}>{draft.trim().length}/240 caracteres</div>
+          <div className={styles.obsModalScopeNote}>
+            {modal.filialLabel === "Todas as filiais"
+              ? "Esta é a observação padrão: vale para todas as filiais que ainda não tiverem uma própria."
+              : modal.inherited
+                ? `Mostrando a observação padrão. Ao salvar, ela passa a valer só para ${modal.filialLabel}. Limpar volta a usar o padrão.`
+                : `Observação específica de ${modal.filialLabel}. Limpar volta a usar a observação padrão (Todas as filiais).`}
+          </div>
           {error && <div className={styles.obsModalError}>{error}</div>}
         </div>
         <div className={styles.obsModalFooter}>
@@ -1014,6 +1026,9 @@ const ObservacaoCell = React.memo(function ObservacaoCell({
   produto,
   cor,
   usarCor,
+  filialScope,
+  filialLabel,
+  inherited,
   titulo,
   codigo,
   corLabel,
@@ -1023,22 +1038,26 @@ const ObservacaoCell = React.memo(function ObservacaoCell({
   produto: string;
   cor: string | null;
   usarCor: boolean;
+  filialScope: string;
+  filialLabel: string;
+  inherited: boolean;
   titulo: string;
   codigo: string;
   corLabel: string | null;
   observacao: string;
-  onSave: (input: { produto: string; cor: string | null; usarCor: boolean; rawValue: string }) => Promise<{ ok: boolean; error?: string }>;
+  onSave: (input: { produto: string; cor: string | null; usarCor: boolean; filialScope: string; rawValue: string }) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
 
   const possuiObservacao = observacao.trim().length > 0;
+  const mostrarHerdada = possuiObservacao && inherited;
 
   async function handleSave(rawValue: string) {
     setSaving(true);
     setError(undefined);
-    const result = await onSave({ produto, cor, usarCor, rawValue });
+    const result = await onSave({ produto, cor, usarCor, filialScope, rawValue });
     setSaving(false);
     if (result.ok) {
       setOpen(false);
@@ -1051,9 +1070,17 @@ const ObservacaoCell = React.memo(function ObservacaoCell({
     <>
       <button
         type="button"
-        className={`${styles.obsTrigger} ${possuiObservacao ? styles.obsTriggerFilled : styles.obsTriggerEmpty} ${error ? styles.obsTriggerError : ""}`}
+        className={`${styles.obsTrigger} ${possuiObservacao ? styles.obsTriggerFilled : styles.obsTriggerEmpty} ${mostrarHerdada ? styles.obsTriggerInherited : ""} ${error ? styles.obsTriggerError : ""}`}
         disabled={saving}
-        title={error ? `Erro ao salvar: ${error}` : (possuiObservacao ? observacao : "Adicionar observação")}
+        title={
+          error
+            ? `Erro ao salvar: ${error}`
+            : !possuiObservacao
+              ? "Adicionar observação"
+              : mostrarHerdada
+                ? `Observação padrão (Todas as filiais): ${observacao}`
+                : observacao
+        }
         onClick={() => {
           setError(undefined);
           setOpen(true);
@@ -1062,13 +1089,16 @@ const ObservacaoCell = React.memo(function ObservacaoCell({
         <span className={`${styles.obsTriggerText} ${!possuiObservacao ? styles.obsTriggerTextMuted : ""}`}>
           {saving ? "Salvando..." : formatObservacaoPreview(observacao)}
         </span>
+        {mostrarHerdada && (
+          <span className={styles.obsTriggerInheritedTag}>padrão</span>
+        )}
         <span className={styles.obsTriggerIcon} aria-hidden>
           ✎
         </span>
       </button>
       {open && (
         <ObservacaoEditorModal
-          modal={{ produto, cor, usarCor, titulo, codigo, corLabel }}
+          modal={{ produto, cor, usarCor, titulo, codigo, corLabel, filialLabel, inherited: mostrarHerdada }}
           initialValue={observacao}
           saving={saving}
           error={error}
@@ -1198,7 +1228,8 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [focusedCurve, setFocusedCurve] = useState<Curva>("A");
   const [compraMetrics, setCompraMetrics] = useState<Record<string, CompraMetricRow>>({});
   const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
-  const [observacoes, setObservacoes] = useState<Record<string, string>>({});
+  // metricKey -> (escopo da filial -> observação). Escopo "" = padrão (fallback de todas as filiais).
+  const [observacoes, setObservacoes] = useState<Record<string, Record<string, string>>>({});
   const [sugestaoTooltip, setSugestaoTooltip] = useState<null | {
     x: number;
     y: number;
@@ -1368,12 +1399,12 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       .then((json: { data?: CurvaAbcObservacaoRecord[]; error?: string }) => {
         if (json.error) throw new Error(json.error);
 
-        const nextMap = Object.fromEntries(
-          (json.data ?? []).map((row) => [
-            buildCurvaAbcMetricKey(row.produto, row.cor ?? null, true),
-            row.observacao ?? "",
-          ])
-        );
+        const nextMap: Record<string, Record<string, string>> = {};
+        for (const row of json.data ?? []) {
+          const metricKey = buildCurvaAbcMetricKey(row.produto, row.cor ?? null, true);
+          const filialScope = (row.filial ?? "").trim();
+          (nextMap[metricKey] ??= {})[filialScope] = row.observacao ?? "";
+        }
 
         if (cancelled) return;
         setObservacoes(nextMap);
@@ -1510,18 +1541,26 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     produto,
     cor,
     usarCor,
+    filialScope,
     rawValue,
   }: {
     produto: string;
     cor: string | null;
     usarCor: boolean;
+    filialScope: string;
     rawValue: string;
   }): Promise<{ ok: boolean; error?: string }> {
     const lookupKey = buildCurvaAbcMetricKey(produto, cor ?? null, usarCor);
     const draftValue = rawValue.trim();
-    const savedValue = (observacoes[lookupKey] ?? "").trim();
+    const byFilial = observacoes[lookupKey] ?? {};
+    const ownValue = byFilial[filialScope];
+    // O que está visível hoje nesta filial: a própria observação ou, na falta, o padrão ("").
+    const resolvedValue = (
+      ownValue != null ? ownValue : filialScope !== "" ? byFilial[""] ?? "" : ""
+    ).trim();
 
-    if (draftValue === savedValue) return { ok: true };
+    // Sem mudança visível: não cria cópia redundante igual ao padrão herdado.
+    if (draftValue === resolvedValue) return { ok: true };
 
     try {
       const res = await fetch("/api/curva-abc-observacoes", {
@@ -1531,6 +1570,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
           company: companyKey,
           produto,
           cor: usarCor ? cor ?? null : null,
+          filial: filialScope,
           observacao: draftValue,
         }),
       });
@@ -1543,12 +1583,19 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       const nextValue = json.data?.observacao ?? "";
 
       setObservacoes((prev) => {
+        const nextByFilial = { ...(prev[lookupKey] ?? {}) };
         if (!nextValue) {
-          const next = { ...prev };
-          delete next[lookupKey];
-          return next;
+          delete nextByFilial[filialScope];
+        } else {
+          nextByFilial[filialScope] = nextValue;
         }
-        return { ...prev, [lookupKey]: nextValue };
+        const next = { ...prev };
+        if (Object.keys(nextByFilial).length === 0) {
+          delete next[lookupKey];
+        } else {
+          next[lookupKey] = nextByFilial;
+        }
+        return next;
       });
       return { ok: true };
     } catch (err) {
@@ -1558,6 +1605,22 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       };
     }
   }
+
+  // Escopo de observação = filial selecionada; "Todas as filiais" edita o padrão (fallback).
+  const observacaoFilialScope = selectedFilial ?? "";
+  const observacaoFilialLabel = selectedFilial ? (data?.displayName ?? selectedFilial) : "Todas as filiais";
+
+  const resolveObservacao = (metricKey: string): { value: string; inherited: boolean } => {
+    const byFilial = observacoes[metricKey];
+    if (!byFilial) return { value: "", inherited: false };
+    const own = byFilial[observacaoFilialScope];
+    if (own != null) return { value: own, inherited: false };
+    if (observacaoFilialScope !== "") {
+      const padrao = byFilial[""];
+      if (padrao != null) return { value: padrao, inherited: true };
+    }
+    return { value: "", inherited: false };
+  };
 
   const produtosFiltrados = useMemo(() => {
     let produtos = produtosBaseFiltro;
@@ -2502,6 +2565,7 @@ const handleBadgeClick = (cat: string) => {
                           const rankGlobal = produtosComCurvaExibidos.indexOf(p) + 1;
                           const precoMedio = p.qtde > 0 ? p.vendas / p.qtde : 0;
                           const markup = p.custo > 0 && precoMedio > 0 ? precoMedio / p.custo : null;
+                          const obsResolved = resolveObservacao(buildCurvaAbcMetricKey(p.produto, p.cor ?? null, porCor));
                           return (
                             <tr
                               key={`${p.produto}-${p.categoria}-${p.cor ?? ""}-${p.grade ?? ""}`}
@@ -2618,10 +2682,13 @@ const handleBadgeClick = (cat: string) => {
                                   produto={p.produto}
                                   cor={p.cor ?? null}
                                   usarCor={porCor}
+                                  filialScope={observacaoFilialScope}
+                                  filialLabel={observacaoFilialLabel}
+                                  inherited={obsResolved.inherited}
                                   titulo={p.descricao || p.produto}
                                   codigo={p.produto}
                                   corLabel={p.corDescricao || p.cor || null}
-                                  observacao={observacoes[buildCurvaAbcMetricKey(p.produto, p.cor ?? null, porCor)] ?? ""}
+                                  observacao={obsResolved.value}
                                   onSave={saveObservacaoValue}
                                 />
                               </td>

@@ -32,6 +32,7 @@ export async function POST(request: Request) {
     company?: CompanyKey;
     produto?: string;
     cor?: string | null;
+    filial?: string | null;
     observacao?: string | null;
   };
 
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
       company: body.company,
       produto: body.produto ?? "",
       cor: body.cor ?? null,
+      filial: body.filial ?? null,
       observacao: body.observacao ?? "",
     });
 
