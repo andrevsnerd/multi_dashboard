@@ -42,6 +42,11 @@ function getColumnMapping(
   }> = [
     { key: 'productId', dbName: 'PRODUTO', type: 'string' },
     { key: 'productName', dbName: 'DESC_PRODUTO', type: 'string' },
+    // Partes descritivas (somente no export, como colunas)
+    { key: 'grupo', dbName: 'GRUPO_PRODUTO', type: 'string' },
+    { key: 'subgrupo', dbName: 'SUBGRUPO_PRODUTO', type: 'string' },
+    { key: 'linha', dbName: 'LINHA', type: 'string' },
+    { key: 'tipo', dbName: 'TIPO_PRODUTO', type: 'string' },
   ];
 
   // Grade apenas para scarfme

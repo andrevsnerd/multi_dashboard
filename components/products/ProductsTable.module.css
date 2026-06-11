@@ -216,6 +216,28 @@
   font-weight: 400;
 }
 
+.productAttributes {
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
+  gap: 4px 6px;
+  margin-top: 4px;
+}
+
+.productAttribute {
+  font-size: 10px;
+  line-height: 1.4;
+  color: #4b5563;
+  background: #f3f4f6;
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.productAttributeLabel {
+  color: #9ca3af;
+  margin-right: 3px;
+}
+
 .inlineTooltipWrapper {
   position: relative;
   display: inline-flex;

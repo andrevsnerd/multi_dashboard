@@ -104,6 +104,29 @@ function formatGroupedMemberShortName(value?: string | null): string {
   return words.slice(0, 2).join(" ");
 }
 
+const PRODUCT_ATTRIBUTE_FIELDS: Array<{ key: keyof ProductDetail; label: string }> = [
+  { key: "grupo", label: "Grupo" },
+  { key: "linha", label: "Linha" },
+  { key: "subgrupo", label: "Subgrupo" },
+  { key: "tipo", label: "Tipo" },
+];
+
+function getProductAttributes(
+  product: ProductDetail
+): Array<{ label: string; value: string }> {
+  return PRODUCT_ATTRIBUTE_FIELDS.reduce<Array<{ label: string; value: string }>>(
+    (acc, field) => {
+      const raw = product[field.key];
+      const value = typeof raw === "string" ? raw.trim() : "";
+      if (value) {
+        acc.push({ label: field.label, value });
+      }
+      return acc;
+    },
+    []
+  );
+}
+
 function getGroupedProductMembers(product: ProductDetail): GroupedProductMemberDisplay[] {
   const aggregated = new Map<string, GroupedProductMemberDisplay>();
 
@@ -595,6 +618,20 @@ export default function ProductsTable({
                     ) : (
                       <div className={styles.productCode}>{groupedCodesLabel}</div>
                     )}
+                    {(() => {
+                      const attributes = getProductAttributes(product);
+                      if (attributes.length === 0) return null;
+                      return (
+                        <div className={styles.productAttributes}>
+                          {attributes.map((attribute) => (
+                            <span key={attribute.label} className={styles.productAttribute}>
+                              <span className={styles.productAttributeLabel}>{attribute.label}:</span>
+                              {attribute.value}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </td>
                   {companyKey === "scarfme" && (
                     <td className={styles.gradeCell}>
@@ -846,6 +883,20 @@ export default function ProductsTable({
                             </span>
                           )}
                         </div>
+                        {(() => {
+                          const attributes = getProductAttributes(product);
+                          if (attributes.length === 0) return null;
+                          return (
+                            <div className={styles.productAttributes}>
+                              {attributes.map((attribute) => (
+                                <span key={attribute.label} className={styles.productAttribute}>
+                                  <span className={styles.productAttributeLabel}>{attribute.label}:</span>
+                                  {attribute.value}
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                       <div className={styles.cardRevenue}>
                         <span className={styles.cardRevenueValue}>

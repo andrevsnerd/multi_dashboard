@@ -26,6 +26,10 @@ export interface ProductDetail {
   isNew: boolean; // true se não teve vendas no período anterior
   corProduto?: string | null; // Código da cor do produto
   descCorProduto?: string | null; // Descrição da cor do produto
+  grupo?: string | null; // GRUPO_PRODUTO (parte descritiva)
+  subgrupo?: string | null; // SUBGRUPO_PRODUTO (parte descritiva)
+  linha?: string | null; // LINHA (parte descritiva)
+  tipo?: string | null; // TIPO_PRODUTO (parte descritiva)
   grade?: string | null; // Grade do produto (apenas para scarfme)
   estoqueRede?: number; // Estoque total em todas as filiais (apenas para scarfme)
   suggestedPrice?: number | null; // Preço sugerido (REVENDA da tabela PRODUTOS)
@@ -552,6 +556,11 @@ export async function fetchProductsWithDetails({
         if (!existing.grade && product.grade) {
           existing.grade = product.grade;
         }
+        // Preservar partes descritivas se não existirem no produto existente
+        if (!existing.grupo && product.grupo) existing.grupo = product.grupo;
+        if (!existing.subgrupo && product.subgrupo) existing.subgrupo = product.subgrupo;
+        if (!existing.linha && product.linha) existing.linha = product.linha;
+        if (!existing.tipo && product.tipo) existing.tipo = product.tipo;
       } else {
         productMap.set(key, { ...product, productId: String(product.productId ?? '').trim() });
       }
@@ -871,6 +880,9 @@ async function fetchProductsWithDetailsSales({
         vf.PRODUTO AS productId,
         MAX(ISNULL(p.DESC_PRODUTO, '')) AS productName,
         MAX(COALESCE(p.GRUPO_PRODUTO, '')) AS grupo,
+        MAX(COALESCE(p.SUBGRUPO_PRODUTO, '')) AS subgrupo,
+        MAX(COALESCE(p.LINHA, '')) AS linha,
+        MAX(COALESCE(p.TIPO_PRODUTO, '')) AS tipo,
         ${gradeSelectField}
         ${colorSelectFields}
         MAX(p.DATA_CADASTRAMENTO) AS registrationDate,
@@ -933,6 +945,9 @@ async function fetchProductsWithDetailsSales({
           p.PRODUTO AS productId,
           p.DESC_PRODUTO AS productName,
           COALESCE(p.GRUPO_PRODUTO, '') AS grupo,
+          COALESCE(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
+          COALESCE(p.LINHA, '') AS linha,
+          COALESCE(p.TIPO_PRODUTO, '') AS tipo,
           ${gradeSelectField}
           ${produtoSemVendaColorFields}
           p.DATA_CADASTRAMENTO AS registrationDate,
@@ -941,7 +956,7 @@ async function fetchProductsWithDetailsSales({
           NULL AS cost,
           ${suggestedPriceField} AS suggestedPrice
         FROM PRODUTOS p WITH (NOLOCK)
-        LEFT JOIN W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp_check WITH (NOLOCK) 
+        LEFT JOIN W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp_check WITH (NOLOCK)
           ON p.PRODUTO = vp_check.PRODUTO
           AND vp_check.DATA_VENDA >= @startDate
           AND vp_check.DATA_VENDA < @endDate
@@ -1000,6 +1015,9 @@ async function fetchProductsWithDetailsSales({
         productId: string;
         productName: string;
         grupo: string | null;
+        subgrupo?: string | null;
+        linha?: string | null;
+        tipo?: string | null;
         grade?: string | null;
         corProduto?: string | null;
         descCorProduto?: string | null;
@@ -1049,7 +1067,10 @@ async function fetchProductsWithDetailsSales({
       const cost = Number(row.cost ?? 0);
       const suggestedPrice = row.suggestedPrice != null && row.suggestedPrice > 0 ? Number(row.suggestedPrice) : null;
       const grupo = (row.grupo && row.grupo.trim() !== '') ? row.grupo.trim() : null;
-      
+      const subgrupo = (row.subgrupo && row.subgrupo.trim() !== '') ? row.subgrupo.trim() : null;
+      const linha = (row.linha && row.linha.trim() !== '') ? row.linha.trim() : null;
+      const tipo = (row.tipo && row.tipo.trim() !== '') ? row.tipo.trim() : null;
+
       // Obter chave para buscar dados do período anterior (inclui cor se groupByColor estiver ativo)
       const previousKey = groupByColor && row.corProduto
         ? `${row.productId}-${row.corProduto}`
@@ -1115,6 +1136,10 @@ async function fetchProductsWithDetailsSales({
         isNew,
         corProduto,
         descCorProduto,
+        grupo,
+        subgrupo,
+        linha,
+        tipo,
         grade,
         estoqueRede: 0, // Será preenchido abaixo para scarfme
         suggestedPrice,
@@ -1421,9 +1446,13 @@ async function fetchProductsWithDetailsEcommerce({
     
     // Query base para produtos com vendas
     let currentQuery = `
-      SELECT 
+      SELECT
         fp.PRODUTO AS productId,
         MAX(p.DESC_PRODUTO) AS productName,
+        MAX(COALESCE(p.GRUPO_PRODUTO, '')) AS grupo,
+        MAX(COALESCE(p.SUBGRUPO_PRODUTO, '')) AS subgrupo,
+        MAX(COALESCE(p.LINHA, '')) AS linha,
+        MAX(COALESCE(p.TIPO_PRODUTO, '')) AS tipo,
         ${ecommerceGradeSelectField}
         ${ecommerceColorSelectFields}
         MAX(p.DATA_CADASTRAMENTO) AS registrationDate,
@@ -1480,9 +1509,13 @@ async function fetchProductsWithDetailsEcommerce({
       // então o filtro de filial é ignorado para produtos sem venda
       const produtosSemVendaQuery = `
         UNION ALL
-        SELECT 
+        SELECT
           p.PRODUTO AS productId,
           p.DESC_PRODUTO AS productName,
+          COALESCE(p.GRUPO_PRODUTO, '') AS grupo,
+          COALESCE(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
+          COALESCE(p.LINHA, '') AS linha,
+          COALESCE(p.TIPO_PRODUTO, '') AS tipo,
           ${ecommerceGradeSelectField}
           ${produtoSemVendaColorFields}
           p.DATA_CADASTRAMENTO AS registrationDate,
@@ -1576,6 +1609,10 @@ async function fetchProductsWithDetailsEcommerce({
       request.query<{
         productId: string;
         productName: string;
+        grupo?: string | null;
+        subgrupo?: string | null;
+        linha?: string | null;
+        tipo?: string | null;
         grade?: string | null;
         corProduto?: string | null;
         registrationDate?: string | Date | null;
@@ -1661,9 +1698,15 @@ async function fetchProductsWithDetailsEcommerce({
         : null;
 
       // Processar grade apenas para scarfme
-      const grade = company === 'scarfme' 
+      const grade = company === 'scarfme'
         ? (row.grade && row.grade.trim() !== '' ? row.grade.trim() : null)
         : undefined;
+
+      // Partes descritivas
+      const grupo = (row.grupo && row.grupo.trim() !== '') ? row.grupo.trim() : null;
+      const subgrupo = (row.subgrupo && row.subgrupo.trim() !== '') ? row.subgrupo.trim() : null;
+      const linha = (row.linha && row.linha.trim() !== '') ? row.linha.trim() : null;
+      const tipo = (row.tipo && row.tipo.trim() !== '') ? row.tipo.trim() : null;
 
       // Processar data de cadastramento
       let registrationDate: string | null = null;
@@ -1689,6 +1732,10 @@ async function fetchProductsWithDetailsEcommerce({
         isNew,
         corProduto,
         descCorProduto,
+        grupo,
+        subgrupo,
+        linha,
+        tipo,
         grade,
         estoqueRede: 0, // Será preenchido abaixo para scarfme
         suggestedPrice,
