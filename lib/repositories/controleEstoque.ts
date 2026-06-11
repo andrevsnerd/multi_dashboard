@@ -2,6 +2,7 @@ import sql from 'mssql';
 
 import { resolveCompany, VAREJO_VALUE, isEcommerceFilial, getFilialGroupMembers } from '@/lib/config/company';
 import { resolveCompanyLive, liveNameForIncoming, liveNamesForIncoming } from '@/lib/server/company-live';
+import { getFilialById } from '@/lib/config/filial-registry';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import { getCurrentMonthRange, normalizeRangeForQuery, shiftRangeByMonths } from '@/lib/utils/date';
@@ -733,12 +734,14 @@ export async function fetchCategoriasComGiro({
       ;WITH UltimaVenda AS (
         SELECT
           vg.PRODUTO,
-          ISNULL(vg.COR_PRODUTO, '') AS COR_PRODUTO,
+          -- Chave de cor tolerante a zero à esquerda ('06' e '6' colapsam em '6');
+          -- cores não-numéricas (ex.: 'L8') caem no fallback string. Evita falso "Nunca vendeu".
+          ISNULL(CAST(TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(vg.COR_PRODUTO)), '')) AS VARCHAR(20)), LTRIM(RTRIM(ISNULL(vg.COR_PRODUTO, '')))) AS corKey,
           MAX(vg.DATA_VENDA) AS ultimaVenda
         FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vg WITH (NOLOCK)
         WHERE vg.QTDE > 0
           ${vendasFilialFilter}
-        GROUP BY vg.PRODUTO, ISNULL(vg.COR_PRODUTO, '')
+        GROUP BY ISNULL(CAST(TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(vg.COR_PRODUTO)), '')) AS VARCHAR(20)), LTRIM(RTRIM(ISNULL(vg.COR_PRODUTO, '')))), vg.PRODUTO
       )
       SELECT DISTINCT
         e.PRODUTO AS produto,
@@ -750,7 +753,8 @@ export async function fetchCategoriasComGiro({
         ISNULL(p.COLECAO, '') AS colecao
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
-      LEFT JOIN UltimaVenda uv ON uv.PRODUTO = e.PRODUTO AND ISNULL(uv.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')
+      LEFT JOIN UltimaVenda uv ON uv.PRODUTO = e.PRODUTO
+        AND uv.corKey = ISNULL(CAST(TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(e.COR_PRODUTO)), '')) AS VARCHAR(20)), LTRIM(RTRIM(ISNULL(e.COR_PRODUTO, ''))))
       WHERE e.ESTOQUE > 0
         ${estoqueFilialFilter}
         ${grupoFilter}
@@ -848,12 +852,14 @@ export async function fetchProdutosParados({
       ;WITH UltimaVenda AS (
         SELECT
           vg.PRODUTO,
-          ISNULL(vg.COR_PRODUTO, '') AS COR_PRODUTO,
+          -- Chave de cor tolerante a zero à esquerda ('06' e '6' colapsam em '6');
+          -- cores não-numéricas (ex.: 'L8') caem no fallback string. Evita falso "Nunca vendeu".
+          ISNULL(CAST(TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(vg.COR_PRODUTO)), '')) AS VARCHAR(20)), LTRIM(RTRIM(ISNULL(vg.COR_PRODUTO, '')))) AS corKey,
           MAX(vg.DATA_VENDA) AS ultimaVenda
         FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vg WITH (NOLOCK)
         WHERE vg.QTDE > 0
           ${vendasFilialFilter}
-        GROUP BY vg.PRODUTO, ISNULL(vg.COR_PRODUTO, '')
+        GROUP BY ISNULL(CAST(TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(vg.COR_PRODUTO)), '')) AS VARCHAR(20)), LTRIM(RTRIM(ISNULL(vg.COR_PRODUTO, '')))), vg.PRODUTO
       )
       SELECT
         e.PRODUTO AS produto,
@@ -875,7 +881,8 @@ export async function fetchProdutosParados({
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
       LEFT JOIN CORES_BASICAS cb WITH (NOLOCK) ON e.COR_PRODUTO = cb.COR
-      LEFT JOIN UltimaVenda uv ON uv.PRODUTO = e.PRODUTO AND ISNULL(uv.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')
+      LEFT JOIN UltimaVenda uv ON uv.PRODUTO = e.PRODUTO
+        AND uv.corKey = ISNULL(CAST(TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(e.COR_PRODUTO)), '')) AS VARCHAR(20)), LTRIM(RTRIM(ISNULL(e.COR_PRODUTO, ''))))
       WHERE e.ESTOQUE > 0
         ${estoqueFilialFilter}
         ${grupoFilter}
@@ -930,6 +937,8 @@ export interface ProdutoParadoDetalhado {
   codigoBarra: string;
   descricao: string;
   cor: string;
+  /** COR_PRODUTO bruto do ERP — necessário para consultar entradas por filial. */
+  corCodigo: string;
   grade: string;
   linha: string;
   subgrupo: string;
@@ -997,10 +1006,12 @@ export async function fetchProdutosParadosDetalhado({
       UltimaVenda AS (
         SELECT
           PRODUTO,
-          ISNULL(COR_PRODUTO, '') AS COR_PRODUTO,
+          -- Chave de cor tolerante a zero à esquerda ('06' e '6' colapsam em '6');
+          -- cores não-numéricas (ex.: 'L8') caem no fallback string. Evita falso "Nunca vendeu".
+          ISNULL(CAST(TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(COR_PRODUTO)), '')) AS VARCHAR(20)), LTRIM(RTRIM(ISNULL(COR_PRODUTO, '')))) AS corKey,
           MAX(dataVenda) AS ultimaVenda
         FROM AllVendas
-        GROUP BY PRODUTO, ISNULL(COR_PRODUTO, '')
+        GROUP BY ISNULL(CAST(TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(COR_PRODUTO)), '')) AS VARCHAR(20)), LTRIM(RTRIM(ISNULL(COR_PRODUTO, '')))), PRODUTO
       )
       SELECT
         e.PRODUTO AS produto,
@@ -1014,6 +1025,7 @@ export async function fetchProdutosParadosDetalhado({
         ), '') AS codigoBarra,
         ISNULL(p.DESC_PRODUTO, '') AS descricao,
         ISNULL(COALESCE(cb.DESC_COR, e.COR_PRODUTO), '') AS cor,
+        ISNULL(e.COR_PRODUTO, '') AS corCodigo,
         ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
         ISNULL(p.LINHA, '') AS linha,
         ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
@@ -1027,7 +1039,8 @@ export async function fetchProdutosParadosDetalhado({
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
       LEFT JOIN CORES_BASICAS cb WITH (NOLOCK) ON e.COR_PRODUTO = cb.COR
-      LEFT JOIN UltimaVenda uv ON uv.PRODUTO = e.PRODUTO AND ISNULL(uv.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')
+      LEFT JOIN UltimaVenda uv ON uv.PRODUTO = e.PRODUTO
+        AND uv.corKey = ISNULL(CAST(TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(e.COR_PRODUTO)), '')) AS VARCHAR(20)), LTRIM(RTRIM(ISNULL(e.COR_PRODUTO, ''))))
       WHERE e.ESTOQUE > 0
         ${estoqueFilialFilter}
         ${grupoFilter}
@@ -1064,6 +1077,7 @@ export async function fetchProdutosParadosDetalhado({
       codigoBarra: string;
       descricao: string;
       cor: string;
+      corCodigo: string;
       grade: string;
       linha: string;
       subgrupo: string;
@@ -1078,6 +1092,7 @@ export async function fetchProdutosParadosDetalhado({
       codigoBarra: r.codigoBarra ?? '',
       descricao: r.descricao ?? '',
       cor: r.cor ?? '',
+      corCodigo: r.corCodigo ?? '',
       grade: r.grade ?? '',
       linha: r.linha ?? '',
       subgrupo: r.subgrupo ?? '',
@@ -1088,6 +1103,110 @@ export async function fetchProdutosParadosDetalhado({
         ? r.ultimaVenda.toISOString().split('T')[0]
         : (r.ultimaVenda ? String(r.ultimaVenda).split('T')[0] : null),
     }));
+  });
+}
+
+export interface EntradaPorFilial {
+  codFilial: string;
+  display: string;
+  ultimaEntrada: string;
+}
+
+/**
+ * Para produtos "nunca vendeu": retorna a última entrada reconhecida por filial,
+ * unindo ESTOQUE_PROD_ENT e LOJA_ENTRADAS. Serve de diagnóstico no tooltip.
+ */
+export async function fetchUltimasEntradasPorFilial({
+  produto,
+  cor,
+}: {
+  produto: string;
+  cor: string;
+}): Promise<EntradaPorFilial[]> {
+  const produtoTrim = (produto ?? '').trim();
+  if (!produtoTrim) return [];
+
+  return withRequest(async (request) => {
+    request.input('ep_produto', sql.VarChar, produtoTrim);
+
+    const corNorm = (cor ?? '').trim();
+    const corNormNum = Number.parseInt(corNorm, 10);
+    const hasCor = corNorm !== '';
+
+    let corFilterEstoque = '';
+    let corFilterLoja = '';
+    if (hasCor) {
+      request.input('ep_cor_str', sql.VarChar, corNorm);
+      request.input('ep_cor_num', sql.Int, Number.isNaN(corNormNum) ? null : corNormNum);
+      corFilterEstoque = `AND (
+          LTRIM(RTRIM(ISNULL(P.COR_PRODUTO, ''))) = @ep_cor_str
+          OR (
+            @ep_cor_num IS NOT NULL
+            AND TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(ISNULL(P.COR_PRODUTO, ''))), '')) = @ep_cor_num
+          )
+        )`;
+      corFilterLoja = `AND (
+          LTRIM(RTRIM(ISNULL(LEP.COR_PRODUTO, ''))) = @ep_cor_str
+          OR (
+            @ep_cor_num IS NOT NULL
+            AND TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(ISNULL(LEP.COR_PRODUTO, ''))), '')) = @ep_cor_num
+          )
+        )`;
+    }
+
+    const query = `
+      SELECT codFilial, MAX(ultimaEntrada) AS ultimaEntrada
+      FROM (
+        SELECT
+          UPPER(LTRIM(RTRIM(ISNULL(f.COD_FILIAL, E.FILIAL)))) AS codFilial,
+          CAST(E.EMISSAO AS DATE) AS ultimaEntrada
+        FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+        JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK)
+          ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+          AND E.FILIAL = P.FILIAL
+        LEFT JOIN FILIAIS f WITH (NOLOCK)
+          ON LTRIM(RTRIM(ISNULL(f.COD_FILIAL, ''))) = LTRIM(RTRIM(ISNULL(E.FILIAL, '')))
+          OR LTRIM(RTRIM(ISNULL(f.FILIAL, ''))) = LTRIM(RTRIM(ISNULL(E.FILIAL, '')))
+        WHERE LTRIM(RTRIM(ISNULL(P.PRODUTO, ''))) = @ep_produto
+          AND E.EMISSAO IS NOT NULL
+          ${corFilterEstoque}
+
+        UNION ALL
+
+        SELECT
+          UPPER(LTRIM(RTRIM(ISNULL(f.COD_FILIAL, LE.FILIAL)))) AS codFilial,
+          CAST(LE.EMISSAO AS DATE) AS ultimaEntrada
+        FROM LOJA_ENTRADAS_PRODUTO AS LEP WITH (NOLOCK)
+        INNER JOIN LOJA_ENTRADAS AS LE WITH (NOLOCK)
+          ON LEP.FILIAL = LE.FILIAL
+          AND LEP.ROMANEIO_PRODUTO = LE.ROMANEIO_PRODUTO
+        LEFT JOIN FILIAIS f WITH (NOLOCK)
+          ON LTRIM(RTRIM(ISNULL(f.COD_FILIAL, ''))) = LTRIM(RTRIM(ISNULL(LE.FILIAL, '')))
+          OR LTRIM(RTRIM(ISNULL(f.FILIAL, ''))) = LTRIM(RTRIM(ISNULL(LE.FILIAL, '')))
+        WHERE LTRIM(RTRIM(ISNULL(LEP.PRODUTO, ''))) = @ep_produto
+          AND LE.EMISSAO IS NOT NULL
+          AND (LE.ENTRADA_CANCELADA = 0 OR LE.ENTRADA_CANCELADA IS NULL)
+          ${corFilterLoja}
+      ) src
+      WHERE codFilial IS NOT NULL AND codFilial <> ''
+      GROUP BY codFilial
+      ORDER BY ultimaEntrada DESC
+    `;
+
+    const result = await request.query<{ codFilial: string; ultimaEntrada: Date | null }>(query);
+
+    return result.recordset
+      .filter(r => r.codFilial && r.ultimaEntrada)
+      .map(r => {
+        const dt = r.ultimaEntrada instanceof Date ? r.ultimaEntrada : new Date(r.ultimaEntrada!);
+        const iso = dt.toISOString().split('T')[0];
+        const filialDef = getFilialById(r.codFilial);
+        return {
+          codFilial: r.codFilial,
+          display: filialDef?.display ?? r.codFilial,
+          ultimaEntrada: iso,
+        };
+      });
   });
 }
 
@@ -1786,18 +1905,21 @@ export async function fetchEstoquePorCategoria({
       ? `;WITH GiroUltimaVenda AS (
           SELECT
             vp.PRODUTO,
-            ISNULL(vp.COR_PRODUTO, '') AS COR_PRODUTO,
+            -- Chave de cor tolerante a zero à esquerda ('06' e '6' colapsam em '6');
+            -- cores não-numéricas (ex.: 'L8') caem no fallback string. Evita falso "Nunca vendeu".
+            ISNULL(CAST(TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(vp.COR_PRODUTO)), '')) AS VARCHAR(20)), LTRIM(RTRIM(ISNULL(vp.COR_PRODUTO, '')))) AS corKey,
             MAX(vp.DATA_VENDA) AS ultimaVenda
           FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
           WHERE vp.QTDE > 0
             ${vendasGlobaisFilter}
-          GROUP BY vp.PRODUTO, ISNULL(vp.COR_PRODUTO, '')
+          GROUP BY ISNULL(CAST(TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(vp.COR_PRODUTO)), '')) AS VARCHAR(20)), LTRIM(RTRIM(ISNULL(vp.COR_PRODUTO, '')))), vp.PRODUTO
         )`
       : '';
 
     // JOIN adicional: por produto e cor
     const giroJoinClause = needsGiroCte
-      ? `LEFT JOIN GiroUltimaVenda guv ON guv.PRODUTO = e.PRODUTO AND ISNULL(guv.COR_PRODUTO, '') = ISNULL(e.COR_PRODUTO, '')`
+      ? `LEFT JOIN GiroUltimaVenda guv ON guv.PRODUTO = e.PRODUTO
+        AND guv.corKey = ISNULL(CAST(TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(e.COR_PRODUTO)), '')) AS VARCHAR(20)), LTRIM(RTRIM(ISNULL(e.COR_PRODUTO, ''))))`
       : '';
 
     const filtroGiroEstoque = needsGiroCte
@@ -4481,22 +4603,6 @@ export async function fetchProdutoDetalhesPorFilial({
       .map((t) => String(t).trim())
       .filter(Boolean)
       .slice(0, 30);
-
-    const hasBusca = buscaItens.length > 0 || !!produtoNome?.trim();
-    const hasCategoria =
-      (company === 'nerd' && !!grupo) ||
-      !!linha ||
-      !!subgrupo ||
-      !!grade ||
-      !!colecao ||
-      !!cor;
-    const hasFilial = !!(filial && filial.trim());
-
-    if (!useProdutosPermitidos && !hasBusca && !hasCategoria && !hasFilial) {
-      throw new Error(
-        'Informe itens na busca, selecione uma filial, cor ou categoria.',
-      );
-    }
 
     const now = new Date();
     const currentMonth = {

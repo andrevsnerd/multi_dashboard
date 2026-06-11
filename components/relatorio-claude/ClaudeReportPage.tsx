@@ -1665,12 +1665,15 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
   const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
   const [selectedColecoes, setSelectedColecoes] = useState<string[]>([]);
   const [selectedSubgrupos, setSelectedSubgrupos] = useState<string[]>([]);
+  const [selectedGrupos, setSelectedGrupos] = useState<string[]>([]);
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
   const [availableColecoes, setAvailableColecoes] = useState<MultiSelectOption[]>([]);
   const [availableSubgrupos, setAvailableSubgrupos] = useState<string[]>([]);
+  const [availableGrupos, setAvailableGrupos] = useState<string[]>([]);
   const [availableGrades, setAvailableGrades] = useState<string[]>([]);
   const [loadingColecoes, setLoadingColecoes] = useState(false);
   const [loadingSubgrupos, setLoadingSubgrupos] = useState(false);
+  const [loadingGrupos, setLoadingGrupos] = useState(false);
   const [loadingGrades, setLoadingGrades] = useState(false);
   const [reports, setReports] = useState<ClaudeReportPayload[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1698,7 +1701,7 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
     };
   }, [ranges]);
 
-  async function loadFilterOptions(kind: "colecoes" | "subgrupos" | "grades") {
+  async function loadFilterOptions(kind: "colecoes" | "subgrupos" | "grupos" | "grades") {
     const params = new URLSearchParams({
       company: companyKey,
       start: formatDateForQuery(envelopeRange.startDate),
@@ -1715,12 +1718,15 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
 
     selectedColecoes.forEach((item) => params.append("colecoes", item));
     selectedSubgrupos.forEach((item) => params.append("subgrupos", item));
+    selectedGrupos.forEach((item) => params.append("grupos", item));
     selectedGrades.forEach((item) => params.append("grades", item));
 
     if (kind === "colecoes") {
       setLoadingColecoes(true);
     } else if (kind === "subgrupos") {
       setLoadingSubgrupos(true);
+    } else if (kind === "grupos") {
+      setLoadingGrupos(true);
     } else {
       setLoadingGrades(true);
     }
@@ -1736,6 +1742,8 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
         setAvailableColecoes(values as MultiSelectOption[]);
       } else if (kind === "subgrupos") {
         setAvailableSubgrupos(values as string[]);
+      } else if (kind === "grupos") {
+        setAvailableGrupos(values as string[]);
       } else {
         setAvailableGrades(values as string[]);
       }
@@ -1744,6 +1752,8 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
         setAvailableColecoes([]);
       } else if (kind === "subgrupos") {
         setAvailableSubgrupos([]);
+      } else if (kind === "grupos") {
+        setAvailableGrupos([]);
       } else {
         setAvailableGrades([]);
       }
@@ -1752,6 +1762,8 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
         setLoadingColecoes(false);
       } else if (kind === "subgrupos") {
         setLoadingSubgrupos(false);
+      } else if (kind === "grupos") {
+        setLoadingGrupos(false);
       } else {
         setLoadingGrades(false);
       }
@@ -1773,6 +1785,7 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
           filial: selectedFilial,
           colecoes: selectedColecoes,
           subgrupos: selectedSubgrupos,
+          grupos: selectedGrupos,
           grades: selectedGrades,
           ranges: ranges.map((range) => ({
             start: formatDateForQuery(range.startDate),
@@ -1919,6 +1932,10 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
   }, [availableSubgrupos]);
 
   useEffect(() => {
+    setSelectedGrupos((current) => current.filter((item) => availableGrupos.includes(item)));
+  }, [availableGrupos]);
+
+  useEffect(() => {
     setSelectedGrades((current) => current.filter((item) => availableGrades.includes(item)));
   }, [availableGrades]);
 
@@ -1992,6 +2009,14 @@ export default function ClaudeReportPage({ companyKey }: ClaudeReportPageProps) 
             onChange={setSelectedSubgrupos}
             onOpen={() => void loadFilterOptions("subgrupos")}
             loading={loadingSubgrupos}
+          />
+          <MultiSelectFilter
+            label="Grupos"
+            value={selectedGrupos}
+            options={availableGrupos}
+            onChange={setSelectedGrupos}
+            onOpen={() => void loadFilterOptions("grupos")}
+            loading={loadingGrupos}
           />
           <MultiSelectFilter
             label="Grades"

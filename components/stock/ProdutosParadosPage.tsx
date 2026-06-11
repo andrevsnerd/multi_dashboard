@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import FilialFilter from "@/components/filters/FilialFilter";
 import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
 import type { CompanyKey } from "@/lib/config/company";
-import type { ProdutoParadoDetalhado } from "@/lib/repositories/controleEstoque";
+import type { EntradaPorFilial, ProdutoParadoDetalhado } from "@/lib/repositories/controleEstoque";
 import { exportProdutosParadosXlsx } from "@/lib/utils/exportProdutosParadosXlsx";
 
 import styles from "./ProdutosParadosPage.module.css";
@@ -96,6 +97,11 @@ export default function ProdutosParadosPage({ companyKey, companyName }: Produto
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [search, setSearch] = useState("");
   const [exporting, setExporting] = useState(false);
+
+  const [tooltipKey, setTooltipKey] = useState<string | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  const [, setTooltipTick] = useState(0);
+  const tooltipCache = useRef<Map<string, EntradaPorFilial[] | "loading" | "error">>(new Map());
 
   const isNerd = companyKey === "nerd";
   const isScarfme = companyKey === "scarfme";
@@ -256,6 +262,33 @@ export default function ProdutosParadosPage({ companyKey, companyName }: Produto
   const thNumClass = (key: SortKey) =>
     [styles.th, styles.thNum, styles.thSortable, sortKey === key ? styles.thActive : ""].filter(Boolean).join(" ");
 
+  const handleNuncaVendeuEnter = useCallback((produto: string, corCodigo: string, e: React.MouseEvent<HTMLSpanElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
+    const key = `${produto}|${corCodigo}`;
+    setTooltipKey(key);
+    // Só reaproveita resultado já carregado (array). "loading"/"error" não bloqueiam novo fetch.
+    const cached = tooltipCache.current.get(key);
+    if (Array.isArray(cached) || cached === "loading") return;
+    tooltipCache.current.set(key, "loading");
+    setTooltipTick(t => t + 1);
+    fetch(`/api/produtos-parados/entradas-por-filial?company=${encodeURIComponent(companyKey)}&produto=${encodeURIComponent(produto)}&cor=${encodeURIComponent(corCodigo)}`, { cache: "no-store" })
+      .then(r => r.json())
+      .then((json: { data?: EntradaPorFilial[] }) => {
+        tooltipCache.current.set(key, json.data ?? []);
+        setTooltipTick(t => t + 1);
+      })
+      .catch(() => {
+        tooltipCache.current.delete(key);
+        setTooltipTick(t => t + 1);
+      });
+  }, [companyKey]);
+
+  const handleNuncaVendeuLeave = useCallback(() => {
+    setTooltipKey(null);
+    setTooltipPos(null);
+  }, []);
+
   return (
     <div className={styles.wrapper}>
       <div className={styles.header}>
@@ -397,9 +430,19 @@ export default function ProdutosParadosPage({ companyKey, companyName }: Produto
                     <td className={styles.td}>{row.colecao}</td>
                     <td className={`${styles.tdNum}`}>{row.estoque.toLocaleString("pt-BR")}</td>
                     <td className={`${styles.tdNum}`}>
-                      <span className={`${styles.diasBadge} ${diasColorClass(row.diasParado, styles)}`}>
-                        {diasLabel(row.diasParado)}
-                      </span>
+                      {row.diasParado >= 9999 ? (
+                        <span
+                          className={`${styles.diasBadge} ${styles.diasNunca}`}
+                          onMouseEnter={(e) => handleNuncaVendeuEnter(row.produto, row.corCodigo, e)}
+                          onMouseLeave={handleNuncaVendeuLeave}
+                        >
+                          Nunca vendeu
+                        </span>
+                      ) : (
+                        <span className={`${styles.diasBadge} ${diasColorClass(row.diasParado, styles)}`}>
+                          {diasLabel(row.diasParado)}
+                        </span>
+                      )}
                     </td>
                     <td className={`${styles.tdNum} ${styles.tdDate}`}>
                       {formatDate(row.ultimaVenda)}
@@ -410,6 +453,32 @@ export default function ProdutosParadosPage({ companyKey, companyName }: Produto
             </table>
           </div>
         </div>
+      )}
+
+      {tooltipKey && tooltipPos && typeof document !== "undefined" && createPortal(
+        (() => {
+          const state = tooltipCache.current.get(tooltipKey);
+          return (
+            <div
+              className={styles.entradaTooltip}
+              style={{ position: "fixed", left: tooltipPos.x, top: tooltipPos.y - 8, transform: "translate(-50%, -100%)" }}
+            >
+              <div className={styles.entradaTooltipTitle}>Última entrada por filial</div>
+              {state === "loading" && <div className={styles.entradaTooltipEmpty}>Carregando...</div>}
+              {state === "error" && <div className={styles.entradaTooltipEmpty}>Erro ao carregar</div>}
+              {Array.isArray(state) && state.length === 0 && (
+                <div className={styles.entradaTooltipEmpty}>Nenhuma entrada encontrada</div>
+              )}
+              {Array.isArray(state) && state.map(e => (
+                <div key={e.codFilial} className={styles.entradaTooltipRow}>
+                  <span className={styles.entradaTooltipFilial}>{e.display}</span>
+                  <span className={styles.entradaTooltipDate}>{formatDate(e.ultimaEntrada)}</span>
+                </div>
+              ))}
+            </div>
+          );
+        })(),
+        document.body
       )}
     </div>
   );

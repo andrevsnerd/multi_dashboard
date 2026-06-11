@@ -281,11 +281,43 @@
   },
   {
     "company": "scarfme",
+    "produto": "13.46.0448",
+    "cor": "03",
+    "label": "produto novo",
+    "createdAt": "2026-06-11T13:19:14.268Z",
+    "updatedAt": "2026-06-11T13:19:14.268Z"
+  },
+  {
+    "company": "scarfme",
+    "produto": "13.46.0449",
+    "cor": "02",
+    "label": "produto novo",
+    "createdAt": "2026-06-11T13:19:14.268Z",
+    "updatedAt": "2026-06-11T13:19:14.268Z"
+  },
+  {
+    "company": "scarfme",
+    "produto": "13.46.0450",
+    "cor": "03",
+    "label": "produto novo",
+    "createdAt": "2026-06-11T13:19:14.268Z",
+    "updatedAt": "2026-06-11T13:19:14.268Z"
+  },
+  {
+    "company": "scarfme",
+    "produto": "13.46.0450",
+    "cor": "04",
+    "label": "produto novo",
+    "createdAt": "2026-06-11T13:19:14.268Z",
+    "updatedAt": "2026-06-11T13:19:14.268Z"
+  },
+  {
+    "company": "scarfme",
     "produto": "13.46.0446",
     "cor": "22",
     "label": "produto novo",
     "createdAt": "2026-06-10T13:53:15.437Z",
-    "updatedAt": "2026-06-10T13:54:22.018Z"
+    "updatedAt": "2026-06-11T13:19:14.268Z"
   },
   {
     "company": "scarfme",
@@ -293,7 +325,7 @@
     "cor": "11",
     "label": "produto novo",
     "createdAt": "2026-06-10T13:53:15.437Z",
-    "updatedAt": "2026-06-10T13:54:22.018Z"
+    "updatedAt": "2026-06-11T13:19:14.268Z"
   },
   {
     "company": "scarfme",
@@ -301,7 +333,7 @@
     "cor": "13",
     "label": "produto novo",
     "createdAt": "2026-06-10T13:53:15.437Z",
-    "updatedAt": "2026-06-10T13:54:22.018Z"
+    "updatedAt": "2026-06-11T13:19:14.268Z"
   },
   {
     "company": "scarfme",
@@ -309,7 +341,7 @@
     "cor": "S3",
     "label": "produto novo",
     "createdAt": "2026-06-10T13:53:15.437Z",
-    "updatedAt": "2026-06-10T13:54:22.018Z"
+    "updatedAt": "2026-06-11T13:19:14.268Z"
   },
   {
     "company": "scarfme",
@@ -317,7 +349,7 @@
     "cor": "04",
     "label": "produto novo",
     "createdAt": "2026-06-10T13:53:15.437Z",
-    "updatedAt": "2026-06-10T13:54:22.018Z"
+    "updatedAt": "2026-06-11T13:19:14.268Z"
   },
   {
     "company": "scarfme",
@@ -325,7 +357,7 @@
     "cor": "04",
     "label": "produto novo",
     "createdAt": "2026-06-10T13:53:15.437Z",
-    "updatedAt": "2026-06-10T13:54:22.018Z"
+    "updatedAt": "2026-06-11T13:19:14.268Z"
   },
   {
     "company": "scarfme",
@@ -333,7 +365,7 @@
     "cor": "09",
     "label": "produto novo",
     "createdAt": "2026-06-03T13:23:54.200Z",
-    "updatedAt": "2026-06-10T13:54:22.018Z"
+    "updatedAt": "2026-06-11T13:19:14.268Z"
   },
   {
     "company": "scarfme",
@@ -341,7 +373,7 @@
     "cor": "04",
     "label": "produto novo",
     "createdAt": "2026-05-28T15:20:41.242Z",
-    "updatedAt": "2026-06-10T13:54:22.018Z"
+    "updatedAt": "2026-06-11T13:19:14.268Z"
   },
   {
     "company": "scarfme",
@@ -349,7 +381,7 @@
     "cor": "03",
     "label": "produto novo",
     "createdAt": "2026-05-27T16:27:28.947Z",
-    "updatedAt": "2026-06-10T13:54:22.018Z"
+    "updatedAt": "2026-06-11T13:19:14.268Z"
   },
   {
     "company": "scarfme",
@@ -357,7 +389,7 @@
     "cor": "04",
     "label": "produto novo",
     "createdAt": "2026-05-27T16:27:28.947Z",
-    "updatedAt": "2026-06-10T13:54:22.018Z"
+    "updatedAt": "2026-06-11T13:19:14.268Z"
   },
   {
     "company": "scarfme",
@@ -365,6 +397,6 @@
     "cor": "06",
     "label": "produto novo",
     "createdAt": "2026-05-27T16:27:28.947Z",
-    "updatedAt": "2026-06-10T13:54:22.018Z"
+    "updatedAt": "2026-06-11T13:19:14.268Z"
   }
 ]

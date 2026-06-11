@@ -53,6 +53,19 @@ interface PivotRow {
   total: number;
 }
 
+type SortField = "descricao" | "total" | `filial:${string}`;
+type SortDirection = "asc" | "desc";
+
+interface SortState {
+  field: SortField;
+  direction: SortDirection;
+}
+
+const DEFAULT_SORT_STATE: SortState = {
+  field: "total",
+  direction: "desc",
+};
+
 function formatInt(n: number): string {
   return Math.round(n).toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 }
@@ -186,6 +199,7 @@ export default function EstoqueItemPage({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DetalhesPorFilialResponse | null>(null);
+  const [sortState, setSortState] = useState<SortState>(DEFAULT_SORT_STATE);
 
   useEffect(() => {
     let active = true;
@@ -568,6 +582,90 @@ export default function EstoqueItemPage({
     return pivotRows.filter((row) => row.cor.trim().toUpperCase() === target);
   }, [pivotRows, cor]);
 
+  useEffect(() => {
+    if (!sortState.field.startsWith("filial:")) {
+      return;
+    }
+
+    const filial = sortState.field.slice("filial:".length);
+    if (!filiaisColumns.includes(filial)) {
+      setSortState(DEFAULT_SORT_STATE);
+    }
+  }, [filiaisColumns, sortState.field]);
+
+  const handleSort = useCallback((field: SortField) => {
+    setSortState((current) => {
+      if (current.field === field) {
+        return {
+          field,
+          direction: current.direction === "asc" ? "desc" : "asc",
+        };
+      }
+
+      const isNumericField = field === "total" || field.startsWith("filial:");
+      return {
+        field,
+        direction: isNumericField ? "desc" : "asc",
+      };
+    });
+  }, []);
+
+  const sortedPivotRows = useMemo(() => {
+    const rows = [...filteredPivotRows];
+    const directionFactor = sortState.direction === "asc" ? 1 : -1;
+    const compareText = (left: string, right: string) =>
+      left.localeCompare(right, "pt-BR", { numeric: true, sensitivity: "base" });
+
+    rows.sort((left, right) => {
+      let primary = 0;
+
+      if (sortState.field === "descricao") {
+        primary =
+          compareText(left.descricao, right.descricao) || compareText(left.produto, right.produto);
+      } else if (sortState.field === "total") {
+        primary = left.total - right.total;
+      } else {
+        const filial = sortState.field.slice("filial:".length);
+        primary = (left.porFilial[filial] ?? 0) - (right.porFilial[filial] ?? 0);
+      }
+
+      if (primary !== 0) {
+        return primary * directionFactor;
+      }
+
+      const totalTieBreak = right.total - left.total;
+      if (totalTieBreak !== 0) {
+        return totalTieBreak;
+      }
+
+      return compareText(left.produto, right.produto);
+    });
+
+    return rows;
+  }, [filteredPivotRows, sortState]);
+
+  const getSortIndicator = useCallback(
+    (field: SortField) => {
+      if (sortState.field !== field) {
+        return "-";
+      }
+
+      return sortState.direction === "asc" ? "^" : "v";
+    },
+    [sortState],
+  );
+
+  const getAriaSort = useCallback(
+    (field: SortField): "none" | "ascending" | "descending" => {
+      if (sortState.field !== field) {
+        return "none";
+      }
+
+      return sortState.direction === "asc" ? "ascending" : "descending";
+    },
+    [sortState],
+  );
+
   const kpis = useMemo(() => {
     if (!data) return null;
 
@@ -837,26 +935,65 @@ export default function EstoqueItemPage({
           <table className={styles.table}>
             <thead>
               <tr>
-                <th className={styles.skuColumn}>Produto</th>
-                <th className={styles.itemColumn}>Desc. produto</th>
-                <th className={`${styles.num} ${styles.totalHeader}`}>Estoque total</th>
+                <th className={styles.itemColumn} aria-sort={getAriaSort("descricao")}>
+                  <button
+                    type="button"
+                    className={styles.sortButton}
+                    onClick={() => handleSort("descricao")}
+                  >
+                    <span>Desc. produto</span>
+                    <span className={styles.sortIcon} aria-hidden>
+                      {getSortIndicator("descricao")}
+                    </span>
+                  </button>
+                </th>
+                <th
+                  className={`${styles.num} ${styles.totalHeader}`}
+                  aria-sort={getAriaSort("total")}
+                >
+                  <button
+                    type="button"
+                    className={`${styles.sortButton} ${styles.sortButtonCenter}`}
+                    onClick={() => handleSort("total")}
+                  >
+                    <span>Estoque total</span>
+                    <span className={styles.sortIcon} aria-hidden>
+                      {getSortIndicator("total")}
+                    </span>
+                  </button>
+                </th>
                 {filiaisColumns.map((filial) => (
-                  <th key={filial} className={styles.num}>
-                    {filial}
+                  <th
+                    key={filial}
+                    className={styles.num}
+                    aria-sort={getAriaSort(`filial:${filial}`)}
+                  >
+                    <button
+                      type="button"
+                      className={`${styles.sortButton} ${styles.sortButtonCenter}`}
+                      onClick={() => handleSort(`filial:${filial}`)}
+                    >
+                      <span>{filial}</span>
+                      <span className={styles.sortIcon} aria-hidden>
+                        {getSortIndicator(`filial:${filial}`)}
+                      </span>
+                    </button>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filteredPivotRows.map((row) => {
+              {sortedPivotRows.map((row) => {
                 const highlightedFiliais = getHighlightedFiliais(row, filiaisColumns);
                 const meta = buildItemMeta(row, companyKey);
 
                 return (
                   <tr key={`${row.produto}-${row.cor}`}>
-                    <td className={`${styles.sku} ${styles.skuColumn}`}>{row.produto}</td>
                     <td className={styles.itemColumn}>
-                      <span className={styles.itemName}>{row.descricao || "-"}</span>
+                      <span className={styles.itemNameRow}>
+                        <span className={styles.itemName}>{row.descricao || "-"}</span>
+                        <span className={styles.itemCode}>{row.produto}</span>
+                      </span>
                       <span className={styles.itemMeta}>{meta || "-"}</span>
                     </td>
                     <td

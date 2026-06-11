@@ -9,6 +9,7 @@ type RequestBody = {
   filial?: string | null;
   colecoes?: string[];
   subgrupos?: string[];
+  grupos?: string[];
   grades?: string[];
   ranges?: Array<{
     start?: string;
@@ -51,6 +52,7 @@ export async function POST(request: Request) {
           range,
           colecoes: body.colecoes ?? [],
           subgrupos: body.subgrupos ?? [],
+          grupos: body.grupos ?? [],
           grades: body.grades ?? [],
         })
       )

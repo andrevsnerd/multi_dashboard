@@ -1802,6 +1802,90 @@ export async function fetchAvailableGrupos({
   subgrupos?: string[] | null;
   grades?: string[] | null;
 } = {}): Promise<string[]> {
+  if (company === 'scarfme') {
+    return withRequest(async (request) => {
+      const { start, end } = resolveRange(range);
+      request.input('startDate', sql.DateTime, start);
+      request.input('endDate', sql.DateTime, end);
+
+      const retailFilialFilter = await buildFilialFilter(
+        request,
+        company,
+        'sales',
+        filial,
+        'f',
+        'availableGruposRetailFilial'
+      );
+      const retailLinhaFilter = buildInFilter(request, linhas, 'availableGruposRetailLinha', 'p.LINHA');
+      const retailColecaoFilter = buildInFilter(request, colecoes, 'availableGruposRetailColecao', 'p.COLECAO');
+      const retailSubgrupoFilter = buildInFilter(request, subgrupos, 'availableGruposRetailSubgrupo', 'p.SUBGRUPO_PRODUTO');
+      const retailGradeFilter = buildInFilter(request, grades, 'availableGruposRetailGrade', 'CONVERT(VARCHAR, p.GRADE)');
+
+      const ecommerceFilialFilter = await buildScarfmeEcommerceFilialFilterForProducts(
+        request,
+        filial,
+        'f',
+        'availableGruposEcomFilial'
+      );
+      const ecommerceLinhaFilter = buildInFilter(request, linhas, 'availableGruposEcomLinha', 'p.LINHA');
+      const ecommerceColecaoFilter = buildInFilter(request, colecoes, 'availableGruposEcomColecao', 'p.COLECAO');
+      const ecommerceSubgrupoFilter = buildInFilter(request, subgrupos, 'availableGruposEcomSubgrupo', 'p.SUBGRUPO_PRODUTO');
+      const ecommerceGradeFilter = buildInFilter(request, grades, 'availableGruposEcomGrade', 'CONVERT(VARCHAR, p.GRADE)');
+
+      try {
+        const retailResult = await request.query<{ grupo: string | null }>(`
+          SELECT DISTINCT
+            UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) AS grupo
+          FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+          INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+            ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
+          LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.COD_FILIAL = vp.CODIGO_FILIAL
+          LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO
+          WHERE vp.DATA_VENDA >= @startDate
+            AND vp.DATA_VENDA < @endDate
+            AND vp.QTDE_CANCELADA = 0
+            AND vp.QTDE > 0
+            AND ISNULL(p.GRUPO_PRODUTO, '') <> ''
+            ${retailFilialFilter}
+            ${retailLinhaFilter}
+            ${retailColecaoFilter}
+            ${retailSubgrupoFilter}
+            ${retailGradeFilter}
+          ORDER BY grupo
+        `);
+        const ecommerceResult = await request.query<{ grupo: string | null }>(`
+          SELECT DISTINCT
+            UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) AS grupo
+          FROM FATURAMENTO f WITH (NOLOCK)
+          JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+            ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+          LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO
+          WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
+            AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
+            AND f.NOTA_CANCELADA = 0
+            AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+            AND fp.QTDE > 0
+            AND ISNULL(p.GRUPO_PRODUTO, '') <> ''
+            ${ecommerceFilialFilter}
+            ${ecommerceLinhaFilter}
+            ${ecommerceColecaoFilter}
+            ${ecommerceSubgrupoFilter}
+            ${ecommerceGradeFilter}
+          ORDER BY grupo
+        `);
+
+        const grupos = [...retailResult.recordset, ...ecommerceResult.recordset]
+          .map((row) => row.grupo?.trim().toUpperCase() || '')
+          .filter((grupo) => grupo !== '');
+
+        return [...new Set(grupos)].sort();
+      } catch (error) {
+        console.error('Erro ao buscar grupos (scarfme):', error);
+        return [];
+      }
+    });
+  }
+
   if (company !== 'nerd') {
     return [];
   }

@@ -165,6 +165,7 @@ export interface ClaudeReportRequest {
   };
   colecoes?: string[] | null;
   subgrupos?: string[] | null;
+  grupos?: string[] | null;
   grades?: string[] | null;
 }
 
@@ -611,6 +612,7 @@ async function querySalesRows(
   filters: {
     colecoes?: string[] | null;
     subgrupos?: string[] | null;
+    grupos?: string[] | null;
     grades?: string[] | null;
   },
   company: CompanyConfig,
@@ -638,6 +640,12 @@ async function querySalesRows(
             "posSubgrupo",
             "COALESCE(p.SUBGRUPO_PRODUTO, '')"
           );
+          const grupoFilter = addArrayFilter(
+            request,
+            filters.grupos,
+            "posGrupo",
+            "COALESCE(p.GRUPO_PRODUTO, '')"
+          );
           const gradeFilter = addArrayFilter(
             request,
             filters.grades,
@@ -655,6 +663,12 @@ async function querySalesRows(
             filters.subgrupos,
             "troSubgrupo",
             "COALESCE(p.SUBGRUPO_PRODUTO, '')"
+          );
+          const trocaGrupoFilter = addArrayFilter(
+            request,
+            filters.grupos,
+            "troGrupo",
+            "COALESCE(p.GRUPO_PRODUTO, '')"
           );
           const trocaGradeFilter = addArrayFilter(
             request,
@@ -699,6 +713,7 @@ async function querySalesRows(
                 AND f.FILIAL IN (${filialPlaceholders})
                 ${colecaoFilter}
                 ${subgrupoFilter}
+                ${grupoFilter}
                 ${gradeFilter}
             ),
             trocas_cte AS (
@@ -735,6 +750,7 @@ async function querySalesRows(
                 AND f.FILIAL IN (${filialPlaceholders})
                 ${trocaColecaoFilter}
                 ${trocaSubgrupoFilter}
+                ${trocaGrupoFilter}
                 ${trocaGradeFilter}
             )
             SELECT
@@ -788,6 +804,12 @@ async function querySalesRows(
             "ecomSubgrupo",
             "COALESCE(p.SUBGRUPO_PRODUTO, '')"
           );
+          const grupoFilter = addArrayFilter(
+            request,
+            filters.grupos,
+            "ecomGrupo",
+            "COALESCE(p.GRUPO_PRODUTO, '')"
+          );
           const gradeFilter = addArrayFilter(
             request,
             filters.grades,
@@ -836,6 +858,7 @@ async function querySalesRows(
               AND f.FILIAL IN (${filialPlaceholders})
               ${colecaoFilter}
               ${subgrupoFilter}
+              ${grupoFilter}
               ${gradeFilter}
             GROUP BY
               CAST(f.EMISSAO AS DATE),
@@ -1431,6 +1454,7 @@ export async function fetchClaudeReport({
   range,
   colecoes,
   subgrupos,
+  grupos,
   grades,
 }: ClaudeReportRequest): Promise<ClaudeReportPayload> {
   const company = await resolveCompanyLive(companySlug);
@@ -1457,6 +1481,7 @@ export async function fetchClaudeReport({
 
   const selectedColecoes = uniqueValues(colecoes);
   const selectedSubgrupos = uniqueValues(subgrupos);
+  const selectedGrupos = uniqueValues(grupos);
   const selectedGrades = uniqueValues(grades);
   const gradeLabel = selectedGrades[0] ?? "MIX";
 
@@ -1471,8 +1496,8 @@ export async function fetchClaudeReport({
     return [];
   });
 
-  const salesFilters = { colecoes: selectedColecoes, subgrupos: selectedSubgrupos, grades: selectedGrades };
-  const hasTypeFilters = selectedSubgrupos.length > 0 || selectedGrades.length > 0;
+  const salesFilters = { colecoes: selectedColecoes, subgrupos: selectedSubgrupos, grupos: selectedGrupos, grades: selectedGrades };
+  const hasTypeFilters = selectedSubgrupos.length > 0 || selectedGrupos.length > 0 || selectedGrades.length > 0;
   const [salesRows, previousStoreRows, priorYear1Rows, priorYear2Rows, generalTypeRows, stockMap, collectionOptions] = await Promise.all([
     querySalesRows(normalizedRange, scope.posMembers, scope.ecommerceMembers, salesFilters, company, scope.maps),
     querySalesRows(previousRange, scope.posMembers, scope.ecommerceMembers, salesFilters, company, scope.maps),
