@@ -8,6 +8,7 @@ import {
   formatRomaneioDateTimeBrasilia,
   parseRomaneioDateTime,
 } from "@/lib/utils/romaneios-date";
+import RomaneioDeleteModal from "./RomaneioDeleteModal";
 import styles from "./RomaneiosPage.module.css";
 
 export interface RomaneioListItem {
@@ -99,6 +100,17 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("saida");
   const [searchTerm, setSearchTerm] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<RomaneioListItem | null>(null);
+
+  const isAdmin = user?.role === "admin";
+
+  function handleDeleted(rom: RomaneioListItem) {
+    const matches = (r: RomaneioListItem) =>
+      !(r.romaneio === rom.romaneio && r.filialOrigem === rom.filialOrigem && r.filialDestino === rom.filialDestino);
+    if (rom.tipo === "saida") setSaidas((prev) => prev.filter(matches));
+    else if (rom.tipo === "entrada") setEntradas((prev) => prev.filter(matches));
+    setDeleteTarget(null);
+  }
 
   function getFilialOption(filialValue: string | null | undefined) {
     const filial = (filialValue || "").trim();
@@ -269,12 +281,34 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
             const isTransitoLiberado = rom.tipo === "entrada" && rom.status === "Transito liberado";
             const destinoBadge = destinoEfetivo ? getFilialDisplayName(destinoEfetivo) : "-";
 
+            const podeExcluir = isAdmin && !isTransito;
+
             return (
               <Link
                 key={`${rom.tipo}-${rom.romaneio}-${rom.filialOrigem}-${rom.filialDestino}-${index}`}
                 href={detailUrl}
                 className={`${styles.card} ${todosConfirmados ? styles.cardConfirmado : ""} ${isTransito ? styles.cardTransit : ""}`}
               >
+                {podeExcluir && (
+                  <button
+                    type="button"
+                    className={styles.deleteBtn}
+                    title="Excluir romaneio"
+                    aria-label="Excluir romaneio"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDeleteTarget(rom);
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      <path d="M6 6l1 14a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M10 11v6M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                )}
                 <div className={styles.cardHeader}>
                   <span className={styles.romaneioId}>#{rom.romaneio}</span>
                   <span className={`${styles.status} ${destinoEfetivo ? styles.statusConcluida : styles.statusVazio}`}>
@@ -311,6 +345,16 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
             );
           })}
         </div>
+      )}
+
+      {deleteTarget && (deleteTarget.tipo === "saida" || deleteTarget.tipo === "entrada") && (
+        <RomaneioDeleteModal
+          tipo={deleteTarget.tipo}
+          romaneio={deleteTarget.romaneio}
+          filial={deleteTarget.tipo === "saida" ? deleteTarget.filialOrigem : deleteTarget.filialDestino}
+          onClose={() => setDeleteTarget(null)}
+          onDeleted={() => handleDeleted(deleteTarget)}
+        />
       )}
     </div>
   );

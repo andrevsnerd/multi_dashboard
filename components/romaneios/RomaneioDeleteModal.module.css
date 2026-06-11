@@ -1,0 +1,166 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.title {
+  margin: 0 0 4px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #b91c1c;
+}
+
+.subtitle {
+  margin: 4px 0 16px;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.choiceBtn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.choiceBtn:hover {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.choiceBtnReturn:hover {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.choiceTitle {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.choiceDesc {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.confirmText {
+  margin: 4px 0 14px;
+  color: #334155;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.tableWrap {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.table th,
+.table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  text-align: left;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 600;
+  z-index: 1;
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.erro {
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.88rem;
+  margin: 0 0 12px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.btnCancel {
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnCancel:hover {
+  background: #f8fafc;
+}
+
+.btnDanger {
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: none;
+  background: #dc2626;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnDanger:hover {
+  background: #b91c1c;
+}
+
+.btnDanger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

@@ -690,6 +690,26 @@
   cursor: not-allowed;
 }
 
+.excluirRomaneioBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: #fff;
+  color: #dc2626;
+  font-size: 14px;
+  font-weight: 700;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.excluirRomaneioBtn:hover {
+  background: #fef2f2;
+  border-color: #dc2626;
+}
+
 .darSaidaTodosBtn {
   display: inline-flex;
   align-items: center;
