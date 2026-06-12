@@ -43,6 +43,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
+    const createdByName = request.headers.get("x-auth-username") ?? undefined;
     const body = await request.json();
     const { companyKey, title, items, draft } = body ?? {};
 
@@ -77,6 +78,7 @@ export async function PUT(
       items: items as CompraTransitoItemRow[],
       forceStatus: draft ? "rascunho" : undefined,
       reconfirm: !draft,
+      createdByName,
     });
 
     if (!updated) {

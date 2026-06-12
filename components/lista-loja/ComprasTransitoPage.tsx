@@ -13,6 +13,7 @@ import type {
   CompraTransitoStatus,
 } from "@/lib/types/compra-transito";
 import { getCompraTransitoItemStatus } from "@/lib/utils/compra-transito-status";
+import { useAuth } from "@/components/auth/AuthContext";
 
 import ComprasTransitoPickerModal from "./ComprasTransitoPickerModal";
 import styles from "./ComprasTransitoPage.module.css";
@@ -95,6 +96,18 @@ function calcDurationDays(createdAt: string, dataRecebimento: string): number | 
   return Math.round((received.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+function calcDaysUntilReceipt(minDate: string | null): string | null {
+  if (!minDate) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const recv = new Date(`${minDate.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(recv.getTime())) return null;
+  const diff = Math.round((recv.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (diff > 0) return `Chega em ${diff} dia${diff !== 1 ? "s" : ""}`;
+  if (diff === 0) return "Chega hoje";
+  return null;
+}
+
 function fmtDuration(days: number | null): string | null {
   if (days === null) return null;
   if (days === 0) return "chegou hoje";
@@ -110,6 +123,7 @@ export default function ComprasTransitoPage({
   companyName: string;
   companySlug: string;
 }) {
+  const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -300,11 +314,16 @@ export default function ComprasTransitoPage({
       if (isDraft && !canSaveDraft) return;
       setSaving(true);
       try {
+        const displayName = user ? (user.nomeExibicao?.trim() || user.username) : undefined;
+        const authHeaders: Record<string, string> = {
+          "Content-Type": "application/json",
+          ...(displayName ? { "x-auth-username": displayName } : {}),
+        };
         let res: Response;
         if (editingId) {
           res = await fetch(`/api/compras-transito/${editingId}`, {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers: authHeaders,
             body: JSON.stringify({
               companyKey,
               title: draftTitle.trim() || undefined,
@@ -315,7 +334,7 @@ export default function ComprasTransitoPage({
         } else {
           res = await fetch("/api/compras-transito", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: authHeaders,
             body: JSON.stringify({
               companyKey,
               title: draftTitle.trim() || undefined,
@@ -358,7 +377,7 @@ export default function ComprasTransitoPage({
         setSaving(false);
       }
     },
-    [canConfirm, canSaveDraft, companyKey, draftItems, draftTitle, editingId, loadCompras, openDetail, saving]
+    [canConfirm, canSaveDraft, companyKey, draftItems, draftTitle, editingId, loadCompras, openDetail, saving, user]
   );
 
   const cancelCompra = useCallback(async () => {
@@ -646,27 +665,28 @@ export default function ComprasTransitoPage({
             </div>
           )}
           {!loading && !error && compras.length > 0 && (
-            <div className={styles.cardsGrid}>
+            <div className={styles.cardsList}>
               {compras.map((compra) => {
                 const periodoRecebimento =
                   compra.minDataRecebimento && compra.maxDataRecebimento
                     ? compra.minDataRecebimento === compra.maxDataRecebimento
                       ? fmtDate(compra.minDataRecebimento)
-                      : `${fmtDate(compra.minDataRecebimento)} ate ${fmtDate(compra.maxDataRecebimento)}`
+                      : `${fmtDate(compra.minDataRecebimento)} – ${fmtDate(compra.maxDataRecebimento)}`
                     : "Sem data";
                 const isTransit = compra.status === "em_transito";
                 const isDraft = compra.status === "rascunho";
+
+                const daysLabel = isTransit ? calcDaysUntilReceipt(compra.minDataRecebimento) : null;
 
                 return (
                   <button
                     key={compra.id}
                     type="button"
-                    className={`${styles.card} ${isDraft ? styles.cardDraft : !isTransit ? styles.cardReceived : ""}`}
+                    className={`${styles.cardRow} ${isDraft ? styles.cardRowDraft : !isTransit ? styles.cardRowReceived : ""}`}
                     onClick={() => void openDetail(compra.id)}
                     disabled={loadingDetail}
                   >
-                    <div className={styles.cardHeader}>
-                      <span className={`${styles.cardTitle} ${isDraft ? styles.cardTitleDraft : ""}`}>{compra.title}</span>
+                    <div className={styles.cardRowLeft}>
                       <span
                         className={`${styles.statusBadge} ${
                           isDraft
@@ -678,15 +698,45 @@ export default function ComprasTransitoPage({
                       >
                         {getStatusLabel(compra.status)}
                       </span>
+                      <div className={styles.cardRowTitleGroup}>
+                        <span className={`${styles.cardRowTitle} ${isDraft ? styles.cardRowTitleDraft : ""}`}>
+                          {compra.title}
+                        </span>
+                        <div className={styles.cardRowMeta}>
+                          {compra.createdByName && (
+                            <span className={styles.cardRowMetaUser}>{compra.createdByName}</span>
+                          )}
+                          <span className={styles.cardRowMetaDate}>{fmtDateTime(compra.confirmedAt)}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className={`${styles.cardMeta} ${isDraft ? styles.cardMetaDraft : ""}`}>
-                      <span>{compra.itemCount} item(ns)</span>
-                      <span>{fmt(compra.totalQuantidade)} un.</span>
-                      <span>{fmtBRL(compra.totalValor)}</span>
+                    <div className={styles.cardRowStats}>
+                      <div className={styles.cardRowStat}>
+                        <span className={styles.cardRowStatLabel}>Itens</span>
+                        <span className={styles.cardRowStatValue}>{compra.itemCount}</span>
+                      </div>
+                      <div className={styles.cardRowStat}>
+                        <span className={styles.cardRowStatLabel}>Qtd.</span>
+                        <span className={styles.cardRowStatValue}>{fmt(compra.totalQuantidade)}</span>
+                      </div>
+                      <div className={styles.cardRowStat}>
+                        <span className={styles.cardRowStatLabel}>Valor</span>
+                        <span className={styles.cardRowStatValue}>{fmtBRL(compra.totalValor)}</span>
+                      </div>
                     </div>
-                    <div className={`${styles.cardSubmeta} ${isDraft ? styles.cardSubmetaDraft : ""}`}>
-                      <span>Recebimento: {periodoRecebimento}</span>
-                      <span>Criada em {fmtDateTime(compra.confirmedAt)}</span>
+                    <div className={styles.cardRowDates}>
+                      <span
+                        className={`${styles.cardRowRecepBadge} ${
+                          isDraft
+                            ? styles.cardRowRecepBadgeDraft
+                            : !isTransit
+                            ? styles.cardRowRecepBadgeReceived
+                            : ""
+                        }`}
+                      >
+                        Recebimento: {periodoRecebimento}
+                      </span>
+                      {daysLabel && <span className={styles.cardRowDaysLabel}>{daysLabel}</span>}
                     </div>
                   </button>
                 );

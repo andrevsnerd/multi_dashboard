@@ -42,6 +42,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const createdByName = request.headers.get("x-auth-username") ?? undefined;
     const body = await request.json();
     const { companyKey, title, items, draft } = body ?? {};
 
@@ -97,6 +98,7 @@ export async function POST(request: Request) {
         typeof title === "string" && title.trim() ? title.trim() : formatDefaultTitle(),
       items: normalizedItems,
       forceStatus: draft ? "rascunho" : undefined,
+      createdByName,
     });
 
     return NextResponse.json({ data: created });

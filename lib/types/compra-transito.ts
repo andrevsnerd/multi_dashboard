@@ -23,6 +23,7 @@ export interface CompraTransito {
   createdAt: string;
   updatedAt: string;
   confirmedAt: string;
+  createdByName?: string;
 }
 
 export interface CompraTransitoListEntry {
@@ -37,4 +38,5 @@ export interface CompraTransitoListEntry {
   createdAt: string;
   updatedAt: string;
   confirmedAt: string;
+  createdByName?: string;
 }

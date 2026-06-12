@@ -139,61 +139,172 @@
   font-size: 1.3rem;
 }
 
-.cardsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
+.cardsList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.card {
+.cardRow {
   border: 1px solid #86efac;
-  border-radius: 20px;
-  padding: 18px;
-  background:
-    linear-gradient(180deg, rgba(240, 253, 244, 0.96), rgba(220, 252, 231, 0.92));
-  box-shadow: 0 18px 36px rgba(21, 128, 61, 0.14);
+  border-radius: 14px;
+  padding: 11px 16px;
+  background: linear-gradient(180deg, rgba(240, 253, 244, 0.96), rgba(220, 252, 231, 0.92));
   text-align: left;
   cursor: pointer;
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.cardReceived {
+.cardRow:hover:not(:disabled) {
+  transform: translateX(2px);
+  box-shadow: 0 6px 20px rgba(21, 128, 61, 0.14);
+}
+
+.cardRow:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.cardRowReceived {
   border-color: #cbd5e1;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(241, 245, 249, 0.96));
-  box-shadow: 0 14px 28px rgba(100, 116, 139, 0.12);
 }
 
-.cardDraft {
+.cardRowReceived:hover:not(:disabled) {
+  box-shadow: 0 6px 16px rgba(100, 116, 139, 0.14);
+}
+
+.cardRowDraft {
   border-color: #fde68a;
   background: linear-gradient(180deg, rgba(255, 251, 235, 0.98), rgba(254, 243, 199, 0.92));
-  box-shadow: 0 14px 28px rgba(161, 98, 7, 0.12);
 }
 
-.cardHeader {
+.cardRowDraft:hover:not(:disabled) {
+  box-shadow: 0 6px 16px rgba(161, 98, 7, 0.12);
+}
+
+.cardRowLeft {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
   gap: 10px;
-  align-items: flex-start;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
-.cardTitle {
+.cardRowTitleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cardRowTitle {
   color: #14532d;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.cardTitleDraft {
+.cardRowTitleDraft {
   color: #78350f;
+}
+
+.cardRowMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: #64748b;
+  flex-wrap: wrap;
+}
+
+.cardRowMetaUser {
+  font-style: italic;
+  color: #475569;
+}
+
+.cardRowMetaDate {
+  color: #94a3b8;
+}
+
+.cardRowStats {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.cardRowStat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  min-width: 52px;
+}
+
+.cardRowStatLabel {
+  font-size: 0.68rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cardRowStatValue {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.cardRowDates {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.cardRowRecepBadge {
+  border-radius: 999px;
+  padding: 3px 11px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid rgba(34, 197, 94, 0.32);
+  color: #166534;
+  white-space: nowrap;
+}
+
+.cardRowRecepBadgeReceived {
+  background: rgba(148, 163, 184, 0.14);
+  border-color: rgba(148, 163, 184, 0.32);
+  color: #475569;
+}
+
+.cardRowRecepBadgeDraft {
+  background: rgba(251, 191, 36, 0.14);
+  border-color: rgba(251, 191, 36, 0.4);
+  color: #92400e;
+}
+
+.cardRowDaysLabel {
+  font-size: 0.73rem;
+  color: #64748b;
+  text-align: right;
 }
 
 .statusBadge {
   white-space: nowrap;
   border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 0.78rem;
+  padding: 4px 9px;
+  font-size: 0.72rem;
   font-weight: 700;
+  flex-shrink: 0;
 }
 
 .statusBadgeTransit {
@@ -209,28 +320,6 @@
 .statusBadgeDraft {
   color: #92400e;
   background: rgba(251, 191, 36, 0.22);
-}
-
-.cardMeta,
-.cardSubmeta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 14px;
-  color: #166534;
-  font-size: 0.92rem;
-}
-
-.cardSubmeta {
-  color: #3f6212;
-  font-size: 0.85rem;
-}
-
-.cardMetaDraft {
-  color: #92400e;
-}
-
-.cardSubmetaDraft {
-  color: #78350f;
 }
 
 .tableWrap {
