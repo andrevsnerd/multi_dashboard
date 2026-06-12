@@ -9,7 +9,7 @@ import {
   useCallback,
 } from "react";
 import { DateRange, RangeKeyDict } from "react-date-range";
-import { endOfMonth, endOfWeek, startOfMonth, startOfWeek, startOfYear, subDays, subMonths } from "date-fns";
+import { endOfMonth, startOfMonth, startOfYear, subDays, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 import { formatDateForQuery, normalizeRange } from "@/lib/utils/date";
@@ -85,7 +85,11 @@ export default function DateRangeFilter({
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const [isMobile, setIsMobile] = useState(false);
   const [draft, setDraft] = useState<DateRangeValue | null>(null);
-  
+  // Mês visível no calendário, controlado por nós para as flechas funcionarem sem "voltar"
+  // sozinhas: como `ranges` é recriado a cada render, o react-date-range reposicionava
+  // o mês na seleção a cada clique. Controlando shownDate, a navegação fica estável.
+  const [shownDate, setShownDate] = useState<Date | null>(null);
+
   const normalized = useMemo(
     () => normalizeRange(value.startDate, value.endDate),
     [value.startDate, value.endDate],
@@ -149,6 +153,21 @@ export default function DateRangeFilter({
   }, [normalized.end, normalized.start, effectiveMaxDate, availableNormalized]);
 
   const presets = useMemo(() => {
+    const clampStartToAvailable = (startDate: Date) => {
+      if (availableNormalized && startDate.getTime() < availableNormalized.start.getTime()) {
+        return new Date(availableNormalized.start.getTime());
+      }
+      return startDate;
+    };
+    const rollingMonths = (months: number) => () => {
+      const endDate = clampDate(new Date());
+      let startDate = clampStartToAvailable(subMonths(endDate, months));
+      if (startDate.getTime() > endDate.getTime()) {
+        startDate = new Date(endDate.getTime());
+      }
+      return { startDate, endDate };
+    };
+
     return [
       {
         label: "Hoje",
@@ -158,90 +177,54 @@ export default function DateRangeFilter({
         },
       },
       {
-        label: "Ontem",
+        label: "Esse mês",
         resolve: () => {
-          const yesterday = subDays(new Date(), 1);
-          const clamped = clampDate(yesterday);
-          return { startDate: clamped, endDate: new Date(clamped.getTime()) };
+          const today = clampDate(new Date());
+          let startDate = clampStartToAvailable(startOfMonth(today));
+          const endDate = clampDate(endOfMonth(today));
+          if (endDate.getTime() < startDate.getTime()) startDate = new Date(endDate.getTime());
+          return { startDate, endDate };
+        },
+      },
+      {
+        label: "Mês Passado",
+        resolve: () => {
+          const today = clampDate(new Date());
+          const lastMonth = subMonths(today, 1);
+          let startDate = clampStartToAvailable(startOfMonth(lastMonth));
+          const endDate = clampDate(endOfMonth(lastMonth));
+          if (startDate.getTime() > endDate.getTime()) startDate = new Date(endDate.getTime());
+          return { startDate, endDate };
+        },
+      },
+      {
+        label: "Esse ano",
+        resolve: () => {
+          const today = clampDate(new Date());
+          let startDate = clampStartToAvailable(startOfYear(today));
+          const endDate = clampDate(new Date());
+          if (startDate.getTime() > endDate.getTime()) startDate = new Date(endDate.getTime());
+          return { startDate, endDate };
         },
       },
       {
         label: "60 dias",
         resolve: () => {
           const endDate = clampDate(new Date());
-          let startDate = subDays(endDate, 59);
-          if (availableNormalized && startDate.getTime() < availableNormalized.start.getTime()) {
-            startDate = new Date(availableNormalized.start.getTime());
-          }
+          let startDate = clampStartToAvailable(subDays(endDate, 59));
           if (startDate.getTime() > endDate.getTime()) {
             startDate = new Date(endDate.getTime());
           }
-          return { startDate, endDate };
-        },
-      },
-      {
-        label: "Esta semana",
-        resolve: () => {
-          const today = clampDate(new Date());
-          let startDate = startOfWeek(today, { weekStartsOn: 1 });
-          let endDate = clampDate(endOfWeek(today, { weekStartsOn: 1 }));
-          if (endDate.getTime() < startDate.getTime()) startDate = new Date(endDate.getTime());
-          return { startDate, endDate };
-        },
-      },
-      {
-        label: "Este mês",
-        resolve: () => {
-          const today = clampDate(new Date());
-          let startDate = startOfMonth(today);
-          if (availableNormalized && startDate.getTime() < availableNormalized.start.getTime()) {
-            startDate = new Date(availableNormalized.start.getTime());
-          }
-          let endDate = clampDate(endOfMonth(today));
-          if (endDate.getTime() < startDate.getTime()) startDate = new Date(endDate.getTime());
-          return { startDate, endDate };
-        },
-      },
-      {
-        label: "Mês passado",
-        resolve: () => {
-          const today = clampDate(new Date());
-          const lastMonth = subMonths(today, 1);
-          let startDate = startOfMonth(lastMonth);
-          let endDate = clampDate(endOfMonth(lastMonth));
-          if (availableNormalized && startDate.getTime() < availableNormalized.start.getTime()) {
-            startDate = new Date(availableNormalized.start.getTime());
-          }
-          if (startDate.getTime() > endDate.getTime()) startDate = new Date(endDate.getTime());
-          return { startDate, endDate };
-        },
-      },
-      {
-        label: "Este ano",
-        resolve: () => {
-          const today = clampDate(new Date());
-          let startDate = startOfYear(today);
-          const endDate = clampDate(new Date());
-          if (availableNormalized && startDate.getTime() < availableNormalized.start.getTime()) {
-            startDate = new Date(availableNormalized.start.getTime());
-          }
-          if (startDate.getTime() > endDate.getTime()) startDate = new Date(endDate.getTime());
           return { startDate, endDate };
         },
       },
       {
         label: "12 meses",
-        resolve: () => {
-          const endDate = clampDate(new Date());
-          let startDate = subMonths(endDate, 12);
-          if (availableNormalized && startDate.getTime() < availableNormalized.start.getTime()) {
-            startDate = new Date(availableNormalized.start.getTime());
-          }
-          if (startDate.getTime() > endDate.getTime()) {
-            startDate = new Date(endDate.getTime());
-          }
-          return { startDate, endDate };
-        },
+        resolve: rollingMonths(12),
+      },
+      {
+        label: "24 meses",
+        resolve: rollingMonths(24),
       },
     ];
   }, [clampDate, availableNormalized]);
@@ -289,21 +272,36 @@ export default function DateRangeFilter({
       const vh = window.innerHeight;
       const gap = 12;
       const horizontalMargin = 12;
-      const dropdownWidth = Math.min(520, vw - horizontalMargin * 2);
-      const top = rect.bottom + gap;
-      const availableBelow = Math.max(220, vh - top - gap);
-      const contentHeight = dropdownRef.current?.offsetHeight ?? 420;
-      const maxHeight = Math.min(contentHeight, availableBelow);
+      const dropdownWidth = Math.min(500, vw - horizontalMargin * 2);
+      const contentHeight = dropdownRef.current?.offsetHeight ?? 360;
+      const viewportMax = vh - gap * 2;
+      const spaceBelow = vh - rect.bottom - gap;
+      const spaceAbove = rect.top - gap;
+      // Só recorre a scroll em viewport patologicamente baixa; caso normal nunca tem scroll.
+      const needsScroll = contentHeight > viewportMax;
+
+      let top: number;
+      if (needsScroll) {
+        top = gap;
+      } else if (contentHeight <= spaceBelow || spaceBelow >= spaceAbove) {
+        // cabe embaixo (ou há mais espaço embaixo): abre para baixo
+        top = rect.bottom + gap;
+      } else {
+        // não cabe embaixo: abre para cima
+        top = Math.max(gap, rect.top - gap - contentHeight);
+      }
 
       const next: React.CSSProperties = {
         position: "fixed",
         zIndex: 1001,
         width: dropdownWidth,
-        maxHeight,
-        overflowY: "auto",
+        overflowY: needsScroll ? "auto" : "visible",
         top,
         bottom: "auto",
       };
+      if (needsScroll) {
+        next.maxHeight = viewportMax;
+      }
 
       if (rect.right >= dropdownWidth) {
         next.right = vw - rect.right;
@@ -338,11 +336,20 @@ export default function DateRangeFilter({
     };
   }, [isOpen, isMobile]);
 
-  const selectionRange = {
-    startDate: draftClamped.startDate,
-    endDate: draftClamped.endDate,
-    key: "selection",
-  };
+  // IMPORTANTE: o react-date-range re-posiciona o mês visível sempre que a prop `ranges`
+  // muda de referência (componentDidUpdate -> updateShownDate). Se passarmos um array novo
+  // a cada render, as flechas e os selects de mês/ano "voltam" sozinhos e ficam inúteis.
+  // Memoizamos por valor (tempo das datas) para a referência só mudar quando a seleção mudar.
+  const calendarRanges = useMemo(
+    () => [
+      {
+        startDate: draftClamped.startDate,
+        endDate: draftClamped.endDate,
+        key: "selection",
+      },
+    ],
+    [draftClamped.startDate, draftClamped.endDate],
+  );
 
   const handleSelect = (ranges: RangeKeyDict) => {
     const selected = ranges.selection;
@@ -398,6 +405,7 @@ export default function DateRangeFilter({
             startDate: new Date(clampedRange.start.getTime()),
             endDate: new Date(clampedRange.end.getTime()),
           });
+          setShownDate(new Date(clampedRange.start.getTime()));
           setIsOpen(true);
         }}
         disabled={disabled}
@@ -453,6 +461,7 @@ export default function DateRangeFilter({
                         end = new Date(start.getTime());
                       }
                       setDraft({ startDate: start, endDate: end });
+                      setShownDate(new Date(start.getTime()));
                     }}
                   />
                 </label>
@@ -473,6 +482,7 @@ export default function DateRangeFilter({
                         start = new Date(end.getTime());
                       }
                       setDraft({ startDate: start, endDate: end });
+                      setShownDate(new Date(end.getTime()));
                     }}
                   />
                 </label>
@@ -490,7 +500,7 @@ export default function DateRangeFilter({
                 </button>
               </div>
               <DateRange
-                ranges={[selectionRange]}
+                ranges={calendarRanges}
                 onChange={handleSelect}
                 direction="horizontal"
                 showMonthArrow
@@ -500,6 +510,8 @@ export default function DateRangeFilter({
                 maxDate={effectiveMaxDate}
                 minDate={minSelectable}
                 moveRangeOnFirstSelection={false}
+                shownDate={shownDate ?? draftClamped.startDate}
+                onShownDateChange={(date) => setShownDate(date)}
               />
             </div>
           </div>
