@@ -451,7 +451,7 @@ export default function ComprasTransitoPage({
     XLSX.writeFile(wb, `compra-${slug}-${dateStr}.xlsx`);
   }, [selectedCompra]);
 
-  const renderTableRows = (items: CompraTransitoItemRow[], readOnly: boolean, createdAt?: string) => (
+  const renderTableRows = (items: CompraTransitoItemRow[], readOnly: boolean) => (
     <div className={styles.tableWrap}>
       <table className={styles.table}>
         <thead>
@@ -480,8 +480,8 @@ export default function ComprasTransitoPage({
               ? getCompraTransitoItemStatus(item.dataRecebimento)
               : "rascunho";
             const durationLabel =
-              readOnly && createdAt && item.dataRecebimento
-                ? fmtDuration(calcDurationDays(createdAt, item.dataRecebimento))
+              readOnly && item.dataRecebimento
+                ? calcDaysUntilReceipt(item.dataRecebimento)
                 : null;
             return (
               <tr
@@ -914,7 +914,7 @@ export default function ComprasTransitoPage({
               <div className={styles.detailTitleBox}>
                 <h2 className={styles.detailTitle}>{selectedCompra.title}</h2>
               </div>
-              {renderTableRows(selectedCompra.items, true, selectedCompra.createdAt)}
+              {renderTableRows(selectedCompra.items, true)}
             </>
           )}
         </>
