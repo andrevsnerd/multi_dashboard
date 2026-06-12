@@ -61,8 +61,15 @@ export interface CompraTransitoItemReconciliacao {
   firstEntryDate?: string;
   lastEntryDate?: string;
   statusReal: CompraTransitoStatusReal;
-  /** Entradas físicas que alimentaram este item. */
-  allocatedEntries: Array<{ data: string; qtde: number; excess?: boolean }>;
+  /** Entradas físicas que alimentaram este item (uma ou mais). */
+  allocatedEntries: Array<{
+    data: string;
+    qtde: number;
+    romaneio?: string;
+    responsavel?: string;
+    custoUnitario?: number;
+    excess?: boolean;
+  }>;
 }
 
 /** Item da compra enriquecido com a reconciliação (campos de resposta, não persistidos). */

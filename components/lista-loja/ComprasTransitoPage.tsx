@@ -110,6 +110,24 @@ function getStatusRealLabel(status: CompraTransitoStatusReal) {
   return "Em trânsito";
 }
 
+/** Texto do tooltip com o detalhamento das entradas reconhecidas de um item. */
+function buildEntriesTitle(rec: CompraTransitoItemReconciliacao): string {
+  if (!rec.allocatedEntries.length) return "";
+  const lines = rec.allocatedEntries.map((e) => {
+    const parts = [fmtDate(e.data)];
+    if (e.romaneio) parts.push(`Romaneio ${e.romaneio}`);
+    parts.push(`${fmt(e.qtde)} un${e.excess ? " (excedente)" : ""}`);
+    if (e.custoUnitario && e.custoUnitario > 0) parts.push(`custo ${fmtBRL2(e.custoUnitario)}`);
+    if (e.responsavel) parts.push(e.responsavel);
+    return `• ${parts.join("  ·  ")}`;
+  });
+  const header =
+    rec.allocatedEntries.length > 1
+      ? `${rec.allocatedEntries.length} entradas reconhecidas (total ${fmt(rec.recebidoQtd)} un):`
+      : "Entrada reconhecida:";
+  return `${header}\n${lines.join("\n")}`;
+}
+
 function calcDaysUntilReceipt(minDate: string | null): string | null {
   if (!minDate) return null;
   const today = new Date();
@@ -621,13 +639,24 @@ export default function ComprasTransitoPage({
                 {readOnly && (
                   <td className={styles.right}>
                     {itemRecon ? (
-                      <div className={styles.recebidoCell}>
+                      <div
+                        className={`${styles.recebidoCell} ${
+                          itemRecon.allocatedEntries.length > 0 ? styles.recebidoCellHover : ""
+                        }`}
+                        title={buildEntriesTitle(itemRecon) || undefined}
+                      >
                         <span
                           className={
                             itemRecon.recebidoQtd > 0 ? styles.recebidoQtd : styles.recebidoZero
                           }
                         >
                           {fmt(itemRecon.recebidoQtd)}
+                          {itemRecon.allocatedEntries.length > 1 && (
+                            <span className={styles.recebidoEntradasCount}>
+                              {" "}
+                              ({itemRecon.allocatedEntries.length} entradas)
+                            </span>
+                          )}
                         </span>
                         {itemRecon.faltou > 0 && (
                           <span className={styles.faltouBadge}>faltou {fmt(itemRecon.faltou)}</span>

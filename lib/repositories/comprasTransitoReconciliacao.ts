@@ -19,6 +19,9 @@ export interface MatrizEntryRow {
   corProduto: string;
   /** Dia da entrada (YYYY-MM-DD). */
   dataEntrada: string;
+  /** Nº do romaneio de entrada. */
+  romaneio: string;
+  responsavel: string;
   qtde: number;
   custoUnitario: number;
 }
@@ -73,6 +76,8 @@ export async function fetchMatrizEntriesByColor(
           PRODUTO,
           COR_PRODUTO,
           DATA_ENTRADA,
+          ROMANEIO,
+          MAX(RESPONSAVEL) AS RESPONSAVEL,
           SUM(QTDE) AS QTDE,
           AVG(CUSTO_UNIT) AS CUSTO_UNIT
         FROM (
@@ -80,6 +85,8 @@ export async function fetchMatrizEntriesByColor(
             LTRIM(RTRIM(p.PRODUTO)) AS PRODUTO,
             LTRIM(RTRIM(ISNULL(p.COR_PRODUTO, ''))) AS COR_PRODUTO,
             CONVERT(VARCHAR(10), e.EMISSAO, 120) AS DATA_ENTRADA,
+            LTRIM(RTRIM(ISNULL(e.ROMANEIO_PRODUTO, ''))) AS ROMANEIO,
+            LTRIM(RTRIM(ISNULL(e.RESPONSAVEL, ''))) AS RESPONSAVEL,
             ISNULL(p.QTDE, 0) AS QTDE,
             NULLIF(p.CUSTO1, 0) AS CUSTO_UNIT
           FROM ESTOQUE_PROD_ENT e WITH (NOLOCK)
@@ -95,6 +102,8 @@ export async function fetchMatrizEntriesByColor(
             LTRIM(RTRIM(lep.PRODUTO)) AS PRODUTO,
             LTRIM(RTRIM(ISNULL(lep.COR_PRODUTO, ''))) AS COR_PRODUTO,
             CONVERT(VARCHAR(10), le.EMISSAO, 120) AS DATA_ENTRADA,
+            LTRIM(RTRIM(ISNULL(le.ROMANEIO_PRODUTO, ''))) AS ROMANEIO,
+            LTRIM(RTRIM(ISNULL(le.RESPONSAVEL, ''))) AS RESPONSAVEL,
             ISNULL(lep.QTDE_ENTRADA, 0) AS QTDE,
             NULLIF(lep.PRECO1, 0) AS CUSTO_UNIT
           FROM LOJA_ENTRADAS le WITH (NOLOCK)
@@ -110,7 +119,7 @@ export async function fetchMatrizEntriesByColor(
                 AND LTRIM(RTRIM(ISNULL(ee.FILIAL, ''))) = LTRIM(RTRIM(ISNULL(le.FILIAL, '')))
             )
         ) AS unificado
-        GROUP BY PRODUTO, COR_PRODUTO, DATA_ENTRADA
+        GROUP BY PRODUTO, COR_PRODUTO, DATA_ENTRADA, ROMANEIO
         ORDER BY DATA_ENTRADA ASC
       `;
 
@@ -118,6 +127,8 @@ export async function fetchMatrizEntriesByColor(
         PRODUTO: string;
         COR_PRODUTO: string | null;
         DATA_ENTRADA: string;
+        ROMANEIO: string | null;
+        RESPONSAVEL: string | null;
         QTDE: number | null;
         CUSTO_UNIT: number | null;
       }>(query);
@@ -126,6 +137,8 @@ export async function fetchMatrizEntriesByColor(
         produto: (row.PRODUTO ?? "").toString().trim(),
         corProduto: (row.COR_PRODUTO ?? "").toString().trim(),
         dataEntrada: (row.DATA_ENTRADA ?? "").toString().trim(),
+        romaneio: (row.ROMANEIO ?? "").toString().trim(),
+        responsavel: (row.RESPONSAVEL ?? "").toString().trim(),
         qtde: Number(row.QTDE ?? 0),
         custoUnitario: Number(row.CUSTO_UNIT ?? 0),
       }));

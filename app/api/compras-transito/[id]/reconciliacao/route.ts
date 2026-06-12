@@ -73,6 +73,9 @@ export async function GET(
         corProduto: e.corProduto,
         dataEntrada: e.dataEntrada,
         qtde: e.qtde,
+        romaneio: e.romaneio,
+        responsavel: e.responsavel,
+        custoUnitario: e.custoUnitario,
       })),
     });
 

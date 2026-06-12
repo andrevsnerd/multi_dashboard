@@ -413,6 +413,16 @@
   gap: 3px;
 }
 
+.recebidoCellHover {
+  cursor: help;
+}
+
+.recebidoEntradasCount {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #2563eb;
+}
+
 .recebidoQtd {
   font-weight: 700;
   color: #0f172a;

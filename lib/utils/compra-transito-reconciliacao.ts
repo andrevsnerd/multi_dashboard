@@ -33,6 +33,18 @@ export interface ReconcileEntryInput {
   /** Data da entrada física (ISO). */
   dataEntrada: string;
   qtde: number;
+  romaneio?: string;
+  responsavel?: string;
+  custoUnitario?: number;
+}
+
+export interface AllocatedEntry {
+  data: string;
+  qtde: number;
+  romaneio?: string;
+  responsavel?: string;
+  custoUnitario?: number;
+  excess?: boolean;
 }
 
 export interface ItemReconciliacao {
@@ -43,7 +55,7 @@ export interface ItemReconciliacao {
   firstEntryDate?: string;
   lastEntryDate?: string;
   statusReal: CompraTransitoStatusReal;
-  allocatedEntries: Array<{ data: string; qtde: number; excess?: boolean }>;
+  allocatedEntries: AllocatedEntry[];
 }
 
 function pad2(n: number): string {
@@ -58,6 +70,23 @@ function dayKeyFromDate(date: Date): string {
 function dayKey(value?: string | null): string {
   return String(value ?? "").trim().slice(0, 10);
 }
+
+/** Diferença em dias entre dois dias YYYY-MM-DD (toDay - fromDay). Infinity se inválido. */
+function dayDiff(fromDay: string, toDay: string): number {
+  const a = new Date(`${fromDay}T00:00:00Z`).getTime();
+  const b = new Date(`${toDay}T00:00:00Z`).getTime();
+  if (Number.isNaN(a) || Number.isNaN(b)) return Infinity;
+  return Math.round((b - a) / 86400000);
+}
+
+/**
+ * Janela (em dias) para entradas COMPLEMENTARES contarem para o mesmo item, a
+ * partir da PRIMEIRA entrada reconhecida dele. Regra do dono: o que chegar até 7
+ * dias depois da primeira entrada completa a diferença daquele item; além disso
+ * já é considerada outra entrada (provavelmente de outra compra) e não conta.
+ * A primeira entrada em si confirma sempre, sem limite superior.
+ */
+const JANELA_COMPLEMENTO_DIAS = 7;
 
 /**
  * Espelha o TRY_CONVERT(INT) do SQL e o normalizeCorKey de products.ts: cor
@@ -96,14 +125,31 @@ interface Slot {
   dataRecebimento: string;
   ordered: number;
   remaining: number;
+  /** Dia da primeira entrada alocada a este item; ancora a janela de complemento. */
+  anchorDay?: string;
   rec: ItemReconciliacao;
 }
 
-function applyAllocation(rec: ItemReconciliacao, data: string, qtde: number, excess: boolean): void {
+interface EntryBucket {
+  data: string;
+  qtde: number;
+  romaneio?: string;
+  responsavel?: string;
+  custoUnitario?: number;
+}
+
+function applyAllocation(rec: ItemReconciliacao, entry: EntryBucket, qtde: number, excess: boolean): void {
   rec.recebidoQtd += qtde;
-  rec.allocatedEntries.push(excess ? { data, qtde, excess: true } : { data, qtde });
-  if (!rec.firstEntryDate || data < rec.firstEntryDate) rec.firstEntryDate = data;
-  if (!rec.lastEntryDate || data > rec.lastEntryDate) rec.lastEntryDate = data;
+  rec.allocatedEntries.push({
+    data: entry.data,
+    qtde,
+    romaneio: entry.romaneio,
+    responsavel: entry.responsavel,
+    custoUnitario: entry.custoUnitario,
+    ...(excess ? { excess: true } : {}),
+  });
+  if (!rec.firstEntryDate || entry.data < rec.firstEntryDate) rec.firstEntryDate = entry.data;
+  if (!rec.lastEntryDate || entry.data > rec.lastEntryDate) rec.lastEntryDate = entry.data;
 }
 
 /**
@@ -156,14 +202,21 @@ export function reconcileCompras(params: {
   }
 
   // Agrupa as entradas pela mesma chave de reconciliação (mescla '06'/'6').
-  const entriesByKey = new Map<string, Array<{ data: string; qtde: number }>>();
+  const entriesByKey = new Map<string, EntryBucket[]>();
   for (const e of params.entries) {
     const qtde = Math.max(0, Math.round(e.qtde ?? 0));
     if (qtde <= 0) continue;
     const key = buildReconcileKey(e.produto, e.corProduto);
+    const bucket: EntryBucket = {
+      data: dayKey(e.dataEntrada),
+      qtde,
+      romaneio: e.romaneio,
+      responsavel: e.responsavel,
+      custoUnitario: e.custoUnitario,
+    };
     const arr = entriesByKey.get(key);
-    if (arr) arr.push({ data: dayKey(e.dataEntrada), qtde });
-    else entriesByKey.set(key, [{ data: dayKey(e.dataEntrada), qtde }]);
+    if (arr) arr.push(bucket);
+    else entriesByKey.set(key, [bucket]);
   }
 
   for (const [key, slotsRaw] of slotsByKey) {
@@ -176,7 +229,15 @@ export function reconcileCompras(params: {
     );
     const ents = (entriesByKey.get(key) ?? [])
       .slice()
-      .sort((a, b) => a.data.localeCompare(b.data));
+      .sort((a, b) => a.data.localeCompare(b.data) || (a.romaneio ?? "").localeCompare(b.romaneio ?? ""));
+
+    // Elegível = entrada após a criação da compra E (se o item já tem entrada)
+    // dentro da janela de complemento a partir da primeira entrada dele.
+    const isEligible = (slot: Slot, entryDay: string): boolean => {
+      if (entryDay < slot.createdDay) return false;
+      if (slot.anchorDay && dayDiff(slot.anchorDay, entryDay) > JANELA_COMPLEMENTO_DIAS) return false;
+      return true;
+    };
 
     // Passo 1 — FIFO: preenche até o pedido, do item mais antigo ao mais novo.
     for (const e of ents) {
@@ -184,21 +245,24 @@ export function reconcileCompras(params: {
       for (const slot of slots) {
         if (remaining <= 0) break;
         if (slot.remaining <= 0) continue;
-        if (e.data < slot.createdDay) continue; // entrada anterior à compra: inelegível
+        if (!isEligible(slot, e.data)) continue;
+        if (!slot.anchorDay) slot.anchorDay = e.data; // 1ª entrada do item ancora a janela
         const take = Math.min(remaining, slot.remaining);
         slot.remaining -= take;
         remaining -= take;
-        applyAllocation(slot.rec, e.data, take, false);
+        applyAllocation(slot.rec, e, take, false);
       }
       e.qtde = remaining; // sobra para o passo 2
     }
 
-    // Passo 2 — excesso: sobra elegível vai para o item elegível mais novo.
+    // Passo 2 — excesso: sobra elegível vai para o item elegível mais novo (dentro
+    // da janela). Sobra fora de janela/anterior a todas as compras não é alocada —
+    // é provavelmente de outra compra.
     for (const e of ents) {
       if (e.qtde <= 0) continue;
       let target: Slot | null = null;
       for (const slot of slots) {
-        if (e.data < slot.createdDay) continue;
+        if (!isEligible(slot, e.data)) continue;
         if (
           !target ||
           slot.createdDay > target.createdDay ||
@@ -207,8 +271,9 @@ export function reconcileCompras(params: {
           target = slot;
         }
       }
-      if (!target) continue; // anterior a todas as compras: não alocada
-      applyAllocation(target.rec, e.data, e.qtde, true);
+      if (!target) continue;
+      if (!target.anchorDay) target.anchorDay = e.data;
+      applyAllocation(target.rec, e, e.qtde, true);
       target.rec.excedeu += e.qtde;
       e.qtde = 0;
     }
