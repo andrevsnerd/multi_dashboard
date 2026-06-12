@@ -110,22 +110,37 @@ function getStatusRealLabel(status: CompraTransitoStatusReal) {
   return "Em trânsito";
 }
 
-/** Texto do tooltip com o detalhamento das entradas reconhecidas de um item. */
-function buildEntriesTitle(rec: CompraTransitoItemReconciliacao): string {
+/**
+ * Texto do tooltip com o detalhamento das entradas reconhecidas de um item.
+ * Deixa explícito que o reconhecimento é por PRODUTO × COR (cabeçalho), e lista
+ * cada romaneio com quantidade e custo TOTAL. Encerra com o total recebido.
+ */
+function buildEntriesTitle(item: CompraTransitoItemRow, rec: CompraTransitoItemReconciliacao): string {
   if (!rec.allocatedEntries.length) return "";
-  const lines = rec.allocatedEntries.map((e) => {
-    const parts = [fmtDate(e.data)];
-    if (e.romaneio) parts.push(`Romaneio ${e.romaneio}`);
-    parts.push(`${fmt(e.qtde)} un${e.excess ? " (excedente)" : ""}`);
-    if (e.custoUnitario && e.custoUnitario > 0) parts.push(`custo ${fmtBRL2(e.custoUnitario)}`);
-    if (e.responsavel) parts.push(e.responsavel);
-    return `• ${parts.join("  ·  ")}`;
-  });
-  const header =
+  const cor = item.corDescricao || item.corProduto || "sem cor";
+  const lines: string[] = [];
+  lines.push(`${item.descricao || item.produto}  (cód ${item.produto})`);
+  lines.push(`Cor: ${cor}`);
+  lines.push(
     rec.allocatedEntries.length > 1
-      ? `${rec.allocatedEntries.length} entradas reconhecidas (total ${fmt(rec.recebidoQtd)} un):`
-      : "Entrada reconhecida:";
-  return `${header}\n${lines.join("\n")}`;
+      ? `Entradas reconhecidas (${rec.allocatedEntries.length}):`
+      : "Entrada reconhecida:"
+  );
+  let custoTotalGeral = 0;
+  for (const e of rec.allocatedEntries) {
+    const parts = [fmtDate(e.data), `Romaneio ${e.romaneio || "?"}`, `${fmt(e.qtde)} un`];
+    if (e.custoUnitario && e.custoUnitario > 0) {
+      const total = Math.round(e.custoUnitario * e.qtde);
+      custoTotalGeral += total;
+      parts.push(`total ${fmtBRL(total)}`);
+    }
+    if (e.excess) parts.push("(excedente)");
+    lines.push(`• ${parts.join("  ·  ")}`);
+  }
+  const totalParts = [`${fmt(rec.recebidoQtd)} un`];
+  if (custoTotalGeral > 0) totalParts.push(fmtBRL(custoTotalGeral));
+  lines.push(`Total recebido: ${totalParts.join("  ·  ")}`);
+  return lines.join("\n");
 }
 
 function calcDaysUntilReceipt(minDate: string | null): string | null {
@@ -643,7 +658,7 @@ export default function ComprasTransitoPage({
                         className={`${styles.recebidoCell} ${
                           itemRecon.allocatedEntries.length > 0 ? styles.recebidoCellHover : ""
                         }`}
-                        title={buildEntriesTitle(itemRecon) || undefined}
+                        title={buildEntriesTitle(item, itemRecon) || undefined}
                       >
                         <span
                           className={
