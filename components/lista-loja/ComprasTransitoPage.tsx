@@ -56,6 +56,20 @@ async function fetchReconciliacao(
   return json.data;
 }
 
+type ReconResumo = CompraTransitoReconciliacaoResposta["resumo"];
+
+async function fetchReconciliacaoLista(
+  companyKey: CompanyKey
+): Promise<Record<string, ReconResumo>> {
+  const params = new URLSearchParams({ company: companyKey });
+  const res = await fetch(`/api/compras-transito/reconciliacao?${params.toString()}`, {
+    cache: "no-store",
+  });
+  const json = (await res.json()) as { data?: Record<string, ReconResumo>; error?: string };
+  if (!res.ok || !json.data) throw new Error(json.error ?? "Erro ao reconciliar lista");
+  return json.data;
+}
+
 function fmt(n: number) {
   return n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 }
@@ -190,6 +204,7 @@ export default function ComprasTransitoPage({
   >(null);
   const [reconLoading, setReconLoading] = useState(false);
   const reconReqRef = useRef(0);
+  const [listRecon, setListRecon] = useState<Record<string, ReconResumo> | null>(null);
 
   const loadCompras = useCallback(async () => {
     setLoading(true);
@@ -197,6 +212,11 @@ export default function ComprasTransitoPage({
     try {
       const data = await fetchCompras(companyKey);
       setCompras(data);
+      // Reconciliação real da lista chega depois (progressivo); recolore os cards.
+      setListRecon(null);
+      fetchReconciliacaoLista(companyKey)
+        .then(setListRecon)
+        .catch(() => setListRecon(null));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar compras em transito");
     } finally {
@@ -823,30 +843,52 @@ export default function ComprasTransitoPage({
                       ? fmtDate(compra.minDataRecebimento)
                       : `${fmtDate(compra.minDataRecebimento)} – ${fmtDate(compra.maxDataRecebimento)}`
                     : "Sem data";
-                const isTransit = compra.status === "em_transito";
-                const isDraft = compra.status === "rascunho";
 
-                const daysLabel = isTransit ? calcDaysUntilReceipt(compra.minDataRecebimento) : null;
+                // Status real (reconciliação) quando já carregado; senão o por data.
+                const resumo = listRecon?.[compra.id];
+                const effStatus: CompraTransitoStatusReal = resumo ? resumo.statusGeral : compra.status;
+                const isDraft = effStatus === "rascunho";
+                const isTransit = effStatus === "em_transito";
+                const isParcial = effStatus === "parcial";
+                const isAtrasado = effStatus === "atrasado";
+                const isRecebido = effStatus === "recebido";
+
+                const daysLabel =
+                  isParcial && resumo
+                    ? `${fmt(resumo.parciais)} item(ns) faltando`
+                    : isTransit
+                    ? calcDaysUntilReceipt(compra.minDataRecebimento)
+                    : null;
+
+                const cardClass = isDraft || isParcial
+                  ? styles.cardRowDraft
+                  : isAtrasado
+                  ? styles.cardRowAtrasado
+                  : isRecebido
+                  ? styles.cardRowReceived
+                  : "";
 
                 return (
                   <button
                     key={compra.id}
                     type="button"
-                    className={`${styles.cardRow} ${isDraft ? styles.cardRowDraft : !isTransit ? styles.cardRowReceived : ""}`}
+                    className={`${styles.cardRow} ${cardClass}`}
                     onClick={() => void openDetail(compra.id)}
                     disabled={loadingDetail}
                   >
                     <div className={styles.cardRowLeft}>
                       <span
                         className={`${styles.statusBadge} ${
-                          isDraft
+                          isDraft || isParcial
                             ? styles.statusBadgeDraft
-                            : isTransit
-                            ? styles.statusBadgeTransit
-                            : styles.statusBadgeReceived
+                            : isAtrasado
+                            ? styles.statusBadgeAtrasado
+                            : isRecebido
+                            ? styles.statusBadgeReceived
+                            : styles.statusBadgeTransit
                         }`}
                       >
-                        {getStatusLabel(compra.status)}
+                        {resumo ? getStatusRealLabel(effStatus) : getStatusLabel(compra.status)}
                       </span>
                       <div className={styles.cardRowTitleGroup}>
                         <span className={`${styles.cardRowTitle} ${isDraft ? styles.cardRowTitleDraft : ""}`}>
@@ -877,11 +919,11 @@ export default function ComprasTransitoPage({
                     <div className={styles.cardRowDates}>
                       <span
                         className={`${styles.cardRowRecepBadge} ${
-                          isDraft
+                          isDraft || isParcial
                             ? styles.cardRowRecepBadgeDraft
-                            : !isTransit
-                            ? styles.cardRowRecepBadgeReceived
-                            : ""
+                            : isTransit
+                            ? ""
+                            : styles.cardRowRecepBadgeReceived
                         }`}
                       >
                         Recebimento: {periodoRecebimento}

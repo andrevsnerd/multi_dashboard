@@ -187,6 +187,15 @@
   box-shadow: 0 6px 16px rgba(161, 98, 7, 0.12);
 }
 
+.cardRowAtrasado {
+  border-color: #fecaca;
+  background: linear-gradient(180deg, rgba(254, 242, 242, 0.98), rgba(254, 226, 226, 0.92));
+}
+
+.cardRowAtrasado:hover:not(:disabled) {
+  box-shadow: 0 6px 16px rgba(185, 28, 28, 0.12);
+}
+
 .cardRowLeft {
   display: flex;
   align-items: center;
@@ -320,6 +329,11 @@
 .statusBadgeDraft {
   color: #92400e;
   background: rgba(251, 191, 36, 0.22);
+}
+
+.statusBadgeAtrasado {
+  color: #b91c1c;
+  background: rgba(239, 68, 68, 0.16);
 }
 
 .tableWrap {
