@@ -2277,6 +2277,60 @@ async function fetchStockExitsDailyRows(
   });
 }
 
+/**
+ * Ajustes de contagem de inventário por dia (ESTOQUE_PROD_CONTAGEM + ESTOQUE_PROD_CTG_AJUSTE),
+ * mesma fonte #6 do extrato admin. QTDE_AJUSTE já vem com sinal (+ aumenta estoque, − diminui).
+ *
+ * Esses ajustes são aplicados DIRETO no estoque pelo módulo de contagem do Linx, sem gerar
+ * romaneio em ESTOQUE_PROD_ENT/SAI — por isso entram aqui como fonte independente. A reconciliação
+ * mostrou que praticamente não há sobreposição com os ajustes de ENT/SAI (mecanismos distintos),
+ * então somar as duas fontes na categoria "Ajuste" não duplica contagem.
+ */
+async function fetchStockCountAdjustmentsDailyRows(
+  params: ProductDetailParams
+): Promise<StockMovementRow[]> {
+  const { start, end } = resolveRange(params.range);
+  return withRequest(async (request) => {
+    request.input('productId', sql.VarChar, params.productId);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+    const companyConfig = await resolveCompanyLive(params.company);
+    if (!companyConfig) return [];
+    const filialFilter = await buildFilialFilter(request, params.company, 'inventory', params.filial, 'c', 'ctgF');
+    // Match de cor robusto: a tabela de ajuste de contagem pode ter COR_PRODUTO com padding.
+    let colorFilter = '';
+    const cleanColors = (params.colors ?? [])
+      .filter((c) => c != null && c !== '')
+      .map((c) => String(c).trim());
+    if (cleanColors.length > 0) {
+      cleanColors.forEach((c, i) => request.input(`ctgColor${i}`, sql.VarChar, c));
+      const ph = cleanColors.map((_, i) => `@ctgColor${i}`).join(', ');
+      colorFilter = `AND RTRIM(LTRIM(ISNULL(CAST(a.COR_PRODUTO AS VARCHAR(20)), ''))) IN (${ph})`;
+    }
+    const query = `
+      SELECT
+        CAST(c.EMISSAO AS DATE) AS d,
+        c.FILIAL AS filial,
+        SUM(ISNULL(a.QTDE_AJUSTE, 0)) AS qty
+      FROM ESTOQUE_PROD_CONTAGEM c WITH (NOLOCK)
+      INNER JOIN ESTOQUE_PROD_CTG_AJUSTE a WITH (NOLOCK) ON c.NOME_CONTAGEM = a.NOME_CONTAGEM
+      WHERE RTRIM(LTRIM(CAST(a.PRODUTO AS VARCHAR(50)))) = @productId
+        AND c.ESTOQUE_AJUSTADO = 1
+        AND c.EMISSAO >= @startDate
+        AND c.EMISSAO < @endDate
+        ${filialFilter}
+        ${colorFilter}
+      GROUP BY CAST(c.EMISSAO AS DATE), c.FILIAL
+    `;
+    const result = await request.query<{ d: Date; filial: string; qty: number | null }>(query);
+    return (result.recordset ?? []).map((r) => ({
+      d: r.d instanceof Date ? r.d : new Date(r.d),
+      filial: r.filial ?? '',
+      qty: Number(r.qty ?? 0),
+    }));
+  });
+}
+
 async function fetchStockSalesDailyRetailRows(
   params: ProductDetailParams
 ): Promise<StockMovementRow[]> {
@@ -2435,28 +2489,33 @@ export async function fetchProductStockProgressSeries(
   let entryRows: ClassifiedMovementRow[];
   let saleRows: StockMovementRow[];
   let exitRows: ClassifiedMovementRow[];
+  let countRows: StockMovementRow[];
 
   if (shouldAggregateEcommerce(params.company, params.filial)) {
-    const [e, sr, se, ex] = await Promise.all([
+    const [e, sr, se, ex, ct] = await Promise.all([
       fetchStockEntriesDailyRows({ ...params, filial: null }),
       fetchStockSalesDailyRetailRows({ ...params, filial: VAREJO_VALUE }),
       fetchStockSalesDailyEcommerceRows({ ...params, filial: null }),
       fetchStockExitsDailyRows({ ...params, filial: null }),
+      fetchStockCountAdjustmentsDailyRows({ ...params, filial: null }),
     ]);
     entryRows = e;
     saleRows = mergeSalesDailyRows(sr, se);
     exitRows = ex;
+    countRows = ct;
   } else if (isEcFilial) {
-    [entryRows, saleRows, exitRows] = await Promise.all([
+    [entryRows, saleRows, exitRows, countRows] = await Promise.all([
       fetchStockEntriesDailyRows(params),
       fetchStockSalesDailyEcommerceRows(params),
       fetchStockExitsDailyRows(params),
+      fetchStockCountAdjustmentsDailyRows(params),
     ]);
   } else {
-    [entryRows, saleRows, exitRows] = await Promise.all([
+    [entryRows, saleRows, exitRows, countRows] = await Promise.all([
       fetchStockEntriesDailyRows(params),
       fetchStockSalesDailyRetailRows(params),
       fetchStockExitsDailyRows(params),
+      fetchStockCountAdjustmentsDailyRows(params),
     ]);
   }
 
@@ -2496,6 +2555,11 @@ export async function fetchProductStockProgressSeries(
     const k = normDispKey(dispLabel(r.filial));
     if (r.ajuste) totalADJ.set(k, (totalADJ.get(k) ?? 0) - r.qty);
     else totalSE.set(k, (totalSE.get(k) ?? 0) + r.qty);
+  }
+  // Ajustes de contagem (QTDE_AJUSTE já com sinal: + aumenta, − diminui).
+  for (const r of countRows) {
+    const k = normDispKey(dispLabel(r.filial));
+    totalADJ.set(k, (totalADJ.get(k) ?? 0) + r.qty);
   }
 
   const allKeys = new Set<string>([
@@ -2542,6 +2606,12 @@ export async function fetchProductStockProgressSeries(
     if (!iso) continue;
     // Ajuste de saída entra no líquido com sinal negativo.
     addDay(r.ajuste ? byDayAdjust : byDayExit, iso, normDispKey(dispLabel(r.filial)), r.ajuste ? -r.qty : r.qty);
+  }
+  for (const r of countRows) {
+    const iso = toLocalIsoDay(r.d);
+    if (!iso) continue;
+    // Contagem entra na categoria Ajuste com o sinal de QTDE_AJUSTE.
+    addDay(byDayAdjust, iso, normDispKey(dispLabel(r.filial)), r.qty);
   }
 
   const toFilialList = (inner: Map<string, number> | undefined) => {

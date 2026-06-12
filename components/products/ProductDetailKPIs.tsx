@@ -1050,7 +1050,7 @@ export default function ProductDetailKPIs({
                 Saídas (vendas)
               </span>
               <span className={styles.chartLegendItem}>
-                <span style={{ display: "inline-block", width: 10, height: 10, background: "#f97316", borderRadius: 2 }} />{" "}
+                <span style={{ display: "inline-block", width: 10, height: 10, background: "#ec4899", borderRadius: 2 }} />{" "}
                 Saídas (mov. estoque)
               </span>
               <span className={styles.chartLegendItem}>
@@ -1159,7 +1159,7 @@ export default function ProductDetailKPIs({
                             −{formatInteger(raw.sales)} saídas (vendas)
                           </p>
                           {raw.stockExits > 0 && (
-                            <p style={{ margin: `0 4px ${raw.adjustments !== 0 ? "4px" : "10px"} 0`, color: "#b91c1c", fontWeight: 600 }}>
+                            <p style={{ margin: `0 4px ${raw.adjustments !== 0 ? "4px" : "10px"} 0`, color: "#db2777", fontWeight: 600 }}>
                               −{formatInteger(raw.stockExits)} saídas (mov. estoque)
                             </p>
                           )}
@@ -1178,7 +1178,7 @@ export default function ProductDetailKPIs({
                               <p style={{ margin: "0 0 6px 0", fontSize: "10px", fontWeight: 700, color: "#94a3b8" }}>
                                 Saldo por filial · <span style={{ fontWeight: 600 }}>+</span> entrada ·{" "}
                                 <span style={{ fontWeight: 600 }}>−</span> venda ·{" "}
-                                <span style={{ fontWeight: 600 }}>↓</span> mov. estoque ·{" "}
+                                <span style={{ fontWeight: 600 }}>−</span> mov. estoque ·{" "}
                                 <span style={{ fontWeight: 600 }}>⇅</span> ajuste
                               </p>
                               {filialRows.map((f) => {
@@ -1216,7 +1216,7 @@ export default function ProductDetailKPIs({
                                         <span style={{ color: "#b91c1c", fontWeight: 700 }}>−{formatInteger(sai)}</span>
                                       ) : null}
                                       {ext > 0 ? (
-                                        <span style={{ color: "#ea580c", fontWeight: 700 }}>↓{formatInteger(ext)}</span>
+                                        <span style={{ color: "#db2777", fontWeight: 700 }}>−{formatInteger(ext)}</span>
                                       ) : null}
                                       {adj !== 0 ? (
                                         <span style={{ color: "#7c3aed", fontWeight: 700 }}>
@@ -1238,7 +1238,7 @@ export default function ProductDetailKPIs({
                   />
                   <Bar yAxisId="flow" dataKey="entries" stackId="mov" name="Entradas" fill="#22c55e" radius={[2, 2, 0, 0]} />
                   <Bar yAxisId="flow" dataKey="salesFlow" stackId="mov" name="Saídas (vendas)" fill="#ef4444" radius={[0, 0, 0, 0]} />
-                  <Bar yAxisId="flow" dataKey="stockExitFlow" stackId="mov" name="Saídas (mov. estoque)" fill="#f97316" radius={[0, 0, 0, 0]} />
+                  <Bar yAxisId="flow" dataKey="stockExitFlow" stackId="mov" name="Saídas (mov. estoque)" fill="#ec4899" radius={[0, 0, 0, 0]} />
                   <Bar yAxisId="flow" dataKey="adjustFlow" stackId="mov" name="Ajuste de estoque" fill="#8b5cf6" radius={[0, 0, 0, 0]} />
                   <Line
                     yAxisId="stock"
