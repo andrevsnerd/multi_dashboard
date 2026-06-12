@@ -1031,7 +1031,13 @@ export default function ComprasTransitoPage({
             <>
               <div
                 className={`${styles.summaryCard} ${
-                  selectedCompra.status === "em_transito"
+                  reconResumo
+                    ? reconResumo.statusGeral === "recebido"
+                      ? styles.summaryCardReceived
+                      : reconResumo.statusGeral === "parcial" || reconResumo.statusGeral === "atrasado"
+                      ? styles.summaryCardDraft
+                      : styles.summaryCardConfirmed
+                    : selectedCompra.status === "em_transito"
                     ? styles.summaryCardConfirmed
                     : selectedCompra.status === "rascunho"
                     ? styles.summaryCardDraft
@@ -1042,14 +1048,24 @@ export default function ComprasTransitoPage({
                   <span className={styles.summaryLabel}>Status</span>
                   <strong
                     className={
-                      selectedCompra.status === "em_transito"
+                      reconResumo
+                        ? reconResumo.statusGeral === "recebido"
+                          ? styles.summaryValue
+                          : reconResumo.statusGeral === "parcial"
+                          ? styles.summaryValueDraft
+                          : reconResumo.statusGeral === "atrasado"
+                          ? styles.summaryValueDanger
+                          : styles.summaryValueGreen
+                        : selectedCompra.status === "em_transito"
                         ? styles.summaryValueGreen
                         : selectedCompra.status === "rascunho"
                         ? styles.summaryValueDraft
                         : styles.summaryValue
                     }
                   >
-                    {getStatusLabel(selectedCompra.status)}
+                    {reconResumo
+                      ? getStatusRealLabel(reconResumo.statusGeral)
+                      : getStatusLabel(selectedCompra.status)}
                   </strong>
                 </div>
                 <div className={styles.summaryItem}>
