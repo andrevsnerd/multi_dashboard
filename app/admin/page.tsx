@@ -26,7 +26,7 @@ const PERMISSION_GROUPS: { label: string; keys: PermissionKey[] }[] = [
   {
     label: "Visão geral",
     keys: [
-      "dashboard", "produtos", "produto-agrupado", "produto-detalhado",
+      "dashboard", "produtos", "produto-agrupado", "produto-detalhado", "produto-performance",
       "produtos-recentes", "produtos-novos", "relatorio-colecao", "relatorio-claude",
       "vendedores", "clientes", "mapa-clientes",
     ],
