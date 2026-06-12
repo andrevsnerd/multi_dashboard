@@ -2578,13 +2578,26 @@ const handleBadgeClick = (cat: string) => {
                                 </span>
                               </td>
                               <td>
-                                <Link
-                                  href={buildProductDetalhadoHref(companyKey, p)}
-                                  className={styles.productDetailLink}
-                                  title="Abrir produto detalhado"
-                                >
+                                <div className={styles.productDetailLink}>
                                   <div className={styles.productNameRow}>
                                     <span className={styles.productName}>{p.descricao || p.produto}</span>
+                                    <Link
+                                      href={buildProductDetalhadoHref(companyKey, p)}
+                                      className={styles.productDetailIcon}
+                                      title="Abrir produto detalhado"
+                                      aria-label={`Abrir produto detalhado de ${p.descricao || p.produto}`}
+                                    >
+                                      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                        <path
+                                          d="M1.75 10C3.3 6.95 6.3 5 10 5C13.7 5 16.7 6.95 18.25 10C16.7 13.05 13.7 15 10 15C6.3 15 3.3 13.05 1.75 10Z"
+                                          stroke="currentColor"
+                                          strokeWidth="1.8"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        />
+                                        <circle cx="10" cy="10" r="2.4" stroke="currentColor" strokeWidth="1.8" />
+                                      </svg>
+                                    </Link>
                                     {(() => {
                                       const cmp = getComparisonBadge(p.vendas, p.vendasPrevious);
                                       if (!cmp) return null;
@@ -2679,7 +2692,7 @@ const handleBadgeClick = (cat: string) => {
                                         : ""}
                                     </div>
                                   )}
-                                </Link>
+                                </div>
                               </td>
                               <td className={styles.obsCell}>
                                 <ObservacaoCell

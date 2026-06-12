@@ -1000,16 +1000,34 @@
 /* ── Product name ── */
 .productDetailLink {
   display: block;
-  color: inherit;
-  text-decoration: none;
   border-radius: 6px;
   margin: -4px;
   padding: 4px;
-  transition: background 0.12s ease;
 }
 
-.productDetailLink:hover {
-  background: rgba(37, 99, 235, 0.07);
+.productDetailIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.productDetailIcon:hover {
+  background: #dbeafe;
+  color: #1e40af;
+  transform: translateY(-1px);
+}
+
+.productDetailIcon svg {
+  width: 14px;
+  height: 14px;
 }
 
 .productNameRow {
