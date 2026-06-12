@@ -420,6 +420,7 @@ export default function ProductDetailKPIs({
       entries: row.entries,
       salesFlow: row.sales > 0 ? row.sales : 0,
       stockExitFlow: row.stockExits > 0 ? row.stockExits : 0,
+      adjustFlow: Math.abs(row.adjustments ?? 0),
       stockGeral: row.stockGeral,
       outOfStock: row.outOfStock,
       _raw: row,
@@ -1036,7 +1037,7 @@ export default function ProductDetailKPIs({
           <div className={styles.chartCard}>
             <h3 className={styles.chartTitle}>Movimento de estoque no período</h3>
             <p className={styles.chartSubtitle}>
-              Barras · entradas (romaneios), saídas por venda e saídas de mov. de estoque por dia · Linha · saldo estimado (geral).
+              Barras · entradas (romaneios), saídas por venda, saídas de mov. de estoque e ajustes por dia · Linha · saldo estimado (geral).
               Ponto vermelho indica dia sem estoque.
             </p>
             <div className={styles.chartLegend}>
@@ -1051,6 +1052,10 @@ export default function ProductDetailKPIs({
               <span className={styles.chartLegendItem}>
                 <span style={{ display: "inline-block", width: 10, height: 10, background: "#f97316", borderRadius: 2 }} />{" "}
                 Saídas (mov. estoque)
+              </span>
+              <span className={styles.chartLegendItem}>
+                <span style={{ display: "inline-block", width: 10, height: 10, background: "#8b5cf6", borderRadius: 2 }} />{" "}
+                Ajuste de estoque
               </span>
               <span className={styles.chartLegendItem}>
                 <span className={styles.chartLegendDotBlue} /> Saldo geral (un.)
@@ -1122,6 +1127,11 @@ export default function ProductDetailKPIs({
                         const k = (x.filialDisplayName || "").toUpperCase().trim();
                         if (k) exitQtyByFilial.set(k, (exitQtyByFilial.get(k) ?? 0) + x.qty);
                       });
+                      const adjustQtyByFilial = new Map<string, number>();
+                      (raw.adjustmentsByFilial ?? []).forEach((a) => {
+                        const k = (a.filialDisplayName || "").toUpperCase().trim();
+                        if (k) adjustQtyByFilial.set(k, (adjustQtyByFilial.get(k) ?? 0) + a.qty);
+                      });
                       return (
                         <div
                           style={{
@@ -1149,11 +1159,17 @@ export default function ProductDetailKPIs({
                             −{formatInteger(raw.sales)} saídas (vendas)
                           </p>
                           {raw.stockExits > 0 && (
-                            <p style={{ margin: "0 4px 10px 0", color: "#b91c1c", fontWeight: 600 }}>
+                            <p style={{ margin: `0 4px ${raw.adjustments !== 0 ? "4px" : "10px"} 0`, color: "#b91c1c", fontWeight: 600 }}>
                               −{formatInteger(raw.stockExits)} saídas (mov. estoque)
                             </p>
                           )}
-                          {raw.stockExits === 0 && <div style={{ marginBottom: "10px" }} />}
+                          {raw.adjustments !== 0 && (
+                            <p style={{ margin: "0 4px 10px 0", color: "#7c3aed", fontWeight: 600 }}>
+                              {raw.adjustments > 0 ? "+" : "−"}
+                              {formatInteger(Math.abs(raw.adjustments))} ajuste de estoque
+                            </p>
+                          )}
+                          {raw.stockExits === 0 && raw.adjustments === 0 && <div style={{ marginBottom: "10px" }} />}
                           <p style={{ margin: "0 0 8px 0", fontWeight: 700, color: raw.outOfStock ? "#dc2626" : "#1d4ed8" }}>
                             Saldo geral (fim do dia): {formatInteger(raw.stockGeral)} un.
                           </p>
@@ -1162,13 +1178,15 @@ export default function ProductDetailKPIs({
                               <p style={{ margin: "0 0 6px 0", fontSize: "10px", fontWeight: 700, color: "#94a3b8" }}>
                                 Saldo por filial · <span style={{ fontWeight: 600 }}>+</span> entrada ·{" "}
                                 <span style={{ fontWeight: 600 }}>−</span> venda ·{" "}
-                                <span style={{ fontWeight: 600 }}>↓</span> mov. estoque
+                                <span style={{ fontWeight: 600 }}>↓</span> mov. estoque ·{" "}
+                                <span style={{ fontWeight: 600 }}>⇅</span> ajuste
                               </p>
                               {filialRows.map((f) => {
                                 const fk = (f.filialDisplayName || "").toUpperCase().trim();
                                 const ent = entryQtyByFilial.get(fk) ?? 0;
                                 const sai = saleQtyByFilial.get(fk) ?? 0;
                                 const ext = exitQtyByFilial.get(fk) ?? 0;
+                                const adj = adjustQtyByFilial.get(fk) ?? 0;
                                 return (
                                   <div
                                     key={f.filialDisplayName}
@@ -1200,6 +1218,11 @@ export default function ProductDetailKPIs({
                                       {ext > 0 ? (
                                         <span style={{ color: "#ea580c", fontWeight: 700 }}>↓{formatInteger(ext)}</span>
                                       ) : null}
+                                      {adj !== 0 ? (
+                                        <span style={{ color: "#7c3aed", fontWeight: 700 }}>
+                                          ⇅{adj > 0 ? "+" : "−"}{formatInteger(Math.abs(adj))}
+                                        </span>
+                                      ) : null}
                                     </span>
                                     <span style={{ fontWeight: 600, flexShrink: 0, textAlign: "right" }}>
                                       {formatInteger(f.stock ?? 0)} un.
@@ -1216,6 +1239,7 @@ export default function ProductDetailKPIs({
                   <Bar yAxisId="flow" dataKey="entries" stackId="mov" name="Entradas" fill="#22c55e" radius={[2, 2, 0, 0]} />
                   <Bar yAxisId="flow" dataKey="salesFlow" stackId="mov" name="Saídas (vendas)" fill="#ef4444" radius={[0, 0, 0, 0]} />
                   <Bar yAxisId="flow" dataKey="stockExitFlow" stackId="mov" name="Saídas (mov. estoque)" fill="#f97316" radius={[0, 0, 0, 0]} />
+                  <Bar yAxisId="flow" dataKey="adjustFlow" stackId="mov" name="Ajuste de estoque" fill="#8b5cf6" radius={[0, 0, 0, 0]} />
                   <Line
                     yAxisId="stock"
                     type="monotone"

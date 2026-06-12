@@ -218,8 +218,10 @@ export interface ProductStockProgressDay {
   dateIso: string;
   entries: number;
   sales: number;
-  /** Saídas de estoque não-venda no dia (transferências, ajustes via ESTOQUE_PROD1_SAI). */
+  /** Saídas de estoque não-venda no dia (transferências, etc. via ESTOQUE_PROD1_SAI), exceto ajustes. */
   stockExits: number;
+  /** Ajuste de estoque líquido no dia (+entrada de ajuste, −saída de ajuste), reconhecido como no extrato (admin). */
+  adjustments: number;
   /** true quando o saldo estimado ao fim do dia é zero ou negativo. */
   outOfStock: boolean;
   stockGeral: number;
@@ -227,6 +229,8 @@ export interface ProductStockProgressDay {
   entriesByFilial: { filialDisplayName: string; qty: number }[];
   salesByFilial: { filialDisplayName: string; qty: number }[];
   exitsByFilial: { filialDisplayName: string; qty: number }[];
+  /** Ajustes por filial (qty com sinal: + entrada de ajuste, − saída de ajuste). */
+  adjustmentsByFilial: { filialDisplayName: string; qty: number }[];
 }
 
 function toLocalIsoDay(value: Date | string): string {
@@ -239,6 +243,32 @@ function toLocalIsoDay(value: Date | string): string {
 }
 
 type StockMovementRow = { d: Date; filial: string; qty: number };
+/** Linha de movimento de estoque já classificada como ajuste ou não. */
+type ClassifiedMovementRow = StockMovementRow & { ajuste: boolean };
+
+/**
+ * Reconhece "ajuste de estoque" a partir dos campos de tipo do romaneio, exatamente
+ * como o extrato do admin (resolveLinxTipoMovimento em app/api/admin/extrato-produto).
+ * Apenas reclassifica movimentos já presentes em ESTOQUE_PROD_ENT/SAI — não soma novas fontes.
+ */
+function isAjusteMovimento(...candidates: Array<string | number | null | undefined>): boolean {
+  const t = candidates
+    .filter((v) => v != null && String(v).trim() !== '')
+    .map((v) => String(v).trim().toUpperCase())
+    .join(' | ');
+  return (
+    /AJUST/.test(t) ||
+    /INVENT/.test(t) ||
+    /ACERT/.test(t) ||
+    /BALAN/.test(t) ||
+    /CONTAG/.test(t) ||
+    /AVULS/.test(t) ||
+    /DEFEIT/.test(t) ||
+    /MOV\.?\s*INTERNA/.test(t) ||
+    /MOVIMENTA(C|Ç)(A|Ã)O\s+INTERNA/.test(t)
+  );
+}
+
 type StockAggregationRow = {
   positiveStock?: number | null;
   negativeStock?: number | null;
@@ -2158,7 +2188,7 @@ export async function fetchProductSaleHistoryComparison(
 
 async function fetchStockEntriesDailyRows(
   params: ProductDetailParams
-): Promise<StockMovementRow[]> {
+): Promise<ClassifiedMovementRow[]> {
   const { start, end } = resolveRange(params.range);
   return withRequest(async (request) => {
     request.input('productId', sql.VarChar, params.productId);
@@ -2170,10 +2200,13 @@ async function fetchStockEntriesDailyRows(
     }
     const filialFilter = await buildFilialFilter(request, params.company, 'inventory', params.filial, 'E', 'entF');
     const colorFilterP = buildColorFilter(request, params.colors)('P');
+    // Agrupa também por tipo de romaneio/entrada para reconhecer ajustes (mesma classificação do extrato admin).
     const query = `
-      SELECT 
+      SELECT
         CAST(E.EMISSAO AS DATE) AS d,
         E.FILIAL AS filial,
+        E.TIPO_ROMANEIO AS tipoRomaneio,
+        E.TIPO_ENTRADA AS tipoEntrada,
         SUM(ISNULL(P.QTDE, 0)) AS qty
       FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
       INNER JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK) ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
@@ -2182,13 +2215,20 @@ async function fetchStockEntriesDailyRows(
         AND E.EMISSAO < @endDate
         ${filialFilter}
         ${colorFilterP}
-      GROUP BY CAST(E.EMISSAO AS DATE), E.FILIAL
+      GROUP BY CAST(E.EMISSAO AS DATE), E.FILIAL, E.TIPO_ROMANEIO, E.TIPO_ENTRADA
     `;
-    const result = await request.query<{ d: Date; filial: string; qty: number | null }>(query);
+    const result = await request.query<{
+      d: Date;
+      filial: string;
+      tipoRomaneio: string | null;
+      tipoEntrada: number | null;
+      qty: number | null;
+    }>(query);
     return (result.recordset ?? []).map((r) => ({
       d: r.d instanceof Date ? r.d : new Date(r.d),
       filial: r.filial ?? '',
       qty: Number(r.qty ?? 0),
+      ajuste: isAjusteMovimento(r.tipoRomaneio, r.tipoEntrada),
     }));
   });
 }
@@ -2196,7 +2236,7 @@ async function fetchStockEntriesDailyRows(
 /** Saídas de estoque não-venda por dia (ESTOQUE_PROD_SAI / ESTOQUE_PROD1_SAI). */
 async function fetchStockExitsDailyRows(
   params: ProductDetailParams
-): Promise<StockMovementRow[]> {
+): Promise<ClassifiedMovementRow[]> {
   const { start, end } = resolveRange(params.range);
   return withRequest(async (request) => {
     request.input('productId', sql.VarChar, params.productId);
@@ -2206,10 +2246,12 @@ async function fetchStockExitsDailyRows(
     if (!companyConfig) return [];
     const filialFilter = await buildFilialFilter(request, params.company, 'inventory', params.filial, 'ES', 'exitF');
     const colorFilterP = buildColorFilter(request, params.colors)('P');
+    // Agrupa também por tipo de romaneio para reconhecer ajustes (mesma classificação do extrato admin).
     const query = `
       SELECT
         CAST(ES.EMISSAO AS DATE) AS d,
         ES.FILIAL AS filial,
+        ES.TIPO_ROMANEIO AS tipoRomaneio,
         SUM(ISNULL(P.QTDE, 0)) AS qty
       FROM ESTOQUE_PROD_SAI AS ES WITH (NOLOCK)
       INNER JOIN ESTOQUE_PROD1_SAI AS P WITH (NOLOCK) ON ES.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
@@ -2218,13 +2260,19 @@ async function fetchStockExitsDailyRows(
         AND ES.EMISSAO < @endDate
         ${filialFilter}
         ${colorFilterP}
-      GROUP BY CAST(ES.EMISSAO AS DATE), ES.FILIAL
+      GROUP BY CAST(ES.EMISSAO AS DATE), ES.FILIAL, ES.TIPO_ROMANEIO
     `;
-    const result = await request.query<{ d: Date; filial: string; qty: number | null }>(query);
+    const result = await request.query<{
+      d: Date;
+      filial: string;
+      tipoRomaneio: string | null;
+      qty: number | null;
+    }>(query);
     return (result.recordset ?? []).map((r) => ({
       d: r.d instanceof Date ? r.d : new Date(r.d),
       filial: r.filial ?? '',
       qty: Number(r.qty ?? 0),
+      ajuste: isAjusteMovimento(r.tipoRomaneio),
     }));
   });
 }
@@ -2384,9 +2432,9 @@ export async function fetchProductStockProgressSeries(
     params.filial !== VAREJO_VALUE &&
     ecFiliais.some((f) => f.trim() === params.filial?.trim());
 
-  let entryRows: StockMovementRow[];
+  let entryRows: ClassifiedMovementRow[];
   let saleRows: StockMovementRow[];
-  let exitRows: StockMovementRow[];
+  let exitRows: ClassifiedMovementRow[];
 
   if (shouldAggregateEcommerce(params.company, params.filial)) {
     const [e, sr, se, ex] = await Promise.all([
@@ -2427,12 +2475,18 @@ export async function fetchProductStockProgressSeries(
     closingMap.set(k, (closingMap.get(k) ?? 0) + Number(row.stock ?? 0));
   }
 
+  // Entradas e saídas normais ficam separadas dos ajustes. O ajuste é líquido por filial
+  // (+ entrada de ajuste de ESTOQUE_PROD_ENT, − saída de ajuste de ESTOQUE_PROD_SAI).
+  // Isto apenas reclassifica movimentos já presentes nas tabelas — o total de impacto no
+  // estoque é idêntico ao anterior, então o saldo rebobinado não muda.
   const totalE = new Map<string, number>();
   const totalS = new Map<string, number>();
   const totalSE = new Map<string, number>();
+  const totalADJ = new Map<string, number>();
   for (const r of entryRows) {
     const k = normDispKey(dispLabel(r.filial));
-    totalE.set(k, (totalE.get(k) ?? 0) + r.qty);
+    if (r.ajuste) totalADJ.set(k, (totalADJ.get(k) ?? 0) + r.qty);
+    else totalE.set(k, (totalE.get(k) ?? 0) + r.qty);
   }
   for (const r of saleRows) {
     const k = normDispKey(dispLabel(r.filial));
@@ -2440,7 +2494,8 @@ export async function fetchProductStockProgressSeries(
   }
   for (const r of exitRows) {
     const k = normDispKey(dispLabel(r.filial));
-    totalSE.set(k, (totalSE.get(k) ?? 0) + r.qty);
+    if (r.ajuste) totalADJ.set(k, (totalADJ.get(k) ?? 0) - r.qty);
+    else totalSE.set(k, (totalSE.get(k) ?? 0) + r.qty);
   }
 
   const allKeys = new Set<string>([
@@ -2448,6 +2503,7 @@ export async function fetchProductStockProgressSeries(
     ...totalE.keys(),
     ...totalS.keys(),
     ...totalSE.keys(),
+    ...totalADJ.keys(),
   ]);
   const running = new Map<string, number>();
   for (const k of allKeys) {
@@ -2455,13 +2511,16 @@ export async function fetchProductStockProgressSeries(
     const te = totalE.get(k) ?? 0;
     const ts = totalS.get(k) ?? 0;
     const tse = totalSE.get(k) ?? 0;
-    // Rebobina para o início do período: estoque atual menos entradas mais todas as saídas
-    running.set(k, close - te + ts + tse);
+    const tadj = totalADJ.get(k) ?? 0;
+    // Rebobina para o início do período: estoque atual menos entradas/ajustes-de-entrada,
+    // mais todas as saídas (vendas, mov. estoque e ajustes-de-saída).
+    running.set(k, close - te + ts + tse - tadj);
   }
 
   const byDayEntry = new Map<string, Map<string, number>>();
   const byDaySale = new Map<string, Map<string, number>>();
   const byDayExit = new Map<string, Map<string, number>>();
+  const byDayAdjust = new Map<string, Map<string, number>>();
   const addDay = (m: Map<string, Map<string, number>>, iso: string, dispK: string, q: number) => {
     if (!q) return;
     if (!m.has(iso)) m.set(iso, new Map());
@@ -2471,7 +2530,7 @@ export async function fetchProductStockProgressSeries(
   for (const r of entryRows) {
     const iso = toLocalIsoDay(r.d);
     if (!iso) continue;
-    addDay(byDayEntry, iso, normDispKey(dispLabel(r.filial)), r.qty);
+    addDay(r.ajuste ? byDayAdjust : byDayEntry, iso, normDispKey(dispLabel(r.filial)), r.qty);
   }
   for (const r of saleRows) {
     const iso = toLocalIsoDay(r.d);
@@ -2481,13 +2540,22 @@ export async function fetchProductStockProgressSeries(
   for (const r of exitRows) {
     const iso = toLocalIsoDay(r.d);
     if (!iso) continue;
-    addDay(byDayExit, iso, normDispKey(dispLabel(r.filial)), r.qty);
+    // Ajuste de saída entra no líquido com sinal negativo.
+    addDay(r.ajuste ? byDayAdjust : byDayExit, iso, normDispKey(dispLabel(r.filial)), r.ajuste ? -r.qty : r.qty);
   }
 
   const toFilialList = (inner: Map<string, number> | undefined) => {
     if (!inner || inner.size === 0) return [];
     return Array.from(inner.entries())
       .filter(([, q]) => q > 0)
+      .map(([k, qty]) => ({ filialDisplayName: k, qty }))
+      .sort((a, b) => a.filialDisplayName.localeCompare(b.filialDisplayName, 'pt-BR'));
+  };
+  // Ajustes podem ter sinal negativo (saída de ajuste); mantém todos os não-zero.
+  const toAdjustList = (inner: Map<string, number> | undefined) => {
+    if (!inner || inner.size === 0) return [];
+    return Array.from(inner.entries())
+      .filter(([, q]) => q !== 0)
       .map(([k, qty]) => ({ filialDisplayName: k, qty }))
       .sort((a, b) => a.filialDisplayName.localeCompare(b.filialDisplayName, 'pt-BR'));
   };
@@ -2498,9 +2566,11 @@ export async function fetchProductStockProgressSeries(
     const em = byDayEntry.get(iso);
     const sm = byDaySale.get(iso);
     const xm = byDayExit.get(iso);
+    const adm = byDayAdjust.get(iso);
     let dayEntries = 0;
     let daySales = 0;
     let dayExits = 0;
+    let dayAdjust = 0;
     if (em) {
       em.forEach((q, dispK) => {
         dayEntries += q;
@@ -2519,6 +2589,13 @@ export async function fetchProductStockProgressSeries(
         running.set(dispK, (running.get(dispK) ?? 0) - q);
       });
     }
+    if (adm) {
+      // q já tem sinal: + entrada de ajuste, − saída de ajuste.
+      adm.forEach((q, dispK) => {
+        dayAdjust += q;
+        running.set(dispK, (running.get(dispK) ?? 0) + q);
+      });
+    }
     let stockGeral = 0;
     const stockByFilialOut: Record<string, number> = {};
     running.forEach((v, k) => {
@@ -2532,12 +2609,14 @@ export async function fetchProductStockProgressSeries(
       entries: Math.round(dayEntries),
       sales: Math.round(daySales),
       stockExits: Math.round(dayExits),
+      adjustments: Math.round(dayAdjust),
       outOfStock: stockGeralRounded <= 0,
       stockGeral: stockGeralRounded,
       stockByFilial: stockByFilialOut,
       entriesByFilial: toFilialList(em),
       salesByFilial: toFilialList(sm),
       exitsByFilial: toFilialList(xm),
+      adjustmentsByFilial: toAdjustList(adm),
     });
   }
 
