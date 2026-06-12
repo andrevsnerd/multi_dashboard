@@ -105,6 +105,7 @@ function getStatusLabel(status: CompraTransitoStatus) {
 
 function getStatusRealLabel(status: CompraTransitoStatusReal) {
   if (status === "recebido") return "Recebido";
+  if (status === "parcial") return "Parcial";
   if (status === "atrasado") return "Atrasado";
   if (status === "rascunho") return "Rascunho";
   return "Em trânsito";
@@ -583,6 +584,8 @@ export default function ComprasTransitoPage({
                       ? styles.rowReceived
                       : shownStatus === "atrasado"
                       ? styles.rowAtrasado
+                      : shownStatus === "parcial"
+                      ? styles.rowParcial
                       : shownStatus === "rascunho"
                       ? styles.rowDraft
                       : styles.rowConfirmed
@@ -599,6 +602,8 @@ export default function ComprasTransitoPage({
                             ? styles.inlineStatusBadgeRecebido
                             : shownStatus === "atrasado"
                             ? styles.inlineStatusBadgeAtrasado
+                            : shownStatus === "parcial"
+                            ? styles.inlineStatusBadgeParcial
                             : shownStatus === "rascunho"
                             ? styles.inlineStatusBadgeDraft
                             : styles.inlineStatusBadgeTransit
@@ -609,6 +614,12 @@ export default function ComprasTransitoPage({
                       {itemRecon?.statusReal === "recebido" && itemRecon.recebidoEm && (
                         <span className={styles.durationChip}>
                           Chegou {fmtDate(itemRecon.recebidoEm)}
+                        </span>
+                      )}
+                      {itemRecon?.statusReal === "parcial" && (
+                        <span className={styles.durationChip}>
+                          Resto em trânsito
+                          {itemRecon.recebidoEm ? ` · parcial ${fmtDate(itemRecon.recebidoEm)}` : ""}
                         </span>
                       )}
                       {durationLabel && (
@@ -1057,6 +1068,14 @@ export default function ComprasTransitoPage({
                         {fmt(reconResumo.recebidos)} / {fmt(reconResumo.totalItens)}
                       </strong>
                     </div>
+                    {reconResumo.parciais > 0 && (
+                      <div className={styles.summaryItem}>
+                        <span className={styles.summaryLabel}>Parciais (falta chegar)</span>
+                        <strong className={styles.summaryValueDraft}>
+                          {fmt(reconResumo.parciais)}
+                        </strong>
+                      </div>
+                    )}
                     <div className={styles.summaryItem}>
                       <span className={styles.summaryLabel}>Atrasados</span>
                       <strong

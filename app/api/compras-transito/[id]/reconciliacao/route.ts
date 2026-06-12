@@ -82,6 +82,7 @@ export async function GET(
     const itensRec = recMap.get(id) ?? new Map();
     const itens: CompraTransitoReconciliacaoResposta["itens"] = {};
     let recebidos = 0;
+    let parciais = 0;
     let atrasados = 0;
     let emTransito = 0;
 
@@ -90,19 +91,23 @@ export async function GET(
       if (!rec) continue;
       itens[item.itemKey] = rec;
       if (rec.statusReal === "recebido") recebidos += 1;
+      else if (rec.statusReal === "parcial") parciais += 1;
       else if (rec.statusReal === "atrasado") atrasados += 1;
       else if (rec.statusReal === "em_transito") emTransito += 1;
     }
 
+    // "recebido" só quando TODOS os itens chegaram por completo. Enquanto faltar
+    // algo, a compra não fica recebida — fica parcial (amarela), depois atrasada.
     const totalItens = target.items.length;
     let statusGeral: CompraTransitoStatusReal = "em_transito";
     if (totalItens > 0 && recebidos === totalItens) statusGeral = "recebido";
+    else if (parciais > 0) statusGeral = "parcial";
     else if (atrasados > 0) statusGeral = "atrasado";
 
     const data: CompraTransitoReconciliacaoResposta = {
       compraId: id,
       itens,
-      resumo: { totalItens, recebidos, atrasados, emTransito, statusGeral },
+      resumo: { totalItens, recebidos, parciais, atrasados, emTransito, statusGeral },
     };
 
     return NextResponse.json({ data });

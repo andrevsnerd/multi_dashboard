@@ -43,10 +43,16 @@ export interface CompraTransitoListEntry {
 
 /**
  * Status "real" de um item, derivado da reconciliação contra entradas físicas na
- * matriz — diferente do status por data (que só presume a chegada). "atrasado"
- * não existe no enum persistido; vive só aqui, na camada de resposta.
+ * matriz — diferente do status por data (que só presume a chegada). "atrasado" e
+ * "parcial" não existem no enum persistido; vivem só aqui, na camada de resposta.
+ * "parcial" = recebeu parte, mas ainda falta (o restante continua em trânsito).
  */
-export type CompraTransitoStatusReal = "rascunho" | "em_transito" | "atrasado" | "recebido";
+export type CompraTransitoStatusReal =
+  | "rascunho"
+  | "em_transito"
+  | "atrasado"
+  | "parcial"
+  | "recebido";
 
 /** Resultado da reconciliação de UM item contra as entradas reais na matriz. */
 export interface CompraTransitoItemReconciliacao {
@@ -83,6 +89,7 @@ export interface CompraTransitoReconciliacaoResposta {
   resumo: {
     totalItens: number;
     recebidos: number;
+    parciais: number;
     atrasados: number;
     emTransito: number;
     statusGeral: CompraTransitoStatusReal;

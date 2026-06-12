@@ -106,13 +106,21 @@ export function buildReconcileKey(produto?: string | null, cor?: string | null):
   return `${String(produto ?? "").trim().toUpperCase()}||${normalizeCorKey(cor)}`;
 }
 
-/** Status real de UM item a partir do que foi recebido vs a data esperada. */
+/**
+ * Status real de UM item a partir do recebido vs o pedido e a data esperada.
+ * - recebido: chegou tudo (recebidoQtd >= pedido), podendo exceder um pouco.
+ * - parcial:  chegou parte, mas ainda falta — o restante continua em trânsito.
+ * - atrasado: nada chegou e a data prevista já passou.
+ * - em_transito: nada chegou e ainda não passou a data.
+ */
 export function deriveItemStatusReal(
   recebidoQtd: number,
+  ordered: number,
   dataRecebimento: string,
   today: Date = new Date()
 ): CompraTransitoStatusReal {
-  if (recebidoQtd > 0) return "recebido";
+  if (ordered > 0 && recebidoQtd >= ordered) return "recebido";
+  if (recebidoQtd > 0) return "parcial";
   const dr = dayKey(dataRecebimento);
   if (!dr) return "rascunho";
   return dr < dayKeyFromDate(today) ? "atrasado" : "em_transito";
@@ -229,53 +237,53 @@ export function reconcileCompras(params: {
     );
     const ents = (entriesByKey.get(key) ?? [])
       .slice()
-      .sort((a, b) => a.data.localeCompare(b.data) || (a.romaneio ?? "").localeCompare(b.romaneio ?? ""));
+      .sort((a, b) => a.data.localeCompare(b.data) || (a.romaneio ?? "").localeCompare(b.romaneio ?? ""))
+      .map((e) => ({ ...e, remaining: e.qtde, touched: new Set<Slot>() }));
 
-    // Elegível = entrada após a criação da compra E (se o item já tem entrada)
-    // dentro da janela de complemento a partir da primeira entrada dele.
-    const isEligible = (slot: Slot, entryDay: string): boolean => {
-      if (entryDay < slot.createdDay) return false;
-      if (slot.anchorDay && dayDiff(slot.anchorDay, entryDay) > JANELA_COMPLEMENTO_DIAS) return false;
-      return true;
-    };
+    const isNewer = (slot: Slot, target: Slot | null): boolean =>
+      !target ||
+      slot.createdDay > target.createdDay ||
+      (slot.createdDay === target.createdDay && slot.itemKey > target.itemKey);
 
-    // Passo 1 — FIFO: preenche até o pedido, do item mais antigo ao mais novo.
+    // Passo 1 — FIFO, preenche FALTAS sem janela. Item faltante "deve" o restante e
+    // aceita entradas futuras indefinidamente (a falta sempre acaba chegando), do
+    // item mais antigo ao mais novo. A janela de 7 dias NÃO se aplica aqui.
     for (const e of ents) {
-      let remaining = e.qtde;
       for (const slot of slots) {
-        if (remaining <= 0) break;
-        if (slot.remaining <= 0) continue;
-        if (!isEligible(slot, e.data)) continue;
-        if (!slot.anchorDay) slot.anchorDay = e.data; // 1ª entrada do item ancora a janela
-        const take = Math.min(remaining, slot.remaining);
+        if (e.remaining <= 0) break;
+        if (slot.remaining <= 0) continue; // item já completo: não preenche mais
+        if (e.data < slot.createdDay) continue; // entrada anterior à compra: inelegível
+        if (!slot.anchorDay) slot.anchorDay = e.data; // 1ª entrada do item
+        const take = Math.min(e.remaining, slot.remaining);
         slot.remaining -= take;
-        remaining -= take;
+        e.remaining -= take;
+        e.touched.add(slot);
         applyAllocation(slot.rec, e, take, false);
       }
-      e.qtde = remaining; // sobra para o passo 2
     }
 
-    // Passo 2 — excesso: sobra elegível vai para o item elegível mais novo (dentro
-    // da janela). Sobra fora de janela/anterior a todas as compras não é alocada —
-    // é provavelmente de outra compra.
+    // Passo 2 — excesso: sobra de entrada após preencher todas as faltas.
+    //  • Preferência: o item que ESTA entrada completou (overshoot do recebimento
+    //    conta mesmo após 7 dias — "quando a compra chega, mesmo excedendo um pouco").
+    //  • Senão (sobra avulsa): item JÁ completo dentro da janela de 7 dias da 1ª
+    //    entrada dele. Fora da janela é provavelmente de outra compra → não aloca.
     for (const e of ents) {
-      if (e.qtde <= 0) continue;
+      if (e.remaining <= 0) continue;
       let target: Slot | null = null;
-      for (const slot of slots) {
-        if (!isEligible(slot, e.data)) continue;
-        if (
-          !target ||
-          slot.createdDay > target.createdDay ||
-          (slot.createdDay === target.createdDay && slot.itemKey > target.itemKey)
-        ) {
-          target = slot;
+      for (const slot of e.touched) {
+        if (isNewer(slot, target)) target = slot;
+      }
+      if (!target) {
+        for (const slot of slots) {
+          if (e.data < slot.createdDay) continue;
+          if (!slot.anchorDay || dayDiff(slot.anchorDay, e.data) > JANELA_COMPLEMENTO_DIAS) continue;
+          if (isNewer(slot, target)) target = slot;
         }
       }
       if (!target) continue;
-      if (!target.anchorDay) target.anchorDay = e.data;
-      applyAllocation(target.rec, e, e.qtde, true);
-      target.rec.excedeu += e.qtde;
-      e.qtde = 0;
+      applyAllocation(target.rec, e, e.remaining, true);
+      target.rec.excedeu += e.remaining;
+      e.remaining = 0;
     }
   }
 
@@ -287,7 +295,7 @@ export function reconcileCompras(params: {
       const ordered = Math.max(0, Math.round(item.quantidade ?? 0));
       rec.faltou = Math.max(0, ordered - rec.recebidoQtd);
       rec.recebidoEm = rec.lastEntryDate;
-      rec.statusReal = deriveItemStatusReal(rec.recebidoQtd, item.dataRecebimento, today);
+      rec.statusReal = deriveItemStatusReal(rec.recebidoQtd, ordered, item.dataRecebimento, today);
     }
   }
 

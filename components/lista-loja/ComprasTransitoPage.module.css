@@ -367,6 +367,10 @@
   background: rgba(254, 226, 226, 0.5);
 }
 
+.rowParcial {
+  background: rgba(254, 243, 199, 0.55);
+}
+
 .readOnlyDateCell {
   display: flex;
   flex-direction: column;
@@ -399,6 +403,11 @@
 .inlineStatusBadgeAtrasado {
   color: #b91c1c;
   background: rgba(239, 68, 68, 0.16);
+}
+
+.inlineStatusBadgeParcial {
+  color: #92400e;
+  background: rgba(251, 191, 36, 0.22);
 }
 
 .inlineStatusBadgeDraft {
