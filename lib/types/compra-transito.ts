@@ -40,3 +40,44 @@ export interface CompraTransitoListEntry {
   confirmedAt: string;
   createdByName?: string;
 }
+
+/**
+ * Status "real" de um item, derivado da reconciliação contra entradas físicas na
+ * matriz — diferente do status por data (que só presume a chegada). "atrasado"
+ * não existe no enum persistido; vive só aqui, na camada de resposta.
+ */
+export type CompraTransitoStatusReal = "rascunho" | "em_transito" | "atrasado" | "recebido";
+
+/** Resultado da reconciliação de UM item contra as entradas reais na matriz. */
+export interface CompraTransitoItemReconciliacao {
+  /** Quantidade que realmente entrou na matriz, atribuída a este item (FIFO). */
+  recebidoQtd: number;
+  /** max(0, pedido - recebido). */
+  faltou: number;
+  /** Quantidade que entrou além do pedido (atribuída ao item mais novo elegível). */
+  excedeu: number;
+  /** Data real de chegada (última entrada alocada). */
+  recebidoEm?: string;
+  firstEntryDate?: string;
+  lastEntryDate?: string;
+  statusReal: CompraTransitoStatusReal;
+  /** Entradas físicas que alimentaram este item. */
+  allocatedEntries: Array<{ data: string; qtde: number; excess?: boolean }>;
+}
+
+/** Item da compra enriquecido com a reconciliação (campos de resposta, não persistidos). */
+export type CompraTransitoItemReconciledRow = CompraTransitoItemRow & Partial<CompraTransitoItemReconciliacao>;
+
+/** Resposta do endpoint de reconciliação para UMA compra. */
+export interface CompraTransitoReconciliacaoResposta {
+  compraId: string;
+  /** itemKey -> reconciliação. */
+  itens: Record<string, CompraTransitoItemReconciliacao>;
+  resumo: {
+    totalItens: number;
+    recebidos: number;
+    atrasados: number;
+    emTransito: number;
+    statusGeral: CompraTransitoStatusReal;
+  };
+}
