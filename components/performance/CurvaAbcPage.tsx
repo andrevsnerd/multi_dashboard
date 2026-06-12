@@ -836,6 +836,21 @@ function buildProductDetalhadoHref(
   return `/${companyKey}/produto-detalhado?${params.toString()}`;
 }
 
+function buildProductPerformanceHref(
+  companyKey: CompanyKey,
+  p: Pick<ProdutoRow, "produto" | "descricao" | "cor">
+): string {
+  if (isProdutoAgrupadoSyntheticId(p.produto)) {
+    return "#";
+  }
+  const params = new URLSearchParams();
+  params.set("productId", p.produto.trim());
+  params.set("name", (p.descricao || p.produto).trim());
+  const cor = (p.cor ?? "").trim();
+  if (cor) params.set("colors", cor);
+  return `/${companyKey}/produto-performance?${params.toString()}`;
+}
+
 function renderGroupedMetricTooltip(
   product: ProdutoRow,
   title: string,
@@ -2596,6 +2611,30 @@ const handleBadgeClick = (cat: string) => {
                                           strokeLinejoin="round"
                                         />
                                         <circle cx="10" cy="10" r="2.4" stroke="currentColor" strokeWidth="1.8" />
+                                      </svg>
+                                    </Link>
+                                    <Link
+                                      href={buildProductPerformanceHref(companyKey, p)}
+                                      className={`${styles.productDetailIcon} ${styles.productPerformanceIcon}`}
+                                      title="Abrir produto performance"
+                                      aria-label={`Abrir produto performance de ${p.descricao || p.produto}`}
+                                    >
+                                      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                        <path
+                                          d="M3 15.5C2.2 14 1.75 12.05 1.75 10C1.75 5.45 5.45 1.75 10 1.75C14.55 1.75 18.25 5.45 18.25 10C18.25 12.05 17.8 14 17 15.5"
+                                          stroke="currentColor"
+                                          strokeWidth="1.8"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        />
+                                        <path
+                                          d="M10 10L13.2 6.8"
+                                          stroke="currentColor"
+                                          strokeWidth="1.8"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        />
+                                        <circle cx="10" cy="10" r="1.4" fill="currentColor" />
                                       </svg>
                                     </Link>
                                     {(() => {

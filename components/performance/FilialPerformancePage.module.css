@@ -1030,6 +1030,16 @@
   height: 14px;
 }
 
+.productPerformanceIcon {
+  background: #fef9c3;
+  color: #a16207;
+}
+
+.productPerformanceIcon:hover {
+  background: #fef08a;
+  color: #854d0e;
+}
+
 .productNameRow {
   display: flex;
   align-items: center;
