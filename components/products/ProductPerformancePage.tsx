@@ -17,16 +17,18 @@ import {
   collectFilials,
   computePerformance,
   detectPeriods,
+  firstActivityIndex,
   lastInStockPeriod,
   summarize,
   type CoverageFilial,
   type CoveragePeriod,
 } from "@/lib/utils/product-coverage";
+import { getLimiteDiasReposicao } from "@/lib/utils/suggestion-rules";
 
 import styles from "./ProductPerformancePage.module.css";
 
 const NO_COLOR_VALUE = "__SEM_COR__";
-const DEFAULT_COVERAGE_DAYS = 30;
+const DEFAULT_COVERAGE_DAYS = 60;
 
 interface ProductPerformancePageProps {
   companyKey: CompanyKey;
@@ -281,7 +283,8 @@ export default function ProductPerformancePage({
   const [error, setError] = useState<string | null>(null);
 
   const [selection, setSelection] = useState<SelectionState | null>(null);
-  const [coverageDays, setCoverageDays] = useState(DEFAULT_COVERAGE_DAYS);
+  // null = usar a cobertura automática do item (regra da Compra Ideal); número = override manual.
+  const [coverageOverride, setCoverageOverride] = useState<number | null>(null);
 
   const selectedColorValue = selectedColors[0]
     ? selectedColors[0]
@@ -328,6 +331,7 @@ export default function ProductPerformancePage({
     setShowSearchResults(false);
     setSearchResults([]);
     setSelectedColors(colors);
+    setCoverageOverride(null);
   }, [searchParams]);
 
   // Buscar produtos ao digitar
@@ -427,7 +431,30 @@ export default function ProductPerformancePage({
 
   const aggFlags = useMemo(() => aggregatedFlags(days), [days]);
   const aggPeriods = useMemo(() => detectPeriods(aggFlags), [aggFlags]);
-  const summary = useMemo(() => summarize(aggFlags), [aggFlags]);
+
+  // Cobertura automática do item: mesma regra da Compra Ideal (linha/subgrupo).
+  const autoCoverageDays = useMemo(() => {
+    if (!detailData) return DEFAULT_COVERAGE_DAYS;
+    return getLimiteDiasReposicao({
+      linha: detailData.detail.linha ?? null,
+      subgrupo: detailData.detail.subgrupo ?? null,
+    });
+  }, [detailData]);
+  const coverageDays = coverageOverride ?? autoCoverageDays;
+
+  // KPIs ancorados na 1ª atividade do produto no período: dias antes de o item
+  // existir/ter estoque não contam como ruptura. Status atual usa o estoque real.
+  const summary = useMemo(() => {
+    const start = firstActivityIndex(days);
+    const anchored = aggFlags.slice(start);
+    const base = summarize(anchored);
+    const currentlyOut = (detailData?.detail.totalStock ?? 0) <= 0;
+    return {
+      ...base,
+      currentlyOut,
+      daysSinceLastStock: currentlyOut ? base.daysSinceLastStock : 0,
+    };
+  }, [days, aggFlags, detailData]);
 
   const branchPeriods = useMemo(
     () =>
@@ -477,6 +504,7 @@ export default function ProductPerformancePage({
     setShowSearchResults(false);
     setSearchResults([]);
     setSelectedColors(preColor ? [preColor] : []);
+    setCoverageOverride(null);
   }, []);
 
   const clearSearch = useCallback(() => {
@@ -488,6 +516,7 @@ export default function ProductPerformancePage({
     setShowSearchResults(false);
     setSearchResults([]);
     setSelectedColors([]);
+    setCoverageOverride(null);
   }, []);
 
   const rangeStartIso = days[selection?.startIndex ?? 0]?.dateIso ?? "";
@@ -652,7 +681,7 @@ export default function ProductPerformancePage({
             ) : null}
           </h2>
           <p className={styles.productSub}>
-            Histórico dos últimos {summary.totalDays} dias em {filiais.length}{" "}
+            {summary.totalDays} dias com histórico em {filiais.length}{" "}
             {filiais.length === 1 ? "filial" : "filiais"}. Verde indica dias com estoque em alguma
             loja; vermelho, ruptura total.
           </p>
@@ -668,12 +697,27 @@ export default function ProductPerformancePage({
                 value={coverageDays}
                 onChange={(e) => {
                   const v = Number(e.target.value);
-                  setCoverageDays(Number.isFinite(v) && v > 0 ? Math.min(365, Math.round(v)) : 1);
+                  setCoverageOverride(
+                    Number.isFinite(v) && v > 0 ? Math.min(365, Math.round(v)) : 1
+                  );
                 }}
                 className={styles.coverageInput}
                 aria-label="Cobertura alvo em dias"
               />
               <span className={styles.statUnit}> dias</span>
+            </span>
+            <span className={styles.statHint}>
+              {coverageOverride === null ? (
+                `Automático (${detailData.detail.linha?.trim() || detailData.detail.subgrupo?.trim() || "padrão"})`
+              ) : (
+                <button
+                  type="button"
+                  className={styles.linkButton}
+                  onClick={() => setCoverageOverride(null)}
+                >
+                  Voltar ao automático ({autoCoverageDays}d)
+                </button>
+              )}
             </span>
           </div>
           <Stat
@@ -819,6 +863,13 @@ export default function ProductPerformancePage({
                   <span className={styles.sortHint}>ORDENADO POR VELOCIDADE</span>
                 </div>
                 <table className={styles.perfTable}>
+                  <colgroup>
+                    <col className={styles.colFilial} />
+                    <col className={styles.colDias} />
+                    <col className={styles.colVend} />
+                    <col className={styles.colVel} />
+                    <col className={styles.colEnviar} />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th>Filial</th>
@@ -854,7 +905,7 @@ export default function ProductPerformancePage({
                                   style={{ width: `${barWidth}%` }}
                                 />
                               </span>
-                              <span className={styles.mono}>
+                              <span className={`${styles.mono} ${styles.velValue}`}>
                                 {nf2.format(f.velocity)}
                                 <span className={styles.muted}> un/d</span>
                               </span>

@@ -165,6 +165,10 @@ export interface ProductDetailInfo {
   productName: string;
   /** Grade do produto (scarfme); ex.: P, M, G */
   grade?: string | null;
+  /** Linha do produto (PRODUTOS.LINHA) — usada na regra de cobertura. */
+  linha?: string | null;
+  /** Subgrupo do produto (PRODUTOS.SUBGRUPO_PRODUTO) — usado na regra de cobertura. */
+  subgrupo?: string | null;
   lastEntryDate: Date | null;
   lastEntryFilial: string | null;
   totalRevenue: number;
@@ -899,6 +903,8 @@ export async function fetchProductDetail({
         p.PRODUTO AS productId,
         p.DESC_PRODUTO AS productName,
         ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
+        ISNULL(p.LINHA, '') AS linha,
+        ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
         ISNULL(p.CUSTO_REPOSICAO1, 0) AS registeredCost,
         ISNULL(p.PRECO_REPOSICAO_1, 0) AS registeredPrice,
         (
@@ -927,6 +933,8 @@ export async function fetchProductDetail({
       productId: string;
       productName: string | null;
       grade: string | null;
+      linha: string | null;
+      subgrupo: string | null;
       registeredCost: number;
       registeredPrice: number;
       lastEntryDate: Date | null;
@@ -937,6 +945,8 @@ export async function fetchProductDetail({
       productId,
       productName: null,
       grade: null,
+      linha: null,
+      subgrupo: null,
       registeredCost: 0,
       registeredPrice: 0,
       lastEntryDate: null,
@@ -1223,6 +1233,8 @@ export async function fetchProductDetail({
       productId: productRow.productId,
       productName: productRow.productName || 'Produto não encontrado',
       grade: (productRow.grade ?? '').trim() || null,
+      linha: (productRow.linha ?? '').trim() || null,
+      subgrupo: (productRow.subgrupo ?? '').trim() || null,
       lastEntryDate,
       lastEntryFilial: lastEntryFilialDisplayName,
       totalRevenue,

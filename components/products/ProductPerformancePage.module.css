@@ -624,25 +624,46 @@
 .perfTable {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: 13px;
+}
+
+.colFilial {
+  width: 28%;
+}
+.colDias {
+  width: 18%;
+}
+.colVend {
+  width: 12%;
+}
+.colVel {
+  width: 26%;
+}
+.colEnviar {
+  width: 16%;
 }
 
 .perfTable th {
   text-align: left;
-  font-size: 10.5px;
-  letter-spacing: 0.06em;
+  font-size: 10px;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--pp-muted);
   font-weight: 600;
-  padding: 0 10px 10px;
+  padding: 0 8px 10px;
   border-bottom: 1px solid var(--pp-border);
+  white-space: nowrap;
 }
 
 .perfTable td {
-  padding: 12px 10px;
+  padding: 11px 8px;
   border-bottom: 1px solid #f1f5f9;
   color: var(--pp-ink);
   vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .perfTable tfoot td {
@@ -658,6 +679,8 @@
 
 .perfFilial {
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .zeroDanger {
@@ -669,24 +692,41 @@
 .velCell {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-width: 150px;
+  gap: 8px;
+  justify-content: flex-start;
 }
 
 .velBarTrack {
-  flex: 1;
+  flex: 1 1 auto;
   height: 6px;
   background: #eef2f7;
   border-radius: 3px;
   overflow: hidden;
-  min-width: 60px;
+  min-width: 36px;
 }
 
 .velBarFill {
   display: block;
   height: 100%;
-  background: var(--pp-ink);
+  background: var(--pp-in);
   border-radius: 3px;
+}
+
+.velValue {
+  flex: 0 0 auto;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.linkButton {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--pp-in);
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  font-family: inherit;
 }
 
 .perfFootnote {

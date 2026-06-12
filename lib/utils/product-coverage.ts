@@ -225,6 +225,28 @@ export function computePerformance(
   };
 }
 
+/**
+ * Primeiro índice com qualquer atividade real do produto no período
+ * (estoque > 0, entrada, venda, saída ou ajuste). Antes disso o produto não
+ * tinha histórico — não conta como ruptura, apenas "ainda não existia".
+ * Retorna 0 quando não há atividade nenhuma (janela inteira considerada).
+ */
+export function firstActivityIndex(days: ProductStockProgressDay[]): number {
+  for (let i = 0; i < days.length; i += 1) {
+    const d = days[i];
+    if (
+      (d.stockGeral ?? 0) > 0 ||
+      (d.entries ?? 0) > 0 ||
+      (d.sales ?? 0) > 0 ||
+      (d.stockExits ?? 0) > 0 ||
+      (d.adjustments ?? 0) !== 0
+    ) {
+      return i;
+    }
+  }
+  return 0;
+}
+
 /** Último período "com estoque" do consolidado, para seleção inicial. */
 export function lastInStockPeriod(periods: CoveragePeriod[]): CoveragePeriod | null {
   for (let i = periods.length - 1; i >= 0; i -= 1) {
