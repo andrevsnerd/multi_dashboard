@@ -851,6 +851,58 @@ function buildProductPerformanceHref(
   return `/${companyKey}/produto-performance?${params.toString()}`;
 }
 
+function renderRowActionIcons(
+  companyKey: CompanyKey,
+  p: Pick<ProdutoRow, "produto" | "descricao" | "cor">
+): React.ReactNode {
+  const name = p.descricao || p.produto;
+  return (
+    <>
+      <Link
+        href={buildProductDetalhadoHref(companyKey, p)}
+        className={styles.productDetailIcon}
+        title="Abrir produto detalhado"
+        aria-label={`Abrir produto detalhado de ${name}`}
+      >
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path
+            d="M1.75 10C3.3 6.95 6.3 5 10 5C13.7 5 16.7 6.95 18.25 10C16.7 13.05 13.7 15 10 15C6.3 15 3.3 13.05 1.75 10Z"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <circle cx="10" cy="10" r="2.4" stroke="currentColor" strokeWidth="1.8" />
+        </svg>
+      </Link>
+      <Link
+        href={buildProductPerformanceHref(companyKey, p)}
+        className={`${styles.productDetailIcon} ${styles.productPerformanceIcon}`}
+        title="Abrir produto performance"
+        aria-label={`Abrir produto performance de ${name}`}
+      >
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path
+            d="M3 15.5C2.2 14 1.75 12.05 1.75 10C1.75 5.45 5.45 1.75 10 1.75C14.55 1.75 18.25 5.45 18.25 10C18.25 12.05 17.8 14 17 15.5"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M10 10L13.2 6.8"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <circle cx="10" cy="10" r="1.4" fill="currentColor" />
+        </svg>
+      </Link>
+    </>
+  );
+}
+
 function renderGroupedMetricTooltip(
   product: ProdutoRow,
   title: string,
@@ -2596,47 +2648,7 @@ const handleBadgeClick = (cat: string) => {
                                 <div className={styles.productDetailLink}>
                                   <div className={styles.productNameRow}>
                                     <span className={styles.productName}>{p.descricao || p.produto}</span>
-                                    <Link
-                                      href={buildProductDetalhadoHref(companyKey, p)}
-                                      className={styles.productDetailIcon}
-                                      title="Abrir produto detalhado"
-                                      aria-label={`Abrir produto detalhado de ${p.descricao || p.produto}`}
-                                    >
-                                      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                                        <path
-                                          d="M1.75 10C3.3 6.95 6.3 5 10 5C13.7 5 16.7 6.95 18.25 10C16.7 13.05 13.7 15 10 15C6.3 15 3.3 13.05 1.75 10Z"
-                                          stroke="currentColor"
-                                          strokeWidth="1.8"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                        />
-                                        <circle cx="10" cy="10" r="2.4" stroke="currentColor" strokeWidth="1.8" />
-                                      </svg>
-                                    </Link>
-                                    <Link
-                                      href={buildProductPerformanceHref(companyKey, p)}
-                                      className={`${styles.productDetailIcon} ${styles.productPerformanceIcon}`}
-                                      title="Abrir produto performance"
-                                      aria-label={`Abrir produto performance de ${p.descricao || p.produto}`}
-                                    >
-                                      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                                        <path
-                                          d="M3 15.5C2.2 14 1.75 12.05 1.75 10C1.75 5.45 5.45 1.75 10 1.75C14.55 1.75 18.25 5.45 18.25 10C18.25 12.05 17.8 14 17 15.5"
-                                          stroke="currentColor"
-                                          strokeWidth="1.8"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                        />
-                                        <path
-                                          d="M10 10L13.2 6.8"
-                                          stroke="currentColor"
-                                          strokeWidth="1.8"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                        />
-                                        <circle cx="10" cy="10" r="1.4" fill="currentColor" />
-                                      </svg>
-                                    </Link>
+                                    {!p.isGroupedProduct && renderRowActionIcons(companyKey, p)}
                                     {(() => {
                                       const cmp = getComparisonBadge(p.vendas, p.vendasPrevious);
                                       if (!cmp) return null;
@@ -2661,6 +2673,9 @@ const handleBadgeClick = (cat: string) => {
                                             {(p.groupedMembers ?? []).map(m => (
                                               <div key={m.produto} className={styles.inlineTooltipRow}>
                                                 {renderGroupedMemberLabel(m, false)}
+                                                <span className={styles.inlineTooltipActions}>
+                                                  {renderRowActionIcons(companyKey, m)}
+                                                </span>
                                               </div>
                                             ))}
                                           </div>

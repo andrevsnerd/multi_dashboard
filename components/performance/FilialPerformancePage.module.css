@@ -1579,6 +1579,10 @@
   position: relative;
   display: inline-flex;
   max-width: 100%;
+  /* Estende a área de hover para cima, cobrindo o gap até o painel,
+     para que os links dentro da tooltip fiquem clicáveis sem fechar. */
+  padding-top: 10px;
+  margin-top: -10px;
 }
 
 .inlineTooltipTrigger {
@@ -1649,6 +1653,18 @@
 
 .inlineTooltipRow:last-child {
   border-bottom: none;
+}
+
+.inlineTooltipActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.inlineTooltipActions .productDetailIcon {
+  width: 22px;
+  height: 22px;
 }
 
 .inlineTooltipLabel {
