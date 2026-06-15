@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "./AuthContext";
+import { NotificationBell } from "@/components/notificacoes/NotificationBell";
 import styles from "./UserHeaderBar.module.css";
 
 export function UserHeaderBar() {
@@ -25,6 +26,7 @@ export function UserHeaderBar() {
             <span>Admin</span>
           </Link>
         )}
+        <NotificationBell />
         <span className={styles.userName}>{user.username}</span>
         <button
           type="button"

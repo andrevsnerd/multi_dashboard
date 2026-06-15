@@ -34,5 +34,19 @@
       "scarfme"
     ],
     "nomeExibicao": "logistico"
+  },
+  {
+    "id": "8006827d2d3d",
+    "username": "nerd.higii",
+    "passwordHash": "dcfd14047e707ca989bf3ec549622f7b:afba5ee4aac16a4bcd6b462c8efadb92c7949406c79b397d5b8b6a07f2444ad602737e1ae3b07946c7f5fa6dae623549d83a6a9cf057b7def31f109c21b05cd8",
+    "role": "gestor",
+    "permissions": [
+      "controle-transferencias",
+      "romaneios",
+      "saidas-entradas-produtos"
+    ],
+    "allowedCompanies": [
+      "nerd"
+    ]
   }
 ]

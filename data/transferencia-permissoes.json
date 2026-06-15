@@ -122,5 +122,27 @@
     "tipoRomaneioFixo": false,
     "podeVerOutrasFiliais": true,
     "filialAtribuida": null
+  },
+  {
+    "username": "nerd.higii",
+    "filiaisOrigem": [
+      "NERD HIGIENOPOLIS"
+    ],
+    "filiaisDestino": [
+      "NERD HIGIENOPOLIS"
+    ],
+    "filiaisDestinoControle": [],
+    "tiposRomaneioPermitidos": [
+      "TRANSFERENCIA ENTRE LOJAS",
+      "AJUSTE DE ESTOQUE",
+      "DEFEITO",
+      "SAÍDA MKT",
+      "AMOSTRA"
+    ],
+    "responsavelPadrao": "NERD.HIGI",
+    "responsavelFixo": true,
+    "tipoRomaneioFixo": false,
+    "podeVerOutrasFiliais": false,
+    "filialAtribuida": "NERD HIGIENOPOLIS"
   }
 ]
