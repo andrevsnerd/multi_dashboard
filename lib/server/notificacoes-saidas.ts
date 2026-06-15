@@ -30,6 +30,33 @@ import type { SaidaPendente } from "@/lib/types/notificacao";
 /** Janela padrão (dias) para considerar uma saída "nova". */
 export const NOTIF_JANELA_DIAS = 30;
 
+/**
+ * Regras da TRAVA de bloqueio (popup persistente).
+ *
+ * - TRAVA_DATA_INICIO: só saídas emitidas a partir desta data contam. Antes
+ *   disso há entradas antigas já corrigidas via ajuste/inventário, que não
+ *   devem prender ninguém.
+ * - TRAVA_DIAS_MINIMOS: carência. Saídas recentes não bloqueiam, dando tempo
+ *   para a loja receber fisicamente o produto antes de confirmar.
+ *
+ * Datas tratadas no fuso local do servidor (mesmo critério usado para parsear
+ * dataEmissao), com precisão de dia/horas — suficiente para estas regras.
+ */
+export const TRAVA_DATA_INICIO = new Date("2026-06-01T00:00:00");
+export const TRAVA_DIAS_MINIMOS = 3;
+
+/**
+ * Uma pendência ATIVA a trava quando: emitida a partir do cutoff E com pelo
+ * menos TRAVA_DIAS_MINIMOS dias de idade. (Já vem não-confirmada da fonte.)
+ */
+export function isSaidaBloqueante(p: { dataEmissao: string }, agora: number = Date.now()): boolean {
+  const t = new Date(p.dataEmissao).getTime();
+  if (Number.isNaN(t)) return false; // sem data confiável: não bloqueia
+  if (t < TRAVA_DATA_INICIO.getTime()) return false; // anterior ao cutoff
+  const carenciaMs = TRAVA_DIAS_MINIMOS * 24 * 60 * 60 * 1000;
+  return t <= agora - carenciaMs; // pelo menos N dias desde a emissão
+}
+
 function cleanDestino(value: string | null | undefined): string | null {
   const trimmed = (value || "").trim();
   if (!trimmed || trimmed === "—" || trimmed === "-") return null;

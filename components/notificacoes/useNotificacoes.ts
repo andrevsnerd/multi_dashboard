@@ -1,6 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthContext";
 import type { Notificacao, NotificacoesResponse } from "@/lib/types/notificacao";
@@ -14,18 +23,44 @@ function getCompanyFromPath(pathname: string | null): string | null {
   return seg && (COMPANIES as readonly string[]).includes(seg) ? seg : null;
 }
 
+function isRomaneiosPath(pathname: string | null): boolean {
+  return (pathname ?? "").includes("/romaneios");
+}
+
+interface NotificacoesState {
+  company: string | null;
+  pathname: string | null;
+  notificacoes: Notificacao[];
+  bloqueios: Notificacao[];
+  naoLidas: number;
+  loading: boolean;
+  marcarLida: (key: string) => Promise<void>;
+  marcarTodas: () => Promise<void>;
+  refetch: () => Promise<void>;
+}
+
+const NotificacoesContext = createContext<NotificacoesState | null>(null);
+
 /**
- * Hook reutilizável para o estado de notificações do usuário na empresa atual.
- * Busca com polling leve e expõe ações de leitura. Não dispara nada quando não
- * há usuário/empresa (ex.: tela de login, seleção de empresa, /admin).
+ * Provider único de notificações: faz UM polling e compartilha o estado com o
+ * sino, a tela cheia e a trava de bloqueio. Evita buscas duplicadas no banco.
+ *
+ * Empresa: prioriza a da URL; se não houver (ex.: tela de seleção "/"), cai
+ * para a única empresa permitida do usuário — assim a trava continua valendo
+ * mesmo fora das telas da empresa.
  */
-export function useNotificacoes() {
+export function NotificacoesProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const pathname = usePathname();
-  const company = getCompanyFromPath(pathname);
   const username = user?.username ?? null;
 
+  const companyFromPath = getCompanyFromPath(pathname);
+  const allowed = user?.allowedCompanies;
+  const fallbackCompany = allowed && allowed.length === 1 ? allowed[0] : null;
+  const company = companyFromPath ?? fallbackCompany;
+
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
+  const [bloqueios, setBloqueios] = useState<Notificacao[]>([]);
   const [naoLidas, setNaoLidas] = useState(0);
   const [loading, setLoading] = useState(false);
   const activeRef = useRef(true);
@@ -33,6 +68,7 @@ export function useNotificacoes() {
   const fetchNotificacoes = useCallback(async () => {
     if (!username || !company) {
       setNotificacoes([]);
+      setBloqueios([]);
       setNaoLidas(0);
       setLoading(false);
       return;
@@ -47,6 +83,7 @@ export function useNotificacoes() {
       const json = (await res.json()) as NotificacoesResponse;
       if (!activeRef.current) return;
       setNotificacoes(json.data || []);
+      setBloqueios(json.bloqueios || []);
       setNaoLidas(json.naoLidas || 0);
     } catch {
       // silencioso: notificações nunca devem quebrar a UI
@@ -55,6 +92,7 @@ export function useNotificacoes() {
     }
   }, [username, company]);
 
+  // Polling principal.
   useEffect(() => {
     activeRef.current = true;
     void fetchNotificacoes();
@@ -65,10 +103,18 @@ export function useNotificacoes() {
     };
   }, [username, company, fetchNotificacoes]);
 
+  // Revalida assim que o usuário SAI da tela de romaneios (onde ele confirma),
+  // para a trava sumir imediatamente após a confirmação.
+  const prevPathRef = useRef(pathname);
+  useEffect(() => {
+    const saiuDeRomaneios = isRomaneiosPath(prevPathRef.current) && !isRomaneiosPath(pathname);
+    prevPathRef.current = pathname;
+    if (saiuDeRomaneios) void fetchNotificacoes();
+  }, [pathname, fetchNotificacoes]);
+
   const marcarLida = useCallback(
     async (key: string) => {
       if (!username) return;
-      // Otimista: marca local antes da resposta.
       setNotificacoes((prev) => prev.map((n) => (n.key === key ? { ...n, lida: true } : n)));
       setNaoLidas((prev) => Math.max(0, prev - 1));
       try {
@@ -78,7 +124,7 @@ export function useNotificacoes() {
           body: JSON.stringify({ keys: [key] }),
         });
       } catch {
-        /* mantém o otimismo; próximo poll reconcilia */
+        /* próximo poll reconcilia */
       }
     },
     [username]
@@ -99,13 +145,37 @@ export function useNotificacoes() {
     }
   }, [username, company]);
 
-  return {
+  const value: NotificacoesState = {
     company,
+    pathname,
     notificacoes,
+    bloqueios,
     naoLidas,
     loading,
     marcarLida,
     marcarTodas,
     refetch: fetchNotificacoes,
   };
+
+  return createElement(NotificacoesContext.Provider, { value }, children);
+}
+
+/** Consome o estado de notificações compartilhado. */
+export function useNotificacoes(): NotificacoesState {
+  const ctx = useContext(NotificacoesContext);
+  if (!ctx) {
+    // Fora do provider: estado inerte (não quebra, só não notifica).
+    return {
+      company: null,
+      pathname: null,
+      notificacoes: [],
+      bloqueios: [],
+      naoLidas: 0,
+      loading: false,
+      marcarLida: async () => {},
+      marcarTodas: async () => {},
+      refetch: async () => {},
+    };
+  }
+  return ctx;
 }

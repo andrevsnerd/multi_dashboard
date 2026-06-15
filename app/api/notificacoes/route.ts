@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSaidasPendentesParaUsuario } from "@/lib/server/notificacoes-saidas";
+import { getSaidasPendentesParaUsuario, isSaidaBloqueante } from "@/lib/server/notificacoes-saidas";
 import { getLidasByUsername, marcarLidas } from "@/lib/utils/notificacoes-leitura-store";
 import type { Notificacao, SaidaPendente } from "@/lib/types/notificacao";
 
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     const companyKey = request.nextUrl.searchParams.get("company")?.trim();
 
     if (!username || !companyKey) {
-      return NextResponse.json({ data: [], naoLidas: 0 });
+      return NextResponse.json({ data: [], naoLidas: 0, bloqueios: [] });
     }
 
     const [pendentes, lidas] = await Promise.all([
@@ -43,11 +43,12 @@ export async function GET(request: NextRequest) {
     }));
 
     const naoLidas = data.reduce((acc, n) => (n.lida ? acc : acc + 1), 0);
+    const bloqueios = data.filter((n) => isSaidaBloqueante(n));
 
-    return NextResponse.json({ data, naoLidas });
+    return NextResponse.json({ data, naoLidas, bloqueios });
   } catch (error) {
     console.error("Erro ao buscar notificações", error);
-    return NextResponse.json({ data: [], naoLidas: 0 });
+    return NextResponse.json({ data: [], naoLidas: 0, bloqueios: [] });
   }
 }
 

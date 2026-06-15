@@ -51,4 +51,10 @@ export interface NotificacoesResponse {
   data: Notificacao[];
   /** Quantidade de notificações ainda não lidas (badge do sino). */
   naoLidas: number;
+  /**
+   * Subconjunto de `data` que ATIVA a trava de bloqueio: saídas destinadas à
+   * filial, não confirmadas, emitidas a partir do cutoff e com pelo menos N
+   * dias de idade. Enquanto houver itens aqui, a UI bloqueia o acesso.
+   */
+  bloqueios: Notificacao[];
 }
