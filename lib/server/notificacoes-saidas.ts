@@ -25,29 +25,24 @@ import { findUserByUsername } from "@/lib/auth/users-store";
 import { getActiveFilial } from "@/lib/config/company";
 import { resolveCompanyDynamic } from "@/lib/config/company-server";
 import { getContadorConfirmadosByCompany } from "@/lib/utils/romaneio-confirmacao-store";
+import { TRAVA_DATA_INICIO, TRAVA_DIAS_MINIMOS } from "@/lib/config/notificacoes-trava";
 import type { SaidaPendente } from "@/lib/types/notificacao";
 
 /** Janela padrão (dias) para considerar uma saída "nova". */
 export const NOTIF_JANELA_DIAS = 30;
 
 /**
- * Regras da TRAVA de bloqueio (popup persistente).
- *
- * - TRAVA_DATA_INICIO: só saídas emitidas a partir desta data contam. Antes
- *   disso há entradas antigas já corrigidas via ajuste/inventário, que não
- *   devem prender ninguém.
- * - TRAVA_DIAS_MINIMOS: carência. Saídas recentes não bloqueiam, dando tempo
- *   para a loja receber fisicamente o produto antes de confirmar.
+ * Regras da TRAVA de bloqueio (popup persistente) — constantes em
+ * lib/config/notificacoes-trava.ts (módulo puro, compartilhado com o client).
  *
  * Datas tratadas no fuso local do servidor (mesmo critério usado para parsear
  * dataEmissao), com precisão de dia/horas — suficiente para estas regras.
  */
-export const TRAVA_DATA_INICIO = new Date("2026-06-01T00:00:00");
-export const TRAVA_DIAS_MINIMOS = 3;
+export { TRAVA_DATA_INICIO, TRAVA_DIAS_MINIMOS };
 
 /**
  * Uma pendência ATIVA a trava quando: emitida a partir do cutoff E com pelo
- * menos TRAVA_DIAS_MINIMOS dias de idade. (Já vem não-confirmada da fonte.)
+ * menos TRAVA_DIAS_MINIMOS dias de idade (atualmente 7). (Já vem não-confirmada da fonte.)
  */
 export function isSaidaBloqueante(p: { dataEmissao: string }, agora: number = Date.now()): boolean {
   const t = new Date(p.dataEmissao).getTime();

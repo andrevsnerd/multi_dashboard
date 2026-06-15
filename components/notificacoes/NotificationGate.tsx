@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { formatRomaneioDateTimeBrasilia } from "@/lib/utils/romaneios-date";
+import { TRAVA_DIAS_MINIMOS } from "@/lib/config/notificacoes-trava";
 import { useNotificacoes } from "./useNotificacoes";
 import styles from "./NotificationGate.module.css";
 
@@ -40,8 +41,8 @@ export function NotificationGate() {
         <h2 className={styles.title}>Confirmação de entradas pendente</h2>
         <p className={styles.subtitle}>
           {bloqueios.length === 1
-            ? "Há 1 entrada com destino à sua filial aguardando confirmação há mais de 3 dias."
-            : `Há ${bloqueios.length} entradas com destino à sua filial aguardando confirmação há mais de 3 dias.`}{" "}
+            ? `Há 1 entrada com destino à sua filial aguardando confirmação há mais de ${TRAVA_DIAS_MINIMOS} dias.`
+            : `Há ${bloqueios.length} entradas com destino à sua filial aguardando confirmação há mais de ${TRAVA_DIAS_MINIMOS} dias.`}{" "}
           Confirme o recebimento para liberar o acesso ao sistema.
         </p>
 
