@@ -56,8 +56,10 @@ export function exportListaLojaToXlsx(options: ExportListaLojaOptions): void {
     { METRICA: "Filial", VALOR: filialNome || "" },
     { METRICA: "Filtro aplicado", VALOR: filtroAplicado || "Todos" },
     { METRICA: "Total de itens", VALOR: rows.length },
-    { METRICA: "Itens sugeridos", VALOR: rows.filter((row) => row.STATUS === "Sugerido").length },
-    { METRICA: "Itens barrados", VALOR: rows.filter((row) => row.STATUS === "Barrado").length },
+    { METRICA: "Itens a repor", VALOR: rows.filter((row) => row.STATUS === "Repor").length },
+    { METRICA: "Itens em excesso", VALOR: rows.filter((row) => row.STATUS === "Excesso").length },
+    { METRICA: "Itens OK", VALOR: rows.filter((row) => row.STATUS === "OK").length },
+    { METRICA: "Compra ideal total (un.)", VALOR: rows.reduce((s, row) => s + (Number(row.COMPRA_IDEAL) || 0), 0) },
     { METRICA: "Exportado em", VALOR: new Date().toLocaleString("pt-BR") },
   ];
 

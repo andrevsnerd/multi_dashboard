@@ -1092,7 +1092,7 @@ async function buildListaLojaExportRows(
   companyKey: string,
   codFilial: string | null,
   itens: ListaItem[],
-  diasCorridosMes: number,
+  comprasTransitoIndex: CompraTransitoIndex,
   transferenciasPorItem?: Record<string, TransferenciaDestinoSugestao[]>
 ): Promise<Array<Record<string, string | number | boolean | null>>> {
   const company = resolveCompany(companyKey);
@@ -1155,7 +1155,8 @@ async function buildListaLojaExportRows(
     const transferenciaExport =
       rotasTransferencia.length > 0 ? buildTransferenciaExportData(rotasTransferencia) : null;
     const curvaAbc = curvaAbcMap.get(itemKey)?.curva ?? null;
-    const baseRow = buildListaLojaExportRow(item, diasCorridosMes, { curvaAbc, transferenciaExport });
+    const transitEntries = getCompraTransitoEntries(comprasTransitoIndex, item.produto, item.corProduto);
+    const baseRow = buildListaLojaExportRow(item, transitEntries, { curvaAbc, transferenciaExport });
     const detalhes = detalhesPorItem[index];
 
     baseRow.FILIAIS_COM_ESTOQUE = detalhes.filiaisComEstoque;
@@ -1357,61 +1358,10 @@ function formatFixed(value: number, digits = 1): string {
   });
 }
 
-function formatMaybe(value: number | null | undefined, digits = 1): string {
-  if (value == null || !Number.isFinite(value)) return "0";
-  return formatFixed(value, digits);
-}
-
-function getHistoricoPeriodoLabel(mesesHistoricoFilial: number): string {
-  return mesesHistoricoFilial >= 12
-    ? "últimos 12 meses"
-    : `período real de ${formatFixed(mesesHistoricoFilial, 1)} meses`;
-}
-
-function buildFinalBlockReason(duracaoAtual: number, limiteDias: number): string {
-  return `Duração atual de ${Math.round(duracaoAtual)} dias não ficou abaixo do limite de ${limiteDias} dias.`;
-}
-
-function buildSBlockReason(mediaVendasMes: number, estoqueAtual: number): string {
-  if (mediaVendasMes < 1) {
-    return `Média mensal de ${formatFixed(mediaVendasMes)} un./mês ficou abaixo do mínimo de 1,0 un./mês.`;
-  }
-  return `Estoque atual de ${Math.round(estoqueAtual)} un. ficou acima de 2x a média mensal (${formatFixed(mediaVendasMes * 2)} un.).`;
-}
-
-function buildEBlockReason(
-  item: ListaItem,
-  mesesSemVenda: number | null,
-  mesesAtivos: number | null,
-  velocidadeAjustada: number | null,
-  estoqueAtual: number
-): string {
-  const qtde12m = Number(item.qtde12m ?? 0);
-  const mesesHistoricoFilial = getMesesHistoricoFilial(item);
-  if (qtde12m <= 0) {
-    return `Não houve vendas no ${getHistoricoPeriodoLabel(mesesHistoricoFilial)}, então não há base para sugestão E.`;
-  }
-  if (item.diasDesdeUltimaVenda != null && item.diasDesdeUltimaVenda < 30) {
-    return `Última venda há ${Math.round(item.diasDesdeUltimaVenda)} dias, abaixo do mínimo de 30 dias para considerar item estagnado.`;
-  }
-  if (mesesAtivos != null && mesesAtivos < 1) {
-    return `Período ativo estimado de ${formatMaybe(mesesAtivos)} meses ficou abaixo do mínimo de 1,0 mês.`;
-  }
-  if (velocidadeAjustada != null && velocidadeAjustada < 0.5) {
-    return `Velocidade ajustada de ${formatMaybe(velocidadeAjustada)} un./mês ficou abaixo do corte de 0,5 un./mês.`;
-  }
-  if (estoqueAtual > 0) {
-    return `Estoque atual de ${Math.round(estoqueAtual)} un. ainda existe, então o item não entrou como E.`;
-  }
-  if (mesesSemVenda != null) {
-    return `Item parado há cerca de ${formatMaybe(mesesSemVenda)} meses, mas não passou no conjunto completo de critérios para sugestão E.`;
-  }
-  return "Não passou nos critérios de sugestão E com os dados atuais.";
-}
 
 function buildListaLojaExportRow(
   item: ListaItem,
-  diasCorridosMes: number,
+  transitEntries: CompraTransitoIndexEntry[],
   exportData?: {
     curvaAbc: Curva | null;
     transferenciaExport: {
@@ -1421,70 +1371,35 @@ function buildListaLojaExportRow(
     } | null;
   }
 ): Record<string, string | number | boolean | null> {
-  const sugestao = getReposicaoCompraView(item, diasCorridosMes);
   const estoqueAtual = Number(item.estoqueFilial ?? 0);
-  const vendasMesAtual = Number(item.vendasMesAtual ?? 0);
-  const consumoDiario = diasCorridosMes > 0 ? vendasMesAtual / diasCorridosMes : 0;
-  const duracaoAtual = consumoDiario > 0 ? estoqueAtual / consumoDiario : 0;
-  const limiteDias = getLimiteDiasReposicao(item);
   const diasHistoricoFilial = Math.min(365, Math.max(0, Number(item.diasHistoricoFilial ?? 365)));
   const mesesHistoricoFilial = getMesesHistoricoFilial(item);
   const historicoParcial = Boolean(item.historicoParcial ?? false);
-  const qtde12m = Number(item.qtde12m ?? 0);
-  const mediaVendasMes = sugestao.sData?.velocidadeAjustada ?? (qtde12m / mesesHistoricoFilial);
-  const mesesSemVenda = sugestao.eData?.mesesSemVenda ?? (item.diasDesdeUltimaVenda != null ? item.diasDesdeUltimaVenda / 30 : null);
-  const mesesAtivos = sugestao.eData?.mesesAtivos ?? (mesesSemVenda != null ? mesesHistoricoFilial - mesesSemVenda : null);
-  const velocidadeAjustada = sugestao.eData?.velocidadeAjustada ?? sugestao.sData?.velocidadeAjustada ?? (mesesAtivos != null && mesesAtivos > 0 ? qtde12m / mesesAtivos : null);
-  const qtdCalculada =
-    sugestao.qtdFinal > 0
-      ? sugestao.qtdFinal
-      : sugestao.qtdS > 0
-        ? sugestao.qtdS
-        : sugestao.qtdE > 0
-          ? sugestao.qtdE
-          : sugestao.qtdPO > 0
-            ? sugestao.qtdPO
-            : sugestao.qtdNM;
-  const status = qtdCalculada > 0 ? "Sugerido" : "Barrado";
-  const tipo = sugestao.qtdFinal > 0
-    ? "Final"
-    : sugestao.qtdS > 0
-      ? "S"
-      : sugestao.qtdE > 0
-        ? "E"
-        : sugestao.qtdPO > 0
-          ? "PO"
-          : sugestao.qtdNM > 0
-            ? "NM"
-          : sugestao.qtdSuficiente
-            ? "Suficiente"
-            : "Sem sugestão";
 
-  let regra = "";
-  let resumo = "";
+  // Mesma Compra Ideal exibida na tabela (ritmo + cobertura-alvo, com trânsito abatido).
+  const ideal = calcCompraIdeal({
+    estoqueAtual,
+    ritmoDiasComEstoque: item.ritmoDiasComEstoque ?? null,
+    ritmoVendasPeriodo: item.ritmoVendasPeriodo ?? null,
+    qtde60d: item.qtde60d ?? null,
+    linha: item.linha,
+    subgrupo: item.subgrupo,
+    transitEntries,
+  });
 
-  if (sugestao.qtdFinal > 0) {
-    regra = "Consumo diário = vendas do mês atual / dias corridos. Se a duração atual fica abaixo do limite, a compra cobre a diferença.";
-    resumo = `Sugestão final de compra de ${qtdCalculada} un. porque a duração atual é ${Math.round(duracaoAtual)} dias, abaixo do limite de ${limiteDias} dias.`;
-  } else if (sugestao.qtdS > 0) {
-    regra = `Qtd S = teto((limite de ${limiteDias} dias / 30) x média mensal).`;
-    resumo = `Sugestão S de ${qtdCalculada} un. com base na média de ${formatFixed(mediaVendasMes)} un./mês e no limite de ${limiteDias} dias.`;
-  } else if (sugestao.qtdE > 0) {
-    regra = "Qtd E = teto((limite de reposição em meses x velocidade ajustada)).";
-    resumo = `Sugestão E de ${qtdCalculada} un. porque o item ficou cerca de ${formatFixed(mesesSemVenda ?? 0, 1)} meses sem venda e a velocidade ajustada é ${formatFixed(velocidadeAjustada ?? 0)} un./mês.`;
-  } else if (sugestao.qtdPO > 0) {
-    regra = "Potencial Oculto: o item vendeu forte enquanto tinha estoque, ficou zerado e recebeu uma sugestao minima protegida por trava.";
-    resumo = `Sugestão PO de ${qtdCalculada} un. porque houve ruptura com potencial, com poucos dias disponíveis e velocidade ajustada alta.`;
-  } else if (sugestao.qtdNM > 0) {
-    regra = "Necessidade Mínima: estoque zerado e 1 unidade a cada 5 vendas nos últimos 12 meses.";
-    resumo = `Sugestão NM de ${qtdCalculada} un. porque o estoque está zerado e o item teve ${fmt(qtde12m)} vendas nos últimos 12 meses.`;
-  } else if (sugestao.qtdSuficiente) {
-    regra = `Estoque atual já cobre o limite de ${limiteDias} dias.`;
-    resumo = `Barrado porque o estoque atual já cobre o limite de ${limiteDias} dias.`;
-  } else {
-    regra = "Não houve sugestão calculada com os dados atuais.";
-    resumo = "Barrado porque os dados atuais não geraram sugestão de compra.";
-  }
+  const compraIdeal = Math.max(0, ideal.compraIdeal);
+  const excedente = Math.max(0, -ideal.compraIdeal);
+  const quantidade = Math.max(0, Math.round(item.quantidade ?? 0));
+  const custoUnit = Number(item.custoUnit ?? 0);
+  const posicao = ideal.estoqueAtual + ideal.emTransito;
+  const statusLabel = COMPRA_IDEAL_STATUS_LABEL[ideal.status];
+
+  const resumo =
+    ideal.status === "REPOR"
+      ? `Repor ${fmt(compraIdeal)} un.: posição de ${fmt(posicao)} un. (estoque ${fmt(ideal.estoqueAtual)}${ideal.emTransito > 0 ? ` + ${fmt(ideal.emTransito)} em trânsito` : ""}) abaixo do alvo de ${fmt(ideal.alvoEstoque)} un. — cobertura-alvo ${ideal.coberturaAlvoDias}d, ritmo ${fmt(ideal.ritmoMensal)}/mês.`
+      : ideal.status === "EXCESSO"
+        ? `Excesso de ${fmt(excedente)} un.: posição de ${fmt(posicao)} un. acima do alvo de ${fmt(ideal.alvoEstoque)} un. (cobertura-alvo ${ideal.coberturaAlvoDias}d).`
+        : `OK: posição de ${fmt(posicao)} un. dentro do alvo de ${fmt(ideal.alvoEstoque)} un. (cobertura-alvo ${ideal.coberturaAlvoDias}d).`;
 
   return {
     CURVA_ABC_REDE: exportData?.curvaAbc ?? "",
@@ -1493,56 +1408,41 @@ function buildListaLojaExportRow(
     CODIGO_BARRA: item.codigoBarra || "",
     COR_PRODUTO: item.corProduto || "",
     DESC_COR: item.descCor || "",
-    QUANTIDADE: Math.max(0, Math.round(item.quantidade ?? 0)),
+    LINHA: item.linha || "",
+    SUBGRUPO: item.subgrupo || "",
+    QUANTIDADE: quantidade,
+    COMPRA_IDEAL: compraIdeal,
+    STATUS: statusLabel,
+    EXCEDENTE: excedente > 0 ? excedente : null,
+    RITMO_MENSAL: ideal.ritmoMensal,
+    CONFIABILIDADE_RITMO: COMPRA_IDEAL_CONFIABILIDADE_LABEL[ideal.confiabilidade],
+    COBERTURA_ALVO_DIAS: ideal.coberturaAlvoDias,
+    ALVO_ESTOQUE: ideal.alvoEstoque,
+    ESTOQUE_FILIAL: item.estoqueFilial ?? null,
+    EM_TRANSITO: ideal.emTransito,
+    POSICAO: posicao,
+    COBERTURA_ATUAL_DIAS: ideal.coberturaAtualDias,
+    ACABA_EM: ideal.acabaEm,
+    DIAS_ATE_ACABAR: ideal.diasAteAcabar,
+    CHEGA_EM: ideal.chegaEm,
+    DIAS_ATE_CHEGADA: ideal.diasAteChegada,
+    SALDO_CHEGADA: ideal.saldoChegada,
     QTDE_12M: item.qtde12m ?? null,
     VALOR_12M: item.valor12m ?? null,
     QTDE_60D: item.qtde60d ?? null,
     VENDAS_MES_ATUAL: item.vendasMesAtual ?? null,
     CUSTO_UNIT: item.custoUnit ?? null,
-    ESTOQUE_FILIAL: item.estoqueFilial ?? null,
+    CUSTO_TOTAL: quantidade > 0 && custoUnit > 0 ? quantidade * custoUnit : null,
     DIAS_DESDE_ULTIMA_VENDA: item.diasDesdeUltimaVenda ?? null,
     PRIMEIRA_ENTRADA_FILIAL: item.primeiraEntradaFilial ?? null,
     DIAS_HISTORICO_FILIAL: diasHistoricoFilial,
     MESES_HISTORICO_FILIAL: mesesHistoricoFilial,
     HISTORICO_PARCIAL: historicoParcial ? "Sim" : "Nao",
-    LINHA: item.linha || "",
-    SUBGRUPO: item.subgrupo || "",
-    STATUS: status,
-    TIPO_SUGESTAO: tipo,
-    REGRA_REPOSICAO: regra,
-    LIMITE_DIAS: limiteDias,
-    VENDAS_MES: vendasMesAtual,
-    DIAS_CORRIDOS: diasCorridosMes,
-    CONSUMO_DIARIO: Number.isFinite(consumoDiario) ? consumoDiario : null,
-    ESTOQUE_ATUAL: estoqueAtual,
-    DURACAO_ATUAL: Number.isFinite(duracaoAtual) ? duracaoAtual : null,
-    QTD_CALCULADA: qtdCalculada > 0 ? qtdCalculada : null,
-    MEDIA_VENDAS_MES: mediaVendasMes,
-    MESES_SEM_VENDA: mesesSemVenda,
-    MESES_ATIVOS: mesesAtivos,
-    VELOCIDADE_AJUSTADA: velocidadeAjustada,
-    QTD_S: sugestao.qtdS > 0 ? sugestao.qtdS : null,
-    QTD_E: sugestao.qtdE > 0 ? sugestao.qtdE : null,
-    QTD_PO: sugestao.qtdPO > 0 ? sugestao.qtdPO : null,
-    CUSTO_TOTAL_SUGERIDO:
-      qtdCalculada > 0 && Number(item.custoUnit ?? 0) > 0
-        ? qtdCalculada * Number(item.custoUnit ?? 0)
-        : null,
     TEM_TRANSFERENCIA_SUGERIDA: exportData?.transferenciaExport ? "Sim" : "Não",
     TRANSFERENCIA_QTD_TOTAL: exportData?.transferenciaExport?.total ?? null,
     TRANSFERENCIA_ROTAS: exportData?.transferenciaExport?.resumoRotas ?? "",
     TRANSFERENCIA_DESTINOS_URGENCIA: exportData?.transferenciaExport?.resumoDestinosUrgencia ?? "",
-    QTD_SUFICIENTE: sugestao.qtdSuficiente ? "Sim" : "Não",
-    SEM_SUGESTAO: sugestao.semSugestao ? "Sim" : "Não",
-    FALHA_FINAL: status === "Barrado" ? buildFinalBlockReason(duracaoAtual, limiteDias) : "",
-    FALHA_S: status === "Barrado" ? buildSBlockReason(mediaVendasMes, estoqueAtual) : "",
-    FALHA_E: status === "Barrado" ? buildEBlockReason(item, mesesSemVenda, mesesAtivos, velocidadeAjustada, estoqueAtual) : "",
-    MOTIVO_BARRADO: status === "Barrado"
-      ? `Barrado porque ${buildFinalBlockReason(duracaoAtual, limiteDias)} ${buildSBlockReason(mediaVendasMes, estoqueAtual)} ${buildEBlockReason(item, mesesSemVenda, mesesAtivos, velocidadeAjustada, estoqueAtual)}`
-      : "",
-    RESUMO: status === "Barrado"
-      ? `Barrado. Final: ${buildFinalBlockReason(duracaoAtual, limiteDias)} S: ${buildSBlockReason(mediaVendasMes, estoqueAtual)} E: ${buildEBlockReason(item, mesesSemVenda, mesesAtivos, velocidadeAjustada, estoqueAtual)}`
-      : resumo,
+    RESUMO: resumo,
   };
 }
 
@@ -1656,6 +1556,8 @@ type ListaLojaItensTableProps = {
   compraView: boolean;
   abcMap: Map<string, CurvaInfo>;
   enableAbc?: boolean;
+  /** Índice de compras em trânsito (gerenciado pela página, compartilhado com o cálculo da qtd sugerida). */
+  comprasTransitoIndex: CompraTransitoIndex;
   transferenciasPorItem?: Record<string, TransferenciaDestinoSugestao[]>;
   onMoveItem?: (fromIndex: number, toIndex: number) => void;
   onIncrement: (index: number) => void;
@@ -1679,6 +1581,7 @@ function ListaLojaItensTable({
   compraView,
   abcMap,
   enableAbc = true,
+  comprasTransitoIndex,
   transferenciasPorItem,
   onMoveItem,
   onIncrement,
@@ -1854,7 +1757,6 @@ function ListaLojaItensTable({
 
   const [estoqueCache, setEstoqueCache] = useState<Record<string, EstoqueTooltipRow[]>>({});
   const [vendasCache, setVendasCache] = useState<Record<string, FilialVendaRow[]>>({});
-  const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
   const [liveMetrics, setLiveMetrics] = useState<
     Record<
       string,
@@ -1888,20 +1790,6 @@ function ListaLojaItensTable({
       }
     >
   >({});
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchComprasTransitoClient(companyKey)
-      .then((docs) => {
-        if (!cancelled) setComprasTransitoIndex(buildCompraTransitoIndex(docs));
-      })
-      .catch(() => {
-        if (!cancelled) setComprasTransitoIndex(new Map());
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [companyKey]);
 
   function hasResolvedLiveMetrics(values: {
     qtde12m: number | null;
@@ -3083,6 +2971,12 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
   const [filiais, setFiliais] = useState<Filial[]>([]);
   const [filiaisDisponiveis, setFiliaisDisponiveis] = useState<Filial[]>([]);
   const [filialSelecionada, setFilialSelecionada] = useState<Filial | null>(null);
+  // true enquanto recalcula vendas/estoque após trocar a loja — usado para sinalizar
+  // visualmente que os valores na tela ainda são os antigos e estão sendo atualizados.
+  const [recalculandoMetricas, setRecalculandoMetricas] = useState(false);
+  // Índice de compras em trânsito, compartilhado entre a tabela (exibição) e o
+  // recálculo da qtd sugerida (para a qtd ao lado do +/- bater com a Compra Ideal da loja).
+  const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
   const [itens, setItens] = useState<ListaItem[]>([]);
   const itensRef = useRef<ListaItem[]>(itens);
   itensRef.current = itens;
@@ -3235,6 +3129,21 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     });
   }, [permissoes, permissoesCarregadas, companyKey]);
 
+  // Carrega o índice de compras em trânsito da empresa (usado na exibição e no cálculo da qtd sugerida).
+  useEffect(() => {
+    let cancelled = false;
+    fetchComprasTransitoClient(companyKey)
+      .then((docs) => {
+        if (!cancelled) setComprasTransitoIndex(buildCompraTransitoIndex(docs));
+      })
+      .catch(() => {
+        if (!cancelled) setComprasTransitoIndex(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyKey]);
+
   // Ao mudar a loja ou abrir outra lista para edição, recalcula vendas 90d e estoque (mesma lógica do Controle de Estoque: grupos de filial, etc.)
   useEffect(() => {
     if (mode !== "editor") return;
@@ -3243,7 +3152,9 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     const itemKey = (i: ListaItem) => buildItemKey(i.produto, i.corProduto);
 
     let cancelled = false;
+    setRecalculandoMetricas(true);
     void (async () => {
+     try {
       const snapshot = itensRef.current;
       const keys = snapshot.map(itemKey);
       const metrics = await Promise.all(
@@ -3252,7 +3163,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             fetchVendasItemMetricas(companyKey, filialConsultaSelecionada, item.produto, item.corProduto),
             fetchEstoqueFilialSum(companyKey, filialConsultaSelecionada, item.produto, item.corProduto),
           ]);
-          return {
+          const fields = {
             qtde12m: vendas?.qtde12m ?? null,
             qtde60d: vendas?.qtde60d ?? null,
             vendasMesAtual: vendas?.vendasMesAtual ?? null,
@@ -3271,6 +3182,33 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             ritmoVendasPeriodo: vendas?.ritmoVendasPeriodo ?? null,
             historicoParcial: vendas?.historicoParcial ?? null,
           };
+
+          // Qtd sugerida ao lado do +/-: com uma loja específica selecionada, segue a
+          // Compra Ideal daquela loja (a MESMA exibida na coluna, já com trânsito abatido).
+          // Na visão geral (TODAS), mantém a sugestão de reposição agregada da rede.
+          let suggestedQty: number;
+          if (filialConsultaSelecionada) {
+            const transitEntries = getCompraTransitoEntries(comprasTransitoIndex, item.produto, item.corProduto);
+            const ideal = calcCompraIdeal({
+              estoqueAtual: estoqueFilial ?? 0,
+              ritmoDiasComEstoque: vendas?.ritmoDiasComEstoque ?? null,
+              ritmoVendasPeriodo: vendas?.ritmoVendasPeriodo ?? null,
+              ritmoInicioIso: vendas?.ritmoInicioIso ?? null,
+              ritmoFimIso: vendas?.ritmoFimIso ?? null,
+              ritmoDiasComVenda: vendas?.ritmoDiasComVenda ?? null,
+              ritmoPrimeiraVendaIso: vendas?.ritmoPrimeiraVendaIso ?? null,
+              ritmoUltimaVendaIso: vendas?.ritmoUltimaVendaIso ?? null,
+              qtde60d: vendas?.qtde60d ?? null,
+              linha: item.linha,
+              subgrupo: item.subgrupo,
+              transitEntries,
+            });
+            suggestedQty = Math.max(0, ideal.compraIdeal);
+          } else {
+            suggestedQty = getSuggestedQtyValue({ ...item, ...fields }, new Date().getDate());
+          }
+
+          return { ...fields, suggestedQty };
         })
       );
       if (cancelled) return;
@@ -3279,19 +3217,21 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
         current.map((it) => {
           const m = metricsByKey.get(itemKey(it));
           if (!m) return it;
-          const merged = { ...it, ...m };
-          return {
-            ...merged,
-            quantidade: getSuggestedQtyValue(merged, new Date().getDate()),
-          };
+          const { suggestedQty, ...metricFields } = m;
+          return { ...it, ...metricFields, quantidade: suggestedQty };
         })
       );
+     } finally {
+       // Só a execução vigente (não cancelada por uma troca de loja mais recente)
+       // desliga o indicador — evita esconder o spinner cedo demais.
+       if (!cancelled) setRecalculandoMetricas(false);
+     }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [filialConsultaSelecionada, mode, companyKey, editingId]);
+  }, [filialConsultaSelecionada, mode, companyKey, editingId, comprasTransitoIndex]);
 
   useEffect(() => {
     if (mode !== "editor" || itensTransferenciaKey.length === 0) {
@@ -4593,7 +4533,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
         companyKey,
         filialParaExport,
         itensVisiveis,
-        diasCorridosMes,
+        comprasTransitoIndex,
         transferenciasPorItem
       );
       exportListaLojaToXlsx({
@@ -4613,7 +4553,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
   }, [
     companyKey,
     companyName,
-    diasCorridosMes,
+    comprasTransitoIndex,
     filtroAplicadoLabel,
     filialSelecionada?.codFilial,
     filialSelecionada?.filial,
@@ -4697,7 +4637,15 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             />
           </div>
           <div className={styles.formGroup}>
-            <label className={styles.label}>Loja</label>
+            <label className={styles.label}>
+              Loja
+              {recalculandoMetricas && (
+                <span className={styles.recalcBadge}>
+                  <span className={styles.recalcSpinner} aria-hidden="true" />
+                  Atualizando valores da loja…
+                </span>
+              )}
+            </label>
             {filiaisDisponiveis.length === 1 && filialSelecionada ? (
               <div className={styles.filialFixed}>{filialLabel(filialSelecionada)}</div>
             ) : (
@@ -4822,6 +4770,13 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             </div>
           ) : (
             <div className={styles.produtosList}>
+              {recalculandoMetricas && (
+                <div className={styles.recalcOverlay} role="status" aria-live="polite">
+                  <span className={styles.recalcOverlaySpinner} aria-hidden="true" />
+                  <span>Atualizando valores da loja…</span>
+                </div>
+              )}
+              <div className={recalculandoMetricas ? styles.produtosListUpdating : undefined}>
               <ListaLojaItensTable
                 companyKey={companyKey}
                 filialCod={filialConsultaSelecionada}
@@ -4829,6 +4784,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                 itens={itensVisiveis}
                 compraView={true}
                 abcMap={abcMapRede}
+                comprasTransitoIndex={comprasTransitoIndex}
                 transferenciasPorItem={transferenciasPorItem}
                 onMoveItem={(fromIndex, toIndex) => {
                   const origem = indicesItensVisiveis[fromIndex];
@@ -4864,6 +4820,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                   setEditorColorPickerOpcoes([]);
                 }}
               />
+              </div>
             </div>
           )}
 
