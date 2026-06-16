@@ -4482,25 +4482,23 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     [curvaMapEditor, diasCorridosMes, filtrarBarrados, filtrarCurvas, filtrarSugeridos, filtrarTransferencias, itens, transferenciasPorItem]
   );
   const kpisLista = useMemo(() => {
-    const totalQtdSugerida = itensVisiveis.reduce((s, item) => {
-      const sugestao = getReposicaoCompraView(item, diasCorridosMes);
-      const qtd = sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS > 0 ? sugestao.qtdS : sugestao.qtdE;
-      return s + Math.max(0, qtd);
-    }, 0);
-    const totalCustoReferencia = itensVisiveis.reduce((s, item) => {
+    // Usa a quantidade real de cada item (= a qtd ao lado do +/-, já alinhada à
+    // Compra Ideal da loja) — a MESMA base do CUSTO_TOTAL do export, pra os totais baterem.
+    let totalQtdSugerida = 0;
+    let totalCustoReferencia = 0;
+    for (const item of itensVisiveis) {
+      const qtd = Math.max(0, Math.round(item.quantidade ?? 0));
+      if (qtd <= 0) continue;
+      totalQtdSugerida += qtd;
       const custoUnit = Number(item.custoUnit ?? 0);
-      if (custoUnit <= 0) return s;
-      const sugestao = getReposicaoCompraView(item, diasCorridosMes);
-      const qtd = sugestao.qtdFinal > 0 ? sugestao.qtdFinal : sugestao.qtdS > 0 ? sugestao.qtdS : sugestao.qtdE;
-      if (qtd <= 0) return s;
-      return s + qtd * custoUnit;
-    }, 0);
+      if (custoUnit > 0) totalCustoReferencia += qtd * custoUnit;
+    }
     return {
       totalItens: itensVisiveis.length,
       totalQtdSugerida,
       totalCustoReferencia,
     };
-  }, [diasCorridosMes, itensVisiveis]);
+  }, [itensVisiveis]);
   const abcMapRede = useMemo(() => new Map<string, CurvaInfo>(), []);
   const abcMapModal = useMemo(() => new Map<string, CurvaInfo>(), []);
 
