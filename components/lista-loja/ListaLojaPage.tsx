@@ -66,6 +66,17 @@ import styles from "./ListaLojaPage.module.css";
 interface Filial {
   codFilial: string;
   filial: string;
+  /** Rótulo de exibição (ex.: "MORUMBI 1" para o grupo, em vez do nome cru da ativa). */
+  displayName?: string;
+  /** Nomes equivalentes (ativa + membros do grupo), usados para casar permissões
+   *  que referenciam um membro não-ativo do grupo (ex.: MORUMBI 1). */
+  aliases?: string[];
+}
+
+/** Rótulo amigável da filial: usa displayName (grupo) quando houver, senão o nome cru. */
+function filialLabel(f?: Filial | null): string {
+  if (!f) return "";
+  return (f.displayName || "").trim() || f.filial;
 }
 
 const TODAS_FILIAIS_VALUE = "__TODAS__";
@@ -3176,19 +3187,33 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
 
   useEffect(() => {
     if (!permissoesCarregadas) return;
-    fetchFiliais(companyKey).then((data) => {
+    fetchFiliais(companyKey).then((dataRaw) => {
+      // MATRIZ não tem performance de venda, então não é uma loja válida para
+      // montar lista de compra — removida APENAS deste select (segue aparecendo
+      // em estoques/análises das outras telas).
+      const data = dataRaw.filter((f) => normalizeKey(f.displayName) !== "MATRIZ");
       setFiliais(data);
       let disponiveis = data;
       if (permissoes) {
+        // Casa a permissão contra a filial ativa OU qualquer alias (membros do
+        // grupo). Sem isto, permissões que apontam para um membro não-ativo do
+        // grupo (ex.: "NERD MORUMBI RDRRRJ", quando a ativa é "NERD MORUMBI RDRX")
+        // não casariam e a loja sumiria do select.
+        const filialMatchesPermissao = (f: Filial, cod: string) => {
+          const target = normalizeKey(cod);
+          if (!target) return false;
+          if (normalizeKey(f.codFilial) === target) return true;
+          return (f.aliases ?? []).some((a) => normalizeKey(a) === target);
+        };
         const resolveFiliais = (lista: string[]) => {
           if (lista.length > 0) {
             return data.filter((f) =>
-              lista.some((cod) => f.codFilial.trim() === (cod || "").trim())
+              lista.some((cod) => filialMatchesPermissao(f, cod))
             );
           }
           if (permissoes.filialAtribuida) {
-            return data.filter(
-              (f) => f.codFilial.trim() === permissoes.filialAtribuida!.trim()
+            return data.filter((f) =>
+              filialMatchesPermissao(f, permissoes.filialAtribuida!)
             );
           }
           return data;
@@ -4373,7 +4398,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     const username = user?.username?.trim() || "";
     const filialCtx = filialSelecionada?.codFilial?.trim() || "sem-filial";
     const sourceContextKey = `lista-loja:${companyKey}:${filialCtx}:${editingId ?? "novo"}`;
-    const titleBase = nomeLista.trim() || buildDefaultListName(filialSelecionada?.filial || "Lista Loja");
+    const titleBase = nomeLista.trim() || buildDefaultListName(filialLabel(filialSelecionada) || "Lista Loja");
     const title = `[Lista Loja] ${appendUserToListName(customTitle?.trim() || titleBase, username)}`;
     const payloadItems: CompraSalvaItemRow[] = itensBase.map((it) => ({
       itemKey: buildItemKey(it.produto, it.corProduto),
@@ -4427,7 +4452,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
 
     setSalvando(true);
     try {
-      const nomeBase = nomeLista.trim() || buildDefaultListName(filialSelecionada?.filial || "Lista");
+      const nomeBase = nomeLista.trim() || buildDefaultListName(filialLabel(filialSelecionada) || "Lista");
       const nomeFinal = appendUserToListName(nomeBase, user.username);
       const result = await salvarLista(
         {
@@ -4449,7 +4474,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     } finally {
       setSalvando(false);
     }
-  }, [companyKey, curvaMapEditor, editingId, filtrarBarrados, filtrarCurvas, filtrarSugeridos, filtrarTransferencias, filialSelecionada?.filial, itens, mostrarNotificacao, nomeLista, transferenciasPorItem, user?.username, enviarParaComprasSalvas]);
+  }, [companyKey, curvaMapEditor, editingId, filtrarBarrados, filtrarCurvas, filtrarSugeridos, filtrarTransferencias, filialSelecionada?.filial, filialSelecionada?.displayName, itens, mostrarNotificacao, nomeLista, transferenciasPorItem, user?.username, enviarParaComprasSalvas]);
 
   // ─── Delete ─────────────────────────────────────────────────────────────────
 
@@ -4574,8 +4599,8 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
       exportListaLojaToXlsx({
         companyKey,
         companyName,
-        listaNome: nomeLista.trim() || buildDefaultListName(filialSelecionada?.filial || "Lista Loja"),
-        filialNome: filialSelecionada?.filial ?? null,
+        listaNome: nomeLista.trim() || buildDefaultListName(filialLabel(filialSelecionada) || "Lista Loja"),
+        filialNome: filialLabel(filialSelecionada) || null,
         filtroAplicado: filtroAplicadoLabel,
         rows,
       });
@@ -4592,6 +4617,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     filtroAplicadoLabel,
     filialSelecionada?.codFilial,
     filialSelecionada?.filial,
+    filialSelecionada?.displayName,
     itensVisiveis,
     transferenciasPorItem,
     mostrarNotificacao,
@@ -4667,13 +4693,13 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
               className={styles.input}
               value={nomeLista}
               onChange={(e) => setNomeLista(e.target.value)}
-              placeholder={buildDefaultListName(filialSelecionada?.filial || "Lista")}
+              placeholder={buildDefaultListName(filialLabel(filialSelecionada) || "Lista")}
             />
           </div>
           <div className={styles.formGroup}>
             <label className={styles.label}>Loja</label>
             {filiaisDisponiveis.length === 1 && filialSelecionada ? (
-              <div className={styles.filialFixed}>{filialSelecionada.filial}</div>
+              <div className={styles.filialFixed}>{filialLabel(filialSelecionada)}</div>
             ) : (
               <select
                 className={styles.select}
@@ -4684,7 +4710,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                 }}
               >
                 {filiaisDisponiveis.map((f) => (
-                  <option key={f.codFilial} value={f.codFilial}>{f.filial}</option>
+                  <option key={f.codFilial} value={f.codFilial}>{filialLabel(f)}</option>
                 ))}
               </select>
             )}
@@ -4799,7 +4825,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
               <ListaLojaItensTable
                 companyKey={companyKey}
                 filialCod={filialConsultaSelecionada}
-                filialNome={filialConsultaSelecionada ? (filialSelecionada?.filial ?? null) : null}
+                filialNome={filialConsultaSelecionada ? (filialLabel(filialSelecionada) || null) : null}
                 itens={itensVisiveis}
                 compraView={true}
                 abcMap={abcMapRede}
