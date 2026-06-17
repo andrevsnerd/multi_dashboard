@@ -54,12 +54,17 @@ export function buildDerivedFilialConfig(company: CompanyKey, nameOf: NameOf): D
 
   // filialGroups: apenas grupos multi-membro e NÃO-ecommerce (e-commerce é
   // agrupado via ecommerceFilials + label de exibição, não por este mecanismo).
+  // A CANÔNICA é a filial ATIVA (não o 1º membro): é ela que o filtro de vendas
+  // usa (`FILIAL = @filial`, sem expandir o grupo) e a chave de meta no dashboard.
+  // Os membros vêm com a ativa primeiro, para a lógica de `slice(1)` que separa
+  // canônica de não-canônicas (GoalsModal) continuar válida.
   const filialGroups: Record<string, string[]> = {};
   for (const g of groups) {
     if (g.memberIds.length <= 1) continue;
     const allEcommerce = g.memberIds.every((id) => getFilialById(id)?.ecommerce);
     if (allEcommerce) continue;
-    filialGroups[nameOf(g.memberIds[0])] = g.memberIds.map(nameOf);
+    const orderedIds = [g.activeId, ...g.memberIds.filter((id) => id !== g.activeId)];
+    filialGroups[nameOf(g.activeId)] = orderedIds.map(nameOf);
   }
 
   // activeFilials: todo membro de todo grupo (single ou multi) aponta para o ativo.

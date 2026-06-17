@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
-import { VAREJO_VALUE } from "@/lib/config/company";
+import { resolveCompany, VAREJO_VALUE } from "@/lib/config/company";
 
 import DateRangeFilter, {
   type DateRangeValue,
@@ -229,12 +229,22 @@ export default function CompanyDashboard({
     return dashboardData.summary;
   }, [dashboardData]);
 
+  const companyConfig = useMemo(() => resolveCompany(companyKey), [companyKey]);
+
   const currentGoal = useMemo(() => {
     if (!dashboardData) return 0;
     const goals = dashboardData.goals;
-    if (effectiveFilial) return goals[effectiveFilial] ?? 0;
+    if (effectiveFilial) {
+      // Filiais canônicas de grupos lógicos (ex.: PAULISTA) podem ter a meta
+      // gravada em qualquer um dos membros — somar todos os membros do grupo.
+      const groupMembers = companyConfig?.filialGroups?.[effectiveFilial];
+      if (groupMembers && groupMembers.length > 0) {
+        return groupMembers.reduce((sum, member) => sum + (goals[member] ?? 0), 0);
+      }
+      return goals[effectiveFilial] ?? 0;
+    }
     return Object.values(goals).reduce((sum, v) => sum + (v as number), 0);
-  }, [dashboardData, effectiveFilial]);
+  }, [dashboardData, effectiveFilial, companyConfig]);
 
   const monthProjection = useMemo(() => {
     if (!dashboardData) return 0;

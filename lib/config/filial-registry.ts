@@ -44,11 +44,12 @@ export interface FilialGroupDef {
   id: string;
   company: CompanyKey;
   display: string;
-  /** IDs (COD_FILIAL) dos membros, na ordem; o 1º é a canônica. */
+  /** IDs (COD_FILIAL) dos membros do grupo (ordem indiferente). */
   memberIds: string[];
   /**
-   * ID da filial operacional/ativa padrão (fallback). A ativa real é detectada
-   * em runtime por venda mais recente (active-filial-detector).
+   * ID da filial operacional/ativa — ESTA é a canônica do grupo (chave de filtro
+   * de vendas e de meta), não o 1º membro. Aqui é o fallback estático; a ativa
+   * real é detectada em runtime por venda mais recente (active-filial-detector).
    */
   activeId: string;
 }
@@ -103,7 +104,7 @@ export const LEGACY_ACTIVE_SELF_MAP_IDS: Record<CompanyKey, string[]> = {
 // ── Grupos lógicos (tratados como uma loja só) ─────────────────────────────────
 
 export const FILIAL_GROUPS: FilialGroupDef[] = [
-  { id: 'morumbi-1',         company: 'nerd',    display: 'MORUMBI 1',  memberIds: ['000099', '000116'],                     activeId: '000116' },
+  { id: 'morumbi-1',         company: 'nerd',    display: 'MORUMBI 1',  memberIds: ['000099', '000116'],                     activeId: '000099' },
   { id: 'morumbi-2',         company: 'nerd',    display: 'MORUMBI 2',  memberIds: ['000115'],                               activeId: '000115' },
   { id: 'paulista',          company: 'scarfme', display: 'PAULISTA',   memberIds: ['000088', '000046', '000112', '000117'], activeId: '000117' },
   { id: 'ecommerce-scarfme', company: 'scarfme', display: 'E-COMMERCE', memberIds: ['000108', '000083', '000082', '000111'], activeId: '000111' },

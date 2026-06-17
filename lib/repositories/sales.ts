@@ -1,6 +1,6 @@
 import sql from 'mssql';
 
-import { resolveCompany, isEcommerceFilial, type CompanyModule, type CompanyKey, VAREJO_VALUE } from '@/lib/config/company';
+import { resolveCompany, isEcommerceFilial, getFilialGroupMembers, type CompanyModule, type CompanyKey, VAREJO_VALUE } from '@/lib/config/company';
 import { resolveCompanyLive, liveNameForIncoming } from '@/lib/server/company-live';
 import {
   fetchEcommerceSummary,
@@ -75,10 +75,18 @@ async function buildFilialFilter(
   const filiais = company.filialFilters[module] ?? [];
   const ecommerceFilials = company.ecommerceFilials ?? [];
 
-  // Se uma filial específica foi selecionada, usar apenas ela
+  // Se uma filial específica foi selecionada, usar ela — OU, se for (canônica/membro
+  // de) um grupo lógico, TODAS as filiais do grupo. O faturamento do grupo é a SOMA
+  // de todos os membros (ex.: loja re-cadastrada no meio do mês → as duas contam);
+  // a canônica é apenas a ativa/rótulo. getFilialGroupMembers devolve [filial] quando
+  // não há grupo, preservando o comportamento de filial única.
   if (specificFilial && specificFilial !== VAREJO_VALUE) {
-    request.input('filial', sql.VarChar, specificFilial);
-    return `AND ${tableAlias}.FILIAL = @filial`;
+    const members = getFilialGroupMembers(company, specificFilial);
+    members.forEach((m, index) => {
+      request.input(`filial${index}`, sql.VarChar, m);
+    });
+    const placeholders = members.map((_, index) => `@filial${index}`).join(', ');
+    return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
   }
 
   // Para scarfme: se for "VAREJO", mostrar apenas filiais normais (sem ecommerce)

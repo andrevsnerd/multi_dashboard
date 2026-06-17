@@ -211,9 +211,12 @@ export function buildDerivedFilialConfig(grupos: FilialGrupo[]): {
   const activeFilials: Record<string, string> = {};
 
   for (const grupo of grupos) {
-    const canonical = grupo.members[0];
+    // A canônica é a filial ATIVA (não o 1º membro): é a que o filtro de vendas
+    // usa e a chave de meta. Membros com a ativa primeiro (lógica de slice(1)).
+    const canonical = grupo.active || grupo.members[0];
     if (!canonical) continue;
-    filialGroups[canonical] = grupo.members;
+    const orderedMembers = [canonical, ...grupo.members.filter((m) => m !== canonical)];
+    filialGroups[canonical] = orderedMembers;
     for (const member of grupo.members) {
       activeFilials[member] = grupo.active;
     }
