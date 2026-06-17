@@ -91,6 +91,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/filial` : "/filial";
   const exportarRelatoriosHref =
     basePath && basePath !== "/" ? `${basePath}/exportar-relatorios` : "/exportar-relatorios";
+  const geradorRelatoriosHref =
+    basePath && basePath !== "/" ? `${basePath}/gerador-relatorios` : "/gerador-relatorios";
   const controleEstoqueHref =
     basePath && basePath !== "/" ? `${basePath}/controle-estoque` : "/controle-estoque";
   const estoqueConsultaHref =
@@ -214,6 +216,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/vendedores",
     "/clientes",
     "/exportar-relatorios",
+    "/gerador-relatorios",
     "/mapa-clientes",
     "/sincronizacao",
     "/admin",
@@ -435,6 +438,14 @@ export default function Sidebar({ companyName }: SidebarProps) {
           permission: "exportar-relatorios",
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/exportar-relatorios", exportarRelatoriosHref),
+        },
+        {
+          key: "gerador-relatorios",
+          label: "Gerador de Relatórios",
+          href: geradorRelatoriosHref,
+          permission: "gerador-relatorios",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/gerador-relatorios", geradorRelatoriosHref),
         },
         {
           key: "sincronizacao",

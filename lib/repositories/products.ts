@@ -2498,10 +2498,64 @@ export async function fetchAvailableGrades({
         .filter((grade) => grade !== '');
       
       const gradesUnicas = [...new Set(grades)].sort();
-      
+
       return gradesUnicas;
     } catch (error) {
       console.error('Erro ao buscar grades:', error);
+      return [];
+    }
+  });
+}
+
+/**
+ * Tipos de produto (TIPO_PRODUTO) que tiveram venda no período/filial.
+ * Usado como fonte de opções do filtro "Tipo" no Gerador de Relatórios.
+ * Cobre as vendas de loja (varejo); para os fins do relatório isso é suficiente.
+ */
+export async function fetchAvailableTipos({
+  company,
+  range,
+  filial,
+}: Pick<ProductsQueryParams, 'company' | 'range' | 'filial'> = {}): Promise<string[]> {
+  if (!company) return [];
+
+  return withRequest(async (request) => {
+    const { start, end } = resolveRange(range);
+    request.input('startDate', sql.DateTime, start);
+    request.input('endDate', sql.DateTime, end);
+
+    const filialFilter = await buildFilialFilter(
+      request,
+      company,
+      'sales',
+      filial,
+      'f',
+      'availableTiposFilial'
+    );
+
+    try {
+      const result = await request.query<{ tipo: string | null }>(`
+        SELECT DISTINCT
+          UPPER(LTRIM(RTRIM(ISNULL(p.TIPO_PRODUTO, '')))) AS tipo
+        FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+          ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
+        LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.COD_FILIAL = vp.CODIGO_FILIAL
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO
+        WHERE vp.DATA_VENDA >= @startDate
+          AND vp.DATA_VENDA < @endDate
+          AND vp.QTDE_CANCELADA = 0
+          AND vp.QTDE > 0
+          AND ISNULL(p.TIPO_PRODUTO, '') <> ''
+          ${filialFilter}
+        ORDER BY tipo
+      `);
+
+      return result.recordset
+        .map((row) => row.tipo?.trim() ?? '')
+        .filter(Boolean);
+    } catch (error) {
+      console.error('Erro ao buscar tipos:', error);
       return [];
     }
   });

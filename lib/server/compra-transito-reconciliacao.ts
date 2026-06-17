@@ -31,9 +31,11 @@ export async function reconcileCompanyCompras(companyKey: CompanyKey): Promise<{
     new Set(confirmed.flatMap((c) => c.items.map((i) => i.produto)).filter(Boolean))
   );
 
-  // Corte = dia da compra mais antiga; nenhuma entrada anterior pode ser alocada.
+  // Corte = data da compra mais antiga (confirmação); nenhuma entrada anterior à
+  // compra mais velha pode ser alocada. Usa confirmedAt (data real do pedido), não
+  // createdAt — um rascunho pode ter sido criado bem antes de a compra existir.
   const cutoff = confirmed.reduce<string>((min, c) => {
-    const day = (c.createdAt ?? "").slice(0, 10);
+    const day = (c.confirmedAt ?? "").slice(0, 10);
     return !min || (day && day < min) ? day || min : min;
   }, "");
 
@@ -47,7 +49,9 @@ export async function reconcileCompanyCompras(companyKey: CompanyKey): Promise<{
   const recMap = reconcileCompras({
     compras: confirmed.map((c) => ({
       id: c.id,
-      createdAt: c.createdAt,
+      // Data da compra = confirmação real do pedido (mesma data exibida na UI),
+      // não a criação do rascunho. Entradas anteriores a ela não a preenchem.
+      dataCompra: c.confirmedAt,
       items: c.items.map((i) => ({
         itemKey: i.itemKey,
         produto: i.produto,

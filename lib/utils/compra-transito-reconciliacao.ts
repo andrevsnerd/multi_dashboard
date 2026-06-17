@@ -8,16 +8,22 @@ import type { CompraTransitoStatusReal } from "@/lib/types/compra-transito";
  * Casa cada item comprado com as entradas físicas que realmente chegaram na
  * matriz, em vez de presumir a chegada pela data. Regra crítica do dono: um item
  * recebido em uma compra NÃO pode ser "roubado" por um produto idêntico comprado
- * numa compra POSTERIOR. Resolvido com alocação FIFO por data de criação da
- * compra + restrição de elegibilidade (entrada anterior à compra não a preenche).
+ * numa compra POSTERIOR. Resolvido com alocação FIFO por DATA DA COMPRA
+ * (confirmação) + restrição de elegibilidade (entrada anterior à compra não a
+ * preenche).
+ *
+ * A âncora é a DATA DA COMPRA — quando o pedido foi de fato confirmado
+ * (confirmedAt), não quando o rascunho foi criado. Uma entrada só conta para uma
+ * compra se ocorreu NO DIA ou DEPOIS da compra; entrada anterior à compra jamais
+ * a preenche (não faz sentido um item ter "chegado" antes de ter sido comprado).
  *
  * Tudo aqui é puro (sem banco), para ser testável isoladamente.
  */
 
 export interface ReconcileCompraInput {
   id: string;
-  /** Âncora estável de ordenação/elegibilidade FIFO (nunca muda após criada). */
-  createdAt: string;
+  /** Data da compra (confirmação) — âncora de ordenação/elegibilidade FIFO. */
+  dataCompra: string;
   items: Array<{
     itemKey: string;
     produto: string;
@@ -129,7 +135,7 @@ export function deriveItemStatusReal(
 interface Slot {
   compraId: string;
   itemKey: string;
-  createdDay: string;
+  compraDay: string;
   dataRecebimento: string;
   ordered: number;
   remaining: number;
@@ -165,7 +171,7 @@ function applyAllocation(rec: ItemReconciliacao, entry: EntryBucket, qtde: numbe
  * e devolve um mapa compraId -> (itemKey -> reconciliação).
  *
  * Passo 1 (FIFO): cada entrada preenche o item ELEGÍVEL mais antigo até o pedido.
- *   Elegível = dia(entrada) >= dia(criação da compra).
+ *   Elegível = dia(entrada) >= dia(da compra/confirmação).
  * Passo 2 (excesso): sobra de entrada elegível vai para o item elegível mais NOVO,
  *   contabilizada como "excedeu". Sobra sem item elegível (anterior a todas as
  *   compras) fica sem alocação — nunca rouba uma compra posterior.
@@ -182,7 +188,7 @@ export function reconcileCompras(params: {
   for (const compra of params.compras) {
     const itemMap = new Map<string, ItemReconciliacao>();
     result.set(compra.id, itemMap);
-    const createdDay = dayKey(compra.createdAt);
+    const compraDay = dayKey(compra.dataCompra);
     for (const item of compra.items) {
       const ordered = Math.max(0, Math.round(item.quantidade ?? 0));
       const rec: ItemReconciliacao = {
@@ -197,7 +203,7 @@ export function reconcileCompras(params: {
       const slot: Slot = {
         compraId: compra.id,
         itemKey: item.itemKey,
-        createdDay,
+        compraDay,
         dataRecebimento: dayKey(item.dataRecebimento),
         ordered,
         remaining: ordered,
@@ -230,7 +236,7 @@ export function reconcileCompras(params: {
   for (const [key, slotsRaw] of slotsByKey) {
     const slots = slotsRaw.slice().sort(
       (a, b) =>
-        a.createdDay.localeCompare(b.createdDay) ||
+        a.compraDay.localeCompare(b.compraDay) ||
         a.dataRecebimento.localeCompare(b.dataRecebimento) ||
         a.compraId.localeCompare(b.compraId) ||
         a.itemKey.localeCompare(b.itemKey)
@@ -242,8 +248,8 @@ export function reconcileCompras(params: {
 
     const isNewer = (slot: Slot, target: Slot | null): boolean =>
       !target ||
-      slot.createdDay > target.createdDay ||
-      (slot.createdDay === target.createdDay && slot.itemKey > target.itemKey);
+      slot.compraDay > target.compraDay ||
+      (slot.compraDay === target.compraDay && slot.itemKey > target.itemKey);
 
     // Passo 1 — FIFO, preenche FALTAS sem janela. Item faltante "deve" o restante e
     // aceita entradas futuras indefinidamente (a falta sempre acaba chegando), do
@@ -252,7 +258,7 @@ export function reconcileCompras(params: {
       for (const slot of slots) {
         if (e.remaining <= 0) break;
         if (slot.remaining <= 0) continue; // item já completo: não preenche mais
-        if (e.data < slot.createdDay) continue; // entrada anterior à compra: inelegível
+        if (e.data < slot.compraDay) continue; // entrada anterior à data da compra: inelegível
         if (!slot.anchorDay) slot.anchorDay = e.data; // 1ª entrada do item
         const take = Math.min(e.remaining, slot.remaining);
         slot.remaining -= take;
@@ -275,7 +281,7 @@ export function reconcileCompras(params: {
       }
       if (!target) {
         for (const slot of slots) {
-          if (e.data < slot.createdDay) continue;
+          if (e.data < slot.compraDay) continue; // entrada anterior à data da compra: inelegível
           if (!slot.anchorDay || dayDiff(slot.anchorDay, e.data) > JANELA_COMPLEMENTO_DIAS) continue;
           if (isNewer(slot, target)) target = slot;
         }
