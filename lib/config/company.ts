@@ -89,6 +89,13 @@ export function getFilialGroupMembers(company: CompanyConfig, filial: string): s
       return members;
     }
   }
+  // E-commerce também é um grupo lógico (lista própria, não em filialGroups):
+  // qualquer filial de e-commerce representa o grupo inteiro. Mesmo tratamento dos
+  // demais grupos → faturamento/meta somam TODOS os membros, canônica = ativa.
+  const ecommerce = company.ecommerceFilials ?? [];
+  if (ecommerce.some((f) => normalizeFilialNameForMatch(f).toUpperCase() === normalizedFilial)) {
+    return ecommerce;
+  }
   return [filial];
 }
 

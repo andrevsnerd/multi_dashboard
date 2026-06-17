@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
-import { resolveCompany, VAREJO_VALUE } from "@/lib/config/company";
+import { getFilialGroupMembers, resolveCompany, VAREJO_VALUE } from "@/lib/config/company";
 
 import DateRangeFilter, {
   type DateRangeValue,
@@ -234,14 +234,16 @@ export default function CompanyDashboard({
   const currentGoal = useMemo(() => {
     if (!dashboardData) return 0;
     const goals = dashboardData.goals;
-    if (effectiveFilial) {
-      // Filiais canônicas de grupos lógicos (ex.: PAULISTA) podem ter a meta
-      // gravada em qualquer um dos membros — somar todos os membros do grupo.
-      const groupMembers = companyConfig?.filialGroups?.[effectiveFilial];
-      if (groupMembers && groupMembers.length > 0) {
-        return groupMembers.reduce((sum, member) => sum + (goals[member] ?? 0), 0);
-      }
-      return goals[effectiveFilial] ?? 0;
+    if (effectiveFilial && effectiveFilial !== VAREJO_VALUE) {
+      // Meta de um grupo = soma das metas de TODOS os membros, independente de qual
+      // é a canônica/ativa. Vale para grupos lógicos (ex.: PAULISTA, meta toda na
+      // canônica) E para e-commerce (meta dividida entre os membros) — somar cobre
+      // os dois esquemas de gravação. getFilialGroupMembers devolve [filial] quando
+      // não é grupo, e qualquer grupo futuro entra aqui sem mudança.
+      const members = companyConfig
+        ? getFilialGroupMembers(companyConfig, effectiveFilial)
+        : [effectiveFilial];
+      return members.reduce((sum, member) => sum + (goals[member] ?? 0), 0);
     }
     return Object.values(goals).reduce((sum, v) => sum + (v as number), 0);
   }, [dashboardData, effectiveFilial, companyConfig]);
