@@ -170,10 +170,13 @@ export async function fetchProductStock(
       positiveCount: 0,
     };
     
-    // Negativos NUNCA são contabilizados: estoque = soma apenas dos saldos positivos.
-    // SKU só com saldo negativo → 0 (segue valendo como ruptura pela regra <= 0).
+    // Regra de visualização de estoque:
+    // - Se há QUALQUER saldo positivo no escopo, conta só os positivos (nunca soma negativos).
+    // - Se NÃO há nada positivo (só negativos), mostra o negativo total, para enxergar
+    //   locais totalmente negativos.
     const positiveStock = Number(row.positiveStock ?? 0);
-    const finalStock = Math.max(0, positiveStock);
+    const negativeStock = Number(row.negativeStock ?? 0);
+    const finalStock = positiveStock > 0 ? positiveStock : negativeStock;
 
     return finalStock;
   });
@@ -242,18 +245,24 @@ export async function fetchMultipleProductsStock(
       positiveCount: number | null;
     }>(query);
 
-    // Somar apenas filiais com estoque positivo (nunca somar negativos)
-    const stockMap = new Map<string, number>();
+    // Acumular positivos e negativos por produto separadamente. O negativo só será
+    // usado quando o produto NÃO tiver nenhum saldo positivo no escopo (totalmente negativo).
+    const posByKey = new Map<string, number>();
+    const negByKey = new Map<string, number>();
     result.recordset.forEach((row) => {
-      // Negativos NUNCA contam: soma só os saldos positivos.
-      const filialStock = Math.max(0, Number(row.positiveStock ?? 0));
-      if (filialStock <= 0) return;
-
       const dbKey = String(row.productId ?? '').trim();
       const callerKey = productIds.find((id) => id != null && String(id).trim() === dbKey)
         ?? productIds.find((id) => id != null && String(id).trim().toLowerCase() === dbKey.toLowerCase());
       const key = callerKey != null ? String(callerKey).trim() : dbKey;
-      stockMap.set(key, (stockMap.get(key) ?? 0) + filialStock);
+      posByKey.set(key, (posByKey.get(key) ?? 0) + Number(row.positiveStock ?? 0));
+      negByKey.set(key, (negByKey.get(key) ?? 0) + Number(row.negativeStock ?? 0));
+    });
+
+    // Regra: positivo > 0 → só positivos; senão → negativo total (enxergar totalmente negativo).
+    const stockMap = new Map<string, number>();
+    posByKey.forEach((pos, key) => {
+      const neg = negByKey.get(key) ?? 0;
+      stockMap.set(key, pos > 0 ? pos : neg);
     });
 
     // Garantir que todos os produtos tenham entrada no mapa (mesmo que com 0)
@@ -304,7 +313,10 @@ export async function fetchMultipleProductsStockByColor(
   // Cada combinação produto+cor pode usar até 2 parâmetros (produto e cor)
   // Usar lotes de 500 para garantir que não excedemos o limite (deixando margem para filtros de filial)
   const BATCH_SIZE = 500;
-  const stockMap = new Map<string, number>();
+  // Acumular positivos e negativos por (produto-cor) ao longo dos lotes. O negativo
+  // só entra quando a chave NÃO tem nenhum saldo positivo no escopo (totalmente negativo).
+  const posByKey = new Map<string, number>();
+  const negByKey = new Map<string, number>();
 
   // Processar em lotes
   for (let i = 0; i < pairsArray.length; i += BATCH_SIZE) {
@@ -387,18 +399,22 @@ export async function fetchMultipleProductsStockByColor(
       return result.recordset;
     });
 
-    // Processar resultados do lote: somar apenas filiais com estoque positivo (nunca somar negativos)
+    // Acumular positivos e negativos por (produto-cor) ao longo dos lotes.
     batchResult.forEach((row) => {
-      // Negativos NUNCA contam: soma só os saldos positivos.
-      const filialStock = Math.max(0, Number(row.positiveStock ?? 0));
-      if (filialStock <= 0) return;
-
       const productId = String(row.productId ?? '').trim();
       const corProduto = row.corProduto != null ? String(row.corProduto).trim() : null;
       const key = corProduto ? `${productId}-${corProduto}` : `${productId}-null`;
-      stockMap.set(key, (stockMap.get(key) ?? 0) + filialStock);
+      posByKey.set(key, (posByKey.get(key) ?? 0) + Number(row.positiveStock ?? 0));
+      negByKey.set(key, (negByKey.get(key) ?? 0) + Number(row.negativeStock ?? 0));
     });
   }
+
+  // Regra: positivo > 0 → só positivos; senão → negativo total (enxergar totalmente negativo).
+  const stockMap = new Map<string, number>();
+  posByKey.forEach((pos, key) => {
+    const neg = negByKey.get(key) ?? 0;
+    stockMap.set(key, pos > 0 ? pos : neg);
+  });
 
   // Garantir que todos os produtos tenham entrada no mapa (mesmo que com 0)
   products.forEach((product) => {
