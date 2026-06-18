@@ -533,6 +533,20 @@ export default function AdminPage() {
           >
             Extrato de Produto
           </Link>
+          <Link
+            href="/admin/prazo-bloqueio"
+            style={{
+              padding: "8px 14px",
+              background: "#1e293b",
+              border: "1px solid #334155",
+              borderRadius: 6,
+              color: "#94a3b8",
+              textDecoration: "none",
+              fontSize: 13,
+            }}
+          >
+            Prazo de Bloqueio
+          </Link>
           <button type="button" className={styles.addButton} onClick={openAdd}>
             + Adicionar usuário
           </button>

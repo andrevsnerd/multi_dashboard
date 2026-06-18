@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSaidasPendentesParaUsuario, isSaidaBloqueante } from "@/lib/server/notificacoes-saidas";
 import { getLidasByUsername, marcarLidas } from "@/lib/utils/notificacoes-leitura-store";
+import { getDiasMinimos } from "@/lib/utils/notificacoes-trava-store";
+import { TRAVA_DIAS_MINIMOS } from "@/lib/config/notificacoes-trava";
 import type { Notificacao, SaidaPendente } from "@/lib/types/notificacao";
 
 /** Monta o link para o detalhe do romaneio (mesma URL usada na lista de romaneios). */
@@ -28,12 +30,13 @@ export async function GET(request: NextRequest) {
     const companyKey = request.nextUrl.searchParams.get("company")?.trim();
 
     if (!username || !companyKey) {
-      return NextResponse.json({ data: [], naoLidas: 0, bloqueios: [] });
+      return NextResponse.json({ data: [], naoLidas: 0, bloqueios: [], diasMinimos: TRAVA_DIAS_MINIMOS });
     }
 
-    const [pendentes, lidas] = await Promise.all([
+    const [pendentes, lidas, diasMinimos] = await Promise.all([
       getSaidasPendentesParaUsuario(companyKey, username),
       getLidasByUsername(username),
+      getDiasMinimos(companyKey),
     ]);
 
     const data: Notificacao[] = pendentes.map((p) => ({
@@ -43,12 +46,12 @@ export async function GET(request: NextRequest) {
     }));
 
     const naoLidas = data.reduce((acc, n) => (n.lida ? acc : acc + 1), 0);
-    const bloqueios = data.filter((n) => isSaidaBloqueante(n));
+    const bloqueios = data.filter((n) => isSaidaBloqueante(n, diasMinimos));
 
-    return NextResponse.json({ data, naoLidas, bloqueios });
+    return NextResponse.json({ data, naoLidas, bloqueios, diasMinimos });
   } catch (error) {
     console.error("Erro ao buscar notificações", error);
-    return NextResponse.json({ data: [], naoLidas: 0, bloqueios: [] });
+    return NextResponse.json({ data: [], naoLidas: 0, bloqueios: [], diasMinimos: TRAVA_DIAS_MINIMOS });
   }
 }
 

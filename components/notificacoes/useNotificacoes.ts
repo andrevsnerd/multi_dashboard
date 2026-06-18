@@ -12,6 +12,7 @@ import {
 } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthContext";
+import { TRAVA_DIAS_MINIMOS } from "@/lib/config/notificacoes-trava";
 import type { Notificacao, NotificacoesResponse } from "@/lib/types/notificacao";
 
 const COMPANIES = ["nerd", "scarfme"] as const;
@@ -33,6 +34,8 @@ interface NotificacoesState {
   notificacoes: Notificacao[];
   bloqueios: Notificacao[];
   naoLidas: number;
+  /** Prazo (dias mínimos) da trava da empresa atual — para textos da UI. */
+  diasMinimos: number;
   loading: boolean;
   marcarLida: (key: string) => Promise<void>;
   marcarTodas: () => Promise<void>;
@@ -62,6 +65,7 @@ export function NotificacoesProvider({ children }: { children: ReactNode }) {
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [bloqueios, setBloqueios] = useState<Notificacao[]>([]);
   const [naoLidas, setNaoLidas] = useState(0);
+  const [diasMinimos, setDiasMinimos] = useState(TRAVA_DIAS_MINIMOS);
   const [loading, setLoading] = useState(false);
   const activeRef = useRef(true);
 
@@ -85,6 +89,7 @@ export function NotificacoesProvider({ children }: { children: ReactNode }) {
       setNotificacoes(json.data || []);
       setBloqueios(json.bloqueios || []);
       setNaoLidas(json.naoLidas || 0);
+      if (typeof json.diasMinimos === "number") setDiasMinimos(json.diasMinimos);
     } catch {
       // silencioso: notificações nunca devem quebrar a UI
     } finally {
@@ -151,6 +156,7 @@ export function NotificacoesProvider({ children }: { children: ReactNode }) {
     notificacoes,
     bloqueios,
     naoLidas,
+    diasMinimos,
     loading,
     marcarLida,
     marcarTodas,
@@ -171,6 +177,7 @@ export function useNotificacoes(): NotificacoesState {
       notificacoes: [],
       bloqueios: [],
       naoLidas: 0,
+      diasMinimos: TRAVA_DIAS_MINIMOS,
       loading: false,
       marcarLida: async () => {},
       marcarTodas: async () => {},

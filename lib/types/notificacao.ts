@@ -57,4 +57,6 @@ export interface NotificacoesResponse {
    * dias de idade. Enquanto houver itens aqui, a UI bloqueia o acesso.
    */
   bloqueios: Notificacao[];
+  /** Prazo (dias mínimos) da trava configurado para a empresa (admin). */
+  diasMinimos: number;
 }

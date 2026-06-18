@@ -42,13 +42,20 @@ export { TRAVA_DATA_INICIO, TRAVA_DIAS_MINIMOS };
 
 /**
  * Uma pendência ATIVA a trava quando: emitida a partir do cutoff E com pelo
- * menos TRAVA_DIAS_MINIMOS dias de idade (atualmente 7). (Já vem não-confirmada da fonte.)
+ * menos `diasMinimos` dias de idade. (Já vem não-confirmada da fonte.)
+ *
+ * `diasMinimos` é o prazo configurável por empresa (admin → Prazo de bloqueio);
+ * quando omitido, usa o default TRAVA_DIAS_MINIMOS.
  */
-export function isSaidaBloqueante(p: { dataEmissao: string }, agora: number = Date.now()): boolean {
+export function isSaidaBloqueante(
+  p: { dataEmissao: string },
+  diasMinimos: number = TRAVA_DIAS_MINIMOS,
+  agora: number = Date.now()
+): boolean {
   const t = new Date(p.dataEmissao).getTime();
   if (Number.isNaN(t)) return false; // sem data confiável: não bloqueia
   if (t < TRAVA_DATA_INICIO.getTime()) return false; // anterior ao cutoff
-  const carenciaMs = TRAVA_DIAS_MINIMOS * 24 * 60 * 60 * 1000;
+  const carenciaMs = diasMinimos * 24 * 60 * 60 * 1000;
   return t <= agora - carenciaMs; // pelo menos N dias desde a emissão
 }
 
