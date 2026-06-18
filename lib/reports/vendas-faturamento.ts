@@ -96,6 +96,7 @@ export const vendasFaturamentoMeta: ReportTypeMeta = {
     "subgrupo",
     "grupo",
     "grade",
+    "colecao",
     "tipo",
   ],
   columns: VENDAS_FATURAMENTO_COLUMNS,

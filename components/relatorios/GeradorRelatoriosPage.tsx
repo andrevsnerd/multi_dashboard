@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateRangeFilter";
 import FilialFilter from "@/components/filters/FilialFilter";
-import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
+import MultiSelectFilter, { type MultiSelectOption } from "@/components/filters/MultiSelectFilter";
 import { useAuth } from "@/components/auth/AuthContext";
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 import { getCurrentMonthRange, formatDateForQuery } from "@/lib/utils/date";
@@ -115,6 +115,7 @@ export default function GeradorRelatoriosPage({
   const [linhas, setLinhas] = useState<string[]>([]);
   const [subgrupos, setSubgrupos] = useState<string[]>([]);
   const [grades, setGrades] = useState<string[]>([]);
+  const [colecoes, setColecoes] = useState<string[]>([]);
   const [cores, setCores] = useState<string[]>([]);
   const [tipos, setTipos] = useState<string[]>([]);
 
@@ -123,6 +124,8 @@ export default function GeradorRelatoriosPage({
   const [optLinhas, setOptLinhas] = useState<string[]>([]);
   const [optSubgrupos, setOptSubgrupos] = useState<string[]>([]);
   const [optGrades, setOptGrades] = useState<string[]>([]);
+  // Coleção usa {value: código, label: "descrição (código)"} — busca casa os dois.
+  const [optColecoes, setOptColecoes] = useState<MultiSelectOption[]>([]);
   const [optCores, setOptCores] = useState<string[]>([]);
   const [optTipos, setOptTipos] = useState<string[]>([]);
   const [loadingOpt, setLoadingOpt] = useState<Record<string, boolean>>({});
@@ -199,44 +202,38 @@ export default function GeradorRelatoriosPage({
   const endStr = formatDateForQuery(range.endDate);
 
   const loadOptions = useCallback(
-    async (kind: "grupo" | "linha" | "subgrupo" | "grade" | "cor" | "tipo") => {
+    async (kind: "grupo" | "linha" | "subgrupo" | "grade" | "colecao" | "cor" | "tipo") => {
       setLoadingOpt((s) => ({ ...s, [kind]: true }));
       try {
         const params = new URLSearchParams({ company: companyKey });
         if (filial) params.set("filial", filial);
-        let url = "";
-        if (kind === "grupo") {
+        if (kind !== "cor") {
           params.set("start", startStr);
           params.set("end", endStr);
-          url = `/api/products/grupos?${params}`;
-        } else if (kind === "linha") {
-          params.set("start", startStr);
-          params.set("end", endStr);
-          url = `/api/products/linhas?${params}`;
-        } else if (kind === "subgrupo") {
-          params.set("start", startStr);
-          params.set("end", endStr);
-          url = `/api/products/subgrupos?${params}`;
-        } else if (kind === "grade") {
-          params.set("start", startStr);
-          params.set("end", endStr);
-          url = `/api/products/grades?${params}`;
-        } else if (kind === "tipo") {
-          params.set("start", startStr);
-          params.set("end", endStr);
-          url = `/api/products/tipos?${params}`;
-        } else {
-          url = `/api/products/cores?${params}`;
         }
+        const endpoint: Record<typeof kind, string> = {
+          grupo: "grupos",
+          linha: "linhas",
+          subgrupo: "subgrupos",
+          grade: "grades",
+          colecao: "colecoes",
+          cor: "cores",
+          tipo: "tipos",
+        };
+        // Coleção: pede descrição junto (label "descrição (código)", value = código).
+        if (kind === "colecao") params.set("includeDescriptions", "1");
+        const url = `/api/products/${endpoint[kind]}?${params}`;
+
         const res = await fetch(url, { cache: "no-store" });
-        const json = (await res.json()) as { data?: string[] };
+        const json = (await res.json()) as { data?: (string | MultiSelectOption)[] };
         const data = json.data ?? [];
-        if (kind === "grupo") setOptGrupos(data);
-        else if (kind === "linha") setOptLinhas(data);
-        else if (kind === "subgrupo") setOptSubgrupos(data);
-        else if (kind === "grade") setOptGrades(data);
-        else if (kind === "tipo") setOptTipos(data);
-        else setOptCores(data);
+        if (kind === "grupo") setOptGrupos(data as string[]);
+        else if (kind === "linha") setOptLinhas(data as string[]);
+        else if (kind === "subgrupo") setOptSubgrupos(data as string[]);
+        else if (kind === "grade") setOptGrades(data as string[]);
+        else if (kind === "colecao") setOptColecoes(data as MultiSelectOption[]);
+        else if (kind === "tipo") setOptTipos(data as string[]);
+        else setOptCores(data as string[]);
       } catch {
         // ignora — multiselect fica vazio
       } finally {
@@ -251,7 +248,7 @@ export default function GeradorRelatoriosPage({
   // que realmente têm opções para a empresa (ex.: NERD não mostra Subgrupo/Grade).
   useEffect(() => {
     if (!meta) return;
-    (["grupo", "linha", "subgrupo", "grade", "cor", "tipo"] as const).forEach((k) => {
+    (["grupo", "linha", "subgrupo", "grade", "colecao", "cor", "tipo"] as const).forEach((k) => {
       if (meta.supportedFilters.includes(k as never)) void loadOptions(k);
     });
   }, [meta, loadOptions]);
@@ -314,6 +311,7 @@ export default function GeradorRelatoriosPage({
     linhas.forEach((l) => params.append("linha", l));
     subgrupos.forEach((s) => params.append("subgrupo", s));
     grades.forEach((g) => params.append("grade", g));
+    colecoes.forEach((c) => params.append("colecao", c));
     cores.forEach((c) => params.append("cor", c));
     tipos.forEach((t) => params.append("tipo", t));
     if (produtoSelected) {
@@ -324,7 +322,7 @@ export default function GeradorRelatoriosPage({
     return params.toString();
   }, [
     companyKey, filial, startStr, endStr, grupos, linhas, subgrupos, grades,
-    cores, tipos, produtoSelected, produtoQuery,
+    colecoes, cores, tipos, produtoSelected, produtoQuery,
   ]);
 
   const handleGenerate = useCallback(async () => {
@@ -621,6 +619,16 @@ export default function GeradorRelatoriosPage({
               onChange={setGrades}
               onOpen={() => void loadOptions("grade")}
               loading={!!loadingOpt.grade}
+            />
+          )}
+          {supports("colecao") && (optColecoes.length > 0 || colecoes.length > 0) && (
+            <MultiSelectFilter
+              label="Coleção"
+              value={colecoes}
+              options={optColecoes}
+              onChange={setColecoes}
+              onOpen={() => void loadOptions("colecao")}
+              loading={!!loadingOpt.colecao}
             />
           )}
           {supports("cor") && (optCores.length > 0 || cores.length > 0) && (
