@@ -196,7 +196,106 @@
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+  align-items: center;
   margin-bottom: 0.5rem;
+}
+
+.colsSelect {
+  position: relative;
+  display: inline-block;
+}
+
+.colsButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.8rem;
+  color: #374151;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.colsButton:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.colsButton strong {
+  color: #111827;
+  font-weight: 700;
+}
+
+.colsBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+}
+
+.colsDropdown {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 21;
+  min-width: 220px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 0.4rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 11px;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.16);
+}
+
+.colsAllBtn {
+  width: 100%;
+  margin-bottom: 0.3rem;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #166534;
+  background: rgba(209, 250, 229, 0.6);
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.colsAllBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.colsOption {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.82rem;
+  color: #374151;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.colsOption:hover {
+  background: #f3f4f6;
+}
+
+.colsOption input {
+  width: 0.95rem;
+  height: 0.95rem;
+  accent-color: #10b981;
+}
+
+.colsOption input:disabled {
+  cursor: not-allowed;
 }
 
 .primaryBtn {

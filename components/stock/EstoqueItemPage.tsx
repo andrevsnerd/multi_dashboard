@@ -152,6 +152,69 @@ async function fetchDetalhesPorFilial(params: {
   return body.data;
 }
 
+function FilialColumnsSelect({
+  columns,
+  hidden,
+  onToggle,
+  onShowAll,
+}: {
+  columns: string[];
+  hidden: Set<string>;
+  onToggle: (label: string) => void;
+  onShowAll: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const visibleCount = columns.filter((column) => !hidden.has(column)).length;
+  const allVisible = visibleCount === columns.length;
+  const summary = allVisible ? "Todas" : `${visibleCount} de ${columns.length}`;
+
+  return (
+    <div className={styles.colsSelect}>
+      <button
+        type="button"
+        className={styles.colsButton}
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        <span>
+          Filiais exibidas: <strong>{summary}</strong>
+        </span>
+        <span aria-hidden>▼</span>
+      </button>
+
+      {open ? (
+        <>
+          <div className={styles.colsBackdrop} onClick={() => setOpen(false)} />
+          <div className={styles.colsDropdown}>
+            <button
+              type="button"
+              className={styles.colsAllBtn}
+              onClick={onShowAll}
+              disabled={allVisible}
+            >
+              Selecionar todas
+            </button>
+            {columns.map((label) => {
+              const checked = !hidden.has(label);
+              const isLastVisible = checked && visibleCount === 1;
+              return (
+                <label key={label} className={styles.colsOption}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={isLastVisible}
+                    onChange={() => onToggle(label)}
+                  />
+                  <span>{label}</span>
+                </label>
+              );
+            })}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 export default function EstoqueItemPage({
   companyKey,
   companyName,
@@ -188,6 +251,7 @@ export default function EstoqueItemPage({
   const [cor, setCor] = useState<string | null>(null);
   const [mostrarZerados, setMostrarZerados] = useState(false);
   const [mostrarNegativos, setMostrarNegativos] = useState(false);
+  const [hiddenFiliais, setHiddenFiliais] = useState<Set<string>>(new Set());
 
   const [apiCores, setApiCores] = useState<string[]>([]);
   const [apiGrupos, setApiGrupos] = useState<string[]>([]);
@@ -576,11 +640,35 @@ export default function EstoqueItemPage({
     return Array.from(seen).sort();
   }, [pivotRows, apiColecoes]);
 
+  const visibleFiliaisColumns = useMemo(
+    () => filiaisColumns.filter((filial) => !hiddenFiliais.has(filial)),
+    [filiaisColumns, hiddenFiliais],
+  );
+
   const filteredPivotRows = useMemo(() => {
-    if (!cor) return pivotRows;
-    const target = cor.trim().toUpperCase();
-    return pivotRows.filter((row) => row.cor.trim().toUpperCase() === target);
-  }, [pivotRows, cor]);
+    const base = !cor
+      ? pivotRows
+      : pivotRows.filter(
+          (row) => row.cor.trim().toUpperCase() === cor.trim().toUpperCase(),
+        );
+
+    // Recalcula o total considerando apenas as filiais visiveis (colunas selecionadas).
+    return base.map((row) => ({
+      ...row,
+      total: sumOnlyPositive(visibleFiliaisColumns.map((filial) => row.porFilial[filial] ?? 0)),
+    }));
+  }, [pivotRows, cor, visibleFiliaisColumns]);
+
+  const toggleFilialColumn = useCallback((label: string) => {
+    setHiddenFiliais((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  }, []);
+
+  const showAllFiliais = useCallback(() => setHiddenFiliais(new Set()), []);
 
   useEffect(() => {
     if (!sortState.field.startsWith("filial:")) {
@@ -588,10 +676,10 @@ export default function EstoqueItemPage({
     }
 
     const filial = sortState.field.slice("filial:".length);
-    if (!filiaisColumns.includes(filial)) {
+    if (!visibleFiliaisColumns.includes(filial)) {
       setSortState(DEFAULT_SORT_STATE);
     }
-  }, [filiaisColumns, sortState.field]);
+  }, [visibleFiliaisColumns, sortState.field]);
 
   const handleSort = useCallback((field: SortField) => {
     setSortState((current) => {
@@ -672,9 +760,9 @@ export default function EstoqueItemPage({
     return {
       itens: filteredPivotRows.length,
       estoqueTotal: sumOnlyPositive(filteredPivotRows.map((row) => row.total)),
-      filiais: filiaisColumns.length,
+      filiais: visibleFiliaisColumns.length,
     };
-  }, [data, filteredPivotRows, filiaisColumns]);
+  }, [data, filteredPivotRows, visibleFiliaisColumns]);
 
   const limparFiltros = () => {
     setItensInput("");
@@ -687,6 +775,7 @@ export default function EstoqueItemPage({
     setSelectedFilial(null);
     setMostrarZerados(false);
     setMostrarNegativos(false);
+    setHiddenFiliais(new Set());
     setData(null);
     setError(null);
   };
@@ -902,6 +991,15 @@ export default function EstoqueItemPage({
         >
           {loading ? "Consultando..." : "Consultar"}
         </button>
+
+        {filiaisColumns.length > 1 ? (
+          <FilialColumnsSelect
+            columns={filiaisColumns}
+            hidden={hiddenFiliais}
+            onToggle={toggleFilialColumn}
+            onShowAll={showAllFiliais}
+          />
+        ) : null}
       </div>
 
       {error ? <div className={styles.error}>{error}</div> : null}
@@ -962,7 +1060,7 @@ export default function EstoqueItemPage({
                     </span>
                   </button>
                 </th>
-                {filiaisColumns.map((filial) => (
+                {visibleFiliaisColumns.map((filial) => (
                   <th
                     key={filial}
                     className={styles.num}
@@ -984,7 +1082,7 @@ export default function EstoqueItemPage({
             </thead>
             <tbody>
               {sortedPivotRows.map((row) => {
-                const highlightedFiliais = getHighlightedFiliais(row, filiaisColumns);
+                const highlightedFiliais = getHighlightedFiliais(row, visibleFiliaisColumns);
                 const meta = buildItemMeta(row, companyKey);
 
                 return (
@@ -1007,7 +1105,7 @@ export default function EstoqueItemPage({
                     >
                       <span className={styles.totalValue}>{formatInt(row.total)}</span>
                     </td>
-                    {filiaisColumns.map((filial) => {
+                    {visibleFiliaisColumns.map((filial) => {
                       const value = row.porFilial[filial] ?? 0;
 
                       return (
