@@ -15,6 +15,7 @@ import type {
   ReportColumnDef,
   ReportPresetDef,
   ReportRow,
+  ReportSummaryMetric,
 } from "@/lib/reports/types";
 import type { ReportPreset } from "@/lib/types/report-preset";
 
@@ -77,6 +78,17 @@ function isNumericType(type: ColumnType): boolean {
   return type !== "text";
 }
 
+function formatKpi(value: number, format: ReportSummaryMetric["format"]): string {
+  if (!Number.isFinite(value)) return "—";
+  if (format === "currency") {
+    return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  }
+  if (format === "int") {
+    return value.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+  }
+  return value.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+}
+
 // ---------- component ----------
 
 export default function GeradorRelatoriosPage({
@@ -132,6 +144,7 @@ export default function GeradorRelatoriosPage({
 
   // Resultado
   const [rows, setRows] = useState<ReportRow[]>([]);
+  const [summary, setSummary] = useState<ReportSummaryMetric[]>([]);
   const [total, setTotal] = useState(0);
   const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -233,6 +246,16 @@ export default function GeradorRelatoriosPage({
     [companyKey, filial, startStr, endStr]
   );
 
+  // Carrega as opções de TODOS os filtros suportados de forma antecipada (ao
+  // montar e quando empresa/filial/período mudam). Assim só exibimos os filtros
+  // que realmente têm opções para a empresa (ex.: NERD não mostra Subgrupo/Grade).
+  useEffect(() => {
+    if (!meta) return;
+    (["grupo", "linha", "subgrupo", "grade", "cor", "tipo"] as const).forEach((k) => {
+      if (meta.supportedFilters.includes(k as never)) void loadOptions(k);
+    });
+  }, [meta, loadOptions]);
+
   // ---------- busca de produto ----------
   const runSearch = useCallback(
     async (term: string) => {
@@ -316,12 +339,14 @@ export default function GeradorRelatoriosPage({
         throw new Error(json?.error || json?.details || "Erro ao gerar relatório");
       }
       setRows(json.rows ?? []);
+      setSummary(Array.isArray(json.summary) ? json.summary : []);
       setTotal(json.total ?? 0);
       setTruncated(Boolean(json.truncated));
       setGeneratedOnce(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao gerar relatório");
       setRows([]);
+      setSummary([]);
       setTotal(0);
       setTruncated(false);
     } finally {
@@ -558,7 +583,7 @@ export default function GeradorRelatoriosPage({
               module="sales"
             />
           )}
-          {supports("grupo") && (
+          {supports("grupo") && (optGrupos.length > 0 || grupos.length > 0) && (
             <MultiSelectFilter
               label="Grupo"
               value={grupos}
@@ -568,7 +593,7 @@ export default function GeradorRelatoriosPage({
               loading={!!loadingOpt.grupo}
             />
           )}
-          {supports("linha") && (
+          {supports("linha") && (optLinhas.length > 0 || linhas.length > 0) && (
             <MultiSelectFilter
               label="Linha"
               value={linhas}
@@ -578,7 +603,7 @@ export default function GeradorRelatoriosPage({
               loading={!!loadingOpt.linha}
             />
           )}
-          {supports("subgrupo") && (
+          {supports("subgrupo") && (optSubgrupos.length > 0 || subgrupos.length > 0) && (
             <MultiSelectFilter
               label="Subgrupo"
               value={subgrupos}
@@ -588,7 +613,7 @@ export default function GeradorRelatoriosPage({
               loading={!!loadingOpt.subgrupo}
             />
           )}
-          {supports("grade") && (
+          {supports("grade") && (optGrades.length > 0 || grades.length > 0) && (
             <MultiSelectFilter
               label="Grade"
               value={grades}
@@ -598,7 +623,7 @@ export default function GeradorRelatoriosPage({
               loading={!!loadingOpt.grade}
             />
           )}
-          {supports("cor") && (
+          {supports("cor") && (optCores.length > 0 || cores.length > 0) && (
             <MultiSelectFilter
               label="Cor"
               value={cores}
@@ -608,7 +633,7 @@ export default function GeradorRelatoriosPage({
               loading={!!loadingOpt.cor}
             />
           )}
-          {supports("tipo") && (
+          {supports("tipo") && (optTipos.length > 0 || tipos.length > 0) && (
             <MultiSelectFilter
               label="Tipo"
               value={tipos}
@@ -782,6 +807,18 @@ export default function GeradorRelatoriosPage({
       </section>
 
       {error && <div className={styles.error}>{error}</div>}
+
+      {/* KPIs */}
+      {summary.length > 0 && (
+        <section className={styles.kpiGrid}>
+          {summary.map((kpi) => (
+            <div key={kpi.label} className={styles.kpiCard}>
+              <span className={styles.kpiLabel}>{kpi.label}</span>
+              <span className={styles.kpiValue}>{formatKpi(kpi.value, kpi.format)}</span>
+            </div>
+          ))}
+        </section>
+      )}
 
       {/* Tabela */}
       {enabledColumns.length === 0 ? (

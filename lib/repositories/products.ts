@@ -2017,6 +2017,42 @@ export async function fetchAvailableLinhas({
   subgrupos?: string[] | null;
   grades?: string[] | null;
 } = {}): Promise<string[]> {
+  // NERD: linhas disponíveis a partir das vendas do período/filial (mesma fonte
+  // e padrão do path NERD de fetchAvailableGrupos). ScarfMe segue abaixo.
+  if (company === 'nerd') {
+    return withRequest(async (request) => {
+      const { start, end } = resolveRange(range);
+      request.input('startDate', sql.DateTime, start);
+      request.input('endDate', sql.DateTime, end);
+
+      const filialFilter = await buildFilialFilter(request, company, 'sales', filial, 'vp');
+
+      const query = `
+        SELECT DISTINCT
+          COALESCE(vp.LINHA, p.LINHA, '') AS linha
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+        WHERE vp.DATA_VENDA >= @startDate
+          AND vp.DATA_VENDA < @endDate
+          AND vp.QTDE > 0
+          AND COALESCE(vp.LINHA, p.LINHA, '') <> ''
+          ${filialFilter}
+        ORDER BY linha
+      `;
+
+      try {
+        const result = await request.query<{ linha: string }>(query);
+        const linhas = result.recordset
+          .map((row) => (row.linha?.trim() || '').toUpperCase())
+          .filter((linha) => linha !== '');
+        return [...new Set(linhas)].sort();
+      } catch (error) {
+        console.error('Erro ao buscar linhas (NERD):', error);
+        return [];
+      }
+    });
+  }
+
   if (company !== 'scarfme') {
     return [];
   }

@@ -21,6 +21,34 @@ export interface SalesTotalsParams {
   filial?: string | null;
   linhas?: string[] | null;
   comparisonMode?: 'month' | 'year';
+  // Filtros opcionais adicionais (usados pelo Gerador de Relatórios). Todos
+  // opcionais e aditivos: callers existentes (dashboard, curva-abc) não os passam.
+  grupos?: string[] | null;
+  subgrupos?: string[] | null;
+  grades?: string[] | null;
+  colecoes?: string[] | null;
+  /** Cores por DESCRIÇÃO (ex.: "PRETO"), casadas em CORES_BASICAS.DESC_COR. */
+  cores?: string[] | null;
+  tipos?: string[] | null;
+  produtoId?: string | null;
+  produtoSearchTerm?: string | null;
+}
+
+/**
+ * Cláusula `AND UPPER(col) IN (...)` para uma lista de valores. Registra os
+ * inputs com o prefixo dado e devolve '' quando a lista é vazia.
+ */
+function buildInListClause(
+  request: sql.Request | RequestLike,
+  values: string[] | null | undefined,
+  prefix: string,
+  columnExpr: string,
+): string {
+  const list = (values ?? []).map((v) => v.trim().toUpperCase()).filter(Boolean);
+  if (list.length === 0) return '';
+  list.forEach((v, i) => request.input(`${prefix}${i}`, sql.VarChar, v));
+  const placeholders = list.map((_, i) => `@${prefix}${i}`).join(', ');
+  return `AND UPPER(LTRIM(RTRIM(ISNULL(${columnExpr}, '')))) IN (${placeholders})`;
 }
 
 export interface SalesTotals {
@@ -126,7 +154,21 @@ function buildLinhaClause(
  *  - aplica filtros opcionais de filial e linha (NERD)
  */
 export async function fetchSalesTotals(params: SalesTotalsParams): Promise<SalesTotals> {
-  const { company, range, filial, linhas, comparisonMode = 'month' } = params;
+  const {
+    company,
+    range,
+    filial,
+    linhas,
+    comparisonMode = 'month',
+    grupos,
+    subgrupos,
+    grades,
+    colecoes,
+    cores,
+    tipos,
+    produtoId,
+    produtoSearchTerm,
+  } = params;
 
   if (!company) return { ...EMPTY };
 
@@ -137,6 +179,10 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
       range,
       filial: filial ?? null,
       linhas: linhas ?? null,
+      grupos: grupos ?? null,
+      subgrupos: subgrupos ?? null,
+      grades: grades ?? null,
+      colecoes: colecoes ?? null,
     });
     const s = summary.summary;
     return {
@@ -163,6 +209,10 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
         range,
         filial: null,
         linhas: linhas ?? null,
+        grupos: grupos ?? null,
+        subgrupos: subgrupos ?? null,
+        grades: grades ?? null,
+        colecoes: colecoes ?? null,
       }),
     ]);
     const e = ecom.summary;
@@ -190,7 +240,30 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
 
     const filialClause = await buildFilialClause(request, company as string, 'sales', filial ?? null);
     const linhaTokens = buildLinhaClause(request, company as string, linhas);
-    const needsProdutoJoin = linhaTokens.active;
+
+    // Filtros adicionais do Gerador de Relatórios (todos opcionais; '' quando vazios).
+    const grupoClause = buildInListClause(request, grupos, 'stGrupo', 'p.GRUPO_PRODUTO');
+    const subgrupoClause = buildInListClause(request, subgrupos, 'stSubgrupo', 'p.SUBGRUPO_PRODUTO');
+    const gradeClause = buildInListClause(request, grades, 'stGrade', 'CONVERT(VARCHAR, p.GRADE)');
+    const colecaoClause = buildInListClause(request, colecoes, 'stColecao', 'p.COLECAO');
+    const tipoClause = buildInListClause(request, tipos, 'stTipo', 'p.TIPO_PRODUTO');
+    const corClause = buildInListClause(request, cores, 'stCor', 'c.DESC_COR');
+
+    const needsProdutoJoin =
+      linhaTokens.active ||
+      !!grupoClause || !!subgrupoClause || !!gradeClause || !!colecaoClause || !!tipoClause;
+    const needsCoresJoin = !!corClause;
+
+    // Filtro por produto específico (id) ou busca textual (apenas em vendas_base).
+    let produtoClauseVp = '';
+    if (produtoId) {
+      request.input('stProdutoId', sql.VarChar, produtoId);
+      produtoClauseVp = 'AND vp.PRODUTO = @stProdutoId';
+    } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
+      request.input('stProdutoSearch', sql.VarChar, `%${produtoSearchTerm.trim()}%`);
+      produtoClauseVp = 'AND vp.DESC_PRODUTO LIKE @stProdutoSearch';
+    }
+    const produtoClauseVt = produtoId ? 'AND vt.PRODUTO = @stProdutoId' : '';
 
     const produtoJoinVp = needsProdutoJoin
       ? 'LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO'
@@ -198,6 +271,20 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
     const produtoJoinVt = needsProdutoJoin
       ? 'LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vt.PRODUTO'
       : '';
+    const coresJoinVp = needsCoresJoin
+      ? 'LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = vp.COR_PRODUTO'
+      : '';
+    const coresJoinVt = needsCoresJoin
+      ? 'LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = vt.COR_PRODUTO'
+      : '';
+
+    // Cláusulas de atributo (produto/cor) — idênticas em vendas_base e TrocasPuras.
+    const prodAttrClause = `${grupoClause}
+          ${subgrupoClause}
+          ${gradeClause}
+          ${colecaoClause}
+          ${tipoClause}
+          ${corClause}`;
 
     const query = `
       WITH vendas_base AS (
@@ -217,6 +304,7 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
         LEFT JOIN FILIAIS f WITH (NOLOCK)
           ON f.COD_FILIAL = vp.CODIGO_FILIAL
         ${produtoJoinVp}
+        ${coresJoinVp}
         WHERE (
             (vp.DATA_VENDA >= @stStart AND vp.DATA_VENDA < @stEnd)
             OR (vp.DATA_VENDA >= @stPrevStart AND vp.DATA_VENDA < @stPrevEnd)
@@ -224,6 +312,8 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
           AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
           ${filialClause}
           ${linhaTokens.clause}
+          ${prodAttrClause}
+          ${produtoClauseVp}
       ),
       trocas_item AS (
         SELECT
@@ -256,6 +346,7 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
         LEFT JOIN FILIAIS f WITH (NOLOCK)
           ON f.COD_FILIAL = vt.CODIGO_FILIAL
         ${produtoJoinVt}
+        ${coresJoinVt}
         WHERE vt.QTDE_CANCELADA = 0
           AND (
             (v.DATA_VENDA >= @stStart AND v.DATA_VENDA < @stEnd)
@@ -273,6 +364,8 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
           )
           ${filialClause}
           ${linhaTokens.clause}
+          ${prodAttrClause}
+          ${produtoClauseVt}
       ),
       VendasComNumero AS (
         SELECT

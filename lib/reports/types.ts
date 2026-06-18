@@ -83,10 +83,19 @@ export interface ReportFilters {
   limit?: number;
 }
 
+/** Cartão de KPI exibido no topo do resultado (ex.: Vendas Total, Ticket Médio). */
+export interface ReportSummaryMetric {
+  label: string;
+  value: number;
+  format: "currency" | "int" | "number";
+}
+
 export interface ReportResult {
   rows: ReportRow[];
   /** Total de linhas encontradas antes de aplicar o limite. */
   total: number;
   /** true quando `total` excedeu o limite e o resultado foi cortado. */
   truncated: boolean;
+  /** KPIs opcionais (específicos da análise) exibidos como cartões no topo. */
+  summary?: ReportSummaryMetric[];
 }
