@@ -100,6 +100,8 @@ export interface ReportFilters {
   limit?: number;
   /** Quando true, calcula e anexa estoque por filial (rede inteira) por linha. */
   estoquePorFilial?: boolean;
+  /** Quando true, calcula a Compra Ideal por produto (caro — limita as linhas). */
+  compraIdeal?: boolean;
 }
 
 /** Cartão de KPI exibido no topo do resultado (ex.: Vendas Total, Ticket Médio). */

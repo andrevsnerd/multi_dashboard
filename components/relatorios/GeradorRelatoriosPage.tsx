@@ -370,7 +370,8 @@ export default function GeradorRelatoriosPage({
       const baseKeys = new Set(catalog.map((c) => c.key));
       const extraSources = computeExtraSources(reportTypeId, enabledKeys, baseKeys);
       const srcQs = extraSources.map((s) => `&src=${encodeURIComponent(s)}`).join("");
-      const url = `/api/relatorios/dados?reportType=${encodeURIComponent(reportTypeId)}&${qs}${wantsFilialStock ? "&estoquePorFilial=1" : ""}${srcQs}`;
+      const compraIdealQs = enabledKeys.includes("COMPRA_IDEAL") ? "&compraIdeal=1" : "";
+      const url = `/api/relatorios/dados?reportType=${encodeURIComponent(reportTypeId)}&${qs}${wantsFilialStock ? "&estoquePorFilial=1" : ""}${srcQs}${compraIdealQs}`;
       const res = await fetch(url, { cache: "no-store" });
       const json = await res.json();
       if (!res.ok) {

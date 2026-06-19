@@ -33,6 +33,7 @@ export const VENDAS_FATURAMENTO_COLUMNS: ReportColumnDef[] = [
   { key: "PRECO_SUGERIDO", defaultLabel: "Preço sugerido", type: "currency" },
   { key: "PARTICIPACAO_PERC", defaultLabel: "Part. (%)", type: "percent" },
   { key: "PARTICIPACAO_ACUM_PERC", defaultLabel: "Part. acum. (%)", type: "percent" },
+  { key: "COMPRA_IDEAL", defaultLabel: "Compra ideal", type: "int" },
 ];
 
 const col = (key: string, label?: string) => ({
@@ -116,6 +117,24 @@ const VENDAS_FATURAMENTO_PRESETS: ReportPresetDef[] = [
     ],
   },
   {
+    id: "builtin-curva-compra",
+    name: "Curva com sugestão de compra",
+    builtin: true,
+    sortBy: "FATURAMENTO",
+    sortDir: "desc",
+    // Igual à Curva ABC + Compra ideal no fim (mesma lógica de lista loja / curva ABC).
+    columns: [
+      col("CURVA"),
+      col("PRODUTO"),
+      col("COR_DESCRICAO"),
+      col("DESCRICAO"),
+      col("QTDE"),
+      col("FATURAMENTO"),
+      col("ESTOQUE"),
+      col("COMPRA_IDEAL"),
+    ],
+  },
+  {
     id: "builtin-completo",
     name: "Completo",
     builtin: true,
@@ -138,7 +157,7 @@ export function buildVendasFaturamentoPresets(companyKey: CompanyKey): ReportPre
     if (PRESETS_LEADING_AT_START.has(preset.id)) {
       return { ...preset, columns: [...leading, ...preset.columns] };
     }
-    if (preset.id === "builtin-curva-abc") {
+    if (preset.id === "builtin-curva-abc" || preset.id === "builtin-curva-compra") {
       // Mantém CURVA em 1º; insere as colunas líderes logo depois.
       return { ...preset, columns: [preset.columns[0], ...leading, ...preset.columns.slice(1)] };
     }

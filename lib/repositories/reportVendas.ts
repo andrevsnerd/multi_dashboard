@@ -11,7 +11,13 @@ import {
   compareFilialDisplayOrder,
 } from "@/lib/config/company";
 import { normalizeRangeForQuery } from "@/lib/utils/date";
-import { ROW_COR_FIELD } from "@/lib/reports/keys";
+import { canonicalKey, ROW_COR_FIELD } from "@/lib/reports/keys";
+import { getControleEstoqueMetricasItens } from "@/lib/server/controle-estoque-metricas";
+import { buildControleEstoqueItemKey } from "@/lib/utils/controle-estoque-metricas";
+import { calcCompraIdealFromResumo } from "@/lib/utils/compra-ideal";
+import { listComprasTransitoFull } from "@/lib/utils/compra-transito-store";
+import { isCompraTransitoDateActive } from "@/lib/utils/compra-transito-status";
+import type { CompraTransitoIndexEntry } from "@/lib/client/compras-transito";
 import type {
   ReportColumnDef,
   ReportFilters,
@@ -19,6 +25,36 @@ import type {
   ReportRow,
   ReportSummaryMetric,
 } from "@/lib/reports/types";
+
+/** Limite de linhas quando a Compra Ideal está ligada (cálculo por item é caro). */
+const COMPRA_IDEAL_LIMIT = 1000;
+
+/** Índice de compras em trânsito ativas por (produto × cor canônica). */
+async function buildTransitIndex(
+  company: string | undefined
+): Promise<Map<string, CompraTransitoIndexEntry[]>> {
+  const idx = new Map<string, CompraTransitoIndexEntry[]>();
+  if (!company) return idx;
+  const compras = await listComprasTransitoFull(company).catch(() => []);
+  const today = new Date();
+  for (const c of compras) {
+    for (const it of c.items ?? []) {
+      if (!isCompraTransitoDateActive(it.dataRecebimento, today)) continue;
+      const k = canonicalKey(it.produto, it.corProduto ?? null);
+      const arr = idx.get(k) ?? [];
+      arr.push({
+        itemKey: it.itemKey ?? "",
+        produto: it.produto,
+        corProduto: it.corProduto ?? null,
+        quantidade: Number(it.quantidade ?? 0),
+        dataRecebimento: it.dataRecebimento,
+        title: c.title ?? "",
+        confirmedAt: c.confirmedAt ?? "",
+      });
+    }
+  }
+  return idx;
+}
 
 /** Prefixo das chaves das colunas dinâmicas de estoque por filial. */
 const FILIAL_COL_PREFIX = "ESTOQUE_FILIAL::";
@@ -111,9 +147,41 @@ export async function fetchVendasFaturamento(
   const sumQuantity = filtered.reduce((s, d) => s + (d.totalQuantity ?? 0), 0);
 
   const total = filtered.length;
-  const limit = filters.limit && filters.limit > 0 ? filters.limit : DEFAULT_LIMIT;
+  const baseLimit = filters.limit && filters.limit > 0 ? filters.limit : DEFAULT_LIMIT;
+  // Compra Ideal calcula métricas por item (caro) → limita as linhas quando ligada.
+  const limit = filters.compraIdeal ? Math.min(baseLimit, COMPRA_IDEAL_LIMIT) : baseLimit;
   const truncated = total > limit;
   const sliced = truncated ? filtered.slice(0, limit) : filtered;
+
+  // Compra Ideal por produto (mesma lógica de Lista Loja / Curva ABC): métricas de
+  // ritmo por item + compras em trânsito → calcCompraIdealFromResumo.
+  let compraIdealByItemKey: Map<string, number> | null = null;
+  if (filters.compraIdeal && sliced.length > 0) {
+    const itens = sliced.map((d) => ({
+      produto: String(d.productId ?? "").trim(),
+      corProduto: d.corProduto ?? null,
+    }));
+    const [metricas, transitIndex] = await Promise.all([
+      getControleEstoqueMetricasItens({
+        company: filters.company,
+        filial: filters.filial ?? null,
+        itens,
+      }),
+      buildTransitIndex(filters.company),
+    ]);
+    compraIdealByItemKey = new Map();
+    for (const d of sliced) {
+      const itemKey = buildControleEstoqueItemKey(d.productId, d.corProduto);
+      const m = metricas[itemKey];
+      if (!m) continue;
+      const transit = transitIndex.get(canonicalKey(d.productId, d.corProduto)) ?? [];
+      const ideal = calcCompraIdealFromResumo(m.resumo, transit, {
+        linha: d.linha,
+        subgrupo: d.subgrupo,
+      });
+      compraIdealByItemKey.set(itemKey, ideal.compraIdeal);
+    }
+  }
 
   // Estoque por filial (opcional). Gera uma coluna por filial (rede inteira, SEMPRE —
   // independente do filtro de filial das vendas) + um ESTOQUE_TOTAL coerente com a soma.
@@ -226,6 +294,11 @@ export async function fetchVendasFaturamento(
       PARTICIPACAO_PERC: round2(partPerc),
       PARTICIPACAO_ACUM_PERC: round2(acumPerc),
     };
+
+    if (filters.compraIdeal) {
+      const ci = compraIdealByItemKey?.get(buildControleEstoqueItemKey(d.productId, d.corProduto));
+      row.COMPRA_IDEAL = ci == null ? null : roundInt(ci);
+    }
 
     if (filters.estoquePorFilial) {
       const est = estoquePorFilialByKey.get(rowKey);

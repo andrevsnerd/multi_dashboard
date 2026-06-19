@@ -35,6 +35,7 @@ export async function GET(request: Request) {
   const limitParam = searchParams.get("limit");
   const limit = limitParam ? Number(limitParam) : undefined;
   const estoquePorFilial = searchParams.get("estoquePorFilial") === "1";
+  const compraIdeal = searchParams.get("compraIdeal") === "1";
   const extraSources = searchParams
     .getAll("src")
     .filter((s): s is SourceId => (VALID_SOURCES as string[]).includes(s));
@@ -55,6 +56,7 @@ export async function GET(request: Request) {
     produtoSearchTerm: produtoSearchTerm || null,
     limit: Number.isFinite(limit) && (limit as number) > 0 ? limit : undefined,
     estoquePorFilial,
+    compraIdeal,
   };
 
   try {
