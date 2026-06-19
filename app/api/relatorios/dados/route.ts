@@ -4,7 +4,7 @@ import { runReport } from "@/lib/reports/registry.server";
 import type { SourceId } from "@/lib/reports/column-sources";
 import type { ReportFilters } from "@/lib/reports/types";
 
-const VALID_SOURCES: SourceId[] = ["vendas", "estoque", "parados"];
+const VALID_SOURCES: SourceId[] = ["vendas", "estoque", "parados", "cadastro"];
 
 // Pro: até 300s. Algumas análises (estoque da rede inteira) varrem muitos itens.
 export const maxDuration = 300;

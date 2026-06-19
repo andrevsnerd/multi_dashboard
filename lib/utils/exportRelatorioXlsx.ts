@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 
 import type { ColumnType, ReportPresetColumn, ReportRow } from "@/lib/reports/types";
-import { formatDataVenda, formatDiasParado } from "@/lib/reports/format";
+import { formatData, formatDataVenda, formatDiasParado } from "@/lib/reports/format";
 
 function safeFilenamePart(s: string): string {
   return s.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 48);
@@ -51,6 +51,7 @@ export function exportRelatorioXlsx(
       // valores numéricos (currency/percent/int) seguem crus — melhor p/ cálculo no Excel.
       if (t === "diasParado") out[label] = formatDiasParado(row[colDef.key]);
       else if (t === "dataVenda") out[label] = formatDataVenda(row[colDef.key]);
+      else if (t === "date") out[label] = formatData(row[colDef.key]);
       else out[label] = row[colDef.key] ?? "";
     }
     return out;

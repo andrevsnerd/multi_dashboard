@@ -9,7 +9,7 @@ import { useAuth } from "@/components/auth/AuthContext";
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 import { getCurrentMonthRange, formatDateForQuery } from "@/lib/utils/date";
 import { exportRelatorioXlsx } from "@/lib/utils/exportRelatorioXlsx";
-import { formatDataVenda, formatDiasParado } from "@/lib/reports/format";
+import { formatData, formatDataVenda, formatDiasParado } from "@/lib/reports/format";
 import { getDefaultPresets, getReportMeta, REPORT_TYPES, VENDAS_FATURAMENTO_ID } from "@/lib/reports/registry";
 import { computeExtraSources, getEditorExtraColumns } from "@/lib/reports/column-sources";
 import type {
@@ -63,6 +63,7 @@ function colTypeOf(catalog: ReportColumnDef[], key: string): ColumnType {
 
 function formatCell(value: ReportRow[string], type: ColumnType): string {
   if (type === "dataVenda") return formatDataVenda(value);
+  if (type === "date") return formatData(value);
   if (type === "diasParado") return formatDiasParado(value);
   if (value === null || value === undefined || value === "") return "";
   if (type === "text") return String(value);
@@ -81,8 +82,8 @@ function formatCell(value: ReportRow[string], type: ColumnType): string {
 }
 
 function isNumericType(type: ColumnType): boolean {
-  // dataVenda alinha/ordena como texto (ISO ordena cronologicamente); diasParado é numérico.
-  return type !== "text" && type !== "dataVenda";
+  // datas alinham/ordenam como texto (ISO ordena cronologicamente); diasParado é numérico.
+  return type !== "text" && type !== "dataVenda" && type !== "date";
 }
 
 function formatKpi(value: number, format: ReportSummaryMetric["format"]): string {

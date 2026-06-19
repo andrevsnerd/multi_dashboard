@@ -1,6 +1,7 @@
 import { VENDAS_FATURAMENTO_COLUMNS, VENDAS_FATURAMENTO_ID } from "./vendas-faturamento";
 import { ESTOQUE_REDE_COLUMNS, ESTOQUE_REDE_ID } from "./estoque-rede";
 import { PRODUTOS_PARADOS_COLUMNS, PRODUTOS_PARADOS_ID } from "./produtos-parados";
+import { PRODUTOS_CADASTRO_COLUMNS, PRODUTOS_CADASTRO_ID } from "./produtos-cadastro";
 import type { ReportColumnDef } from "./types";
 
 /**
@@ -9,13 +10,14 @@ import type { ReportColumnDef } from "./types";
  * casadas por produto × cor. Aqui ficam o mapa coluna→fonte e os utilitários (puros,
  * usados no client e no server).
  */
-export type SourceId = "vendas" | "estoque" | "parados";
+export type SourceId = "vendas" | "estoque" | "parados" | "cadastro";
 
 /** Fonte nativa de cada tipo de análise (a base já fornece essas colunas). */
 export const NATIVE_SOURCE: Record<string, SourceId> = {
   [VENDAS_FATURAMENTO_ID]: "vendas",
   [ESTOQUE_REDE_ID]: "estoque",
   [PRODUTOS_PARADOS_ID]: "parados",
+  [PRODUTOS_CADASTRO_ID]: "cadastro",
 };
 
 /**
@@ -37,6 +39,7 @@ const SOURCE_CROSS_KEYS: Record<SourceId, string[]> = {
   ],
   estoque: ["ESTOQUE_TOTAL"],
   parados: ["DIAS_PARADO", "ULTIMA_VENDA"],
+  cadastro: ["DATA_CADASTRO", "DIAS_CADASTRO"],
 };
 
 const ALL_DEFS: Map<string, ReportColumnDef> = (() => {
@@ -45,6 +48,7 @@ const ALL_DEFS: Map<string, ReportColumnDef> = (() => {
     ...VENDAS_FATURAMENTO_COLUMNS,
     ...ESTOQUE_REDE_COLUMNS,
     ...PRODUTOS_PARADOS_COLUMNS,
+    ...PRODUTOS_CADASTRO_COLUMNS,
   ]) {
     if (!m.has(c.key)) m.set(c.key, c);
   }

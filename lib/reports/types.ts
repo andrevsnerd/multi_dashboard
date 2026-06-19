@@ -15,7 +15,9 @@ export type ColumnType =
   /** Dias parado: número de dias; valor >= 9999 (sentinela) exibe "Nunca vendeu". */
   | "diasParado"
   /** Última venda: data ISO (yyyy-mm-dd); vazio/nulo exibe "Nunca vendeu". */
-  | "dataVenda";
+  | "dataVenda"
+  /** Data genérica: ISO (yyyy-mm-dd) → dd/mm/yyyy; vazio fica em branco. */
+  | "date";
 
 /** Catálogo de uma coluna disponível em uma análise. */
 export interface ReportColumnDef {

@@ -25,3 +25,11 @@ export function rawKey(produto: CorInput, code: CorInput): string {
 
 /** Campos ocultos embutidos nas linhas-base para permitir o join (nunca viram coluna). */
 export const ROW_COR_FIELD = "__cor"; // código cru da cor
+
+/** Dias decorridos desde uma data ISO até `nowMs` (passado pelo chamador). null se sem data. */
+export function diasDesde(iso: string | null | undefined, nowMs: number): number | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  return Math.max(0, Math.floor((nowMs - t) / 86400000));
+}

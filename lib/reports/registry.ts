@@ -11,6 +11,11 @@ import {
   produtosParadosMeta,
   PRODUTOS_PARADOS_ID,
 } from "./produtos-parados";
+import {
+  buildProdutosCadastroPresets,
+  produtosCadastroMeta,
+  PRODUTOS_CADASTRO_ID,
+} from "./produtos-cadastro";
 
 /**
  * Registry PURO de tipos de análise (apenas metadados/colunas/presets).
@@ -25,6 +30,7 @@ export const REPORT_TYPES: ReportTypeMeta[] = [
   vendasFaturamentoMeta,
   estoqueRedeMeta,
   produtosParadosMeta,
+  produtosCadastroMeta,
 ];
 
 export function getReportMeta(id: string): ReportTypeMeta | undefined {
@@ -44,6 +50,9 @@ export function getDefaultPresets(id: string, companyKey: CompanyKey): ReportPre
   }
   if (id === PRODUTOS_PARADOS_ID) {
     return buildProdutosParadosPresets(companyKey);
+  }
+  if (id === PRODUTOS_CADASTRO_ID) {
+    return buildProdutosCadastroPresets(companyKey);
   }
   return getReportMeta(id)?.defaultPresets ?? [];
 }

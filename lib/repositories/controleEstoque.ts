@@ -7864,6 +7864,7 @@ export interface EstoqueRedeItemRow {
   tipo: string;
   cor: string; // descrição da cor (DESC_COR)
   corCodigo: string; // código cru da cor (representativo) — para join entre análises
+  dataCadastro: string | null; // DATA_CADASTRAMENTO (ISO yyyy-mm-dd) do produto
   filial: string; // nome cru do ERP
   positiveStock: number;
   negativeStock: number;
@@ -7953,6 +7954,7 @@ export async function fetchEstoqueRedePorProduto({
         ISNULL(p.TIPO_PRODUTO, '') AS tipo,
         ISNULL(COALESCE(c.DESC_COR, e.COR_PRODUTO), '') AS cor,
         MAX(ISNULL(e.COR_PRODUTO, '')) AS corCodigo,
+        MAX(p.DATA_CADASTRAMENTO) AS dataCadastro,
         e.FILIAL AS filial,
         SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS positiveStock,
         SUM(CASE WHEN e.ESTOQUE < 0 THEN e.ESTOQUE ELSE 0 END) AS negativeStock
@@ -7995,6 +7997,7 @@ export async function fetchEstoqueRedePorProduto({
       tipo: string;
       cor: string;
       corCodigo: string;
+      dataCadastro: Date | string | null;
       filial: string;
       positiveStock: number | null;
       negativeStock: number | null;
@@ -8010,6 +8013,9 @@ export async function fetchEstoqueRedePorProduto({
       tipo: (r.tipo ?? '').trim(),
       cor: (r.cor ?? '').trim(),
       corCodigo: (r.corCodigo ?? '').trim(),
+      dataCadastro: r.dataCadastro instanceof Date
+        ? r.dataCadastro.toISOString().split('T')[0]
+        : (r.dataCadastro ? String(r.dataCadastro).split('T')[0] : null),
       filial: (r.filial ?? '').trim(),
       positiveStock: Number(r.positiveStock ?? 0),
       negativeStock: Number(r.negativeStock ?? 0),

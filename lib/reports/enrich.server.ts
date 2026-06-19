@@ -2,8 +2,11 @@ import "server-only";
 
 import { fetchProductsWithDetails } from "@/lib/repositories/products";
 import { fetchMultipleProductsStockByColor } from "@/lib/repositories/inventory";
-import { fetchProdutosParadosDetalhado } from "@/lib/repositories/controleEstoque";
-import { canonicalKey, rawKey, ROW_COR_FIELD } from "./keys";
+import {
+  fetchProdutosParadosDetalhado,
+  fetchEstoqueRedePorProduto,
+} from "@/lib/repositories/controleEstoque";
+import { canonicalKey, rawKey, diasDesde, ROW_COR_FIELD } from "./keys";
 import { DIAS_PARADO_NUNCA, ULTIMA_VENDA_NUNCA } from "./format";
 import type { ReportFilters, ReportRow } from "./types";
 import type { SourceId } from "./column-sources";
@@ -118,6 +121,36 @@ async function enrichEstoque(
   return { byKey, defaults: { ESTOQUE_TOTAL: 0 } };
 }
 
+/** Data de cadastro e dias desde o cadastro por produto × cor. */
+async function enrichCadastro(filters: ReportFilters): Promise<EnrichResult> {
+  const itens = await fetchEstoqueRedePorProduto({
+    company: filters.company,
+    filial: filters.filial ?? null,
+    grupos: filters.grupos ?? null,
+    linhas: filters.linhas ?? null,
+    subgrupos: filters.subgrupos ?? null,
+    grades: filters.grades ?? null,
+    colecoes: filters.colecoes ?? null,
+    cores: filters.cores ?? null,
+    tipos: filters.tipos ?? null,
+    produtoId: filters.produtoId ?? null,
+    produtoSearchTerm: filters.produtoSearchTerm ?? null,
+  });
+
+  const nowMs = Date.now();
+  const byKey = new Map<string, Partial<ReportRow>>();
+  for (const d of itens) {
+    const key = canonicalKey(d.produto, d.corCodigo);
+    if (byKey.has(key)) continue;
+    const dias = diasDesde(d.dataCadastro, nowMs);
+    byKey.set(key, {
+      DATA_CADASTRO: d.dataCadastro,
+      DIAS_CADASTRO: dias == null ? null : roundInt(dias),
+    });
+  }
+  return { byKey };
+}
+
 /** Executa o enricher de uma fonte. */
 export async function runEnricher(
   source: SourceId,
@@ -126,5 +159,6 @@ export async function runEnricher(
 ): Promise<EnrichResult> {
   if (source === "vendas") return enrichVendas(filters);
   if (source === "parados") return enrichParados(filters);
+  if (source === "cadastro") return enrichCadastro(filters);
   return enrichEstoque(filters, baseRows);
 }
