@@ -5,6 +5,7 @@ import {
   getFilialLabelForDisplay,
   compareFilialDisplayOrder,
 } from "@/lib/config/company";
+import { ROW_COR_FIELD } from "@/lib/reports/keys";
 import type {
   ReportColumnDef,
   ReportFilters,
@@ -37,6 +38,7 @@ interface Agg {
   grade: string;
   tipo: string;
   cor: string;
+  corCodigo: string;
   posByLabel: Map<string, number>;
   negByLabel: Map<string, number>;
 }
@@ -92,6 +94,7 @@ export async function fetchEstoqueRede(filters: ReportFilters): Promise<ReportRe
         grade: r.grade,
         tipo: r.tipo,
         cor: r.cor,
+        corCodigo: r.corCodigo,
         posByLabel: new Map(),
         negByLabel: new Map(),
       };
@@ -136,6 +139,7 @@ export async function fetchEstoqueRede(filters: ReportFilters): Promise<ReportRe
 
   const rows: ReportRow[] = sliced.map(({ agg, total: estoqueTotal }) => {
     const row: ReportRow = {
+      [ROW_COR_FIELD]: agg.corCodigo, // código cru da cor (join entre análises)
       PRODUTO: agg.produto,
       GRUPO: agg.grupo,
       LINHA: agg.linha,

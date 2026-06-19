@@ -11,6 +11,7 @@ import { getCurrentMonthRange, formatDateForQuery } from "@/lib/utils/date";
 import { exportRelatorioXlsx } from "@/lib/utils/exportRelatorioXlsx";
 import { formatDataVenda, formatDiasParado } from "@/lib/reports/format";
 import { getDefaultPresets, getReportMeta, REPORT_TYPES, VENDAS_FATURAMENTO_ID } from "@/lib/reports/registry";
+import { computeExtraSources, getEditorExtraColumns } from "@/lib/reports/column-sources";
 import type {
   ColumnType,
   ReportColumnDef,
@@ -112,6 +113,11 @@ export default function GeradorRelatoriosPage({
   const [reportTypeId, setReportTypeId] = useState<string>(VENDAS_FATURAMENTO_ID);
   const meta = useMemo(() => getReportMeta(reportTypeId), [reportTypeId]);
   const catalog = useMemo<ReportColumnDef[]>(() => meta?.columns ?? [], [meta]);
+  // Catálogo do editor = colunas da base + colunas "cross" de outras análises (misturar).
+  const editorCatalog = useMemo<ReportColumnDef[]>(() => {
+    const baseKeys = new Set(catalog.map((c) => c.key));
+    return [...catalog, ...getEditorExtraColumns(reportTypeId, baseKeys)];
+  }, [catalog, reportTypeId]);
   const supports = (f: string) => meta?.supportedFilters.includes(f as never) ?? false;
 
   // Filtros
@@ -162,12 +168,12 @@ export default function GeradorRelatoriosPage({
   // Colunas dinâmicas (ex.: estoque por filial) devolvidas pelo backend.
   const [dynamicColumns, setDynamicColumns] = useState<ReportColumnDef[]>([]);
 
-  // Catálogo efetivo = catálogo fixo + colunas dinâmicas (para tipo/formatação).
+  // Catálogo efetivo = base + colunas cross + colunas dinâmicas (para tipo/formatação).
   const effectiveCatalog = useMemo<ReportColumnDef[]>(() => {
-    const m = new Map(catalog.map((c) => [c.key, c] as const));
+    const m = new Map(editorCatalog.map((c) => [c.key, c] as const));
     for (const d of dynamicColumns) m.set(d.key, d);
     return Array.from(m.values());
-  }, [catalog, dynamicColumns]);
+  }, [editorCatalog, dynamicColumns]);
 
   // Presets padrão da empresa (alguns variam por empresa — ex.: colunas líderes).
   const builtinPresets = useMemo<ReportPresetDef[]>(
@@ -189,14 +195,14 @@ export default function GeradorRelatoriosPage({
   // Aplica um preset (builtin ou backend) à estrutura de colunas.
   const applyPreset = useCallback(
     (preset: { id: string; columns: { key: string; label: string }[]; sortBy?: string | null; sortDir?: SortDir | null }) => {
-      setWorkingColumns(buildWorkingColumns(catalog, preset.columns));
+      setWorkingColumns(buildWorkingColumns(editorCatalog, preset.columns));
       if (preset.sortBy) setSortBy(preset.sortBy);
       if (preset.sortDir) setSortDir(preset.sortDir);
       setActivePresetId(preset.id);
       // Limpa colunas dinâmicas de filial; serão repovoadas ao gerar, se a view pedir.
       setDynamicColumns([]);
     },
-    [catalog]
+    [editorCatalog]
   );
 
   // Inicializa estrutura com o primeiro preset builtin quando muda de análise.
@@ -358,7 +364,12 @@ export default function GeradorRelatoriosPage({
     setError(null);
     try {
       const qs = buildQuery();
-      const url = `/api/relatorios/dados?reportType=${encodeURIComponent(reportTypeId)}&${qs}${wantsFilialStock ? "&estoquePorFilial=1" : ""}`;
+      // Fontes extras (colunas de outras análises misturadas neste preset).
+      const enabledKeys = workingColumns.filter((c) => c.enabled).map((c) => c.key);
+      const baseKeys = new Set(catalog.map((c) => c.key));
+      const extraSources = computeExtraSources(reportTypeId, enabledKeys, baseKeys);
+      const srcQs = extraSources.map((s) => `&src=${encodeURIComponent(s)}`).join("");
+      const url = `/api/relatorios/dados?reportType=${encodeURIComponent(reportTypeId)}&${qs}${wantsFilialStock ? "&estoquePorFilial=1" : ""}${srcQs}`;
       const res = await fetch(url, { cache: "no-store" });
       const json = await res.json();
       if (!res.ok) {
@@ -394,7 +405,7 @@ export default function GeradorRelatoriosPage({
     } finally {
       setLoading(false);
     }
-  }, [buildQuery, wantsFilialStock, reportTypeId]);
+  }, [buildQuery, wantsFilialStock, reportTypeId, workingColumns, catalog]);
 
   // ---------- ordenação client-side ----------
   const enabledColumns = useMemo(

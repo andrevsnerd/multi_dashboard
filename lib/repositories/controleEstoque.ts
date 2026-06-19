@@ -7863,6 +7863,7 @@ export interface EstoqueRedeItemRow {
   grade: string;
   tipo: string;
   cor: string; // descrição da cor (DESC_COR)
+  corCodigo: string; // código cru da cor (representativo) — para join entre análises
   filial: string; // nome cru do ERP
   positiveStock: number;
   negativeStock: number;
@@ -7951,6 +7952,7 @@ export async function fetchEstoqueRedePorProduto({
         ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
         ISNULL(p.TIPO_PRODUTO, '') AS tipo,
         ISNULL(COALESCE(c.DESC_COR, e.COR_PRODUTO), '') AS cor,
+        MAX(ISNULL(e.COR_PRODUTO, '')) AS corCodigo,
         e.FILIAL AS filial,
         SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS positiveStock,
         SUM(CASE WHEN e.ESTOQUE < 0 THEN e.ESTOQUE ELSE 0 END) AS negativeStock
@@ -7992,6 +7994,7 @@ export async function fetchEstoqueRedePorProduto({
       grade: string;
       tipo: string;
       cor: string;
+      corCodigo: string;
       filial: string;
       positiveStock: number | null;
       negativeStock: number | null;
@@ -8006,6 +8009,7 @@ export async function fetchEstoqueRedePorProduto({
       grade: (r.grade ?? '').trim(),
       tipo: (r.tipo ?? '').trim(),
       cor: (r.cor ?? '').trim(),
+      corCodigo: (r.corCodigo ?? '').trim(),
       filial: (r.filial ?? '').trim(),
       positiveStock: Number(r.positiveStock ?? 0),
       negativeStock: Number(r.negativeStock ?? 0),

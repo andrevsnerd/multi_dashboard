@@ -11,6 +11,7 @@ import {
   compareFilialDisplayOrder,
 } from "@/lib/config/company";
 import { normalizeRangeForQuery } from "@/lib/utils/date";
+import { ROW_COR_FIELD } from "@/lib/reports/keys";
 import type {
   ReportColumnDef,
   ReportFilters,
@@ -201,6 +202,7 @@ export async function fetchVendasFaturamento(
     const curva = acumPerc <= 60 ? "A" : acumPerc <= 90 ? "B" : "C";
 
     const row: ReportRow = {
+      [ROW_COR_FIELD]: corKey ?? "", // código cru da cor (join entre análises)
       CURVA: curva,
       PRODUTO: pid,
       COR: d.corProduto ? String(d.corProduto).trim() : "",

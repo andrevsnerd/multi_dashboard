@@ -1,4 +1,6 @@
 import { fetchProdutosParadosDetalhado } from "@/lib/repositories/controleEstoque";
+import { ROW_COR_FIELD } from "@/lib/reports/keys";
+import { ULTIMA_VENDA_NUNCA } from "@/lib/reports/format";
 import type { ReportFilters, ReportResult, ReportRow } from "@/lib/reports/types";
 
 const DEFAULT_LIMIT = 5000;
@@ -66,6 +68,7 @@ export async function fetchProdutosParados(filters: ReportFilters): Promise<Repo
   const rows: ReportRow[] = sliced.map((d) => {
     const nuncaVendeu = !d.ultimaVenda || d.diasParado >= NUNCA_VENDEU;
     return {
+      [ROW_COR_FIELD]: d.corCodigo ?? "", // código cru da cor (join entre análises)
       PRODUTO: d.produto,
       CODIGO_BARRA: d.codigoBarra,
       GRUPO: d.grupo,
@@ -78,8 +81,8 @@ export async function fetchProdutosParados(filters: ReportFilters): Promise<Repo
       ESTOQUE: roundInt(d.estoque),
       // Valor numérico (sentinela NUNCA_VENDEU) — o formatador exibe "Nunca vendeu".
       DIAS_PARADO: nuncaVendeu ? NUNCA_VENDEU : roundInt(d.diasParado),
-      // Data ISO (yyyy-mm-dd) ou null → o formatador exibe "Nunca vendeu".
-      ULTIMA_VENDA: nuncaVendeu ? null : d.ultimaVenda,
+      // Sentinela "NUNCA" = nunca vendeu (≠ vazio, que significa "sem dado" no enriquecimento).
+      ULTIMA_VENDA: nuncaVendeu ? ULTIMA_VENDA_NUNCA : d.ultimaVenda,
     };
   });
 

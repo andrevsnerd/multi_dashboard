@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server";
 
 import { getReportMeta } from "@/lib/reports/registry";
+import { CROSS_COLUMN_KEYS } from "@/lib/reports/column-sources";
 import type { ReportPresetColumn } from "@/lib/reports/types";
 import { createReportPreset, listReportPresets } from "@/lib/utils/report-preset-store";
 
-/** Filtra colunas para apenas as chaves válidas do catálogo da análise. */
+/** Filtra colunas para as chaves válidas: catálogo da análise + colunas cross (misturar). */
 function sanitizeColumns(reportType: string, columns: unknown): ReportPresetColumn[] {
   const meta = getReportMeta(reportType);
-  const validKeys = new Set((meta?.columns ?? []).map((c) => c.key));
+  const validKeys = new Set([
+    ...(meta?.columns ?? []).map((c) => c.key),
+    ...CROSS_COLUMN_KEYS,
+  ]);
   if (!Array.isArray(columns)) return [];
   return columns
     .map((c) => ({

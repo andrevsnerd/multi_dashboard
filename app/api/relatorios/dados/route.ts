@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { getReportFetcher } from "@/lib/reports/registry.server";
+import { runReport } from "@/lib/reports/registry.server";
+import type { SourceId } from "@/lib/reports/column-sources";
 import type { ReportFilters } from "@/lib/reports/types";
+
+const VALID_SOURCES: SourceId[] = ["vendas", "estoque", "parados"];
 
 // Pro: até 300s. Algumas análises (estoque da rede inteira) varrem muitos itens.
 export const maxDuration = 300;
@@ -32,11 +35,9 @@ export async function GET(request: Request) {
   const limitParam = searchParams.get("limit");
   const limit = limitParam ? Number(limitParam) : undefined;
   const estoquePorFilial = searchParams.get("estoquePorFilial") === "1";
-
-  const fetcher = getReportFetcher(reportType);
-  if (!fetcher) {
-    return NextResponse.json({ error: "Análise não encontrada" }, { status: 404 });
-  }
+  const extraSources = searchParams
+    .getAll("src")
+    .filter((s): s is SourceId => (VALID_SOURCES as string[]).includes(s));
 
   const filters: ReportFilters = {
     company,
@@ -57,7 +58,10 @@ export async function GET(request: Request) {
   };
 
   try {
-    const result = await fetcher(filters);
+    const result = await runReport(reportType, filters, extraSources);
+    if (!result) {
+      return NextResponse.json({ error: "Análise não encontrada" }, { status: 404 });
+    }
     return NextResponse.json(result);
   } catch (error) {
     console.error(`Erro ao gerar relatório (${reportType})`, error);
