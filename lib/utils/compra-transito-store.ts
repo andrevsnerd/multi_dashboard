@@ -74,6 +74,7 @@ function normalizeItem(row: CompraTransitoItemRow): CompraTransitoItemRow {
     itemKey: String(row.itemKey ?? "").trim(),
     produto: String(row.produto ?? "").trim(),
     descricao: String(row.descricao ?? row.produto ?? "").trim(),
+    codigoBarra: row.codigoBarra ? String(row.codigoBarra).trim() : undefined,
     corProduto: row.corProduto ? String(row.corProduto).trim() : undefined,
     corDescricao: row.corDescricao ? String(row.corDescricao).trim() : undefined,
     grade: row.grade ? String(row.grade).trim() : undefined,

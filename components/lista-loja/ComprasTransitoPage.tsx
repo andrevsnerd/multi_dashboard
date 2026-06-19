@@ -70,6 +70,49 @@ async function fetchReconciliacaoLista(
   return json.data;
 }
 
+type ProdutoBarcodeLookupRow = {
+  produto: string;
+  corProduto: string | null;
+  codigoBarra: string | null;
+};
+
+async function fetchCodigoBarraProduto(
+  companyKey: CompanyKey,
+  item: CompraTransitoItemRow
+): Promise<string> {
+  const produto = item.produto.trim();
+  if (!produto) return "";
+
+  const params = new URLSearchParams({
+    company: companyKey,
+    q: produto,
+    entrada: "true",
+  });
+  if (item.corProduto?.trim()) {
+    params.set("corProduto", item.corProduto.trim());
+  }
+
+  const res = await fetch(`/api/transferencia-produtos/produtos?${params.toString()}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) return "";
+
+  const json = (await res.json()) as { data?: ProdutoBarcodeLookupRow[] };
+  const rows = json.data ?? [];
+  const corProduto = item.corProduto?.trim() ?? "";
+
+  const exactMatch =
+    rows.find(
+      (row) =>
+        row.produto.trim() === produto &&
+        (row.corProduto?.trim() ?? "") === corProduto &&
+        (row.codigoBarra?.trim() ?? "")
+    ) ??
+    rows.find((row) => row.produto.trim() === produto && (row.codigoBarra?.trim() ?? ""));
+
+  return exactMatch?.codigoBarra?.trim() ?? "";
+}
+
 function fmt(n: number) {
   return n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 }
@@ -520,9 +563,29 @@ export default function ComprasTransitoPage({
     XLSX.writeFile(wb, `compras-transito-${companyKey}-${dateStr}.xlsx`);
   }, [compras, companyKey]);
 
-  const exportDetailXlsx = useCallback(() => {
+  const exportDetailXlsx = useCallback(async () => {
     if (!selectedCompra) return;
-    const rows = selectedCompra.items.map((item) => {
+    const barcodeCache = new Map<string, string>();
+    const resolvedItems = await Promise.all(
+      selectedCompra.items.map(async (item) => {
+        const cacheKey = `${item.produto}::${item.corProduto ?? ""}`;
+        const barcodeAtual = item.codigoBarra?.trim() ?? "";
+        if (barcodeAtual) {
+          barcodeCache.set(cacheKey, barcodeAtual);
+          return { ...item, codigoBarra: barcodeAtual };
+        }
+
+        if (barcodeCache.has(cacheKey)) {
+          return { ...item, codigoBarra: barcodeCache.get(cacheKey) ?? "" };
+        }
+
+        const fetchedBarcode = await fetchCodigoBarraProduto(companyKey, item);
+        barcodeCache.set(cacheKey, fetchedBarcode);
+        return { ...item, codigoBarra: fetchedBarcode };
+      })
+    );
+
+    const rows = resolvedItems.map((item) => {
       const custo = Number(item.custoUnitario ?? 0);
       const qtd = Math.max(0, Math.round(item.quantidade ?? 0));
       const estoque = Math.round(Number(item.estoqueAtual ?? 0));
@@ -537,6 +600,7 @@ export default function ComprasTransitoPage({
         Status: getStatusRealLabel(shownStatus),
         Produto: item.produto,
         Descrição: item.descricao,
+        "Codigo de Barras": item.codigoBarra || "",
         Cor: item.corDescricao || item.corProduto || "",
         Grade: item.grade || "",
         Pedido: qtd,
@@ -555,7 +619,7 @@ export default function ComprasTransitoPage({
     const dateStr = new Date().toISOString().slice(0, 10);
     const slug = selectedCompra.title.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase().slice(0, 40);
     XLSX.writeFile(wb, `compra-${slug}-${dateStr}.xlsx`);
-  }, [selectedCompra, recon]);
+  }, [companyKey, selectedCompra, recon]);
 
   const renderTableRows = (items: CompraTransitoItemRow[], readOnly: boolean) => (
     <div className={styles.tableWrap}>

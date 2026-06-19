@@ -61,6 +61,7 @@ export async function POST(request: Request) {
       itemKey: String(row.itemKey ?? ""),
       produto: String(row.produto ?? ""),
       descricao: String(row.descricao ?? row.produto ?? ""),
+      codigoBarra: row.codigoBarra ? String(row.codigoBarra) : undefined,
       corProduto: row.corProduto ? String(row.corProduto) : undefined,
       corDescricao: row.corDescricao ? String(row.corDescricao) : undefined,
       grade: row.grade ? String(row.grade) : undefined,

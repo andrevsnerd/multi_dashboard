@@ -4,6 +4,7 @@ export interface CompraTransitoItemRow {
   itemKey: string;
   produto: string;
   descricao: string;
+  codigoBarra?: string;
   corProduto?: string;
   corDescricao?: string;
   grade?: string;
