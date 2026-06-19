@@ -11,28 +11,42 @@ function normalizeBarcode(value: string | null | undefined): string {
   return String(value ?? '').trim();
 }
 
-function barcodeMatchesSearch(barcode: string | null | undefined, searchTerm: string): boolean {
-  const barcodeNorm = normalizeBarcode(barcode);
-  const searchNorm = normalizeBarcode(searchTerm);
+function compareBarcodePreference(
+  current: string | null | undefined,
+  candidate: string | null | undefined
+): number {
+  const currentNorm = normalizeBarcode(current);
+  const candidateNorm = normalizeBarcode(candidate);
 
-  if (!barcodeNorm || !searchNorm) {
-    return false;
+  if (!candidateNorm) return 1;
+  if (!currentNorm) return -1;
+
+  if (candidateNorm.length !== currentNorm.length) {
+    return candidateNorm.length - currentNorm.length;
   }
 
-  if (barcodeNorm === searchNorm) {
-    return true;
+  const currentNum = Number(currentNorm);
+  const candidateNum = Number(candidateNorm);
+
+  if (Number.isFinite(currentNum) && Number.isFinite(candidateNum) && candidateNum !== currentNum) {
+    return candidateNum < currentNum ? -1 : 1;
   }
 
-  const barcodeNum = Number(barcodeNorm);
-  const searchNum = Number(searchNorm);
+  return candidateNorm.localeCompare(currentNorm);
+}
 
-  return Number.isFinite(barcodeNum) && Number.isFinite(searchNum) && barcodeNum === searchNum;
+function choosePreferredBarcode(
+  current: string | null | undefined,
+  candidate: string | null | undefined
+): string | null {
+  return compareBarcodePreference(current, candidate) < 0
+    ? normalizeBarcode(candidate) || null
+    : normalizeBarcode(current) || null;
 }
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const searchTerm = searchParams.get('q') || '';
-  const barcodeHint = searchParams.get('barcodeHint') || '';
   const filialOrigem = searchParams.get('filialOrigem');
   const company = await resolveCompanyLive(searchParams.get('company') || undefined);
   const filialOperacional = filialOrigem ? getActiveFilial(company, filialOrigem) : null;
@@ -65,7 +79,6 @@ export async function GET(request: Request) {
   try {
     const produtos = await withRequest(async (req) => {
       const searchTermTrimmed = searchTerm.trim();
-      const barcodePriorityTerm = normalizeBarcode(barcodeHint) || searchTermTrimmed;
       const incluirEstoqueZero = isEntrada || porColecao || porGrade;
       
       // Buscar por código de barras primeiro, depois por produto/nome
@@ -443,13 +456,11 @@ export async function GET(request: Request) {
 
         const produtoData = produtosMap.get(key)!;
         const codigoBarraLinha = normalizeBarcode(row.CODIGO_BARRA) || null;
-        if (
-          codigoBarraLinha &&
-          (!produtoData.codigoBarra ||
-            (barcodeMatchesSearch(codigoBarraLinha, barcodePriorityTerm) &&
-              !barcodeMatchesSearch(produtoData.codigoBarra, barcodePriorityTerm)))
-        ) {
-          produtoData.codigoBarra = codigoBarraLinha;
+        if (codigoBarraLinha) {
+          produtoData.codigoBarra = choosePreferredBarcode(
+            produtoData.codigoBarra,
+            codigoBarraLinha
+          );
         }
         // Quando tem corProduto (do código de barras) ou é entrada, mostrar TODOS os estoques (incluindo 0)
         // Quando não tem corProduto e não é entrada, só mostrar estoques > 0

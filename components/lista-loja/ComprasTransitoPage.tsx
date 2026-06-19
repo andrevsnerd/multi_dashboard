@@ -76,6 +76,39 @@ type ProdutoBarcodeLookupRow = {
   codigoBarra: string | null;
 };
 
+function compareBarcodePreference(
+  current: string | null | undefined,
+  candidate: string | null | undefined
+): number {
+  const currentNorm = String(current ?? "").trim();
+  const candidateNorm = String(candidate ?? "").trim();
+
+  if (!candidateNorm) return 1;
+  if (!currentNorm) return -1;
+
+  if (candidateNorm.length !== currentNorm.length) {
+    return candidateNorm.length - currentNorm.length;
+  }
+
+  const currentNum = Number(currentNorm);
+  const candidateNum = Number(candidateNorm);
+
+  if (Number.isFinite(currentNum) && Number.isFinite(candidateNum) && candidateNum !== currentNum) {
+    return candidateNum < currentNum ? -1 : 1;
+  }
+
+  return candidateNorm.localeCompare(currentNorm);
+}
+
+function choosePreferredBarcode(
+  current: string | null | undefined,
+  candidate: string | null | undefined
+): string {
+  return compareBarcodePreference(current, candidate) < 0
+    ? String(candidate ?? "").trim()
+    : String(current ?? "").trim();
+}
+
 async function fetchCodigoBarraProduto(
   companyKey: CompanyKey,
   item: CompraTransitoItemRow
@@ -101,16 +134,21 @@ async function fetchCodigoBarraProduto(
   const rows = json.data ?? [];
   const corProduto = item.corProduto?.trim() ?? "";
 
-  const exactMatch =
-    rows.find(
-      (row) =>
-        row.produto.trim() === produto &&
-        (row.corProduto?.trim() ?? "") === corProduto &&
-        (row.codigoBarra?.trim() ?? "")
-    ) ??
-    rows.find((row) => row.produto.trim() === produto && (row.codigoBarra?.trim() ?? ""));
+  let preferred = "";
+  for (const row of rows) {
+    if (row.produto.trim() !== produto) continue;
+    if (corProduto && (row.corProduto?.trim() ?? "") !== corProduto) continue;
+    preferred = choosePreferredBarcode(preferred, row.codigoBarra);
+  }
 
-  return exactMatch?.codigoBarra?.trim() ?? "";
+  if (preferred) return preferred;
+
+  for (const row of rows) {
+    if (row.produto.trim() !== produto) continue;
+    preferred = choosePreferredBarcode(preferred, row.codigoBarra);
+  }
+
+  return preferred;
 }
 
 function fmt(n: number) {
@@ -570,18 +608,18 @@ export default function ComprasTransitoPage({
       selectedCompra.items.map(async (item) => {
         const cacheKey = `${item.produto}::${item.corProduto ?? ""}`;
         const barcodeAtual = item.codigoBarra?.trim() ?? "";
-        if (barcodeAtual) {
-          barcodeCache.set(cacheKey, barcodeAtual);
-          return { ...item, codigoBarra: barcodeAtual };
-        }
-
         if (barcodeCache.has(cacheKey)) {
-          return { ...item, codigoBarra: barcodeCache.get(cacheKey) ?? "" };
+          const barcodePreferido = choosePreferredBarcode(
+            barcodeAtual,
+            barcodeCache.get(cacheKey) ?? ""
+          );
+          return { ...item, codigoBarra: barcodePreferido };
         }
 
         const fetchedBarcode = await fetchCodigoBarraProduto(companyKey, item);
-        barcodeCache.set(cacheKey, fetchedBarcode);
-        return { ...item, codigoBarra: fetchedBarcode };
+        const barcodePreferido = choosePreferredBarcode(barcodeAtual, fetchedBarcode);
+        barcodeCache.set(cacheKey, barcodePreferido);
+        return { ...item, codigoBarra: barcodePreferido };
       })
     );
 
