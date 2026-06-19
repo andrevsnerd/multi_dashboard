@@ -6,6 +6,11 @@ import {
   VENDAS_FATURAMENTO_ID,
 } from "./vendas-faturamento";
 import { buildEstoqueRedePresets, estoqueRedeMeta, ESTOQUE_REDE_ID } from "./estoque-rede";
+import {
+  buildProdutosParadosPresets,
+  produtosParadosMeta,
+  PRODUTOS_PARADOS_ID,
+} from "./produtos-parados";
 
 /**
  * Registry PURO de tipos de análise (apenas metadados/colunas/presets).
@@ -16,7 +21,11 @@ import { buildEstoqueRedePresets, estoqueRedeMeta, ESTOQUE_REDE_ID } from "./est
  * com seu `ReportTypeMeta`, registre aqui e registre o fetcher em
  * `registry.server.ts`.
  */
-export const REPORT_TYPES: ReportTypeMeta[] = [vendasFaturamentoMeta, estoqueRedeMeta];
+export const REPORT_TYPES: ReportTypeMeta[] = [
+  vendasFaturamentoMeta,
+  estoqueRedeMeta,
+  produtosParadosMeta,
+];
 
 export function getReportMeta(id: string): ReportTypeMeta | undefined {
   return REPORT_TYPES.find((r) => r.id === id);
@@ -32,6 +41,9 @@ export function getDefaultPresets(id: string, companyKey: CompanyKey): ReportPre
   }
   if (id === ESTOQUE_REDE_ID) {
     return buildEstoqueRedePresets(companyKey);
+  }
+  if (id === PRODUTOS_PARADOS_ID) {
+    return buildProdutosParadosPresets(companyKey);
   }
   return getReportMeta(id)?.defaultPresets ?? [];
 }

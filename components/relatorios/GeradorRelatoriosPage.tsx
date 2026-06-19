@@ -9,6 +9,7 @@ import { useAuth } from "@/components/auth/AuthContext";
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 import { getCurrentMonthRange, formatDateForQuery } from "@/lib/utils/date";
 import { exportRelatorioXlsx } from "@/lib/utils/exportRelatorioXlsx";
+import { formatDataVenda, formatDiasParado } from "@/lib/reports/format";
 import { getDefaultPresets, getReportMeta, REPORT_TYPES, VENDAS_FATURAMENTO_ID } from "@/lib/reports/registry";
 import type {
   ColumnType,
@@ -60,6 +61,8 @@ function colTypeOf(catalog: ReportColumnDef[], key: string): ColumnType {
 }
 
 function formatCell(value: ReportRow[string], type: ColumnType): string {
+  if (type === "dataVenda") return formatDataVenda(value);
+  if (type === "diasParado") return formatDiasParado(value);
   if (value === null || value === undefined || value === "") return "";
   if (type === "text") return String(value);
   const num = Number(value);
@@ -77,7 +80,8 @@ function formatCell(value: ReportRow[string], type: ColumnType): string {
 }
 
 function isNumericType(type: ColumnType): boolean {
-  return type !== "text";
+  // dataVenda alinha/ordena como texto (ISO ordena cronologicamente); diasParado é numérico.
+  return type !== "text" && type !== "dataVenda";
 }
 
 function formatKpi(value: number, format: ReportSummaryMetric["format"]): string {
@@ -563,6 +567,8 @@ export default function GeradorRelatoriosPage({
   }, [filial, companyKey]);
 
   const handleExport = () => {
+    const columnTypes: Record<string, ColumnType> = {};
+    for (const c of enabledColumns) columnTypes[c.key] = colTypeOf(effectiveCatalog, c.key);
     exportRelatorioXlsx(
       sortedRows,
       enabledColumns.map((c) => ({ key: c.key, label: c.label })),
@@ -572,6 +578,7 @@ export default function GeradorRelatoriosPage({
         range: { startDate: range.startDate, endDate: range.endDate },
         filialLabel,
         sheetName: meta?.label,
+        columnTypes,
       }
     );
   };

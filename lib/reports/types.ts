@@ -6,7 +6,16 @@
  * que tocam o banco ficam em `registry.server.ts` / repositórios.
  */
 
-export type ColumnType = "text" | "int" | "number" | "currency" | "percent";
+export type ColumnType =
+  | "text"
+  | "int"
+  | "number"
+  | "currency"
+  | "percent"
+  /** Dias parado: número de dias; valor >= 9999 (sentinela) exibe "Nunca vendeu". */
+  | "diasParado"
+  /** Última venda: data ISO (yyyy-mm-dd); vazio/nulo exibe "Nunca vendeu". */
+  | "dataVenda";
 
 /** Catálogo de uma coluna disponível em uma análise. */
 export interface ReportColumnDef {

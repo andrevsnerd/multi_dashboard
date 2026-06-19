@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 
-import type { ReportPresetColumn, ReportRow } from "@/lib/reports/types";
+import type { ColumnType, ReportPresetColumn, ReportRow } from "@/lib/reports/types";
+import { formatDataVenda, formatDiasParado } from "@/lib/reports/format";
 
 function safeFilenamePart(s: string): string {
   return s.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 48);
@@ -26,6 +27,8 @@ export function exportRelatorioXlsx(
     range: { startDate: Date; endDate: Date };
     filialLabel?: string | null;
     sheetName?: string;
+    /** Tipos por coluna; só diasParado/dataVenda são formatados (ex.: "Nunca vendeu"). Demais saem crus (melhor p/ Excel). */
+    columnTypes?: Record<string, ColumnType>;
   }
 ): void {
   if (rows.length === 0) {
@@ -37,12 +40,18 @@ export function exportRelatorioXlsx(
     return;
   }
 
+  const types = options.columnTypes ?? {};
   // Cada linha vira um objeto na ordem do preset, com a chave = rótulo exibido.
   const orderedRows = rows.map((row) => {
     const out: Record<string, string | number | null> = {};
     for (const colDef of columns) {
       const label = colDef.label || colDef.key;
-      out[label] = row[colDef.key] ?? "";
+      const t = types[colDef.key];
+      // Apenas estas duas colunas precisam virar texto (ex.: "Nunca vendeu");
+      // valores numéricos (currency/percent/int) seguem crus — melhor p/ cálculo no Excel.
+      if (t === "diasParado") out[label] = formatDiasParado(row[colDef.key]);
+      else if (t === "dataVenda") out[label] = formatDataVenda(row[colDef.key]);
+      else out[label] = row[colDef.key] ?? "";
     }
     return out;
   });

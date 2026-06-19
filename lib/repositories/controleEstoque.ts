@@ -945,6 +945,7 @@ export interface ProdutoParadoDetalhado {
   corCodigo: string;
   grade: string;
   linha: string;
+  grupo: string;
   subgrupo: string;
   colecao: string;
   estoque: number;
@@ -1032,6 +1033,7 @@ export async function fetchProdutosParadosDetalhado({
         ISNULL(e.COR_PRODUTO, '') AS corCodigo,
         ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
         ISNULL(p.LINHA, '') AS linha,
+        ISNULL(p.GRUPO_PRODUTO, '') AS grupo,
         ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
         ISNULL(p.COLECAO, '') AS colecao,
         SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoque,
@@ -1065,6 +1067,7 @@ export async function fetchProdutosParadosDetalhado({
         cb.DESC_COR,
         p.GRADE,
         p.LINHA,
+        p.GRUPO_PRODUTO,
         p.SUBGRUPO_PRODUTO,
         p.COLECAO,
         uv.ultimaVenda
@@ -1084,6 +1087,7 @@ export async function fetchProdutosParadosDetalhado({
       corCodigo: string;
       grade: string;
       linha: string;
+      grupo: string;
       subgrupo: string;
       colecao: string;
       estoque: number;
@@ -1099,6 +1103,7 @@ export async function fetchProdutosParadosDetalhado({
       corCodigo: r.corCodigo ?? '',
       grade: r.grade ?? '',
       linha: r.linha ?? '',
+      grupo: r.grupo ?? '',
       subgrupo: r.subgrupo ?? '',
       colecao: r.colecao ?? '',
       estoque: Number(r.estoque) || 0,
