@@ -7847,3 +7847,163 @@ export async function fetchAvailableCores({
       .filter(Boolean);
   });
 }
+
+/** Linha de estoque por (produto, cor, filial) para o relatório de Estoque por filial. */
+export interface EstoqueRedeItemRow {
+  produto: string;
+  descricao: string;
+  grupo: string;
+  linha: string;
+  subgrupo: string;
+  grade: string;
+  tipo: string;
+  cor: string; // descrição da cor (DESC_COR)
+  filial: string; // nome cru do ERP
+  positiveStock: number;
+  negativeStock: number;
+}
+
+export interface EstoqueRedeParams {
+  company?: string;
+  filial?: string | null;
+  grupos?: string[] | null;
+  linhas?: string[] | null;
+  subgrupos?: string[] | null;
+  grades?: string[] | null;
+  colecoes?: string[] | null;
+  cores?: string[] | null; // por descrição
+  tipos?: string[] | null;
+  produtoId?: string | null;
+  produtoSearchTerm?: string | null;
+}
+
+/**
+ * Estoque de TODOS os produtos (por produto × cor × filial) no mesmo escopo da tela
+ * Estoque Consulta / KPI de estoque: exclui SEM GRUPO/SEM LINHA, aplica exclusões e,
+ * para NERD, só ELETRONICOS. Devolve positivo/negativo por filial separados (o
+ * chamador decide a exibição por filial e o total da rede). Não envolve vendas.
+ */
+export async function fetchEstoqueRedePorProduto({
+  company,
+  filial,
+  grupos,
+  linhas,
+  subgrupos,
+  grades,
+  colecoes,
+  cores,
+  tipos,
+  produtoId,
+  produtoSearchTerm,
+}: EstoqueRedeParams): Promise<EstoqueRedeItemRow[]> {
+  return withRequest(async (request) => {
+    const estoqueFilialFilter = await buildFilialFilter(request, company, filial ?? null, 'e');
+    const grupoFilter = buildGrupoFilter(request, company, grupos ?? null, 'p');
+    const linhaFilter = buildLinhaFilter(request, company, linhas ?? null, 'p');
+    const colecaoFilter = buildColecaoFilter(request, company, colecoes ?? null, 'p');
+    const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos ?? null, 'p');
+    const gradeFilter = buildGradeFilter(request, company, grades ?? null, 'p');
+    const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineEstRede');
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
+
+    let produtoFilter = '';
+    if (produtoId) {
+      request.input('produtoIdEstRede', sql.VarChar, produtoId);
+      produtoFilter = `AND e.PRODUTO = @produtoIdEstRede`;
+    } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
+      request.input('produtoSearchEstRede', sql.VarChar, `%${produtoSearchTerm.trim()}%`);
+      produtoFilter = `AND p.DESC_PRODUTO LIKE @produtoSearchEstRede`;
+    }
+
+    let corFilter = '';
+    const coresList = (cores ?? []).map((c) => c.trim().toUpperCase()).filter(Boolean);
+    if (coresList.length > 0) {
+      coresList.forEach((cv, i) => request.input(`estRedeCor${i}`, sql.VarChar, cv));
+      const ph = coresList.map((_, i) => `@estRedeCor${i}`).join(', ');
+      corFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(COALESCE(c.DESC_COR, e.COR_PRODUTO), '')))) IN (${ph})`;
+    }
+
+    let tipoFilter = '';
+    const tiposList = (tipos ?? []).map((t) => t.trim().toUpperCase()).filter(Boolean);
+    if (tiposList.length > 0) {
+      tiposList.forEach((tv, i) => request.input(`estRedeTipo${i}`, sql.VarChar, tv));
+      const ph = tiposList.map((_, i) => `@estRedeTipo${i}`).join(', ');
+      tipoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.TIPO_PRODUTO, '')))) IN (${ph})`;
+    }
+
+    const categoriaNotEmpty =
+      company === 'nerd'
+        ? `AND ISNULL(p.GRUPO_PRODUTO, '') <> ''`
+        : `AND ISNULL(p.LINHA, '') <> ''`;
+
+    const query = `
+      SELECT
+        e.PRODUTO AS produto,
+        ISNULL(p.DESC_PRODUTO, '') AS descricao,
+        ISNULL(p.GRUPO_PRODUTO, '') AS grupo,
+        ISNULL(p.LINHA, '') AS linha,
+        ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
+        ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
+        ISNULL(p.TIPO_PRODUTO, '') AS tipo,
+        ISNULL(COALESCE(c.DESC_COR, e.COR_PRODUTO), '') AS cor,
+        e.FILIAL AS filial,
+        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS positiveStock,
+        SUM(CASE WHEN e.ESTOQUE < 0 THEN e.ESTOQUE ELSE 0 END) AS negativeStock
+      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
+      WHERE 1=1
+        ${estoqueFilialFilter}
+        ${grupoFilter}
+        ${linhaFilter}
+        ${colecaoFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
+        ${produtoFilter}
+        ${corFilter}
+        ${tipoFilter}
+        ${categoriaNotEmpty}
+      GROUP BY
+        e.PRODUTO,
+        p.DESC_PRODUTO,
+        p.GRUPO_PRODUTO,
+        p.LINHA,
+        p.SUBGRUPO_PRODUTO,
+        p.GRADE,
+        p.TIPO_PRODUTO,
+        COALESCE(c.DESC_COR, e.COR_PRODUTO),
+        e.FILIAL
+      HAVING ABS(SUM(ISNULL(e.ESTOQUE, 0))) > 0
+    `;
+
+    const result = await request.query<{
+      produto: string;
+      descricao: string;
+      grupo: string;
+      linha: string;
+      subgrupo: string;
+      grade: string;
+      tipo: string;
+      cor: string;
+      filial: string;
+      positiveStock: number | null;
+      negativeStock: number | null;
+    }>(query);
+
+    return result.recordset.map((r) => ({
+      produto: (r.produto ?? '').trim(),
+      descricao: (r.descricao ?? '').trim(),
+      grupo: (r.grupo ?? '').trim(),
+      linha: (r.linha ?? '').trim(),
+      subgrupo: (r.subgrupo ?? '').trim(),
+      grade: (r.grade ?? '').trim(),
+      tipo: (r.tipo ?? '').trim(),
+      cor: (r.cor ?? '').trim(),
+      filial: (r.filial ?? '').trim(),
+      positiveStock: Number(r.positiveStock ?? 0),
+      negativeStock: Number(r.negativeStock ?? 0),
+    }));
+  });
+}

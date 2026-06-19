@@ -9,7 +9,7 @@ import { useAuth } from "@/components/auth/AuthContext";
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 import { getCurrentMonthRange, formatDateForQuery } from "@/lib/utils/date";
 import { exportRelatorioXlsx } from "@/lib/utils/exportRelatorioXlsx";
-import { getReportMeta, REPORT_TYPES, VENDAS_FATURAMENTO_ID } from "@/lib/reports/registry";
+import { getDefaultPresets, getReportMeta, REPORT_TYPES, VENDAS_FATURAMENTO_ID } from "@/lib/reports/registry";
 import type {
   ColumnType,
   ReportColumnDef,
@@ -36,6 +36,8 @@ interface WorkingColumn {
 type SortDir = "asc" | "desc";
 
 const SYNTHETIC_NEW = "__new__";
+/** Prefixo das chaves das colunas dinâmicas de estoque por filial (espelha o backend). */
+const FILIAL_COL_PREFIX = "ESTOQUE_FILIAL::";
 
 // ---------- helpers ----------
 
@@ -153,12 +155,32 @@ export default function GeradorRelatoriosPage({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [generatedOnce, setGeneratedOnce] = useState(false);
+  // Colunas dinâmicas (ex.: estoque por filial) devolvidas pelo backend.
+  const [dynamicColumns, setDynamicColumns] = useState<ReportColumnDef[]>([]);
+
+  // Catálogo efetivo = catálogo fixo + colunas dinâmicas (para tipo/formatação).
+  const effectiveCatalog = useMemo<ReportColumnDef[]>(() => {
+    const m = new Map(catalog.map((c) => [c.key, c] as const));
+    for (const d of dynamicColumns) m.set(d.key, d);
+    return Array.from(m.values());
+  }, [catalog, dynamicColumns]);
+
+  // Presets padrão da empresa (alguns variam por empresa — ex.: colunas líderes).
+  const builtinPresets = useMemo<ReportPresetDef[]>(
+    () => getDefaultPresets(reportTypeId, companyKey),
+    [reportTypeId, companyKey]
+  );
 
   // Lista combinada de presets (builtin + backend).
   const allPresets = useMemo(() => {
-    const builtin = (meta?.defaultPresets ?? []) as ReportPresetDef[];
-    return { builtin, backend: backendPresets };
-  }, [meta, backendPresets]);
+    return { builtin: builtinPresets, backend: backendPresets };
+  }, [builtinPresets, backendPresets]);
+
+  // Preset ativo pede estoque por filial? (só presets builtin carregam a flag)
+  const wantsFilialStock = useMemo(
+    () => !!allPresets.builtin.find((p) => p.id === activePresetId)?.dynamicFilialStock,
+    [allPresets, activePresetId]
+  );
 
   // Aplica um preset (builtin ou backend) à estrutura de colunas.
   const applyPreset = useCallback(
@@ -167,13 +189,15 @@ export default function GeradorRelatoriosPage({
       if (preset.sortBy) setSortBy(preset.sortBy);
       if (preset.sortDir) setSortDir(preset.sortDir);
       setActivePresetId(preset.id);
+      // Limpa colunas dinâmicas de filial; serão repovoadas ao gerar, se a view pedir.
+      setDynamicColumns([]);
     },
     [catalog]
   );
 
   // Inicializa estrutura com o primeiro preset builtin quando muda de análise.
   useEffect(() => {
-    const first = meta?.defaultPresets?.[0];
+    const first = builtinPresets[0];
     if (first) applyPreset(first);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reportTypeId]);
@@ -329,9 +353,9 @@ export default function GeradorRelatoriosPage({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/relatorios/vendas-faturamento?${buildQuery()}`, {
-        cache: "no-store",
-      });
+      const qs = buildQuery();
+      const url = `/api/relatorios/dados?reportType=${encodeURIComponent(reportTypeId)}&${qs}${wantsFilialStock ? "&estoquePorFilial=1" : ""}`;
+      const res = await fetch(url, { cache: "no-store" });
       const json = await res.json();
       if (!res.ok) {
         throw new Error(json?.error || json?.details || "Erro ao gerar relatório");
@@ -341,6 +365,22 @@ export default function GeradorRelatoriosPage({
       setTotal(json.total ?? 0);
       setTruncated(Boolean(json.truncated));
       setGeneratedOnce(true);
+
+      // Colunas dinâmicas de estoque por filial: mescla no catálogo e anexa às
+      // colunas habilitadas (após as fixas), evitando duplicatas.
+      const dyn: ReportColumnDef[] = Array.isArray(json.dynamicColumns) ? json.dynamicColumns : [];
+      setDynamicColumns(dyn);
+      if (wantsFilialStock && dyn.length > 0) {
+        setWorkingColumns((cols) => {
+          const existing = new Set(cols.map((c) => c.key));
+          const appended = dyn
+            .filter((d) => !existing.has(d.key))
+            .map((d) => ({ key: d.key, label: d.defaultLabel, enabled: true }));
+          return [...cols, ...appended];
+        });
+      } else {
+        setWorkingColumns((cols) => cols.filter((c) => !c.key.startsWith(FILIAL_COL_PREFIX)));
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao gerar relatório");
       setRows([]);
@@ -350,7 +390,7 @@ export default function GeradorRelatoriosPage({
     } finally {
       setLoading(false);
     }
-  }, [buildQuery]);
+  }, [buildQuery, wantsFilialStock, reportTypeId]);
 
   // ---------- ordenação client-side ----------
   const enabledColumns = useMemo(
@@ -360,7 +400,7 @@ export default function GeradorRelatoriosPage({
 
   const sortedRows = useMemo(() => {
     if (!sortBy) return rows;
-    const type = colTypeOf(catalog, sortBy);
+    const type = colTypeOf(effectiveCatalog,sortBy);
     const numeric = isNumericType(type);
     const dir = sortDir === "asc" ? 1 : -1;
     return [...rows].sort((a, b) => {
@@ -371,14 +411,14 @@ export default function GeradorRelatoriosPage({
       }
       return String(av ?? "").localeCompare(String(bv ?? "")) * dir;
     });
-  }, [rows, sortBy, sortDir, catalog]);
+  }, [rows, sortBy, sortDir, effectiveCatalog]);
 
   const toggleSort = (key: string) => {
     if (sortBy === key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortBy(key);
-      setSortDir(isNumericType(colTypeOf(catalog, key)) ? "desc" : "asc");
+      setSortDir(isNumericType(colTypeOf(effectiveCatalog,key)) ? "desc" : "asc");
     }
   };
 
@@ -508,7 +548,7 @@ export default function GeradorRelatoriosPage({
         throw new Error(json?.error || "Erro ao excluir preset");
       }
       await loadPresets();
-      const firstBuiltin = meta?.defaultPresets?.[0];
+      const firstBuiltin = builtinPresets[0];
       if (firstBuiltin) applyPreset(firstBuiltin);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Erro ao excluir preset");
@@ -839,7 +879,7 @@ export default function GeradorRelatoriosPage({
                 {enabledColumns.map((col) => (
                   <th
                     key={col.key}
-                    className={`${styles.th} ${isNumericType(colTypeOf(catalog, col.key)) ? styles.thNumeric : ""}`}
+                    className={`${styles.th} ${isNumericType(colTypeOf(effectiveCatalog,col.key)) ? styles.thNumeric : ""}`}
                     onClick={() => toggleSort(col.key)}
                   >
                     {col.label}
@@ -852,7 +892,7 @@ export default function GeradorRelatoriosPage({
               {sortedRows.map((row, i) => (
                 <tr key={i}>
                   {enabledColumns.map((col) => {
-                    const type = colTypeOf(catalog, col.key);
+                    const type = colTypeOf(effectiveCatalog,col.key);
                     return (
                       <td
                         key={col.key}

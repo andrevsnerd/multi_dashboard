@@ -35,6 +35,12 @@ export interface ReportPresetDef {
   sortDir?: "asc" | "desc";
   /** true para presets padrão do sistema (não editáveis/excluíveis no backend). */
   builtin?: boolean;
+  /**
+   * Quando true, a análise busca o estoque detalhado por filial e ANEXA, após as
+   * colunas fixas, uma coluna por filial (rede inteira). As colunas por filial são
+   * dinâmicas (dependem da empresa) — vêm em `ReportResult.dynamicColumns`.
+   */
+  dynamicFilialStock?: boolean;
 }
 
 export type ReportFilterKey =
@@ -81,6 +87,8 @@ export interface ReportFilters {
   produtoId?: string | null;
   /** Limite de linhas retornadas (default no repositório). */
   limit?: number;
+  /** Quando true, calcula e anexa estoque por filial (rede inteira) por linha. */
+  estoquePorFilial?: boolean;
 }
 
 /** Cartão de KPI exibido no topo do resultado (ex.: Vendas Total, Ticket Médio). */
@@ -98,4 +106,9 @@ export interface ReportResult {
   truncated: boolean;
   /** KPIs opcionais (específicos da análise) exibidos como cartões no topo. */
   summary?: ReportSummaryMetric[];
+  /**
+   * Colunas extras geradas dinamicamente pela análise (ex.: uma coluna de estoque
+   * por filial). O front mescla estas ao catálogo e as anexa às colunas habilitadas.
+   */
+  dynamicColumns?: ReportColumnDef[];
 }

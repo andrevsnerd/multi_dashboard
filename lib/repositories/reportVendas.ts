@@ -1,7 +1,26 @@
 import { fetchProductsWithDetails } from "@/lib/repositories/products";
+import {
+  fetchMultipleProductsStockByColorPorFilial,
+  type FilialStockBreakdown,
+} from "@/lib/repositories/inventory";
 import { fetchSalesTotals } from "@/lib/services/salesTotals";
+import { resolveCompanyLive } from "@/lib/server/company-live";
+import {
+  getOperationalFilials,
+  getFilialLabelForDisplay,
+  compareFilialDisplayOrder,
+} from "@/lib/config/company";
 import { normalizeRangeForQuery } from "@/lib/utils/date";
-import type { ReportFilters, ReportResult, ReportRow, ReportSummaryMetric } from "@/lib/reports/types";
+import type {
+  ReportColumnDef,
+  ReportFilters,
+  ReportResult,
+  ReportRow,
+  ReportSummaryMetric,
+} from "@/lib/reports/types";
+
+/** Prefixo das chaves das colunas dinâmicas de estoque por filial. */
+const FILIAL_COL_PREFIX = "ESTOQUE_FILIAL::";
 
 /** Limite alto por padrão; a página pode reduzir. Sinaliza `truncated` se exceder. */
 const DEFAULT_LIMIT = 5000;
@@ -89,12 +108,79 @@ export async function fetchVendasFaturamento(
   // Totais do conjunto filtrado (servem para participação E para os KPIs).
   const sumRevenue = filtered.reduce((s, d) => s + (d.totalRevenue ?? 0), 0);
   const sumQuantity = filtered.reduce((s, d) => s + (d.totalQuantity ?? 0), 0);
-  const sumStock = filtered.reduce((s, d) => s + (d.stock ?? 0), 0);
 
   const total = filtered.length;
   const limit = filters.limit && filters.limit > 0 ? filters.limit : DEFAULT_LIMIT;
   const truncated = total > limit;
   const sliced = truncated ? filtered.slice(0, limit) : filtered;
+
+  // Estoque por filial (opcional). Gera uma coluna por filial (rede inteira, SEMPRE —
+  // independente do filtro de filial das vendas) + um ESTOQUE_TOTAL coerente com a soma.
+  // Por filial: pos>0?pos:neg (mesma regra de visualização). Total da rede: (Σpos)>0?Σpos:Σneg.
+  let dynamicColumns: ReportColumnDef[] | undefined;
+  const estoquePorFilialByKey = new Map<
+    string,
+    { total: number; porLabel: Map<string, number> }
+  >();
+
+  if (filters.estoquePorFilial && sliced.length > 0) {
+    const company = await resolveCompanyLive(filters.company);
+    const pairs = sliced.map((d) => ({
+      productId: String(d.productId ?? "").trim(),
+      corProduto: d.corProduto ?? null,
+    }));
+    const breakdown: Map<string, Map<string, FilialStockBreakdown>> =
+      await fetchMultipleProductsStockByColorPorFilial(pairs, {
+        company: filters.company,
+        filial: null, // sempre a rede inteira ("onde o produto está")
+      }).catch(() => new Map<string, Map<string, FilialStockBreakdown>>());
+
+    const labelSet = new Set<string>();
+    if (company) {
+      for (const f of getOperationalFilials(company, "inventory")) {
+        labelSet.add(getFilialLabelForDisplay(company, f));
+      }
+    }
+
+    for (const d of sliced) {
+      const pid = String(d.productId ?? "").trim();
+      const cor = d.corProduto ? String(d.corProduto).trim() : null;
+      const key = cor ? `${pid}-${cor}` : `${pid}-null`;
+      const byFilial = breakdown.get(key);
+      const porLabel = new Map<string, number>();
+      let sumPos = 0;
+      let sumNeg = 0;
+      if (byFilial) {
+        const posByLabel = new Map<string, number>();
+        const negByLabel = new Map<string, number>();
+        byFilial.forEach((b) => {
+          const label = company ? getFilialLabelForDisplay(company, b.filial) : b.filial;
+          labelSet.add(label);
+          posByLabel.set(label, (posByLabel.get(label) ?? 0) + b.positiveStock);
+          negByLabel.set(label, (negByLabel.get(label) ?? 0) + b.negativeStock);
+        });
+        posByLabel.forEach((pos, label) => {
+          const neg = negByLabel.get(label) ?? 0;
+          porLabel.set(label, pos > 0 ? pos : neg);
+          sumPos += pos;
+          sumNeg += neg;
+        });
+      }
+      estoquePorFilialByKey.set(key, {
+        total: sumPos > 0 ? sumPos : sumNeg,
+        porLabel,
+      });
+    }
+
+    const orderedLabels = Array.from(labelSet).sort((a, b) =>
+      company ? compareFilialDisplayOrder(a, b, company) : a.localeCompare(b, "pt-BR")
+    );
+    dynamicColumns = orderedLabels.map((label) => ({
+      key: `${FILIAL_COL_PREFIX}${label}`,
+      defaultLabel: label,
+      type: "int" as const,
+    }));
+  }
 
   let acumPerc = 0;
   const rows: ReportRow[] = sliced.map((d) => {
@@ -106,8 +192,17 @@ export async function fetchVendasFaturamento(
     const partPerc = sumRevenue !== 0 ? (revenue / sumRevenue) * 100 : 0;
     acumPerc += partPerc;
 
-    return {
-      PRODUTO: String(d.productId ?? "").trim(),
+    const pid = String(d.productId ?? "").trim();
+    const corKey = d.corProduto ? String(d.corProduto).trim() : null;
+    const rowKey = corKey ? `${pid}-${corKey}` : `${pid}-null`;
+
+    // Curva ABC pela mesma regra da tela de Curva ABC: faturamento acumulado
+    // (já ordenado desc) ≤60% → A, ≤90% → B, senão C.
+    const curva = acumPerc <= 60 ? "A" : acumPerc <= 90 ? "B" : "C";
+
+    const row: ReportRow = {
+      CURVA: curva,
+      PRODUTO: pid,
       COR: d.corProduto ? String(d.corProduto).trim() : "",
       COR_DESCRICAO: d.descCorProduto ?? "",
       DESCRICAO: d.productName ?? "",
@@ -129,6 +224,16 @@ export async function fetchVendasFaturamento(
       PARTICIPACAO_PERC: round2(partPerc),
       PARTICIPACAO_ACUM_PERC: round2(acumPerc),
     };
+
+    if (filters.estoquePorFilial) {
+      const est = estoquePorFilialByKey.get(rowKey);
+      row.ESTOQUE_TOTAL = roundInt(est?.total ?? 0);
+      for (const col of dynamicColumns ?? []) {
+        row[col.key] = roundInt(est?.porLabel.get(col.defaultLabel) ?? 0);
+      }
+    }
+
+    return row;
   });
 
   // KPIs sempre coerentes com o que está na tabela (refletem todos os filtros,
@@ -139,8 +244,7 @@ export async function fetchVendasFaturamento(
     { label: "Vendas Total", value: round2(sumRevenue), format: "currency" },
     { label: "Produtos Vendidos", value: roundInt(sumQuantity), format: "int" },
     { label: "Ticket Médio", value: round2(ticketMedio), format: "currency" },
-    { label: "Estoque Total", value: roundInt(sumStock), format: "int" },
   ];
 
-  return { rows, total, truncated, summary };
+  return { rows, total, truncated, summary, dynamicColumns };
 }

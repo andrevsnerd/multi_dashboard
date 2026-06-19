@@ -431,6 +431,132 @@ export async function fetchMultipleProductsStockByColor(
   return stockMap;
 }
 
+/** Estoque positivo/negativo por filial (nome cru do ERP) de um (produto, cor). */
+export interface FilialStockBreakdown {
+  filial: string;
+  positiveStock: number;
+  negativeStock: number;
+}
+
+/**
+ * Igual a fetchMultipleProductsStockByColor, mas NÃO colapsa as filiais: devolve o
+ * detalhamento por filial (positivo/negativo separados) de cada (produto, cor).
+ * Usa exatamente o mesmo casamento produto+cor, então a soma por filial é coerente
+ * com o estoque agregado daquela função. Cabe ao chamador decidir como exibir
+ * (ex.: pos>0?pos:neg por filial) e como agregar o total da rede.
+ *
+ * Retorna Map<"productId-corProduto" | "productId-null", Map<filialCru, breakdown>>.
+ */
+export async function fetchMultipleProductsStockByColorPorFilial(
+  products: Array<{ productId: string; corProduto?: string | null }>,
+  { company, filial, ecommerceOnly = false, skipFilialFilter = false }: ProductStockParams = {}
+): Promise<Map<string, Map<string, FilialStockBreakdown>>> {
+  const result = new Map<string, Map<string, FilialStockBreakdown>>();
+  if (products.length === 0) {
+    return result;
+  }
+
+  const productColorPairs = new Map<string, { productId: string; corProduto: string | null }>();
+  products.forEach((product) => {
+    const productId = String(product.productId ?? '').trim();
+    const corProduto = product.corProduto != null ? String(product.corProduto).trim() : null;
+    const key = corProduto ? `${productId}-${corProduto}` : `${productId}-null`;
+    if (!productColorPairs.has(key)) {
+      productColorPairs.set(key, { productId, corProduto });
+    }
+  });
+
+  const pairsArray = Array.from(productColorPairs.values());
+  const BATCH_SIZE = 500;
+
+  for (let i = 0; i < pairsArray.length; i += BATCH_SIZE) {
+    const batch = pairsArray.slice(i, i + BATCH_SIZE);
+
+    const batchResult = await withRequest(async (request) => {
+      let filialFilter = '';
+      if (!skipFilialFilter) {
+        if (ecommerceOnly && !filial && company) {
+          const companyConfig = await resolveCompanyLive(company);
+          const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
+          if (ecommerceFilials.length > 0) {
+            ecommerceFilials.forEach((f, index) => {
+              request.input(`estoqueEcommerceFilial${index}`, sql.VarChar, f);
+            });
+            const placeholders = ecommerceFilials
+              .map((_, index) => `@estoqueEcommerceFilial${index}`)
+              .join(', ');
+            filialFilter = `AND e.FILIAL IN (${placeholders})`;
+          }
+        } else {
+          filialFilter = await buildFilialFilter(request, company, filial);
+        }
+      }
+
+      const conditions: string[] = [];
+      let paramIndex = 0;
+      batch.forEach((pair) => {
+        const productParam = `productId${paramIndex}`;
+        request.input(productParam, sql.VarChar, pair.productId);
+        if (pair.corProduto !== null) {
+          const colorParam = `corProduto${paramIndex}`;
+          request.input(colorParam, sql.VarChar, pair.corProduto);
+          conditions.push(`(e.PRODUTO = @${productParam} AND e.COR_PRODUTO = @${colorParam})`);
+        } else {
+          conditions.push(`(e.PRODUTO = @${productParam})`);
+        }
+        paramIndex++;
+      });
+
+      let whereClause = '';
+      if (conditions.length > 0) {
+        whereClause = `WHERE (${conditions.join(' OR ')})`;
+        if (filialFilter) whereClause += ` ${filialFilter}`;
+      } else if (filialFilter) {
+        whereClause = `WHERE ${filialFilter.replace(/^AND /, '')}`;
+      }
+
+      const query = `
+        SELECT
+          e.PRODUTO AS productId,
+          e.COR_PRODUTO AS corProduto,
+          e.FILIAL AS filial,
+          SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS positiveStock,
+          SUM(CASE WHEN e.ESTOQUE < 0 THEN e.ESTOQUE ELSE 0 END) AS negativeStock
+        FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+        ${whereClause}
+        GROUP BY e.PRODUTO, e.COR_PRODUTO, e.FILIAL
+      `;
+
+      const queryResult = await request.query<{
+        productId: string;
+        corProduto: string | null;
+        filial: string | null;
+        positiveStock: number | null;
+        negativeStock: number | null;
+      }>(query);
+
+      return queryResult.recordset;
+    });
+
+    batchResult.forEach((row) => {
+      const productId = String(row.productId ?? '').trim();
+      const corProduto = row.corProduto != null ? String(row.corProduto).trim() : null;
+      const key = corProduto ? `${productId}-${corProduto}` : `${productId}-null`;
+      const filialRaw = String(row.filial ?? '').trim();
+      if (!filialRaw) return;
+
+      if (!result.has(key)) result.set(key, new Map());
+      const byFilial = result.get(key)!;
+      const prev = byFilial.get(filialRaw) ?? { filial: filialRaw, positiveStock: 0, negativeStock: 0 };
+      prev.positiveStock += Number(row.positiveStock ?? 0);
+      prev.negativeStock += Number(row.negativeStock ?? 0);
+      byFilial.set(filialRaw, prev);
+    });
+  }
+
+  return result;
+}
+
 export interface StockSummaryParams {
   company?: string;
   filial?: string | null;

@@ -1,26 +1,24 @@
 import { NextResponse } from "next/server";
 
 import { getReportFetcher } from "@/lib/reports/registry.server";
-import { VENDAS_FATURAMENTO_ID } from "@/lib/reports/vendas-faturamento";
 import type { ReportFilters } from "@/lib/reports/types";
 
-// Pro: até 300s. A consulta reusa fetchProductsWithDetails (vendas + estoque).
+// Pro: até 300s. Algumas análises (estoque da rede inteira) varrem muitos itens.
 export const maxDuration = 300;
 
+/**
+ * Rota genérica do Gerador de Relatórios: despacha para o fetcher da análise
+ * indicada por `reportType`. Aceita o superconjunto de filtros; cada análise usa
+ * apenas o que precisa.
+ */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
+  const reportType = searchParams.get("reportType") ?? "";
   const company = searchParams.get("company") ?? undefined;
   const filial = searchParams.get("filial");
   const start = searchParams.get("start") ?? undefined;
   const end = searchParams.get("end") ?? undefined;
-
-  if (!start || !end) {
-    return NextResponse.json(
-      { error: "Parâmetros start e end são obrigatórios" },
-      { status: 400 }
-    );
-  }
 
   const grupos = searchParams.getAll("grupo").filter(Boolean);
   const linhas = searchParams.getAll("linha").filter(Boolean);
@@ -33,6 +31,12 @@ export async function GET(request: Request) {
   const produtoSearchTerm = searchParams.get("produtoSearchTerm");
   const limitParam = searchParams.get("limit");
   const limit = limitParam ? Number(limitParam) : undefined;
+  const estoquePorFilial = searchParams.get("estoquePorFilial") === "1";
+
+  const fetcher = getReportFetcher(reportType);
+  if (!fetcher) {
+    return NextResponse.json({ error: "Análise não encontrada" }, { status: 404 });
+  }
 
   const filters: ReportFilters = {
     company,
@@ -49,27 +53,21 @@ export async function GET(request: Request) {
     produtoId: produtoId || null,
     produtoSearchTerm: produtoSearchTerm || null,
     limit: Number.isFinite(limit) && (limit as number) > 0 ? limit : undefined,
+    estoquePorFilial,
   };
 
   try {
-    const fetcher = getReportFetcher(VENDAS_FATURAMENTO_ID);
-    if (!fetcher) {
-      return NextResponse.json({ error: "Análise não encontrada" }, { status: 404 });
-    }
     const result = await fetcher(filters);
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Erro ao gerar relatório de vendas por faturamento", error);
+    console.error(`Erro ao gerar relatório (${reportType})`, error);
     const details = error instanceof Error ? error.message : "Erro desconhecido";
     if (error instanceof Error && "code" in error && error.code === "ETIMEOUT") {
       return NextResponse.json(
-        { error: "Timeout: a consulta demorou demais. Reduza o período ou aplique filtros.", code: "ETIMEOUT" },
+        { error: "Timeout: a consulta demorou demais. Reduza o escopo ou aplique filtros.", code: "ETIMEOUT" },
         { status: 504 }
       );
     }
-    return NextResponse.json(
-      { error: "Erro ao gerar relatório", details },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Erro ao gerar relatório", details }, { status: 500 });
   }
 }

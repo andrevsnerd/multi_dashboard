@@ -1,3 +1,5 @@
+import type { CompanyKey } from "@/lib/config/company";
+import { companyLeadingColumns } from "./company-columns";
 import type { ReportColumnDef, ReportPresetDef, ReportTypeMeta } from "./types";
 
 export const VENDAS_FATURAMENTO_ID = "vendas-faturamento";
@@ -8,6 +10,7 @@ export const VENDAS_FATURAMENTO_ID = "vendas-faturamento";
  * `fetchVendasFaturamento` (lib/repositories/reportVendas.ts).
  */
 export const VENDAS_FATURAMENTO_COLUMNS: ReportColumnDef[] = [
+  { key: "CURVA", defaultLabel: "Curva", type: "text" },
   { key: "PRODUTO", defaultLabel: "Código", type: "text" },
   { key: "COR", defaultLabel: "Cor (cód.)", type: "text" },
   { key: "COR_DESCRICAO", defaultLabel: "Cor", type: "text" },
@@ -26,6 +29,7 @@ export const VENDAS_FATURAMENTO_COLUMNS: ReportColumnDef[] = [
   { key: "MARGEM", defaultLabel: "Margem (R$)", type: "currency" },
   { key: "MARGEM_PERC", defaultLabel: "Margem (%)", type: "percent" },
   { key: "ESTOQUE", defaultLabel: "Estoque", type: "int" },
+  { key: "ESTOQUE_TOTAL", defaultLabel: "Estoque total", type: "int" },
   { key: "PRECO_SUGERIDO", defaultLabel: "Preço sugerido", type: "currency" },
   { key: "PARTICIPACAO_PERC", defaultLabel: "Part. (%)", type: "percent" },
   { key: "PARTICIPACAO_ACUM_PERC", defaultLabel: "Part. acum. (%)", type: "percent" },
@@ -56,6 +60,27 @@ const VENDAS_FATURAMENTO_PRESETS: ReportPresetDef[] = [
     ],
   },
   {
+    id: "builtin-curva-abc",
+    name: "Curva ABC",
+    builtin: true,
+    sortBy: "FATURAMENTO",
+    sortDir: "desc",
+    // Igual ao preset de faturamento, com a coluna Curva (A/B/C) em primeiro.
+    // Regra dos 60%/90% por faturamento acumulado (mesma da tela de Curva ABC).
+    columns: [
+      col("CURVA"),
+      col("PRODUTO"),
+      col("COR_DESCRICAO"),
+      col("DESCRICAO"),
+      col("QTDE"),
+      col("FATURAMENTO"),
+      col("TICKET_MEDIO", "Preço médio"),
+      col("CUSTO_UNITARIO", "Custo unit."),
+      col("MARKUP"),
+      col("ESTOQUE"),
+    ],
+  },
+  {
     id: "builtin-margem",
     name: "Margem",
     builtin: true,
@@ -73,6 +98,24 @@ const VENDAS_FATURAMENTO_PRESETS: ReportPresetDef[] = [
     ],
   },
   {
+    id: "builtin-faturamento-estoque",
+    name: "Faturamento com estoque",
+    builtin: true,
+    sortBy: "FATURAMENTO",
+    sortDir: "desc",
+    // Visão focada em estoque: além das colunas fixas, anexa uma coluna por filial
+    // (rede inteira) automaticamente — ver `dynamicFilialStock`.
+    dynamicFilialStock: true,
+    columns: [
+      col("PRODUTO"),
+      col("COR_DESCRICAO"),
+      col("DESCRICAO"),
+      col("QTDE"),
+      col("FATURAMENTO"),
+      col("ESTOQUE_TOTAL"),
+    ],
+  },
+  {
     id: "builtin-completo",
     name: "Completo",
     builtin: true,
@@ -81,6 +124,27 @@ const VENDAS_FATURAMENTO_PRESETS: ReportPresetDef[] = [
     columns: VENDAS_FATURAMENTO_COLUMNS.map((c) => col(c.key)),
   },
 ];
+
+// Presets que recebem as colunas líderes logo no INÍCIO.
+const PRESETS_LEADING_AT_START = new Set(["builtin-faturamento", "builtin-faturamento-estoque"]);
+
+/**
+ * Presets padrão da análise, ajustados por empresa: as colunas líderes entram no
+ * começo dos presets de faturamento e logo APÓS a coluna "Curva" no preset Curva ABC.
+ */
+export function buildVendasFaturamentoPresets(companyKey: CompanyKey): ReportPresetDef[] {
+  const leading = companyLeadingColumns(companyKey);
+  return VENDAS_FATURAMENTO_PRESETS.map((preset) => {
+    if (PRESETS_LEADING_AT_START.has(preset.id)) {
+      return { ...preset, columns: [...leading, ...preset.columns] };
+    }
+    if (preset.id === "builtin-curva-abc") {
+      // Mantém CURVA em 1º; insere as colunas líderes logo depois.
+      return { ...preset, columns: [preset.columns[0], ...leading, ...preset.columns.slice(1)] };
+    }
+    return preset;
+  });
+}
 
 export const vendasFaturamentoMeta: ReportTypeMeta = {
   id: VENDAS_FATURAMENTO_ID,
