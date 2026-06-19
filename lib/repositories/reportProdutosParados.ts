@@ -1,6 +1,7 @@
 import { fetchProdutosParadosDetalhado } from "@/lib/repositories/controleEstoque";
 import { ROW_COR_FIELD } from "@/lib/reports/keys";
 import { ULTIMA_VENDA_NUNCA } from "@/lib/reports/format";
+import { applyColecaoLabels } from "@/lib/repositories/colecao";
 import type { ReportFilters, ReportResult, ReportRow } from "@/lib/reports/types";
 
 const DEFAULT_LIMIT = 5000;
@@ -85,6 +86,8 @@ export async function fetchProdutosParados(filters: ReportFilters): Promise<Repo
       ULTIMA_VENDA: nuncaVendeu ? ULTIMA_VENDA_NUNCA : d.ultimaVenda,
     };
   });
+
+  await applyColecaoLabels(filters.company, rows);
 
   return { rows, total, truncated };
 }

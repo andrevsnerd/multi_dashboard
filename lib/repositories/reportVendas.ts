@@ -4,6 +4,7 @@ import {
   type FilialStockBreakdown,
 } from "@/lib/repositories/inventory";
 import { fetchSalesTotals } from "@/lib/services/salesTotals";
+import { applyColecaoLabels } from "@/lib/repositories/colecao";
 import { resolveCompanyLive } from "@/lib/server/company-live";
 import {
   getOperationalFilials,
@@ -320,6 +321,8 @@ export async function fetchVendasFaturamento(
     { label: "Produtos Vendidos", value: roundInt(sumQuantity), format: "int" },
     { label: "Ticket Médio", value: round2(ticketMedio), format: "currency" },
   ];
+
+  await applyColecaoLabels(filters.company, rows);
 
   return { rows, total, truncated, summary, dynamicColumns };
 }

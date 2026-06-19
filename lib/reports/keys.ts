@@ -25,6 +25,9 @@ export function rawKey(produto: CorInput, code: CorInput): string {
 
 /** Campos ocultos embutidos nas linhas-base para permitir o join (nunca viram coluna). */
 export const ROW_COR_FIELD = "__cor"; // código cru da cor
+/** Partes da coleção (a tela mostra "DESC (COD)"; o XLSX separa em duas colunas). */
+export const ROW_COLECAO_DESC_FIELD = "__colecaoDesc";
+export const ROW_COLECAO_COD_FIELD = "__colecaoCod";
 
 /** Dias decorridos desde uma data ISO até `nowMs` (passado pelo chamador). null se sem data. */
 export function diasDesde(iso: string | null | undefined, nowMs: number): number | null {

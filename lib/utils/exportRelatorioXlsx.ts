@@ -1,7 +1,8 @@
 import * as XLSX from "xlsx";
 
-import type { ColumnType, ReportPresetColumn, ReportRow } from "@/lib/reports/types";
+import type { ColumnType, ReportCellValue, ReportPresetColumn, ReportRow } from "@/lib/reports/types";
 import { formatData, formatDataVenda, formatDiasParado } from "@/lib/reports/format";
+import { ROW_COLECAO_COD_FIELD, ROW_COLECAO_DESC_FIELD } from "@/lib/reports/keys";
 
 function safeFilenamePart(s: string): string {
   return s.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 48);
@@ -41,23 +42,47 @@ export function exportRelatorioXlsx(
   }
 
   const types = options.columnTypes ?? {};
-  // Cada linha vira um objeto na ordem do preset, com a chave = rótulo exibido.
-  const orderedRows = rows.map((row) => {
-    const out: Record<string, string | number | null> = {};
-    for (const colDef of columns) {
-      const label = colDef.label || colDef.key;
-      const t = types[colDef.key];
-      // Apenas estas duas colunas precisam virar texto (ex.: "Nunca vendeu");
-      // valores numéricos (currency/percent/int) seguem crus — melhor p/ cálculo no Excel.
-      if (t === "diasParado") out[label] = formatDiasParado(row[colDef.key]);
-      else if (t === "dataVenda") out[label] = formatDataVenda(row[colDef.key]);
-      else if (t === "date") out[label] = formatData(row[colDef.key]);
-      else out[label] = row[colDef.key] ?? "";
+
+  // Colunas de saída (label + extrator). COLECAO ("DESC (COD)" na tela) vira DUAS
+  // colunas no XLSX: descrição e código separados.
+  type OutCol = { label: string; get: (row: ReportRow) => ReportCellValue };
+  const outCols: OutCol[] = [];
+  for (const colDef of columns) {
+    const label = colDef.label || colDef.key;
+    const t = types[colDef.key];
+
+    if (colDef.key === "COLECAO") {
+      outCols.push({
+        label,
+        get: (row) => (row[ROW_COLECAO_DESC_FIELD] ?? row.COLECAO ?? "") as ReportCellValue,
+      });
+      outCols.push({
+        label: "Cód. coleção",
+        get: (row) => (row[ROW_COLECAO_COD_FIELD] ?? "") as ReportCellValue,
+      });
+      continue;
     }
+
+    // Só diasParado/dataVenda/date viram texto; números seguem crus (melhor p/ Excel).
+    const get =
+      t === "diasParado"
+        ? (row: ReportRow) => formatDiasParado(row[colDef.key])
+        : t === "dataVenda"
+          ? (row: ReportRow) => formatDataVenda(row[colDef.key])
+          : t === "date"
+            ? (row: ReportRow) => formatData(row[colDef.key])
+            : (row: ReportRow) => row[colDef.key] ?? "";
+    outCols.push({ label, get });
+  }
+
+  // Cada linha vira um objeto na ordem definida, com a chave = rótulo da coluna de saída.
+  const orderedRows = rows.map((row) => {
+    const out: Record<string, ReportCellValue> = {};
+    for (const c of outCols) out[c.label] = c.get(row);
     return out;
   });
 
-  const header = columns.map((c) => c.label || c.key);
+  const header = outCols.map((c) => c.label);
   const worksheet = XLSX.utils.json_to_sheet(orderedRows, { header });
   const workbook = XLSX.utils.book_new();
   const sheetName = (options.sheetName ?? "Relatório").slice(0, 31);

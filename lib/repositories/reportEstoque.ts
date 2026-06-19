@@ -6,6 +6,7 @@ import {
   compareFilialDisplayOrder,
 } from "@/lib/config/company";
 import { ROW_COR_FIELD } from "@/lib/reports/keys";
+import { applyColecaoLabels } from "@/lib/repositories/colecao";
 import type {
   ReportColumnDef,
   ReportFilters,
@@ -157,6 +158,8 @@ export async function fetchEstoqueRede(filters: ReportFilters): Promise<ReportRe
     }
     return row;
   });
+
+  await applyColecaoLabels(filters.company, rows);
 
   return { rows, total, truncated, dynamicColumns, summary };
 }

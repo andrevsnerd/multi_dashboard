@@ -20,6 +20,7 @@ export const VENDAS_FATURAMENTO_COLUMNS: ReportColumnDef[] = [
   { key: "LINHA", defaultLabel: "Linha", type: "text" },
   { key: "TIPO", defaultLabel: "Tipo", type: "text" },
   { key: "GRADE", defaultLabel: "Grade", type: "text" },
+  { key: "COLECAO", defaultLabel: "Coleção", type: "text" },
   { key: "QTDE", defaultLabel: "Qtde", type: "int" },
   { key: "FATURAMENTO", defaultLabel: "Faturamento", type: "currency" },
   { key: "TICKET_MEDIO", defaultLabel: "Preço médio", type: "currency" },

@@ -15,6 +15,7 @@ export const ESTOQUE_REDE_COLUMNS: ReportColumnDef[] = [
   { key: "LINHA", defaultLabel: "Linha", type: "text" },
   { key: "SUBGRUPO", defaultLabel: "Subgrupo", type: "text" },
   { key: "GRADE", defaultLabel: "Grade", type: "text" },
+  { key: "COLECAO", defaultLabel: "Coleção", type: "text" },
   { key: "TIPO", defaultLabel: "Tipo", type: "text" },
   { key: "COR", defaultLabel: "Cor", type: "text" },
   { key: "DESCRICAO", defaultLabel: "Descrição", type: "text" },

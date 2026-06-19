@@ -3,6 +3,7 @@ import {
   type EstoqueRedeItemRow,
 } from "@/lib/repositories/controleEstoque";
 import { diasDesde, ROW_COR_FIELD } from "@/lib/reports/keys";
+import { applyColecaoLabels } from "@/lib/repositories/colecao";
 import type { ReportFilters, ReportResult, ReportRow } from "@/lib/reports/types";
 
 const DEFAULT_LIMIT = 5000;
@@ -66,6 +67,8 @@ export async function fetchProdutosCadastro(filters: ReportFilters): Promise<Rep
       DIAS_CADASTRO: dias == null ? null : roundInt(dias),
     };
   });
+
+  await applyColecaoLabels(filters.company, rows);
 
   return { rows, total, truncated };
 }

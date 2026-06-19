@@ -15,6 +15,7 @@ export function companyLeadingColumns(companyKey: CompanyKey): ReportPresetColum
       { key: "LINHA", label: "Linha" },
       { key: "SUBGRUPO", label: "Subgrupo" },
       { key: "GRADE", label: "Grade" },
+      { key: "COLECAO", label: "Coleção" },
     ];
   }
   return [{ key: "GRUPO", label: "Grupo" }];
