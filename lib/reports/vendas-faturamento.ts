@@ -121,6 +121,25 @@ const VENDAS_FATURAMENTO_PRESETS: ReportPresetDef[] = [
     ],
   },
   {
+    id: "builtin-vendas-estoque-filiais",
+    name: "Vendas + estoque por filial",
+    builtin: true,
+    sortBy: "FATURAMENTO",
+    sortDir: "desc",
+    // Cada item vendido seguido de TODAS as colunas de estoque por filial (rede inteira),
+    // anexadas automaticamente após as fixas — ver `dynamicFilialStock`.
+    dynamicFilialStock: true,
+    columns: [
+      col("PRODUTO"),
+      col("COR_DESCRICAO"),
+      col("DESCRICAO"),
+      col("QTDE"),
+      col("FATURAMENTO"),
+      col("TICKET_MEDIO", "Preço médio"),
+      col("ESTOQUE_TOTAL"),
+    ],
+  },
+  {
     id: "builtin-projecao-estoque",
     name: "Projeção e estoque",
     builtin: true,
@@ -172,6 +191,7 @@ const VENDAS_FATURAMENTO_PRESETS: ReportPresetDef[] = [
 const PRESETS_LEADING_AT_START = new Set([
   "builtin-faturamento",
   "builtin-faturamento-estoque",
+  "builtin-vendas-estoque-filiais",
   "builtin-projecao-estoque",
 ]);
 

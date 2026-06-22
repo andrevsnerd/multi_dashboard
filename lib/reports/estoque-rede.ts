@@ -80,7 +80,7 @@ export const estoqueRedeMeta: ReportTypeMeta = {
   // Sem período (estoque é o saldo atual) e sem filtro de filial (mostra todas).
   // "diasParado": filtra por defasagem de venda; o backend calcula a defasagem mesmo que
   // a coluna Dias parado não esteja habilitada.
-  supportedFilters: ["nome", "cor", "linha", "subgrupo", "grupo", "grade", "tipo", "diasParado"],
+  supportedFilters: ["nome", "cor", "linha", "subgrupo", "grupo", "grade", "tipo", "colecao", "diasParado"],
   columns: ESTOQUE_REDE_COLUMNS,
   defaultPresets: ESTOQUE_REDE_PRESETS,
 };
