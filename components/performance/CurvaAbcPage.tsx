@@ -1362,13 +1362,13 @@ async function buildCompraIdealPorFilialRowsCurvaAbc(
       onFilialDone?.();
     }
 
-    const byMetricKey = new Map<string, number>();
+    const byMetricKey = new Map<string, { ci: number; estoque: number }>();
     for (const plan of plans) {
       const memberMetrics = plan.members
         .map((member) => allMetricRows[buildControleEstoqueItemKey(member.produto, member.corProduto)])
         .filter((m): m is ControleEstoqueItemMetricas => Boolean(m));
       if (memberMetrics.length === 0) {
-        byMetricKey.set(plan.metricKey, 0);
+        byMetricKey.set(plan.metricKey, { ci: 0, estoque: 0 });
         continue;
       }
       const merged =
@@ -1378,7 +1378,10 @@ async function buildCompraIdealPorFilialRowsCurvaAbc(
         getCompraTransitoEntries(comprasTransitoIndex, plan.row.produto, porCor ? (plan.row.cor ?? null) : null),
         { linha: plan.row.linha, subgrupo: plan.row.subgrupo }
       );
-      byMetricKey.set(plan.metricKey, Math.max(0, ideal.compraIdeal));
+      byMetricKey.set(plan.metricKey, {
+        ci: Math.max(0, ideal.compraIdeal),
+        estoque: Math.max(0, Math.round(merged.resumo.estoqueTotal ?? 0)),
+      });
     }
     return byMetricKey;
   });
@@ -1398,14 +1401,19 @@ async function buildCompraIdealPorFilialRowsCurvaAbc(
       CUSTO_UNIT: Math.round((p.custo ?? 0) * 100) / 100,
       VENDAS_PERIODO: Math.round(p.vendas * 100) / 100,
       QTDE_PERIODO: p.qtde,
-      ESTOQUE_REDE: p.estoque ?? 0,
+      // Placeholder; preenchido abaixo com a soma do estoque por filial (rede).
+      ESTOQUE_REDE: 0,
     };
     let totalRede = 0;
+    let estoqueRede = 0;
     filiais.forEach((_, idx) => {
-      const qtd = idealPorFilial[idx]?.get(plan.metricKey) ?? 0;
+      const cell = idealPorFilial[idx]?.get(plan.metricKey);
+      const qtd = cell?.ci ?? 0;
       row[colunasFiliais[idx]] = qtd;
       totalRede += qtd;
+      estoqueRede += cell?.estoque ?? 0;
     });
+    row.ESTOQUE_REDE = estoqueRede;
     row["TOTAL REDE"] = totalRede;
     return row;
   });
@@ -1444,7 +1452,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exportingPdf, setExportingPdf] = useState(false);
-  const [compraIdealFilialProgresso, setCompraIdealFilialProgresso] = useState<{ feito: number; total: number } | null>(null);
+  const [compraIdealFilialProgresso, setCompraIdealFilialProgresso] = useState<{ feito: number; total: number; fase: "lendo" | "gerando" } | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubgrupos, setSelectedSubgrupos] = useState<string[]>([]);
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
@@ -2322,31 +2330,59 @@ const handleBadgeClick = (cat: string) => {
 
     if (targets.length === 0) return;
 
-    setCompraIdealFilialProgresso({ feito: 0, total: targets.length });
+    setCompraIdealFilialProgresso({ feito: 0, total: targets.length, fase: "lendo" });
     try {
-      // Universo COMPLETO da rede, sem o TOP da fonte (limit=0) e sempre todas as filiais
-      // (ignora a loja selecionada na tela). Garante que itens de cauda relevantes para
-      // lojas específicas — que cairiam fora do top-N agregado — entrem no export.
-      const universoParams = new URLSearchParams({
-        company: companyKey,
-        month: String(selectedMonth),
-        year: String(selectedYear),
-        start: formatDateForQuery(range.startDate),
-        end: formatDateForQuery(range.endDate),
-        compare: comparisonMode,
-        limit: "0",
-      });
-      if (porCor) universoParams.set("porCor", "1");
-      if (companyKey === "nerd" && filtrarEletronicos) universoParams.append("linha", "ELETRONICOS");
+      // Universo = UNIÃO das listas de curva ABC de cada loja (cada uma com seu próprio TOP
+      // normal), e não o universo bruto da rede. Assim um item que entra na curva ABC de
+      // QUALQUER loja aparece na lista agregada — mesmo que não ranqueie no total geral —,
+      // sem inflar com a cauda profunda da rede inteira.
+      const buildUniversoParams = (filial: string) => {
+        const p = new URLSearchParams({
+          company: companyKey,
+          month: String(selectedMonth),
+          year: String(selectedYear),
+          start: formatDateForQuery(range.startDate),
+          end: formatDateForQuery(range.endDate),
+          compare: comparisonMode,
+          filial,
+        });
+        if (porCor) p.set("porCor", "1");
+        if (companyKey === "nerd" && filtrarEletronicos) p.append("linha", "ELETRONICOS");
+        return p;
+      };
 
-      const universoRes = await fetch(`/api/curva-abc?${universoParams}`, { cache: "no-store" });
-      const universoJson = (await universoRes.json()) as FilialData & { error?: string };
-      if (!universoRes.ok || universoJson.error) {
-        throw new Error(universoJson.error ?? "Erro ao carregar o universo de itens");
+      const listasPorLoja = await mapWithConcurrency(targets, 4, async (f) => {
+        try {
+          const res = await fetch(`/api/curva-abc?${buildUniversoParams(f.filial)}`, { cache: "no-store" });
+          const json = (await res.json()) as FilialData & { error?: string };
+          if (!res.ok || json.error) return [];
+          return json.produtos ?? [];
+        } catch {
+          return [];
+        } finally {
+          setCompraIdealFilialProgresso((prev) => (prev ? { ...prev, feito: prev.feito + 1 } : prev));
+        }
+      });
+
+      // Dedupe por chave de métrica, somando vendas/qtde das lojas onde o item aparece
+      // (dá o total de período da rede só para os itens que entraram em alguma loja).
+      const universoMap = new Map<string, ProdutoRow>();
+      for (const lista of listasPorLoja) {
+        for (const prod of lista) {
+          const key = buildCurvaAbcMetricKey(prod.produto, prod.cor ?? null, porCor);
+          const existing = universoMap.get(key);
+          if (existing) {
+            existing.vendas += prod.vendas;
+            existing.qtde += prod.qtde;
+          } else {
+            universoMap.set(key, { ...prod });
+          }
+        }
       }
-      const universo = calcularCurvas(universoJson.produtos ?? []);
+      const universo = calcularCurvas(Array.from(universoMap.values()));
       if (universo.length === 0) return;
 
+      setCompraIdealFilialProgresso({ feito: 0, total: targets.length, fase: "gerando" });
       const { rows, colunasFiliais } = await buildCompraIdealPorFilialRowsCurvaAbc(
         companyKey,
         universo,
@@ -2361,7 +2397,7 @@ const handleBadgeClick = (cat: string) => {
         companyName: cfg.name,
         listaNome: `Curva ABC ${periodo}`,
         filtroAplicado:
-          `Todas as lojas · universo completo (sem corte)` +
+          `Todas as lojas · união das curvas ABC por loja` +
           (porCor ? " · por cor" : "") +
           (companyKey === "nerd" && filtrarEletronicos ? " · só ELETRONICOS" : ""),
         colunasFiliais,
@@ -2535,7 +2571,7 @@ const handleBadgeClick = (cat: string) => {
                 onExportCompraIdealFilial={() => { void handleExportCompraIdealPorFilial(); }}
                 compraIdealFilialLabel={
                   compraIdealFilialProgresso
-                    ? `Gerando… ${compraIdealFilialProgresso.feito}/${compraIdealFilialProgresso.total} lojas`
+                    ? `${compraIdealFilialProgresso.fase === "lendo" ? "Lendo lojas" : "Gerando"}… ${compraIdealFilialProgresso.feito}/${compraIdealFilialProgresso.total}`
                     : null
                 }
               />
