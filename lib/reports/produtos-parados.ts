@@ -10,7 +10,8 @@ export const PRODUTOS_PARADOS_ID = "produtos-parados";
  */
 export const PRODUTOS_PARADOS_COLUMNS: ReportColumnDef[] = [
   { key: "PRODUTO", defaultLabel: "Código", type: "text" },
-  { key: "CODIGO_BARRA", defaultLabel: "Cód. barra", type: "text" },
+  // "Código de barra" é anexado automaticamente no fim de toda análise (runReport),
+  // com o menor código por produto×cor — por isso não fica no catálogo aqui.
   { key: "GRUPO", defaultLabel: "Grupo", type: "text" },
   { key: "LINHA", defaultLabel: "Linha", type: "text" },
   { key: "SUBGRUPO", defaultLabel: "Subgrupo", type: "text" },

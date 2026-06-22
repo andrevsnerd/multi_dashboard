@@ -4,10 +4,11 @@ import { fetchVendasFaturamento } from "@/lib/repositories/reportVendas";
 import { fetchEstoqueRede } from "@/lib/repositories/reportEstoque";
 import { fetchProdutosParados } from "@/lib/repositories/reportProdutosParados";
 import { fetchProdutosCadastro } from "@/lib/repositories/reportProdutosCadastro";
+import { fetchMenorCodigoBarra } from "@/lib/repositories/products";
 import { runEnricher } from "./enrich.server";
 import { canonicalKey, ROW_COR_FIELD } from "./keys";
 import { NATIVE_SOURCE, type SourceId } from "./column-sources";
-import type { ReportFilters, ReportResult } from "./types";
+import type { ReportColumnDef, ReportFilters, ReportResult } from "./types";
 import { VENDAS_FATURAMENTO_ID } from "./vendas-faturamento";
 import { ESTOQUE_REDE_ID } from "./estoque-rede";
 import { PRODUTOS_PARADOS_ID } from "./produtos-parados";
@@ -80,5 +81,44 @@ export async function runReport(
     result.total = result.rows.length;
   }
 
+  // Coluna "Código de barra" no FIM de toda análise: o menor código (interno, não o EAN
+  // grande), por produto×cor. Anexada como coluna dinâmica (após as colunas de filial),
+  // então aparece na tabela e no export de qualquer preset.
+  await appendCodigoBarra(result);
+
   return result;
+}
+
+const CODIGO_BARRA_COL: ReportColumnDef = {
+  key: "CODIGO_BARRA",
+  defaultLabel: "Código de barra",
+  type: "text",
+};
+
+/** Preenche row.CODIGO_BARRA (menor código por produto×cor) e registra a coluna dinâmica. */
+async function appendCodigoBarra(result: ReportResult): Promise<void> {
+  if (result.rows.length === 0) return;
+
+  const produtos = result.rows.map((r) => String(r.PRODUTO ?? "").trim()).filter(Boolean);
+  const codigos = await fetchMenorCodigoBarra(produtos).catch(() => []);
+
+  // Mapa por chave canônica (produto×cor) — tolerante a zero à esquerda na cor, igual aos
+  // enrichers. Fallback por produto cobre linhas cuja cor não casa (ex.: cor vazia).
+  const byKey = new Map<string, string>();
+  const byProduto = new Map<string, string>();
+  for (const c of codigos) {
+    if (!c.codigoBarra) continue;
+    const k = canonicalKey(c.produto, c.cor);
+    if (!byKey.has(k)) byKey.set(k, c.codigoBarra);
+    if (!byProduto.has(c.produto)) byProduto.set(c.produto, c.codigoBarra);
+  }
+
+  for (const row of result.rows) {
+    const produto = String(row.PRODUTO ?? "").trim();
+    const k = canonicalKey(row.PRODUTO, row[ROW_COR_FIELD]);
+    row.CODIGO_BARRA = byKey.get(k) ?? byProduto.get(produto) ?? "";
+  }
+
+  // Coluna dinâmica por ÚLTIMO (depois das colunas de filial, se houver).
+  result.dynamicColumns = [...(result.dynamicColumns ?? []), CODIGO_BARRA_COL];
 }

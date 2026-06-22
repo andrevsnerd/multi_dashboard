@@ -398,21 +398,22 @@ export default function GeradorRelatoriosPage({
       setTruncated(Boolean(json.truncated));
       setGeneratedOnce(true);
 
-      // Colunas dinâmicas de estoque por filial: mescla no catálogo e anexa às
-      // colunas habilitadas (após as fixas), evitando duplicatas.
+      // Colunas dinâmicas (estoque por filial + "Código de barra"): mescla no catálogo e
+      // (re)anexa ao FIM das colunas habilitadas, na ordem que o backend mandou. Removemos
+      // antes as dinâmicas já anexadas (por regra estável de chave) p/ não duplicar nem
+      // desordenar entre gerações.
       const dyn: ReportColumnDef[] = Array.isArray(json.dynamicColumns) ? json.dynamicColumns : [];
       setDynamicColumns(dyn);
-      if (wantsFilialStock && dyn.length > 0) {
-        setWorkingColumns((cols) => {
-          const existing = new Set(cols.map((c) => c.key));
-          const appended = dyn
-            .filter((d) => !existing.has(d.key))
-            .map((d) => ({ key: d.key, label: d.defaultLabel, enabled: true }));
-          return [...cols, ...appended];
-        });
-      } else {
-        setWorkingColumns((cols) => cols.filter((c) => !c.key.startsWith(FILIAL_COL_PREFIX)));
-      }
+      setWorkingColumns((cols) => {
+        const stripped = cols.filter(
+          (c) => c.key !== "CODIGO_BARRA" && !c.key.startsWith(FILIAL_COL_PREFIX)
+        );
+        const existing = new Set(stripped.map((c) => c.key));
+        const appended = dyn
+          .filter((d) => !existing.has(d.key))
+          .map((d) => ({ key: d.key, label: d.defaultLabel, enabled: true }));
+        return [...stripped, ...appended];
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao gerar relatório");
       setRows([]);

@@ -2657,3 +2657,72 @@ export async function fetchProdutosCustoPrecoMestre(
 
   return out;
 }
+
+/** Código de barra "menor" (interno) por produto×cor, vindo de PRODUTOS_BARRA. */
+export interface CodigoBarraPorProdutoCor {
+  produto: string;
+  /** COR_PRODUTO bruto do ERP ('' quando sem cor). */
+  cor: string;
+  codigoBarra: string;
+}
+
+/**
+ * Retorna o código de barra preferencial (o MENOR/interno, não o EAN grande) por
+ * produto×cor. Replica o ranking canônico do export oficial (exportar_todos_relatorios.py):
+ * TIPO_COD_BAR=3 → códigos curtos (<=8) → TIPO_COD_BAR=1 → resto; desempate por data e código.
+ * Busca em lotes (IN tem limite de parâmetros no SQL Server).
+ */
+export async function fetchMenorCodigoBarra(
+  produtos: string[]
+): Promise<CodigoBarraPorProdutoCor[]> {
+  const ids = [...new Set(produtos.map((p) => (p ?? '').trim()).filter(Boolean))];
+  const out: CodigoBarraPorProdutoCor[] = [];
+  if (ids.length === 0) return out;
+
+  const CHUNK = 1000;
+  for (let start = 0; start < ids.length; start += CHUNK) {
+    const chunk = ids.slice(start, start + CHUNK);
+    await withRequest(async (request) => {
+      chunk.forEach((id, i) => request.input(`cb${i}`, sql.VarChar, id));
+      const placeholders = chunk.map((_, i) => `@cb${i}`).join(', ');
+      const query = `
+        ;WITH Ranked AS (
+          SELECT
+            LTRIM(RTRIM(pb.PRODUTO)) AS produto,
+            ISNULL(LTRIM(RTRIM(pb.COR_PRODUTO)), '') AS cor,
+            LTRIM(RTRIM(pb.CODIGO_BARRA)) AS codigoBarra,
+            ROW_NUMBER() OVER (
+              PARTITION BY pb.PRODUTO, ISNULL(pb.COR_PRODUTO, '')
+              ORDER BY
+                CASE
+                  WHEN LTRIM(RTRIM(CAST(pb.TIPO_COD_BAR AS VARCHAR(10)))) = '3' THEN 0
+                  WHEN LEN(LTRIM(RTRIM(pb.CODIGO_BARRA))) <= 8 THEN 1
+                  WHEN LTRIM(RTRIM(CAST(pb.TIPO_COD_BAR AS VARCHAR(10)))) = '1' THEN 2
+                  ELSE 3
+                END,
+                pb.DATA_PARA_TRANSFERENCIA DESC,
+                pb.CODIGO_BARRA
+            ) AS rn
+          FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+          WHERE ISNULL(pb.INATIVO, 0) = 0
+            AND pb.CODIGO_BARRA IS NOT NULL
+            AND LTRIM(RTRIM(pb.CODIGO_BARRA)) <> ''
+            AND pb.PRODUTO IN (${placeholders})
+        )
+        SELECT produto, cor, codigoBarra
+        FROM Ranked
+        WHERE rn = 1
+      `;
+      const result = await request.query<{ produto: string; cor: string; codigoBarra: string }>(query);
+      for (const r of result.recordset) {
+        out.push({
+          produto: (r.produto ?? '').trim(),
+          cor: (r.cor ?? '').trim(),
+          codigoBarra: (r.codigoBarra ?? '').trim(),
+        });
+      }
+    });
+  }
+
+  return out;
+}
