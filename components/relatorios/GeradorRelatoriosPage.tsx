@@ -358,7 +358,8 @@ export default function GeradorRelatoriosPage({
       params.set("produtoSearchTerm", produtoQuery.trim());
     }
     const diasNum = Number(diasParadoValor.trim());
-    if (diasParadoValor.trim() !== "" && Number.isFinite(diasNum) && diasNum >= 0) {
+    const suportaDiasParado = meta?.supportedFilters.includes("diasParado" as never) ?? false;
+    if (suportaDiasParado && diasParadoValor.trim() !== "" && Number.isFinite(diasNum) && diasNum >= 0) {
       params.set("diasParadoValor", String(Math.round(diasNum)));
       params.set("diasParadoModo", diasParadoModo);
     }
@@ -366,7 +367,7 @@ export default function GeradorRelatoriosPage({
   }, [
     companyKey, filial, startStr, endStr, grupos, linhas, subgrupos, grades,
     colecoes, cores, tipos, produtoSelected, produtoQuery,
-    diasParadoValor, diasParadoModo,
+    diasParadoValor, diasParadoModo, meta,
   ]);
 
   const handleGenerate = useCallback(async () => {

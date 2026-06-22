@@ -2596,3 +2596,64 @@ export async function fetchAvailableTipos({
     }
   });
 }
+
+/** Custo de reposição + preço sugerido por produto, direto da tabela mestre PRODUTOS. */
+export interface ProdutoCustoPrecoMestre {
+  /** CUSTO_REPOSICAO1 (custo de reposição atual do produto). */
+  custo: number;
+  /** PRECO_REPOSICAO_1 (preço de revenda sugerido); null quando ausente/zero. */
+  precoSugerido: number | null;
+}
+
+/**
+ * Busca custo e preço sugerido de produtos diretamente da tabela mestre PRODUTOS
+ * (`CUSTO_REPOSICAO1` e `PRECO_REPOSICAO_1`), independente de venda. Esses dados
+ * existem para todo produto cadastrado — por isso são usados em análises de estoque,
+ * onde o custo/preço vindo das vendas zera para itens que não venderam no período.
+ * Valores são por PRODUTO (a rede valoriza estoque no nível do produto, não da cor).
+ * Faz busca em lotes (IN tem limite de parâmetros no SQL Server).
+ */
+export async function fetchProdutosCustoPrecoMestre(
+  produtos: string[]
+): Promise<Map<string, ProdutoCustoPrecoMestre>> {
+  const ids = [...new Set(produtos.map((p) => (p ?? '').trim()).filter(Boolean))];
+  const out = new Map<string, ProdutoCustoPrecoMestre>();
+  if (ids.length === 0) return out;
+
+  const CHUNK = 1000;
+  for (let start = 0; start < ids.length; start += CHUNK) {
+    const chunk = ids.slice(start, start + CHUNK);
+    await withRequest(async (request) => {
+      chunk.forEach((id, i) => request.input(`cpm${i}`, sql.VarChar, id));
+      const placeholders = chunk.map((_, i) => `@cpm${i}`).join(', ');
+      const query = `
+        SELECT
+          p.PRODUTO AS produto,
+          MAX(ISNULL(CAST(p.CUSTO_REPOSICAO1 AS DECIMAL(18, 2)), 0)) AS custo,
+          MAX(CASE
+            WHEN p.PRECO_REPOSICAO_1 IS NULL OR p.PRECO_REPOSICAO_1 = 0 THEN NULL
+            ELSE CAST(p.PRECO_REPOSICAO_1 AS DECIMAL(18, 2))
+          END) AS precoSugerido
+        FROM PRODUTOS p WITH (NOLOCK)
+        WHERE p.PRODUTO IN (${placeholders})
+        GROUP BY p.PRODUTO
+      `;
+      const result = await request.query<{
+        produto: string;
+        custo: number | null;
+        precoSugerido: number | null;
+      }>(query);
+      for (const r of result.recordset) {
+        const produto = (r.produto ?? '').trim();
+        if (!produto) continue;
+        out.set(produto, {
+          custo: Number(r.custo ?? 0) || 0,
+          precoSugerido:
+            r.precoSugerido != null && Number(r.precoSugerido) > 0 ? Number(r.precoSugerido) : null,
+        });
+      }
+    });
+  }
+
+  return out;
+}

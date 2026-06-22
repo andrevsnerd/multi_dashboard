@@ -1,6 +1,6 @@
 import "server-only";
 
-import { fetchProductsWithDetails } from "@/lib/repositories/products";
+import { fetchProductsWithDetails, fetchProdutosCustoPrecoMestre } from "@/lib/repositories/products";
 import { fetchMultipleProductsStockByColor } from "@/lib/repositories/inventory";
 import {
   fetchProdutosParadosDetalhado,
@@ -27,7 +27,10 @@ function roundInt(v: number | null | undefined): number {
 }
 
 /** Métricas de vendas por produto × cor (faturamento, qtde, custo, margem…). */
-async function enrichVendas(filters: ReportFilters): Promise<EnrichResult> {
+async function enrichVendas(
+  filters: ReportFilters,
+  baseRows: ReportRow[]
+): Promise<EnrichResult> {
   const details = await fetchProductsWithDetails({
     company: filters.company,
     range: { start: filters.start, end: filters.end },
@@ -59,6 +62,33 @@ async function enrichVendas(filters: ReportFilters): Promise<EnrichResult> {
       PRECO_SUGERIDO: d.suggestedPrice != null ? round2(d.suggestedPrice) : null,
     });
   }
+
+  // Custo e preço sugerido vêm da tabela MESTRE (PRODUTOS), não das vendas: na base de
+  // estoque/parados/cadastro a maioria dos itens não vendeu no período e zerava. Esses
+  // dados existem para todo produto cadastrado, então preenchemos sempre por produto.
+  const master = await fetchProdutosCustoPrecoMestre(
+    baseRows.map((r) => String(r.PRODUTO ?? "").trim())
+  );
+  for (const row of baseRows) {
+    const produto = String(row.PRODUTO ?? "").trim();
+    const m = master.get(produto);
+    if (!m) continue;
+    const key = canonicalKey(produto, row[ROW_COR_FIELD]);
+    const existing = byKey.get(key);
+    if (existing) {
+      // Vendeu: mantém o custo realizado (margem/markup dependem dele) e só completa
+      // o que veio zerado; preço sugerido é atributo de cadastro → sempre do mestre.
+      if (m.precoSugerido != null) existing.PRECO_SUGERIDO = m.precoSugerido;
+      if (!(Number(existing.CUSTO_UNITARIO ?? 0) > 0) && m.custo > 0) {
+        existing.CUSTO_UNITARIO = round2(m.custo);
+        existing.CUSTO_TOTAL = round2(m.custo * Number(existing.QTDE ?? 0));
+      }
+    } else {
+      // Não vendeu no período: custo/preço do mestre; demais métricas ficam no default 0.
+      byKey.set(key, { CUSTO_UNITARIO: round2(m.custo), PRECO_SUGERIDO: m.precoSugerido });
+    }
+  }
+
   // Produto da base sem venda no período → métricas 0 (em vez de vazio).
   const defaults: Partial<ReportRow> = {
     QTDE: 0,
@@ -157,7 +187,7 @@ export async function runEnricher(
   filters: ReportFilters,
   baseRows: ReportRow[]
 ): Promise<EnrichResult> {
-  if (source === "vendas") return enrichVendas(filters);
+  if (source === "vendas") return enrichVendas(filters, baseRows);
   if (source === "parados") return enrichParados(filters);
   if (source === "cadastro") return enrichCadastro(filters);
   return enrichEstoque(filters, baseRows);

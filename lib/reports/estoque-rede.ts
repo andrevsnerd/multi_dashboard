@@ -39,6 +39,28 @@ const ESTOQUE_REDE_PRESETS: ReportPresetDef[] = [
     dynamicFilialStock: true,
     columns: [col("PRODUTO"), col("COR"), col("DESCRICAO"), col("ESTOQUE_TOTAL")],
   },
+  {
+    // Estoque por filial + colunas de custo/preço (mestre), parados e cadastro.
+    // Permite ver quais produtos estão parados e em quais filiais o estoque está.
+    id: "builtin-estoque-parados-filial",
+    name: "Parados por filial (custo/preço)",
+    builtin: true,
+    sortBy: "DIAS_PARADO",
+    sortDir: "desc",
+    dynamicFilialStock: true,
+    columns: [
+      col("PRODUTO"),
+      col("COR"),
+      col("DESCRICAO"),
+      col("ESTOQUE_TOTAL"),
+      col("CUSTO_UNITARIO", "Custo unit."),
+      col("CUSTO_TOTAL", "Custo total"),
+      col("PRECO_SUGERIDO", "Preço sugerido"),
+      col("DIAS_PARADO", "Dias parado"),
+      col("ULTIMA_VENDA", "Última venda"),
+      col("DATA_CADASTRO", "Data cadastro"),
+    ],
+  },
 ];
 
 /** Presets ajustados por empresa: colunas líderes (Grupo / Linha+Subgrupo+Grade) no início. */
@@ -56,7 +78,9 @@ export const estoqueRedeMeta: ReportTypeMeta = {
   description:
     "Estoque de todos os produtos (por produto × cor) da rede, com uma coluna por filial e o estoque total. Mesmo escopo da Estoque Consulta (saldos negativos só aparecem quando a filial está totalmente negativa).",
   // Sem período (estoque é o saldo atual) e sem filtro de filial (mostra todas).
-  supportedFilters: ["nome", "cor", "linha", "subgrupo", "grupo", "grade", "tipo"],
+  // "diasParado": filtra por defasagem de venda; o backend calcula a defasagem mesmo que
+  // a coluna Dias parado não esteja habilitada.
+  supportedFilters: ["nome", "cor", "linha", "subgrupo", "grupo", "grade", "tipo", "diasParado"],
   columns: ESTOQUE_REDE_COLUMNS,
   defaultPresets: ESTOQUE_REDE_PRESETS,
 };
