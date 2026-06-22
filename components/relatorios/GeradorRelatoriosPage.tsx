@@ -134,6 +134,8 @@ export default function GeradorRelatoriosPage({
   // Filtro opcional de dias parado (análise Produtos Parados): valor + modo.
   const [diasParadoValor, setDiasParadoValor] = useState<string>("");
   const [diasParadoModo, setDiasParadoModo] = useState<"lte" | "gte">("gte");
+  const [incluirZerados, setIncluirZerados] = useState(false);
+  const [incluirNegativos, setIncluirNegativos] = useState(false);
 
   // Opções dinâmicas
   const [optGrupos, setOptGrupos] = useState<string[]>([]);
@@ -363,11 +365,14 @@ export default function GeradorRelatoriosPage({
       params.set("diasParadoValor", String(Math.round(diasNum)));
       params.set("diasParadoModo", diasParadoModo);
     }
+    const suportaSaldo = meta?.supportedFilters.includes("saldoEstoque" as never) ?? false;
+    if (suportaSaldo && incluirZerados) params.set("incluirZerados", "1");
+    if (suportaSaldo && incluirNegativos) params.set("incluirNegativos", "1");
     return params.toString();
   }, [
     companyKey, filial, startStr, endStr, grupos, linhas, subgrupos, grades,
     colecoes, cores, tipos, produtoSelected, produtoQuery,
-    diasParadoValor, diasParadoModo, meta,
+    diasParadoValor, diasParadoModo, incluirZerados, incluirNegativos, meta,
   ]);
 
   const handleGenerate = useCallback(async () => {
@@ -786,6 +791,29 @@ export default function GeradorRelatoriosPage({
                     ×
                   </button>
                 )}
+              </div>
+            </div>
+          )}
+          {supports("saldoEstoque") && (
+            <div className={styles.searchField}>
+              <label className={styles.fieldLabel}>Saldo (opcional)</label>
+              <div className={styles.saldoRow}>
+                <label className={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={incluirZerados}
+                    onChange={(e) => setIncluirZerados(e.target.checked)}
+                  />
+                  Incluir zerados
+                </label>
+                <label className={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={incluirNegativos}
+                    onChange={(e) => setIncluirNegativos(e.target.checked)}
+                  />
+                  Incluir negativos
+                </label>
               </div>
             </div>
           )}

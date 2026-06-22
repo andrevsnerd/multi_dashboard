@@ -66,6 +66,8 @@ export async function fetchEstoqueRede(filters: ReportFilters): Promise<ReportRe
       tipos: filters.tipos ?? null,
       produtoId: filters.produtoId ?? null,
       produtoSearchTerm: filters.produtoSearchTerm ?? null,
+      // Para listar zerados, a fonte precisa devolver os grupos com saldo líquido 0.
+      incluirZerados: filters.incluirZerados ?? false,
     }),
   ]);
 
@@ -118,11 +120,27 @@ export async function fetchEstoqueRede(filters: ReportFilters): Promise<ReportRe
   // Estoque total por (produto, cor) = soma só dos POSITIVOS (igual ao Controle de
   // Estoque). Os negativos continuam visíveis nas colunas por filial (pos>0?pos:neg),
   // mas NÃO entram no total — assim o KPI/coluna "Estoque total" bate com o Controle.
-  const aggs = Array.from(byKey.values()).map((agg) => {
-    let sumPos = 0;
-    agg.posByLabel.forEach((v) => (sumPos += v));
-    return { agg, total: sumPos };
-  });
+  //
+  // Listagem (igual à Estoque Consulta): por padrão só itens com estoque positivo.
+  // "incluirNegativos" também lista os que têm só negativo; "incluirZerados" também
+  // lista os zerados (saldo 0 em toda a rede). Itens mistos (pos+neg) sempre entram e
+  // mostram o negativo nas colunas da filial.
+  const incluirZerados = filters.incluirZerados ?? false;
+  const incluirNegativos = filters.incluirNegativos ?? false;
+  const aggs = Array.from(byKey.values())
+    .map((agg) => {
+      let sumPos = 0;
+      let sumNeg = 0;
+      agg.posByLabel.forEach((v) => (sumPos += v));
+      agg.negByLabel.forEach((v) => (sumNeg += v));
+      return { agg, total: sumPos, sumNeg };
+    })
+    .filter(({ total, sumNeg }) => {
+      if (total > 0) return true; // tem positivo em alguma filial
+      if (incluirNegativos && sumNeg < 0) return true; // só negativo
+      if (incluirZerados && sumNeg === 0) return true; // zerado em toda a rede
+      return false;
+    });
 
   aggs.sort((a, b) => b.total - a.total);
 

@@ -36,6 +36,8 @@ export async function GET(request: Request) {
   const limit = limitParam ? Number(limitParam) : undefined;
   const estoquePorFilial = searchParams.get("estoquePorFilial") === "1";
   const compraIdeal = searchParams.get("compraIdeal") === "1";
+  const incluirZerados = searchParams.get("incluirZerados") === "1";
+  const incluirNegativos = searchParams.get("incluirNegativos") === "1";
   const diasParadoValorParam = searchParams.get("diasParadoValor");
   const diasParadoValorNum = diasParadoValorParam != null ? Number(diasParadoValorParam) : NaN;
   const diasParadoValor =
@@ -65,6 +67,8 @@ export async function GET(request: Request) {
     diasParadoModo,
     estoquePorFilial,
     compraIdeal,
+    incluirZerados,
+    incluirNegativos,
   };
 
   try {

@@ -138,6 +138,28 @@
   padding: 0 4px;
 }
 
+.saldoRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  min-height: 38px;
+}
+
+.checkLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #334155;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.checkLabel input {
+  cursor: pointer;
+}
+
 .searchDropdown {
   position: absolute;
   top: calc(100% + 4px);

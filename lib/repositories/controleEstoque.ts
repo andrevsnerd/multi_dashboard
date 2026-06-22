@@ -7887,6 +7887,8 @@ export interface EstoqueRedeParams {
   tipos?: string[] | null;
   produtoId?: string | null;
   produtoSearchTerm?: string | null;
+  /** Quando true, também retorna grupos (produto×cor×filial) com saldo líquido ZERO. */
+  incluirZerados?: boolean;
 }
 
 /**
@@ -7907,6 +7909,7 @@ export async function fetchEstoqueRedePorProduto({
   tipos,
   produtoId,
   produtoSearchTerm,
+  incluirZerados = false,
 }: EstoqueRedeParams): Promise<EstoqueRedeItemRow[]> {
   return withRequest(async (request) => {
     const estoqueFilialFilter = await buildFilialFilter(request, company, filial ?? null, 'e');
@@ -7947,6 +7950,10 @@ export async function fetchEstoqueRedePorProduto({
       company === 'nerd'
         ? `AND ISNULL(p.GRUPO_PRODUTO, '') <> ''`
         : `AND ISNULL(p.LINHA, '') <> ''`;
+
+    // Por padrão descarta grupos (produto×cor×filial) com saldo líquido zero. Com
+    // incluirZerados, mantém-os para que itens zerados também apareçam (igual à Estoque Consulta).
+    const havingClause = incluirZerados ? '' : 'HAVING ABS(SUM(ISNULL(e.ESTOQUE, 0))) > 0';
 
     const query = `
       SELECT
@@ -7989,7 +7996,7 @@ export async function fetchEstoqueRedePorProduto({
         p.TIPO_PRODUTO,
         COALESCE(c.DESC_COR, e.COR_PRODUTO),
         e.FILIAL
-      HAVING ABS(SUM(ISNULL(e.ESTOQUE, 0))) > 0
+      ${havingClause}
     `;
 
     const result = await request.query<{

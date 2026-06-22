@@ -65,7 +65,8 @@ export type ReportFilterKey =
   | "colecao"
   | "tipo"
   | "filial"
-  | "diasParado";
+  | "diasParado"
+  | "saldoEstoque";
 
 /** Metadados puros de um tipo de análise (sem o fetcher). */
 export interface ReportTypeMeta {
@@ -105,6 +106,10 @@ export interface ReportFilters {
   diasParadoModo?: "lte" | "gte" | null;
   /** Quando true, calcula e anexa estoque por filial (rede inteira) por linha. */
   estoquePorFilial?: boolean;
+  /** Estoque por filial: além dos positivos, lista também itens zerados (saldo 0 em tudo). */
+  incluirZerados?: boolean;
+  /** Estoque por filial: além dos positivos, lista também itens só negativos. */
+  incluirNegativos?: boolean;
   /** Quando true, calcula a Compra Ideal por produto (caro — limita as linhas). */
   compraIdeal?: boolean;
 }
