@@ -6,7 +6,10 @@ import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthContext";
 import { calculateTransfers } from "@/components/controle-transferencias/ControleTransferenciasTable";
 import ComprasSalvasListPanel from "@/components/stock/ComprasSalvasListPanel";
-import { buildControleEstoqueItemKey } from "@/lib/utils/controle-estoque-metricas";
+import {
+  buildControleEstoqueItemKey,
+  type ControleEstoqueItemMetricas,
+} from "@/lib/utils/controle-estoque-metricas";
 import {
   aggregateEstoquePorFilialByDisplayLabel,
   compareFilialDisplayOrder,
@@ -16,7 +19,10 @@ import {
   type CompanyConfig,
   type CompanyKey,
 } from "@/lib/config/company";
-import { fetchControleEstoqueItemMetricasClient } from "@/lib/client/controle-estoque-metricas";
+import {
+  fetchControleEstoqueItemMetricasClient,
+  fetchControleEstoqueMetricasItensClient,
+} from "@/lib/client/controle-estoque-metricas";
 import {
   buildCompraTransitoIndex,
   fetchComprasTransitoClient,
@@ -24,10 +30,11 @@ import {
   type CompraTransitoIndex,
   type CompraTransitoIndexEntry,
 } from "@/lib/client/compras-transito";
-import { exportListaLojaToXlsx } from "@/lib/utils/exportListaLoja";
+import { exportListaLojaToXlsx, exportCompraIdealPorFilialToXlsx } from "@/lib/utils/exportListaLoja";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
 import {
   calcCompraIdeal,
+  calcCompraIdealFromResumo,
   COMPRA_IDEAL_STATUS_LABEL,
   COMPRA_IDEAL_CONFIABILIDADE_LABEL,
   type CompraIdealStatus,
@@ -1180,6 +1187,84 @@ async function buildListaLojaExportRows(
 
     return baseRow;
   });
+}
+
+/**
+ * Monta as linhas do export "Compra Ideal por Loja": uma linha por item, uma coluna por
+ * loja com a Compra Ideal daquela loja. O número de cada coluna é IDÊNTICO ao que aparece
+ * ao filtrar a lista por aquela loja — mesma fonte (resumo de métricas com escopo na filial)
+ * e mesma regra (calcCompraIdeal, trânsito da rede abatido, negativos zerados).
+ *
+ * Eficiência: o client fetcher agrupa todos os itens de uma mesma loja numa única
+ * requisição HTTP, então o custo é ~1 requisição por loja (não item × loja).
+ */
+async function buildCompraIdealPorFilialRows(
+  companyKey: string,
+  filiais: Filial[],
+  itens: ListaItem[],
+  comprasTransitoIndex: CompraTransitoIndex,
+  onFilialDone?: () => void
+): Promise<{ rows: Array<Record<string, string | number | boolean | null>>; colunasFiliais: string[] }> {
+  const company = resolveCompany(companyKey);
+  const filiaisOrdenadas = [...filiais].sort((a, b) =>
+    compareFilialDisplayOrder(filialLabel(a), filialLabel(b), company)
+  );
+  const colunasFiliais = filiaisOrdenadas.map((f) => filialLabel(f));
+
+  const itensInput = itens.map((i) => ({ produto: i.produto, corProduto: i.corProduto }));
+
+  // Uma "rodada" por loja (cada uma vira 1 requisição batcheada). Concorrência limitada
+  // para não saturar o backend com várias consultas pesadas de histórico ao mesmo tempo.
+  const metricasPorFilial = await mapWithConcurrency(filiaisOrdenadas, 4, async (f) => {
+    try {
+      return await fetchControleEstoqueMetricasItensClient({
+        company: companyKey,
+        filial: f.codFilial,
+        includeHistorico: true,
+        itens: itensInput,
+      });
+    } catch {
+      return {} as Record<string, ControleEstoqueItemMetricas>;
+    } finally {
+      onFilialDone?.();
+    }
+  });
+
+  const rows = itens.map((item) => {
+    const transitEntries = getCompraTransitoEntries(comprasTransitoIndex, item.produto, item.corProduto);
+    const itemKey = buildControleEstoqueItemKey(item.produto, item.corProduto);
+
+    let custoMax = 0;
+    let totalRede = 0;
+    const row: Record<string, string | number | boolean | null> = {
+      PRODUTO: item.produto,
+      DESC_PRODUTO: item.descProduto,
+      CODIGO_BARRA: item.codigoBarra || "",
+      COR_PRODUTO: item.corProduto || "",
+      DESC_COR: item.descCor || "",
+      LINHA: item.linha || "",
+      SUBGRUPO: item.subgrupo || "",
+      CUSTO_UNIT: null,
+    };
+
+    filiaisOrdenadas.forEach((_, idx) => {
+      const metricas = metricasPorFilial[idx]?.[itemKey] ?? null;
+      const ideal = calcCompraIdealFromResumo(metricas?.resumo ?? null, transitEntries, {
+        linha: item.linha,
+        subgrupo: item.subgrupo,
+      });
+      const qtd = Math.max(0, ideal.compraIdeal);
+      row[colunasFiliais[idx]] = qtd;
+      totalRede += qtd;
+      custoMax = Math.max(custoMax, Number(metricas?.resumo?.custoUnitario ?? 0));
+    });
+
+    row.CUSTO_UNIT = custoMax > 0 ? custoMax : null;
+    row["TOTAL REDE"] = totalRede;
+    return row;
+  });
+
+  return { rows, colunasFiliais };
 }
 
 function getLimiteDiasReposicao(item: { linha?: string | null; subgrupo?: string | null }) {
@@ -3026,6 +3111,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
   const [modalColorPickerOpcoes, setModalColorPickerOpcoes] = useState<Produto[]>([]);
   const [modalColorPickerLoading, setModalColorPickerLoading] = useState(false);
   const [exportandoXlsx, setExportandoXlsx] = useState(false);
+  const [compraIdealProgresso, setCompraIdealProgresso] = useState<{ feito: number; total: number } | null>(null);
   const [filtrarSugeridos, setFiltrarSugeridos] = useState(false);
   const [filtrarBarrados, setFiltrarBarrados] = useState(false);
   const [filtrarTransferencias, setFiltrarTransferencias] = useState(false);
@@ -4562,6 +4648,51 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     nomeLista,
   ]);
 
+  const exportarCompraIdealPorFilial = useCallback(async () => {
+    if (itensVisiveis.length === 0) {
+      mostrarNotificacao("Adicione itens para exportar", "error");
+      return;
+    }
+    if (filiais.length === 0) {
+      mostrarNotificacao("Nenhuma loja disponível para o cálculo", "error");
+      return;
+    }
+
+    setCompraIdealProgresso({ feito: 0, total: filiais.length });
+    try {
+      const { rows, colunasFiliais } = await buildCompraIdealPorFilialRows(
+        companyKey,
+        filiais,
+        itensVisiveis,
+        comprasTransitoIndex,
+        () => setCompraIdealProgresso((prev) => (prev ? { ...prev, feito: prev.feito + 1 } : prev))
+      );
+      exportCompraIdealPorFilialToXlsx({
+        companyKey,
+        companyName,
+        listaNome: nomeLista.trim() || buildDefaultListName(filialLabel(filialSelecionada) || "Lista Loja"),
+        filtroAplicado: filtroAplicadoLabel,
+        colunasFiliais,
+        rows,
+      });
+      mostrarNotificacao("Compra ideal por loja exportada com sucesso!");
+    } catch (err: unknown) {
+      mostrarNotificacao(err instanceof Error ? err.message : "Erro ao exportar compra ideal por loja", "error");
+    } finally {
+      setCompraIdealProgresso(null);
+    }
+  }, [
+    companyKey,
+    companyName,
+    comprasTransitoIndex,
+    filiais,
+    filtroAplicadoLabel,
+    filialSelecionada,
+    itensVisiveis,
+    mostrarNotificacao,
+    nomeLista,
+  ]);
+
   if (!permissoesCarregadas) {
     return (
       <div className={styles.wrapper}>
@@ -4604,6 +4735,23 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
               title={itensVisiveis.length === 0 ? "Adicione itens para exportar" : "Exportar a lista atual para XLSX"}
             >
               {exportandoXlsx ? "Exportando XLSX..." : "Exportar XLSX"}
+            </button>
+            <button
+              type="button"
+              className={styles.exportXlsxBtn}
+              onClick={() => {
+                void exportarCompraIdealPorFilial();
+              }}
+              disabled={itensVisiveis.length === 0 || compraIdealProgresso !== null}
+              title={
+                itensVisiveis.length === 0
+                  ? "Adicione itens para exportar"
+                  : "Exportar a compra ideal de cada loja (uma coluna por loja) para XLSX"
+              }
+            >
+              {compraIdealProgresso
+                ? `Gerando… ${compraIdealProgresso.feito}/${compraIdealProgresso.total} lojas`
+                : "Exportar Compra Ideal por Loja"}
             </button>
             <button
               type="button"
