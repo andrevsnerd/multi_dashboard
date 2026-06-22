@@ -59,6 +59,7 @@ import { isProdutoAgrupadoSyntheticId } from "@/lib/utils/produtos-agrupados";
 import FilialVendedoresTab from "./FilialVendedoresTab";
 import { exportCurvaAbcSimpleCsv } from "@/lib/utils/exportCurvaAbcSimpleCsv";
 import { exportCurvaAbcSimpleXlsx, type CurvaAbcSimpleXlsxRow } from "@/lib/utils/exportCurvaAbcSimpleXlsx";
+import { exportCompraIdealPorFilialToXlsx } from "@/lib/utils/exportListaLoja";
 import styles from "./FilialPerformancePage.module.css";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -1187,11 +1188,15 @@ const ExportMenu = React.memo(function ExportMenu({
   onExportCsv,
   onExportXlsx,
   onExportPdf,
+  onExportCompraIdealFilial,
+  compraIdealFilialLabel,
 }: {
   exportingPdf: boolean;
   onExportCsv: () => void;
   onExportXlsx: () => void;
   onExportPdf: () => void;
+  onExportCompraIdealFilial: () => void;
+  compraIdealFilialLabel: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -1246,11 +1251,167 @@ const ExportMenu = React.memo(function ExportMenu({
           >
             {exportingPdf ? "Exportando PDF..." : "Exportar PDF"}
           </button>
+          <button
+            type="button"
+            className={styles.exportMenuItem}
+            onClick={() => { if (!compraIdealFilialLabel) { setOpen(false); } onExportCompraIdealFilial(); }}
+            title="Exporta todos os itens com a Compra Ideal de cada loja em colunas separadas (uma lista só, todas as lojas)"
+            disabled={compraIdealFilialLabel !== null}
+          >
+            {compraIdealFilialLabel ?? "Compra Ideal por Loja"}
+          </button>
         </div>
       )}
     </div>
   );
 });
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  mapper: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const worker = async () => {
+    while (true) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      if (currentIndex >= items.length) return;
+      results[currentIndex] = await mapper(items[currentIndex]!, currentIndex);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+  return results;
+}
+
+/** Loja-alvo do export: nome canônico (param `filial` da API) + rótulo de exibição (cabeçalho da coluna). */
+interface FilialExportTarget {
+  filial: string;
+  label: string;
+}
+
+/**
+ * Monta as linhas do export "Compra Ideal por Loja" da Curva ABC: agrega TODOS os itens
+ * (união de todas as lojas) numa lista só, com uma coluna por loja contendo a Compra Ideal
+ * daquela loja. Se o item não vende numa loja, a coluna fica 0; nas que vende, recebe a
+ * sugestão daquela loja. Mesma regra/fonte do resto da Curva ABC (resumo de métricas com
+ * escopo na filial → calcCompraIdealFromResumo, trânsito abatido, negativos zerados),
+ * inclusive a fusão de produtos agrupados.
+ *
+ * Eficiência: o client fetcher agrupa itens por loja numa única requisição (em lotes),
+ * então o custo é ~1 conjunto de lotes por loja, não item × loja.
+ */
+async function buildCompraIdealPorFilialRowsCurvaAbc(
+  companyKey: string,
+  produtos: ProdutoComCurva[],
+  filiais: FilialExportTarget[],
+  comprasTransitoIndex: CompraTransitoIndex,
+  porCor: boolean,
+  onFilialDone?: () => void
+): Promise<{ rows: Array<Record<string, string | number | boolean | null>>; colunasFiliais: string[] }> {
+  // Plano por linha: chave de métrica + itens-membro (produto agrupado expande para seus membros).
+  const plans = produtos.map((row) => {
+    const metricKey = buildCurvaAbcMetricKey(row.produto, row.cor ?? null, porCor);
+    const members =
+      row.isGroupedProduct && (row.groupedMembers?.length ?? 0) > 0
+        ? row.groupedMembers!.map((member) => ({
+            produto: member.produto,
+            corProduto: porCor ? (member.cor || null) : null,
+          }))
+        : [{ produto: row.produto, corProduto: porCor ? (row.cor ?? null) : null }];
+    return { row, metricKey, members };
+  });
+
+  // Itens únicos a consultar (membros deduplicados).
+  const itemLookup = new Map<string, { produto: string; corProduto: string | null }>();
+  for (const plan of plans) {
+    for (const member of plan.members) {
+      itemLookup.set(buildControleEstoqueItemKey(member.produto, member.corProduto), member);
+    }
+  }
+  const itens = Array.from(itemLookup.values());
+
+  // Rótulos das colunas (um por loja), garantindo unicidade caso dois nomes colidam.
+  const seenLabel = new Map<string, number>();
+  const colunasFiliais = filiais.map((f) => {
+    const base = f.label;
+    const count = seenLabel.get(base) ?? 0;
+    seenLabel.set(base, count + 1);
+    return count === 0 ? base : `${base} (${count + 1})`;
+  });
+
+  // Uma "rodada" por loja (cada uma vira lotes de requisições). Concorrência limitada
+  // para não saturar o backend com várias consultas pesadas de histórico ao mesmo tempo.
+  const idealPorFilial = await mapWithConcurrency(filiais, 3, async (f) => {
+    const allMetricRows: Record<string, ControleEstoqueItemMetricas> = {};
+    try {
+      for (let i = 0; i < itens.length; i += METRICAS_CHUNK_SIZE) {
+        const chunk = itens.slice(i, i + METRICAS_CHUNK_SIZE);
+        const rows = await fetchControleEstoqueMetricasItensClient({
+          company: companyKey,
+          filial: f.filial,
+          includeHistorico: true,
+          itens: chunk,
+        });
+        Object.assign(allMetricRows, rows);
+      }
+    } catch {
+      // Falha parcial: a loja entra com o que conseguiu (itens ausentes ficam 0).
+    } finally {
+      onFilialDone?.();
+    }
+
+    const byMetricKey = new Map<string, number>();
+    for (const plan of plans) {
+      const memberMetrics = plan.members
+        .map((member) => allMetricRows[buildControleEstoqueItemKey(member.produto, member.corProduto)])
+        .filter((m): m is ControleEstoqueItemMetricas => Boolean(m));
+      if (memberMetrics.length === 0) {
+        byMetricKey.set(plan.metricKey, 0);
+        continue;
+      }
+      const merged =
+        memberMetrics.length === 1 ? memberMetrics[0]! : mergeControleEstoqueMetricasEntries(memberMetrics);
+      const ideal = calcCompraIdealFromResumo(
+        merged.resumo,
+        getCompraTransitoEntries(comprasTransitoIndex, plan.row.produto, porCor ? (plan.row.cor ?? null) : null),
+        { linha: plan.row.linha, subgrupo: plan.row.subgrupo }
+      );
+      byMetricKey.set(plan.metricKey, Math.max(0, ideal.compraIdeal));
+    }
+    return byMetricKey;
+  });
+
+  const rows = plans.map((plan) => {
+    const p = plan.row;
+    const row: Record<string, string | number | boolean | null> = {
+      CURVA: p.curva,
+      PRODUTO: p.produto,
+      DESCRICAO: p.descricao || p.produto,
+      CODIGO_BARRA: p.codigoBarra || "",
+      COR_DESCRICAO: porCor ? (p.corDescricao || p.cor || "") : "",
+      // No NERD a "categoria" da curva ABC é o GRUPO_PRODUTO → vira a coluna GRUPO.
+      ...(companyKey === "nerd" ? { GRUPO: p.categoria?.trim() || "" } : {}),
+      LINHA: p.linha?.trim() || "",
+      SUBGRUPO: p.subgrupo?.trim() || "",
+      CUSTO_UNIT: Math.round((p.custo ?? 0) * 100) / 100,
+      VENDAS_PERIODO: Math.round(p.vendas * 100) / 100,
+      QTDE_PERIODO: p.qtde,
+      ESTOQUE_REDE: p.estoque ?? 0,
+    };
+    let totalRede = 0;
+    filiais.forEach((_, idx) => {
+      const qtd = idealPorFilial[idx]?.get(plan.metricKey) ?? 0;
+      row[colunasFiliais[idx]] = qtd;
+      totalRede += qtd;
+    });
+    row["TOTAL REDE"] = totalRede;
+    return row;
+  });
+
+  return { rows, colunasFiliais };
+}
 
 function getInitialRange(month: number, year: number): DateRangeValue {
   const base = new Date(year, month, 1);
@@ -1283,6 +1444,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [compraIdealFilialProgresso, setCompraIdealFilialProgresso] = useState<{ feito: number; total: number } | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubgrupos, setSelectedSubgrupos] = useState<string[]>([]);
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
@@ -2090,11 +2252,13 @@ const handleBadgeClick = (cat: string) => {
         COLECAO: p.colecao?.trim() || "",
         GRADE: companyKey === "scarfme" ? (p.grade ?? "") : "",
         COR_DESCRICAO: porCor ? (p.corDescricao || p.cor || "") : "",
+        ...(companyKey === "nerd" ? { GRUPO: p.categoria?.trim() || "" } : {}),
         PERC_PARTICIPACAO: Math.round(p.percParticipacao * 10) / 10,
         PERC_ACUMULADA: Math.round(p.percCumulativa * 1000) / 10,
         VENDAS: Math.round(p.vendas * 100) / 100,
         QTDE: p.qtde,
         ESTOQUE: p.estoque ?? 0,
+        CUSTO_UNIT: Math.round((p.custo ?? 0) * 100) / 100,
         MARKUP: markup !== null ? Math.round(markup * 100) / 100 : "",
         COMPRA_IDEAL: getSugestaoCompraExportValue(p),
         VAR_VS_PERIODO_ANTERIOR: variacao,
@@ -2119,6 +2283,93 @@ const handleBadgeClick = (cat: string) => {
     const rows = buildExportSimpleRows();
     if (rows.length === 0) return;
     exportCurvaAbcSimpleCsv(rows, exportOptions);
+  };
+
+  const handleExportCompraIdealPorFilial = async () => {
+    if (compraIdealFilialProgresso !== null) return;
+
+    // Lojas-alvo: filiais canônicas de venda (uma coluna cada), excluindo MATRIZ, membros
+    // não-canônicos de grupos e o e-commerce (NERD); para SCARFME inclui o e-commerce, igual
+    // ao que o seletor de filial permite escolher loja a loja.
+    const cfg = resolveCompany(companyKey);
+    if (!cfg) return;
+    const ecommerceFilials = cfg.ecommerceFilials ?? [];
+    const groups = cfg.filialGroups ?? {};
+    const canonicals = new Set(Object.keys(groups));
+    const nonCanonicalGroupMembers = new Set<string>();
+    for (const members of Object.values(groups)) {
+      for (const m of members) {
+        if (!canonicals.has(m)) nonCanonicalGroupMembers.add(m);
+      }
+    }
+    const matrizByCompany: Record<string, string[]> = {
+      scarfme: ["SCARF ME - MATRIZ"],
+      nerd: ["NERD"],
+    };
+    const matrizSet = new Set(matrizByCompany[companyKey] ?? []);
+    const displayNames = cfg.filialDisplayNames ?? {};
+    const salesFiliais = cfg.filialFilters?.sales ?? [];
+    const targets: FilialExportTarget[] = salesFiliais
+      .filter(
+        (f) => !ecommerceFilials.includes(f) && !nonCanonicalGroupMembers.has(f) && !matrizSet.has(f)
+      )
+      .map((f) => ({ filial: f, label: displayNames[f] ?? f }));
+    if (companyKey === "scarfme" && ecommerceFilials.length > 0) {
+      const ec = ecommerceFilials[0]!;
+      targets.push({ filial: ec, label: displayNames[ec] ?? ec });
+    }
+    targets.sort((a, b) => compareFilialDisplayOrder(a.label, b.label, cfg));
+
+    if (targets.length === 0) return;
+
+    setCompraIdealFilialProgresso({ feito: 0, total: targets.length });
+    try {
+      // Universo COMPLETO da rede, sem o TOP da fonte (limit=0) e sempre todas as filiais
+      // (ignora a loja selecionada na tela). Garante que itens de cauda relevantes para
+      // lojas específicas — que cairiam fora do top-N agregado — entrem no export.
+      const universoParams = new URLSearchParams({
+        company: companyKey,
+        month: String(selectedMonth),
+        year: String(selectedYear),
+        start: formatDateForQuery(range.startDate),
+        end: formatDateForQuery(range.endDate),
+        compare: comparisonMode,
+        limit: "0",
+      });
+      if (porCor) universoParams.set("porCor", "1");
+      if (companyKey === "nerd" && filtrarEletronicos) universoParams.append("linha", "ELETRONICOS");
+
+      const universoRes = await fetch(`/api/curva-abc?${universoParams}`, { cache: "no-store" });
+      const universoJson = (await universoRes.json()) as FilialData & { error?: string };
+      if (!universoRes.ok || universoJson.error) {
+        throw new Error(universoJson.error ?? "Erro ao carregar o universo de itens");
+      }
+      const universo = calcularCurvas(universoJson.produtos ?? []);
+      if (universo.length === 0) return;
+
+      const { rows, colunasFiliais } = await buildCompraIdealPorFilialRowsCurvaAbc(
+        companyKey,
+        universo,
+        targets,
+        comprasTransitoIndex,
+        porCor,
+        () => setCompraIdealFilialProgresso((prev) => (prev ? { ...prev, feito: prev.feito + 1 } : prev))
+      );
+      const periodo = `${formatDateForQuery(range.startDate)}_a_${formatDateForQuery(range.endDate)}`;
+      exportCompraIdealPorFilialToXlsx({
+        companyKey,
+        companyName: cfg.name,
+        listaNome: `Curva ABC ${periodo}`,
+        filtroAplicado:
+          `Todas as lojas · universo completo (sem corte)` +
+          (porCor ? " · por cor" : "") +
+          (companyKey === "nerd" && filtrarEletronicos ? " · só ELETRONICOS" : ""),
+        colunasFiliais,
+        rows,
+      });
+    } finally {
+      setCompraIdealFilialProgresso(null);
+    }
   };
 
   const handleExportPdf = async () => {
@@ -2281,6 +2532,12 @@ const handleBadgeClick = (cat: string) => {
                 onExportCsv={handleExportSimpleCsv}
                 onExportXlsx={handleExportSimpleXlsx}
                 onExportPdf={handleExportPdf}
+                onExportCompraIdealFilial={() => { void handleExportCompraIdealPorFilial(); }}
+                compraIdealFilialLabel={
+                  compraIdealFilialProgresso
+                    ? `Gerando… ${compraIdealFilialProgresso.feito}/${compraIdealFilialProgresso.total} lojas`
+                    : null
+                }
               />
             )}
           </div>

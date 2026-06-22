@@ -7,6 +7,8 @@ export interface CurvaAbcSimpleXlsxRow {
   PRODUTO: string;
   DESCRICAO: string;
   COR_DESCRICAO: string;
+  /** Só NERD: GRUPO_PRODUTO. Ausente nas demais empresas (lá grupo = linha). */
+  GRUPO?: string;
   QTDE: number;
   ESTOQUE: number;
   CODIGO_BARRA: string;
@@ -18,6 +20,7 @@ export interface CurvaAbcSimpleXlsxRow {
   PERC_PARTICIPACAO: number;
   PERC_ACUMULADA: number;
   VENDAS: number;
+  CUSTO_UNIT: number;
   MARKUP: number | "";
   COMPRA_IDEAL: number | "";
   VAR_VS_PERIODO_ANTERIOR: number | string;
@@ -56,6 +59,7 @@ export function exportCurvaAbcSimpleXlsx(
     QTDE: row.QTDE,
     ESTOQUE: row.ESTOQUE,
     CODIGO_BARRA: row.CODIGO_BARRA,
+    ...(row.GRUPO !== undefined ? { GRUPO: row.GRUPO } : {}),
     LINHA: row.LINHA,
     SUBGRUPO: row.SUBGRUPO,
     TIPO_PRODUTO: row.TIPO_PRODUTO,
@@ -64,6 +68,7 @@ export function exportCurvaAbcSimpleXlsx(
     PERC_PARTICIPACAO: row.PERC_PARTICIPACAO,
     PERC_ACUMULADA: row.PERC_ACUMULADA,
     VENDAS: row.VENDAS,
+    CUSTO_UNIT: row.CUSTO_UNIT,
     MARKUP: row.MARKUP,
     COMPRA_IDEAL: row.COMPRA_IDEAL,
     VAR_VS_PERIODO_ANTERIOR: row.VAR_VS_PERIODO_ANTERIOR,

@@ -81,6 +81,11 @@ export async function GET(request: Request) {
   const porCor = searchParams.get('porCor') === '1';
   const linhaParams = searchParams.getAll('linha');
   const linhasFilter = linhaParams.length > 0 ? linhaParams : null;
+  // `limit` opcional: 0 = sem TOP (universo completo, usado pelo export "Compra Ideal por
+  // Loja"). Ausente = comportamento padrão (TOP da fonte). Não afeta a tela normal.
+  const limitParamRaw = searchParams.get('limit');
+  const limitParam =
+    limitParamRaw != null && Number.isFinite(Number(limitParamRaw)) ? Math.max(0, Math.floor(Number(limitParamRaw))) : undefined;
 
   if (!companyKey) {
     return NextResponse.json({ error: 'Parâmetros obrigatórios faltando' }, { status: 400 });
@@ -335,6 +340,7 @@ export async function GET(request: Request) {
           fetchFilialProdutoSales(companyKey, allPosMembers, allEcomMembers, resolvedRange, comparisonMode, {
             groupByCor: porCor,
             linhas: linhasFilter,
+            limit: limitParam,
           }),
           fetchProdutoQtdePorFilial(companyKey, allPosMembers, allEcomMembers, resolvedRange, {
             groupByCor: porCor,
@@ -488,6 +494,7 @@ export async function GET(request: Request) {
         fetchFilialProdutoSales(companyKey, posMembers, ecomMembers, resolvedRange, comparisonMode, {
           groupByCor: porCor,
           linhas: linhasFilter,
+          limit: limitParam,
         }),
         fetchProdutoEstoquePorFilial(companyKey, posMembers, ecomMembers, { groupByCor: porCor }),
         fetchProdutoEstoquePorFilial(companyKey, [...allPosMembers, ...matrizList], allEcomMembers, { groupByCor: porCor }),
