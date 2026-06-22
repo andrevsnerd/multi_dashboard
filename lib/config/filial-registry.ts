@@ -77,7 +77,10 @@ export const FILIAIS: FilialDef[] = [
   { id: '000055', company: 'scarfme', display: 'MORUMBI',      dbNameFallback: 'MORUMBI - JJJ',              modules: ['sales', 'inventory'] },
   { id: '000062', company: 'scarfme', display: 'OSCAR FREIRE', dbNameFallback: 'OSCAR FREIRE - FSZ',         modules: ['sales', 'inventory'] },
   { id: '000038', company: 'scarfme', display: 'HIGIENÓPOLIS', dbNameFallback: 'SCARF ME - HIGIENOPOLIS 2',  modules: ['sales', 'inventory'] },
-  { id: '000101', company: 'scarfme', display: 'IBIRAPUERA',   dbNameFallback: 'SCARFME - IBIRAPUERA LLL',   modules: ['sales', 'inventory'] },
+  // IBIRAPUERA: loja DESATIVADA. Entrada mantida só para o histórico resolver o nome
+  // pelo ID; modules vazio = fora de todos os filtros operacionais (sales E inventory),
+  // some das listas, colunas por filial, KPIs e queries (FILIAL IN ... não a inclui).
+  { id: '000101', company: 'scarfme', display: 'IBIRAPUERA',   dbNameFallback: 'SCARFME - IBIRAPUERA LLL',   modules: [] },
   { id: '000088', company: 'scarfme', display: 'PAULISTA',     dbNameFallback: 'SCARFME ME - PAULISTA FFF',  modules: ['sales', 'inventory'], group: 'paulista' },
   { id: '000046', company: 'scarfme', display: 'PAULISTA',     dbNameFallback: 'SCARF ME - PAULISTA RSR',    modules: ['sales', 'inventory'], group: 'paulista' },
   { id: '000112', company: 'scarfme', display: 'PAULISTA',     dbNameFallback: 'SCARF ME - PAULISTA FFFR',   modules: ['sales', 'inventory'], group: 'paulista' },
