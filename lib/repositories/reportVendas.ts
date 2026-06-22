@@ -252,6 +252,15 @@ export async function fetchVendasFaturamento(
     }));
   }
 
+  // Projeção/duração: ritmo diário medido no período selecionado, projetado para o
+  // mês corrente. Projeção qtd mês = ritmo × dias do mês; Estoque final mês = estoque −
+  // ritmo × dias restantes do mês; Duração = estoque ÷ ritmo (dias). Tudo barato (sem query).
+  const { start: pStart, end: pEnd } = normalizeRangeForQuery({ start: filters.start, end: filters.end });
+  const diasPeriodo = Math.max(1, Math.round((pEnd.getTime() - pStart.getTime()) / 86400000));
+  const hoje = new Date();
+  const diasNoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
+  const diasRestantesMes = Math.max(0, diasNoMes - hoje.getDate());
+
   let acumPerc = 0;
   const rows: ReportRow[] = sliced.map((d) => {
     const qty = d.totalQuantity ?? 0;
@@ -283,6 +292,10 @@ export async function fetchVendasFaturamento(
       TIPO: d.tipo ?? "",
       GRADE: d.grade ?? "",
       QTDE: roundInt(qty),
+      PROJECAO_QTD_MES: roundInt((qty / diasPeriodo) * diasNoMes),
+      ESTOQUE_FINAL_MES: roundInt((d.stock ?? 0) - (qty / diasPeriodo) * diasRestantesMes),
+      DURACAO_ESTOQUE:
+        qty > 0 ? roundInt((d.stock ?? 0) / (qty / diasPeriodo)) : (d.stock ?? 0) > 0 ? 999 : 0,
       FATURAMENTO: round2(revenue),
       TICKET_MEDIO: round2(d.averagePrice),
       CUSTO_UNITARIO: round2(custoUnit),

@@ -16,6 +16,7 @@ export const PRODUTOS_PARADOS_COLUMNS: ReportColumnDef[] = [
   { key: "SUBGRUPO", defaultLabel: "Subgrupo", type: "text" },
   { key: "GRADE", defaultLabel: "Grade", type: "text" },
   { key: "COLECAO", defaultLabel: "Coleção", type: "text" },
+  { key: "TIPO", defaultLabel: "Tipo", type: "text" },
   { key: "COR", defaultLabel: "Cor", type: "text" },
   { key: "DESCRICAO", defaultLabel: "Descrição", type: "text" },
   { key: "ESTOQUE", defaultLabel: "Estoque", type: "int" },
@@ -62,7 +63,7 @@ export const produtosParadosMeta: ReportTypeMeta = {
   description:
     "Produtos (por produto × cor) com estoque, mostrando há quantos dias estão sem vender (ou \"Nunca vendeu\") e a data da última venda. Mesma lógica da página Produtos Parados; ordene por Dias parado para ver os mais parados primeiro.",
   // Sem período (a defasagem é calculada até hoje).
-  supportedFilters: ["filial", "nome", "cor", "linha", "subgrupo", "grupo", "grade"],
+  supportedFilters: ["filial", "nome", "cor", "linha", "subgrupo", "grupo", "grade", "diasParado"],
   columns: PRODUTOS_PARADOS_COLUMNS,
   defaultPresets: PRODUTOS_PARADOS_PRESETS,
 };

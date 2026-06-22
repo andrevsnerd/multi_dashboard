@@ -36,6 +36,12 @@ export async function GET(request: Request) {
   const limit = limitParam ? Number(limitParam) : undefined;
   const estoquePorFilial = searchParams.get("estoquePorFilial") === "1";
   const compraIdeal = searchParams.get("compraIdeal") === "1";
+  const diasParadoValorParam = searchParams.get("diasParadoValor");
+  const diasParadoValorNum = diasParadoValorParam != null ? Number(diasParadoValorParam) : NaN;
+  const diasParadoValor =
+    Number.isFinite(diasParadoValorNum) && diasParadoValorNum >= 0 ? diasParadoValorNum : null;
+  const diasParadoModoParam = searchParams.get("diasParadoModo");
+  const diasParadoModo = diasParadoModoParam === "lte" ? "lte" : diasParadoModoParam === "gte" ? "gte" : null;
   const extraSources = searchParams
     .getAll("src")
     .filter((s): s is SourceId => (VALID_SOURCES as string[]).includes(s));
@@ -55,6 +61,8 @@ export async function GET(request: Request) {
     produtoId: produtoId || null,
     produtoSearchTerm: produtoSearchTerm || null,
     limit: Number.isFinite(limit) && (limit as number) > 0 ? limit : undefined,
+    diasParadoValor,
+    diasParadoModo,
     estoquePorFilial,
     compraIdeal,
   };

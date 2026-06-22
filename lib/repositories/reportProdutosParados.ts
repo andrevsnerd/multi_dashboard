@@ -47,8 +47,19 @@ export async function fetchProdutosParados(filters: ReportFilters): Promise<Repo
   const termo = (filters.produtoSearchTerm ?? "").trim().toUpperCase();
   const produtoIdAlvo = (filters.produtoId ?? "").trim().toUpperCase();
 
+  // Filtro opcional de dias parado: "lte" = até X dias; "gte" = X dias ou mais.
+  // (gte inclui "nunca vendeu" = 9999; lte o exclui — comportamento esperado.)
+  const diasCorte =
+    filters.diasParadoValor != null && Number.isFinite(filters.diasParadoValor)
+      ? filters.diasParadoValor
+      : null;
+  const diasModo = filters.diasParadoModo === "lte" ? "lte" : "gte";
+
   const filtered = itens.filter((d) => {
     if (corSet && !corSet.has(up(d.cor))) return false;
+    if (diasCorte != null) {
+      if (diasModo === "lte" ? d.diasParado > diasCorte : d.diasParado < diasCorte) return false;
+    }
     if (produtoIdAlvo) {
       if (up(d.produto) !== produtoIdAlvo) return false;
     } else if (termo.length >= 2) {
@@ -77,6 +88,7 @@ export async function fetchProdutosParados(filters: ReportFilters): Promise<Repo
       SUBGRUPO: d.subgrupo,
       GRADE: d.grade,
       COLECAO: d.colecao,
+      TIPO: d.tipo,
       COR: d.cor,
       DESCRICAO: d.descricao,
       ESTOQUE: roundInt(d.estoque),

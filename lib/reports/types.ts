@@ -64,7 +64,8 @@ export type ReportFilterKey =
   | "grade"
   | "colecao"
   | "tipo"
-  | "filial";
+  | "filial"
+  | "diasParado";
 
 /** Metadados puros de um tipo de análise (sem o fetcher). */
 export interface ReportTypeMeta {
@@ -98,6 +99,10 @@ export interface ReportFilters {
   produtoId?: string | null;
   /** Limite de linhas retornadas (default no repositório). */
   limit?: number;
+  /** Filtro opcional de dias parado (análise Produtos Parados). Nº de dias de corte. */
+  diasParadoValor?: number | null;
+  /** Modo do corte: "lte" = até X dias; "gte" = igual ou mais de X dias. */
+  diasParadoModo?: "lte" | "gte" | null;
   /** Quando true, calcula e anexa estoque por filial (rede inteira) por linha. */
   estoquePorFilial?: boolean;
   /** Quando true, calcula a Compra Ideal por produto (caro — limita as linhas). */

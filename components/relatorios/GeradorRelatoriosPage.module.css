@@ -118,6 +118,26 @@
   cursor: pointer;
 }
 
+.diasParadoRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.diasParadoRow .input {
+  width: 90px;
+}
+
+.diasParadoClear {
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
 .searchDropdown {
   position: absolute;
   top: calc(100% + 4px);

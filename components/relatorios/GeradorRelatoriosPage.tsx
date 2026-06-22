@@ -131,6 +131,9 @@ export default function GeradorRelatoriosPage({
   const [colecoes, setColecoes] = useState<string[]>([]);
   const [cores, setCores] = useState<string[]>([]);
   const [tipos, setTipos] = useState<string[]>([]);
+  // Filtro opcional de dias parado (análise Produtos Parados): valor + modo.
+  const [diasParadoValor, setDiasParadoValor] = useState<string>("");
+  const [diasParadoModo, setDiasParadoModo] = useState<"lte" | "gte">("gte");
 
   // Opções dinâmicas
   const [optGrupos, setOptGrupos] = useState<string[]>([]);
@@ -354,10 +357,16 @@ export default function GeradorRelatoriosPage({
     } else if (produtoQuery.trim().length >= 2) {
       params.set("produtoSearchTerm", produtoQuery.trim());
     }
+    const diasNum = Number(diasParadoValor.trim());
+    if (diasParadoValor.trim() !== "" && Number.isFinite(diasNum) && diasNum >= 0) {
+      params.set("diasParadoValor", String(Math.round(diasNum)));
+      params.set("diasParadoModo", diasParadoModo);
+    }
     return params.toString();
   }, [
     companyKey, filial, startStr, endStr, grupos, linhas, subgrupos, grades,
     colecoes, cores, tipos, produtoSelected, produtoQuery,
+    diasParadoValor, diasParadoModo,
   ]);
 
   const handleGenerate = useCallback(async () => {
@@ -741,6 +750,40 @@ export default function GeradorRelatoriosPage({
                       </button>
                     ))}
                   </div>
+                )}
+              </div>
+            </div>
+          )}
+          {supports("diasParado") && (
+            <div className={styles.searchField}>
+              <label className={styles.fieldLabel}>Dias parado (opcional)</label>
+              <div className={styles.diasParadoRow}>
+                <select
+                  className={styles.select}
+                  value={diasParadoModo}
+                  onChange={(e) => setDiasParadoModo(e.target.value as "lte" | "gte")}
+                >
+                  <option value="gte">Igual ou mais de</option>
+                  <option value="lte">Até</option>
+                </select>
+                <input
+                  className={styles.input}
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={diasParadoValor}
+                  placeholder="dias"
+                  onChange={(e) => setDiasParadoValor(e.target.value)}
+                />
+                {diasParadoValor.trim() !== "" && (
+                  <button
+                    type="button"
+                    className={styles.diasParadoClear}
+                    onClick={() => setDiasParadoValor("")}
+                    aria-label="Limpar dias parado"
+                  >
+                    ×
+                  </button>
                 )}
               </div>
             </div>

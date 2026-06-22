@@ -54,7 +54,13 @@ export function exportRelatorioXlsx(
     if (colDef.key === "COLECAO") {
       outCols.push({
         label,
-        get: (row) => (row[ROW_COLECAO_DESC_FIELD] ?? row.COLECAO ?? "") as ReportCellValue,
+        // Descrição da coleção; quando não há descrição conhecida, cai no código
+        // (igual ao rótulo da tela) para a coluna nunca sair vazia.
+        get: (row) => {
+          const desc = row[ROW_COLECAO_DESC_FIELD];
+          if (desc != null && String(desc).trim() !== "") return desc as ReportCellValue;
+          return (row[ROW_COLECAO_COD_FIELD] ?? row.COLECAO ?? "") as ReportCellValue;
+        },
       });
       outCols.push({
         label: "Cód. coleção",

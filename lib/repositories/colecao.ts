@@ -1,48 +1,46 @@
 import sql from "mssql";
 
 import { withRequest } from "@/lib/db/connection";
-import { fetchAvailableColecoesWithDescriptions } from "@/lib/repositories/products";
 import { ROW_COLECAO_COD_FIELD, ROW_COLECAO_DESC_FIELD } from "@/lib/reports/keys";
 import type { ReportRow } from "@/lib/reports/types";
 
-/** Extrai a descrição de um rótulo "DESC (COD)"; "" quando o rótulo é só o código. */
-function descFromLabel(label: string, code: string): string {
-  const suffix = ` (${code})`;
-  if (label === code) return "";
-  if (label.endsWith(suffix)) return label.slice(0, label.length - suffix.length).trim();
-  return label;
-}
-
 /**
- * Rótulo de coleção no formato "DESCRIÇÃO (CÓDIGO)" (ex.: "TARSILA (U7)") por produto,
+ * Rótulo de coleção no formato "DESCRIÇÃO (CÓDIGO)" (ex.: "PERMANENTE (01)") por produto,
  * para o Gerador de Relatórios. Só faz sentido para SCARFME.
  *
- * Reusa `fetchAvailableColecoesWithDescriptions` (mesma formatação de rótulo já usada no
- * filtro de coleção) para o mapa código→rótulo (cacheado), e mapeia produto→código via
- * PRODUTOS. Coleções sem descrição conhecida caem no próprio código.
+ * Fonte da descrição: tabela MESTRE `COLECOES` (COLECAO = código, DESC_COLECAO = descrição),
+ * NÃO o faturamento. Todo produto cadastrado tem coleção e toda coleção tem descrição na
+ * COLECOES — então a descrição resolve para QUALQUER produto, inclusive os que nunca
+ * venderam (caso dos Produtos Parados / recém-cadastrados). Join: COLECOES.COLECAO =
+ * PRODUTOS.COLECAO (o COD_COLECAO não é usado). Validado: 314/314 códigos cobertos.
  */
 const CACHE_TTL_MS = 10 * 60 * 1000;
-const labelMapCache = new Map<string, { expires: number; map: Map<string, string> }>();
+// COLECOES é catálogo global (~329 linhas) — cabe inteiro num único mapa cacheado.
+let descCache: { expires: number; map: Map<string, string> } | null = null;
 
-async function getColecaoLabelMap(company: string): Promise<Map<string, string>> {
-  const cached = labelMapCache.get(company);
-  if (cached && cached.expires > Date.now()) return cached.map;
+async function getColecaoDescMap(): Promise<Map<string, string>> {
+  if (descCache && descCache.expires > Date.now()) return descCache.map;
 
-  const now = new Date();
-  const start = new Date(now);
-  start.setMonth(start.getMonth() - 24); // janela ampla p/ cobrir coleções ativas
-  const options = await fetchAvailableColecoesWithDescriptions({
-    company,
-    range: { start, end: now },
-    filial: null,
-  }).catch(() => []);
+  const map = await withRequest(async (req) => {
+    const r = await req.query<{ cod: string; descricao: string | null }>(
+      `SELECT
+         UPPER(LTRIM(RTRIM(ISNULL(COLECAO, '')))) AS cod,
+         MAX(LTRIM(RTRIM(ISNULL(DESC_COLECAO, '')))) AS descricao
+       FROM COLECOES WITH (NOLOCK)
+       WHERE ISNULL(COLECAO, '') <> ''
+       GROUP BY UPPER(LTRIM(RTRIM(ISNULL(COLECAO, ''))))`
+    );
+    const m = new Map<string, string>();
+    for (const row of r.recordset) {
+      const cod = (row.cod ?? "").trim().toUpperCase();
+      const desc = (row.descricao ?? "").trim();
+      // Ignora descrição que é só o próprio código (não agrega leitura).
+      if (cod) m.set(cod, desc && desc.toUpperCase() !== cod ? desc : "");
+    }
+    return m;
+  }).catch(() => new Map<string, string>());
 
-  const map = new Map<string, string>();
-  for (const o of options) {
-    const code = (o.value ?? "").trim().toUpperCase();
-    if (code) map.set(code, o.label ?? code);
-  }
-  labelMapCache.set(company, { expires: Date.now() + CACHE_TTL_MS, map });
+  descCache = { expires: Date.now() + CACHE_TTL_MS, map };
   return map;
 }
 
@@ -80,18 +78,19 @@ export async function applyColecaoLabels(
   if (company !== "scarfme" || rows.length === 0) return;
 
   const produtos = rows.map((r) => String(r.PRODUTO ?? "").trim()).filter(Boolean);
-  const [labelMap, codeByProduto] = await Promise.all([
-    getColecaoLabelMap(company),
+  const [descByCode, codeByProduto] = await Promise.all([
+    getColecaoDescMap(),
     fetchColecaoCodeByProduto(produtos),
   ]);
 
   for (const r of rows) {
     const produto = String(r.PRODUTO ?? "").trim();
     const code = codeByProduto.get(produto) ?? "";
-    const label = code ? labelMap.get(code) ?? code : "";
-    r.COLECAO = label; // tela: "DESC (COD)" numa coluna só
+    const desc = code ? descByCode.get(code) ?? "" : "";
+    // Tela: "DESC (COD)" numa coluna só (cai no próprio código se faltar descrição).
+    r.COLECAO = code ? (desc ? `${desc} (${code})` : code) : "";
     // XLSX: descrição e código separados (ver exportRelatorioXlsx).
-    r[ROW_COLECAO_DESC_FIELD] = code ? descFromLabel(label, code) : "";
+    r[ROW_COLECAO_DESC_FIELD] = desc;
     r[ROW_COLECAO_COD_FIELD] = code;
   }
 }

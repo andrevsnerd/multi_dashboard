@@ -948,6 +948,7 @@ export interface ProdutoParadoDetalhado {
   grupo: string;
   subgrupo: string;
   colecao: string;
+  tipo: string;
   estoque: number;
   diasParado: number;
   ultimaVenda: string | null;
@@ -1036,6 +1037,7 @@ export async function fetchProdutosParadosDetalhado({
         ISNULL(p.GRUPO_PRODUTO, '') AS grupo,
         ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
         ISNULL(p.COLECAO, '') AS colecao,
+        ISNULL(p.TIPO_PRODUTO, '') AS tipo,
         SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoque,
         uv.ultimaVenda,
         CASE
@@ -1070,6 +1072,7 @@ export async function fetchProdutosParadosDetalhado({
         p.GRUPO_PRODUTO,
         p.SUBGRUPO_PRODUTO,
         p.COLECAO,
+        p.TIPO_PRODUTO,
         uv.ultimaVenda
       HAVING SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) > 0
       ORDER BY
@@ -1090,6 +1093,7 @@ export async function fetchProdutosParadosDetalhado({
       grupo: string;
       subgrupo: string;
       colecao: string;
+      tipo: string;
       estoque: number;
       ultimaVenda: Date | null;
       diasParado: number;
@@ -1106,6 +1110,7 @@ export async function fetchProdutosParadosDetalhado({
       grupo: r.grupo ?? '',
       subgrupo: r.subgrupo ?? '',
       colecao: r.colecao ?? '',
+      tipo: r.tipo ?? '',
       estoque: Number(r.estoque) || 0,
       diasParado: Number(r.diasParado) || 0,
       ultimaVenda: r.ultimaVenda instanceof Date
