@@ -345,6 +345,11 @@ export default function ProductDetailPage({
               availableColors,
               detail: {
                 ...productData.detail,
+                registrationDate: productData.detail.registrationDate
+                  ? productData.detail.registrationDate instanceof Date
+                    ? productData.detail.registrationDate
+                    : new Date(productData.detail.registrationDate)
+                  : null,
                 lastEntryDate: productData.detail.lastEntryDate
                   ? productData.detail.lastEntryDate instanceof Date
                     ? productData.detail.lastEntryDate
@@ -521,6 +526,12 @@ export default function ProductDetailPage({
           <div className={styles.productCodeRow}>
             <span className={styles.productCodeLabel}>COD</span>
             <span className={styles.productCodeValue}>{data.detail.productId}</span>
+            {data.detail.barcode && (
+              <>
+                <span className={styles.productCodeLabel}>COD. BARRAS</span>
+                <span className={styles.productCodeValue}>{data.detail.barcode}</span>
+              </>
+            )}
           </div>
 
           <div className={styles.productMetaRow}>
@@ -563,6 +574,16 @@ export default function ProductDetailPage({
                   </button>
                 )}
               </div>
+            )}
+
+            {data.detail.registrationDate && (
+              <span className={styles.lastEntryInline}>
+                Data de cadastro:{" "}
+                {(data.detail.registrationDate instanceof Date
+                  ? data.detail.registrationDate
+                  : new Date(data.detail.registrationDate)
+                ).toLocaleDateString("pt-BR")}
+              </span>
             )}
 
             {data.detail.lastEntryDate && (

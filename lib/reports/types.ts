@@ -52,6 +52,11 @@ export interface ReportPresetDef {
    * dinâmicas (dependem da empresa) — vêm em `ReportResult.dynamicColumns`.
    */
   dynamicFilialStock?: boolean;
+  /**
+   * Quando true (junto de `dynamicFilialStock`), anexa também a quantidade vendida
+   * por filial, INTERCALADA com o estoque: por filial → "{filial} Venda", "{filial} Estoque".
+   */
+  dynamicFilialSales?: boolean;
 }
 
 export type ReportFilterKey =
@@ -106,6 +111,8 @@ export interface ReportFilters {
   diasParadoModo?: "lte" | "gte" | null;
   /** Quando true, calcula e anexa estoque por filial (rede inteira) por linha. */
   estoquePorFilial?: boolean;
+  /** Quando true, calcula e anexa a quantidade vendida por filial (rede inteira) por linha. */
+  vendasPorFilial?: boolean;
   /** Estoque por filial: além dos positivos, lista também itens zerados (saldo 0 em tudo). */
   incluirZerados?: boolean;
   /** Estoque por filial: além dos positivos, lista também itens só negativos. */

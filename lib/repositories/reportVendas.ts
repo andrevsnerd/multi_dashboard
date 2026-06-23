@@ -3,6 +3,7 @@ import {
   fetchMultipleProductsStockByColorPorFilial,
   type FilialStockBreakdown,
 } from "@/lib/repositories/inventory";
+import { fetchProdutoQtdePorFilial } from "@/lib/repositories/performance";
 import { fetchSalesTotals } from "@/lib/services/salesTotals";
 import { applyColecaoLabels } from "@/lib/repositories/colecao";
 import { resolveCompanyLive } from "@/lib/server/company-live";
@@ -10,6 +11,7 @@ import {
   getOperationalFilials,
   getFilialLabelForDisplay,
   compareFilialDisplayOrder,
+  type CompanyKey,
 } from "@/lib/config/company";
 import { normalizeRangeForQuery } from "@/lib/utils/date";
 import { canonicalKey, ROW_COR_FIELD } from "@/lib/reports/keys";
@@ -59,6 +61,9 @@ async function buildTransitIndex(
 
 /** Prefixo das chaves das colunas dinâmicas de estoque por filial. */
 const FILIAL_COL_PREFIX = "ESTOQUE_FILIAL::";
+
+/** Prefixo das chaves das colunas dinâmicas de venda (qtde) por filial. */
+const VENDA_FILIAL_COL_PREFIX = "VENDA_FILIAL::";
 
 /** Limite alto por padrão; a página pode reduzir. Sinaliza `truncated` se exceder. */
 const DEFAULT_LIMIT = 5000;
@@ -184,27 +189,21 @@ export async function fetchVendasFaturamento(
     }
   }
 
-  // Estoque por filial (opcional). Gera uma coluna por filial (rede inteira, SEMPRE —
-  // independente do filtro de filial das vendas) + um ESTOQUE_TOTAL coerente com a soma.
-  // Por filial: pos>0?pos:neg (mesma regra de visualização). Total da rede: (Σpos)>0?Σpos:Σneg.
+  // Estoque e/ou venda por filial (opcional). Gera colunas por filial (rede inteira,
+  // SEMPRE — independente do filtro de filial das vendas). Quando ambos estão ligados,
+  // as colunas vêm INTERCALADAS por filial: "{filial} Venda", "{filial} Estoque".
+  // Estoque por filial: pos>0?pos:neg (regra de visualização). Total da rede: (Σpos)>0?Σpos:Σneg.
+  // Venda por filial: qtde líquida vendida no período (mesma fonte da Curva ABC / visão geral).
   let dynamicColumns: ReportColumnDef[] | undefined;
   const estoquePorFilialByKey = new Map<
     string,
     { total: number; porLabel: Map<string, number> }
   >();
+  const vendaPorFilialByKey = new Map<string, Map<string, number>>();
+  const wantsFilialBreakdown = filters.estoquePorFilial || filters.vendasPorFilial;
 
-  if (filters.estoquePorFilial && sliced.length > 0) {
+  if (wantsFilialBreakdown && sliced.length > 0) {
     const company = await resolveCompanyLive(filters.company);
-    const pairs = sliced.map((d) => ({
-      productId: String(d.productId ?? "").trim(),
-      corProduto: d.corProduto ?? null,
-    }));
-    const breakdown: Map<string, Map<string, FilialStockBreakdown>> =
-      await fetchMultipleProductsStockByColorPorFilial(pairs, {
-        company: filters.company,
-        filial: null, // sempre a rede inteira ("onde o produto está")
-      }).catch(() => new Map<string, Map<string, FilialStockBreakdown>>());
-
     const labelSet = new Set<string>();
     if (company) {
       for (const f of getOperationalFilials(company, "inventory")) {
@@ -212,44 +211,112 @@ export async function fetchVendasFaturamento(
       }
     }
 
-    for (const d of sliced) {
-      const pid = String(d.productId ?? "").trim();
-      const cor = d.corProduto ? String(d.corProduto).trim() : null;
-      const key = cor ? `${pid}-${cor}` : `${pid}-null`;
-      const byFilial = breakdown.get(key);
-      const porLabel = new Map<string, number>();
-      let sumPos = 0;
-      let sumNeg = 0;
-      if (byFilial) {
-        const posByLabel = new Map<string, number>();
-        const negByLabel = new Map<string, number>();
-        byFilial.forEach((b) => {
-          const label = company ? getFilialLabelForDisplay(company, b.filial) : b.filial;
-          labelSet.add(label);
-          posByLabel.set(label, (posByLabel.get(label) ?? 0) + b.positiveStock);
-          negByLabel.set(label, (negByLabel.get(label) ?? 0) + b.negativeStock);
-        });
-        posByLabel.forEach((pos, label) => {
-          const neg = negByLabel.get(label) ?? 0;
-          porLabel.set(label, pos > 0 ? pos : neg);
-          sumPos += pos;
-          sumNeg += neg;
+    // ── Estoque por filial ────────────────────────────────────────────────────
+    if (filters.estoquePorFilial) {
+      const pairs = sliced.map((d) => ({
+        productId: String(d.productId ?? "").trim(),
+        corProduto: d.corProduto ?? null,
+      }));
+      const breakdown: Map<string, Map<string, FilialStockBreakdown>> =
+        await fetchMultipleProductsStockByColorPorFilial(pairs, {
+          company: filters.company,
+          filial: null, // sempre a rede inteira ("onde o produto está")
+        }).catch(() => new Map<string, Map<string, FilialStockBreakdown>>());
+
+      for (const d of sliced) {
+        const pid = String(d.productId ?? "").trim();
+        const cor = d.corProduto ? String(d.corProduto).trim() : null;
+        const key = cor ? `${pid}-${cor}` : `${pid}-null`;
+        const byFilial = breakdown.get(key);
+        const porLabel = new Map<string, number>();
+        let sumPos = 0;
+        let sumNeg = 0;
+        if (byFilial) {
+          const posByLabel = new Map<string, number>();
+          const negByLabel = new Map<string, number>();
+          byFilial.forEach((b) => {
+            const label = company ? getFilialLabelForDisplay(company, b.filial) : b.filial;
+            labelSet.add(label);
+            posByLabel.set(label, (posByLabel.get(label) ?? 0) + b.positiveStock);
+            negByLabel.set(label, (negByLabel.get(label) ?? 0) + b.negativeStock);
+          });
+          posByLabel.forEach((pos, label) => {
+            const neg = negByLabel.get(label) ?? 0;
+            porLabel.set(label, pos > 0 ? pos : neg);
+            sumPos += pos;
+            sumNeg += neg;
+          });
+        }
+        estoquePorFilialByKey.set(key, {
+          total: sumPos > 0 ? sumPos : sumNeg,
+          porLabel,
         });
       }
-      estoquePorFilialByKey.set(key, {
-        total: sumPos > 0 ? sumPos : sumNeg,
-        porLabel,
-      });
+    }
+
+    // ── Venda (qtde) por filial ───────────────────────────────────────────────
+    if (filters.vendasPorFilial && company) {
+      const ecommerceFilials = new Set(company.ecommerceFilials ?? []);
+      const salesFiliais = company.filialFilters.sales ?? [];
+      const posNames = salesFiliais.filter((f) => !ecommerceFilials.has(f));
+      const ecomNames = salesFiliais.filter((f) => ecommerceFilials.has(f));
+      const range = normalizeRangeForQuery({ start: filters.start, end: filters.end });
+
+      const qtdeRows = await fetchProdutoQtdePorFilial(
+        (filters.company ?? "") as CompanyKey,
+        posNames,
+        ecomNames,
+        range,
+        { groupByCor: true }
+      ).catch(() => []);
+
+      // Indexa por produto×cor canônica → label → qtde (somando rótulos que se repetem,
+      // ex.: e-commerce / grupos de filial → mesmo label de exibição).
+      const byCanonical = new Map<string, Map<string, number>>();
+      for (const r of qtdeRows) {
+        const label = getFilialLabelForDisplay(company, r.filial);
+        if (!label) continue;
+        labelSet.add(label);
+        const k = canonicalKey(r.produto, r.cor || null);
+        let porLabel = byCanonical.get(k);
+        if (!porLabel) {
+          porLabel = new Map<string, number>();
+          byCanonical.set(k, porLabel);
+        }
+        porLabel.set(label, (porLabel.get(label) ?? 0) + Number(r.qtde ?? 0));
+      }
+
+      for (const d of sliced) {
+        const pid = String(d.productId ?? "").trim();
+        const cor = d.corProduto ? String(d.corProduto).trim() : null;
+        const key = cor ? `${pid}-${cor}` : `${pid}-null`;
+        vendaPorFilialByKey.set(key, byCanonical.get(canonicalKey(pid, cor)) ?? new Map());
+      }
     }
 
     const orderedLabels = Array.from(labelSet).sort((a, b) =>
       company ? compareFilialDisplayOrder(a, b, company) : a.localeCompare(b, "pt-BR")
     );
-    dynamicColumns = orderedLabels.map((label) => ({
-      key: `${FILIAL_COL_PREFIX}${label}`,
-      defaultLabel: label,
-      type: "int" as const,
-    }));
+
+    const bothModes = !!filters.estoquePorFilial && !!filters.vendasPorFilial;
+    dynamicColumns = orderedLabels.flatMap((label) => {
+      const cols: ReportColumnDef[] = [];
+      if (filters.vendasPorFilial) {
+        cols.push({
+          key: `${VENDA_FILIAL_COL_PREFIX}${label}`,
+          defaultLabel: bothModes ? `${label} Venda` : label,
+          type: "int" as const,
+        });
+      }
+      if (filters.estoquePorFilial) {
+        cols.push({
+          key: `${FILIAL_COL_PREFIX}${label}`,
+          defaultLabel: bothModes ? `${label} Estoque` : label,
+          type: "int" as const,
+        });
+      }
+      return cols;
+    });
   }
 
   // Projeção/duração: ritmo diário medido no período selecionado, projetado para o
@@ -315,10 +382,19 @@ export async function fetchVendasFaturamento(
     }
 
     if (filters.estoquePorFilial) {
-      const est = estoquePorFilialByKey.get(rowKey);
-      row.ESTOQUE_TOTAL = roundInt(est?.total ?? 0);
+      row.ESTOQUE_TOTAL = roundInt(estoquePorFilialByKey.get(rowKey)?.total ?? 0);
+    }
+    if (wantsFilialBreakdown) {
+      const estPorLabel = estoquePorFilialByKey.get(rowKey)?.porLabel;
+      const vendaPorLabel = vendaPorFilialByKey.get(rowKey);
       for (const col of dynamicColumns ?? []) {
-        row[col.key] = roundInt(est?.porLabel.get(col.defaultLabel) ?? 0);
+        if (col.key.startsWith(VENDA_FILIAL_COL_PREFIX)) {
+          const label = col.key.slice(VENDA_FILIAL_COL_PREFIX.length);
+          row[col.key] = roundInt(vendaPorLabel?.get(label) ?? 0);
+        } else if (col.key.startsWith(FILIAL_COL_PREFIX)) {
+          const label = col.key.slice(FILIAL_COL_PREFIX.length);
+          row[col.key] = roundInt(estPorLabel?.get(label) ?? 0);
+        }
       }
     }
 

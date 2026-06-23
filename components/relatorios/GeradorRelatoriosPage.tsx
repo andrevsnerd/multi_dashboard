@@ -40,6 +40,8 @@ type SortDir = "asc" | "desc";
 const SYNTHETIC_NEW = "__new__";
 /** Prefixo das chaves das colunas dinâmicas de estoque por filial (espelha o backend). */
 const FILIAL_COL_PREFIX = "ESTOQUE_FILIAL::";
+/** Prefixo das chaves das colunas dinâmicas de venda por filial (espelha o backend). */
+const VENDA_FILIAL_COL_PREFIX = "VENDA_FILIAL::";
 
 // ---------- helpers ----------
 
@@ -195,6 +197,12 @@ export default function GeradorRelatoriosPage({
   // Preset ativo pede estoque por filial? (só presets builtin carregam a flag)
   const wantsFilialStock = useMemo(
     () => !!allPresets.builtin.find((p) => p.id === activePresetId)?.dynamicFilialStock,
+    [allPresets, activePresetId]
+  );
+
+  // Preset ativo pede venda por filial? (intercala "{filial} Venda" com o estoque)
+  const wantsFilialSales = useMemo(
+    () => !!allPresets.builtin.find((p) => p.id === activePresetId)?.dynamicFilialSales,
     [allPresets, activePresetId]
   );
 
@@ -386,7 +394,7 @@ export default function GeradorRelatoriosPage({
       const extraSources = computeExtraSources(reportTypeId, enabledKeys, baseKeys);
       const srcQs = extraSources.map((s) => `&src=${encodeURIComponent(s)}`).join("");
       const compraIdealQs = enabledKeys.includes("COMPRA_IDEAL") ? "&compraIdeal=1" : "";
-      const url = `/api/relatorios/dados?reportType=${encodeURIComponent(reportTypeId)}&${qs}${wantsFilialStock ? "&estoquePorFilial=1" : ""}${srcQs}${compraIdealQs}`;
+      const url = `/api/relatorios/dados?reportType=${encodeURIComponent(reportTypeId)}&${qs}${wantsFilialStock ? "&estoquePorFilial=1" : ""}${wantsFilialSales ? "&vendasPorFilial=1" : ""}${srcQs}${compraIdealQs}`;
       const res = await fetch(url, { cache: "no-store" });
       const json = await res.json();
       if (!res.ok) {
@@ -406,7 +414,10 @@ export default function GeradorRelatoriosPage({
       setDynamicColumns(dyn);
       setWorkingColumns((cols) => {
         const stripped = cols.filter(
-          (c) => c.key !== "CODIGO_BARRA" && !c.key.startsWith(FILIAL_COL_PREFIX)
+          (c) =>
+            c.key !== "CODIGO_BARRA" &&
+            !c.key.startsWith(FILIAL_COL_PREFIX) &&
+            !c.key.startsWith(VENDA_FILIAL_COL_PREFIX)
         );
         const existing = new Set(stripped.map((c) => c.key));
         const appended = dyn
@@ -423,7 +434,7 @@ export default function GeradorRelatoriosPage({
     } finally {
       setLoading(false);
     }
-  }, [buildQuery, wantsFilialStock, reportTypeId, workingColumns, catalog]);
+  }, [buildQuery, wantsFilialStock, wantsFilialSales, reportTypeId, workingColumns, catalog]);
 
   // ---------- ordenação client-side ----------
   const enabledColumns = useMemo(

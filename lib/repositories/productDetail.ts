@@ -169,6 +169,13 @@ export interface ProductDetailInfo {
   linha?: string | null;
   /** Subgrupo do produto (PRODUTOS.SUBGRUPO_PRODUTO) — usado na regra de cobertura. */
   subgrupo?: string | null;
+  /** Data de cadastro do produto (PRODUTOS.DATA_CADASTRAMENTO). */
+  registrationDate: Date | null;
+  /**
+   * Código de barras da variação (produto × cor). Só é preenchido quando UMA cor
+   * está selecionada, pois o código de barras é por cor. null caso contrário.
+   */
+  barcode: string | null;
   lastEntryDate: Date | null;
   lastEntryFilial: string | null;
   totalRevenue: number;
@@ -907,6 +914,7 @@ export async function fetchProductDetail({
         ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
         ISNULL(p.CUSTO_REPOSICAO1, 0) AS registeredCost,
         ISNULL(p.PRECO_REPOSICAO_1, 0) AS registeredPrice,
+        p.DATA_CADASTRAMENTO AS registrationDate,
         (
           SELECT TOP 1
             E.EMISSAO
@@ -937,6 +945,7 @@ export async function fetchProductDetail({
       subgrupo: string | null;
       registeredCost: number;
       registeredPrice: number;
+      registrationDate: Date | null;
       lastEntryDate: Date | null;
       lastEntryFilial: string | null;
     }>(productQuery);
@@ -949,6 +958,7 @@ export async function fetchProductDetail({
       subgrupo: null,
       registeredCost: 0,
       registeredPrice: 0,
+      registrationDate: null,
       lastEntryDate: null,
       lastEntryFilial: null,
     };
@@ -1219,9 +1229,17 @@ export async function fetchProductDetail({
     // Converter lastEntryDate para Date se existir
     let lastEntryDate: Date | null = null;
     if (productRow.lastEntryDate) {
-      lastEntryDate = productRow.lastEntryDate instanceof Date 
-        ? productRow.lastEntryDate 
+      lastEntryDate = productRow.lastEntryDate instanceof Date
+        ? productRow.lastEntryDate
         : new Date(productRow.lastEntryDate);
+    }
+
+    // Converter registrationDate para Date se existir
+    let registrationDate: Date | null = null;
+    if (productRow.registrationDate) {
+      registrationDate = productRow.registrationDate instanceof Date
+        ? productRow.registrationDate
+        : new Date(productRow.registrationDate);
     }
 
     // Aplicar mapeamento para lastEntryFilial
@@ -1229,12 +1247,46 @@ export async function fetchProductDetail({
       ? (displayNames[productRow.lastEntryFilial] ?? productRow.lastEntryFilial)
       : null;
 
+    // Código de barras (produto × cor): só faz sentido com UMA cor selecionada,
+    // pois cada cor tem o seu. Mesma regra de "menor código" do export (não EAN).
+    let barcode: string | null = null;
+    const singleColor =
+      colors && colors.length === 1 ? String(colors[0] ?? '').trim() : null;
+    if (singleColor !== null) {
+      request.input('barcodeCor', sql.VarChar, singleColor);
+      const barcodeQuery = `
+        SELECT TOP 1 LTRIM(RTRIM(pb.CODIGO_BARRA)) AS codigoBarra
+        FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+        WHERE ISNULL(pb.INATIVO, 0) = 0
+          AND pb.CODIGO_BARRA IS NOT NULL
+          AND LTRIM(RTRIM(pb.CODIGO_BARRA)) <> ''
+          AND pb.PRODUTO = @productId
+          AND (
+            LTRIM(RTRIM(ISNULL(pb.COR_PRODUTO, ''))) = @barcodeCor
+            OR TRY_CONVERT(INT, pb.COR_PRODUTO) = TRY_CONVERT(INT, @barcodeCor)
+          )
+        ORDER BY
+          CASE
+            WHEN LTRIM(RTRIM(CAST(pb.TIPO_COD_BAR AS VARCHAR(10)))) = '3' THEN 0
+            WHEN LEN(LTRIM(RTRIM(pb.CODIGO_BARRA))) <= 8 THEN 1
+            WHEN LTRIM(RTRIM(CAST(pb.TIPO_COD_BAR AS VARCHAR(10)))) = '1' THEN 2
+            ELSE 3
+          END,
+          pb.DATA_PARA_TRANSFERENCIA DESC,
+          pb.CODIGO_BARRA
+      `;
+      const barcodeResult = await request.query<{ codigoBarra: string }>(barcodeQuery);
+      barcode = (barcodeResult.recordset[0]?.codigoBarra ?? '').trim() || null;
+    }
+
     return {
       productId: productRow.productId,
       productName: productRow.productName || 'Produto não encontrado',
       grade: (productRow.grade ?? '').trim() || null,
       linha: (productRow.linha ?? '').trim() || null,
       subgrupo: (productRow.subgrupo ?? '').trim() || null,
+      registrationDate,
+      barcode,
       lastEntryDate,
       lastEntryFilial: lastEntryFilialDisplayName,
       totalRevenue,
