@@ -712,6 +712,8 @@ export interface ProdutoQtdePorFilialRow {
   cor: string;
   filial: string;
   qtde: number;
+  /** Faturamento líquido (valor) vendido na filial — trocas/descontos já abatidos. */
+  vendas: number;
 }
 
 /**
@@ -729,7 +731,7 @@ export async function fetchProdutoQtdePorFilial(
   const start = range.start;
   const end = range.end;
 
-  type RawRow = { PRODUTO: string; FILIAL: string; QTDE: number; COR_PRODUTO?: string };
+  type RawRow = { PRODUTO: string; FILIAL: string; QTDE: number; VENDAS?: number; COR_PRODUTO?: string };
 
   const runPos = (): Promise<ProdutoQtdePorFilialRow[]> => {
     if (posFilialNames.length === 0) return Promise.resolve([]);
@@ -749,6 +751,8 @@ export async function fetchProdutoQtdePorFilial(
             ISNULL(vp.COR_PRODUTO, '') AS COR_PRODUTO,
             vp.TAMANHO,
             vp.QTDE,
+            vp.PRECO_LIQUIDO,
+            CAST((vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) AS DECIMAL(38,6)) AS DESCONTO_VENDA,
             f.FILIAL
           FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
           INNER JOIN LOJA_VENDA v WITH (NOLOCK)
@@ -767,7 +771,8 @@ export async function fetchProdutoQtdePorFilial(
             vt.PRODUTO,
             ISNULL(vt.COR_PRODUTO, '') AS COR_PRODUTO,
             vt.TAMANHO,
-            SUM(vt.QTDE) AS QTDE_TROCA
+            SUM(vt.QTDE) AS QTDE_TROCA,
+            CAST(SUM(vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS VALOR_TROCA
           FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
           INNER JOIN LOJA_VENDA v WITH (NOLOCK)
             ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
@@ -784,6 +789,7 @@ export async function fetchProdutoQtdePorFilial(
             vt.PRODUTO,
             ISNULL(vt.COR_PRODUTO, '') AS COR_PRODUTO,
             f.FILIAL,
+            CAST((0 - vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS VALOR_LIQUIDO_CALC,
             (0 - vt.QTDE) AS QTDE_LIQUIDA_CALC
           FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
           INNER JOIN LOJA_VENDA v WITH (NOLOCK)
@@ -811,6 +817,8 @@ export async function fetchProdutoQtdePorFilial(
             vb.COR_PRODUTO,
             vb.TAMANHO,
             vb.QTDE,
+            vb.PRECO_LIQUIDO,
+            vb.DESCONTO_VENDA,
             vb.TICKET,
             vb.CODIGO_FILIAL,
             ROW_NUMBER() OVER (
@@ -824,6 +832,11 @@ export async function fetchProdutoQtdePorFilial(
             vcn.FILIAL,
             vcn.PRODUTO,
             vcn.COR_PRODUTO,
+            CAST(
+              CAST(vcn.PRECO_LIQUIDO * vcn.QTDE AS DECIMAL(38,6))
+              - CAST(vcn.DESCONTO_VENDA AS DECIMAL(38,6))
+              - CAST(CASE WHEN vcn.RN = 1 THEN ISNULL(ti.VALOR_TROCA, 0) ELSE 0 END AS DECIMAL(38,6))
+            AS DECIMAL(38,6)) AS VALOR_LIQUIDO_CALC,
             (vcn.QTDE - CASE WHEN vcn.RN = 1 THEN ISNULL(ti.QTDE_TROCA, 0) ELSE 0 END) AS QTDE_LIQUIDA_CALC
           FROM VendasComNumero vcn
           LEFT JOIN trocas_item ti
@@ -837,6 +850,7 @@ export async function fetchProdutoQtdePorFilial(
             tp.FILIAL,
             tp.PRODUTO,
             tp.COR_PRODUTO,
+            tp.VALOR_LIQUIDO_CALC,
             tp.QTDE_LIQUIDA_CALC
           FROM TrocasPuras tp
         )
@@ -844,7 +858,8 @@ export async function fetchProdutoQtdePorFilial(
           ISNULL(m.PRODUTO, '') AS PRODUTO,
           ${corSelect}
           ISNULL(m.FILIAL, '') AS FILIAL,
-          SUM(m.QTDE_LIQUIDA_CALC) AS QTDE
+          SUM(m.QTDE_LIQUIDA_CALC) AS QTDE,
+          SUM(m.VALOR_LIQUIDO_CALC) AS VENDAS
         FROM movimentos m
         WHERE m.FILIAL IS NOT NULL
         GROUP BY ISNULL(m.PRODUTO, ''), ISNULL(m.FILIAL, '')${corGroup}
@@ -856,6 +871,7 @@ export async function fetchProdutoQtdePorFilial(
           cor: groupByCor ? (r.COR_PRODUTO?.trim() ?? '') : '',
           filial: r.FILIAL?.trim() ?? '',
           qtde: Number(r.QTDE ?? 0),
+          vendas: Number(r.VENDAS ?? 0),
         }))
         .filter(r => r.produto !== '');
     });
@@ -875,7 +891,8 @@ export async function fetchProdutoQtdePorFilial(
           ISNULL(fp.PRODUTO, '') AS PRODUTO,
           ${corSelect}
           ISNULL(f.FILIAL, '') AS FILIAL,
-          SUM(fp.QTDE) AS QTDE
+          SUM(fp.QTDE) AS QTDE,
+          SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS VENDAS
         FROM FATURAMENTO f WITH (NOLOCK)
         JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
           ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
@@ -893,6 +910,7 @@ export async function fetchProdutoQtdePorFilial(
           cor: groupByCor ? (r.COR_PRODUTO?.trim() ?? '') : '',
           filial: r.FILIAL?.trim() ?? '',
           qtde: Number(r.QTDE ?? 0),
+          vendas: Number(r.VENDAS ?? 0),
         }))
         .filter(r => r.produto !== '');
     });
@@ -903,8 +921,12 @@ export async function fetchProdutoQtdePorFilial(
   for (const r of [...posRows, ...ecomRows]) {
     const k = `${r.produto}||${r.cor}||${r.filial}`;
     const ex = merged.get(k);
-    if (ex) ex.qtde += r.qtde;
-    else merged.set(k, { ...r });
+    if (ex) {
+      ex.qtde += r.qtde;
+      ex.vendas += r.vendas;
+    } else {
+      merged.set(k, { ...r });
+    }
   }
   return Array.from(merged.values());
 }

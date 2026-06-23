@@ -62,8 +62,11 @@ async function buildTransitIndex(
 /** Prefixo das chaves das colunas dinâmicas de estoque por filial. */
 const FILIAL_COL_PREFIX = "ESTOQUE_FILIAL::";
 
-/** Prefixo das chaves das colunas dinâmicas de venda (qtde) por filial. */
+/** Prefixo das chaves das colunas dinâmicas de venda (faturamento) por filial. */
 const VENDA_FILIAL_COL_PREFIX = "VENDA_FILIAL::";
+
+/** Prefixo das chaves das colunas dinâmicas de quantidade vendida por filial. */
+const QTD_FILIAL_COL_PREFIX = "QTD_FILIAL::";
 
 /** Limite alto por padrão; a página pode reduzir. Sinaliza `truncated` se exceder. */
 const DEFAULT_LIMIT = 5000;
@@ -199,7 +202,9 @@ export async function fetchVendasFaturamento(
     string,
     { total: number; porLabel: Map<string, number> }
   >();
-  const vendaPorFilialByKey = new Map<string, Map<string, number>>();
+  // Por filial: faturamento (valor) e quantidade vendida, separados.
+  const vendaFatPorFilialByKey = new Map<string, Map<string, number>>();
+  const vendaQtdPorFilialByKey = new Map<string, Map<string, number>>();
   const wantsFilialBreakdown = filters.estoquePorFilial || filters.vendasPorFilial;
 
   if (wantsFilialBreakdown && sliced.length > 0) {
@@ -270,27 +275,36 @@ export async function fetchVendasFaturamento(
         { groupByCor: true }
       ).catch(() => []);
 
-      // Indexa por produto×cor canônica → label → qtde (somando rótulos que se repetem,
-      // ex.: e-commerce / grupos de filial → mesmo label de exibição).
-      const byCanonical = new Map<string, Map<string, number>>();
+      // Indexa por produto×cor canônica → label → {fat, qtde} (somando rótulos que se
+      // repetem, ex.: e-commerce / grupos de filial → mesmo label de exibição).
+      const fatByCanonical = new Map<string, Map<string, number>>();
+      const qtdByCanonical = new Map<string, Map<string, number>>();
       for (const r of qtdeRows) {
         const label = getFilialLabelForDisplay(company, r.filial);
         if (!label) continue;
         labelSet.add(label);
         const k = canonicalKey(r.produto, r.cor || null);
-        let porLabel = byCanonical.get(k);
-        if (!porLabel) {
-          porLabel = new Map<string, number>();
-          byCanonical.set(k, porLabel);
+        let fatLabel = fatByCanonical.get(k);
+        if (!fatLabel) {
+          fatLabel = new Map<string, number>();
+          fatByCanonical.set(k, fatLabel);
         }
-        porLabel.set(label, (porLabel.get(label) ?? 0) + Number(r.qtde ?? 0));
+        fatLabel.set(label, (fatLabel.get(label) ?? 0) + Number(r.vendas ?? 0));
+        let qtdLabel = qtdByCanonical.get(k);
+        if (!qtdLabel) {
+          qtdLabel = new Map<string, number>();
+          qtdByCanonical.set(k, qtdLabel);
+        }
+        qtdLabel.set(label, (qtdLabel.get(label) ?? 0) + Number(r.qtde ?? 0));
       }
 
       for (const d of sliced) {
         const pid = String(d.productId ?? "").trim();
         const cor = d.corProduto ? String(d.corProduto).trim() : null;
         const key = cor ? `${pid}-${cor}` : `${pid}-null`;
-        vendaPorFilialByKey.set(key, byCanonical.get(canonicalKey(pid, cor)) ?? new Map());
+        const ck = canonicalKey(pid, cor);
+        vendaFatPorFilialByKey.set(key, fatByCanonical.get(ck) ?? new Map());
+        vendaQtdPorFilialByKey.set(key, qtdByCanonical.get(ck) ?? new Map());
       }
     }
 
@@ -298,20 +312,26 @@ export async function fetchVendasFaturamento(
       company ? compareFilialDisplayOrder(a, b, company) : a.localeCompare(b, "pt-BR")
     );
 
-    const bothModes = !!filters.estoquePorFilial && !!filters.vendasPorFilial;
+    // Por filial, na ordem: "{filial} Venda" (faturamento), "{filial} Qtd" (quantidade),
+    // "{filial} Estoque". Quando só estoque está ligado, a coluna mantém só o nome da filial.
     dynamicColumns = orderedLabels.flatMap((label) => {
       const cols: ReportColumnDef[] = [];
       if (filters.vendasPorFilial) {
         cols.push({
           key: `${VENDA_FILIAL_COL_PREFIX}${label}`,
-          defaultLabel: bothModes ? `${label} Venda` : label,
+          defaultLabel: `${label} Venda`,
+          type: "currency" as const,
+        });
+        cols.push({
+          key: `${QTD_FILIAL_COL_PREFIX}${label}`,
+          defaultLabel: `${label} Qtd`,
           type: "int" as const,
         });
       }
       if (filters.estoquePorFilial) {
         cols.push({
           key: `${FILIAL_COL_PREFIX}${label}`,
-          defaultLabel: bothModes ? `${label} Estoque` : label,
+          defaultLabel: filters.vendasPorFilial ? `${label} Estoque` : label,
           type: "int" as const,
         });
       }
@@ -386,11 +406,15 @@ export async function fetchVendasFaturamento(
     }
     if (wantsFilialBreakdown) {
       const estPorLabel = estoquePorFilialByKey.get(rowKey)?.porLabel;
-      const vendaPorLabel = vendaPorFilialByKey.get(rowKey);
+      const fatPorLabel = vendaFatPorFilialByKey.get(rowKey);
+      const qtdPorLabel = vendaQtdPorFilialByKey.get(rowKey);
       for (const col of dynamicColumns ?? []) {
         if (col.key.startsWith(VENDA_FILIAL_COL_PREFIX)) {
           const label = col.key.slice(VENDA_FILIAL_COL_PREFIX.length);
-          row[col.key] = roundInt(vendaPorLabel?.get(label) ?? 0);
+          row[col.key] = round2(fatPorLabel?.get(label) ?? 0);
+        } else if (col.key.startsWith(QTD_FILIAL_COL_PREFIX)) {
+          const label = col.key.slice(QTD_FILIAL_COL_PREFIX.length);
+          row[col.key] = roundInt(qtdPorLabel?.get(label) ?? 0);
         } else if (col.key.startsWith(FILIAL_COL_PREFIX)) {
           const label = col.key.slice(FILIAL_COL_PREFIX.length);
           row[col.key] = roundInt(estPorLabel?.get(label) ?? 0);

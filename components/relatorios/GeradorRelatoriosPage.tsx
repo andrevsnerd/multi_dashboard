@@ -40,8 +40,9 @@ type SortDir = "asc" | "desc";
 const SYNTHETIC_NEW = "__new__";
 /** Prefixo das chaves das colunas dinâmicas de estoque por filial (espelha o backend). */
 const FILIAL_COL_PREFIX = "ESTOQUE_FILIAL::";
-/** Prefixo das chaves das colunas dinâmicas de venda por filial (espelha o backend). */
+/** Prefixos das chaves das colunas dinâmicas de venda/qtde por filial (espelha o backend). */
 const VENDA_FILIAL_COL_PREFIX = "VENDA_FILIAL::";
+const QTD_FILIAL_COL_PREFIX = "QTD_FILIAL::";
 
 // ---------- helpers ----------
 
@@ -156,6 +157,7 @@ export default function GeradorRelatoriosPage({
   const [produtoResults, setProdutoResults] = useState<Array<{ productId: string; productName: string }>>([]);
   const [produtoDropdownOpen, setProdutoDropdownOpen] = useState(false);
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchWrapRef = useRef<HTMLDivElement | null>(null);
 
   // Presets + estrutura de colunas
   const [backendPresets, setBackendPresets] = useState<ReportPreset[]>([]);
@@ -348,6 +350,28 @@ export default function GeradorRelatoriosPage({
     setProdutoResults([]);
   };
 
+  // Fecha o dropdown de sugestões ao clicar fora ou apertar Esc — mantém o texto
+  // digitado (vira `produtoSearchTerm` ao gerar, sem precisar clicar numa sugestão).
+  useEffect(() => {
+    if (!produtoDropdownOpen) return;
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      if (searchWrapRef.current && !searchWrapRef.current.contains(e.target as Node)) {
+        setProdutoDropdownOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setProdutoDropdownOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [produtoDropdownOpen]);
+
   // ---------- gerar ----------
   const buildQuery = useCallback(() => {
     const params = new URLSearchParams();
@@ -417,7 +441,8 @@ export default function GeradorRelatoriosPage({
           (c) =>
             c.key !== "CODIGO_BARRA" &&
             !c.key.startsWith(FILIAL_COL_PREFIX) &&
-            !c.key.startsWith(VENDA_FILIAL_COL_PREFIX)
+            !c.key.startsWith(VENDA_FILIAL_COL_PREFIX) &&
+            !c.key.startsWith(QTD_FILIAL_COL_PREFIX)
         );
         const existing = new Set(stripped.map((c) => c.key));
         const appended = dyn
@@ -741,13 +766,16 @@ export default function GeradorRelatoriosPage({
           {supports("nome") && (
             <div className={styles.searchField}>
               <label className={styles.fieldLabel}>Nome / código / cód. barra</label>
-              <div className={styles.searchWrap}>
+              <div className={styles.searchWrap} ref={searchWrapRef}>
                 <input
                   className={styles.input}
                   value={produtoQuery}
                   placeholder="Buscar produto..."
                   onChange={(e) => onProdutoQueryChange(e.target.value)}
                   onFocus={() => produtoResults.length > 0 && setProdutoDropdownOpen(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") setProdutoDropdownOpen(false);
+                  }}
                 />
                 {(produtoQuery || produtoSelected) && (
                   <button type="button" className={styles.clearBtn} onClick={clearProduto}>
