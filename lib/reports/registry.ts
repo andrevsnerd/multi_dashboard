@@ -16,6 +16,11 @@ import {
   produtosCadastroMeta,
   PRODUTOS_CADASTRO_ID,
 } from "./produtos-cadastro";
+import {
+  buildVendasHistoricoPresets,
+  vendasHistoricoMeta,
+  VENDAS_HISTORICO_ID,
+} from "./vendas-historico";
 
 /**
  * Registry PURO de tipos de análise (apenas metadados/colunas/presets).
@@ -28,6 +33,7 @@ import {
  */
 export const REPORT_TYPES: ReportTypeMeta[] = [
   vendasFaturamentoMeta,
+  vendasHistoricoMeta,
   estoqueRedeMeta,
   produtosParadosMeta,
   produtosCadastroMeta,
@@ -53,6 +59,9 @@ export function getDefaultPresets(id: string, companyKey: CompanyKey): ReportPre
   }
   if (id === PRODUTOS_CADASTRO_ID) {
     return buildProdutosCadastroPresets(companyKey);
+  }
+  if (id === VENDAS_HISTORICO_ID) {
+    return buildVendasHistoricoPresets();
   }
   return getReportMeta(id)?.defaultPresets ?? [];
 }

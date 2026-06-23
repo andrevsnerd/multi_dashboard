@@ -70,6 +70,9 @@ export function getEditorExtraColumns(
   baseCatalogKeys: Set<string>
 ): ReportColumnDef[] {
   const native = NATIVE_SOURCE[reportTypeId];
+  // Tipos sem fonte nativa (ex.: Histórico de vendas, no grão de transação) não
+  // participam do "misturar colunas" — o join por produto × cor não se aplica.
+  if (!native) return [];
   const out: ReportColumnDef[] = [];
   (Object.keys(SOURCE_CROSS_KEYS) as SourceId[]).forEach((src) => {
     if (src === native) return;
@@ -89,6 +92,7 @@ export function computeExtraSources(
   baseCatalogKeys: Set<string>
 ): SourceId[] {
   const native = NATIVE_SOURCE[reportTypeId];
+  if (!native) return []; // tipos sem fonte nativa não mistura colunas (ver acima)
   const needed = new Set<SourceId>();
   for (const k of enabledKeys) {
     if (baseCatalogKeys.has(k)) continue; // nativa da base

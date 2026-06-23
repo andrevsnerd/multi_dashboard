@@ -4,6 +4,7 @@ import { fetchVendasFaturamento } from "@/lib/repositories/reportVendas";
 import { fetchEstoqueRede } from "@/lib/repositories/reportEstoque";
 import { fetchProdutosParados } from "@/lib/repositories/reportProdutosParados";
 import { fetchProdutosCadastro } from "@/lib/repositories/reportProdutosCadastro";
+import { fetchVendasHistorico } from "@/lib/repositories/reportVendasHistorico";
 import { fetchMenorCodigoBarra } from "@/lib/repositories/products";
 import { runEnricher } from "./enrich.server";
 import { canonicalKey, ROW_COR_FIELD } from "./keys";
@@ -13,6 +14,7 @@ import { VENDAS_FATURAMENTO_ID } from "./vendas-faturamento";
 import { ESTOQUE_REDE_ID } from "./estoque-rede";
 import { PRODUTOS_PARADOS_ID } from "./produtos-parados";
 import { PRODUTOS_CADASTRO_ID } from "./produtos-cadastro";
+import { VENDAS_HISTORICO_ID } from "./vendas-historico";
 
 export type ReportFetcher = (filters: ReportFilters) => Promise<ReportResult>;
 
@@ -25,6 +27,7 @@ const FETCHERS: Record<string, ReportFetcher> = {
   [ESTOQUE_REDE_ID]: fetchEstoqueRede,
   [PRODUTOS_PARADOS_ID]: fetchProdutosParados,
   [PRODUTOS_CADASTRO_ID]: fetchProdutosCadastro,
+  [VENDAS_HISTORICO_ID]: fetchVendasHistorico,
 };
 
 export function getReportFetcher(id: string): ReportFetcher | undefined {
