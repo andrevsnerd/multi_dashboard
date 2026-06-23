@@ -44,6 +44,7 @@ import {
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
 import { calcCompraIdealFromResumo, type CompraIdealResult } from "@/lib/utils/compra-ideal";
 import CompraIdealCell from "@/components/shared/CompraIdealCell";
+import { useCatracaDataCompra, type CatracaFreeze } from "@/lib/client/use-catraca-data-compra";
 
 import styles from "./ListaCompraSugeridaPage.module.css";
 
@@ -356,7 +357,8 @@ function calcularSugestaoCompletoComTransito(
     ritmoUltimaVendaIso?: string | null;
     totalNmQty: number | null;
   } | undefined,
-  comprasTransitoIndex: CompraTransitoIndex
+  comprasTransitoIndex: CompraTransitoIndex,
+  company?: string | null
 ): {
   qty: number | null;
   ideal: CompraIdealResult | null;
@@ -382,7 +384,7 @@ function calcularSugestaoCompletoComTransito(
       ritmoUltimaVendaIso: liveData.ritmoUltimaVendaIso ?? null,
     },
     transitEntries,
-    { linha: match.linha, subgrupo: match.subgrupo }
+    { linha: match.linha, subgrupo: match.subgrupo, company }
   );
 
   return {
@@ -691,6 +693,9 @@ export default function CompraSalvaDetalhePage({
     totalNmQty: number | null;
   }>>({});
   const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
+  // Catraca da data de compra (modo ciclo) — filial do contexto da compra salva.
+  const catracaFilial = doc?.sourceContextKey ? (parseListaLojaFilial(doc.sourceContextKey) ?? "") : "";
+  const catraca = useCatracaDataCompra(companyKey, catracaFilial);
   const [estoquePorFilialCache, setEstoquePorFilialCache] = useState<
     Record<string, Array<{ filial: string; estoque: number }>>
   >({});
@@ -1032,11 +1037,43 @@ export default function CompraSalvaDetalhePage({
       const estoque = live?.estoqueAtual ?? match?.estoqueAtual ?? null;
       const custoUnit = it.custoUnitario || match?.custoUnitario || 0;
       const custoTotal = custoUnit > 0 ? Math.round(effectiveQtdManual * custoUnit) : 0;
-      const sugestaoAtual = calcularSugestaoCompletoComTransito(match, live, comprasTransitoIndex);
+      const sugestaoBase = calcularSugestaoCompletoComTransito(match, live, comprasTransitoIndex, companyKey);
+      // Catraca: mantém a data registrada (mais cedo) quando é pra manter (sem mutar o objeto).
+      const sugestaoAtual = sugestaoBase.ideal
+        ? {
+            ...sugestaoBase,
+            ideal: catraca.reconcile(
+              sugestaoBase.ideal,
+              buildControleEstoqueItemKey(produto, expandirPorCor ? corProduto : null),
+              getCompraTransitoEntries(comprasTransitoIndex, produto, expandirPorCor ? corProduto : null)
+            ).ideal,
+          }
+        : sugestaoBase;
       const qtdSugerida = sugestaoAtual.qty;
       return { it, match, live, estoque, custoUnit, custoTotal, qtdSugerida, sugestaoAtual, effectiveQtdManual };
     });
-  }, [items, listaRows, expandirPorCor, liveMetrics, manualDistribuicao, manualState, manualTotalByItemKey, comprasTransitoIndex]);
+  }, [items, listaRows, expandirPorCor, liveMetrics, manualDistribuicao, manualState, manualTotalByItemKey, comprasTransitoIndex, companyKey, catraca.reconcile]);
+
+  // Catraca: junta gravações pendentes e persiste.
+  const catracaFreezes = useMemo<CatracaFreeze[]>(() => {
+    if (!catraca.enabled) return [];
+    const out: CatracaFreeze[] = [];
+    for (const r of rowsComputed) {
+      const ideal = r.sugestaoAtual?.ideal;
+      if (!ideal) continue;
+      const produto = r.it.produto.trim();
+      const corCat = expandirPorCor ? (r.it.corProduto ?? "").trim() : null;
+      const { freeze } = catraca.reconcile(
+        ideal,
+        buildControleEstoqueItemKey(produto, corCat),
+        getCompraTransitoEntries(comprasTransitoIndex, produto, corCat)
+      );
+      if (freeze) out.push(freeze);
+    }
+    return out;
+  }, [rowsComputed, expandirPorCor, comprasTransitoIndex, catraca.enabled, catraca.reconcile]);
+
+  useEffect(() => catraca.persist(catracaFreezes), [catracaFreezes, catraca.persist]);
 
   const totals = useMemo(() => {
     const totalItens = rowsComputed.length;

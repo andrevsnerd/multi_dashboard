@@ -39,6 +39,7 @@ import { formatDateForQuery } from "@/lib/utils/date";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
 import { calcCompraIdealFromResumo, type CompraIdealResult } from "@/lib/utils/compra-ideal";
 import CompraIdealCell from "@/components/shared/CompraIdealCell";
+import { useCatracaDataCompra, type CatracaFreeze } from "@/lib/client/use-catraca-data-compra";
 import {
   partesDestinoCompraFinal,
   type DestinoCompraFinalParte,
@@ -218,7 +219,8 @@ function buildCompraIdealFromMetricRow(
   live: CompraMetricRow | undefined,
   p: { produto: string; cor?: string | null; linha?: string | null; subgrupo?: string | null },
   comprasTransitoIndex: CompraTransitoIndex,
-  porCor: boolean
+  porCor: boolean,
+  company?: string | null
 ): CompraIdealResult {
   return calcCompraIdealFromResumo(
     {
@@ -233,7 +235,7 @@ function buildCompraIdealFromMetricRow(
       ritmoUltimaVendaIso: live?.ritmoUltimaVendaIso ?? null,
     },
     getCompraTransitoEntries(comprasTransitoIndex, p.produto, porCor ? (p.cor ?? null) : null),
-    { linha: p.linha, subgrupo: p.subgrupo }
+    { linha: p.linha, subgrupo: p.subgrupo, company }
   );
 }
 
@@ -1376,7 +1378,7 @@ async function buildCompraIdealPorFilialRowsCurvaAbc(
       const ideal = calcCompraIdealFromResumo(
         merged.resumo,
         getCompraTransitoEntries(comprasTransitoIndex, plan.row.produto, porCor ? (plan.row.cor ?? null) : null),
-        { linha: plan.row.linha, subgrupo: plan.row.subgrupo }
+        { linha: plan.row.linha, subgrupo: plan.row.subgrupo, company: companyKey }
       );
       byMetricKey.set(plan.metricKey, {
         ci: Math.max(0, ideal.compraIdeal),
@@ -1466,6 +1468,8 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [focusedCurve, setFocusedCurve] = useState<Curva>("A");
   const [compraMetrics, setCompraMetrics] = useState<Record<string, CompraMetricRow>>({});
   const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
+  // Catraca da data de compra (modo ciclo) — mesma lógica/persistência das demais telas.
+  const catraca = useCatracaDataCompra(companyKey, selectedFilial ?? "");
   // metricKey -> (escopo da filial -> observação). Escopo "" = padrão (fallback de todas as filiais).
   const [observacoes, setObservacoes] = useState<Record<string, Record<string, string>>>({});
   const [sugestaoTooltip, setSugestaoTooltip] = useState<null | {
@@ -1897,6 +1901,27 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   }, [produtosFiltrados]);
   const diasCorridosMes = Math.max(1, new Date().getDate());
 
+  // Catraca: junta gravações pendentes (avança/re-baseia; manter → null) e persiste.
+  const catracaFreezesAbc = useMemo<CatracaFreeze[]>(() => {
+    if (!catraca.enabled) return [];
+    const out: CatracaFreeze[] = [];
+    for (const p of produtosComCurva) {
+      const metricKey = buildCurvaAbcMetricKey(p.produto, p.cor ?? null, porCor);
+      if (!Object.prototype.hasOwnProperty.call(compraMetrics, metricKey)) continue;
+      const corCat = porCor ? (p.cor ?? null) : null;
+      const idealCru = buildCompraIdealFromMetricRow(compraMetrics[metricKey], p, comprasTransitoIndex, porCor, companyKey);
+      const { freeze } = catraca.reconcile(
+        idealCru,
+        buildControleEstoqueItemKey(p.produto, corCat),
+        getCompraTransitoEntries(comprasTransitoIndex, p.produto, corCat)
+      );
+      if (freeze) out.push(freeze);
+    }
+    return out;
+  }, [produtosComCurva, compraMetrics, comprasTransitoIndex, porCor, companyKey, catraca.enabled, catraca.reconcile]);
+
+  useEffect(() => catraca.persist(catracaFreezesAbc), [catracaFreezesAbc, catraca.persist]);
+
   const produtosComCurvaComFiltroSugestao = useMemo(() => {
     const base = (companyKey === 'nerd' && filtrarEletronicos)
       ? produtosComCurva.filter((p) => normalizeKey(p.linha ?? '') === 'ELETRONICOS')
@@ -1912,7 +1937,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
         live?.vendasMesAtual == null &&
         live?.estoqueFilial == null;
       if (semBaseLive) return false;
-      const ideal = buildCompraIdealFromMetricRow(live, p, comprasTransitoIndex, porCor);
+      const ideal = buildCompraIdealFromMetricRow(live, p, comprasTransitoIndex, porCor, companyKey);
       return ideal.compraIdeal > 0;
     });
   }, [filtrarEletronicos, filtrarSugeridos, companyKey, produtosComCurva, compraMetrics, comprasTransitoIndex, diasCorridosMes, porCor]);
@@ -2233,7 +2258,7 @@ const handleBadgeClick = (cat: string) => {
     const live = compraMetrics[metricKey];
     const hasLive = Object.prototype.hasOwnProperty.call(compraMetrics, metricKey);
     if (!hasLive) return "";
-    const ideal = buildCompraIdealFromMetricRow(live, p, comprasTransitoIndex, porCor);
+    const ideal = buildCompraIdealFromMetricRow(live, p, comprasTransitoIndex, porCor, companyKey);
     return ideal.compraIdeal;
   };
 
@@ -3158,7 +3183,13 @@ const handleBadgeClick = (cat: string) => {
                                     if (semBaseLive) {
                                       return <span className={styles.cellMetric}>Sem dados</span>;
                                     }
-                                    const ideal = buildCompraIdealFromMetricRow(live, p, comprasTransitoIndex, porCor);
+                                    const corCat = porCor ? (p.cor ?? null) : null;
+                                    const idealCru = buildCompraIdealFromMetricRow(live, p, comprasTransitoIndex, porCor, companyKey);
+                                    const { ideal } = catraca.reconcile(
+                                      idealCru,
+                                      buildControleEstoqueItemKey(p.produto, corCat),
+                                      getCompraTransitoEntries(comprasTransitoIndex, p.produto, corCat)
+                                    );
                                     return <CompraIdealCell ideal={ideal} />;
                                   })()}
                                 </td>

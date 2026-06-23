@@ -55,8 +55,26 @@ export function buildCompraIdealTitle(ideal: CompraIdealResult): string {
   linhas.push(
     `Cobertura atual: ${ideal.coberturaAtualDias != null ? `${fmt(ideal.coberturaAtualDias)}d` : "—"}`
   );
-  linhas.push(`Lead time: ${ideal.leadTimeDias}d · cobertura pós-chegada: ${ideal.coberturaAlvoDias}d`);
-  linhas.push(`Alvo total: ${ideal.alvoTotalDias}d → ${fmt(ideal.alvoEstoque)} un`);
+  linhas.push(`Produção (lead time): ${ideal.producaoDias}d · cobertura: ${ideal.coberturaAlvoDias}d`);
+  if (ideal.modoCiclo) {
+    // Modo ciclo: a quantidade é 1 ciclo de cobertura; a data é o que importa.
+    linhas.push(`Alvo: 1 ciclo de cobertura (${ideal.coberturaAlvoDias}d)`);
+    if (ideal.acabaComTransitoIso) {
+      linhas.push(
+        `Estoque+trânsito acaba em: ${shortDate(ideal.acabaComTransitoIso)}${
+          ideal.diasAteAcabarComTransito != null ? ` (${fmt(ideal.diasAteAcabarComTransito)}d)` : ""
+        }`
+      );
+    }
+    if (ideal.dataCompra) {
+      const quando = ideal.comprarAgora
+        ? "AGORA (atrasado/no ponto)"
+        : `${shortDate(ideal.dataCompra)}${ideal.diasAteComprar != null ? ` (em ${fmt(ideal.diasAteComprar)}d)` : ""}`;
+      linhas.push(`📅 Comprar: ${quando}`);
+    }
+  } else {
+    linhas.push(`Alvo total: ${ideal.alvoTotalDias}d → ${fmt(ideal.alvoEstoque)} un`);
+  }
   linhas.push(
     `Estoque + trânsito: ${fmt(ideal.estoqueAtual)} + ${fmt(ideal.emTransito)} = ${fmt(
       ideal.estoqueAtual + ideal.emTransito
@@ -87,37 +105,61 @@ interface CompraIdealCellProps {
  */
 export default function CompraIdealCell({ ideal, style }: CompraIdealCellProps) {
   const precisaRepor = ideal.status === "REPOR";
+  // No modo ciclo, mostra a DATA de compra junto da quantidade (data fixa do ciclo).
+  const mostraData = ideal.modoCiclo && precisaRepor && ideal.dataCompra != null;
   return (
     <span
       title={buildCompraIdealTitle(ideal)}
       style={{
         display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
+        flexDirection: "column",
+        alignItems: "flex-end",
+        gap: 2,
         cursor: "help",
         whiteSpace: "nowrap",
         ...style,
       }}
     >
-      <span style={{ fontWeight: precisaRepor ? 700 : 500, color: precisaRepor ? "#b45309" : "#64748b" }}>
-        {precisaRepor ? `${fmt(ideal.compraIdeal)} pcs` : "Suficiente"}
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontWeight: precisaRepor ? 700 : 500, color: precisaRepor ? "#b45309" : "#64748b" }}>
+          {precisaRepor ? `${fmt(ideal.compraIdeal)} pcs` : "Suficiente"}
+        </span>
+        {ideal.emTransito > 0 && (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              padding: "0 6px",
+              height: 16,
+              borderRadius: 999,
+              fontSize: 10,
+              fontWeight: 800,
+              background: "#dcfce7",
+              color: "#166534",
+              border: "1px solid #22c55e",
+            }}
+          >
+            T {fmt(ideal.emTransito)}
+          </span>
+        )}
       </span>
-      {ideal.emTransito > 0 && (
+      {mostraData && (
         <span
           style={{
             display: "inline-flex",
             alignItems: "center",
-            padding: "0 6px",
-            height: 16,
-            borderRadius: 999,
-            fontSize: 10,
-            fontWeight: 800,
-            background: "#dcfce7",
-            color: "#166534",
-            border: "1px solid #22c55e",
+            gap: 4,
+            fontSize: 11,
+            fontWeight: ideal.comprarAgora ? 800 : 600,
+            color: ideal.comprarAgora ? "#b91c1c" : "#0f766e",
           }}
         >
-          T {fmt(ideal.emTransito)}
+          📅{" "}
+          {ideal.comprarAgora
+            ? "comprar agora"
+            : `${shortDate(ideal.dataCompra)}${
+                ideal.diasAteComprar != null ? ` · ${fmt(ideal.diasAteComprar)}d` : ""
+              }`}
         </span>
       )}
     </span>

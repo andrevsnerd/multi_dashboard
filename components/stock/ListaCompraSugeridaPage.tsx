@@ -47,6 +47,7 @@ import {
 } from "@/lib/client/compras-transito";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
 import { buildControleEstoqueItemKey, type ControleEstoqueItemMetricas } from "@/lib/utils/controle-estoque-metricas";
+import { useCatracaDataCompra, type CatracaFreeze } from "@/lib/client/use-catraca-data-compra";
 import ComprasSalvasListPanel from "@/components/stock/ComprasSalvasListPanel";
 import styles from "./ListaCompraSugeridaPage.module.css";
 
@@ -695,6 +696,8 @@ export default function ListaCompraSugeridaPage({
   const [reposicaoNmFiliaisMap, setReposicaoNmFiliaisMap] = useState<Record<string, FilialNecessidadeMinimaInfo[]>>({});
   const [reposicaoSuggestionLoading, setReposicaoSuggestionLoading] = useState(false);
   const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
+  // Catraca da data de compra (modo ciclo) — lógica compartilhada com as demais telas.
+  const catraca = useCatracaDataCompra(companyKey, filial);
   const diasCorridosMes = useMemo(() => new Date().getDate(), []);
 
   useEffect(() => {
@@ -1501,8 +1504,9 @@ export default function ListaCompraSugeridaPage({
           sugestaoView: { type: "SEM_SUGESTAO" as SuggestionType, qty: 0, qtdFinal: 0, qtdS: 0, qtdE: 0 },
         };
       }
-      const transitEntries = getCompraTransitoEntries(comprasTransitoIndex, p.produto, expandirPorCor ? (p.cor ?? null) : null);
-      const ideal = calcCompraIdealFromResumo(
+      const cor = expandirPorCor ? (p.cor ?? null) : null;
+      const transitEntries = getCompraTransitoEntries(comprasTransitoIndex, p.produto, cor);
+      const idealCru = calcCompraIdealFromResumo(
         {
           estoqueTotal: p.estoqueAtual ?? 0,
           qtde60d: p.vendas60dias ?? null,
@@ -1515,8 +1519,10 @@ export default function ListaCompraSugeridaPage({
           ritmoUltimaVendaIso: p.ritmoUltimaVendaIso ?? null,
         },
         transitEntries,
-        { linha: p.linha, subgrupo: p.subgrupo }
+        { linha: p.linha, subgrupo: p.subgrupo, company: companyKey }
       );
+      // Catraca compartilhada: aplica a data registrada (mais cedo) quando é pra manter.
+      const { ideal } = catraca.reconcile(idealCru, buildControleEstoqueItemKey(p.produto, cor), transitEntries);
       const qtd = Math.max(0, ideal.compraIdeal);
       return {
         ...p,
@@ -1532,7 +1538,24 @@ export default function ListaCompraSugeridaPage({
         },
       };
     });
-  }, [produtosComCurva, modoReposicao, incluirCurvaB, incluirCurvaC, diasCorridosMes, comprasTransitoIndex, expandirPorCor, abcNmTotalQtyMap]);
+  }, [produtosComCurva, modoReposicao, incluirCurvaB, incluirCurvaC, diasCorridosMes, comprasTransitoIndex, expandirPorCor, abcNmTotalQtyMap, companyKey, catraca.reconcile]);
+
+  // Catraca: junta as gravações pendentes (reconcile é idempotente, então reaplicar no ideal
+  // já reconciliado devolve freeze só quando precisa avançar/re-basear; manter → null).
+  const catracaFreezes = useMemo<CatracaFreeze[]>(() => {
+    if (!catraca.enabled) return [];
+    const out: CatracaFreeze[] = [];
+    for (const p of produtosComCurvaFinal) {
+      if (!p.ideal) continue;
+      const cor = expandirPorCor ? (p.cor ?? null) : null;
+      const transit = getCompraTransitoEntries(comprasTransitoIndex, p.produto, cor);
+      const { freeze } = catraca.reconcile(p.ideal, buildControleEstoqueItemKey(p.produto, cor), transit);
+      if (freeze) out.push(freeze);
+    }
+    return out;
+  }, [produtosComCurvaFinal, comprasTransitoIndex, expandirPorCor, catraca.enabled, catraca.reconcile]);
+
+  useEffect(() => catraca.persist(catracaFreezes), [catracaFreezes, catraca.persist]);
 
   const totalCustoABC = produtosComCurvaFinal.reduce((s, p) => {
     const cu = p.custoUnitario ?? 0;

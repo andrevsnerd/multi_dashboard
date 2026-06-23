@@ -16,6 +16,8 @@ import {
 import { fetchControleEstoqueMetricasItensClient } from "@/lib/client/controle-estoque-metricas";
 import { calcCompraIdealFromResumo, type CompraIdealResult } from "@/lib/utils/compra-ideal";
 import CompraIdealCell from "@/components/shared/CompraIdealCell";
+import { useCatracaDataCompra, type CatracaFreeze } from "@/lib/client/use-catraca-data-compra";
+import { buildControleEstoqueItemKey } from "@/lib/utils/controle-estoque-metricas";
 import {
   buildCurvaPorProdutoKey,
   type CurvaPorProdutoApiResponse,
@@ -356,6 +358,9 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
   const [data, setData] = useState<CurvaPorProdutoApiResponse | null>(null);
   const [metricas, setMetricas] = useState<Record<string, MetricasRow>>({});
   const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
+  // Catraca da data de compra (modo ciclo) — mesma lógica/persistência das demais telas.
+  const { enabled: catracaEnabled, reconcile: catracaReconcile, persist: catracaPersist } =
+    useCatracaDataCompra(companyKey, selectedFilial ?? "");
   const [suggestionTooltip, setSuggestionTooltip] = useState<null | {
     x: number;
     y: number;
@@ -511,7 +516,7 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
         currentMetric?.vendasMesAtual == null &&
         currentMetric?.estoqueFilial == null;
       const transitEntries = getCompraTransitoEntries(comprasTransitoIndex, row.produto, row.corProduto ?? null);
-      const ideal = calcCompraIdealFromResumo(
+      const idealCru = calcCompraIdealFromResumo(
         {
           estoqueTotal: currentMetric?.estoqueFilial ?? 0,
           qtde60d: currentMetric?.qtde60d ?? null,
@@ -524,7 +529,12 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
           ritmoUltimaVendaIso: currentMetric?.ritmoUltimaVendaIso ?? null,
         },
         transitEntries,
-        { linha: row.linha, subgrupo: row.subgrupo }
+        { linha: row.linha, subgrupo: row.subgrupo, company: companyKey }
+      );
+      const { ideal } = catracaReconcile(
+        idealCru,
+        buildControleEstoqueItemKey(row.produto, row.corProduto ?? null),
+        transitEntries
       );
 
       return {
@@ -534,7 +544,26 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
         metricState: (!hasMetric ? "loading" : semBaseMetric ? "nodata" : "ok") as DisplayRow["metricState"],
       };
     });
-  }, [comprasTransitoIndex, data, metricas]);
+  }, [comprasTransitoIndex, data, metricas, companyKey, catracaReconcile]);
+
+  // Catraca: junta as gravações pendentes (reconcile idempotente sobre o ideal já exibido).
+  const catracaFreezes = useMemo<CatracaFreeze[]>(() => {
+    if (!catracaEnabled) return [];
+    const out: CatracaFreeze[] = [];
+    for (const row of displayRows) {
+      if (!row.ideal) continue;
+      const transitEntries = getCompraTransitoEntries(comprasTransitoIndex, row.produto, row.corProduto ?? null);
+      const { freeze } = catracaReconcile(
+        row.ideal,
+        buildControleEstoqueItemKey(row.produto, row.corProduto ?? null),
+        transitEntries
+      );
+      if (freeze) out.push(freeze);
+    }
+    return out;
+  }, [displayRows, comprasTransitoIndex, catracaEnabled, catracaReconcile]);
+
+  useEffect(() => catracaPersist(catracaFreezes), [catracaFreezes, catracaPersist]);
 
   const representedRows = useMemo(
     () => displayRows.filter((row) => row.represented).sort((a, b) => b.vendas - a.vendas),

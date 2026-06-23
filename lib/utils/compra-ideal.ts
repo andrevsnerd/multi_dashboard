@@ -1,5 +1,6 @@
 import type { CompraTransitoIndexEntry } from "@/lib/client/compras-transito";
 import { getLimiteDiasReposicao } from "@/lib/utils/suggestion-rules";
+import { hasCicloCompra, resolveCicloCompra } from "@/lib/config/compra-ciclo";
 
 /**
  * Compra Ideal — lógica global e simples de reposição por cobertura.
@@ -35,6 +36,15 @@ export interface CompraIdealInput {
   qtde60d?: number | null;
   linha?: string | null;
   subgrupo?: string | null;
+  /**
+   * Modo CICLO (opcional). Quando `coberturaDias` E `producaoDias` vêm preenchidos, o
+   * cálculo separa o lead time (produção) da cobertura e usa a lógica de ciclo de compra:
+   * quantidade = 1 ciclo de cobertura e DATA de compra fixa = (acaba c/ trânsito) − produção.
+   * Quando ausentes, cai na lógica LEGADA (lead time = cobertura, alvo = 2× cobertura).
+   */
+  coberturaDias?: number | null;
+  /** Lead time real (dias de produção + transporte até chegar no PDV). Ver `coberturaDias`. */
+  producaoDias?: number | null;
   /** Entradas de compra em trânsito já confirmadas para o item. */
   transitEntries?: CompraTransitoIndexEntry[];
   /** Data de referência ("hoje"); injetável para testes. */
@@ -81,6 +91,23 @@ export interface CompraIdealResult {
   coberturaAtualDias: number | null;
   /** Lead time assumido (dias até a compra nova chegar) — igual à cobertura. */
   leadTimeDias: number;
+  /** Lead time/produção em dias (dias até a compra nova chegar no PDV). No legado = cobertura. */
+  producaoDias: number;
+  /** true quando usou a lógica de CICLO (lead time separado da cobertura). */
+  modoCiclo: boolean;
+  /** Data (ISO) em que estoque + trânsito acaba, considerando a chegada do trânsito. */
+  acabaComTransitoIso: string | null;
+  /** Dias até acabar considerando o trânsito (a partir de hoje). */
+  diasAteAcabarComTransito: number | null;
+  /**
+   * Data SUGERIDA de compra (ISO) = (acaba c/ trânsito) − produção. É a data em que a
+   * compra precisa ser feita para a remessa chegar antes do estoque romper. Só no modo ciclo.
+   */
+  dataCompra: string | null;
+  /** Dias até a data de compra (negativo = atrasado, deveria já ter comprado). */
+  diasAteComprar: number | null;
+  /** true quando a data de compra já passou/é hoje (precisa comprar agora). */
+  comprarAgora: boolean;
   /** Alvo total em dias = lead time + cobertura pós-chegada. */
   alvoTotalDias: number;
   /** Estoque atual restante na data da próxima chegada (sem somar o que chega), ou null. */
@@ -126,10 +153,68 @@ function daysBetween(from: Date, to: Date): number {
   return Math.round((startOfLocalDay(to).getTime() - startOfLocalDay(from).getTime()) / MS_PER_DAY);
 }
 
+interface ChegadaProjecao {
+  /** Quantidade que chega. */
+  qty: number;
+  /** Dia (índice a partir de hoje, ≥0) em que chega. Sem data conhecida ⇒ 0 (já disponível). */
+  dia: number;
+}
+
+/**
+ * Projeta o ESTOQUE no fim de um dia futuro (índice a partir de hoje), consumindo a
+ * `consumoDiario` e somando as chegadas de trânsito nas suas datas. Nunca vai abaixo de 0
+ * (rupturas não geram estoque negativo). Usado para saber o saldo na chegada da compra nova.
+ */
+function projetarEstoqueNoDia(
+  estoqueInicial: number,
+  consumoDiario: number,
+  chegadas: ChegadaProjecao[],
+  diaAlvo: number
+): number {
+  let estoque = Math.max(0, estoqueInicial);
+  let dia = 0;
+  for (const c of chegadas) {
+    if (c.dia > diaAlvo) break;
+    estoque = Math.max(0, estoque - consumoDiario * (c.dia - dia)) + c.qty;
+    dia = c.dia;
+  }
+  return Math.max(0, estoque - consumoDiario * (diaAlvo - dia));
+}
+
+/**
+ * Projeta em que DIA (índice a partir de hoje, float) o estoque + trânsito acaba — ou seja,
+ * quando a última unidade da posição atual é consumida, considerando que o trânsito só passa
+ * a contar na sua data de chegada (respeita o gap se o estoque rompe antes da chegada).
+ * Retorna null quando não há consumo.
+ */
+function projetarDiaAcaba(
+  estoqueInicial: number,
+  consumoDiario: number,
+  chegadas: ChegadaProjecao[]
+): number | null {
+  if (consumoDiario <= 0) return null;
+  let estoque = Math.max(0, estoqueInicial);
+  let dia = 0;
+  for (const c of chegadas) {
+    estoque = Math.max(0, estoque - consumoDiario * (c.dia - dia)) + c.qty;
+    dia = c.dia;
+  }
+  return dia + estoque / consumoDiario;
+}
+
 export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
   const hoje = input.hoje ?? new Date();
   const estoqueAtual = Math.round(Number(input.estoqueAtual ?? 0));
-  const coberturaAlvoDias = getLimiteDiasReposicao({ linha: input.linha, subgrupo: input.subgrupo });
+  // Modo CICLO: lead time (produção) vem separado da cobertura. Sem ele, lógica legada
+  // (cobertura por linha/subgrupo e lead time = cobertura).
+  const modoCiclo =
+    input.coberturaDias != null &&
+    Number(input.coberturaDias) > 0 &&
+    input.producaoDias != null &&
+    Number(input.producaoDias) >= 0;
+  const coberturaAlvoDias = modoCiclo
+    ? Math.round(Number(input.coberturaDias))
+    : getLimiteDiasReposicao({ linha: input.linha, subgrupo: input.subgrupo });
   const fatorExcesso = Number(input.fatorExcesso ?? FATOR_EXCESSO_PADRAO);
 
   // Ritmo: prioriza a janela de "dias com estoque" (até 60 mais recentes). Sem ela,
@@ -202,14 +287,13 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
     saldoChegada = Math.max(0, Math.round(estoqueAtual - consumoDiario * diasAteChegada));
   }
 
-  // Alvo = sobreviver o lead time (até a compra nova chegar) + manter cobertura saudável
-  // após a chegada. Lead time = própria cobertura → alvo total = 2× cobertura. Já embute a
-  // quantidade em trânsito (abatida da posição) e o consumo durante o lead time.
-  const leadTimeDias = coberturaAlvoDias;
-  const alvoTotalDias = leadTimeDias + coberturaAlvoDias;
+  // Lead time = produção (modo ciclo) ou a própria cobertura (legado).
+  const producaoDias = modoCiclo ? Math.round(Number(input.producaoDias)) : coberturaAlvoDias;
+  // Alvo de POSIÇÃO em dias = lead time + cobertura pós-chegada. Usado para excesso/OK.
+  const alvoTotalDias = producaoDias + coberturaAlvoDias;
+  const leadTimeDias = producaoDias;
   const alvoEstoque = Math.round(consumoDiario * alvoTotalDias);
   const posicao = estoqueAtual + emTransito;
-  const compraIdeal = Math.ceil(alvoEstoque - posicao);
 
   const coberturaAtualDias = consumoDiario > 0 ? Math.round(estoqueAtual / consumoDiario) : null;
   // Folga até a chegada do trânsito existente: rompe antes se negativo.
@@ -218,13 +302,64 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
     folgaAteChegadaDias = (coberturaAtualDias ?? 0) - diasAteChegada;
   }
 
+  // --- Campos do modo ciclo (data de compra fixa + quantidade de 1 ciclo) ---
+  let acabaComTransitoIso: string | null = null;
+  let diasAteAcabarComTransito: number | null = null;
+  let dataCompra: string | null = null;
+  let diasAteComprar: number | null = null;
+  let comprarAgora = false;
+
+  let compraIdeal: number;
   let status: CompraIdealStatus;
-  if (compraIdeal > 0) {
-    status = "REPOR";
-  } else if (posicao > 0 && posicao > alvoEstoque * fatorExcesso) {
-    status = "EXCESSO";
+
+  if (modoCiclo && consumoDiario > 0) {
+    // Chegadas de trânsito como índices de dia a partir de hoje (sem data ⇒ disponível já).
+    const chegadas: ChegadaProjecao[] = entries.map((e) => ({
+      qty: e.qty,
+      dia: e.data ? Math.max(0, daysBetween(hoje, e.data)) : 0,
+    }));
+
+    // Dia em que estoque + trânsito acaba (respeitando quando cada remessa chega).
+    const diaAcaba = projetarDiaAcaba(estoqueAtual, consumoDiario, chegadas);
+    if (diaAcaba != null) {
+      const diaAcabaInt = Math.max(0, Math.round(diaAcaba));
+      diasAteAcabarComTransito = diaAcabaInt;
+      acabaComTransitoIso = formatIso(addDays(hoje, diaAcabaInt));
+
+      // Data de compra = (dia que acaba) − produção. A remessa nova precisa ser pedida
+      // com `producaoDias` de antecedência para chegar antes do estoque romper.
+      const diaCompraRaw = diaAcaba - producaoDias;
+      diasAteComprar = Math.round(diaCompraRaw);
+      comprarAgora = diaCompraRaw <= 0;
+      dataCompra = formatIso(addDays(hoje, Math.max(0, Math.round(diaCompraRaw))));
+
+      // Quantidade = 1 ciclo de cobertura, descontando o que ainda restará quando a
+      // remessa nova chegar (dia da compra + produção). Em regime estável o saldo na
+      // chegada ≈ 0 (a remessa chega quando o estoque anterior acaba) ⇒ qtd = consumo×cobertura.
+      const diaChegadaNova = Math.max(0, Math.round(diaCompraRaw)) + producaoDias;
+      const saldoNaChegada = projetarEstoqueNoDia(estoqueAtual, consumoDiario, chegadas, diaChegadaNova);
+      compraIdeal = Math.max(0, Math.ceil(consumoDiario * coberturaAlvoDias - saldoNaChegada));
+    } else {
+      compraIdeal = 0;
+    }
+
+    if (compraIdeal > 0) {
+      status = "REPOR";
+    } else if (posicao > 0 && posicao > alvoEstoque * fatorExcesso) {
+      status = "EXCESSO";
+    } else {
+      status = "OK";
+    }
   } else {
-    status = "OK";
+    // Lógica LEGADA: alvo = 2× cobertura, compra = alvo − posição (pode ser negativa).
+    compraIdeal = Math.ceil(alvoEstoque - posicao);
+    if (compraIdeal > 0) {
+      status = "REPOR";
+    } else if (posicao > 0 && posicao > alvoEstoque * fatorExcesso) {
+      status = "EXCESSO";
+    } else {
+      status = "OK";
+    }
   }
 
   return {
@@ -249,6 +384,13 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
     diasAteAcabar,
     coberturaAtualDias,
     leadTimeDias,
+    producaoDias,
+    modoCiclo,
+    acabaComTransitoIso,
+    diasAteAcabarComTransito,
+    dataCompra,
+    diasAteComprar,
+    comprarAgora,
     alvoTotalDias,
     saldoChegada,
     folgaAteChegadaDias,
@@ -282,9 +424,20 @@ export interface CompraIdealResumoLike {
 export function calcCompraIdealFromResumo(
   resumo: CompraIdealResumoLike | null | undefined,
   transitEntries: CompraTransitoIndexEntry[],
-  meta: { linha?: string | null; subgrupo?: string | null },
+  meta: { linha?: string | null; subgrupo?: string | null; company?: string | null },
   hoje?: Date
 ): CompraIdealResult {
+  // Quando a empresa tem ciclos configurados (ex.: scarfme), resolve cobertura + produção
+  // por categoria → ativa o modo ciclo (lead time separado, quantidade de 1 ciclo, data fixa).
+  // Sem isso (ou empresa sem ciclos, ex.: nerd hoje) → lógica legada.
+  let coberturaDias: number | null = null;
+  let producaoDias: number | null = null;
+  if (meta.company && hasCicloCompra(meta.company)) {
+    const ciclo = resolveCicloCompra(meta.company, { linha: meta.linha, subgrupo: meta.subgrupo });
+    coberturaDias = ciclo.coberturaDias;
+    producaoDias = ciclo.producaoDias;
+  }
+
   return calcCompraIdeal({
     estoqueAtual: resumo?.estoqueTotal ?? 0,
     qtde60d: resumo?.qtde60d ?? null,
@@ -297,9 +450,36 @@ export function calcCompraIdealFromResumo(
     ritmoUltimaVendaIso: resumo?.ritmoUltimaVendaIso ?? null,
     linha: meta.linha,
     subgrupo: meta.subgrupo,
+    coberturaDias,
+    producaoDias,
     transitEntries,
     hoje,
   });
+}
+
+/**
+ * Aplica uma DATA DE COMPRA da catraca (persistida) sobre um resultado já calculado,
+ * recomputando `diasAteComprar` e `comprarAgora` em relação a hoje. A quantidade e o resto
+ * seguem vivos (recalculados a cada carga). A decisão de QUAL data usar (catraca vs
+ * recalculada) é de quem chama — aqui só reaplicamos a data escolhida. Sem efeito fora do
+ * modo ciclo.
+ */
+export function applyDataCompraFixa(
+  ideal: CompraIdealResult,
+  dataCompraIso: string,
+  hoje?: Date
+): CompraIdealResult {
+  if (!ideal.modoCiclo) return ideal;
+  const ref = hoje ?? new Date();
+  const data = parseIsoDate(dataCompraIso);
+  if (!data) return ideal;
+  const dias = daysBetween(ref, data);
+  return {
+    ...ideal,
+    dataCompra: formatIso(data),
+    diasAteComprar: dias,
+    comprarAgora: dias <= 0,
+  };
 }
 
 export const COMPRA_IDEAL_STATUS_LABEL: Record<CompraIdealStatus, string> = {

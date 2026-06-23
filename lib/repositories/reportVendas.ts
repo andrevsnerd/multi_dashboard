@@ -187,6 +187,7 @@ export async function fetchVendasFaturamento(
       const ideal = calcCompraIdealFromResumo(m.resumo, transit, {
         linha: d.linha,
         subgrupo: d.subgrupo,
+        company: filters.company,
       });
       compraIdealByItemKey.set(itemKey, ideal.compraIdeal);
     }

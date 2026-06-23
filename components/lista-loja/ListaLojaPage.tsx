@@ -40,6 +40,8 @@ import {
   type CompraIdealStatus,
   type CompraIdealResult,
 } from "@/lib/utils/compra-ideal";
+import { resolveCicloCompra, hasCicloCompra } from "@/lib/config/compra-ciclo";
+import { useCatracaDataCompra, type CatracaFreeze } from "@/lib/client/use-catraca-data-compra";
 import {
   partesDestinoCompraFinal,
   type DestinoCompraFinalParte,
@@ -1163,7 +1165,7 @@ async function buildListaLojaExportRows(
       rotasTransferencia.length > 0 ? buildTransferenciaExportData(rotasTransferencia) : null;
     const curvaAbc = curvaAbcMap.get(itemKey)?.curva ?? null;
     const transitEntries = getCompraTransitoEntries(comprasTransitoIndex, item.produto, item.corProduto);
-    const baseRow = buildListaLojaExportRow(item, transitEntries, { curvaAbc, transferenciaExport });
+    const baseRow = buildListaLojaExportRow(item, transitEntries, { curvaAbc, transferenciaExport }, companyKey);
     const detalhes = detalhesPorItem[index];
 
     baseRow.FILIAIS_COM_ESTOQUE = detalhes.filiaisComEstoque;
@@ -1252,6 +1254,7 @@ async function buildCompraIdealPorFilialRows(
       const ideal = calcCompraIdealFromResumo(metricas?.resumo ?? null, transitEntries, {
         linha: item.linha,
         subgrupo: item.subgrupo,
+        company: companyKey,
       });
       const qtd = Math.max(0, ideal.compraIdeal);
       row[colunasFiliais[idx]] = qtd;
@@ -1454,12 +1457,16 @@ function buildListaLojaExportRow(
       resumoRotas: string;
       resumoDestinosUrgencia: string;
     } | null;
-  }
+  },
+  company?: string | null
 ): Record<string, string | number | boolean | null> {
   const estoqueAtual = Number(item.estoqueFilial ?? 0);
   const diasHistoricoFilial = Math.min(365, Math.max(0, Number(item.diasHistoricoFilial ?? 365)));
   const mesesHistoricoFilial = getMesesHistoricoFilial(item);
   const historicoParcial = Boolean(item.historicoParcial ?? false);
+  const cicloExport = company && hasCicloCompra(company)
+    ? resolveCicloCompra(company, { linha: item.linha, subgrupo: item.subgrupo })
+    : null;
 
   // Mesma Compra Ideal exibida na tabela (ritmo + cobertura-alvo, com trânsito abatido).
   const ideal = calcCompraIdeal({
@@ -1469,6 +1476,8 @@ function buildListaLojaExportRow(
     qtde60d: item.qtde60d ?? null,
     linha: item.linha,
     subgrupo: item.subgrupo,
+    coberturaDias: cicloExport?.coberturaDias ?? null,
+    producaoDias: cicloExport?.producaoDias ?? null,
     transitEntries,
   });
 
@@ -1682,6 +1691,9 @@ function ListaLojaItensTable({
   onCancelColorPicker,
 }: ListaLojaItensTableProps) {
   const filialScopeKey = filialCod && filialCod.trim() ? filialCod.trim() : "__ALL__";
+  // Catraca da data de compra (modo ciclo) — mesma lógica/persistência das demais telas.
+  const { enabled: catracaEnabled, reconcile: catracaReconcile, persist: catracaPersist } =
+    useCatracaDataCompra(companyKey, filialCod ?? "");
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const diasCorridosMes = new Date().getDate();
@@ -2005,6 +2017,40 @@ function ListaLojaItensTable({
     [onMoveItem, dragIndex]
   );
 
+  // Catraca: junta gravações pendentes (mesmo cálculo do display: ciclo + ritmo + trânsito).
+  const catracaFreezes = useMemo<CatracaFreeze[]>(() => {
+    if (!catracaEnabled) return [];
+    const out: CatracaFreeze[] = [];
+    for (const item of itens) {
+      const metricKey = `${filialScopeKey}::${buildItemKey(item.produto, item.corProduto)}`;
+      const live = liveMetrics[metricKey];
+      const hasLive = Object.prototype.hasOwnProperty.call(liveMetrics, metricKey);
+      const ciclo = resolveCicloCompra(companyKey, { linha: item.linha, subgrupo: item.subgrupo });
+      const transitEntries = getCompraTransitoEntries(comprasTransitoIndex, item.produto, item.corProduto);
+      const idealCru = calcCompraIdeal({
+        estoqueAtual: hasLive ? (live?.estoqueFilial ?? 0) : (item.estoqueFilial ?? 0),
+        ritmoDiasComEstoque: hasLive ? (live?.ritmoDiasComEstoque ?? null) : null,
+        ritmoVendasPeriodo: hasLive ? (live?.ritmoVendasPeriodo ?? null) : null,
+        ritmoInicioIso: hasLive ? (live?.ritmoInicioIso ?? null) : null,
+        ritmoFimIso: hasLive ? (live?.ritmoFimIso ?? null) : null,
+        ritmoDiasComVenda: hasLive ? (live?.ritmoDiasComVenda ?? null) : null,
+        ritmoPrimeiraVendaIso: hasLive ? (live?.ritmoPrimeiraVendaIso ?? null) : null,
+        ritmoUltimaVendaIso: hasLive ? (live?.ritmoUltimaVendaIso ?? null) : null,
+        qtde60d: hasLive ? (live?.qtde60d ?? null) : (item.qtde60d ?? null),
+        linha: item.linha,
+        subgrupo: item.subgrupo,
+        coberturaDias: ciclo.coberturaDias,
+        producaoDias: ciclo.producaoDias,
+        transitEntries,
+      });
+      const { freeze } = catracaReconcile(idealCru, buildItemKey(item.produto, item.corProduto), transitEntries);
+      if (freeze) out.push(freeze);
+    }
+    return out;
+  }, [itens, liveMetrics, comprasTransitoIndex, companyKey, filialScopeKey, catracaEnabled, catracaReconcile]);
+
+  useEffect(() => catracaPersist(catracaFreezes), [catracaFreezes, catracaPersist]);
+
   if (itens.length === 0) return null;
   return (
     <div className={`${styles.produtosTableWrap} ${compraView ? styles.produtosTableWrapCompra : ""}`}>
@@ -2081,7 +2127,10 @@ function ListaLojaItensTable({
                 const ritmoPrimeiraVendaIso = hasLive ? (live?.ritmoPrimeiraVendaIso ?? null) : null;
                 const ritmoUltimaVendaIso = hasLive ? (live?.ritmoUltimaVendaIso ?? null) : null;
                 const transitEntries = getCompraTransitoEntries(comprasTransitoIndex, item.produto, item.corProduto);
-                const ideal = calcCompraIdeal({
+                const cicloItem = hasCicloCompra(companyKey)
+                  ? resolveCicloCompra(companyKey, { linha: item.linha, subgrupo: item.subgrupo })
+                  : null;
+                const idealCru = calcCompraIdeal({
                   estoqueAtual: estoqueFilial,
                   ritmoDiasComEstoque,
                   ritmoVendasPeriodo,
@@ -2093,8 +2142,15 @@ function ListaLojaItensTable({
                   qtde60d,
                   linha: item.linha,
                   subgrupo: item.subgrupo,
+                  coberturaDias: cicloItem?.coberturaDias ?? null,
+                  producaoDias: cicloItem?.producaoDias ?? null,
                   transitEntries,
                 });
+                const { ideal } = catracaReconcile(
+                  idealCru,
+                  buildItemKey(item.produto, item.corProduto),
+                  transitEntries
+                );
                 return (
                   <>
               <td>
@@ -2469,9 +2525,16 @@ function ListaLojaItensTable({
                         })
                       }
                       onMouseLeave={() => setCompraIdealTooltip(null)}
-                      style={{ fontWeight: 700, color: compraIdealDisplay > 0 ? "#b45309" : "#475569" }}
+                      style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", fontWeight: 700, color: compraIdealDisplay > 0 ? "#b45309" : "#475569" }}
                     >
-                      {fmt(compraIdealDisplay)} pcs
+                      <span>{fmt(compraIdealDisplay)} pcs</span>
+                      {ideal.modoCiclo && ideal.dataCompra && ideal.status === "REPOR" ? (
+                        <span style={{ fontSize: 11, fontWeight: 600, color: ideal.comprarAgora ? "#b91c1c" : "#0f766e" }}>
+                          {ideal.comprarAgora
+                            ? "📅 comprar agora"
+                            : `📅 ${formatShortDate(ideal.dataCompra)}${ideal.diasAteComprar != null ? ` · ${fmt(ideal.diasAteComprar)}d` : ""}`}
+                        </span>
+                      ) : null}
                     </span>
                   );
                 })()}
@@ -3275,6 +3338,9 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
           let suggestedQty: number;
           if (filialConsultaSelecionada) {
             const transitEntries = getCompraTransitoEntries(comprasTransitoIndex, item.produto, item.corProduto);
+            const cicloSug = hasCicloCompra(companyKey)
+              ? resolveCicloCompra(companyKey, { linha: item.linha, subgrupo: item.subgrupo })
+              : null;
             const ideal = calcCompraIdeal({
               estoqueAtual: estoqueFilial ?? 0,
               ritmoDiasComEstoque: vendas?.ritmoDiasComEstoque ?? null,
@@ -3287,6 +3353,8 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
               qtde60d: vendas?.qtde60d ?? null,
               linha: item.linha,
               subgrupo: item.subgrupo,
+              coberturaDias: cicloSug?.coberturaDias ?? null,
+              producaoDias: cicloSug?.producaoDias ?? null,
               transitEntries,
             });
             suggestedQty = Math.max(0, ideal.compraIdeal);
