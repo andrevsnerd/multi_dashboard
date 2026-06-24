@@ -42,6 +42,7 @@ import {
 } from "@/lib/utils/compra-ideal";
 import { resolveCicloCompra, hasCicloCompra } from "@/lib/config/compra-ciclo";
 import { useCatracaDataCompra, type CatracaFreeze } from "@/lib/client/use-catraca-data-compra";
+import CompraIdealExplainCard from "@/components/shared/CompraIdealExplainCard";
 import {
   partesDestinoCompraFinal,
   type DestinoCompraFinalParte,
@@ -698,6 +699,51 @@ async function fetchVendasItemMetricas(
   } catch {
     return null;
   }
+}
+
+/**
+ * Monta um ListaItem completo (com snapshot de vendas/estoque e qtd sugerida) a partir
+ * de um item base. Mesma lógica de `adicionarProdutoModal`, isolada para reuso pela
+ * entrada vinda da Curva ABC ("criar lista com este produto").
+ */
+async function buildListaItemComMetricas(
+  companyKey: string,
+  codFilial: string | null,
+  base: {
+    produto: string;
+    descProduto: string;
+    codigoBarra: string | null;
+    corProduto: string | null;
+    descCor: string;
+    linha?: string | null;
+    subgrupo?: string | null;
+  }
+): Promise<ListaItem> {
+  const [vendas, estoque] = await Promise.all([
+    fetchVendasItemMetricas(companyKey, codFilial, base.produto, base.corProduto),
+    fetchEstoqueFilialSum(companyKey, codFilial, base.produto, base.corProduto),
+  ]);
+  const metricFields = {
+    qtde12m: vendas?.qtde12m ?? null,
+    qtde60d: vendas?.qtde60d ?? null,
+    vendasMesAtual: vendas?.vendasMesAtual ?? null,
+    valor12m: vendas?.valor12m ?? null,
+    custoUnit: vendas?.custoUnit ?? null,
+    estoqueFilial: estoque,
+    diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
+    primeiraEntradaFilial: vendas?.primeiraEntradaFilial ?? null,
+    diasHistoricoFilial: vendas?.diasHistoricoFilial ?? null,
+    mesesHistoricoFilial: vendas?.mesesHistoricoFilial ?? null,
+    diasComEstoquePositivo: vendas?.diasComEstoquePositivo ?? null,
+    diasSemEstoque: vendas?.diasSemEstoque ?? null,
+    mesesDisponiveis: vendas?.mesesDisponiveis ?? null,
+    velocidadeAjustada: vendas?.velocidadeAjustada ?? null,
+    ritmoDiasComEstoque: vendas?.ritmoDiasComEstoque ?? null,
+    ritmoVendasPeriodo: vendas?.ritmoVendasPeriodo ?? null,
+    historicoParcial: vendas?.historicoParcial ?? null,
+  };
+  const quantidade = getSuggestedQtyValue({ ...base, quantidade: 0, ...metricFields }, new Date().getDate());
+  return { ...base, quantidade, ...metricFields };
 }
 
 async function fetchVendasPorFilialItem(
@@ -2119,8 +2165,11 @@ function ListaLojaItensTable({
                 const totalPerFilialQty = filiaisNMAgregado.reduce((s, f) => s + f.qtd, 0) + filiaisCoberturaAgregado.reduce((s, f) => s + f.qtd, 0);
                 // Compra Ideal: ritmo medido sobre os até 60 dias com estoque mais recentes
                 // (× cobertura-alvo − estoque − trânsito). Fallback p/ 60d corridos enquanto não carrega o live.
-                const ritmoDiasComEstoque = hasLive ? (live?.ritmoDiasComEstoque ?? null) : null;
-                const ritmoVendasPeriodo = hasLive ? (live?.ritmoVendasPeriodo ?? null) : null;
+                // Antes do liveMetrics chegar, usa o snapshot de ritmo já gravado no item
+                // (a semente da Curva ABC e as listas salvas o populam) — assim a Compra Ideal
+                // já aparece no valor certo e não "pisca" do fallback para a janela.
+                const ritmoDiasComEstoque = hasLive ? (live?.ritmoDiasComEstoque ?? null) : (item.ritmoDiasComEstoque ?? null);
+                const ritmoVendasPeriodo = hasLive ? (live?.ritmoVendasPeriodo ?? null) : (item.ritmoVendasPeriodo ?? null);
                 const ritmoInicioIso = hasLive ? (live?.ritmoInicioIso ?? null) : null;
                 const ritmoFimIso = hasLive ? (live?.ritmoFimIso ?? null) : null;
                 const ritmoDiasComVenda = hasLive ? (live?.ritmoDiasComVenda ?? null) : null;
@@ -2144,6 +2193,7 @@ function ListaLojaItensTable({
                   subgrupo: item.subgrupo,
                   coberturaDias: cicloItem?.coberturaDias ?? null,
                   producaoDias: cicloItem?.producaoDias ?? null,
+                  grupoCiclo: cicloItem?.grupo ?? null,
                   transitEntries,
                 });
                 const { ideal } = catracaReconcile(
@@ -2712,52 +2762,19 @@ function ListaLojaItensTable({
         </div>
       )}
       {compraIdealTooltip && (
-        <div className={styles.metricTooltip} style={getTooltipViewportPosition(compraIdealTooltip.x, compraIdealTooltip.y)}>
-          <div className={styles.metricTooltipTitle}>Compra ideal → {fmt(compraIdealTooltip.ideal.compraIdeal)} pcs</div>
-          <div className={styles.metricTooltipMeta}><strong>Produto:</strong> {compraIdealTooltip.produto}</div>
-          {compraIdealTooltip.cor && <div className={styles.metricTooltipMeta}><strong>Cor:</strong> {compraIdealTooltip.cor}</div>}
-          <div className={styles.metricTooltipLine} style={{ marginTop: 6, color: "#64748b", fontSize: 11 }}>
-            Alvo = sobreviver o lead time (até a compra chegar) + cobertura saudável após a chegada. Lead time = cobertura → alvo = 2× cobertura.
-          </div>
-          <div className={styles.metricTooltipDivider} />
-          <div className={styles.metricTooltipRow}>
-            <span>Ritmo</span><span>{fmt(compraIdealTooltip.ideal.ritmoMensal)}/mês ({compraIdealTooltip.ideal.consumoDiario.toFixed(2)}/dia)</span>
-          </div>
-          <div className={styles.metricTooltipRow}>
-            <span>Cobertura atual</span>
-            <span>{compraIdealTooltip.ideal.coberturaAtualDias != null ? `${fmt(compraIdealTooltip.ideal.coberturaAtualDias)}d` : "—"}</span>
-          </div>
-          <div className={styles.metricTooltipRow}>
-            <span>Lead time</span><span>{compraIdealTooltip.ideal.leadTimeDias}d</span>
-          </div>
-          <div className={styles.metricTooltipRow}>
-            <span>Cobertura alvo pós-chegada</span><span>{compraIdealTooltip.ideal.coberturaAlvoDias}d</span>
-          </div>
-          {compraIdealTooltip.ideal.emTransito > 0 ? (
-            <div className={styles.metricTooltipRow}>
-              <span>Dias até ruptura antes da chegada</span>
-              <span style={(compraIdealTooltip.ideal.folgaAteChegadaDias ?? 0) < 0 ? { color: "#b91c1c", fontWeight: 700 } : undefined}>
-                {compraIdealTooltip.ideal.folgaAteChegadaDias != null ? `${fmt(compraIdealTooltip.ideal.folgaAteChegadaDias)}d` : "—"}
-              </span>
-            </div>
-          ) : null}
-          <div className={styles.metricTooltipRow}>
-            <span>Alvo total</span><span>{compraIdealTooltip.ideal.alvoTotalDias}d → {fmt(compraIdealTooltip.ideal.alvoEstoque)} un</span>
-          </div>
-          <div className={styles.metricTooltipRow}>
-            <span>Estoque + trânsito</span><span>{fmt(compraIdealTooltip.ideal.estoqueAtual)} + {fmt(compraIdealTooltip.ideal.emTransito)} = {fmt(compraIdealTooltip.ideal.estoqueAtual + compraIdealTooltip.ideal.emTransito)} un</span>
-          </div>
-          <div className={styles.metricTooltipDivider} />
-          <div className={styles.metricTooltipRow}>
-            <span><strong>Compra ideal</strong></span>
-            <span><strong>{fmt(Math.max(0, compraIdealTooltip.ideal.compraIdeal))} pcs</strong></span>
-          </div>
-          {compraIdealTooltip.ideal.compraIdeal < 0 ? (
-            <div className={styles.metricTooltipRow}>
-              <span>Excedente</span>
-              <span style={{ color: "#166534", fontWeight: 700 }}>+{fmt(-compraIdealTooltip.ideal.compraIdeal)} un</span>
-            </div>
-          ) : null}
+        <div
+          style={{
+            position: "fixed",
+            zIndex: 9999,
+            pointerEvents: "none",
+            ...getTooltipViewportPosition(compraIdealTooltip.x, compraIdealTooltip.y),
+          }}
+        >
+          <CompraIdealExplainCard
+            ideal={compraIdealTooltip.ideal}
+            descricao={compraIdealTooltip.produto}
+            cor={compraIdealTooltip.cor}
+          />
         </div>
       )}
       {ritmoTooltip && (
@@ -2802,6 +2819,11 @@ function ListaLojaItensTable({
               <div className={styles.metricTooltipRow}>
                 <span>Consumo</span><span>{ritmoTooltip.ideal.consumoDiario.toFixed(2)} un/dia</span>
               </div>
+              {ritmoTooltip.ideal.ritmoBaseAmortecida ? (
+                <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#b45309", marginTop: 2 }}>
+                  Piso de lançamento: {fmt(ritmoTooltip.ideal.ritmoDiasBase)}d reais de estoque → consumo projetado sobre base mínima de 30 dias (não extrapola a rajada).
+                </div>
+              ) : null}
               {ritmoTooltip.ideal.ritmoSpanVendaDias != null && ritmoTooltip.ideal.ritmoSpanVendaDias < ritmoTooltip.ideal.ritmoDiasBase * 0.5 ? (
                 <div className={styles.metricTooltipLine} style={{ fontSize: 11, color: "#b45309", marginTop: 2 }}>
                   ⚠ Vendas concentradas em {fmt(ritmoTooltip.ideal.ritmoSpanVendaDias)}d dos {fmt(ritmoTooltip.ideal.ritmoDiasBase)}d — ritmo real no surto pode ser maior.
@@ -3128,6 +3150,8 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
   const [itens, setItens] = useState<ListaItem[]>([]);
   const itensRef = useRef<ListaItem[]>(itens);
   itensRef.current = itens;
+  // Garante que a semente vinda da Curva ABC (?addProduto=...) só seja aplicada uma vez.
+  const seedAplicadoRef = useRef(false);
 
   // Modal adicionar produto
   const [modalAberto, setModalAberto] = useState(false);
@@ -4467,6 +4491,84 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
   const voltarParaLista = useCallback(() => {
     setMode("list");
   }, []);
+
+  // ─── Entrada vinda da Curva ABC ("criar lista com este produto") ─────────────
+  // Quando a URL traz ?addProduto=..., abre uma nova lista (visão geral) já com o
+  // produto adicionado, como se o usuário tivesse criado a lista e incluído o item.
+  useEffect(() => {
+    if (seedAplicadoRef.current) return;
+    if (!permissoesCarregadas) return;
+    if (filiaisDisponiveis.length === 0) return;
+    const seedProduto = (searchParams.get("addProduto") || "").trim();
+    if (!seedProduto) return;
+
+    seedAplicadoRef.current = true;
+
+    const seedCor = (searchParams.get("addCor") || "").trim() || null;
+    const seedNome = (searchParams.get("addNome") || "").trim() || seedProduto;
+    const seedCorDesc = (searchParams.get("addCorDesc") || "").trim();
+    // Escopo de filial herdado da Curva ABC (nome canônico, cod ou displayName). Casar aqui
+    // garante que ritmo/Compra Ideal abram IGUAIS ao que estava na Curva ABC. Sem match
+    // (ou sem addFilial) → TODAS (visão geral), que é filiaisDisponiveis[0].
+    const seedFilial = (searchParams.get("addFilial") || "").trim();
+    const alvoFilial = normalizeKey(seedFilial);
+    const filialMatch = alvoFilial
+      ? filiaisDisponiveis.find(
+          (f) =>
+            normalizeKey(f.codFilial) === alvoFilial ||
+            normalizeKey(f.filial) === alvoFilial ||
+            normalizeKey(f.displayName) === alvoFilial ||
+            (f.aliases ?? []).some((a) => normalizeKey(a) === alvoFilial)
+        )
+      : null;
+
+    const filialInicial = filialMatch ?? filiaisDisponiveis[0];
+    setEditingId(undefined);
+    setNomeLista("");
+    setFilialSelecionada(filialInicial);
+    setItens([]);
+    setMode("editor");
+
+    const filialCod =
+      filialInicial.codFilial === TODAS_FILIAIS_VALUE ? null : filialInicial.codFilial?.trim() || null;
+
+    void (async () => {
+      let base = {
+        produto: seedProduto,
+        descProduto: seedNome,
+        codigoBarra: null as string | null,
+        corProduto: seedCor,
+        descCor: resolveStrictColorDescription(seedCor, seedCorDesc),
+        linha: null as string | null,
+        subgrupo: null as string | null,
+      };
+      try {
+        const encontrados = await searchProdutos(seedProduto, companyKey, seedCor ?? undefined);
+        const match = seedCor
+          ? encontrados.find((p) => (p.corProduto ?? "").trim() === seedCor.trim()) ?? encontrados[0]
+          : encontrados.find((p) => p.produto.trim() === seedProduto) ?? encontrados[0];
+        if (match) {
+          base = {
+            produto: match.produto,
+            descProduto: match.descProduto || seedNome,
+            codigoBarra: match.codigoBarra ?? null,
+            corProduto: match.corProduto ?? seedCor,
+            descCor: resolveStrictColorDescription(match.corProduto ?? seedCor, match.descCor || seedCorDesc),
+            linha: match.linha ?? null,
+            subgrupo: match.subgrupo ?? null,
+          };
+        }
+      } catch {
+        // sem match na base: segue com o item mínimo dos parâmetros
+      }
+      try {
+        const item = await buildListaItemComMetricas(companyKey, filialCod, base);
+        setItens([item]);
+      } catch {
+        setItens([{ ...base, quantidade: 1 }]);
+      }
+    })();
+  }, [permissoesCarregadas, filiaisDisponiveis, searchParams, companyKey]);
 
   // ─── Save ───────────────────────────────────────────────────────────────────
 

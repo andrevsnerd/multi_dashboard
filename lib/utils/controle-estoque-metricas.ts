@@ -338,6 +338,32 @@ export function mergeControleEstoqueMetricasEntries(
   const estoquePorFilial = Array.from(estoquePorFilialMap.values());
   const vendasPorFilial = Array.from(vendasPorFilialMap.values());
 
+  // A janela de ritmo (maior trecho contínuo com estoque) NÃO é derivável dos agregados por
+  // filial — ela vem da simulação diária, que só os MEMBROS têm calculada. Se deixássemos o
+  // summarize zerar a janela, todo produto AGRUPADO cairia em consumo 0 ("Suficiente"). Então
+  // agregamos a janela dos membros: somamos as vendas-no-trecho e usamos o MAIOR trecho como
+  // base de dias (período representativo). É a MESMA regra aplicada ao grupo, com dado real.
+  let ritmoDiasComEstoque = 0;
+  let ritmoVendasPeriodo = 0;
+  let ritmoDiasComVenda = 0;
+  let ritmoInicioIso: string | null = null;
+  let ritmoFimIso: string | null = null;
+  let ritmoPrimeiraVendaIso: string | null = null;
+  let ritmoUltimaVendaIso: string | null = null;
+  for (const r of rows) {
+    ritmoVendasPeriodo += Number(r.resumo?.ritmoVendasPeriodo ?? 0);
+    ritmoDiasComVenda += Number(r.resumo?.ritmoDiasComVenda ?? 0);
+    const dias = Number(r.resumo?.ritmoDiasComEstoque ?? 0);
+    if (dias > ritmoDiasComEstoque) {
+      ritmoDiasComEstoque = dias;
+      ritmoInicioIso = r.resumo?.ritmoInicioIso ?? null;
+      ritmoFimIso = r.resumo?.ritmoFimIso ?? null;
+    }
+    ritmoPrimeiraVendaIso = getEarlierIsoDate(ritmoPrimeiraVendaIso, r.resumo?.ritmoPrimeiraVendaIso ?? null);
+    const ult = r.resumo?.ritmoUltimaVendaIso ?? null;
+    if (ult && ult > (ritmoUltimaVendaIso ?? "")) ritmoUltimaVendaIso = ult;
+  }
+
   return {
     item: {
       produto: rows[0]?.item.produto ?? "",
@@ -345,9 +371,16 @@ export function mergeControleEstoqueMetricasEntries(
     },
     estoquePorFilial,
     vendasPorFilial,
-    resumo: summarizeControleEstoqueItemMetricas({
-      estoquePorFilial,
-      vendasPorFilial,
-    }),
+    resumo: {
+      ...summarizeControleEstoqueItemMetricas({ estoquePorFilial, vendasPorFilial }),
+      // Janela agregada dos membros (o summarize sozinho a zeraria).
+      ritmoDiasComEstoque,
+      ritmoVendasPeriodo,
+      ritmoDiasComVenda,
+      ritmoInicioIso,
+      ritmoFimIso,
+      ritmoPrimeiraVendaIso,
+      ritmoUltimaVendaIso,
+    },
   };
 }

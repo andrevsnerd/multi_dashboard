@@ -854,9 +854,37 @@ function buildProductPerformanceHref(
   return `/${companyKey}/produto-performance?${params.toString()}`;
 }
 
+/**
+ * Link para a Lista Loja que abre uma nova lista já com este produto adicionado
+ * (como se o usuário criasse a lista e incluísse o item para analisar lá).
+ */
+function buildListaLojaHref(
+  companyKey: CompanyKey,
+  p: Pick<ProdutoRow, "produto" | "descricao" | "cor" | "corDescricao">,
+  selectedFilial: string | null
+): string {
+  if (isProdutoAgrupadoSyntheticId(p.produto)) {
+    return "#";
+  }
+  const params = new URLSearchParams();
+  params.set("addProduto", p.produto.trim());
+  params.set("addNome", (p.descricao || p.produto).trim());
+  const cor = (p.cor ?? "").trim();
+  if (cor) params.set("addCor", cor);
+  const corDesc = (p.corDescricao ?? "").trim();
+  if (corDesc) params.set("addCorDesc", corDesc);
+  // Abre a Lista Loja no MESMO escopo de filial da Curva ABC (nome canônico) para que
+  // ritmo/Compra Ideal batam com o que está sendo visto aqui. Sem isto, a lista abre em
+  // TODAS e o ritmo (medido por escopo) pode divergir. Vazio ⇒ TODAS (visão geral).
+  const filial = (selectedFilial ?? "").trim();
+  if (filial) params.set("addFilial", filial);
+  return `/${companyKey}/lista-loja?${params.toString()}`;
+}
+
 function renderRowActionIcons(
   companyKey: CompanyKey,
-  p: Pick<ProdutoRow, "produto" | "descricao" | "cor">
+  p: Pick<ProdutoRow, "produto" | "descricao" | "cor" | "corDescricao">,
+  selectedFilial: string | null
 ): React.ReactNode {
   const name = p.descricao || p.produto;
   return (
@@ -866,6 +894,8 @@ function renderRowActionIcons(
         className={styles.productDetailIcon}
         title="Abrir produto detalhado"
         aria-label={`Abrir produto detalhado de ${name}`}
+        target="_blank"
+        rel="noopener noreferrer"
       >
         <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
           <path
@@ -883,6 +913,8 @@ function renderRowActionIcons(
         className={`${styles.productDetailIcon} ${styles.productPerformanceIcon}`}
         title="Abrir produto performance"
         aria-label={`Abrir produto performance de ${name}`}
+        target="_blank"
+        rel="noopener noreferrer"
       >
         <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
           <path
@@ -901,6 +933,16 @@ function renderRowActionIcons(
           />
           <circle cx="10" cy="10" r="1.4" fill="currentColor" />
         </svg>
+      </Link>
+      <Link
+        href={buildListaLojaHref(companyKey, p, selectedFilial)}
+        className={`${styles.productDetailIcon} ${styles.productListaLojaIcon}`}
+        title="Criar uma lista de loja com este produto"
+        aria-label={`Criar lista de loja com ${name}`}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <span className={styles.productListaLojaIconText} aria-hidden="true">LL</span>
       </Link>
     </>
   );
@@ -2966,7 +3008,7 @@ const handleBadgeClick = (cat: string) => {
                                 <div className={styles.productDetailLink}>
                                   <div className={styles.productNameRow}>
                                     <span className={styles.productName}>{p.descricao || p.produto}</span>
-                                    {!p.isGroupedProduct && renderRowActionIcons(companyKey, p)}
+                                    {!p.isGroupedProduct && renderRowActionIcons(companyKey, p, selectedFilial)}
                                     {(() => {
                                       const cmp = getComparisonBadge(p.vendas, p.vendasPrevious);
                                       if (!cmp) return null;
@@ -2992,7 +3034,7 @@ const handleBadgeClick = (cat: string) => {
                                               <div key={m.produto} className={styles.inlineTooltipRow}>
                                                 {renderGroupedMemberLabel(m, false)}
                                                 <span className={styles.inlineTooltipActions}>
-                                                  {renderRowActionIcons(companyKey, m)}
+                                                  {renderRowActionIcons(companyKey, m, selectedFilial)}
                                                 </span>
                                               </div>
                                             ))}
@@ -3190,7 +3232,7 @@ const handleBadgeClick = (cat: string) => {
                                       buildControleEstoqueItemKey(p.produto, corCat),
                                       getCompraTransitoEntries(comprasTransitoIndex, p.produto, corCat)
                                     );
-                                    return <CompraIdealCell ideal={ideal} />;
+                                    return <CompraIdealCell ideal={ideal} descricao={p.descricao} cor={p.cor} />;
                                   })()}
                                 </td>
                               </>

@@ -32,7 +32,7 @@ export interface CompraIdealInput {
   ritmoDiasComVenda?: number | null;
   ritmoPrimeiraVendaIso?: string | null;
   ritmoUltimaVendaIso?: string | null;
-  /** Fallback de ritmo: vendas dos últimos 60 dias corridos (usado se a janela não vier). */
+  /** @deprecated Não é mais usado no cálculo de ritmo (a regra usa só a janela `ritmoDiasComEstoque`). */
   qtde60d?: number | null;
   linha?: string | null;
   subgrupo?: string | null;
@@ -45,6 +45,8 @@ export interface CompraIdealInput {
   coberturaDias?: number | null;
   /** Lead time real (dias de produção + transporte até chegar no PDV). Ver `coberturaDias`. */
   producaoDias?: number | null;
+  /** Rótulo do grupo do ciclo (Seda, Cashmere, Lenços BR…), só para exibição no tooltip. */
+  grupoCiclo?: string | null;
   /** Entradas de compra em trânsito já confirmadas para o item. */
   transitEntries?: CompraTransitoIndexEntry[];
   /** Data de referência ("hoje"); injetável para testes. */
@@ -62,6 +64,11 @@ export interface CompraIdealResult {
   ritmoDiasBase: number;
   /** Vendas usadas na base do ritmo. */
   ritmoVendasBase: number;
+  /**
+   * true quando a janela tinha menos de 30 dias com estoque e o consumo/dia foi calculado
+   * com a base mínima de 30 dias (piso de histórico de lançamento) em vez dos dias reais.
+   */
+  ritmoBaseAmortecida: boolean;
   /** Confiabilidade da estimativa de ritmo: alta (≥60d), baixa (≥14d), muito_baixa (<14d). */
   confiabilidade: CompraIdealConfiabilidade;
   /** Data de início do período usado no ritmo (ISO), ou null. */
@@ -95,6 +102,10 @@ export interface CompraIdealResult {
   producaoDias: number;
   /** true quando usou a lógica de CICLO (lead time separado da cobertura). */
   modoCiclo: boolean;
+  /** Rótulo do grupo do ciclo (Seda, Cashmere, Lenços BR…), ou null. */
+  grupoCiclo: string | null;
+  /** Saldo de estoque projetado para a chegada da compra nova (o "− saldo" da quantidade). */
+  saldoNaChegadaCompra: number | null;
   /** Data (ISO) em que estoque + trânsito acaba, considerando a chegada do trânsito. */
   acabaComTransitoIso: string | null;
   /** Dias até acabar considerando o trânsito (a partir de hoje). */
@@ -124,6 +135,13 @@ export interface CompraIdealResult {
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 // Alvo já embute lead time + cobertura; só é excesso bem acima disso.
 const FATOR_EXCESSO_PADRAO = 1.5;
+/**
+ * Piso de histórico para a janela de ritmo. Produto com menos de 30 dias com estoque
+ * (ex.: lançamento) não pode extrapolar a rajada: o consumo/dia é calculado como se a
+ * base mínima fosse 30 dias. Ex.: 172 vendas em 12 dias → 172/30 (≈5,7/dia), não 172/12
+ * (≈14/dia). A partir de 30 dias com estoque, usa a janela real normalmente.
+ */
+const RITMO_DIAS_BASE_MINIMO = 30;
 
 function startOfLocalDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -217,28 +235,18 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
     : getLimiteDiasReposicao({ linha: input.linha, subgrupo: input.subgrupo });
   const fatorExcesso = Number(input.fatorExcesso ?? FATOR_EXCESSO_PADRAO);
 
-  // Ritmo: prioriza a janela de "dias com estoque" (até 60 mais recentes). Sem ela,
-  // cai no fallback de 60 dias corridos (qtde60d) com confiabilidade rebaixada.
-  let ritmoDiasBase = 0;
-  let ritmoVendasBase = 0;
-  let consumoDiario = 0;
-  let confiabilidade: CompraIdealConfiabilidade;
-  // Usa a janela de "dias com estoque" só quando ela existe (>0). Quando vem 0/ausente
-  // (ex.: resumo de produto agrupado, que não recalcula a janela), cai no fallback de
-  // 60 dias corridos via qtde60d — que continua agregado corretamente.
-  if (input.ritmoDiasComEstoque != null && Number(input.ritmoDiasComEstoque) > 0) {
-    ritmoDiasBase = Math.max(0, Math.round(Number(input.ritmoDiasComEstoque ?? 0)));
-    ritmoVendasBase = Math.max(0, Number(input.ritmoVendasPeriodo ?? 0));
-    consumoDiario = ritmoDiasBase > 0 ? ritmoVendasBase / ritmoDiasBase : 0;
-    confiabilidade = ritmoDiasBase >= 60 ? "alta" : ritmoDiasBase >= 14 ? "baixa" : "muito_baixa";
-  } else {
-    // Fallback legado: 60 dias corridos.
-    const qtde60d = Math.max(0, Number(input.qtde60d ?? 0));
-    ritmoDiasBase = 0;
-    ritmoVendasBase = qtde60d;
-    consumoDiario = qtde60d / 60;
-    confiabilidade = "baixa";
-  }
+  // Ritmo — REGRA ÚNICA, sem fallback. Base = maior trecho contínuo com estoque
+  // (`ritmoDiasComEstoque`, já capado em 60 na origem) e as vendas dentro dele:
+  //   divisor = MAX(trecho, 30)   → sem trecho/<30 = 30 · 30-59 = dias reais · ≥60 = 60
+  //   consumo/dia = vendas_do_trecho ÷ divisor
+  const ritmoDiasBase = Math.max(0, Math.round(Number(input.ritmoDiasComEstoque ?? 0)));
+  const ritmoVendasBase = Math.max(0, Number(input.ritmoVendasPeriodo ?? 0));
+  const divisorRitmo = Math.max(ritmoDiasBase, RITMO_DIAS_BASE_MINIMO);
+  const consumoDiario = ritmoVendasBase / divisorRitmo;
+  // Trecho < 30 (inclui "sem trecho" = novo): o consumo foi amortecido pelo piso de 30.
+  const ritmoBaseAmortecida = ritmoDiasBase < RITMO_DIAS_BASE_MINIMO;
+  const confiabilidade: CompraIdealConfiabilidade =
+    ritmoDiasBase >= 60 ? "alta" : ritmoDiasBase >= 14 ? "baixa" : "muito_baixa";
   const ritmoMensal = Math.round(consumoDiario * 30);
   const ritmoInicioIso = input.ritmoInicioIso ?? null;
   const ritmoFimIso = input.ritmoFimIso ?? null;
@@ -308,6 +316,7 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
   let dataCompra: string | null = null;
   let diasAteComprar: number | null = null;
   let comprarAgora = false;
+  let saldoNaChegadaCompra: number | null = null;
 
   let compraIdeal: number;
   let status: CompraIdealStatus;
@@ -338,6 +347,7 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
       // chegada ≈ 0 (a remessa chega quando o estoque anterior acaba) ⇒ qtd = consumo×cobertura.
       const diaChegadaNova = Math.max(0, Math.round(diaCompraRaw)) + producaoDias;
       const saldoNaChegada = projetarEstoqueNoDia(estoqueAtual, consumoDiario, chegadas, diaChegadaNova);
+      saldoNaChegadaCompra = Math.round(saldoNaChegada);
       compraIdeal = Math.max(0, Math.ceil(consumoDiario * coberturaAlvoDias - saldoNaChegada));
     } else {
       compraIdeal = 0;
@@ -368,6 +378,7 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
     coberturaAlvoDias,
     ritmoDiasBase,
     ritmoVendasBase,
+    ritmoBaseAmortecida,
     confiabilidade,
     ritmoInicioIso,
     ritmoFimIso,
@@ -386,6 +397,8 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
     leadTimeDias,
     producaoDias,
     modoCiclo,
+    grupoCiclo: input.grupoCiclo ?? null,
+    saldoNaChegadaCompra,
     acabaComTransitoIso,
     diasAteAcabarComTransito,
     dataCompra,
@@ -432,10 +445,12 @@ export function calcCompraIdealFromResumo(
   // Sem isso (ou empresa sem ciclos, ex.: nerd hoje) → lógica legada.
   let coberturaDias: number | null = null;
   let producaoDias: number | null = null;
+  let grupoCiclo: string | null = null;
   if (meta.company && hasCicloCompra(meta.company)) {
     const ciclo = resolveCicloCompra(meta.company, { linha: meta.linha, subgrupo: meta.subgrupo });
     coberturaDias = ciclo.coberturaDias;
     producaoDias = ciclo.producaoDias;
+    grupoCiclo = ciclo.grupo;
   }
 
   return calcCompraIdeal({
@@ -452,6 +467,7 @@ export function calcCompraIdealFromResumo(
     subgrupo: meta.subgrupo,
     coberturaDias,
     producaoDias,
+    grupoCiclo,
     transitEntries,
     hoje,
   });
