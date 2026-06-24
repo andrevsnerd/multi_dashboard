@@ -6826,6 +6826,16 @@ export async function fetchVendasProdutoPorFilial({
     ritmoPrimeiraVendaIso: string | null;
     /** Última venda dentro da janela (ISO), ou null. */
     ritmoUltimaVendaIso: string | null;
+    /** Dias do trecho RECENTE com estoque (último período contínuo, teto 60). */
+    ritmoRecenteDias: number;
+    /** Vendas líquidas no trecho recente. */
+    ritmoRecenteVendas: number;
+    /** Início do trecho recente (ISO), ou null. */
+    ritmoRecenteInicioIso: string | null;
+    /** Fim do trecho recente (ISO), ou null. */
+    ritmoRecenteFimIso: string | null;
+    /** Gap (dias) entre o fim do maior trecho e o início do recente (0 = mesmo trecho). */
+    ritmoGapDias: number;
   };
 }> {
   return withRequest(async (request) => {
@@ -7544,6 +7554,45 @@ export async function fetchVendasProdutoPorFilial({
       ritmoFimIso = ritmoDias[bestEnd]!.iso;
     }
 
+    // Trecho RECENTE: o ÚLTIMO período contínuo com estoque (reflete o ritmo de HOJE).
+    // Quando o MAIOR trecho terminou há muito tempo (gap grande até o trecho recente), ele
+    // está "velho" e o consumo daquele período não vale mais — quem decide trocar a base é o
+    // engine (compra-ideal.ts), conforme a tolerância de "janela antiga" da empresa. Aqui só
+    // medimos: dias/vendas do trecho recente (mesmo teto de 60) e o GAP entre os dois trechos.
+    let recStart = -1;
+    let recEnd = -1;
+    for (let i = ritmoDias.length - 1; i >= 0; i--) {
+      if (ritmoDias[i]!.temEstoque) {
+        recEnd = i;
+        break;
+      }
+    }
+    if (recEnd >= 0) {
+      recStart = recEnd;
+      while (recStart > 0 && ritmoDias[recStart - 1]!.temEstoque) recStart -= 1;
+    }
+    let ritmoRecenteDias = 0;
+    let ritmoRecenteVendas = 0;
+    let ritmoRecenteInicioIso: string | null = null;
+    let ritmoRecenteFimIso: string | null = null;
+    if (recEnd >= 0) {
+      const recLen = recEnd - recStart + 1;
+      const recWindowStart = recLen > 60 ? recEnd - 59 : recStart;
+      for (let i = recWindowStart; i <= recEnd; i++) {
+        ritmoRecenteDias += 1;
+        ritmoRecenteVendas += ritmoDias[i]!.vendas;
+      }
+      ritmoRecenteInicioIso = ritmoDias[recWindowStart]!.iso;
+      ritmoRecenteFimIso = ritmoDias[recEnd]!.iso;
+    }
+    // Gap (dias) entre o FIM do maior trecho e o INÍCIO do trecho recente. = 0 quando os dois
+    // são o mesmo trecho (produto contínuo até hoje), garantindo que históricos saudáveis de
+    // 60+ dias NUNCA sejam trocados pelo recente.
+    let ritmoGapDias = 0;
+    if (bestEnd >= 0 && recStart > bestEnd) {
+      ritmoGapDias = recStart - bestEnd - 1;
+    }
+
     if (byFilial.size === 0 && produtoCustoUnitario > 0) {
       byFilial.set(filialSel ?? 'TODAS', {
         filial: filialSel ?? 'TODAS',
@@ -7603,6 +7652,11 @@ export async function fetchVendasProdutoPorFilial({
         ritmoDiasComVenda,
         ritmoPrimeiraVendaIso,
         ritmoUltimaVendaIso,
+        ritmoRecenteDias,
+        ritmoRecenteVendas: Math.round(ritmoRecenteVendas),
+        ritmoRecenteInicioIso,
+        ritmoRecenteFimIso,
+        ritmoGapDias,
       },
     };
   });

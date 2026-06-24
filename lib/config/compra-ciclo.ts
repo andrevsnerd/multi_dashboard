@@ -67,6 +67,18 @@ interface CompanyCicloConfig {
   /** Regras por categoria (precedência). Default quando nenhuma casa. */
   rules: CicloRule[];
   default: CicloCompra;
+  /**
+   * JANELA ANTIGA — gap (em dias) acima do qual o MAIOR trecho contínuo com estoque é
+   * considerado "velho": o produto ficou sem estoque por tanto tempo entre o trecho longo e
+   * o trecho recente que o ritmo daquele período não reflete mais o de hoje. Acima desse gap,
+   * o cálculo passa a usar o TRECHO RECENTE como base do ritmo (ver compra-ideal.ts).
+   *
+   * Números medidos nos dados reais (jun/2026, SKUs que zeraram e voltaram em 13 meses):
+   *  - SCARF ME: gap mediano ~35d, P75 ~105d → 60d cobre ~64% dos casos como ruptura (mantém
+   *    o histórico) e troca só nos gaps longos; alinhado ao ciclo de produção (37–70d).
+   *  - NERD: gap mediano ~14d, P75 ~49d → 30d cobre ~66% como ruptura; é o dobro do lead (14d).
+   */
+  gapAntigoDias: number;
 }
 
 /**
@@ -80,11 +92,13 @@ const CICLO_CONFIG: Record<CompanyKey, CompanyCicloConfig> = {
     enabled: true,
     rules: SCARFME_RULES,
     default: { grupo: "Padrão", coberturaDias: 60, producaoDias: 37 },
+    gapAntigoDias: 60,
   },
   nerd: {
     enabled: true,
     rules: [],
     default: { grupo: "Padrão", coberturaDias: 30, producaoDias: 14 },
+    gapAntigoDias: 30,
   },
 };
 
@@ -116,4 +130,16 @@ export function resolveCicloCompra(
 export function hasCicloCompra(company: CompanyKey | string | null | undefined): boolean {
   const key = normalize(company).toLowerCase() as CompanyKey;
   return CICLO_CONFIG[key]?.enabled ?? false;
+}
+
+/**
+ * Gap (em dias) da JANELA ANTIGA da empresa — acima dele o maior trecho com estoque é tratado
+ * como "velho" e o ritmo passa a usar o trecho recente. `null` quando a empresa não está
+ * configurada (aí o cálculo nunca troca a base; preserva o comportamento legado).
+ */
+export function resolveGapAntigoDias(
+  company: CompanyKey | string | null | undefined
+): number | null {
+  const key = normalize(company).toLowerCase() as CompanyKey;
+  return CICLO_CONFIG[key]?.gapAntigoDias ?? null;
 }

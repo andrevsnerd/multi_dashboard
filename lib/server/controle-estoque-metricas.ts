@@ -196,6 +196,11 @@ async function loadControleEstoqueItemMetricas(input: {
       ritmoDiasComVenda: Number(vendasPorFilialResult.resumoDisponibilidade.ritmoDiasComVenda ?? 0),
       ritmoPrimeiraVendaIso: vendasPorFilialResult.resumoDisponibilidade.ritmoPrimeiraVendaIso ?? null,
       ritmoUltimaVendaIso: vendasPorFilialResult.resumoDisponibilidade.ritmoUltimaVendaIso ?? null,
+      ritmoRecenteDias: Number(vendasPorFilialResult.resumoDisponibilidade.ritmoRecenteDias ?? 0),
+      ritmoRecenteVendas: Number(vendasPorFilialResult.resumoDisponibilidade.ritmoRecenteVendas ?? 0),
+      ritmoRecenteInicioIso: vendasPorFilialResult.resumoDisponibilidade.ritmoRecenteInicioIso ?? null,
+      ritmoRecenteFimIso: vendasPorFilialResult.resumoDisponibilidade.ritmoRecenteFimIso ?? null,
+      ritmoGapDias: Number(vendasPorFilialResult.resumoDisponibilidade.ritmoGapDias ?? 0),
     },
   };
 }

@@ -59,6 +59,16 @@ export interface ControleEstoqueItemMetricasResumo extends ControleEstoqueResumo
   ritmoPrimeiraVendaIso: string | null;
   /** Última venda dentro da janela (ISO), ou null. */
   ritmoUltimaVendaIso: string | null;
+  /** Dias do trecho RECENTE com estoque (último período contínuo, teto 60). */
+  ritmoRecenteDias: number;
+  /** Vendas líquidas no trecho recente. */
+  ritmoRecenteVendas: number;
+  /** Início do trecho recente (ISO), ou null. */
+  ritmoRecenteInicioIso: string | null;
+  /** Fim do trecho recente (ISO), ou null. */
+  ritmoRecenteFimIso: string | null;
+  /** Gap (dias) entre o fim do maior trecho e o início do recente (0 = mesmo trecho). */
+  ritmoGapDias: number;
 }
 
 export interface ControleEstoqueItemMetricas {
@@ -234,6 +244,11 @@ export function summarizeControleEstoqueItemMetricas(input: {
     ritmoDiasComVenda: 0,
     ritmoPrimeiraVendaIso: null,
     ritmoUltimaVendaIso: null,
+    ritmoRecenteDias: 0,
+    ritmoRecenteVendas: 0,
+    ritmoRecenteInicioIso: null,
+    ritmoRecenteFimIso: null,
+    ritmoGapDias: 0,
     ...historico,
   };
 }
@@ -350,6 +365,15 @@ export function mergeControleEstoqueMetricasEntries(
   let ritmoFimIso: string | null = null;
   let ritmoPrimeiraVendaIso: string | null = null;
   let ritmoUltimaVendaIso: string | null = null;
+  // Trecho recente + gap agregados: vendas do recente SOMAM (como as do maior trecho); dias do
+  // recente = MAIOR entre os membros (janela representativa); o GAP vem do membro que define o
+  // maior trecho (é "há quanto tempo o trecho-base do grupo terminou"); fim/início recente do
+  // membro com o fim mais recente.
+  let ritmoRecenteDias = 0;
+  let ritmoRecenteVendas = 0;
+  let ritmoRecenteInicioIso: string | null = null;
+  let ritmoRecenteFimIso: string | null = null;
+  let ritmoGapDias = 0;
   for (const r of rows) {
     ritmoVendasPeriodo += Number(r.resumo?.ritmoVendasPeriodo ?? 0);
     ritmoDiasComVenda += Number(r.resumo?.ritmoDiasComVenda ?? 0);
@@ -358,10 +382,19 @@ export function mergeControleEstoqueMetricasEntries(
       ritmoDiasComEstoque = dias;
       ritmoInicioIso = r.resumo?.ritmoInicioIso ?? null;
       ritmoFimIso = r.resumo?.ritmoFimIso ?? null;
+      ritmoGapDias = Number(r.resumo?.ritmoGapDias ?? 0);
     }
     ritmoPrimeiraVendaIso = getEarlierIsoDate(ritmoPrimeiraVendaIso, r.resumo?.ritmoPrimeiraVendaIso ?? null);
     const ult = r.resumo?.ritmoUltimaVendaIso ?? null;
     if (ult && ult > (ritmoUltimaVendaIso ?? "")) ritmoUltimaVendaIso = ult;
+    ritmoRecenteVendas += Number(r.resumo?.ritmoRecenteVendas ?? 0);
+    const rDias = Number(r.resumo?.ritmoRecenteDias ?? 0);
+    if (rDias > ritmoRecenteDias) ritmoRecenteDias = rDias;
+    const rFim = r.resumo?.ritmoRecenteFimIso ?? null;
+    if (rFim && rFim > (ritmoRecenteFimIso ?? "")) {
+      ritmoRecenteFimIso = rFim;
+      ritmoRecenteInicioIso = r.resumo?.ritmoRecenteInicioIso ?? null;
+    }
   }
 
   return {
@@ -381,6 +414,11 @@ export function mergeControleEstoqueMetricasEntries(
       ritmoFimIso,
       ritmoPrimeiraVendaIso,
       ritmoUltimaVendaIso,
+      ritmoRecenteDias,
+      ritmoRecenteVendas,
+      ritmoRecenteInicioIso,
+      ritmoRecenteFimIso,
+      ritmoGapDias,
     },
   };
 }

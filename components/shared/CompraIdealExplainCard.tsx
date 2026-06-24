@@ -20,7 +20,10 @@ function shortDate(iso?: string | null): string {
 
 /** Cabeçalho por tamanho da janela de ritmo (mesma régua do cálculo). */
 function cenario(ideal: CompraIdealResult): { emoji: string; label: string } {
-  if (ideal.ritmoDiasBase === 0) return { emoji: "ℹ️", label: "Sem janela — 60 dias corridos" };
+  // Janela antiga: o maior trecho estava velho (gap > tolerância) → usou o recente.
+  if (ideal.usouTrechoRecente) {
+    return { emoji: "🔄", label: `Trecho recente (maior estava velho · gap ${fmt(ideal.ritmoGapDias)}d)` };
+  }
   if (ideal.ritmoDiasBase < 30) return { emoji: "🆕", label: "Base curta (<30d) — ritmo amortecido" };
   if (ideal.ritmoDiasBase < 60) return { emoji: "📊", label: "Base parcial (30–59d)" };
   return { emoji: "✅", label: "Janela cheia (≥60d) — estável" };
@@ -40,7 +43,7 @@ function buildPerguntas(ideal: CompraIdealResult): QA[] {
   const precisaRepor = ideal.status === "REPOR";
 
   // 1. histórico (maior trecho contínuo com estoque)
-  const hist =
+  const baseHist =
     ideal.ritmoDiasBase === 0
       ? "sem trecho com estoque → tratado como novo → divide por 30"
       : ideal.ritmoDiasBase < 30
@@ -48,6 +51,10 @@ function buildPerguntas(ideal: CompraIdealResult): QA[] {
         : ideal.ritmoDiasBase < 60
           ? `${fmt(ideal.ritmoDiasBase)} dias com estoque → 30–59 → usa dias reais`
           : `${fmt(ideal.ritmoDiasBase)} dias com estoque → ≥60 → janela cheia (teto 60)`;
+  // Janela antiga: o maior trecho ficou velho (gap > tolerância da empresa) → usa o recente.
+  const hist = ideal.usouTrechoRecente
+    ? `maior trecho ficou ${fmt(ideal.ritmoGapDias)}d parado (> ${fmt(ideal.gapAntigoDias ?? 0)}d) → usa o RECENTE: ${baseHist}`
+    : baseHist;
 
   // 2. consumo/dia
   const consumo = `${fmt(ideal.ritmoVendasBase)} vendas ÷ ${divisor} = ${fmt2(ideal.consumoDiario)}/dia  (≈ ${fmt(ideal.ritmoMensal)}/mês)`;

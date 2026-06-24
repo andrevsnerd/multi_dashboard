@@ -1,6 +1,6 @@
 import type { CompraTransitoIndexEntry } from "@/lib/client/compras-transito";
 import { getLimiteDiasReposicao } from "@/lib/utils/suggestion-rules";
-import { hasCicloCompra, resolveCicloCompra } from "@/lib/config/compra-ciclo";
+import { hasCicloCompra, resolveCicloCompra, resolveGapAntigoDias } from "@/lib/config/compra-ciclo";
 
 /**
  * Compra Ideal — lógica global e simples de reposição por cobertura.
@@ -32,6 +32,19 @@ export interface CompraIdealInput {
   ritmoDiasComVenda?: number | null;
   ritmoPrimeiraVendaIso?: string | null;
   ritmoUltimaVendaIso?: string | null;
+  /**
+   * JANELA ANTIGA — trecho RECENTE (último período contínuo com estoque) e o GAP em dias até
+   * o maior trecho. Quando `ritmoGapDias` > `gapAntigoDias` (tolerância da empresa), o maior
+   * trecho é tratado como "velho" e o cálculo usa o recente como base do ritmo. Sem
+   * `gapAntigoDias` (empresa não configurada) → nunca troca; usa sempre o maior trecho.
+   */
+  ritmoRecenteDias?: number | null;
+  ritmoRecenteVendas?: number | null;
+  ritmoRecenteInicioIso?: string | null;
+  ritmoRecenteFimIso?: string | null;
+  ritmoGapDias?: number | null;
+  /** Tolerância de gap (dias) da empresa; acima dela usa o trecho recente. Ver acima. */
+  gapAntigoDias?: number | null;
   /** @deprecated Não é mais usado no cálculo de ritmo (a regra usa só a janela `ritmoDiasComEstoque`). */
   qtde60d?: number | null;
   linha?: string | null;
@@ -69,6 +82,15 @@ export interface CompraIdealResult {
    * com a base mínima de 30 dias (piso de histórico de lançamento) em vez dos dias reais.
    */
   ritmoBaseAmortecida: boolean;
+  /**
+   * true quando o ritmo usou o TRECHO RECENTE no lugar do maior trecho, porque o maior estava
+   * "velho" (gap > tolerância da empresa). Janela antiga detectada e corrigida.
+   */
+  usouTrechoRecente: boolean;
+  /** Gap (dias) entre o fim do maior trecho e o início do recente (0 = mesmo trecho). */
+  ritmoGapDias: number;
+  /** Tolerância de gap (dias) aplicada, ou null quando a empresa não tem janela antiga configurada. */
+  gapAntigoDias: number | null;
   /** Confiabilidade da estimativa de ritmo: alta (≥60d), baixa (≥14d), muito_baixa (<14d). */
   confiabilidade: CompraIdealConfiabilidade;
   /** Data de início do período usado no ritmo (ISO), ou null. */
@@ -239,8 +261,22 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
   // (`ritmoDiasComEstoque`, já capado em 60 na origem) e as vendas dentro dele:
   //   divisor = MAX(trecho, 30)   → sem trecho/<30 = 30 · 30-59 = dias reais · ≥60 = 60
   //   consumo/dia = vendas_do_trecho ÷ divisor
-  const ritmoDiasBase = Math.max(0, Math.round(Number(input.ritmoDiasComEstoque ?? 0)));
-  const ritmoVendasBase = Math.max(0, Number(input.ritmoVendasPeriodo ?? 0));
+  //
+  // JANELA ANTIGA: se o maior trecho terminou há mais que a tolerância da empresa
+  // (gap > gapAntigoDias), ele está "velho" — o produto ficou sem estoque tempo demais e o
+  // ritmo daquele período não reflete o de hoje. Aí a base passa a ser o TRECHO RECENTE. Sem
+  // tolerância configurada, ou gap dentro dela (ruptura normal), mantém o maior trecho.
+  const melhorDias = Math.max(0, Math.round(Number(input.ritmoDiasComEstoque ?? 0)));
+  const melhorVendas = Math.max(0, Number(input.ritmoVendasPeriodo ?? 0));
+  const recenteDias = Math.max(0, Math.round(Number(input.ritmoRecenteDias ?? 0)));
+  const recenteVendas = Math.max(0, Number(input.ritmoRecenteVendas ?? 0));
+  const ritmoGapDias = Math.max(0, Math.round(Number(input.ritmoGapDias ?? 0)));
+  const gapAntigoDias =
+    input.gapAntigoDias != null ? Math.max(0, Math.round(Number(input.gapAntigoDias))) : null;
+  const usouTrechoRecente =
+    gapAntigoDias != null && gapAntigoDias > 0 && ritmoGapDias > gapAntigoDias && recenteDias > 0;
+  const ritmoDiasBase = usouTrechoRecente ? recenteDias : melhorDias;
+  const ritmoVendasBase = usouTrechoRecente ? recenteVendas : melhorVendas;
   const divisorRitmo = Math.max(ritmoDiasBase, RITMO_DIAS_BASE_MINIMO);
   const consumoDiario = ritmoVendasBase / divisorRitmo;
   // Trecho < 30 (inclui "sem trecho" = novo): o consumo foi amortecido pelo piso de 30.
@@ -248,8 +284,13 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
   const confiabilidade: CompraIdealConfiabilidade =
     ritmoDiasBase >= 60 ? "alta" : ritmoDiasBase >= 14 ? "baixa" : "muito_baixa";
   const ritmoMensal = Math.round(consumoDiario * 30);
-  const ritmoInicioIso = input.ritmoInicioIso ?? null;
-  const ritmoFimIso = input.ritmoFimIso ?? null;
+  // Datas do período usado: quando troca pro recente, exibe as datas do trecho recente.
+  const ritmoInicioIso = usouTrechoRecente
+    ? (input.ritmoRecenteInicioIso ?? null)
+    : (input.ritmoInicioIso ?? null);
+  const ritmoFimIso = usouTrechoRecente
+    ? (input.ritmoRecenteFimIso ?? null)
+    : (input.ritmoFimIso ?? null);
   const ritmoFimDate = parseIsoDate(ritmoFimIso);
   const ritmoDiasAtras = ritmoFimDate ? Math.max(0, daysBetween(ritmoFimDate, hoje)) : null;
   const ritmoDiasComVenda = Math.max(0, Math.round(Number(input.ritmoDiasComVenda ?? 0)));
@@ -379,6 +420,9 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
     ritmoDiasBase,
     ritmoVendasBase,
     ritmoBaseAmortecida,
+    usouTrechoRecente,
+    ritmoGapDias,
+    gapAntigoDias,
     confiabilidade,
     ritmoInicioIso,
     ritmoFimIso,
@@ -427,6 +471,11 @@ export interface CompraIdealResumoLike {
   ritmoDiasComVenda?: number | null;
   ritmoPrimeiraVendaIso?: string | null;
   ritmoUltimaVendaIso?: string | null;
+  ritmoRecenteDias?: number | null;
+  ritmoRecenteVendas?: number | null;
+  ritmoRecenteInicioIso?: string | null;
+  ritmoRecenteFimIso?: string | null;
+  ritmoGapDias?: number | null;
 }
 
 /**
@@ -463,6 +512,12 @@ export function calcCompraIdealFromResumo(
     ritmoDiasComVenda: resumo?.ritmoDiasComVenda ?? null,
     ritmoPrimeiraVendaIso: resumo?.ritmoPrimeiraVendaIso ?? null,
     ritmoUltimaVendaIso: resumo?.ritmoUltimaVendaIso ?? null,
+    ritmoRecenteDias: resumo?.ritmoRecenteDias ?? null,
+    ritmoRecenteVendas: resumo?.ritmoRecenteVendas ?? null,
+    ritmoRecenteInicioIso: resumo?.ritmoRecenteInicioIso ?? null,
+    ritmoRecenteFimIso: resumo?.ritmoRecenteFimIso ?? null,
+    ritmoGapDias: resumo?.ritmoGapDias ?? null,
+    gapAntigoDias: resolveGapAntigoDias(meta.company),
     linha: meta.linha,
     subgrupo: meta.subgrupo,
     coberturaDias,

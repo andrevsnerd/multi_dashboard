@@ -40,7 +40,7 @@ import {
   type CompraIdealStatus,
   type CompraIdealResult,
 } from "@/lib/utils/compra-ideal";
-import { resolveCicloCompra, hasCicloCompra } from "@/lib/config/compra-ciclo";
+import { resolveCicloCompra, hasCicloCompra, resolveGapAntigoDias } from "@/lib/config/compra-ciclo";
 import { useCatracaDataCompra, type CatracaFreeze } from "@/lib/client/use-catraca-data-compra";
 import CompraIdealExplainCard from "@/components/shared/CompraIdealExplainCard";
 import {
@@ -572,7 +572,7 @@ async function fetchVendasItemMetricas(
   produto: string,
   corProduto: string | null,
   itemMeta?: { linha?: string | null; subgrupo?: string | null }
-): Promise<{ qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null; diasDesdeUltimaVenda: number | null; primeiraEntradaFilial: string | null; diasHistoricoFilial: number; mesesHistoricoFilial: number; diasComEstoquePositivo: number; diasSemEstoque: number; mesesDisponiveis: number; velocidadeAjustada: number; ritmoDiasComEstoque: number; ritmoVendasPeriodo: number; ritmoInicioIso: string | null; ritmoFimIso: string | null; ritmoDiasComVenda: number; ritmoPrimeiraVendaIso: string | null; ritmoUltimaVendaIso: string | null; historicoParcial: boolean; filiaisNM: FilialNecessidadeMinima[]; filiaisCobertura: FilialNecessidadeMinima[]; vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number; velocidadeAjustada?: number | null; mesesDisponiveis?: number | null; diasComEstoquePositivo?: number | null }>; estoquePorFilial: Array<{ filial: string; estoque: number }> } | null> {
+): Promise<{ qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null; diasDesdeUltimaVenda: number | null; primeiraEntradaFilial: string | null; diasHistoricoFilial: number; mesesHistoricoFilial: number; diasComEstoquePositivo: number; diasSemEstoque: number; mesesDisponiveis: number; velocidadeAjustada: number; ritmoDiasComEstoque: number; ritmoVendasPeriodo: number; ritmoInicioIso: string | null; ritmoFimIso: string | null; ritmoDiasComVenda: number; ritmoPrimeiraVendaIso: string | null; ritmoUltimaVendaIso: string | null; ritmoRecenteDias: number; ritmoRecenteVendas: number; ritmoRecenteInicioIso: string | null; ritmoRecenteFimIso: string | null; ritmoGapDias: number; historicoParcial: boolean; filiaisNM: FilialNecessidadeMinima[]; filiaisCobertura: FilialNecessidadeMinima[]; vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number; velocidadeAjustada?: number | null; mesesDisponiveis?: number | null; diasComEstoquePositivo?: number | null }>; estoquePorFilial: Array<{ filial: string; estoque: number }> } | null> {
   type VendasItemMetricasApiRow = {
     qtde12m: number;
     qtde60d: number;
@@ -652,6 +652,11 @@ async function fetchVendasItemMetricas(
       ritmoDiasComVenda: metricas.resumo.ritmoDiasComVenda,
       ritmoPrimeiraVendaIso: metricas.resumo.ritmoPrimeiraVendaIso,
       ritmoUltimaVendaIso: metricas.resumo.ritmoUltimaVendaIso,
+      ritmoRecenteDias: metricas.resumo.ritmoRecenteDias,
+      ritmoRecenteVendas: metricas.resumo.ritmoRecenteVendas,
+      ritmoRecenteInicioIso: metricas.resumo.ritmoRecenteInicioIso,
+      ritmoRecenteFimIso: metricas.resumo.ritmoRecenteFimIso,
+      ritmoGapDias: metricas.resumo.ritmoGapDias,
       historicoParcial: metricas.resumo.historicoParcial,
       filiaisNM,
       filiaisCobertura,
@@ -691,6 +696,11 @@ async function fetchVendasItemMetricas(
       ritmoDiasComVenda: 0,
       ritmoPrimeiraVendaIso: null,
       ritmoUltimaVendaIso: null,
+      ritmoRecenteDias: 0,
+      ritmoRecenteVendas: 0,
+      ritmoRecenteInicioIso: null,
+      ritmoRecenteFimIso: null,
+      ritmoGapDias: 0,
       filiaisNM: [],
       filiaisCobertura: [],
       vendasPorFilial: [],
@@ -1925,6 +1935,11 @@ function ListaLojaItensTable({
         ritmoDiasComVenda: number | null;
         ritmoPrimeiraVendaIso: string | null;
         ritmoUltimaVendaIso: string | null;
+        ritmoRecenteDias: number | null;
+        ritmoRecenteVendas: number | null;
+        ritmoRecenteInicioIso: string | null;
+        ritmoRecenteFimIso: string | null;
+        ritmoGapDias: number | null;
         historicoParcial: boolean | null;
         filiaisNM: FilialNecessidadeMinima[] | null;
         filiaisCobertura: FilialNecessidadeMinima[] | null;
@@ -2025,6 +2040,11 @@ function ListaLojaItensTable({
             ritmoDiasComVenda: vendas?.ritmoDiasComVenda ?? null,
             ritmoPrimeiraVendaIso: vendas?.ritmoPrimeiraVendaIso ?? null,
             ritmoUltimaVendaIso: vendas?.ritmoUltimaVendaIso ?? null,
+            ritmoRecenteDias: vendas?.ritmoRecenteDias ?? null,
+            ritmoRecenteVendas: vendas?.ritmoRecenteVendas ?? null,
+            ritmoRecenteInicioIso: vendas?.ritmoRecenteInicioIso ?? null,
+            ritmoRecenteFimIso: vendas?.ritmoRecenteFimIso ?? null,
+            ritmoGapDias: vendas?.ritmoGapDias ?? null,
             historicoParcial: vendas?.historicoParcial ?? null,
             filiaisNM: vendas?.filiaisNM ?? null,
             filiaisCobertura: vendas?.filiaisCobertura ?? null,
@@ -2082,6 +2102,12 @@ function ListaLojaItensTable({
         ritmoDiasComVenda: hasLive ? (live?.ritmoDiasComVenda ?? null) : null,
         ritmoPrimeiraVendaIso: hasLive ? (live?.ritmoPrimeiraVendaIso ?? null) : null,
         ritmoUltimaVendaIso: hasLive ? (live?.ritmoUltimaVendaIso ?? null) : null,
+        ritmoRecenteDias: hasLive ? (live?.ritmoRecenteDias ?? null) : null,
+        ritmoRecenteVendas: hasLive ? (live?.ritmoRecenteVendas ?? null) : null,
+        ritmoRecenteInicioIso: hasLive ? (live?.ritmoRecenteInicioIso ?? null) : null,
+        ritmoRecenteFimIso: hasLive ? (live?.ritmoRecenteFimIso ?? null) : null,
+        ritmoGapDias: hasLive ? (live?.ritmoGapDias ?? null) : null,
+        gapAntigoDias: resolveGapAntigoDias(companyKey),
         qtde60d: hasLive ? (live?.qtde60d ?? null) : (item.qtde60d ?? null),
         linha: item.linha,
         subgrupo: item.subgrupo,
@@ -2175,6 +2201,11 @@ function ListaLojaItensTable({
                 const ritmoDiasComVenda = hasLive ? (live?.ritmoDiasComVenda ?? null) : null;
                 const ritmoPrimeiraVendaIso = hasLive ? (live?.ritmoPrimeiraVendaIso ?? null) : null;
                 const ritmoUltimaVendaIso = hasLive ? (live?.ritmoUltimaVendaIso ?? null) : null;
+                const ritmoRecenteDias = hasLive ? (live?.ritmoRecenteDias ?? null) : null;
+                const ritmoRecenteVendas = hasLive ? (live?.ritmoRecenteVendas ?? null) : null;
+                const ritmoRecenteInicioIso = hasLive ? (live?.ritmoRecenteInicioIso ?? null) : null;
+                const ritmoRecenteFimIso = hasLive ? (live?.ritmoRecenteFimIso ?? null) : null;
+                const ritmoGapDias = hasLive ? (live?.ritmoGapDias ?? null) : null;
                 const transitEntries = getCompraTransitoEntries(comprasTransitoIndex, item.produto, item.corProduto);
                 const cicloItem = hasCicloCompra(companyKey)
                   ? resolveCicloCompra(companyKey, { linha: item.linha, subgrupo: item.subgrupo })
@@ -2188,6 +2219,12 @@ function ListaLojaItensTable({
                   ritmoDiasComVenda,
                   ritmoPrimeiraVendaIso,
                   ritmoUltimaVendaIso,
+                  ritmoRecenteDias,
+                  ritmoRecenteVendas,
+                  ritmoRecenteInicioIso,
+                  ritmoRecenteFimIso,
+                  ritmoGapDias,
+                  gapAntigoDias: resolveGapAntigoDias(companyKey),
                   qtde60d,
                   linha: item.linha,
                   subgrupo: item.subgrupo,
@@ -3382,6 +3419,12 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
               ritmoDiasComVenda: vendas?.ritmoDiasComVenda ?? null,
               ritmoPrimeiraVendaIso: vendas?.ritmoPrimeiraVendaIso ?? null,
               ritmoUltimaVendaIso: vendas?.ritmoUltimaVendaIso ?? null,
+              ritmoRecenteDias: vendas?.ritmoRecenteDias ?? null,
+              ritmoRecenteVendas: vendas?.ritmoRecenteVendas ?? null,
+              ritmoRecenteInicioIso: vendas?.ritmoRecenteInicioIso ?? null,
+              ritmoRecenteFimIso: vendas?.ritmoRecenteFimIso ?? null,
+              ritmoGapDias: vendas?.ritmoGapDias ?? null,
+              gapAntigoDias: resolveGapAntigoDias(companyKey),
               qtde60d: vendas?.qtde60d ?? null,
               linha: item.linha,
               subgrupo: item.subgrupo,
