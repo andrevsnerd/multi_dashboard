@@ -2442,9 +2442,20 @@ export default function ListaCompraSugeridaPage({
                               {(() => {
                                 // Modo Reposição: Compra Ideal (regra global). Modo proporcional segue a lógica antiga.
                                 if (modoReposicao) {
+                                  // Mesmos 3 estados globais da Curva ABC: carregando (métricas
+                                  // do item não chegaram) / sem dados / número.
+                                  const carregando = p.ritmoDiasComEstoque == null;
+                                  const semBase =
+                                    p.qtde12m == null && p.vendasMesAtual == null && p.estoqueAtual == null;
                                   return (
                                     <td className={styles.qtdSugerida}>
-                                      {p.ideal ? <CompraIdealCell ideal={p.ideal} /> : "—"}
+                                      <CompraIdealCell
+                                        ideal={p.ideal ?? null}
+                                        loading={carregando}
+                                        semDados={!carregando && semBase}
+                                        descricao={p.descricao}
+                                        cor={p.cor}
+                                      />
                                     </td>
                                   );
                                 }

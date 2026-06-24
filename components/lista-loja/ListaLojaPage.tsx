@@ -2561,6 +2561,14 @@ function ListaLojaItensTable({
               </td>
               <td className={styles.colNumeric}>
                 {(() => {
+                  // Mesmos estados globais (idênticos à Curva ABC): carregando / sem dados / número.
+                  if (!hasLive) {
+                    return <span style={{ color: "#94a3b8", fontWeight: 500, whiteSpace: "nowrap" }}>Carregando...</span>;
+                  }
+                  const semBase = qtde12m == null && vendasMesAtual == null && estoqueFilial == null;
+                  if (semBase) {
+                    return <span style={{ color: "#94a3b8", fontWeight: 500, whiteSpace: "nowrap" }}>Sem dados</span>;
+                  }
                   const compraIdealDisplay = Math.max(0, ideal.compraIdeal);
                   return (
                     <span

@@ -1859,9 +1859,13 @@ export default function CompraSalvaDetalhePage({
                                   : partesDestino === null
                                     ? "—"
                                     : <DestinoCompraFinalBadges partes={partesDestino} />}
-                                {sugestaoAtual.ideal ? (
+                                {(live === undefined || sugestaoAtual.ideal) ? (
                                   <span style={{ marginLeft: 6 }}>
-                                    <CompraIdealCell ideal={sugestaoAtual.ideal} />
+                                    <CompraIdealCell
+                                      ideal={sugestaoAtual.ideal}
+                                      loading={live === undefined}
+                                      cor={it.corProduto}
+                                    />
                                   </span>
                                 ) : null}
                                 {qtdSugerida !== null && qtdSugerida !== effectiveQtdManual && (() => {

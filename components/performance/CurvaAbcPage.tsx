@@ -3215,24 +3215,28 @@ const handleBadgeClick = (cat: string) => {
                                     const metricKey = buildCurvaAbcMetricKey(p.produto, p.cor ?? null, porCor);
                                     const live = compraMetrics[metricKey];
                                     const hasLive = Object.prototype.hasOwnProperty.call(compraMetrics, metricKey);
-                                    if (!hasLive) {
-                                      return <span className={styles.cellMetric}>Carregando...</span>;
-                                    }
                                     const semBaseLive =
                                       live?.qtde12m == null &&
                                       live?.vendasMesAtual == null &&
                                       live?.estoqueFilial == null;
-                                    if (semBaseLive) {
-                                      return <span className={styles.cellMetric}>Sem dados</span>;
-                                    }
                                     const corCat = porCor ? (p.cor ?? null) : null;
-                                    const idealCru = buildCompraIdealFromMetricRow(live, p, comprasTransitoIndex, porCor, companyKey);
-                                    const { ideal } = catraca.reconcile(
-                                      idealCru,
-                                      buildControleEstoqueItemKey(p.produto, corCat),
-                                      getCompraTransitoEntries(comprasTransitoIndex, p.produto, corCat)
+                                    const ideal =
+                                      hasLive && !semBaseLive
+                                        ? catraca.reconcile(
+                                            buildCompraIdealFromMetricRow(live, p, comprasTransitoIndex, porCor, companyKey),
+                                            buildControleEstoqueItemKey(p.produto, corCat),
+                                            getCompraTransitoEntries(comprasTransitoIndex, p.produto, corCat)
+                                          ).ideal
+                                        : null;
+                                    return (
+                                      <CompraIdealCell
+                                        ideal={ideal}
+                                        loading={!hasLive}
+                                        semDados={hasLive && semBaseLive}
+                                        descricao={p.descricao}
+                                        cor={p.cor}
+                                      />
                                     );
-                                    return <CompraIdealCell ideal={ideal} descricao={p.descricao} cor={p.cor} />;
                                   })()}
                                 </td>
                               </>

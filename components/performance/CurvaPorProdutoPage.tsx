@@ -854,13 +854,12 @@ export default function CurvaPorProdutoPage({ companyKey, month, year, compare }
                         <td className={styles.right}>{fmt(row.qtde)}</td>
                         <td className={styles.right}>{fmt(row.estoque)}</td>
                         <td>
-                          {row.metricState !== "ok" || !row.ideal ? (
-                            <span style={{ color: "#94a3b8" }}>
-                              {row.metricState === "loading" ? "Carregando…" : "Sem dados"}
-                            </span>
-                          ) : (
-                            <CompraIdealCell ideal={row.ideal} />
-                          )}
+                          <CompraIdealCell
+                            ideal={row.metricState === "ok" ? row.ideal : null}
+                            loading={row.metricState === "loading"}
+                            semDados={row.metricState === "nodata"}
+                            cor={row.corProduto}
+                          />
                         </td>
                       </tr>
                     );
