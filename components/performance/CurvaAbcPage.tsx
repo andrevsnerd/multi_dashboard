@@ -37,7 +37,7 @@ import {
 } from "@/lib/client/compras-transito";
 import { formatDateForQuery } from "@/lib/utils/date";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
-import { calcCompraIdealFromResumo, type CompraIdealResult } from "@/lib/utils/compra-ideal";
+import { calcCompraIdealFromResumo, precisaComprarEssaSemana, type CompraIdealResult } from "@/lib/utils/compra-ideal";
 import CompraIdealCell from "@/components/shared/CompraIdealCell";
 import { useCatracaDataCompra, type CatracaFreeze } from "@/lib/client/use-catraca-data-compra";
 import {
@@ -1505,6 +1505,8 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [porCor, setPorCor] = useState(true);
   const [filtrarEletronicos, setFiltrarEletronicos] = useState(companyKey === 'nerd');
   const [filtrarSugeridos, setFiltrarSugeridos] = useState(false);
+  // Subconjunto dos sugeridos: só os que precisam comprar AGORA (data de compra chegou/passou).
+  const [filtrarComprarAgora, setFiltrarComprarAgora] = useState(false);
   const [selectedCurvas, setSelectedCurvas] = useState<Set<Curva>>(new Set());
   const [selectedStockBuckets, setSelectedStockBuckets] = useState<Set<StockBucket>>(new Set());
   const [focusedCurve, setFocusedCurve] = useState<Curva>("A");
@@ -1968,7 +1970,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     const base = (companyKey === 'nerd' && filtrarEletronicos)
       ? produtosComCurva.filter((p) => normalizeKey(p.linha ?? '') === 'ELETRONICOS')
       : produtosComCurva;
-    if (!filtrarSugeridos) return base;
+    if (!filtrarSugeridos && !filtrarComprarAgora) return base;
     return base.filter((p) => {
       const metricKey = buildCurvaAbcMetricKey(p.produto, p.cor ?? null, porCor);
       const live = compraMetrics[metricKey];
@@ -1980,9 +1982,13 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
         live?.estoqueFilial == null;
       if (semBaseLive) return false;
       const ideal = buildCompraIdealFromMetricRow(live, p, comprasTransitoIndex, porCor, companyKey);
+      // "Comprar agora" é subconjunto de "Sugeridos": precisa comprar E a data chegou — OU cai na
+      // janela "comprar essa semana" (NERD às segundas), que entra junto no mesmo filtro.
+      if (filtrarComprarAgora)
+        return ideal.compraIdeal > 0 && (ideal.comprarAgora || precisaComprarEssaSemana(ideal, companyKey));
       return ideal.compraIdeal > 0;
     });
-  }, [filtrarEletronicos, filtrarSugeridos, companyKey, produtosComCurva, compraMetrics, comprasTransitoIndex, diasCorridosMes, porCor]);
+  }, [filtrarEletronicos, filtrarSugeridos, filtrarComprarAgora, companyKey, produtosComCurva, compraMetrics, comprasTransitoIndex, diasCorridosMes, porCor]);
 
   const produtosComCurvaComFiltroEstoque = useMemo(() => {
     if (selectedStockBuckets.size === 0) return produtosComCurvaComFiltroSugestao;
@@ -2030,6 +2036,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     hasStructuredFilters ||
     (companyKey === "nerd" && filtrarEletronicos) ||
     filtrarSugeridos ||
+    filtrarComprarAgora ||
     selectedCurvas.size > 0 ||
     selectedStockBuckets.size > 0;
 
@@ -2041,6 +2048,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     (companyKey === "nerd" && filtrarEletronicos) &&
     !hasStructuredFilters &&
     !filtrarSugeridos &&
+    !filtrarComprarAgora &&
     selectedCurvas.size === 0 &&
     selectedStockBuckets.size === 0;
 
@@ -2695,6 +2703,14 @@ const handleBadgeClick = (cat: string) => {
               />
               Sugeridos
             </label>
+            <label className={styles.checkboxLabel} title="Mostra os que precisam comprar agora (data chegou) ou essa semana (NERD: até a próxima segunda)">
+              <input
+                type="checkbox"
+                checked={filtrarComprarAgora}
+                onChange={(e) => setFiltrarComprarAgora(e.target.checked)}
+              />
+              Comprar agora
+            </label>
             <span className={styles.filterStripDivider} />
             {(["A", "B", "C"] as Curva[]).map(curva => (
               <label key={curva} className={styles.checkboxLabel}>
@@ -2706,7 +2722,7 @@ const handleBadgeClick = (cat: string) => {
                 <span className={styles.curvaCheckDot} data-curva={curva}>{curva}</span>
               </label>
             ))}
-            {(selectedCurvas.size > 0 || selectedStockBuckets.size > 0 || filtrarSugeridos) && (
+            {(selectedCurvas.size > 0 || selectedStockBuckets.size > 0 || filtrarSugeridos || filtrarComprarAgora) && (
               <button
                 type="button"
                 className={styles.filtroClearBtn}
@@ -2714,6 +2730,7 @@ const handleBadgeClick = (cat: string) => {
                   setSelectedCurvas(new Set());
                   setSelectedStockBuckets(new Set());
                   setFiltrarSugeridos(false);
+                  setFiltrarComprarAgora(false);
                 }}
               >
                 Limpar filtros
@@ -3235,6 +3252,7 @@ const handleBadgeClick = (cat: string) => {
                                         semDados={hasLive && semBaseLive}
                                         descricao={p.descricao}
                                         cor={p.cor}
+                                        company={companyKey}
                                       />
                                     );
                                   })()}

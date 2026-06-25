@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 
-import { type CompraIdealResult } from "@/lib/utils/compra-ideal";
+import { precisaComprarEssaSemana, type CompraIdealResult } from "@/lib/utils/compra-ideal";
 import CompraIdealExplainCard from "@/components/shared/CompraIdealExplainCard";
 
 const MESES_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -32,6 +32,8 @@ interface CompraIdealCellProps {
   /** Cabeçalho opcional do card (descrição do produto + cor). */
   descricao?: string | null;
   cor?: string | null;
+  /** Empresa — habilita o rótulo "comprar essa semana" (hoje só NERD compra em dia fixo). */
+  company?: string | null;
 }
 
 /** Texto neutro (carregando / sem dados) — mesma aparência em todas as telas. */
@@ -48,7 +50,7 @@ function CellTexto({ texto }: { texto: string }) {
  * (2) `semDados` → "Sem dados" · (3) caso contrário → número/data. Nunca mostra 0 falso:
  * enquanto o dado real do ritmo não chega, fica em "Carregando...".
  */
-export default function CompraIdealCell({ ideal, loading, semDados, style, descricao, cor }: CompraIdealCellProps) {
+export default function CompraIdealCell({ ideal, loading, semDados, style, descricao, cor, company }: CompraIdealCellProps) {
   // Hook sempre no topo (rules-of-hooks) — antes de qualquer return condicional.
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
 
@@ -58,6 +60,9 @@ export default function CompraIdealCell({ ideal, loading, semDados, style, descr
 
   const precisaRepor = ideal.status === "REPOR";
   const mostraData = ideal.modoCiclo && precisaRepor && ideal.dataCompra != null;
+  // Comprar essa semana: data sugerida cai até a próxima compra (NERD às segundas). O tooltip
+  // continua mostrando a data verdadeira; aqui o rótulo vira "comprar essa semana".
+  const essaSemana = precisaComprarEssaSemana(ideal, company);
 
   const cardW = 340;
   const cardH = 280;
@@ -109,16 +114,18 @@ export default function CompraIdealCell({ ideal, loading, semDados, style, descr
             alignItems: "center",
             gap: 4,
             fontSize: 11,
-            fontWeight: ideal.comprarAgora ? 800 : 600,
-            color: ideal.comprarAgora ? "#b91c1c" : "#0f766e",
+            fontWeight: ideal.comprarAgora || essaSemana ? 800 : 600,
+            color: ideal.comprarAgora ? "#b91c1c" : essaSemana ? "#b45309" : "#0f766e",
           }}
         >
           📅{" "}
           {ideal.comprarAgora
             ? "comprar agora"
-            : `${shortDate(ideal.dataCompra)}${
-                ideal.diasAteComprar != null ? ` · ${fmt(ideal.diasAteComprar)}d` : ""
-              }`}
+            : essaSemana
+              ? "comprar essa semana"
+              : `${shortDate(ideal.dataCompra)}${
+                  ideal.diasAteComprar != null ? ` · ${fmt(ideal.diasAteComprar)}d` : ""
+                }`}
         </span>
       )}
       {pos &&

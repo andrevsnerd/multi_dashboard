@@ -1,6 +1,12 @@
 import type { CompraTransitoIndexEntry } from "@/lib/client/compras-transito";
 import { getLimiteDiasReposicao } from "@/lib/utils/suggestion-rules";
-import { hasCicloCompra, resolveCicloCompra, resolveGapAntigoDias } from "@/lib/config/compra-ciclo";
+import {
+  hasCicloCompra,
+  resolveCicloCompra,
+  resolveCompraDiaSemana,
+  resolveGapAntigoDias,
+  resolveRecenteHorizonteDias,
+} from "@/lib/config/compra-ciclo";
 
 /**
  * Compra Ideal — lógica global e simples de reposição por cobertura.
@@ -42,9 +48,17 @@ export interface CompraIdealInput {
   ritmoRecenteVendas?: number | null;
   ritmoRecenteInicioIso?: string | null;
   ritmoRecenteFimIso?: string | null;
+  /** Última venda DENTRO do trecho recente (ISO) — sinal de "vendeu recentemente?". */
+  ritmoRecenteUltimaVendaIso?: string | null;
   ritmoGapDias?: number | null;
   /** Tolerância de gap (dias) da empresa; acima dela usa o trecho recente. Ver acima. */
   gapAntigoDias?: number | null;
+  /**
+   * RESGATE DE JANELA ZERADA — horizonte (dias) que define "vendeu recentemente". Quando o
+   * MAIOR trecho teve 0 venda mas o trecho recente vendeu dentro deste horizonte, o ritmo usa
+   * o recente em vez de zerar o consumo. `null` (empresa não configurada) → resgate desligado.
+   */
+  recenteHorizonteDias?: number | null;
   /** @deprecated Não é mais usado no cálculo de ritmo (a regra usa só a janela `ritmoDiasComEstoque`). */
   qtde60d?: number | null;
   linha?: string | null;
@@ -83,10 +97,13 @@ export interface CompraIdealResult {
    */
   ritmoBaseAmortecida: boolean;
   /**
-   * true quando o ritmo usou o TRECHO RECENTE no lugar do maior trecho, porque o maior estava
-   * "velho" (gap > tolerância da empresa). Janela antiga detectada e corrigida.
+   * true quando o ritmo usou o TRECHO RECENTE no lugar do maior trecho. Dois motivos possíveis,
+   * em `motivoTrechoRecente`: "gap" (o maior trecho vendia mas ficou velho) ou "zerado" (o maior
+   * trecho teve 0 venda e o recente vendeu dentro do horizonte — resgate do vendedor lento).
    */
   usouTrechoRecente: boolean;
+  /** Por que trocou pro trecho recente: "gap" (janela antiga) | "zerado" (resgate) | null. */
+  motivoTrechoRecente: "gap" | "zerado" | null;
   /** Gap (dias) entre o fim do maior trecho e o início do recente (0 = mesmo trecho). */
   ritmoGapDias: number;
   /** Tolerância de gap (dias) aplicada, ou null quando a empresa não tem janela antiga configurada. */
@@ -273,8 +290,32 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
   const ritmoGapDias = Math.max(0, Math.round(Number(input.ritmoGapDias ?? 0)));
   const gapAntigoDias =
     input.gapAntigoDias != null ? Math.max(0, Math.round(Number(input.gapAntigoDias))) : null;
-  const usouTrechoRecente =
+  // (1) JANELA ANTIGA: o maior trecho VENDIA mas ficou velho (gap > tolerância) → usa o recente.
+  const trocaPorGap =
     gapAntigoDias != null && gapAntigoDias > 0 && ritmoGapDias > gapAntigoDias && recenteDias > 0;
+  // (2) RESGATE DE JANELA ZERADA: o maior trecho teve 0 venda (vendedor lento cujo trecho longo
+  // calhou num período parado), mas o trecho recente VENDEU dentro do horizonte da empresa → usa
+  // o recente em vez de zerar o consumo e cair em "Suficiente" com estoque 0. Só dispara quando
+  // o maior trecho realmente não vendeu (melhorVendas <= 0) — não mexe no giro saudável.
+  const recenteHorizonteDias =
+    input.recenteHorizonteDias != null ? Math.max(0, Math.round(Number(input.recenteHorizonteDias))) : null;
+  const recenteUltimaVendaDate = parseIsoDate(input.ritmoRecenteUltimaVendaIso);
+  const recenteVendaDiasAtras = recenteUltimaVendaDate
+    ? Math.max(0, daysBetween(recenteUltimaVendaDate, hoje))
+    : null;
+  const vendeuRecentemente =
+    recenteHorizonteDias != null &&
+    recenteHorizonteDias > 0 &&
+    recenteVendaDiasAtras != null &&
+    recenteVendaDiasAtras <= recenteHorizonteDias;
+  const resgateZerado =
+    !trocaPorGap && melhorVendas <= 0 && recenteVendas > 0 && recenteDias > 0 && vendeuRecentemente;
+  const usouTrechoRecente = trocaPorGap || resgateZerado;
+  const motivoTrechoRecente: "gap" | "zerado" | null = trocaPorGap
+    ? "gap"
+    : resgateZerado
+      ? "zerado"
+      : null;
   const ritmoDiasBase = usouTrechoRecente ? recenteDias : melhorDias;
   const ritmoVendasBase = usouTrechoRecente ? recenteVendas : melhorVendas;
   const divisorRitmo = Math.max(ritmoDiasBase, RITMO_DIAS_BASE_MINIMO);
@@ -421,6 +462,7 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
     ritmoVendasBase,
     ritmoBaseAmortecida,
     usouTrechoRecente,
+    motivoTrechoRecente,
     ritmoGapDias,
     gapAntigoDias,
     confiabilidade,
@@ -475,6 +517,7 @@ export interface CompraIdealResumoLike {
   ritmoRecenteVendas?: number | null;
   ritmoRecenteInicioIso?: string | null;
   ritmoRecenteFimIso?: string | null;
+  ritmoRecenteUltimaVendaIso?: string | null;
   ritmoGapDias?: number | null;
 }
 
@@ -516,8 +559,10 @@ export function calcCompraIdealFromResumo(
     ritmoRecenteVendas: resumo?.ritmoRecenteVendas ?? null,
     ritmoRecenteInicioIso: resumo?.ritmoRecenteInicioIso ?? null,
     ritmoRecenteFimIso: resumo?.ritmoRecenteFimIso ?? null,
+    ritmoRecenteUltimaVendaIso: resumo?.ritmoRecenteUltimaVendaIso ?? null,
     ritmoGapDias: resumo?.ritmoGapDias ?? null,
     gapAntigoDias: resolveGapAntigoDias(meta.company),
+    recenteHorizonteDias: resolveRecenteHorizonteDias(meta.company),
     linha: meta.linha,
     subgrupo: meta.subgrupo,
     coberturaDias,
@@ -551,6 +596,35 @@ export function applyDataCompraFixa(
     diasAteComprar: dias,
     comprarAgora: dias <= 0,
   };
+}
+
+/**
+ * Dias até a próxima ocorrência de um dia da semana (0=Dom … 6=Sáb), a partir de `hoje`.
+ * Sempre 1..7: se hoje já é o dia, retorna 7 (a PRÓXIMA ocorrência, não hoje).
+ */
+function diasAteProximoDiaSemana(hoje: Date, diaSemana: number): number {
+  const diff = (diaSemana - hoje.getDay() + 7) % 7;
+  return diff === 0 ? 7 : diff;
+}
+
+/**
+ * "COMPRAR ESSA SEMANA" — para empresas que compram num dia fixo da semana (ex.: NERD às
+ * segundas): um item cuja DATA de compra sugerida cai dentro dos dias até a próxima ocorrência
+ * desse dia (1..7) deve ser comprado JÁ nessa janela. Lê os campos já calculados (não recalcula
+ * nada), então segue correto mesmo após a catraca (applyDataCompraFixa atualiza diasAteComprar).
+ * Não inclui o "comprar agora" (data já chegou) — esse tem rótulo próprio. Empresa sem
+ * `compraDiaSemana` (ex.: scarfme) → sempre false.
+ */
+export function precisaComprarEssaSemana(
+  ideal: CompraIdealResult,
+  company: string | null | undefined,
+  hoje: Date = new Date()
+): boolean {
+  const diaSemana = resolveCompraDiaSemana(company);
+  if (diaSemana == null) return false;
+  if (!ideal.modoCiclo || ideal.status !== "REPOR" || ideal.comprarAgora) return false;
+  if (ideal.diasAteComprar == null) return false;
+  return ideal.diasAteComprar <= diasAteProximoDiaSemana(hoje, diaSemana);
 }
 
 export const COMPRA_IDEAL_STATUS_LABEL: Record<CompraIdealStatus, string> = {

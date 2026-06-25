@@ -67,6 +67,8 @@ export interface ControleEstoqueItemMetricasResumo extends ControleEstoqueResumo
   ritmoRecenteInicioIso: string | null;
   /** Fim do trecho recente (ISO), ou null. */
   ritmoRecenteFimIso: string | null;
+  /** Última venda DENTRO do trecho recente (ISO), ou null. Sinal de "vendeu recentemente?". */
+  ritmoRecenteUltimaVendaIso: string | null;
   /** Gap (dias) entre o fim do maior trecho e o início do recente (0 = mesmo trecho). */
   ritmoGapDias: number;
 }
@@ -248,6 +250,7 @@ export function summarizeControleEstoqueItemMetricas(input: {
     ritmoRecenteVendas: 0,
     ritmoRecenteInicioIso: null,
     ritmoRecenteFimIso: null,
+    ritmoRecenteUltimaVendaIso: null,
     ritmoGapDias: 0,
     ...historico,
   };
@@ -373,6 +376,7 @@ export function mergeControleEstoqueMetricasEntries(
   let ritmoRecenteVendas = 0;
   let ritmoRecenteInicioIso: string | null = null;
   let ritmoRecenteFimIso: string | null = null;
+  let ritmoRecenteUltimaVendaIso: string | null = null;
   let ritmoGapDias = 0;
   for (const r of rows) {
     ritmoVendasPeriodo += Number(r.resumo?.ritmoVendasPeriodo ?? 0);
@@ -395,6 +399,9 @@ export function mergeControleEstoqueMetricasEntries(
       ritmoRecenteFimIso = rFim;
       ritmoRecenteInicioIso = r.resumo?.ritmoRecenteInicioIso ?? null;
     }
+    // Venda mais recente entre os membros: define se o GRUPO "vendeu recentemente".
+    const rUlt = r.resumo?.ritmoRecenteUltimaVendaIso ?? null;
+    if (rUlt && rUlt > (ritmoRecenteUltimaVendaIso ?? "")) ritmoRecenteUltimaVendaIso = rUlt;
   }
 
   return {
@@ -418,6 +425,7 @@ export function mergeControleEstoqueMetricasEntries(
       ritmoRecenteVendas,
       ritmoRecenteInicioIso,
       ritmoRecenteFimIso,
+      ritmoRecenteUltimaVendaIso,
       ritmoGapDias,
     },
   };

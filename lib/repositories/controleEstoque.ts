@@ -6834,6 +6834,8 @@ export async function fetchVendasProdutoPorFilial({
     ritmoRecenteInicioIso: string | null;
     /** Fim do trecho recente (ISO), ou null. */
     ritmoRecenteFimIso: string | null;
+    /** Última venda DENTRO do trecho recente (ISO), ou null. Sinal de "vendeu recentemente?". */
+    ritmoRecenteUltimaVendaIso: string | null;
     /** Gap (dias) entre o fim do maior trecho e o início do recente (0 = mesmo trecho). */
     ritmoGapDias: number;
   };
@@ -7575,12 +7577,18 @@ export async function fetchVendasProdutoPorFilial({
     let ritmoRecenteVendas = 0;
     let ritmoRecenteInicioIso: string | null = null;
     let ritmoRecenteFimIso: string | null = null;
+    // Última venda DENTRO do trecho recente: é o sinal de "vendeu recentemente?" usado pelo
+    // resgate de janela zerada no engine (compra-ideal.ts). Sem ele não dá pra distinguir um
+    // trecho recente que ainda vende de um que só tem estoque parado.
+    let ritmoRecenteUltimaVendaIso: string | null = null;
     if (recEnd >= 0) {
       const recLen = recEnd - recStart + 1;
       const recWindowStart = recLen > 60 ? recEnd - 59 : recStart;
       for (let i = recWindowStart; i <= recEnd; i++) {
         ritmoRecenteDias += 1;
-        ritmoRecenteVendas += ritmoDias[i]!.vendas;
+        const vendasDia = ritmoDias[i]!.vendas;
+        ritmoRecenteVendas += vendasDia;
+        if (vendasDia > 0) ritmoRecenteUltimaVendaIso = ritmoDias[i]!.iso;
       }
       ritmoRecenteInicioIso = ritmoDias[recWindowStart]!.iso;
       ritmoRecenteFimIso = ritmoDias[recEnd]!.iso;
@@ -7656,6 +7664,7 @@ export async function fetchVendasProdutoPorFilial({
         ritmoRecenteVendas: Math.round(ritmoRecenteVendas),
         ritmoRecenteInicioIso,
         ritmoRecenteFimIso,
+        ritmoRecenteUltimaVendaIso,
         ritmoGapDias,
       },
     };

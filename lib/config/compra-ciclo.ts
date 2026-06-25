@@ -79,6 +79,24 @@ interface CompanyCicloConfig {
    *  - NERD: gap mediano ~14d, P75 ~49d → 30d cobre ~66% como ruptura; é o dobro do lead (14d).
    */
   gapAntigoDias: number;
+  /**
+   * RESGATE DE JANELA ZERADA — horizonte (em dias) que define "vendeu recentemente". Quando o
+   * MAIOR trecho contínuo com estoque teve 0 venda (vendedor lento/intermitente cujo trecho
+   * longo calhou num período parado), mas houve venda no TRECHO RECENTE dentro deste horizonte,
+   * o ritmo passa a ser medido pelo trecho recente ÷ máx(dias, 30) em vez de zerar o consumo e
+   * cair em "Suficiente". Independente do `gapAntigoDias` (que trata o trecho longo que vendia
+   * mas ficou velho); aqui o trecho longo NÃO vendeu. Default 60 nas duas; a SCARF ME, com
+   * produção mais longa (até 90d), pode querer afrouxar este número depois.
+   */
+  recenteHorizonteDias: number;
+  /**
+   * COMPRAR ESSA SEMANA — dia da semana (0=Dom … 6=Sáb) em que a empresa coloca as compras.
+   * Quando definido, um item cuja DATA de compra sugerida cai dentro dos dias até a próxima
+   * ocorrência desse dia (1..7) é sinalizado como "comprar essa semana" (deve ser comprado já
+   * nessa janela, já que só se compra nesse dia). `null`/ausente = sem regra semanal. Hoje só
+   * NERD (segundas = 1); SCARF ME fica de fora até definirmos.
+   */
+  compraDiaSemana?: number | null;
 }
 
 /**
@@ -93,12 +111,15 @@ const CICLO_CONFIG: Record<CompanyKey, CompanyCicloConfig> = {
     rules: SCARFME_RULES,
     default: { grupo: "Padrão", coberturaDias: 60, producaoDias: 37 },
     gapAntigoDias: 60,
+    recenteHorizonteDias: 60,
   },
   nerd: {
     enabled: true,
     rules: [],
     default: { grupo: "Padrão", coberturaDias: 30, producaoDias: 14 },
     gapAntigoDias: 30,
+    recenteHorizonteDias: 60,
+    compraDiaSemana: 1, // compras NERD acontecem às segundas-feiras
   },
 };
 
@@ -142,4 +163,27 @@ export function resolveGapAntigoDias(
 ): number | null {
   const key = normalize(company).toLowerCase() as CompanyKey;
   return CICLO_CONFIG[key]?.gapAntigoDias ?? null;
+}
+
+/**
+ * Horizonte (dias) do RESGATE de janela zerada da empresa — dentro dele uma venda no trecho
+ * recente reativa o ritmo de um item cujo maior trecho teve 0 venda. `null` quando a empresa
+ * não está configurada (aí o resgate não dispara; preserva o comportamento legado).
+ */
+export function resolveRecenteHorizonteDias(
+  company: CompanyKey | string | null | undefined
+): number | null {
+  const key = normalize(company).toLowerCase() as CompanyKey;
+  return CICLO_CONFIG[key]?.recenteHorizonteDias ?? null;
+}
+
+/**
+ * Dia da semana (0=Dom … 6=Sáb) em que a empresa coloca as compras, ou `null` quando não há
+ * regra semanal (aí "comprar essa semana" não se aplica). Ver `compraDiaSemana`.
+ */
+export function resolveCompraDiaSemana(
+  company: CompanyKey | string | null | undefined
+): number | null {
+  const key = normalize(company).toLowerCase() as CompanyKey;
+  return CICLO_CONFIG[key]?.compraDiaSemana ?? null;
 }

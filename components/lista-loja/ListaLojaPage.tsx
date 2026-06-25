@@ -35,12 +35,13 @@ import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics"
 import {
   calcCompraIdeal,
   calcCompraIdealFromResumo,
+  precisaComprarEssaSemana,
   COMPRA_IDEAL_STATUS_LABEL,
   COMPRA_IDEAL_CONFIABILIDADE_LABEL,
   type CompraIdealStatus,
   type CompraIdealResult,
 } from "@/lib/utils/compra-ideal";
-import { resolveCicloCompra, hasCicloCompra, resolveGapAntigoDias } from "@/lib/config/compra-ciclo";
+import { resolveCicloCompra, hasCicloCompra, resolveGapAntigoDias, resolveRecenteHorizonteDias } from "@/lib/config/compra-ciclo";
 import { useCatracaDataCompra, type CatracaFreeze } from "@/lib/client/use-catraca-data-compra";
 import CompraIdealExplainCard from "@/components/shared/CompraIdealExplainCard";
 import {
@@ -119,6 +120,11 @@ interface ListaItem {
   /** Janela de ritmo (maior período contínuo com estoque), snapshot ao adicionar */
   ritmoDiasComEstoque?: number | null;
   ritmoVendasPeriodo?: number | null;
+  /** Trecho recente + última venda dele + gap — snapshot p/ o resgate de janela zerada no filtro. */
+  ritmoRecenteDias?: number | null;
+  ritmoRecenteVendas?: number | null;
+  ritmoRecenteUltimaVendaIso?: string | null;
+  ritmoGapDias?: number | null;
   /** Vendas no mês atual (para cálculo de Duração), snapshot ao adicionar */
   vendasMesAtual?: number | null;
   /** Custo unitário de reposição, snapshot ao adicionar */
@@ -571,7 +577,7 @@ async function fetchVendasItemMetricas(
   produto: string,
   corProduto: string | null,
   itemMeta?: { linha?: string | null; subgrupo?: string | null }
-): Promise<{ qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null; diasDesdeUltimaVenda: number | null; primeiraEntradaFilial: string | null; diasHistoricoFilial: number; mesesHistoricoFilial: number; diasComEstoquePositivo: number; diasSemEstoque: number; mesesDisponiveis: number; velocidadeAjustada: number; ritmoDiasComEstoque: number; ritmoVendasPeriodo: number; ritmoInicioIso: string | null; ritmoFimIso: string | null; ritmoDiasComVenda: number; ritmoPrimeiraVendaIso: string | null; ritmoUltimaVendaIso: string | null; ritmoRecenteDias: number; ritmoRecenteVendas: number; ritmoRecenteInicioIso: string | null; ritmoRecenteFimIso: string | null; ritmoGapDias: number; historicoParcial: boolean; filiaisNM: FilialNecessidadeMinima[]; filiaisCobertura: FilialNecessidadeMinima[]; vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number; velocidadeAjustada?: number | null; mesesDisponiveis?: number | null; diasComEstoquePositivo?: number | null }>; estoquePorFilial: Array<{ filial: string; estoque: number }> } | null> {
+): Promise<{ qtde12m: number; qtde60d: number; vendasMesAtual: number; valor12m: number | null; custoUnit: number | null; diasDesdeUltimaVenda: number | null; primeiraEntradaFilial: string | null; diasHistoricoFilial: number; mesesHistoricoFilial: number; diasComEstoquePositivo: number; diasSemEstoque: number; mesesDisponiveis: number; velocidadeAjustada: number; ritmoDiasComEstoque: number; ritmoVendasPeriodo: number; ritmoInicioIso: string | null; ritmoFimIso: string | null; ritmoDiasComVenda: number; ritmoPrimeiraVendaIso: string | null; ritmoUltimaVendaIso: string | null; ritmoRecenteDias: number; ritmoRecenteVendas: number; ritmoRecenteInicioIso: string | null; ritmoRecenteFimIso: string | null; ritmoRecenteUltimaVendaIso: string | null; ritmoGapDias: number; historicoParcial: boolean; filiaisNM: FilialNecessidadeMinima[]; filiaisCobertura: FilialNecessidadeMinima[]; vendasPorFilial: Array<{ filial: string; qtde12m: number; qtde60d?: number; velocidadeAjustada?: number | null; mesesDisponiveis?: number | null; diasComEstoquePositivo?: number | null }>; estoquePorFilial: Array<{ filial: string; estoque: number }> } | null> {
   type VendasItemMetricasApiRow = {
     qtde12m: number;
     qtde60d: number;
@@ -655,6 +661,7 @@ async function fetchVendasItemMetricas(
       ritmoRecenteVendas: metricas.resumo.ritmoRecenteVendas,
       ritmoRecenteInicioIso: metricas.resumo.ritmoRecenteInicioIso,
       ritmoRecenteFimIso: metricas.resumo.ritmoRecenteFimIso,
+      ritmoRecenteUltimaVendaIso: metricas.resumo.ritmoRecenteUltimaVendaIso,
       ritmoGapDias: metricas.resumo.ritmoGapDias,
       historicoParcial: metricas.resumo.historicoParcial,
       filiaisNM,
@@ -699,6 +706,7 @@ async function fetchVendasItemMetricas(
       ritmoRecenteVendas: 0,
       ritmoRecenteInicioIso: null,
       ritmoRecenteFimIso: null,
+      ritmoRecenteUltimaVendaIso: null,
       ritmoGapDias: 0,
       filiaisNM: [],
       filiaisCobertura: [],
@@ -1494,6 +1502,7 @@ function calcQtdSugeridaParaFilial(
     ritmoRecenteVendas?: number | null;
     ritmoRecenteInicioIso?: string | null;
     ritmoRecenteFimIso?: string | null;
+    ritmoRecenteUltimaVendaIso?: string | null;
     ritmoGapDias?: number | null;
     qtde60d?: number | null;
     qtde12m?: number | null;
@@ -1527,8 +1536,10 @@ function calcQtdSugeridaParaFilial(
     ritmoRecenteVendas: vendas?.ritmoRecenteVendas ?? null,
     ritmoRecenteInicioIso: vendas?.ritmoRecenteInicioIso ?? null,
     ritmoRecenteFimIso: vendas?.ritmoRecenteFimIso ?? null,
+    ritmoRecenteUltimaVendaIso: vendas?.ritmoRecenteUltimaVendaIso ?? null,
     ritmoGapDias: vendas?.ritmoGapDias ?? null,
     gapAntigoDias: resolveGapAntigoDias(companyKey),
+    recenteHorizonteDias: resolveRecenteHorizonteDias(companyKey),
     qtde60d: vendas?.qtde60d ?? null,
     linha: item.linha,
     subgrupo: item.subgrupo,
@@ -1542,6 +1553,42 @@ function calcQtdSugeridaParaFilial(
 function itemTemSugestaoCompra(item: ListaItem, diasCorridosMes: number): boolean {
   const sugestao = getReposicaoCompraView(item, diasCorridosMes);
   return sugestao.qtdFinal > 0 || sugestao.qtdS > 0 || sugestao.qtdE > 0 || sugestao.qtdPO > 0 || sugestao.qtdNM > 0;
+}
+
+/**
+ * Item precisa COMPRAR AGORA: mede a MESMA Compra Ideal da coluna (calcCompraIdeal a partir do
+ * snapshot de ritmo do item) e exige compra ideal > 0 E a data de compra já chegada
+ * (`comprarAgora`). Inclui os campos do trecho recente para o resgate de janela zerada valer aqui
+ * igual na coluna (ex.: SMART WATCH lento que voltou a vender).
+ */
+function itemTemCompraAgora(
+  item: ListaItem,
+  companyKey: string,
+  comprasTransitoIndex: CompraTransitoIndex
+): boolean {
+  const transitEntries = getCompraTransitoEntries(comprasTransitoIndex, item.produto, item.corProduto);
+  const ciclo = hasCicloCompra(companyKey)
+    ? resolveCicloCompra(companyKey, { linha: item.linha, subgrupo: item.subgrupo })
+    : null;
+  const ideal = calcCompraIdeal({
+    estoqueAtual: item.estoqueFilial ?? 0,
+    ritmoDiasComEstoque: item.ritmoDiasComEstoque ?? null,
+    ritmoVendasPeriodo: item.ritmoVendasPeriodo ?? null,
+    ritmoRecenteDias: item.ritmoRecenteDias ?? null,
+    ritmoRecenteVendas: item.ritmoRecenteVendas ?? null,
+    ritmoRecenteUltimaVendaIso: item.ritmoRecenteUltimaVendaIso ?? null,
+    ritmoGapDias: item.ritmoGapDias ?? null,
+    gapAntigoDias: resolveGapAntigoDias(companyKey),
+    recenteHorizonteDias: resolveRecenteHorizonteDias(companyKey),
+    qtde60d: item.qtde60d ?? null,
+    linha: item.linha,
+    subgrupo: item.subgrupo,
+    coberturaDias: ciclo?.coberturaDias ?? null,
+    producaoDias: ciclo?.producaoDias ?? null,
+    transitEntries,
+  });
+  // Inclui o "comprar essa semana" (NERD às segundas) — entra junto no filtro "comprar agora".
+  return ideal.compraIdeal > 0 && (ideal.comprarAgora || precisaComprarEssaSemana(ideal, companyKey));
 }
 
 function itemEhBarrado(item: ListaItem, diasCorridosMes: number): boolean {
@@ -2012,6 +2059,7 @@ function ListaLojaItensTable({
         ritmoRecenteVendas: number | null;
         ritmoRecenteInicioIso: string | null;
         ritmoRecenteFimIso: string | null;
+        ritmoRecenteUltimaVendaIso: string | null;
         ritmoGapDias: number | null;
         historicoParcial: boolean | null;
         filiaisNM: FilialNecessidadeMinima[] | null;
@@ -2117,6 +2165,7 @@ function ListaLojaItensTable({
             ritmoRecenteVendas: vendas?.ritmoRecenteVendas ?? null,
             ritmoRecenteInicioIso: vendas?.ritmoRecenteInicioIso ?? null,
             ritmoRecenteFimIso: vendas?.ritmoRecenteFimIso ?? null,
+            ritmoRecenteUltimaVendaIso: vendas?.ritmoRecenteUltimaVendaIso ?? null,
             ritmoGapDias: vendas?.ritmoGapDias ?? null,
             historicoParcial: vendas?.historicoParcial ?? null,
             filiaisNM: vendas?.filiaisNM ?? null,
@@ -2179,8 +2228,10 @@ function ListaLojaItensTable({
         ritmoRecenteVendas: hasLive ? (live?.ritmoRecenteVendas ?? null) : null,
         ritmoRecenteInicioIso: hasLive ? (live?.ritmoRecenteInicioIso ?? null) : null,
         ritmoRecenteFimIso: hasLive ? (live?.ritmoRecenteFimIso ?? null) : null,
+        ritmoRecenteUltimaVendaIso: hasLive ? (live?.ritmoRecenteUltimaVendaIso ?? null) : null,
         ritmoGapDias: hasLive ? (live?.ritmoGapDias ?? null) : null,
         gapAntigoDias: resolveGapAntigoDias(companyKey),
+        recenteHorizonteDias: resolveRecenteHorizonteDias(companyKey),
         qtde60d: hasLive ? (live?.qtde60d ?? null) : (item.qtde60d ?? null),
         linha: item.linha,
         subgrupo: item.subgrupo,
@@ -2278,6 +2329,7 @@ function ListaLojaItensTable({
                 const ritmoRecenteVendas = hasLive ? (live?.ritmoRecenteVendas ?? null) : null;
                 const ritmoRecenteInicioIso = hasLive ? (live?.ritmoRecenteInicioIso ?? null) : null;
                 const ritmoRecenteFimIso = hasLive ? (live?.ritmoRecenteFimIso ?? null) : null;
+                const ritmoRecenteUltimaVendaIso = hasLive ? (live?.ritmoRecenteUltimaVendaIso ?? null) : null;
                 const ritmoGapDias = hasLive ? (live?.ritmoGapDias ?? null) : null;
                 const transitEntries = getCompraTransitoEntries(comprasTransitoIndex, item.produto, item.corProduto);
                 const cicloItem = hasCicloCompra(companyKey)
@@ -2296,8 +2348,10 @@ function ListaLojaItensTable({
                   ritmoRecenteVendas,
                   ritmoRecenteInicioIso,
                   ritmoRecenteFimIso,
+                  ritmoRecenteUltimaVendaIso,
                   ritmoGapDias,
                   gapAntigoDias: resolveGapAntigoDias(companyKey),
+                  recenteHorizonteDias: resolveRecenteHorizonteDias(companyKey),
                   qtde60d,
                   linha: item.linha,
                   subgrupo: item.subgrupo,
@@ -2696,13 +2750,18 @@ function ListaLojaItensTable({
                       style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", fontWeight: 700, color: compraIdealDisplay > 0 ? "#b45309" : "#475569" }}
                     >
                       <span>{fmt(compraIdealDisplay)} pcs</span>
-                      {ideal.modoCiclo && ideal.dataCompra && ideal.status === "REPOR" ? (
-                        <span style={{ fontSize: 11, fontWeight: 600, color: ideal.comprarAgora ? "#b91c1c" : "#0f766e" }}>
-                          {ideal.comprarAgora
-                            ? "📅 comprar agora"
-                            : `📅 ${formatShortDate(ideal.dataCompra)}${ideal.diasAteComprar != null ? ` · ${fmt(ideal.diasAteComprar)}d` : ""}`}
-                        </span>
-                      ) : null}
+                      {ideal.modoCiclo && ideal.dataCompra && ideal.status === "REPOR" ? (() => {
+                        const essaSemana = precisaComprarEssaSemana(ideal, companyKey);
+                        return (
+                          <span style={{ fontSize: 11, fontWeight: ideal.comprarAgora || essaSemana ? 800 : 600, color: ideal.comprarAgora ? "#b91c1c" : essaSemana ? "#b45309" : "#0f766e" }}>
+                            {ideal.comprarAgora
+                              ? "📅 comprar agora"
+                              : essaSemana
+                                ? "📅 comprar essa semana"
+                                : `📅 ${formatShortDate(ideal.dataCompra)}${ideal.diasAteComprar != null ? ` · ${fmt(ideal.diasAteComprar)}d` : ""}`}
+                          </span>
+                        );
+                      })() : null}
                     </span>
                   );
                 })()}
@@ -3318,6 +3377,8 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
   const [exportandoXlsx, setExportandoXlsx] = useState(false);
   const [compraIdealProgresso, setCompraIdealProgresso] = useState<{ feito: number; total: number } | null>(null);
   const [filtrarSugeridos, setFiltrarSugeridos] = useState(false);
+  // Subconjunto: só os que precisam comprar AGORA (data de compra chegou/passou).
+  const [filtrarComprarAgora, setFiltrarComprarAgora] = useState(false);
   const [filtrarBarrados, setFiltrarBarrados] = useState(false);
   const [filtrarTransferencias, setFiltrarTransferencias] = useState(false);
   const [filtrarCurvas, setFiltrarCurvas] = useState<Set<string>>(new Set());
@@ -3471,6 +3532,10 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             velocidadeAjustada: vendas?.velocidadeAjustada ?? null,
             ritmoDiasComEstoque: vendas?.ritmoDiasComEstoque ?? null,
             ritmoVendasPeriodo: vendas?.ritmoVendasPeriodo ?? null,
+            ritmoRecenteDias: vendas?.ritmoRecenteDias ?? null,
+            ritmoRecenteVendas: vendas?.ritmoRecenteVendas ?? null,
+            ritmoRecenteUltimaVendaIso: vendas?.ritmoRecenteUltimaVendaIso ?? null,
+            ritmoGapDias: vendas?.ritmoGapDias ?? null,
             historicoParcial: vendas?.historicoParcial ?? null,
           };
 
@@ -4631,6 +4696,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
         const curva = curvaMapEditor.get(buildItemKey(item.produto, item.corProduto))?.curva ?? null;
         if (!curva || !filtrarCurvas.has(curva)) return false;
       }
+      if (filtrarComprarAgora && !itemTemCompraAgora(item, companyKey, comprasTransitoIndex)) return false;
       if (!filtrarSugeridos && !filtrarBarrados && !filtrarTransferencias) return true;
       if (filtrarTransferencias) return itemTemTransferenciaSugerida(item, diasCorridosMesLocal, transferenciasPorItem);
       const sugerido = itemTemSugestaoCompra(item, diasCorridosMesLocal);
@@ -4678,7 +4744,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     } catch (err: unknown) {
       mostrarNotificacao(err instanceof Error ? err.message : "Erro ao enviar para Compras Salvas", "error");
     }
-  }, [companyKey, curvaMapEditor, editingId, filtrarBarrados, filtrarCurvas, filtrarSugeridos, filtrarTransferencias, filialSelecionada, itens, mostrarNotificacao, nomeLista, transferenciasPorItem, user?.username]);
+  }, [companyKey, comprasTransitoIndex, curvaMapEditor, editingId, filtrarBarrados, filtrarComprarAgora, filtrarCurvas, filtrarSugeridos, filtrarTransferencias, filialSelecionada, itens, mostrarNotificacao, nomeLista, transferenciasPorItem, user?.username]);
 
   const salvar = useCallback(async () => {
     if (!user?.username) return;
@@ -4688,6 +4754,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
         const curva = curvaMapEditor.get(buildItemKey(item.produto, item.corProduto))?.curva ?? null;
         if (!curva || !filtrarCurvas.has(curva)) return false;
       }
+      if (filtrarComprarAgora && !itemTemCompraAgora(item, companyKey, comprasTransitoIndex)) return false;
       if (!filtrarSugeridos && !filtrarBarrados && !filtrarTransferencias) return true;
       if (filtrarTransferencias) return itemTemTransferenciaSugerida(item, diasCorridosMesLocal, transferenciasPorItem);
       const sugerido = itemTemSugestaoCompra(item, diasCorridosMesLocal);
@@ -4722,7 +4789,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     } finally {
       setSalvando(false);
     }
-  }, [companyKey, curvaMapEditor, editingId, filtrarBarrados, filtrarCurvas, filtrarSugeridos, filtrarTransferencias, filialSelecionada?.filial, filialSelecionada?.displayName, itens, mostrarNotificacao, nomeLista, transferenciasPorItem, user?.username, enviarParaComprasSalvas]);
+  }, [companyKey, comprasTransitoIndex, curvaMapEditor, editingId, filtrarBarrados, filtrarComprarAgora, filtrarCurvas, filtrarSugeridos, filtrarTransferencias, filialSelecionada?.filial, filialSelecionada?.displayName, itens, mostrarNotificacao, nomeLista, transferenciasPorItem, user?.username, enviarParaComprasSalvas]);
 
   // ─── Delete ─────────────────────────────────────────────────────────────────
 
@@ -4751,13 +4818,14 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
 
   const totalItensModal = itensModal.reduce((s, i) => s + i.quantidade, 0);
   const diasCorridosMes = new Date().getDate();
-  const filtrosAtivos = filtrarSugeridos || filtrarBarrados || filtrarTransferencias || filtrarCurvas.size > 0;
+  const filtrosAtivos = filtrarSugeridos || filtrarComprarAgora || filtrarBarrados || filtrarTransferencias || filtrarCurvas.size > 0;
   const itensVisiveis = useMemo(() => {
     return itens.filter((item) => {
       if (filtrarCurvas.size > 0) {
         const curva = curvaMapEditor.get(buildItemKey(item.produto, item.corProduto))?.curva ?? null;
         if (!curva || !filtrarCurvas.has(curva)) return false;
       }
+      if (filtrarComprarAgora && !itemTemCompraAgora(item, companyKey, comprasTransitoIndex)) return false;
       if (!filtrarSugeridos && !filtrarBarrados && !filtrarTransferencias) return true;
       if (filtrarTransferencias) return itemTemTransferenciaSugerida(item, diasCorridosMes, transferenciasPorItem);
       const sugerido = itemTemSugestaoCompra(item, diasCorridosMes);
@@ -4767,7 +4835,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
       if (filtrarBarrados) return barrado;
       return true;
     });
-  }, [curvaMapEditor, diasCorridosMes, filtrarBarrados, filtrarCurvas, filtrarSugeridos, filtrarTransferencias, itens, transferenciasPorItem]);
+  }, [companyKey, comprasTransitoIndex, curvaMapEditor, diasCorridosMes, filtrarBarrados, filtrarComprarAgora, filtrarCurvas, filtrarSugeridos, filtrarTransferencias, itens, transferenciasPorItem]);
   const indicesItensVisiveis = useMemo(
     () =>
       itens
@@ -4777,6 +4845,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             const curva = curvaMapEditor.get(buildItemKey(item.produto, item.corProduto))?.curva ?? null;
             if (!curva || !filtrarCurvas.has(curva)) return false;
           }
+          if (filtrarComprarAgora && !itemTemCompraAgora(item, companyKey, comprasTransitoIndex)) return false;
           if (!filtrarSugeridos && !filtrarBarrados && !filtrarTransferencias) return true;
           if (filtrarTransferencias) return itemTemTransferenciaSugerida(item, diasCorridosMes, transferenciasPorItem);
           const sugerido = itemTemSugestaoCompra(item, diasCorridosMes);
@@ -4787,7 +4856,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
           return true;
         })
         .map(({ index }) => index),
-    [curvaMapEditor, diasCorridosMes, filtrarBarrados, filtrarCurvas, filtrarSugeridos, filtrarTransferencias, itens, transferenciasPorItem]
+    [companyKey, comprasTransitoIndex, curvaMapEditor, diasCorridosMes, filtrarBarrados, filtrarComprarAgora, filtrarCurvas, filtrarSugeridos, filtrarTransferencias, itens, transferenciasPorItem]
   );
   const kpisLista = useMemo(() => {
     // Usa a quantidade real de cada item (= a qtd ao lado do +/-, já alinhada à
@@ -4814,6 +4883,8 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
 
   const filtroAplicadoLabel = filtrarTransferencias
     ? "Transferências"
+    : filtrarComprarAgora
+    ? "Comprar agora"
     : filtrarSugeridos && filtrarBarrados
       ? "Sugeridos e barrados"
       : filtrarSugeridos
@@ -5065,6 +5136,14 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
               />
               <span>Sugeridos</span>
             </label>
+            <label className={styles.filtroToggle} title="Os que precisam comprar agora (data chegou) ou essa semana (NERD: até a próxima segunda)">
+              <input
+                type="checkbox"
+                checked={filtrarComprarAgora}
+                onChange={(e) => setFiltrarComprarAgora(e.target.checked)}
+              />
+              <span>Comprar agora</span>
+            </label>
             <label className={styles.filtroToggle}>
               <input
                 type="checkbox"
@@ -5105,6 +5184,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                 className={styles.filtroClearBtn}
                 onClick={() => {
                   setFiltrarSugeridos(false);
+                  setFiltrarComprarAgora(false);
                   setFiltrarBarrados(false);
                   setFiltrarTransferencias(false);
                   setFiltrarCurvas(new Set());
