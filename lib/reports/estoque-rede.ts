@@ -37,7 +37,17 @@ const ESTOQUE_REDE_PRESETS: ReportPresetDef[] = [
     sortDir: "desc",
     // Sempre anexa as colunas por filial (rede inteira) após as fixas.
     dynamicFilialStock: true,
-    columns: [col("PRODUTO"), col("COR"), col("DESCRICAO"), col("ESTOQUE_TOTAL")],
+    columns: [
+      col("PRODUTO"),
+      col("COR"),
+      col("DESCRICAO"),
+      col("ESTOQUE_TOTAL"),
+      // Custo/preço vêm da tabela mestre (PRODUTOS) via fonte "vendas" — o cliente
+      // adiciona a fonte automaticamente ao habilitar estas colunas (ver enrich.server).
+      // CUSTO_TOTAL fica fora: na fonte vendas é custo×qtde VENDIDA, não custo×estoque.
+      col("CUSTO_UNITARIO", "Custo unit."),
+      col("PRECO_SUGERIDO", "Preço sugerido"),
+    ],
   },
   {
     // Estoque por filial + colunas de custo/preço (mestre), parados e cadastro.
