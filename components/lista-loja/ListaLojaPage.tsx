@@ -60,7 +60,6 @@ import {
   calcQtdSugestaoS as getSharedQtdSugestaoS,
   getReposicaoBaseType as getSharedReposicaoBaseType,
   getReposicaoCompraView as getSharedReposicaoCompraView,
-  getSuggestedQtyValue as getSharedSuggestedQtyValue,
   type SuggestionPOData,
   type SuggestionEData,
   type SuggestionSData,
@@ -727,7 +726,8 @@ async function buildListaItemComMetricas(
     descCor: string;
     linha?: string | null;
     subgrupo?: string | null;
-  }
+  },
+  comprasTransitoIndex: CompraTransitoIndex
 ): Promise<ListaItem> {
   const [vendas, estoque] = await Promise.all([
     fetchVendasItemMetricas(companyKey, codFilial, base.produto, base.corProduto),
@@ -752,7 +752,17 @@ async function buildListaItemComMetricas(
     ritmoVendasPeriodo: vendas?.ritmoVendasPeriodo ?? null,
     historicoParcial: vendas?.historicoParcial ?? null,
   };
-  const quantidade = getSuggestedQtyValue({ ...base, quantidade: 0, ...metricFields }, new Date().getDate());
+  // Com filial específica, segue a Compra Ideal (mesma fórmula da coluna). Na visão geral
+  // (TODAS), cai na sugestão de reposição agregada — igual aos demais caminhos de adição.
+  const quantidade = calcQtdSugeridaParaFilial(
+    codFilial,
+    base,
+    vendas,
+    estoque,
+    companyKey,
+    comprasTransitoIndex,
+    new Date().getDate()
+  );
   return { ...base, quantidade, ...metricFields };
 }
 
@@ -1462,8 +1472,71 @@ function getReposicaoCompraView(item: ListaItem, diasCorridosMes: number): {
   );
 }
 
-function getSuggestedQtyValue(item: ListaItem, diasCorridosMes: number): number {
-  return getSharedSuggestedQtyValue(getReposicaoCompraView(item, diasCorridosMes));
+/**
+ * Quantidade sugerida ao adicionar um item: usa SEMPRE calcCompraIdeal — a MESMA fórmula da
+ * coluna "Compra Ideal" (ritmo × cobertura − estoque − trânsito). Assim o número entre o − e o +
+ * é idêntico ao exibido na coluna, tanto numa filial específica quanto na visão geral (TODAS,
+ * onde estoque/ritmo já chegam agregados pela rede). O `_diasCorridosMes` fica só por
+ * compatibilidade de assinatura (não é usado no cálculo por cobertura).
+ */
+function calcQtdSugeridaParaFilial(
+  _filialCod: string | null,
+  item: { produto: string; corProduto: string | null; linha?: string | null; subgrupo?: string | null },
+  vendas: {
+    ritmoDiasComEstoque?: number | null;
+    ritmoVendasPeriodo?: number | null;
+    ritmoInicioIso?: string | null;
+    ritmoFimIso?: string | null;
+    ritmoDiasComVenda?: number | null;
+    ritmoPrimeiraVendaIso?: string | null;
+    ritmoUltimaVendaIso?: string | null;
+    ritmoRecenteDias?: number | null;
+    ritmoRecenteVendas?: number | null;
+    ritmoRecenteInicioIso?: string | null;
+    ritmoRecenteFimIso?: string | null;
+    ritmoGapDias?: number | null;
+    qtde60d?: number | null;
+    qtde12m?: number | null;
+    vendasMesAtual?: number | null;
+    diasDesdeUltimaVenda?: number | null;
+    mesesHistoricoFilial?: number | null;
+    diasComEstoquePositivo?: number | null;
+    diasSemEstoque?: number | null;
+    mesesDisponiveis?: number | null;
+    velocidadeAjustada?: number | null;
+  } | null | undefined,
+  estoqueFilial: number | null,
+  companyKey: string,
+  comprasTransitoIndex: CompraTransitoIndex,
+  _diasCorridosMes: number
+): number {
+  const transitEntries = getCompraTransitoEntries(comprasTransitoIndex, item.produto, item.corProduto);
+  const cicloSug = hasCicloCompra(companyKey)
+    ? resolveCicloCompra(companyKey, { linha: item.linha, subgrupo: item.subgrupo })
+    : null;
+  const ideal = calcCompraIdeal({
+    estoqueAtual: estoqueFilial ?? 0,
+    ritmoDiasComEstoque: vendas?.ritmoDiasComEstoque ?? null,
+    ritmoVendasPeriodo: vendas?.ritmoVendasPeriodo ?? null,
+    ritmoInicioIso: vendas?.ritmoInicioIso ?? null,
+    ritmoFimIso: vendas?.ritmoFimIso ?? null,
+    ritmoDiasComVenda: vendas?.ritmoDiasComVenda ?? null,
+    ritmoPrimeiraVendaIso: vendas?.ritmoPrimeiraVendaIso ?? null,
+    ritmoUltimaVendaIso: vendas?.ritmoUltimaVendaIso ?? null,
+    ritmoRecenteDias: vendas?.ritmoRecenteDias ?? null,
+    ritmoRecenteVendas: vendas?.ritmoRecenteVendas ?? null,
+    ritmoRecenteInicioIso: vendas?.ritmoRecenteInicioIso ?? null,
+    ritmoRecenteFimIso: vendas?.ritmoRecenteFimIso ?? null,
+    ritmoGapDias: vendas?.ritmoGapDias ?? null,
+    gapAntigoDias: resolveGapAntigoDias(companyKey),
+    qtde60d: vendas?.qtde60d ?? null,
+    linha: item.linha,
+    subgrupo: item.subgrupo,
+    coberturaDias: cicloSug?.coberturaDias ?? null,
+    producaoDias: cicloSug?.producaoDias ?? null,
+    transitEntries,
+  });
+  return Math.max(0, ideal.compraIdeal);
 }
 
 function itemTemSugestaoCompra(item: ListaItem, diasCorridosMes: number): boolean {
@@ -3401,41 +3474,18 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             historicoParcial: vendas?.historicoParcial ?? null,
           };
 
-          // Qtd sugerida ao lado do +/-: com uma loja específica selecionada, segue a
-          // Compra Ideal daquela loja (a MESMA exibida na coluna, já com trânsito abatido).
-          // Na visão geral (TODAS), mantém a sugestão de reposição agregada da rede.
-          let suggestedQty: number;
-          if (filialConsultaSelecionada) {
-            const transitEntries = getCompraTransitoEntries(comprasTransitoIndex, item.produto, item.corProduto);
-            const cicloSug = hasCicloCompra(companyKey)
-              ? resolveCicloCompra(companyKey, { linha: item.linha, subgrupo: item.subgrupo })
-              : null;
-            const ideal = calcCompraIdeal({
-              estoqueAtual: estoqueFilial ?? 0,
-              ritmoDiasComEstoque: vendas?.ritmoDiasComEstoque ?? null,
-              ritmoVendasPeriodo: vendas?.ritmoVendasPeriodo ?? null,
-              ritmoInicioIso: vendas?.ritmoInicioIso ?? null,
-              ritmoFimIso: vendas?.ritmoFimIso ?? null,
-              ritmoDiasComVenda: vendas?.ritmoDiasComVenda ?? null,
-              ritmoPrimeiraVendaIso: vendas?.ritmoPrimeiraVendaIso ?? null,
-              ritmoUltimaVendaIso: vendas?.ritmoUltimaVendaIso ?? null,
-              ritmoRecenteDias: vendas?.ritmoRecenteDias ?? null,
-              ritmoRecenteVendas: vendas?.ritmoRecenteVendas ?? null,
-              ritmoRecenteInicioIso: vendas?.ritmoRecenteInicioIso ?? null,
-              ritmoRecenteFimIso: vendas?.ritmoRecenteFimIso ?? null,
-              ritmoGapDias: vendas?.ritmoGapDias ?? null,
-              gapAntigoDias: resolveGapAntigoDias(companyKey),
-              qtde60d: vendas?.qtde60d ?? null,
-              linha: item.linha,
-              subgrupo: item.subgrupo,
-              coberturaDias: cicloSug?.coberturaDias ?? null,
-              producaoDias: cicloSug?.producaoDias ?? null,
-              transitEntries,
-            });
-            suggestedQty = Math.max(0, ideal.compraIdeal);
-          } else {
-            suggestedQty = getSuggestedQtyValue({ ...item, ...fields }, new Date().getDate());
-          }
+          // Qtd sugerida ao lado do +/-: segue SEMPRE a Compra Ideal (a MESMA exibida na coluna,
+          // já com trânsito abatido). Numa loja específica usa o escopo da loja; na visão geral
+          // (TODAS) usa o escopo agregado da rede — em ambos bate com a coluna ao lado.
+          const suggestedQty = calcQtdSugeridaParaFilial(
+            filialConsultaSelecionada,
+            item,
+            vendas,
+            estoqueFilial,
+            companyKey,
+            comprasTransitoIndex,
+            new Date().getDate()
+          );
 
           return { ...fields, suggestedQty };
         })
@@ -3684,12 +3734,9 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
   }, []);
 
   const confirmarModal = useCallback(() => {
-    const dias = new Date().getDate();
     setItens(
       itensModal.map((item) => {
-        const sugestao = getSuggestedQtyValue(item, dias);
-        // Ao confirmar: itens "sem sugestão" ficam com qtd 0 na lista
-        if (sugestao <= 0) return { ...item, quantidade: 0 };
+        if (item.quantidade <= 0) return { ...item, quantidade: 0 };
         return item;
       })
     );
@@ -3749,28 +3796,13 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             ...prev,
             {
               ...base,
-              quantidade: getSuggestedQtyValue(
-                {
-                  ...base,
-                  quantidade: 0,
-                  qtde12m: vendas?.qtde12m ?? null,
-                  qtde60d: vendas?.qtde60d ?? null,
-                  vendasMesAtual: vendas?.vendasMesAtual ?? null,
-                  valor12m: vendas?.valor12m ?? null,
-                  custoUnit: vendas?.custoUnit ?? null,
-                  estoqueFilial: estoque,
-                  diasDesdeUltimaVenda: vendas?.diasDesdeUltimaVenda ?? null,
-                  primeiraEntradaFilial: vendas?.primeiraEntradaFilial ?? null,
-                  diasHistoricoFilial: vendas?.diasHistoricoFilial ?? null,
-                  mesesHistoricoFilial: vendas?.mesesHistoricoFilial ?? null,
-                  diasComEstoquePositivo: vendas?.diasComEstoquePositivo ?? null,
-                  diasSemEstoque: vendas?.diasSemEstoque ?? null,
-                  mesesDisponiveis: vendas?.mesesDisponiveis ?? null,
-                  velocidadeAjustada: vendas?.velocidadeAjustada ?? null,
-                  ritmoDiasComEstoque: vendas?.ritmoDiasComEstoque ?? null,
-                  ritmoVendasPeriodo: vendas?.ritmoVendasPeriodo ?? null,
-                  historicoParcial: vendas?.historicoParcial ?? null,
-                },
+              quantidade: calcQtdSugeridaParaFilial(
+                filialCod,
+                base,
+                vendas,
+                estoque,
+                companyKey,
+                comprasTransitoIndex,
                 new Date().getDate()
               ),
               qtde12m: vendas?.qtde12m ?? null,
@@ -3795,7 +3827,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
         });
       })();
     },
-    [mostrarNotificacao, produtos, filialConsultaSelecionada, companyKey]
+    [mostrarNotificacao, produtos, filialConsultaSelecionada, companyKey, comprasTransitoIndex]
   );
 
   const adicionarComCor = useCallback(
@@ -3915,26 +3947,13 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             continue;
           }
           const metrics = metricsMap.get(key) || { qtde12m: null, valor12m: null, qtde60d: null, vendasMesAtual: null, custoUnit: null, estoqueFilial: null, diasDesdeUltimaVenda: null, primeiraEntradaFilial: null, diasHistoricoFilial: null, mesesHistoricoFilial: null, diasComEstoquePositivo: null, diasSemEstoque: null, mesesDisponiveis: null, velocidadeAjustada: null, historicoParcial: null };
-          const suggested = getSuggestedQtyValue(
-            {
-              ...agg.item,
-              quantidade: 0,
-              qtde12m: metrics.qtde12m,
-              valor12m: metrics.valor12m,
-              qtde60d: metrics.qtde60d,
-              vendasMesAtual: metrics.vendasMesAtual,
-              custoUnit: metrics.custoUnit,
-              estoqueFilial: metrics.estoqueFilial,
-              diasDesdeUltimaVenda: metrics.diasDesdeUltimaVenda,
-              primeiraEntradaFilial: metrics.primeiraEntradaFilial,
-              diasHistoricoFilial: metrics.diasHistoricoFilial,
-              mesesHistoricoFilial: metrics.mesesHistoricoFilial,
-              diasComEstoquePositivo: metrics.diasComEstoquePositivo,
-              diasSemEstoque: metrics.diasSemEstoque,
-              mesesDisponiveis: metrics.mesesDisponiveis,
-              velocidadeAjustada: metrics.velocidadeAjustada,
-              historicoParcial: metrics.historicoParcial,
-            },
+          const suggested = calcQtdSugeridaParaFilial(
+            filialCod,
+            agg.item,
+            metrics,
+            metrics.estoqueFilial,
+            companyKey,
+            comprasTransitoIndex,
             new Date().getDate()
           );
           next.push({
@@ -3970,7 +3989,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     } finally {
       setImportandoColecao(false);
     }
-  }, [companyKey, filialConsultaSelecionada, mostrarNotificacao]);
+  }, [companyKey, filialConsultaSelecionada, mostrarNotificacao, comprasTransitoIndex]);
 
   const importarGradeProdutos = useCallback(async (gradeInput?: string) => {
     const grade = (gradeInput ?? "").trim();
@@ -4049,26 +4068,13 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             continue;
           }
           const metrics = metricsMap.get(key) || { qtde12m: null, valor12m: null, qtde60d: null, vendasMesAtual: null, custoUnit: null, estoqueFilial: null, diasDesdeUltimaVenda: null, primeiraEntradaFilial: null, diasHistoricoFilial: null, mesesHistoricoFilial: null, diasComEstoquePositivo: null, diasSemEstoque: null, mesesDisponiveis: null, velocidadeAjustada: null, historicoParcial: null };
-          const suggested = getSuggestedQtyValue(
-            {
-              ...agg.item,
-              quantidade: 0,
-              qtde12m: metrics.qtde12m,
-              valor12m: metrics.valor12m,
-              qtde60d: metrics.qtde60d,
-              vendasMesAtual: metrics.vendasMesAtual,
-              custoUnit: metrics.custoUnit,
-              estoqueFilial: metrics.estoqueFilial,
-              diasDesdeUltimaVenda: metrics.diasDesdeUltimaVenda,
-              primeiraEntradaFilial: metrics.primeiraEntradaFilial,
-              diasHistoricoFilial: metrics.diasHistoricoFilial,
-              mesesHistoricoFilial: metrics.mesesHistoricoFilial,
-              diasComEstoquePositivo: metrics.diasComEstoquePositivo,
-              diasSemEstoque: metrics.diasSemEstoque,
-              mesesDisponiveis: metrics.mesesDisponiveis,
-              velocidadeAjustada: metrics.velocidadeAjustada,
-              historicoParcial: metrics.historicoParcial,
-            },
+          const suggested = calcQtdSugeridaParaFilial(
+            filialCod,
+            agg.item,
+            metrics,
+            metrics.estoqueFilial,
+            companyKey,
+            comprasTransitoIndex,
             new Date().getDate()
           );
           next.push({
@@ -4104,7 +4110,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     } finally {
       setImportandoGrade(false);
     }
-  }, [companyKey, filialConsultaSelecionada, mostrarNotificacao]);
+  }, [companyKey, filialConsultaSelecionada, mostrarNotificacao, comprasTransitoIndex]);
 
   const opcoesImportacao = useMemo(() => {
     if (companyKey !== "scarfme") return [];
@@ -4272,26 +4278,13 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             continue;
           }
           const metrics = metricsMap.get(key) || { qtde12m: null, valor12m: null, qtde60d: null, vendasMesAtual: null, custoUnit: null, estoqueFilial: null, diasDesdeUltimaVenda: null, primeiraEntradaFilial: null, diasHistoricoFilial: null, mesesHistoricoFilial: null, diasComEstoquePositivo: null, diasSemEstoque: null, mesesDisponiveis: null, velocidadeAjustada: null, historicoParcial: null };
-          const suggested = getSuggestedQtyValue(
-            {
-              ...agg.item,
-              quantidade: 0,
-              qtde12m: metrics.qtde12m,
-              valor12m: metrics.valor12m,
-              qtde60d: metrics.qtde60d,
-              vendasMesAtual: metrics.vendasMesAtual,
-              custoUnit: metrics.custoUnit,
-              estoqueFilial: metrics.estoqueFilial,
-              diasDesdeUltimaVenda: metrics.diasDesdeUltimaVenda,
-              primeiraEntradaFilial: metrics.primeiraEntradaFilial,
-              diasHistoricoFilial: metrics.diasHistoricoFilial,
-              mesesHistoricoFilial: metrics.mesesHistoricoFilial,
-              diasComEstoquePositivo: metrics.diasComEstoquePositivo,
-              diasSemEstoque: metrics.diasSemEstoque,
-              mesesDisponiveis: metrics.mesesDisponiveis,
-              velocidadeAjustada: metrics.velocidadeAjustada,
-              historicoParcial: metrics.historicoParcial,
-            },
+          const suggested = calcQtdSugeridaParaFilial(
+            filialCod,
+            agg.item,
+            metrics,
+            metrics.estoqueFilial,
+            companyKey,
+            comprasTransitoIndex,
             new Date().getDate()
           );
           next.push({
@@ -4333,7 +4326,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
     } finally {
       setImportandoBatch(false);
     }
-  }, [batchCodes, filialConsultaSelecionada, companyKey, mostrarNotificacao]);
+  }, [batchCodes, filialConsultaSelecionada, companyKey, mostrarNotificacao, comprasTransitoIndex]);
 
   // ─── Editor: lista items (fora do modal) ─────────────────────────────────────
 
@@ -4471,7 +4464,15 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
         if (mode === "add") {
           const novoItem: ListaItem = {
             ...novoItemBase,
-            quantidade: getSuggestedQtyValue({ ...novoItemBase, quantidade: 0 }, new Date().getDate()),
+            quantidade: calcQtdSugeridaParaFilial(
+              filialCod,
+              produtoComCor,
+              vendas,
+              estoque,
+              companyKey,
+              comprasTransitoIndex,
+              new Date().getDate()
+            ),
           };
           if (idxExistente >= 0) {
             const next = [...prev];
@@ -4514,7 +4515,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
       }
       mostrarNotificacao(mode === "add" ? "Nova cor adicionada ao item" : "Cor atualizada com sucesso");
     },
-    [companyKey, filialConsultaSelecionada, mostrarNotificacao, editorColorPickerMode, modalColorPickerMode]
+    [companyKey, filialConsultaSelecionada, mostrarNotificacao, editorColorPickerMode, modalColorPickerMode, comprasTransitoIndex]
   );
 
   // ─── Navigation ─────────────────────────────────────────────────────────────
@@ -4613,13 +4614,13 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
         // sem match na base: segue com o item mínimo dos parâmetros
       }
       try {
-        const item = await buildListaItemComMetricas(companyKey, filialCod, base);
+        const item = await buildListaItemComMetricas(companyKey, filialCod, base, comprasTransitoIndex);
         setItens([item]);
       } catch {
         setItens([{ ...base, quantidade: 1 }]);
       }
     })();
-  }, [permissoesCarregadas, filiaisDisponiveis, searchParams, companyKey]);
+  }, [permissoesCarregadas, filiaisDisponiveis, searchParams, companyKey, comprasTransitoIndex]);
 
   // ─── Save ───────────────────────────────────────────────────────────────────
 
