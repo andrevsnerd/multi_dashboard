@@ -139,6 +139,36 @@
   font-size: 1.3rem;
 }
 
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.searchInput {
+  flex: 1 1 320px;
+  min-width: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 11px 14px;
+  font-size: 0.95rem;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+}
+
+.searchCount {
+  color: #64748b;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
 .cardsList {
   display: flex;
   flex-direction: column;

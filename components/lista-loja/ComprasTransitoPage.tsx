@@ -35,6 +35,35 @@ async function fetchCompras(companyKey: CompanyKey): Promise<CompraTransitoListE
   return json.data ?? [];
 }
 
+/**
+ * Índice de busca por compra: junta nome da compra + (código, descrição, código de
+ * barras e cor) de cada item num texto normalizado, para o filtro instantâneo da
+ * search bar achar tanto pela compra quanto por qualquer produto dentro dela.
+ */
+async function fetchComprasSearchIndex(
+  companyKey: CompanyKey
+): Promise<Record<string, string>> {
+  const params = new URLSearchParams({ company: companyKey, includeItems: "1" });
+  const res = await fetch(`/api/compras-transito?${params.toString()}`, { cache: "no-store" });
+  const json = (await res.json()) as { data?: CompraTransito[]; error?: string };
+  if (!res.ok) throw new Error(json.error ?? "Erro ao indexar compras em transito");
+  const index: Record<string, string> = {};
+  for (const compra of json.data ?? []) {
+    const parts: string[] = [compra.title];
+    for (const item of compra.items ?? []) {
+      parts.push(
+        item.produto,
+        item.descricao,
+        item.codigoBarra ?? "",
+        item.corProduto ?? "",
+        item.corDescricao ?? ""
+      );
+    }
+    index[compra.id] = parts.join(" ").toLowerCase();
+  }
+  return index;
+}
+
 async function fetchCompra(companyKey: CompanyKey, id: string): Promise<CompraTransito> {
   const params = new URLSearchParams({ company: companyKey });
   const res = await fetch(`/api/compras-transito/${id}?${params.toString()}`, { cache: "no-store" });
@@ -286,6 +315,8 @@ export default function ComprasTransitoPage({
   const [reconLoading, setReconLoading] = useState(false);
   const reconReqRef = useRef(0);
   const [listRecon, setListRecon] = useState<Record<string, ReconResumo> | null>(null);
+  const [search, setSearch] = useState("");
+  const [searchIndex, setSearchIndex] = useState<Record<string, string> | null>(null);
 
   const loadCompras = useCallback(async () => {
     setLoading(true);
@@ -298,6 +329,12 @@ export default function ComprasTransitoPage({
       fetchReconciliacaoLista(companyKey)
         .then(setListRecon)
         .catch(() => setListRecon(null));
+      // Índice de busca (itens de cada compra) também chega depois; até lá o filtro
+      // funciona só pelo nome da compra.
+      setSearchIndex(null);
+      fetchComprasSearchIndex(companyKey)
+        .then(setSearchIndex)
+        .catch(() => setSearchIndex(null));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar compras em transito");
     } finally {
@@ -339,6 +376,17 @@ export default function ComprasTransitoPage({
     });
     return { emTransito, recebidas, rascunhos };
   }, [compras]);
+
+  const filteredCompras = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return compras;
+    // Cada termo separado por espaço precisa bater (em nome da compra ou em algum item).
+    const terms = q.split(/\s+/).filter(Boolean);
+    return compras.filter((compra) => {
+      const haystack = `${compra.title.toLowerCase()} ${searchIndex?.[compra.id] ?? ""}`;
+      return terms.every((term) => haystack.includes(term));
+    });
+  }, [compras, search, searchIndex]);
 
   const canConfirm = useMemo(
     () =>
@@ -926,6 +974,24 @@ export default function ComprasTransitoPage({
             )}
           </div>
 
+          {!loading && !error && compras.length > 0 && (
+            <div className={styles.searchBar}>
+              <input
+                type="search"
+                className={styles.searchInput}
+                placeholder="Buscar por nome da compra, código, código de barras ou produto..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              {search.trim() && (
+                <span className={styles.searchCount}>
+                  {filteredCompras.length} de {compras.length}
+                  {searchIndex === null && " · indexando produtos…"}
+                </span>
+              )}
+            </div>
+          )}
+
           {loading && <div className={styles.emptyState}>Carregando compras em trânsito...</div>}
           {!loading && error && <div className={styles.errorBox}>{error}</div>}
           {!loading && !error && compras.length === 0 && (
@@ -936,9 +1002,17 @@ export default function ComprasTransitoPage({
               </button>
             </div>
           )}
-          {!loading && !error && compras.length > 0 && (
+          {!loading && !error && compras.length > 0 && filteredCompras.length === 0 && (
+            <div className={styles.emptyState}>
+              <p>Nenhuma compra encontrada para “{search.trim()}”.</p>
+              <button type="button" className={styles.ghostBtn} onClick={() => setSearch("")}>
+                Limpar busca
+              </button>
+            </div>
+          )}
+          {!loading && !error && filteredCompras.length > 0 && (
             <div className={styles.cardsList}>
-              {compras.map((compra) => {
+              {filteredCompras.map((compra) => {
                 const periodoRecebimento =
                   compra.minDataRecebimento && compra.maxDataRecebimento
                     ? compra.minDataRecebimento === compra.maxDataRecebimento
