@@ -8,9 +8,9 @@
  *   UPDATE ESTOQUE_PRODUTOS SET ESTOQUE = ESTOQUE + SUM(Ax), ESx = ESx + Ax, ...
  *
  * Resultado: o ajuste fica registrado igual a uma contagem real do Linx, aparece no
- * extrato do item (CONTAGEM/AJUSTE) com a descrição (NOME_CONTAGEM) e o responsável,
- * e o histórico fica computado nativamente. As triggers do header só carimbam
- * DATA_AJUSTE — setar ESTOQUE_AJUSTADO=1 não duplica o movimento.
+ * extrato do item (CONTAGEM/AJUSTE) com a descrição (NOME_CONTAGEM) e o responsável.
+ * O "desfazer" (estorno) cria uma nova contagem com os deltas invertidos — nada é
+ * apagado do Linx; original e estorno ficam ambos no histórico.
  *
  * Ver memória: ajuste-estoque-mecanismo-trigger.
  */
@@ -49,6 +49,14 @@ export interface AjusteContagemResult {
   semDiferenca: number;
 }
 
+export interface EstornoResult {
+  success: true;
+  nomeContagem: string; // o nome do estorno criado
+  nomeOriginal: string;
+  itensAjustados: number;
+  somaDelta: number;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type PoolLike = { request: () => any };
 
@@ -58,26 +66,43 @@ function escapeLike(value: string): string {
   return value.replace(/'/g, "''");
 }
 
-/**
- * Linha do saldo atual + slot de grade (TAMANHO_BASE) por produto.
- * O movimento é dirigido pela coluna A{slot}; para tamanho único (UNICO) slot=1.
- */
-interface SaldoAtual {
+interface ItemDelta {
   produto: string;
   cor: string;
-  estoque: number;
-  slot: number; // 1..48
+  delta: number;
+  slot: number; // 1..48 (TAMANHO_BASE; UNICO => 1)
 }
 
+/** TAMANHO_BASE (slot da grade) por produto; default 1 (tamanho único). */
+async function carregarSlots(pool: PoolLike, produtos: string[]): Promise<Map<string, number>> {
+  const slotByProduto = new Map<string, number>();
+  const unicos = [...new Set(produtos.map((p) => p.trim()))];
+  for (let i = 0; i < unicos.length; i += 800) {
+    const chunk = unicos.slice(i, i + 800);
+    const inList = chunk.map((p) => `'${escapeLike(p)}'`).join(',');
+    const req = pool.request();
+    const res = await req.query(`
+      SELECT RTRIM(LTRIM(PRODUTO)) AS PRODUTO, ISNULL(TAMANHO_BASE,1) AS TB
+      FROM PRODUTOS WITH (NOLOCK) WHERE RTRIM(LTRIM(PRODUTO)) IN (${inList})
+    `);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const r of res.recordset as any[]) {
+      const n = parseInt(r.TB, 10);
+      slotByProduto.set(r.PRODUTO, n >= 1 && n <= 48 ? n : 1);
+    }
+  }
+  return slotByProduto;
+}
+
+/** Saldo atual + slot por (produto,cor) para a filial. */
 async function carregarSaldoESlots(
   pool: PoolLike,
   filialNome: string,
   produtosCores: Array<{ produto: string; cor: string }>
-): Promise<Map<string, SaldoAtual>> {
-  const map = new Map<string, SaldoAtual>();
+): Promise<Map<string, { estoque: number; slot: number }>> {
+  const map = new Map<string, { estoque: number; slot: number }>();
   if (produtosCores.length === 0) return map;
 
-  // Saldo atual de TODOS os itens da filial (uma query). Chave = produto|cor (trim).
   const reqSaldo = pool.request();
   reqSaldo.input('filial', filialNome);
   const saldoRes = await reqSaldo.query(`
@@ -93,51 +118,45 @@ async function carregarSaldoESlots(
     saldoByKey.set(`${r.PRODUTO}|${r.COR}`, Number(r.ESTOQUE) || 0);
   }
 
-  // TAMANHO_BASE por produto (slot da grade). Default 1 (UNICO).
-  const produtosUnicos = [...new Set(produtosCores.map((p) => p.produto.trim()))];
-  const slotByProduto = new Map<string, number>();
-  for (let i = 0; i < produtosUnicos.length; i += 800) {
-    const chunk = produtosUnicos.slice(i, i + 800);
-    const inList = chunk.map((p) => `'${escapeLike(p)}'`).join(',');
-    const reqTb = pool.request();
-    const tbRes = await reqTb.query(`
-      SELECT RTRIM(LTRIM(PRODUTO)) AS PRODUTO, ISNULL(TAMANHO_BASE,1) AS TB
-      FROM PRODUTOS WITH (NOLOCK)
-      WHERE RTRIM(LTRIM(PRODUTO)) IN (${inList})
-    `);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const r of tbRes.recordset as any[]) {
-      const n = parseInt(r.TB, 10);
-      slotByProduto.set(r.PRODUTO, n >= 1 && n <= 48 ? n : 1);
-    }
-  }
-
+  const slots = await carregarSlots(pool, produtosCores.map((p) => p.produto));
   for (const pc of produtosCores) {
     const produto = pc.produto.trim();
     const cor = (pc.cor ?? '').trim();
     const key = `${produto}|${cor}`;
-    map.set(key, {
-      produto,
-      cor,
-      estoque: saldoByKey.get(key) ?? 0,
-      slot: slotByProduto.get(produto) ?? 1,
-    });
+    map.set(key, { estoque: saldoByKey.get(key) ?? 0, slot: slots.get(produto) ?? 1 });
   }
   return map;
 }
 
+async function nomeJaExiste(pool: PoolLike, nome: string): Promise<boolean> {
+  const req = pool.request();
+  req.input('nome', nome);
+  const res = await req.query(`
+    SELECT COUNT(*) AS TOTAL FROM ESTOQUE_PROD_CONTAGEM WITH (NOLOCK)
+    WHERE RTRIM(LTRIM(NOME_CONTAGEM)) = RTRIM(LTRIM(@nome))
+  `);
+  return (res.recordset[0]?.TOTAL ?? 0) > 0;
+}
+
 /**
- * Executa o ajuste: cria a contagem e deixa a trigger aplicar o estoque.
- * Recalcula o delta contra o saldo ATUAL (corrida-seguro): delta = contagem - saldoAtual.
+ * Insere a contagem (header + itens com deltas já calculados). A trigger
+ * LXI_ESTOQUE_PROD_CTG_AJUSTE aplica o estoque a cada INSERT (soma A1..A48 →
+ * ESTOQUE/ESx). QTDE_AJUSTE guarda o delta; A{slot} dirige o movimento.
  */
-export async function executarAjusteContagem(
+async function aplicarContagem(
   pool: PoolLike,
-  params: AjusteContagemParams
-): Promise<AjusteContagemResult> {
-  const filialNome = params.filialNome.trim();
+  params: {
+    filialNome: string;
+    nomeContagem: string;
+    emissao: string;
+    responsavel: string;
+    obs?: string | null;
+    deltas: ItemDelta[];
+  }
+): Promise<{ itensAjustados: number; somaDelta: number }> {
+  const { filialNome, emissao, deltas } = params;
   const nomeContagem = params.nomeContagem.trim();
   const responsavel = (params.responsavel || '').trim().slice(0, 25) || 'AJUSTE';
-  const emissao = params.emissao;
   const obs = params.obs?.trim() || null;
 
   if (!filialNome) throw new Error('Filial não informada.');
@@ -145,56 +164,13 @@ export async function executarAjusteContagem(
   if (nomeContagem.length > NOME_MAX) {
     throw new Error(`A descrição deve ter no máximo ${NOME_MAX} caracteres.`);
   }
-  if (!params.itens || params.itens.length === 0) {
-    throw new Error('Nenhum item para ajustar.');
-  }
+  if (deltas.length === 0) throw new Error('Nenhuma diferença a ajustar.');
 
-  // 0) NOME_CONTAGEM é PK — garante unicidade (erro claro em vez de violar PK).
-  const reqDup = pool.request();
-  reqDup.input('nome', nomeContagem);
-  const dupRes = await reqDup.query(`
-    SELECT COUNT(*) AS TOTAL FROM ESTOQUE_PROD_CONTAGEM WITH (NOLOCK)
-    WHERE RTRIM(LTRIM(NOME_CONTAGEM)) = RTRIM(LTRIM(@nome))
-  `);
-  if ((dupRes.recordset[0]?.TOTAL ?? 0) > 0) {
+  if (await nomeJaExiste(pool, nomeContagem)) {
     throw new Error(`Já existe uma contagem com a descrição "${nomeContagem}". Escolha outra.`);
   }
 
-  // 1) Recalcula deltas contra o saldo atual.
-  const saldoMap = await carregarSaldoESlots(
-    pool,
-    filialNome,
-    params.itens.map((it) => ({ produto: it.produto, cor: it.cor }))
-  );
-
-  interface ItemDelta {
-    produto: string;
-    cor: string;
-    delta: number;
-    slot: number;
-  }
-  const deltas: ItemDelta[] = [];
-  let semDiferenca = 0;
-  for (const it of params.itens) {
-    const produto = it.produto.trim();
-    const cor = (it.cor ?? '').trim();
-    const info = saldoMap.get(`${produto}|${cor}`);
-    const saldoAtual = info?.estoque ?? 0;
-    const slot = info?.slot ?? 1;
-    const contagem = Math.trunc(it.contagem);
-    const delta = contagem - saldoAtual;
-    if (delta === 0) {
-      semDiferenca += 1;
-      continue;
-    }
-    deltas.push({ produto, cor, delta, slot });
-  }
-
-  if (deltas.length === 0) {
-    throw new Error('Nenhuma diferença a ajustar (todos os itens já batem com o saldo atual).');
-  }
-
-  // 2) Header da contagem (FILIAL deve existir em FILIAIS — FK via trigger).
+  // Header (FILIAL deve existir em FILIAIS — FK via trigger).
   const reqHeader = pool.request();
   reqHeader.input('nome', nomeContagem);
   reqHeader.input('filial', filialNome);
@@ -211,14 +187,9 @@ export async function executarAjusteContagem(
     )
   `);
 
-  // 3) Itens de ajuste. A trigger LXI_ESTOQUE_PROD_CTG_AJUSTE aplica o estoque
-  //    a cada INSERT (agrupa por produto/cor/filial e soma A1..A48). QTDE_AJUSTE
-  //    guarda o delta para exibição; a coluna A{slot} é quem dirige o movimento
-  //    (TAMANHO_BASE; UNICO => A1). Como a coluna de slot varia por produto,
-  //    agrupamos por slot e emitimos um multi-row INSERT por (chunk, slot).
-  //    Header sem itens (se algo falhar) é inofensivo: não altera estoque.
+  // Itens — multi-row INSERT por (chunk, slot). Header sem itens (se falhar) é inofensivo.
   const somaDelta = deltas.reduce((s, d) => s + d.delta, 0);
-  const CHUNK = 300; // < limite de 2100 parâmetros (3 params/linha + @nome)
+  const CHUNK = 300; // < limite de 2100 parâmetros (3/linha + @nome)
   for (let i = 0; i < deltas.length; i += CHUNK) {
     const chunk = deltas.slice(i, i + CHUNK);
     const bySlot = new Map<number, ItemDelta[]>();
@@ -244,11 +215,118 @@ export async function executarAjusteContagem(
     }
   }
 
-  return {
-    success: true,
+  return { itensAjustados: deltas.length, somaDelta };
+}
+
+/**
+ * Executa o ajuste: recalcula o delta contra o saldo ATUAL (corrida-seguro):
+ * delta = contagem - saldoAtual; depois cria a contagem (a trigger aplica o estoque).
+ */
+export async function executarAjusteContagem(
+  pool: PoolLike,
+  params: AjusteContagemParams
+): Promise<AjusteContagemResult> {
+  const filialNome = params.filialNome.trim();
+  const nomeContagem = params.nomeContagem.trim();
+
+  if (!params.itens || params.itens.length === 0) {
+    throw new Error('Nenhum item para ajustar.');
+  }
+
+  const saldoMap = await carregarSaldoESlots(
+    pool,
+    filialNome,
+    params.itens.map((it) => ({ produto: it.produto, cor: it.cor }))
+  );
+
+  const deltas: ItemDelta[] = [];
+  let semDiferenca = 0;
+  for (const it of params.itens) {
+    const produto = it.produto.trim();
+    const cor = (it.cor ?? '').trim();
+    const info = saldoMap.get(`${produto}|${cor}`);
+    const saldoAtual = info?.estoque ?? 0;
+    const slot = info?.slot ?? 1;
+    const delta = Math.trunc(it.contagem) - saldoAtual;
+    if (delta === 0) {
+      semDiferenca += 1;
+      continue;
+    }
+    deltas.push({ produto, cor, delta, slot });
+  }
+
+  if (deltas.length === 0) {
+    throw new Error('Nenhuma diferença a ajustar (todos os itens já batem com o saldo atual).');
+  }
+
+  const { itensAjustados, somaDelta } = await aplicarContagem(pool, {
+    filialNome,
     nomeContagem,
-    itensAjustados: deltas.length,
-    somaDelta,
-    semDiferenca,
-  };
+    emissao: params.emissao,
+    responsavel: params.responsavel,
+    obs: params.obs,
+    deltas,
+  });
+
+  return { success: true, nomeContagem, itensAjustados, somaDelta, semDiferenca };
+}
+
+/**
+ * Desfaz (estorna) uma contagem: lê os deltas originais e cria uma nova contagem
+ * com os deltas invertidos. Nada é apagado — original e estorno ficam no histórico.
+ */
+export async function estornarContagem(
+  pool: PoolLike,
+  params: { nomeOriginal: string; novoNome: string; emissao: string; responsavel: string }
+): Promise<EstornoResult> {
+  const nomeOriginal = params.nomeOriginal.trim();
+  const novoNome = params.novoNome.trim();
+  if (!nomeOriginal) throw new Error('Contagem original não informada.');
+  if (!novoNome || novoNome.length > NOME_MAX) throw new Error('Nome de estorno inválido.');
+
+  // Header original (filial).
+  const reqH = pool.request();
+  reqH.input('nome', nomeOriginal);
+  const hRes = await reqH.query(`
+    SELECT TOP 1 RTRIM(FILIAL) AS FILIAL FROM ESTOQUE_PROD_CONTAGEM WITH (NOLOCK)
+    WHERE RTRIM(LTRIM(NOME_CONTAGEM)) = RTRIM(LTRIM(@nome))
+  `);
+  const filialNome = hRes.recordset[0]?.FILIAL?.trim();
+  if (!filialNome) throw new Error(`Contagem "${nomeOriginal}" não encontrada.`);
+
+  // Itens originais (deltas a inverter).
+  const reqI = pool.request();
+  reqI.input('nome', nomeOriginal);
+  const iRes = await reqI.query(`
+    SELECT RTRIM(PRODUTO) AS PRODUTO, RTRIM(ISNULL(COR_PRODUTO,'')) AS COR, ISNULL(QTDE_AJUSTE,0) AS Q
+    FROM ESTOQUE_PROD_CTG_AJUSTE WITH (NOLOCK)
+    WHERE RTRIM(LTRIM(NOME_CONTAGEM)) = RTRIM(LTRIM(@nome)) AND ISNULL(QTDE_AJUSTE,0) <> 0
+  `);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const orig = iRes.recordset as any[];
+  if (orig.length === 0) throw new Error('A contagem não tem itens para estornar.');
+
+  const slots = await carregarSlots(pool, orig.map((r) => String(r.PRODUTO).trim()));
+  const deltas: ItemDelta[] = orig
+    .map((r) => {
+      const produto = String(r.PRODUTO).trim();
+      return {
+        produto,
+        cor: String(r.COR ?? '').trim(),
+        delta: -(Number(r.Q) || 0),
+        slot: slots.get(produto) ?? 1,
+      };
+    })
+    .filter((d) => d.delta !== 0);
+
+  const { itensAjustados, somaDelta } = await aplicarContagem(pool, {
+    filialNome,
+    nomeContagem: novoNome,
+    emissao: params.emissao,
+    responsavel: params.responsavel,
+    obs: `ESTORNO de ${nomeOriginal}`,
+    deltas,
+  });
+
+  return { success: true, nomeContagem: novoNome, nomeOriginal, itensAjustados, somaDelta };
 }

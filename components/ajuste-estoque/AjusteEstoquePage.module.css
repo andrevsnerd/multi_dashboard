@@ -225,6 +225,13 @@
   font-size: 22px;
   font-weight: 700;
 }
+.totalBoxDestaque {
+  background: var(--ae-blue-bg);
+  border-color: #bfdbfe;
+}
+.final {
+  color: var(--ae-blue);
+}
 .pos {
   color: var(--ae-green);
 }

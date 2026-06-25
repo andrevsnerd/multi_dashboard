@@ -15,13 +15,23 @@ function esc(value: string): string {
   return value.replace(/'/g, "''");
 }
 
+function normNome(s: string): string {
+  return (s ?? '').replace(/\s+/g, ' ').trim().toUpperCase();
+}
+
+function adivinharEmpresaPorNome(nome: string): CompanyKey {
+  return normNome(nome).startsWith('NERD') ? 'nerd' : 'scarfme';
+}
+
 export interface FilialAjuste {
   cod: string;
-  nome: string; // FILIAIS.FILIAL exato (chave de escrita)
-  display: string;
+  nome: string; // FILIAIS.FILIAL exato (chave de escrita e exibição)
+  display: string; // = nome real (mantido por compat com o front)
+  apelido: string | null; // apelido curto do registry, se houver
   estoquePositivo: number;
   linhas: number;
   company: CompanyKey | null;
+  vendaRecente: boolean;
 }
 
 interface FilialRow {
@@ -53,40 +63,117 @@ async function carregarFiliaisComEstoque(): Promise<FilialRow[]> {
   }));
 }
 
+/** Nomes (FILIAIS.FILIAL) com venda nos últimos `dias` — varejo (LOJA_VENDA) + e-commerce (FATURAMENTO). */
+async function carregarFiliaisComVendaRecente(dias = 7): Promise<Set<string>> {
+  const rows = await query<{ NOME: string }>(`
+    SELECT DISTINCT RTRIM(fil.FILIAL) AS NOME
+    FROM FILIAIS fil WITH (NOLOCK)
+    INNER JOIN LOJA_VENDA v WITH (NOLOCK) ON v.CODIGO_FILIAL = fil.COD_FILIAL
+    WHERE v.DATA_VENDA >= DATEADD(DAY, -${dias}, GETDATE())
+    UNION
+    SELECT DISTINCT RTRIM(f.FILIAL) AS NOME
+    FROM FATURAMENTO f WITH (NOLOCK)
+    WHERE f.EMISSAO >= DATEADD(DAY, -${dias}, GETDATE())
+      AND f.NOTA_CANCELADA = 0
+      AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+  `);
+  return new Set(rows.map((r) => normNome(r.NOME)));
+}
+
 /**
  * Lista filiais para a tela de ajuste:
- *  - ativas: filiais operacionais da empresa (registry, modules não-vazio);
- *  - inativas: demais filiais COM estoque positivo (úteis p/ zerar lojas desativadas).
+ *  - ativas: filiais da empresa EM USO = com venda nos últimos 7 dias. Inclui também
+ *    depósito/MATRIZ (registry inventory-only, não vende mas é operacional).
+ *    Membros de grupo obsoletos (sem venda recente) caem em "não utilizadas".
+ *  - inativas: TODO o restante (não-ativo desta empresa), inclusive sem estoque.
+ *  Nome exibido = nome REAL (FILIAIS.FILIAL).
  */
 export async function listarFiliaisParaAjuste(
   company: CompanyKey
 ): Promise<{ ativas: FilialAjuste[]; inativas: FilialAjuste[] }> {
-  const rows = await carregarFiliaisComEstoque();
+  const [rows, vendaRecenteSet] = await Promise.all([
+    carregarFiliaisComEstoque(),
+    carregarFiliaisComVendaRecente().catch(() => new Set<string>()),
+  ]);
   const ativas: FilialAjuste[] = [];
   const inativas: FilialAjuste[] = [];
 
   for (const r of rows) {
     const def = getFilialById(r.cod);
-    const isAtivaDaEmpresa = !!def && def.company === company && def.modules.length > 0;
+    const empresaDaFilial = def?.company ?? adivinharEmpresaPorNome(r.nome);
+    const vendaRecente = vendaRecenteSet.has(normNome(r.nome));
+    // Depósito/MATRIZ: no registry, operacional só em inventory (não vende).
+    const inventoryOnly = !!def && def.modules.length > 0 && !def.modules.includes('sales');
+    // Em uso (globalmente): vende recente OU é depósito operacional.
+    const emUso = vendaRecente || inventoryOnly;
+
     const item: FilialAjuste = {
       cod: r.cod,
       nome: r.nome,
-      display: def?.display ?? r.nome,
+      display: r.nome, // nome real
+      apelido: def?.display ?? null,
       estoquePositivo: r.estPos,
       linhas: r.linhas,
       company: def?.company ?? null,
+      vendaRecente,
     };
-    if (isAtivaDaEmpresa) {
-      ativas.push(item);
-    } else if (r.estPos > 0) {
-      // Não-utilizada / desativada / de outra empresa, mas ainda com estoque.
-      inativas.push(item);
+    if (emUso && empresaDaFilial === company) {
+      ativas.push(item); // ativa desta empresa
+    } else if (!emUso) {
+      inativas.push(item); // não utilizada (ninguém usa mais), inclusive sem estoque
     }
+    // emUso de OUTRA empresa: fica fora (pertence à outra empresa).
   }
 
-  ativas.sort((a, b) => a.display.localeCompare(b.display));
-  inativas.sort((a, b) => b.estoquePositivo - a.estoquePositivo);
+  ativas.sort((a, b) => a.nome.localeCompare(b.nome));
+  // Não utilizadas: com estoque primeiro (mais úteis p/ zerar), depois por nome.
+  inativas.sort((a, b) =>
+    b.estoquePositivo - a.estoquePositivo || a.nome.localeCompare(b.nome)
+  );
   return { ativas, inativas };
+}
+
+export interface AjusteRecente {
+  nome: string;
+  filial: string;
+  emissao: string;
+  itens: number;
+  soma: number;
+}
+
+/** Lista os ajustes recentes do responsável (para oferecer "desfazer"). Exclui estornos. */
+export async function listarAjustesRecentes(
+  responsavel: string,
+  dias = 7
+): Promise<AjusteRecente[]> {
+  const respEsc = esc(responsavel.trim());
+  const rows = await query<{
+    NOME: string;
+    FILIAL: string;
+    EMISSAO: Date;
+    ITENS: number;
+    SOMA: number;
+  }>(`
+    SELECT TOP 30 RTRIM(c.NOME_CONTAGEM) AS NOME, RTRIM(c.FILIAL) AS FILIAL, c.EMISSAO,
+           ISNULL(s.ITENS, 0) AS ITENS, ISNULL(s.SOMA, 0) AS SOMA
+    FROM ESTOQUE_PROD_CONTAGEM c WITH (NOLOCK)
+    LEFT JOIN (
+      SELECT NOME_CONTAGEM, COUNT(*) AS ITENS, SUM(ISNULL(QTDE_AJUSTE, 0)) AS SOMA
+      FROM ESTOQUE_PROD_CTG_AJUSTE WITH (NOLOCK) GROUP BY NOME_CONTAGEM
+    ) s ON s.NOME_CONTAGEM = c.NOME_CONTAGEM
+    WHERE c.ESTOQUE_AJUSTADO = 1
+      AND RTRIM(LTRIM(c.RESPONSAVEL)) = '${respEsc}'
+      AND c.EMISSAO >= DATEADD(DAY, -${dias}, GETDATE())
+      AND (c.OBS IS NULL OR CAST(c.OBS AS VARCHAR(60)) NOT LIKE 'ESTORNO%')
+    ORDER BY c.DATA_PARA_TRANSFERENCIA DESC, c.EMISSAO DESC
+  `);
+  return rows.map((r) => ({
+    nome: r.NOME?.trim() ?? '',
+    filial: r.FILIAL?.trim() ?? '',
+    emissao: r.EMISSAO ? new Date(r.EMISSAO).toISOString() : '',
+    itens: Number(r.ITENS) || 0,
+    soma: Number(r.SOMA) || 0,
+  }));
 }
 
 /** Resolve o nome EXATO da filial (FILIAIS.FILIAL) a partir do COD_FILIAL. */
@@ -312,6 +399,12 @@ export interface DiferencasResultado {
     positivos: number;
     negativos: number;
     somaDelta: number;
+    /** Soma dos saldos atuais no escopo (pode incluir negativos). */
+    saldoAtualTotal: number;
+    /** Soma dos saldos finais após o ajuste (= soma das contagens). */
+    saldoFinalTotal: number;
+    /** Quantos itens do escopo têm saldo atual negativo. */
+    itensSaldoNegativo: number;
   };
   naoEncontrados: string[];
   ambiguos: string[];
@@ -412,6 +505,9 @@ export async function calcularDiferencas(opts: {
     positivos: comDiferenca.filter((l) => l.delta > 0).length,
     negativos: comDiferenca.filter((l) => l.delta < 0).length,
     somaDelta: comDiferenca.reduce((s, l) => s + l.delta, 0),
+    saldoAtualTotal: linhas.reduce((s, l) => s + l.saldo, 0),
+    saldoFinalTotal: linhas.reduce((s, l) => s + l.contagem, 0),
+    itensSaldoNegativo: linhas.filter((l) => l.saldo < 0).length,
   };
 
   return { linhas, totais, naoEncontrados, ambiguos, invalidas };

@@ -10,9 +10,11 @@ interface FilialAjuste {
   cod: string;
   nome: string;
   display: string;
+  apelido: string | null;
   estoquePositivo: number;
   linhas: number;
   company: CompanyKey | null;
+  vendaRecente: boolean;
 }
 
 interface DiferencaLinha {
@@ -35,10 +37,21 @@ interface PreviewResposta {
     positivos: number;
     negativos: number;
     somaDelta: number;
+    saldoAtualTotal: number;
+    saldoFinalTotal: number;
+    itensSaldoNegativo: number;
   };
   naoEncontrados: string[];
   ambiguos: string[];
   invalidas: string[];
+}
+
+interface AjusteRecente {
+  nome: string;
+  filial: string;
+  emissao: string;
+  itens: number;
+  soma: number;
 }
 
 type Modo = "inventario" | "zerar";
@@ -100,7 +113,64 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
     { nomeContagem: string; itensAjustados: number; somaDelta: number; semDiferenca: number } | null
   >(null);
 
+  const [recentes, setRecentes] = useState<AjusteRecente[]>([]);
+  const [estornandoNome, setEstornandoNome] = useState<string | null>(null);
+  const [estornoMsg, setEstornoMsg] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchRecentes = useCallback(async () => {
+    if (!username) return;
+    try {
+      const r = await fetch("/api/ajuste-estoque/recentes", {
+        headers: { "x-auth-username": username },
+      });
+      const d = await r.json();
+      setRecentes(Array.isArray(d?.recentes) ? d.recentes : []);
+    } catch {
+      /* silencioso */
+    }
+  }, [username]);
+
+  useEffect(() => {
+    fetchRecentes();
+  }, [fetchRecentes]);
+
+  const desfazer = useCallback(
+    async (nome: string) => {
+      if (
+        !window.confirm(
+          `Desfazer o ajuste "${nome}"? Será criado um estorno que devolve o estoque ao estado anterior (registrado no histórico).`
+        )
+      ) {
+        return;
+      }
+      setEstornandoNome(nome);
+      setEstornoMsg(null);
+      setErro(null);
+      try {
+        const r = await fetch("/api/ajuste-estoque/estornar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-auth-username": username },
+          body: JSON.stringify({ nomeOriginal: nome }),
+        });
+        const d = await r.json();
+        if (!r.ok) {
+          setErro(d?.error ?? "Erro ao desfazer ajuste.");
+          return;
+        }
+        setEstornoMsg(
+          `Estorno "${d.nomeContagem}" aplicado — ${d.itensAjustados} item(ns) revertido(s).`
+        );
+        fetchRecentes();
+      } catch {
+        setErro("Erro de conexão ao desfazer ajuste.");
+      } finally {
+        setEstornandoNome(null);
+      }
+    },
+    [username, fetchRecentes]
+  );
 
   const filialSelecionada = useMemo(() => {
     return (
@@ -226,13 +296,14 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
       });
       setConfirmando(false);
       setPreview(null);
+      fetchRecentes();
     } catch {
       setErro("Erro de conexão ao executar ajuste.");
     } finally {
       setExecutando(false);
       setConfirmCheck(false);
     }
-  }, [preview, linhasComDiferenca, username, filialCod, modo, nomeContagem, dataContagem, obs]);
+  }, [preview, linhasComDiferenca, username, filialCod, modo, nomeContagem, dataContagem, obs, fetchRecentes]);
 
   const podeCalcular = !!filialCod && (modo === "zerar" || !!arquivoTexto.trim());
   const podeConfirmar =
@@ -278,15 +349,15 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
               disabled={carregandoFiliais}
             >
               <option value="">{carregandoFiliais ? "Carregando…" : "Selecione…"}</option>
-              <optgroup label="Filiais ativas">
+              <optgroup label="Filiais ativas (venda recente)">
                 {filiais.ativas.map((f) => (
                   <option key={f.cod} value={f.cod}>
-                    {f.display} ({f.cod}) — {f.estoquePositivo.toLocaleString("pt-BR")} un
+                    {f.nome} ({f.cod}) — {f.estoquePositivo.toLocaleString("pt-BR")} un
                   </option>
                 ))}
               </optgroup>
               {filiais.inativas.length > 0 && (
-                <optgroup label="Filiais não utilizadas (com estoque)">
+                <optgroup label="Filiais não utilizadas (todas)">
                   {filiais.inativas.map((f) => (
                     <option key={f.cod} value={f.cod}>
                       {f.nome} ({f.cod}) — {f.estoquePositivo.toLocaleString("pt-BR")} un
@@ -407,6 +478,22 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
           <p className={styles.fileHintMuted}>
             Já aparece no extrato dos produtos (CONTAGEM/AJUSTE) com sua descrição e responsável.
           </p>
+          <div className={styles.actionsRow}>
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              onClick={() => desfazer(resultado.nomeContagem)}
+              disabled={estornandoNome === resultado.nomeContagem}
+            >
+              {estornandoNome === resultado.nomeContagem ? "Desfazendo…" : "↩ Desfazer este ajuste"}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {estornoMsg && (
+        <section className={`${styles.card} ${styles.sucesso}`}>
+          <p style={{ margin: 0 }}>↩ {estornoMsg}</p>
         </section>
       )}
 
@@ -414,6 +501,29 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
       {preview && (
         <section className={styles.card}>
           <div className={styles.totaisBar}>
+            <div className={`${styles.totalBox} ${styles.totalBoxDestaque}`}>
+              <span className={styles.totalLabel}>Saldo atual (total)</span>
+              <span className={styles.totalValor}>
+                {preview.totais.saldoAtualTotal.toLocaleString("pt-BR")}
+              </span>
+            </div>
+            <div className={`${styles.totalBox} ${styles.totalBoxDestaque}`}>
+              <span className={styles.totalLabel}>Saldo final (após ajuste)</span>
+              <span className={`${styles.totalValor} ${styles.final}`}>
+                {preview.totais.saldoFinalTotal.toLocaleString("pt-BR")}
+              </span>
+            </div>
+            <div className={styles.totalBox}>
+              <span className={styles.totalLabel}>Variação líquida</span>
+              <span
+                className={`${styles.totalValor} ${
+                  preview.totais.somaDelta < 0 ? styles.neg : styles.pos
+                }`}
+              >
+                {preview.totais.somaDelta > 0 ? "+" : ""}
+                {preview.totais.somaDelta.toLocaleString("pt-BR")}
+              </span>
+            </div>
             <div className={styles.totalBox}>
               <span className={styles.totalLabel}>Itens no escopo</span>
               <span className={styles.totalValor}>{preview.totais.itens.toLocaleString("pt-BR")}</span>
@@ -430,18 +540,16 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
               <span className={styles.totalLabel}>Saídas (−)</span>
               <span className={`${styles.totalValor} ${styles.neg}`}>{preview.totais.negativos}</span>
             </div>
-            <div className={styles.totalBox}>
-              <span className={styles.totalLabel}>Variação líquida</span>
-              <span
-                className={`${styles.totalValor} ${
-                  preview.totais.somaDelta < 0 ? styles.neg : styles.pos
-                }`}
-              >
-                {preview.totais.somaDelta > 0 ? "+" : ""}
-                {preview.totais.somaDelta.toLocaleString("pt-BR")}
-              </span>
-            </div>
           </div>
+
+          {preview.totais.itensSaldoNegativo > 0 && (
+            <p className={styles.fileHintMuted}>
+              ℹ {preview.totais.itensSaldoNegativo} item(ns) têm saldo negativo no escopo — por
+              isso a variação líquida ({preview.totais.somaDelta > 0 ? "+" : ""}
+              {preview.totais.somaDelta}) difere do estoque positivo da filial. Após o ajuste o
+              saldo final total fica <strong>{preview.totais.saldoFinalTotal.toLocaleString("pt-BR")}</strong>.
+            </p>
+          )}
 
           {(preview.naoEncontrados.length > 0 ||
             preview.ambiguos.length > 0 ||
@@ -488,9 +596,9 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
                   <th>Produto</th>
                   <th>Descrição</th>
                   <th>Cor</th>
-                  <th className={styles.num}>Saldo</th>
-                  <th className={styles.num}>Contagem</th>
+                  <th className={styles.num}>Saldo atual</th>
                   <th className={styles.num}>Diferença</th>
+                  <th className={styles.num}>Saldo final</th>
                 </tr>
               </thead>
               <tbody>
@@ -500,7 +608,6 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
                     <td>{l.descProduto}</td>
                     <td>{l.descCor || l.cor}</td>
                     <td className={styles.num}>{l.saldo}</td>
-                    <td className={styles.num}>{l.contagem}</td>
                     <td
                       className={`${styles.num} ${
                         l.delta < 0 ? styles.neg : l.delta > 0 ? styles.pos : ""
@@ -509,6 +616,7 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
                       {l.delta > 0 ? "+" : ""}
                       {l.delta}
                     </td>
+                    <td className={`${styles.num} ${styles.final}`}>{l.contagem}</td>
                   </tr>
                 ))}
               </tbody>
@@ -537,6 +645,54 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
         </section>
       )}
 
+      {/* ── Desfazer ajustes recentes ── */}
+      {recentes.length > 0 && (
+        <section className={styles.card}>
+          <h2 className={styles.cardTitle}>Desfazer ajustes recentes</h2>
+          <p className={styles.fileHintMuted}>
+            Seus ajustes dos últimos 7 dias. Desfazer cria um estorno (ajuste inverso) registrado.
+          </p>
+          <div className={styles.tableScroll}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Descrição</th>
+                  <th>Filial</th>
+                  <th>Data</th>
+                  <th className={styles.num}>Itens</th>
+                  <th className={styles.num}>Variação</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentes.map((r) => (
+                  <tr key={r.nome}>
+                    <td className={styles.mono}>{r.nome}</td>
+                    <td>{r.filial}</td>
+                    <td>{r.emissao ? new Date(r.emissao).toLocaleDateString("pt-BR") : "—"}</td>
+                    <td className={styles.num}>{r.itens}</td>
+                    <td className={`${styles.num} ${r.soma < 0 ? styles.neg : styles.pos}`}>
+                      {r.soma > 0 ? "+" : ""}
+                      {r.soma}
+                    </td>
+                    <td className={styles.num}>
+                      <button
+                        type="button"
+                        className={styles.secondaryBtn}
+                        onClick={() => desfazer(r.nome)}
+                        disabled={estornandoNome === r.nome}
+                      >
+                        {estornandoNome === r.nome ? "Desfazendo…" : "↩ Desfazer"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       {/* ── Modal de confirmação ── */}
       {confirmando && preview && (
         <div className={styles.modalOverlay} onClick={() => !executando && setConfirmando(false)}>
@@ -555,10 +711,12 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
                 {preview.totais.somaDelta}
               </strong>{" "}
               un
+              <br />
+              Saldo final (total) após o ajuste:{" "}
+              <strong>{preview.totais.saldoFinalTotal.toLocaleString("pt-BR")}</strong> un
             </p>
             <p className={styles.modalWarn}>
-              ⚠ Esta ação altera o estoque REAL no Linx e fica registrada no histórico. Não há
-              desfazer automático.
+              Altera o estoque real no Linx e registra no extrato. Dá pra desfazer depois.
             </p>
             <label className={styles.confirmCheck}>
               <input
