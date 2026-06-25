@@ -7,6 +7,8 @@ import { fetchProdutosCadastro } from "@/lib/repositories/reportProdutosCadastro
 import { fetchVendasHistorico } from "@/lib/repositories/reportVendasHistorico";
 import { fetchCompraSugeridaAbc } from "@/lib/repositories/reportCompraSugeridaAbc";
 import { fetchMenorCodigoBarra } from "@/lib/repositories/products";
+import { listFornecedoresByCompany } from "@/lib/utils/fornecedores-store";
+import { productMatchesFornecedor } from "@/lib/utils/fornecedor-matcher";
 import { runEnricher } from "./enrich.server";
 import { canonicalKey, ROW_COR_FIELD } from "./keys";
 import { NATIVE_SOURCE, type SourceId } from "./column-sources";
@@ -61,6 +63,21 @@ export async function runReport(
   if (!base) return null;
 
   const result = await base(filters, ctx);
+
+  // Filtro por grupo de fornecedor (NERD): mantém só as linhas cujo produto×cor
+  // pertence ao fornecedor escolhido. Aplicado antes do enriquecimento para que
+  // só as linhas filtradas sejam enriquecidas. Ver lib/utils/fornecedor-matcher.ts.
+  if (filters.fornecedor && filters.company) {
+    const fornecedores = await listFornecedoresByCompany(filters.company);
+    result.rows = result.rows.filter((row) =>
+      productMatchesFornecedor(fornecedores, filters.fornecedor as string, {
+        produto: String(row.PRODUTO ?? ""),
+        cor: String(row[ROW_COR_FIELD] ?? row.COR ?? ""),
+        descricao: String(row.DESCRICAO ?? ""),
+      })
+    );
+    result.total = result.rows.length;
+  }
 
   // Filtro de dias parado: quando ativo numa análise cuja base NÃO é parados (ex.: estoque
   // por filial), força a fonte "parados" a rodar para popular DIAS_PARADO, mesmo que a

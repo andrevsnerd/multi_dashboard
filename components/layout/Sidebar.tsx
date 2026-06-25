@@ -93,6 +93,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/exportar-relatorios` : "/exportar-relatorios";
   const geradorRelatoriosHref =
     basePath && basePath !== "/" ? `${basePath}/gerador-relatorios` : "/gerador-relatorios";
+  const fornecedoresHref =
+    basePath && basePath !== "/" ? `${basePath}/fornecedores` : "/fornecedores";
   const controleEstoqueHref =
     basePath && basePath !== "/" ? `${basePath}/controle-estoque` : "/controle-estoque";
   const estoqueConsultaHref =
@@ -134,6 +136,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/sincronizacao` : "/sincronizacao";
 
   const isScarfme = basePath === "/scarfme";
+  const isNerd = basePath === "/nerd";
 
   const matchesSegment = (currentPathname: string | null, segment: string, href?: string) =>
     currentPathname?.includes(segment) || currentPathname === href;
@@ -447,6 +450,18 @@ export default function Sidebar({ companyName }: SidebarProps) {
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/gerador-relatorios", geradorRelatoriosHref),
         },
+        ...(isNerd
+          ? [
+              {
+                key: "fornecedores",
+                label: "Grupos de Fornecedores",
+                href: fornecedoresHref,
+                permission: "fornecedores" as const,
+                isActive: (currentPathname: string | null) =>
+                  matchesSegment(currentPathname, "/fornecedores", fornecedoresHref),
+              },
+            ]
+          : []),
         {
           key: "sincronizacao",
           label: "Sincronização",

@@ -36,6 +36,7 @@ import {
   type CompraTransitoIndex,
 } from "@/lib/client/compras-transito";
 import { formatDateForQuery } from "@/lib/utils/date";
+import { productMatchesFornecedor, type Fornecedor } from "@/lib/utils/fornecedor-matcher";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
 import { calcCompraIdealFromResumo, precisaComprarEssaSemana, type CompraIdealResult } from "@/lib/utils/compra-ideal";
 import CompraIdealCell from "@/components/shared/CompraIdealCell";
@@ -1525,6 +1526,9 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [selectedSubgrupos, setSelectedSubgrupos] = useState<string[]>([]);
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
   const [selectedColecoes, setSelectedColecoes] = useState<string[]>([]);
+  // Filtro por grupo de fornecedor (só NERD).
+  const [fornecedorFiltro, setFornecedorFiltro] = useState<string>("");
+  const [fornecedoresOpts, setFornecedoresOpts] = useState<Fornecedor[]>([]);
   const [activeTab, setActiveTab] = useState<"produtos" | "vendedores">("produtos");
   const [porCor, setPorCor] = useState(true);
   const [filtrarEletronicos, setFiltrarEletronicos] = useState(companyKey === 'nerd');
@@ -1932,6 +1936,28 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     return { value: "", inherited: false };
   };
 
+  // Carrega grupos de fornecedores (só NERD) para o filtro.
+  useEffect(() => {
+    if (companyKey !== "nerd") {
+      setFornecedoresOpts([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/fornecedores?company=nerd`, { cache: "no-store" });
+        if (!res.ok) return;
+        const json = (await res.json()) as { data: Fornecedor[] };
+        if (!cancelled) setFornecedoresOpts(json.data ?? []);
+      } catch {
+        // silencioso
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [companyKey]);
+
   const produtosFiltrados = useMemo(() => {
     let produtos = produtosBaseFiltro;
     if (selectedSubgrupos.length > 0) {
@@ -1943,8 +1969,17 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     if (selectedColecoes.length > 0) {
       produtos = produtos.filter((p) => selectedColecoes.includes((p.colecao ?? "").trim()));
     }
+    if (companyKey === "nerd" && fornecedorFiltro && fornecedoresOpts.length > 0) {
+      produtos = produtos.filter((p) =>
+        productMatchesFornecedor(fornecedoresOpts, fornecedorFiltro, {
+          produto: p.produto,
+          cor: p.cor,
+          descricao: p.descricao,
+        })
+      );
+    }
     return produtos;
-  }, [produtosBaseFiltro, selectedSubgrupos, selectedGrades, selectedColecoes]);
+  }, [produtosBaseFiltro, selectedSubgrupos, selectedGrades, selectedColecoes, companyKey, fornecedorFiltro, fornecedoresOpts]);
 
   const activeStructureFilterLabels = [
     selectedCategory ? getCategoryHeaderLabel(selectedCategory) : null,
@@ -2813,6 +2848,23 @@ const handleBadgeClick = (cat: string) => {
             )}
           </div>
           <div className={styles.filterStripRight}>
+            {companyKey === "nerd" && fornecedoresOpts.length > 0 && (
+              <div className={styles.fornecedorFilter}>
+                <span className={styles.fornecedorFilterLabel}>Fornecedor</span>
+                <select
+                  className={styles.fornecedorFilterSelect}
+                  value={fornecedorFiltro}
+                  onChange={(e) => setFornecedorFiltro(e.target.value)}
+                >
+                  <option value="">Todos</option>
+                  {fornecedoresOpts.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             {availableSubgrupos.length > 0 && (
               <MultiSelectFilter
                 label="Subgrupo"

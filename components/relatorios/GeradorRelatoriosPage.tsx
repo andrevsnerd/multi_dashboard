@@ -141,6 +141,9 @@ export default function GeradorRelatoriosPage({
   const [diasParadoModo, setDiasParadoModo] = useState<"lte" | "gte">("gte");
   const [incluirZerados, setIncluirZerados] = useState(false);
   const [incluirNegativos, setIncluirNegativos] = useState(false);
+  // Filtro por grupo de fornecedor (só NERD).
+  const [fornecedor, setFornecedor] = useState<string>("");
+  const [fornecedoresOpts, setFornecedoresOpts] = useState<Array<{ id: string; nome: string }>>([]);
 
   // Opções dinâmicas
   const [optGrupos, setOptGrupos] = useState<string[]>([]);
@@ -250,6 +253,28 @@ export default function GeradorRelatoriosPage({
   useEffect(() => {
     void loadPresets();
   }, [loadPresets]);
+
+  // Carrega grupos de fornecedores (só NERD) para o filtro.
+  useEffect(() => {
+    if (companyKey !== "nerd") {
+      setFornecedoresOpts([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/fornecedores?company=nerd`, { cache: "no-store" });
+        if (!res.ok) return;
+        const json = (await res.json()) as { data: Array<{ id: string; nome: string }> };
+        if (!cancelled) setFornecedoresOpts(json.data ?? []);
+      } catch {
+        // silencioso
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [companyKey]);
 
   // ---------- opções de filtro (lazy) ----------
   const startStr = formatDateForQuery(range.startDate);
@@ -404,11 +429,12 @@ export default function GeradorRelatoriosPage({
     const suportaSaldo = meta?.supportedFilters.includes("saldoEstoque" as never) ?? false;
     if (suportaSaldo && incluirZerados) params.set("incluirZerados", "1");
     if (suportaSaldo && incluirNegativos) params.set("incluirNegativos", "1");
+    if (companyKey === "nerd" && fornecedor) params.set("fornecedor", fornecedor);
     return params.toString();
   }, [
     companyKey, filial, startStr, endStr, grupos, linhas, subgrupos, grades,
     colecoes, cores, tipos, produtoSelected, produtoQuery,
-    diasParadoValor, diasParadoModo, incluirZerados, incluirNegativos, meta,
+    diasParadoValor, diasParadoModo, incluirZerados, incluirNegativos, fornecedor, meta,
   ]);
 
   // Aplica o ReportResult recebido (fetch único OU stream) ao estado da página.
@@ -800,6 +826,23 @@ export default function GeradorRelatoriosPage({
               onChange={setFilial}
               module="sales"
             />
+          )}
+          {companyKey === "nerd" && fornecedoresOpts.length > 0 && (
+            <div className={styles.searchField}>
+              <label className={styles.fieldLabel}>Fornecedor</label>
+              <select
+                className={styles.select}
+                value={fornecedor}
+                onChange={(e) => setFornecedor(e.target.value)}
+              >
+                <option value="">Todos</option>
+                {fornecedoresOpts.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
           {supports("grupo") && (optGrupos.length > 0 || grupos.length > 0) && (
             <MultiSelectFilter

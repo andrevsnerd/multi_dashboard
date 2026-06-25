@@ -47,7 +47,7 @@ const PERMISSION_GROUPS: { label: string; keys: PermissionKey[] }[] = [
   },
   {
     label: "Ferramentas",
-    keys: ["filial", "exportar-relatorios", "sincronizacao", "blackfriday"],
+    keys: ["filial", "exportar-relatorios", "gerador-relatorios", "fornecedores", "sincronizacao", "blackfriday"],
   },
 ];
 

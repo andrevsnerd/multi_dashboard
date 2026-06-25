@@ -66,6 +66,7 @@ import {
   type SuggestionSData,
 } from "@/lib/utils/suggestion-rules";
 import { getMappedColorDescription } from "@/lib/utils/colorMapping";
+import { productMatchesFornecedor, type Fornecedor } from "@/lib/utils/fornecedor-matcher";
 import type { CompraSalvaItemRow } from "@/lib/types/compra-salva";
 import type { ProdutoTransferencia } from "@/lib/repositories/controleTransferencias";
 
@@ -3382,6 +3383,9 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
   const [filtrarBarrados, setFiltrarBarrados] = useState(false);
   const [filtrarTransferencias, setFiltrarTransferencias] = useState(false);
   const [filtrarCurvas, setFiltrarCurvas] = useState<Set<string>>(new Set());
+  // Filtro por grupo de fornecedor (só NERD).
+  const [fornecedorFiltro, setFornecedorFiltro] = useState<string>("");
+  const [fornecedoresOpts, setFornecedoresOpts] = useState<Fornecedor[]>([]);
   const [curvaMapEditor, setCurvaMapEditor] = useState<Map<string, CurvaInfo>>(new Map());
   const [transferenciasPorItem, setTransferenciasPorItem] = useState<Record<string, TransferenciaDestinoSugestao[]>>({});
   const [permissoes, setPermissoes] = useState<TransferenciaPermissao | null>(null);
@@ -4818,9 +4822,45 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
 
   const totalItensModal = itensModal.reduce((s, i) => s + i.quantidade, 0);
   const diasCorridosMes = new Date().getDate();
-  const filtrosAtivos = filtrarSugeridos || filtrarComprarAgora || filtrarBarrados || filtrarTransferencias || filtrarCurvas.size > 0;
+
+  // Carrega grupos de fornecedores (só NERD) para o filtro de exibição.
+  useEffect(() => {
+    if (companyKey !== "nerd") {
+      setFornecedoresOpts([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/fornecedores?company=nerd`, { cache: "no-store" });
+        if (!res.ok) return;
+        const json = (await res.json()) as { data: Fornecedor[] };
+        if (!cancelled) setFornecedoresOpts(json.data ?? []);
+      } catch {
+        // silencioso
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [companyKey]);
+
+  const fornecedorAtivo = companyKey === "nerd" && !!fornecedorFiltro && fornecedoresOpts.length > 0;
+  const itemMatchFornecedor = useCallback(
+    (item: ListaItem) =>
+      !fornecedorAtivo ||
+      productMatchesFornecedor(fornecedoresOpts, fornecedorFiltro, {
+        produto: item.produto,
+        cor: item.corProduto,
+        descricao: item.descProduto,
+      }),
+    [fornecedorAtivo, fornecedoresOpts, fornecedorFiltro]
+  );
+
+  const filtrosAtivos = filtrarSugeridos || filtrarComprarAgora || filtrarBarrados || filtrarTransferencias || filtrarCurvas.size > 0 || fornecedorAtivo;
   const itensVisiveis = useMemo(() => {
     return itens.filter((item) => {
+      if (!itemMatchFornecedor(item)) return false;
       if (filtrarCurvas.size > 0) {
         const curva = curvaMapEditor.get(buildItemKey(item.produto, item.corProduto))?.curva ?? null;
         if (!curva || !filtrarCurvas.has(curva)) return false;
@@ -4835,12 +4875,13 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
       if (filtrarBarrados) return barrado;
       return true;
     });
-  }, [companyKey, comprasTransitoIndex, curvaMapEditor, diasCorridosMes, filtrarBarrados, filtrarComprarAgora, filtrarCurvas, filtrarSugeridos, filtrarTransferencias, itens, transferenciasPorItem]);
+  }, [companyKey, comprasTransitoIndex, curvaMapEditor, diasCorridosMes, filtrarBarrados, filtrarComprarAgora, filtrarCurvas, filtrarSugeridos, filtrarTransferencias, itens, transferenciasPorItem, itemMatchFornecedor]);
   const indicesItensVisiveis = useMemo(
     () =>
       itens
         .map((item, index) => ({ item, index }))
         .filter(({ item }) => {
+          if (!itemMatchFornecedor(item)) return false;
           if (filtrarCurvas.size > 0) {
             const curva = curvaMapEditor.get(buildItemKey(item.produto, item.corProduto))?.curva ?? null;
             if (!curva || !filtrarCurvas.has(curva)) return false;
@@ -4856,7 +4897,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
           return true;
         })
         .map(({ index }) => index),
-    [companyKey, comprasTransitoIndex, curvaMapEditor, diasCorridosMes, filtrarBarrados, filtrarComprarAgora, filtrarCurvas, filtrarSugeridos, filtrarTransferencias, itens, transferenciasPorItem]
+    [companyKey, comprasTransitoIndex, curvaMapEditor, diasCorridosMes, filtrarBarrados, filtrarComprarAgora, filtrarCurvas, filtrarSugeridos, filtrarTransferencias, itens, transferenciasPorItem, itemMatchFornecedor]
   );
   const kpisLista = useMemo(() => {
     // Usa a quantidade real de cada item (= a qtd ao lado do +/-, já alinhada à
@@ -5128,6 +5169,22 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
             </div>
           )}
           <div className={styles.filtroRow}>
+            {companyKey === "nerd" && fornecedoresOpts.length > 0 && (
+              <select
+                className={styles.select}
+                style={{ maxWidth: 220 }}
+                value={fornecedorFiltro}
+                onChange={(e) => setFornecedorFiltro(e.target.value)}
+                title="Filtrar por grupo de fornecedor"
+              >
+                <option value="">Fornecedor: Todos</option>
+                {fornecedoresOpts.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.nome}
+                  </option>
+                ))}
+              </select>
+            )}
             <label className={styles.filtroToggle}>
               <input
                 type="checkbox"
@@ -5188,6 +5245,7 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                   setFiltrarBarrados(false);
                   setFiltrarTransferencias(false);
                   setFiltrarCurvas(new Set());
+                  setFornecedorFiltro("");
                 }}
               >
                 Limpar filtros

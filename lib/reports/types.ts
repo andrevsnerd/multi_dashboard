@@ -119,6 +119,8 @@ export interface ReportFilters {
   incluirNegativos?: boolean;
   /** Quando true, calcula a Compra Ideal por produto (caro — limita as linhas). */
   compraIdeal?: boolean;
+  /** Id do grupo de fornecedor (NERD) para filtrar produtos (Externo / Centro / ...). */
+  fornecedor?: string | null;
 }
 
 /** Cartão de KPI exibido no topo do resultado (ex.: Vendas Total, Ticket Médio). */

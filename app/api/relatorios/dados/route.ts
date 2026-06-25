@@ -32,6 +32,7 @@ export async function GET(request: Request) {
   const tipos = searchParams.getAll("tipo").filter(Boolean);
   const produtoId = searchParams.get("produtoId");
   const produtoSearchTerm = searchParams.get("produtoSearchTerm");
+  const fornecedor = searchParams.get("fornecedor");
   const limitParam = searchParams.get("limit");
   const limit = limitParam ? Number(limitParam) : undefined;
   const estoquePorFilial = searchParams.get("estoquePorFilial") === "1";
@@ -63,6 +64,7 @@ export async function GET(request: Request) {
     tipos: tipos.length > 0 ? tipos : null,
     produtoId: produtoId || null,
     produtoSearchTerm: produtoSearchTerm || null,
+    fornecedor: fornecedor || null,
     limit: Number.isFinite(limit) && (limit as number) > 0 ? limit : undefined,
     diasParadoValor,
     diasParadoModo,
