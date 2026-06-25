@@ -60,7 +60,7 @@ import { isProdutoAgrupadoSyntheticId } from "@/lib/utils/produtos-agrupados";
 import FilialVendedoresTab from "./FilialVendedoresTab";
 import { exportCurvaAbcSimpleCsv } from "@/lib/utils/exportCurvaAbcSimpleCsv";
 import { exportCurvaAbcSimpleXlsx, type CurvaAbcSimpleXlsxRow } from "@/lib/utils/exportCurvaAbcSimpleXlsx";
-import { exportCompraIdealPorFilialToXlsx } from "@/lib/utils/exportListaLoja";
+import { exportCompraPorLojaXlsx, type CompraLojaExportColumn } from "@/lib/utils/exportCompraSugeridaAbcXlsx";
 import styles from "./FilialPerformancePage.module.css";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -1477,6 +1477,8 @@ async function buildCompraIdealPorFilialRowsCurvaAbc(
     });
     row.ESTOQUE_REDE = estoqueRede;
     row["TOTAL REDE"] = totalRede;
+    // Custo total = custo unit. × compra total da rede (vira fórmula dinâmica no XLSX).
+    row.CUSTO_TOTAL = Math.round((Number(row.CUSTO_UNIT) || 0) * totalRede * 100) / 100;
     return row;
   });
 
@@ -2513,17 +2515,43 @@ const handleBadgeClick = (cat: string) => {
           : gating === "sugeridos"
             ? " · só com compra sugerida"
             : "";
-      exportCompraIdealPorFilialToXlsx({
+      const filtroAplicado =
+        `Todas as lojas · união das curvas ABC por loja` +
+        (porCor ? " · por cor" : "") +
+        (companyKey === "nerd" && filtrarEletronicos ? " · só ELETRONICOS" : "") +
+        gatingLabel;
+
+      // Mesmo visual + fórmulas dinâmicas do Gerador de Relatórios: identidade → custo unit.
+      // → Compra total (= soma das lojas) → Custo total (= custo × compra total) → colunas das
+      // lojas. Editar a qtd de uma loja recalcula os totais no Excel.
+      const cols: CompraLojaExportColumn[] = [];
+      cols.push({ key: "CURVA", label: "Curva", role: "value", type: "text" });
+      if (companyKey === "nerd") {
+        cols.push({ key: "GRUPO", label: "Grupo", role: "value", type: "text" });
+      } else {
+        cols.push({ key: "LINHA", label: "Linha", role: "value", type: "text" });
+        cols.push({ key: "SUBGRUPO", label: "Subgrupo", role: "value", type: "text" });
+      }
+      cols.push({ key: "PRODUTO", label: "Código", role: "value", type: "text" });
+      if (porCor) cols.push({ key: "COR_DESCRICAO", label: "Cor", role: "value", type: "text" });
+      cols.push({ key: "DESCRICAO", label: "Descrição", role: "value", type: "text" });
+      cols.push({ key: "CODIGO_BARRA", label: "Código de barra", role: "value", type: "text" });
+      cols.push({ key: "CUSTO_UNIT", label: "Custo unit.", role: "custoUnit", type: "currency" });
+      cols.push({ key: "VENDAS_PERIODO", label: "Venda período", role: "value", type: "currency" });
+      cols.push({ key: "QTDE_PERIODO", label: "Qtd período", role: "value", type: "int" });
+      cols.push({ key: "ESTOQUE_REDE", label: "Estoque rede", role: "value", type: "int" });
+      cols.push({ key: "TOTAL REDE", label: "Compra total", role: "compraTotal", type: "int" });
+      cols.push({ key: "CUSTO_TOTAL", label: "Custo total", role: "custoTotal", type: "currency" });
+      for (const label of colunasFiliais) {
+        cols.push({ key: label, label, role: "filial", type: "int" });
+      }
+
+      await exportCompraPorLojaXlsx(rows, cols, {
+        fileLabel: `compra-ideal-por-loja-curva-abc-${periodo}`,
         companyKey,
-        companyName: cfg.name,
-        listaNome: `Curva ABC ${periodo}`,
-        filtroAplicado:
-          `Todas as lojas · união das curvas ABC por loja` +
-          (porCor ? " · por cor" : "") +
-          (companyKey === "nerd" && filtrarEletronicos ? " · só ELETRONICOS" : "") +
-          gatingLabel,
-        colunasFiliais,
-        rows,
+        sheetName: "Compra Ideal por Loja",
+        titleLines: [`${cfg.name} — Compra Ideal por Loja`, filtroAplicado],
+        dateRange: { startDate: range.startDate, endDate: range.endDate },
       });
     } finally {
       setCompraIdealFilialProgresso(null);

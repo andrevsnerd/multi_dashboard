@@ -1,8 +1,10 @@
-import type { ColumnType, ReportCellValue, ReportPresetColumn, ReportRow } from "@/lib/reports/types";
+import type { ColumnType, ReportPresetColumn, ReportRow } from "@/lib/reports/types";
 import { COMPRA_FILIAL_COL_PREFIX } from "@/lib/reports/compra-sugerida-abc";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ExcelJSCell = any;
+
+type CellValue = string | number | boolean | null;
 
 function safeFilenamePart(s: string): string {
   return s.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 48);
@@ -34,27 +36,44 @@ function numFmtFor(type: ColumnType | undefined): string | null {
 }
 
 /**
- * Exporta a análise "Compra sugerida por Curva ABC" para XLSX com FÓRMULAS dinâmicas
- * (via ExcelJS — o exportador genérico usa SheetJS, que só escreve valores):
- *  - Compra total = SOMA das colunas das lojas da linha (=B+C+…). Editar a quantidade de
- *    qualquer loja recalcula a Compra total no Excel.
- *  - Custo total = Compra total × Custo unitário (recalcula junto).
- *  - Linha TOTAL no rodapé somando Compra total, Custo total e cada loja — o valor total
- *    da compra acompanha qualquer edição.
- *
- * Detecta as colunas por chave: `COMPRA_FILIAL::{loja}` (lojas), COMPRA_TOTAL, CUSTO_TOTAL,
- * CUSTO_UNITARIO. As demais saem como valores crus.
+ * Papel da coluna no export "compra por loja":
+ *  - filial: quantidade editável de uma loja (entra na soma da Compra total)
+ *  - compraTotal: Compra total da linha = SOMA das colunas das lojas (fórmula)
+ *  - custoTotal: Custo total = Custo unit. × Compra total (fórmula)
+ *  - custoUnit: custo unitário (valor de referência)
+ *  - value: coluna comum (texto/número), sai como valor cru
  */
-export async function exportCompraSugeridaAbcXlsx(
-  rows: ReportRow[],
-  columns: ReportPresetColumn[],
-  options: {
-    reportLabel: string;
-    companyKey: string;
-    range: { startDate: Date; endDate: Date };
-    sheetName?: string;
-    columnTypes?: Record<string, ColumnType>;
-  }
+export type CompraLojaRole = "filial" | "compraTotal" | "custoTotal" | "custoUnit" | "value";
+
+export interface CompraLojaExportColumn {
+  key: string;
+  label: string;
+  role: CompraLojaRole;
+  /** Tipo p/ formatação (currency/int/...). filial→int, custoUnit/custoTotal→currency por padrão. */
+  type?: ColumnType;
+}
+
+export interface CompraPorLojaExportOptions {
+  /** Base do nome do arquivo. */
+  fileLabel: string;
+  companyKey: string;
+  sheetName?: string;
+  /** Linhas de contexto exibidas antes do cabeçalho (ex.: empresa · filtro · período). */
+  titleLines?: string[];
+  /** Período para o sufixo do nome do arquivo. */
+  dateRange?: { startDate: Date; endDate: Date } | null;
+}
+
+/**
+ * Núcleo do export "compra por loja" com FÓRMULAS dinâmicas (ExcelJS — o genérico SheetJS só
+ * escreve valores): Compra total = SOMA das colunas das lojas, Custo total = Custo unit. ×
+ * Compra total, e uma linha TOTAL no rodapé. Editar a quantidade de qualquer loja recalcula
+ * tudo no Excel. Reutilizado pelo Gerador de Relatórios e pela Curva ABC.
+ */
+export async function exportCompraPorLojaXlsx(
+  rows: Array<Record<string, CellValue>>,
+  columns: CompraLojaExportColumn[],
+  options: CompraPorLojaExportOptions
 ): Promise<void> {
   if (rows.length === 0) {
     alert("Não há dados para exportar");
@@ -65,41 +84,61 @@ export async function exportCompraSugeridaAbcXlsx(
     return;
   }
 
-  const types = options.columnTypes ?? {};
-
-  // Índices (1-based para o Excel) das colunas especiais.
+  // Índices (1-based) das colunas especiais.
   const filialCols: number[] = [];
   let compraTotalCol = 0;
   let custoTotalCol = 0;
   let custoUnitCol = 0;
   columns.forEach((c, i) => {
     const n = i + 1;
-    if (c.key.startsWith(COMPRA_FILIAL_COL_PREFIX)) filialCols.push(n);
-    else if (c.key === "COMPRA_TOTAL") compraTotalCol = n;
-    else if (c.key === "CUSTO_TOTAL") custoTotalCol = n;
-    else if (c.key === "CUSTO_UNITARIO") custoUnitCol = n;
+    if (c.role === "filial") filialCols.push(n);
+    else if (c.role === "compraTotal") compraTotalCol = n;
+    else if (c.role === "custoTotal") custoTotalCol = n;
+    else if (c.role === "custoUnit") custoUnitCol = n;
   });
+
+  // Tipo efetivo p/ formatação por papel.
+  const typeOf = (c: CompraLojaExportColumn): ColumnType | undefined => {
+    if (c.role === "filial" || c.role === "compraTotal") return c.type ?? "int";
+    if (c.role === "custoUnit" || c.role === "custoTotal") return c.type ?? "currency";
+    return c.type;
+  };
 
   const excelJsMod = await import("exceljs");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ExcelJS = (excelJsMod as any).default ?? excelJsMod;
 
   const workbook = new ExcelJS.Workbook();
-  const ws = workbook.addWorksheet((options.sheetName ?? "Compra sugerida").slice(0, 31), {
-    views: [{ state: "frozen", ySplit: 1 }],
+  const titleLines = options.titleLines ?? [];
+  const headerRowNum = titleLines.length + 1;
+  const firstDataRow = headerRowNum + 1;
+
+  const ws = workbook.addWorksheet((options.sheetName ?? "Compra por loja").slice(0, 31), {
+    views: [{ state: "frozen", ySplit: headerRowNum }],
   });
 
-  // Larguras: identidade mais larga, números compactos.
+  // Larguras.
   ws.columns = columns.map((c) => {
     if (c.key === "DESCRICAO") return { width: 32 };
     if (c.key === "COR_DESCRICAO" || c.key === "COLECAO") return { width: 16 };
-    const t = types[c.key];
-    if (t === "currency") return { width: 14 };
+    if (typeOf(c) === "currency") return { width: 14 };
     return { width: 12 };
   });
 
+  // ── Linhas de título (contexto), mescladas em toda a largura ──
+  titleLines.forEach((line, i) => {
+    const tr = ws.getRow(i + 1);
+    tr.getCell(1).value = line;
+    ws.mergeCells(i + 1, 1, i + 1, columns.length);
+    tr.getCell(1).font = { bold: i === 0, size: i === 0 ? 12 : 10, name: "Calibri", color: { argb: "FF334155" } };
+    tr.getCell(1).alignment = { horizontal: "left", vertical: "middle" };
+  });
+
   // ── Cabeçalho ──
-  const headerRow = ws.addRow(columns.map((c) => c.label || c.key));
+  const headerRow = ws.getRow(headerRowNum);
+  columns.forEach((c, i) => {
+    headerRow.getCell(i + 1).value = c.label || c.key;
+  });
   headerRow.height = 20;
   headerRow.eachCell({ includeEmpty: true }, (cell: ExcelJSCell) => {
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } };
@@ -111,41 +150,39 @@ export async function exportCompraSugeridaAbcXlsx(
     };
   });
 
-  const firstDataRow = 2;
   rows.forEach((row, i) => {
     const r = firstDataRow + i;
-    // Valores crus (formulas sobrescrevem depois). Numéricos saem como número p/ somar/formatar.
-    const values = columns.map((c) => {
-      const t = types[c.key];
+    const xrow = ws.getRow(r);
+    columns.forEach((c, ci) => {
+      const t = typeOf(c);
       const v = row[c.key];
+      const cell = xrow.getCell(ci + 1);
       if (t === "text" || t === "dataVenda" || t === "date" || t === undefined) {
-        return (v ?? "") as ReportCellValue;
+        cell.value = (v ?? "") as CellValue;
+      } else {
+        const num = Number(v);
+        cell.value = Number.isFinite(num) ? num : 0;
       }
-      const num = Number(v);
-      return Number.isFinite(num) ? num : 0;
     });
-    const xrow = ws.addRow(values);
     xrow.height = 15;
 
     // Compra total = soma das colunas das lojas desta linha (dinâmica no Excel).
     if (compraTotalCol > 0 && filialCols.length > 0) {
-      const formula = filialCols.map((c) => `${colLetter(c)}${r}`).join("+");
       xrow.getCell(compraTotalCol).value = {
-        formula,
-        result: Number(row.COMPRA_TOTAL ?? 0),
+        formula: filialCols.map((c) => `${colLetter(c)}${r}`).join("+"),
+        result: Number(row[columns[compraTotalCol - 1].key] ?? 0),
       };
     }
-    // Custo total = Compra total × Custo unitário (recalcula junto).
+    // Custo total = Custo unit. × Compra total (recalcula junto).
     if (custoTotalCol > 0 && custoUnitCol > 0 && compraTotalCol > 0) {
       xrow.getCell(custoTotalCol).value = {
         formula: `${colLetter(custoUnitCol)}${r}*${colLetter(compraTotalCol)}${r}`,
-        result: Number(row.CUSTO_TOTAL ?? 0),
+        result: Number(row[columns[custoTotalCol - 1].key] ?? 0),
       };
     }
 
     xrow.eachCell({ includeEmpty: true }, (cell: ExcelJSCell, colNum: number) => {
-      const c = columns[colNum - 1];
-      const fmt = numFmtFor(types[c.key]);
+      const fmt = numFmtFor(typeOf(columns[colNum - 1]));
       if (fmt) {
         cell.numFmt = fmt;
         cell.alignment = { horizontal: "right", vertical: "middle" };
@@ -162,7 +199,8 @@ export async function exportCompraSugeridaAbcXlsx(
 
   // ── Linha TOTAL (rodapé) ──
   const lastDataRow = firstDataRow + rows.length - 1;
-  const totalRow = ws.addRow([]);
+  const totalRowNum = lastDataRow + 1;
+  const totalRow = ws.getRow(totalRowNum);
   totalRow.getCell(1).value = "TOTAL";
   const sumCols = [...filialCols];
   if (compraTotalCol > 0) sumCols.push(compraTotalCol);
@@ -172,17 +210,14 @@ export async function exportCompraSugeridaAbcXlsx(
     totalRow.getCell(c).value = { formula: `SUM(${L}${firstDataRow}:${L}${lastDataRow})` };
   }
   totalRow.eachCell({ includeEmpty: true }, (cell: ExcelJSCell, colNum: number) => {
-    const c = columns[colNum - 1];
-    const fmt = c ? numFmtFor(types[c.key]) : null;
+    const fmt = columns[colNum - 1] ? numFmtFor(typeOf(columns[colNum - 1])) : null;
     if (fmt) {
       cell.numFmt = fmt;
       cell.alignment = { horizontal: "right", vertical: "middle" };
     }
     cell.font = { bold: true, size: 10, name: "Calibri" };
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEDEFF3" } };
-    cell.border = {
-      top: { style: "thin" }, bottom: { style: "thin" },
-    };
+    cell.border = { top: { style: "thin" }, bottom: { style: "thin" } };
   });
 
   // ── Download ──
@@ -193,12 +228,43 @@ export async function exportCompraSugeridaAbcXlsx(
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${safeFilenamePart(options.reportLabel)}-${options.companyKey}-${formatDateRange(
-    options.range.startDate,
-    options.range.endDate
-  )}.xlsx`;
+  const rangePart = options.dateRange
+    ? `-${formatDateRange(options.dateRange.startDate, options.dateRange.endDate)}`
+    : "";
+  a.download = `${safeFilenamePart(options.fileLabel)}-${options.companyKey}${rangePart}.xlsx`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+/**
+ * Wrapper do Gerador de Relatórios: mapeia as colunas do preset (por chave) para os papéis
+ * do núcleo e delega. Mantém a assinatura usada pela página do gerador.
+ */
+export async function exportCompraSugeridaAbcXlsx(
+  rows: ReportRow[],
+  columns: ReportPresetColumn[],
+  options: {
+    reportLabel: string;
+    companyKey: string;
+    range: { startDate: Date; endDate: Date };
+    sheetName?: string;
+    columnTypes?: Record<string, ColumnType>;
+  }
+): Promise<void> {
+  const types = options.columnTypes ?? {};
+  const mapped: CompraLojaExportColumn[] = columns.map((c) => {
+    if (c.key.startsWith(COMPRA_FILIAL_COL_PREFIX)) return { key: c.key, label: c.label, role: "filial", type: "int" };
+    if (c.key === "COMPRA_TOTAL") return { key: c.key, label: c.label, role: "compraTotal", type: "int" };
+    if (c.key === "CUSTO_TOTAL") return { key: c.key, label: c.label, role: "custoTotal", type: "currency" };
+    if (c.key === "CUSTO_UNITARIO") return { key: c.key, label: c.label, role: "custoUnit", type: "currency" };
+    return { key: c.key, label: c.label, role: "value", type: types[c.key] };
+  });
+  await exportCompraPorLojaXlsx(rows as Array<Record<string, CellValue>>, mapped, {
+    fileLabel: options.reportLabel,
+    companyKey: options.companyKey,
+    sheetName: options.sheetName,
+    dateRange: options.range,
+  });
 }
