@@ -26,15 +26,29 @@ export default function GoalCard({
 
   const percentage = useMemo(() => {
     if (goal === 0) return 0;
-    const percent = Math.min((currentValue / goal) * 100, 100);
+    const percent = (currentValue / goal) * 100;
     return Math.round(percent);
   }, [currentValue, goal]);
 
   const chartData = useMemo(() => {
-    const remaining = Math.max(0, 100 - percentage);
+    // Anel base: cinza preenche de 0 a 100%; o restante fica claro.
+    const filled = Math.min(percentage, 100);
+    const remaining = Math.max(0, 100 - filled);
     return [
-      { name: "Concluído", value: percentage },
+      { name: "Concluído", value: filled },
       { name: "Restante", value: remaining },
+    ];
+  }, [percentage]);
+
+  // Quando a meta é ultrapassada, o excedente inicia um novo ciclo em verde
+  // por cima do anel cinza, com o mesmo comportamento de preenchimento.
+  const overflowData = useMemo(() => {
+    const overflow = Math.max(0, percentage - 100);
+    if (overflow === 0) return null;
+    const filled = Math.min(overflow, 100);
+    return [
+      { name: "Excedente", value: filled },
+      { name: "Restante", value: Math.max(0, 100 - filled) },
     ];
   }, [percentage]);
 
@@ -79,10 +93,27 @@ export default function GoalCard({
               startAngle={90}
               endAngle={-270}
               dataKey="value"
+              isAnimationActive={false}
             >
               <Cell key="completed" fill="#475569" />
               <Cell key="remaining" fill="#e2e8f0" />
             </Pie>
+            {overflowData && (
+              <Pie
+                data={overflowData}
+                cx="50%"
+                cy="50%"
+                innerRadius={60}
+                outerRadius={80}
+                startAngle={90}
+                endAngle={-270}
+                dataKey="value"
+                stroke="none"
+              >
+                <Cell key="overflow" fill="#22c55e" />
+                <Cell key="overflow-rest" fill="transparent" />
+              </Pie>
+            )}
           </PieChart>
         </ResponsiveContainer>
         )}

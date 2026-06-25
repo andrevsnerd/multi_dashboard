@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CompanyKey } from "@/lib/config/company";
 import { useAuth } from "@/components/auth/AuthContext";
 
@@ -52,6 +52,14 @@ interface AjusteRecente {
   emissao: string;
   itens: number;
   soma: number;
+}
+
+interface AjusteDetalheItem {
+  produto: string;
+  descProduto: string;
+  cor: string;
+  descCor: string;
+  qtde: number;
 }
 
 type Modo = "inventario" | "zerar";
@@ -116,6 +124,9 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
   const [recentes, setRecentes] = useState<AjusteRecente[]>([]);
   const [estornandoNome, setEstornandoNome] = useState<string | null>(null);
   const [estornoMsg, setEstornoMsg] = useState<string | null>(null);
+  const [detalheAberto, setDetalheAberto] = useState<string | null>(null);
+  const [detalheCache, setDetalheCache] = useState<Record<string, AjusteDetalheItem[]>>({});
+  const [detalheCarregando, setDetalheCarregando] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -135,6 +146,28 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
   useEffect(() => {
     fetchRecentes();
   }, [fetchRecentes]);
+
+  const verDetalhe = useCallback(
+    async (nome: string) => {
+      if (detalheAberto === nome) {
+        setDetalheAberto(null);
+        return;
+      }
+      setDetalheAberto(nome);
+      if (detalheCache[nome]) return;
+      setDetalheCarregando(true);
+      try {
+        const r = await fetch(`/api/ajuste-estoque/detalhe?nome=${encodeURIComponent(nome)}`);
+        const d = await r.json();
+        setDetalheCache((prev) => ({ ...prev, [nome]: Array.isArray(d?.itens) ? d.itens : [] }));
+      } catch {
+        setDetalheCache((prev) => ({ ...prev, [nome]: [] }));
+      } finally {
+        setDetalheCarregando(false);
+      }
+    },
+    [detalheAberto, detalheCache]
+  );
 
   const desfazer = useCallback(
     async (nome: string) => {
@@ -648,9 +681,10 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
       {/* ── Desfazer ajustes recentes ── */}
       {recentes.length > 0 && (
         <section className={styles.card}>
-          <h2 className={styles.cardTitle}>Desfazer ajustes recentes</h2>
+          <h2 className={styles.cardTitle}>Ajustes recentes</h2>
           <p className={styles.fileHintMuted}>
-            Seus ajustes dos últimos 7 dias. Desfazer cria um estorno (ajuste inverso) registrado.
+            Seus 10 últimos ajustes. Clique na descrição para ver os itens. Desfazer cria um
+            estorno (ajuste inverso) registrado.
           </p>
           <div className={styles.tableScroll}>
             <table className={styles.table}>
@@ -666,26 +700,76 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
               </thead>
               <tbody>
                 {recentes.map((r) => (
-                  <tr key={r.nome}>
-                    <td className={styles.mono}>{r.nome}</td>
-                    <td>{r.filial}</td>
-                    <td>{r.emissao ? new Date(r.emissao).toLocaleDateString("pt-BR") : "—"}</td>
-                    <td className={styles.num}>{r.itens}</td>
-                    <td className={`${styles.num} ${r.soma < 0 ? styles.neg : styles.pos}`}>
-                      {r.soma > 0 ? "+" : ""}
-                      {r.soma}
-                    </td>
-                    <td className={styles.num}>
-                      <button
-                        type="button"
-                        className={styles.secondaryBtn}
-                        onClick={() => desfazer(r.nome)}
-                        disabled={estornandoNome === r.nome}
-                      >
-                        {estornandoNome === r.nome ? "Desfazendo…" : "↩ Desfazer"}
-                      </button>
-                    </td>
-                  </tr>
+                  <Fragment key={r.nome}>
+                    <tr>
+                      <td>
+                        <button
+                          type="button"
+                          className={styles.linkBtn}
+                          onClick={() => verDetalhe(r.nome)}
+                        >
+                          {detalheAberto === r.nome ? "▾" : "▸"} <span className={styles.mono}>{r.nome}</span>
+                        </button>
+                      </td>
+                      <td>{r.filial}</td>
+                      <td>{r.emissao ? new Date(r.emissao).toLocaleDateString("pt-BR") : "—"}</td>
+                      <td className={styles.num}>{r.itens}</td>
+                      <td className={`${styles.num} ${r.soma < 0 ? styles.neg : styles.pos}`}>
+                        {r.soma > 0 ? "+" : ""}
+                        {r.soma}
+                      </td>
+                      <td className={styles.num}>
+                        <button
+                          type="button"
+                          className={styles.secondaryBtn}
+                          onClick={() => desfazer(r.nome)}
+                          disabled={estornandoNome === r.nome}
+                        >
+                          {estornandoNome === r.nome ? "Desfazendo…" : "↩ Desfazer"}
+                        </button>
+                      </td>
+                    </tr>
+                    {detalheAberto === r.nome && (
+                      <tr>
+                        <td colSpan={6} className={styles.detalheCell}>
+                          {detalheCarregando && !detalheCache[r.nome] ? (
+                            <span className={styles.fileHintMuted}>Carregando itens…</span>
+                          ) : (
+                            <table className={styles.detalheTable}>
+                              <thead>
+                                <tr>
+                                  <th>Produto</th>
+                                  <th>Descrição</th>
+                                  <th>Cor</th>
+                                  <th className={styles.num}>Ajuste</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(detalheCache[r.nome] ?? []).map((it, idx) => (
+                                  <tr key={`${it.produto}|${it.cor}|${idx}`}>
+                                    <td className={styles.mono}>{it.produto}</td>
+                                    <td>{it.descProduto}</td>
+                                    <td>{it.descCor || it.cor}</td>
+                                    <td className={`${styles.num} ${it.qtde < 0 ? styles.neg : styles.pos}`}>
+                                      {it.qtde > 0 ? "+" : ""}
+                                      {it.qtde}
+                                    </td>
+                                  </tr>
+                                ))}
+                                {(detalheCache[r.nome]?.length ?? 0) === 0 && !detalheCarregando && (
+                                  <tr>
+                                    <td colSpan={4} className={styles.fileHintMuted}>
+                                      Nenhum item encontrado.
+                                    </td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

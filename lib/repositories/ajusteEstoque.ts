@@ -141,11 +141,8 @@ export interface AjusteRecente {
   soma: number;
 }
 
-/** Lista os ajustes recentes do responsável (para oferecer "desfazer"). Exclui estornos. */
-export async function listarAjustesRecentes(
-  responsavel: string,
-  dias = 7
-): Promise<AjusteRecente[]> {
+/** Lista os 10 ajustes mais recentes do responsável (para "desfazer"/consultar). Exclui estornos. */
+export async function listarAjustesRecentes(responsavel: string): Promise<AjusteRecente[]> {
   const respEsc = esc(responsavel.trim());
   const rows = await query<{
     NOME: string;
@@ -154,7 +151,7 @@ export async function listarAjustesRecentes(
     ITENS: number;
     SOMA: number;
   }>(`
-    SELECT TOP 30 RTRIM(c.NOME_CONTAGEM) AS NOME, RTRIM(c.FILIAL) AS FILIAL, c.EMISSAO,
+    SELECT TOP 10 RTRIM(c.NOME_CONTAGEM) AS NOME, RTRIM(c.FILIAL) AS FILIAL, c.EMISSAO,
            ISNULL(s.ITENS, 0) AS ITENS, ISNULL(s.SOMA, 0) AS SOMA
     FROM ESTOQUE_PROD_CONTAGEM c WITH (NOLOCK)
     LEFT JOIN (
@@ -163,7 +160,6 @@ export async function listarAjustesRecentes(
     ) s ON s.NOME_CONTAGEM = c.NOME_CONTAGEM
     WHERE c.ESTOQUE_AJUSTADO = 1
       AND RTRIM(LTRIM(c.RESPONSAVEL)) = '${respEsc}'
-      AND c.EMISSAO >= DATEADD(DAY, -${dias}, GETDATE())
       AND (c.OBS IS NULL OR CAST(c.OBS AS VARCHAR(60)) NOT LIKE 'ESTORNO%')
     ORDER BY c.DATA_PARA_TRANSFERENCIA DESC, c.EMISSAO DESC
   `);
@@ -173,6 +169,43 @@ export async function listarAjustesRecentes(
     emissao: r.EMISSAO ? new Date(r.EMISSAO).toISOString() : '',
     itens: Number(r.ITENS) || 0,
     soma: Number(r.SOMA) || 0,
+  }));
+}
+
+export interface AjusteDetalheItem {
+  produto: string;
+  descProduto: string;
+  cor: string;
+  descCor: string;
+  qtde: number;
+}
+
+/** Itens de um ajuste (contagem) — o que foi ajustado e quanto. */
+export async function detalharAjuste(nomeContagem: string): Promise<AjusteDetalheItem[]> {
+  const nomeEsc = esc(nomeContagem.trim());
+  const rows = await query<{
+    PRODUTO: string;
+    COR: string;
+    QTD: number;
+    DESC_PRODUTO: string;
+    DESC_COR: string;
+  }>(`
+    SELECT RTRIM(a.PRODUTO) AS PRODUTO, RTRIM(ISNULL(a.COR_PRODUTO, '')) AS COR,
+           ISNULL(a.QTDE_AJUSTE, 0) AS QTD,
+           RTRIM(ISNULL(p.DESC_PRODUTO, '')) AS DESC_PRODUTO,
+           RTRIM(ISNULL(cb.DESC_COR, '')) AS DESC_COR
+    FROM ESTOQUE_PROD_CTG_AJUSTE a WITH (NOLOCK)
+    LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = a.PRODUTO
+    LEFT JOIN CORES_BASICAS cb WITH (NOLOCK) ON cb.COR = a.COR_PRODUTO
+    WHERE RTRIM(LTRIM(a.NOME_CONTAGEM)) = '${nomeEsc}'
+    ORDER BY a.PRODUTO, a.COR_PRODUTO
+  `);
+  return rows.map((r) => ({
+    produto: r.PRODUTO?.trim() ?? '',
+    descProduto: r.DESC_PRODUTO?.trim() ?? '',
+    cor: r.COR?.trim() ?? '',
+    descCor: r.DESC_COR?.trim() ?? '',
+    qtde: Number(r.QTD) || 0,
   }));
 }
 
