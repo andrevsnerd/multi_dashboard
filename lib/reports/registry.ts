@@ -21,6 +21,11 @@ import {
   vendasHistoricoMeta,
   VENDAS_HISTORICO_ID,
 } from "./vendas-historico";
+import {
+  buildCompraSugeridaAbcPresets,
+  compraSugeridaAbcMeta,
+  COMPRA_SUGERIDA_ABC_ID,
+} from "./compra-sugerida-abc";
 
 /**
  * Registry PURO de tipos de análise (apenas metadados/colunas/presets).
@@ -37,6 +42,7 @@ export const REPORT_TYPES: ReportTypeMeta[] = [
   estoqueRedeMeta,
   produtosParadosMeta,
   produtosCadastroMeta,
+  compraSugeridaAbcMeta,
 ];
 
 export function getReportMeta(id: string): ReportTypeMeta | undefined {
@@ -62,6 +68,9 @@ export function getDefaultPresets(id: string, companyKey: CompanyKey): ReportPre
   }
   if (id === VENDAS_HISTORICO_ID) {
     return buildVendasHistoricoPresets();
+  }
+  if (id === COMPRA_SUGERIDA_ABC_ID) {
+    return buildCompraSugeridaAbcPresets(companyKey);
   }
   return getReportMeta(id)?.defaultPresets ?? [];
 }

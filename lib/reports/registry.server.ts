@@ -5,6 +5,7 @@ import { fetchEstoqueRede } from "@/lib/repositories/reportEstoque";
 import { fetchProdutosParados } from "@/lib/repositories/reportProdutosParados";
 import { fetchProdutosCadastro } from "@/lib/repositories/reportProdutosCadastro";
 import { fetchVendasHistorico } from "@/lib/repositories/reportVendasHistorico";
+import { fetchCompraSugeridaAbc } from "@/lib/repositories/reportCompraSugeridaAbc";
 import { fetchMenorCodigoBarra } from "@/lib/repositories/products";
 import { runEnricher } from "./enrich.server";
 import { canonicalKey, ROW_COR_FIELD } from "./keys";
@@ -15,8 +16,18 @@ import { ESTOQUE_REDE_ID } from "./estoque-rede";
 import { PRODUTOS_PARADOS_ID } from "./produtos-parados";
 import { PRODUTOS_CADASTRO_ID } from "./produtos-cadastro";
 import { VENDAS_HISTORICO_ID } from "./vendas-historico";
+import { COMPRA_SUGERIDA_ABC_ID } from "./compra-sugerida-abc";
 
-export type ReportFetcher = (filters: ReportFilters) => Promise<ReportResult>;
+/** Progresso opcional de uma análise demorada (ex.: cálculo por loja). */
+export interface ReportRunContext {
+  /** Reporta avanço: itens feitos / total e uma fase opcional (ex.: "lojas"). */
+  onProgress?: (done: number, total: number, phase?: string) => void;
+}
+
+export type ReportFetcher = (
+  filters: ReportFilters,
+  ctx?: ReportRunContext
+) => Promise<ReportResult>;
 
 /**
  * Mapa de fetchers por tipo de análise. SÓ no servidor (importa repositórios
@@ -28,6 +39,7 @@ const FETCHERS: Record<string, ReportFetcher> = {
   [PRODUTOS_PARADOS_ID]: fetchProdutosParados,
   [PRODUTOS_CADASTRO_ID]: fetchProdutosCadastro,
   [VENDAS_HISTORICO_ID]: fetchVendasHistorico,
+  [COMPRA_SUGERIDA_ABC_ID]: fetchCompraSugeridaAbc,
 };
 
 export function getReportFetcher(id: string): ReportFetcher | undefined {
@@ -42,12 +54,13 @@ export function getReportFetcher(id: string): ReportFetcher | undefined {
 export async function runReport(
   reportType: string,
   filters: ReportFilters,
-  extraSources: SourceId[]
+  extraSources: SourceId[],
+  ctx?: ReportRunContext
 ): Promise<ReportResult | null> {
   const base = getReportFetcher(reportType);
   if (!base) return null;
 
-  const result = await base(filters);
+  const result = await base(filters, ctx);
 
   // Filtro de dias parado: quando ativo numa análise cuja base NÃO é parados (ex.: estoque
   // por filial), força a fonte "parados" a rodar para popular DIAS_PARADO, mesmo que a

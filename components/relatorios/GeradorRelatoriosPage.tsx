@@ -9,6 +9,8 @@ import { useAuth } from "@/components/auth/AuthContext";
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 import { getCurrentMonthRange, formatDateForQuery } from "@/lib/utils/date";
 import { exportRelatorioXlsx } from "@/lib/utils/exportRelatorioXlsx";
+import { exportCompraSugeridaAbcXlsx } from "@/lib/utils/exportCompraSugeridaAbcXlsx";
+import { COMPRA_FILIAL_COL_PREFIX, COMPRA_SUGERIDA_ABC_ID } from "@/lib/reports/compra-sugerida-abc";
 import { formatData, formatDataVenda, formatDiasParado } from "@/lib/reports/format";
 import { getDefaultPresets, getReportMeta, REPORT_TYPES, VENDAS_FATURAMENTO_ID } from "@/lib/reports/registry";
 import { computeExtraSources, getEditorExtraColumns } from "@/lib/reports/column-sources";
@@ -177,6 +179,8 @@ export default function GeradorRelatoriosPage({
   const [generatedOnce, setGeneratedOnce] = useState(false);
   // Colunas dinâmicas (ex.: estoque por filial) devolvidas pelo backend.
   const [dynamicColumns, setDynamicColumns] = useState<ReportColumnDef[]>([]);
+  // Progresso de análises demoradas via streaming (ex.: compra sugerida por loja).
+  const [genProgress, setGenProgress] = useState<{ done: number; total: number; phase?: string } | null>(null);
 
   // Catálogo efetivo = base + colunas cross + colunas dinâmicas (para tipo/formatação).
   const effectiveCatalog = useMemo<ReportColumnDef[]>(() => {
@@ -407,11 +411,117 @@ export default function GeradorRelatoriosPage({
     diasParadoValor, diasParadoModo, incluirZerados, incluirNegativos, meta,
   ]);
 
+  // Aplica o ReportResult recebido (fetch único OU stream) ao estado da página.
+  const applyResult = useCallback((json: {
+    rows?: ReportRow[];
+    summary?: ReportSummaryMetric[];
+    total?: number;
+    truncated?: boolean;
+    dynamicColumns?: ReportColumnDef[];
+  }) => {
+    setRows(json.rows ?? []);
+    setSummary(Array.isArray(json.summary) ? json.summary : []);
+    setTotal(json.total ?? 0);
+    setTruncated(Boolean(json.truncated));
+    setGeneratedOnce(true);
+
+    // Colunas dinâmicas (estoque/compra por filial + "Código de barra"): mescla no catálogo
+    // e (re)anexa ao FIM das colunas habilitadas, na ordem que o backend mandou. Removemos
+    // antes as dinâmicas já anexadas (por regra estável de chave) p/ não duplicar nem
+    // desordenar entre gerações.
+    const dyn: ReportColumnDef[] = Array.isArray(json.dynamicColumns) ? json.dynamicColumns : [];
+    setDynamicColumns(dyn);
+    setWorkingColumns((cols) => {
+      const stripped = cols.filter(
+        (c) =>
+          c.key !== "CODIGO_BARRA" &&
+          !c.key.startsWith(FILIAL_COL_PREFIX) &&
+          !c.key.startsWith(VENDA_FILIAL_COL_PREFIX) &&
+          !c.key.startsWith(QTD_FILIAL_COL_PREFIX) &&
+          !c.key.startsWith(COMPRA_FILIAL_COL_PREFIX)
+      );
+      const existing = new Set(stripped.map((c) => c.key));
+      const appended = dyn
+        .filter((d) => !existing.has(d.key))
+        .map((d) => ({ key: d.key, label: d.defaultLabel, enabled: true }));
+      return [...stripped, ...appended];
+    });
+  }, []);
+
+  const clearResultOnError = useCallback((message: string) => {
+    setError(message);
+    setRows([]);
+    setSummary([]);
+    setTotal(0);
+    setTruncated(false);
+  }, []);
+
+  // Caminho de streaming para análises demoradas: lê NDJSON via fetch (NÃO EventSource — ele
+  // reconecta sozinho ao fim do stream e dispararia o cálculo de novo). Mostra "Calculando
+  // compra por loja… X/N" enquanto o servidor calcula e aplica o resultado ao final.
+  const generateViaStream = useCallback(
+    async (url: string) => {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok || !res.body) {
+        clearResultOnError("Erro ao gerar relatório");
+        return;
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let gotResult = false;
+
+      const handleLine = (line: string) => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+        let msg: { type?: string; done?: number; total?: number; phase?: string; result?: unknown; error?: string; details?: string };
+        try {
+          msg = JSON.parse(trimmed);
+        } catch {
+          return; // linha parcial/ruído — ignora
+        }
+        if (msg.type === "progress") {
+          setGenProgress({ done: msg.done ?? 0, total: msg.total ?? 0, phase: msg.phase });
+        } else if (msg.type === "result") {
+          gotResult = true;
+          applyResult((msg.result ?? {}) as Parameters<typeof applyResult>[0]);
+        } else if (msg.type === "failed") {
+          gotResult = true;
+          clearResultOnError(msg.error || msg.details || "Erro ao gerar relatório");
+        }
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let idx: number;
+        while ((idx = buf.indexOf("\n")) >= 0) {
+          handleLine(buf.slice(0, idx));
+          buf = buf.slice(idx + 1);
+        }
+      }
+      handleLine(buf); // resto sem \n final
+      if (!gotResult) clearResultOnError("Conexão interrompida ao gerar o relatório");
+    },
+    [applyResult, clearResultOnError]
+  );
+
   const handleGenerate = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setGenProgress(null);
     try {
       const qs = buildQuery();
+
+      // Análise demorada → streaming com progresso por loja.
+      if (reportTypeId === COMPRA_SUGERIDA_ABC_ID) {
+        await generateViaStream(
+          `/api/relatorios/compra-sugerida-abc/stream?reportType=${encodeURIComponent(reportTypeId)}&${qs}`
+        );
+        return;
+      }
+
       // Fontes extras (colunas de outras análises misturadas neste preset).
       const enabledKeys = workingColumns.filter((c) => c.enabled).map((c) => c.key);
       const baseKeys = new Set(catalog.map((c) => c.key));
@@ -424,42 +534,24 @@ export default function GeradorRelatoriosPage({
       if (!res.ok) {
         throw new Error(json?.error || json?.details || "Erro ao gerar relatório");
       }
-      setRows(json.rows ?? []);
-      setSummary(Array.isArray(json.summary) ? json.summary : []);
-      setTotal(json.total ?? 0);
-      setTruncated(Boolean(json.truncated));
-      setGeneratedOnce(true);
-
-      // Colunas dinâmicas (estoque por filial + "Código de barra"): mescla no catálogo e
-      // (re)anexa ao FIM das colunas habilitadas, na ordem que o backend mandou. Removemos
-      // antes as dinâmicas já anexadas (por regra estável de chave) p/ não duplicar nem
-      // desordenar entre gerações.
-      const dyn: ReportColumnDef[] = Array.isArray(json.dynamicColumns) ? json.dynamicColumns : [];
-      setDynamicColumns(dyn);
-      setWorkingColumns((cols) => {
-        const stripped = cols.filter(
-          (c) =>
-            c.key !== "CODIGO_BARRA" &&
-            !c.key.startsWith(FILIAL_COL_PREFIX) &&
-            !c.key.startsWith(VENDA_FILIAL_COL_PREFIX) &&
-            !c.key.startsWith(QTD_FILIAL_COL_PREFIX)
-        );
-        const existing = new Set(stripped.map((c) => c.key));
-        const appended = dyn
-          .filter((d) => !existing.has(d.key))
-          .map((d) => ({ key: d.key, label: d.defaultLabel, enabled: true }));
-        return [...stripped, ...appended];
-      });
+      applyResult(json);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erro ao gerar relatório");
-      setRows([]);
-      setSummary([]);
-      setTotal(0);
-      setTruncated(false);
+      clearResultOnError(e instanceof Error ? e.message : "Erro ao gerar relatório");
     } finally {
       setLoading(false);
+      setGenProgress(null);
     }
-  }, [buildQuery, wantsFilialStock, wantsFilialSales, reportTypeId, workingColumns, catalog]);
+  }, [
+    buildQuery,
+    wantsFilialStock,
+    wantsFilialSales,
+    reportTypeId,
+    workingColumns,
+    catalog,
+    applyResult,
+    clearResultOnError,
+    generateViaStream,
+  ]);
 
   // ---------- ordenação client-side ----------
   const enabledColumns = useMemo(
@@ -634,6 +726,22 @@ export default function GeradorRelatoriosPage({
   const handleExport = () => {
     const columnTypes: Record<string, ColumnType> = {};
     for (const c of enabledColumns) columnTypes[c.key] = colTypeOf(effectiveCatalog, c.key);
+    // Compra sugerida por Curva ABC: export dedicado com fórmulas (Compra total / Custo
+    // total dinâmicos no Excel). Os demais relatórios usam o export genérico (valores).
+    if (reportTypeId === COMPRA_SUGERIDA_ABC_ID) {
+      void exportCompraSugeridaAbcXlsx(
+        sortedRows,
+        enabledColumns.map((c) => ({ key: c.key, label: c.label })),
+        {
+          reportLabel: meta?.label ?? "compra-sugerida",
+          companyKey,
+          range: { startDate: range.startDate, endDate: range.endDate },
+          sheetName: meta?.label,
+          columnTypes,
+        }
+      );
+      return;
+    }
     exportRelatorioXlsx(
       sortedRows,
       enabledColumns.map((c) => ({ key: c.key, label: c.label })),
@@ -985,6 +1093,33 @@ export default function GeradorRelatoriosPage({
           </span>
         )}
       </section>
+
+      {loading && reportTypeId === COMPRA_SUGERIDA_ABC_ID && (
+        <section className={styles.progressWrap}>
+          <div className={styles.progressHeader}>
+            <span className={styles.progressSpinner} aria-hidden="true" />
+            <span className={styles.progressText}>
+              {genProgress && genProgress.phase === "lojas" && genProgress.total > 0
+                ? `Calculando compra por loja… ${genProgress.done}/${genProgress.total} lojas`
+                : "Buscando vendas da rede…"}
+            </span>
+          </div>
+          <div className={styles.progressBar}>
+            {genProgress && genProgress.total > 0 ? (
+              <div
+                className={styles.progressFill}
+                style={{ width: `${Math.round((genProgress.done / genProgress.total) * 100)}%` }}
+              />
+            ) : (
+              <div className={`${styles.progressFill} ${styles.progressFillIndeterminate}`} />
+            )}
+          </div>
+          <p className={styles.progressHint}>
+            Lê o histórico de cada loja para calcular a compra sugerida — pode levar alguns
+            instantes.
+          </p>
+        </section>
+      )}
 
       {error && <div className={styles.error}>{error}</div>}
 

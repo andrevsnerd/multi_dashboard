@@ -1352,7 +1352,15 @@ async function buildCompraIdealPorFilialRowsCurvaAbc(
   filiais: FilialExportTarget[],
   comprasTransitoIndex: CompraTransitoIndex,
   porCor: boolean,
-  onFilialDone?: () => void
+  onFilialDone?: () => void,
+  /**
+   * Espelha o filtro da tela: "none" = compra ideal cheia de cada loja (todos os itens);
+   * "sugeridos" = só itens que alguma loja precisa repor; "comprar-agora" = a qtd da loja
+   * só entra quando AQUELA loja precisa comprar agora/essa semana (senão 0), e itens que
+   * nenhuma loja precisa comprar agora somem. Mesma regra de `calcCompraIdealFromResumo` +
+   * `comprarAgora`/`precisaComprarEssaSemana` usada na tabela.
+   */
+  gating: "none" | "sugeridos" | "comprar-agora" = "none"
 ): Promise<{ rows: Array<Record<string, string | number | boolean | null>>; colunasFiliais: string[] }> {
   // Plano por linha: chave de métrica + itens-membro (produto agrupado expande para seus membros).
   const plans = produtos.map((row) => {
@@ -1422,8 +1430,18 @@ async function buildCompraIdealPorFilialRowsCurvaAbc(
         getCompraTransitoEntries(comprasTransitoIndex, plan.row.produto, porCor ? (plan.row.cor ?? null) : null),
         { linha: plan.row.linha, subgrupo: plan.row.subgrupo, company: companyKey }
       );
+      const ciFull = Math.max(0, ideal.compraIdeal);
+      // No modo "comprar-agora", a qtd da loja só conta quando a data de compra já chegou
+      // (comprarAgora) ou cai antes do próximo dia de compra (precisaComprarEssaSemana).
+      const ci =
+        gating === "comprar-agora"
+          ? ideal.compraIdeal > 0 &&
+            (ideal.comprarAgora || precisaComprarEssaSemana(ideal, companyKey))
+            ? ciFull
+            : 0
+          : ciFull;
       byMetricKey.set(plan.metricKey, {
-        ci: Math.max(0, ideal.compraIdeal),
+        ci,
         estoque: Math.max(0, Math.round(merged.resumo.estoqueTotal ?? 0)),
       });
     }
@@ -1462,7 +1480,11 @@ async function buildCompraIdealPorFilialRowsCurvaAbc(
     return row;
   });
 
-  return { rows, colunasFiliais };
+  // Com filtro ativo, remove itens que nenhuma loja precisa (total da rede zerado) — espelha
+  // a tabela, que some com esses itens quando "Sugeridos"/"Comprar agora" está ligado.
+  const finalRows = gating === "none" ? rows : rows.filter((r) => Number(r["TOTAL REDE"] ?? 0) > 0);
+
+  return { rows: finalRows, colunasFiliais };
 }
 
 function getInitialRange(month: number, year: number): DateRangeValue {
@@ -2457,6 +2479,13 @@ const handleBadgeClick = (cat: string) => {
       const universo = calcularCurvas(Array.from(universoMap.values()));
       if (universo.length === 0) return;
 
+      // Espelha o filtro da tela: "Comprar agora" tem precedência sobre "Sugeridos".
+      const gating: "none" | "sugeridos" | "comprar-agora" = filtrarComprarAgora
+        ? "comprar-agora"
+        : filtrarSugeridos
+          ? "sugeridos"
+          : "none";
+
       setCompraIdealFilialProgresso({ feito: 0, total: targets.length, fase: "gerando" });
       const { rows, colunasFiliais } = await buildCompraIdealPorFilialRowsCurvaAbc(
         companyKey,
@@ -2464,9 +2493,26 @@ const handleBadgeClick = (cat: string) => {
         targets,
         comprasTransitoIndex,
         porCor,
-        () => setCompraIdealFilialProgresso((prev) => (prev ? { ...prev, feito: prev.feito + 1 } : prev))
+        () => setCompraIdealFilialProgresso((prev) => (prev ? { ...prev, feito: prev.feito + 1 } : prev)),
+        gating
       );
+      if (rows.length === 0) {
+        alert(
+          gating === "comprar-agora"
+            ? "Nenhum item para comprar agora/essa semana nas lojas no período."
+            : gating === "sugeridos"
+              ? "Nenhum item com compra sugerida nas lojas no período."
+              : "Nenhum item para exportar."
+        );
+        return;
+      }
       const periodo = `${formatDateForQuery(range.startDate)}_a_${formatDateForQuery(range.endDate)}`;
+      const gatingLabel =
+        gating === "comprar-agora"
+          ? " · só comprar agora/essa semana"
+          : gating === "sugeridos"
+            ? " · só com compra sugerida"
+            : "";
       exportCompraIdealPorFilialToXlsx({
         companyKey,
         companyName: cfg.name,
@@ -2474,7 +2520,8 @@ const handleBadgeClick = (cat: string) => {
         filtroAplicado:
           `Todas as lojas · união das curvas ABC por loja` +
           (porCor ? " · por cor" : "") +
-          (companyKey === "nerd" && filtrarEletronicos ? " · só ELETRONICOS" : ""),
+          (companyKey === "nerd" && filtrarEletronicos ? " · só ELETRONICOS" : "") +
+          gatingLabel,
         colunasFiliais,
         rows,
       });

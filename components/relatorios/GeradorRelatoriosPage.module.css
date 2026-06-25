@@ -425,3 +425,78 @@
 .table tbody tr:hover {
   background: #f8fafc;
 }
+
+/* ── Progresso de análise demorada (compra sugerida por loja, via stream) ── */
+.progressWrap {
+  margin-top: 4px;
+  padding: 14px 16px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 10px;
+}
+
+.progressHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progressSpinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(14, 165, 233, 0.3);
+  border-top-color: #0ea5e9;
+  border-radius: 50%;
+  animation: gerProgressSpin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.progressText {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0369a1;
+  font-variant-numeric: tabular-nums;
+}
+
+.progressBar {
+  margin-top: 10px;
+  height: 8px;
+  width: 100%;
+  background: #e0f2fe;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: #0ea5e9;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.progressFillIndeterminate {
+  width: 40%;
+  animation: gerProgressSlide 1.2s ease-in-out infinite;
+}
+
+.progressHint {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: #0369a1;
+  opacity: 0.8;
+}
+
+@keyframes gerProgressSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes gerProgressSlide {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(260%);
+  }
+}
