@@ -1,0 +1,358 @@
+:root {
+  --ae-bg: #f8fafc;
+  --ae-card: #ffffff;
+  --ae-border: #e2e8f0;
+  --ae-text: #0f172a;
+  --ae-text-2: #64748b;
+  --ae-text-3: #94a3b8;
+  --ae-blue: #2563eb;
+  --ae-blue-bg: #eff6ff;
+  --ae-red: #dc2626;
+  --ae-red-bg: #fef2f2;
+  --ae-green: #16a34a;
+  --ae-amber-bg: #fffbeb;
+  --ae-amber-border: #fcd34d;
+  --ae-radius: 10px;
+  --ae-shadow: 0 1px 3px rgba(0, 0, 0, 0.07), 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+.wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: var(--ae-text);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.title {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0;
+}
+.subtitle {
+  font-size: 15px;
+  color: var(--ae-text-2);
+  margin: 0;
+  max-width: 820px;
+  line-height: 1.45;
+}
+
+.card {
+  background: var(--ae-card);
+  border: 1px solid var(--ae-border);
+  border-radius: var(--ae-radius);
+  box-shadow: var(--ae-shadow);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cardTitle {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+}
+
+/* Modo tabs */
+.modoTabs {
+  display: inline-flex;
+  gap: 6px;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 10px;
+  align-self: flex-start;
+}
+.modoTab {
+  border: none;
+  background: transparent;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ae-text-2);
+  cursor: pointer;
+}
+.modoTabAtivo {
+  background: #fff;
+  color: var(--ae-text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ae-text-2);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.hint {
+  font-size: 12px;
+  color: var(--ae-text-3);
+  font-weight: 500;
+}
+.input,
+.textarea {
+  border: 1px solid var(--ae-border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 15px;
+  font-family: inherit;
+  color: var(--ae-text);
+  background: #fff;
+  width: 100%;
+}
+.input:disabled {
+  background: #f8fafc;
+  color: var(--ae-text-2);
+}
+.textarea {
+  resize: vertical;
+}
+
+.uploadRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.fileInput {
+  display: none;
+}
+.fileInfo {
+  font-size: 14px;
+  color: var(--ae-text);
+  font-weight: 600;
+}
+.fileHintMuted {
+  font-size: 13px;
+  color: var(--ae-text-3);
+}
+
+.actionsRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.primaryBtn,
+.secondaryBtn,
+.dangerBtn {
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.primaryBtn {
+  background: var(--ae-blue);
+  color: #fff;
+}
+.primaryBtn:disabled {
+  background: #cbd5e1;
+  cursor: not-allowed;
+}
+.secondaryBtn {
+  background: #fff;
+  border-color: var(--ae-border);
+  color: var(--ae-text);
+}
+.dangerBtn {
+  background: var(--ae-red);
+  color: #fff;
+}
+.dangerBtn:disabled {
+  background: #fca5a5;
+  cursor: not-allowed;
+}
+
+.erro {
+  color: var(--ae-red);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Sucesso */
+.sucesso {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+.sucessoTitle {
+  margin: 0;
+  font-size: 18px;
+  color: var(--ae-green);
+}
+
+/* Totais */
+.totaisBar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.totalBox {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #f8fafc;
+  border: 1px solid var(--ae-border);
+  border-radius: 8px;
+  padding: 10px 16px;
+  min-width: 120px;
+}
+.totalLabel {
+  font-size: 12px;
+  color: var(--ae-text-2);
+  font-weight: 600;
+}
+.totalValor {
+  font-size: 22px;
+  font-weight: 700;
+}
+.pos {
+  color: var(--ae-green);
+}
+.neg {
+  color: var(--ae-red);
+}
+
+/* Avisos */
+.avisos {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--ae-amber-bg);
+  border: 1px solid var(--ae-amber-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.aviso {
+  font-size: 13px;
+  color: #92400e;
+}
+
+.tableHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ae-text-2);
+  cursor: pointer;
+}
+
+.tableScroll {
+  overflow-x: auto;
+  max-height: 520px;
+  overflow-y: auto;
+  border: 1px solid var(--ae-border);
+  border-radius: 8px;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.table th {
+  position: sticky;
+  top: 0;
+  background: #f1f5f9;
+  text-align: left;
+  padding: 9px 12px;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--ae-text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.table td {
+  padding: 8px 12px;
+  border-top: 1px solid var(--ae-border);
+}
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+.rowDiff {
+  background: #fffdf5;
+}
+
+/* Modal */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+.modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 480px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+}
+.modalTitle {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+}
+.modalText {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.modalWarn {
+  margin: 0;
+  font-size: 14px;
+  color: #92400e;
+  background: var(--ae-amber-bg);
+  border: 1px solid var(--ae-amber-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.confirmCheck {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}

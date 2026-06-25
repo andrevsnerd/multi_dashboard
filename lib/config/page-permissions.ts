@@ -32,6 +32,7 @@ export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "transferencia-produtos", label: "Transferencia de Produtos", routeSegments: ["transferencia-produtos"] },
   { key: "romaneios", label: "Romaneios", routeSegments: ["romaneios"] },
   { key: "saidas-entradas-produtos", label: "Saidas e Entradas de Produtos", routeSegments: ["saidas-entradas-produtos"] },
+  { key: "ajuste-estoque", label: "Ajuste de Estoque", routeSegments: ["ajuste-estoque"] },
   { key: "destino-romaneio", label: "Destino Romaneio" },
   { key: "lista-loja", label: "Lista Loja", routeSegments: ["lista-loja"] },
   { key: "compras-transito", label: "Compras em Transito", routeSegments: ["compras-transito"] },

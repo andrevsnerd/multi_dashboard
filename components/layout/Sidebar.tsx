@@ -124,6 +124,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/"
       ? `${basePath}/saidas-entradas-produtos`
       : "/saidas-entradas-produtos";
+  const ajusteEstoqueHref =
+    basePath && basePath !== "/" ? `${basePath}/ajuste-estoque` : "/ajuste-estoque";
   const listaLojaHref =
     basePath && basePath !== "/" ? `${basePath}/lista-loja` : "/lista-loja";
   const comprasTransitoHref =
@@ -204,6 +206,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/transferencia-produtos",
     "/romaneios",
     "/saidas-entradas-produtos",
+    "/ajuste-estoque",
     "/lista-loja",
     "/compras-transito",
     "/compras-salvas",
@@ -397,6 +400,14 @@ export default function Sidebar({ companyName }: SidebarProps) {
           permission: "saidas-entradas-produtos",
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/saidas-entradas-produtos", saidasEntradasProdutosHref),
+        },
+        {
+          key: "ajuste-estoque",
+          label: "Ajuste de Estoque",
+          href: ajusteEstoqueHref,
+          permission: "ajuste-estoque",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/ajuste-estoque", ajusteEstoqueHref),
         },
         {
           key: "lista-loja",
