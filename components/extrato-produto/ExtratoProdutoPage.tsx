@@ -823,6 +823,23 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
             <InfoCard label="Movimentos" value={`${dados.linhas.length}`} t={t} />
           </div>
 
+          {/* Classificação do produto */}
+          {(dados.linha || dados.subgrupo || dados.grupo || dados.tipoProduto || dados.colecao) && (
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 20 }}>
+              {dados.linha && <InfoCard label="Linha" value={dados.linha} t={t} />}
+              {dados.subgrupo && <InfoCard label="Subgrupo" value={dados.subgrupo} t={t} />}
+              {dados.grupo && <InfoCard label="Grupo" value={dados.grupo} t={t} />}
+              {dados.tipoProduto && <InfoCard label="Tipo" value={dados.tipoProduto} t={t} />}
+              {dados.colecao && (
+                <InfoCard
+                  label="Coleção"
+                  value={dados.descColecao ? `${dados.colecao} — ${dados.descColecao}` : dados.colecao}
+                  t={t}
+                />
+              )}
+            </div>
+          )}
+
           {/* Sumário por tipo */}
           <div style={{ marginBottom: 20 }}>
             <p style={{ fontSize: 12, color: t.muted, margin: "0 0 8px" }}>Resumo por tipo de movimento:</p>

@@ -169,6 +169,10 @@ export interface ProductDetailInfo {
   linha?: string | null;
   /** Subgrupo do produto (PRODUTOS.SUBGRUPO_PRODUTO) — usado na regra de cobertura. */
   subgrupo?: string | null;
+  grupo?: string | null;
+  tipoProduto?: string | null;
+  colecao?: string | null;
+  descColecao?: string | null;
   /** Data de cadastro do produto (PRODUTOS.DATA_CADASTRAMENTO). */
   registrationDate: Date | null;
   /**
@@ -912,6 +916,10 @@ export async function fetchProductDetail({
         ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
         ISNULL(p.LINHA, '') AS linha,
         ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
+        ISNULL(p.GRUPO_PRODUTO, '') AS grupo,
+        ISNULL(p.TIPO_PRODUTO, '') AS tipoProduto,
+        ISNULL(p.COLECAO, '') AS colecao,
+        ISNULL(col.DESC_COLECAO, '') AS descColecao,
         ISNULL(p.CUSTO_REPOSICAO1, 0) AS registeredCost,
         ISNULL(p.PRECO_REPOSICAO_1, 0) AS registeredPrice,
         p.DATA_CADASTRAMENTO AS registrationDate,
@@ -934,6 +942,7 @@ export async function fetchProductDetail({
           ORDER BY E.EMISSAO DESC
         ) AS lastEntryFilial
       FROM PRODUTOS p WITH (NOLOCK)
+      LEFT JOIN COLECOES col WITH (NOLOCK) ON col.COLECAO = p.COLECAO
       WHERE p.PRODUTO = @productId
     `;
 
@@ -943,6 +952,10 @@ export async function fetchProductDetail({
       grade: string | null;
       linha: string | null;
       subgrupo: string | null;
+      grupo: string | null;
+      tipoProduto: string | null;
+      colecao: string | null;
+      descColecao: string | null;
       registeredCost: number;
       registeredPrice: number;
       registrationDate: Date | null;
@@ -956,6 +969,10 @@ export async function fetchProductDetail({
       grade: null,
       linha: null,
       subgrupo: null,
+      grupo: null,
+      tipoProduto: null,
+      colecao: null,
+      descColecao: null,
       registeredCost: 0,
       registeredPrice: 0,
       registrationDate: null,
@@ -1285,6 +1302,10 @@ export async function fetchProductDetail({
       grade: (productRow.grade ?? '').trim() || null,
       linha: (productRow.linha ?? '').trim() || null,
       subgrupo: (productRow.subgrupo ?? '').trim() || null,
+      grupo: (productRow.grupo ?? '').trim() || null,
+      tipoProduto: (productRow.tipoProduto ?? '').trim() || null,
+      colecao: (productRow.colecao ?? '').trim() || null,
+      descColecao: (productRow.descColecao ?? '').trim() || null,
       registrationDate,
       barcode,
       lastEntryDate,

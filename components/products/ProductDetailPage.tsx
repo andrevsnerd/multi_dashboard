@@ -534,6 +534,41 @@ export default function ProductDetailPage({
             )}
           </div>
 
+          {(data.detail.linha || data.detail.subgrupo || data.detail.grupo || data.detail.tipoProduto || data.detail.colecao) && (
+            <div className={styles.productClassifRow}>
+              {data.detail.linha && (
+                <span className={styles.classifTag}>
+                  <span className={styles.classifLabel}>Linha</span>
+                  {data.detail.linha}
+                </span>
+              )}
+              {data.detail.subgrupo && (
+                <span className={styles.classifTag}>
+                  <span className={styles.classifLabel}>Subgrupo</span>
+                  {data.detail.subgrupo}
+                </span>
+              )}
+              {data.detail.grupo && (
+                <span className={styles.classifTag}>
+                  <span className={styles.classifLabel}>Grupo</span>
+                  {data.detail.grupo}
+                </span>
+              )}
+              {data.detail.tipoProduto && (
+                <span className={styles.classifTag}>
+                  <span className={styles.classifLabel}>Tipo</span>
+                  {data.detail.tipoProduto}
+                </span>
+              )}
+              {data.detail.colecao && (
+                <span className={styles.classifTag}>
+                  <span className={styles.classifLabel}>Coleção</span>
+                  {data.detail.descColecao ? `${data.detail.colecao} — ${data.detail.descColecao}` : data.detail.colecao}
+                </span>
+              )}
+            </div>
+          )}
+
           <div className={styles.productMetaRow}>
             {(data.availableColors ?? []).length > 0 && (
               <div className={styles.colorSelectGroup}>

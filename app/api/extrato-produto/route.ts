@@ -49,6 +49,12 @@ export interface ExtratoResponse {
   grade: string | null;
   filial: string;
   estoqueAtual: number;
+  linha: string | null;
+  subgrupo: string | null;
+  grupo: string | null;
+  tipoProduto: string | null;
+  colecao: string | null;
+  descColecao: string | null;
   coresDisponiveis: ProdutoCorOption[];
   filiaisDisponiveis: ProdutoFilialOption[];
   linhas: ExtratoLinha[];
@@ -390,19 +396,38 @@ export async function GET(request: NextRequest) {
   let descCor: string | null = null;
   let grade: string | null = null;
   let estoqueAtual = 0;
+  let linhaClassif: string | null = null;
+  let subgrupo: string | null = null;
+  let grupo: string | null = null;
+  let tipoProduto: string | null = null;
+  let colecao: string | null = null;
+  let descColecao: string | null = null;
 
   try {
     const prodInfo = await query<{
       DESC_PRODUTO: string;
       GRADE: string;
       DESC_COR: string;
+      LINHA: string | null;
+      SUBGRUPO: string | null;
+      GRUPO: string | null;
+      TIPO: string | null;
+      COLECAO: string | null;
+      DESC_COLECAO: string | null;
     }>(`
       SELECT TOP 1
         p.DESC_PRODUTO,
         p.GRADE,
-        c.DESC_COR
+        c.DESC_COR,
+        LTRIM(RTRIM(ISNULL(p.LINHA, ''))) AS LINHA,
+        LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, ''))) AS SUBGRUPO,
+        LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, ''))) AS GRUPO,
+        LTRIM(RTRIM(ISNULL(p.TIPO_PRODUTO, ''))) AS TIPO,
+        LTRIM(RTRIM(ISNULL(p.COLECAO, ''))) AS COLECAO,
+        LTRIM(RTRIM(ISNULL(col.DESC_COLECAO, ''))) AS DESC_COLECAO
       FROM PRODUTOS p WITH (NOLOCK)
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = '${corSql}'
+      LEFT JOIN COLECOES col WITH (NOLOCK) ON col.COLECAO = p.COLECAO
       WHERE ${produtoEqualsSql("p.PRODUTO", produto)}
     `);
     const estoqueRows = await query<{ ESTOQUE: number }>(`
@@ -413,9 +438,16 @@ export async function GET(request: NextRequest) {
         ${filialSql ? `AND ep.FILIAL LIKE '%${filialSql}%'` : ""}
     `);
     if (prodInfo.length > 0) {
-      descProduto = prodInfo[0].DESC_PRODUTO?.trim() ?? null;
-      grade = prodInfo[0].GRADE?.trim() ?? null;
-      descCor = prodInfo[0].DESC_COR?.trim() ?? null;
+      const r = prodInfo[0];
+      descProduto = r.DESC_PRODUTO?.trim() ?? null;
+      grade = r.GRADE?.trim() ?? null;
+      descCor = r.DESC_COR?.trim() ?? null;
+      linhaClassif = r.LINHA || null;
+      subgrupo = r.SUBGRUPO || null;
+      grupo = r.GRUPO || null;
+      tipoProduto = r.TIPO || null;
+      colecao = r.COLECAO || null;
+      descColecao = r.DESC_COLECAO || null;
     }
     estoqueAtual = Number(estoqueRows[0]?.ESTOQUE ?? 0);
   } catch (e) {
@@ -832,6 +864,12 @@ export async function GET(request: NextRequest) {
     grade,
     filial: filial ?? "Todas",
     estoqueAtual,
+    linha: linhaClassif,
+    subgrupo,
+    grupo,
+    tipoProduto,
+    colecao,
+    descColecao,
     coresDisponiveis,
     filiaisDisponiveis,
     linhas,
