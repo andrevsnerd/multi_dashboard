@@ -77,8 +77,8 @@ function sumOnlyPositive(values: number[]): number {
 function buildItemMeta(row: PivotRow, companyKey: CompanyKey): string {
   const parts =
     companyKey === "nerd"
-      ? [row.linha, row.subgrupo, row.cor]
-      : [row.linha, row.subgrupo, row.colecao, row.grade ? `Grade ${row.grade}` : null, row.cor];
+      ? [row.linha, row.subgrupo]
+      : [row.linha, row.subgrupo, row.colecao, row.grade ? `Grade ${row.grade}` : null];
 
   return parts.filter((value) => Boolean(value && value.trim())).join(" · ");
 }
@@ -1090,6 +1090,9 @@ export default function EstoqueItemPage({
                     <td className={styles.itemColumn}>
                       <span className={styles.itemNameRow}>
                         <span className={styles.itemName}>{row.descricao || "-"}</span>
+                        {row.cor && row.cor.trim() && (
+                          <span className={styles.colorBadge}>{row.cor}</span>
+                        )}
                         <span className={styles.itemCode}>{row.produto}</span>
                       </span>
                       <span className={styles.itemMeta}>{meta || "-"}</span>
