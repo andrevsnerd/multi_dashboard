@@ -1,4 +1,4 @@
-import { fetchProductsWithDetails } from "@/lib/repositories/products";
+import { fetchProductsWithDetails, fetchProdutosCustoPrecoMestre } from "@/lib/repositories/products";
 import {
   fetchMultipleProductsStockByColorPorFilial,
   type FilialStockBreakdown,
@@ -161,6 +161,15 @@ export async function fetchVendasFaturamento(
   const limit = filters.compraIdeal ? Math.min(baseLimit, COMPRA_IDEAL_LIMIT) : baseLimit;
   const truncated = total > limit;
   const sliced = truncated ? filtered.slice(0, limit) : filtered;
+
+  // Custo unitário e preço sugerido SEMPRE da tabela mestre PRODUTOS (CUSTO_REPOSICAO1 /
+  // PRECO_REPOSICAO_1) — o custo atual, não o custo da época da venda (esse só aparece na
+  // análise "Histórico de vendas", coluna CUSTO_UNIT_HISTORICO). Custo total, margem e
+  // markup são derivados desse custo atualizado. Valor por PRODUTO (custo é atributo de
+  // cadastro, não da cor).
+  const custoPrecoMestre = await fetchProdutosCustoPrecoMestre(
+    sliced.map((d) => String(d.productId ?? "").trim())
+  );
 
   // Compra Ideal por produto (mesma lógica de Lista Loja / Curva ABC): métricas de
   // ritmo por item + compras em trânsito → calcCompraIdealFromResumo.
@@ -352,14 +361,23 @@ export async function fetchVendasFaturamento(
   let acumPerc = 0;
   const rows: ReportRow[] = sliced.map((d) => {
     const qty = d.totalQuantity ?? 0;
-    const custoUnit = d.cost ?? 0;
+    const pid = String(d.productId ?? "").trim();
+    // Custo atualizado do mestre; cai no custo de venda só se o cadastro não tiver custo.
+    const mestre = custoPrecoMestre.get(pid);
+    const custoUnit = mestre && mestre.custo > 0 ? mestre.custo : (d.cost ?? 0);
     const custoTotal = custoUnit * qty;
     const revenue = d.totalRevenue ?? 0;
     const margem = revenue - custoTotal;
+    const avgPrice = d.averagePrice ?? 0;
+    const markup = custoUnit > 0 ? avgPrice / custoUnit : 0;
+    const precoSugerido =
+      mestre && mestre.precoSugerido != null
+        ? mestre.precoSugerido
+        : d.suggestedPrice != null
+          ? d.suggestedPrice
+          : null;
     const partPerc = sumRevenue !== 0 ? (revenue / sumRevenue) * 100 : 0;
     acumPerc += partPerc;
-
-    const pid = String(d.productId ?? "").trim();
     const corKey = d.corProduto ? String(d.corProduto).trim() : null;
     const rowKey = corKey ? `${pid}-${corKey}` : `${pid}-null`;
 
@@ -388,11 +406,11 @@ export async function fetchVendasFaturamento(
       TICKET_MEDIO: round2(d.averagePrice),
       CUSTO_UNITARIO: round2(custoUnit),
       CUSTO_TOTAL: round2(custoTotal),
-      MARKUP: round2(d.markup),
+      MARKUP: round2(markup),
       MARGEM: round2(margem),
       MARGEM_PERC: revenue !== 0 ? round2((margem / revenue) * 100) : 0,
       ESTOQUE: roundInt(d.stock),
-      PRECO_SUGERIDO: d.suggestedPrice != null ? round2(d.suggestedPrice) : null,
+      PRECO_SUGERIDO: precoSugerido != null ? round2(precoSugerido) : null,
       PARTICIPACAO_PERC: round2(partPerc),
       PARTICIPACAO_ACUM_PERC: round2(acumPerc),
     };

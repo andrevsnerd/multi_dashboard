@@ -63,6 +63,7 @@ interface RawRow {
   QTDE: number | null;
   PRECO_LIQUIDO: number | null;
   VALOR_LIQUIDO: number | null;
+  CUSTO_HIST: number | null;
   LINHA: string | null;
   GRUPO: string | null;
   SUBGRUPO: string | null;
@@ -169,6 +170,7 @@ export async function fetchVendasHistorico(filters: ReportFilters): Promise<Repo
           CAST(vp.PRECO_LIQUIDO AS DECIMAL(38,6)) AS PRECO_LIQUIDO,
           CAST(vp.QTDE * vp.PRECO_LIQUIDO
             - (vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) AS DECIMAL(38,6)) AS VALOR_LIQUIDO,
+          CAST(ISNULL(vp.CUSTO, 0) AS DECIMAL(38,6)) AS CUSTO_HIST,
           UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) AS LINHA,
           UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) AS GRUPO,
           UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) AS SUBGRUPO,
@@ -208,6 +210,7 @@ export async function fetchVendasHistorico(filters: ReportFilters): Promise<Repo
           fp.QTDE,
           CAST(ISNULL(fp.PRECO, CASE WHEN fp.QTDE <> 0 THEN fp.VALOR_LIQUIDO / fp.QTDE ELSE fp.VALOR_LIQUIDO END) AS DECIMAL(38,6)) AS PRECO_LIQUIDO,
           CAST(ISNULL(fp.VALOR_LIQUIDO, 0) AS DECIMAL(38,6)) AS VALOR_LIQUIDO,
+          CAST(ISNULL(fp.CUSTO_NA_DATA, 0) AS DECIMAL(38,6)) AS CUSTO_HIST,
           UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) AS LINHA,
           UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) AS GRUPO,
           UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) AS SUBGRUPO,
@@ -268,6 +271,7 @@ export async function fetchVendasHistorico(filters: ReportFilters): Promise<Repo
       QTDE: roundInt(r.QTDE),
       PRECO_LIQUIDO: round2(r.PRECO_LIQUIDO),
       VALOR: round2(r.VALOR_LIQUIDO),
+      CUSTO_UNIT_HISTORICO: round2(r.CUSTO_HIST),
       LINHA: (r.LINHA ?? "").trim(),
       GRUPO: (r.GRUPO ?? "").trim(),
       SUBGRUPO: (r.SUBGRUPO ?? "").trim(),

@@ -43,50 +43,47 @@ async function enrichVendas(
     groupByColor: true,
   });
 
-  const byKey = new Map<string, Partial<ReportRow>>();
+  // Métricas de venda por produto × cor (qtde, faturamento, preço médio). O custo NÃO
+  // sai daqui — vem sempre do mestre, abaixo.
+  const salesByKey = new Map<string, { qty: number; revenue: number; avgPrice: number }>();
   for (const d of details) {
-    const qty = d.totalQuantity ?? 0;
-    const custoUnit = d.cost ?? 0;
-    const custoTotal = custoUnit * qty;
-    const revenue = d.totalRevenue ?? 0;
-    const margem = revenue - custoTotal;
-    byKey.set(canonicalKey(d.productId, d.corProduto), {
-      QTDE: roundInt(qty),
-      FATURAMENTO: round2(revenue),
-      TICKET_MEDIO: round2(d.averagePrice),
-      CUSTO_UNITARIO: round2(custoUnit),
-      CUSTO_TOTAL: round2(custoTotal),
-      MARKUP: round2(d.markup),
-      MARGEM: round2(margem),
-      MARGEM_PERC: revenue !== 0 ? round2((margem / revenue) * 100) : 0,
-      PRECO_SUGERIDO: d.suggestedPrice != null ? round2(d.suggestedPrice) : null,
+    salesByKey.set(canonicalKey(d.productId, d.corProduto), {
+      qty: d.totalQuantity ?? 0,
+      revenue: d.totalRevenue ?? 0,
+      avgPrice: d.averagePrice ?? 0,
     });
   }
 
-  // Custo e preço sugerido vêm da tabela MESTRE (PRODUTOS), não das vendas: na base de
-  // estoque/parados/cadastro a maioria dos itens não vendeu no período e zerava. Esses
-  // dados existem para todo produto cadastrado, então preenchemos sempre por produto.
+  // Custo e preço sugerido SEMPRE da tabela MESTRE (PRODUTOS): o custo ATUALIZADO, não o
+  // da época da venda (esse só aparece na análise "Histórico de vendas"). Esses dados
+  // existem para todo produto cadastrado — custo total, margem e markup derivam deles.
   const master = await fetchProdutosCustoPrecoMestre(
     baseRows.map((r) => String(r.PRODUTO ?? "").trim())
   );
+
+  const byKey = new Map<string, Partial<ReportRow>>();
   for (const row of baseRows) {
     const produto = String(row.PRODUTO ?? "").trim();
-    const m = master.get(produto);
-    if (!m) continue;
     const key = canonicalKey(produto, row[ROW_COR_FIELD]);
-    const existing = byKey.get(key);
-    if (existing) {
-      // Vendeu: mantém o custo realizado (margem/markup dependem dele) e só completa
-      // o que veio zerado; preço sugerido é atributo de cadastro → sempre do mestre.
-      if (m.precoSugerido != null) existing.PRECO_SUGERIDO = m.precoSugerido;
-      if (!(Number(existing.CUSTO_UNITARIO ?? 0) > 0) && m.custo > 0) {
-        existing.CUSTO_UNITARIO = round2(m.custo);
-        existing.CUSTO_TOTAL = round2(m.custo * Number(existing.QTDE ?? 0));
-      }
-    } else {
-      // Não vendeu no período: custo/preço do mestre; demais métricas ficam no default 0.
-      byKey.set(key, { CUSTO_UNITARIO: round2(m.custo), PRECO_SUGERIDO: m.precoSugerido });
-    }
+    const s = salesByKey.get(key);
+    const m = master.get(produto);
+    const qty = s?.qty ?? 0;
+    const revenue = s?.revenue ?? 0;
+    const avgPrice = s?.avgPrice ?? 0;
+    const custoUnit = m?.custo ?? 0;
+    const custoTotal = custoUnit * qty;
+    const margem = revenue - custoTotal;
+    byKey.set(key, {
+      QTDE: roundInt(qty),
+      FATURAMENTO: round2(revenue),
+      TICKET_MEDIO: round2(avgPrice),
+      CUSTO_UNITARIO: round2(custoUnit),
+      CUSTO_TOTAL: round2(custoTotal),
+      MARKUP: custoUnit > 0 ? round2(avgPrice / custoUnit) : 0,
+      MARGEM: round2(margem),
+      MARGEM_PERC: revenue !== 0 ? round2((margem / revenue) * 100) : 0,
+      PRECO_SUGERIDO: m?.precoSugerido ?? null,
+    });
   }
 
   // Produto da base sem venda no período → métricas 0 (em vez de vazio).

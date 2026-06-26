@@ -20,6 +20,10 @@ export const VENDAS_HISTORICO_COLUMNS: ReportColumnDef[] = [
   { key: "QTDE", defaultLabel: "Qtde", type: "int" },
   { key: "PRECO_LIQUIDO", defaultLabel: "Preço unit.", type: "currency" },
   { key: "VALOR", defaultLabel: "Venda Líquida", type: "currency" },
+  // Custo unitário NA ÉPOCA da venda (tabela de vendas) — só faz sentido aqui, para
+  // acompanhar quanto custava o item quando foi vendido. As demais análises usam o
+  // custo ATUALIZADO da tabela mestre PRODUTOS.
+  { key: "CUSTO_UNIT_HISTORICO", defaultLabel: "Custo unit. histórico", type: "currency" },
   { key: "LINHA", defaultLabel: "Linha", type: "text" },
   { key: "GRUPO", defaultLabel: "Grupo", type: "text" },
   { key: "SUBGRUPO", defaultLabel: "Subgrupo", type: "text" },
@@ -51,6 +55,7 @@ const VENDAS_HISTORICO_PRESETS: ReportPresetDef[] = [
       col("QTDE"),
       col("PRECO_LIQUIDO"),
       col("VALOR"),
+      col("CUSTO_UNIT_HISTORICO"),
     ],
   },
   {
