@@ -13,16 +13,152 @@ import type {
 import type { ProdutosAtivosResponse } from "@/app/api/extrato-produto/produtos/route";
 import type { AdminFilialOption } from "@/app/api/extrato-produto/filiais/route";
 
-// ── Constantes ──────────────────────────────────────────────────────────────
+// ── Tema (claro = padrão, escuro = opção) ────────────────────────────────────
 
-const TIPO_CORES: Record<string, string> = {
+type ThemeMode = "light" | "dark";
+
+const THEME_STORAGE_KEY = "extrato-produto-tema";
+
+interface Palette {
+  pageBg: string;
+  text: string;
+  heading: string;
+  muted: string;
+  subMuted: string;
+  border: string;
+  borderStrong: string;
+  cardBg: string;
+  inputBg: string;
+  inputBorder: string;
+  inputText: string;
+  accent: string;
+  accentText: string;
+  tableHeaderBg: string;
+  tableHeaderText: string;
+  rowEven: string;
+  rowOdd: string;
+  rowDiverge: string;
+  mono: string;
+  romaneio: string;
+  errorBg: string;
+  errorBorder: string;
+  errorText: string;
+  dropdownHover: string;
+  highlight: string;
+  saldo: string;
+  posNum: string;
+  negNum: string;
+  zeroNum: string;
+  gradePos: string;
+  gradeNeg: string;
+  gradeWarn: string;
+  warnBg: string;
+  warnBorder: string;
+  warnText: string;
+  listCor: string;
+  // cores dos badges por tipo de movimento
+  tipoCores: Record<string, string>;
+}
+
+const TIPO_CORES_DARK: Record<string, string> = {
   "ENTRADA NORMAL": "#86efac",
   "ENTRADA POR TRANSFERENCIA": "#22c55e",
   "SAÍDA NORMAL": "#fdba74",
   "SAÍDA POR TRANSFERÊNCIA": "#f97316",
   "AJUSTE": "#a78bfa",
-  "LOJA VENDAS":    "#ef4444",
+  "LOJA VENDAS": "#ef4444",
 };
+
+const TIPO_CORES_LIGHT: Record<string, string> = {
+  "ENTRADA NORMAL": "#16a34a",
+  "ENTRADA POR TRANSFERENCIA": "#15803d",
+  "SAÍDA NORMAL": "#ea580c",
+  "SAÍDA POR TRANSFERÊNCIA": "#c2410c",
+  "AJUSTE": "#7c3aed",
+  "LOJA VENDAS": "#dc2626",
+};
+
+const LIGHT: Palette = {
+  pageBg: "#f8fafc",
+  text: "#334155",
+  heading: "#0f172a",
+  muted: "#64748b",
+  subMuted: "#64748b",
+  border: "#e2e8f0",
+  borderStrong: "#cbd5e1",
+  cardBg: "#ffffff",
+  inputBg: "#ffffff",
+  inputBorder: "#cbd5e1",
+  inputText: "#0f172a",
+  accent: "#3b82f6",
+  accentText: "#ffffff",
+  tableHeaderBg: "#f1f5f9",
+  tableHeaderText: "#475569",
+  rowEven: "#ffffff",
+  rowOdd: "#f8fafc",
+  rowDiverge: "#fff7ed",
+  mono: "#0369a1",
+  romaneio: "#7c3aed",
+  errorBg: "#fef2f2",
+  errorBorder: "#fca5a5",
+  errorText: "#b91c1c",
+  dropdownHover: "#f1f5f9",
+  highlight: "#b45309",
+  saldo: "#0891b2",
+  posNum: "#16a34a",
+  negNum: "#dc2626",
+  zeroNum: "#94a3b8",
+  gradePos: "#ca8a04",
+  gradeNeg: "#ea580c",
+  gradeWarn: "#b45309",
+  warnBg: "#fffbeb",
+  warnBorder: "#fde68a",
+  warnText: "#92400e",
+  listCor: "#65a30d",
+  tipoCores: TIPO_CORES_LIGHT,
+};
+
+const DARK: Palette = {
+  pageBg: "#0f172a",
+  text: "#e2e8f0",
+  heading: "#f1f5f9",
+  muted: "#64748b",
+  subMuted: "#94a3b8",
+  border: "#1e293b",
+  borderStrong: "#334155",
+  cardBg: "#1e293b",
+  inputBg: "#1e293b",
+  inputBorder: "#334155",
+  inputText: "#f1f5f9",
+  accent: "#3b82f6",
+  accentText: "#ffffff",
+  tableHeaderBg: "#1e293b",
+  tableHeaderText: "#94a3b8",
+  rowEven: "#0f172a",
+  rowOdd: "#111827",
+  rowDiverge: "#451a03",
+  mono: "#7dd3fc",
+  romaneio: "#a78bfa",
+  errorBg: "#450a0a",
+  errorBorder: "#dc2626",
+  errorText: "#fca5a5",
+  dropdownHover: "#334155",
+  highlight: "#f59e0b",
+  saldo: "#22d3ee",
+  posNum: "#86efac",
+  negNum: "#fca5a5",
+  zeroNum: "#64748b",
+  gradePos: "#fde68a",
+  gradeNeg: "#fdba74",
+  gradeWarn: "#f59e0b",
+  warnBg: "#1c1917",
+  warnBorder: "#44403c",
+  warnText: "#78716c",
+  listCor: "#a3e635",
+  tipoCores: TIPO_CORES_DARK,
+};
+
+// ── Constantes ──────────────────────────────────────────────────────────────
 
 const STATUS_TRANSITO: Record<number, string> = {
   0: "Aguardando",
@@ -44,8 +180,8 @@ function fmtNum(n: number) {
   return n === 0 ? "0" : n > 0 ? `+${n}` : `${n}`;
 }
 
-function badge(tipo: string) {
-  const color = TIPO_CORES[tipo] ?? "#94a3b8";
+function badge(tipo: string, t: Palette) {
+  const color = t.tipoCores[tipo] ?? t.subMuted;
   return (
     <span
       style={{
@@ -76,6 +212,8 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
   const router = useRouter();
   const searchParams = useSearchParams();
   const basePath = `/${companyKey}/extrato-produto`;
+  const [theme, setTheme] = useState<ThemeMode>("light");
+  const t = theme === "light" ? LIGHT : DARK;
   const [produto, setProduto] = useState("");
   const [cor, setCor] = useState("");
   const [filial, setFilial] = useState("");
@@ -106,6 +244,25 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
       user ? { "X-Auth-Username": user.username } : {},
     [user]
   );
+
+  // Lê a preferência de tema salva (padrão = claro).
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
+      if (saved === "dark" || saved === "light") setTheme(saved);
+    } catch {
+      /* localStorage indisponível — mantém claro */
+    }
+  }, []);
+
+  // Persiste a preferência de tema.
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      /* ignora */
+    }
+  }, [theme]);
 
   // Carrega todas as filiais disponíveis uma vez para o autocomplete.
   useEffect(() => {
@@ -358,22 +515,49 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
     };
   });
 
+  const inputStyle = makeInputStyle(t);
+  const th = makeTh(t);
+
   return (
-    <main style={{ padding: "24px 32px", fontFamily: "var(--font-mono, monospace)", minHeight: "100vh", background: "#0f172a", color: "#e2e8f0" }}>
+    <main style={{ padding: "24px 32px", fontFamily: "var(--font-mono, monospace)", minHeight: "100vh", background: t.pageBg, color: t.text }}>
       {/* ── Cabeçalho ── */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: "8px 0 4px", fontSize: 22, color: "#f1f5f9" }}>
-          Extrato de Produto
-        </h1>
-        <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>
-          Visualiza todos os movimentos de estoque de um produto+cor+filial, mostrando a diferença
-          entre o campo QTDE (total) e o campo de grade (EN_1/SA_1 → 90x90).
-        </p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 24 }}>
+        <div>
+          <h1 style={{ margin: "8px 0 4px", fontSize: 22, color: t.heading }}>
+            Extrato de Produto
+          </h1>
+          <p style={{ margin: 0, fontSize: 13, color: t.muted }}>
+            Visualiza todos os movimentos de estoque de um produto+cor+filial, mostrando a diferença
+            entre o campo QTDE (total) e o campo de grade (EN_1/SA_1 → 90x90).
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
+          title={theme === "light" ? "Mudar para tema escuro" : "Mudar para tema claro"}
+          style={{
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "7px 12px",
+            background: t.cardBg,
+            border: `1px solid ${t.borderStrong}`,
+            borderRadius: 8,
+            color: t.text,
+            cursor: "pointer",
+            fontSize: 12,
+            fontWeight: 600,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {theme === "light" ? "🌙 Tema escuro" : "☀️ Tema claro"}
+        </button>
       </div>
 
       {/* ── Formulário ── */}
       <form onSubmit={buscar} style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "flex-end" }}>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#94a3b8" }}>
+        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: t.subMuted }}>
           Produto ou código de barras *
           <input
             type="text"
@@ -387,7 +571,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
             style={inputStyle}
           />
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#94a3b8" }}>
+        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: t.subMuted }}>
           Cor *
           {coresDisponiveis.length > 0 ? (
             <select
@@ -412,7 +596,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
             />
           )}
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#94a3b8" }}>
+        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: t.subMuted }}>
           Filial
           <div style={{ position: "relative" }}>
             <input
@@ -442,13 +626,13 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
                     top: "calc(100% + 2px)",
                     left: 0,
                     right: 0,
-                    background: "#1e293b",
-                    border: "1px solid #334155",
+                    background: t.cardBg,
+                    border: `1px solid ${t.borderStrong}`,
                     borderRadius: 6,
                     zIndex: 50,
                     maxHeight: 240,
                     overflowY: "auto",
-                    boxShadow: "0 4px 16px #00000066",
+                    boxShadow: "0 4px 16px #0000001f",
                   }}
                 >
                   {sugestoes.map((s) => (
@@ -466,18 +650,18 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
                         padding: "8px 10px",
                         background: "none",
                         border: "none",
-                        borderBottom: "1px solid #0f172a",
-                        color: "#f1f5f9",
+                        borderBottom: `1px solid ${t.border}`,
+                        color: t.heading,
                         cursor: "pointer",
                         fontSize: 12,
                         display: "flex",
                         gap: 4,
                       }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#334155"; }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = t.dropdownHover; }}
                       onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "none"; }}
                     >
                       <span>{s.filial}</span>
-                      {s.extra && <span style={{ color: "#64748b" }}>{s.extra}</span>}
+                      {s.extra && <span style={{ color: t.muted }}>{s.extra}</span>}
                     </button>
                   ))}
                 </div>
@@ -490,8 +674,8 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
           disabled={loading}
           style={{
             padding: "8px 20px",
-            background: "#3b82f6",
-            color: "#fff",
+            background: t.accent,
+            color: t.accentText,
             border: "none",
             borderRadius: 6,
             cursor: "pointer",
@@ -505,7 +689,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
       </form>
 
       {(lookupLoading || lookupMsg || coresDisponiveis.length > 0 || filiaisDisponiveis.length > 0) && (
-        <div style={{ marginTop: -14, marginBottom: 18, fontSize: 12, color: lookupMsg.includes("Erro") ? "#fca5a5" : "#94a3b8" }}>
+        <div style={{ marginTop: -14, marginBottom: 18, fontSize: 12, color: lookupMsg.includes("Erro") ? t.errorText : t.subMuted }}>
           {lookupLoading
             ? "Buscando cores e filiais disponíveis..."
             : lookupMsg ||
@@ -514,7 +698,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
       )}
 
       {erro && (
-        <div style={{ background: "#450a0a", border: "1px solid #dc2626", borderRadius: 6, padding: "10px 16px", color: "#fca5a5", marginBottom: 16, fontSize: 13 }}>
+        <div style={{ background: t.errorBg, border: `1px solid ${t.errorBorder}`, borderRadius: 6, padding: "10px 16px", color: t.errorText, marginBottom: 16, fontSize: 13 }}>
           {erro}
         </div>
       )}
@@ -523,19 +707,19 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
       {listaDados && (
         <div style={{ marginTop: -4, marginBottom: 20 }}>
           {listaErro && (
-            <div style={{ background: "#450a0a", border: "1px solid #dc2626", borderRadius: 6, padding: "10px 16px", color: "#fca5a5", marginBottom: 12, fontSize: 13 }}>
+            <div style={{ background: t.errorBg, border: `1px solid ${t.errorBorder}`, borderRadius: 6, padding: "10px 16px", color: t.errorText, marginBottom: 12, fontSize: 13 }}>
               {listaErro}
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 10, color: "#94a3b8", fontSize: 12 }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 10, color: t.subMuted, fontSize: 12 }}>
             <span>
-              {listaDados.total} produto(s) com movimento em <strong style={{ color: "#e2e8f0" }}>{listaDados.filial}</strong> · página {listaDados.page}
+              {listaDados.total} produto(s) com movimento em <strong style={{ color: t.text }}>{listaDados.filial}</strong> · página {listaDados.page}
             </span>
             <span style={{ marginLeft: "auto" }}>20 por página · mais recente → mais antigo</span>
           </div>
 
-          <div style={{ border: "1px solid #1e293b", borderRadius: 8, overflow: "hidden" }}>
+          <div style={{ border: `1px solid ${t.border}`, borderRadius: 8, overflow: "hidden" }}>
             {listaDados.items.map((item) => (
               <button
                 key={`${item.produto}-${item.cor}`}
@@ -562,23 +746,23 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
                   gap: 12,
                   alignItems: "center",
                   padding: "10px 12px",
-                  background: "#0f172a",
+                  background: t.cardBg,
                   border: "none",
-                  borderBottom: "1px solid #1e293b",
+                  borderBottom: `1px solid ${t.border}`,
                   cursor: "pointer",
-                  color: "#e2e8f0",
+                  color: t.text,
                 }}
               >
-                <span style={{ fontFamily: "monospace", color: "#7dd3fc", minWidth: 110 }}>
+                <span style={{ fontFamily: "monospace", color: t.mono, minWidth: 110 }}>
                   {item.produto}
                 </span>
-                <span style={{ color: "#a3e635", fontFamily: "monospace", minWidth: 40 }}>
+                <span style={{ color: t.listCor, fontFamily: "monospace", minWidth: 40 }}>
                   {item.cor || "—"}
                 </span>
-                <span style={{ color: "#94a3b8", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span style={{ color: t.subMuted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {item.descProduto ?? "—"}
                 </span>
-                <span style={{ color: "#64748b", fontSize: 12, whiteSpace: "nowrap" }}>
+                <span style={{ color: t.muted, fontSize: 12, whiteSpace: "nowrap" }}>
                   {fmtDate(item.ultimoMovimento)}
                 </span>
               </button>
@@ -592,9 +776,9 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
               onClick={() => buscarListaProdutos(listaPage - 1)}
               style={{
                 padding: "7px 12px",
-                background: "#1e293b",
-                color: "#e2e8f0",
-                border: "1px solid #334155",
+                background: t.cardBg,
+                color: t.text,
+                border: `1px solid ${t.borderStrong}`,
                 borderRadius: 6,
                 cursor: "pointer",
                 fontSize: 12,
@@ -608,9 +792,9 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
               onClick={() => buscarListaProdutos(listaPage + 1)}
               style={{
                 padding: "7px 12px",
-                background: "#1e293b",
-                color: "#e2e8f0",
-                border: "1px solid #334155",
+                background: t.cardBg,
+                color: t.text,
+                border: `1px solid ${t.borderStrong}`,
                 borderRadius: 6,
                 cursor: "pointer",
                 fontSize: 12,
@@ -627,55 +811,59 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
         <>
           {/* Info do produto */}
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 20 }}>
-            <InfoCard label="Produto" value={`${dados.produto} — ${dados.descProduto ?? "?"}`} />
-            <InfoCard label="Cor" value={`${dados.cor} — ${dados.descCor ?? "?"}`} />
-            {dados.codigoBarra && <InfoCard label="Código barra" value={dados.codigoBarra} />}
-            <InfoCard label="Grade" value={dados.grade ?? "—"} highlight />
-            <InfoCard label="Filial" value={dados.filial} />
-            <InfoCard label="Estoque atual" value={`${dados.estoqueAtual} un`} highlight />
-            <InfoCard label="Saldo QTDE" value={`${saldoMovimentos} un`} />
-            <InfoCard label="Saldo grade" value={`${saldoGrade} un`} />
-            <InfoCard label="Diferença" value={`${diferencaEstoque} un`} highlight={diferencaEstoque !== 0} />
-            <InfoCard label="Movimentos" value={`${dados.linhas.length}`} />
+            <InfoCard label="Produto" value={`${dados.produto} — ${dados.descProduto ?? "?"}`} t={t} />
+            <InfoCard label="Cor" value={`${dados.cor} — ${dados.descCor ?? "?"}`} t={t} />
+            {dados.codigoBarra && <InfoCard label="Código barra" value={dados.codigoBarra} t={t} />}
+            <InfoCard label="Grade" value={dados.grade ?? "—"} highlight t={t} />
+            <InfoCard label="Filial" value={dados.filial} t={t} />
+            <InfoCard label="Estoque atual" value={`${dados.estoqueAtual} un`} highlight t={t} />
+            <InfoCard label="Saldo QTDE" value={`${saldoMovimentos} un`} t={t} />
+            <InfoCard label="Saldo grade" value={`${saldoGrade} un`} t={t} />
+            <InfoCard label="Diferença" value={`${diferencaEstoque} un`} highlight={diferencaEstoque !== 0} t={t} />
+            <InfoCard label="Movimentos" value={`${dados.linhas.length}`} t={t} />
           </div>
 
           {/* Sumário por tipo */}
           <div style={{ marginBottom: 20 }}>
-            <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 8px" }}>Resumo por tipo de movimento:</p>
+            <p style={{ fontSize: 12, color: t.muted, margin: "0 0 8px" }}>Resumo por tipo de movimento:</p>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {totaisPorTipo.map((t) => (
-                <div
-                  key={t.tipo}
-                  onClick={() =>
-                    setTiposFiltro((prev) =>
-                      prev.includes(t.tipo) ? prev.filter((x) => x !== t.tipo) : [...prev, t.tipo]
-                    )
-                  }
-                  style={{
-                    background: tiposFiltro.includes(t.tipo) ? (TIPO_CORES[t.tipo] ?? "#94a3b8") + "33" : "#1e293b",
-                    border: `1px solid ${tiposFiltro.includes(t.tipo) ? (TIPO_CORES[t.tipo] ?? "#94a3b8") : "#334155"}`,
-                    borderRadius: 8,
-                    padding: "8px 14px",
-                    cursor: "pointer",
-                    userSelect: "none",
-                  }}
-                >
-                  <div style={{ fontSize: 11, color: TIPO_CORES[t.tipo] ?? "#94a3b8", marginBottom: 2 }}>{t.tipo}</div>
-                  <div style={{ fontSize: 13, color: "#f1f5f9" }}>
-                    {t.count}x · QTDE: <span style={{ fontWeight: 700 }}>{fmtNum(t.qtde)}</span>
-                    {t.qtde !== t.qtdeGrade && (
-                      <span style={{ color: "#f59e0b", marginLeft: 8, fontSize: 11 }}>
-                        Grade: {fmtNum(t.qtdeGrade)}
-                      </span>
-                    )}
+              {totaisPorTipo.map((resumo) => {
+                const corTipo = t.tipoCores[resumo.tipo] ?? t.subMuted;
+                const ativo = tiposFiltro.includes(resumo.tipo);
+                return (
+                  <div
+                    key={resumo.tipo}
+                    onClick={() =>
+                      setTiposFiltro((prev) =>
+                        prev.includes(resumo.tipo) ? prev.filter((x) => x !== resumo.tipo) : [...prev, resumo.tipo]
+                      )
+                    }
+                    style={{
+                      background: ativo ? corTipo + "33" : t.cardBg,
+                      border: `1px solid ${ativo ? corTipo : t.borderStrong}`,
+                      borderRadius: 8,
+                      padding: "8px 14px",
+                      cursor: "pointer",
+                      userSelect: "none",
+                    }}
+                  >
+                    <div style={{ fontSize: 11, color: corTipo, marginBottom: 2 }}>{resumo.tipo}</div>
+                    <div style={{ fontSize: 13, color: t.heading }}>
+                      {resumo.count}x · QTDE: <span style={{ fontWeight: 700 }}>{fmtNum(resumo.qtde)}</span>
+                      {resumo.qtde !== resumo.qtdeGrade && (
+                        <span style={{ color: t.highlight, marginLeft: 8, fontSize: 11 }}>
+                          Grade: {fmtNum(resumo.qtdeGrade)}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
           {/* Filtros extras */}
-          <div style={{ display: "flex", gap: 16, marginBottom: 14, alignItems: "center", fontSize: 12, color: "#94a3b8" }}>
+          <div style={{ display: "flex", gap: 16, marginBottom: 14, alignItems: "center", fontSize: 12, color: t.subMuted }}>
             <label style={{ display: "flex", gap: 6, cursor: "pointer" }}>
               <input
                 type="checkbox"
@@ -687,7 +875,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
             {tiposFiltro.length > 0 && (
               <button
                 onClick={() => setTiposFiltro([])}
-                style={{ background: "none", border: "none", color: "#3b82f6", cursor: "pointer", fontSize: 12 }}
+                style={{ background: "none", border: "none", color: t.accent, cursor: "pointer", fontSize: 12 }}
               >
                 Limpar filtro de tipo
               </button>
@@ -700,20 +888,20 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
           {/* Tabela */}
           <div
             ref={tableRef}
-            style={{ overflowX: "auto", borderRadius: 8, border: "1px solid #1e293b" }}
+            style={{ overflowX: "auto", borderRadius: 8, border: `1px solid ${t.border}` }}
           >
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               <thead>
-                <tr style={{ background: "#1e293b", color: "#94a3b8" }}>
+                <tr style={{ background: t.tableHeaderBg, color: t.tableHeaderText }}>
                   <th style={th}>Data</th>
                   <th style={th}>Tipo</th>
                   <th style={th}>Documento</th>
                   <th style={th}>Romaneio / Pedido</th>
                   <th style={th}>Filial Origem</th>
                   <th style={th}>Filial Destino</th>
-                  <th style={{ ...th, color: "#f1f5f9" }}>QTDE</th>
-                  <th style={{ ...th, color: "#f59e0b" }}>Grade ({dados.grade ?? "?"})</th>
-                  <th style={{ ...th, color: "#22d3ee" }}>Saldo</th>
+                  <th style={{ ...th, color: t.heading }}>QTDE</th>
+                  <th style={{ ...th, color: t.highlight }}>Grade ({dados.grade ?? "?"})</th>
+                  <th style={{ ...th, color: t.saldo }}>Saldo</th>
                   <th style={th}>Preço</th>
                   <th style={th}>Status Trânsito</th>
                   <th style={th}>OBS</th>
@@ -727,32 +915,32 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
                       key={i}
                       style={{
                         background: diverge
-                          ? "#451a03"
+                          ? t.rowDiverge
                           : i % 2 === 0
-                          ? "#0f172a"
-                          : "#111827",
-                        borderBottom: "1px solid #1e293b",
+                          ? t.rowEven
+                          : t.rowOdd,
+                        borderBottom: `1px solid ${t.border}`,
                       }}
                     >
                       <td style={td}>{fmtDate(l.emissao)}</td>
-                      <td style={td}>{badge(l.tipo)}</td>
-                      <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>
+                      <td style={td}>{badge(l.tipo, t)}</td>
+                      <td style={{ ...td, fontFamily: "monospace", color: t.mono }}>
                         {l.doc}
                       </td>
-                      <td style={{ ...td, color: "#a78bfa", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                      <td style={{ ...td, color: t.romaneio, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                           title={l.romaneio ?? undefined}>
                         {l.romaneio ?? "—"}
                       </td>
-                      <td style={{ ...td, color: "#94a3b8", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <td style={{ ...td, color: t.subMuted, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {l.filialOrigem ?? "—"}
                       </td>
-                      <td style={{ ...td, color: "#94a3b8", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <td style={{ ...td, color: t.subMuted, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {l.filialDestino ?? "—"}
                       </td>
-                      <td style={{ ...td, textAlign: "right", color: l.qtde > 0 ? "#86efac" : l.qtde < 0 ? "#fca5a5" : "#64748b", fontWeight: 700 }}>
+                      <td style={{ ...td, textAlign: "right", color: l.qtde > 0 ? t.posNum : l.qtde < 0 ? t.negNum : t.zeroNum, fontWeight: 700 }}>
                         {fmtNum(l.qtde)}
                       </td>
-                      <td style={{ ...td, textAlign: "right", color: l.qtdeGrade > 0 ? "#fde68a" : l.qtdeGrade < 0 ? "#fdba74" : (diverge ? "#f59e0b" : "#64748b"), fontWeight: 700 }}>
+                      <td style={{ ...td, textAlign: "right", color: l.qtdeGrade > 0 ? t.gradePos : l.qtdeGrade < 0 ? t.gradeNeg : (diverge ? t.gradeWarn : t.zeroNum), fontWeight: 700 }}>
                         {diverge ? (
                           <span title="Grade zerada! QTDE tem valor mas EN_1/SA_1 = 0. Pode causar divergência no extrato Linx.">
                             ⚠ {fmtNum(l.qtdeGrade)}
@@ -761,18 +949,18 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
                           fmtNum(l.qtdeGrade)
                         )}
                       </td>
-                      <td style={{ ...td, textAlign: "right", color: "#22d3ee", fontWeight: 700 }}>
+                      <td style={{ ...td, textAlign: "right", color: t.saldo, fontWeight: 700 }}>
                         {l.saldoAcumulado}
                       </td>
-                      <td style={{ ...td, textAlign: "right", color: "#94a3b8" }}>
+                      <td style={{ ...td, textAlign: "right", color: t.subMuted }}>
                         {l.preco > 0 ? `R$ ${l.preco.toFixed(2)}` : "—"}
                       </td>
-                      <td style={{ ...td, color: "#94a3b8" }}>
+                      <td style={{ ...td, color: t.subMuted }}>
                         {l.statusTransito != null
                           ? STATUS_TRANSITO[l.statusTransito] ?? l.statusTransito
                           : "—"}
                       </td>
-                      <td style={{ ...td, color: "#64748b", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                      <td style={{ ...td, color: t.muted, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                           title={l.obs ?? undefined}>
                         {l.obs ?? "—"}
                       </td>
@@ -781,7 +969,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
                 })}
                 {linhasComSaldo.length === 0 && (
                   <tr>
-                    <td colSpan={12} style={{ ...td, textAlign: "center", color: "#475569", padding: 32 }}>
+                    <td colSpan={12} style={{ ...td, textAlign: "center", color: t.muted, padding: 32 }}>
                       Nenhum movimento encontrado com os filtros atuais.
                     </td>
                   </tr>
@@ -791,20 +979,20 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
           </div>
 
           {/* Legenda */}
-          <div style={{ marginTop: 20, padding: 16, background: "#1e293b", borderRadius: 8, fontSize: 12, color: "#64748b" }}>
-            <p style={{ margin: "0 0 8px", color: "#94a3b8", fontWeight: 600 }}>Legenda</p>
+          <div style={{ marginTop: 20, padding: 16, background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 12, color: t.muted }}>
+            <p style={{ margin: "0 0 8px", color: t.subMuted, fontWeight: 600 }}>Legenda</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 8 }}>
               <div>
-                <strong style={{ color: "#f1f5f9" }}>QTDE</strong> — campo total declarado no romaneio
+                <strong style={{ color: t.heading }}>QTDE</strong> — campo total declarado no romaneio
               </div>
               <div>
-                <strong style={{ color: "#f59e0b" }}>Grade ({dados.grade ?? "?"})</strong> — campo EN_1/SA_1 (grade específica)
+                <strong style={{ color: t.highlight }}>Grade ({dados.grade ?? "?"})</strong> — campo EN_1/SA_1 (grade específica)
               </div>
               <div>
-                <strong style={{ color: "#22d3ee" }}>Saldo</strong> — acumulado cronológico pelo campo QTDE
+                <strong style={{ color: t.saldo }}>Saldo</strong> — acumulado cronológico pelo campo QTDE
               </div>
               <div>
-                <strong style={{ color: "#f59e0b" }}>⚠ Grade zerada</strong> — QTDE tem valor mas EN_1/SA_1 = 0 → divergência no Linx
+                <strong style={{ color: t.highlight }}>⚠ Grade zerada</strong> — QTDE tem valor mas EN_1/SA_1 = 0 → divergência no Linx
               </div>
               <div>
                 <strong>Status Trânsito 4 = Liberado</strong> — entrada liberada do trânsito pela tela de liberação
@@ -823,7 +1011,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
 
           {/* Erros da API */}
           {dados.erros.length > 0 && (
-            <div style={{ marginTop: 16, padding: 12, background: "#1c1917", border: "1px solid #44403c", borderRadius: 6, fontSize: 11, color: "#78716c" }}>
+            <div style={{ marginTop: 16, padding: 12, background: t.warnBg, border: `1px solid ${t.warnBorder}`, borderRadius: 6, fontSize: 11, color: t.warnText }}>
               <p style={{ margin: "0 0 6px" }}>Avisos da API:</p>
               {dados.erros.map((e, i) => <div key={i}>{e}</div>)}
             </div>
@@ -836,42 +1024,46 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
 
 // ── Sub-componentes ─────────────────────────────────────────────────────────
 
-function InfoCard({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function InfoCard({ label, value, highlight, t }: { label: string; value: string; highlight?: boolean; t: Palette }) {
   return (
     <div style={{
-      background: "#1e293b",
-      border: `1px solid ${highlight ? "#334155" : "#1e293b"}`,
+      background: t.cardBg,
+      border: `1px solid ${highlight ? t.borderStrong : t.border}`,
       borderRadius: 8,
       padding: "8px 14px",
       minWidth: 100,
     }}>
-      <div style={{ fontSize: 10, color: "#64748b", marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 14, fontWeight: 600, color: highlight ? "#f59e0b" : "#f1f5f9" }}>{value}</div>
+      <div style={{ fontSize: 10, color: t.muted, marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 600, color: highlight ? t.highlight : t.heading }}>{value}</div>
     </div>
   );
 }
 
 // ── Estilos inline ──────────────────────────────────────────────────────────
 
-const inputStyle: React.CSSProperties = {
-  padding: "8px 10px",
-  background: "#1e293b",
-  border: "1px solid #334155",
-  borderRadius: 6,
-  color: "#f1f5f9",
-  fontSize: 13,
-  width: 180,
-  outline: "none",
-};
+function makeInputStyle(t: Palette): React.CSSProperties {
+  return {
+    padding: "8px 10px",
+    background: t.inputBg,
+    border: `1px solid ${t.inputBorder}`,
+    borderRadius: 6,
+    color: t.inputText,
+    fontSize: 13,
+    width: 180,
+    outline: "none",
+  };
+}
 
-const th: React.CSSProperties = {
-  padding: "10px 12px",
-  textAlign: "left",
-  fontSize: 11,
-  fontWeight: 600,
-  whiteSpace: "nowrap",
-  borderBottom: "1px solid #334155",
-};
+function makeTh(t: Palette): React.CSSProperties {
+  return {
+    padding: "10px 12px",
+    textAlign: "left",
+    fontSize: 11,
+    fontWeight: 600,
+    whiteSpace: "nowrap",
+    borderBottom: `1px solid ${t.borderStrong}`,
+  };
+}
 
 const td: React.CSSProperties = {
   padding: "8px 12px",
