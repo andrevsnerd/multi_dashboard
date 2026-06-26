@@ -1,6 +1,6 @@
 .wrapper {
   padding: 24px;
-  background: #f5f5f5;
+  background: var(--s-gray100b);
   min-height: 100vh;
 }
 
@@ -14,7 +14,7 @@
 .backButton {
   background: none;
   border: none;
-  color: #333;
+  color: var(--t-333);
   font-size: 14px;
   cursor: pointer;
   padding: 8px 0;
@@ -31,13 +31,13 @@
 .title {
   font-size: 24px;
   font-weight: 600;
-  color: #333;
+  color: var(--t-333);
   margin: 0;
 }
 
 /* Cabeçalho de informações */
 .infoHeader {
-  background: white;
+  background: var(--s-white);
   padding: 20px;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -60,14 +60,14 @@
 .infoLabel {
   font-size: 12px;
   font-weight: 600;
-  color: #666;
+  color: var(--t-666);
   text-transform: uppercase;
 }
 
 .infoValue {
   font-size: 14px;
   font-weight: 500;
-  color: #333;
+  color: var(--t-333);
 }
 
 .loading,
@@ -75,7 +75,7 @@
   text-align: center;
   padding: 48px;
   font-size: 16px;
-  color: #666;
+  color: var(--t-666);
 }
 
 .error {
@@ -91,7 +91,7 @@
 }
 
 .metricCard {
-  background: white;
+  background: var(--s-white);
   padding: 20px;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -99,7 +99,7 @@
 
 .metricLabel {
   font-size: 12px;
-  color: #666;
+  color: var(--t-666);
   text-transform: uppercase;
   margin-bottom: 8px;
   font-weight: 500;
@@ -108,7 +108,7 @@
 .metricValue {
   font-size: 20px;
   font-weight: 600;
-  color: #333;
+  color: var(--t-333);
 }
 
 /* Verificação (debug): totais = soma das linhas */
@@ -119,12 +119,12 @@
   padding: 12px 16px;
   margin-bottom: 24px;
   font-size: 13px;
-  color: #333;
+  color: var(--t-333);
 }
 
 .verificacaoLabel {
   font-weight: 600;
-  color: #555;
+  color: var(--t-555);
   margin-bottom: 4px;
 }
 
@@ -144,7 +144,7 @@
 
 /* Tabela */
 .tableWrapper {
-  background: white;
+  background: var(--s-white);
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   overflow: hidden;
@@ -156,7 +156,7 @@
 }
 
 .detailsTable thead {
-  background: #f8f9fa;
+  background: var(--s-gray50);
 }
 
 .detailsTable th {
@@ -164,7 +164,7 @@
   text-align: left;
   font-size: 12px;
   font-weight: 600;
-  color: #666;
+  color: var(--t-666);
   text-transform: uppercase;
   border-bottom: 2px solid #e0e0e0;
 }
@@ -188,12 +188,12 @@
 .detailsTable td {
   padding: 12px 16px;
   font-size: 14px;
-  color: #333;
-  border-bottom: 1px solid #f0f0f0;
+  color: var(--t-333);
+  border-bottom: 1px solid var(--s-gray100b);
 }
 
 .detailsTable tbody tr.evenRow {
-  background: white;
+  background: var(--s-white);
 }
 
 .detailsTable tfoot .footerRow {
@@ -205,17 +205,17 @@
 .detailsTable tfoot .footerLabel {
   padding: 12px 16px;
   font-size: 13px;
-  color: #555;
+  color: var(--t-555);
 }
 
 .detailsTable tfoot .footerValue {
   padding: 12px 16px;
   font-size: 14px;
-  color: #333;
+  color: var(--t-333);
 }
 
 .detailsTable tbody tr.oddRow {
-  background: #f9f9f9;
+  background: var(--s-gray50);
 }
 
 .detailsTable tbody tr:hover {

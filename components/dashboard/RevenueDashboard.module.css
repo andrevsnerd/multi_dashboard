@@ -12,8 +12,8 @@
 
 .selectorButton {
   border: 1px solid #d0d5dd;
-  background: #ffffff;
-  color: #1f2937;
+  background: var(--s-white);
+  color: var(--t-gray800);
   padding: 12px 20px;
   border-radius: 999px;
   font-weight: 600;
@@ -27,13 +27,13 @@
 
 .selectorButton:hover {
   border-color: #475569;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .selectorButtonActive {
   border-color: #475569;
-  color: #0f172a;
-  background: linear-gradient(135deg, #f1f5f9 0%, #f8fafc 100%);
+  color: var(--t-900);
+  background: linear-gradient(135deg, var(--s-100) 0%, var(--s-50) 100%);
   box-shadow: 0 6px 20px rgba(71, 85, 105, 0.15);
 }
 
@@ -45,14 +45,14 @@
 
 .summaryTitle {
   font-size: 18px;
-  color: #0f172a;
+  color: var(--t-900);
   font-weight: 600;
   margin: 0;
 }
 
 .summarySubtitle {
   font-size: 14px;
-  color: #64748b;
+  color: var(--t-500);
   margin: 0;
 }
 
@@ -63,9 +63,9 @@
 }
 
 .card {
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 20px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--b-200);
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -77,7 +77,7 @@
   font-size: 14px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #94a3b8;
+  color: var(--t-400);
   margin: 0;
   font-weight: 600;
 }
@@ -87,7 +87,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 0 0 8px 0;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--b-200);
   margin-bottom: 8px;
 }
 
@@ -103,7 +103,7 @@
 .headerLabel {
   font-size: 11px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--t-500);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -123,7 +123,7 @@
   align-items: center;
   gap: 16px;
   padding-bottom: 16px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--s-100);
 }
 
 .listItem:last-child {
@@ -139,12 +139,12 @@
 
 .itemTitle {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .itemSubtitle {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--t-400);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -156,9 +156,9 @@
   padding: 4px 10px;
   font-size: 12px;
   font-weight: 600;
-  color: #475569;
-  background: linear-gradient(135deg, #f1f5f9 0%, #f8fafc 100%);
-  border: 1px solid #e2e8f0;
+  color: var(--t-600);
+  background: linear-gradient(135deg, var(--s-100) 0%, var(--s-50) 100%);
+  border: 1px solid var(--b-200);
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   letter-spacing: 0.02em;
@@ -189,9 +189,9 @@
 }
 
 .variationNeutral {
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  border-color: #cbd5e1;
-  color: #64748b;
+  background: linear-gradient(135deg, var(--s-50) 0%, var(--s-100) 100%);
+  border-color: var(--b-300);
+  color: var(--t-500);
 }
 
 .variationArrow {
@@ -209,7 +209,7 @@
 .itemName {
   font-size: 15px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
   line-height: 1.4;
   display: block;
 }
@@ -251,12 +251,12 @@
 .metricValue {
   font-size: 16px;
   font-weight: 600;
-  color: #475569;
+  color: var(--t-600);
 }
 
 .metricLabel {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--t-400);
 }
 
 .stockBadge {
@@ -264,7 +264,7 @@
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  background: linear-gradient(135deg, var(--s-50) 0%, var(--s-100) 100%);
   border: 1.5px solid #47556926;
   border-radius: 8px;
   padding: 8px 12px;
@@ -275,25 +275,25 @@
 .stockNumber {
   font-size: 16px;
   font-weight: 700;
-  color: #475569;
+  color: var(--t-600);
   letter-spacing: -0.02em;
 }
 
 .stockLabel {
   font-size: 9px;
   font-weight: 500;
-  color: #64748b;
+  color: var(--t-500);
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
 
 .state {
-  background: #f8fafc;
+  background: var(--s-50);
   border-radius: 16px;
   border: 1px dashed #cbd5f5;
   padding: 32px;
   text-align: center;
-  color: #64748b;
+  color: var(--t-500);
   font-size: 14px;
 }
 

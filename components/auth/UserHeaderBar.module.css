@@ -3,8 +3,8 @@
   top: 0;
   z-index: 100;
   width: 100%;
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
+  background: var(--s-white);
+  border-bottom: 1px solid var(--b-200);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
@@ -24,15 +24,15 @@
   padding: 6px 12px;
   font-size: 13px;
   font-weight: 500;
-  color: #64748b;
+  color: var(--t-500);
   text-decoration: none;
   border-radius: 8px;
   transition: color 0.15s, background-color 0.15s;
 }
 
 .adminLink:hover {
-  color: #0f172a;
-  background-color: #f1f5f9;
+  color: var(--t-900);
+  background-color: var(--s-100);
 }
 
 .adminLink svg {
@@ -42,12 +42,12 @@
 .userName {
   font-size: 14px;
   font-weight: 500;
-  color: #475569;
+  color: var(--t-600);
 }
 
 .logoutBtn {
   font-size: 14px;
-  color: #64748b;
+  color: var(--t-500);
   background: none;
   border: none;
   cursor: pointer;
@@ -56,6 +56,6 @@
 }
 
 .logoutBtn:hover {
-  color: #0f172a;
-  background: #f1f5f9;
+  color: var(--t-900);
+  background: var(--s-100);
 }

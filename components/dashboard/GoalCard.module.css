@@ -1,7 +1,7 @@
 .container {
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 20px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--b-subtle);
   padding: 24px;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
   display: flex;
@@ -49,14 +49,14 @@
 .percentage {
   font-size: 32px;
   font-weight: 700;
-  color: #475569;
+  color: var(--t-600);
   line-height: 1;
   margin-bottom: 4px;
 }
 
 .label {
   font-size: 14px;
-  color: #94a3b8;
+  color: var(--t-400);
   font-weight: 500;
 }
 
@@ -79,7 +79,7 @@
 
 .footerLabel {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--t-400);
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
@@ -87,7 +87,7 @@
 .footerValue {
   font-size: 16px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .goalItem {

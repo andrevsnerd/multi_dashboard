@@ -1,6 +1,6 @@
 .wrapper {
   padding: 24px;
-  background: #f5f5f5;
+  background: var(--s-gray100b);
   min-height: 100vh;
 }
 
@@ -23,7 +23,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
+  background: var(--s-white);
   border-radius: 8px;
   color: #e65100;
   flex-shrink: 0;
@@ -32,13 +32,13 @@
 .title {
   font-size: 26px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--t-1a);
   margin: 0 0 4px 0;
 }
 
 .subtitle {
   font-size: 13px;
-  color: #666;
+  color: var(--t-666);
   margin: 0;
 }
 
@@ -57,7 +57,7 @@
 }
 
 .kpiCard {
-  background: #fff;
+  background: var(--s-white);
   border-radius: 10px;
   padding: 16px 20px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
@@ -79,7 +79,7 @@
 .kpiValue {
   font-size: 22px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--t-1a);
 }
 
 /* Filtros */
@@ -110,11 +110,11 @@
   padding: 6px 14px;
   font-size: 13px;
   font-weight: 500;
-  background: #fff;
+  background: var(--s-white);
   border: 1px solid #ddd;
   border-radius: 20px;
   cursor: pointer;
-  color: #555;
+  color: var(--t-555);
   transition: all 0.15s;
   white-space: nowrap;
 }
@@ -140,7 +140,7 @@
   font-size: 13px;
   border: 1px solid #ddd;
   border-radius: 6px;
-  background: #fff;
+  background: var(--s-white);
   outline: none;
   width: 220px;
   transition: border-color 0.15s;
@@ -152,11 +152,11 @@
 
 /* Tabela */
 .feedback {
-  background: #fff;
+  background: var(--s-white);
   border-radius: 10px;
   padding: 32px;
   text-align: center;
-  color: #666;
+  color: var(--t-666);
   font-size: 14px;
 }
 
@@ -165,7 +165,7 @@
 }
 
 .tableWrapper {
-  background: #fff;
+  background: var(--s-white);
   border-radius: 10px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   overflow: hidden;
@@ -176,7 +176,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 16px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--s-gray100b);
 }
 
 .tableCount {
@@ -226,7 +226,7 @@
   color: #888;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  background: #fafafa;
+  background: var(--s-gray50);
   border-bottom: 1px solid #ececec;
   white-space: nowrap;
   cursor: default;
@@ -239,8 +239,8 @@
 }
 
 .thSortable:hover {
-  color: #555;
-  background: #f0f0f0;
+  color: var(--t-555);
+  background: var(--s-gray100b);
 }
 
 .thActive {
@@ -269,12 +269,12 @@
 }
 
 .tr {
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid var(--s-gray100b);
   transition: background 0.1s;
 }
 
 .tr:hover {
-  background: #fafafa;
+  background: var(--s-gray50);
 }
 
 .tr:last-child {
@@ -283,13 +283,13 @@
 
 .td {
   padding: 8px 12px;
-  color: #333;
+  color: var(--t-333);
   white-space: nowrap;
 }
 
 .tdMono {
   padding: 8px 12px;
-  color: #555;
+  color: var(--t-555);
   font-family: monospace;
   font-size: 12px;
   white-space: nowrap;
@@ -297,7 +297,7 @@
 
 .tdDesc {
   padding: 8px 12px;
-  color: #333;
+  color: var(--t-333);
   max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -307,14 +307,14 @@
 .tdNum {
   padding: 8px 12px;
   text-align: right;
-  color: #333;
+  color: var(--t-333);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
 .tdDate {
   font-size: 12px;
-  color: #555;
+  color: var(--t-555);
 }
 
 /* Badges de dias parado */

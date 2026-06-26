@@ -83,7 +83,7 @@
 }
 
 .secondaryButton {
-  background: white;
+  background: var(--s-white);
   color: #6d2e46;
   padding: 10px 14px;
   border: 1px solid rgba(109, 46, 70, 0.18);
@@ -133,7 +133,7 @@
 }
 
 .rangeCard {
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--s-white);
   border: 1px solid rgba(109, 46, 70, 0.1);
   padding: 14px;
   display: flex;
@@ -264,7 +264,7 @@
 .auditPanel {
   margin: 14px 0 18px;
   padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--s-white);
   border-left: 4px solid #d4a373;
   box-shadow: 0 4px 12px rgba(78, 48, 57, 0.08);
 }
@@ -478,7 +478,7 @@
 }
 
 .statCard {
-  background: white;
+  background: var(--s-white);
   min-height: 180px;
   border-top: 12px solid #6d2e46;
   padding: 24px 22px;
@@ -552,7 +552,7 @@
 }
 
 .miniCallout {
-  background: #fff;
+  background: var(--s-white);
   border-left: 5px solid #d4a373;
   padding: 13px 16px;
   margin-top: 10px;
@@ -682,7 +682,7 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  background: rgba(255, 255, 255, 0.68);
+  background: var(--s-white);
   margin-top: 10px;
   font-size: 14px;
 }
@@ -780,7 +780,7 @@
 }
 
 .podiumCard {
-  background: white;
+  background: var(--s-white);
   display: grid;
   grid-template-columns: 92px 1fr;
   min-height: 112px;
@@ -859,7 +859,7 @@
 }
 
 .yearLight {
-  background: white;
+  background: var(--s-white);
   border-top: 10px solid #6d2e46;
 }
 
@@ -986,7 +986,7 @@
 }
 
 .profileCard {
-  background: white;
+  background: var(--s-white);
   border-top: 8px solid #6d2e46;
   box-shadow: 0 6px 16px rgba(78, 48, 57, 0.12);
   display: flex;
@@ -1131,7 +1131,7 @@
 }
 
 .scopeCard {
-  background: white;
+  background: var(--s-white);
   border-top: 10px solid #6d2e46;
   padding: 22px;
   min-height: 260px;
@@ -1254,7 +1254,7 @@
   grid-template-columns: 120px 92px 1fr 68px;
   gap: 10px;
   align-items: center;
-  background: rgba(255, 255, 255, 0.68);
+  background: var(--s-white);
   padding: 10px 12px;
 }
 
@@ -1308,7 +1308,7 @@
 }
 
 .driftCard {
-  background: white;
+  background: var(--s-white);
   padding: 18px 20px;
   border-left: 8px solid #5a8c5c;
   box-shadow: 0 4px 12px rgba(78, 48, 57, 0.08);
@@ -1371,7 +1371,7 @@
 }
 
 .storyCard {
-  background: white;
+  background: var(--s-white);
   border-left: 6px solid #d4a373;
   padding: 18px 22px;
   min-height: 92px;

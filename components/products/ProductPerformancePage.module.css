@@ -95,7 +95,7 @@
   border: 1px solid var(--pp-border);
   border-radius: 10px;
   font-size: 14px;
-  background: #fff;
+  background: var(--s-white);
   color: var(--pp-ink);
 }
 
@@ -121,7 +121,7 @@
   top: calc(100% + 6px);
   left: 0;
   right: 0;
-  background: #fff;
+  background: var(--s-white);
   border: 1px solid var(--pp-border);
   border-radius: 10px;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
@@ -137,7 +137,7 @@
   border: none;
   background: transparent;
   cursor: pointer;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--s-100);
 }
 
 .searchResultItem:hover {
@@ -161,7 +161,7 @@
   border: 1px solid var(--pp-border);
   border-radius: 10px;
   font-size: 14px;
-  background: #fff;
+  background: var(--s-white);
   color: var(--pp-ink);
   min-width: 180px;
 }
@@ -341,7 +341,7 @@
 
 /* ---------- Timeline ---------- */
 .timelineCard {
-  background: #fff;
+  background: var(--s-white);
   border: 1px solid var(--pp-border);
   border-radius: 14px;
   padding: 20px 22px 8px;
@@ -432,7 +432,7 @@
 }
 
 .branchCard {
-  background: #fff;
+  background: var(--s-white);
   border: 1px solid var(--pp-border);
   border-radius: 14px;
   padding: 16px 22px;
@@ -460,7 +460,7 @@
   gap: 16px;
   align-items: center;
   padding: 10px 0;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--s-100);
 }
 
 .branchRow:first-child {
@@ -477,7 +477,7 @@
 .performancePanel {
   display: grid;
   grid-template-columns: minmax(280px, 36%) 1fr;
-  background: #fff;
+  background: var(--s-white);
   border: 1px solid var(--pp-border);
   border-radius: 14px;
   overflow: hidden;
@@ -663,7 +663,7 @@
 
 .perfTable td {
   padding: 10px 6px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--s-100);
   color: var(--pp-ink);
   vertical-align: middle;
   white-space: nowrap;
@@ -744,7 +744,7 @@
   padding: 48px;
   text-align: center;
   color: var(--pp-muted);
-  background: #fff;
+  background: var(--s-white);
   border: 1px dashed var(--pp-border);
   border-radius: 14px;
 }
@@ -755,7 +755,7 @@
   gap: 12px;
   padding: 32px;
   color: var(--pp-muted);
-  background: #fff;
+  background: var(--s-white);
   border: 1px solid var(--pp-border);
   border-radius: 14px;
 }

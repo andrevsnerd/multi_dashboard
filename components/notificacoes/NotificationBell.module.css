@@ -10,7 +10,7 @@
   justify-content: center;
   width: 36px;
   height: 36px;
-  color: #64748b;
+  color: var(--t-500);
   background: none;
   border: none;
   border-radius: 8px;
@@ -19,8 +19,8 @@
 }
 
 .bellBtn:hover {
-  color: #0f172a;
-  background: #f1f5f9;
+  color: var(--t-900);
+  background: var(--s-100);
 }
 
 .badge {
@@ -46,8 +46,8 @@
   right: 0;
   width: 360px;
   max-width: calc(100vw - 32px);
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
   border-radius: 14px;
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
   z-index: 200;
@@ -60,13 +60,13 @@
   justify-content: space-between;
   gap: 8px;
   padding: 12px 16px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--s-100);
 }
 
 .panelTitle {
   font-size: 14px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .markAll {
@@ -80,7 +80,7 @@
 }
 
 .markAll:hover {
-  background: #eef2ff;
+  background: var(--s-blue50);
 }
 
 .list {
@@ -92,7 +92,7 @@
   padding: 28px 16px;
   text-align: center;
   font-size: 13px;
-  color: #94a3b8;
+  color: var(--t-400);
 }
 
 .item {
@@ -102,19 +102,19 @@
   width: 100%;
   text-align: left;
   padding: 12px 16px;
-  background: #ffffff;
+  background: var(--s-white);
   border: none;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--s-100);
   cursor: pointer;
   transition: background-color 0.12s;
 }
 
 .item:hover {
-  background: #f8fafc;
+  background: var(--s-50);
 }
 
 .itemLido {
-  background: #ffffff;
+  background: var(--s-white);
 }
 
 .dot {
@@ -128,7 +128,7 @@
 
 .item.itemLido .itemTitle {
   font-weight: 500;
-  color: #475569;
+  color: var(--t-600);
 }
 
 .itemBody {
@@ -141,17 +141,17 @@
 .itemTitle {
   font-size: 13px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .itemSub {
   font-size: 12px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .itemMeta {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--t-400);
 }
 
 .verTodas {
@@ -162,9 +162,9 @@
   font-weight: 600;
   color: #6366f1;
   text-decoration: none;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--s-100);
 }
 
 .verTodas:hover {
-  background: #f8fafc;
+  background: var(--s-50);
 }

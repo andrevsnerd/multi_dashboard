@@ -32,9 +32,9 @@
 }
 
 .card {
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 20px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--b-subtle);
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -54,7 +54,7 @@
   font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--t-500);
   font-weight: 600;
   line-height: 1.2;
 }
@@ -64,7 +64,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #94a3b8;
+  color: var(--t-400);
   width: 32px;
   height: 32px;
   flex-shrink: 0;
@@ -77,7 +77,7 @@
 .cardValue {
   font-size: 28px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
   line-height: 1.2;
 }
 
@@ -110,7 +110,7 @@
 .cardDescription {
   margin: 0;
   font-size: 14px;
-  color: #64748b;
+  color: var(--t-500);
   line-height: 1.25;
   min-height: 18px;
 }
@@ -140,7 +140,7 @@
 .estoqueSectionTitle {
   font-size: 18px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
   margin: 0 0 16px 0;
 }
 
@@ -152,9 +152,9 @@
 }
 
 .estoqueCard {
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 20px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--b-subtle);
   padding: 24px;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
   display: flex;
@@ -167,21 +167,21 @@
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--t-500);
   font-weight: 600;
 }
 
 .estoqueCardValue {
   font-size: 22px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 /* New: Estoque por Filial (layout igual ao print) */
 .stockByFilialCard {
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--b-subtle);
   padding: 18px;
   box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
 }
@@ -196,14 +196,14 @@
 .stockByFilialTitle {
   font-size: 16px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
   margin: 0;
 }
 
 .stockByFilialSubtitle {
   margin: 0;
   font-size: 12px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .stockByFilialList {
@@ -223,7 +223,7 @@
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--t-500);
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -232,7 +232,7 @@
 
 .stockByFilialBarWrap {
   height: 6px;
-  background: #f1f5f9;
+  background: var(--s-100);
   border-radius: 9999px;
   overflow: hidden;
 }
@@ -267,7 +267,7 @@
   gap: 10px;
   align-items: baseline;
   font-size: 12px;
-  color: #0f172a;
+  color: var(--t-900);
   white-space: nowrap;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -286,7 +286,7 @@
 }
 
 .stockByFilialPct {
-  color: #64748b;
+  color: var(--t-500);
   font-weight: 600;
   font-size: 12px;
   min-width: 52px;
@@ -300,9 +300,9 @@
 }
 
 .chartCard {
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 20px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--b-subtle);
   padding: 24px;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
 }
@@ -310,13 +310,13 @@
 .chartTitle {
   font-size: 18px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
   margin: 0 0 4px 0;
 }
 
 .chartSubtitle {
   font-size: 14px;
-  color: #64748b;
+  color: var(--t-500);
   margin: 0 0 16px 0;
 }
 
@@ -331,7 +331,7 @@
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .chartLegendDotBlue {
@@ -355,9 +355,9 @@
 
 /* Stock projection card */
 .stockProjectionCard {
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 20px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--b-subtle);
   padding: 24px;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
   display: flex;
@@ -371,7 +371,7 @@
   gap: 8px;
   font-size: 18px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
   margin: 0;
 }
 
@@ -379,7 +379,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .stockProjectionGrid {
@@ -398,14 +398,14 @@
   font-size: 12px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--t-500);
   font-weight: 600;
 }
 
 .stockProjectionValue {
   font-size: 22px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .consumoProjected {
@@ -416,7 +416,7 @@
 
 .consumoLabel {
   font-size: 14px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .progressBarWrapper {
@@ -428,7 +428,7 @@
 .progressBar {
   flex: 1;
   height: 10px;
-  background: #e2e8f0;
+  background: var(--b-200);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -443,7 +443,7 @@
 .consumoValue {
   font-size: 14px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
   white-space: nowrap;
 }
 
@@ -453,7 +453,7 @@
   gap: 8px;
   margin: 0;
   font-size: 13px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .depletionIcon {
@@ -528,12 +528,12 @@
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: #64748b;
+  color: var(--t-500);
   cursor: pointer;
   transition: color 0.15s, background 0.15s;
 }
 .cardEditButton:hover {
-  color: #0f172a;
+  color: var(--t-900);
   background: rgba(15, 23, 42, 0.06);
 }
 .cardEditButton:focus-visible {
@@ -553,7 +553,7 @@
   padding: 16px;
 }
 .modalContent {
-  background: #fff;
+  background: var(--s-white);
   border-radius: 16px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   max-width: 520px;
@@ -566,7 +566,7 @@
 .modalTitle {
   font-size: 18px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
   padding: 20px 24px 12px;
   margin: 0;
 }
@@ -581,20 +581,20 @@
   gap: 12px;
   align-items: center;
   padding: 10px 0;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--b-200);
 }
 .modalRow:last-child {
   border-bottom: none;
 }
 .modalRowLabel {
   font-size: 14px;
-  color: #475569;
+  color: var(--t-600);
 }
 .modalInput {
   width: 120px;
   padding: 8px 12px;
   font-size: 14px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--b-200);
   border-radius: 8px;
   text-align: right;
 }
@@ -605,21 +605,21 @@
 }
 .modalConfirmMessage {
   padding: 16px 24px;
-  background: #f1f5f9;
+  background: var(--s-100);
   border-radius: 12px;
   margin: 0 24px 16px;
   font-size: 14px;
-  color: #475569;
+  color: var(--t-600);
 }
 .modalConfirmMessage strong {
-  color: #0f172a;
+  color: var(--t-900);
 }
 .modalActions {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
   padding: 16px 24px 24px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--b-200);
 }
 .modalButton {
   padding: 10px 20px;
@@ -630,12 +630,12 @@
   transition: background 0.15s, color 0.15s;
 }
 .modalButtonSecondary {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--s-100);
+  color: var(--t-600);
   border: none;
 }
 .modalButtonSecondary:hover {
-  background: #e2e8f0;
+  background: var(--b-200);
 }
 .modalButtonPrimary {
   background: #0f172a;
@@ -652,13 +652,13 @@
 .modalEmpty {
   padding: 24px;
   text-align: center;
-  color: #64748b;
+  color: var(--t-500);
   font-size: 14px;
 }
 .modalLoading {
   padding: 24px;
   text-align: center;
-  color: #64748b;
+  color: var(--t-500);
   font-size: 14px;
 }
 .modalError {

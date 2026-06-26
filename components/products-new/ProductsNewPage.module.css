@@ -14,18 +14,18 @@
   margin: 0;
   font-size: 2rem;
   line-height: 1.1;
-  color: #111827;
+  color: var(--t-gray900);
 }
 
 .subtitle {
   margin: 0;
-  color: #4b5563;
+  color: var(--t-gray600);
   font-size: 0.95rem;
 }
 
 .card {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--s-white);
+  border: 1px solid var(--b-gray200);
   border-radius: 18px;
   overflow: hidden;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
@@ -41,14 +41,14 @@
 }
 
 .table thead {
-  background: #f8fafc;
+  background: var(--s-50);
 }
 
 .table th,
 .table td {
   padding: 14px 16px;
   text-align: left;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--b-gray200);
   font-size: 0.95rem;
 }
 
@@ -57,7 +57,7 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #475569;
+  color: var(--t-600);
 }
 
 .table tbody tr:last-child td {
@@ -66,26 +66,26 @@
 
 .produto {
   font-weight: 700;
-  color: #111827;
+  color: var(--t-gray900);
   white-space: nowrap;
 }
 
 .dataCadastro {
-  color: #374151;
+  color: var(--t-gray700);
   white-space: nowrap;
 }
 
 .descricao {
-  color: #1f2937;
+  color: var(--t-gray800);
 }
 
 .cor {
-  color: #374151;
+  color: var(--t-gray700);
   white-space: nowrap;
 }
 
 .dias {
-  color: #0f172a;
+  color: var(--t-900);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -93,7 +93,7 @@
 .empty {
   padding: 36px 20px;
   text-align: center;
-  color: #6b7280;
+  color: var(--t-gray500);
 }
 
 @media (max-width: 768px) {

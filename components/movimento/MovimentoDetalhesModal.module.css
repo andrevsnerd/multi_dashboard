@@ -10,7 +10,7 @@
 }
 
 .modal {
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 20px;
   box-shadow: 0 24px 48px rgba(15, 23, 42, 0.25);
   width: 100%;
@@ -26,19 +26,19 @@
   align-items: center;
   justify-content: space-between;
   padding: 24px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  border-bottom: 1px solid var(--b-subtle);
 }
 
 .title {
   font-size: 24px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
   margin: 0 0 4px 0;
 }
 
 .subtitle {
   font-size: 14px;
-  color: #64748b;
+  color: var(--t-500);
   margin: 0;
 }
 
@@ -48,7 +48,7 @@
   border-radius: 8px;
   border: none;
   background: transparent;
-  color: #64748b;
+  color: var(--t-500);
   font-size: 24px;
   cursor: pointer;
   display: flex;
@@ -58,8 +58,8 @@
 }
 
 .closeButton:hover {
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--s-50);
+  color: var(--t-900);
 }
 
 .content {
@@ -72,14 +72,14 @@
   display: flex;
   gap: 8px;
   margin-bottom: 24px;
-  border-bottom: 2px solid rgba(15, 23, 42, 0.08);
+  border-bottom: 2px solid var(--b-subtle);
 }
 
 .tab {
   padding: 12px 24px;
   border: none;
   background: transparent;
-  color: #64748b;
+  color: var(--t-500);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -89,12 +89,12 @@
 }
 
 .tab:hover {
-  color: #0f172a;
-  background: #f8fafc;
+  color: var(--t-900);
+  background: var(--s-50);
 }
 
 .tabActive {
-  color: #0f172a;
+  color: var(--t-900);
   border-bottom-color: #0f172a;
 }
 
@@ -103,9 +103,9 @@
   gap: 24px;
   margin-bottom: 24px;
   padding: 20px;
-  background: #f8fafc;
+  background: var(--s-50);
   border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--b-subtle);
   flex-wrap: wrap;
 }
 
@@ -117,7 +117,7 @@
 
 .summaryLabel {
   font-size: 12px;
-  color: #64748b;
+  color: var(--t-500);
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -126,23 +126,23 @@
 .summaryValue {
   font-size: 18px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .tableWrapper {
   overflow-x: auto;
   border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--b-subtle);
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
-  background: #ffffff;
+  background: var(--s-white);
 }
 
 .table thead {
-  background: #f8fafc;
+  background: var(--s-50);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -153,26 +153,26 @@
   text-align: left;
   font-size: 12px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--t-500);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 2px solid rgba(15, 23, 42, 0.08);
+  border-bottom: 2px solid var(--b-subtle);
   white-space: nowrap;
 }
 
 .table tbody tr {
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  border-bottom: 1px solid var(--b-subtle);
   transition: background 0.2s;
 }
 
 .table tbody tr:hover {
-  background: #f8fafc;
+  background: var(--s-50);
 }
 
 .table td {
   padding: 12px 16px;
   font-size: 14px;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .produtoCell {
@@ -181,7 +181,7 @@
 }
 
 .corCell {
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .descCell {
@@ -192,7 +192,7 @@
 }
 
 .categoriaCell {
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .numberCell {
@@ -203,16 +203,16 @@
 .currencyCell {
   text-align: right;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .dateCell {
-  color: #64748b;
+  color: var(--t-500);
   font-size: 13px;
 }
 
 .filialCell {
-  color: #64748b;
+  color: var(--t-500);
   font-weight: 500;
 }
 
@@ -226,7 +226,7 @@
 .empty {
   padding: 40px;
   text-align: center;
-  color: #64748b;
+  color: var(--t-500);
   font-size: 14px;
 }
 

@@ -10,7 +10,7 @@
 }
 
 .confirmarTransferenciaModal {
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 12px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
   max-width: 480px;
@@ -24,7 +24,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 20px 24px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--b-gray200);
 }
 
 .confirmarTransferenciaTitleRow {
@@ -42,7 +42,7 @@
   margin: 0;
   font-size: 20px;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--t-gray800);
 }
 
 .confirmarTransferenciaClose {
@@ -50,7 +50,7 @@
   border: none;
   padding: 8px;
   cursor: pointer;
-  color: #6b7280;
+  color: var(--t-gray500);
   border-radius: 6px;
   display: flex;
   align-items: center;
@@ -59,8 +59,8 @@
 }
 
 .confirmarTransferenciaClose:hover {
-  color: #1f2937;
-  background: #f3f4f6;
+  color: var(--t-gray800);
+  background: var(--s-gray100);
 }
 
 .confirmarTransferenciaContent {
@@ -86,7 +86,7 @@
   gap: 8px;
   padding: 16px 20px;
   border-radius: 12px;
-  background: #f9fafb;
+  background: var(--s-gray50);
   min-width: 140px;
 }
 
@@ -105,7 +105,7 @@
 .confirmarTransferenciaFilialLabel {
   font-size: 12px;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--t-gray500);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -129,21 +129,21 @@
 
 .confirmarTransferenciaEstoqueOrigem {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--t-gray500);
   margin-top: 4px;
 }
 
 .confirmarTransferenciaArrow {
-  color: #9ca3af;
+  color: var(--t-gray400);
   flex-shrink: 0;
 }
 
 /* Produto card */
 .confirmarTransferenciaProdutoCard {
-  background: #f9fafb;
+  background: var(--s-gray50);
   border-radius: 10px;
   padding: 16px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
 }
 
 .confirmarTransferenciaProdutoHeader {
@@ -155,19 +155,19 @@
 
 .confirmarTransferenciaProdutoIcon {
   font-size: 18px;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-weight: 600;
 }
 
 .confirmarTransferenciaProdutoCodigo {
   font-size: 16px;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--t-gray800);
 }
 
 .confirmarTransferenciaProdutoDescricao {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--t-gray500);
   margin-top: 2px;
 }
 
@@ -185,7 +185,7 @@
 
 .confirmarTransferenciaFieldLabel {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--t-gray500);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -193,7 +193,7 @@
 .confirmarTransferenciaFieldValue {
   font-size: 14px;
   font-weight: 500;
-  color: #1f2937;
+  color: var(--t-gray800);
 }
 
 .confirmarTransferenciaInfoCard {
@@ -222,13 +222,13 @@
 .confirmarTransferenciaQuantidadeLabel {
   font-size: 14px;
   font-weight: 500;
-  color: #374151;
+  color: var(--t-gray700);
 }
 
 .confirmarTransferenciaQuantidadeInput {
   padding: 12px 16px;
   font-size: 16px;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--b-gray200);
   border-radius: 8px;
   width: 100%;
   max-width: 160px;
@@ -265,8 +265,8 @@
   align-items: center;
   gap: 12px;
   padding: 20px 24px;
-  border-top: 1px solid #e5e7eb;
-  background: #fafafa;
+  border-top: 1px solid var(--b-gray200);
+  background: var(--s-gray50);
   border-radius: 0 0 12px 12px;
   flex-wrap: wrap;
 }
@@ -281,16 +281,16 @@
   padding: 10px 20px;
   font-size: 14px;
   font-weight: 500;
-  border: 1px solid #d1d5db;
-  background: #ffffff;
-  color: #374151;
+  border: 1px solid var(--b-gray300);
+  background: var(--s-white);
+  color: var(--t-gray700);
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
 
 .confirmarTransferenciaCancel:hover:not(:disabled) {
-  background: #f9fafb;
+  background: var(--s-gray50);
   border-color: #9ca3af;
 }
 

@@ -1,6 +1,120 @@
+/*
+ * ─────────────────────────────────────────────────────────────────────────
+ *  TEMA / DESIGN TOKENS
+ *  Cada token tem o valor CLARO igual ao literal original usado no app
+ *  (tema claro continua idêntico ao atual) e um valor ESCURO derivado da
+ *  paleta navy do dashboard. O tema é trocado via [data-theme="dark"] no
+ *  <html> (ver ThemeProvider). Tudo abaixo é consumido por var(--token).
+ * ─────────────────────────────────────────────────────────────────────────
+ */
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* App / superfícies */
+  --app-bg: #f8fafc;
+  --s-white: #ffffff;   /* cards, sidebar, header, branco puro */
+  --s-50: #f8fafc;      /* superfície recolhida */
+  --s-gray50: #f9fafb;
+  --s-gray100b: #f5f5f5;
+  --s-100: #f1f5f9;     /* hover */
+  --s-gray100: #f3f4f6;
+  --s-blue50: #eff6ff;  /* destaque azul claro */
+
+  /* Bordas */
+  --b-200: #e2e8f0;
+  --b-gray200: #e5e7eb;
+  --b-300: #cbd5e1;
+  --b-gray300: #d1d5db;
+  --b-subtle: rgba(15, 23, 42, 0.08);
+  --b-subtle2: rgba(15, 23, 42, 0.12);
+
+  /* Texto */
+  --t-900: #0f172a;
+  --t-gray900: #111827;
+  --t-1a: #1a1a1a;
+  --t-800: #1e293b;
+  --t-gray800: #1f2937;
+  --t-700: #334155;
+  --t-gray700: #374151;
+  --t-333: #333333;
+  --t-600: #475569;
+  --t-gray600: #4b5563;
+  --t-500: #64748b;
+  --t-gray500: #6b7280;
+  --t-666: #666666;
+  --t-555: #555555;
+  --t-400: #94a3b8;
+  --t-gray400: #9ca3af;
+
+  /* Marca */
+  --brand-scarfme: #2d1b4e;
+
+  /* Gráficos (consumidos via useTheme nos componentes recharts) */
+  --chart-line: #475569;
+  --chart-grid: #e2e8f0;
+  --chart-axis: #94a3b8;
+  --chart-axis-text: #64748b;
+  --chart-track: #e2e8f0;
+  --chart-tooltip-bg: #ffffff;
+
+  /* Sidebar / estados de navegação */
+  --nav-hover: rgba(255, 255, 255, 0.9);
+  --nav-active: #ffffff;
+  --submenu-bg: rgba(255, 255, 255, 0.58);
+}
+
+:root[data-theme="dark"] {
+  --background: #0a111e;
+  --foreground: #e9eef7;
+
+  --app-bg: #0a111e;
+  --s-white: #1a2433;
+  --s-50: #111b2b;
+  --s-gray50: #141d2d;
+  --s-gray100b: #141d2d;
+  --s-100: #222e45;
+  --s-gray100: #1f2a3e;
+  --s-blue50: rgba(37, 99, 235, 0.16);
+
+  --b-200: #29344b;
+  --b-gray200: #29344b;
+  --b-300: #38455f;
+  --b-gray300: #38455f;
+  --b-subtle: rgba(148, 163, 184, 0.15);
+  --b-subtle2: rgba(148, 163, 184, 0.22);
+
+  --t-900: #eaf0f8;
+  --t-gray900: #eaf0f8;
+  --t-1a: #eaf0f8;
+  --t-800: #dde4ee;
+  --t-gray800: #dde4ee;
+  --t-700: #c7d1df;
+  --t-gray700: #c7d1df;
+  --t-333: #c7d1df;
+  --t-600: #aab6c8;
+  --t-gray600: #aab6c8;
+  --t-500: #94a3b8;
+  --t-gray500: #94a3b8;
+  --t-666: #98a5b6;
+  --t-555: #8a97a9;
+  --t-400: #74829a;
+  --t-gray400: #74829a;
+
+  --brand-scarfme: #c4b5fd;
+
+  --chart-line: #cbd5e1;
+  --chart-grid: rgba(148, 163, 184, 0.16);
+  --chart-axis: #64748b;
+  --chart-axis-text: #94a3b8;
+  --chart-track: #29344b;
+  --chart-tooltip-bg: #1a2433;
+
+  --nav-hover: rgba(148, 163, 184, 0.1);
+  --nav-active: #26334e;
+  --submenu-bg: rgba(255, 255, 255, 0.03);
+
+  color-scheme: dark;
 }
 
 /*
@@ -15,10 +129,11 @@ body {
 
 body {
   color: var(--foreground);
-  background: #f8fafc;
+  background: var(--app-bg);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 * {

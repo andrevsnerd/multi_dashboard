@@ -2,7 +2,7 @@
   width: 100%;
   padding: 24px;
   min-height: 100vh;
-  background: #f9fafb;
+  background: var(--s-gray50);
 }
 
 .header {
@@ -12,7 +12,7 @@
 .title {
   font-size: 28px;
   font-weight: 700;
-  color: #111827;
+  color: var(--t-gray900);
   margin: 0 0 8px 0;
   display: flex;
   align-items: center;
@@ -26,7 +26,7 @@
 
 .subtitle {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--t-gray500);
   margin: 0;
 }
 
@@ -44,7 +44,7 @@
 }
 
 .section {
-  background: white;
+  background: var(--s-white);
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -54,7 +54,7 @@
   display: block;
   font-size: 12px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--t-gray500);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 12px;
@@ -69,7 +69,7 @@
 
 .itemCount {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-weight: 500;
 }
 
@@ -80,11 +80,11 @@
 .select {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--b-gray300);
   border-radius: 8px;
   font-size: 14px;
-  background: white;
-  color: #111827;
+  background: var(--s-white);
+  color: var(--t-gray900);
   cursor: pointer;
   transition: border-color 0.2s;
 }
@@ -100,9 +100,9 @@
   align-items: center;
   gap: 12px;
   padding: 16px;
-  background: #f9fafb;
+  background: var(--s-gray50);
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
   margin-top: 12px;
 }
 
@@ -118,13 +118,13 @@
 .filialName {
   font-size: 16px;
   font-weight: 600;
-  color: #111827;
+  color: var(--t-gray900);
   margin-bottom: 4px;
 }
 
 .filialCode {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--t-gray500);
 }
 
 .checkmark {
@@ -144,7 +144,7 @@
 .emptyState {
   text-align: center;
   padding: 48px 24px;
-  color: #9ca3af;
+  color: var(--t-gray400);
   font-size: 14px;
 }
 
@@ -157,7 +157,7 @@
 .emptySubtext {
   font-size: 12px;
   margin-top: 8px;
-  color: #9ca3af;
+  color: var(--t-gray400);
 }
 
 .produtosList {
@@ -172,9 +172,9 @@
   justify-content: space-between;
   align-items: center;
   padding: 16px;
-  background: #f9fafb;
+  background: var(--s-gray50);
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
 }
 
 .produtoInfo {
@@ -184,13 +184,13 @@
 .produtoName {
   font-size: 16px;
   font-weight: 600;
-  color: #111827;
+  color: var(--t-gray900);
   margin-bottom: 4px;
 }
 
 .produtoSku {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--t-gray500);
 }
 
 .produtoControls {
@@ -203,7 +203,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--b-gray300);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -212,8 +212,8 @@
   width: 32px;
   height: 32px;
   border: none;
-  background: white;
-  color: #111827;
+  background: var(--s-white);
+  color: var(--t-gray900);
   font-size: 18px;
   font-weight: 600;
   cursor: pointer;
@@ -224,7 +224,7 @@
 }
 
 .quantityButton:hover:not(:disabled) {
-  background: #f3f4f6;
+  background: var(--s-gray100);
 }
 
 .quantityButton:disabled {
@@ -239,8 +239,8 @@
   text-align: center;
   font-size: 14px;
   font-weight: 600;
-  color: #111827;
-  background: white;
+  color: var(--t-gray900);
+  background: var(--s-white);
 }
 
 .quantityInput:focus {
@@ -249,9 +249,9 @@
 
 .stockIndicator {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--t-gray500);
   padding: 4px 8px;
-  background: #f3f4f6;
+  background: var(--s-gray100);
   border-radius: 4px;
 }
 
@@ -310,7 +310,7 @@
   justify-content: space-between;
   margin-bottom: 20px;
   padding: 16px;
-  background: #f9fafb;
+  background: var(--s-gray50);
   border-radius: 8px;
 }
 
@@ -324,7 +324,7 @@
 .resumoOrigem span,
 .resumoDestino span {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--t-gray500);
   text-transform: uppercase;
   font-weight: 600;
 }
@@ -332,13 +332,13 @@
 .resumoOrigem strong,
 .resumoDestino strong {
   font-size: 16px;
-  color: #111827;
+  color: var(--t-gray900);
   font-weight: 600;
 }
 
 .resumoArrow {
   font-size: 24px;
-  color: #6b7280;
+  color: var(--t-gray500);
   margin: 0 16px;
 }
 
@@ -351,7 +351,7 @@
 
 .resumoCard {
   padding: 16px;
-  background: #f9fafb;
+  background: var(--s-gray50);
   border-radius: 8px;
   text-align: center;
 }
@@ -359,13 +359,13 @@
 .resumoCardValue {
   font-size: 24px;
   font-weight: 700;
-  color: #111827;
+  color: var(--t-gray900);
   margin-bottom: 4px;
 }
 
 .resumoCardLabel {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--t-gray500);
   text-transform: uppercase;
   font-weight: 600;
 }
@@ -409,7 +409,7 @@
   display: block;
   font-size: 12px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--t-gray500);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 8px;
@@ -418,11 +418,11 @@
 .configSelect {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--b-gray300);
   border-radius: 8px;
   font-size: 14px;
-  background: white;
-  color: #111827;
+  background: var(--s-white);
+  color: var(--t-gray900);
   cursor: pointer;
   transition: border-color 0.2s;
 }
@@ -436,12 +436,12 @@
 .observacaoTextarea {
   width: 100%;
   padding: 10px 14px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--b-200);
   border-radius: 10px;
   font-size: 15px;
   font-family: inherit;
-  background: white;
-  color: #334155;
+  background: var(--s-white);
+  color: var(--t-700);
   resize: vertical;
   min-height: 80px;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -454,14 +454,14 @@
 }
 
 .observacaoTextarea:disabled {
-  background: #f8fafc;
-  color: #94a3b8;
+  background: var(--s-50);
+  color: var(--t-400);
   cursor: not-allowed;
 }
 
 .observacaoCounter {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--t-400);
   text-align: right;
   margin-top: 4px;
 }
@@ -475,10 +475,10 @@
 .customInput {
   flex: 1;
   padding: 10px 12px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--b-gray300);
   border-radius: 8px;
   font-size: 14px;
-  color: #111827;
+  color: var(--t-gray900);
 }
 
 .customInput:focus {
@@ -522,14 +522,14 @@
 
 .logItemWrapper:hover .logItem {
   border-color: #94a3b8;
-  background: #f8fafc;
+  background: var(--s-50);
 }
 
 .logItem {
   padding: 16px;
-  background: #f9fafb;
+  background: var(--s-gray50);
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
   transition: border-color 0.15s, background 0.15s;
 }
 
@@ -543,7 +543,7 @@
 .logRomaneio {
   font-size: 14px;
   font-weight: 600;
-  color: #111827;
+  color: var(--t-gray900);
 }
 
 .logStatus {
@@ -557,13 +557,13 @@
 
 .logDetails {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--t-gray500);
   margin-bottom: 6px;
 }
 
 .logResponsavel {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--t-gray500);
   margin-bottom: 8px;
 }
 
@@ -572,7 +572,7 @@
   justify-content: space-between;
   align-items: center;
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--t-gray400);
 }
 
 .logDate {
@@ -587,9 +587,9 @@
   top: 100%;
   margin-top: 4px;
   z-index: 50;
-  background: #fff;
+  background: var(--s-white);
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--b-200);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   padding: 8px 10px;
   max-height: 240px;
@@ -599,7 +599,7 @@
 .logPopoverLoad {
   padding: 8px 0;
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--t-400);
   text-align: center;
 }
 
@@ -611,15 +611,15 @@
 
 .logPopoverRow {
   padding: 6px 8px;
-  background: #f8fafc;
+  background: var(--s-50);
   border-radius: 6px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--b-200);
 }
 
 .logPopoverNome {
   font-size: 12px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
   margin-bottom: 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -628,7 +628,7 @@
 
 .logPopoverMeta {
   font-size: 11px;
-  color: #64748b;
+  color: var(--t-500);
   margin-bottom: 4px;
   white-space: nowrap;
   overflow: hidden;
@@ -637,7 +637,7 @@
 
 .logPopoverEstoque {
   font-size: 11px;
-  color: #475569;
+  color: var(--t-600);
   margin-top: 4px;
 }
 
@@ -650,7 +650,7 @@
 }
 
 .logPopoverEstoque strong {
-  color: #0f172a;
+  color: var(--t-900);
   font-weight: 600;
 }
 
@@ -670,7 +670,7 @@
 }
 
 .modal {
-  background: white;
+  background: var(--s-white);
   border-radius: 12px;
   width: 100%;
   max-width: 600px;
@@ -685,13 +685,13 @@
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--b-gray200);
 }
 
 .modalTitle {
   font-size: 20px;
   font-weight: 600;
-  color: #111827;
+  color: var(--t-gray900);
   margin: 0;
 }
 
@@ -701,7 +701,7 @@
   border: none;
   background: transparent;
   font-size: 24px;
-  color: #6b7280;
+  color: var(--t-gray500);
   cursor: pointer;
   border-radius: 4px;
   transition: background-color 0.2s;
@@ -711,7 +711,7 @@
 }
 
 .modalClose:hover {
-  background: #f3f4f6;
+  background: var(--s-gray100);
 }
 
 .modalContent {
@@ -731,16 +731,16 @@
   top: 50%;
   transform: translateY(-50%);
   font-size: 18px;
-  color: #9ca3af;
+  color: var(--t-gray400);
 }
 
 .searchInput {
   width: 100%;
   padding: 12px 12px 12px 40px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--b-gray300);
   border-radius: 8px;
   font-size: 14px;
-  color: #111827;
+  color: var(--t-gray900);
 }
 
 .searchInput:focus {
@@ -752,7 +752,7 @@
 .loading {
   text-align: center;
   padding: 24px;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-size: 14px;
 }
 
@@ -769,14 +769,14 @@
   align-items: center;
   gap: 12px;
   padding: 16px;
-  background: #f9fafb;
+  background: var(--s-gray50);
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
   transition: border-color 0.2s;
 }
 
 .produtoModalItem:hover {
-  border-color: #d1d5db;
+  border-color: var(--b-gray300);
 }
 
 .produtoModalIcon {
@@ -791,13 +791,13 @@
 .produtoModalName {
   font-size: 16px;
   font-weight: 600;
-  color: #111827;
+  color: var(--t-gray900);
   margin-bottom: 4px;
 }
 
 .produtoModalDetails {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--t-gray500);
 }
 
 .addProdutoButton {

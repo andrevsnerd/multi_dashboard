@@ -10,9 +10,9 @@
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  background: #f8f9fa;
+  background: var(--s-gray50);
   border-radius: 8px 8px 0 0;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
   border-bottom: none;
   position: relative;
   -webkit-overflow-scrolling: touch;
@@ -26,7 +26,7 @@
 
 .scrollBarTop::-webkit-scrollbar-track,
 .container::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--s-gray100b);
   border-radius: 4px;
 }
 
@@ -49,7 +49,7 @@
   width: 100%;
   overflow-x: auto;
   overflow-y: visible;
-  background: white;
+  background: var(--s-white);
   border-radius: 0 0 8px 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   position: relative;
@@ -70,7 +70,7 @@
 }
 
 .table thead {
-  background-color: #f8f9fa;
+  background-color: var(--s-gray50);
   z-index: 10;
   position: sticky;
   top: 0;
@@ -81,8 +81,8 @@
   text-align: center;
   font-weight: 600;
   font-size: 10px;
-  color: #1f2937;
-  border-bottom: 2px solid #e5e7eb;
+  color: var(--t-gray800);
+  border-bottom: 2px solid var(--b-gray200);
   white-space: nowrap;
   letter-spacing: 0.2px;
   text-transform: uppercase;
@@ -108,15 +108,15 @@
 .table td {
   padding: 0;
   border-bottom: none;
-  color: #374151;
+  color: var(--t-gray700);
   font-size: 11px;
   vertical-align: middle;
   white-space: nowrap;
-  background-color: white;
+  background-color: var(--s-white);
 }
 
 .table tbody tr {
-  background-color: white;
+  background-color: var(--s-white);
 }
 
 .table tbody tr td:first-child {
@@ -134,12 +134,12 @@
 }
 
 .table tbody tr:hover td {
-  background-color: #f9fafb;
+  background-color: var(--s-gray50);
 }
 
 .subgrupoCell {
   font-weight: 500;
-  color: #1f2937;
+  color: var(--t-gray800);
   text-align: left;
   padding: 10px 2px;
   font-size: 11px;
@@ -161,11 +161,11 @@
 .gradeCell {
   display: inline-block;
   padding: 2px 6px;
-  background-color: #f3f4f6;
+  background-color: var(--s-gray100);
   border-radius: 4px;
   font-size: 10px;
   font-weight: 500;
-  color: #374151;
+  color: var(--t-gray700);
   min-width: 28px;
   text-align: center;
 }
@@ -186,7 +186,7 @@
 
 .productName {
   font-size: 11px;
-  color: #1f2937;
+  color: var(--t-gray800);
   margin-bottom: 2px;
   line-height: 1.3;
   display: -webkit-box;
@@ -197,7 +197,7 @@
 
 .productCode {
   font-size: 9px;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-weight: 400;
   letter-spacing: 0.1px;
 }
@@ -205,7 +205,7 @@
 .numberCell {
   font-weight: 600;
   font-size: 11px;
-  color: #1f2937;
+  color: var(--t-gray800);
   text-align: right;
   padding: 10px 6px;
   width: 70px;
@@ -216,7 +216,7 @@
 .numberCellCenter {
   font-weight: 600;
   font-size: 11px;
-  color: #1f2937;
+  color: var(--t-gray800);
   text-align: center;
   padding: 10px 6px;
   width: 70px;
@@ -320,13 +320,13 @@
   align-items: center;
   justify-content: center;
   padding: 10px 4px;
-  background-color: #f8f9fa;
+  background-color: var(--s-gray50);
   border-radius: 0;
   width: 100%;
   min-width: 70px;
   max-width: 100%;
   min-height: 50px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
   transition: all 0.2s ease;
   box-sizing: border-box;
 }
@@ -358,7 +358,7 @@
 .stockValue {
   font-weight: 600;
   font-size: 18px;
-  color: #1f2937;
+  color: var(--t-gray800);
   line-height: 1;
   text-align: center;
 }
@@ -372,8 +372,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: rgba(255, 255, 255, 0.7);
-  color: #6b7280;
+  background-color: var(--s-white);
+  color: var(--t-gray500);
   font-weight: 500;
   font-size: 10px;
   border: 1px solid rgba(0, 0, 0, 0.1);
@@ -383,39 +383,39 @@
 }
 
 .filialCellBlue .salesBadge {
-  background-color: rgba(255, 255, 255, 0.6);
-  color: #6b7280;
+  background-color: var(--s-white);
+  color: var(--t-gray500);
   border-color: rgba(0, 0, 0, 0.08);
 }
 
 .filialCellOrange .salesBadge {
-  background-color: rgba(255, 255, 255, 0.6);
-  color: #6b7280;
+  background-color: var(--s-white);
+  color: var(--t-gray500);
   border-color: rgba(0, 0, 0, 0.08);
 }
 
 .filialCellPurple .salesBadge {
-  background-color: rgba(255, 255, 255, 0.6);
-  color: #6b7280;
+  background-color: var(--s-white);
+  color: var(--t-gray500);
   border-color: rgba(0, 0, 0, 0.08);
 }
 
 .filialCell:not(.filialCellBlue):not(.filialCellOrange):not(.filialCellPurple) .salesBadge {
-  background-color: rgba(255, 255, 255, 0.7);
-  color: #6b7280;
+  background-color: var(--s-white);
+  color: var(--t-gray500);
   border-color: rgba(0, 0, 0, 0.1);
 }
 
 .salesValue {
   font-size: 9px;
-  color: #6b7280;
+  color: var(--t-gray500);
   line-height: 1.1;
 }
 
 .actionButton {
   padding: 6px 10px;
-  background-color: #e5e7eb;
-  color: #374151;
+  background-color: var(--b-gray200);
+  color: var(--t-gray700);
   border: none;
   border-radius: 4px;
   font-size: 10px;
@@ -430,7 +430,7 @@
 }
 
 .actionButton:hover {
-  background-color: #d1d5db;
+  background-color: var(--b-gray300);
 }
 
 .actionButton.dark {
@@ -444,13 +444,13 @@
 
 /* Estilos para diferentes tipos de ação */
 .actionSEM_VENDAS_AGUARDAR {
-  background-color: #f9fafb;
-  color: #6b7280;
-  border: 1px solid #e5e7eb;
+  background-color: var(--s-gray50);
+  color: var(--t-gray500);
+  border: 1px solid var(--b-gray200);
 }
 
 .actionSEM_VENDAS_AGUARDAR:hover {
-  background-color: #f3f4f6;
+  background-color: var(--s-gray100);
 }
 
 .actionTRANSFERIR {
@@ -476,30 +476,30 @@
 }
 
 .actionMONITORAR {
-  background-color: #f9fafb;
-  color: #6b7280;
-  border: 1px solid #e5e7eb;
+  background-color: var(--s-gray50);
+  color: var(--t-gray500);
+  border: 1px solid var(--b-gray200);
 }
 
 .actionMONITORAR:hover {
-  background-color: #f3f4f6;
+  background-color: var(--s-gray100);
 }
 
 .actionESTOQUE_NORMAL {
-  background-color: #f9fafb;
-  color: #6b7280;
-  border: 1px solid #e5e7eb;
+  background-color: var(--s-gray50);
+  color: var(--t-gray500);
+  border: 1px solid var(--b-gray200);
 }
 
 .actionESTOQUE_NORMAL:hover {
-  background-color: #f3f4f6;
+  background-color: var(--s-gray100);
 }
 
 .loading,
 .empty {
   padding: 40px;
   text-align: center;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-size: 14px;
 }
 
@@ -559,20 +559,20 @@
   }
 
   .filialCellBlue .salesBadge {
-    background-color: rgba(255, 255, 255, 0.6);
-    color: #6b7280;
+    background-color: var(--s-white);
+    color: var(--t-gray500);
     border-color: rgba(0, 0, 0, 0.08);
   }
 
   .filialCellOrange .salesBadge {
-    background-color: rgba(255, 255, 255, 0.6);
-    color: #6b7280;
+    background-color: var(--s-white);
+    color: var(--t-gray500);
     border-color: rgba(0, 0, 0, 0.08);
   }
 
   .filialCellPurple .salesBadge {
-    background-color: rgba(255, 255, 255, 0.6);
-    color: #6b7280;
+    background-color: var(--s-white);
+    color: var(--t-gray500);
     border-color: rgba(0, 0, 0, 0.08);
   }
 
@@ -646,20 +646,20 @@
   }
 
   .filialCellBlue .salesBadge {
-    background-color: rgba(255, 255, 255, 0.6);
-    color: #6b7280;
+    background-color: var(--s-white);
+    color: var(--t-gray500);
     border-color: rgba(0, 0, 0, 0.08);
   }
 
   .filialCellOrange .salesBadge {
-    background-color: rgba(255, 255, 255, 0.6);
-    color: #6b7280;
+    background-color: var(--s-white);
+    color: var(--t-gray500);
     border-color: rgba(0, 0, 0, 0.08);
   }
 
   .filialCellPurple .salesBadge {
-    background-color: rgba(255, 255, 255, 0.6);
-    color: #6b7280;
+    background-color: var(--s-white);
+    color: var(--t-gray500);
     border-color: rgba(0, 0, 0, 0.08);
   }
 
@@ -774,20 +774,20 @@
   }
 
   .filialCellBlue .salesBadge {
-    background-color: rgba(255, 255, 255, 0.6);
-    color: #6b7280;
+    background-color: var(--s-white);
+    color: var(--t-gray500);
     border-color: rgba(0, 0, 0, 0.08);
   }
 
   .filialCellOrange .salesBadge {
-    background-color: rgba(255, 255, 255, 0.6);
-    color: #6b7280;
+    background-color: var(--s-white);
+    color: var(--t-gray500);
     border-color: rgba(0, 0, 0, 0.08);
   }
 
   .filialCellPurple .salesBadge {
-    background-color: rgba(255, 255, 255, 0.6);
-    color: #6b7280;
+    background-color: var(--s-white);
+    color: var(--t-gray500);
     border-color: rgba(0, 0, 0, 0.08);
   }
 
@@ -859,20 +859,20 @@
   }
 
   .filialCellBlue .salesBadge {
-    background-color: rgba(255, 255, 255, 0.6);
-    color: #6b7280;
+    background-color: var(--s-white);
+    color: var(--t-gray500);
     border-color: rgba(0, 0, 0, 0.08);
   }
 
   .filialCellOrange .salesBadge {
-    background-color: rgba(255, 255, 255, 0.6);
-    color: #6b7280;
+    background-color: var(--s-white);
+    color: var(--t-gray500);
     border-color: rgba(0, 0, 0, 0.08);
   }
 
   .filialCellPurple .salesBadge {
-    background-color: rgba(255, 255, 255, 0.6);
-    color: #6b7280;
+    background-color: var(--s-white);
+    color: var(--t-gray500);
     border-color: rgba(0, 0, 0, 0.08);
   }
 

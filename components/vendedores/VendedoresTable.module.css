@@ -9,7 +9,7 @@
   width: 100%;
   overflow-x: auto;
   overflow-y: visible;
-  background: white;
+  background: var(--s-white);
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   position: relative;
@@ -20,7 +20,7 @@
   .container {
     border-radius: 20px;
     box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
-    border: 1px solid rgba(15, 23, 42, 0.08);
+    border: 1px solid var(--b-subtle);
     overflow: hidden;
   }
 }
@@ -30,7 +30,7 @@
 }
 
 .container::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--s-gray100b);
   border-radius: 4px;
 }
 
@@ -53,7 +53,7 @@
 }
 
 .table thead {
-  background-color: #f8f9fa;
+  background-color: var(--s-gray50);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -64,8 +64,8 @@
   text-align: center;
   font-weight: 600;
   font-size: 11px;
-  color: #1f2937;
-  border-bottom: 2px solid #e5e7eb;
+  color: var(--t-gray800);
+  border-bottom: 2px solid var(--b-gray200);
   white-space: nowrap;
   letter-spacing: 0.3px;
   text-transform: uppercase;
@@ -95,8 +95,8 @@
 
 .table td {
   padding: 12px 10px;
-  border-bottom: 1px solid #e5e7eb;
-  color: #374151;
+  border-bottom: 1px solid var(--b-gray200);
+  color: var(--t-gray700);
   font-size: 13px;
   vertical-align: middle;
   white-space: nowrap;
@@ -134,7 +134,7 @@
 }
 
 .table tbody tr:hover {
-  background-color: #f9fafb;
+  background-color: var(--s-gray50);
 }
 
 .table tbody tr:last-child td {
@@ -149,7 +149,7 @@
 }
 
 .sortable:hover {
-  background-color: #f1f5f9;
+  background-color: var(--s-100);
 }
 
 .sortIndicator {
@@ -167,7 +167,7 @@
 }
 
 .vendedorRow:hover {
-  background-color: #f1f5f9 !important;
+  background-color: var(--s-100) !important;
 }
 
 .vendedorInfo {
@@ -179,7 +179,7 @@
 .rankingNumber {
   font-size: 14px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--t-500);
   min-width: 32px;
   text-align: left;
   padding-top: 2px;
@@ -203,8 +203,8 @@
 .grupoBadge {
   display: inline-block;
   padding: 4px 10px;
-  background-color: #e5e7eb;
-  color: #374151;
+  background-color: var(--b-gray200);
+  color: var(--t-gray700);
   border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
@@ -251,41 +251,41 @@
 
 .vendedorName {
   font-weight: 500;
-  color: #1f2937;
+  color: var(--t-gray800);
   font-size: 13px;
 }
 
 .vendedorFilial {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-weight: 400;
 }
 
 .currencyCell {
   text-align: right !important;
   font-weight: 500;
-  color: #1f2937;
+  color: var(--t-gray800);
   min-width: 110px;
 }
 
 .numberCell {
   text-align: right !important;
   font-weight: 500;
-  color: #1f2937;
+  color: var(--t-gray800);
   min-width: 80px;
 }
 
 .categoryCell {
   text-align: left !important;
   font-weight: 500;
-  color: #1f2937;
+  color: var(--t-gray800);
   min-width: 160px;
 }
 
 .percentageCell {
   text-align: center !important;
   font-weight: 500;
-  color: #1f2937;
+  color: var(--t-gray800);
   min-width: 120px;
 }
 
@@ -293,7 +293,7 @@
 .empty {
   padding: 40px 20px;
   text-align: center;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-size: 14px;
 }
 
@@ -304,8 +304,8 @@
 
 .card {
   padding: 8px 12px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  background: #ffffff;
+  border-bottom: 1px solid var(--b-subtle);
+  background: var(--s-white);
   transition: background-color 0.2s;
   cursor: pointer;
 }
@@ -315,7 +315,7 @@
 }
 
 .card:active {
-  background-color: #f8fafc;
+  background-color: var(--s-50);
 }
 
 .cardContent {
@@ -345,7 +345,7 @@
 .cardVendedorName {
   font-size: 13px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
   margin: 0;
   line-height: 1.3;
   white-space: nowrap;
@@ -355,7 +355,7 @@
 
 .cardVendedorFilial {
   font-size: 11px;
-  color: #64748b;
+  color: var(--t-500);
   font-weight: 400;
   white-space: nowrap;
   overflow: hidden;
@@ -381,7 +381,7 @@
 .cardMetricLabel {
   font-size: 9px;
   font-weight: 600;
-  color: #9ca3af;
+  color: var(--t-gray400);
   text-transform: uppercase;
   letter-spacing: 0.3px;
   white-space: nowrap;
@@ -390,14 +390,14 @@
 .cardMetricValue {
   font-size: 11px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
   white-space: nowrap;
 }
 
 .cardMetricValueHighlight {
   font-size: 11px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
   white-space: nowrap;
 }
 
@@ -406,7 +406,7 @@
   border: none;
   cursor: pointer;
   font-size: 12px;
-  color: #64748b;
+  color: var(--t-500);
   padding: 4px;
   display: flex;
   align-items: center;
@@ -416,13 +416,13 @@
 }
 
 .cardExpandButton:hover {
-  color: #1f2937;
+  color: var(--t-gray800);
 }
 
 .cardRankingNumber {
   font-size: 12px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--t-500);
   min-width: 24px;
   text-align: left;
   padding-top: 2px;
@@ -440,8 +440,8 @@
 .cardGrupoBadge {
   display: inline-block;
   padding: 3px 8px;
-  background-color: #e5e7eb;
-  color: #374151;
+  background-color: var(--b-gray200);
+  color: var(--t-gray700);
   border-radius: 6px;
   font-size: 10px;
   font-weight: 600;
@@ -451,8 +451,8 @@
 }
 
 .cardExpanded {
-  background-color: #fafafa;
-  border-top: 1px solid #e5e7eb;
+  background-color: var(--s-gray50);
+  border-top: 1px solid var(--b-gray200);
   padding: 10px 12px;
 }
 
@@ -469,10 +469,10 @@
 }
 
 .cardProdutoItem {
-  background: white;
+  background: var(--s-white);
   padding: 8px 10px;
   border-radius: 6px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -481,7 +481,7 @@
 }
 
 .cardProdutoItem:active {
-  border-color: #d1d5db;
+  border-color: var(--b-gray300);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
@@ -496,7 +496,7 @@
 .cardProdutoGrupo {
   font-size: 9px;
   font-weight: 600;
-  color: #9ca3af;
+  color: var(--t-gray400);
   text-transform: uppercase;
   letter-spacing: 0.4px;
 }
@@ -510,8 +510,8 @@
 .cardProdutoTag {
   display: inline-block;
   padding: 2px 6px;
-  background-color: #f3f4f6;
-  color: #6b7280;
+  background-color: var(--s-gray100);
+  color: var(--t-gray500);
   border-radius: 4px;
   font-size: 9px;
   font-weight: 600;
@@ -528,7 +528,7 @@
 .cardProdutoDescricao {
   font-size: 12px;
   font-weight: 400;
-  color: #1f2937;
+  color: var(--t-gray800);
   line-height: 1.3;
   white-space: nowrap;
   overflow: hidden;
@@ -538,7 +538,7 @@
 .cardProdutoCodigo {
   font-size: 10px;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--t-gray500);
   line-height: 1.2;
 }
 
@@ -560,7 +560,7 @@
 .cardProdutoMetricLabel {
   font-size: 9px;
   font-weight: 600;
-  color: #9ca3af;
+  color: var(--t-gray400);
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
@@ -568,7 +568,7 @@
 .cardProdutoMetricValue {
   font-size: 11px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--t-gray800);
   white-space: nowrap;
 }
 
@@ -636,12 +636,12 @@
 
 /* Expanded row styles */
 .expandedRow {
-  background-color: #fafafa;
+  background-color: var(--s-gray50);
 }
 
 .expandedCell {
   padding: 20px 16px !important;
-  background-color: #fafafa;
+  background-color: var(--s-gray50);
 }
 
 .produtosExpandedWrapper {
@@ -657,11 +657,11 @@
 .produtosSearchInput {
   width: 100%;
   padding: 10px 14px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
   border-radius: 6px;
   font-size: 14px;
-  color: #1f2937;
-  background-color: #ffffff;
+  color: var(--t-gray800);
+  background-color: var(--s-white);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -672,14 +672,14 @@
 }
 
 .produtosSearchInput::placeholder {
-  color: #9ca3af;
+  color: var(--t-gray400);
 }
 
 .produtosContainer {
   width: 100%;
-  background-color: #ffffff;
+  background-color: var(--s-white);
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
   overflow: hidden;
 }
 
@@ -691,17 +691,17 @@
 
 .produtosTable thead {
   background-color: transparent;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--b-gray200);
 }
 
 .produtosTable th {
   padding: 12px 16px;
   font-weight: 600;
   font-size: 11px;
-  color: #6b7280;
+  color: var(--t-gray500);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--b-gray200);
 }
 
 .produtoGrupoHeader {
@@ -783,8 +783,8 @@
 
 .produtosTable td {
   padding: 14px 16px;
-  border-bottom: 1px solid #f3f4f6;
-  color: #374151;
+  border-bottom: 1px solid var(--s-gray100);
+  color: var(--t-gray700);
   font-size: 13px;
   vertical-align: middle;
 }
@@ -794,7 +794,7 @@
 }
 
 .produtosTable tbody tr:hover {
-  background-color: #f9fafb;
+  background-color: var(--s-gray50);
 }
 
 .produtosTable tbody tr:last-child td {
@@ -803,7 +803,7 @@
 
 .produtoGrupoCell {
   font-weight: 500;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-size: 12px;
   text-align: left;
 }
@@ -812,13 +812,13 @@
 .produtoColecaoCell,
 .produtoSubgrupoCell {
   font-weight: 500;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-size: 12px;
   text-align: left;
 }
 
 .produtoDescricaoCell {
-  color: #1f2937;
+  color: var(--t-gray800);
   font-weight: 400;
   text-align: left;
 }
@@ -831,27 +831,27 @@
 
 .produtoDescricaoText {
   font-weight: 400;
-  color: #1f2937;
+  color: var(--t-gray800);
   line-height: 1.4;
 }
 
 .produtoCodigo {
   font-size: 11px;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--t-gray500);
   line-height: 1.3;
 }
 
 .produtoGradeCell {
   font-weight: 500;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-size: 12px;
   text-align: left;
 }
 
 .produtoCorCell {
   font-weight: 500;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-size: 12px;
   text-align: left;
 }
@@ -859,14 +859,14 @@
 .produtoFaturamentoCell {
   text-align: right;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--t-gray800);
   font-size: 13px;
 }
 
 .produtoQuantidadeCell {
   text-align: right;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-size: 13px;
 }
 
@@ -874,7 +874,7 @@
 .emptyProdutos {
   padding: 40px 20px;
   text-align: center;
-  color: #9ca3af;
+  color: var(--t-gray400);
   font-size: 13px;
   font-weight: 500;
 }

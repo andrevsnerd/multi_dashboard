@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
+import { useTheme } from "@/components/theme/ThemeContext";
 import styles from "./GoalCard.module.css";
 
 interface GoalCardProps {
@@ -19,6 +20,9 @@ export default function GoalCard({
   label = "Meta",
 }: GoalCardProps) {
   const [mounted, setMounted] = useState(false);
+  const { theme } = useTheme();
+  const ringFilled = theme === "dark" ? "#cbd5e1" : "#475569";
+  const ringTrack = theme === "dark" ? "#29344b" : "#e2e8f0";
 
   useEffect(() => {
     setMounted(true);
@@ -95,8 +99,8 @@ export default function GoalCard({
               dataKey="value"
               isAnimationActive={false}
             >
-              <Cell key="completed" fill="#475569" />
-              <Cell key="remaining" fill="#e2e8f0" />
+              <Cell key="completed" fill={ringFilled} />
+              <Cell key="remaining" fill={ringTrack} />
             </Pie>
             {overflowData && (
               <Pie

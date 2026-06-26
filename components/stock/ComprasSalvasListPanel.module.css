@@ -4,7 +4,7 @@
 
 .subtitle {
   font-size: 14px;
-  color: #64748b;
+  color: var(--t-500);
   margin: 0 0 16px 0;
 }
 
@@ -13,8 +13,8 @@
 }
 
 .kpiCard {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--s-50);
+  border: 1px solid var(--b-200);
   border-radius: 12px;
   padding: 12px 14px;
   display: flex;
@@ -24,20 +24,20 @@
 
 .kpiLabel {
   font-size: 12px;
-  color: #64748b;
+  color: var(--t-500);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
 
 .kpiValue {
   font-size: 28px;
-  color: #0f172a;
+  color: var(--t-900);
   line-height: 1.1;
 }
 
 .kpiSub {
   font-size: 12px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .filterRow {
@@ -52,23 +52,23 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  color: #475569;
+  color: var(--t-600);
   font-size: 12px;
 }
 
 .dateField input {
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--b-300);
   border-radius: 8px;
   padding: 6px 8px;
   font-size: 13px;
-  color: #0f172a;
-  background: #fff;
+  color: var(--t-900);
+  background: var(--s-white);
 }
 
 .clearDates {
-  border: 1px solid #cbd5e1;
-  background: #fff;
-  color: #475569;
+  border: 1px solid var(--b-300);
+  background: var(--s-white);
+  color: var(--t-600);
   border-radius: 8px;
   height: 32px;
   padding: 0 10px;
@@ -79,8 +79,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
   border-radius: 10px;
   padding: 8px 12px;
   margin-bottom: 16px;
@@ -98,23 +98,23 @@
   grid-template-columns: 1fr auto auto;
   gap: 14px;
   align-items: center;
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
   border-radius: 10px;
   padding: 8px 12px;
-  color: #334155;
+  color: var(--t-700);
   font-size: 13px;
 }
 
 .dailyTotalItem strong {
-  color: #0f172a;
+  color: var(--t-900);
   font-size: 14px;
 }
 
 .searchIcon {
   width: 15px;
   height: 15px;
-  color: #94a3b8;
+  color: var(--t-400);
   flex-shrink: 0;
 }
 
@@ -124,14 +124,14 @@
   outline: none;
   background: transparent;
   font-size: 14px;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .searchClear {
   background: none;
   border: none;
   cursor: pointer;
-  color: #94a3b8;
+  color: var(--t-400);
   font-size: 18px;
   line-height: 1;
   padding: 0;
@@ -149,9 +149,9 @@
   justify-content: space-between;
   gap: 16px;
   padding: 16px 20px;
-  background: #fff;
+  background: var(--s-white);
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--b-200);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   text-decoration: none;
   color: inherit;
@@ -159,7 +159,7 @@
 }
 
 .card:hover {
-  background: #f8fafc;
+  background: var(--s-50);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
@@ -175,7 +175,7 @@
 .cardTitle {
   font-size: 16px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .cardComprada .cardTitle { color: #166534; }
@@ -203,7 +203,7 @@
 
 .cardHour {
   font-size: 13px;
-  color: #64748b;
+  color: var(--t-500);
   font-weight: 400;
 }
 
@@ -214,7 +214,7 @@
 
 .cardMeta {
   font-size: 13px;
-  color: #64748b;
+  color: var(--t-500);
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
@@ -232,7 +232,7 @@
 
 .cardMetaInline {
   font-size: 13px;
-  color: #64748b;
+  color: var(--t-500);
   display: inline-flex;
   align-items: center;
   gap: 12px;
@@ -250,8 +250,8 @@
   gap: 4px;
   padding: 8px 10px;
   border-radius: 10px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--s-50);
+  border: 1px solid var(--b-200);
   flex-shrink: 0;
 }
 
@@ -262,7 +262,7 @@
 
 .totalValorLabel {
   font-size: 11px;
-  color: #64748b;
+  color: var(--t-500);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -271,7 +271,7 @@
   font-size: 19px;
   font-weight: 600;
   line-height: 1.1;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .cardComprada .totalValorValue {
@@ -314,9 +314,9 @@
 .error {
   padding: 40px 24px;
   text-align: center;
-  color: #64748b;
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  color: var(--t-500);
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
   border-radius: 12px;
 }
 

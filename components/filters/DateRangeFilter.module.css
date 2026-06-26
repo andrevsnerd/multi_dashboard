@@ -9,7 +9,7 @@
   font-size: 12px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #475569;
+  color: var(--t-600);
 }
 
 .button {
@@ -19,8 +19,8 @@
   gap: 12px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  background: #ffffff;
+  border: 1px solid var(--b-subtle2);
+  background: var(--s-white);
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -40,13 +40,13 @@
 
 .valuePrimary {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
   font-size: 13px;
 }
 
 .valueSecondary {
   font-size: 12px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .dropdown {
@@ -60,7 +60,7 @@
   gap: 12px;
   padding: 12px;
   border-radius: 14px;
-  background: #ffffff;
+  background: var(--s-white);
   border: 1px solid rgba(15, 23, 42, 0.1);
   box-shadow: 0 18px 34px rgba(15, 23, 42, 0.16);
   min-width: 440px;
@@ -89,7 +89,7 @@
 
 .fieldLabel {
   font-size: 11px;
-  color: #475569;
+  color: var(--t-600);
   font-weight: 600;
 }
 
@@ -98,9 +98,9 @@
   padding: 8px 10px;
   border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.55);
-  background: #ffffff;
+  background: var(--s-white);
   font-size: 12px;
-  color: #0f172a;
+  color: var(--t-900);
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -121,8 +121,8 @@
   padding: 8px 10px;
   font-size: 12px;
   border: 1px solid rgba(148, 163, 184, 0.55);
-  background: #ffffff;
-  color: #0f172a;
+  background: var(--s-white);
+  color: var(--t-900);
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -157,7 +157,7 @@
   border-radius: 10px;
   padding: 8px 10px;
   font-size: 12px;
-  color: #0f172a;
+  color: var(--t-900);
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease;
 }

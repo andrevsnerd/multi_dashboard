@@ -44,7 +44,7 @@
 }
 
 .transferGroup {
-  background-color: #ffffff;
+  background-color: var(--s-white);
   border-radius: 8px;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
   overflow: hidden;
@@ -121,11 +121,11 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  background-color: #ffffff;
+  background-color: var(--s-white);
 }
 
 .table thead {
-  background-color: #f9fafb;
+  background-color: var(--s-gray50);
 }
 
 .table th {
@@ -133,10 +133,10 @@
   text-align: left;
   font-size: 12px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--t-gray500);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid var(--b-gray200);
 }
 
 .realizadaHeader {
@@ -238,7 +238,7 @@
 }
 
 .transferirDisabled {
-  color: #9ca3af;
+  color: var(--t-gray400);
   font-size: 14px;
 }
 
@@ -336,7 +336,7 @@
 }
 
 .destinationTabActive {
-  background: #fff;
+  background: var(--s-white);
   color: #047857;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
@@ -369,18 +369,18 @@
   padding: 20px 12px;
   text-align: center;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-style: italic;
 }
 
 .realizadasTable {
   width: 100%;
   border-collapse: collapse;
-  background: #fff;
+  background: var(--s-white);
 }
 
 .realizadasTable thead {
-  background: #f9fafb;
+  background: var(--s-gray50);
 }
 
 .realizadasTable th {
@@ -388,17 +388,17 @@
   text-align: left;
   font-size: 11px;
   font-weight: 700;
-  color: #6b7280;
+  color: var(--t-gray500);
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--b-gray200);
 }
 
 .realizadasTable td {
   padding: 10px 12px;
   font-size: 13px;
-  color: #1f2937;
-  border-bottom: 1px solid #f3f4f6;
+  color: var(--t-gray800);
+  border-bottom: 1px solid var(--s-gray100);
 }
 
 .realizadasStatus {
@@ -438,7 +438,7 @@
   justify-content: space-between;
   align-items: center;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--t-gray500);
 }
 
 .realizadasFooterLink {
@@ -465,12 +465,12 @@
 .realizadasRomaneio {
   font-family: 'Courier New', monospace;
   font-size: 12px;
-  color: #4b5563;
+  color: var(--t-gray600);
 }
 
 .realizadasData {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--t-gray500);
   white-space: nowrap;
 }
 
@@ -482,7 +482,7 @@
   font-size: 13px;
   font-weight: 700;
   color: #16a34a;
-  background: #fff;
+  background: var(--s-white);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -532,7 +532,7 @@
   justify-content: space-between;
   font-size: 11px;
   font-weight: 700;
-  color: #6b7280;
+  color: var(--t-gray500);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -549,9 +549,9 @@
   max-height: 260px;
   overflow-y: auto;
   padding: 4px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
   border-radius: 8px;
-  background: #f9fafb;
+  background: var(--s-gray50);
 }
 
 .modalItemRow {
@@ -560,9 +560,9 @@
   align-items: center;
   gap: 12px;
   padding: 8px 10px;
-  background: #fff;
+  background: var(--s-white);
   border-radius: 6px;
-  border: 1px solid #f1f5f9;
+  border: 1px solid var(--s-100);
 }
 
 .modalItemMain {
@@ -575,7 +575,7 @@
 .modalItemDesc {
   font-size: 13px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -583,7 +583,7 @@
 
 .modalItemMeta {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--t-gray500);
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -633,7 +633,7 @@
 }
 
 .modalCard {
-  background: #fff;
+  background: var(--s-white);
   border-radius: 12px;
   width: 100%;
   max-width: 460px;
@@ -698,13 +698,13 @@
   align-items: flex-start;
   gap: 16px;
   font-size: 13px;
-  color: #1f2937;
+  color: var(--t-gray800);
 }
 
 .modalRowLabel {
   font-size: 11px;
   font-weight: 700;
-  color: #6b7280;
+  color: var(--t-gray500);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   flex-shrink: 0;
@@ -715,7 +715,7 @@
 .modalRowValue {
   font-size: 14px;
   font-weight: 600;
-  color: #111827;
+  color: var(--t-gray900);
   text-align: right;
   flex: 1;
 }
@@ -726,8 +726,8 @@
   justify-content: center;
   gap: 12px;
   padding: 12px 14px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--s-50);
+  border: 1px solid var(--b-200);
   border-radius: 10px;
 }
 
@@ -745,13 +745,13 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  color: #94a3b8;
+  color: var(--t-400);
 }
 
 .modalRouteName {
   font-size: 13px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
   text-align: center;
   word-break: break-word;
 }
@@ -818,16 +818,16 @@
   padding: 10px 16px;
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
-  background: #f3f4f6;
-  border: 1px solid #d1d5db;
+  color: var(--t-gray700);
+  background: var(--s-gray100);
+  border: 1px solid var(--b-gray300);
   border-radius: 8px;
   cursor: pointer;
   transition: background-color 0.15s;
 }
 
 .modalBtnSecondary:hover:not(:disabled) {
-  background: #e5e7eb;
+  background: var(--b-gray200);
 }
 
 .modalBtnSecondary:disabled {
@@ -866,7 +866,7 @@
   width: 14px;
   height: 14px;
   border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #fff;
+  border-top-color: var(--s-white);
   border-radius: 50%;
   animation: modalSpin 0.7s linear infinite;
 }
@@ -876,20 +876,20 @@
 }
 
 .table tbody tr {
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--s-gray100);
   transition: background-color 0.15s;
 }
 
 .table tbody tr:nth-child(even) {
-  background-color: #f9fafb;
+  background-color: var(--s-gray50);
 }
 
 .table tbody tr:nth-child(odd) {
-  background-color: #ffffff;
+  background-color: var(--s-white);
 }
 
 .table tbody tr:hover {
-  background-color: #f3f4f6;
+  background-color: var(--s-gray100);
 }
 
 /* Linha inteira marcada como "já realizada" (pendente de atualização no sistema) – cinza escuro = transformado */
@@ -944,7 +944,7 @@
 .table td {
   padding: 16px;
   font-size: 14px;
-  color: #1f2937;
+  color: var(--t-gray800);
 }
 
 .realizadaCell {
@@ -960,7 +960,7 @@
   cursor: pointer;
   user-select: none;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--t-gray500);
 }
 
 .realizadaCheckbox {
@@ -993,7 +993,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #9ca3af;
+  color: var(--t-gray400);
   flex-shrink: 0;
 }
 
@@ -1010,23 +1010,23 @@
 .codigoBarraBadge {
   display: inline-block;
   padding: 4px 12px;
-  background-color: #f3f4f6;
+  background-color: var(--s-gray100);
   border-radius: 12px;
   font-size: 12px;
-  color: #1f2937;
+  color: var(--t-gray800);
   font-weight: 500;
   font-family: 'Courier New', monospace;
   letter-spacing: 0.5px;
 }
 
 .codigoBarraEmpty {
-  color: #9ca3af;
+  color: var(--t-gray400);
   font-size: 12px;
   font-style: italic;
 }
 
 .descricaoCell {
-  color: #374151;
+  color: var(--t-gray700);
 }
 
 .estoqueCell {
@@ -1037,10 +1037,10 @@
 .estoqueBadge {
   display: inline-block;
   padding: 4px 12px;
-  background-color: #f3f4f6;
+  background-color: var(--s-gray100);
   border-radius: 12px;
   font-size: 12px;
-  color: #1f2937;
+  color: var(--t-gray800);
   font-weight: 600;
   min-width: 40px;
   text-align: center;
@@ -1055,12 +1055,12 @@
   display: inline-block;
   padding: 4px 12px;
   font-size: 12px;
-  color: #1f2937;
+  color: var(--t-gray800);
   font-weight: 500;
 }
 
 .subgrupoEmpty {
-  color: #9ca3af;
+  color: var(--t-gray400);
   font-size: 12px;
   font-style: italic;
 }
@@ -1081,7 +1081,7 @@
 }
 
 .gradeEmpty {
-  color: #9ca3af;
+  color: var(--t-gray400);
   font-size: 12px;
   font-style: italic;
 }
@@ -1099,10 +1099,10 @@
 .corBadge {
   display: inline-block;
   padding: 4px 12px;
-  background-color: #f3f4f6;
+  background-color: var(--s-gray100);
   border-radius: 12px;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-weight: 500;
 }
 
@@ -1179,13 +1179,13 @@
   max-width: min(360px, calc(100vw - 24px));
   transform: translate(-50%, calc(-100% - 10px));
   padding: 0;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
   border-radius: 12px;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14), 0 4px 12px rgba(15, 23, 42, 0.08);
   font-size: 12px;
   line-height: 1.45;
-  color: #334155;
+  color: var(--t-700);
   pointer-events: auto;
   text-align: left;
   overflow: hidden;
@@ -1198,7 +1198,7 @@
   bottom: -6px;
   transform: translateX(-50%);
   border: 6px solid transparent;
-  border-top-color: #ffffff;
+  border-top-color: var(--s-white);
   filter: drop-shadow(0 1px 0 #e2e8f0);
 }
 
@@ -1218,7 +1218,7 @@
   justify-content: space-between;
   gap: 8px;
   padding: 10px 14px 10px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--b-200);
 }
 
 .qttCurvaTag {
@@ -1226,13 +1226,13 @@
   font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .qttEnviarPrincipal {
   font-size: 15px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1243,7 +1243,7 @@
 /* Seções */
 .qttSection {
   padding: 10px 14px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--s-100);
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -1261,7 +1261,7 @@
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #94a3b8;
+  color: var(--t-400);
 }
 
 /* Badge de urgência do destino */
@@ -1298,8 +1298,8 @@
 .qttPotencialTag {
   font-size: 10px;
   font-weight: 700;
-  color: #64748b;
-  background: #f1f5f9;
+  color: var(--t-500);
+  background: var(--s-100);
   padding: 1px 6px;
   border-radius: 4px;
 }
@@ -1310,20 +1310,20 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  color: #475569;
+  color: var(--t-600);
 }
 
 .qttRowStrong {
-  color: #0f172a;
+  color: var(--t-900);
   font-weight: 600;
   padding-top: 3px;
-  border-top: 1px dashed #e2e8f0;
+  border-top: 1px dashed var(--b-200);
   margin-top: 2px;
 }
 
 .qttRowNote {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--t-400);
   font-style: italic;
 }
 
@@ -1361,7 +1361,7 @@
   margin: 0;
   padding: 8px 14px;
   font-size: 11px;
-  color: #64748b;
+  color: var(--t-500);
   line-height: 1.4;
 }
 
@@ -1370,9 +1370,9 @@
   padding: 9px 14px;
   font-size: 11px;
   line-height: 1.45;
-  color: #475569;
-  background: #f8fafc;
-  border-top: 1px solid #e2e8f0;
+  color: var(--t-600);
+  background: var(--s-50);
+  border-top: 1px solid var(--b-200);
 }
 
 .qttFooterSep {
@@ -1471,14 +1471,14 @@
   border: none;
   background: transparent;
   border-radius: 6px;
-  color: #6b7280;
+  color: var(--t-gray500);
   cursor: pointer;
   transition: color 0.15s, background-color 0.15s;
 }
 
 .quantidadeRealIconBtn:hover {
-  color: #1f2937;
-  background-color: #e5e7eb;
+  color: var(--t-gray800);
+  background-color: var(--b-gray200);
 }
 
 .quantidadeRealIconBtn:disabled {
@@ -1502,13 +1502,13 @@
   border: none;
   background: transparent;
   border-radius: 8px;
-  color: #374151;
+  color: var(--t-gray700);
   cursor: pointer;
   transition: color 0.15s;
 }
 
 .quantidadeRealAddBtn:hover {
-  color: #1f2937;
+  color: var(--t-gray800);
 }
 
 .quantidadeRealAddBtn:disabled {
@@ -1535,9 +1535,9 @@
   font-size: 13px;
   font-weight: 600;
   text-align: center;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--b-gray300);
   border-radius: 6px;
-  background: #fff;
+  background: var(--s-white);
 }
 
 .quantidadeRealInput:focus {
@@ -1584,15 +1584,15 @@
   padding: 0;
   border: none;
   background: transparent;
-  color: #6b7280;
+  color: var(--t-gray500);
   border-radius: 6px;
   cursor: pointer;
   transition: color 0.15s, background-color 0.15s;
 }
 
 .quantidadeRealCancelBtn:hover {
-  color: #374151;
-  background-color: #e5e7eb;
+  color: var(--t-gray700);
+  background-color: var(--b-gray200);
 }
 
 .quantidadeRealCancelBtn svg {
@@ -1601,7 +1601,7 @@
 }
 
 .destinationSection {
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--b-gray200);
 }
 
 .destinationSection:first-of-type {
@@ -1660,22 +1660,22 @@
 }
 
 .footer {
-  background-color: #f9fafb;
+  background-color: var(--s-gray50);
   padding: 16px 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--b-gray200);
 }
 
 .footerLeft {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--t-gray500);
 }
 
 .footerRight {
   font-size: 14px;
-  color: #1f2937;
+  color: var(--t-gray800);
   font-weight: 500;
 }
 
@@ -1694,21 +1694,21 @@
 .empty {
   text-align: center;
   padding: 48px 24px;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-size: 16px;
 }
 
 /* Tooltip */
 .tooltip {
   position: fixed;
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 8px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.1);
   z-index: 1000;
   min-width: 400px;
   max-width: 500px;
   overflow: visible;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
   pointer-events: auto;
 }
 
@@ -1748,12 +1748,12 @@
 .tooltipSectionTitle {
   font-size: 10px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--t-gray500);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 6px;
   padding-bottom: 4px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--b-gray200);
 }
 
 .tooltipFilialRow {
@@ -1763,15 +1763,15 @@
   justify-content: space-between;
   gap: 8px;
   padding: 6px 10px;
-  background: #f9fafb;
+  background: var(--s-gray50);
   border-radius: 6px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
 }
 
 .tooltipFilialName {
   font-size: 12px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--t-gray800);
   min-width: 120px;
   flex-shrink: 0;
 }
@@ -1781,7 +1781,7 @@
   flex-wrap: nowrap;
   gap: 8px;
   font-size: 11px;
-  color: #6b7280;
+  color: var(--t-gray500);
   flex: 1;
   justify-content: flex-end;
   align-items: center;
@@ -1801,18 +1801,18 @@
   align-items: center;
   gap: 3px;
   white-space: nowrap;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-size: 11px;
 }
 
 .tooltipEstoque strong,
 .tooltipVendas strong {
-  color: #1f2937;
+  color: var(--t-gray800);
   font-weight: 600;
 }
 
 .tooltipUltimaEntrada strong {
-  color: #4b5563;
+  color: var(--t-gray600);
   font-weight: 500;
 }
 

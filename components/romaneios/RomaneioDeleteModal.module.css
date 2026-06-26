@@ -10,7 +10,7 @@
 }
 
 .modal {
-  background: #fff;
+  background: var(--s-white);
   border-radius: 12px;
   width: 100%;
   max-width: 560px;
@@ -29,7 +29,7 @@
 
 .subtitle {
   margin: 4px 0 16px;
-  color: #475569;
+  color: var(--t-600);
   font-size: 0.95rem;
 }
 
@@ -46,16 +46,16 @@
   gap: 4px;
   text-align: left;
   padding: 14px 16px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--b-200);
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--s-50);
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
 
 .choiceBtn:hover {
   border-color: #94a3b8;
-  background: #f1f5f9;
+  background: var(--s-100);
 }
 
 .choiceBtnReturn:hover {
@@ -65,17 +65,17 @@
 
 .choiceTitle {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .choiceDesc {
   font-size: 0.85rem;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .confirmText {
   margin: 4px 0 14px;
-  color: #334155;
+  color: var(--t-700);
   font-size: 0.95rem;
   line-height: 1.45;
 }
@@ -83,7 +83,7 @@
 .tableWrap {
   max-height: 320px;
   overflow-y: auto;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--b-200);
   border-radius: 8px;
   margin-bottom: 14px;
 }
@@ -97,15 +97,15 @@
 .table th,
 .table td {
   padding: 7px 10px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--s-100);
   text-align: left;
 }
 
 .table thead th {
   position: sticky;
   top: 0;
-  background: #f8fafc;
-  color: #475569;
+  background: var(--s-50);
+  color: var(--t-600);
   font-weight: 600;
   z-index: 1;
 }
@@ -135,15 +135,15 @@
 .btnCancel {
   padding: 9px 16px;
   border-radius: 8px;
-  border: 1px solid #cbd5e1;
-  background: #fff;
-  color: #334155;
+  border: 1px solid var(--b-300);
+  background: var(--s-white);
+  color: var(--t-700);
   font-weight: 600;
   cursor: pointer;
 }
 
 .btnCancel:hover {
-  background: #f8fafc;
+  background: var(--s-50);
 }
 
 .btnDanger {

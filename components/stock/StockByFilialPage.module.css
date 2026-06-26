@@ -14,7 +14,7 @@
 .title {
   font-size: 24px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--t-gray800);
   margin: 0;
 }
 
@@ -37,7 +37,7 @@
   gap: 8px;
   cursor: pointer;
   font-size: 14px;
-  color: #374151;
+  color: var(--t-gray700);
   user-select: none;
 }
 
@@ -49,7 +49,7 @@
 }
 
 .loading {
-  color: #6b7280;
+  color: var(--t-gray500);
   font-size: 14px;
 }
 
@@ -63,25 +63,25 @@
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  background: #ffffff;
-  border: 1px solid #d1d5db;
+  background: var(--s-white);
+  border: 1px solid var(--b-gray300);
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
-  color: #374151;
+  color: var(--t-gray700);
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
 }
 
 .exportButton:hover {
-  background: #f9fafb;
+  background: var(--s-gray50);
   border-color: #9ca3af;
-  color: #1f2937;
+  color: var(--t-gray800);
 }
 
 .exportButton:active {
-  background: #f3f4f6;
+  background: var(--s-gray100);
   transform: translateY(1px);
 }
 

@@ -9,7 +9,7 @@
   width: 100%;
   overflow-x: auto;
   overflow-y: visible;
-  background: white;
+  background: var(--s-white);
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   position: relative;
@@ -20,7 +20,7 @@
   .container {
     border-radius: 20px;
     box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
-    border: 1px solid rgba(15, 23, 42, 0.08);
+    border: 1px solid var(--b-subtle);
     overflow: hidden;
   }
 }
@@ -30,7 +30,7 @@
 }
 
 .container::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--s-gray100b);
   border-radius: 4px;
 }
 
@@ -53,7 +53,7 @@
 }
 
 .table thead {
-  background-color: #f8f9fa;
+  background-color: var(--s-gray50);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -64,8 +64,8 @@
   text-align: center;
   font-weight: 600;
   font-size: 11px;
-  color: #1f2937;
-  border-bottom: 2px solid #e5e7eb;
+  color: var(--t-gray800);
+  border-bottom: 2px solid var(--b-gray200);
   white-space: nowrap;
   letter-spacing: 0.3px;
   text-transform: uppercase;
@@ -84,8 +84,8 @@
 
 .table td {
   padding: 12px 10px;
-  border-bottom: 1px solid #e5e7eb;
-  color: #374151;
+  border-bottom: 1px solid var(--b-gray200);
+  color: var(--t-gray700);
   font-size: 13px;
   vertical-align: middle;
   white-space: nowrap;
@@ -107,7 +107,7 @@
 }
 
 .table tbody tr:hover {
-  background-color: #f9fafb;
+  background-color: var(--s-gray50);
 }
 
 .table tbody tr[role="button"] {
@@ -116,7 +116,7 @@
 }
 
 .table tbody tr[role="button"]:hover {
-  background-color: #eef2ff;
+  background-color: var(--s-blue50);
   box-shadow: inset 3px 0 0 #6366f1;
 }
 
@@ -137,7 +137,7 @@
 }
 
 .sortable:hover {
-  background-color: #f1f5f9;
+  background-color: var(--s-100);
 }
 
 .sortIndicator {
@@ -153,14 +153,14 @@
 .dateCell {
   text-align: center !important;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--t-gray500);
 }
 
 .loading,
 .empty {
   padding: 40px 20px;
   text-align: center;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-size: 14px;
 }
 
@@ -171,8 +171,8 @@
 
 .card {
   padding: 12px 16px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  background: #ffffff;
+  border-bottom: 1px solid var(--b-subtle);
+  background: var(--s-white);
   transition: background-color 0.2s;
   cursor: pointer;
 }
@@ -182,11 +182,11 @@
 }
 
 .card:active {
-  background-color: #f8fafc;
+  background-color: var(--s-50);
 }
 
 .card:hover {
-  background-color: #eef2ff;
+  background-color: var(--s-blue50);
 }
 
 .card:focus-visible {
@@ -213,7 +213,7 @@
 
 .cardDate {
   font-size: 12px;
-  color: #64748b;
+  color: var(--t-500);
   font-weight: 500;
   white-space: nowrap;
   flex-shrink: 0;
@@ -222,13 +222,13 @@
 .cardTitle {
   font-size: 15px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
   line-height: 1.3;
 }
 
 .cardCpfInline {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--t-400);
   font-weight: 400;
 }
 
@@ -248,26 +248,26 @@
 
 .cardLabel {
   font-weight: 600;
-  color: #6b7280;
+  color: var(--t-gray500);
   min-width: 75px;
   flex-shrink: 0;
   font-size: 12px;
 }
 
 .cardValue {
-  color: #1f2937;
+  color: var(--t-gray800);
   flex: 1;
   word-break: break-word;
   font-size: 13px;
 }
 
 .cardCityInline {
-  color: #94a3b8;
+  color: var(--t-400);
   font-size: 12px;
 }
 
 .cardFilialInline {
-  color: #94a3b8;
+  color: var(--t-400);
   font-size: 11px;
   font-weight: 400;
   margin-left: 4px;

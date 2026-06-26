@@ -1,6 +1,6 @@
 .wrapper {
   padding: 24px;
-  background: #f5f5f5;
+  background: var(--s-gray100b);
   min-height: 100vh;
 }
 
@@ -23,21 +23,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
+  background: var(--s-white);
   border-radius: 8px;
-  color: #333;
+  color: var(--t-333);
 }
 
 .title {
   font-size: 28px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--t-1a);
   margin: 0 0 4px 0;
 }
 
 .subtitle {
   font-size: 14px;
-  color: #666;
+  color: var(--t-666);
   margin: 0;
 }
 
@@ -50,7 +50,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #666;
+  color: var(--t-666);
   font-size: 14px;
 }
 
@@ -62,7 +62,7 @@
 }
 
 .kpiCard {
-  background: #fff;
+  background: var(--s-white);
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -71,7 +71,7 @@
 .kpiLabel {
   font-size: 12px;
   font-weight: 600;
-  color: #666;
+  color: var(--t-666);
   text-transform: uppercase;
   margin-bottom: 8px;
 }
@@ -79,14 +79,14 @@
 .kpiValue {
   font-size: 24px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--t-1a);
   margin-bottom: 8px;
 }
 
 .kpiPrevious {
   font-size: 12px;
   font-weight: 400;
-  color: #64748b;
+  color: var(--t-500);
   margin-top: 4px;
   margin-bottom: 4px;
 }
@@ -145,18 +145,18 @@
   align-items: center;
   gap: 12px;
   padding: 10px 16px;
-  background: #fff;
+  background: var(--s-white);
   border: 1px solid #e5e5e5;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
   font-size: 14px;
   font-weight: 500;
-  color: #666;
+  color: var(--t-666);
 }
 
 .toggleButton:hover {
-  background: #f5f5f5;
+  background: var(--s-gray100b);
   border-color: #d5d5d5;
 }
 
@@ -189,7 +189,7 @@
   left: 2px;
   width: 20px;
   height: 20px;
-  background: #fff;
+  background: var(--s-white);
   border-radius: 50%;
   transition: transform 0.3s;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
@@ -219,7 +219,7 @@
 .sectionTitle {
   font-size: 20px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--t-1a);
   margin: 0;
 }
 
@@ -228,20 +228,20 @@
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  background: #fff;
+  background: var(--s-white);
   border: 1px solid #e5e5e5;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
-  color: #666;
+  color: var(--t-666);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .backButton:hover {
-  background: #f5f5f5;
+  background: var(--s-gray100b);
   border-color: #d5d5d5;
-  color: #1a1a1a;
+  color: var(--t-1a);
 }
 
 .categoriasGrid {
@@ -252,7 +252,7 @@
 }
 
 .categoriaCard {
-  background: #fff;
+  background: var(--s-white);
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -277,7 +277,7 @@
 .categoriaName {
   font-size: 16px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--t-1a);
   text-decoration: none;
   cursor: pointer;
   transition: color 0.2s;
@@ -298,8 +298,8 @@
 .detailTag {
   font-size: 10px;
   font-weight: 500;
-  color: #666;
-  background: #f5f5f5;
+  color: var(--t-666);
+  background: var(--s-gray100b);
   padding: 3px 8px;
   border-radius: 12px;
   white-space: nowrap;
@@ -331,7 +331,7 @@
 .estoqueValue {
   font-size: 32px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--t-1a);
   line-height: 1.2;
   transition: color 0.2s;
 }
@@ -343,18 +343,18 @@
 .estoqueUnit {
   font-size: 16px;
   font-weight: 500;
-  color: #666;
+  color: var(--t-666);
 }
 
 .vendasBreakdown {
   margin-top: 8px;
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--t-400);
   line-height: 1.4;
 }
 
 .vendasDetail {
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .vendasSeparator {
@@ -382,11 +382,11 @@
 }
 
 .infoLabel {
-  color: #666;
+  color: var(--t-666);
 }
 
 .infoValue {
-  color: #1a1a1a;
+  color: var(--t-1a);
   font-weight: 600;
 }
 
@@ -404,13 +404,13 @@
 
 .metricLabel {
   font-size: 12px;
-  color: #666;
+  color: var(--t-666);
 }
 
 .metricValue {
   font-size: 14px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--t-1a);
 }
 
 .metricValue.positive {
@@ -427,7 +427,7 @@
   align-items: center;
   margin-bottom: 24px;
   padding: 16px;
-  background: #fff;
+  background: var(--s-white);
   border-radius: 12px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
@@ -443,12 +443,12 @@
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  background: #f5f5f5;
+  background: var(--s-gray100b);
   border: 1px solid #e5e5e5;
   border-radius: 20px;
   font-size: 14px;
   font-weight: 500;
-  color: #666;
+  color: var(--t-666);
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -474,12 +474,12 @@
 
 .periodButton {
   padding: 8px 16px;
-  background: #f5f5f5;
+  background: var(--s-gray100b);
   border: 1px solid #e5e5e5;
   border-radius: 20px;
   font-size: 14px;
   font-weight: 500;
-  color: #666;
+  color: var(--t-666);
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -502,7 +502,7 @@
 }
 
 .chartCard {
-  background: #fff;
+  background: var(--s-white);
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -511,7 +511,7 @@
 .chartTitle {
   font-size: 16px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--t-1a);
   margin-bottom: 16px;
 }
 
@@ -521,7 +521,7 @@
 }
 
 .tableWrapper {
-  background: #fff;
+  background: var(--s-white);
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -534,7 +534,7 @@
 }
 
 .previsoesTable thead {
-  background: #f5f5f5;
+  background: var(--s-gray100b);
 }
 
 .previsoesTable th {
@@ -542,7 +542,7 @@
   text-align: left;
   font-size: 12px;
   font-weight: 600;
-  color: #666;
+  color: var(--t-666);
   text-transform: uppercase;
   border-bottom: 2px solid #e5e5e5;
 }
@@ -550,12 +550,12 @@
 .previsoesTable td {
   padding: 12px 16px;
   font-size: 14px;
-  color: #1a1a1a;
+  color: var(--t-1a);
   border-bottom: 1px solid #e5e5e5;
 }
 
 .previsoesTable tbody tr:hover {
-  background: #f9f9f9;
+  background: var(--s-gray50);
 }
 
 .statusBadge {
@@ -628,7 +628,7 @@
 
 .paradosPeriodoSelect {
   padding: 10px 14px;
-  background: #fff;
+  background: var(--s-white);
   border: 1.5px solid #f97316;
   border-radius: 8px;
   font-size: 13px;
@@ -669,7 +669,7 @@
   text-align: center;
   padding: 48px;
   font-size: 16px;
-  color: #666;
+  color: var(--t-666);
 }
 
 .error {
@@ -739,7 +739,7 @@
 }
 
 .modalContent {
-  background: white;
+  background: var(--s-white);
   border-radius: 12px;
   max-width: 1200px;
   width: 100%;
@@ -761,14 +761,14 @@
   margin: 0;
   font-size: 20px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--t-1a);
 }
 
 .modalClose {
   background: none;
   border: none;
   font-size: 32px;
-  color: #666;
+  color: var(--t-666);
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -781,7 +781,7 @@
 }
 
 .modalClose:hover {
-  color: #333;
+  color: var(--t-333);
 }
 
 .modalBody {
@@ -793,10 +793,10 @@
 .modalInfo {
   margin-bottom: 20px;
   padding: 12px;
-  background: #f5f5f5;
+  background: var(--s-gray100b);
   border-radius: 8px;
   font-size: 14px;
-  color: #666;
+  color: var(--t-666);
 }
 
 .modalResumo {
@@ -804,7 +804,7 @@
   gap: 24px;
   margin-bottom: 20px;
   padding: 16px;
-  background: #f9f9f9;
+  background: var(--s-gray50);
   border-radius: 8px;
   border: 1px solid #e0e0e0;
 }
@@ -817,14 +817,14 @@
 
 .resumoLabel {
   font-size: 12px;
-  color: #666;
+  color: var(--t-666);
   font-weight: 500;
 }
 
 .resumoValue {
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: var(--t-333);
 }
 
 .resumoValue.positive {
@@ -848,7 +848,7 @@
   padding: 12px 24px;
   font-size: 14px;
   font-weight: 500;
-  color: #666;
+  color: var(--t-666);
   cursor: pointer;
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
@@ -856,7 +856,7 @@
 }
 
 .modalTab:hover {
-  color: #333;
+  color: var(--t-333);
 }
 
 .modalTabActive {
@@ -868,7 +868,7 @@
 .modalEmpty {
   text-align: center;
   padding: 40px;
-  color: #666;
+  color: var(--t-666);
   font-size: 14px;
 }
 
@@ -883,7 +883,7 @@
 }
 
 .detalhesTable thead {
-  background: #f5f5f5;
+  background: var(--s-gray100b);
   position: sticky;
   top: 0;
 }
@@ -892,19 +892,19 @@
   padding: 12px;
   text-align: left;
   font-weight: 600;
-  color: #333;
+  color: var(--t-333);
   border-bottom: 2px solid #e0e0e0;
   white-space: nowrap;
 }
 
 .detalhesTable td {
   padding: 12px;
-  border-bottom: 1px solid #f0f0f0;
-  color: #666;
+  border-bottom: 1px solid var(--s-gray100b);
+  color: var(--t-666);
 }
 
 .detalhesTable tbody tr:hover {
-  background: #f9f9f9;
+  background: var(--s-gray50);
 }
 
 .detalhesTable tbody tr:last-child td {

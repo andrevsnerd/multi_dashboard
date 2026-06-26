@@ -1,6 +1,6 @@
 .wrapper {
   padding: 24px;
-  background: #f5f5f5;
+  background: var(--s-gray100b);
   min-height: 100vh;
 }
 
@@ -23,21 +23,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
+  background: var(--s-white);
   border-radius: 8px;
-  color: #333;
+  color: var(--t-333);
 }
 
 .title {
   font-size: 28px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--t-1a);
   margin: 0 0 4px 0;
 }
 
 .subtitle {
   font-size: 14px;
-  color: #666;
+  color: var(--t-666);
   margin: 0;
 }
 
@@ -50,7 +50,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #666;
+  color: var(--t-666);
   font-size: 14px;
 }
 
@@ -70,7 +70,7 @@
 }
 
 .kpiCard {
-  background: #fff;
+  background: var(--s-white);
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -99,27 +99,27 @@
 .kpiLabel {
   font-size: 12px;
   font-weight: 600;
-  color: #666;
+  color: var(--t-666);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .kpiIcon {
-  color: #666;
+  color: var(--t-666);
   opacity: 0.6;
 }
 
 .kpiValue {
   font-size: 32px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--t-1a);
   margin-bottom: 8px;
   line-height: 1.2;
 }
 
 .kpiSecondary {
   font-size: 14px;
-  color: #64748b;
+  color: var(--t-500);
   margin-bottom: 8px;
 }
 
@@ -150,7 +150,7 @@
   align-items: center;
   gap: 12px;
   padding: 16px;
-  background: #fff;
+  background: var(--s-white);
   border-radius: 8px;
   margin-bottom: 24px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -172,7 +172,7 @@
 }
 
 .loadingText {
-  color: #666;
+  color: var(--t-666);
   font-size: 14px;
 }
 

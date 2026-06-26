@@ -2,8 +2,8 @@
   width: 240px;
   min-height: 100vh;
   height: 100vh;
-  background: #ffffff;
-  border-right: 1px solid rgba(15, 23, 42, 0.08);
+  background: var(--s-white);
+  border-right: 1px solid var(--b-subtle);
   padding: 24px 0;
   display: flex;
   flex-direction: column;
@@ -64,7 +64,7 @@
 
 .logo {
   padding: 0 24px 18px 24px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  border-bottom: 1px solid var(--b-subtle);
   margin-bottom: 10px;
   position: relative;
   display: flex;
@@ -84,13 +84,13 @@
 .logoText {
   font-size: 20px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
   letter-spacing: -0.02em;
   flex: 1;
 }
 
 .logoTextScarfme {
-  color: #2d1b4e;
+  color: var(--brand-scarfme);
 }
 
 .toggleButton {
@@ -103,7 +103,7 @@
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  color: #64748b;
+  color: var(--t-500);
   transition: all 0.3s ease;
   padding: 0;
   z-index: 201;
@@ -111,7 +111,7 @@
 
 .toggleButton:hover {
   background: rgba(15, 23, 42, 0.05);
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .toggleButton:active {
@@ -131,14 +131,14 @@
   position: fixed;
   top: 32px;
   left: 32px;
-  background: #ffffff;
+  background: var(--s-white);
   border: 1px solid rgba(15, 23, 42, 0.1);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   transition: left 0.3s ease, top 0.3s ease;
 }
 
 .toggleButtonFloating:hover {
-  background: #f8fafc;
+  background: var(--s-50);
   border-color: rgba(15, 23, 42, 0.2);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
@@ -206,15 +206,15 @@
   top: 0;
   z-index: 2;
   padding: 0 0 14px;
-  background: linear-gradient(180deg, #ffffff 0%, rgba(255, 255, 255, 0.96) 100%);
+  background: linear-gradient(180deg, var(--s-white) 0%, var(--s-white) 100%);
 }
 
 .searchInput {
   width: 100%;
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 12px;
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--s-50);
+  color: var(--t-900);
   font-size: 14px;
   padding: 10px 12px;
   outline: none;
@@ -222,18 +222,18 @@
 }
 
 .searchInput::placeholder {
-  color: #94a3b8;
+  color: var(--t-400);
 }
 
 .searchInput:focus {
   border-color: rgba(15, 23, 42, 0.24);
-  background: #ffffff;
+  background: var(--s-white);
   box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.16);
 }
 
 .emptyState {
   padding: 12px 10px 4px;
-  color: #64748b;
+  color: var(--t-500);
   font-size: 13px;
 }
 
@@ -242,7 +242,7 @@
   flex-direction: column;
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 16px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  background: linear-gradient(180deg, var(--s-white) 0%, var(--s-50) 100%);
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
   overflow: hidden;
 }
@@ -267,7 +267,7 @@
   border: none;
   cursor: pointer;
   text-align: left;
-  color: #0f172a;
+  color: var(--t-900);
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
@@ -288,25 +288,25 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #475569;
+  color: var(--t-600);
 }
 
 .sectionMeta {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--t-400);
 }
 
 .sectionIcon {
   width: 16px;
   height: 16px;
-  color: #64748b;
+  color: var(--t-500);
   flex-shrink: 0;
   transition: transform 0.2s ease, color 0.2s ease;
 }
 
 .sectionIconExpanded {
   transform: rotate(180deg);
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .sectionContent {
@@ -320,7 +320,7 @@
   padding: 10px 12px;
   border-radius: 10px;
   text-decoration: none;
-  color: #64748b;
+  color: var(--t-500);
   font-size: 14px;
   font-weight: 500;
   transition: all 0.2s;
@@ -328,20 +328,20 @@
 }
 
 .navItem:hover {
-  background: rgba(255, 255, 255, 0.9);
-  color: #334155;
+  background: var(--nav-hover);
+  color: var(--t-700);
 }
 
 .navItemActive {
-  background: #ffffff;
-  color: #0f172a;
+  background: var(--nav-active);
+  color: var(--t-900);
   font-weight: 600;
   box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.22);
 }
 
 .navItemActive:hover {
-  background: #ffffff;
-  color: #0f172a;
+  background: var(--nav-active);
+  color: var(--t-900);
 }
 
 .navLabel {
@@ -426,32 +426,32 @@
   padding: 8px 12px;
   border-radius: 8px;
   text-decoration: none;
-  color: #64748b;
+  color: var(--t-500);
   font-size: 13px;
   font-weight: 400;
   transition: all 0.2s;
   margin-left: 8px;
   border-left: 2px solid rgba(148, 163, 184, 0.18);
-  background: rgba(255, 255, 255, 0.58);
+  background: var(--submenu-bg);
 }
 
 .submenuItem:hover {
-  background: rgba(255, 255, 255, 0.92);
-  color: #334155;
+  background: var(--nav-hover);
+  color: var(--t-700);
   border-left-color: rgba(15, 23, 42, 0.18);
 }
 
 .submenuItemActive {
-  background: #ffffff;
-  color: #0f172a;
+  background: var(--nav-active);
+  color: var(--t-900);
   font-weight: 600;
   border-left-color: rgba(15, 23, 42, 0.45);
   box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.2);
 }
 
 .submenuItemActive:hover {
-  background: #ffffff;
-  color: #0f172a;
+  background: var(--nav-active);
+  color: var(--t-900);
   border-left-color: rgba(15, 23, 42, 0.45);
 }
 

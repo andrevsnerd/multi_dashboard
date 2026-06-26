@@ -12,7 +12,7 @@
 .modal {
   width: min(1160px, 100%);
   max-height: min(88vh, 920px);
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 20px;
   box-shadow: 0 28px 80px rgba(15, 23, 42, 0.28);
   display: flex;
@@ -26,19 +26,19 @@
   justify-content: space-between;
   gap: 16px;
   padding: 22px 24px 18px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--b-200);
 }
 
 .title {
   margin: 0;
   font-size: 24px;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .subtitle {
   margin: 6px 0 0;
   font-size: 14px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .closeButton {
@@ -46,8 +46,8 @@
   height: 38px;
   border: none;
   border-radius: 999px;
-  background: #f1f5f9;
-  color: #0f172a;
+  background: var(--s-100);
+  color: var(--t-900);
   font-size: 26px;
   cursor: pointer;
 }
@@ -67,8 +67,8 @@
 }
 
 .column + .column {
-  border-left: 1px solid #e2e8f0;
-  background: #f8fafc;
+  border-left: 1px solid var(--b-200);
+  background: var(--s-50);
 }
 
 .section {
@@ -80,19 +80,19 @@
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #475569;
+  color: var(--t-600);
   margin-bottom: 8px;
 }
 
 .searchInput,
 .textarea {
   width: 100%;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--b-300);
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--s-white);
   padding: 12px 14px;
   font-size: 14px;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .textarea {
@@ -124,8 +124,8 @@
   left: 0;
   right: 0;
   z-index: 20;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
+  background: var(--s-white);
+  border: 1px solid var(--b-300);
   border-radius: 14px;
   box-shadow: 0 18px 48px rgba(15, 23, 42, 0.16);
   overflow: hidden;
@@ -143,16 +143,16 @@
 
 .dropdownItem {
   border: none;
-  background: #ffffff;
+  background: var(--s-white);
   cursor: pointer;
 }
 
 .dropdownItem:hover {
-  background: #f8fafc;
+  background: var(--s-50);
 }
 
 .dropdownEmpty {
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .secondaryButton,
@@ -173,8 +173,8 @@
 }
 
 .secondaryButton {
-  background: #e2e8f0;
-  color: #0f172a;
+  background: var(--b-200);
+  color: var(--t-900);
 }
 
 .secondaryButton:disabled,
@@ -209,7 +209,7 @@
 .selectedCard {
   border: 1px solid #dbe3ee;
   border-radius: 16px;
-  background: #ffffff;
+  background: var(--s-white);
   padding: 14px;
   display: flex;
   gap: 12px;
@@ -218,7 +218,7 @@
 
 .resultCardActive {
   border-color: #0f172a;
-  background: #f8fafc;
+  background: var(--s-50);
 }
 
 .resultMain {
@@ -229,13 +229,13 @@
 .resultName {
   font-size: 15px;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .resultMeta {
   margin-top: 4px;
   font-size: 13px;
-  color: #64748b;
+  color: var(--t-500);
   word-break: break-word;
 }
 
@@ -266,10 +266,10 @@
 }
 
 .colorChip {
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--b-300);
   border-radius: 999px;
-  background: #ffffff;
-  color: #0f172a;
+  background: var(--s-white);
+  color: var(--t-900);
   padding: 6px 10px;
   font-size: 12px;
   font-weight: 700;
@@ -278,7 +278,7 @@
 
 .colorHint {
   font-size: 12px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .selectedHeader {
@@ -291,22 +291,22 @@
 
 .selectedCount {
   font-size: 13px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .linkButton {
   background: transparent;
-  color: #0f172a;
+  color: var(--t-900);
   font-size: 13px;
   font-weight: 700;
 }
 
 .emptyState {
-  border: 1px dashed #cbd5e1;
+  border: 1px dashed var(--b-300);
   border-radius: 16px;
-  background: #ffffff;
+  background: var(--s-white);
   padding: 18px;
-  color: #64748b;
+  color: var(--t-500);
   font-size: 14px;
   text-align: center;
 }
@@ -316,7 +316,7 @@
   justify-content: flex-end;
   gap: 10px;
   padding: 18px 24px 22px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--b-200);
 }
 
 @media (max-width: 960px) {
@@ -326,7 +326,7 @@
 
   .column + .column {
     border-left: none;
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid var(--b-200);
   }
 }
 

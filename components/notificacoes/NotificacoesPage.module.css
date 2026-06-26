@@ -13,14 +13,14 @@
 .title {
   font-size: 24px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
   margin: 0;
 }
 
 .subtitle {
   margin: 4px 0 0;
   font-size: 14px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .markAll {
@@ -28,7 +28,7 @@
   font-size: 13px;
   font-weight: 600;
   color: #6366f1;
-  background: #eef2ff;
+  background: var(--s-blue50);
   border: none;
   border-radius: 8px;
   padding: 8px 14px;
@@ -42,9 +42,9 @@
 .empty {
   padding: 64px 24px;
   text-align: center;
-  color: #475569;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  color: var(--t-600);
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
   border-radius: 16px;
   font-size: 16px;
   font-weight: 600;
@@ -54,7 +54,7 @@
   margin-top: 8px;
   font-size: 13px;
   font-weight: 400;
-  color: #94a3b8;
+  color: var(--t-400);
 }
 
 .list {
@@ -70,8 +70,8 @@
   width: 100%;
   text-align: left;
   padding: 16px 18px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
   border-radius: 14px;
   cursor: pointer;
   transition: border-color 0.12s, box-shadow 0.12s, transform 0.05s;
@@ -87,7 +87,7 @@
 }
 
 .cardLido {
-  background: #f8fafc;
+  background: var(--s-50);
 }
 
 .dot {
@@ -100,7 +100,7 @@
 
 .cardLido .cardTitle {
   font-weight: 500;
-  color: #475569;
+  color: var(--t-600);
 }
 
 .cardBody {
@@ -111,13 +111,13 @@
 .cardTitle {
   font-size: 15px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .cardSub {
   margin-top: 3px;
   font-size: 13px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .parcial {
@@ -128,7 +128,7 @@
 .cardMeta {
   margin-top: 3px;
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--t-400);
 }
 
 .acao {

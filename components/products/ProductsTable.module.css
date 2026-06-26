@@ -9,7 +9,7 @@
   width: 100%;
   overflow-x: auto;
   overflow-y: visible;
-  background: white;
+  background: var(--s-white);
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   position: relative;
@@ -20,7 +20,7 @@
   .container {
     border-radius: 20px;
     box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
-    border: 1px solid rgba(15, 23, 42, 0.08);
+    border: 1px solid var(--b-subtle);
     overflow: hidden;
   }
 }
@@ -30,7 +30,7 @@
 }
 
 .container::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--s-gray100b);
   border-radius: 4px;
 }
 
@@ -53,7 +53,7 @@
 }
 
 .table thead {
-  background-color: #f8f9fa;
+  background-color: var(--s-gray50);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -64,8 +64,8 @@
   text-align: center;
   font-weight: 600;
   font-size: 11px;
-  color: #1f2937;
-  border-bottom: 2px solid #e5e7eb;
+  color: var(--t-gray800);
+  border-bottom: 2px solid var(--b-gray200);
   white-space: nowrap;
   letter-spacing: 0.3px;
   text-transform: uppercase;
@@ -101,8 +101,8 @@
 
 .table td {
   padding: 12px 10px;
-  border-bottom: 1px solid #e5e7eb;
-  color: #374151;
+  border-bottom: 1px solid var(--b-gray200);
+  color: var(--t-gray700);
   font-size: 13px;
   vertical-align: middle;
   white-space: nowrap;
@@ -140,7 +140,7 @@
 }
 
 .table tbody tr:hover {
-  background-color: #f9fafb;
+  background-color: var(--s-gray50);
 }
 
 .table tbody tr.noSaleRow {
@@ -149,7 +149,7 @@
 }
 
 .table tbody tr.noSaleRow:hover {
-  background-color: #f9fafb;
+  background-color: var(--s-gray50);
   border-left-color: #f87171;
 }
 
@@ -169,7 +169,7 @@
 }
 
 .sortable:hover {
-  background-color: #f1f5f9;
+  background-color: var(--s-100);
 }
 
 .sortIndicator {
@@ -182,7 +182,7 @@
   font-weight: 500;
   font-family: 'Courier New', monospace;
   font-size: 12px;
-  color: #4b5563;
+  color: var(--t-gray600);
   text-align: left !important;
   min-width: 100px;
 }
@@ -205,14 +205,14 @@
 
 .productName {
   font-weight: 500;
-  color: #1f2937;
+  color: var(--t-gray800);
   margin-bottom: 4px;
 }
 
 .productCode {
   font-size: 11px;
   font-family: 'Courier New', monospace;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-weight: 400;
 }
 
@@ -226,15 +226,15 @@
 .productAttribute {
   font-size: 10px;
   line-height: 1.4;
-  color: #4b5563;
-  background: #f3f4f6;
+  color: var(--t-gray600);
+  background: var(--s-gray100);
   border-radius: 4px;
   padding: 1px 6px;
   white-space: nowrap;
 }
 
 .productAttributeLabel {
-  color: #9ca3af;
+  color: var(--t-gray400);
   margin-right: 3px;
 }
 
@@ -258,7 +258,7 @@
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.22);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(248, 250, 252, 0.99) 100%);
+  background: linear-gradient(180deg, var(--s-white) 0%, var(--s-50) 100%);
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
   z-index: 50;
 }
@@ -320,20 +320,20 @@
   gap: 2px;
   min-width: 0;
   text-align: left;
-  color: #0f172a;
+  color: var(--t-900);
   font-size: 11px;
   font-weight: 600;
 }
 
 .inlineTooltipCode {
   font-family: 'Courier New', monospace;
-  color: #64748b;
+  color: var(--t-500);
   font-size: 10px;
   font-weight: 400;
 }
 
 .inlineTooltipMeta {
-  color: #64748b;
+  color: var(--t-500);
   font-size: 10px;
   font-weight: 500;
 }
@@ -353,7 +353,7 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  color: #0f172a;
+  color: var(--t-900);
   font-size: 11px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -362,14 +362,14 @@
 .currencyCell {
   text-align: right !important;
   font-weight: 500;
-  color: #1f2937;
+  color: var(--t-gray800);
   min-width: 110px;
 }
 
 .numberCell {
   text-align: right !important;
   font-weight: 500;
-  color: #1f2937;
+  color: var(--t-gray800);
   min-width: 80px;
 }
 
@@ -387,7 +387,7 @@
 .stockRedeValue {
   cursor: help;
   border-bottom: 1px dashed rgba(37, 99, 235, 0.35);
-  color: #0f172a;
+  color: var(--t-900);
   transition: color 0.18s ease, border-color 0.18s ease;
 }
 
@@ -418,7 +418,7 @@
   right: 16px;
   width: 12px;
   height: 12px;
-  background: rgba(248, 250, 252, 0.98);
+  background: var(--s-50);
   border-right: 1px solid rgba(148, 163, 184, 0.22);
   border-bottom: 1px solid rgba(148, 163, 184, 0.22);
   transform: rotate(45deg);
@@ -435,7 +435,7 @@
 .stockTooltipSubtitle {
   margin-top: 2px;
   font-size: 11px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .stockTooltipList {
@@ -452,7 +452,7 @@
   align-items: center;
   padding: 5px 8px;
   border-radius: 7px;
-  background: rgba(241, 245, 249, 0.8);
+  background: var(--s-100);
 }
 
 .stockTooltipFilial {
@@ -463,7 +463,7 @@
   text-align: left;
   font-size: 11px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .stockTooltipQty {
@@ -476,7 +476,7 @@
 .stockTooltipEmpty {
   margin-top: 6px;
   font-size: 11px;
-  color: #64748b;
+  color: var(--t-500);
   text-align: left;
   line-height: 1.4;
 }
@@ -508,7 +508,7 @@
 
 .varianceNeutral {
   background: rgba(148, 163, 184, 0.14);
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .newBadge {
@@ -568,7 +568,7 @@
 .empty {
   padding: 40px 20px;
   text-align: center;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-size: 14px;
 }
 
@@ -579,8 +579,8 @@
 
 .card {
   padding: 12px 16px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  background: #ffffff;
+  border-bottom: 1px solid var(--b-subtle);
+  background: var(--s-white);
   transition: background-color 0.2s;
   position: relative;
 }
@@ -611,7 +611,7 @@
 }
 
 .card:active {
-  background-color: #f8fafc;
+  background-color: var(--s-50);
 }
 
 .cardMain {
@@ -641,7 +641,7 @@
 .cardProductName {
   font-size: 14px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
   margin: 0 0 6px 0;
   line-height: 1.3;
 }
@@ -660,7 +660,7 @@
 .cardDate {
   font-size: 13px;
   font-weight: 500;
-  color: #475569;
+  color: var(--t-600);
   line-height: 1.3;
   margin-bottom: 4px;
 }
@@ -668,7 +668,7 @@
 .cardProductCode {
   font-size: 11px;
   font-family: 'Courier New', monospace;
-  color: #64748b;
+  color: var(--t-500);
   font-weight: 400;
 }
 
@@ -676,8 +676,8 @@
 .cardColor {
   display: inline-block;
   padding: 2px 8px;
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--s-100);
+  color: var(--t-600);
   border-radius: 6px;
   font-size: 11px;
   font-weight: 500;
@@ -693,13 +693,13 @@
 .cardRevenueValue {
   font-size: 16px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
   line-height: 1.2;
 }
 
 .cardQuantity {
   font-size: 11px;
-  color: #64748b;
+  color: var(--t-500);
   font-weight: 500;
   margin-left: 4px;
 }
@@ -740,8 +740,8 @@
 .cardStockRede {
   display: inline-block;
   padding: 3px 8px;
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--s-100);
+  color: var(--t-600);
   border-radius: 6px;
   font-size: 10px;
   font-weight: 500;
@@ -759,7 +759,7 @@
 
 .cardPriceItem {
   font-size: 9px;
-  color: #64748b;
+  color: var(--t-500);
   font-weight: 500;
   white-space: nowrap;
   text-align: right;
@@ -767,7 +767,7 @@
 }
 
 .cardPriceLabel {
-  color: #94a3b8;
+  color: var(--t-400);
   font-weight: 400;
   margin-right: 3px;
 }
@@ -799,14 +799,14 @@
 
 .cardLabel {
   font-size: 13px;
-  color: #64748b;
+  color: var(--t-500);
   font-weight: 500;
   flex-shrink: 0;
 }
 
 .cardValue {
   font-size: 14px;
-  color: #0f172a;
+  color: var(--t-900);
   font-weight: 600;
   text-align: right;
   flex: 1;
@@ -816,7 +816,7 @@
 
 .varianceNeutral {
   background: rgba(148, 163, 184, 0.14);
-  color: #64748b;
+  color: var(--t-500);
 }
 
 /* Mobile optimizations */

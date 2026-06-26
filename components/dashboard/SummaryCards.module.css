@@ -5,9 +5,9 @@
 }
 
 .card {
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 20px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--b-subtle);
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -25,7 +25,7 @@
   font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #94a3b8;
+  color: var(--t-400);
 }
 
 .valueBlock {
@@ -47,31 +47,31 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.14em;
-  color: #94a3b8;
+  color: var(--t-400);
 }
 
 .secondaryValueText {
   font-size: 16px;
   font-weight: 600;
-  color: #475569;
+  color: var(--t-600);
   line-height: 1.2;
 }
 
 .value {
   font-size: 32px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
   line-height: 1.2;
 }
 
 .valueHighlight {
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .description {
   margin: 0;
   font-size: 14px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .divider {
@@ -96,13 +96,13 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.14em;
-  color: #94a3b8;
+  color: var(--t-400);
 }
 
 .previousValue {
   font-size: 16px;
   font-weight: 600;
-  color: #475569;
+  color: var(--t-600);
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -132,7 +132,7 @@
 
 .changeBadgeNeutral {
   background: rgba(148, 163, 184, 0.18);
-  color: #475569;
+  color: var(--t-600);
 }
 
 @media (max-width: 768px) {

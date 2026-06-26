@@ -62,10 +62,10 @@ export function AuthGuard({ children }: { children: ReactNode }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)",
+        background: "var(--app-bg)",
       }}
     >
-      <span style={{ color: "#64748b" }}>Carregando...</span>
+      <span style={{ color: "var(--t-500)" }}>Carregando...</span>
     </div>
   );
 

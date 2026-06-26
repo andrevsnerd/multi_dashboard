@@ -2,13 +2,13 @@
   width: 100%;
   padding: 24px;
   min-height: 100vh;
-  background: #f9fafb;
+  background: var(--s-gray50);
 }
 
 .loading {
   padding: 48px;
   text-align: center;
-  color: #6b7280;
+  color: var(--t-gray500);
 }
 
 .header {
@@ -51,7 +51,7 @@
 .title {
   font-size: 24px;
   font-weight: 700;
-  color: #111827;
+  color: var(--t-gray900);
   margin: 0 0 8px 0;
   display: flex;
   align-items: center;
@@ -63,24 +63,24 @@
   align-items: center;
   justify-content: center;
   background: none;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--b-gray300);
   border-radius: 6px;
   padding: 4px 6px;
-  color: #6b7280;
+  color: var(--t-gray500);
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
   flex-shrink: 0;
 }
 
 .editRomaneioTitleBtn:hover {
-  color: #111827;
+  color: var(--t-gray900);
   border-color: #9ca3af;
-  background: #f3f4f6;
+  background: var(--s-gray100);
 }
 
 .meta {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--t-gray500);
   margin: 0;
 }
 
@@ -92,7 +92,7 @@
   display: block;
   font-size: 12px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--t-gray500);
   text-transform: uppercase;
   letter-spacing: 0.02em;
   margin-bottom: 6px;
@@ -102,10 +102,10 @@
   min-width: 280px;
   padding: 10px 12px;
   font-size: 14px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
   border-radius: 8px;
-  background: #fff;
-  color: #111827;
+  background: var(--s-white);
+  color: var(--t-gray900);
   cursor: pointer;
 }
 
@@ -124,7 +124,7 @@
   margin-top: 6px;
   font-size: 12px;
   font-weight: 600;
-  color: #374151;
+  color: var(--t-gray700);
 }
 
 .destinoMeta span {
@@ -146,7 +146,7 @@
 
 .destinoReadOnly {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--t-gray500);
   margin: 0 0 20px 0;
 }
 
@@ -162,9 +162,9 @@
   align-items: center;
   gap: 12px;
   padding: 16px 20px;
-  background: #fff;
+  background: var(--s-white);
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   min-width: 140px;
 }
@@ -181,7 +181,7 @@
 
 .summaryValue {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--t-gray500);
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
@@ -189,13 +189,13 @@
 .summaryNumber {
   font-size: 20px;
   font-weight: 700;
-  color: #111827;
+  color: var(--t-gray900);
 }
 
 .tableWrap {
-  background: #fff;
+  background: var(--s-white);
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   overflow-x: auto;
 }
@@ -209,21 +209,21 @@
 .table th {
   text-align: left;
   padding: 12px 14px;
-  background: #f9fafb;
+  background: var(--s-gray50);
   font-weight: 600;
-  color: #374151;
-  border-bottom: 1px solid #e5e7eb;
+  color: var(--t-gray700);
+  border-bottom: 1px solid var(--b-gray200);
   white-space: nowrap;
 }
 
 .table td {
   padding: 12px 14px;
-  border-bottom: 1px solid #f3f4f6;
-  color: #111827;
+  border-bottom: 1px solid var(--s-gray100);
+  color: var(--t-gray900);
 }
 
 .table tbody tr:hover {
-  background: #f9fafb;
+  background: var(--s-gray50);
 }
 
 .destinoTag {
@@ -244,7 +244,7 @@
 
 .qtdValue {
   font-weight: 600;
-  color: #111827;
+  color: var(--t-gray900);
 }
 
 .transferirBtn {
@@ -266,11 +266,11 @@
 .emptyState {
   text-align: center;
   padding: 48px 24px;
-  color: #9ca3af;
+  color: var(--t-gray400);
   font-size: 14px;
-  background: #fff;
+  background: var(--s-white);
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
 }
 
 /* ---- Linha confirmada (recebida) ---- */
@@ -293,7 +293,7 @@
 
 /* Loading dots */
 .loadingDots {
-  color: #9ca3af;
+  color: var(--t-gray400);
   font-size: 18px;
   letter-spacing: 2px;
 }
@@ -337,7 +337,7 @@
 
 .qtdeInputLabel {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--t-gray500);
   white-space: nowrap;
 }
 
@@ -349,7 +349,7 @@
   border: 2px solid #3b82f6;
   border-radius: 6px;
   text-align: center;
-  color: #111827;
+  color: var(--t-gray900);
   outline: none;
 }
 
@@ -398,18 +398,18 @@
 .cancelarQtdeBtn {
   padding: 5px 10px;
   background: transparent;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-size: 12px;
   font-weight: 500;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
   border-radius: 7px;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
 }
 
 .cancelarQtdeBtn:hover {
-  color: #374151;
-  border-color: #d1d5db;
+  color: var(--t-gray700);
+  border-color: var(--b-gray300);
 }
 
 /* ---- Item confirmado ---- */
@@ -486,17 +486,17 @@
 }
 
 .editarQtdeBtn:hover {
-  background: #eff6ff;
+  background: var(--s-blue50);
   border-color: #93c5fd;
 }
 
 .desfazerBtn {
   padding: 3px 10px;
   background: transparent;
-  color: #9ca3af;
+  color: var(--t-gray400);
   font-size: 11px;
   font-weight: 500;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
   border-radius: 7px;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
@@ -519,7 +519,7 @@
   justify-content: center;
   padding: 3px 5px;
   background: transparent;
-  color: #9ca3af;
+  color: var(--t-gray400);
   border: 1px solid transparent;
   border-radius: 5px;
   cursor: pointer;
@@ -530,13 +530,13 @@
 .editQtdBtn:hover {
   color: #3b82f6;
   border-color: #bfdbfe;
-  background: #eff6ff;
+  background: var(--s-blue50);
 }
 
 /* ---- Preview de impacto no modal de edição ---- */
 .editQtdPreview {
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
+  background: var(--s-gray100);
+  border: 1px solid var(--b-gray200);
   border-radius: 10px;
   padding: 12px 16px;
   display: flex;
@@ -547,7 +547,7 @@
 .editQtdPreviewTitle {
   font-size: 11px;
   font-weight: 700;
-  color: #6b7280;
+  color: var(--t-gray500);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin: 0 0 4px 0;
@@ -562,18 +562,18 @@
 
 .editQtdPreviewLabel {
   font-size: 13px;
-  color: #374151;
+  color: var(--t-gray700);
   font-weight: 500;
 }
 
 .editQtdPreviewVal {
   font-size: 14px;
-  color: #111827;
+  color: var(--t-gray900);
   white-space: nowrap;
 }
 
 .editQtdArrow {
-  color: #9ca3af;
+  color: var(--t-gray400);
   margin: 0 4px;
 }
 
@@ -588,7 +588,7 @@
 /* Estoque destino */
 .estoqueValor {
   font-weight: 600;
-  color: #111827;
+  color: var(--t-gray900);
 }
 
 .estoqueZero {
@@ -603,11 +603,11 @@
   justify-content: center;
   width: 26px;
   height: 26px;
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--s-gray100);
+  color: var(--t-gray700);
   font-size: 16px;
   font-weight: 700;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--b-gray300);
   border-radius: 6px;
   cursor: pointer;
   line-height: 1;
@@ -616,12 +616,12 @@
 }
 
 .qtdeSpinBtn:hover {
-  background: #e5e7eb;
+  background: var(--b-gray200);
   border-color: #9ca3af;
 }
 
 .qtdeSpinBtn:active {
-  background: #d1d5db;
+  background: var(--b-gray300);
 }
 
 /* ---- Confirmar Tudo ---- */
@@ -670,18 +670,18 @@
   align-items: center;
   gap: 8px;
   padding: 10px 18px;
-  background: #fff;
-  color: #111827;
+  background: var(--s-white);
+  color: var(--t-gray900);
   font-size: 14px;
   font-weight: 700;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--b-gray300);
   border-radius: 8px;
   cursor: pointer;
   transition: background-color 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
 }
 
 .exportXlsxBtn:hover:not(:disabled) {
-  background: #f9fafb;
+  background: var(--s-gray50);
   border-color: #9ca3af;
 }
 
@@ -695,7 +695,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 18px;
-  background: #fff;
+  background: var(--s-white);
   color: #dc2626;
   font-size: 14px;
   font-weight: 700;
@@ -742,7 +742,7 @@
 }
 
 .modal {
-  background: #fff;
+  background: var(--s-white);
   border-radius: 16px;
   padding: 28px 28px 24px;
   width: 100%;
@@ -756,13 +756,13 @@
 .modalTitle {
   font-size: 20px;
   font-weight: 700;
-  color: #111827;
+  color: var(--t-gray900);
   margin: 0;
 }
 
 .modalOrigem {
   font-size: 14px;
-  color: #4b5563;
+  color: var(--t-gray600);
   margin: 0;
 }
 
@@ -775,16 +775,16 @@
 .modalLabel {
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: var(--t-gray700);
 }
 
 .modalSelect {
   padding: 10px 12px;
   font-size: 14px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--b-gray300);
   border-radius: 8px;
-  background: #fff;
-  color: #111827;
+  background: var(--s-white);
+  color: var(--t-gray900);
   cursor: pointer;
   outline: none;
   transition: border-color 0.2s;
@@ -796,8 +796,8 @@
 
 .modalItensResumo {
   font-size: 13px;
-  color: #6b7280;
-  background: #f3f4f6;
+  color: var(--t-gray500);
+  background: var(--s-gray100);
   padding: 10px 14px;
   border-radius: 8px;
 }
@@ -830,16 +830,16 @@
   padding: 10px 20px;
   font-size: 14px;
   font-weight: 500;
-  color: #374151;
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
+  color: var(--t-gray700);
+  background: var(--s-gray100);
+  border: 1px solid var(--b-gray200);
   border-radius: 8px;
   cursor: pointer;
   transition: background-color 0.2s;
 }
 
 .modalBtnCancelar:hover:not(:disabled) {
-  background: #e5e7eb;
+  background: var(--b-gray200);
 }
 
 .modalBtnConfirmar {
@@ -867,7 +867,7 @@
   width: 100%;
   padding: 8px 12px;
   font-size: 14px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--b-gray300);
   border-radius: 6px;
   outline: none;
   box-sizing: border-box;
@@ -902,7 +902,7 @@
   padding: 4px 12px;
   font-size: 12px;
   font-weight: 600;
-  background: #fff;
+  background: var(--s-white);
   border: 1px solid #6ee7b7;
   border-radius: 6px;
   color: #065f46;
@@ -917,7 +917,7 @@
 .fecharBannerBtn {
   background: none;
   border: none;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-size: 14px;
   cursor: pointer;
   padding: 0 4px;
@@ -925,5 +925,5 @@
 }
 
 .fecharBannerBtn:hover {
-  color: #111827;
+  color: var(--t-gray900);
 }

@@ -32,7 +32,7 @@
 .title {
   font-size: 28px;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--t-gray800);
   margin: 0;
 }
 
@@ -45,7 +45,7 @@
 .subtitle {
   margin: 0;
   font-size: 13px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .controlsRow {
@@ -94,7 +94,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
+  color: var(--t-gray500);
   pointer-events: none;
 }
 
@@ -102,11 +102,11 @@
   width: 100%;
   padding: 10px 40px 10px 44px;
   font-size: 14px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--b-gray300);
   border-radius: 8px;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
-  background-color: #ffffff;
+  background-color: var(--s-white);
   height: 42px;
   box-sizing: border-box;
 }
@@ -122,7 +122,7 @@
   padding: 0;
   border: none;
   background: transparent;
-  color: #6b7280;
+  color: var(--t-gray500);
   cursor: pointer;
   border-radius: 4px;
   transition: background-color 0.2s, color 0.2s;
@@ -130,12 +130,12 @@
 }
 
 .clearButton:hover {
-  background-color: #f3f4f6;
-  color: #1f2937;
+  background-color: var(--s-gray100);
+  color: var(--t-gray800);
 }
 
 .clearButton:active {
-  background-color: #e5e7eb;
+  background-color: var(--b-gray200);
 }
 
 .headerRow :global([class*="DateRangeFilter"]) {
@@ -161,8 +161,8 @@
   left: 0;
   right: 0;
   margin-top: 4px;
-  background: #ffffff;
-  border: 1px solid #d1d5db;
+  background: var(--s-white);
+  border: 1px solid var(--b-gray300);
   border-radius: 8px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   max-height: 300px;
@@ -178,7 +178,7 @@
   background: none;
   cursor: pointer;
   transition: background-color 0.2s;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--s-gray100);
 }
 
 .searchResultItem:last-child {
@@ -186,26 +186,26 @@
 }
 
 .searchResultItem:hover {
-  background-color: #f9fafb;
+  background-color: var(--s-gray50);
 }
 
 .searchResultName {
   font-size: 14px;
   font-weight: 500;
-  color: #1f2937;
+  color: var(--t-gray800);
   margin-bottom: 4px;
 }
 
 .searchResultId {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--t-gray500);
 }
 
 .loading {
-  color: #6b7280;
+  color: var(--t-gray500);
   font-size: 14px;
   padding: 8px 12px;
-  background-color: #f9fafb;
+  background-color: var(--s-gray50);
   border-radius: 6px;
 }
 
@@ -246,7 +246,7 @@
   padding: 12px 16px;
   border: 1px solid rgba(148, 163, 184, 0.24);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--s-white);
   box-shadow: 0 18px 38px rgba(15, 23, 42, 0.1);
   backdrop-filter: blur(8px);
 }
@@ -270,12 +270,12 @@
 .loadingOverlayTitle {
   font-size: 13px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .loadingOverlayHint {
   font-size: 12px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .inlineLoadingTag {
@@ -283,7 +283,7 @@
   align-items: center;
   padding: 5px 10px;
   border-radius: 999px;
-  background: #eff6ff;
+  background: var(--s-blue50);
   color: #1d4ed8;
   font-size: 11px;
   font-weight: 700;
@@ -299,8 +299,8 @@
 .skeletonSurface {
   position: relative;
   overflow: hidden;
-  background: #ffffff;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: var(--s-white);
+  border: 1px solid var(--b-subtle);
   border-radius: 12px;
   box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
   padding: 18px;
@@ -342,7 +342,7 @@
   display: block;
   height: 12px;
   border-radius: 999px;
-  background: #e2e8f0;
+  background: var(--b-200);
 }
 
 .skeletonLine::after {
@@ -350,7 +350,7 @@
   position: absolute;
   inset: 0;
   transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.72), transparent);
+  background: linear-gradient(90deg, transparent, var(--s-white), transparent);
   animation: shimmer 1.4s ease-in-out infinite;
 }
 
@@ -405,7 +405,7 @@
 .skeletonMetricCard {
   padding: 14px;
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--s-50);
   border: 1px solid rgba(148, 163, 184, 0.12);
   display: flex;
   flex-direction: column;
@@ -434,17 +434,17 @@
 }
 
 .productHeader {
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 20px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--b-subtle);
   padding: 24px;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
 }
 
 .stockTotalCard {
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 20px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--b-subtle);
   padding: 24px;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
   display: flex;
@@ -458,32 +458,32 @@
   font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--t-500);
   font-weight: 600;
 }
 
 .stockTotalCardValue {
   font-size: 28px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .stockTotalCardUnit {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--t-400);
 }
 
 .productName {
   font-size: 24px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
   margin: 0;
 }
 
 .productGrade {
   font-size: 12px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--t-500);
   letter-spacing: 0.02em;
 }
 
@@ -500,17 +500,17 @@
   font-size: 12px;
   font-weight: 500;
   border-radius: 9999px;
-  border: 1px solid #cbd5e1;
-  background: #f8fafc;
-  color: #475569;
+  border: 1px solid var(--b-300);
+  background: var(--s-50);
+  color: var(--t-600);
   cursor: pointer;
   transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .colorBadge:hover {
-  background: #e2e8f0;
+  background: var(--b-200);
   border-color: #94a3b8;
-  color: #334155;
+  color: var(--t-700);
 }
 
 .colorBadgeSelected {
@@ -539,7 +539,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .colorSelectNative {
@@ -548,9 +548,9 @@
   font-size: 12px;
   font-weight: 600;
   border-radius: 9999px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
-  color: #334155;
+  border: 1px solid var(--b-200);
+  background: var(--s-50);
+  color: var(--t-700);
   outline: none;
 }
 
@@ -567,18 +567,18 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--b-200);
   border-radius: 8px;
-  background: #ffffff;
-  color: #475569;
+  background: var(--s-white);
+  color: var(--t-600);
   cursor: pointer;
   transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .colorEditButton:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-  color: #0f172a;
+  background: var(--s-50);
+  border-color: var(--b-300);
+  color: var(--t-900);
 }
 
 .colorEditButton:disabled {
@@ -587,9 +587,9 @@
 }
 
 .productCard {
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--b-subtle);
   padding: 18px;
   box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
   display: flex;
@@ -627,19 +627,19 @@
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .productCodeLabel {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #94a3b8;
+  color: var(--t-400);
 }
 
 .productCodeValue {
   font-weight: 600;
-  color: #475569;
+  color: var(--t-600);
 }
 
 .productClassifRow {
@@ -656,9 +656,9 @@
   gap: 5px;
   font-size: 11px;
   font-weight: 500;
-  color: #475569;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
+  color: var(--t-600);
+  background: var(--s-100);
+  border: 1px solid var(--b-200);
   border-radius: 4px;
   padding: 2px 7px;
   white-space: nowrap;
@@ -667,7 +667,7 @@
 .classifLabel {
   font-size: 10px;
   font-weight: 600;
-  color: #94a3b8;
+  color: var(--t-400);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -681,7 +681,7 @@
 
 .lastEntryInline {
   font-size: 12px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .colorSelectNative:focus {
@@ -695,7 +695,7 @@
   gap: 16px;
   align-items: center;
   font-size: 14px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 /* Espaço entre o código do produto e as badges de cor */
@@ -705,7 +705,7 @@
 
 .productId {
   font-weight: 500;
-  color: #475569;
+  color: var(--t-600);
 }
 
 .lastEntryContainer {
@@ -713,7 +713,7 @@
 }
 
 .lastEntry {
-  color: #64748b;
+  color: var(--t-500);
   display: block;
 }
 
@@ -736,9 +736,9 @@
 }
 
 .empty {
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 20px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--b-subtle);
   padding: 48px 24px;
   text-align: center;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
@@ -747,7 +747,7 @@
 .empty p {
   margin: 0;
   font-size: 16px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .modalOverlay {
@@ -763,7 +763,7 @@
 
 .modalContent {
   width: min(100%, 440px);
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 12px;
   box-shadow: 0 24px 50px rgba(15, 23, 42, 0.24);
   overflow: hidden;
@@ -781,7 +781,7 @@
   margin: 0;
   font-size: 18px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .modalCloseButton {
@@ -793,14 +793,14 @@
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: #64748b;
+  color: var(--t-500);
   cursor: pointer;
   font-size: 16px;
 }
 
 .modalCloseButton:hover {
-  background: #f1f5f9;
-  color: #0f172a;
+  background: var(--s-100);
+  color: var(--t-900);
 }
 
 .colorForm {
@@ -816,17 +816,17 @@
   gap: 6px;
   font-size: 12px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--t-500);
   text-transform: uppercase;
 }
 
 .colorFormInput {
   height: 38px;
   padding: 8px 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--b-200);
   border-radius: 8px;
   font-size: 14px;
-  color: #0f172a;
+  color: var(--t-900);
   text-transform: uppercase;
 }
 
@@ -849,7 +849,7 @@
   justify-content: flex-end;
   gap: 10px;
   padding: 14px 20px 20px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--b-200);
 }
 
 .modalButton {
@@ -864,8 +864,8 @@
 
 .modalButtonSecondary {
   border: none;
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--s-100);
+  color: var(--t-600);
 }
 
 .modalButtonPrimary {

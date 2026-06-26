@@ -1,6 +1,6 @@
 .wrapper {
   padding: 24px;
-  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  background: linear-gradient(180deg, var(--s-50) 0%, var(--s-100) 100%);
   min-height: 100vh;
 }
 
@@ -9,8 +9,8 @@
 .missingCard,
 .emptyState,
 .summaryCard {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.05);
 }
 
@@ -36,13 +36,13 @@
   margin: 0;
   font-size: 30px;
   line-height: 1.05;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .subtitle {
   margin: 10px 0 0;
   font-size: 15px;
-  color: #64748b;
+  color: var(--t-500);
   max-width: 720px;
 }
 
@@ -82,8 +82,8 @@
 }
 
 .secondaryButton {
-  background: #e2e8f0;
-  color: #0f172a;
+  background: var(--b-200);
+  color: var(--t-900);
 }
 
 .primaryButton:disabled,
@@ -98,7 +98,7 @@
   gap: 10px;
   padding: 8px 10px;
   border-radius: 14px;
-  background: #ffffff;
+  background: var(--s-white);
   border: 1px solid #dbe3ee;
 }
 
@@ -107,12 +107,12 @@
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .toggleButton {
-  background: #f8fafc;
-  color: #475569;
+  background: var(--s-50);
+  color: var(--t-600);
   padding: 9px 14px;
 }
 
@@ -126,13 +126,13 @@
 }
 
 .selectionHint {
-  color: #64748b;
+  color: var(--t-500);
   font-size: 14px;
 }
 
 .clearButton {
   background: transparent;
-  color: #0f172a;
+  color: var(--t-900);
   padding: 0;
 }
 
@@ -154,14 +154,14 @@
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .summaryValue {
   display: block;
   margin-top: 8px;
   font-size: 24px;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .error,
@@ -181,9 +181,9 @@
 
 .loading,
 .emptyTable {
-  background: #ffffff;
-  color: #475569;
-  border: 1px solid #e2e8f0;
+  background: var(--s-white);
+  color: var(--t-600);
+  border: 1px solid var(--b-200);
 }
 
 .emptyState {
@@ -194,13 +194,13 @@
 .emptyTitle {
   margin: 0;
   font-size: 22px;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .emptyText {
   margin: 10px auto 0;
   max-width: 620px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .tableCard {
@@ -251,7 +251,7 @@
   width: 30px;
   height: 30px;
   border-radius: 999px;
-  background: #eff6ff;
+  background: var(--s-blue50);
   color: #1d4ed8;
   text-decoration: none;
   flex-shrink: 0;
@@ -303,7 +303,7 @@
 .productName {
   font-size: 18px;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .colorBadge {
@@ -311,8 +311,8 @@
   align-items: center;
   padding: 4px 10px;
   border-radius: 999px;
-  background: #e2e8f0;
-  color: #334155;
+  background: var(--b-200);
+  color: var(--t-700);
   font-size: 12px;
   font-weight: 800;
   line-height: 1;
@@ -342,11 +342,11 @@
 .missingMeta {
   margin-top: 6px;
   font-size: 14px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .productSubMeta {
-  color: #475569;
+  color: var(--t-600);
 }
 
 .suggestionBadge {
@@ -379,8 +379,8 @@
 }
 
 .suggestionmuted {
-  background: #f1f5f9;
-  color: #64748b;
+  background: var(--s-100);
+  color: var(--t-500);
 }
 
 .ruleTooltip {
@@ -428,13 +428,13 @@
 .missingTitle {
   margin: 0;
   font-size: 20px;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .missingCount {
   font-size: 13px;
   font-weight: 800;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .missingList {
@@ -445,16 +445,16 @@
 }
 
 .missingItem {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--b-200);
   border-radius: 16px;
   padding: 14px;
-  background: #f8fafc;
+  background: var(--s-50);
 }
 
 .missingName {
   font-size: 15px;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .missingNameRow {

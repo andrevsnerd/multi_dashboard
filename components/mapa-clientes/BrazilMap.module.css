@@ -8,7 +8,7 @@
 
 /* Tooltip */
 .tooltip {
-  background: #ffffff;
+  background: var(--s-white);
   border: 1px solid rgba(15, 23, 42, 0.1);
   border-radius: 10px;
   padding: 10px 14px;
@@ -25,13 +25,13 @@
 .tooltipTitle {
   font-size: 13px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
   margin-bottom: 6px;
 }
 
 .tooltipUf {
   font-weight: 400;
-  color: #64748b;
+  color: var(--t-500);
   font-size: 12px;
 }
 
@@ -50,12 +50,12 @@
 
 .tooltipSub {
   font-size: 12px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .tooltipCount {
   font-size: 12px;
-  color: #475569;
+  color: var(--t-600);
   margin-top: 2px;
 }
 
@@ -66,5 +66,5 @@
   right: 0;
   text-align: center;
   font-size: 13px;
-  color: #94a3b8;
+  color: var(--t-400);
 }

@@ -17,13 +17,13 @@
 .brandTitle {
   font-size: 28px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
   margin: 0;
 }
 
 .brandSubtitle {
   font-size: 13px;
-  color: #64748b;
+  color: var(--t-500);
   margin: 0;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -37,7 +37,7 @@
 
 .navPlaceholder {
   font-size: 13px;
-  color: #94a3b8;
+  color: var(--t-400);
   padding: 8px 16px;
   border: 1px dashed rgba(148, 163, 184, 0.5);
   border-radius: 999px;

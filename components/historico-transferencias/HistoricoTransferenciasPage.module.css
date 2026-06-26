@@ -17,14 +17,14 @@
   margin: 0;
   font-size: 24px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
   letter-spacing: -0.02em;
 }
 
 .subtitle {
   margin: 4px 0 0;
   font-size: 14px;
-  color: #6b7280;
+  color: var(--t-gray500);
 }
 
 .backLink {
@@ -34,7 +34,7 @@
   font-size: 13px;
   font-weight: 600;
   color: #2563eb;
-  background: #eff6ff;
+  background: var(--s-blue50);
   border: 1px solid #bfdbfe;
   border-radius: 8px;
   text-decoration: none;
@@ -52,7 +52,7 @@
   align-items: flex-end;
   gap: 14px;
   padding: 16px;
-  background: #fff;
+  background: var(--s-white);
   border-radius: 10px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
@@ -70,15 +70,15 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  color: #6b7280;
+  color: var(--t-gray500);
 }
 
 .filterField select {
   padding: 8px 10px;
   font-size: 13px;
-  color: #1f2937;
-  background: #f9fafb;
-  border: 1px solid #d1d5db;
+  color: var(--t-gray800);
+  background: var(--s-gray50);
+  border: 1px solid var(--b-gray300);
   border-radius: 8px;
   cursor: pointer;
   transition: border-color 0.15s, background-color 0.15s;
@@ -87,7 +87,7 @@
 .filterField select:focus {
   outline: none;
   border-color: #2563eb;
-  background: #fff;
+  background: var(--s-white);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
@@ -95,9 +95,9 @@
   padding: 8px 14px;
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
-  background: #f3f4f6;
-  border: 1px solid #d1d5db;
+  color: var(--t-gray700);
+  background: var(--s-gray100);
+  border: 1px solid var(--b-gray300);
   border-radius: 8px;
   cursor: pointer;
   transition: background-color 0.15s;
@@ -105,7 +105,7 @@
 }
 
 .resetBtn:hover {
-  background: #e5e7eb;
+  background: var(--b-gray200);
 }
 
 .errorBox {
@@ -118,7 +118,7 @@
 }
 
 .tableCard {
-  background: #fff;
+  background: var(--s-white);
   border-radius: 10px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   overflow-x: auto;
@@ -130,7 +130,7 @@
 }
 
 .table thead {
-  background: #f9fafb;
+  background: var(--s-gray50);
 }
 
 .table th {
@@ -138,23 +138,23 @@
   text-align: left;
   font-size: 11px;
   font-weight: 700;
-  color: #6b7280;
+  color: var(--t-gray500);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid var(--b-gray200);
   white-space: nowrap;
 }
 
 .table td {
   padding: 14px 16px;
   font-size: 13px;
-  color: #1f2937;
-  border-bottom: 1px solid #f3f4f6;
+  color: var(--t-gray800);
+  border-bottom: 1px solid var(--s-gray100);
   vertical-align: middle;
 }
 
 .table tbody tr:hover {
-  background: #f9fafb;
+  background: var(--s-gray50);
 }
 
 .statusBadge {
@@ -191,30 +191,30 @@
 .cellSub {
   margin-top: 2px;
   font-size: 11px;
-  color: #6b7280;
+  color: var(--t-gray500);
 }
 
 .romaneioCell {
   font-family: 'Courier New', monospace;
   font-size: 12px;
-  color: #4b5563;
+  color: var(--t-gray600);
 }
 
 .dateCell {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--t-gray500);
   white-space: nowrap;
 }
 
 .byCell {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--t-gray500);
 }
 
 .emptyCell {
   text-align: center;
   padding: 32px 16px;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-style: italic;
 }
 
@@ -231,7 +231,7 @@
   font-size: 13px;
   font-weight: 600;
   color: #2563eb;
-  background: #fff;
+  background: var(--s-white);
   border: 1px solid #bfdbfe;
   border-radius: 8px;
   cursor: pointer;
@@ -251,5 +251,5 @@
 .pageInfo {
   font-size: 13px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--t-gray500);
 }

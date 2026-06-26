@@ -15,7 +15,7 @@
 .title {
   font-size: 24px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--t-gray800);
   margin: 0;
 }
 
@@ -28,12 +28,12 @@
 
 .periodLabel {
   font-size: 14px;
-  color: #4b5563;
+  color: var(--t-gray600);
   font-weight: 500;
 }
 
 .loading {
-  color: #6b7280;
+  color: var(--t-gray500);
   font-size: 14px;
 }
 
@@ -47,7 +47,7 @@
   align-items: flex-start;
   gap: 12px;
   padding: 16px;
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  background: linear-gradient(135deg, var(--s-blue50) 0%, #dbeafe 100%);
   border: 1px solid #bfdbfe;
   border-radius: 8px;
   margin-bottom: 24px;

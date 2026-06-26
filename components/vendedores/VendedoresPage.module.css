@@ -15,7 +15,7 @@
 .title {
   font-size: 28px;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--t-gray800);
   margin: 0;
 }
 
@@ -40,7 +40,7 @@
   font-size: 12px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #475569;
+  color: var(--t-600);
 }
 
 .searchInputWrapper {
@@ -53,15 +53,15 @@
   width: 100%;
   padding: 14px 40px 14px 18px;
   font-size: 14px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  border: 1px solid var(--b-subtle2);
   border-radius: 16px;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  background-color: #ffffff;
+  background-color: var(--s-white);
   box-sizing: border-box;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .searchInput::placeholder {
@@ -86,7 +86,7 @@
   padding: 0;
   border: none;
   background: transparent;
-  color: #6b7280;
+  color: var(--t-gray500);
   cursor: pointer;
   border-radius: 4px;
   transition: background-color 0.2s, color 0.2s;
@@ -94,12 +94,12 @@
 }
 
 .clearButton:hover {
-  background-color: #f3f4f6;
-  color: #1f2937;
+  background-color: var(--s-gray100);
+  color: var(--t-gray800);
 }
 
 .clearButton:active {
-  background-color: #e5e7eb;
+  background-color: var(--b-gray200);
 }
 
 .searchResults {
@@ -108,8 +108,8 @@
   left: 0;
   right: 0;
   margin-top: 4px;
-  background: #ffffff;
-  border: 1px solid #d1d5db;
+  background: var(--s-white);
+  border: 1px solid var(--b-gray300);
   border-radius: 8px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   max-height: 300px;
@@ -119,7 +119,7 @@
 
 .searchResultSeparator {
   height: 1px;
-  background: #e5e7eb;
+  background: var(--b-gray200);
   margin: 4px 0;
 }
 
@@ -131,7 +131,7 @@
   background: none;
   cursor: pointer;
   transition: background-color 0.15s;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--s-gray100);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -142,18 +142,18 @@
 }
 
 .searchResultItem:hover {
-  background-color: #f9fafb;
+  background-color: var(--s-gray50);
 }
 
 .searchResultName {
   font-size: 14px;
   font-weight: 500;
-  color: #1f2937;
+  color: var(--t-gray800);
 }
 
 .searchResultId {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--t-gray500);
 }
 
 .loadingBanner {
@@ -225,12 +225,12 @@
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  background: #ffffff;
-  border: 1px solid #d1d5db;
+  background: var(--s-white);
+  border: 1px solid var(--b-gray300);
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
-  color: #374151;
+  color: var(--t-gray700);
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
@@ -238,13 +238,13 @@
 }
 
 .exportButton:hover:not(:disabled) {
-  background: #f9fafb;
+  background: var(--s-gray50);
   border-color: #9ca3af;
-  color: #1f2937;
+  color: var(--t-gray800);
 }
 
 .exportButton:active:not(:disabled) {
-  background: #f3f4f6;
+  background: var(--s-gray100);
   transform: translateY(1px);
 }
 

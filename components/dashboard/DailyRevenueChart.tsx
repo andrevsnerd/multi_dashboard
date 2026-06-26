@@ -13,6 +13,7 @@ import {
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+import { useTheme } from "@/components/theme/ThemeContext";
 import styles from "./DailyRevenueChart.module.css";
 
 interface DailyRevenueData {
@@ -92,6 +93,27 @@ export default function DailyRevenueChart({
   const [loading, setLoading] = useState(initialData === undefined);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const { theme } = useTheme();
+  const c =
+    theme === "dark"
+      ? {
+          grid: "rgba(148, 163, 184, 0.16)",
+          axis: "#64748b",
+          axisText: "#94a3b8",
+          line: "#cbd5e1",
+          tooltipBg: "#1a2433",
+          tooltipBorder: "#29344b",
+          tooltipText: "#cbd5e1",
+        }
+      : {
+          grid: "#e2e8f0",
+          axis: "#94a3b8",
+          axisText: "#64748b",
+          line: "#475569",
+          tooltipBg: "#fff",
+          tooltipBorder: "#e2e8f0",
+          tooltipText: "#64748b",
+        };
 
   const rangeKey = useMemo(
     () => `${startDate.toISOString()}::${endDate.toISOString()}::${filial ?? "all"}::${(linhas ?? []).join(",")}`,
@@ -191,17 +213,17 @@ export default function DailyRevenueChart({
         {mounted && (
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <CartesianGrid strokeDasharray="3 3" stroke={c.grid} />
             <XAxis
               dataKey="date"
-              stroke="#94a3b8"
+              stroke={c.axis}
               style={{ fontSize: "12px" }}
-              tick={{ fill: "#64748b" }}
+              tick={{ fill: c.axisText }}
             />
             <YAxis
-              stroke="#94a3b8"
+              stroke={c.axis}
               style={{ fontSize: "12px" }}
-              tick={{ fill: "#64748b" }}
+              tick={{ fill: c.axisText }}
               tickFormatter={(value) => {
                 if (value >= 1000) {
                   return `R$ ${(value / 1000).toFixed(0)}k`;
@@ -211,20 +233,21 @@ export default function DailyRevenueChart({
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#fff",
-                border: "1px solid #e2e8f0",
+                backgroundColor: c.tooltipBg,
+                border: `1px solid ${c.tooltipBorder}`,
                 borderRadius: "8px",
                 padding: "8px 12px",
               }}
+              itemStyle={{ color: c.tooltipText }}
               formatter={(value: number) => formatCurrency(value)}
-              labelStyle={{ color: "#64748b", fontSize: "12px", marginBottom: "4px" }}
+              labelStyle={{ color: c.tooltipText, fontSize: "12px", marginBottom: "4px" }}
             />
             <Line
               type="monotone"
               dataKey="revenue"
-              stroke="#475569"
+              stroke={c.line}
               strokeWidth={2}
-              dot={{ fill: "#475569", r: 4 }}
+              dot={{ fill: c.line, r: 4 }}
               activeDot={{ r: 6 }}
             />
           </LineChart>

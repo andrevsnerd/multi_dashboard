@@ -111,13 +111,13 @@
   gap: 10px;
   padding: 22px 24px;
   border-radius: 24px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  background: linear-gradient(180deg, var(--s-white) 0%, var(--s-50) 100%);
   border: 1px solid rgba(148, 163, 184, 0.18);
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
 }
 
 .kpiLabel {
-  color: #64748b;
+  color: var(--t-500);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -125,13 +125,13 @@
 }
 
 .kpiValue {
-  color: #0f172a;
+  color: var(--t-900);
   font-size: clamp(24px, 3vw, 34px);
   line-height: 1.1;
 }
 
 .kpiMeta {
-  color: #475569;
+  color: var(--t-600);
   font-size: 13px;
 }
 
@@ -145,7 +145,7 @@
 .tableCard {
   padding: 24px;
   border-radius: 28px;
-  background: #ffffff;
+  background: var(--s-white);
   border: 1px solid rgba(148, 163, 184, 0.18);
   box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
 }
@@ -159,13 +159,13 @@
 
 .sectionTitle {
   margin: 0;
-  color: #0f172a;
+  color: var(--t-900);
   font-size: 20px;
 }
 
 .sectionText {
   margin: 0;
-  color: #64748b;
+  color: var(--t-500);
   font-size: 14px;
   line-height: 1.5;
 }
@@ -182,8 +182,8 @@
   justify-content: center;
   min-height: 220px;
   border-radius: 22px;
-  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
-  color: #64748b;
+  background: linear-gradient(180deg, var(--s-50) 0%, var(--s-100) 100%);
+  color: var(--t-500);
   text-align: center;
   padding: 24px;
 }
@@ -203,12 +203,12 @@
 .detailTable th,
 .detailTable td {
   padding: 14px 16px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--b-200);
   vertical-align: top;
 }
 
 .table th {
-  color: #475569;
+  color: var(--t-600);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -216,8 +216,8 @@
 }
 
 .detailTable th {
-  background: #f8fafc;
-  color: #475569;
+  background: var(--s-50);
+  color: var(--t-600);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -229,12 +229,12 @@
 }
 
 .productRow:hover {
-  background: #f8fafc;
+  background: var(--s-50);
 }
 
 .productName {
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .expandButton {
@@ -243,21 +243,21 @@
   margin-right: 10px;
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 10px;
-  background: #ffffff;
-  color: #0f172a;
+  background: var(--s-white);
+  color: var(--t-900);
   cursor: pointer;
   font-size: 18px;
   line-height: 1;
 }
 
 .expandButton:hover {
-  background: #eff6ff;
+  background: var(--s-blue50);
   border-color: rgba(37, 99, 235, 0.3);
 }
 
 .detailRow td {
   padding: 0;
-  background: #f8fafc;
+  background: var(--s-50);
 }
 
 .detailPanel {
@@ -265,7 +265,7 @@
 }
 
 .detailTable {
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 20px;
   overflow: hidden;
   box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.14);
@@ -293,7 +293,7 @@
 
 .totalRow td {
   font-weight: 800;
-  background: #f8fafc;
+  background: var(--s-50);
 }
 
 .loadingBanner {

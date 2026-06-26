@@ -11,13 +11,13 @@
 .title {
   font-size: 28px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--t-gray800);
   margin: 0 0 8px 0;
 }
 
 .subtitle {
   font-size: 16px;
-  color: #6b7280;
+  color: var(--t-gray500);
   margin: 0;
   line-height: 1.6;
 }
@@ -36,11 +36,11 @@
 }
 
 .selectionBar {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 20px;
-  background: white;
+  background: var(--s-white);
 }
 
 .selectionActions {
@@ -61,7 +61,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #374151;
+  color: var(--t-gray700);
   font-size: 14px;
   font-weight: 500;
 }
@@ -74,8 +74,8 @@
 }
 
 .progressContainer {
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--s-white);
+  border: 1px solid var(--b-gray200);
   border-radius: 8px;
   padding: 24px;
   margin-bottom: 32px;
@@ -99,7 +99,7 @@
 .progressLabel {
   font-size: 16px;
   font-weight: 500;
-  color: #1f2937;
+  color: var(--t-gray800);
 }
 
 .progressPercent {
@@ -116,7 +116,7 @@
 
 .tempoDecorrido {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--t-gray500);
   font-weight: 500;
 }
 
@@ -129,7 +129,7 @@
 .progressBar {
   width: 100%;
   height: 12px;
-  background: #f3f4f6;
+  background: var(--s-gray100);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -173,9 +173,9 @@
 }
 
 .buttonSecondary {
-  background: white;
-  color: #374151;
-  border: 1px solid #d1d5db;
+  background: var(--s-white);
+  color: var(--t-gray700);
+  border: 1px solid var(--b-gray300);
   border-radius: 8px;
   padding: 12px 20px;
   font-size: 15px;
@@ -185,12 +185,12 @@
 }
 
 .buttonSecondary:hover:not(:disabled) {
-  background: #f9fafb;
+  background: var(--s-gray50);
   border-color: #9ca3af;
 }
 
 .buttonSecondary:disabled {
-  color: #9ca3af;
+  color: var(--t-gray400);
   cursor: not-allowed;
 }
 
@@ -201,8 +201,8 @@
 }
 
 .relatorioCard {
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--s-white);
+  border: 1px solid var(--b-gray200);
   border-radius: 8px;
   padding: 20px;
   transition: box-shadow 0.2s;
@@ -226,13 +226,13 @@
 .relatorioNome {
   font-size: 18px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--t-gray800);
   margin: 0;
 }
 
 .relatorioRegistros {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--t-gray500);
 }
 
 .relatorioMetadata {
@@ -261,8 +261,8 @@
 }
 
 .badgePendente {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--s-gray100);
+  color: var(--t-gray500);
 }
 
 .badgeCarregando {
@@ -311,11 +311,11 @@
 }
 
 .buttonSmall {
-  background: #f9fafb;
-  border: 1px solid #d1d5db;
+  background: var(--s-gray50);
+  border: 1px solid var(--b-gray300);
   border-radius: 6px;
   padding: 8px 14px;
-  color: #374151;
+  color: var(--t-gray700);
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
@@ -323,12 +323,12 @@
 }
 
 .buttonSmall:hover:not(:disabled) {
-  background: #f3f4f6;
+  background: var(--s-gray100);
   border-color: #9ca3af;
 }
 
 .buttonSmall:disabled {
-  color: #9ca3af;
+  color: var(--t-gray400);
   cursor: not-allowed;
 }
 
@@ -336,19 +336,19 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: white;
-  border: 1px solid #d1d5db;
+  background: var(--s-white);
+  border: 1px solid var(--b-gray300);
   border-radius: 6px;
   padding: 8px 16px;
   font-size: 14px;
   font-weight: 500;
-  color: #374151;
+  color: var(--t-gray700);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .buttonExport:hover {
-  background: #f9fafb;
+  background: var(--s-gray50);
   border-color: #9ca3af;
 }
 

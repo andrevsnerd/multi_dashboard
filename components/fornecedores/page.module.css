@@ -21,7 +21,7 @@
 
 .subtitle {
   font-size: 13px;
-  color: #94a3b8;
+  color: var(--t-400);
   margin: 0;
   max-width: 640px;
 }
@@ -91,7 +91,7 @@
   cursor: pointer;
   border: 1px solid #334155;
   background: #1e293b;
-  color: #94a3b8;
+  color: var(--t-400);
 }
 .editBtn:hover { color: #e2e8f0; }
 .deleteBtn:hover { color: #f87171; border-color: #7f1d1d; }
@@ -170,7 +170,7 @@
   margin: 0;
 }
 
-.hint { font-size: 12px; color: #64748b; }
+.hint { font-size: 12px; color: var(--t-500); }
 
 .termoInputRow { display: flex; gap: 8px; }
 
@@ -222,7 +222,7 @@
 }
 .chipX:hover { color: #f87171; }
 
-.empty { font-size: 12px; color: #64748b; font-style: italic; }
+.empty { font-size: 12px; color: var(--t-500); font-style: italic; }
 
 /* ── Busca de produto ── */
 .searchWrap { position: relative; }
@@ -279,7 +279,7 @@
   background: #1e293b;
   border: 1px solid #334155;
   border-radius: 8px;
-  color: #94a3b8;
+  color: var(--t-400);
   font-size: 14px;
   cursor: pointer;
 }

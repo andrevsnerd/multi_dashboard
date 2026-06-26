@@ -60,7 +60,7 @@
   padding: 16px 18px;
   border: 1px solid rgba(115, 85, 49, 0.12);
   border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255, 249, 241, 0.95), rgba(255, 255, 255, 0.95));
+  background: linear-gradient(180deg, rgba(255, 249, 241, 0.95), var(--s-white));
 }
 
 .legendTitle,
@@ -106,7 +106,7 @@
   padding: 14px 16px;
   border-radius: 16px;
   border: 1px solid rgba(115, 85, 49, 0.14);
-  background: rgba(255, 255, 255, 0.84);
+  background: var(--s-white);
   color: var(--text-main);
   cursor: pointer;
   text-align: left;
@@ -150,7 +150,7 @@
   padding: 0 14px;
   border-radius: 16px;
   border: 1px solid rgba(115, 85, 49, 0.16);
-  background: #fff;
+  background: var(--s-white);
   color: var(--text-main);
   font-size: 14px;
   box-shadow: 0 8px 24px rgba(115, 85, 49, 0.08);
@@ -182,7 +182,7 @@
   padding: 16px 18px;
   border-radius: 18px;
   border: 1px solid rgba(115, 85, 49, 0.12);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(250, 244, 236, 0.94));
+  background: linear-gradient(180deg, var(--s-white), rgba(250, 244, 236, 0.94));
 }
 
 .highlightValue {
@@ -273,12 +273,12 @@
 
 .curveC {
   background: rgba(71, 85, 105, 0.14);
-  color: #475569;
+  color: var(--t-600);
 }
 
 .curveEmpty {
   background: rgba(148, 163, 184, 0.14);
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .statusMissing {
@@ -346,7 +346,7 @@
 
 .toolbarButton {
   border: 1px solid rgba(115, 85, 49, 0.16);
-  background: #fff;
+  background: var(--s-white);
   color: var(--text-main);
   padding: 10px 14px;
   border-radius: 999px;

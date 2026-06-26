@@ -16,7 +16,7 @@
   max-height: calc(100vh - 48px);
   display: flex;
   flex-direction: column;
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 20px;
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
   padding: 28px;
@@ -39,14 +39,14 @@
   margin: 0 0 8px;
   font-size: 20px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .subtitle {
   margin: 0 0 18px;
   font-size: 14px;
   line-height: 1.5;
-  color: #475569;
+  color: var(--t-600);
 }
 
 .list {
@@ -62,9 +62,9 @@
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--b-200);
   border-radius: 12px;
-  background: #f8fafc;
+  background: var(--s-50);
 }
 
 .itemBody {
@@ -75,19 +75,19 @@
 .itemTitle {
   font-size: 14px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .itemMeta {
   margin-top: 2px;
   font-size: 12px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .itemDate {
   margin-top: 2px;
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--t-400);
 }
 
 .confirmBtn {
@@ -110,6 +110,6 @@
 .footer {
   margin: 0;
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--t-400);
   text-align: center;
 }

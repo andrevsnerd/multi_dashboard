@@ -12,7 +12,7 @@
 
 /* ── Header card ── */
 .headerCard {
-  background: #ffffff;
+  background: var(--s-white);
   border: 1px solid #e8eaed;
   border-radius: 12px;
   margin-bottom: 20px;
@@ -48,13 +48,13 @@
 .title {
   font-size: 22px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
   margin: 0 0 4px 0;
 }
 
 .subtitle {
   font-size: 14px;
-  color: #64748b;
+  color: var(--t-500);
   margin: 0;
 }
 
@@ -63,20 +63,20 @@
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
-  color: #64748b;
+  color: var(--t-500);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .backButton:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-  color: #334155;
+  background: var(--s-50);
+  border-color: var(--b-300);
+  color: var(--t-700);
 }
 
 .headerActions {
@@ -108,8 +108,8 @@
 
 /* ── Summary card ── */
 .summaryCard {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
   border-radius: 12px;
   padding: 16px 24px;
   margin-bottom: 20px;
@@ -131,7 +131,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #94a3b8;
+  color: var(--t-400);
 }
 
 .summaryValue {
@@ -143,7 +143,7 @@
 .summaryValueNeutral {
   font-size: 20px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--t-800);
 }
 
 .summaryValueSmall {
@@ -158,13 +158,13 @@
 .summaryDivider {
   width: 1px;
   height: 36px;
-  background: #e2e8f0;
+  background: var(--b-200);
 }
 
 /* ── Table card ── */
 .tableCard {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   /* clip esconde cantos; também impede thead sticky no scroll da janela — usar só onde não há sticky */
@@ -260,9 +260,9 @@
 .table tbody td {
   padding: 12px 16px;
   font-size: 13px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--s-100);
   vertical-align: middle;
-  color: #334155;
+  color: var(--t-700);
 }
 
 .table tbody tr:last-child td {
@@ -270,7 +270,7 @@
 }
 
 .table tbody tr:hover td {
-  background: #f8fafc;
+  background: var(--s-50);
 }
 
 /* ── Curva section separator row ── */
@@ -309,16 +309,16 @@
 .sectionTitle {
   font-size: 13px;
   font-weight: 700;
-  color: #374151;
+  color: var(--t-gray700);
 }
 
 .sectionCount {
   font-size: 12px;
-  color: #6b7280;
-  background: #ffffff;
+  color: var(--t-gray500);
+  background: var(--s-white);
   padding: 2px 8px;
   border-radius: 10px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--b-gray200);
 }
 
 .sectionNote {
@@ -345,8 +345,8 @@
   border-radius: 50%;
   font-size: 11px;
   font-weight: 700;
-  background: #f1f5f9;
-  color: #64748b;
+  background: var(--s-100);
+  color: var(--t-500);
 }
 
 .rank.top {
@@ -357,19 +357,19 @@
 /* Product name */
 .productName {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .productCode {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--t-400);
   margin-top: 2px;
 }
 
 .destinoCell {
   font-size: 12px;
   line-height: 1.35;
-  color: #334155;
+  color: var(--t-700);
   max-width: 520px;
   word-break: break-word;
   vertical-align: middle;
@@ -421,7 +421,7 @@
 }
 
 .vendas {
-  color: #475569;
+  color: var(--t-600);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -442,7 +442,7 @@
 .percBarTrack {
   width: 80px;
   height: 6px;
-  background: #e2e8f0;
+  background: var(--b-200);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -459,7 +459,7 @@
 
 .percText {
   font-size: 12px;
-  color: #64748b;
+  color: var(--t-500);
   font-variant-numeric: tabular-nums;
   min-width: 36px;
   text-align: right;
@@ -477,7 +477,7 @@
 .qtdSugeridaZero {
   text-align: right;
   font-size: 13px;
-  color: #94a3b8;
+  color: var(--t-400);
 }
 
 .right {
@@ -491,7 +491,7 @@
   text-align: center;
   padding: 48px;
   font-size: 15px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .error {
@@ -503,7 +503,7 @@
   align-items: center;
   gap: 8px;
   margin: 12px 16px 0;
-  color: #64748b;
+  color: var(--t-500);
   font-size: 13px;
   font-weight: 500;
 }
@@ -527,7 +527,7 @@
   align-items: center;
   gap: 4px;
   padding: 0 24px 16px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--s-100);
   padding-top: 12px;
 }
 
@@ -539,18 +539,18 @@
   gap: 6px;
   padding: 8px 16px;
   background: transparent;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--b-200);
   border-radius: 8px;
   font-size: 13px;
   font-weight: 500;
-  color: #64748b;
+  color: var(--t-500);
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .tab:hover {
-  background: #f8fafc;
-  color: #334155;
+  background: var(--s-50);
+  color: var(--t-700);
 }
 
 .tabActive {
@@ -567,8 +567,8 @@
 .tabBadgeInfo {
   font-size: 10px;
   font-weight: 600;
-  background: #e2e8f0;
-  color: #64748b;
+  background: var(--b-200);
+  color: var(--t-500);
   padding: 1px 6px;
   border-radius: 8px;
   text-transform: uppercase;
@@ -584,7 +584,7 @@
 .sectionRowReposicao td {
   padding: 10px 16px !important;
   border-bottom: none !important;
-  background: #eff6ff;
+  background: var(--s-blue50);
   border-top: 2px solid #93c5fd;
 }
 
@@ -609,8 +609,8 @@
 
 /* ── Total row ── */
 .totalRow td {
-  background: #f8fafc;
-  border-top: 2px solid #e2e8f0;
+  background: var(--s-50);
+  border-top: 2px solid var(--b-200);
   font-weight: 700;
 }
 
@@ -619,8 +619,8 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
   border-radius: 10px;
   padding: 12px 18px;
   margin-bottom: 16px;
@@ -642,20 +642,20 @@
 .toggleWrapSecondary {
   padding: 6px 10px;
   border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
+  border: 1px solid var(--b-200);
+  background: var(--s-50);
 }
 
 .toggleWrapSecondary:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
+  background: var(--s-100);
+  border-color: var(--b-300);
 }
 
 .toggleTrack {
   position: relative;
   width: 40px;
   height: 22px;
-  background: #cbd5e1;
+  background: var(--b-300);
   border-radius: 11px;
   transition: background 0.2s;
   flex-shrink: 0;
@@ -671,7 +671,7 @@
   left: 3px;
   width: 16px;
   height: 16px;
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 50%;
   transition: left 0.2s;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
@@ -684,20 +684,20 @@
 .toggleLabelText {
   font-size: 13px;
   font-weight: 700;
-  color: #334155;
+  color: var(--t-700);
 }
 
 .toggleDivider {
   width: 1px;
   height: 20px;
-  background: #e2e8f0;
+  background: var(--b-200);
   flex-shrink: 0;
 }
 
 .toggleIncluirLabel {
   font-size: 12px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--t-500);
   text-transform: uppercase;
   letter-spacing: 0.4px;
 }
@@ -737,7 +737,7 @@
 
 .modoDescTag {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--t-400);
   margin-left: auto;
 }
 
@@ -886,9 +886,9 @@
   z-index: 2000;
   min-width: 260px;
   max-width: 360px;
-  background: #ffffff;
-  color: #1e293b;
-  border: 1px solid #e2e8f0;
+  background: var(--s-white);
+  color: var(--t-800);
+  border: 1px solid var(--b-200);
   border-radius: 8px;
   padding: 10px 12px;
   box-shadow: 0 4px 24px rgba(15, 23, 42, 0.13);
@@ -898,24 +898,24 @@
 .metricTooltipTitle {
   font-size: 13px;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--t-900);
   margin-bottom: 6px;
 }
 
 .metricTooltipMeta {
   font-size: 12px;
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .metricTooltipDivider {
   height: 1px;
-  background: #e2e8f0;
+  background: var(--b-200);
   margin: 7px 0;
 }
 
 .metricTooltipLine {
   font-size: 12px;
-  color: #334155;
+  color: var(--t-700);
 }
 
 .metricTooltipRow {
@@ -924,7 +924,7 @@
   justify-content: space-between;
   gap: 12px;
   font-size: 12px;
-  color: #334155;
+  color: var(--t-700);
   margin-top: 3px;
 }
 
@@ -934,10 +934,10 @@
   justify-content: space-between;
   margin-top: 8px;
   padding-top: 6px;
-  border-top: 1px dashed #cbd5e1;
+  border-top: 1px dashed var(--b-300);
   font-size: 12px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .tooltip {
@@ -1023,7 +1023,7 @@
 
 .tooltipEstoqueMeta {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--t-400);
   margin-bottom: 2px;
 }
 
@@ -1052,7 +1052,7 @@
 .partialHistoryBadge {
   display: inline-flex;
   margin-left: 4px;
-  color: #64748b;
+  color: var(--t-500);
   font-size: 11px;
   font-weight: 700;
   vertical-align: middle;
@@ -1073,17 +1073,17 @@
   width: 22px;
   height: 22px;
   border-radius: 7px;
-  border: 1px solid #e2e8f0;
-  background: #ffffff;
-  color: #0f172a;
+  border: 1px solid var(--b-200);
+  background: var(--s-white);
+  color: var(--t-900);
   font-weight: 900;
   cursor: pointer;
   margin-left: 10px;
 }
 
 .addBtn:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
+  background: var(--s-50);
+  border-color: var(--b-300);
 }
 
 .addBtnActive {
@@ -1095,7 +1095,7 @@
 .qtyInput {
   width: 96px;
   padding: 6px 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--b-200);
   border-radius: 8px;
   font-size: 13px;
   text-align: right;
@@ -1109,7 +1109,7 @@
   width: 26px;
   height: 26px;
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--b-200);
   background: #fff1f2;
   color: #991b1b;
   font-weight: 900;
@@ -1122,9 +1122,9 @@
   gap: 8px;
   padding: 8px 12px;
   border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  background: #ffffff;
-  color: #0f172a;
+  border: 1px solid var(--b-200);
+  background: var(--s-white);
+  color: var(--t-900);
   font-size: 13px;
   font-weight: 800;
   cursor: pointer;
@@ -1132,8 +1132,8 @@
 }
 
 .exportBtn:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
+  background: var(--s-50);
+  border-color: var(--b-300);
 }
 
 .exportBtn:disabled {
@@ -1161,7 +1161,7 @@
 .exportMenuLabel,
 .exportCaret {
   font-size: 13px;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .exportMenuLabel {
@@ -1176,9 +1176,9 @@
   width: 18px;
   height: 18px;
   border-radius: 999px;
-  background: #f1f5f9;
+  background: var(--s-100);
   border: 1px solid #dbe4ee;
-  color: #475569;
+  color: var(--t-600);
   font-size: 10px;
   font-weight: 900;
   line-height: 1;
@@ -1188,8 +1188,8 @@
 
 .exportCaretOpen {
   transform: rotate(180deg);
-  background: #e2e8f0;
-  border-color: #cbd5e1;
+  background: var(--b-200);
+  border-color: var(--b-300);
 }
 
 .exportDropdown {
@@ -1202,8 +1202,8 @@
   gap: 4px;
   padding: 6px;
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  background: #ffffff;
+  border: 1px solid var(--b-200);
+  background: var(--s-white);
   box-shadow: 0 18px 36px rgba(15, 23, 42, 0.12);
   z-index: 20;
 }
@@ -1211,7 +1211,7 @@
 .exportMenuItem {
   border: none;
   background: transparent;
-  color: #0f172a;
+  color: var(--t-900);
   text-align: left;
   padding: 10px 12px;
   border-radius: 8px;
@@ -1221,7 +1221,7 @@
 }
 
 .exportMenuItem:hover {
-  background: #f8fafc;
+  background: var(--s-50);
 }
 
 .exportMenuItem:disabled {
@@ -1257,9 +1257,9 @@
   font-weight: 600;
   padding: 2px 7px;
   border-radius: 10px;
-  border: 1px solid #cbd5e1;
-  background: #f8fafc;
-  color: #64748b;
+  border: 1px solid var(--b-300);
+  background: var(--s-50);
+  color: var(--t-500);
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
@@ -1268,9 +1268,9 @@
 }
 
 .manualToggleBtn:hover {
-  background: #f1f5f9;
+  background: var(--s-100);
   border-color: #94a3b8;
-  color: #334155;
+  color: var(--t-700);
 }
 
 .manualToggleBtnActive {
@@ -1317,9 +1317,9 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #334155;
+  border: 1px solid var(--b-300);
+  background: var(--s-white);
+  color: var(--t-700);
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -1330,7 +1330,7 @@
 }
 
 .manualQtyBtn:hover {
-  background: #f1f5f9;
+  background: var(--s-100);
   border-color: #94a3b8;
 }
 
@@ -1341,10 +1341,10 @@
   width: 48px;
   min-width: 48px;
   text-align: center;
-  color: #0f172a;
-  border: 1px solid #cbd5e1;
+  color: var(--t-900);
+  border: 1px solid var(--b-300);
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--s-white);
   padding: 2px 4px;
   height: 20px;
   box-sizing: border-box;
@@ -1379,12 +1379,12 @@
   padding: 4px 8px;
   border-radius: 6px;
   border: 1px dashed #94a3b8;
-  background: #f8fafc;
-  color: #334155;
+  background: var(--s-50);
+  color: var(--t-700);
 }
 
 .manualAddFilialInput::placeholder {
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .manualAddFilialBtn {
@@ -1392,15 +1392,15 @@
   font-weight: 700;
   padding: 4px 8px;
   border-radius: 6px;
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #334155;
+  border: 1px solid var(--b-300);
+  background: var(--s-white);
+  color: var(--t-700);
   cursor: pointer;
   transition: background 0.1s, border-color 0.1s, color 0.1s;
 }
 
 .manualAddFilialBtn:hover:not(:disabled) {
-  background: #f1f5f9;
+  background: var(--s-100);
   border-color: #94a3b8;
 }
 
@@ -1455,9 +1455,9 @@
   font-weight: 600;
   padding: 3px 8px;
   border-radius: 10px;
-  border: 1px solid #cbd5e1;
-  background: #f8fafc;
-  color: #64748b;
+  border: 1px solid var(--b-300);
+  background: var(--s-50);
+  color: var(--t-500);
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s;
@@ -1476,9 +1476,9 @@
   gap: 12px;
   margin-top: 12px;
   padding: 18px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--b-200);
   border-radius: 16px;
-  background: #ffffff;
+  background: var(--s-white);
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
 }
 
@@ -1490,14 +1490,14 @@
 }
 
 .manualProductPanelTitle {
-  color: #0f172a;
+  color: var(--t-900);
   font-size: 14px;
   font-weight: 800;
 }
 
 .manualProductPanelHint {
   margin-top: 3px;
-  color: #64748b;
+  color: var(--t-500);
   font-size: 12px;
 }
 
@@ -1506,8 +1506,8 @@
   padding: 11px 13px;
   border: 1px solid #dbe4ee;
   border-radius: 12px;
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--s-50);
+  color: var(--t-900);
   font-size: 14px;
 }
 
@@ -1515,7 +1515,7 @@
   outline: none;
   border-color: #93c5fd;
   box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.22);
-  background: #ffffff;
+  background: var(--s-white);
 }
 
 .manualProductStatus,
@@ -1525,7 +1525,7 @@
 }
 
 .manualProductStatus {
-  color: #64748b;
+  color: var(--t-500);
 }
 
 .manualProductError {
@@ -1544,9 +1544,9 @@
   justify-content: space-between;
   gap: 12px;
   padding: 12px 14px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--b-200);
   border-radius: 12px;
-  background: #f8fafc;
+  background: var(--s-50);
 }
 
 .manualProductResultMain {
@@ -1560,17 +1560,17 @@
   justify-content: center;
   min-width: 92px;
   padding: 8px 12px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--b-300);
   border-radius: 10px;
-  background: #ffffff;
-  color: #0f172a;
+  background: var(--s-white);
+  color: var(--t-900);
   font-size: 12px;
   font-weight: 800;
   cursor: pointer;
 }
 
 .manualProductAddBtn:hover:not(:disabled) {
-  background: #eff6ff;
+  background: var(--s-blue50);
   border-color: #93c5fd;
 }
 

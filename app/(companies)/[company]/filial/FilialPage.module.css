@@ -16,13 +16,13 @@
 .title {
   font-size: 24px;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--t-900);
   margin: 0 0 4px;
 }
 
 .subtitle {
   font-size: 13px;
-  color: #64748b;
+  color: var(--t-500);
   margin: 0;
   max-width: 640px;
   line-height: 1.5;
@@ -37,9 +37,9 @@
 .statPill {
   font-size: 12px;
   font-weight: 600;
-  color: #334155;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
+  color: var(--t-700);
+  background: var(--s-100);
+  border: 1px solid var(--b-200);
   border-radius: 999px;
   padding: 6px 12px;
   white-space: nowrap;
@@ -63,9 +63,9 @@
 .select {
   width: 100%;
   font-size: 13px;
-  color: #0f172a;
-  background: #fff;
-  border: 1px solid #cbd5e1;
+  color: var(--t-900);
+  background: var(--s-white);
+  border: 1px solid var(--b-300);
   border-radius: 8px;
   padding: 9px 12px;
   outline: none;
@@ -87,16 +87,16 @@
 .clearBtn {
   font-size: 13px;
   font-weight: 600;
-  color: #475569;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
+  color: var(--t-600);
+  background: var(--s-100);
+  border: 1px solid var(--b-200);
   border-radius: 8px;
   padding: 9px 14px;
   cursor: pointer;
 }
 
 .clearBtn:hover {
-  background: #e2e8f0;
+  background: var(--b-200);
 }
 
 /* ── Estados ────────────────────────────────────────── */
@@ -105,7 +105,7 @@
 .error {
   padding: 32px;
   text-align: center;
-  color: #64748b;
+  color: var(--t-500);
   font-size: 14px;
 }
 
@@ -127,8 +127,8 @@
 
 /* ── Lista mestre ───────────────────────────────────── */
 .listPanel {
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
   border-radius: 12px;
   overflow: hidden;
   position: sticky;
@@ -142,17 +142,17 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #94a3b8;
+  color: var(--t-400);
   padding: 12px 14px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--s-100);
   position: sticky;
   top: 0;
-  background: #fff;
+  background: var(--s-white);
   z-index: 1;
 }
 
 .group {
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--s-100);
 }
 
 .groupHeader {
@@ -162,14 +162,14 @@
   width: 100%;
   gap: 8px;
   padding: 11px 14px;
-  background: #f8fafc;
+  background: var(--s-50);
   border: none;
   cursor: pointer;
   text-align: left;
 }
 
 .groupHeader:hover {
-  background: #f1f5f9;
+  background: var(--s-100);
 }
 
 .groupTitle {
@@ -178,7 +178,7 @@
   gap: 8px;
   font-size: 13px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--t-800);
 }
 
 .groupCod {
@@ -198,8 +198,8 @@
 .groupCount {
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
-  background: #e2e8f0;
+  color: var(--t-500);
+  background: var(--b-200);
   border-radius: 999px;
   padding: 2px 8px;
 }
@@ -223,23 +223,23 @@
 }
 
 .filialItem:hover {
-  background: #f8fafc;
+  background: var(--s-50);
 }
 
 .filialItemActive {
-  background: #eef2ff;
+  background: var(--s-blue50);
   border-left-color: #6366f1;
 }
 
 .filialName {
   font-size: 13px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--t-900);
 }
 
 .filialMeta {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--t-400);
 }
 
 /* ── Detalhe ────────────────────────────────────────── */
@@ -252,10 +252,10 @@
   align-items: center;
   justify-content: center;
   height: 400px;
-  color: #94a3b8;
+  color: var(--t-400);
   font-size: 14px;
-  background: #fff;
-  border: 1px dashed #cbd5e1;
+  background: var(--s-white);
+  border: 1px dashed var(--b-300);
   border-radius: 12px;
 }
 
@@ -329,8 +329,8 @@
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -342,7 +342,7 @@
   letter-spacing: 0.04em;
   color: #6366f1;
   padding: 12px 16px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--s-100);
   background: #fafafe;
 }
 
@@ -370,12 +370,12 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: #94a3b8;
+  color: var(--t-400);
 }
 
 .fieldValue {
   font-size: 13px;
-  color: #0f172a;
+  color: var(--t-900);
   font-weight: 500;
   word-break: break-word;
 }

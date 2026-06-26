@@ -1,7 +1,7 @@
 .container {
-  background: #ffffff;
+  background: var(--s-white);
   border-radius: 20px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--b-subtle);
   padding: 24px;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
   height: 100%;
@@ -20,7 +20,7 @@
   font-size: 14px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #94a3b8;
+  color: var(--t-400);
   margin: 0;
   font-weight: 600;
 }
@@ -36,7 +36,7 @@
 .empty {
   padding: 40px;
   text-align: center;
-  color: #64748b;
+  color: var(--t-500);
   font-size: 14px;
 }
 

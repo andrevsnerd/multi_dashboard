@@ -51,7 +51,7 @@
   align-items: center;
   justify-content: center;
   color: #2563eb;
-  background: #eff6ff;
+  background: var(--s-blue50);
   border: 1px solid #bfdbfe;
   flex-shrink: 0;
 }
@@ -74,7 +74,7 @@
 /* segmented control */
 .segControl {
   display: inline-flex;
-  background: #fff;
+  background: var(--s-white);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 2px;
@@ -168,16 +168,16 @@
 }
 
 .configSegment + .configSegment {
-  border-left: 1px solid #f1f5f9;
+  border-left: 1px solid var(--s-100);
 }
 
 .configIcon {
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  background: #f1f5f9;
+  background: var(--s-100);
   border: 1px solid var(--border);
-  color: #64748b;
+  color: var(--t-500);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -204,7 +204,7 @@
 .configBarSelect {
   width: 100%;
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--s-white);
   font-size: 18px;
   font-weight: 600;
   color: var(--text);
@@ -231,7 +231,7 @@
 .configBarInput {
   width: 100%;
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--s-white);
   font-size: 18px;
   font-weight: 600;
   color: var(--text);
@@ -255,15 +255,15 @@
   transform: translateY(-50%);
   width: 18px;
   height: 18px;
-  color: #94a3b8;
+  color: var(--t-400);
   pointer-events: none;
 }
 .selectChevron svg { width: 18px; height: 18px; }
 
 .selectWrap:hover .configBarSelect:not(:disabled),
 .selectWrap:hover .configBarInput:not(:disabled) {
-  background: #f8fafc;
-  border-color: #cbd5e1;
+  background: var(--s-50);
+  border-color: var(--b-300);
 }
 
 .configBarSelect:focus,
@@ -349,9 +349,9 @@
   width: 24px;
   height: 24px;
   border-radius: 8px;
-  background: #f1f5f9;
+  background: var(--s-100);
   border: 1px solid var(--border);
-  color: #64748b;
+  color: var(--t-500);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -363,7 +363,7 @@
   font-size: 14px;
   font-weight: 600;
   color: var(--text-3);
-  background: #f1f5f9;
+  background: var(--s-100);
   padding: 2px 7px;
   border-radius: 20px;
 }
@@ -414,16 +414,16 @@
 
 .logItem {
   padding: 12px 14px;
-  background: #fff;
+  background: var(--s-white);
   border-radius: 0;
   border: none;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--s-100);
   cursor: default;
   transition: border-color 120ms, background 120ms;
 }
 .logItemWrapper:first-child .logItem { border-top: none; }
 .logItemWrapper:hover .logItem {
-  background: #f8fafc;
+  background: var(--s-50);
 }
 
 .logHeader {
@@ -493,9 +493,9 @@
 /* popover inline */
 .logPopover {
   margin-top: 4px;
-  background: #fff;
+  background: var(--s-white);
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--b-200);
   box-shadow: 0 6px 16px rgba(0,0,0,.10);
   padding: 10px 12px;
   max-height: 240px;
@@ -526,9 +526,9 @@
 
 .logPopoverRow {
   padding: 7px 9px;
-  background: #f8fafc;
+  background: var(--s-50);
   border-radius: 6px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--b-200);
 }
 
 .logPopoverNome {
@@ -543,7 +543,7 @@
 
 .logPopoverMeta {
   font-size: 14px;
-  color: #64748b;
+  color: var(--t-500);
   margin-bottom: 4px;
   white-space: nowrap;
   overflow: hidden;
@@ -558,8 +558,8 @@
 
 .logPopoverEstoqueItem {
   font-size: 14px;
-  color: #475569;
-  background: #e2e8f0;
+  color: var(--t-600);
+  background: var(--b-200);
   padding: 2px 6px;
   border-radius: 4px;
 }
@@ -608,7 +608,7 @@
   align-items: center;
   gap: 10px;
   padding: 9px 12px;
-  background: #f8fafc;
+  background: var(--s-50);
   border-radius: 8px;
   border: 1px solid var(--border);
   transition: border-color 120ms;
@@ -642,7 +642,7 @@
 .inlineColorSelect {
   height: 28px;
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--s-white);
   color: var(--text-2);
   font-size: 13px;
   font-weight: 600;
@@ -653,8 +653,8 @@
 }
 
 .inlineColorSelect:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
+  background: var(--s-50);
+  border-color: var(--b-300);
 }
 
 .inlineColorSelect:focus {
@@ -669,7 +669,7 @@
   border: 1px solid var(--border);
   border-radius: 6px;
   overflow: hidden;
-  background: #fff;
+  background: var(--s-white);
 }
 .qtyBtn {
   width: 26px;
@@ -698,14 +698,14 @@
   font-size: 16px;
   font-weight: 600;
   color: var(--text);
-  background: #fff;
+  background: var(--s-white);
 }
 .qtyInput:focus { outline: none; }
 
 .stockPill {
   font-size: 13px;
   color: var(--text-3);
-  background: #f1f5f9;
+  background: var(--s-100);
   padding: 2px 6px;
   border-radius: 4px;
   white-space: nowrap;
@@ -739,9 +739,9 @@
   height: 44px;
   margin: 10px auto 10px;
   border-radius: 14px;
-  background: #f1f5f9;
+  background: var(--s-100);
   border: 1px solid var(--border);
-  color: #94a3b8;
+  color: var(--t-400);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -777,7 +777,7 @@
   padding: 8px 12px;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--s-white);
   color: var(--text-2);
   font-size: 15px;
   font-weight: 500;
@@ -785,7 +785,7 @@
   white-space: nowrap;
 }
 .clearProductsBtn:hover:not(:disabled) {
-  background: #f8fafc;
+  background: var(--s-50);
 }
 .clearProductsBtn:disabled {
   opacity: .5;
@@ -834,7 +834,7 @@
   transform: translateY(-50%);
   width: 16px;
   height: 16px;
-  color: #94a3b8;
+  color: var(--t-400);
 }
 .inlineSearchIcon svg { width: 16px; height: 16px; }
 
@@ -846,7 +846,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--s-100);
   padding-top: 12px;
 }
 
@@ -863,7 +863,7 @@
   border-radius: 8px;
   font-size: 17px;
   font-family: inherit;
-  background: #f8fafc;
+  background: var(--s-50);
   color: var(--text);
   resize: none;
   min-height: 58px;
@@ -873,7 +873,7 @@
 .obsTextarea:focus {
   outline: none;
   border-color: #94a3b8;
-  background: #fff;
+  background: var(--s-white);
 }
 .obsTextarea:disabled { color: var(--text-3); cursor: not-allowed; }
 
@@ -897,7 +897,7 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
-  background: #fff;
+  background: var(--s-white);
   flex-shrink: 0;
 }
 
@@ -954,8 +954,8 @@
   transform: translateY(-1px);
 }
 .submitBtn:disabled {
-  background: #cbd5e1 !important;
-  color: #94a3b8 !important;
+  background: var(--b-300) !important;
+  color: var(--t-400) !important;
   cursor: not-allowed;
   box-shadow: none !important;
   transform: none !important;
@@ -986,7 +986,7 @@
 }
 
 .modal {
-  background: #fff;
+  background: var(--s-white);
   border-radius: 14px;
   width: 100%;
   max-width: 560px;
@@ -1001,7 +1001,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 18px 22px 14px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--s-100);
 }
 .modalTitle { font-size: 21px; font-weight: 700; color: var(--text); margin: 0; }
 
@@ -1026,7 +1026,7 @@
 .modalCartBlock {
   margin-bottom: 14px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--s-100);
 }
 
 .modalCartHeader {
@@ -1097,12 +1097,12 @@
   align-items: center;
   gap: 10px;
   padding: 11px 13px;
-  background: #f8fafc;
+  background: var(--s-50);
   border-radius: 8px;
   border: 1px solid var(--border);
   transition: border-color 120ms, background 120ms;
 }
-.produtoModalItem:hover { border-color: #cbd5e1; background: #f1f5f9; }
+.produtoModalItem:hover { border-color: #cbd5e1; background: var(--s-100); }
 .produtoModalIcon { font-size: 21px; flex-shrink: 0; }
 .produtoModalInfo { flex: 1; min-width: 0; }
 .produtoModalName { font-size: 17px; font-weight: 600; color: var(--text); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1164,8 +1164,8 @@
 .colorChipCancel {
   padding: 5px 9px;
   border-radius: 6px;
-  border: 1px solid #e2e8f0;
-  background: #f1f5f9;
+  border: 1px solid var(--b-200);
+  background: var(--s-100);
   font-size: 13px;
   cursor: pointer;
   color: var(--text-3);
@@ -1184,7 +1184,7 @@
 /* modal de edição */
 .modalBody  { padding: 16px 22px; flex: 1; }
 .modalInfoBox {
-  background: #f8fafc;
+  background: var(--s-50);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px 14px;
@@ -1216,7 +1216,7 @@
   align-items: center;
   justify-content: flex-end;
   padding: 12px 22px 18px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--s-100);
   gap: 10px;
 }
 .btnDanger {
@@ -1234,7 +1234,7 @@
 .btnDanger:disabled { opacity: .5; cursor: not-allowed; }
 .btnSecondary {
   padding: 8px 14px;
-  background: #fff;
+  background: var(--s-white);
   color: var(--text-2);
   border: 1px solid var(--border);
   border-radius: 7px;
@@ -1319,7 +1319,7 @@
   .wrapper { padding: 12px 12px 40px; }
   .configGrid { grid-template-columns: 1fr; }
   .configCardWide { grid-template-columns: 1fr; }
-  .configSegment + .configSegment { border-left: none; border-top: 1px solid #f1f5f9; }
+  .configSegment + .configSegment { border-left: none; border-top: 1px solid var(--s-100); }
   .configBar { grid-template-columns: 1fr; }
   .topBar { flex-direction: column; align-items: flex-start; gap: 10px; }
   .submitRow { flex-direction: column; }

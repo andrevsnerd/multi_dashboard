@@ -21,9 +21,9 @@
   padding: 8px 12px;
   border: 1px solid #e0e0e0;
   border-radius: 6px;
-  background: #fff;
+  background: var(--s-white);
   font-size: 14px;
-  color: #333;
+  color: var(--t-333);
   cursor: pointer;
 }
 
@@ -34,18 +34,18 @@
 
 .goalsButton {
   padding: 8px 16px;
-  background: #fff;
+  background: var(--s-white);
   border: 1px solid #e0e0e0;
   border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
-  color: #555;
+  color: var(--t-555);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
 
 .goalsButton:hover {
-  background: #f5f5f5;
+  background: var(--s-gray100b);
   border-color: #ccc;
 }
 
@@ -85,7 +85,7 @@
 }
 
 .card {
-  background: #fff;
+  background: var(--s-white);
   border: 1px solid #e8e8e8;
   border-radius: 8px;
   padding: 16px 20px;
@@ -105,7 +105,7 @@
 .cardValue {
   font-size: 20px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--t-1a);
 }
 
 /* Loading / Error */
@@ -128,7 +128,7 @@
   overflow-x: auto;
   border-radius: 8px;
   border: 1px solid #e8e8e8;
-  background: #fff;
+  background: var(--s-white);
 }
 
 .table {
@@ -150,7 +150,7 @@
   color: #000;
   text-transform: uppercase;
   white-space: nowrap;
-  background: #fafafa;
+  background: var(--s-gray50);
 }
 
 .thFilial {
@@ -169,7 +169,7 @@
 }
 
 .thVendas {
-  background: #fafafa !important;
+  background: var(--s-gray50) !important;
   border-left: none;
   border-right: none;
   box-shadow: none;
@@ -183,7 +183,7 @@
 }
 
 .bodyRow {
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--s-gray100b);
   transition: background 0.1s;
 }
 
@@ -214,7 +214,7 @@
 .tdFilial {
   padding: 14px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--t-1a);
   white-space: nowrap;
 }
 
@@ -232,7 +232,7 @@
 .td {
   padding: 14px;
   text-align: right;
-  color: #333;
+  color: var(--t-333);
   white-space: nowrap;
 }
 
@@ -258,7 +258,7 @@
 .tdQtde {
   padding: 14px;
   text-align: right;
-  color: #333;
+  color: var(--t-333);
 }
 
 .tdCat {
@@ -267,7 +267,7 @@
   min-width: 112px;
   max-width: 112px;
   text-align: center;
-  color: #333;
+  color: var(--t-333);
   white-space: nowrap;
   position: relative;
   box-shadow: inset 0 0 0 1px #edf1f5;
@@ -332,7 +332,7 @@
 .catPct {
   font-size: 14px;
   font-weight: 600;
-  color: #333;
+  color: var(--t-333);
   display: inline-block;
   margin-top: 8px;
 }
@@ -365,18 +365,18 @@
 
 /* Totals row */
 .totalsRow {
-  background: #f5f5f5;
+  background: var(--s-gray100b);
   border-top: 2px solid #e0e0e0;
 }
 
 .totalsRow td {
   padding: 14px;
   font-weight: 600;
-  color: #555;
+  color: var(--t-555);
 }
 
 .totalsRow .tdFilial {
-  color: #555;
+  color: var(--t-555);
   font-size: 12px;
   letter-spacing: 0.3px;
   text-transform: uppercase;
@@ -392,18 +392,18 @@
 /* View toggle button */
 .viewToggleBtn {
   padding: 8px 16px;
-  background: #fff;
+  background: var(--s-white);
   border: 1px solid #e0e0e0;
   border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
-  color: #555;
+  color: var(--t-555);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
 
 .viewToggleBtn:hover {
-  background: #f5f5f5;
+  background: var(--s-gray100b);
   border-color: #ccc;
 }
 
@@ -427,7 +427,7 @@
 .comparisonToggleLabel {
   font-size: 13px;
   font-weight: 600;
-  color: #555;
+  color: var(--t-555);
 }
 
 .comparisonToggleGroup {
@@ -443,7 +443,7 @@
 }
 
 .branchCard {
-  background: #fff;
+  background: var(--s-white);
   border: 1px solid #e8e8e8;
   border-radius: 12px;
   padding: 16px 20px;
@@ -478,7 +478,7 @@
 .cardFilialName {
   font-size: 18px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--t-1a);
   line-height: 1.2;
 }
 
@@ -515,7 +515,7 @@
 .cardRevenue {
   font-size: 22px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--t-1a);
 }
 
 .cardQtde {
@@ -547,7 +547,7 @@
 
 .progressBarTrack {
   height: 6px;
-  background: #f0f0f0;
+  background: var(--s-gray100b);
   border-radius: 3px;
   overflow: hidden;
   margin-top: 5px;
@@ -601,7 +601,7 @@
 .catPillNeutral {
   background: #f1f3f5;
   border-color: #d0d7de;
-  color: #6b7280;
+  color: var(--t-gray500);
 }
 
 .catArrowUp {
