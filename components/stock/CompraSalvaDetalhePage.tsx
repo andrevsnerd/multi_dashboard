@@ -1391,6 +1391,12 @@ export default function CompraSalvaDetalhePage({
       const originalInputs = Array.from(target.querySelectorAll("input")) as HTMLInputElement[];
       const inputValues = originalInputs.map((inp) => inp.value);
 
+      // Pontos de quebra (em px de CSS, relativos ao topo da área exportada) onde
+      // é seguro cortar a página — entre linhas da tabela, nunca no meio de uma.
+      // Medidos DENTRO do clone porque os elementos data-pdf-hide alteram o layout.
+      let rowBreaksCss: number[] = [];
+      let cloneHeightCss = 0;
+
       const canvas = await html2canvas(target, {
         backgroundColor: "#ffffff",
         scale: 2,
@@ -1424,6 +1430,16 @@ export default function CompraSalvaDetalhePage({
               if (cs.position === "sticky") htmlEl.style.position = "relative";
             });
           }
+
+          // Coletar as bordas inferiores das linhas (após esconder/substituir),
+          // para alinhar as quebras de página a limites de linha.
+          const baseRect = cloneEl.getBoundingClientRect();
+          cloneHeightCss = baseRect.height;
+          const breaks = new Set<number>();
+          cloneEl.querySelectorAll("tbody tr").forEach((tr) => {
+            breaks.add((tr as HTMLElement).getBoundingClientRect().bottom - baseRect.top);
+          });
+          rowBreaksCss = Array.from(breaks).sort((a, b) => a - b);
         },
       });
 
@@ -1452,12 +1468,35 @@ export default function CompraSalvaDetalhePage({
       const pageHeight = pdf.internal.pageSize.getHeight();
       const imgWidth = pageWidth;
       const pageHeightPx = Math.floor((canvas.width * pageHeight) / pageWidth);
+
+      // Converte os pontos de quebra de px-CSS para px-canvas (html2canvas usou scale:2,
+      // mas derivamos a razão real para não depender disso).
+      const cssToCanvas = cloneHeightCss > 0 ? canvas.height / cloneHeightCss : 2;
+      const breakPointsPx = rowBreaksCss
+        .map((y) => Math.round(y * cssToCanvas))
+        .filter((y) => y > 0 && y < canvas.height)
+        .sort((a, b) => a - b);
+
       let renderedHeightPx = 0;
       let pageIndex = 0;
 
       while (renderedHeightPx < canvas.height) {
-        const remainingHeightPx = canvas.height - renderedHeightPx;
-        const sliceHeightPx = Math.min(pageHeightPx, remainingHeightPx);
+        const maxEndPx = renderedHeightPx + pageHeightPx;
+        let sliceEndPx: number;
+        if (maxEndPx >= canvas.height) {
+          // Última página: leva tudo o que resta.
+          sliceEndPx = canvas.height;
+        } else {
+          // Maior quebra de linha que cabe nesta página; se nenhuma couber
+          // (linha mais alta que a página) faz corte rígido para não travar.
+          let candidate = 0;
+          for (const bp of breakPointsPx) {
+            if (bp > renderedHeightPx && bp <= maxEndPx) candidate = bp;
+            else if (bp > maxEndPx) break;
+          }
+          sliceEndPx = candidate > renderedHeightPx ? candidate : maxEndPx;
+        }
+        const sliceHeightPx = sliceEndPx - renderedHeightPx;
         const pageCanvas = document.createElement("canvas");
         pageCanvas.width = canvas.width;
         pageCanvas.height = sliceHeightPx;
