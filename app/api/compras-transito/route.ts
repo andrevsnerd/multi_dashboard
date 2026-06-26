@@ -6,6 +6,7 @@ import {
   listComprasTransitoFull,
   listComprasTransito,
 } from "@/lib/utils/compra-transito-store";
+import { fillMissingBarcodes } from "@/lib/server/compra-transito-barcodes";
 
 function formatDefaultTitle() {
   const now = new Date();
@@ -93,11 +94,15 @@ export async function POST(request: Request) {
       }
     }
 
+    // Padroniza: completa o código de barras (do Linx) que faltar. Aditivo e tolerante a
+    // falha — se o Linx estiver fora, salva sem barcode (não bloqueia a criação).
+    const { items: itemsComBarcode } = await fillMissingBarcodes(normalizedItems);
+
     const created = await createCompraTransito({
       companyKey: String(companyKey),
       title:
         typeof title === "string" && title.trim() ? title.trim() : formatDefaultTitle(),
-      items: normalizedItems,
+      items: itemsComBarcode,
       forceStatus: draft ? "rascunho" : undefined,
       createdByName,
     });

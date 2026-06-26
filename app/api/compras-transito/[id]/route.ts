@@ -6,6 +6,7 @@ import {
   getCompraTransito,
   updateCompraTransito,
 } from "@/lib/utils/compra-transito-store";
+import { fillMissingBarcodes } from "@/lib/server/compra-transito-barcodes";
 
 export async function GET(
   request: Request,
@@ -73,9 +74,12 @@ export async function PUT(
       }
     }
 
+    // Padroniza: completa o código de barras (do Linx) ausente. Aditivo e tolerante a falha.
+    const { items: itemsComBarcode } = await fillMissingBarcodes(items as CompraTransitoItemRow[]);
+
     const updated = await updateCompraTransito(String(companyKey), id, {
       title: typeof title === "string" ? title : undefined,
-      items: items as CompraTransitoItemRow[],
+      items: itemsComBarcode,
       forceStatus: draft ? "rascunho" : undefined,
       reconfirm: !draft,
       createdByName,

@@ -64,6 +64,32 @@ async function fetchComprasSearchIndex(
   return index;
 }
 
+/** True quando o termo parece um código de barras (só dígitos, 4+). */
+function pareceCodigoBarras(term: string): boolean {
+  const v = term.trim();
+  return v.length >= 4 && /^\d+$/.test(v);
+}
+
+/**
+ * Resolve um código de barras ao código do produto. A busca da lista casa pelo texto
+ * indexado dos itens (que inclui o código do produto), então isto faz o filtro por
+ * código de barras funcionar MESMO quando o item foi salvo sem `codigoBarra` — o caso
+ * comum de itens importados de coleção/grade ou de lista. Usa o mesmo endpoint do picker.
+ */
+async function resolveProdutoPorCodigoBarras(
+  companyKey: CompanyKey,
+  codigoBarras: string
+): Promise<string | null> {
+  const params = new URLSearchParams({ company: companyKey, codigoBarras: codigoBarras.trim() });
+  const res = await fetch(
+    `/api/transferencia-produtos/produto-por-codigo-barras?${params.toString()}`,
+    { cache: "no-store" }
+  );
+  if (!res.ok) return null;
+  const json = (await res.json()) as { data?: { produto?: string } | null };
+  return json.data?.produto?.trim() || null;
+}
+
 async function fetchCompra(companyKey: CompanyKey, id: string): Promise<CompraTransito> {
   const params = new URLSearchParams({ company: companyKey });
   const res = await fetch(`/api/compras-transito/${id}?${params.toString()}`, { cache: "no-store" });
@@ -317,6 +343,9 @@ export default function ComprasTransitoPage({
   const [listRecon, setListRecon] = useState<Record<string, ReconResumo> | null>(null);
   const [search, setSearch] = useState("");
   const [searchIndex, setSearchIndex] = useState<Record<string, string> | null>(null);
+  // Quando o termo de busca é um código de barras, guardamos aqui o código de produto
+  // resolvido — assim o filtro acha a compra mesmo que o item não tenha barcode gravado.
+  const [barcodeProduto, setBarcodeProduto] = useState<string | null>(null);
 
   const loadCompras = useCallback(async () => {
     setLoading(true);
@@ -377,6 +406,30 @@ export default function ComprasTransitoPage({
     return { emTransito, recebidas, rascunhos };
   }, [compras]);
 
+  // Termo é código de barras → resolve para o código do produto (debounce) para o filtro
+  // achar pela referência do produto, mesmo sem `codigoBarra` salvo no item.
+  useEffect(() => {
+    const term = search.trim();
+    if (!pareceCodigoBarras(term)) {
+      setBarcodeProduto(null);
+      return;
+    }
+    let active = true;
+    const id = window.setTimeout(() => {
+      resolveProdutoPorCodigoBarras(companyKey, term)
+        .then((produto) => {
+          if (active) setBarcodeProduto(produto ? produto.toLowerCase() : null);
+        })
+        .catch(() => {
+          if (active) setBarcodeProduto(null);
+        });
+    }, 300);
+    return () => {
+      active = false;
+      window.clearTimeout(id);
+    };
+  }, [search, companyKey]);
+
   const filteredCompras = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return compras;
@@ -384,9 +437,13 @@ export default function ComprasTransitoPage({
     const terms = q.split(/\s+/).filter(Boolean);
     return compras.filter((compra) => {
       const haystack = `${compra.title.toLowerCase()} ${searchIndex?.[compra.id] ?? ""}`;
-      return terms.every((term) => haystack.includes(term));
+      if (terms.every((term) => haystack.includes(term))) return true;
+      // Código de barras digitado: casa pelo produto resolvido (itens podem não ter o
+      // código de barras gravado, então buscar pelo barcode cru não acharia nada).
+      if (barcodeProduto && haystack.includes(barcodeProduto)) return true;
+      return false;
     });
-  }, [compras, search, searchIndex]);
+  }, [compras, search, searchIndex, barcodeProduto]);
 
   const canConfirm = useMemo(
     () =>
