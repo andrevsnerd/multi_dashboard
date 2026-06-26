@@ -7,6 +7,7 @@ import {
   listComprasTransito,
 } from "@/lib/utils/compra-transito-store";
 import { fillMissingBarcodes } from "@/lib/server/compra-transito-barcodes";
+import { applyAutoRecebimento } from "@/lib/server/compra-transito-recebimento";
 
 function formatDefaultTitle() {
   const now = new Date();
@@ -67,6 +68,7 @@ export async function POST(request: Request) {
       corDescricao: row.corDescricao ? String(row.corDescricao) : undefined,
       grade: row.grade ? String(row.grade) : undefined,
       dataRecebimento: String(row.dataRecebimento ?? ""),
+      dataRecebimentoManual: row.dataRecebimentoManual === true ? true : undefined,
       quantidade: Number(row.quantidade ?? 0),
       custoUnitario:
         row.custoUnitario != null ? Number(row.custoUnitario) : undefined,
@@ -74,8 +76,15 @@ export async function POST(request: Request) {
       status: "em_transito",
     }));
 
+    // Na CONFIRMAÇÃO, a data de recebimento dos itens não-manuais é calculada a partir de
+    // AGORA + tempo de produção do ciclo do produto (mesmo lead time da Compra Ideal).
+    // Roda antes da validação para que datas automáticas satisfaçam a exigência de data.
+    const itemsComData = draft
+      ? normalizedItems
+      : await applyAutoRecebimento(String(companyKey), normalizedItems, new Date());
+
     if (!draft) {
-      const hasInvalidItem = normalizedItems.some(
+      const hasInvalidItem = itemsComData.some(
         (item) =>
           !item.itemKey.trim() ||
           !item.produto.trim() ||
@@ -96,7 +105,7 @@ export async function POST(request: Request) {
 
     // Padroniza: completa o código de barras (do Linx) que faltar. Aditivo e tolerante a
     // falha — se o Linx estiver fora, salva sem barcode (não bloqueia a criação).
-    const { items: itemsComBarcode } = await fillMissingBarcodes(normalizedItems);
+    const { items: itemsComBarcode } = await fillMissingBarcodes(itemsComData);
 
     const created = await createCompraTransito({
       companyKey: String(companyKey),

@@ -4,8 +4,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { fetchControleEstoqueItemMetricasClient } from "@/lib/client/controle-estoque-metricas";
 import type { CompanyKey } from "@/lib/config/company";
+import { resolveCicloCompra } from "@/lib/config/compra-ciclo";
 import type { CompraTransitoItemRow } from "@/lib/types/compra-transito";
 import { buildControleEstoqueItemKey } from "@/lib/utils/controle-estoque-metricas";
+
+/** Hoje + `dias` em YYYY-MM-DD (local). Usado para o preview da data de recebimento. */
+function addDiasHojeIso(dias: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + Math.max(0, Math.round(dias)));
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
 
 import styles from "../performance/CurvaPorProdutoPickerModal.module.css";
 
@@ -451,6 +460,15 @@ export default function ComprasTransitoPickerModal({
           const existing = existingMap.get(itemKey);
           if (existing) return existing;
 
+          // Data de recebimento AUTOMÁTICA (preview): hoje + tempo de produção do ciclo do
+          // produto. Marcada como não-manual; na confirmação o servidor recalcula a partir
+          // da data real de confirmação. O usuário pode editar (vira manual).
+          const producaoDias = resolveCicloCompra(companyKey, {
+            linha: produto.linha,
+            subgrupo: produto.subgrupo,
+          }).producaoDias;
+          const dataRecebimentoAuto = addDiasHojeIso(producaoDias);
+
           try {
             const metricas = await fetchControleEstoqueItemMetricasClient({
               company: companyKey,
@@ -470,7 +488,8 @@ export default function ComprasTransitoPickerModal({
               corProduto: produto.corProduto ?? undefined,
               corDescricao: produto.descCor || undefined,
               grade: produto.grade ?? undefined,
-              dataRecebimento: new Date().toISOString().slice(0, 10),
+              dataRecebimento: dataRecebimentoAuto,
+              dataRecebimentoManual: false,
               quantidade: 1,
               custoUnitario: metricas?.resumo.custoUnitario ?? undefined,
               estoqueAtual: metricas?.resumo.estoqueTotal ?? sumEstoque(produto),
@@ -485,7 +504,8 @@ export default function ComprasTransitoPickerModal({
               corProduto: produto.corProduto ?? undefined,
               corDescricao: produto.descCor || undefined,
               grade: produto.grade ?? undefined,
-              dataRecebimento: new Date().toISOString().slice(0, 10),
+              dataRecebimento: dataRecebimentoAuto,
+              dataRecebimentoManual: false,
               quantidade: 1,
               custoUnitario: undefined,
               estoqueAtual: sumEstoque(produto),

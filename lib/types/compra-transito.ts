@@ -9,6 +9,13 @@ export interface CompraTransitoItemRow {
   corDescricao?: string;
   grade?: string;
   dataRecebimento: string;
+  /**
+   * true quando o usuário fixou a data manualmente. Quando ausente/false, a data é
+   * AUTOMÁTICA: na confirmação o sistema calcula dataRecebimento = data da confirmação +
+   * tempo de produção (producaoDias do ciclo do produto). Permite recalcular conforme a
+   * data real em que a compra é confirmada, sem sobrescrever o que o usuário fixou.
+   */
+  dataRecebimentoManual?: boolean;
   quantidade: number;
   custoUnitario?: number;
   estoqueAtual?: number;

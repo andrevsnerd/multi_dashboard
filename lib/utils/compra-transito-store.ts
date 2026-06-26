@@ -79,6 +79,7 @@ function normalizeItem(row: CompraTransitoItemRow): CompraTransitoItemRow {
     corDescricao: row.corDescricao ? String(row.corDescricao).trim() : undefined,
     grade: row.grade ? String(row.grade).trim() : undefined,
     dataRecebimento,
+    dataRecebimentoManual: row.dataRecebimentoManual === true ? true : undefined,
     quantidade: Math.max(0, Math.round(Number(row.quantidade ?? 0))),
     custoUnitario:
       row.custoUnitario != null && Number.isFinite(Number(row.custoUnitario))

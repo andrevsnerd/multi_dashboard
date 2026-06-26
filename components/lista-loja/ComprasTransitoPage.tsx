@@ -449,7 +449,11 @@ export default function ComprasTransitoPage({
     () =>
       draftItems.length > 0 &&
       draftItems.every(
-        (item) => item.dataRecebimento.trim() && Math.max(0, Math.round(item.quantidade ?? 0)) > 0
+        (item) =>
+          // Item automático será datado pelo servidor na confirmação (hoje + produção);
+          // só itens MANUAIS precisam ter a data preenchida aqui.
+          (item.dataRecebimento.trim() !== "" || item.dataRecebimentoManual !== true) &&
+          Math.max(0, Math.round(item.quantidade ?? 0)) > 0
       ),
     [draftItems]
   );
@@ -470,7 +474,15 @@ export default function ComprasTransitoPage({
     setRecon(null);
     setReconResumo(null);
     setReconLoading(false);
-    setDraftItems(compra.items);
+    // Ao editar uma compra existente, datas já definidas são tratadas como MANUAIS para não
+    // serem recalculadas silenciosamente numa reconfirmação. O usuário pode limpar p/ voltar ao automático.
+    setDraftItems(
+      compra.items.map((item) => ({
+        ...item,
+        dataRecebimentoManual:
+          item.dataRecebimentoManual ?? (item.dataRecebimento?.trim() ? true : false),
+      }))
+    );
     setDraftTitle(compra.title);
     setEditingId(compra.id);
     setBulkDate("");
@@ -517,11 +529,17 @@ export default function ComprasTransitoPage({
 
   const applyBulkDate = useCallback((date: string) => {
     if (!date) return;
-    setDraftItems((prev) => prev.map((item) => ({ ...item, dataRecebimento: date })));
+    // Definir data em massa é ação manual → fixa (não será recalculada na confirmação).
+    setDraftItems((prev) =>
+      prev.map((item) => ({ ...item, dataRecebimento: date, dataRecebimentoManual: true }))
+    );
   }, []);
 
   const clearAllDates = useCallback(() => {
-    setDraftItems((prev) => prev.map((item) => ({ ...item, dataRecebimento: "" })));
+    // Limpar volta ao modo automático: a data será calculada na confirmação (produção).
+    setDraftItems((prev) =>
+      prev.map((item) => ({ ...item, dataRecebimento: "", dataRecebimentoManual: false }))
+    );
   }, []);
 
   const openList = useCallback(() => {
@@ -857,14 +875,27 @@ export default function ComprasTransitoPage({
                       )}
                     </div>
                   ) : (
-                    <input
-                      type="date"
-                      className={styles.input}
-                      value={item.dataRecebimento}
-                      onChange={(e) =>
-                        updateDraftItem(item.itemKey, { dataRecebimento: e.target.value })
-                      }
-                    />
+                    <div className={styles.readOnlyDateCell}>
+                      <input
+                        type="date"
+                        className={styles.input}
+                        value={item.dataRecebimento}
+                        onChange={(e) =>
+                          updateDraftItem(item.itemKey, {
+                            dataRecebimento: e.target.value,
+                            dataRecebimentoManual: true,
+                          })
+                        }
+                      />
+                      {item.dataRecebimentoManual !== true && (
+                        <span
+                          className={styles.durationChip}
+                          title="Data automática = data da confirmação + tempo de produção do produto. Editar fixa a data; este preview é recalculado quando você confirma."
+                        >
+                          auto · produção
+                        </span>
+                      )}
+                    </div>
                   )}
                 </td>
                 <td className={styles.codeCell}>{item.produto}</td>
@@ -1214,6 +1245,11 @@ export default function ComprasTransitoPage({
             </div>
           ) : (
             <>
+              <div className={styles.helperText}>
+                As datas de recebimento são automáticas: ao confirmar, cada item recebe a data
+                da confirmação + o tempo de produção do produto. Edite uma data para fixá-la, ou
+                use os controles abaixo. &quot;Limpar todas&quot; volta tudo para automático.
+              </div>
               <div className={styles.bulkDateBar}>
                 <label className={styles.bulkDateLabel} htmlFor="bulk-date">
                   Data para todos:
@@ -1249,7 +1285,7 @@ export default function ComprasTransitoPage({
               {renderTableRows(draftItems, false)}
               {!canConfirm && (
                 <div className={styles.helperText}>
-                  Para confirmar, preencha a data de recebimento e a quantidade em todos os itens. Ou salve como rascunho para definir as datas depois.
+                  Para confirmar, cada item precisa de quantidade maior que zero (a data é automática). Itens com data fixada manualmente precisam ter a data preenchida — ou limpe para voltar ao automático.
                 </div>
               )}
             </>
