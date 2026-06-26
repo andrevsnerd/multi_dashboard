@@ -7,6 +7,7 @@ import {
   compareFilialDisplayOrder,
 } from "@/lib/config/company";
 import { canonicalKey, ROW_COR_FIELD } from "@/lib/reports/keys";
+import { getMappedColorDescription } from "@/lib/utils/colorMapping";
 import { getControleEstoqueMetricasItens } from "@/lib/server/controle-estoque-metricas";
 import { buildControleEstoqueItemKey } from "@/lib/utils/controle-estoque-metricas";
 import {
@@ -36,6 +37,26 @@ const ITEM_LIMIT = 1500;
 /** Quantas lojas calcular em paralelo (cada uma já batcheia os itens internamente). */
 const FILIAL_CONCURRENCY = 3;
 
+/**
+ * Alias por DESCRIÇÃO de cor (espelha lib/client/compras-transito): casa quando o
+ * código de cor gravado no trânsito difere do código de estoque/curva mas representa
+ * a MESMA cor (ex.: '86' x '120' = AZUL/VERDE), quando o trânsito veio sem código,
+ * ou quando gravaram a descrição no lugar do código. Prefixo dedicado para nunca
+ * colidir com a chave canônica.
+ */
+const TRANSIT_DESC_PREFIX = " desc ";
+
+function transitDescKey(
+  produto: string | null | undefined,
+  corProduto: string | null | undefined,
+  corDescricao?: string | null
+): string | null {
+  const fromCode = getMappedColorDescription(corProduto);
+  const raw = (fromCode || (corDescricao ?? "")).trim().toUpperCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+  if (!raw) return null;
+  return `${TRANSIT_DESC_PREFIX}${String(produto ?? "").trim()}||${raw}`;
+}
+
 /** Índice de compras em trânsito ativas por (produto × cor canônica) — abatido como pool da rede. */
 async function buildTransitIndex(
   company: string | undefined
@@ -47,9 +68,7 @@ async function buildTransitIndex(
   for (const c of compras) {
     for (const it of c.items ?? []) {
       if (!isCompraTransitoDateActive(it.dataRecebimento, today)) continue;
-      const k = canonicalKey(it.produto, it.corProduto ?? null);
-      const arr = idx.get(k) ?? [];
-      arr.push({
+      const entry: CompraTransitoIndexEntry = {
         itemKey: it.itemKey ?? "",
         produto: it.produto,
         corProduto: it.corProduto ?? null,
@@ -57,8 +76,11 @@ async function buildTransitIndex(
         dataRecebimento: it.dataRecebimento,
         title: c.title ?? "",
         confirmedAt: c.confirmedAt ?? "",
-      });
-      idx.set(k, arr);
+      };
+      const k = canonicalKey(it.produto, it.corProduto ?? null);
+      idx.set(k, [...(idx.get(k) ?? []), entry]);
+      const dk = transitDescKey(it.produto, it.corProduto, it.corDescricao);
+      if (dk) idx.set(dk, [...(idx.get(dk) ?? []), entry]);
     }
   }
   return idx;
@@ -218,7 +240,12 @@ export async function fetchCompraSugeridaAbc(
     const pid = String(d.productId ?? "").trim();
     const corKey = d.corProduto ? String(d.corProduto).trim() : null;
     const itemKey = buildControleEstoqueItemKey(d.productId, d.corProduto);
-    const transit = transitIndex.get(canonicalKey(pid, corKey)) ?? [];
+    let transit = transitIndex.get(canonicalKey(pid, corKey)) ?? [];
+    if (transit.length === 0) {
+      // Fallback por descrição de cor (códigos divergentes para a mesma cor, etc.).
+      const dk = transitDescKey(pid, corKey, d.descCorProduto);
+      if (dk) transit = transitIndex.get(dk) ?? [];
+    }
 
     // Compra sugerida de cada loja, somada por rótulo (lojas que colapsam no mesmo label).
     const qtyByLabel = new Map<string, number>();

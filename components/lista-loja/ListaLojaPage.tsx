@@ -2703,7 +2703,12 @@ function ListaLojaItensTable({
                 {ideal.saldoChegada != null ? (
                   <span
                     className={styles.cellMetric}
-                    title="Estoque atual restante na data da chegada (+ o que chega, em verde)"
+                    title={
+                      ideal.rupturaAntesDaChegada
+                        ? `Estoque zera ${formatShortDate(ideal.acabaEm)} e a remessa só chega ${formatShortDate(ideal.chegaEm)} → ~${fmt(ideal.diasRupturaAntesChegada ?? 0)}d sem estoque. Em ciclo não dá pra antecipar (produção chegaria ainda mais tarde) — sinalizado para você decidir/expeditar.`
+                        : "Estoque atual restante na data da chegada (+ o que chega, em verde)"
+                    }
+                    style={ideal.rupturaAntesDaChegada ? { color: "#b91c1c", fontWeight: 700 } : undefined}
                     onMouseEnter={ideal.emTransito > 0 ? (e) =>
                       setTransitoTooltip({
                         x: e.clientX,
@@ -2715,6 +2720,7 @@ function ListaLojaItensTable({
                       }) : undefined}
                     onMouseLeave={() => setTransitoTooltip(null)}
                   >
+                    {ideal.rupturaAntesDaChegada ? "⚠️ " : ""}
                     {fmt(ideal.saldoChegada)}
                     {ideal.emTransito > 0 ? (
                       <span style={{ color: "#166534", fontWeight: 700 }}> (+{fmt(ideal.emTransito)})</span>

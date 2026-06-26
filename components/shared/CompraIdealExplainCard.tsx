@@ -20,6 +20,14 @@ function shortDate(iso?: string | null): string {
 
 /** Cabeçalho por tamanho da janela de ritmo (mesma régua do cálculo). */
 function cenario(ideal: CompraIdealResult): { emoji: string; label: string } {
+  // Ruptura antes da chegada tem prioridade: a posição (estoque+trânsito) parece "cheia",
+  // mas o estoque zera antes de a remessa pousar → há janela sem estoque. Não é "estável".
+  if (ideal.rupturaAntesDaChegada) {
+    return {
+      emoji: "⚠️",
+      label: `Vai romper ~${fmt(ideal.diasRupturaAntesChegada ?? 0)}d antes da remessa chegar`,
+    };
+  }
   // Resgate: o maior trecho teve 0 venda, mas vendeu recente → usa o recente (vendedor lento).
   if (ideal.motivoTrechoRecente === "zerado") {
     return { emoji: "🔄", label: "Vendeu recente · base zerada resgatada" };
@@ -72,9 +80,12 @@ function buildPerguntas(ideal: CompraIdealResult): QA[] {
   const acaba =
     ideal.consumoDiario <= 0
       ? "sem consumo → não zera"
-      : ideal.emTransito > 0
-        ? `estoque ${fmt(ideal.estoqueAtual)} + trânsito ${fmt(ideal.emTransito)} → acaba ${shortDate(dataAcaba)} (${fmt(diasAcaba ?? 0)} dias)`
-        : `${fmt(ideal.estoqueAtual)} ÷ ${fmt2(ideal.consumoDiario)} = ${fmt(diasAcaba ?? 0)} dias → acaba ${shortDate(dataAcaba)}`;
+      : ideal.rupturaAntesDaChegada
+        ? // Honestidade: o estoque ATUAL zera antes do trânsito chegar — mostra o gap, não a data final.
+          `estoque ${fmt(ideal.estoqueAtual)} zera ${shortDate(ideal.acabaEm)} (${fmt(ideal.diasAteAcabar ?? 0)}d) · remessa só chega ${shortDate(ideal.chegaEm)} (${fmt(ideal.diasAteChegada ?? 0)}d) → ~${fmt(ideal.diasRupturaAntesChegada ?? 0)}d SEM ESTOQUE`
+        : ideal.emTransito > 0
+          ? `estoque ${fmt(ideal.estoqueAtual)} + trânsito ${fmt(ideal.emTransito)} → acaba ${shortDate(dataAcaba)} (${fmt(diasAcaba ?? 0)} dias)`
+          : `${fmt(ideal.estoqueAtual)} ÷ ${fmt2(ideal.consumoDiario)} = ${fmt(diasAcaba ?? 0)} dias → acaba ${shortDate(dataAcaba)}`;
 
   const perguntas: QA[] = [
     { n: 1, pergunta: "qual o histórico?", formula: hist },

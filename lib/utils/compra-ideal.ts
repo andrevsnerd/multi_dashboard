@@ -164,6 +164,14 @@ export interface CompraIdealResult {
   saldoChegada: number | null;
   /** Folga até a chegada do trânsito existente: cobertura atual − dias até a chegada (negativo = rompe antes). */
   folgaAteChegadaDias: number | null;
+  /**
+   * Há trânsito a caminho, mas o estoque atual zera ANTES de ele chegar — haverá ruptura
+   * no intervalo. Não dá pra "comprar ponte" em ciclo (a produção chegaria ainda mais tarde),
+   * então isto é um SINAL: o item não está "estável" como a posição (estoque+trânsito) sugere.
+   */
+  rupturaAntesDaChegada: boolean;
+  /** Dias estimados sem estoque entre a ruptura e a chegada do trânsito (null se não rompe antes). */
+  diasRupturaAntesChegada: number | null;
   /** Estoque-alvo: consumo/dia × (lead time + cobertura). */
   alvoEstoque: number;
   /** Compra ideal = alvo − (estoque + trânsito). Pode ser negativa (excesso). */
@@ -392,6 +400,19 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
     folgaAteChegadaDias = (coberturaAtualDias ?? 0) - diasAteChegada;
   }
 
+  // Ruptura antes da chegada: o estoque atual zera (diasAteAcabar) ANTES de o trânsito
+  // pousar (diasAteChegada). O gap é a janela sem estoque. Usa as MESMAS datas exibidas
+  // (acabaEm × chegaEm) para o número bater com a tela.
+  let rupturaAntesDaChegada = false;
+  let diasRupturaAntesChegada: number | null = null;
+  if (proximaChegada && consumoDiario > 0 && diasAteChegada != null && diasAteAcabar != null) {
+    const gap = diasAteChegada - diasAteAcabar;
+    if (gap > 0) {
+      rupturaAntesDaChegada = true;
+      diasRupturaAntesChegada = gap;
+    }
+  }
+
   // --- Campos do modo ciclo (data de compra fixa + quantidade de 1 ciclo) ---
   let acabaComTransitoIso: string | null = null;
   let diasAteAcabarComTransito: number | null = null;
@@ -493,6 +514,8 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
     alvoTotalDias,
     saldoChegada,
     folgaAteChegadaDias,
+    rupturaAntesDaChegada,
+    diasRupturaAntesChegada,
     alvoEstoque,
     compraIdeal,
     status,
