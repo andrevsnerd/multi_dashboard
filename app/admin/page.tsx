@@ -10,6 +10,7 @@ import {
   type RoleKey,
   type PermissionKey,
 } from "@/types/auth";
+import { roleAllowsPermission } from "@/lib/auth/permissions";
 import styles from "./page.module.css";
 const _filialLabelOverrides: Record<string, string> = {
   'NERD MORUMBI RDRRRJ': 'NERD MORUMBI RDRRRJ',
@@ -42,7 +43,7 @@ const PERMISSION_GROUPS: { label: string; keys: PermissionKey[] }[] = [
     label: "Operações",
     keys: [
       "controle-transferencias", "transferencia-produtos", "romaneios",
-      "saidas-entradas-produtos", "lista-loja", "compras-transito", "compras-salvas", "destino-romaneio",
+      "saidas-entradas-produtos", "extrato-produto", "lista-loja", "compras-transito", "compras-salvas", "destino-romaneio",
     ],
   },
   {
@@ -355,7 +356,11 @@ export default function AdminPage() {
       const userPayload = {
         username: formUsername,
         role: formRole,
-        permissions: formRole === "admin" ? [] : formPermissions,
+        // Remove permissoes restritas que nao se aplicam a funcao (ex: extrato-produto em gestor).
+        permissions:
+          formRole === "admin"
+            ? []
+            : formPermissions.filter((k) => roleAllowsPermission(formRole, k)),
         allowedCompanies: formEmpresa ? [formEmpresa] : [],
         nomeExibicao: formNome || null,
         somenteVarejo: formSomenteVarejo || null,
@@ -518,20 +523,6 @@ export default function AdminPage() {
             }}
           >
             Grupos de Filiais
-          </Link>
-          <Link
-            href="/admin/extrato-produto"
-            style={{
-              padding: "8px 14px",
-              background: "#1e293b",
-              border: "1px solid #334155",
-              borderRadius: 6,
-              color: "#94a3b8",
-              textDecoration: "none",
-              fontSize: 13,
-            }}
-          >
-            Extrato de Produto
           </Link>
           <Link
             href="/admin/prazo-bloqueio"
@@ -737,7 +728,11 @@ export default function AdminPage() {
                   <p className={styles.sectionTitle}>Páginas que pode acessar</p>
                   <div className={styles.permGroups}>
                     {groupedPermissions.map((group) => {
-                      const groupKeys = group.items.map((i) => i.key);
+                      // Esconde permissoes restritas por funcao que nao se aplicam
+                      // a funcao selecionada (ex: extrato-produto some para gestor).
+                      const items = group.items.filter((i) => roleAllowsPermission(formRole, i.key));
+                      if (items.length === 0) return null;
+                      const groupKeys = items.map((i) => i.key);
                       const selectedCount = groupKeys.filter((k) => formPermissions.includes(k)).length;
                       const allSelected = selectedCount === groupKeys.length;
                       const collapsed = collapsedGroups.has(group.label);
@@ -764,7 +759,7 @@ export default function AdminPage() {
                                 {allSelected ? "Desmarcar todos" : "Marcar todos"}
                               </button>
                               <div className={styles.permGroupGrid}>
-                                {group.items.map(({ key, label }) => (
+                                {items.map(({ key, label }) => (
                                   <label key={key} className={styles.checkboxLabel}>
                                     <input
                                       type="checkbox"

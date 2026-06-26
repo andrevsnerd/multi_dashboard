@@ -1,17 +1,17 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthContext";
+import type { CompanyKey } from "@/lib/config/company";
 import type {
   ExtratoResponse,
   ProdutoCorOption,
   ProdutoFilialOption,
   ProdutoLookupResponse,
-} from "@/app/api/admin/extrato-produto/route";
-import type { ProdutosAtivosResponse } from "@/app/api/admin/extrato-produto/produtos/route";
-import type { AdminFilialOption } from "@/app/api/admin/extrato-produto/filiais/route";
+} from "@/app/api/extrato-produto/route";
+import type { ProdutosAtivosResponse } from "@/app/api/extrato-produto/produtos/route";
+import type { AdminFilialOption } from "@/app/api/extrato-produto/filiais/route";
 
 // ── Constantes ──────────────────────────────────────────────────────────────
 
@@ -66,10 +66,16 @@ function badge(tipo: string) {
 
 // ── Componente principal ─────────────────────────────────────────────────────
 
-export default function ExtratoPage() {
+interface ExtratoProdutoPageProps {
+  companyKey: CompanyKey;
+  companyName: string;
+}
+
+export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPageProps) {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const basePath = `/${companyKey}/extrato-produto`;
   const [produto, setProduto] = useState("");
   const [cor, setCor] = useState("");
   const [filial, setFilial] = useState("");
@@ -104,7 +110,7 @@ export default function ExtratoPage() {
   // Carrega todas as filiais disponíveis uma vez para o autocomplete.
   useEffect(() => {
     if (!user) return;
-    fetch("/api/admin/extrato-produto/filiais", { headers: authHeader() })
+    fetch("/api/extrato-produto/filiais", { headers: authHeader() })
       .then((r) => r.json())
       .then((json) => { if (json.data) setAllFiliais(json.data); })
       .catch(() => {});
@@ -172,7 +178,7 @@ export default function ExtratoPage() {
       try {
         const params = new URLSearchParams({ produto: termo, lookup: "1" });
         if (corRef.current.trim()) params.set("cor", corRef.current.trim());
-        const res = await fetch(`/api/admin/extrato-produto?${params}`, {
+        const res = await fetch(`/api/extrato-produto?${params}`, {
           headers: authHeader(),
           signal: controller.signal,
         });
@@ -244,7 +250,7 @@ export default function ExtratoPage() {
     setListaErro("");
     try {
       const params = new URLSearchParams({ filial: f, page: String(nextPage), pageSize: "20" });
-      const res = await fetch(`/api/admin/extrato-produto/produtos?${params}`, {
+      const res = await fetch(`/api/extrato-produto/produtos?${params}`, {
         headers: authHeader(),
       });
       const json = await res.json();
@@ -271,7 +277,7 @@ export default function ExtratoPage() {
       if (paramsIn.cor?.trim()) params.set("cor", paramsIn.cor.trim());
       if (paramsIn.filial?.trim()) params.set("filial", paramsIn.filial.trim());
 
-      const res = await fetch(`/api/admin/extrato-produto?${params}`, { headers: authHeader() });
+      const res = await fetch(`/api/extrato-produto?${params}`, { headers: authHeader() });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Erro ao buscar");
       setDados(json as ExtratoResponse);
@@ -356,9 +362,6 @@ export default function ExtratoPage() {
     <main style={{ padding: "24px 32px", fontFamily: "var(--font-mono, monospace)", minHeight: "100vh", background: "#0f172a", color: "#e2e8f0" }}>
       {/* ── Cabeçalho ── */}
       <div style={{ marginBottom: 24 }}>
-        <Link href="/admin" style={{ color: "#94a3b8", textDecoration: "none", fontSize: 13 }}>
-          ← Admin
-        </Link>
         <h1 style={{ margin: "8px 0 4px", fontSize: 22, color: "#f1f5f9" }}>
           Extrato de Produto
         </h1>
@@ -549,7 +552,7 @@ export default function ExtratoPage() {
                   setListaDados(null);
 
                   const params = new URLSearchParams({ produto: p, cor: c, filial: f });
-                  router.replace(`/admin/extrato-produto?${params.toString()}`);
+                  router.replace(`${basePath}?${params.toString()}`);
                   fetchExtrato({ produto: p, cor: c, filial: f });
                 }}
                 style={{

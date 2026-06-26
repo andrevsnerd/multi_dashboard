@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findUserByUsername } from "@/lib/auth/users-store";
+import { userHasPagePermission } from "@/lib/auth/permissions";
+import type { UserSession } from "@/types/auth";
 import { query } from "@/lib/db/connection";
 
-async function isAdmin(username: string): Promise<boolean> {
+/** Acesso ao Extrato de Produto: admin sempre; logistica se a pagina for liberada. */
+async function canAccessExtrato(username: string): Promise<boolean> {
   const user = await findUserByUsername(username);
-  return user?.role === "admin";
+  if (!user) return false;
+  return userHasPagePermission(user as unknown as UserSession, "extrato-produto");
 }
 
 function trimValue(value: unknown) {
@@ -18,7 +22,7 @@ export interface AdminFilialOption {
 
 export async function GET(request: NextRequest) {
   const username = request.headers.get("x-auth-username");
-  if (!username || !(await isAdmin(username))) {
+  if (!username || !(await canAccessExtrato(username))) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 

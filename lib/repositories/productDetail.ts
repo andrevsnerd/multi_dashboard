@@ -259,7 +259,7 @@ type ClassifiedMovementRow = StockMovementRow & { ajuste: boolean };
 
 /**
  * Reconhece "ajuste de estoque" a partir dos campos de tipo do romaneio, exatamente
- * como o extrato do admin (resolveLinxTipoMovimento em app/api/admin/extrato-produto).
+ * como o extrato de produto (resolveLinxTipoMovimento em app/api/extrato-produto).
  * Apenas reclassifica movimentos já presentes em ESTOQUE_PROD_ENT/SAI — não soma novas fontes.
  */
 function isAjusteMovimento(...candidates: Array<string | number | null | undefined>): boolean {

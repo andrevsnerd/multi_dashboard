@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "./SidebarContext";
 import { useAuth } from "@/components/auth/AuthContext";
-import { userHasPagePermission } from "@/lib/auth/permissions";
+import { userHasPagePermission, roleAllowsPermission } from "@/lib/auth/permissions";
 import type { PermissionKey } from "@/types/auth";
 
 import styles from "./Sidebar.module.css";
@@ -124,6 +124,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/"
       ? `${basePath}/saidas-entradas-produtos`
       : "/saidas-entradas-produtos";
+  const extratoProdutoHref =
+    basePath && basePath !== "/" ? `${basePath}/extrato-produto` : "/extrato-produto";
   const ajusteEstoqueHref =
     basePath && basePath !== "/" ? `${basePath}/ajuste-estoque` : "/ajuste-estoque";
   const listaLojaHref =
@@ -206,6 +208,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/transferencia-produtos",
     "/romaneios",
     "/saidas-entradas-produtos",
+    "/extrato-produto",
     "/ajuste-estoque",
     "/lista-loja",
     "/compras-transito",
@@ -402,6 +405,14 @@ export default function Sidebar({ companyName }: SidebarProps) {
             matchesSegment(currentPathname, "/saidas-entradas-produtos", saidasEntradasProdutosHref),
         },
         {
+          key: "extrato-produto",
+          label: "Extrato de Produto",
+          href: extratoProdutoHref,
+          permission: "extrato-produto",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/extrato-produto", extratoProdutoHref),
+        },
+        {
           key: "ajuste-estoque",
           label: "Ajuste de Estoque",
           href: ajusteEstoqueHref,
@@ -509,6 +520,9 @@ export default function Sidebar({ companyName }: SidebarProps) {
     if (permission === "admin") return user.role === "admin";
 
     if (user.role === "admin") return true;
+
+    // Permissoes restritas por funcao (ex: extrato-produto so para logistica/admin).
+    if (permission && !roleAllowsPermission(user.role, permission)) return false;
 
     if ((user.role === "gestor" || user.role === "logistica") && !user.permissions?.length) {
       return true;

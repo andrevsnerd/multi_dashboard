@@ -1,8 +1,23 @@
 import { LEGACY_PERMISSION_FALLBACKS } from "@/lib/config/page-permissions";
 import { NAV_ROUTE_MAP } from "@/lib/config/nav-route-map";
-import type { CompanyKey, PermissionKey, UserSession } from "@/types/auth";
+import type { CompanyKey, PermissionKey, RoleKey, UserSession } from "@/types/auth";
 
 const ALL_COMPANIES: CompanyKey[] = ["nerd", "scarfme"];
+
+/**
+ * Permissoes restritas por funcao: mesmo que concedidas a um usuario, so
+ * funcionam para as funcoes listadas. Ex: o Extrato de Produto so e acessivel
+ * para admin ou logistica (gestor nunca ve, mesmo com a pagina marcada).
+ */
+export const ROLE_RESTRICTED_PERMISSIONS: Partial<Record<PermissionKey, RoleKey[]>> = {
+  "extrato-produto": ["admin", "logistica"],
+};
+
+/** True se a funcao do usuario pode, em tese, receber/usar essa permissao. */
+export function roleAllowsPermission(role: RoleKey, key: PermissionKey): boolean {
+  const allowedRoles = ROLE_RESTRICTED_PERMISSIONS[key];
+  return !allowedRoles || allowedRoles.includes(role);
+}
 
 /** Empresas que o usuario pode ver. Se allowedCompanies nao definido ou vazio = as duas. */
 export function getVisibleCompanies(user: UserSession | null): CompanyKey[] {
@@ -46,6 +61,8 @@ export function pathnameToPermission(pathname: string | null): PermissionKey | "
 export function userHasPagePermission(user: UserSession | null, key: PermissionKey): boolean {
   if (!user) return false;
   if (user.role === "admin") return true;
+  // Permissoes restritas por funcao: gestor nunca acessa, mesmo se marcada.
+  if (!roleAllowsPermission(user.role, key)) return false;
   if ((user.role === "gestor" || user.role === "logistica") && !user.permissions?.length) return true;
 
   const perms = user.permissions ?? [];
