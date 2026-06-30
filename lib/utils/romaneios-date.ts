@@ -4,18 +4,20 @@ export function parseRomaneioDateTime(value: string): Date {
   const normalized = (value || "").trim();
   if (!normalized) return new Date(Number.NaN);
 
-  if (/[zZ]|[+-]\d{2}:\d{2}$/.test(normalized)) {
+  // Já tem fuso explícito (Z ou ±HH:MM) → instante absoluto, parse direto.
+  if (/[zZ]|[+-]\d{2}:?\d{2}$/.test(normalized)) {
     return new Date(normalized);
   }
 
-  if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
-    const isoLike = normalized.replace(/\s+/, "T");
-    const parsed = new Date(isoLike);
-    if (!Number.isNaN(parsed.getTime())) return parsed;
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(normalized)) {
-    const parsed = new Date(normalized);
+  // Datas do SQL Server chegam SEM fuso, no horário de Brasília. `new Date`
+  // sobre uma string sem fuso usa o TZ local da máquina (navegador), então em
+  // computadores fora do Brasil o horário sai deslocado. Ancoramos em -03:00
+  // para o resultado ser idêntico em qualquer máquina/local.
+  const naiveMatch = normalized.match(
+    /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?)$/
+  );
+  if (naiveMatch) {
+    const parsed = new Date(`${naiveMatch[1]}T${naiveMatch[2]}-03:00`);
     if (!Number.isNaN(parsed.getTime())) return parsed;
   }
 
