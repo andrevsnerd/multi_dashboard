@@ -91,6 +91,9 @@ export const FILIAIS: FilialDef[] = [
   { id: '000082', company: 'scarfme', display: 'E-COMMERCE',   dbNameFallback: 'SCARF ME MATRIZ - FFF',      modules: ['sales', 'inventory'], ecommerce: true, group: 'ecommerce-scarfme', leadTimeDays: 2 },
   { id: '000085', company: 'scarfme', display: 'VILLA LOBOS',  dbNameFallback: 'VILLA LOBOS - LLL',          modules: ['sales', 'inventory'] },
   { id: '000111', company: 'scarfme', display: 'E-COMMERCE',   dbNameFallback: 'MSC COMERCIO DE LENCOS LT',  modules: ['sales', 'inventory'], ecommerce: true, group: 'ecommerce-scarfme' },
+  // AKS alterna com a MSC a cada ~15 dias (rodízio fiscal). Só uma emite por vez;
+  // a filial ativa do grupo é detectada por EMISSAO mais recente (active-filial-detector).
+  { id: '000118', company: 'scarfme', display: 'E-COMMERCE',   dbNameFallback: 'AKS COMERCIO DE LENCOS LT',  modules: ['sales', 'inventory'], ecommerce: true, group: 'ecommerce-scarfme' },
   { id: '000109', company: 'scarfme', display: 'GALEÃO RJ',    dbNameFallback: 'SCARFME LLL -  GALEAO RJ',   modules: ['sales', 'inventory'] },
 ];
 
@@ -110,7 +113,7 @@ export const FILIAL_GROUPS: FilialGroupDef[] = [
   { id: 'morumbi-1',         company: 'nerd',    display: 'MORUMBI 1',  memberIds: ['000099', '000116'],                     activeId: '000099' },
   { id: 'morumbi-2',         company: 'nerd',    display: 'MORUMBI 2',  memberIds: ['000115'],                               activeId: '000115' },
   { id: 'paulista',          company: 'scarfme', display: 'PAULISTA',   memberIds: ['000088', '000046', '000112', '000117'], activeId: '000117' },
-  { id: 'ecommerce-scarfme', company: 'scarfme', display: 'E-COMMERCE', memberIds: ['000108', '000083', '000082', '000111'], activeId: '000111' },
+  { id: 'ecommerce-scarfme', company: 'scarfme', display: 'E-COMMERCE', memberIds: ['000108', '000083', '000082', '000111', '000118'], activeId: '000111' },
 ];
 
 // ── Configurações por empresa ──────────────────────────────────────────────────
