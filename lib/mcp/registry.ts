@@ -17,6 +17,7 @@ import { registerProdutosVendidosTools } from './tools/produtos-vendidos';
 import { registerProdutoCurvaTools } from './tools/produto-curva';
 import { registerProdutosParadosTools } from './tools/produtos-parados';
 import { registerFaturamentoTools } from './tools/faturamento';
+import { registerRelatoriosTools } from './tools/relatorios';
 
 /**
  * Registra todas as tools do servidor MCP do multi-dashboard.
@@ -28,6 +29,8 @@ import { registerFaturamentoTools } from './tools/faturamento';
  * Fase 4: produto (ficha 360), top_produtos, sem_estoque (rupturas + sugestão),
  *         compras_transito (comprado/quando chega), produtos_vendidos (ranking
  *         por período arbitrário) e produto_curva (curva ABC 12m + mês).
+ * Fase 5: relatorio_vendas_faturamento e relatorio_vendas_historico — expõem as
+ *         análises do Gerador de Relatórios (mesmo runReport, todas as colunas).
  */
 export function registerAllTools(server: McpServer) {
   registerDiscoveryTools(server);
@@ -45,4 +48,5 @@ export function registerAllTools(server: McpServer) {
   registerProdutoCurvaTools(server);
   registerProdutosParadosTools(server);
   registerFaturamentoTools(server);
+  registerRelatoriosTools(server);
 }
