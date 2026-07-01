@@ -30,6 +30,11 @@ export function formatDateForQuery(date: Date): string {
   return format(date, 'yyyy-MM-dd');
 }
 
+// Fuso de negócio: Brasil (UTC-3, sem horário de verão desde 2019). Todas as
+// datas selecionadas pelo usuário (pickers) representam dias no calendário
+// brasileiro, independentemente do fuso em que o servidor Node roda (prod = UTC).
+const BUSINESS_TZ_OFFSET_MS = 3 * 60 * 60 * 1000;
+
 function parseDateInput(value: Date | string): Date {
   if (value instanceof Date) {
     return new Date(value.getTime());
@@ -38,13 +43,20 @@ function parseDateInput(value: Date | string): Date {
   const dateOnlyMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (dateOnlyMatch) {
     const [, year, month, day] = dateOnlyMatch;
-    const parsed = new Date(0);
-    parsed.setFullYear(Number(year), Number(month) - 1, Number(day));
-    parsed.setHours(0, 0, 0, 0);
-    return parsed;
+    // Ancorar à meia-noite UTC do dia — determinístico, independe do fuso do servidor.
+    return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
   }
 
-  return new Date(value);
+  // String com horário (instante ISO), tipicamente vinda de `Date.toISOString()`
+  // no cliente. O dia-calendário pretendido é o do fuso de negócio (Brasil), não
+  // o do servidor: sem isso, um fim de dia 23:59 BRT (= 02:59Z do dia seguinte) é
+  // lido como o dia seguinte em servidores UTC, incluindo indevidamente +1 dia no
+  // período. Convertemos o instante para a hora-parede BRT e fixamos à meia-noite
+  // UTC daquele dia.
+  const inst = new Date(value);
+  if (Number.isNaN(inst.getTime())) return inst;
+  const brt = new Date(inst.getTime() - BUSINESS_TZ_OFFSET_MS);
+  return new Date(Date.UTC(brt.getUTCFullYear(), brt.getUTCMonth(), brt.getUTCDate()));
 }
 
 export function normalizeRange(
@@ -70,7 +82,11 @@ export function normalizeRange(
 }
 
 export function toUtcStartOfDay(date: Date): Date {
-  return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  // Getters UTC (não locais): `parseDateInput` já ancora todas as datas à meia-noite
+  // UTC do dia pretendido, então ler em UTC mantém o mesmo dia em qualquer fuso de
+  // servidor. Com getters locais, um servidor UTC-3 recuaria um dia (00:00Z → 21:00
+  // do dia anterior).
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
 export function toUtcExclusiveEnd(date: Date): Date {
