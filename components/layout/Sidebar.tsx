@@ -87,6 +87,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
   const vendedoresHref =
     basePath && basePath !== "/" ? `${basePath}/vendedores` : "/vendedores";
   const clientesHref = basePath && basePath !== "/" ? `${basePath}/clientes` : "/clientes";
+  const faturamentoHref =
+    basePath && basePath !== "/" ? `${basePath}/faturamento` : "/faturamento";
   const filialHref =
     basePath && basePath !== "/" ? `${basePath}/filial` : "/filial";
   const exportarRelatoriosHref =
@@ -224,6 +226,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/produto-performance",
     "/vendedores",
     "/clientes",
+    "/faturamento",
     "/exportar-relatorios",
     "/gerador-relatorios",
     "/mapa-clientes",
@@ -270,6 +273,13 @@ export default function Sidebar({ companyName }: SidebarProps) {
           href: clientesHref,
           permission: "clientes",
           isActive: (currentPathname) => matchesSegment(currentPathname, "/clientes", clientesHref),
+        },
+        {
+          key: "faturamento",
+          label: "Faturamento / NFs",
+          href: faturamentoHref,
+          permission: "faturamento",
+          isActive: (currentPathname) => matchesSegment(currentPathname, "/faturamento", faturamentoHref),
         },
         ...(isScarfme
           ? [

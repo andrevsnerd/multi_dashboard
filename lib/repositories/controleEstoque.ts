@@ -7,6 +7,7 @@ import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import { getCurrentMonthRange, normalizeRangeForQuery, shiftRangeByMonths } from '@/lib/utils/date';
 import { getColorDescription } from '@/lib/utils/colorMapping';
+import { buildControleEstoqueItemKey } from '@/lib/utils/controle-estoque-metricas';
 import type { DateRangeInput } from '@/types/dashboard';
 
 function resolveRange(range?: DateRangeInput) {
@@ -6938,7 +6939,6 @@ export async function fetchVendasProdutoPorFilial({
 
     const result = await request.query<{ filial: string; qtde12m: number; qtde60d: number; valor12m: number | null; custoUnitario: number | null; ultimaVenda: Date | null }>(queryVarejo);
     const byFilial = new Map<string, { filial: string; qtde12m: number; qtde60d: number; qtdeMesAtual: number; valor12m: number; custoUnitario: number; ultimaVenda: Date | null; primeiraEntradaFilial: Date | null; primeiraVendaFilial: Date | null }>();
-    const msPerDay = 1000 * 60 * 60 * 24;
     for (const r of result.recordset) {
       byFilial.set(r.filial, {
         filial: r.filial,
@@ -7207,30 +7207,6 @@ export async function fetchVendasProdutoPorFilial({
       }
     }
 
-    const nowMs = Date.now();
-    const buildHistoricoFilial = (primeiraEntradaFilial: Date | null, primeiraVendaFilial: Date | null) => {
-      // Entrada real e a base principal; venda mais antiga e fallback quando nao houver entrada.
-      const dataBase = primeiraEntradaFilial ?? primeiraVendaFilial;
-      if (!dataBase || Number.isNaN(dataBase.getTime())) {
-        return {
-          diasHistoricoFilial: 365,
-          mesesHistoricoFilial: 12,
-          historicoParcial: false,
-        };
-      }
-
-      const diasHistoricoFilial = Math.min(
-        365,
-        Math.max(0, Math.floor((nowMs - dataBase.getTime()) / msPerDay))
-      );
-      const mesesHistoricoFilial = Math.min(12, Math.max(1, diasHistoricoFilial / 30));
-      return {
-        diasHistoricoFilial,
-        mesesHistoricoFilial,
-        historicoParcial: diasHistoricoFilial < 365,
-      };
-    };
-
     const estoqueDisponibilidadeFilialFilter = await buildFilialFilter(request, company, filialSel, 'EA');
     const saidaEstoqueFilialFilter = estoqueDisponibilidadeFilialFilter.replace(/EA\./g, 'ES.');
     const queryEstoqueAtual = `
@@ -7377,8 +7353,86 @@ export async function fetchVendasProdutoPorFilial({
           : Promise.resolve({ recordset: [] } as { recordset: DailyMovementRow[] }),
       ]);
 
+    return computeDisponibilidade({
+      byFilial,
+      estoqueAtual: estoqueAtualResult.recordset,
+      entriesDaily: entriesDailyRes.recordset,
+      exitsDaily: exitsDailyRes.recordset,
+      retailSalesDaily: retailSalesDailyRes.recordset,
+      ecommerceSalesDaily: ecommerceSalesDailyRes.recordset,
+      produtoCustoUnitario,
+      filialSel,
+      inicio12m,
+      fimPeriodo,
+    });
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Núcleo de disponibilidade/ritmo COMPARTILHADO entre o caminho por-item
+// (fetchVendasProdutoPorFilial) e o caminho em LOTE (fetchVendasProdutoPorFilialLote).
+// É a parte cara e delicada do cálculo; manter UM só corpo garante resultado idêntico
+// nos dois caminhos. Ver memória compra-sugerida-abc-conexao-perdida-n1-proxy.
+// ─────────────────────────────────────────────────────────────────────────────
+type ByFilialAgg = {
+  filial: string;
+  qtde12m: number;
+  qtde60d: number;
+  qtdeMesAtual: number;
+  valor12m: number;
+  custoUnitario: number;
+  ultimaVenda: Date | null;
+  primeiraEntradaFilial: Date | null;
+  primeiraVendaFilial: Date | null;
+};
+type DailyMovementRow = { d: Date; filial: string; qty: number | null };
+type EstoqueAtualAggRow = {
+  filial: string;
+  positiveStock: number | null;
+  negativeStock: number | null;
+  positiveCount: number | null;
+};
+
+function computeDisponibilidade(input: {
+  byFilial: Map<string, ByFilialAgg>;
+  estoqueAtual: EstoqueAtualAggRow[];
+  entriesDaily: DailyMovementRow[];
+  exitsDaily: DailyMovementRow[];
+  retailSalesDaily: DailyMovementRow[];
+  ecommerceSalesDaily: DailyMovementRow[];
+  produtoCustoUnitario: number;
+  filialSel: string | null;
+  inicio12m: Date;
+  fimPeriodo: Date;
+}) {
+  const { byFilial, produtoCustoUnitario, filialSel, inicio12m, fimPeriodo } = input;
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const nowMs = Date.now();
+  const buildHistoricoFilial = (primeiraEntradaFilial: Date | null, primeiraVendaFilial: Date | null) => {
+    // Entrada real e a base principal; venda mais antiga e fallback quando nao houver entrada.
+    const dataBase = primeiraEntradaFilial ?? primeiraVendaFilial;
+    if (!dataBase || Number.isNaN(dataBase.getTime())) {
+      return {
+        diasHistoricoFilial: 365,
+        mesesHistoricoFilial: 12,
+        historicoParcial: false,
+      };
+    }
+
+    const diasHistoricoFilial = Math.min(
+      365,
+      Math.max(0, Math.floor((nowMs - dataBase.getTime()) / msPerDay))
+    );
+    const mesesHistoricoFilial = Math.min(12, Math.max(1, diasHistoricoFilial / 30));
+    return {
+      diasHistoricoFilial,
+      mesesHistoricoFilial,
+      historicoParcial: diasHistoricoFilial < 365,
+    };
+  };
+
     const currentStockMap = new Map<string, number>();
-    for (const row of estoqueAtualResult.recordset) {
+    for (const row of input.estoqueAtual) {
       const positiveStock = Number(row.positiveStock ?? 0);
       const negativeStock = Number(row.negativeStock ?? 0);
       const positiveCount = Number(row.positiveCount ?? 0);
@@ -7415,10 +7469,10 @@ export async function fetchVendasProdutoPorFilial({
         byDay.set(dateIso, inner);
       }
     };
-    addMovement(entriesDailyRes.recordset, entriesTotalMap, entryByDay);
-    addMovement(exitsDailyRes.recordset, exitsTotalMap, exitByDay);
-    addMovement(retailSalesDailyRes.recordset, salesTotalMap, saleByDay);
-    addMovement(ecommerceSalesDailyRes.recordset, salesTotalMap, saleByDay);
+    addMovement(input.entriesDaily, entriesTotalMap, entryByDay);
+    addMovement(input.exitsDaily, exitsTotalMap, exitByDay);
+    addMovement(input.retailSalesDaily, salesTotalMap, saleByDay);
+    addMovement(input.ecommerceSalesDaily, salesTotalMap, saleByDay);
 
     // Todas as chaves abaixo precisam estar normalizadas (trim) para que estoque, movimentos e
     // contagem de dias positivos compartilhem a MESMA chave de filial.
@@ -7668,7 +7722,738 @@ export async function fetchVendasProdutoPorFilial({
         ritmoGapDias,
       },
     };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Versões em LOTE de fetchEstoqueProdutoPorFilial / fetchVendasProdutoPorFilial.
+// Em vez de ~10 queries POR ITEM (que no proxy viram ~10 POSTs por item × loja e
+// derrubam a conexão — ver memória compra-sugerida-abc-conexao-perdida-n1-proxy),
+// rodam cada query UMA vez por chunk de produtos (PRODUTO IN (...)), agregando por
+// produto×cor×filial, e particionam por item em JS com o MESMO match tolerante de cor
+// das queries single. O cálculo de disponibilidade/ritmo é o núcleo COMPARTILHADO
+// computeDisponibilidade — então o resultado por item é idêntico ao caminho per-item.
+// ─────────────────────────────────────────────────────────────────────────────
+const LOTE_PRODUTO_CHUNK = 500;
+
+function loteChunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+/** Match de cor idêntico ao filtro SQL das queries single (igualdade de string OU numérica via TRY_CONVERT INT). */
+function loteCorMatches(rowCorRaw: string | null | undefined, reqCorNorm: string | null, reqCorNum: number | null): boolean {
+  if (reqCorNorm == null) return true; // item sem cor → casa todas as cores do produto
+  const raw = (rowCorRaw ?? '').trim();
+  if (raw === reqCorNorm) return true;
+  if (reqCorNum != null && raw !== '' && /^[+-]?\d+$/.test(raw)) {
+    const n = Number.parseInt(raw, 10);
+    if (!Number.isNaN(n) && n === reqCorNum) return true;
+  }
+  return false;
+}
+
+type LoteItemNorm = { produto: string; corProduto: string | null; key: string; reqCorNorm: string | null; reqCorNum: number | null };
+
+function loteNormalizeItens(itens: Array<{ produto: string; corProduto?: string | null }>): LoteItemNorm[] {
+  const unique = new Map<string, LoteItemNorm>();
+  for (const it of itens) {
+    const produto = (it.produto ?? '').trim();
+    if (!produto) continue;
+    const corTrim = (it.corProduto ?? '').trim();
+    const corProduto = corTrim || null;
+    const key = buildControleEstoqueItemKey(produto, corProduto);
+    if (unique.has(key)) continue;
+    const reqCorNorm = corProduto;
+    const reqCorNum =
+      reqCorNorm != null && !Number.isNaN(Number.parseInt(reqCorNorm, 10))
+        ? Number.parseInt(reqCorNorm, 10)
+        : null;
+    unique.set(key, { produto, corProduto, key, reqCorNorm, reqCorNum });
+  }
+  return Array.from(unique.values());
+}
+
+function loteIndexByProduto<T extends { produto: string }>(rows: T[]): Map<string, T[]> {
+  const idx = new Map<string, T[]>();
+  for (const r of rows) {
+    const k = (r.produto ?? '').trim();
+    const arr = idx.get(k);
+    if (arr) arr.push(r);
+    else idx.set(k, [r]);
+  }
+  return idx;
+}
+
+/**
+ * Estoque por filial em LOTE (espelha fetchEstoqueProdutoPorFilial, prefixo 'e').
+ * Retorna Map<itemKey, Array<{filial, estoque}>> com a MESMA agregação por filial.
+ */
+export async function fetchEstoqueProdutoPorFilialLote({
+  company,
+  filial,
+  itens,
+}: {
+  company?: string;
+  filial?: string | null;
+  itens: Array<{ produto: string; corProduto?: string | null }>;
+}): Promise<Map<string, Array<{ filial: string; estoque: number }>>> {
+  const out = new Map<string, Array<{ filial: string; estoque: number }>>();
+  const norm = loteNormalizeItens(itens);
+  if (norm.length === 0) return out;
+  const produtos = Array.from(new Set(norm.map((n) => n.produto)));
+
+  type Row = { produto: string; cor: string | null; filial: string; positiveStock: number | null };
+  const raw: Row[] = [];
+  for (const chunk of loteChunk(produtos, LOTE_PRODUTO_CHUNK)) {
+    await withRequest(async (request) => {
+      const inClause = chunk.map((_, i) => `@elp${i}`).join(',');
+      chunk.forEach((p, i) => request.input(`elp${i}`, sql.VarChar, p));
+      const estoqueFilialFilter = await buildFilialFilter(request, company, filial ?? null, 'e');
+      const query = `
+        SELECT
+          LTRIM(RTRIM(ISNULL(e.PRODUTO, ''))) AS produto,
+          LTRIM(RTRIM(ISNULL(e.COR_PRODUTO, ''))) AS cor,
+          e.FILIAL AS filial,
+          SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS positiveStock
+        FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+        WHERE LTRIM(RTRIM(ISNULL(e.PRODUTO, ''))) IN (${inClause})
+          ${estoqueFilialFilter}
+        GROUP BY LTRIM(RTRIM(ISNULL(e.PRODUTO, ''))), LTRIM(RTRIM(ISNULL(e.COR_PRODUTO, ''))), e.FILIAL
+      `;
+      const res = await request.query<Row>(query);
+      for (const r of res.recordset) raw.push(r);
+    });
+  }
+
+  const byProduto = loteIndexByProduto(raw);
+  for (const item of norm) {
+    const rows = (byProduto.get(item.produto) ?? []).filter((r) => loteCorMatches(r.cor, item.reqCorNorm, item.reqCorNum));
+    const byFilialEstoque = new Map<string, number>();
+    for (const r of rows) {
+      const estoque = Math.max(0, Number(r.positiveStock ?? 0)); // negativos nunca contam
+      byFilialEstoque.set(r.filial, (byFilialEstoque.get(r.filial) ?? 0) + estoque);
+    }
+    const result = Array.from(byFilialEstoque.entries())
+      .map(([f, e]) => ({ filial: f, estoque: Math.round(e) }))
+      .sort((a, b) => a.filial.localeCompare(b.filial));
+    out.set(item.key, result);
+  }
+  return out;
+}
+
+/**
+ * Vendas/disponibilidade por filial em LOTE (espelha fetchVendasProdutoPorFilial).
+ * Retorna Map<itemKey, {rows, resumoDisponibilidade}> idêntico ao per-item.
+ */
+export async function fetchVendasProdutoPorFilialLote({
+  company,
+  filial,
+  includeHistoricoRows = false,
+  itens,
+}: {
+  company?: string;
+  filial?: string | null;
+  includeHistoricoRows?: boolean;
+  itens: Array<{ produto: string; corProduto?: string | null }>;
+}): Promise<Map<string, ReturnType<typeof computeDisponibilidade>>> {
+  const out = new Map<string, ReturnType<typeof computeDisponibilidade>>();
+  const norm = loteNormalizeItens(itens);
+  if (norm.length === 0) return out;
+  const produtos = Array.from(new Set(norm.map((n) => n.produto)));
+  const filialSel = filial ?? null;
+
+  const now = new Date();
+  const fimPeriodo = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+  const inicio12m = new Date(fimPeriodo);
+  inicio12m.setDate(inicio12m.getDate() - 365);
+  const inicio60d = new Date(fimPeriodo);
+  inicio60d.setDate(inicio60d.getDate() - 60);
+  const inicioMesAtual = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+
+  // mergeScarfmeEcommerce: mesma decisão da query single (filtro válido e não-vazio).
+  let mergeScarfmeEcommerce = false;
+  if (company === 'scarfme') {
+    await withRequest(async (request) => {
+      const f = await buildScarfmeEcommerceFaturamentoFilialFilter(request, filialSel, 'vfEcFil');
+      mergeScarfmeEcommerce = f !== '' && !f.includes('1=0');
+    });
+  }
+
+  // Runner: roda `build(request, inClause)` uma vez por chunk de produtos, acumulando as linhas.
+  async function collect<T>(build: (request: sql.Request | RequestLike, inClause: string) => Promise<string>): Promise<T[]> {
+    const acc: T[] = [];
+    for (const chunk of loteChunk(produtos, LOTE_PRODUTO_CHUNK)) {
+      await withRequest(async (request) => {
+        request.input('vf_inicio12m', sql.DateTime, inicio12m);
+        request.input('vf_fim', sql.DateTime, fimPeriodo);
+        request.input('vf_inicio60d', sql.DateTime, inicio60d);
+        request.input('vf_inicioMesAtual', sql.DateTime, inicioMesAtual);
+        const inClause = chunk.map((_, i) => `@vfp${i}`).join(',');
+        chunk.forEach((p, i) => request.input(`vfp${i}`, sql.VarChar, p));
+        const q = await build(request, inClause);
+        const res = await request.query<T>(q);
+        for (const r of res.recordset) acc.push(r);
+      });
+    }
+    return acc;
+  }
+
+  type VarejoRow = { produto: string; cor: string | null; filial: string; qtde12m: number; qtde60d: number; valor12m: number | null; custoUnitario: number | null; ultimaVenda: Date | null };
+  type MesRow = { produto: string; cor: string | null; filial: string; qtdeMesAtual: number | null };
+  type PVRow = { produto: string; cor: string | null; filial: string; primeiraVendaFilial: Date | null };
+  type PERow = { produto: string; cor: string | null; filial: string; primeiraEntradaFilial: Date | null };
+  type EstRow = { produto: string; cor: string | null; filial: string; positiveStock: number | null; negativeStock: number | null; positiveCount: number | null };
+  type DailyRow = { produto: string; cor: string | null; d: Date; filial: string; qty: number | null };
+  type CadRow = { produto: string; custoUnitario: number | null };
+
+  // ── Cadastro (custo por produto) ──
+  const cadastroRaw = await collect<CadRow>(async (_request, inClause) => `
+    SELECT LTRIM(RTRIM(ISNULL(PRODUTO, ''))) AS produto, MAX(ISNULL(CUSTO_REPOSICAO1, 0)) AS custoUnitario
+    FROM PRODUTOS WITH (NOLOCK)
+    WHERE LTRIM(RTRIM(ISNULL(PRODUTO, ''))) IN (${inClause})
+    GROUP BY LTRIM(RTRIM(ISNULL(PRODUTO, '')))
+  `);
+  const custoByProduto = new Map<string, number>();
+  for (const r of cadastroRaw) custoByProduto.set((r.produto ?? '').trim(), Number(r.custoUnitario ?? 0));
+
+  // ── Varejo 12m/60d ──
+  const varejoRaw = await collect<VarejoRow>(async (request, inClause) => {
+    const vendasFilialFilter = await buildVendasFilialFilter(request, company, filialSel, 'vf');
+    return `
+      SELECT
+        LTRIM(RTRIM(ISNULL(vf.PRODUTO, ''))) AS produto,
+        LTRIM(RTRIM(ISNULL(vf.COR_PRODUTO, ''))) AS cor,
+        vf.FILIAL AS filial,
+        SUM(CASE WHEN vf.QTDE_CANCELADA = 0 THEN vf.QTDE ELSE 0 END) AS qtde12m,
+        SUM(CASE WHEN vf.QTDE_CANCELADA = 0 AND vf.DATA_VENDA >= @vf_inicio60d THEN vf.QTDE ELSE 0 END) AS qtde60d,
+        SUM(CASE WHEN vf.QTDE_CANCELADA = 0 THEN (ISNULL(vf.PRECO_LIQUIDO, 0) * vf.QTDE) - ISNULL(vf.DESCONTO_VENDA, 0) ELSE 0 END) AS valor12m,
+        MAX(ISNULL(p.CUSTO_REPOSICAO1, 0)) AS custoUnitario,
+        MAX(CASE WHEN vf.QTDE_CANCELADA = 0 THEN vf.DATA_VENDA ELSE NULL END) AS ultimaVenda
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vf WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON LTRIM(RTRIM(ISNULL(p.PRODUTO, ''))) = LTRIM(RTRIM(ISNULL(vf.PRODUTO, '')))
+      WHERE vf.DATA_VENDA >= @vf_inicio12m
+        AND vf.DATA_VENDA < @vf_fim
+        AND vf.QTDE > 0
+        AND LTRIM(RTRIM(ISNULL(vf.PRODUTO, ''))) IN (${inClause})
+        ${vendasFilialFilter}
+      GROUP BY LTRIM(RTRIM(ISNULL(vf.PRODUTO, ''))), LTRIM(RTRIM(ISNULL(vf.COR_PRODUTO, ''))), vf.FILIAL
+    `;
   });
+
+  const ecommerceRaw = mergeScarfmeEcommerce
+    ? await collect<VarejoRow>(async (request, inClause) => {
+        const ecommerceFatFilialFilter = await buildScarfmeEcommerceFaturamentoFilialFilter(request, filialSel, 'vfEcFil');
+        return `
+          SELECT
+            LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) AS produto,
+            LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))) AS cor,
+            f.FILIAL AS filial,
+            SUM(CAST(fp.QTDE AS FLOAT)) AS qtde12m,
+            SUM(CASE WHEN f.EMISSAO >= @vf_inicio60d THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS qtde60d,
+            SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS valor12m,
+            MAX(ISNULL(p.CUSTO_REPOSICAO1, 0)) AS custoUnitario,
+            MAX(CASE WHEN f.NOTA_CANCELADA = 0 THEN f.EMISSAO ELSE NULL END) AS ultimaVenda
+          FROM FATURAMENTO f WITH (NOLOCK)
+          JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+            ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+          LEFT JOIN PRODUTOS p WITH (NOLOCK) ON LTRIM(RTRIM(ISNULL(p.PRODUTO, ''))) = LTRIM(RTRIM(ISNULL(fp.PRODUTO, '')))
+          WHERE f.EMISSAO >= @vf_inicio12m
+            AND f.EMISSAO < @vf_fim
+            AND f.NOTA_CANCELADA = 0
+            AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+            AND CAST(fp.QTDE AS FLOAT) > 0
+            AND LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) IN (${inClause})
+            ${ecommerceFatFilialFilter}
+          GROUP BY LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))), LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))), f.FILIAL
+        `;
+      })
+    : [];
+
+  // ── Mês atual ──
+  const varejoMesRaw = await collect<MesRow>(async (request, inClause) => {
+    const vendasFilialFilter = await buildVendasFilialFilter(request, company, filialSel, 'vf');
+    return `
+      SELECT
+        LTRIM(RTRIM(ISNULL(vf.PRODUTO, ''))) AS produto,
+        LTRIM(RTRIM(ISNULL(vf.COR_PRODUTO, ''))) AS cor,
+        vf.FILIAL AS filial,
+        SUM(CASE WHEN vf.QTDE_CANCELADA = 0 THEN vf.QTDE ELSE 0 END) AS qtdeMesAtual
+      FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vf WITH (NOLOCK)
+      WHERE vf.DATA_VENDA >= @vf_inicioMesAtual
+        AND vf.DATA_VENDA < @vf_fim
+        AND vf.QTDE > 0
+        AND LTRIM(RTRIM(ISNULL(vf.PRODUTO, ''))) IN (${inClause})
+        ${vendasFilialFilter}
+      GROUP BY LTRIM(RTRIM(ISNULL(vf.PRODUTO, ''))), LTRIM(RTRIM(ISNULL(vf.COR_PRODUTO, ''))), vf.FILIAL
+    `;
+  });
+
+  const ecommerceMesRaw = mergeScarfmeEcommerce
+    ? await collect<MesRow>(async (request, inClause) => {
+        const ecommerceFatFilialFilter = await buildScarfmeEcommerceFaturamentoFilialFilter(request, filialSel, 'vfEcFil');
+        return `
+          SELECT
+            LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) AS produto,
+            LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))) AS cor,
+            f.FILIAL AS filial,
+            SUM(CAST(fp.QTDE AS FLOAT)) AS qtdeMesAtual
+          FROM FATURAMENTO f WITH (NOLOCK)
+          JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+            ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+          WHERE f.EMISSAO >= @vf_inicioMesAtual
+            AND f.EMISSAO < @vf_fim
+            AND f.NOTA_CANCELADA = 0
+            AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+            AND CAST(fp.QTDE AS FLOAT) > 0
+            AND LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) IN (${inClause})
+            ${ecommerceFatFilialFilter}
+          GROUP BY LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))), LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))), f.FILIAL
+        `;
+      })
+    : [];
+
+  // ── Histórico (1ª venda / 1ª entrada) ──
+  const primeiraVendaRaw = includeHistoricoRows
+    ? await collect<PVRow>(async (request, inClause) => {
+        const vendasFilialFilter = await buildVendasFilialFilter(request, company, filialSel, 'vf');
+        const ecommerceFatFilialFilter = mergeScarfmeEcommerce
+          ? await buildScarfmeEcommerceFaturamentoFilialFilter(request, filialSel, 'vfEcFil')
+          : '';
+        return `
+          SELECT produto, cor, filial, MIN(primeiraVendaFilial) AS primeiraVendaFilial
+          FROM (
+            SELECT
+              LTRIM(RTRIM(ISNULL(vf.PRODUTO, ''))) AS produto,
+              LTRIM(RTRIM(ISNULL(vf.COR_PRODUTO, ''))) AS cor,
+              vf.FILIAL AS filial,
+              vf.DATA_VENDA AS primeiraVendaFilial
+            FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vf WITH (NOLOCK)
+            WHERE vf.DATA_VENDA < @vf_fim
+              AND vf.QTDE > 0
+              AND vf.QTDE_CANCELADA = 0
+              AND LTRIM(RTRIM(ISNULL(vf.PRODUTO, ''))) IN (${inClause})
+              ${vendasFilialFilter}
+            ${mergeScarfmeEcommerce ? `
+            UNION ALL
+            SELECT
+              LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) AS produto,
+              LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))) AS cor,
+              f.FILIAL AS filial,
+              f.EMISSAO AS primeiraVendaFilial
+            FROM FATURAMENTO f WITH (NOLOCK)
+            JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+              ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+            WHERE f.EMISSAO < @vf_fim
+              AND f.NOTA_CANCELADA = 0
+              AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+              AND CAST(fp.QTDE AS FLOAT) > 0
+              AND LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) IN (${inClause})
+              ${ecommerceFatFilialFilter}
+            ` : ''}
+          ) vendas_historicas
+          GROUP BY produto, cor, filial
+        `;
+      })
+    : [];
+
+  const primeiraEntradaRaw = includeHistoricoRows
+    ? await collect<PERow>(async (request, inClause) => {
+        const entradaEstoqueFilialFilter = await buildEntradaFilialFilter(request, company, filialSel, 'E', 'entradaEstoqueFilial');
+        const entradaLojaFilialFilter = await buildEntradaFilialFilter(request, company, filialSel, 'LE', 'entradaLojaFilial');
+        return `
+          SELECT produto, cor, filial, MIN(primeiraEntradaFilial) AS primeiraEntradaFilial
+          FROM (
+            SELECT
+              LTRIM(RTRIM(ISNULL(P.PRODUTO, ''))) AS produto,
+              LTRIM(RTRIM(ISNULL(P.COR_PRODUTO, ''))) AS cor,
+              E.FILIAL AS filial,
+              E.EMISSAO AS primeiraEntradaFilial
+            FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+            JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK)
+              ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+              AND E.FILIAL = P.FILIAL
+            WHERE P.PRODUTO IS NOT NULL
+              AND E.EMISSAO IS NOT NULL
+              AND LTRIM(RTRIM(ISNULL(P.PRODUTO, ''))) IN (${inClause})
+              ${entradaEstoqueFilialFilter}
+
+            UNION ALL
+
+            SELECT
+              LTRIM(RTRIM(ISNULL(LEP.PRODUTO, ''))) AS produto,
+              LTRIM(RTRIM(ISNULL(LEP.COR_PRODUTO, ''))) AS cor,
+              LE.FILIAL AS filial,
+              LE.EMISSAO AS primeiraEntradaFilial
+            FROM LOJA_ENTRADAS_PRODUTO AS LEP WITH (NOLOCK)
+            INNER JOIN LOJA_ENTRADAS AS LE WITH (NOLOCK)
+              ON LEP.FILIAL = LE.FILIAL
+              AND LEP.ROMANEIO_PRODUTO = LE.ROMANEIO_PRODUTO
+            WHERE LEP.PRODUTO IS NOT NULL
+              AND LE.EMISSAO IS NOT NULL
+              AND LTRIM(RTRIM(ISNULL(LEP.PRODUTO, ''))) IN (${inClause})
+              AND (LE.ENTRADA_CANCELADA = 0 OR LE.ENTRADA_CANCELADA IS NULL)
+              ${entradaLojaFilialFilter}
+          ) entradas
+          GROUP BY produto, cor, filial
+        `;
+      })
+    : [];
+
+  // ── Estoque atual (disponibilidade, prefixo EA) ──
+  const estoqueAtualRaw = await collect<EstRow>(async (request, inClause) => {
+    const estoqueDisponibilidadeFilialFilter = await buildFilialFilter(request, company, filialSel, 'EA');
+    return `
+      SELECT
+        LTRIM(RTRIM(ISNULL(EA.PRODUTO, ''))) AS produto,
+        LTRIM(RTRIM(ISNULL(EA.COR_PRODUTO, ''))) AS cor,
+        EA.FILIAL AS filial,
+        SUM(CASE WHEN EA.ESTOQUE > 0 THEN EA.ESTOQUE ELSE 0 END) AS positiveStock,
+        SUM(CASE WHEN EA.ESTOQUE < 0 THEN EA.ESTOQUE ELSE 0 END) AS negativeStock,
+        COUNT(CASE WHEN EA.ESTOQUE > 0 THEN 1 END) AS positiveCount
+      FROM ESTOQUE_PRODUTOS EA WITH (NOLOCK)
+      WHERE LTRIM(RTRIM(ISNULL(EA.PRODUTO, ''))) IN (${inClause})
+        ${estoqueDisponibilidadeFilialFilter}
+      GROUP BY LTRIM(RTRIM(ISNULL(EA.PRODUTO, ''))), LTRIM(RTRIM(ISNULL(EA.COR_PRODUTO, ''))), EA.FILIAL
+    `;
+  });
+
+  // ── Movimentos diários ──
+  const entriesDailyRaw = await collect<DailyRow>(async (request, inClause) => {
+    const entradaEstoqueFilialFilter = await buildEntradaFilialFilter(request, company, filialSel, 'E', 'entradaEstoqueFilial');
+    const entradaLojaFilialFilter = await buildEntradaFilialFilter(request, company, filialSel, 'LE', 'entradaLojaFilial');
+    return `
+      SELECT
+        LTRIM(RTRIM(ISNULL(P.PRODUTO, ''))) AS produto,
+        LTRIM(RTRIM(ISNULL(P.COR_PRODUTO, ''))) AS cor,
+        CAST(E.EMISSAO AS DATE) AS d,
+        E.FILIAL AS filial,
+        SUM(ISNULL(P.QTDE, 0)) AS qty
+      FROM ESTOQUE_PROD_ENT AS E WITH (NOLOCK)
+      INNER JOIN ESTOQUE_PROD1_ENT AS P WITH (NOLOCK)
+        ON E.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+        AND E.FILIAL = P.FILIAL
+      WHERE LTRIM(RTRIM(ISNULL(P.PRODUTO, ''))) IN (${inClause})
+        AND E.EMISSAO >= @vf_inicio12m
+        AND E.EMISSAO < @vf_fim
+        ${entradaEstoqueFilialFilter}
+      GROUP BY LTRIM(RTRIM(ISNULL(P.PRODUTO, ''))), LTRIM(RTRIM(ISNULL(P.COR_PRODUTO, ''))), CAST(E.EMISSAO AS DATE), E.FILIAL
+
+      UNION ALL
+
+      SELECT
+        LTRIM(RTRIM(ISNULL(LEP.PRODUTO, ''))) AS produto,
+        LTRIM(RTRIM(ISNULL(LEP.COR_PRODUTO, ''))) AS cor,
+        CAST(LE.EMISSAO AS DATE) AS d,
+        LE.FILIAL AS filial,
+        SUM(ISNULL(LEP.QTDE_ENTRADA, 0)) AS qty
+      FROM LOJA_ENTRADAS_PRODUTO AS LEP WITH (NOLOCK)
+      INNER JOIN LOJA_ENTRADAS AS LE WITH (NOLOCK)
+        ON LEP.FILIAL = LE.FILIAL
+        AND LEP.ROMANEIO_PRODUTO = LE.ROMANEIO_PRODUTO
+      WHERE LTRIM(RTRIM(ISNULL(LEP.PRODUTO, ''))) IN (${inClause})
+        AND LE.EMISSAO >= @vf_inicio12m
+        AND LE.EMISSAO < @vf_fim
+        AND (LE.ENTRADA_CANCELADA = 0 OR LE.ENTRADA_CANCELADA IS NULL)
+        ${entradaLojaFilialFilter}
+      GROUP BY LTRIM(RTRIM(ISNULL(LEP.PRODUTO, ''))), LTRIM(RTRIM(ISNULL(LEP.COR_PRODUTO, ''))), CAST(LE.EMISSAO AS DATE), LE.FILIAL
+    `;
+  });
+
+  const exitsDailyRaw = await collect<DailyRow>(async (request, inClause) => {
+    const estoqueDisponibilidadeFilialFilter = await buildFilialFilter(request, company, filialSel, 'EA');
+    const saidaEstoqueFilialFilter = estoqueDisponibilidadeFilialFilter.replace(/EA\./g, 'ES.');
+    return `
+      SELECT
+        LTRIM(RTRIM(ISNULL(P.PRODUTO, ''))) AS produto,
+        LTRIM(RTRIM(ISNULL(P.COR_PRODUTO, ''))) AS cor,
+        CAST(ES.EMISSAO AS DATE) AS d,
+        ES.FILIAL AS filial,
+        SUM(ISNULL(P.QTDE, 0)) AS qty
+      FROM ESTOQUE_PROD_SAI AS ES WITH (NOLOCK)
+      INNER JOIN ESTOQUE_PROD1_SAI AS P WITH (NOLOCK)
+        ON ES.ROMANEIO_PRODUTO = P.ROMANEIO_PRODUTO
+      WHERE LTRIM(RTRIM(ISNULL(P.PRODUTO, ''))) IN (${inClause})
+        AND ES.EMISSAO >= @vf_inicio12m
+        AND ES.EMISSAO < @vf_fim
+        ${saidaEstoqueFilialFilter}
+      GROUP BY LTRIM(RTRIM(ISNULL(P.PRODUTO, ''))), LTRIM(RTRIM(ISNULL(P.COR_PRODUTO, ''))), CAST(ES.EMISSAO AS DATE), ES.FILIAL
+    `;
+  });
+
+  const retailSalesDailyRaw = await collect<DailyRow>(async (request, inClause) => {
+    const vendasFilialFilter = await buildVendasFilialFilter(request, company, filialSel, 'vf');
+    return `
+      WITH vendas_base AS (
+        SELECT
+          vf.*,
+          CASE WHEN vf.QTDE_CANCELADA > 0 THEN 0 ELSE vf.QTDE END AS totalQtdeVenda
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vf WITH (NOLOCK)
+        WHERE LTRIM(RTRIM(ISNULL(vf.PRODUTO, ''))) IN (${inClause})
+          AND vf.DATA_VENDA >= @vf_inicio12m
+          AND vf.DATA_VENDA < @vf_fim
+          AND vf.QTDE > 0
+          ${vendasFilialFilter}
+      ),
+      trocas_item AS (
+        SELECT
+          TICKET,
+          CODIGO_FILIAL,
+          PRODUTO,
+          COR_PRODUTO,
+          TAMANHO,
+          SUM(QTDE) AS qtdeTroca
+        FROM LOJA_VENDA_TROCA WITH (NOLOCK)
+        WHERE QTDE_CANCELADA = 0
+        GROUP BY TICKET, CODIGO_FILIAL, PRODUTO, COR_PRODUTO, TAMANHO
+      )
+      SELECT
+        LTRIM(RTRIM(ISNULL(vb.PRODUTO, ''))) AS produto,
+        LTRIM(RTRIM(ISNULL(vb.COR_PRODUTO, ''))) AS cor,
+        CAST(vb.DATA_VENDA AS DATE) AS d,
+        vb.FILIAL AS filial,
+        SUM(vb.totalQtdeVenda - ISNULL(ti.qtdeTroca, 0)) AS qty
+      FROM vendas_base vb
+      LEFT JOIN trocas_item ti
+        ON ti.TICKET = vb.TICKET
+        AND ti.CODIGO_FILIAL = vb.CODIGO_FILIAL
+        AND ti.PRODUTO = vb.PRODUTO
+        AND ISNULL(ti.COR_PRODUTO, '') = ISNULL(vb.COR_PRODUTO, '')
+        AND ISNULL(ti.TAMANHO, 0) = ISNULL(vb.TAMANHO, 0)
+      GROUP BY LTRIM(RTRIM(ISNULL(vb.PRODUTO, ''))), LTRIM(RTRIM(ISNULL(vb.COR_PRODUTO, ''))), CAST(vb.DATA_VENDA AS DATE), vb.FILIAL
+    `;
+  });
+
+  const ecommerceSalesDailyRaw = mergeScarfmeEcommerce
+    ? await collect<DailyRow>(async (request, inClause) => {
+        const ecommerceFatFilialFilter = await buildScarfmeEcommerceFaturamentoFilialFilter(request, filialSel, 'vfEcFil');
+        return `
+          SELECT
+            LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) AS produto,
+            LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))) AS cor,
+            CAST(f.EMISSAO AS DATE) AS d,
+            f.FILIAL AS filial,
+            SUM(CAST(fp.QTDE AS FLOAT)) AS qty
+          FROM FATURAMENTO f WITH (NOLOCK)
+          JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+            ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+          WHERE LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) IN (${inClause})
+            AND f.EMISSAO >= @vf_inicio12m
+            AND f.EMISSAO < @vf_fim
+            AND f.NOTA_CANCELADA = 0
+            AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+            AND CAST(fp.QTDE AS FLOAT) > 0
+            ${ecommerceFatFilialFilter}
+          GROUP BY LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))), LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))), CAST(f.EMISSAO AS DATE), f.FILIAL
+        `;
+      })
+    : [];
+
+  // ── Índices por produto p/ partição rápida ──
+  const idxVarejo = loteIndexByProduto(varejoRaw);
+  const idxEcommerce = loteIndexByProduto(ecommerceRaw);
+  const idxVarejoMes = loteIndexByProduto(varejoMesRaw);
+  const idxEcommerceMes = loteIndexByProduto(ecommerceMesRaw);
+  const idxPV = loteIndexByProduto(primeiraVendaRaw);
+  const idxPE = loteIndexByProduto(primeiraEntradaRaw);
+  const idxEstoque = loteIndexByProduto(estoqueAtualRaw);
+  const idxEntries = loteIndexByProduto(entriesDailyRaw);
+  const idxExits = loteIndexByProduto(exitsDailyRaw);
+  const idxRetail = loteIndexByProduto(retailSalesDailyRaw);
+  const idxEcomDaily = loteIndexByProduto(ecommerceSalesDailyRaw);
+
+  // Agrega linhas de venda (varejo/ecommerce) por filial: soma qtd/valor, MAX custo/última venda.
+  const aggVendaPorFilial = (rows: VarejoRow[]) => {
+    const m = new Map<string, ByFilialAgg & { _seed: true }>();
+    for (const r of rows) {
+      const uv = r.ultimaVenda ? new Date(r.ultimaVenda) : null;
+      const ex = m.get(r.filial);
+      if (ex) {
+        ex.qtde12m += Number(r.qtde12m ?? 0);
+        ex.qtde60d += Number(r.qtde60d ?? 0);
+        ex.valor12m += Number(r.valor12m ?? 0);
+        ex.custoUnitario = Math.max(ex.custoUnitario, Number(r.custoUnitario ?? 0));
+        if (uv && (!ex.ultimaVenda || uv > ex.ultimaVenda)) ex.ultimaVenda = uv;
+      } else {
+        m.set(r.filial, {
+          filial: r.filial,
+          qtde12m: Number(r.qtde12m ?? 0),
+          qtde60d: Number(r.qtde60d ?? 0),
+          qtdeMesAtual: 0,
+          valor12m: Number(r.valor12m ?? 0),
+          custoUnitario: Number(r.custoUnitario ?? 0),
+          ultimaVenda: uv,
+          primeiraEntradaFilial: null,
+          primeiraVendaFilial: null,
+          _seed: true,
+        });
+      }
+    }
+    return Array.from(m.values()).map((v) => ({
+      filial: v.filial,
+      qtde12m: v.qtde12m,
+      qtde60d: v.qtde60d,
+      valor12m: v.valor12m,
+      custoUnitario: v.custoUnitario,
+      ultimaVenda: v.ultimaVenda,
+    }));
+  };
+
+  const aggMesPorFilial = (rows: MesRow[]) => {
+    const m = new Map<string, number>();
+    for (const r of rows) m.set(r.filial, (m.get(r.filial) ?? 0) + Number(r.qtdeMesAtual ?? 0));
+    return Array.from(m.entries()).map(([filial, qtdeMesAtual]) => ({ filial, qtdeMesAtual }));
+  };
+
+  const aggDateMinPorFilial = <K extends string>(rows: Array<{ filial: string } & Record<K, Date | null>>, field: K) => {
+    const m = new Map<string, Date | null>();
+    for (const r of rows) {
+      const v = (r[field] as Date | null) ? new Date(r[field] as Date) : null;
+      if (!v) continue;
+      const ex = m.get(r.filial);
+      if (ex == null || v < ex) m.set(r.filial, v);
+    }
+    return Array.from(m.entries()).map(([filial, d]) => ({ filial, [field]: d } as { filial: string } & Record<K, Date | null>));
+  };
+
+  const aggEstoquePorFilial = (rows: EstRow[]) => {
+    const m = new Map<string, { positiveStock: number; negativeStock: number; positiveCount: number }>();
+    for (const r of rows) {
+      const ex = m.get(r.filial) ?? { positiveStock: 0, negativeStock: 0, positiveCount: 0 };
+      ex.positiveStock += Number(r.positiveStock ?? 0);
+      ex.negativeStock += Number(r.negativeStock ?? 0);
+      ex.positiveCount += Number(r.positiveCount ?? 0);
+      m.set(r.filial, ex);
+    }
+    return Array.from(m.entries()).map(([filial, v]) => ({ filial, ...v }));
+  };
+
+  // Replica EXATAMENTE o folding de byFilial de fetchVendasProdutoPorFilial.
+  const foldByFilial = (
+    varejo: ReturnType<typeof aggVendaPorFilial>,
+    ecommerce: ReturnType<typeof aggVendaPorFilial>,
+    varejoMes: ReturnType<typeof aggMesPorFilial>,
+    ecommerceMes: ReturnType<typeof aggMesPorFilial>,
+    primeiraVenda: Array<{ filial: string; primeiraVendaFilial: Date | null }>,
+    primeiraEntrada: Array<{ filial: string; primeiraEntradaFilial: Date | null }>,
+    produtoCustoUnitario: number,
+  ): Map<string, ByFilialAgg> => {
+    const byFilial = new Map<string, ByFilialAgg>();
+    for (const r of varejo) {
+      byFilial.set(r.filial, {
+        filial: r.filial,
+        qtde12m: Math.round(Number(r.qtde12m ?? 0)),
+        qtde60d: Math.round(Number(r.qtde60d ?? 0)),
+        qtdeMesAtual: 0,
+        valor12m: Number(r.valor12m ?? 0),
+        custoUnitario: Number(r.custoUnitario ?? 0) || produtoCustoUnitario,
+        ultimaVenda: r.ultimaVenda ? new Date(r.ultimaVenda) : null,
+        primeiraEntradaFilial: null,
+        primeiraVendaFilial: null,
+      });
+    }
+    if (mergeScarfmeEcommerce) {
+      for (const r of ecommerce) {
+        const q12 = Math.round(Number(r.qtde12m ?? 0));
+        const q60 = Math.round(Number(r.qtde60d ?? 0));
+        const val = Number(r.valor12m ?? 0);
+        const custo = Number(r.custoUnitario ?? 0);
+        const ecUltimaVenda = r.ultimaVenda ? new Date(r.ultimaVenda) : null;
+        const ex = byFilial.get(r.filial);
+        if (ex) {
+          ex.qtde12m += q12;
+          ex.qtde60d += q60;
+          ex.valor12m += val;
+          ex.custoUnitario = Math.max(ex.custoUnitario, custo || produtoCustoUnitario);
+          if (ecUltimaVenda && (!ex.ultimaVenda || ecUltimaVenda > ex.ultimaVenda)) {
+            ex.ultimaVenda = ecUltimaVenda;
+          }
+        } else {
+          byFilial.set(r.filial, { filial: r.filial, qtde12m: q12, qtde60d: q60, qtdeMesAtual: 0, valor12m: val, custoUnitario: custo || produtoCustoUnitario, ultimaVenda: ecUltimaVenda, primeiraEntradaFilial: null, primeiraVendaFilial: null });
+        }
+      }
+    }
+    for (const r of varejoMes) {
+      const qMes = Math.round(Number(r.qtdeMesAtual ?? 0));
+      const ex = byFilial.get(r.filial);
+      if (ex) {
+        ex.qtdeMesAtual = qMes;
+      } else {
+        byFilial.set(r.filial, { filial: r.filial, qtde12m: 0, qtde60d: 0, qtdeMesAtual: qMes, valor12m: 0, custoUnitario: produtoCustoUnitario, ultimaVenda: null, primeiraEntradaFilial: null, primeiraVendaFilial: null });
+      }
+    }
+    if (mergeScarfmeEcommerce) {
+      for (const r of ecommerceMes) {
+        const qMes = Math.round(Number(r.qtdeMesAtual ?? 0));
+        const ex = byFilial.get(r.filial);
+        if (ex) {
+          ex.qtdeMesAtual += qMes;
+        } else {
+          byFilial.set(r.filial, { filial: r.filial, qtde12m: 0, qtde60d: 0, qtdeMesAtual: qMes, valor12m: 0, custoUnitario: produtoCustoUnitario, ultimaVenda: null, primeiraEntradaFilial: null, primeiraVendaFilial: null });
+        }
+      }
+    }
+    if (includeHistoricoRows) {
+      for (const r of primeiraVenda) {
+        const primeiraVendaFilial = r.primeiraVendaFilial ? new Date(r.primeiraVendaFilial) : null;
+        const ex = byFilial.get(r.filial);
+        if (ex) {
+          ex.primeiraVendaFilial =
+            primeiraVendaFilial && (!ex.primeiraVendaFilial || primeiraVendaFilial < ex.primeiraVendaFilial)
+              ? primeiraVendaFilial
+              : ex.primeiraVendaFilial;
+        } else {
+          byFilial.set(r.filial, { filial: r.filial, qtde12m: 0, qtde60d: 0, qtdeMesAtual: 0, valor12m: 0, custoUnitario: produtoCustoUnitario, ultimaVenda: null, primeiraEntradaFilial: null, primeiraVendaFilial });
+        }
+      }
+      for (const r of primeiraEntrada) {
+        const primeiraEntradaFilial = r.primeiraEntradaFilial ? new Date(r.primeiraEntradaFilial) : null;
+        const ex = byFilial.get(r.filial);
+        if (ex) {
+          ex.primeiraEntradaFilial =
+            primeiraEntradaFilial && (!ex.primeiraEntradaFilial || primeiraEntradaFilial < ex.primeiraEntradaFilial)
+              ? primeiraEntradaFilial
+              : ex.primeiraEntradaFilial;
+        } else {
+          byFilial.set(r.filial, { filial: r.filial, qtde12m: 0, qtde60d: 0, qtdeMesAtual: 0, valor12m: 0, custoUnitario: produtoCustoUnitario, ultimaVenda: null, primeiraEntradaFilial, primeiraVendaFilial: null });
+        }
+      }
+    }
+    return byFilial;
+  };
+
+  for (const item of norm) {
+    const p = item.produto;
+    const match = <T extends { cor: string | null }>(rows: T[] | undefined) =>
+      (rows ?? []).filter((r) => loteCorMatches(r.cor, item.reqCorNorm, item.reqCorNum));
+    const produtoCustoUnitario = custoByProduto.get(p) ?? 0;
+
+    const byFilial = foldByFilial(
+      aggVendaPorFilial(match(idxVarejo.get(p))),
+      aggVendaPorFilial(match(idxEcommerce.get(p))),
+      aggMesPorFilial(match(idxVarejoMes.get(p))),
+      aggMesPorFilial(match(idxEcommerceMes.get(p))),
+      aggDateMinPorFilial(match(idxPV.get(p)), 'primeiraVendaFilial'),
+      aggDateMinPorFilial(match(idxPE.get(p)), 'primeiraEntradaFilial'),
+      produtoCustoUnitario,
+    );
+
+    const result = computeDisponibilidade({
+      byFilial,
+      estoqueAtual: aggEstoquePorFilial(match(idxEstoque.get(p))),
+      entriesDaily: match(idxEntries.get(p)).map((r) => ({ d: r.d, filial: r.filial, qty: r.qty })),
+      exitsDaily: match(idxExits.get(p)).map((r) => ({ d: r.d, filial: r.filial, qty: r.qty })),
+      retailSalesDaily: match(idxRetail.get(p)).map((r) => ({ d: r.d, filial: r.filial, qty: r.qty })),
+      ecommerceSalesDaily: match(idxEcomDaily.get(p)).map((r) => ({ d: r.d, filial: r.filial, qty: r.qty })),
+      produtoCustoUnitario,
+      filialSel,
+      inicio12m,
+      fimPeriodo,
+    });
+    out.set(item.key, result);
+  }
+
+  return out;
 }
 
 /**

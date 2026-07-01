@@ -60,7 +60,17 @@ Em produção (Vercel), defina `MCP_API_TOKEN` em Project → Settings → Envir
 | `produto_curva` | Curva ABC de um produto em **duas janelas**: últimos 12 meses e mês atual. Responde "é curva A nos 12m?" e "é curva A neste mês?" (independente). NERD e SCARF ME, escopo rede. |
 | `produtos_parados` | Produtos com estoque **sem venda há mais de N dias** (você escolhe `dias`: 90, 120, 180…). Filtros de filial/categoria. Ordenado por estoque (maior encalhe primeiro). |
 
-Padrão de uso pelo Claude: **descobrir** (`listar_filiais`, `listar_categorias`) → **filtrar** → **consultar** (`vendas`, `top_produtos`, `produto`, …). Para a ficha de um produto: `top_produtos` (acha o código) → `produto` (detalha).
+### Fase 5 — fiscal (NFs / faturamento)
+Lê o **módulo fiscal** do ERP (tabela `FATURAMENTO` + itens `W_FATURAMENTO_PROD_02` + `NATUREZAS_SAIDAS`), que é **outra fonte** que não `LOJA_VENDA`. É onde aparece o **faturamento da MATRIZ ScarfMe** (vendas corporativas / private / revenda) — que corretamente **não** aparece nas telas/tools de `vendas`. Lê **todas as filiais fiscais** por padrão (sem distinção).
+
+| Tool | O que faz |
+|------|-----------|
+| `notas_fiscais` | Lista as **NFs de saída** emitidas num período (por EMISSÃO; padrão = mês corrente) + **totais** (nº de NFs, valor, qtde). Cada NF: número, série, filial fiscal, cliente (NOME_CLIFOR), natureza de operação (código + descrição), emissão, valor, qtde, desconto, chave NFe, status, representante. Filtros: `empresa` (omitir = todas), `filial`, `naturezas`, `cliente`, `nf`, `produto` (NFs que contêm o item), `incluirCanceladas` (false), `incluirDevolucoes` (true). |
+| `nota_fiscal` | Detalhe de **UMA** NF: cabeçalho completo (cliente, natureza, valor, ICMS/IPI, chave NFe, transportadora, representante, condição de pgto) + **todos os itens** (produto, cor, coleção, qtde, preço, desconto, valor líquido, custo). Informe `nf` (+ `serie`/`filial` p/ desambiguar). |
+| `faturamento_resumo` | Agregados do faturamento fiscal: totais + quebras **por natureza**, **por filial**, **por mês** e **por cliente** (top 50). Responde "quanto a matriz faturou no mês", "faturamento por natureza". Mesmos filtros de `notas_fiscais`. |
+| `listar_naturezas` | Dimensões p/ filtros: **filiais fiscais** que emitiram NF (12m, com EMPRESA e volume) + **naturezas de operação** ativas (código + descrição). |
+
+Padrão de uso pelo Claude: **descobrir** (`listar_filiais`, `listar_categorias`, `listar_naturezas`) → **filtrar** → **consultar** (`vendas`, `top_produtos`, `produto`, `notas_fiscais`, …). Para a ficha de um produto: `top_produtos` (acha o código) → `produto` (detalha). Para o fiscal: `listar_naturezas` → `notas_fiscais`/`faturamento_resumo` → `nota_fiscal` (abre uma).
 
 ### Cobertura das perguntas típicas
 | Pergunta | Tool |
@@ -93,8 +103,13 @@ Padrão de uso pelo Claude: **descobrir** (`listar_filiais`, `listar_categorias`
 | "é curva A nos 12 meses? e neste mês?" | `produto_curva` (NERD + SCARF ME) |
 | "qual produto está parado há mais de X dias?" | `produtos_parados` (`dias` configurável) |
 | "tabela/ranking ABC geral" (SCARF ME) | `curva_abc` |
+| "quais NFs foram emitidas no mês" / "todas as notas de saída" | `notas_fiscais` |
+| "quanto a matriz ScarfMe faturou no mês" (corporativo/private/revenda) | `faturamento_resumo` (ou `notas_fiscais` → `totais`) |
+| "faturamento por natureza de operação" / "quais clientes mais compraram da matriz" | `faturamento_resumo` (`porNatureza` / `porCliente`) |
+| "abrir a NF X" / "itens da nota Y" / "chave NFe da nota" | `nota_fiscal` |
+| "quais naturezas / filiais fiscais existem" | `listar_naturezas` |
 
-> Notas: (1) `top_produtos` usa janelas fixas (12m/60d/mês) **+ sugestão de compra**; para período arbitrário use `produtos_vendidos`. (2) `curva_abc` (tabela ABC completa) é SCARF ME apenas; `produto_curva` (curva de 1 produto) atende ambas as empresas. (3) `compras_transito` reflete o cadastro manual do dashboard, não pedidos do ERP.
+> Notas: (1) `top_produtos` usa janelas fixas (12m/60d/mês) **+ sugestão de compra**; para período arbitrário use `produtos_vendidos`. (2) `curva_abc` (tabela ABC completa) é SCARF ME apenas; `produto_curva` (curva de 1 produto) atende ambas as empresas. (3) `compras_transito` reflete o cadastro manual do dashboard, não pedidos do ERP. (4) **Fiscal** (`notas_fiscais`/`nota_fiscal`/`faturamento_resumo`) lê `FATURAMENTO` — fonte diferente de `vendas` (`LOJA_VENDA`); os números **não batem** com as tools de vendas de propósito (o fiscal inclui a matriz e naturezas não-varejo). Vendas de loja = `vendas`; NFs / faturamento da matriz = fiscal.
 
 ## Como conectar
 

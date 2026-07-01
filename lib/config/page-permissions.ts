@@ -18,6 +18,7 @@ export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "relatorio-claude", label: "Relatorio Claude", routeSegments: ["relatorio-claude"] },
   { key: "vendedores", label: "Vendedores", routeSegments: ["vendedores"] },
   { key: "clientes", label: "Clientes", routeSegments: ["clientes"] },
+  { key: "faturamento", label: "Faturamento / NFs", routeSegments: ["faturamento"] },
   { key: "controle-estoque", label: "Controle de Estoque", routeSegments: ["controle-estoque"] },
   { key: "estoque-consulta", label: "Estoque Consulta", routeSegments: ["estoque-consulta"] },
   { key: "controle-giro", label: "Controle de Giro", routeSegments: ["controle-giro"] },

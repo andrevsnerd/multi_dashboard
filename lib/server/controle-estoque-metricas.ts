@@ -1,6 +1,8 @@
 import {
   fetchEstoqueProdutoPorFilial,
   fetchVendasProdutoPorFilial,
+  fetchEstoqueProdutoPorFilialLote,
+  fetchVendasProdutoPorFilialLote,
 } from "@/lib/repositories/controleEstoque";
 import {
   getActiveFilial,
@@ -124,31 +126,17 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-async function loadControleEstoqueItemMetricas(input: {
-  company?: string;
-  filial?: string | null;
-  includeHistorico?: boolean;
-  item: ControleEstoqueItemInput;
-}): Promise<ControleEstoqueItemMetricas> {
-  const produto = normalizeControleEstoqueItemValue(input.item.produto);
-  const corProduto = normalizeControleEstoqueItemValue(input.item.corProduto) || null;
-  const estoqueFilialScope = await resolveEstoqueFilialScope(input.company, input.filial ?? null);
-
-  const [estoquePorFilial, vendasPorFilialResult] = await Promise.all([
-    fetchEstoqueProdutoPorFilial({
-      company: input.company,
-      filial: estoqueFilialScope,
-      produto,
-      corProduto,
-    }),
-    fetchVendasProdutoPorFilial({
-      company: input.company,
-      filial: input.filial ?? null,
-      produto,
-      corProduto,
-      includeHistoricoRows: Boolean(input.includeHistorico),
-    }),
-  ]);
+/**
+ * Monta o ControleEstoqueItemMetricas a partir dos resultados de estoque + vendas/disponibilidade.
+ * Núcleo COMPARTILHADO entre o caminho per-item (loadControleEstoqueItemMetricas) e o caminho em
+ * lote (getControleEstoqueMetricasItensBatched) — garante montagem idêntica nos dois.
+ */
+function assembleControleEstoqueItemMetricas(
+  produto: string,
+  corProduto: string | null,
+  estoquePorFilial: Awaited<ReturnType<typeof fetchEstoqueProdutoPorFilial>>,
+  vendasPorFilialResult: Awaited<ReturnType<typeof fetchVendasProdutoPorFilial>>
+): ControleEstoqueItemMetricas {
   const vendasPorFilialRaw = vendasPorFilialResult.rows;
 
   const vendasPorFilial = vendasPorFilialRaw.map((row) => ({
@@ -206,6 +194,35 @@ async function loadControleEstoqueItemMetricas(input: {
   };
 }
 
+async function loadControleEstoqueItemMetricas(input: {
+  company?: string;
+  filial?: string | null;
+  includeHistorico?: boolean;
+  item: ControleEstoqueItemInput;
+}): Promise<ControleEstoqueItemMetricas> {
+  const produto = normalizeControleEstoqueItemValue(input.item.produto);
+  const corProduto = normalizeControleEstoqueItemValue(input.item.corProduto) || null;
+  const estoqueFilialScope = await resolveEstoqueFilialScope(input.company, input.filial ?? null);
+
+  const [estoquePorFilial, vendasPorFilialResult] = await Promise.all([
+    fetchEstoqueProdutoPorFilial({
+      company: input.company,
+      filial: estoqueFilialScope,
+      produto,
+      corProduto,
+    }),
+    fetchVendasProdutoPorFilial({
+      company: input.company,
+      filial: input.filial ?? null,
+      produto,
+      corProduto,
+      includeHistoricoRows: Boolean(input.includeHistorico),
+    }),
+  ]);
+
+  return assembleControleEstoqueItemMetricas(produto, corProduto, estoquePorFilial, vendasPorFilialResult);
+}
+
 export async function getControleEstoqueItemMetricas(input: {
   company?: string;
   filial?: string | null;
@@ -260,4 +277,52 @@ export async function getControleEstoqueMetricasItens(
   });
 
   return Object.fromEntries(results.filter((entry): entry is NonNullable<(typeof results)[number]> => entry != null));
+}
+
+/**
+ * Versão em LOTE de getControleEstoqueMetricasItens: em vez de ~10 queries POR ITEM (que no
+ * proxy derrubavam a conexão em relatórios grandes — ver memória
+ * compra-sugerida-abc-conexao-perdida-n1-proxy), faz uma varredura por chunk de produtos e
+ * monta cada item com o MESMO assembler/summarize → resultado idêntico ao per-item.
+ *
+ * Usar em telas/relatórios que pedem métricas de MUITOS itens de uma vez (ex.: Compra sugerida
+ * por Curva ABC). O caminho per-item continua para detalhe de 1 produto.
+ */
+export async function getControleEstoqueMetricasItensBatched(
+  input: ControleEstoqueMetricasItensPayload
+): Promise<Record<string, ControleEstoqueItemMetricas>> {
+  const itens = dedupeControleEstoqueItens(input.itens ?? []);
+  if (itens.length === 0) return {};
+
+  const estoqueFilialScope = await resolveEstoqueFilialScope(input.company, input.filial ?? null);
+  const itensInput = itens.map((item) => ({
+    produto: normalizeControleEstoqueItemValue(item.produto),
+    corProduto: normalizeControleEstoqueItemValue(item.corProduto) || null,
+  }));
+
+  const [estoqueMap, vendasMap] = await Promise.all([
+    fetchEstoqueProdutoPorFilialLote({
+      company: input.company,
+      filial: estoqueFilialScope,
+      itens: itensInput,
+    }),
+    fetchVendasProdutoPorFilialLote({
+      company: input.company,
+      filial: input.filial ?? null,
+      includeHistoricoRows: Boolean(input.includeHistorico),
+      itens: itensInput,
+    }),
+  ]);
+
+  const out: Record<string, ControleEstoqueItemMetricas> = {};
+  for (const item of itens) {
+    const produto = normalizeControleEstoqueItemValue(item.produto);
+    const corProduto = normalizeControleEstoqueItemValue(item.corProduto) || null;
+    const key = buildControleEstoqueItemKey(item.produto, item.corProduto);
+    const estoquePorFilial = estoqueMap.get(key) ?? [];
+    const vendasPorFilialResult = vendasMap.get(key);
+    if (!vendasPorFilialResult) continue; // sem dados de venda → item fica de fora (espelha o per-item que omite falhas)
+    out[key] = assembleControleEstoqueItemMetricas(produto, corProduto, estoquePorFilial, vendasPorFilialResult);
+  }
+  return out;
 }

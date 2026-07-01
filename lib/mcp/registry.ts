@@ -16,6 +16,7 @@ import { registerComprasTools } from './tools/compras';
 import { registerProdutosVendidosTools } from './tools/produtos-vendidos';
 import { registerProdutoCurvaTools } from './tools/produto-curva';
 import { registerProdutosParadosTools } from './tools/produtos-parados';
+import { registerFaturamentoTools } from './tools/faturamento';
 
 /**
  * Registra todas as tools do servidor MCP do multi-dashboard.
@@ -43,4 +44,5 @@ export function registerAllTools(server: McpServer) {
   registerProdutosVendidosTools(server);
   registerProdutoCurvaTools(server);
   registerProdutosParadosTools(server);
+  registerFaturamentoTools(server);
 }

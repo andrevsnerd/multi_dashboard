@@ -8,7 +8,7 @@ import {
 } from "@/lib/config/company";
 import { canonicalKey, ROW_COR_FIELD } from "@/lib/reports/keys";
 import { getMappedColorDescription } from "@/lib/utils/colorMapping";
-import { getControleEstoqueMetricasItens } from "@/lib/server/controle-estoque-metricas";
+import { getControleEstoqueMetricasItensBatched } from "@/lib/server/controle-estoque-metricas";
 import { buildControleEstoqueItemKey } from "@/lib/utils/controle-estoque-metricas";
 import {
   calcCompraIdealFromResumo,
@@ -207,7 +207,7 @@ export async function fetchCompraSugeridaAbc(
   ctx?.onProgress?.(0, orderedNames.length, "lojas");
   const [metricasPorFilial, transitIndex] = await Promise.all([
     mapWithConcurrency(orderedNames, FILIAL_CONCURRENCY, (name) =>
-      getControleEstoqueMetricasItens({
+      getControleEstoqueMetricasItensBatched({
         company: filters.company,
         filial: name,
         includeHistorico: true,
