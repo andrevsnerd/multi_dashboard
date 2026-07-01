@@ -40,6 +40,7 @@ interface FilialOption {
   displayName?: string;
   activeFilial?: string;
   aliases?: string[];
+  members?: string[];
 }
 
 interface RomaneiosPageProps {
@@ -103,6 +104,8 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
   const [deleteTarget, setDeleteTarget] = useState<RomaneioListItem | null>(null);
 
   const isAdmin = user?.role === "admin";
+  const isLogistica = user?.role === "logistica";
+  const podeVerFilialConsiderada = isAdmin || isLogistica;
 
   function handleDeleted(rom: RomaneioListItem) {
     const matches = (r: RomaneioListItem) =>
@@ -146,6 +149,45 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
     return Array.from(
       new Set(values.map((value) => (value || "").trim()).filter(Boolean))
     );
+  }
+
+  // Parte do nome que distingue esta filial das demais do mesmo grupo (rodízio).
+  // Ex.: E-COMMERCE pode ser "MSC COMERCIO DE LENCOS LT" ou "AKS ..." → "MSC"/"AKS".
+  // Só retorna algo quando o grupo tem >1 membro (há o que distinguir).
+  function getFilialConsideradaSigla(filialValue: string | null | undefined) {
+    const raw = (filialValue || "").trim();
+    if (!raw) return "";
+    const option = getFilialOption(raw);
+    const members = option?.members ?? [];
+    if (members.length <= 1) return "";
+
+    const norm = (s: string) => s.trim().toUpperCase();
+    const tokenize = (s: string) =>
+      s
+        .replace(/[-‐-―−]/g, " ")
+        .split(/\s+/)
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+    // O nome específico considerado: o membro que casa com o valor bruto salvo,
+    // ou o próprio valor bruto (preserva o histórico, mesmo se hoje o ativo é outro).
+    const rawKey = norm(raw);
+    const considerado =
+      members.find((m) => norm(m) === rawKey) || raw;
+
+    const rawTokens = tokenize(considerado);
+    const outrosTokens = new Set(
+      members
+        .filter((m) => norm(m) !== norm(considerado))
+        .flatMap(tokenize)
+        .map((t) => t.toUpperCase())
+    );
+    const unicos = rawTokens.filter((t) => !outrosTokens.has(t.toUpperCase()));
+    if (unicos.length === 0) return rawTokens[rawTokens.length - 1] || "";
+
+    // Preferir códigos curtos (MSC, AKS, CMS, LLL, FFF) quando existirem.
+    const curtos = unicos.filter((t) => t.length <= 4);
+    return (curtos.length > 0 ? curtos : unicos).join(" ");
   }
 
   function getDestinoFiltroValue(romaneio: RomaneioListItem) {
@@ -280,6 +322,10 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
             const isTransito = rom.tipo === "transito";
             const isTransitoLiberado = rom.tipo === "entrada" && rom.status === "Transito liberado";
             const destinoBadge = destinoEfetivo ? getFilialDisplayName(destinoEfetivo) : "-";
+            const filialConsideradaRaw = cleanDestinoValue(rom.filialDestino) || destinoEfetivo;
+            const filialConsideradaSigla = podeVerFilialConsiderada
+              ? getFilialConsideradaSigla(filialConsideradaRaw)
+              : "";
 
             const podeExcluir = isAdmin && !isTransito;
 
@@ -314,6 +360,14 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
                   <span className={`${styles.status} ${destinoEfetivo ? styles.statusConcluida : styles.statusVazio}`}>
                     {destinoBadge}
                   </span>
+                  {filialConsideradaSigla && (
+                    <span
+                      className={styles.filialConsiderada}
+                      title={`Filial considerada neste destino: ${getFilialDisplayName(filialConsideradaRaw)} · ${filialConsideradaRaw}`}
+                    >
+                      {filialConsideradaSigla}
+                    </span>
+                  )}
                   {isTransito ? (
                     <span className={`${styles.status} ${styles.statusTransito}`}>Em transito</span>
                   ) : isTransitoLiberado ? (

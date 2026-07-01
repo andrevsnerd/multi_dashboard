@@ -28,7 +28,41 @@ type FilialOption = {
   displayName: string;
   activeFilial: string;
   aliases: string[];
+  /** Nomes de todos os membros do grupo (>1 quando há rodízio; ex.: E-COMMERCE = MSC, AKS…). */
+  members: string[];
 };
+
+const normFilialKey = (s: string) =>
+  (s || '').trim().replace(/[‐-―−]/g, '-').replace(/\s+/g, ' ').toUpperCase();
+
+/**
+ * Retorna os nomes de todos os membros do grupo ao qual a filial ativa pertence.
+ * E-commerce é agrupado via ecommerceFilials; demais grupos via filialGroups.
+ * Filial sem grupo (rodízio) retorna apenas ela mesma.
+ */
+function getGroupMembers(
+  company: Awaited<ReturnType<typeof resolveCompanyDynamic>>,
+  activeFilial: string
+): string[] {
+  if (!company) return [activeFilial];
+  const activeKey = normFilialKey(activeFilial);
+
+  const ecommerce = company.ecommerceFilials ?? [];
+  if (ecommerce.some((f) => normFilialKey(f) === activeKey)) {
+    return [...new Set(ecommerce.map((f) => f.trim()))];
+  }
+
+  for (const [canonical, members] of Object.entries(company.filialGroups ?? {})) {
+    const inGroup =
+      normFilialKey(canonical) === activeKey ||
+      members.some((m) => normFilialKey(m) === activeKey);
+    if (inGroup) {
+      return [...new Set([canonical, ...members].map((m) => m.trim()))];
+    }
+  }
+
+  return [activeFilial.trim()];
+}
 
 function getFilialAliases(
   company: Awaited<ReturnType<typeof resolveCompanyDynamic>>,
@@ -79,6 +113,7 @@ function toFilialOption(
     displayName: getFilialLabelForDisplay(company, activeFilial),
     activeFilial,
     aliases: getFilialAliases(company, activeFilial),
+    members: getGroupMembers(company, activeFilial),
   };
 }
 

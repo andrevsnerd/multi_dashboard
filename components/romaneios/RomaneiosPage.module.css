@@ -203,6 +203,19 @@
   border: 1px solid #fdba74;
 }
 
+.filialConsiderada {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--t-gray600);
+  background: var(--s-gray100);
+  border: 1px dashed var(--t-gray400);
+  padding: 2px 8px;
+  border-radius: 9999px;
+  white-space: nowrap;
+  margin-left: -4px;
+}
+
 .badgeConfirmado {
   margin-left: auto;
   font-size: 11px;
