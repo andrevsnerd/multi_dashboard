@@ -132,6 +132,17 @@ pode sempre refinar na pergunta seguinte ("e só na Paulista?", "e em abril?").
 - "Detalha cada venda da PASHMINA OFF WHITE: data, filial, vendedor e desconto." *(venda a venda)*
 - "Top 20 clientes da SCARF ME por compras neste ano."
 
+### 📑 Relatórios completos (o que antes você exportava em planilha)
+- "Me dá o relatório de vendas por faturamento da coleção Pantanal Vivo 25, de janeiro a junho." *(traz Curva, Linha, Subgrupo, Grade, Custo, Markup, Estoque, Código de barra — tudo)*
+- "Agora o histórico de vendas dessa mesma coleção no mesmo período." *(venda a venda: data, filial, vendedor, custo na época)*
+- "Relatório completo de faturamento da linha PASHMINA este mês."
+- "Histórico de vendas do produto 07.A1.00B3 dos últimos 3 meses."
+
+> Essas duas trazem **todas as colunas** dos relatórios que você exportava em Excel
+> (vendas por faturamento e histórico de vendas). Se você já sabe o nome da coleção,
+> pode falar normal ("da coleção Pantanal Vivo 25") — o Claude descobre o código
+> sozinho perguntando as categorias disponíveis, se precisar.
+
 ### 🧭 Descoberta (quando não souber os nomes)
 - "Quais empresas e filiais existem?"
 - "Quais categorias (grupos/linhas) a SCARF ME tem?"
@@ -178,7 +189,7 @@ Você pode pedir coisas mais ricas e ele junta as ferramentas sozinho:
 
 Código e configurações:
 - ✅ Rota `/api/mcp` → [app/api/[transport]/route.ts](../app/api/[transport]/route.ts)
-- ✅ 19 tools registradas → [lib/mcp/registry.ts](../lib/mcp/registry.ts)
+- ✅ 21 tools registradas → [lib/mcp/registry.ts](../lib/mcp/registry.ts)
 - ✅ Token no `.env.local` → `MCP_API_TOKEN=scarfme2026`
 - ✅ Suporte a `?token=` na URL (sem OAuth, funciona no Claude.ai/Desktop)
 
