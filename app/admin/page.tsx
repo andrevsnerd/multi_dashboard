@@ -152,6 +152,11 @@ export default function AdminPage() {
   // Grupos de páginas recolhidos (vazio = todos expandidos)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
+  // Widget "copiar de outro usuário": null = fechado; "full" = novo usuário (copia tudo);
+  // "pages" = editar (copia só as páginas).
+  const [userPicker, setUserPicker] = useState<null | "full" | "pages">(null);
+  const [pickerSearch, setPickerSearch] = useState("");
+
   const authHeader = useCallback(
     (): Record<string, string> =>
       currentUser ? { "X-Auth-Username": currentUser.username } : {},
@@ -240,11 +245,15 @@ export default function AdminPage() {
     setEditingId(null);
     resetForm();
     setFormPermissions(["controle-transferencias"]);
+    setUserPicker(null);
+    setPickerSearch("");
     setModal("add");
   }
 
   function openEdit(u: UserRow) {
     setEditingId(u.id);
+    setUserPicker(null);
+    setPickerSearch("");
     setFormNome(u.nomeExibicao ?? "");
     setFormUsername(u.username);
     setFormPassword("");
@@ -254,8 +263,16 @@ export default function AdminPage() {
     setFormPermissions(u.permissions ?? []);
     setFormSomenteVarejo(u.somenteVarejo ?? false);
 
-    // Preencher dados de transferência se existir
-    const tp = transfPerms.find((p) => p.username === u.username);
+    // Preencher dados de transferência a partir do próprio usuário.
+    applyTransfConfigFromUser(u.username);
+
+    setFormError("");
+    setModal("edit");
+  }
+
+  /** Carrega no form a config de transferência de um username (ou limpa, se não houver). */
+  function applyTransfConfigFromUser(username: string) {
+    const tp = transfPerms.find((p) => p.username === username);
     if (tp) {
       setFormFilialPrincipal(tp.filialAtribuida ?? "");
       setFormFiliaisOrigem(tp.filiaisOrigem ?? []);
@@ -286,14 +303,40 @@ export default function AdminPage() {
       setFormPodeVerOutras(false);
       setFormAdvancedFiliais(false);
     }
+  }
 
-    setFormError("");
-    setModal("edit");
+  /**
+   * Copia a configuração de um usuário de referência para o form atual.
+   * - mode "full" (novo usuário): copia páginas, função, empresa, varejo e toda
+   *   a config de filial/transferência. NÃO copia login, senha nem nome de exibição.
+   * - mode "pages" (editar): copia SOMENTE as páginas liberadas, ignorando o resto.
+   * Para usuário admin de origem, "páginas" = todas as páginas disponíveis.
+   */
+  function applyUserConfig(u: UserRow, mode: "full" | "pages") {
+    const pages: PermissionKey[] =
+      u.role === "admin" ? ALL_PERMISSION_KEYS.map((p) => p.key) : (u.permissions ?? []);
+    setFormPermissions(pages);
+    if (mode === "pages") return;
+
+    setFormRole(u.role);
+    const ac = u.allowedCompanies;
+    setFormEmpresa(!ac?.length || ac.length === 2 ? "" : (ac[0] as "" | CompanyKey));
+    setFormSomenteVarejo(u.somenteVarejo ?? false);
+    applyTransfConfigFromUser(u.username);
   }
 
   function closeModal() {
     setModal("none");
     setEditingId(null);
+    setUserPicker(null);
+    setPickerSearch("");
+  }
+
+  /** Aplica a config do usuário escolhido no picker e fecha o widget. */
+  function pickReferenceUser(u: UserRow) {
+    if (userPicker) applyUserConfig(u, userPicker);
+    setUserPicker(null);
+    setPickerSearch("");
   }
 
   function togglePermission(key: PermissionKey) {
@@ -491,6 +534,112 @@ export default function AdminPage() {
     return getFilialNome(tp.filialAtribuida);
   }
 
+  /** Dropdown que lista usuários para copiar config. Renderizado sob o botão-gatilho. */
+  function renderUserPicker(mode: "full" | "pages") {
+    const term = pickerSearch.trim().toLowerCase();
+    const candidatos = users
+      .filter((u) => u.id !== editingId)
+      .filter(
+        (u) =>
+          !term ||
+          u.username.toLowerCase().includes(term) ||
+          (u.nomeExibicao ?? "").toLowerCase().includes(term)
+      );
+    return (
+      <div
+        style={{
+          position: "absolute",
+          top: "calc(100% + 6px)",
+          right: 0,
+          zIndex: 50,
+          width: 280,
+          maxHeight: 320,
+          display: "flex",
+          flexDirection: "column",
+          background: "var(--surface, #0f172a)",
+          border: "1px solid var(--border, #334155)",
+          borderRadius: 8,
+          boxShadow: "0 8px 24px rgba(0,0,0,.4)",
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ padding: 8, borderBottom: "1px solid var(--border, #334155)" }}>
+          <p style={{ margin: "0 0 6px", fontSize: 12, color: "var(--text-muted, #94a3b8)" }}>
+            {mode === "full"
+              ? "Copiar tudo (páginas, função, empresa e filial) — login e senha ficam em branco."
+              : "Copiar somente as páginas liberadas deste usuário."}
+          </p>
+          <input
+            type="text"
+            value={pickerSearch}
+            onChange={(e) => setPickerSearch(e.target.value)}
+            placeholder="Buscar usuário..."
+            autoFocus
+            style={{
+              width: "100%",
+              padding: "6px 8px",
+              fontSize: 13,
+              background: "var(--surface-2, #1e293b)",
+              border: "1px solid var(--border, #334155)",
+              borderRadius: 6,
+              color: "var(--text, #e2e8f0)",
+            }}
+          />
+        </div>
+        <div style={{ overflowY: "auto" }}>
+          {candidatos.length === 0 ? (
+            <p style={{ padding: 12, margin: 0, fontSize: 13, color: "var(--text-muted, #94a3b8)" }}>
+              Nenhum usuário encontrado.
+            </p>
+          ) : (
+            candidatos.map((u) => (
+              <button
+                key={u.id}
+                type="button"
+                onClick={() => pickReferenceUser(u)}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  gap: 2,
+                  width: "100%",
+                  padding: "8px 10px",
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: "1px solid var(--border, #1e293b)",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  color: "var(--text, #e2e8f0)",
+                }}
+              >
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{u.nomeExibicao || u.username}</span>
+                <span style={{ fontSize: 11, color: "var(--text-muted, #94a3b8)" }}>
+                  @{u.username} · {ROLE_LABELS[u.role]} ·{" "}
+                  {u.role === "admin"
+                    ? "todas as páginas"
+                    : `${u.permissions.length} página${u.permissions.length !== 1 ? "s" : ""}`}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const pickerTriggerStyle: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "5px 10px",
+    fontSize: 12,
+    background: "var(--surface-2, #1e293b)",
+    border: "1px solid var(--border, #334155)",
+    borderRadius: 6,
+    color: "var(--text-muted, #94a3b8)",
+    cursor: "pointer",
+  };
+
   if (!currentUser) return null;
 
   const groupedPermissions = buildGroupedPermissions();
@@ -631,6 +780,27 @@ export default function AdminPage() {
             </h2>
             <form onSubmit={handleSubmit} className={styles.form}>
 
+              {/* ── Copiar de outro usuário (só ao criar) ── */}
+              {modal === "add" && (
+                <div
+                  style={{
+                    position: "relative",
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    marginBottom: -4,
+                  }}
+                >
+                  <button
+                    type="button"
+                    style={pickerTriggerStyle}
+                    onClick={() => setUserPicker(userPicker === "full" ? null : "full")}
+                  >
+                    ⧉ Usar outro usuário como referência
+                  </button>
+                  {userPicker === "full" && renderUserPicker("full")}
+                </div>
+              )}
+
               {/* ── Seção: Dados básicos ── */}
               <div className={styles.section}>
                 <p className={styles.sectionTitle}>Dados básicos</p>
@@ -725,7 +895,28 @@ export default function AdminPage() {
               {/* ── Seção: Páginas (agrupadas e recolhíveis) ── */}
               {formRole !== "admin" && (
                 <div className={styles.section}>
-                  <p className={styles.sectionTitle}>Páginas que pode acessar</p>
+                  <div
+                    style={{
+                      position: "relative",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 8,
+                    }}
+                  >
+                    <p className={styles.sectionTitle} style={{ margin: 0 }}>
+                      Páginas que pode acessar
+                    </p>
+                    <button
+                      type="button"
+                      style={pickerTriggerStyle}
+                      onClick={() => setUserPicker(userPicker === "pages" ? null : "pages")}
+                      title="Copiar as páginas liberadas de outro usuário"
+                    >
+                      ⧉ Importar de outro usuário
+                    </button>
+                    {userPicker === "pages" && renderUserPicker("pages")}
+                  </div>
                   <div className={styles.permGroups}>
                     {groupedPermissions.map((group) => {
                       // Esconde permissoes restritas por funcao que nao se aplicam
