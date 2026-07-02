@@ -40,10 +40,11 @@ export async function GET(request: Request) {
   let endDate: Date | undefined;
   let filtrarApenasComVendas = false;
   if (giroDias && startParam && endParam) {
-    const start = new Date(startParam);
-    const end = new Date(endParam);
-    if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
-      const { start: startNorm, end: endNorm } = normalizeRangeForQuery({ start, end });
+    // Valida sem descartar a string: normalizeRangeForQuery precisa receber a STRING
+    // (não um Date) para interpretar o dia no fuso de negócio (Brasil). Passar um Date
+    // de um instante ISO puraria essa lógica e traria +1 dia em servidores UTC.
+    if (!Number.isNaN(new Date(startParam).getTime()) && !Number.isNaN(new Date(endParam).getTime())) {
+      const { start: startNorm, end: endNorm } = normalizeRangeForQuery({ start: startParam, end: endParam });
       startDate = startNorm;
       endDate = endNorm;
       filtrarApenasComVendas = true;
@@ -98,10 +99,10 @@ export async function POST(request: Request) {
     const startParam = body.start;
     const endParam = body.end;
     if (giroDias != null && startParam != null && endParam != null) {
-      const start = new Date(startParam);
-      const end = new Date(endParam);
-      if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
-        const { start: startNorm, end: endNorm } = normalizeRangeForQuery({ start, end });
+      // Passa as STRINGS ao normalizador (ver POST acima): Date de instante ISO
+      // puraria a interpretação de fuso de negócio e traria +1 dia em servidor UTC.
+      if (!Number.isNaN(new Date(startParam).getTime()) && !Number.isNaN(new Date(endParam).getTime())) {
+        const { start: startNorm, end: endNorm } = normalizeRangeForQuery({ start: startParam, end: endParam });
         startDate = startNorm;
         endDate = endNorm;
         filtrarApenasComVendas = true;

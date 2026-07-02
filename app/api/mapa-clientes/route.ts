@@ -3,6 +3,7 @@ import sql from 'mssql';
 
 import { withRequest } from '@/lib/db/connection';
 import { resolveCompanyLive } from '@/lib/server/company-live';
+import { normalizeRangeForQuery } from '@/lib/utils/date';
 
 export const maxDuration = 60;
 
@@ -41,8 +42,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Sem filiais configuradas para esta empresa' }, { status: 400 });
   }
 
-  const start = startParam ? new Date(startParam) : new Date(new Date().getFullYear(), 0, 1);
-  const end = endParam ? new Date(endParam) : new Date();
+  // Datas selecionadas vão pelo normalizador canônico (fuso de negócio Brasil): passar
+  // as STRINGS cruas — nunca `new Date(param)` — para não trazer +1 dia em servidor UTC.
+  // `end` volta EXCLUSIVO (início do dia seguinte); a query usa `< CAST(@endDate AS DATE)`.
+  const { start, end } = normalizeRangeForQuery({
+    start: startParam ?? new Date(new Date().getFullYear(), 0, 1),
+    end: endParam ?? new Date(),
+  });
 
   try {
     const result = await withRequest(async (req) => {
@@ -68,7 +74,7 @@ export async function GET(request: Request) {
          AND f.NF_SAIDA = fp.NF_SAIDA
          AND f.SERIE_NF = fp.SERIE_NF
         WHERE CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
-          AND CAST(f.EMISSAO AS DATE) <= CAST(@endDate AS DATE)
+          AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
           AND f.FILIAL IN (${filialParams})

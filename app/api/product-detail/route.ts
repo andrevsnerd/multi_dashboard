@@ -11,7 +11,7 @@ import {
   type ProductDetailInfo,
   type ProductStockProgressDay,
 } from '@/lib/repositories/productDetail';
-import { getCurrentMonthRange } from '@/lib/utils/date';
+import { getCurrentMonthRange, normalizeRangeForQuery } from '@/lib/utils/date';
 
 const NO_COLOR_PARAM = '__SEM_COR__';
 
@@ -58,10 +58,12 @@ export async function GET(request: Request) {
   };
 
   try {
-    const rangeStart = new Date(range.start);
-    const rangeEnd = new Date(range.end);
-    const startD = startOfDay(rangeStart);
-    const endD = startOfDay(rangeEnd);
+    // Deriva o range de comparação a partir das datas JÁ normalizadas no fuso de
+    // negócio (não de `new Date(range.start)` do instante ISO cru: numa virada de mês
+    // isso deslocaria o mês inteiro da comparação em servidor UTC).
+    const { start: normStart, end: normEnd } = normalizeRangeForQuery(range);
+    const startD = startOfDay(normStart);
+    const endD = startOfDay(new Date(normEnd.getTime() - 24 * 60 * 60 * 1000)); // último dia inclusivo
 
     // Do 1º dia do mês anterior ao início do range até o último dia do mês anterior ao fim do range
     // (cobre todos os “mês anterior” necessários para cada dia do gráfico).

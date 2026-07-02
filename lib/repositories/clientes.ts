@@ -163,9 +163,12 @@ export async function fetchClientes({
       startDateStr = parseDateToString(startDate);
       
       // Para o endDate, adicionar 1 dia (exclusivo) para incluir todo o dia final
-      const endDate = range.end instanceof Date ? range.end : new Date(range.end);
-      const endDatePlusOne = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() + 1);
-      endDateStr = parseDateToString(endDatePlusOne);
+      // Fim exclusivo no fuso de negócio (Brasil), derivado da string do cliente pelo
+      // normalizador canônico: evita +1 dia em servidor UTC (23:59 BRT = 02:59Z do dia
+      // seguinte seria lido como o próximo dia). toISOString().slice(0,10) é determinístico
+      // pois o fim volta ancorado à meia-noite UTC.
+      const endDatePlusOne = normalizeRangeForQuery({ start: range.start, end: range.end }).end;
+      endDateStr = endDatePlusOne.toISOString().slice(0, 10);
     } else {
       const defaultRange = getCurrentMonthRange();
       startDateStr = parseDateToString(defaultRange.start);
@@ -486,9 +489,12 @@ export async function fetchClientesCount({
       startDateStr = parseDateToString(startDate);
       
       // Para o endDate, adicionar 1 dia (exclusivo) para incluir todo o dia final
-      const endDate = range.end instanceof Date ? range.end : new Date(range.end);
-      const endDatePlusOne = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() + 1);
-      endDateStr = parseDateToString(endDatePlusOne);
+      // Fim exclusivo no fuso de negócio (Brasil), derivado da string do cliente pelo
+      // normalizador canônico: evita +1 dia em servidor UTC (23:59 BRT = 02:59Z do dia
+      // seguinte seria lido como o próximo dia). toISOString().slice(0,10) é determinístico
+      // pois o fim volta ancorado à meia-noite UTC.
+      const endDatePlusOne = normalizeRangeForQuery({ start: range.start, end: range.end }).end;
+      endDateStr = endDatePlusOne.toISOString().slice(0, 10);
     } else {
       const defaultRange = getCurrentMonthRange();
       startDateStr = parseDateToString(defaultRange.start);
@@ -581,9 +587,12 @@ export async function fetchTopFilialByClientes({
       const startDate = range.start instanceof Date ? range.start : new Date(range.start);
       startDateStr = parseDateToString(startDate);
       
-      const endDate = range.end instanceof Date ? range.end : new Date(range.end);
-      const endDatePlusOne = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() + 1);
-      endDateStr = parseDateToString(endDatePlusOne);
+      // Fim exclusivo no fuso de negócio (Brasil), derivado da string do cliente pelo
+      // normalizador canônico: evita +1 dia em servidor UTC (23:59 BRT = 02:59Z do dia
+      // seguinte seria lido como o próximo dia). toISOString().slice(0,10) é determinístico
+      // pois o fim volta ancorado à meia-noite UTC.
+      const endDatePlusOne = normalizeRangeForQuery({ start: range.start, end: range.end }).end;
+      endDateStr = endDatePlusOne.toISOString().slice(0, 10);
     } else {
       const defaultRange = getCurrentMonthRange();
       startDateStr = parseDateToString(defaultRange.start);
@@ -829,9 +838,12 @@ export async function fetchFilialClientesPerformance({
       const startDate = range.start instanceof Date ? range.start : new Date(range.start);
       startDateStr = parseDateToString(startDate);
       
-      const endDate = range.end instanceof Date ? range.end : new Date(range.end);
-      const endDatePlusOne = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() + 1);
-      endDateStr = parseDateToString(endDatePlusOne);
+      // Fim exclusivo no fuso de negócio (Brasil), derivado da string do cliente pelo
+      // normalizador canônico: evita +1 dia em servidor UTC (23:59 BRT = 02:59Z do dia
+      // seguinte seria lido como o próximo dia). toISOString().slice(0,10) é determinístico
+      // pois o fim volta ancorado à meia-noite UTC.
+      const endDatePlusOne = normalizeRangeForQuery({ start: range.start, end: range.end }).end;
+      endDateStr = endDatePlusOne.toISOString().slice(0, 10);
     } else {
       const defaultRange = getCurrentMonthRange();
       startDateStr = parseDateToString(defaultRange.start);
@@ -1005,9 +1017,12 @@ export async function fetchTopVendedoresClientes({
       const startDate = range.start instanceof Date ? range.start : new Date(range.start);
       startDateStr = parseDateToString(startDate);
       
-      const endDate = range.end instanceof Date ? range.end : new Date(range.end);
-      const endDatePlusOne = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() + 1);
-      endDateStr = parseDateToString(endDatePlusOne);
+      // Fim exclusivo no fuso de negócio (Brasil), derivado da string do cliente pelo
+      // normalizador canônico: evita +1 dia em servidor UTC (23:59 BRT = 02:59Z do dia
+      // seguinte seria lido como o próximo dia). toISOString().slice(0,10) é determinístico
+      // pois o fim volta ancorado à meia-noite UTC.
+      const endDatePlusOne = normalizeRangeForQuery({ start: range.start, end: range.end }).end;
+      endDateStr = endDatePlusOne.toISOString().slice(0, 10);
     } else {
       const defaultRange = getCurrentMonthRange();
       startDateStr = parseDateToString(defaultRange.start);
@@ -1110,9 +1125,12 @@ export async function fetchVendedoresList({
       const startDate = range.start instanceof Date ? range.start : new Date(range.start);
       startDateStr = parseDateToString(startDate);
       
-      const endDate = range.end instanceof Date ? range.end : new Date(range.end);
-      const endDatePlusOne = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() + 1);
-      endDateStr = parseDateToString(endDatePlusOne);
+      // Fim exclusivo no fuso de negócio (Brasil), derivado da string do cliente pelo
+      // normalizador canônico: evita +1 dia em servidor UTC (23:59 BRT = 02:59Z do dia
+      // seguinte seria lido como o próximo dia). toISOString().slice(0,10) é determinístico
+      // pois o fim volta ancorado à meia-noite UTC.
+      const endDatePlusOne = normalizeRangeForQuery({ start: range.start, end: range.end }).end;
+      endDateStr = endDatePlusOne.toISOString().slice(0, 10);
     } else {
       const defaultRange = getCurrentMonthRange();
       startDateStr = parseDateToString(defaultRange.start);
