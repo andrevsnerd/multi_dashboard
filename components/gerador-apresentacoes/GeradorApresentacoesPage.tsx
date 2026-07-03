@@ -9,12 +9,15 @@ import type { CompanyKey } from "@/lib/config/company";
 import { getCurrentMonthRange, formatDateForQuery } from "@/lib/utils/date";
 import {
   COLECAO_COMPLETA_ID,
+  COMPARATIVO_COLECOES_ID,
   PRESENTATION_TYPES,
   getPresentationMeta,
 } from "@/lib/presentations/registry";
 import type { ColecaoPresentationPayload } from "@/lib/repositories/colecaoPresentation";
+import type { ComparativoColecoesPayload } from "@/lib/repositories/comparativoColecoes";
 
 import ColecaoDeck from "./ColecaoDeck";
+import ComparativoDeck from "./ComparativoDeck";
 import styles from "./GeradorApresentacoesPage.module.css";
 
 interface GeradorApresentacoesPageProps {
@@ -63,6 +66,8 @@ export default function GeradorApresentacoesPage({
 
   // Resultado
   const [report, setReport] = useState<ColecaoPresentationPayload | null>(null);
+  const [comparativo, setComparativo] = useState<ComparativoColecoesPayload | null>(null);
+  const [coversByCode, setCoversByCode] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exportingPdf, setExportingPdf] = useState(false);
@@ -122,6 +127,63 @@ export default function GeradorApresentacoesPage({
     void loadAssets();
   }, [loadAssets]);
 
+  // Comparativo: carrega as capas (recortes) de TODAS as coleções selecionadas
+  // — reusa as imagens já enviadas por coleção; serve tanto ao preview do
+  // uploader quanto ao deck.
+  const loadCoversForSelection = useCallback(async () => {
+    if (colecoes.length === 0) {
+      setCoversByCode({});
+      return;
+    }
+    const entries = await Promise.all(
+      colecoes.map(async (code) => {
+        try {
+          const r = await fetch(
+            `/api/gerador-apresentacoes/assets?company=${companyKey}&colecao=${encodeURIComponent(code)}`,
+            { cache: "no-store" }
+          );
+          if (!r.ok) return [code, null] as const;
+          const j = (await r.json()) as { cover: string | null };
+          return [code, j.cover ?? null] as const;
+        } catch {
+          return [code, null] as const;
+        }
+      })
+    );
+    setCoversByCode(Object.fromEntries(entries));
+  }, [colecoes, companyKey]);
+
+  useEffect(() => {
+    if (presentationTypeId === COMPARATIVO_COLECOES_ID) void loadCoversForSelection();
+  }, [presentationTypeId, loadCoversForSelection]);
+
+  // Upload/troca da capa de UMA coleção específica (recorte de fundo transparente).
+  const [uploadingCoverCode, setUploadingCoverCode] = useState<string | null>(null);
+  const uploadCoverFor = useCallback(
+    async (code: string, file: File | undefined) => {
+      if (!file) return;
+      setUploadingCoverCode(code);
+      setError(null);
+      try {
+        const dataUrl = await readFileAsDataUrl(file);
+        const res = await fetch("/api/gerador-apresentacoes/assets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ company: companyKey, kind: "cover", ref: code, dataUrl }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error || "Erro ao salvar imagem.");
+        setCoversByCode((prev) => ({ ...prev, [code]: dataUrl }));
+        if (code === singleColecao) setCoverDataUrl(dataUrl);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Erro ao salvar a capa.");
+      } finally {
+        setUploadingCoverCode(null);
+      }
+    },
+    [companyKey, singleColecao]
+  );
+
   const uploadAsset = useCallback(
     async (kind: "logo" | "cover", file: File) => {
       const dataUrl = await readFileAsDataUrl(file);
@@ -178,6 +240,16 @@ export default function GeradorApresentacoesPage({
     }
   };
 
+  // Descrição de uma coleção pelo código (para títulos do comparativo).
+  const labelForCode = useCallback(
+    (code: string) => {
+      const opt = optColecoes.find((o) => o.value === code);
+      if (!opt) return code;
+      return opt.label.replace(/\s*\([^)]*\)\s*$/, "").trim() || opt.label;
+    },
+    [optColecoes]
+  );
+
   // ---- gerar ----
   const handleGenerate = useCallback(async () => {
     if (colecoes.length === 0) {
@@ -187,6 +259,44 @@ export default function GeradorApresentacoesPage({
     setLoading(true);
     setError(null);
     try {
+      if (presentationTypeId === COMPARATIVO_COLECOES_ID) {
+        const res = await fetch("/api/gerador-apresentacoes/comparativo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            company: companyKey,
+            filial,
+            range: { start: startStr, end: endStr },
+            colecoes: colecoes.map((code) => ({ code, label: labelForCode(code) })),
+          }),
+        });
+        const json = (await res.json()) as { data?: ComparativoColecoesPayload; error?: string };
+        if (!res.ok) throw new Error(json.error ?? "Erro ao gerar o comparativo.");
+        const data = json.data ?? null;
+        setComparativo(data);
+        setReport(null);
+        // Carrega as capas de todas as coleções do deck.
+        if (data) {
+          const entries = await Promise.all(
+            data.slides.map(async (s) => {
+              try {
+                const r = await fetch(
+                  `/api/gerador-apresentacoes/assets?company=${companyKey}&colecao=${encodeURIComponent(s.code)}`,
+                  { cache: "no-store" }
+                );
+                if (!r.ok) return [s.code, null] as const;
+                const j = (await r.json()) as { cover: string | null };
+                return [s.code, j.cover ?? null] as const;
+              } catch {
+                return [s.code, null] as const;
+              }
+            })
+          );
+          setCoversByCode(Object.fromEntries(entries));
+        }
+        return;
+      }
+
       const res = await fetch("/api/gerador-apresentacoes/colecao", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -201,18 +311,20 @@ export default function GeradorApresentacoesPage({
       const json = (await res.json()) as { data?: ColecaoPresentationPayload; error?: string };
       if (!res.ok) throw new Error(json.error ?? "Erro ao gerar a apresentação.");
       setReport(json.data ?? null);
+      setComparativo(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao gerar a apresentação.");
       setReport(null);
+      setComparativo(null);
     } finally {
       setLoading(false);
     }
-  }, [colecoes, companyKey, filial, singleColecaoLabel, startStr, endStr]);
+  }, [colecoes, companyKey, filial, singleColecaoLabel, startStr, endStr, presentationTypeId, labelForCode]);
 
   // ---- export PDF (mesmo pipeline do Relatório Claude) ----
   const handleExportPdf = useCallback(async () => {
     const deckElement = deckRef.current;
-    if (!report || !deckElement) return;
+    if ((!report && !comparativo) || !deckElement) return;
     const slideElements = Array.from(deckElement.querySelectorAll<HTMLElement>("[data-pdf-slide]"));
     if (slideElements.length === 0) return;
 
@@ -272,18 +384,21 @@ export default function GeradorApresentacoesPage({
         canvas.height = 0;
       }
 
-      const safeName = `apresentacao-${report.collection.code || "colecao"}-${report.period.start}-${report.period.end}`
-        .replace(/[^\w-]+/g, "_")
-        .slice(0, 100);
+      const baseName = comparativo
+        ? `comparativo-colecoes-${comparativo.period.start}-${comparativo.period.end}`
+        : `apresentacao-${report?.collection.code || "colecao"}-${report?.period.start}-${report?.period.end}`;
+      const safeName = baseName.replace(/[^\w-]+/g, "_").slice(0, 100);
       doc.save(`${safeName}.pdf`);
     } catch (e) {
       window.alert(e instanceof Error ? e.message : "Erro ao exportar PDF");
     } finally {
       setExportingPdf(false);
     }
-  }, [report]);
+  }, [report, comparativo]);
 
   const isColecaoType = presentationTypeId === COLECAO_COMPLETA_ID;
+  const isComparativo = presentationTypeId === COMPARATIVO_COLECOES_ID;
+  const hasResult = Boolean(report || comparativo);
 
   return (
     <div className={styles.wrapper}>
@@ -352,50 +467,95 @@ export default function GeradorApresentacoesPage({
             números são somados mas a capa não é aplicada.
           </p>
         )}
+        {isComparativo && (
+          <p className={styles.hint}>
+            Escolha 2 ou mais coleções — cada uma vira um slide com paleta própria, ordenadas por
+            venda líquida, mais um slide final de decisão de renovação. Cada slide usa o recorte
+            (fundo transparente) da coleção — envie/troque abaixo, por coleção.
+          </p>
+        )}
       </section>
 
       {/* Imagens */}
       {meta?.requiresCover && (
         <section className={styles.panel}>
           <h2 className={styles.panelTitle}>Imagens</h2>
+          <p className={styles.hint}>
+            Use imagens com <strong>fundo transparente</strong> (PNG recortado) — elas aparecem
+            &quot;flutuando&quot; sobre o círculo da coleção, como no modelo. Reenviar substitui a
+            anterior; o que já foi enviado aparece no preview.
+          </p>
           <div className={styles.uploadGrid}>
-            {/* Capa da coleção */}
-            <div className={styles.uploadCard}>
-              <div className={styles.uploadPreview}>
-                {coverDataUrl ? (
-                  <img src={coverDataUrl} alt="Capa da coleção" />
-                ) : (
-                  <span className={styles.uploadEmpty}>Sem capa</span>
-                )}
-              </div>
-              <div className={styles.uploadBody}>
-                <span className={styles.uploadTitle}>Capa da coleção</span>
-                <span className={coverDataUrl ? `${styles.uploadStatus} ${styles.uploadStatusOk}` : styles.uploadStatus}>
-                  {!singleColecao
-                    ? "Selecione uma coleção"
-                    : coverDataUrl
-                      ? `Imagem salva${coverUpdatedAt ? " · atualizada agora" : ""}`
-                      : "Nenhuma imagem enviada"}
-                </span>
-                <div className={styles.uploadActions}>
-                  <button
-                    type="button"
-                    className={styles.fileBtn}
-                    disabled={!singleColecao || uploadingCover}
-                    onClick={() => coverInputRef.current?.click()}
-                  >
-                    {uploadingCover ? "Enviando..." : coverDataUrl ? "Substituir imagem" : "Enviar imagem"}
-                  </button>
-                  <input
-                    ref={coverInputRef}
-                    type="file"
-                    accept="image/*"
-                    className={styles.hiddenInput}
-                    onChange={(e) => void onPickCover(e.target.files?.[0])}
-                  />
+            {/* Capa da coleção (tipo #1: coleção âncora única) */}
+            {isColecaoType && (
+              <div className={styles.uploadCard}>
+                <div className={styles.uploadPreview}>
+                  {coverDataUrl ? (
+                    <img src={coverDataUrl} alt="Capa da coleção" />
+                  ) : (
+                    <span className={styles.uploadEmpty}>Sem capa</span>
+                  )}
+                </div>
+                <div className={styles.uploadBody}>
+                  <span className={styles.uploadTitle}>Capa da coleção</span>
+                  <span className={coverDataUrl ? `${styles.uploadStatus} ${styles.uploadStatusOk}` : styles.uploadStatus}>
+                    {!singleColecao
+                      ? "Selecione uma coleção"
+                      : coverDataUrl
+                        ? `Imagem salva${coverUpdatedAt ? " · atualizada agora" : ""}`
+                        : "Nenhuma imagem enviada"}
+                  </span>
+                  <div className={styles.uploadActions}>
+                    <button
+                      type="button"
+                      className={styles.fileBtn}
+                      disabled={!singleColecao || uploadingCover}
+                      onClick={() => coverInputRef.current?.click()}
+                    >
+                      {uploadingCover ? "Enviando..." : coverDataUrl ? "Substituir imagem" : "Enviar imagem"}
+                    </button>
+                    <input
+                      ref={coverInputRef}
+                      type="file"
+                      accept="image/*"
+                      className={styles.hiddenInput}
+                      onChange={(e) => void onPickCover(e.target.files?.[0])}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* Comparativo: uma capa (recorte) por coleção selecionada */}
+            {isComparativo &&
+              colecoes.map((code) => {
+                const url = coversByCode[code] ?? null;
+                return (
+                  <div key={code} className={styles.uploadCard}>
+                    <div className={styles.uploadPreview}>
+                      {url ? <img src={url} alt={labelForCode(code)} /> : <span className={styles.uploadEmpty}>Sem imagem</span>}
+                    </div>
+                    <div className={styles.uploadBody}>
+                      <span className={styles.uploadTitle}>{labelForCode(code)}</span>
+                      <span className={url ? `${styles.uploadStatus} ${styles.uploadStatusOk}` : styles.uploadStatus}>
+                        {url ? "Imagem salva" : "Nenhuma imagem enviada"}
+                      </span>
+                      <div className={styles.uploadActions}>
+                        <label className={styles.fileBtn}>
+                          {uploadingCoverCode === code ? "Enviando..." : url ? "Substituir" : "Enviar"}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className={styles.hiddenInput}
+                            disabled={uploadingCoverCode === code}
+                            onChange={(e) => void uploadCoverFor(code, e.target.files?.[0])}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
 
             {/* Logo SCARF·ME */}
             <div className={styles.uploadCard}>
@@ -450,13 +610,18 @@ export default function GeradorApresentacoesPage({
           type="button"
           className={styles.btnSecondary}
           onClick={() => void handleExportPdf()}
-          disabled={!report || exportingPdf}
+          disabled={!hasResult || exportingPdf}
         >
           {exportingPdf ? "Exportando..." : "Exportar PDF"}
         </button>
         {report && !loading && (
           <span className={styles.resultMeta}>
             {report.kpis.nSkus} SKUs · {report.kpis.canaisAtivos} canais · {report.period.label}
+          </span>
+        )}
+        {comparativo && !loading && (
+          <span className={styles.resultMeta}>
+            {comparativo.totals.colecoes} coleções · {comparativo.period.label}
           </span>
         )}
       </section>
@@ -474,10 +639,19 @@ export default function GeradorApresentacoesPage({
             deckRef={deckRef}
           />
         </div>
+      ) : comparativo ? (
+        <div className={styles.deckWrap}>
+          <ComparativoDeck
+            payload={comparativo}
+            logoDataUrl={logoDataUrl}
+            coversByCode={coversByCode}
+            deckRef={deckRef}
+          />
+        </div>
       ) : (
         !loading && (
           <div className={styles.empty}>
-            Escolha uma coleção e clique em “Gerar apresentação” para montar os slides.
+            Escolha as coleções e clique em “Gerar apresentação” para montar os slides.
           </div>
         )
       )}

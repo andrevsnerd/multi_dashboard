@@ -783,3 +783,116 @@ export async function fetchCollectionReportAvailableRange({
     };
   });
 }
+
+export interface CollectionMonthlyPoint {
+  year: number;
+  month: number;
+  revenue: number;
+}
+
+export interface CollectionComparativeExtras {
+  /** Série mensal de venda líquida (varejo + e-commerce), ordenada. */
+  monthly: CollectionMonthlyPoint[];
+  /** Venda bruta (antes do desconto) — apenas canal físico. */
+  grossSales: number;
+  /** Desconto concedido (R$) — apenas canal físico. */
+  discountSales: number;
+}
+
+/**
+ * Extras do Relatório Comparativo entre Coleções: série mensal de venda líquida
+ * (varejo + e-com) e desconto concedido (canal físico). Reaproveita os MESMOS
+ * filtros de filial/coleção/canal do `fetchCollectionReport` — mesma tabela,
+ * mesmos joins e mesma fórmula de venda líquida. O e-commerce não separa
+ * desconto na fonte (FATURAMENTO), então gross/desconto refletem só o físico.
+ */
+export async function fetchCollectionComparativeExtras({
+  company,
+  range,
+  filial,
+  colecoes,
+}: CollectionReportQueryParams = {}): Promise<CollectionComparativeExtras> {
+  const empty: CollectionComparativeExtras = { monthly: [], grossSales: 0, discountSales: 0 };
+  if (company !== "scarfme") return empty;
+
+  const normalizedCollections = normalizeCollectionValues(colecoes);
+
+  return withRequest(async (request) => {
+    const { start, end } = resolveRange(range);
+    request.input("startDate", sql.DateTime, start);
+    request.input("endDate", sql.DateTime, end);
+
+    const monthlyMap = new Map<string, CollectionMonthlyPoint>();
+    let grossSales = 0;
+    let discountSales = 0;
+
+    const addMonthly = (year: number, month: number, revenue: number) => {
+      const key = `${year}-${month}`;
+      const cur = monthlyMap.get(key);
+      if (cur) cur.revenue += revenue;
+      else monthlyMap.set(key, { year, month, revenue });
+    };
+
+    if (shouldIncludeSalesChannel(company, filial)) {
+      const salesFilial = filial && filial !== VAREJO_VALUE ? filial : VAREJO_VALUE;
+      const filialFilter = await buildSalesFilialFilter(request, company, salesFilial, "extrasSales");
+      const collectionFilter = buildSalesCollectionFilter(request, normalizedCollections, "extrasSales");
+      const result = await request.query<{ y: number; m: number; net: number; gross: number; disc: number }>(`
+        SELECT
+          YEAR(vp.DATA_VENDA) AS y,
+          MONTH(vp.DATA_VENDA) AS m,
+          SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.PRECO_LIQUIDO * vp.QTDE END) AS gross,
+          SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) END) AS net,
+          SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE ISNULL(vp.DESCONTO_VENDA, 0) END) AS disc
+        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
+        WHERE vp.DATA_VENDA >= @startDate
+          AND vp.DATA_VENDA < @endDate
+          AND vp.QTDE > 0
+          ${filialFilter}
+          ${collectionFilter}
+        GROUP BY YEAR(vp.DATA_VENDA), MONTH(vp.DATA_VENDA)
+      `);
+      for (const row of result.recordset) {
+        addMonthly(Number(row.y), Number(row.m), Number(row.net ?? 0));
+        grossSales += Number(row.gross ?? 0);
+        discountSales += Number(row.disc ?? 0);
+      }
+    }
+
+    if (shouldIncludeEcommerceChannel(company, filial)) {
+      const ecommerceFilial = filial && isEcommerceFilial(company, filial) ? filial : null;
+      const filialFilter = await buildEcommerceFilialFilter(request, company, ecommerceFilial, "extrasEcom");
+      const collectionFilter = buildEcommerceCollectionFilter(request, normalizedCollections, "extrasEcom");
+      const result = await request.query<{ y: number; m: number; net: number }>(`
+        SELECT
+          YEAR(f.EMISSAO) AS y,
+          MONTH(f.EMISSAO) AS m,
+          SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS net
+        FROM FATURAMENTO f WITH (NOLOCK)
+        JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+          ON f.FILIAL = fp.FILIAL
+          AND f.NF_SAIDA = fp.NF_SAIDA
+          AND f.SERIE_NF = fp.SERIE_NF
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO
+        WHERE f.EMISSAO >= @startDate
+          AND f.EMISSAO < @endDate
+          AND f.NOTA_CANCELADA = 0
+          AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+          AND fp.QTDE > 0
+          ${filialFilter}
+          ${collectionFilter}
+        GROUP BY YEAR(f.EMISSAO), MONTH(f.EMISSAO)
+      `);
+      for (const row of result.recordset) {
+        addMonthly(Number(row.y), Number(row.m), Number(row.net ?? 0));
+      }
+    }
+
+    const monthly = Array.from(monthlyMap.values()).sort((a, b) =>
+      a.year !== b.year ? a.year - b.year : a.month - b.month
+    );
+
+    return { monthly, grossSales, discountSales };
+  });
+}
