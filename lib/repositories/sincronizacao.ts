@@ -1,42 +1,11 @@
 import sql from "mssql";
 
-import { resolveCompany, getFilialLabelForDisplay, getActiveFilial } from "@/lib/config/company";
+import { getFilialLabelForDisplay, getOperationalFilials } from "@/lib/config/company";
 import { resolveCompanyDynamic } from "@/lib/config/company-server";
+import { getFilialById } from "@/lib/config/filial-registry";
 import { withRequest } from "@/lib/db/connection";
+import { idForName } from "@/lib/server/filial-resolver";
 import { parseBrasiliaDateTime } from "@/lib/utils/brasilia-datetime";
-
-const SINCRONIZACAO_FILIAIS = [
-  "SCARF ME - HIGIENOPOLIS 2",
-  "SCARF ME - PAULISTA RSR",
-  "SCARF ME - PAULISTA FFFR",
-  "SCARFME LLL -  GALEAO RJ",
-  "MSC COMERCIO DE LENCOS LT",
-  "GUARULHOS - RSR",
-  "IGUATEMI SP - JJJ",
-  "MORUMBI - JJJ",
-  "NERD CENTER NORTE",
-  "NERD ELDORADO",
-  "NERD HIGIENOPOLIS",
-  "NERD LEBLON",
-  "NERD MORUMBI RDRRRJ",
-  "NERD MORUMBI RDRX",
-  "NERD MORUMBI RDRRX",
-  "NERD VILLA LOBOS",
-  "OSCAR FREIRE - FSZ",
-  "VILLA LOBOS - LLL",
-] as const;
-
-const SINCRONIZACAO_FILIAIS_NORMALIZADAS = SINCRONIZACAO_FILIAIS.map((f) => normalizarChaveFilial(f));
-const SINCRONIZACAO_FILIAIS_EXCLUIDAS = [
-  "NERD MORUMBI - RDRRX",
-  "NERD",
-  "NERD HIGIENOPOLIS RDRRX",
-  "NERD MORUMBI",
-  "SCARF ME- HIGIENOPOLIS",
-] as const;
-const SINCRONIZACAO_FILIAIS_EXCLUIDAS_NORMALIZADAS = new Set(
-  SINCRONIZACAO_FILIAIS_EXCLUIDAS.map((f) => normalizarFilial(f))
-);
 
 export type SincronizacaoStatus = "OK" | "ATENCAO" | "ATRASADO" | "SEM_VENDAS";
 
@@ -60,16 +29,6 @@ function normalizarFilial(valor: unknown): string {
   return String(valor ?? "")
     .replace(/\u00a0/g, " ")
     .replace(/[\u2010-\u2015\u2212]/g, "-")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function normalizarChaveFilial(valor: unknown): string {
-  return normalizarFilial(valor)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -120,75 +79,59 @@ export async function fetchSincronizacaoFiliais(): Promise<{
     return getFilialLabelForDisplay(config, filialName);
   }
 
+  // Canônica ATUAL (uma por grupo) de cada empresa — mesma fonte do resto do app
+  // (grupo resolvido dinamicamente pela venda/emissão mais recente, ex.: rodízio
+  // e-commerce MSC/AKS). MATRIZ fica de fora: não é loja de sincronização.
+  const canonicasNomes = [
+    ...getOperationalFilials(nerdConfig, "sales"),
+    ...getOperationalFilials(scarfmeConfig, "sales"),
+  ].filter((nome) => {
+    const config = nome.toUpperCase().startsWith("NERD") ? nerdConfig : scarfmeConfig;
+    return getFilialLabelForDisplay(config, nome).toUpperCase() !== "MATRIZ";
+  });
+
+  // Resolve cada canônica para o COD_FILIAL do registry. O match com a tabela FILIAIS
+  // passa a ser por ID (exato), nunca por nome normalizado — necessário porque grupos
+  // têm filiais cujo nome só difere por hífen ("SCARF ME - PAULISTA FFFR" 000112 vs
+  // "SCARF ME PAULISTA FFFR" 000117): sob normalização colidiriam e a NÃO-canônica
+  // (e linhas-lixo do ERP) entrariam junto.
+  const canonicasCods: string[] = [];
+  for (const nome of canonicasNomes) {
+    const id = await idForName(nome);
+    if (id) canonicasCods.push(id);
+  }
+  const canonicasCodSet = new Set(canonicasCods);
+  const ordemCod = new Map(canonicasCods.map((id, i) => [id, i]));
+
   return withRequest(async (request) => {
     const agora = new Date();
-    const consideradas = new Set(SINCRONIZACAO_FILIAIS_NORMALIZADAS);
-    const ordem = new Map(SINCRONIZACAO_FILIAIS_NORMALIZADAS.map((f, i) => [f, i]));
-    const ecommerceFiliais = new Set(
-      (resolveCompany("scarfme")?.ecommerceFilials ?? []).map((f) => normalizarChaveFilial(f))
-    );
 
-    const filiaisResult = await request.query<{ COD_FILIAL: number; FILIAL: string }>(`
-      SELECT COD_FILIAL, FILIAL
+    const filiaisResult = await request.query<{ COD_STR: string; FILIAL: string }>(`
+      SELECT RTRIM(LTRIM(CAST(COD_FILIAL AS VARCHAR(50)))) AS COD_STR, FILIAL
       FROM FILIAIS WITH (NOLOCK)
     `);
 
-    const filiais = filiaisResult.recordset
-      .map((row) => ({
-        codFilial: Number(row.COD_FILIAL),
-        filial: normalizarFilial(row.FILIAL),
-        filialKey: normalizarChaveFilial(row.FILIAL),
-      }))
-      .filter((row) => {
-        if (!Number.isFinite(row.codFilial)) {
-          return false;
-        }
-        if (SINCRONIZACAO_FILIAIS_EXCLUIDAS_NORMALIZADAS.has(row.filial)) {
-          return false;
-        }
-
-        if (consideradas.has(row.filialKey)) {
-          return true;
-        }
-
-        // Tolerar pequenas diferenças de cadastro no ERP, como espaços ou sufixos extras.
-        for (const filialBase of SINCRONIZACAO_FILIAIS_NORMALIZADAS) {
-          if (row.filialKey.includes(filialBase) || filialBase.includes(row.filialKey)) {
-            return true;
-          }
-        }
-
-        return false;
+    const filiaisDeduped = filiaisResult.recordset
+      .map((row) => {
+        const def = getFilialById(row.COD_STR);
+        return {
+          codFilial: Number(row.COD_STR),
+          regId: def?.id ?? null,
+          isEcommerce: def?.ecommerce === true,
+          filial: normalizarFilial(row.FILIAL),
+        };
       })
-      .sort((a, b) => (ordem.get(a.filialKey) ?? 10_000) - (ordem.get(b.filialKey) ?? 10_000));
-
-    // Deduplica por grupo: mantém apenas a filial ativa de cada grupo.
-    // Usa normalizarFilial (preserva hífen) para comparar nomes — necessário porque
-    // "SCARF ME PAULISTA FFFR" e "SCARF ME - PAULISTA FFFR" são entidades distintas.
-    const groupedByActive = new Map<string, typeof filiais[0]>();
-    for (const row of filiais) {
-      const config = row.filial.toUpperCase().startsWith("NERD") ? nerdConfig : scarfmeConfig;
-      const activeNome = getActiveFilial(config, row.filial);
-      const activeKey = normalizarChaveFilial(activeNome);
-      if (!groupedByActive.has(activeKey)) {
-        groupedByActive.set(activeKey, row);
-      } else {
-        const currentIsActive =
-          normalizarFilial(groupedByActive.get(activeKey)!.filial) === normalizarFilial(activeNome);
-        if (!currentIsActive) {
-          groupedByActive.set(activeKey, row);
-        }
-      }
-    }
-    const filiaisDeduped = [...groupedByActive.values()].sort(
-      (a, b) => (ordem.get(a.filialKey) ?? 10_000) - (ordem.get(b.filialKey) ?? 10_000)
-    );
+      .filter((row) => row.regId !== null && canonicasCodSet.has(row.regId))
+      .sort(
+        (a, b) =>
+          (ordemCod.get(a.regId as string) ?? 10_000) - (ordemCod.get(b.regId as string) ?? 10_000)
+      );
 
     const resultado: SincronizacaoFilial[] = [];
 
     for (const [index, filial] of filiaisDeduped.entries()) {
       const sufixo = `_${index}`;
-      const isEcommerce = ecommerceFiliais.has(filial.filialKey);
+      const isEcommerce = filial.isEcommerce;
       const dataVendaQuery = isEcommerce
         ? `
           SELECT CONVERT(VARCHAR(19), MAX(f.EMISSAO), 120) AS DATA_VENDA
