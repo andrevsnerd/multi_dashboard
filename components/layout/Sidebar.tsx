@@ -97,6 +97,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/exportar-relatorios` : "/exportar-relatorios";
   const geradorRelatoriosHref =
     basePath && basePath !== "/" ? `${basePath}/gerador-relatorios` : "/gerador-relatorios";
+  const geradorApresentacoesHref =
+    basePath && basePath !== "/" ? `${basePath}/gerador-apresentacoes` : "/gerador-apresentacoes";
   const fornecedoresHref =
     basePath && basePath !== "/" ? `${basePath}/fornecedores` : "/fornecedores";
   const controleEstoqueHref =
@@ -232,6 +234,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/faturamento",
     "/exportar-relatorios",
     "/gerador-relatorios",
+    "/gerador-apresentacoes",
     "/mapa-clientes",
     "/sincronizacao",
     "/admin",
@@ -493,6 +496,18 @@ export default function Sidebar({ companyName }: SidebarProps) {
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/gerador-relatorios", geradorRelatoriosHref),
         },
+        ...(isScarfme
+          ? [
+              {
+                key: "gerador-apresentacoes",
+                label: "Gerador de Apresentações",
+                href: geradorApresentacoesHref,
+                permission: "gerador-apresentacoes" as const,
+                isActive: (currentPathname: string | null) =>
+                  matchesSegment(currentPathname, "/gerador-apresentacoes", geradorApresentacoesHref),
+              },
+            ]
+          : []),
         ...(isNerd
           ? [
               {

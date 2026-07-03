@@ -1,0 +1,46 @@
+/**
+ * Registry extensível dos tipos de apresentação do Gerador de Apresentações.
+ * Espelha a ideia do `lib/reports/registry.ts` (tipos de análise): a página lê
+ * daqui a lista de tipos, quais filtros cada tipo suporta e o que ele exige
+ * (ex.: upload de capa, coleção única). Novos tipos entram só adicionando um
+ * item nesta lista + a lógica de dados correspondente.
+ */
+
+export type PresentationFilterKey =
+  | "periodo"
+  | "filial"
+  | "colecao"
+  | "subgrupo"
+  | "grade"
+  | "grupo";
+
+export interface PresentationTypeMeta {
+  id: string;
+  label: string;
+  description: string;
+  /** Filtros exibidos na home para este tipo. */
+  supportedFilters: PresentationFilterKey[];
+  /** Exibe o campo de upload da imagem de capa da coleção. */
+  requiresCover: boolean;
+  /** Deck é sobre UMA coleção (título/capa usam a coleção selecionada). */
+  singleCollection: boolean;
+}
+
+export const COLECAO_COMPLETA_ID = "colecao-completa";
+
+export const PRESENTATION_TYPES: PresentationTypeMeta[] = [
+  {
+    id: COLECAO_COMPLETA_ID,
+    label: "Relatório Completo de Coleção (com imagens)",
+    description:
+      "Deck de 5 slides no padrão SCARF·ME: capa com foto da coleção, números, " +
+      "performance por produto, vendas por canal/loja e conclusão. Exporta em PDF.",
+    supportedFilters: ["colecao", "periodo", "filial"],
+    requiresCover: true,
+    singleCollection: true,
+  },
+];
+
+export function getPresentationMeta(id: string): PresentationTypeMeta | undefined {
+  return PRESENTATION_TYPES.find((t) => t.id === id);
+}

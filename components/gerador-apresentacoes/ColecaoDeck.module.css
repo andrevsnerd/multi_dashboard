@@ -1,0 +1,582 @@
+/* Porte fiel do template copa-galisteu.hbs (Gerador de Apresentações).
+   Tema coral SCARF·ME, tipografia Fraunces (display) + Inter (texto).
+   Cada slide = 1280×720, vira uma página no export PDF (html2canvas+jsPDF). */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+.deck {
+  --accent: #ff6f61;
+  --accent-d: #e8554a;
+  --accent-soft: #fff0ee;
+  --accent-soft2: #ffe3de;
+  --ink: #2b2024;
+  --muted: #8a7b7e;
+  --line: #f0e6e6;
+  --paper: #fffdfc;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+}
+
+/* Mesmo padrão do Relatório Claude: slide com px fixo, width min(1280,100%) e
+   min-height 720. O export PDF clona cada slide forçando width 1280px, então a
+   fidelidade final é garantida no PDF (a pré-visualização é best-effort). */
+.slide {
+  width: min(1280px, 100%);
+  min-height: 720px;
+  background: var(--paper);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  color: var(--ink);
+  font-family: 'Inter', system-ui, sans-serif;
+  border-radius: 14px;
+  box-shadow: 0 18px 46px -22px rgba(43, 32, 36, 0.45);
+}
+
+.slide * {
+  box-sizing: border-box;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.slide h1,
+.slide h2,
+.slide h3,
+.slide h4,
+.serif {
+  font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+  margin: 0;
+}
+
+/* logo: proporção fixa 3.324:1, nunca distorce */
+.logo {
+  height: 42px;
+  width: calc(42px * 3.324);
+  object-fit: contain;
+  object-position: left center;
+  display: block;
+}
+.logoSm {
+  height: 26px;
+  width: calc(26px * 3.324);
+  object-fit: contain;
+  object-position: left center;
+  display: block;
+}
+.wordmark {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 900;
+  font-size: 30px;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  line-height: 1;
+}
+.wordmark .dot {
+  color: var(--accent);
+  margin: 0 2px;
+}
+.wordmarkSm {
+  font-size: 19px;
+}
+
+/* ===================== COVER / HERO ===================== */
+.hero .left {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 54%;
+  height: 100%;
+  padding: 64px 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  z-index: 3;
+}
+.kicker {
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+.hero h1 {
+  font-size: 80px;
+  line-height: 0.92;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+.hero h1 .sub {
+  display: block;
+  font-size: 30px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-top: 16px;
+  letter-spacing: 0;
+  line-height: 1.25;
+}
+.meta {
+  font-size: 15px;
+  color: var(--muted);
+  line-height: 1.75;
+}
+.meta b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.imgwrap {
+  position: absolute;
+  right: -40px;
+  top: 0;
+  width: 52%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+.imgwrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.imgPlaceholder {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 46%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 40px;
+  z-index: 2;
+}
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  z-index: 1;
+}
+
+/* ===================== CONTENT SHELL ===================== */
+.head {
+  padding: 40px 60px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+.eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.26em;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.head h2 {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-top: 6px;
+}
+.pageimg {
+  height: 62px;
+  width: 62px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--accent-soft);
+}
+.tag {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 14px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.body {
+  flex: 1;
+  padding: 24px 60px 56px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.footer {
+  position: absolute;
+  bottom: 22px;
+  left: 60px;
+  right: 60px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+/* ===================== NUMBERS SLIDE ===================== */
+.numgrid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 28px;
+  flex: 1;
+  min-height: 0;
+}
+.kcol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.kpi {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 24px 26px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.kpi .lbl {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+.kpi .val {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 46px;
+  font-weight: 700;
+  margin-top: 6px;
+  line-height: 1;
+}
+.kpi .val small {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.kpi .foot {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+.kpi.accent {
+  background: linear-gradient(135deg, var(--accent), var(--accent-d));
+  border: none;
+}
+.kpi.accent .lbl,
+.kpi.accent .foot {
+  color: rgba(255, 255, 255, 0.82);
+}
+.kpi.accent .val {
+  color: #fff;
+  font-size: 54px;
+}
+.krow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  flex: 1;
+}
+
+.podium {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 26px 28px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.podium h3 {
+  font-size: 19px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.psub {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-bottom: 18px;
+}
+.prow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
+}
+.prow:last-child {
+  border-bottom: none;
+}
+.prank {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--accent);
+  width: 30px;
+  flex-shrink: 0;
+}
+.pinfo {
+  flex: 1;
+  min-width: 0;
+}
+.pinfo .pn {
+  font-weight: 600;
+  font-size: 14.5px;
+  line-height: 1.2;
+}
+.pinfo .pm {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.pinfo .bar {
+  height: 6px;
+  background: var(--accent-soft);
+  border-radius: 6px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+.pinfo .bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 6px;
+}
+.pval {
+  text-align: right;
+  flex-shrink: 0;
+}
+.pval .v {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 700;
+  font-size: 18px;
+}
+.pval .s {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* ===================== STORES SLIDE ===================== */
+.storewrap {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 36px;
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
+}
+.tablecard {
+  display: flex;
+  flex-direction: column;
+}
+.ct {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+.slide table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.slide th {
+  text-align: left;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+  padding: 0 10px 11px;
+  border-bottom: 2px solid var(--line);
+}
+.slide td {
+  padding: 12.5px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.strong {
+  font-weight: 700;
+}
+.sname {
+  font-weight: 600;
+}
+.totrow td {
+  border-top: 2px solid var(--ink);
+  border-bottom: none;
+  font-weight: 700;
+  font-family: 'Fraunces', Georgia, serif;
+  padding-top: 14px;
+}
+.chartcard {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 26px 28px;
+}
+.chartcard .ct {
+  margin-bottom: 0;
+}
+.cs {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 4px 0 16px;
+}
+
+/* ===================== PRODUCTS TABLE SLIDE ===================== */
+.ptable th {
+  padding: 0 12px 11px;
+}
+.ptable td {
+  padding: 12px 12px;
+}
+.rank {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 700;
+  color: var(--accent);
+  width: 34px;
+  font-size: 17px;
+}
+.pname {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pdesc {
+  font-weight: 600;
+  font-size: 14px;
+}
+.pmeta {
+  font-size: 11px;
+  color: var(--muted);
+}
+.share {
+  width: 160px;
+}
+.share .sb {
+  display: inline-block;
+  width: 96px;
+  height: 7px;
+  background: var(--accent-soft);
+  border-radius: 6px;
+  overflow: hidden;
+  vertical-align: middle;
+  margin-right: 9px;
+}
+.share .sf {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 6px;
+}
+.share span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.ins {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-top: 18px;
+}
+.ins h4 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+.ins p {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+/* ===================== CSS BAR CHART ===================== */
+.hbarChart {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+  justify-content: center;
+}
+.hbarRow {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  align-items: center;
+  gap: 12px;
+}
+.hbarLabel {
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: right;
+}
+.hbarTrack {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.hbarFill {
+  height: 26px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2px;
+  flex-shrink: 0;
+}
+.hbarFill span {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #fff;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+.hbarValue {
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ===================== CONCLUSION SLIDE ===================== */
+.closeGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  flex: 1;
+}
+.closeCard {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.closeCard h4 {
+  font-size: 18px;
+}
+.closeCard p {
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+.footKpis {
+  display: grid;
+  gap: 16px;
+  margin-top: 8px;
+}
