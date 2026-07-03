@@ -49,6 +49,10 @@
 
   /* Marca */
   --brand-scarfme: #2d1b4e;
+  /* Variantes pré-misturadas da marca (não usar color-mix(): html2canvas, usado
+     no export de PDF, não sabe parsear a função e quebra a captura). */
+  --brand-scarfme-tint: rgba(45, 27, 78, 0.12);
+  --brand-scarfme-soft: rgb(140, 130, 158);
 
   /* Gráficos (consumidos via useTheme nos componentes recharts) */
   --chart-line: #475569;
@@ -102,6 +106,8 @@
   --t-gray400: #74829a;
 
   --brand-scarfme: #c4b5fd;
+  --brand-scarfme-tint: rgba(196, 181, 253, 0.12);
+  --brand-scarfme-soft: rgb(223, 214, 254);
 
   --chart-line: #cbd5e1;
   --chart-grid: rgba(148, 163, 184, 0.16);

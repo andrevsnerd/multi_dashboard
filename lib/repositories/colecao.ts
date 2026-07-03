@@ -18,7 +18,7 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
 // COLECOES é catálogo global (~329 linhas) — cabe inteiro num único mapa cacheado.
 let descCache: { expires: number; map: Map<string, string> } | null = null;
 
-async function getColecaoDescMap(): Promise<Map<string, string>> {
+export async function getColecaoDescMap(): Promise<Map<string, string>> {
   if (descCache && descCache.expires > Date.now()) return descCache.map;
 
   const map = await withRequest(async (req) => {
