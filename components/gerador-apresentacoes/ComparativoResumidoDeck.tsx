@@ -134,9 +134,6 @@ function Card({ card, index, cover }: { card: ResumoColecaoCard; index: number; 
         <div className={styles.name} style={{ color: hex(p.ink) }}>
           {card.title}
         </div>
-        <span className={styles.codeChip} style={{ color: hex(p.primary), background: hex(p.tint) }}>
-          {card.code}
-        </span>
       </div>
 
       <div className={styles.metrics}>
