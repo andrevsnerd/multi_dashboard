@@ -10,14 +10,17 @@ import { getCurrentMonthRange, formatDateForQuery } from "@/lib/utils/date";
 import {
   COLECAO_COMPLETA_ID,
   COMPARATIVO_COLECOES_ID,
+  COMPARATIVO_RESUMIDO_ID,
   PRESENTATION_TYPES,
   getPresentationMeta,
 } from "@/lib/presentations/registry";
 import type { ColecaoPresentationPayload } from "@/lib/repositories/colecaoPresentation";
 import type { ComparativoColecoesPayload } from "@/lib/repositories/comparativoColecoes";
+import type { ComparativoResumidoPayload } from "@/lib/repositories/comparativoResumido";
 
 import ColecaoDeck from "./ColecaoDeck";
 import ComparativoDeck from "./ComparativoDeck";
+import ComparativoResumidoDeck from "./ComparativoResumidoDeck";
 import styles from "./GeradorApresentacoesPage.module.css";
 
 interface GeradorApresentacoesPageProps {
@@ -67,6 +70,7 @@ export default function GeradorApresentacoesPage({
   // Resultado
   const [report, setReport] = useState<ColecaoPresentationPayload | null>(null);
   const [comparativo, setComparativo] = useState<ComparativoColecoesPayload | null>(null);
+  const [resumido, setResumido] = useState<ComparativoResumidoPayload | null>(null);
   const [coversByCode, setCoversByCode] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -154,7 +158,12 @@ export default function GeradorApresentacoesPage({
   }, [colecoes, companyKey]);
 
   useEffect(() => {
-    if (presentationTypeId === COMPARATIVO_COLECOES_ID) void loadCoversForSelection();
+    if (
+      presentationTypeId === COMPARATIVO_COLECOES_ID ||
+      presentationTypeId === COMPARATIVO_RESUMIDO_ID
+    ) {
+      void loadCoversForSelection();
+    }
   }, [presentationTypeId, loadCoversForSelection]);
 
   // Upload/troca da capa de UMA coleção específica (recorte de fundo transparente).
@@ -275,6 +284,7 @@ export default function GeradorApresentacoesPage({
         const data = json.data ?? null;
         setComparativo(data);
         setReport(null);
+        setResumido(null);
         // Carrega as capas de todas as coleções do deck.
         if (data) {
           const entries = await Promise.all(
@@ -289,6 +299,45 @@ export default function GeradorApresentacoesPage({
                 return [s.code, j.cover ?? null] as const;
               } catch {
                 return [s.code, null] as const;
+              }
+            })
+          );
+          setCoversByCode(Object.fromEntries(entries));
+        }
+        return;
+      }
+
+      if (presentationTypeId === COMPARATIVO_RESUMIDO_ID) {
+        const res = await fetch("/api/gerador-apresentacoes/comparativo-resumido", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            company: companyKey,
+            filial,
+            range: { start: startStr, end: endStr },
+            colecoes: colecoes.map((code) => ({ code, label: labelForCode(code) })),
+          }),
+        });
+        const json = (await res.json()) as { data?: ComparativoResumidoPayload; error?: string };
+        if (!res.ok) throw new Error(json.error ?? "Erro ao gerar o comparativo resumido.");
+        const data = json.data ?? null;
+        setResumido(data);
+        setReport(null);
+        setComparativo(null);
+        // Carrega as fotos (recortes) de todas as coleções do resumo.
+        if (data) {
+          const entries = await Promise.all(
+            data.cards.map(async (c) => {
+              try {
+                const r = await fetch(
+                  `/api/gerador-apresentacoes/assets?company=${companyKey}&colecao=${encodeURIComponent(c.code)}`,
+                  { cache: "no-store" }
+                );
+                if (!r.ok) return [c.code, null] as const;
+                const j = (await r.json()) as { cover: string | null };
+                return [c.code, j.cover ?? null] as const;
+              } catch {
+                return [c.code, null] as const;
               }
             })
           );
@@ -312,10 +361,12 @@ export default function GeradorApresentacoesPage({
       if (!res.ok) throw new Error(json.error ?? "Erro ao gerar a apresentação.");
       setReport(json.data ?? null);
       setComparativo(null);
+      setResumido(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao gerar a apresentação.");
       setReport(null);
       setComparativo(null);
+      setResumido(null);
     } finally {
       setLoading(false);
     }
@@ -324,7 +375,7 @@ export default function GeradorApresentacoesPage({
   // ---- export PDF (mesmo pipeline do Relatório Claude) ----
   const handleExportPdf = useCallback(async () => {
     const deckElement = deckRef.current;
-    if ((!report && !comparativo) || !deckElement) return;
+    if ((!report && !comparativo && !resumido) || !deckElement) return;
     const slideElements = Array.from(deckElement.querySelectorAll<HTMLElement>("[data-pdf-slide]"));
     if (slideElements.length === 0) return;
 
@@ -386,7 +437,9 @@ export default function GeradorApresentacoesPage({
 
       const baseName = comparativo
         ? `comparativo-colecoes-${comparativo.period.start}-${comparativo.period.end}`
-        : `apresentacao-${report?.collection.code || "colecao"}-${report?.period.start}-${report?.period.end}`;
+        : resumido
+          ? `comparativo-resumido-${resumido.period.start}-${resumido.period.end}`
+          : `apresentacao-${report?.collection.code || "colecao"}-${report?.period.start}-${report?.period.end}`;
       const safeName = baseName.replace(/[^\w-]+/g, "_").slice(0, 100);
       doc.save(`${safeName}.pdf`);
     } catch (e) {
@@ -394,11 +447,14 @@ export default function GeradorApresentacoesPage({
     } finally {
       setExportingPdf(false);
     }
-  }, [report, comparativo]);
+  }, [report, comparativo, resumido]);
 
   const isColecaoType = presentationTypeId === COLECAO_COMPLETA_ID;
   const isComparativo = presentationTypeId === COMPARATIVO_COLECOES_ID;
-  const hasResult = Boolean(report || comparativo);
+  const isResumido = presentationTypeId === COMPARATIVO_RESUMIDO_ID;
+  // Tipos multi-coleção usam uma foto (recorte) por coleção selecionada.
+  const isMultiCover = isComparativo || isResumido;
+  const hasResult = Boolean(report || comparativo || resumido);
 
   return (
     <div className={styles.wrapper}>
@@ -474,6 +530,13 @@ export default function GeradorApresentacoesPage({
             (fundo transparente) da coleção — envie/troque abaixo, por coleção.
           </p>
         )}
+        {isResumido && (
+          <p className={styles.hint}>
+            Escolha as coleções — cada uma vira uma carta compacta (uma abaixo da outra) com foto,
+            venda líquida, quantidade vendida, peças (SKUs) e a evolução mensal, ordenadas por venda
+            líquida. Use o recorte (fundo transparente) de cada coleção — envie/troque abaixo.
+          </p>
+        )}
       </section>
 
       {/* Imagens */}
@@ -526,8 +589,8 @@ export default function GeradorApresentacoesPage({
               </div>
             )}
 
-            {/* Comparativo: uma capa (recorte) por coleção selecionada */}
-            {isComparativo &&
+            {/* Multi-coleção: uma foto (recorte) por coleção selecionada */}
+            {isMultiCover &&
               colecoes.map((code) => {
                 const url = coversByCode[code] ?? null;
                 return (
@@ -624,6 +687,11 @@ export default function GeradorApresentacoesPage({
             {comparativo.totals.colecoes} coleções · {comparativo.period.label}
           </span>
         )}
+        {resumido && !loading && (
+          <span className={styles.resultMeta}>
+            {resumido.totals.colecoes} coleções · {resumido.period.label}
+          </span>
+        )}
       </section>
 
       {error && <div className={styles.error}>{error}</div>}
@@ -643,6 +711,15 @@ export default function GeradorApresentacoesPage({
         <div className={styles.deckWrap}>
           <ComparativoDeck
             payload={comparativo}
+            logoDataUrl={logoDataUrl}
+            coversByCode={coversByCode}
+            deckRef={deckRef}
+          />
+        </div>
+      ) : resumido ? (
+        <div className={styles.deckWrap}>
+          <ComparativoResumidoDeck
+            payload={resumido}
             logoDataUrl={logoDataUrl}
             coversByCode={coversByCode}
             deckRef={deckRef}

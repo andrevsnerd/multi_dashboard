@@ -28,6 +28,7 @@ export interface PresentationTypeMeta {
 
 export const COLECAO_COMPLETA_ID = "colecao-completa";
 export const COMPARATIVO_COLECOES_ID = "comparativo-colecoes";
+export const COMPARATIVO_RESUMIDO_ID = "comparativo-resumido";
 
 export const PRESENTATION_TYPES: PresentationTypeMeta[] = [
   {
@@ -47,6 +48,17 @@ export const PRESENTATION_TYPES: PresentationTypeMeta[] = [
       "Compara várias coleções (uma por slide, com paleta própria): venda líquida, " +
       "ticket médio, markup, desconto, evolução mensal e um slide final de decisão " +
       "de renovação. Escolha 2 ou mais coleções. Exporta em PDF.",
+    supportedFilters: ["colecao", "periodo", "filial"],
+    requiresCover: true,
+    singleCollection: false,
+  },
+  {
+    id: COMPARATIVO_RESUMIDO_ID,
+    label: "Comparativo Resumido de Coleções",
+    description:
+      "Versão enxuta do comparativo: uma carta compacta por coleção (uma abaixo da " +
+      "outra) com foto, venda líquida, quantidade vendida, peças (SKUs) e a evolução " +
+      "mensal. Escolha as coleções, envie a foto de cada uma. Exporta em PDF.",
     supportedFilters: ["colecao", "periodo", "filial"],
     requiresCover: true,
     singleCollection: false,
