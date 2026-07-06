@@ -292,3 +292,50 @@
 .center { text-align: center; padding: 40px 0; }
 .linkBack { color: var(--t-600); font-size: 13px; text-decoration: none; }
 .linkBack:hover { color: var(--brand-scarfme); text-decoration: underline; }
+
+.rowLink { cursor: pointer; }
+.rowLink:hover td { background: var(--s-100); }
+
+/* Detalhe (somente leitura) */
+.viewValue {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 2px;
+  font-size: 14px;
+  color: var(--t-900);
+  border-bottom: 1px dashed var(--b-200);
+}
+.viewValueEmpty { color: var(--t-400); font-style: italic; }
+.viewHint {
+  font-size: 12px;
+  color: var(--t-500);
+  margin-top: 2px;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: var(--s-blue50);
+  color: var(--brand-scarfme);
+}
+.pillNeutral { background: var(--s-100); color: var(--t-600); }
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 4px;
+}
+@media (max-width: 720px) { .statGrid { grid-template-columns: repeat(2, 1fr); } }
+.statBox {
+  background: var(--s-50);
+  border: 1px solid var(--b-200);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.statLabel { font-size: 11.5px; color: var(--t-500); text-transform: uppercase; letter-spacing: 0.04em; }
+.statValue { font-size: 16px; font-weight: 700; color: var(--t-900); margin-top: 2px; }

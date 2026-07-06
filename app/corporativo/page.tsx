@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import type { ClienteCorporativoListItem } from "@/lib/corporativo/types";
 import styles from "./corporativo.module.css";
 
 export default function CorporativoListPage() {
+  const router = useRouter();
   const [items, setItems] = useState<ClienteCorporativoListItem[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -97,7 +99,12 @@ export default function CorporativoListPage() {
                 <tr><td colSpan={9} className={styles.center}><span className={styles.muted}>Nenhum cliente encontrado.</span></td></tr>
               ) : (
                 items.map((c) => (
-                  <tr key={c.codigo}>
+                  <tr
+                    key={c.codigo}
+                    className={styles.rowLink}
+                    title="Ver cadastro completo"
+                    onClick={() => router.push(`/corporativo/${c.codigo}`)}
+                  >
                     <td className={styles.codeCell}>{c.codigo}</td>
                     <td>{c.nomeClifor}{c.inativo && <span className={styles.tag} style={{ marginLeft: 6 }}>inativo</span>}</td>
                     <td>{c.razaoSocial}</td>

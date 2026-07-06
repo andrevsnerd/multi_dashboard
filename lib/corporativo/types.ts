@@ -114,6 +114,52 @@ export interface ClienteCorporativoCriado {
   cpfCnpj: string;
 }
 
+/** Detalhe completo (mestre + comercial) de um cliente corporativo já cadastrado. */
+export interface ClienteCorporativoDetalhe {
+  codigo: string;
+  nomeClifor: string;
+  razaoSocial: string;
+  cpfCnpj: string;
+  tipoPessoa: TipoPessoa;
+  rgIe: string;
+  inscricaoMunicipal: string;
+  tipoTributacao: string;
+  indicadorFiscal: string;
+  suframa: string;
+
+  endereco: EnderecoBloco & { numero: string; complemento: string };
+  cobranca: EnderecoBloco & { numero: string; complemento: string };
+  entrega: EnderecoBloco & { numero: string; complemento: string };
+  enderecoCobrancaIgual: boolean;
+  enderecoEntregaIgual: boolean;
+
+  ddd1: string;
+  telefone1: string;
+  ddd2: string;
+  telefone2: string;
+  email: string;
+  emailNfe: string;
+  aniversario: string | null;
+
+  filial: string;
+  condicaoPgto: string;
+  condicaoPgtoDescricao: string;
+  codigoTabPreco: string;
+  codigoTabPrecoDescricao: string;
+  transportadora: string;
+  regiao: string;
+  conceito: string;
+  tipo: string;
+  pontualidade: string;
+  limiteCredito: number;
+  indicadorVenda: string;
+  matrizCliente: string;
+  observacao: string;
+
+  cadastramento: string | null;
+  inativo: boolean;
+}
+
 /** Linha da listagem de clientes corporativos. */
 export interface ClienteCorporativoListItem {
   codigo: string;

@@ -5,6 +5,7 @@ import { query, withRequest } from "@/lib/db/connection";
 import type { RequestLike } from "@/lib/db/proxy";
 import type {
   ClienteCorporativoCriado,
+  ClienteCorporativoDetalhe,
   ClienteCorporativoInput,
   ClienteCorporativoListItem,
   CorporativoLookups,
@@ -221,6 +222,159 @@ function mapListRow(r: RawListRow): ClienteCorporativoListItem {
     cadastramento: r.cadastramento ? new Date(r.cadastramento).toISOString() : null,
     inativo: Boolean(r.inativo),
   };
+}
+
+interface RawDetalheRow {
+  codigo: string;
+  nome: string;
+  razao: string;
+  cpf: string;
+  pj: boolean;
+  rgIe: string;
+  im: string | null;
+  tipoTributacao: string | null;
+  indicadorFiscal: number | null;
+  suframa: string | null;
+
+  cep: string; endereco: string; numero: string; complemento: string;
+  bairro: string; cidade: string; uf: string; ibge: string;
+
+  cobCep: string; cobEndereco: string; cobNumero: string; cobComplemento: string;
+  cobBairro: string; cobCidade: string; cobUf: string; cobIbge: string;
+
+  entCep: string; entEndereco: string; entNumero: string; entComplemento: string;
+  entBairro: string; entCidade: string; entUf: string; entIbge: string;
+
+  ddd1: string; tel1: string; ddd2: string; tel2: string;
+  email: string | null; emailNfe: string | null; aniversario: Date | string | null;
+
+  filial: string; condicaoPgto: string; condicaoPgtoDesc: string | null;
+  codigoTabPreco: string; codigoTabPrecoDesc: string | null;
+  transportadora: string; regiao: string; conceito: string; tipo: string;
+  pontualidade: string; limiteCredito: number; indicadorVenda: string;
+  matrizCliente: string; observacao: string | null;
+
+  cadastramento: Date | string | null;
+  inativo: boolean;
+}
+
+/** Busca o cadastro completo (mestre + comercial) de um cliente pelo código. */
+export async function fetchClienteCorporativoDetalhe(
+  codigo: string
+): Promise<ClienteCorporativoDetalhe | null> {
+  const cod = onlyDigits(codigo).padStart(6, "0").slice(-6);
+  if (!cod) return null;
+
+  const rows = await withRequest(async (request: sql.Request | RequestLike) => {
+    const req = request as sql.Request;
+    req.input("codigo", cod);
+    const result = await req.query(`
+      SELECT
+        LTRIM(RTRIM(cf.CLIFOR)) AS codigo,
+        LTRIM(RTRIM(cf.NOME_CLIFOR)) AS nome,
+        LTRIM(RTRIM(cf.RAZAO_SOCIAL)) AS razao,
+        LTRIM(RTRIM(cf.CGC_CPF)) AS cpf,
+        cf.PJ_PF AS pj,
+        LTRIM(RTRIM(cf.RG_IE)) AS rgIe,
+        LTRIM(RTRIM(cf.IM)) AS im,
+        LTRIM(RTRIM(cf.TIPO_TRIBUTACAO)) AS tipoTributacao,
+        cf.INDICADOR_FISCAL_TERCEIRO AS indicadorFiscal,
+        LTRIM(RTRIM(cf.INSCRICAO_SUFRAMA)) AS suframa,
+
+        LTRIM(RTRIM(cf.CEP)) AS cep, LTRIM(RTRIM(cf.ENDERECO)) AS endereco,
+        LTRIM(RTRIM(cf.NUMERO)) AS numero, LTRIM(RTRIM(cf.COMPLEMENTO)) AS complemento,
+        LTRIM(RTRIM(cf.BAIRRO)) AS bairro, LTRIM(RTRIM(cf.CIDADE)) AS cidade,
+        LTRIM(RTRIM(cf.UF)) AS uf, LTRIM(RTRIM(cf.COD_MUNICIPIO_IBGE)) AS ibge,
+
+        LTRIM(RTRIM(cf.COBRANCA_CEP)) AS cobCep, LTRIM(RTRIM(cf.COBRANCA_ENDERECO)) AS cobEndereco,
+        LTRIM(RTRIM(cf.COBRANCA_NUMERO)) AS cobNumero, LTRIM(RTRIM(cf.COBRANCA_COMPLEMENTO)) AS cobComplemento,
+        LTRIM(RTRIM(cf.COBRANCA_BAIRRO)) AS cobBairro, LTRIM(RTRIM(cf.COBRANCA_CIDADE)) AS cobCidade,
+        LTRIM(RTRIM(cf.COBRANCA_UF)) AS cobUf, LTRIM(RTRIM(cf.COD_MUNICIPIO_IBGE_COBRANCA)) AS cobIbge,
+
+        LTRIM(RTRIM(cf.ENTREGA_CEP)) AS entCep, LTRIM(RTRIM(cf.ENTREGA_ENDERECO)) AS entEndereco,
+        LTRIM(RTRIM(cf.ENTREGA_NUMERO)) AS entNumero, LTRIM(RTRIM(cf.ENTREGA_COMPLEMENTO)) AS entComplemento,
+        LTRIM(RTRIM(cf.ENTREGA_BAIRRO)) AS entBairro, LTRIM(RTRIM(cf.ENTREGA_CIDADE)) AS entCidade,
+        LTRIM(RTRIM(cf.ENTREGA_UF)) AS entUf, LTRIM(RTRIM(cf.COD_MUNICIPIO_IBGE_ENTREGA)) AS entIbge,
+
+        LTRIM(RTRIM(cf.DDD1)) AS ddd1, LTRIM(RTRIM(cf.TELEFONE1)) AS tel1,
+        LTRIM(RTRIM(cf.DDD2)) AS ddd2, LTRIM(RTRIM(cf.TELEFONE2)) AS tel2,
+        LTRIM(RTRIM(cf.EMAIL)) AS email, LTRIM(RTRIM(cf.EMAIL_NFE)) AS emailNfe, cf.ANIVERSARIO AS aniversario,
+
+        LTRIM(RTRIM(ca.FILIAL)) AS filial,
+        LTRIM(RTRIM(ca.CONDICAO_PGTO)) AS condicaoPgto, LTRIM(RTRIM(cp.DESC_COND_PGTO)) AS condicaoPgtoDesc,
+        LTRIM(RTRIM(ca.CODIGO_TAB_PRECO)) AS codigoTabPreco, LTRIM(RTRIM(tp.TABELA)) AS codigoTabPrecoDesc,
+        LTRIM(RTRIM(ca.TRANSPORTADORA)) AS transportadora, LTRIM(RTRIM(ca.REGIAO)) AS regiao,
+        LTRIM(RTRIM(ca.CONCEITO)) AS conceito, LTRIM(RTRIM(ca.TIPO)) AS tipo,
+        LTRIM(RTRIM(ca.PONTUALIDADE)) AS pontualidade, ISNULL(ca.LIMITE_CREDITO, 0) AS limiteCredito,
+        LTRIM(RTRIM(ca.INDICADOR_VENDA)) AS indicadorVenda, LTRIM(RTRIM(ca.MATRIZ_CLIENTE)) AS matrizCliente,
+        ca.OBS AS observacao,
+
+        cf.CADASTRAMENTO AS cadastramento, ISNULL(ca.INATIVO, 0) AS inativo
+      FROM CADASTRO_CLI_FOR cf WITH (NOLOCK)
+      LEFT JOIN CLIENTES_ATACADO ca WITH (NOLOCK) ON LTRIM(RTRIM(ca.CLIFOR)) = LTRIM(RTRIM(cf.CLIFOR))
+      LEFT JOIN COND_ATAC_PGTOS cp WITH (NOLOCK) ON LTRIM(RTRIM(cp.CONDICAO_PGTO)) = LTRIM(RTRIM(ca.CONDICAO_PGTO))
+      LEFT JOIN TABELAS_PRECO tp WITH (NOLOCK) ON LTRIM(RTRIM(tp.CODIGO_TAB_PRECO)) = LTRIM(RTRIM(ca.CODIGO_TAB_PRECO))
+      WHERE LTRIM(RTRIM(cf.CLIFOR)) = @codigo`);
+    return result.recordset as RawDetalheRow[];
+  });
+
+  const r = rows[0];
+  if (!r) return null;
+
+  const endereco = { cep: r.cep, endereco: r.endereco, numero: r.numero, complemento: r.complemento, bairro: r.bairro, cidade: r.cidade, uf: r.uf, codMunicipioIbge: r.ibge };
+  const cobranca = { cep: r.cobCep, endereco: r.cobEndereco, numero: r.cobNumero, complemento: r.cobComplemento, bairro: r.cobBairro, cidade: r.cobCidade, uf: r.cobUf, codMunicipioIbge: r.cobIbge };
+  const entrega = { cep: r.entCep, endereco: r.entEndereco, numero: r.entNumero, complemento: r.entComplemento, bairro: r.entBairro, cidade: r.entCidade, uf: r.entUf, codMunicipioIbge: r.entIbge };
+
+  return {
+    codigo: r.codigo,
+    nomeClifor: r.nome,
+    razaoSocial: r.razao,
+    cpfCnpj: r.cpf ?? "",
+    tipoPessoa: r.pj ? "PJ" : "PF",
+    rgIe: r.rgIe ?? "",
+    inscricaoMunicipal: r.im ?? "",
+    tipoTributacao: r.tipoTributacao ?? "",
+    indicadorFiscal: r.indicadorFiscal != null ? String(r.indicadorFiscal) : "",
+    suframa: r.suframa ?? "",
+    endereco,
+    cobranca,
+    entrega,
+    enderecoCobrancaIgual: enderecoIguais(endereco, cobranca),
+    enderecoEntregaIgual: enderecoIguais(endereco, entrega),
+    ddd1: r.ddd1 ?? "",
+    telefone1: r.tel1 ?? "",
+    ddd2: r.ddd2 ?? "",
+    telefone2: r.tel2 ?? "",
+    email: r.email ?? "",
+    emailNfe: r.emailNfe ?? "",
+    aniversario: r.aniversario ? new Date(r.aniversario).toISOString() : null,
+    filial: r.filial ?? "",
+    condicaoPgto: r.condicaoPgto ?? "",
+    condicaoPgtoDescricao: r.condicaoPgtoDesc ?? "",
+    codigoTabPreco: r.codigoTabPreco ?? "",
+    codigoTabPrecoDescricao: r.codigoTabPrecoDesc ?? "",
+    transportadora: r.transportadora ?? "",
+    regiao: r.regiao ?? "",
+    conceito: r.conceito ?? "",
+    tipo: r.tipo ?? "",
+    pontualidade: r.pontualidade ?? "",
+    limiteCredito: Number(r.limiteCredito) || 0,
+    indicadorVenda: r.indicadorVenda ?? "",
+    matrizCliente: r.matrizCliente ?? "",
+    observacao: r.observacao ?? "",
+    cadastramento: r.cadastramento ? new Date(r.cadastramento).toISOString() : null,
+    inativo: Boolean(r.inativo),
+  };
+}
+
+function enderecoIguais(a: EnderecoBloco, b: EnderecoBloco): boolean {
+  return (
+    a.cep === b.cep &&
+    a.endereco === b.endereco &&
+    a.bairro === b.bairro &&
+    a.cidade === b.cidade &&
+    a.uf === b.uf
+  );
 }
 
 /** Busca cliente existente pelo documento (para avisar duplicidade). */
