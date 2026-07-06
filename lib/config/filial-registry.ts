@@ -105,6 +105,7 @@ export const FILIAIS: FilialDef[] = [
 export const LEGACY_ACTIVE_SELF_MAP_IDS: Record<CompanyKey, string[]> = {
   nerd: [],
   scarfme: ['000109'],
+  corporativo: [],
 };
 
 // ── Grupos lógicos (tratados como uma loja só) ─────────────────────────────────
@@ -121,12 +122,14 @@ export const FILIAL_GROUPS: FilialGroupDef[] = [
 export const COMPANY_LEAD_TIME_DEFAULT: Record<CompanyKey, number> = {
   nerd: 2,
   scarfme: 3,
+  corporativo: 0,
 };
 
 /** Ordem fixa dos cards "Estoque por Filial" (por nome de exibição). */
 export const ESTOQUE_FILIAL_ORDER: Record<CompanyKey, string[]> = {
   nerd: ['MATRIZ', 'MORUMBI 1', 'MORUMBI 2', 'ELDORADO', 'VILLA LOBOS', 'HIGIENOPOLIS', 'LEBLON', 'CENTER NORTE'],
   scarfme: ['MATRIZ', 'E-COMMERCE', 'GUARULHOS', 'MORUMBI', 'OSCAR FREIRE', 'VILLA LOBOS', 'GALEÃO RJ'],
+  corporativo: [],
 };
 
 // ── Helpers de leitura (puros, sem banco) ──────────────────────────────────────

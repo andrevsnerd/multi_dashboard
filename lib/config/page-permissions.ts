@@ -48,6 +48,8 @@ export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "fornecedores", label: "Grupos de Fornecedores", routeSegments: ["fornecedores"] },
   { key: "sincronizacao", label: "Sincronizacao", routeSegments: ["sincronizacao"] },
   { key: "blackfriday", label: "Black Friday", routeSegments: ["blackfriday"] },
+  // Área CORPORATIVO (cadastro de clientes atacado). Rota-raiz "corporativo".
+  { key: "clientes-corporativos", label: "Clientes Corporativos", routeSegments: ["corporativo"] },
 ] as const satisfies readonly PagePermissionDefinition[];
 
 export type PermissionKey = (typeof PAGE_PERMISSION_DEFINITIONS)[number]["key"];

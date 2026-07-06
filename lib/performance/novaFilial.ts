@@ -25,6 +25,7 @@ export interface NovaFilialPreset {
 const MATRIZ_FILIAIS: Record<CompanyKey, string[]> = {
   nerd: ["NERD"],
   scarfme: ["SCARF ME - MATRIZ"],
+  corporativo: [],
 };
 
 export const CURVA_LABELS: Record<Curva, string> = {
@@ -59,6 +60,7 @@ const PRESETS: Record<CompanyKey, NovaFilialPreset[]> = {
       target: "NERD MORUMBI RDRRX",
     },
   ],
+  corporativo: [],
 };
 
 export function normalizeNovaFilialKey(value?: string | null): string {

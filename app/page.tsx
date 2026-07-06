@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthContext";
-import { getFirstAllowedPath, getVisibleCompanies } from "@/lib/auth/permissions";
+import { canAccessPath, getFirstAllowedPath, getVisibleCompanies } from "@/lib/auth/permissions";
 import styles from "./page.module.css";
 
 export default function Home() {
@@ -10,6 +10,8 @@ export default function Home() {
   const visible = user ? getVisibleCompanies(user) : ["nerd", "scarfme"];
   const nerdHref = user ? getFirstAllowedPath(user, "nerd") : "/nerd";
   const scarfmeHref = user ? getFirstAllowedPath(user, "scarfme") : "/scarfme";
+  // CORPORATIVO só aparece para quem realmente pode entrar (admin + cliente_corporativo).
+  const canCorporativo = user ? canAccessPath(user, "/corporativo") : false;
 
   return (
     <main className={styles.container}>
@@ -35,6 +37,13 @@ export default function Home() {
             <span className={styles.companyLabel}>SCARF ME</span>
             <strong className={styles.companyTitle}>Dashboard Scarf Me</strong>
             <span className={styles.companyHint}>Indicadores estratégicos por operação</span>
+          </Link>
+        )}
+        {canCorporativo && (
+          <Link href="/corporativo" className={styles.companyCard}>
+            <span className={styles.companyLabel}>CORPORATIVO</span>
+            <strong className={styles.companyTitle}>Clientes Corporativos</strong>
+            <span className={styles.companyHint}>Cadastro de clientes atacado (PF e PJ)</span>
           </Link>
         )}
       </div>

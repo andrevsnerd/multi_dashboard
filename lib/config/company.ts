@@ -1,6 +1,6 @@
 import { buildDerivedFilialConfig, staticNameOf } from './filial-config-builder';
 
-export type CompanyKey = 'nerd' | 'scarfme';
+export type CompanyKey = 'nerd' | 'scarfme' | 'corporativo';
 
 export type CompanyModule = 'sales' | 'inventory';
 
@@ -58,6 +58,14 @@ const companyConfigs: Record<CompanyKey, CompanyConfig> = {
       'EMBALAGENS',
       'CAPAS E ACESSORIOS P/ CEL',
     ],
+  },
+  // CORPORATIVO não é uma operação de varejo: não tem filiais/estoque/vendas.
+  // É uma área dedicada ao cadastro de clientes corporativos (atacado). Os campos
+  // de filial ficam vazios de propósito; a área vive fora do dashboard [company].
+  corporativo: {
+    key: 'corporativo',
+    name: 'CORPORATIVO',
+    ...buildDerivedFilialConfig('corporativo', staticNameOf),
   },
 };
 

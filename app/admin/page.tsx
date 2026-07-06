@@ -745,11 +745,13 @@ export default function AdminPage() {
                     </span>
                   </td>
                   <td>
-                    {!u.allowedCompanies?.length || u.allowedCompanies.length === 2
-                      ? "Ambas"
-                      : u.allowedCompanies[0] === "nerd"
-                        ? "NERD"
-                        : "SCARF ME"}
+                    {!u.allowedCompanies?.length
+                      ? "Todas"
+                      : u.allowedCompanies
+                          .map((c) =>
+                            c === "nerd" ? "NERD" : c === "scarfme" ? "SCARF ME" : "CORPORATIVO"
+                          )
+                          .join(", ")}
                   </td>
                   <td>{getUserFilial(u)}</td>
                   <td className={styles.permCount}>
@@ -892,6 +894,7 @@ export default function AdminPage() {
                         <option value="">Ambas (NERD e SCARF ME)</option>
                         <option value="nerd">Só NERD</option>
                         <option value="scarfme">Só SCARF ME</option>
+                        <option value="corporativo">Só CORPORATIVO</option>
                       </select>
                     </label>
                   </div>

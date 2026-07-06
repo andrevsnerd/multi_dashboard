@@ -2,7 +2,7 @@ import { LEGACY_PERMISSION_FALLBACKS } from "@/lib/config/page-permissions";
 import { NAV_ROUTE_MAP } from "@/lib/config/nav-route-map";
 import type { CompanyKey, PermissionKey, RoleKey, UserSession } from "@/types/auth";
 
-const ALL_COMPANIES: CompanyKey[] = ["nerd", "scarfme"];
+const ALL_COMPANIES: CompanyKey[] = ["nerd", "scarfme", "corporativo"];
 
 /**
  * Permissoes restritas por funcao: mesmo que concedidas a um usuario, so
@@ -11,6 +11,9 @@ const ALL_COMPANIES: CompanyKey[] = ["nerd", "scarfme"];
  */
 export const ROLE_RESTRICTED_PERMISSIONS: Partial<Record<PermissionKey, RoleKey[]>> = {
   "extrato-produto": ["admin", "logistica"],
+  // Área corporativo é exclusiva do admin e do cliente_corporativo. Gestor/logística
+  // (mesmo com "sem permissões = vê tudo") nunca acessam, pois roleAllowsPermission barra.
+  "clientes-corporativos": ["admin", "cliente_corporativo"],
 };
 
 /** True se a funcao do usuario pode, em tese, receber/usar essa permissao. */
@@ -43,6 +46,8 @@ export function pathnameToPermission(pathname: string | null): PermissionKey | "
   if (pathname === "/admin") return "admin";
 
   const parts = pathname.split("/").filter(Boolean);
+  // Área CORPORATIVO: toda rota /corporativo/* exige a permissão clientes-corporativos.
+  if (parts[0] === "corporativo") return "clientes-corporativos";
   if (parts.length === 1) return "dashboard"; // /nerd -> dashboard
   if (parts.length < 2) return null;
 
@@ -82,8 +87,12 @@ export function canAccessPath(user: UserSession | null, pathname: string | null)
 
   const parts = pathname?.split("/").filter(Boolean) ?? [];
   const companySegment = parts[0];
-  if (companySegment && (companySegment === "nerd" || companySegment === "scarfme")) {
-    if (!canAccessCompany(user, companySegment)) return false;
+  if (
+    companySegment &&
+    (companySegment === "nerd" || companySegment === "scarfme" || companySegment === "corporativo")
+  ) {
+    // Admin pode ver qualquer empresa; demais respeitam allowedCompanies.
+    if (user.role !== "admin" && !canAccessCompany(user, companySegment)) return false;
   }
 
   if (user.role === "admin") return true;
@@ -93,6 +102,9 @@ export function canAccessPath(user: UserSession | null, pathname: string | null)
 /** Primeira rota permitida para o usuario em uma empresa (ex: /nerd/controle-transferencias). */
 export function getFirstAllowedPath(user: UserSession | null, company: string): string {
   if (!user) return `/${company}`;
+  // Área corporativo tem rota própria (fora do dashboard [company]).
+  if (company === "corporativo") return "/corporativo";
+  if (user.role === "cliente_corporativo") return "/corporativo";
   if (user.role === "admin") return `/${company}`;
   if ((user.role === "gestor" || user.role === "logistica") && !user.permissions?.length) return `/${company}`;
   if (user.permissions.includes("controle-transferencias")) return `/${company}/controle-transferencias`;

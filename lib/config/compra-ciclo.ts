@@ -121,6 +121,14 @@ const CICLO_CONFIG: Record<CompanyKey, CompanyCicloConfig> = {
     recenteHorizonteDias: 60,
     compraDiaSemana: 1, // compras NERD acontecem às segundas-feiras
   },
+  // CORPORATIVO não faz compra/reposição — só cadastro de clientes. Config inerte.
+  corporativo: {
+    enabled: false,
+    rules: [],
+    default: { grupo: "Padrão", coberturaDias: 30, producaoDias: 14 },
+    gapAntigoDias: 30,
+    recenteHorizonteDias: 60,
+  },
 };
 
 /**

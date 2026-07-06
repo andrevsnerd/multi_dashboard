@@ -36,6 +36,11 @@ export default async function CompanyDashboardPage({ params }: CompanyPageProps)
     notFound();
   }
 
+  // CORPORATIVO não tem dashboard: vive na área própria /corporativo (rota estática).
+  if (company.key === "corporativo") {
+    notFound();
+  }
+
   return (
     <PageLayout companyName={company.name}>
     <div className={styles.page}>
