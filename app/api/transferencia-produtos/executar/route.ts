@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 
 import { findUserByUsername } from '@/lib/auth/users-store';
-import { getActiveFilial, resolveCompany } from '@/lib/config/company';
+import { getActiveFilial } from '@/lib/config/company';
+import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import { getConnectionPool } from '@/lib/db/connection';
 import { shouldUseProxy, forwardTransferToProxy } from '@/lib/db/proxy';
 import { executeTransfer } from '@/lib/transfer-executor';
@@ -20,14 +21,19 @@ interface TransferenciaRequest {
   companyKey?: string;
 }
 
-function getActiveFilialForRequest(companyKey: string | undefined, filial: string): string {
-  const preferredCompany = resolveCompany(companyKey);
+// Resolve a filial informada para a CANÔNICA ATIVA detectada ao vivo (venda mais recente
+// entre os membros do grupo — ex.: rodízio MSC↔AKS do e-commerce). Precisa ser dinâmico:
+// esta é a rota que GRAVA o romaneio, então usar a canônica estática mandaria a movimentação
+// para a filial errada quando o rodízio girasse.
+async function getActiveFilialForRequest(companyKey: string | undefined, filial: string): Promise<string> {
+  const preferredCompany = await resolveCompanyDynamic(companyKey);
   if (preferredCompany) {
     return getActiveFilial(preferredCompany, filial);
   }
 
   for (const key of ['nerd', 'scarfme']) {
-    const company = resolveCompany(key);
+    const company = await resolveCompanyDynamic(key);
+    if (!company) continue;
     const active = getActiveFilial(company, filial);
     if (active !== filial.trim()) return active;
   }
@@ -59,8 +65,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const fo = getActiveFilialForRequest(companyKey, filialOrigem.trim());
-    const fd = getActiveFilialForRequest(companyKey, filialDestino.trim());
+    const fo = await getActiveFilialForRequest(companyKey, filialOrigem.trim());
+    const fd = await getActiveFilialForRequest(companyKey, filialDestino.trim());
 
     if (!username) {
       return NextResponse.json(
@@ -89,10 +95,10 @@ export async function POST(request: Request) {
 
         const origemOk =
           permissao.filiaisOrigem.length === 0 ||
-          permissao.filiaisOrigem.some((p) => getActiveFilialForRequest(companyKey, (p || '').trim()) === fo);
+          (await Promise.all(permissao.filiaisOrigem.map((p) => getActiveFilialForRequest(companyKey, (p || '').trim())))).some((a) => a === fo);
         const destinoOk =
           permissao.filiaisDestino.length === 0 ||
-          permissao.filiaisDestino.some((p) => getActiveFilialForRequest(companyKey, (p || '').trim()) === fd);
+          (await Promise.all(permissao.filiaisDestino.map((p) => getActiveFilialForRequest(companyKey, (p || '').trim())))).some((a) => a === fd);
 
         if (!origemOk || !destinoOk) {
           return NextResponse.json(

@@ -7,7 +7,8 @@
 
 import { hasPostgres } from '@/lib/db/neon';
 import { getNeonSql } from '@/lib/db/neon';
-import { getActiveFilial, resolveCompany } from '@/lib/config/company';
+import { getActiveFilial, type CompanyConfig } from '@/lib/config/company';
+import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import fs from 'fs';
 import path from 'path';
 
@@ -15,12 +16,23 @@ const PERMISSOES_FILE = path.join(process.cwd(), 'data', 'transferencia-permisso
 
 let tableChecked = false;
 
-function normalizeFilialAcrossCompanies(filial: string | null | undefined): string {
+/**
+ * Resolve uma filial (origem/destino/atribuída) para a CANÔNICA ATIVA do grupo, usando a
+ * detecção viva (venda mais recente entre os membros — ex.: rodízio MSC↔AKS do e-commerce).
+ * DEVE ser dinâmico: se um usuário está atribuído a uma filial de grupo, a canônica gravada
+ * precisa acompanhar o rodízio; com a canônica estática, o filtro de romaneios por
+ * `filialAtribuida` não casaria com o destino (que as rotas resolvem pela canônica viva).
+ * `configs` = configs dinâmicos de nerd/scarfme resolvidos uma vez (evita rodar o detector em loop).
+ */
+function normalizeFilialAcrossCompanies(
+  filial: string | null | undefined,
+  configs: Array<CompanyConfig | null>
+): string {
   const raw = (filial || '').trim();
   if (!raw || raw.toUpperCase() === 'TODAS') return raw;
 
-  for (const key of ['nerd', 'scarfme']) {
-    const company = resolveCompany(key);
+  for (const company of configs) {
+    if (!company) continue;
     const active = getActiveFilial(company, raw);
     if (active !== raw) return active;
   }
@@ -28,12 +40,15 @@ function normalizeFilialAcrossCompanies(filial: string | null | undefined): stri
   return raw;
 }
 
-function normalizeFilialList(filiais: string[] | null | undefined): string[] {
+function normalizeFilialList(
+  filiais: string[] | null | undefined,
+  configs: Array<CompanyConfig | null>
+): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
 
   for (const filial of filiais ?? []) {
-    const active = normalizeFilialAcrossCompanies(filial);
+    const active = normalizeFilialAcrossCompanies(filial, configs);
     const key = active.toUpperCase();
     if (!active || seen.has(key)) continue;
     seen.add(key);
@@ -43,14 +58,20 @@ function normalizeFilialList(filiais: string[] | null | undefined): string[] {
   return result;
 }
 
-function normalizePermissao(permissao: TransferenciaPermissao): TransferenciaPermissao {
+async function normalizePermissao(permissao: TransferenciaPermissao): Promise<TransferenciaPermissao> {
+  // Resolve os configs dinâmicos (com a canônica viva) UMA vez para toda a permissão.
+  const configs = await Promise.all([
+    resolveCompanyDynamic('nerd'),
+    resolveCompanyDynamic('scarfme'),
+  ]);
+
   return {
     ...permissao,
-    filiaisOrigem: normalizeFilialList(permissao.filiaisOrigem),
-    filiaisDestino: normalizeFilialList(permissao.filiaisDestino),
-    filiaisDestinoControle: normalizeFilialList(permissao.filiaisDestinoControle),
+    filiaisOrigem: normalizeFilialList(permissao.filiaisOrigem, configs),
+    filiaisDestino: normalizeFilialList(permissao.filiaisDestino, configs),
+    filiaisDestinoControle: normalizeFilialList(permissao.filiaisDestinoControle, configs),
     filialAtribuida: permissao.filialAtribuida
-      ? normalizeFilialAcrossCompanies(permissao.filialAtribuida)
+      ? normalizeFilialAcrossCompanies(permissao.filialAtribuida, configs)
       : permissao.filialAtribuida ?? null,
   };
 }
@@ -129,7 +150,7 @@ export async function getPermissaoByUsername(username: string): Promise<Transfer
   if (!hasPostgres()) {
     const permissoes = readPermissoesFile();
     const permissao = permissoes.find((p) => p.username.toLowerCase() === normalized) ?? null;
-    return permissao ? normalizePermissao(permissao) : null;
+    return permissao ? await normalizePermissao(permissao) : null;
   }
 
   const sql = getNeonSql();
@@ -158,13 +179,13 @@ export async function getPermissaoByUsername(username: string): Promise<Transfer
     if (process.env.NODE_ENV === 'development') {
       const fromFile = readPermissoesFile();
       const permissao = fromFile.find((p) => p.username.toLowerCase() === normalized) ?? null;
-      return permissao ? normalizePermissao(permissao) : null;
+      return permissao ? await normalizePermissao(permissao) : null;
     }
     return null;
   }
 
   const row = result[0];
-  return normalizePermissao({
+  return await normalizePermissao({
     username: row.username,
     filiaisOrigem: row.filiais_origem || [],
     filiaisDestino: row.filiais_destino || [],
@@ -183,7 +204,7 @@ export async function getPermissaoByUsername(username: string): Promise<Transfer
  * Salva ou atualiza as permissões de um usuário
  */
 export async function savePermissao(permissao: TransferenciaPermissao): Promise<void> {
-  const permissaoNormalizada = normalizePermissao(permissao);
+  const permissaoNormalizada = await normalizePermissao(permissao);
   if (!hasPostgres()) {
     const permissoes = readPermissoesFile();
     const normalized = permissaoNormalizada.username.toLowerCase().trim();
@@ -260,7 +281,7 @@ export async function savePermissao(permissao: TransferenciaPermissao): Promise<
  */
 export async function listAllPermissoes(): Promise<TransferenciaPermissao[]> {
   if (!hasPostgres()) {
-    return readPermissoesFile().map(normalizePermissao);
+    return Promise.all(readPermissoesFile().map(normalizePermissao));
   }
 
   const sql = getNeonSql();
@@ -283,7 +304,7 @@ export async function listAllPermissoes(): Promise<TransferenciaPermissao[]> {
     ORDER BY username
   `;
 
-  return result.map((row) => normalizePermissao({
+  return Promise.all(result.map((row) => normalizePermissao({
     username: row.username,
     filiaisOrigem: row.filiais_origem || [],
     filiaisDestino: row.filiais_destino || [],
@@ -295,7 +316,7 @@ export async function listAllPermissoes(): Promise<TransferenciaPermissao[]> {
     tipoRomaneioFixo: row.tipo_romaneio_fixo || false,
     podeVerOutrasFiliais: row.pode_ver_outras_filiais === true,
     filialAtribuida: row.filial_atribuida != null ? String(row.filial_atribuida).trim() || null : null,
-  }));
+  })));
 }
 
 /**

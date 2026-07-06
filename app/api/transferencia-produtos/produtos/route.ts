@@ -3,7 +3,7 @@ import { getPublicDatabaseErrorMessage, isDatabaseConnectionError, withRequest }
 import sql from 'mssql';
 import { getMappedColorDescription } from '@/lib/utils/colorMapping';
 import { getActiveFilial } from '@/lib/config/company';
-import { resolveCompanyLive } from '@/lib/server/company-live';
+import { resolveCompanyDynamic } from '@/lib/config/company-server';
 
 export const maxDuration = 60;
 
@@ -48,7 +48,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const searchTerm = searchParams.get('q') || '';
   const filialOrigem = searchParams.get('filialOrigem');
-  const company = await resolveCompanyLive(searchParams.get('company') || undefined);
+  const company = await resolveCompanyDynamic(searchParams.get('company') || undefined);
   const filialOperacional = filialOrigem ? getActiveFilial(company, filialOrigem) : null;
   const corProduto = searchParams.get('corProduto'); // Para filtrar quando encontrado por código de barras
   const isEntrada = searchParams.get('entrada') === 'true';

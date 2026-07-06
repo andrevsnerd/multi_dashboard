@@ -99,6 +99,23 @@ interface TransfPerm {
 interface Filial {
   codFilial: string;
   filial: string;
+  /** Nome curto de exibição (ex.: "E-COMMERCE", "PAULISTA"). */
+  displayName?: string;
+  /** Membros do grupo (>1 = grupo com canônica rotativa, ex.: E-COMMERCE MSC↔AKS). */
+  members?: string[];
+}
+
+/**
+ * Rótulo da opção de filial. Para GRUPOS (mais de um membro — ex.: E-COMMERCE do rodízio
+ * MSC↔AKS, ou PAULISTA), mostra o nome do grupo + a CANÔNICA ATIVA atual, deixando claro
+ * qual filial está operacional agora. Filial simples usa o override/nome de sempre.
+ */
+function filialOptionLabel(f: Filial): string {
+  if (f.members && f.members.length > 1) {
+    const base = f.displayName?.trim() || getFilialLabel(f.filial);
+    return `${base} — canônica atual: ${f.filial}`;
+  }
+  return getFilialLabel(f.filial);
 }
 
 /* ── Página ── */
@@ -525,7 +542,8 @@ export default function AdminPage() {
 
   /* ── Helpers de exibição ── */
   function getFilialNome(cod: string) {
-    return filiais.find((f) => f.codFilial === cod)?.filial ?? cod;
+    const f = filiais.find((f) => f.codFilial === cod);
+    return f ? filialOptionLabel(f) : cod;
   }
 
   function getUserFilial(u: UserRow) {
@@ -986,7 +1004,7 @@ export default function AdminPage() {
                       <option value="">Nenhuma — somente visualização</option>
                       {formFiliais.map((f) => (
                         <option key={f.codFilial} value={f.codFilial}>
-                          {f.filial}
+                          {filialOptionLabel(f)}
                         </option>
                       ))}
                     </select>
@@ -1083,7 +1101,7 @@ export default function AdminPage() {
                                 }
                                 disabled={saving}
                               />
-                              {getFilialLabel(f.filial)}
+                              {filialOptionLabel(f)}
                             </label>
                           ))}
                         </div>
@@ -1109,7 +1127,7 @@ export default function AdminPage() {
                                 }
                                 disabled={saving}
                               />
-                              {getFilialLabel(f.filial)}
+                              {filialOptionLabel(f)}
                             </label>
                           ))}
                         </div>
