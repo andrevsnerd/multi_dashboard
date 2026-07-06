@@ -137,7 +137,7 @@ export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps
   const [range, setRange] = useState<DateRangeValue>(initialRange);
   const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
   const [metric, setMetric] = useState<MetricKey>("vendas");
-  const [theme, setTheme] = useState<Theme>("padrao");
+  const [theme, setTheme] = useState<Theme>("fotos");
 
   const [items, setItems] = useState<ColecaoPanelItem[]>([]);
   const [loading, setLoading] = useState(false);

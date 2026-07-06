@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { type CompanyConfig } from './company';
-import { resolveCompanyLive, liveNameForFilialRef, liveNamesForFilialRefs } from '@/lib/server/company-live';
+import { resolveCompanyLive, liveNameForFilialRef, liveNamesForFilialRefs, idForFilialRef } from '@/lib/server/company-live';
 import {
   listFilialGruposByCompany,
   buildDerivedFilialConfig,
@@ -68,4 +68,45 @@ export async function resolveCompanyDynamic(
   } catch {
     return base;
   }
+}
+
+/**
+ * Detecta a filial ATIVA (canônica) de cada grupo da empresa pela venda/emissão mais
+ * recente entre os membros — a MESMA regra usada por `resolveCompanyDynamic` (e, portanto,
+ * pelo dashboard). Retorna Map de groupId → COD_FILIAL detectado.
+ *
+ * Usado pelo painel admin de Grupos de Filiais para exibir a canônica VIVA (ex.: rodízio
+ * MSC↔AKS do e-commerce), em vez do `active` estático salvo/registry, que fica defasado
+ * quando o rodízio vira. Em caso de falha, o detector já cai no active configurado.
+ */
+export async function detectActiveFilialIdsByCompany(
+  company?: string
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const base = await resolveCompanyLive(company);
+  if (!base) return out;
+
+  const grupos = await listFilialGruposByCompany(base.key);
+  if (grupos.length === 0) return out;
+
+  const gruposVivos = await Promise.all(
+    grupos.map(async (g) => ({
+      ...g,
+      members: (await liveNamesForFilialRefs(g.members)) ?? g.members,
+      active: (await liveNameForFilialRef(g.active)) ?? g.active,
+    }))
+  );
+
+  const detectedActives = await detectActiveFilials(
+    gruposVivos,
+    base.ecommerceFilials ?? []
+  );
+
+  // detectActiveFilials devolve NOMES vivos; converte de volta para COD_FILIAL.
+  for (const [gid, name] of detectedActives) {
+    const id = await idForFilialRef(name);
+    if (id) out.set(gid, id);
+  }
+
+  return out;
 }

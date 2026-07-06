@@ -6,6 +6,7 @@ import {
   type FilialGrupo,
 } from '@/lib/utils/filial-grupos-store';
 import { idsForFilialRefs, idForFilialRef } from '@/lib/server/company-live';
+import { detectActiveFilialIdsByCompany } from '@/lib/config/company-server';
 
 function slugify(text: string): string {
   return text
@@ -44,7 +45,33 @@ export async function GET(req: NextRequest) {
       }))
     );
 
-    return NextResponse.json({ data: gruposPorId });
+    // Detecta a canônica VIVA de cada grupo (venda/emissão mais recente entre os membros
+    // — mesma regra do dashboard). Assim o painel acompanha o rodízio (ex.: MSC↔AKS do
+    // e-commerce) em vez de exibir o `active` estático defasado.
+    const empresas = [...new Set(gruposPorId.map((g) => g.company))];
+    const detectedPorEmpresa = new Map<string, Map<string, string>>();
+    await Promise.all(
+      empresas.map(async (c) => {
+        try {
+          detectedPorEmpresa.set(c, await detectActiveFilialIdsByCompany(c));
+        } catch {
+          detectedPorEmpresa.set(c, new Map());
+        }
+      })
+    );
+
+    const comCanonica = gruposPorId.map((g) => {
+      const detected = detectedPorEmpresa.get(g.company)?.get(g.id);
+      const activeAtual = detected ?? g.active; // canônica viva; fallback = configurada
+      return {
+        ...g,
+        active: activeAtual,
+        configuredActive: g.active,                              // fallback estático (para o formulário)
+        autoDetected: detected != null && g.members.length > 1,  // regra de última venda só escolhe entre 2+ membros
+      };
+    });
+
+    return NextResponse.json({ data: comCanonica });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'Erro ao listar grupos' },

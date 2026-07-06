@@ -8,8 +8,10 @@ interface FilialGrupo {
   id: string;
   label: string;
   company: string;
-  members: string[]; // COD_FILIAL
-  active: string;    // COD_FILIAL
+  members: string[];         // COD_FILIAL
+  active: string;            // COD_FILIAL — canônica VIVA (detectada pela última venda)
+  configuredActive?: string; // COD_FILIAL — ativa estática configurada (fallback)
+  autoDetected?: boolean;    // true quando `active` veio da regra de última venda
 }
 
 interface FilialOption {
@@ -111,7 +113,9 @@ export default function FilialGruposPage() {
     setFormLabel(g.label);
     setFormCompany(g.company);
     setFormMemberIds(g.members);
-    setFormActive(g.active);
+    // Edita a ativa CONFIGURADA (fallback estático), não a canônica detectada ao vivo —
+    // do contrário salvaríamos a detecção do momento como fallback fixo.
+    setFormActive(g.configuredActive ?? g.active);
     setFormError("");
     setModal("edit");
   }
@@ -286,6 +290,16 @@ export default function FilialGruposPage() {
                         }}>
                           {filialLabel(g.active)}
                         </span>
+                        {g.autoDetected && (
+                          <div style={{ fontSize: 10, color: "#0284c7", marginTop: 4, fontWeight: 600 }}>
+                            ⟳ detectada pela última venda
+                          </div>
+                        )}
+                        {g.configuredActive && g.configuredActive !== g.active && (
+                          <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>
+                            configurada: {filialLabel(g.configuredActive)}
+                          </div>
+                        )}
                       </td>
                       <td className={styles.actionsCol}>
                         <button
