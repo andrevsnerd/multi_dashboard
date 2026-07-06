@@ -1,76 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type {
-  ClienteCorporativoCriado,
-  CorporativoLookups,
-  OptionItem,
-  TipoPessoa,
-} from "@/lib/corporativo/types";
+import { useCallback, useEffect, useState } from "react";
+import type { ClienteCorporativoCriado, CorporativoLookups, TipoPessoa } from "@/lib/corporativo/types";
+import { ClienteCorporativoForm } from "../_components/ClienteCorporativoForm";
+import { initialForm, pickOption, UF_REGIAO, type EnderecoFields, type FormState } from "../_components/formTypes";
 import styles from "../corporativo.module.css";
-
-/** UF → macro-região (para preencher REGIAO automaticamente). */
-const UF_REGIAO: Record<string, string> = {
-  AC: "NORTE", AP: "NORTE", AM: "NORTE", PA: "NORTE", RO: "NORTE", RR: "NORTE", TO: "NORTE",
-  AL: "NORDESTE", BA: "NORDESTE", CE: "NORDESTE", MA: "NORDESTE", PB: "NORDESTE", PE: "NORDESTE", PI: "NORDESTE", RN: "NORDESTE", SE: "NORDESTE",
-  DF: "CENTRO OESTE", GO: "CENTRO OESTE", MT: "CENTRO OESTE", MS: "CENTRO OESTE",
-  ES: "SUDESTE", MG: "SUDESTE", RJ: "SUDESTE", SP: "SUDESTE",
-  PR: "SUL", RS: "SUL", SC: "SUL",
-};
-
-type EnderecoFields = {
-  cep: string; endereco: string; numero: string; complemento: string;
-  bairro: string; cidade: string; uf: string; codMunicipioIbge: string;
-};
-
-const emptyEndereco: EnderecoFields = {
-  cep: "", endereco: "", numero: "", complemento: "", bairro: "", cidade: "", uf: "", codMunicipioIbge: "",
-};
-
-interface FormState extends EnderecoFields {
-  tipoPessoa: TipoPessoa;
-  razaoSocial: string;
-  nomeFantasia: string;
-  cpfCnpj: string;
-  rgIe: string;
-  isento: boolean;
-  inscricaoMunicipal: string;
-  tipoTributacao: string;
-  indicadorFiscal: string;
-  suframa: string;
-  ddd1: string; telefone1: string; ddd2: string; telefone2: string;
-  email: string; emailNfe: string; aniversario: string;
-  mesmoEnderecoCobranca: boolean;
-  mesmoEnderecoEntrega: boolean;
-  cobranca: EnderecoFields;
-  entrega: EnderecoFields;
-  filial: string; condicaoPgto: string; codigoTabPreco: string;
-  transportadora: string; regiao: string; conceito: string; tipo: string; pontualidade: string;
-  limiteCredito: string; indicadorVenda: string; matrizCliente: string; observacao: string;
-}
-
-const initialForm: FormState = {
-  ...emptyEndereco,
-  tipoPessoa: "PJ",
-  razaoSocial: "", nomeFantasia: "", cpfCnpj: "", rgIe: "", isento: true,
-  inscricaoMunicipal: "", tipoTributacao: "", indicadorFiscal: "1", suframa: "",
-  ddd1: "", telefone1: "", ddd2: "", telefone2: "",
-  email: "", emailNfe: "", aniversario: "",
-  mesmoEnderecoCobranca: true, mesmoEnderecoEntrega: true,
-  cobranca: { ...emptyEndereco }, entrega: { ...emptyEndereco },
-  filial: "", condicaoPgto: "", codigoTabPreco: "", transportadora: "", regiao: "",
-  conceito: "", tipo: "", pontualidade: "INDEFINIDO",
-  limiteCredito: "0", indicadorVenda: "", matrizCliente: "", observacao: "",
-};
-
-function pick(options: OptionItem[], prefer: string[]): string {
-  for (const p of prefer) {
-    const hit = options.find((o) => o.value.toUpperCase() === p.toUpperCase());
-    if (hit) return hit.value;
-  }
-  return options[0]?.value ?? "";
-}
 
 export default function NovoClienteCorporativoPage() {
   const [lookups, setLookups] = useState<CorporativoLookups | null>(null);
@@ -95,13 +30,13 @@ export default function NovoClienteCorporativoPage() {
         setLookups(lk);
         setForm((f) => ({
           ...f,
-          condicaoPgto: pick(lk.condicoesPgto, ["01"]),
-          codigoTabPreco: pick(lk.tabelasPreco, ["01"]),
-          transportadora: pick(lk.transportadoras, ["NOSSO CARRO", "CARRO PROPRIO", "CORREIOS - SEDEX"]),
-          conceito: pick(lk.conceitos, ["BOM"]),
-          tipo: pick(lk.tipos, ["CORPORATIVO", "ATACADO"]),
-          pontualidade: pick(lk.pontualidades, ["INDEFINIDO"]),
-          filial: pick(lk.filiais, ["SCARF ME - MATRIZ"]),
+          condicaoPgto: pickOption(lk.condicoesPgto, ["01"]),
+          codigoTabPreco: pickOption(lk.tabelasPreco, ["01"]),
+          transportadora: pickOption(lk.transportadoras, ["NOSSO CARRO", "CARRO PROPRIO", "CORREIOS - SEDEX"]),
+          conceito: pickOption(lk.conceitos, ["BOM"]),
+          tipo: pickOption(lk.tipos, ["CORPORATIVO", "ATACADO"]),
+          pontualidade: pickOption(lk.pontualidades, ["INDEFINIDO"]),
+          filial: pickOption(lk.filiais, ["SCARF ME - MATRIZ"]),
         }));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Erro ao carregar formulário.");
@@ -122,7 +57,6 @@ export default function NovoClienteCorporativoPage() {
     []
   );
 
-  // Troca de tipo pessoa: ajusta indicador fiscal e limpa doc.
   function trocarTipo(tp: TipoPessoa) {
     setForm((f) => ({
       ...f,
@@ -306,11 +240,6 @@ export default function NovoClienteCorporativoPage() {
     }));
   }
 
-  const docPlaceholder = isPJ ? "00.000.000/0000-00" : "000.000.000-00";
-  const cnpjOk = digitsDoc.length === 14;
-
-  const selectOptions = useMemo(() => lookups, [lookups]);
-
   if (criado) {
     return (
       <div className={styles.page}>
@@ -326,6 +255,9 @@ export default function NovoClienteCorporativoPage() {
                 <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={novoCadastro}>
                   Cadastrar outro
                 </button>
+                <Link href={`/corporativo/${criado.codigo}`} className={styles.btn}>
+                  Ver cadastro completo
+                </Link>
                 <Link href="/corporativo" className={styles.btn}>
                   Ver lista de clientes
                 </Link>
@@ -358,268 +290,21 @@ export default function NovoClienteCorporativoPage() {
           <div className={styles.card}><p className={styles.muted}>Carregando formulário…</p></div>
         ) : (
           <>
-            {/* Identificação */}
-            <div className={styles.card}>
-              <h2 className={styles.sectionTitle}>Identificação</h2>
-              <p className={styles.sectionHint}>Pessoa Física ou Jurídica. No CNPJ, use “Buscar” para autopreencher.</p>
-              <div className={styles.grid}>
-                <div className={`${styles.field} ${styles.col4}`}>
-                  <span className={styles.label}>Tipo de pessoa</span>
-                  <div className={styles.toggleRow}>
-                    <button type="button" onClick={() => trocarTipo("PJ")}
-                      className={`${styles.toggleBtn} ${isPJ ? styles.toggleBtnActive : ""}`}>Jurídica</button>
-                    <button type="button" onClick={() => trocarTipo("PF")}
-                      className={`${styles.toggleBtn} ${!isPJ ? styles.toggleBtnActive : ""}`}>Física</button>
-                  </div>
-                </div>
-
-                <div className={`${styles.field} ${styles.col8}`}>
-                  <span className={styles.label}>{isPJ ? "CNPJ" : "CPF"} <span className={styles.req}>*</span></span>
-                  <div className={styles.inputRow}>
-                    <input className={styles.input} value={form.cpfCnpj} placeholder={docPlaceholder}
-                      inputMode="numeric"
-                      onChange={(e) => set("cpfCnpj", e.target.value)} />
-                    {isPJ && (
-                      <button type="button" className={`${styles.btn}`} disabled={!cnpjOk || buscandoCnpj}
-                        onClick={buscarCnpj}>
-                        {buscandoCnpj ? "Buscando…" : "Buscar CNPJ"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className={`${styles.field} ${styles.col8}`}>
-                  <span className={styles.label}>{isPJ ? "Razão social" : "Nome completo"} <span className={styles.req}>*</span></span>
-                  <input className={styles.input} value={form.razaoSocial} maxLength={90}
-                    onChange={(e) => set("razaoSocial", e.target.value)} />
-                </div>
-
-                <div className={`${styles.field} ${styles.col4}`}>
-                  <span className={styles.label}>Nome no sistema <span className={styles.opt}>(máx 25)</span></span>
-                  <input className={styles.input} value={form.nomeFantasia} maxLength={25}
-                    placeholder={isPJ ? "Nome fantasia" : "(usa o nome)"}
-                    onChange={(e) => set("nomeFantasia", e.target.value)} />
-                </div>
-
-                <div className={`${styles.field} ${styles.col4}`}>
-                  <span className={styles.label}>{isPJ ? "Inscrição Estadual" : "RG"}</span>
-                  <input className={styles.input} value={form.isento ? "" : form.rgIe} maxLength={19}
-                    disabled={form.isento} placeholder={form.isento ? "ISENTO" : ""}
-                    onChange={(e) => set("rgIe", e.target.value)} />
-                </div>
-                <div className={`${styles.field} ${styles.col2}`} style={{ justifyContent: "flex-end" }}>
-                  <label className={styles.checkboxRow}>
-                    <input type="checkbox" checked={form.isento} onChange={(e) => set("isento", e.target.checked)} />
-                    Isento
-                  </label>
-                </div>
-
-                <div className={`${styles.field} ${styles.col3}`}>
-                  <span className={styles.label}>Indica Tipo (fiscal)</span>
-                  <select className={styles.select} value={form.indicadorFiscal}
-                    onChange={(e) => set("indicadorFiscal", e.target.value)}>
-                    {selectOptions?.indicadoresFiscais.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {isPJ && (
-                  <>
-                    <div className={`${styles.field} ${styles.col3}`}>
-                      <span className={styles.label}>Tipo tributação</span>
-                      <select className={styles.select} value={form.tipoTributacao}
-                        onChange={(e) => set("tipoTributacao", e.target.value)}>
-                        <option value="">—</option>
-                        {selectOptions?.tiposTributacao.map((o) => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className={`${styles.field} ${styles.col3}`}>
-                      <span className={styles.label}>Inscrição Municipal <span className={styles.opt}>(opc.)</span></span>
-                      <input className={styles.input} value={form.inscricaoMunicipal} maxLength={15}
-                        onChange={(e) => set("inscricaoMunicipal", e.target.value)} />
-                    </div>
-                    <div className={`${styles.field} ${styles.col3}`}>
-                      <span className={styles.label}>SUFRAMA <span className={styles.opt}>(opc.)</span></span>
-                      <input className={styles.input} value={form.suframa} maxLength={9}
-                        onChange={(e) => set("suframa", e.target.value)} />
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Endereço */}
-            <div className={styles.card}>
-              <h2 className={styles.sectionTitle}>Endereço principal</h2>
-              <p className={styles.sectionHint}>Preencha o CEP e clique em “Buscar” para completar (traz o código IBGE p/ NF-e).</p>
-              <div className={styles.grid}>
-                <div className={`${styles.field} ${styles.col3}`}>
-                  <span className={styles.label}>CEP <span className={styles.req}>*</span></span>
-                  <div className={styles.inputRow}>
-                    <input className={styles.input} value={form.cep} inputMode="numeric" maxLength={9}
-                      onChange={(e) => set("cep", e.target.value)}
-                      onBlur={() => buscarCep("principal")} />
-                    <button type="button" className={styles.btn} disabled={buscandoCep === "principal"}
-                      onClick={() => buscarCep("principal")}>
-                      {buscandoCep === "principal" ? "…" : "Buscar"}
-                    </button>
-                  </div>
-                </div>
-                <div className={`${styles.field} ${styles.col7}`}>
-                  <span className={styles.label}>Endereço <span className={styles.req}>*</span></span>
-                  <input className={styles.input} value={form.endereco} maxLength={90}
-                    onChange={(e) => set("endereco", e.target.value)} />
-                </div>
-                <div className={`${styles.field} ${styles.col2}`}>
-                  <span className={styles.label}>Número</span>
-                  <input className={styles.input} value={form.numero} maxLength={10}
-                    onChange={(e) => set("numero", e.target.value)} />
-                </div>
-                <div className={`${styles.field} ${styles.col4}`}>
-                  <span className={styles.label}>Complemento</span>
-                  <input className={styles.input} value={form.complemento} maxLength={60}
-                    onChange={(e) => set("complemento", e.target.value)} />
-                </div>
-                <div className={`${styles.field} ${styles.col4}`}>
-                  <span className={styles.label}>Bairro</span>
-                  <input className={styles.input} value={form.bairro} maxLength={25}
-                    onChange={(e) => set("bairro", e.target.value)} />
-                </div>
-                <div className={`${styles.field} ${styles.col3}`}>
-                  <span className={styles.label}>Cidade <span className={styles.req}>*</span></span>
-                  <input className={styles.input} value={form.cidade} maxLength={35}
-                    onChange={(e) => set("cidade", e.target.value)} />
-                </div>
-                <div className={`${styles.field} ${styles.col2}`}>
-                  <span className={styles.label}>UF <span className={styles.req}>*</span></span>
-                  <input className={styles.input} value={form.uf} maxLength={2}
-                    onChange={(e) => {
-                      const uf = e.target.value.toUpperCase();
-                      setForm((f) => ({ ...f, uf, regiao: UF_REGIAO[uf] ?? f.regiao }));
-                    }} />
-                </div>
-                <div className={`${styles.field} ${styles.col3}`}>
-                  <span className={styles.label}>Cód. IBGE <span className={styles.req}>*</span></span>
-                  <input className={styles.input} value={form.codMunicipioIbge} maxLength={10}
-                    onChange={(e) => set("codMunicipioIbge", e.target.value)} />
-                </div>
-              </div>
-            </div>
-
-            {/* Contato */}
-            <div className={styles.card}>
-              <h2 className={styles.sectionTitle}>Contato</h2>
-              <div className={styles.grid}>
-                <div className={`${styles.field} ${styles.col2}`}>
-                  <span className={styles.label}>DDD <span className={styles.req}>*</span></span>
-                  <input className={styles.input} value={form.ddd1} inputMode="numeric" maxLength={5}
-                    onChange={(e) => set("ddd1", e.target.value)} />
-                </div>
-                <div className={`${styles.field} ${styles.col4}`}>
-                  <span className={styles.label}>Telefone <span className={styles.req}>*</span></span>
-                  <input className={styles.input} value={form.telefone1} inputMode="numeric" maxLength={10}
-                    onChange={(e) => set("telefone1", e.target.value)} />
-                </div>
-                <div className={`${styles.field} ${styles.col2}`}>
-                  <span className={styles.label}>DDD 2 <span className={styles.opt}>(opc.)</span></span>
-                  <input className={styles.input} value={form.ddd2} inputMode="numeric" maxLength={5}
-                    onChange={(e) => set("ddd2", e.target.value)} />
-                </div>
-                <div className={`${styles.field} ${styles.col4}`}>
-                  <span className={styles.label}>Telefone 2 <span className={styles.opt}>(opc.)</span></span>
-                  <input className={styles.input} value={form.telefone2} inputMode="numeric" maxLength={10}
-                    onChange={(e) => set("telefone2", e.target.value)} />
-                </div>
-                <div className={`${styles.field} ${styles.col5}`}>
-                  <span className={styles.label}>E-mail</span>
-                  <input className={styles.input} value={form.email} maxLength={100} type="email"
-                    onChange={(e) => set("email", e.target.value)} />
-                </div>
-                <div className={`${styles.field} ${styles.col5}`}>
-                  <span className={styles.label}>E-mail NF-e</span>
-                  <input className={styles.input} value={form.emailNfe} maxLength={100} type="email"
-                    onChange={(e) => set("emailNfe", e.target.value)} />
-                </div>
-                <div className={`${styles.field} ${styles.col2}`}>
-                  <span className={styles.label}>Aniversário <span className={styles.opt}>(opc.)</span></span>
-                  <input className={styles.input} value={form.aniversario} type="date"
-                    onChange={(e) => set("aniversario", e.target.value)} />
-                </div>
-              </div>
-            </div>
-
-            {/* Cobrança / Entrega */}
-            <div className={styles.card}>
-              <h2 className={styles.sectionTitle}>Cobrança e entrega</h2>
-              <p className={styles.sectionHint}>Por padrão espelham o endereço principal. Desmarque para informar endereços diferentes.</p>
-              <div className={styles.grid}>
-                <div className={`${styles.field} ${styles.col6}`}>
-                  <label className={styles.checkboxRow}>
-                    <input type="checkbox" checked={form.mesmoEnderecoCobranca}
-                      onChange={(e) => set("mesmoEnderecoCobranca", e.target.checked)} />
-                    Cobrança usa o endereço principal
-                  </label>
-                </div>
-                <div className={`${styles.field} ${styles.col6}`}>
-                  <label className={styles.checkboxRow}>
-                    <input type="checkbox" checked={form.mesmoEnderecoEntrega}
-                      onChange={(e) => set("mesmoEnderecoEntrega", e.target.checked)} />
-                    Entrega usa o endereço principal
-                  </label>
-                </div>
-              </div>
-
-              {!form.mesmoEnderecoCobranca && (
-                <EnderecoSubForm titulo="Endereço de cobrança" bloco="cobranca" data={form.cobranca}
-                  onChange={(k, v) => setEnd("cobranca", k, v)}
-                  onBuscar={() => buscarCep("cobranca")} buscando={buscandoCep === "cobranca"} />
-              )}
-              {!form.mesmoEnderecoEntrega && (
-                <EnderecoSubForm titulo="Endereço de entrega" bloco="entrega" data={form.entrega}
-                  onChange={(k, v) => setEnd("entrega", k, v)}
-                  onBuscar={() => buscarCep("entrega")} buscando={buscandoCep === "entrega"} />
-              )}
-            </div>
-
-            {/* Comercial */}
-            <div className={styles.card}>
-              <h2 className={styles.sectionTitle}>Dados comerciais</h2>
-              <div className={styles.grid}>
-                <SelectField className={styles.col4} label="Filial" required value={form.filial}
-                  options={selectOptions?.filiais ?? []} onChange={(v) => set("filial", v)} />
-                <SelectField className={styles.col4} label="Condição de pagamento" value={form.condicaoPgto}
-                  options={selectOptions?.condicoesPgto ?? []} onChange={(v) => set("condicaoPgto", v)} />
-                <SelectField className={styles.col4} label="Tabela de preços" value={form.codigoTabPreco}
-                  options={selectOptions?.tabelasPreco ?? []} onChange={(v) => set("codigoTabPreco", v)} />
-                <SelectField className={styles.col4} label="Transportadora" value={form.transportadora}
-                  options={selectOptions?.transportadoras ?? []} onChange={(v) => set("transportadora", v)} />
-                <SelectField className={styles.col4} label="Região" value={form.regiao}
-                  options={selectOptions?.regioes ?? []} onChange={(v) => set("regiao", v)} />
-                <SelectField className={styles.col4} label="Tipo" value={form.tipo}
-                  options={selectOptions?.tipos ?? []} onChange={(v) => set("tipo", v)} />
-                <SelectField className={styles.col4} label="Conceito" value={form.conceito}
-                  options={selectOptions?.conceitos ?? []} onChange={(v) => set("conceito", v)} />
-                <SelectField className={styles.col4} label="Pontualidade" value={form.pontualidade}
-                  options={selectOptions?.pontualidades ?? []} onChange={(v) => set("pontualidade", v)} />
-                <div className={`${styles.field} ${styles.col4}`}>
-                  <span className={styles.label}>Limite de crédito</span>
-                  <input className={styles.input} value={form.limiteCredito} inputMode="decimal"
-                    onChange={(e) => set("limiteCredito", e.target.value)} />
-                </div>
-                <div className={`${styles.field} ${styles.col12}`}>
-                  <span className={styles.label}>Observação de faturamento <span className={styles.opt}>(opc.)</span></span>
-                  <textarea className={styles.textarea} value={form.observacao} maxLength={4000}
-                    onChange={(e) => set("observacao", e.target.value)} />
-                </div>
-              </div>
-            </div>
+            <ClienteCorporativoForm
+              form={form}
+              options={lookups ?? EMPTY_OPTIONS}
+              onTipoChange={trocarTipo}
+              setField={set}
+              setEnderecoField={setEnd}
+              onBuscarCnpj={buscarCnpj}
+              buscandoCnpj={buscandoCnpj}
+              onBuscarCep={buscarCep}
+              buscandoCep={buscandoCep}
+            />
 
             <div className={styles.footerBar}>
               <div className={styles.codePreview}>
-                Próximo código: <strong>{selectOptions?.proximoCodigoPreview || "—"}</strong>
+                Próximo código: <strong>{lookups?.proximoCodigoPreview || "—"}</strong>
               </div>
               <div style={{ display: "flex", gap: 10 }}>
                 {warn ? (
@@ -642,84 +327,8 @@ export default function NovoClienteCorporativoPage() {
   );
 }
 
-function SelectField({
-  label, value, options, onChange, className, required,
-}: {
-  label: string;
-  value: string;
-  options: OptionItem[];
-  onChange: (v: string) => void;
-  className?: string;
-  required?: boolean;
-}) {
-  return (
-    <div className={`${styles.field} ${className ?? ""}`}>
-      <span className={styles.label}>{label} {required && <span className={styles.req}>*</span>}</span>
-      <select className={styles.select} value={value} onChange={(e) => onChange(e.target.value)}>
-        {!options.some((o) => o.value === value) && <option value="">—</option>}
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function EnderecoSubForm({
-  titulo, data, onChange, onBuscar, buscando,
-}: {
-  titulo: string;
-  bloco: "cobranca" | "entrega";
-  data: EnderecoFields;
-  onChange: (key: keyof EnderecoFields, value: string) => void;
-  onBuscar: () => void;
-  buscando: boolean;
-}) {
-  return (
-    <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px dashed var(--b-300)" }}>
-      <h3 className={styles.label} style={{ marginBottom: 12 }}>{titulo}</h3>
-      <div className={styles.grid}>
-        <div className={`${styles.field} ${styles.col3}`}>
-          <span className={styles.label}>CEP</span>
-          <div className={styles.inputRow}>
-            <input className={styles.input} value={data.cep} inputMode="numeric" maxLength={9}
-              onChange={(e) => onChange("cep", e.target.value)} onBlur={onBuscar} />
-            <button type="button" className={styles.btn} disabled={buscando} onClick={onBuscar}>
-              {buscando ? "…" : "Buscar"}
-            </button>
-          </div>
-        </div>
-        <div className={`${styles.field} ${styles.col7}`}>
-          <span className={styles.label}>Endereço</span>
-          <input className={styles.input} value={data.endereco} maxLength={90}
-            onChange={(e) => onChange("endereco", e.target.value)} />
-        </div>
-        <div className={`${styles.field} ${styles.col2}`}>
-          <span className={styles.label}>Número</span>
-          <input className={styles.input} value={data.numero} maxLength={10}
-            onChange={(e) => onChange("numero", e.target.value)} />
-        </div>
-        <div className={`${styles.field} ${styles.col4}`}>
-          <span className={styles.label}>Complemento</span>
-          <input className={styles.input} value={data.complemento} maxLength={60}
-            onChange={(e) => onChange("complemento", e.target.value)} />
-        </div>
-        <div className={`${styles.field} ${styles.col4}`}>
-          <span className={styles.label}>Bairro</span>
-          <input className={styles.input} value={data.bairro} maxLength={25}
-            onChange={(e) => onChange("bairro", e.target.value)} />
-        </div>
-        <div className={`${styles.field} ${styles.col2}`}>
-          <span className={styles.label}>Cidade</span>
-          <input className={styles.input} value={data.cidade} maxLength={35}
-            onChange={(e) => onChange("cidade", e.target.value)} />
-        </div>
-        <div className={`${styles.field} ${styles.col2}`}>
-          <span className={styles.label}>UF</span>
-          <input className={styles.input} value={data.uf} maxLength={2}
-            onChange={(e) => onChange("uf", e.target.value.toUpperCase())} />
-        </div>
-      </div>
-    </div>
-  );
-}
+const EMPTY_OPTIONS: CorporativoLookups = {
+  condicoesPgto: [], tabelasPreco: [], transportadoras: [], regioes: [], conceitos: [],
+  pontualidades: [], tipos: [], tiposTributacao: [], indicadoresFiscais: [], filiais: [],
+  proximoCodigoPreview: "",
+};
