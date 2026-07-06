@@ -27,8 +27,11 @@ import { normalizeRangeForQuery, getCurrentMonthRange } from '@/lib/utils/date';
 const EMPRESA_CODES: Record<'nerd' | 'scarfme', number[]> = {
   // NERD fatura muito pouco por NF (uso residual), mas mantemos o filtro.
   nerd: [8],
-  // ScarfME: MATRIZ (1), MATRIZ LLL (10), MATRIZ CMS (13) e MSC COMERCIO (15).
-  scarfme: [1, 10, 13, 15],
+  // ScarfME: MATRIZ (1), MATRIZ LLL (10), MATRIZ CMS (13), MSC COMERCIO (15) e
+  // AKS COMERCIO (16). MSC↔AKS fazem o rodízio fiscal do e-commerce (~15 dias); a AKS
+  // é a entidade fiscal mais nova — sem o 16 aqui, todo o faturamento dela some das
+  // tools fiscais (notas_fiscais / faturamento_resumo / página /faturamento).
+  scarfme: [1, 10, 13, 15, 16],
 };
 
 export type FaturamentoEmpresa = 'nerd' | 'scarfme';
