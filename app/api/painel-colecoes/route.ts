@@ -3,6 +3,7 @@ import sql from "mssql";
 
 import { withRequest } from "@/lib/db/connection";
 import { fetchSalesTotals } from "@/lib/services/salesTotals";
+import { fetchCollectionComparativeExtras } from "@/lib/repositories/collectionReport";
 import { getColecaoDescMap } from "@/lib/repositories/colecao";
 import { resolveCompanyLive } from "@/lib/server/company-live";
 import { VAREJO_VALUE, type CompanyKey } from "@/lib/config/company";
@@ -62,6 +63,12 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+export interface ColecaoPanelMonthPoint {
+  label: string;
+  val: number;
+  disp: string;
+}
+
 export interface ColecaoPanelItem {
   key: string;
   label: string;
@@ -70,6 +77,68 @@ export interface ColecaoPanelItem {
   vendas: number;
   qtdVendida: number;
   skus: number;
+  /** Evolução mensal da venda líquida (mesma métrica/escopo de `vendas`), para o
+   * mini-gráfico do tema "Com fotos". Escalada para somar `vendas`. */
+  months: ColecaoPanelMonthPoint[];
+  maxV: number;
+}
+
+const MESES_CURTOS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+function chartDisp(v: number): string {
+  if (v >= 1_000) return `R$ ${Math.round(v / 1_000).toLocaleString("pt-BR")}k`;
+  return `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
+}
+
+/**
+ * Evolução mensal por GRUPO (mesmos códigos somados, ex.: Galisteu = T6+Y3+U5
+ * numa única série) via `fetchCollectionComparativeExtras` — reusa a mesma
+ * fonte/escopo (varejo+e-commerce, rodízio MSC/AKS) do Comparativo Resumido.
+ * A série é escalada para somar exatamente `vendasByKey` (a VL já validada
+ * pela lógica varejo/e-commerce específica deste painel).
+ */
+async function fetchMonthsByGroup(
+  groups: ColecaoConfig[],
+  company: string,
+  filial: string | null,
+  range: { start: string; end: string },
+  vendasByKey: Map<string, number>
+): Promise<Map<string, { months: ColecaoPanelMonthPoint[]; maxV: number }>> {
+  const out = new Map<string, { months: ColecaoPanelMonthPoint[]; maxV: number }>();
+  const CONCURRENCY = 4;
+  for (let i = 0; i < groups.length; i += CONCURRENCY) {
+    const batch = groups.slice(i, i + CONCURRENCY);
+    await Promise.all(
+      batch.map(async (group) => {
+        try {
+          const extras = await fetchCollectionComparativeExtras({
+            company,
+            filial,
+            range,
+            colecoes: group.codes,
+          });
+          const rawMonths = extras.monthly.map((m) => ({
+            label: MESES_CURTOS[m.month - 1] ?? String(m.month),
+            val: Math.max(0, m.revenue),
+          }));
+          const rawSum = rawMonths.reduce((s, m) => s + m.val, 0);
+          const target = vendasByKey.get(group.key) ?? rawSum;
+          const scale = rawSum > 0 ? target / rawSum : 1;
+          const months = rawMonths.map((m) => ({
+            label: m.label,
+            val: m.val * scale,
+            disp: chartDisp(m.val * scale),
+          }));
+          const maxV = Math.max(...months.map((m) => m.val), 1) * 1.08;
+          out.set(group.key, { months, maxV });
+        } catch (err) {
+          console.error(`painel-colecoes: falha série mensal ${group.key}`, err);
+          out.set(group.key, { months: [], maxV: 1 });
+        }
+      })
+    );
+  }
+  return out;
 }
 
 /**
@@ -277,7 +346,7 @@ export async function GET(request: Request) {
       () => new Map<string, string>()
     );
 
-    const data: ColecaoPanelItem[] = COLECOES.map((c) => {
+    const baseData: Omit<ColecaoPanelItem, "months" | "maxV">[] = COLECOES.map((c) => {
       let vendas = 0;
       let qtd = 0;
       let skus = 0;
@@ -303,6 +372,16 @@ export async function GET(request: Request) {
         qtdVendida: Math.round(qtd),
         skus,
       };
+    });
+
+    // ── Evolução mensal (tema "Com fotos"): uma série por grupo, escalada p/
+    // bater com a VL já calculada acima.
+    const vendasByKey = new Map(baseData.map((d) => [d.key, d.vendas]));
+    const monthsByKey = await fetchMonthsByGroup(COLECOES, company, filial, { start, end }, vendasByKey);
+
+    const data: ColecaoPanelItem[] = baseData.map((item) => {
+      const mm = monthsByKey.get(item.key);
+      return { ...item, months: mm?.months ?? [], maxV: mm?.maxV ?? 1 };
     });
 
     return NextResponse.json({ data });

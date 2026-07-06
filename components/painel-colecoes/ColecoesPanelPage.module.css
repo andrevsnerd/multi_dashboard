@@ -340,6 +340,174 @@
   color: var(--t-gray900);
 }
 
+/* ── Tema "Com fotos" (mesmo layout do Comparativo Resumido) ───────────────
+   Card branco fixo, cores vindas da paleta da coleção (inline style), como no
+   deck de apresentação — intencionalmente não segue os tokens de dark mode: é
+   um tema visual à parte, replicando fielmente o comparativo. */
+.photoCard {
+  background: #ffffff;
+  border: 1.5px solid #eceef1;
+  border-radius: 20px;
+  padding: 12px 26px 12px 12px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  flex-wrap: wrap;
+}
+
+.photoCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.09);
+}
+
+.photoWrap {
+  position: relative;
+  flex-shrink: 0;
+  width: 96px;
+  height: 96px;
+  border-radius: 22px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.photoHiddenInput {
+  display: none;
+}
+
+.photoRing {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px solid;
+  opacity: 0.55;
+}
+
+.photoImg {
+  position: relative;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+}
+
+.photoRankBadge {
+  position: relative;
+  font-family: "Cambria", Georgia, "Times New Roman", serif;
+  font-size: 30px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.photoOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4px;
+  background: rgba(15, 23, 42, 0.6);
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.photoWrap:hover .photoOverlay,
+.photoOverlayVisible {
+  opacity: 1;
+}
+
+.photoNameBlock {
+  flex: 0 0 200px;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.photoName {
+  font-family: "Cambria", Georgia, "Times New Roman", serif;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.photoSubtitle {
+  font-size: 0.78rem;
+  color: var(--t-gray500);
+}
+
+.photoMetrics {
+  display: flex;
+  gap: 12px;
+  flex: 1 1 320px;
+  min-width: 280px;
+}
+
+.photoMetric {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: #f6f7f9;
+  text-align: center;
+  justify-content: center;
+}
+
+.photoMetricValue {
+  font-family: "Cambria", Georgia, "Times New Roman", serif;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.photoMetricLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #8a8e9c;
+}
+
+.photoChart {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 900px) {
+  .photoCard {
+    justify-content: flex-start;
+  }
+
+  .photoMetrics {
+    order: 3;
+    flex: 1 1 100%;
+  }
+
+  .photoChart {
+    order: 4;
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+}
+
 /* ── States ─────────────────────────────────────────────────────────────── */
 .error {
   padding: 20px;

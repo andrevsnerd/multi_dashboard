@@ -6,7 +6,9 @@ import DateRangeFilter, {
   type DateRangeValue,
 } from "@/components/filters/DateRangeFilter";
 import FilialFilter from "@/components/filters/FilialFilter";
+import MiniAreaChart from "@/components/shared/MiniAreaChart";
 import { resolveCompany, VAREJO_VALUE, type CompanyKey } from "@/lib/config/company";
+import { paletteForIndex } from "@/lib/presentations/palettes";
 import { formatDateForQuery, getCurrentMonthRange } from "@/lib/utils/date";
 import { exportColecoesPanelToExcel } from "@/lib/utils/exportColecoesPanelXlsx";
 
@@ -14,6 +16,12 @@ import styles from "./ColecoesPanelPage.module.css";
 
 interface ColecoesPanelPageProps {
   companyKey: CompanyKey;
+}
+
+interface ColecaoPanelMonthPoint {
+  label: string;
+  val: number;
+  disp: string;
 }
 
 interface ColecaoPanelItem {
@@ -24,9 +32,12 @@ interface ColecaoPanelItem {
   vendas: number;
   qtdVendida: number;
   skus: number;
+  months: ColecaoPanelMonthPoint[];
+  maxV: number;
 }
 
 type MetricKey = "vendas" | "qtdVendida" | "skus";
+type Theme = "padrao" | "fotos";
 
 const METRICS: { key: MetricKey; label: string }[] = [
   { key: "vendas", label: "Vendas" },
@@ -34,9 +45,36 @@ const METRICS: { key: MetricKey; label: string }[] = [
   { key: "skus", label: "Peças (SKUs)" },
 ];
 
+const THEMES: { key: Theme; label: string }[] = [
+  { key: "padrao", label: "Padrão" },
+  { key: "fotos", label: "Com fotos" },
+];
+
 // Teto do preenchimento da barra do item líder: evita que ela encoste na borda
 // direita do track, mantendo o mesmo respiro visual das demais barras.
 const MAX_BAR_PCT = 92;
+
+const hex = (c: string) => (c.startsWith("#") ? c : `#${c}`);
+
+/**
+ * Chave da imagem no banco (`presentation_assets`, kind="cover") — a MESMA
+ * usada pelo Gerador de Apresentações. Coleções de código único reusam o
+ * próprio código (ex.: "X7"), então uma foto já enviada lá aparece aqui sem
+ * reenvio. Agregados (ex.: Galisteu) não têm um código único → usam a key do
+ * grupo como referência própria.
+ */
+function coverRefFor(item: ColecaoPanelItem): string {
+  return item.codes.length === 1 ? item.codes[0].trim().toUpperCase() : item.key.toUpperCase();
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Falha ao ler o arquivo."));
+    reader.readAsDataURL(file);
+  });
+}
 
 function formatCurrency(value: number): string {
   return value.toLocaleString("pt-BR", {
@@ -99,11 +137,19 @@ export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps
   const [range, setRange] = useState<DateRangeValue>(initialRange);
   const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
   const [metric, setMetric] = useState<MetricKey>("vendas");
+  const [theme, setTheme] = useState<Theme>("padrao");
 
   const [items, setItems] = useState<ColecaoPanelItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exportingPdf, setExportingPdf] = useState(false);
+
+  // Imagens do tema "Com fotos" — mesmo banco (`presentation_assets`) e mesma
+  // rota do Gerador de Apresentações. undefined = ainda não buscada; null =
+  // buscada, sem imagem; string = data URL salva.
+  const [covers, setCovers] = useState<Record<string, string | null | undefined>>({});
+  const [uploadingCoverRef, setUploadingCoverRef] = useState<string | null>(null);
+  const [coverError, setCoverError] = useState<string | null>(null);
 
   const captureRef = useRef<HTMLDivElement>(null);
 
@@ -130,6 +176,61 @@ export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps
       active = false;
     };
   }, [companyKey, range.startDate, range.endDate, selectedFilial]);
+
+  // Fotos das coleções (tema "Com fotos") — busca só as que ainda não foram
+  // carregadas nesta sessão, no mesmo endereço usado pelo Gerador de
+  // Apresentações (`/api/gerador-apresentacoes/assets`, kind="cover").
+  useEffect(() => {
+    if (theme !== "fotos" || items.length === 0) return;
+    let active = true;
+
+    const refs = Array.from(new Set(items.map(coverRefFor)));
+    const missing = refs.filter((ref) => !(ref in covers));
+    if (missing.length === 0) return;
+
+    Promise.all(
+      missing.map(async (ref) => {
+        try {
+          const res = await fetch(
+            `/api/gerador-apresentacoes/assets?company=${companyKey}&colecao=${encodeURIComponent(ref)}`,
+            { cache: "no-store" }
+          );
+          if (!res.ok) return [ref, null] as const;
+          const json = (await res.json()) as { cover: string | null };
+          return [ref, json.cover ?? null] as const;
+        } catch {
+          return [ref, null] as const;
+        }
+      })
+    ).then((entries) => {
+      if (active) setCovers((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [theme, items, companyKey, covers]);
+
+  const handleUploadCover = async (ref: string, file: File | undefined) => {
+    if (!file) return;
+    setUploadingCoverRef(ref);
+    setCoverError(null);
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const res = await fetch("/api/gerador-apresentacoes/assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company: companyKey, kind: "cover", ref, dataUrl }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Erro ao salvar imagem.");
+      setCovers((prev) => ({ ...prev, [ref]: dataUrl }));
+    } catch (e) {
+      setCoverError(e instanceof Error ? e.message : "Erro ao salvar a imagem.");
+    } finally {
+      setUploadingCoverRef(null);
+    }
+  };
 
   const maxForMetric = useMemo(() => {
     return items.reduce((max, item) => Math.max(max, item[metric] ?? 0), 0);
@@ -256,21 +357,40 @@ export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps
         </div>
 
         <div className={styles.controls} data-pdf-hide>
-          <span className={styles.controlsLabel}>Comparar por</span>
-          <div className={styles.segmented} role="tablist" aria-label="Métrica de comparação">
-            {METRICS.map((m) => (
+          <span className={styles.controlsLabel}>Tema</span>
+          <div className={styles.segmented} role="tablist" aria-label="Tema do painel">
+            {THEMES.map((t) => (
               <button
-                key={m.key}
+                key={t.key}
                 type="button"
                 role="tab"
-                aria-selected={metric === m.key}
-                className={`${styles.segment} ${metric === m.key ? styles.segmentActive : ""}`}
-                onClick={() => setMetric(m.key)}
+                aria-selected={theme === t.key}
+                className={`${styles.segment} ${theme === t.key ? styles.segmentActive : ""}`}
+                onClick={() => setTheme(t.key)}
               >
-                {m.label}
+                {t.label}
               </button>
             ))}
           </div>
+          {theme === "padrao" && (
+            <>
+              <span className={styles.controlsLabel}>Comparar por</span>
+              <div className={styles.segmented} role="tablist" aria-label="Métrica de comparação">
+                {METRICS.map((m) => (
+                  <button
+                    key={m.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={metric === m.key}
+                    className={`${styles.segment} ${metric === m.key ? styles.segmentActive : ""}`}
+                    onClick={() => setMetric(m.key)}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           <div className={styles.exportGroup}>
             <button
               type="button"
@@ -292,6 +412,12 @@ export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps
         </div>
       </header>
 
+      {theme === "fotos" && coverError && (
+        <div className={styles.error} data-pdf-hide>
+          {coverError}
+        </div>
+      )}
+
       {error ? (
         <div className={styles.error}>{error}</div>
       ) : loading ? (
@@ -302,6 +428,77 @@ export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps
         </div>
       ) : items.length === 0 ? (
         <div className={styles.empty}>Nenhuma coleção com vendas no período.</div>
+      ) : theme === "fotos" ? (
+        <div className={styles.list}>
+          {items.map((item, index) => {
+            const palette = paletteForIndex(index);
+            const ref = coverRefFor(item);
+            const cover = covers[ref] ?? null;
+            const isUploading = uploadingCoverRef === ref;
+
+            return (
+              <article key={item.key} className={styles.photoCard}>
+                <label className={styles.photoWrap} style={{ background: hex(palette.tint) }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className={styles.photoHiddenInput}
+                    onChange={(e) => void handleUploadCover(ref, e.target.files?.[0])}
+                  />
+                  <div className={styles.photoRing} style={{ borderColor: hex(palette.circ) }} />
+                  {cover ? (
+                    <img src={cover} alt={item.label} className={styles.photoImg} />
+                  ) : (
+                    <span className={styles.photoRankBadge} style={{ color: hex(palette.primary) }}>
+                      {index + 1}
+                    </span>
+                  )}
+                  <div
+                    className={`${styles.photoOverlay} ${isUploading ? styles.photoOverlayVisible : ""}`}
+                  >
+                    {isUploading ? "Enviando…" : cover ? "Trocar foto" : "Adicionar foto"}
+                  </div>
+                </label>
+
+                <div className={styles.photoNameBlock}>
+                  <span className={styles.photoName} style={{ color: hex(palette.ink) }}>
+                    {item.label}
+                  </span>
+                  {item.subtitle && (
+                    <span className={styles.photoSubtitle}>{item.subtitle}</span>
+                  )}
+                </div>
+
+                <div className={styles.photoMetrics}>
+                  <div className={styles.photoMetric}>
+                    <span className={styles.photoMetricValue} style={{ color: hex(palette.ink) }}>
+                      {formatCurrency(item.vendas)}
+                    </span>
+                    <span className={styles.photoMetricLabel} style={{ color: hex(palette.primary) }}>
+                      VENDAS
+                    </span>
+                  </div>
+                  <div className={styles.photoMetric}>
+                    <span className={styles.photoMetricValue} style={{ color: hex(palette.ink) }}>
+                      {formatInt(item.qtdVendida)}
+                    </span>
+                    <span className={styles.photoMetricLabel}>QTD.</span>
+                  </div>
+                  <div className={styles.photoMetric}>
+                    <span className={styles.photoMetricValue} style={{ color: hex(palette.ink) }}>
+                      {formatInt(item.skus)}
+                    </span>
+                    <span className={styles.photoMetricLabel}>PEÇAS (SKUS)</span>
+                  </div>
+                </div>
+
+                <div className={styles.photoChart}>
+                  <MiniAreaChart months={item.months} maxV={item.maxV} palette={palette} />
+                </div>
+              </article>
+            );
+          })}
+        </div>
       ) : (
         <div className={styles.list}>
           {items.map((item, index) => {
