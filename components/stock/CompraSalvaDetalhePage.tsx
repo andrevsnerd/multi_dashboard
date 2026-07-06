@@ -1391,50 +1391,54 @@ export default function CompraSalvaDetalhePage({
       const originalInputs = Array.from(target.querySelectorAll("input")) as HTMLInputElement[];
       const inputValues = originalInputs.map((inp) => inp.value);
 
+      // Aplicado em CADA clone (medição + cada fatia capturada): esconde UI que não deve
+      // aparecer no PDF, troca inputs por spans com o valor certo, e corrige overflow:clip
+      // e position:sticky que o html2canvas não trata bem fora do container real.
+      const applyExportTransform = (cloneDoc: Document, cloneEl: HTMLElement) => {
+        cloneEl.querySelectorAll("[data-pdf-hide]").forEach((el) => {
+          (el as HTMLElement).style.display = "none";
+        });
+
+        const cloneInputs = Array.from(cloneEl.querySelectorAll("input")) as HTMLInputElement[];
+        cloneInputs.forEach((cloneInp, i) => {
+          const span = cloneDoc.createElement("span");
+          span.style.cssText = "display:block;text-align:right;font-weight:700;font-size:14px;font-variant-numeric:tabular-nums;padding:6px 8px;";
+          span.textContent = inputValues[i] ?? "";
+          cloneInp.replaceWith(span);
+        });
+
+        const cloneWin = cloneDoc.defaultView;
+        if (cloneWin) {
+          cloneEl.querySelectorAll("*").forEach((el) => {
+            const htmlEl = el as HTMLElement;
+            const cs = cloneWin.getComputedStyle(htmlEl);
+            if (cs.overflow === "clip") htmlEl.style.overflow = "visible";
+            if (cs.position === "sticky") htmlEl.style.position = "relative";
+          });
+        }
+      };
+
       // Pontos de quebra (em px de CSS, relativos ao topo da área exportada) onde
       // é seguro cortar a página — entre linhas da tabela, nunca no meio de uma.
-      // Medidos DENTRO do clone porque os elementos data-pdf-hide alteram o layout.
       let rowBreaksCss: number[] = [];
-      let cloneHeightCss = 0;
+      let contentWidthCss = 0;
+      let contentHeightCss = 0;
 
-      const canvas = await html2canvas(target, {
+      // Passagem de MEDIÇÃO: canvas final é minúsculo (scale ínfimo) de propósito —
+      // aqui só nos importa o layout do clone (onclone roda antes do desenho, no
+      // tamanho real em CSS px), não a imagem em si.
+      await html2canvas(target, {
         backgroundColor: "#ffffff",
-        scale: 2,
+        scale: 0.05,
         useCORS: true,
         logging: false,
-        // onclone: html2canvas renderiza o clone num iframe isolado,
-        // fora de qualquer container scrollável do layout — isso garante
-        // captura do conteúdo COMPLETO, não só a porção visível na tela.
+        windowWidth: target.scrollWidth,
+        windowHeight: target.scrollHeight,
         onclone: (cloneDoc, cloneEl) => {
-          // Ocultar elementos de UI que não devem aparecer no PDF
-          cloneEl.querySelectorAll("[data-pdf-hide]").forEach((el) => {
-            (el as HTMLElement).style.display = "none";
-          });
-
-          // Substituir inputs por spans com o valor correto
-          const cloneInputs = Array.from(cloneEl.querySelectorAll("input")) as HTMLInputElement[];
-          cloneInputs.forEach((cloneInp, i) => {
-            const span = cloneDoc.createElement("span");
-            span.style.cssText = "display:block;text-align:right;font-weight:700;font-size:14px;font-variant-numeric:tabular-nums;padding:6px 8px;";
-            span.textContent = inputValues[i] ?? "";
-            cloneInp.replaceWith(span);
-          });
-
-          // Corrigir overflow:clip e position:sticky no clone
-          const cloneWin = cloneDoc.defaultView;
-          if (cloneWin) {
-            cloneEl.querySelectorAll("*").forEach((el) => {
-              const htmlEl = el as HTMLElement;
-              const cs = cloneWin.getComputedStyle(htmlEl);
-              if (cs.overflow === "clip") htmlEl.style.overflow = "visible";
-              if (cs.position === "sticky") htmlEl.style.position = "relative";
-            });
-          }
-
-          // Coletar as bordas inferiores das linhas (após esconder/substituir),
-          // para alinhar as quebras de página a limites de linha.
+          applyExportTransform(cloneDoc, cloneEl);
           const baseRect = cloneEl.getBoundingClientRect();
-          cloneHeightCss = baseRect.height;
+          contentWidthCss = baseRect.width;
+          contentHeightCss = baseRect.height;
           const breaks = new Set<number>();
           cloneEl.querySelectorAll("tbody tr").forEach((tr) => {
             breaks.add((tr as HTMLElement).getBoundingClientRect().bottom - baseRect.top);
@@ -1443,78 +1447,90 @@ export default function CompraSalvaDetalhePage({
         },
       });
 
-      const pageWidthMm = 210;
-      const pageHeightMm = (canvas.height * pageWidthMm) / canvas.width;
-      const maxSinglePageHeightMm = 5000;
+      if (contentWidthCss <= 0 || contentHeightCss <= 0) {
+        throw new Error("Não foi possível medir o conteúdo para exportação.");
+      }
 
-      if (pageHeightMm <= maxSinglePageHeightMm) {
+      const SCALE = 2;
+      const pageWidthMm = 210;
+      const cssToMm = pageWidthMm / contentWidthCss;
+      // Altura máxima (em px de CSS) de uma única captura. Compras com muitos itens
+      // geram uma tabela muito alta; capturar tudo de uma vez num canvas só (como antes)
+      // ultrapassa o limite de dimensão de canvas do navegador (~16k-32k px) e o navegador
+      // devolve a imagem cortada/em branco a partir dali, sem erro — daí compras grandes
+      // saírem com o fim da lista faltando. Por isso cada página é capturada separadamente,
+      // já recortada (html2canvas x/y/width/height) no tamanho abaixo, nunca um canvas gigante.
+      const MAX_SLICE_CSS_HEIGHT = 6000;
+
+      const captureSlice = (startCss: number, endCss: number) =>
+        html2canvas(target, {
+          backgroundColor: "#ffffff",
+          scale: SCALE,
+          useCORS: true,
+          logging: false,
+          windowWidth: target.scrollWidth,
+          windowHeight: target.scrollHeight,
+          x: 0,
+          y: startCss,
+          width: contentWidthCss,
+          height: endCss - startCss,
+          onclone: (cloneDoc, cloneEl) => applyExportTransform(cloneDoc, cloneEl),
+        });
+
+      const safeName = (doc?.title ?? "compra-salva").replace(/[^\w\-]+/g, "_").slice(0, 80);
+
+      if (contentHeightCss <= MAX_SLICE_CSS_HEIGHT) {
+        // Compra pequena: cabe inteira numa única fatia segura — 1 página só, como antes.
+        const canvas = await captureSlice(0, contentHeightCss);
+        const pageHeightMm = contentHeightCss * cssToMm;
         const pdf = new jsPDF({
           orientation: "portrait",
           unit: "mm",
           format: [pageWidthMm, pageHeightMm],
         });
         pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, pageWidthMm, pageHeightMm, undefined, "FAST");
-        const safeName = (doc?.title ?? "compra-salva").replace(/[^\w\-]+/g, "_").slice(0, 80);
         pdf.save(`${safeName}.pdf`);
         return;
       }
 
+      // Compra grande: pagina em A4, cada página com sua própria captura independente.
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
         format: "a4",
       });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pageWidth;
-      const pageHeightPx = Math.floor((canvas.width * pageHeight) / pageWidth);
+      const a4HeightMm = pdf.internal.pageSize.getHeight();
+      const sliceCssHeight = Math.min(a4HeightMm / cssToMm, MAX_SLICE_CSS_HEIGHT);
 
-      // Converte os pontos de quebra de px-CSS para px-canvas (html2canvas usou scale:2,
-      // mas derivamos a razão real para não depender disso).
-      const cssToCanvas = cloneHeightCss > 0 ? canvas.height / cloneHeightCss : 2;
-      const breakPointsPx = rowBreaksCss
-        .map((y) => Math.round(y * cssToCanvas))
-        .filter((y) => y > 0 && y < canvas.height)
-        .sort((a, b) => a - b);
-
-      let renderedHeightPx = 0;
+      let cursorCss = 0;
       let pageIndex = 0;
 
-      while (renderedHeightPx < canvas.height) {
-        const maxEndPx = renderedHeightPx + pageHeightPx;
-        let sliceEndPx: number;
-        if (maxEndPx >= canvas.height) {
+      while (cursorCss < contentHeightCss) {
+        const maxEndCss = cursorCss + sliceCssHeight;
+        let sliceEndCss: number;
+        if (maxEndCss >= contentHeightCss) {
           // Última página: leva tudo o que resta.
-          sliceEndPx = canvas.height;
+          sliceEndCss = contentHeightCss;
         } else {
           // Maior quebra de linha que cabe nesta página; se nenhuma couber
           // (linha mais alta que a página) faz corte rígido para não travar.
-          let candidate = 0;
-          for (const bp of breakPointsPx) {
-            if (bp > renderedHeightPx && bp <= maxEndPx) candidate = bp;
-            else if (bp > maxEndPx) break;
+          let candidate = cursorCss;
+          for (const bp of rowBreaksCss) {
+            if (bp > cursorCss && bp <= maxEndCss) candidate = bp;
+            else if (bp > maxEndCss) break;
           }
-          sliceEndPx = candidate > renderedHeightPx ? candidate : maxEndPx;
+          sliceEndCss = candidate > cursorCss ? candidate : maxEndCss;
         }
-        const sliceHeightPx = sliceEndPx - renderedHeightPx;
-        const pageCanvas = document.createElement("canvas");
-        pageCanvas.width = canvas.width;
-        pageCanvas.height = sliceHeightPx;
-        const ctx = pageCanvas.getContext("2d");
-        if (!ctx) break;
 
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-        ctx.drawImage(canvas, 0, renderedHeightPx, canvas.width, sliceHeightPx, 0, 0, pageCanvas.width, pageCanvas.height);
-        const imgHeight = (sliceHeightPx * imgWidth) / canvas.width;
+        const canvas = await captureSlice(cursorCss, sliceEndCss);
+        const imgHeightMm = (sliceEndCss - cursorCss) * cssToMm;
         if (pageIndex > 0) pdf.addPage();
-        pdf.addImage(pageCanvas.toDataURL("image/png"), "PNG", 0, 0, imgWidth, imgHeight, undefined, "FAST");
+        pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, pageWidthMm, imgHeightMm, undefined, "FAST");
 
-        renderedHeightPx += sliceHeightPx;
+        cursorCss = sliceEndCss;
         pageIndex += 1;
       }
 
-      const safeName = (doc?.title ?? "compra-salva").replace(/[^\w\-]+/g, "_").slice(0, 80);
       pdf.save(`${safeName}.pdf`);
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "Erro ao exportar PDF");
