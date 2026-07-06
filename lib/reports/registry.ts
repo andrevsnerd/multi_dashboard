@@ -26,6 +26,11 @@ import {
   compraSugeridaAbcMeta,
   COMPRA_SUGERIDA_ABC_ID,
 } from "./compra-sugerida-abc";
+import {
+  buildClientesFilialPresets,
+  clientesFilialMeta,
+  CLIENTES_FILIAL_ID,
+} from "./clientes-filial";
 
 /**
  * Registry PURO de tipos de análise (apenas metadados/colunas/presets).
@@ -43,6 +48,7 @@ export const REPORT_TYPES: ReportTypeMeta[] = [
   produtosParadosMeta,
   produtosCadastroMeta,
   compraSugeridaAbcMeta,
+  clientesFilialMeta,
 ];
 
 export function getReportMeta(id: string): ReportTypeMeta | undefined {
@@ -71,6 +77,9 @@ export function getDefaultPresets(id: string, companyKey: CompanyKey): ReportPre
   }
   if (id === COMPRA_SUGERIDA_ABC_ID) {
     return buildCompraSugeridaAbcPresets(companyKey);
+  }
+  if (id === CLIENTES_FILIAL_ID) {
+    return buildClientesFilialPresets();
   }
   return getReportMeta(id)?.defaultPresets ?? [];
 }

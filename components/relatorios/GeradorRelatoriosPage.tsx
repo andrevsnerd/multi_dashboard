@@ -10,7 +10,9 @@ import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 import { getCurrentMonthRange, formatDateForQuery } from "@/lib/utils/date";
 import { exportRelatorioXlsx } from "@/lib/utils/exportRelatorioXlsx";
 import { exportCompraSugeridaAbcXlsx } from "@/lib/utils/exportCompraSugeridaAbcXlsx";
+import { exportClientesFilialXlsx } from "@/lib/utils/exportClientesFilialXlsx";
 import { COMPRA_FILIAL_COL_PREFIX, COMPRA_SUGERIDA_ABC_ID } from "@/lib/reports/compra-sugerida-abc";
+import { CLIENTES_FILIAL_ID, FILIAL_COMPRAS_COL_PREFIX } from "@/lib/reports/clientes-filial";
 import { formatData, formatDataVenda, formatDiasParado } from "@/lib/reports/format";
 import { getDefaultPresets, getReportMeta, REPORT_TYPES, VENDAS_FATURAMENTO_ID } from "@/lib/reports/registry";
 import { computeExtraSources, getEditorExtraColumns } from "@/lib/reports/column-sources";
@@ -464,7 +466,8 @@ export default function GeradorRelatoriosPage({
           !c.key.startsWith(FILIAL_COL_PREFIX) &&
           !c.key.startsWith(VENDA_FILIAL_COL_PREFIX) &&
           !c.key.startsWith(QTD_FILIAL_COL_PREFIX) &&
-          !c.key.startsWith(COMPRA_FILIAL_COL_PREFIX)
+          !c.key.startsWith(COMPRA_FILIAL_COL_PREFIX) &&
+          !c.key.startsWith(FILIAL_COMPRAS_COL_PREFIX)
       );
       const existing = new Set(stripped.map((c) => c.key));
       const appended = dyn
@@ -762,6 +765,21 @@ export default function GeradorRelatoriosPage({
           reportLabel: meta?.label ?? "compra-sugerida",
           companyKey,
           range: { startDate: range.startDate, endDate: range.endDate },
+          sheetName: meta?.label,
+          columnTypes,
+        }
+      );
+      return;
+    }
+    // Clientes por filial: export dedicado com estilo (cabeçalho, zebra, linha TOTAL).
+    if (reportTypeId === CLIENTES_FILIAL_ID) {
+      void exportClientesFilialXlsx(
+        sortedRows,
+        enabledColumns.map((c) => ({ key: c.key, label: c.label })),
+        {
+          companyKey,
+          range: { startDate: range.startDate, endDate: range.endDate },
+          filialLabel,
           sheetName: meta?.label,
           columnTypes,
         }

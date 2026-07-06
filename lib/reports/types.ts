@@ -81,6 +81,12 @@ export interface ReportTypeMeta {
   supportedFilters: ReportFilterKey[];
   columns: ReportColumnDef[];
   defaultPresets: ReportPresetDef[];
+  /**
+   * Quando `false`, a análise NÃO é por produto × cor (ex.: Clientes por Filial).
+   * O `runReport` então pula o pós-processamento específico de produto: filtro por
+   * grupo de fornecedor e a coluna dinâmica "Código de barra". Default: true.
+   */
+  productBased?: boolean;
 }
 
 export type ReportCellValue = string | number | null;

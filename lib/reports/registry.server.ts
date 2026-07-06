@@ -6,6 +6,7 @@ import { fetchProdutosParados } from "@/lib/repositories/reportProdutosParados";
 import { fetchProdutosCadastro } from "@/lib/repositories/reportProdutosCadastro";
 import { fetchVendasHistorico } from "@/lib/repositories/reportVendasHistorico";
 import { fetchCompraSugeridaAbc } from "@/lib/repositories/reportCompraSugeridaAbc";
+import { fetchClientesFilial } from "@/lib/repositories/reportClientesFilial";
 import { fetchMenorCodigoBarra } from "@/lib/repositories/products";
 import { listFornecedoresByCompany } from "@/lib/utils/fornecedores-store";
 import { productMatchesFornecedor } from "@/lib/utils/fornecedor-matcher";
@@ -19,6 +20,8 @@ import { PRODUTOS_PARADOS_ID } from "./produtos-parados";
 import { PRODUTOS_CADASTRO_ID } from "./produtos-cadastro";
 import { VENDAS_HISTORICO_ID } from "./vendas-historico";
 import { COMPRA_SUGERIDA_ABC_ID } from "./compra-sugerida-abc";
+import { CLIENTES_FILIAL_ID } from "./clientes-filial";
+import { getReportMeta } from "./registry";
 
 /** Progresso opcional de uma análise demorada (ex.: cálculo por loja). */
 export interface ReportRunContext {
@@ -42,6 +45,7 @@ const FETCHERS: Record<string, ReportFetcher> = {
   [PRODUTOS_CADASTRO_ID]: fetchProdutosCadastro,
   [VENDAS_HISTORICO_ID]: fetchVendasHistorico,
   [COMPRA_SUGERIDA_ABC_ID]: fetchCompraSugeridaAbc,
+  [CLIENTES_FILIAL_ID]: fetchClientesFilial,
 };
 
 export function getReportFetcher(id: string): ReportFetcher | undefined {
@@ -63,6 +67,14 @@ export async function runReport(
   if (!base) return null;
 
   const result = await base(filters, ctx);
+
+  // Análises que NÃO são por produto × cor (ex.: Clientes por Filial) pulam TODO o
+  // pós-processamento de produto abaixo: filtro por fornecedor, enriquecimento por
+  // produto×cor e a coluna dinâmica "Código de barra" (nenhum se aplica a linhas de
+  // cliente). O tipo declara isso via `productBased: false` no seu ReportTypeMeta.
+  if (getReportMeta(reportType)?.productBased === false) {
+    return result;
+  }
 
   // Filtro por grupo de fornecedor (NERD): mantém só as linhas cujo produto×cor
   // pertence ao fornecedor escolhido. Aplicado antes do enriquecimento para que

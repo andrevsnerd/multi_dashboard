@@ -38,7 +38,7 @@ export interface ClientesQueryParams {
   searchTerm?: string;
 }
 
-async function buildFilialFilter(
+export async function buildFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   module: CompanyModule,
